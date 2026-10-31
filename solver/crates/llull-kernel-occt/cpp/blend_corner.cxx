@@ -111,6 +111,8 @@ struct FillSetting {
 constexpr FillSetting kFillSettings[] = {{15, 12, 60}, {15, 14, 100}, {40, 12, 100}, {15, 13, 100}, {25, 12, 60}};
 // A setback must exceed the distance its blends reach by this relative margin (equal means the contact lines meet in one point).
 constexpr double kMarginRelative = 1e-9;
+// The most a creased star may be off tangency at the pole end of its crease spoke: the limit check_blends puts on it (13.33.7).
+constexpr double kCreasePole = 0.1;
 
 // check_blends samples a contact at up to 101 points (its `samples` limit): the built gap is measured at as many.
 constexpr int kGapSamples = 100;
@@ -294,12 +296,8 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
   int sharp = -1;
   if (!unrounded.empty()) {
     const std::string cause = std::string("edge ") + std::to_string(unrounded.front()) + " meets the " + (mode.automatic ? "vertex " : "setback vertex ") + where(corner.at) + " but is not rounded: ";
-    if (mode.automatic) {
-      why = std::string(kUnsupported) + cause + "a " + noun + " rounds every edge that meets there, in the same step";
-      return false;
-    }
     if (unrounded.size() > 1 || incident.size() != 3) {
-      why = std::string(kUnsupported) + cause + "a setback corner leaves at most one edge of a three-edge vertex sharp (this vertex has " + std::to_string(incident.size()) + " edges, " +
+      why = std::string(kUnsupported) + cause + "a " + noun + " leaves at most one edge of a three-edge vertex sharp (this vertex has " + std::to_string(incident.size()) + " edges, " +
             std::to_string(unrounded.size()) + " not rounded); round the others in the same step";
       return false;
     }
@@ -337,7 +335,7 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
       why = std::string(kFailed) + "edge " + std::to_string(edge) + " does not end at " + where(corner.at);
       return false;
     }
-    if (edge == sharp && !(distance[edge] < frame.length)) {
+    if (edge == sharp && !mode.automatic && !(distance[edge] < frame.length)) {
       why = std::string(kUnsupported) + "the setback " + number(distance[edge]) + " of the unrounded edge " + std::to_string(edge) + " at " + where(corner.at) + " is not shorter than the edge (" + number(frame.length) + ")";
       return false;
     }
@@ -452,6 +450,18 @@ bool plan_corner(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &ed
     for (const int edge : rounded) {
       distance[edge] = required[edge] * mode.factor;
       corner.setbacks.emplace_back(edge, distance[edge]);
+    }
+    if (sharp >= 0) {
+      // the unrounded edge of a profile corner (13.39) enters the hole as far from the vertex as the farthest blend section does
+      double entry = 0.0;
+      for (const int edge : rounded) entry = std::max(entry, distance[edge]);
+      distance[sharp] = entry;
+      corner.setbacks.emplace_back(sharp, entry);
+      if (!(entry < plan.frames.at(sharp).length)) {
+        why = std::string(kUnsupported) + "the entry point of the unrounded edge " + std::to_string(sharp) + " at " + where(corner.at) + " (" + number(entry) +
+              " from the vertex, as far as the blend sections) is not before the end of the edge (" + number(plan.frames.at(sharp).length) + ")";
+        return false;
+      }
     }
   }
   for (const int edge : rounded)
@@ -698,7 +708,8 @@ bool boundary_angle(const TopoDS_Face &patch, const std::vector<TopoDS_Edge> &lo
 // The ORIENTED check of a patch in the sewn solid: along every edge of the patch image the outward normals of the patch and of the face on the other side (the face orientation applied
 // to both) must agree within kMixedFillAngle. A patch folded to the wrong side, or a surface tangent to its neighbour but facing the other way, reads about pi here and fails; false with the
 // worst angle (pi for an unmeasured edge) otherwise.
-bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMapOfShapeListOfShape &edge_faces, double &worst, bool tangent_edges_only = false) {
+bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMapOfShapeListOfShape &edge_faces, double &worst, bool tangent_edges_only = false,
+                          const TopTools_IndexedMapOfShape *creased_star = nullptr) {
   worst = 0;
   for (TopExp_Explorer it(patch, TopAbs_EDGE); it.More(); it.Next()) {
     const TopoDS_Edge edge = TopoDS::Edge(it.Current());
@@ -723,7 +734,7 @@ bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMa
       }
       curves.push_back({on_side, {first, last}});
     }
-    double edge_worst = 0;
+    double edge_worst = 0, first_angle = 0, last_angle = 0;
     for (int k = 0; k <= kGapSamples; ++k) {
       const double fraction = static_cast<double>(k) / kGapSamples;
       gp_Vec normals[2];
@@ -747,7 +758,17 @@ bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMa
         normal.Normalize();
         normals[side] = sides[side].Orientation() == TopAbs_REVERSED ? normal.Reversed() : normal;
       }
-      edge_worst = std::max(edge_worst, normals[0].Angle(normals[1]));
+      const double angle = normals[0].Angle(normals[1]);
+      if (k == 0) first_angle = angle;
+      if (k == kGapSamples) last_angle = angle;
+      edge_worst = std::max(edge_worst, angle);
+    }
+    // The crease spoke of a star that holds an unrounded edge (13.39): two sub-patches of the star that meet at the dihedral angle where the spoke leaves the sharp edge and fade to nothing at the
+    // pole. Its end at the pole must be tangent within kCreasePole (the limit check_blends puts on it); a spoke that is tangent at both ends keeps the ordinary check, and a flip reads pi at both.
+    if (creased_star != nullptr && creased_star->Contains(sides[0]) && creased_star->Contains(sides[1]) && std::max(first_angle, last_angle) > kMixedFillAngle) {
+      const double pole = std::min(first_angle, last_angle);
+      worst = std::max(worst, pole > kCreasePole ? pole : 0.0);
+      continue;
     }
     // (probe only) an edge where the faces meet at a corner is not a tangent edge: the seam of a test shape
     if (tangent_edges_only && std::min(edge_worst, kPi - edge_worst) > 0.5) continue;
@@ -1116,6 +1137,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   const TopTools_IndexedMapOfShape unique_edges = query::distinct(shape, TopAbs_EDGE);
   // Every edge that meets a setback vertex is rounded in this step, and every rounded edge ends at a setback vertex (the ball must be able to cut the whole of each blend).
   std::vector<TopoDS_Vertex> corner_vertices;
+  std::vector<int> sharp_of;  // per corner: the unrounded edge that enters the hole (13.39), -1 when every edge is rounded
   for (const Corner &corner : corners) {
     const TopoDS_Vertex vertex = vertex_at(shape, corner.at, vertex_tolerance);
     if (vertex.IsNull()) {
@@ -1128,11 +1150,44 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       why = std::string(kUnsupported) + "only " + std::to_string(incident.size()) + " edge(s) meet at " + where(corner.at) + ": a setback corner needs 3 or more";
       return nullptr;
     }
+    // One unrounded edge of a three-edge vertex stays sharp (13.39): the ball cuts the mitre of the other two and the star holds the crease where the sharp edge enters.
+    std::vector<int> unrounded;
+    for (const int edge : incident)
+      if (radius.find(edge) == radius.end()) unrounded.push_back(edge);
+    sharp_of.push_back(unrounded.size() == 1 ? unrounded.front() : -1);
+    // Measured on the cylinder block (sharp edge 1 or 2, the rounded edges at 1.2 and the sharp one at 1.0 / 1.6 / 2.0, 6 cases): the cut planes isolate no face, OCCT generates none at a vertex with a sharp edge.
+    if (unrounded.size() == 1 && by_planes[sharp_of.size() - 1]) {
+      why = std::string(kUnsupported) + "edge " + std::to_string(unrounded.front()) + " meets the setback vertex " + where(corner.at) +
+            " but is not rounded: a vertex with a sharp edge takes one ball (equal setbacks on all its edges); different distances cut it by planes, which isolate no face of the mitre there (6 of 6 cases measured)";
+      return nullptr;
+    }
+    if (!unrounded.empty() && (unrounded.size() > 1 || incident.size() != 3)) {
+      why = std::string(kUnsupported) + "edge " + std::to_string(unrounded.front()) + " meets the setback vertex " + where(corner.at) +
+            " but is not rounded: a setback corner leaves at most one edge of a three-edge vertex sharp (this vertex has " + std::to_string(incident.size()) + " edges, " +
+            std::to_string(unrounded.size()) + " not rounded); round the others in the same step";
+      return nullptr;
+    }
     for (const int edge : incident) {
       if (radius.find(edge) == radius.end()) {
-        why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the setback vertex " + where(corner.at) +
-              " but is not rounded: a setback corner rounds every edge that meets there, in the same step";
-        return nullptr;
+        for (const int other : incident)
+          if (other != edge && !radius.at(other).constant()) {
+            why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the setback vertex " + where(corner.at) +
+                  " but is not rounded: the two rounded edges of a vertex with a sharp edge need a constant radius in this build (edge " + std::to_string(other) + " varies)";
+            return nullptr;
+          }
+        // Measured on the cylinder block (r 0.3 to 2, ball 1 to 3.5, 7 cases): the star over a hole whose crease vertex lies on a curved sharp edge misses the blend ends by 3e-6 to 9e-6 at 64 poles
+        // (the limit is 0.2e-6 x the diagonal), against 1e-8 on a straight sharp edge.
+        if (BRepAdaptor_Curve(TopoDS::Edge(unique_edges(edge + 1))).GetType() != GeomAbs_Line) {
+          why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the setback vertex " + where(corner.at) +
+                " but is not rounded: an edge left sharp at a setback corner must be a straight line (the star over a curved sharp edge missed the blend ends by 3e-6 to 9e-6 in every case measured, limit 0.2e-6 x the diagonal)";
+          return nullptr;
+        }
+        const auto given = std::find_if(corner.setbacks.begin(), corner.setbacks.end(), [&](const auto &entry) { return entry.first == edge; });
+        if (given != corner.setbacks.end() && !(given->second > 0)) {
+          why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " at " + where(corner.at) +
+                " is left sharp and has setback 0: the distance of an unrounded edge is where it enters the corner patch (> 0)";
+          return nullptr;
+        }
       }
       if (std::none_of(corner.setbacks.begin(), corner.setbacks.end(), [&](const auto &entry) { return entry.first == edge; })) {
         why = std::string(kFailed) + "no setback distance for edge " + std::to_string(edge) + " at " + where(corner.at) + " (give 0 for an edge left to the rolling ball)";
@@ -1294,6 +1349,8 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   const double volume_rounded = volume_of(current.shape);
   // The ball must hold OCCT's own corner at each vertex (the farthest point of the faces generated at the vertex), and meet no face that does not belong to the vertex.
   const TopTools_IndexedMapOfShape rounded_faces = query::distinct(current.shape, TopAbs_FACE);
+  TopTools_IndexedDataMapOfShapeListOfShape rounded_edge_faces;
+  TopExp::MapShapesAndAncestors(current.shape, TopAbs_EDGE, TopAbs_FACE, rounded_edge_faces);
   std::vector<TopTools_IndexedMapOfShape> belongings(corners.size()), seeds_of(corners.size());
   for (size_t c = 0; c < corners.size(); ++c) {
     TopTools_IndexedMapOfShape belonging;
@@ -1310,6 +1367,28 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
         for (int sample = 0; sample <= 10; ++sample)
           minimum = std::max(minimum, curve.Value(curve.FirstParameter() + (curve.LastParameter() - curve.FirstParameter()) * sample / 10.0).Distance(corners[c].at));
       }
+    // The crease where the blends of the two rounded edges meet (OCCT's own corner at a vertex with a sharp edge, 13.39): the ball must hold all of it, else the loop would pass through a second crease.
+    std::vector<gp_Pnt> mitre;
+    if (sharp_of[c] >= 0) {
+      std::vector<TopTools_IndexedMapOfShape> blend_faces;  // the faces generated by each rounded edge
+      for (const int edge : edges_at(vertex_edges_all, unique_edges, corner_vertices[c]))
+        if (edge != sharp_of[c]) {
+          blend_faces.emplace_back();
+          for (TopTools_ListIteratorOfListOfShape it(maker.Generated(unique_edges(edge + 1))); it.More(); it.Next()) blend_faces.back().Add(it.Value());
+        }
+      if (blend_faces.size() == 2)
+        for (int f = 1; f <= blend_faces[0].Extent(); ++f)
+          for (TopExp_Explorer edges(blend_faces[0](f), TopAbs_EDGE); edges.More(); edges.Next()) {
+            const TopoDS_Edge edge = TopoDS::Edge(edges.Current());
+            if (BRep_Tool::Degenerated(edge) || !rounded_edge_faces.Contains(edge)) continue;
+            bool other = false;
+            for (TopTools_ListIteratorOfListOfShape owner(rounded_edge_faces.FindFromKey(edge)); owner.More(); owner.Next()) other = other || blend_faces[1].Contains(owner.Value());
+            if (!other) continue;
+            const BRepAdaptor_Curve curve(edge);
+            for (int sample = 0; sample <= 20; ++sample) mitre.push_back(curve.Value(curve.FirstParameter() + (curve.LastParameter() - curve.FirstParameter()) * sample / 20.0));
+          }
+      for (const gp_Pnt &point : mitre) minimum = std::max(minimum, point.Distance(corners[c].at));
+    }
     TopTools_IndexedMapOfShape incident_faces;
     for (TopTools_ListIteratorOfListOfShape faces(vertex_faces_all.FindFromKey(corner_vertices[c])); faces.More(); faces.Next()) incident_faces.Add(faces.Value());
     for (int f = 1; f <= incident_faces.Extent(); ++f) {
@@ -1329,6 +1408,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
             for (int sample = 0; sample <= 10; ++sample)
               extent = std::max(extent, gp_Vec(corners[c].at, curve.Value(curve.FirstParameter() + (curve.LastParameter() - curve.FirstParameter()) * sample / 10.0)) * plane.outward);
           }
+        for (const gp_Pnt &point : mitre) extent = std::max(extent, gp_Vec(corners[c].at, point) * plane.outward);
         if (!(gp_Vec(corners[c].at, plane.at) * plane.outward > extent * (1 + 1e-3))) {
           why = std::string(kTooShort) + "the setback of edge " + std::to_string(plane.edge) + " at " + where(corners[c].at) + " must exceed " + number(extent) +
                 " (the extent of the rolling-ball corner along the edge): the cut plane would cut the blends inside the corner";
@@ -1525,6 +1605,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
                                        std::max(1e-6 * diagonal, 1e-12)));
     }
     job.allow_star = allow_star;
+    job.creased = sharp_of[c] >= 0;
   }
   fill_all(jobs, patch_gap_limit, diagonal);
   for (const FillJob &job : jobs) star_used = star_used || !job.patch_loop.empty();
@@ -1536,7 +1617,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   TopTools_IndexedMapOfShape dropped;
   std::vector<TopoDS_Face> patches;
   std::vector<std::string> patch_names;
-  std::vector<bool> patch_is_star;
+  std::vector<bool> patch_is_star, patch_is_creased;  // per patch: a sub-patch of a star, and of a star that holds the crease of an unrounded edge
   std::vector<std::string> corner_kinds(corners.size()), corner_centres(corners.size());
   double worst_patch_gap = 0;
   for (size_t c = 0; c < corners.size(); ++c) {
@@ -1568,6 +1649,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       patches.push_back(job.patches[k]);
       patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
       patch_is_star.push_back(!job.patch_loop.empty());
+      patch_is_creased.push_back(!job.patch_loop.empty() && job.creased);
       corner_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
       corner_centres[c] = job.hinted ? "surface" : "rule";
     }
@@ -1624,10 +1706,13 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   {
     TopTools_IndexedDataMapOfShapeListOfShape solid_edge_faces;
     TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, solid_edge_faces);
+    TopTools_IndexedMapOfShape creased_stars;
+    for (size_t p = 0; p < patches.size(); ++p)
+      if (patch_is_creased[p]) creased_stars.Add(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]);
     for (size_t p = 0; p < patches.size(); ++p) {
       if (!patch_is_star[p]) continue;
       double worst = 0;
-      if (!oriented_patch_angle(TopoDS::Face(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]), solid_edge_faces, worst)) {
+      if (!oriented_patch_angle(TopoDS::Face(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]), solid_edge_faces, worst, false, &creased_stars)) {
         fill_failed = true;
         why = std::string(kFailed) + "a sub-patch of the corner star is not tangent to its neighbours in the sewn solid (outward normals differ by " + number(worst) + " rad, limit " +
               number(kMixedFillAngle) + (worst > kPi / 2 ? ": it faces the other way" : "") + ")";

@@ -21,23 +21,23 @@ fn step(shape: &Shape, vertex: [f64; 3], sharp: usize, radius: f64, setback: f64
     (edges, corners)
 }
 
-fn volume(shape: &Shape) -> f64 {
+pub(crate) fn volume(shape: &Shape) -> f64 {
     mass_properties(shape).map(|m| m.volume).unwrap_or(0.0)
 }
 
 /// The volume of `a - b` (0 when nothing is left).
-fn volume_outside(a: &Shape, b: &Shape) -> f64 {
+pub(crate) fn volume_outside(a: &Shape, b: &Shape) -> f64 {
     boolean(BooleanOp::Subtract, a, b, true).unwrap().map(|s| volume(&s)).unwrap_or(0.0)
 }
 
 /// One edge that borders a corner patch: whether both its faces are patches, and the G1 angle (rad) at 21 samples along it.
-struct PatchEdge {
-    edge: usize,
-    both_patches: bool,
-    g1: Vec<f64>,
+pub(crate) struct PatchEdge {
+    pub(crate) edge: usize,
+    pub(crate) both_patches: bool,
+    pub(crate) g1: Vec<f64>,
 }
 
-fn patch_edges(shape: &Shape) -> Vec<PatchEdge> {
+pub(crate) fn patch_edges(shape: &Shape) -> Vec<PatchEdge> {
     let topo = topology(shape).unwrap();
     let patches: Vec<usize> = topo["faces"]
         .as_array()
@@ -63,13 +63,13 @@ fn patch_edges(shape: &Shape) -> Vec<PatchEdge> {
 
 /// What the patches of a step with sharp edges read: the largest G1 angle over every patch edge but the crease spokes at the interior samples (the last sample of a spoke is the nudged pole of the
 /// star: read apart), the pole-end reading, and the crease spokes (an edge between two sub-patches that starts at more than 0.1 rad).
-struct Reading {
-    interior: f64,
-    pole_end: f64,
-    creases: Vec<PatchEdge>,
+pub(crate) struct Reading {
+    pub(crate) interior: f64,
+    pub(crate) pole_end: f64,
+    pub(crate) creases: Vec<PatchEdge>,
 }
 
-fn read(shape: &Shape) -> Reading {
+pub(crate) fn read(shape: &Shape) -> Reading {
     let mut reading = Reading { interior: 0.0, pole_end: 0.0, creases: Vec::new() };
     for edge in patch_edges(shape) {
         if edge.both_patches && edge.g1[0].max(edge.g1[20]) > 0.1 {
@@ -85,7 +85,7 @@ fn read(shape: &Shape) -> Reading {
 }
 
 /// The crease angles along a crease spoke from its end on the sharp edge (the large one) to the pole.
-fn along_the_crease(edge: &PatchEdge) -> Vec<f64> {
+pub(crate) fn along_the_crease(edge: &PatchEdge) -> Vec<f64> {
     let mut angles = edge.g1.clone();
     if angles[0] < angles[20] {
         angles.reverse();
@@ -93,18 +93,18 @@ fn along_the_crease(edge: &PatchEdge) -> Vec<f64> {
     angles
 }
 
-fn endpoints(shape: &Shape, edge: usize) -> ([f64; 3], [f64; 3]) {
+pub(crate) fn endpoints(shape: &Shape, edge: usize) -> ([f64; 3], [f64; 3]) {
     let topo = topology(shape).unwrap();
     (point(&topo["edges"][edge]["start"]), point(&topo["edges"][edge]["end"]))
 }
 
-fn near(a: [f64; 3], b: [f64; 3]) -> bool {
+pub(crate) fn near(a: [f64; 3], b: [f64; 3]) -> bool {
     a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-6)
 }
 
 /// The closed form of a cube of side `side` whose two edges at one vertex are rounded by the rolling ball (a mitre of two cylinders, 13.33.4): the two blends each remove r^2 (1 - pi/4) along
 /// the edge and the removed prisms overlap in r^3 (5/3 - pi/2) at the vertex.
-fn mitre_volume(side: f64, radius: f64) -> f64 {
+pub(crate) fn mitre_volume(side: f64, radius: f64) -> f64 {
     let quarter = std::f64::consts::FRAC_PI_4;
     side.powi(3) - 2.0 * radius * radius * (1.0 - quarter) * side + radius.powi(3) * (5.0 / 3.0 - std::f64::consts::FRAC_PI_2)
 }
@@ -366,16 +366,17 @@ fn what_a_sharp_edge_does_not_take_is_refused_by_name() {
     );
 }
 
-/// BLD §13.33: the trim builder (curved edges or faces at the vertex, or its test hook) still rounds every edge there or names the one that is not.
+/// BLD §13.33 / §13.39: the trim builder (curved edges or faces at the vertex, or its test hook) takes ONE unrounded edge of a three-edge vertex; with two it names them.
 #[test]
-fn the_trim_builder_still_names_an_unrounded_edge() {
+fn the_trim_builder_names_two_unrounded_edges() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
     crate::test_bridge::set_corner_trim(true);
     let shape = cube(10.0);
-    let (edges, corners) = step(&shape, [0.0; 3], 2, 1.0, 2.0);
+    let (mut edges, corners) = step(&shape, [0.0; 3], 2, 1.0, 2.0);
+    edges.truncate(3);
     let text = setback_reason(&shape, &edges, &corners).unwrap();
-    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("is not rounded"), "{text}");
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("is not rounded") && text.contains("at most one edge"), "{text}");
 }
 
 /// BLD §13.33.3: a plate (MakeFilling) cannot hold the crease of the sharp edge, so a hole with a sharp edge has no plate fallback: with the star refused (hook 2), with only plates (hook 0) and

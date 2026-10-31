@@ -5,7 +5,6 @@
  * @failure a vertex whose edges are not all rounded but one, or a kernel without edge continuity -> that corner is omitted
  */
 
-import type { SetbackCorner } from '../../model/blendTypes';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -22,7 +21,7 @@ export function creaseOfCorners(
   kernel: GeometryKernel,
   shape: ShapeHandle,
   topology: ShapeTopology | null,
-  corners: readonly SetbackCorner[],
+  corners: ReadonlyArray<{ readonly vertex: Vec3 }>,
   rounded: readonly number[],
 ): CornerCrease[] {
   if (topology === null) return [];

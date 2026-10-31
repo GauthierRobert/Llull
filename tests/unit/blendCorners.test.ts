@@ -459,6 +459,50 @@ describe('fillet_edge corners', () => {
     expect(filletOf(done.document, done.affected[0] as string).corners).toHaveLength(8);
   });
 
+  it('a profile step has no corners entry: the crease of a vertex whose third edge stays sharp is read at the vertices the kernel names in its notes (13.39)', () => {
+    const atCorner = TOPOLOGY.edges.filter((one) => [one.start, one.end].some((end) => end.every((value) => value === -HALF)));
+    expect(atCorner).toHaveLength(3);
+    const [first, second, sharp] = atCorner as [ShapeEdge, ShapeEdge, ShapeEdge];
+    const reportOf = (corners: NonNullable<BlendReport['notes']>['corners']): BlendReport => ({
+      stage: 'none',
+      contours: [],
+      vertices: [],
+      partial: false,
+      unsupportedVertices: [],
+      done: true,
+      valid: true,
+      notes: { builder: 'corners', factor: 2, ...(corners === undefined ? {} : { corners }) },
+    });
+    const noted = [
+      {
+        vertex: [-HALF, -HALF, -HALF] as [number, number, number],
+        patch: 'exact' as const,
+        setbacks: atCorner.map((one) => ({ edge: one.index, distance: 2 })),
+      },
+    ];
+    const profile = { type: 'conic' as const, rho: 0.5 };
+    const edges = [first, second].map((one) => ({ index: one.index, size: 1 }));
+    const run = (report: BlendReport): ReturnType<typeof execute> => {
+      const { doc, id } = cube();
+      return execute(
+        doc,
+        'fillet_edge',
+        { id, edges, profile },
+        ctxOf({ ...scriptedKernel({ topology: TOPOLOGY }), blendReport: () => report }),
+      );
+    };
+    const done = run(reportOf(noted));
+    expect(done.error).toBeUndefined();
+    expect((done.data as { corners: unknown }).corners).toEqual([
+      { vertex: [-HALF, -HALF, -HALF], crease: { sharpEdge: sharp.index, entryRad: 1.570796 } },
+    ]);
+    expect(done.summary).toContain(`Sharp edge kept at 1 corner(s): edge ${sharp.index}`);
+    // a kernel that names no corners reports no crease, and the profile data stays
+    const none = run(reportOf(undefined));
+    expect((none.data as { corners?: unknown }).corners).toBeUndefined();
+    expect((none.data as { profile: unknown }).profile).toBeDefined();
+  });
+
   it('a kernel refusal that the kernel explains as a short setback is BLD_SETBACK_TOO_SHORT with the edge text, ids and the corners path', () => {
     const report: BlendReport = {
       stage: 'setback',

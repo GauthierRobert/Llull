@@ -314,7 +314,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
           kernel,
           shape,
           topology,
-          corners,
+          corners.length > 0 ? corners : (notes?.corners ?? []), // profile corners are found by the kernel: its notes name the vertices (13.39)
           plan.map((entry) => entry.edge),
         );
   const creased = withCreases(profiledResult, creases);
