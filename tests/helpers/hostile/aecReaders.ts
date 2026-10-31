@@ -121,6 +121,7 @@ export const AEC_READERS: readonly HostileReader[] = [
     input: 'text',
     build: proteusBuild,
     nest: proteusNest,
+    budgetMs: 10_000,
     read: (input) => execute(createEmptyDocument(), 'import_dexpi', { text: asText(input) }),
     accepts: (result) => (result as { summary: string }).summary.startsWith('import_dexpi: DEXPI 1.3'),
   },

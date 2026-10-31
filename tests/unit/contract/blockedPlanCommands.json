@@ -144,13 +144,7 @@
       "pipe_stress_allowables",
       "spring_variability"
     ],
-    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-01-tank-pump-mvp.json": ["plant_report"],
-    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-02-inline-valves-v1.json": ["plant_report"],
-    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-04-excel-roundtrip.json": [
-      "export_plant_data",
-      "import_plant_data",
-      "plant_report"
-    ],
+    "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-04-excel-roundtrip.json": ["import_plant_data"],
     "docs/plant/08-plant-data-reports-interop/validation/plans/sc-dat-05-ifc-summary-bsi.json": ["ifc_summary"],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-02-viewpoint-bcf-roundtrip.json": [
       "export_bcf_viewpoint",
