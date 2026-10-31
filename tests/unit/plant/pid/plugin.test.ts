@@ -13,6 +13,8 @@ const PID_COMMANDS = [
   'export_pid_svg',
   'pid_report',
   'check_pid',
+  'check_pid_3d',
+  'link_pid_item',
   'parse_instrument_tag',
   'create_pid_sheet',
   'add_pid_equipment',
@@ -31,7 +33,7 @@ const PID_COMMANDS = [
 ];
 
 describe('pid plugin', () => {
-  it('is the pid toolset with the M2 to M5 commands and adds no derived entity', () => {
+  it('is the pid toolset with the M2 to M7 commands and adds no derived entity', () => {
     expect(pidPlugin).toMatchObject({ name: 'pid', toolset: 'pid' });
     expect(pidPlugin.commands.map((command) => command.name)).toEqual(PID_COMMANDS);
     expect(TOOLSET_NAMES).toContain('pid');

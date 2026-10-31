@@ -27,6 +27,9 @@ export const DEXPI_REMEDIATION: Readonly<Record<string, string>> = {
   PID_PARAM_INVALID: 'Fix the parameter combination the message names.',
   PID_ACTUATOR_EXISTS: 'A valve has one actuating system: delete_pid_item the existing one first.',
   PID_LINE_NUMBER_FORMAT: 'Use tokens {dn} {fluid} {seq} {class} {area} {unit} only, and set the line fields they need.',
+  PID_LINK_DUPLICATE:
+    'The pair already exists, or the 3D element is linked to another P&ID item: link_pid_item that item with element null first.',
+  PID_LINK_NOT_FOUND: 'Nothing to clear: the P&ID item has no explicit link (check_pid_3d lists what is matched).',
   PID_SHEET_DUPLICATE: 'Choose another sheet number (omit `sheet` to take the next free PID-nnn).',
   PID_SHEET_NOT_FOUND: 'List the sheets with pid_report kind=counts or import a P&ID with import_dexpi first.',
 };

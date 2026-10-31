@@ -8,6 +8,8 @@ import { addPidNozzle } from './commands/addPidNozzle';
 import { addPidOffPageConnector } from './commands/addPidOffPageConnector';
 import { addPidSignalLine } from './commands/addPidSignalLine';
 import { checkPid } from './commands/checkPid';
+import { checkPid3d } from './commands/checkPid3d';
+import { linkPidItem } from './commands/linkPidItem';
 import { createPidSheet } from './commands/createPidSheet';
 import { deletePidItem } from './commands/deletePidItem';
 import { exportDexpi } from './commands/exportDexpi';
@@ -29,6 +31,8 @@ export const pidCatalog = commandCatalog(
   exportPidSvg,
   pidReport,
   checkPid,
+  checkPid3d,
+  linkPidItem,
   parseInstrumentTag,
   createPidSheet,
   addPidEquipment,
