@@ -197,6 +197,27 @@ const numbers = (text: string | undefined): number[] =>
     .filter((part) => part !== '')
     .map(Number);
 
+const POSITIVE_FIELDS = new Set(['majorRadius', 'minorRadius', 'radius', 'semiAxes', 'radii']);
+const DIRECTION_FIELDS = new Set(['axis', 'normal', 'reference']);
+
+/** Why the text of one reference field cannot be used (count, finite numbers, sign, range), or null when it is fine or still empty. */
+export function referenceFieldProblem(kind: string, name: string, fields: Readonly<Record<string, string>>): string | null {
+  const text = fields[name] ?? '';
+  if (text.trim() === '') return null;
+  const parts = numbers(text);
+  const size = VECTOR_FIELDS.has(name) ? 3 : name === 'radii' ? 2 : 1;
+  if (parts.length !== size) return `needs ${size === 1 ? 'one number' : `${size} numbers`}`;
+  if (!parts.every(Number.isFinite)) return 'must be numbers';
+  if (POSITIVE_FIELDS.has(name) && !parts.every((v) => v > 0)) return 'must be greater than 0';
+  if (DIRECTION_FIELDS.has(name) && parts.every((v) => v === 0)) return 'must not be zero';
+  if (name === 'halfAngleDeg' && !((parts[0] as number) > 0 && (parts[0] as number) < 90)) return 'must be between 0 and 90 degrees';
+  if (kind === 'torus' && name === 'minorRadius') {
+    const major = numbers(fields['majorRadius'])[0];
+    if (major !== undefined && Number.isFinite(major) && (parts[0] as number) >= major) return 'must be smaller than majorRadius';
+  }
+  return null;
+}
+
 /** The compareTo parameter of a draft, or null while a required field is empty or not a number. */
 export function referenceParams(draft: ReferenceDraft | null): Record<string, unknown> | null {
   if (draft === null) return null;
@@ -207,7 +228,8 @@ export function referenceParams(draft: ReferenceDraft | null): Record<string, un
   for (const name of wanted) {
     const parts = numbers(draft.fields[name]);
     const size = VECTOR_FIELDS.has(name) ? 3 : name === 'radii' ? 2 : 1;
-    const complete = parts.length === size && parts.every(Number.isFinite);
+    const complete =
+      parts.length === size && parts.every(Number.isFinite) && referenceFieldProblem(draft.kind, name, draft.fields) === null;
     if (!complete) {
       if (name === 'offset') continue;
       return null;

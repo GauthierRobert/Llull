@@ -2,15 +2,15 @@
 
 import type { CadDocument } from '../../model/types';
 import { resolveFrame, toLocal } from '../../geometry/deform/frame';
-import { deformOverlay } from '../../geometry/deform/overlay';
+import { buildDeformOverlay } from '../../geometry/deform/overlay';
 import { referenceWire } from '../../geometry/deform/referenceWire';
-import { REFERENCE_FIELDS } from '../../geometry/deform/referenceShape';
+import { referenceDistance } from '../../geometry/deform/referenceShape';
 import type { Vec3 } from '../../model/vectors';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import type { CommandResult } from '../types';
 import { defRejection } from './codes';
-import { deformNodeOf } from './sourceMesh';
+import { deformNodeOf, sourceMeshOf } from './sourceMesh';
 import { compareToParam, idParam } from './schema';
 
 /** Centre and half-diagonal of the vertices of a mesh, or the unit box when it has none. */
@@ -25,7 +25,11 @@ function boundsOf(positions: ReadonlyArray<number>): { centre: Vec3; radius: num
     }
   const size = [0, 1, 2].map((a) => (high[a] as number) - (low[a] as number));
   return {
-    centre: [0, 1, 2].map((a) => ((low[a] as number) + (high[a] as number)) / 2) as unknown as Vec3,
+    centre: [
+      ((low[0] as number) + (high[0] as number)) / 2,
+      ((low[1] as number) + (high[1] as number)) / 2,
+      ((low[2] as number) + (high[2] as number)) / 2,
+    ],
     radius: Math.max(0.5 * Math.hypot(size[0] as number, size[1] as number, size[2] as number), 1e-9),
   };
 }
@@ -48,7 +52,7 @@ export const deformOverlayQuery = defineCommand({
     id: idParam.describe('Id of the deformed mesh entity (the id a deformation command returned in affected).'),
     compareTo: compareToParam.optional(),
   }),
-  run: (doc: CadDocument, { id, compareTo }): CommandResult => {
+  run: (doc: CadDocument, { id, compareTo }, ctx): CommandResult => {
     const fail = (code: string, message: string, path: string[]): CommandResult =>
       defRejection(doc, 'deform_overlay', code, message, [id], path);
     const entity = doc.entities[id];
@@ -62,20 +66,27 @@ export const deformOverlayQuery = defineCommand({
     const bounds = boundsOf(entity.kind === 'mesh' ? entity.mesh.positions : []);
     let reference: Vec3[][] | null = null;
     if (compareTo !== undefined) {
+      const checked = referenceDistance(compareTo);
+      if ('missing' in checked)
+        return fail('DEF_COMPARE_INVALID', `compareTo.${checked.missing} is missing or invalid for kind '${compareTo.kind}'`, [
+          `params.compareTo.${checked.missing}`,
+        ]);
       reference = referenceWire(compareTo, bounds);
       if (reference === null)
-        return fail('DEF_COMPARE_INVALID', `compareTo needs ${REFERENCE_FIELDS[compareTo.kind].join(', ')} for kind '${compareTo.kind}'`, [
-          'params.compareTo',
-        ]);
+        return fail('DEF_COMPARE_INVALID', `compareTo of kind '${compareTo.kind}' cannot be drawn`, ['params.compareTo']);
     }
-    // the region planes reach 30 % past the body from the frame axis (the body, not its length, sets how wide the planes are drawn)
-    const positions = entity.kind === 'mesh' ? entity.mesh.positions : [];
+    // the slab is a rest-frame object: its planes reach 30 % past the REST body (the source recipe) from the frame axis; without a source mesh
+    // the deformed mesh stands in, capped by the bounds so a bend cannot blow the planes up
+    const source = sourceMeshOf(ctx?.kernel ?? null, node.source, doc);
+    const restPositions = source === null ? null : source.positions;
+    const positions = restPositions ?? (entity.kind === 'mesh' ? entity.mesh.positions : []);
     let reach = 0;
     for (let i = 0; i + 2 < positions.length; i += 3) {
       const local = toLocal(frame, [positions[i] as number, positions[i + 1] as number, positions[i + 2] as number]);
       reach = Math.max(reach, Math.hypot(local[0], local[1]));
     }
-    const overlay = deformOverlay(node.law, node.region, frame, bounds.radius, Math.max(1.3 * reach, 1e-9));
+    const lateral = restPositions === null ? Math.min(1.3 * reach, bounds.radius) : 1.3 * reach;
+    const overlay = buildDeformOverlay(node.law, node.region, frame, bounds.radius, Math.max(lateral, 1e-9));
     const parts = [
       'frame',
       ...(overlay.region === null ? [] : [overlay.region.infinite ? 'infinite region' : 'region']),

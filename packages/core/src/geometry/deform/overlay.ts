@@ -77,7 +77,8 @@ function latticeOverlay(law: Extract<DeformLaw, { kind: 'lattice' }>, frame: Loc
   const world = (c: Vec3): Vec3 => toWorld(frame, fromBoxCoordinates(law, c));
   const at = (i: number, j: number, k: number): Vec3 => {
     const t = [restPosition(law, 0, i), restPosition(law, 1, j), restPosition(law, 2, k)];
-    return [0, 1, 2].map((a) => law.box.min[a]! + t[a]! * (law.box.max[a]! - law.box.min[a]!)) as unknown as Vec3;
+    const along = (a: 0 | 1 | 2): number => law.box.min[a] + (t[a] as number) * (law.box.max[a] - law.box.min[a]);
+    return [along(0), along(1), along(2)];
   };
   const offsets = new Map<number, Vec3>();
   for (const { index, delta } of law.offsets) {
@@ -112,7 +113,7 @@ function latticeOverlay(law: Extract<DeformLaw, { kind: 'lattice' }>, frame: Loc
 /**
  * The overlay data of a deform node. `extent` is the half-diagonal of the body bounds (the length the frame axes are drawn at), `lateral` the reach of the body from the frame axis (the half size of the region planes).
  */
-export function deformOverlay(
+export function buildDeformOverlay(
   law: DeformLaw,
   region: DeformRegion | undefined,
   frame: LocalFrame,

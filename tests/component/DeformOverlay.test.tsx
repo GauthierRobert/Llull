@@ -15,6 +15,7 @@ import {
   gridSegments,
   netSegments,
   parseDeformOverlay,
+  referenceFieldProblem,
   referenceFields,
   referenceParams,
   regionSegments,
@@ -44,12 +45,15 @@ describe('ViewportControls - deformation overlay toggle', () => {
     const button = screen.getByLabelText('Deformation overlays');
     expect(button.getAttribute('aria-pressed')).toBe('false');
     expect(screen.queryByLabelText('Deformation overlay layers')).toBeNull();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(button);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('aria-controls')).toBe(screen.getByLabelText('Deformation overlay layers').id);
     expect(useDeformOverlayStore.getState().enabled).toBe(true);
     expect(screen.getByLabelText('Deformation overlay layers')).not.toBeNull();
-    fireEvent.click(screen.getByLabelText('Lattice layer'));
+    fireEvent.click(screen.getByLabelText('Lattice'));
     expect(useDeformOverlayStore.getState().layers.lattice).toBe(false);
-    fireEvent.click(screen.getByLabelText('Lattice layer'));
+    fireEvent.click(screen.getByLabelText('Lattice'));
     expect(useDeformOverlayStore.getState().layers.lattice).toBe(true);
     fireEvent.click(screen.getByLabelText('Deformation overlays'));
     expect(useDeformOverlayStore.getState().enabled).toBe(false);
@@ -82,6 +86,36 @@ describe('ViewportControls - deformation overlay toggle', () => {
     expect(referenceParams(useDeformOverlayStore.getState().reference)).toBeNull();
     fireEvent.change(screen.getByLabelText('Reference shape'), { target: { value: '' } });
     expect(useDeformOverlayStore.getState().reference).toBeNull();
+  });
+
+  it('a field that cannot be used is flagged (aria-invalid, described by its reason) and keeps the shape from being queried', () => {
+    useDeformOverlayStore.setState({ enabled: true });
+    render(<ViewportControls />);
+    fireEvent.change(screen.getByLabelText('Reference shape'), { target: { value: 'torus' } });
+    const type = (name: string, value: string): void => {
+      fireEvent.change(screen.getByLabelText(`Reference ${name}`), { target: { value } });
+    };
+    type('majorRadius', '60');
+    type('minorRadius', '70');
+    type('center', '0 0 0');
+    type('axis', '0 0 1');
+    const minor = screen.getByLabelText('Reference minorRadius');
+    expect(minor.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(minor.getAttribute('aria-describedby') as string)?.textContent).toBe('must be smaller than majorRadius');
+    expect(referenceParams(useDeformOverlayStore.getState().reference)).toBeNull();
+    type('minorRadius', '5');
+    expect(screen.getByLabelText('Reference minorRadius').getAttribute('aria-invalid')).toBe('false');
+    expect(referenceParams(useDeformOverlayStore.getState().reference)).not.toBeNull();
+  });
+
+  it('the reason of every kind of unusable field', () => {
+    expect(referenceFieldProblem('sphere', 'radius', { radius: '-2' })).toBe('must be greater than 0');
+    expect(referenceFieldProblem('sphere', 'center', { center: '1 2' })).toBe('needs 3 numbers');
+    expect(referenceFieldProblem('sphere', 'radius', { radius: 'abc' })).toBe('must be numbers');
+    expect(referenceFieldProblem('plane', 'normal', { normal: '0 0 0' })).toBe('must not be zero');
+    expect(referenceFieldProblem('cone', 'halfAngleDeg', { halfAngleDeg: '90' })).toBe('must be between 0 and 90 degrees');
+    expect(referenceFieldProblem('cone', 'halfAngleDeg', { halfAngleDeg: '30' })).toBeNull();
+    expect(referenceFieldProblem('cone', 'halfAngleDeg', {})).toBeNull();
   });
 
   it('every reference kind lists its fields (a helicoid also its optional offset)', () => {
@@ -229,6 +263,24 @@ describe('DeformOverlay', () => {
     expect(container.querySelector('group[name^="deform-overlay-"]')).toBeNull();
     act(() => useDeformOverlayStore.getState().setEnabled(false));
     expect(container.querySelector('group')).toBeNull();
+  });
+
+  it('typing the reference keeps the last drawing on screen: the group never disappears while the answer reloads', () => {
+    vi.useFakeTimers();
+    try {
+      const id = deformed();
+      useStore.getState().select([id]);
+      useDeformOverlayStore.setState({ enabled: true });
+      const { container } = render(<DeformOverlay />);
+      const group = (): Element | null => container.querySelector('group[name="deform-overlay-' + id + '"]');
+      expect(group()).not.toBeNull();
+      act(() => useDeformOverlayStore.getState().setReference({ kind: 'sphere', fields: { center: '0 0 50', radius: '30' } }));
+      expect(group()).not.toBeNull();
+      act(() => void vi.advanceTimersByTime(300));
+      expect(group()).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('draws at most the first four selected bodies and does not change the document', () => {

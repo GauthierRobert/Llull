@@ -2,48 +2,17 @@
 // `inspect_sweep` (a read-only host query, re-run when the entity changes); for a selected loft, its section rings. Drawn over the model.
 
 import React, { useMemo } from 'react';
-import * as THREE from 'three';
 import type { LoftEntity, SweepEntity } from '@core/model/types';
 import { loftSectionRings } from '@core/geometry/loft';
 import { useStore } from '@ui/store';
 import { useSurfaceOverlayStore } from '@ui/store/surfaceOverlayStore';
 import { useHostQuery } from '@ui/panels/analysis/useHostQuery';
-import { positionsGeometry } from '../../lineGeometry';
-import { useDisposable } from '../../useDisposable';
+import { Segments } from '../overlays/Segments';
 import { MAX_FRAME_ENTITIES, closedLoopSegments, frameSegments, parseFrameStations } from './sweepFramesGeometry';
 
 const STATIONS = 13;
-const RENDER_ORDER = 997;
-const HIDDEN_OPACITY = 0.25;
 const AXIS_COLORS = { tangent: '#e5484d', normal: '#30a46c', binormal: '#3e63dd' } as const;
 const OUTLINE_COLOR = '#f5a524';
-
-/** Lines drawn depth-tested, plus a faint second pass without depth so the parts behind the solid stay readable. */
-export function Segments({ positions, color }: { positions: Float32Array; color: string }): React.ReactElement | null {
-  const geometry = useDisposable(() => positionsGeometry(positions), [positions]);
-  const front = useDisposable(() => new THREE.LineBasicMaterial({ color }), [color]);
-  const behind = useDisposable(
-    () => new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true, opacity: HIDDEN_OPACITY }),
-    [color],
-  );
-  const objects = useMemo(() => {
-    const make = (material: THREE.LineBasicMaterial, order: number): THREE.LineSegments => {
-      const lines = new THREE.LineSegments(geometry, material);
-      lines.renderOrder = order;
-      lines.frustumCulled = false;
-      return lines;
-    };
-    return [make(behind, RENDER_ORDER), make(front, RENDER_ORDER + 1)];
-  }, [geometry, front, behind]);
-  if (positions.length === 0) return null;
-  return (
-    <>
-      {objects.map((object) => (
-        <primitive key={object.id} object={object} />
-      ))}
-    </>
-  );
-}
 
 function SweepFrames({ sweep }: { sweep: SweepEntity }): React.ReactElement | null {
   const params = useMemo(() => ({ id: sweep.id, samples: STATIONS, outline: true }), [sweep.id]);

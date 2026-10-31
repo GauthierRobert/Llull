@@ -1,12 +1,13 @@
 // Review overlays of the selected deformed bodies (01 DEF M4, presentation only): the frame, the region slab, the lattice net, the base and target curves of a
 // flow, the flow sheets and a reference shape, drawn from `deform_overlay` (a read-only host query, re-run when the entity or the reference changes).
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import type { MeshSolidEntity } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { useDeformOverlayStore } from '@ui/store/deformOverlayStore';
 import { useHostQuery } from '@ui/panels/analysis/useHostQuery';
-import { Segments } from '../analysis/SweepFramesOverlay';
+import { Segments } from './Segments';
 import {
   boxSegments,
   chainSegments,
@@ -15,9 +16,22 @@ import {
   gridSegments,
   netSegments,
   parseDeformOverlay,
+  type DeformOverlayView,
   referenceParams,
   regionSegments,
 } from './deformOverlayGeometry';
+
+/** The reference text is queried once typing pauses this long. */
+const REFERENCE_DEBOUNCE_MS = 250;
+
+function useDebounced<T>(value: T, ms: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(timer);
+  }, [value, ms]);
+  return settled;
+}
 
 /** Bodies drawn at once. */
 export const MAX_DEFORM_OVERLAYS = 4;
@@ -36,11 +50,16 @@ const COLORS = {
 
 function DeformedBody({ entity }: { entity: MeshSolidEntity }): React.ReactElement | null {
   const layers = useDeformOverlayStore((s) => s.layers);
-  const draft = useDeformOverlayStore((s) => s.reference);
+  const typed = useDeformOverlayStore((s) => s.reference);
+  const draft = useDebounced(typed, REFERENCE_DEBOUNCE_MS);
   const compareTo = useMemo(() => (layers.reference ? referenceParams(draft) : null), [layers.reference, draft]);
   const params = useMemo(() => ({ id: entity.id, ...(compareTo === null ? {} : { compareTo }) }), [entity.id, compareTo]);
   const query = useHostQuery('deform_overlay', params, entity);
-  const view = useMemo(() => (query.status === 'done' && !query.isError ? parseDeformOverlay(query.data) : null), [query]);
+  const answered = useMemo(() => (query.status === 'done' && !query.isError ? parseDeformOverlay(query.data) : null), [query]);
+  // the last answer stays drawn while the next one loads (no flicker while the reference is typed)
+  const last = useRef<DeformOverlayView | null>(null);
+  if (answered !== null) last.current = answered;
+  const view = answered ?? (query.status === 'done' ? null : last.current);
   const parts = useMemo(() => {
     if (view === null) return null;
     return {
@@ -90,15 +109,17 @@ function DeformedBody({ entity }: { entity: MeshSolidEntity }): React.ReactEleme
 
 export function DeformOverlay(): React.ReactElement | null {
   const enabled = useDeformOverlayStore((s) => s.enabled);
-  const entities = useStore((s) => s.document.entities);
-  const selection = useStore((s) => s.document.selection);
+  const drawn = useStore(
+    useShallow((s) =>
+      s.document.selection
+        .flatMap((id) => {
+          const entity = s.document.entities[id];
+          return entity?.kind === 'mesh' && entity.brep?.op === 'deform' ? [entity] : [];
+        })
+        .slice(0, MAX_DEFORM_OVERLAYS),
+    ),
+  );
   if (!enabled) return null;
-  const drawn = selection
-    .flatMap((id) => {
-      const entity = entities[id];
-      return entity?.kind === 'mesh' && entity.brep?.op === 'deform' ? [entity] : [];
-    })
-    .slice(0, MAX_DEFORM_OVERLAYS);
   return (
     <group name="deform-overlay">
       {drawn.map((entity) => (

@@ -6,7 +6,7 @@ import type { DeformLaw } from '@core/model/deform';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { resolveFrame } from '@core/geometry/deform/frame';
-import { deformOverlay } from '@core/geometry/deform/overlay';
+import { buildDeformOverlay } from '@core/geometry/deform/overlay';
 import { referenceWire } from '@core/geometry/deform/referenceWire';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { WORLD_Z, addBox, addCylinder, dataOf, installKernel } from './harness';
@@ -173,7 +173,7 @@ describe('deform_overlay of a deformed body', () => {
       nodes: [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 2, 0, 0, 1, 1, 1, 2, 0, 0, 1],
       baseNodes: [0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1],
     };
-    const overlay = deformOverlay(law, undefined, frame, 10, 5);
+    const overlay = buildDeformOverlay(law, undefined, frame, 10, 5);
     expect(overlay.sheet).toMatchObject({ nx: 2, ny: 2 });
     expect(overlay.sheet?.target).toEqual([
       [10, 0, 0],
@@ -226,8 +226,20 @@ describe('deform_overlay of a deformed body', () => {
   });
 });
 
+describe('deform_overlay region planes', () => {
+  it('a bend: the planes are sized from the REST body (1.3 x its cross-section reach), not from the bent mesh that moved ~55 off the axis', async () => {
+    await installKernel('none');
+    const rod = addCylinder(5, (50 * Math.PI) / 2);
+    const bent = execute(rod.doc, 'bend_body', { id: rod.id, radius: 50, angleDeg: 90, frame: WORLD_Z, output: { tolerance: 0.01 } });
+    expect(bent.error, bent.summary).toBeUndefined();
+    const radius = dataOf<Overlay>(execute(bent.document, 'deform_overlay', { id: bent.affected[0] })).region?.radius as number;
+    expect(radius).toBeGreaterThan(1.3 * 5 * 0.97);
+    expect(radius).toBeLessThanOrEqual(1.3 * 5 * 1.001);
+  });
+});
+
 describe('deform_overlay refusals', () => {
-  it('an unknown id, an entity that was not deformed, and a compareTo with a missing field are named no-ops', async () => {
+  it('an unknown id, an entity that was not deformed, a degenerate recorded frame and every unusable compareTo are named no-ops', async () => {
     await installKernel('none');
     const { doc, id } = addBox();
     const missing = execute(doc, 'deform_overlay', { id: 'nope' });
@@ -235,9 +247,34 @@ describe('deform_overlay refusals', () => {
     expectNoOp(missing, doc);
     const plain = execute(doc, 'deform_overlay', { id });
     expect(plain.error?.code).toBe('DEF_NOT_DEFORMED');
+    expectNoOp(plain, doc);
     const twisted = execute(doc, 'twist_body', { id, angleDeg: 30, frame: WORLD_Z, output: { tolerance: 0.01 } });
-    const invalid = execute(twisted.document, 'deform_overlay', { id: twisted.affected[0], compareTo: { kind: 'torus', majorRadius: 5 } });
-    expect(invalid.error?.code).toBe('DEF_COMPARE_INVALID');
-    expect(invalid.summary).toContain('minorRadius');
+    const deformedId = twisted.affected[0] as string;
+    const invalidCases: Array<[Record<string, unknown>, string]> = [
+      [{ kind: 'torus', majorRadius: 5 }, 'minorRadius'],
+      [{ kind: 'torus', majorRadius: 5, minorRadius: 5, center: [0, 0, 0], axis: [0, 0, 1] }, 'minorRadius'],
+      [{ kind: 'torus', majorRadius: 5, minorRadius: 1, center: [0, 0, 0], axis: [0, 0, 0] }, 'axis'],
+      [{ kind: 'sphere', center: [0, 0, 0], radius: -2 }, 'radius'],
+      [{ kind: 'cone', apex: [0, 0, 0], axis: [0, 0, 1], halfAngleDeg: 90 }, 'halfAngleDeg'],
+      [{ kind: 'plane', point: [0, 0, 0], normal: [0, 0, 0] }, 'normal'],
+    ];
+    for (const [compareTo, field] of invalidCases) {
+      const invalid = execute(twisted.document, 'deform_overlay', { id: deformedId, compareTo });
+      expect(invalid.error?.code, JSON.stringify(compareTo)).toBe('DEF_COMPARE_INVALID');
+      expect(invalid.summary).toContain(field);
+      expectNoOp(invalid, twisted.document);
+    }
+    const entity = twisted.document.entities[deformedId];
+    if (entity?.kind !== 'mesh' || entity.brep?.op !== 'deform') throw new Error('a deformed mesh is expected');
+    const broken: CadDocument = {
+      ...twisted.document,
+      entities: {
+        ...twisted.document.entities,
+        [deformedId]: { ...entity, brep: { ...entity.brep, frame: { ...entity.brep.frame, axis: [0, 0, 0] } } },
+      },
+    };
+    const degenerate = execute(broken, 'deform_overlay', { id: deformedId });
+    expect(degenerate.error?.code).toBe('DEF_FRAME_DEGENERATE');
+    expectNoOp(degenerate, broken);
   });
 });
