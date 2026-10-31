@@ -390,6 +390,31 @@ fn a_300_degree_reflex_face_takes_the_path_through_q_and_keeps_the_mirror_symmet
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
     assert!(analyze(&built).unwrap().valid);
     assert!(worst_patch_angle(&built) < 0.0095, "oriented tangents: {}", worst_patch_angle(&built));
+    assert!(worst_tangent_angle(&built) < 0.01, "{}", worst_tangent_angle(&built));
+    let topo = topology(&built).unwrap();
+    assert_eq!(topo["faces"].as_array().unwrap().len(), 9 + 5 + 2, "7 sides and 2 caps, 5 blends, 2 patches");
+    // Q = V - l / sin(30 degrees) along the bisector: 0.8 behind the apex (4, 5); the polyline corner is a vertex of the built solid on both faces
+    let meeting = |q: [f64; 3]| {
+        topo["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| {
+                (0..3).all(|a| (num(&e["start"][a]) - q[a]).abs() < 1e-6) || (0..3).all(|a| (num(&e["end"][a]) - q[a]).abs() < 1e-6)
+            })
+            .count()
+    };
+    assert_eq!(
+        (meeting([3.2, 5.0, 6.0]), meeting([3.2, 5.0, 0.0])),
+        (2, 2),
+        "the two segments of the path meet at Q on the top face and on the bottom face"
+    );
+    // closed form of the prisms: the 4 convex edges (r 0.4, 5.93 long each between the setback and the free end) are removed, the reflex vertical edge (4.0) added: -0.677; the patches take the rest
+    // (measured +0.477 together, +0.24 each: the sharp stub of a 300 degree corner is bigger than the notch rim's)
+    let change = mass_properties(&built).unwrap().volume - mass_properties(&shape).unwrap().volume;
+    let area = 0.16 * (1.0 - std::f64::consts::FRAC_PI_4);
+    let prisms = area * 4.0 - area * 4.0 * 5.9282;
+    assert!(change - prisms > 0.4 && change - prisms < 0.56, "prisms {prisms} + 2 patches: {change}");
     let mass = mass_properties(&built).unwrap();
     assert!((mass.centroid[1] - 5.0).abs() < 1e-6, "mirror symmetry about y = 5: {:?}", mass.centroid);
     assert!(
@@ -432,15 +457,20 @@ fn a_taper_on_a_mixed_corner_builds_or_is_refused_by_name() {
         rounded.iter().map(|&edge| if top.contains(&edge) { (edge, 0.5, 0.3) } else { (edge, 0.5, 0.5) }).collect();
     let (edges, mut corners) = spec_tapered(&shape, &tapers, &[rim], 1.2);
     corners.extend(spec_tapered(&shape, &tapers, &[inner], 1.2).1);
-    let reason = setback_reason(&shape, &edges, &corners).unwrap();
-    if reason.is_empty() {
-        let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
-        assert!(analyze(&built).unwrap().valid);
-        assert!(worst_patch_angle(&built) < 0.0095);
-        assert!(mass_properties(&built).unwrap().volume.is_finite());
-    } else {
-        assert!(reason.starts_with("[BLD_CORNER_") || reason.starts_with("[BLD_SETBACK_"), "{reason}");
-    }
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    assert_eq!(topology(&built).unwrap()["faces"].as_array().unwrap().len(), 9 + 5 + 2, "9 planes, 5 blends, 2 patches");
+    // closed form of the prisms (r^2 (1 - pi / 4) x the length between the setback section and the free end, r linear): the vertical edge (0.5, 2.6) and the two floor edges (0.5, 3.8)
+    // are added, the two top edges tapering 0.5 -> 0.3 over 3.8 are removed (0.234 or 0.297, by the end the taper starts at); the inner patch adds 0.339 and the rim patch 0.05 to 0.1
+    let area = 1.0 - std::f64::consts::FRAC_PI_4;
+    let added = area * 0.25 * (2.6 + 2.0 * 3.8);
+    let removed = |first: f64, last: f64| 2.0 * area * 3.8 * (first * first + first * last + last * last) / 3.0;
+    let (low, high) = (added - removed(0.348, 0.5) + 0.339, added - removed(0.3, 0.452) + 0.339 + 0.1);
+    let change = mass_properties(&built).unwrap().volume - mass_properties(&shape).unwrap().volume;
+    assert!(change > low && change < high, "prisms + patches in ({low}, {high}): {change} (observed 0.724)");
+    assert!(worst_patch_angle(&built) < 0.0095, "{}", worst_patch_angle(&built));
+    assert!(worst_tangent_angle(&built) < 0.01, "{}", worst_tangent_angle(&built));
 }
 
 #[test]
@@ -690,5 +720,35 @@ fn a_setback_corner_on_a_box_with_a_spherical_pocket_keeps_the_pocket() {
     assert_eq!(
         topology(&with_pocket).unwrap()["faces"].as_array().unwrap().len(),
         topology(&solid).unwrap()["faces"].as_array().unwrap().len() + 1
+    );
+}
+
+/// BLD §13.18 review: the guards of the mixed corner are exercised on shapes the test chooses (cfg(test) seams in blend_corner.cxx). The oriented patch check on the blend face of a filleted block
+/// reads about 0 across its tangent edges, and about pi once the face is turned round in a rebuilt shell; the boundary angle is measured for an intact boundary and refuses (-1, not
+/// measured) when a loop edge is missing from it.
+#[test]
+fn the_guards_of_the_mixed_corner_fail_on_a_patch_turned_round_and_on_an_unmeasured_boundary() {
+    let _serial = crate::serial_blends();
+    let block = make_box([0.0; 3], [20.0, 10.0, 5.0]).unwrap().unwrap();
+    let topo = topology(&block).unwrap();
+    let top = topo["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|e| ["start", "end"].iter().all(|key| (num(&e[key][2]) - 5.0).abs() < 1e-9 && (num(&e[key][1]) - 10.0).abs() < 1e-9))
+        .unwrap() as u32;
+    let rounded = crate::features::fillet(&block, &[top], 1.0, None).unwrap().unwrap();
+    let blend =
+        topology(&rounded).unwrap()["faces"].as_array().unwrap().iter().position(|face| face["surface"] == "cylinder").unwrap() as i32;
+    let as_built = crate::test_bridge::oriented_angle(&rounded, blend, false);
+    let turned = crate::test_bridge::oriented_angle(&rounded, blend, true);
+    assert!((0.0..1e-6).contains(&as_built), "a blend tangent to its faces, outward normals agree: {as_built}");
+    assert!((turned - std::f64::consts::PI).abs() < 1e-6, "the same face turned round faces the other way: {turned}");
+    let whole = crate::test_bridge::boundary_angle(&rounded, blend, false);
+    assert!(whole >= 0.0, "every edge of an intact boundary is measured: {whole}");
+    assert_eq!(
+        crate::test_bridge::boundary_angle(&rounded, blend, true),
+        -1.0,
+        "a loop edge missing from the boundary is not measured: the check fails closed"
     );
 }
