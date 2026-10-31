@@ -5,7 +5,9 @@ import { sha256Hex } from '@lib/sha256';
 import { buildGraph, selectRuns } from '../../piping/graph';
 import { getPiping, refuse } from '../../piping/model';
 import { isoIssue, refuseIso } from '../codes';
+import { splitComponents } from '../fieldWelds';
 import { legacyLines, legacyNetwork } from '../legacyNetwork';
+import { fieldWeldsOf } from '../lineNetwork';
 import type { IsoIssue, PcfLineData, PcfUnit, PcfUnits, PipingNetwork } from '../model';
 import { GENERATED_UNITS, dataOfNetwork, missingSkeyIds, networkOf, summarise } from '../pcf/pcfMap';
 import { writePcfText } from '../pcf/pcfWrite';
@@ -75,7 +77,7 @@ export const exportPcf = defineCommand({
     'lines imported with import_pcf (written back from the stored data, unknown records included) and legacy pipes (add_pipe_run: elbows are derived at every interior point from the long-radius B16.9 ' +
     'centre-to-end, flagged in data.files[].warnings as ISO_LEGACY_FITTINGS_DERIVED, and the line ends are ISO_OPEN_END warnings). SKEY is written only where the isometric key is confirmed ' +
     '(elbow butt weld ELBW / socket weld ELSW, tee TEBW, weld neck flange FLWN, eccentric reducer REBW); other components are written without one and listed in data.files[].missingSkey - add the key ' +
-    'in your isometric tool, or pass strictSkey to refuse instead. A stub-in has no PCF component (listed in skipped). Welds, supports and spools are not written yet (05 isometrics M2+). ' +
+    'in your isometric tool, or pass strictSkey to refuse instead. A stub-in has no PCF component (listed in skipped). Field welds added with add_field_weld are written as WELD records (SKEY WS / WF, ERECTION-ITEM) between the two pipe pieces; supports are not written yet (05 isometrics M5). ' +
     'Give lineIds (a routed line id, a PCF line number or a legacy line number), or omit for every line. units mm (default) or inch. ' +
     'Returns data = { files: [{ name, content, sha256, componentCount, countsByType, source, skipped, missingSkey, bolts, openEnds, warnings }], count, reviewRequired }; save it with llull export_pcf --save <dir> (one file per line). ' +
     'Refusals: ISO_LINE_NOT_FOUND, ISO_NO_PIPING, ISO_SKEY_MISSING (strictSkey), the RTE_* code of a run that no longer derives (fix it first), MAT_EXPORT_CONTROLLED. Does not modify the document. Next: check_piping before handing the file over; import_pcf reads it back.',
@@ -164,7 +166,16 @@ export const exportPcf = defineCommand({
         broken.failure.detail,
       );
     const graph = buildGraph(doc, selection.graphRuns);
-    const sources = wanted.flatMap((entry): Source[] => {
+    const withFieldWelds = (source: Source, lineId: string): Source => {
+      const welds = fieldWeldsOf(doc, lineId);
+      if (welds.length === 0) return source;
+      return {
+        ...source,
+        data: { ...source.data, components: splitComponents(source.data.components, welds).components },
+        network: { ...source.network, components: splitComponents(source.network.components, welds).components },
+      };
+    };
+    const sourceOf = (entry: Entry): Source[] => {
       const line = piping.lines[entry.id];
       if (entry.kind === 'route' && line !== undefined) {
         const route = routeNetwork({
@@ -178,7 +189,8 @@ export const exportPcf = defineCommand({
       if (entry.kind === 'pcf' && data !== undefined) return [{ network: networkOf(data), data }];
       const network = entry.kind === 'legacy' ? legacyNetwork(doc, entry.id) : null;
       return network === null ? [] : [{ network, data: dataOfNetwork(network) }];
-    });
+    };
+    const sources = wanted.flatMap((entry) => sourceOf(entry).map((source) => withFieldWelds(source, entry.id)));
     const errors = sources.flatMap((source) => source.network.warnings.filter((warning) => warning.severity === 'error'));
     const firstError = errors[0];
     if (firstError !== undefined)

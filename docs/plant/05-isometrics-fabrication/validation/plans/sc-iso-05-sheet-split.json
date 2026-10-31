@@ -15,7 +15,7 @@
     },
     { "command": "define_isometric", "params": { "lineId": "R-301", "maxPipePiecesPerSheet": 8, "splitAt": "weld" } },
     { "command": "export_isometric", "params": { "lineId": "R-301", "style": "final", "paper": "A3", "formats": ["svg"] }, "as": "issue1" },
-    { "command": "add_field_weld", "params": { "lineId": "R-301", "at": [19000, 2000, 5000], "type": "field" } },
+    { "command": "add_field_weld", "params": { "lineId": "R-301", "at": [19000, 2000, 5000], "type": "site" } },
     { "command": "export_isometric", "params": { "lineId": "R-301", "style": "final", "paper": "A3", "formats": ["svg"] }, "as": "issue2" }
   ],
   "expected": [

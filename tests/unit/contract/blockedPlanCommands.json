@@ -68,28 +68,13 @@
       "tank_shell_thickness"
     ],
     "docs/plant/04-pid-schematics/validation/plans/sc-pid-03-pid-vs-3d.json": ["check_pid_3d"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-01-parse-sample-pcf.json": [
-      "check_isometric",
-      "cut_list",
-      "piping_bom",
-      "split_spools",
-      "spool_list",
-      "weld_list"
-    ],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": [
-      "add_end_flange",
-      "add_field_weld",
-      "piping_bom"
-    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-01-parse-sample-pcf.json": ["check_isometric"],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": ["add_end_flange"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-03-isometric-sheet.json": ["export_isometric"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-04-sloped-line.json": ["export_isometric"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-05-sheet-split.json": [
-      "add_field_weld",
-      "define_isometric",
-      "export_isometric"
-    ],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-05-sheet-split.json": ["define_isometric", "export_isometric"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": ["export_piping_ga"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-07-check-errors.json": ["check_isometric", "set_fabrication_rules"],
+    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-07-check-errors.json": ["check_isometric"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-08-supports-skew.json": ["export_isometric"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-01-caged-ladder.json": ["add_ladder"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-02-steel-stair.json": ["add_steel_stair"],

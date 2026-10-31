@@ -491,7 +491,7 @@ Coverage gate 90/85/90/90 applies (`packages/domain-aec/src/**`).
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
 | ISO-M1 | **Built 2026-10-25 (§13).** network port + legacy network; PCF lexer / reader / writer; `import_pcf` (preview + `pcf_line`), `export_pcf`; codes; VC-ISO-01..03 | PSC bend radius rule (fallback: 1.5 × NPS LR90 from the B16.9 table) | 5 d |
-| ISO-M2 | welds + persistent numbering, `add_field_weld`, `set_weld_type`, spools, `set_fabrication_rules`, cut list, BOM with bolting; VC-ISO-05..09, 14 | PSC flange / bolt tables | 5 d |
+| ISO-M2 | **Built 2026-10-31 (§13.2).** welds + persistent numbering, `add_field_weld`, `set_weld_type`, spools, `set_fabrication_rules`, cut list, BOM with bolting; VC-ISO-05..09, 14 | PSC flange / bolt tables | 5 d |
 | ISO-M3 | iso graph, projection, not-to-scale layout, symbols, dimensions, elevations, slope, tables, SVG / DXF, single sheet; `check_isometric`; VC-ISO-10..12, 16, 17 | — | 8 d |
 | ISO-M4 | sheet split + continuation + stability, spool isos, `define_isometric`, `issue_isometric` (human gate) | 09 PLM signatures (aerospace) | 4 d |
 | ISO-M5 | `import_pcf as=route` via RTE; supports in PCF / iso; skew boxes; piping GA (`export_piping_ga`); VC-ISO-04, 13, 15 | 02 RTE | 5 d |
@@ -610,4 +610,37 @@ fixture, route to export to import preview, inch, unknown records, slice persist
 `server/tests/cliImportPcf.test.ts` (`import_pcf file=`, `export_pcf --save`). The CLI reads the file through one `FILE_PARAMS` row (`import_pcf: text`, utf8) in `server/src/cli/exchange.ts`.
 
 **Open.** Conformance of the fixture and of an llull export with a licensed ISOGEN (OQ-ISO-01, M6). SKEYs beyond ELBW, ELSW, TEBW, FLWN, REBW (OQ-ISO-02). Connectivity-based `openEnds` for imported and legacy lines (M3; routed lines
-use the RTE graph). Routed components from a PCF and supports in the PCF (M5). The pack plans `sc-iso-01/02/08` still need the M2+ commands to run end to end.
+use the RTE graph). Routed components from a PCF and supports in the PCF (M5). The pack plans `sc-iso-01/02/08` needed the M2+ commands to run end to end (sc-iso-01 now runs up to `check_isometric`, §13.2).
+
+### 13.2 ISO-M2 (2026-10-31): welds, persistent numbering, spools, cut list, BOM with bolting
+
+Nine commands in the plugin `piping-fabrication` (toolset `piping`): `add_field_weld`, `set_weld_type`, `number_welds`, `weld_list`, `set_fabrication_rules`, `split_spools`, `spool_list`, `cut_list`, `piping_bom`.
+All read a line through one function, `lineNetwork.ts loadLine`: routed line, imported PCF line or legacy pipe line (the M1 network port), with the stored field welds applied.
+
+| File | Content |
+| ---- | ------- |
+| `fieldWelds.ts` | `splitComponents`: a stored field weld splits the PIPE it lies on (1 mm tolerance) into `<pipeId>.s1`, `.s2` with a WELD (SKEY WS / WF, ERECTION-ITEM) between; a weld on no pipe is stale and ignored (`ISO_FIELD_WELD_STALE`) |
+| `joints.ts` | connection nodes keyed at 0.1 mm, iterative depth-first walk from the line start (run before branch), joint classes shop / site / field_fit / bolted / other, terminals |
+| `welds.ts` | numbering plan: match stored welds to joints (same position and components, else position, else components), new = highest + 1, vanished = orphaned, `renumber` |
+| `spools.ts` | union-find spools, names `<line or spoolPrefix>-SP<nn>`, metrics, limit violations, `suggestSplit` for autoBreak |
+| `cutList.ts`, `bom.ts` | cut pieces; BOM rows and bolting (ASME B16.5 table of the bundled catalogue) |
+| `analysis.ts` | one line read + graph + numbering plan + spools: what the commands call |
+
+Slice `doc.plant.fabrication` gained optional `rules`, `fieldWelds`, `welds` (key `<lineId>#<n>`), `highestWeldNumber`, `spoolBreaks`; `validate.ts` checks them (key = id, number unique per line). `delete_pcf_line` also removes the line's field welds, weld numbers and spool breaks. `export_pcf` writes the field welds as WELD records for all three line sources (its description lost "welds and spools are not written yet": a changed sentence of an existing tool).
+
+**Deviations from §3 / §4 / §5 (all decided).**
+
+- Spools and cut pieces are **derived, not stored** (`SpoolRecord` is not persisted): they follow every edit and their names are stable from the flow order; the stored part is the break choice per line (`split_spools`) and the inserted welds. `WeldRecord` is keyed `<lineId>#<n>` (not by joint key, which changes when a joint moves) and carries `kindSet` (a `set_weld_type` override).
+- **Field welds are a layer over the line**, not an edit of it: a routed or legacy line cannot be edited by a weld, and an imported line must keep its lossless bytes. `add_field_weld` takes `type: site | field_fit` only (default `site`); the pack plans said `field`, corrected in sc-iso-02 / 05. Weld kind is `site` (not the reference script's `field`); `weld_list` adds `field: true` for site and field-fit, and sc-iso-01 / VC-ISO-05 now expect `site` for W2.
+- `weld_list` of an unnumbered line shows the numbers `number_welds` would give (`numbered: false`, warning `ISO_WELDS_UNNUMBERED` in data, not a refusal): sc-iso-01 reads welds before numbering. Numbers are `<prefix><n>` with prefixes from the rules (default `W` for both shop and erection); the file's `HIGHEST-WELD-NUMBER` raises the starting point. `number_welds` returns `highest` as a map by line and takes `lineId` and / or `lineIds`; `weld_list` has no `format: csv` (M6, VC-ISO-22).
+- `set_weld_type` finds a weld by `weldId` or `lineId` + `at` and only works on numbered welds (`ISO_WELD_NOT_FOUND` otherwise); the number is re-prefixed for the new kind and keeps its n.
+- Spool limits: `maxSpoolLengthMm / WidthMm / HeightMm` form the envelope compared with the spool envelope after sorting both triples (an omitted side is unlimited); `lengthMm` of a spool is its longest centreline path (reported, not limited). Weight is the sum of the `WEIGHT`s the components carry (`weightComplete: false` when some carries none; no unit weights are invented); pieces = PIPE count. `line_ends` in `breakAt` is accepted and has no effect (a line end always ends a spool). An OLET without END-POINTs joins by its branch point only. The longest path is a double sweep (exact on a tree, a bound on a loop).
+- `autoBreak` needs `field_welds` in `breakAt`, inserts site welds one at a time at the pipe nearest the middle of the longest path of the first violating spool (both pieces at least max(1 mm, minCutPieceMm); fallback: the middle of the longest pipe of the spool), at most 200 passes, and refuses with the violation code when it cannot fit. The inserted welds are ordinary field welds (ids `fw-<step>.<k>`).
+- `cut_list`: the gap is always required (param or rule); the allowance only when the line has a field-fit weld; `ISO_CUT_LENGTH_SHORT` is a refusal (a piece not longer than max(0, minCutPieceMm)); stock-length nesting (V1) is not built. `data` adds `centrelineTotalMm` and the per-end `adjustments`.
+- `piping_bom`: scopes `line | spool | document` (`sheet` arrives with the sheets, M4). Bolting: a flange pair (FL-FL joint) or, with `matingFlanges: assume_in_scope`, each FL line end gives one gasket and one bolt set (default `this_side_only`: pairs only); bolts per set and diameter come from the bundled ASME B16.5 weld-neck table by DN and class, the class being parsed from the flange item code (`FLWN-100-150`); a flange without a readable class or size is counted as a joint and gasket, listed in `bolting.unresolved` and warned (`ISO_BOLTING_UNRESOLVED`). A bolted joint belongs to the spool of its first component, so the spool BOMs add up to the line. Components without item code are warned (`ISO_ITEM_CODE_MISSING`), not refused. Stud length is not computed (V1).
+- New codes: `ISO_SPOOL_NOT_FOUND`, `ISO_BOLTING_UNRESOLVED`, `ISO_FIELD_WELD_STALE`, `ISO_SPOOL_WEIGHT_INCOMPLETE` (table only, not raised yet); `ISO_NO_PIPING` is also raised by the new queries for a routed line without a run.
+- No kernel (L9): none of the commands sets `requiresKernel`. No text reader was added (no hostile-input entry).
+
+**Tests.** `tests/unit/plant/fabrication/{welds,spools,cutList,bom,lineSources,scenarioPlans}.test.ts`: VC-ISO-05 (13 welds against the reference script, branch welds last), VC-ISO-06 (2 spools; 1 without the WELD record), VC-ISO-07 (gap 0 / 3, WF allowance 100, both gaps), VC-ISO-08 / 09 (BOM identities, 3 gaskets and 24 studs 5/8 in), VC-ISO-14 (W14 after a new weld, old numbers kept), orphans and renumber, coded refusals with the document unchanged, `is pure`, replay equality, routed and legacy sources, a 1000-component timing check (bound 3 x the budget plus runner slack), and the pack plans SC-ISO-01 and SC-ISO-07 run step by step (the `check_isometric` steps skipped until M3). `blockedPlanCommands.json` lost `weld_list`, `split_spools`, `spool_list`, `cut_list`, `piping_bom`, `add_field_weld`, `set_fabrication_rules`; still blocked: `check_isometric` (sc-iso-01, 07), `add_end_flange` (sc-iso-02, RTE), `define_isometric` / `export_isometric` (sc-iso-03..05, 08), `export_piping_ga`.
+
+**Open.** VC-ISO-22 (CSV weld map) and the isometric timing of VC-ISO-18 are M6; stock-length nesting and stud lengths are V1; the sheet-scope BOM waits for M4; the sc-iso-02 BOM step waits for RTE flanges and branches.
