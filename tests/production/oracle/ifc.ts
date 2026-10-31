@@ -1,118 +1,19 @@
 /**
- * Minimal, independent IFC (ISO 10303-21 STEP physical file) reader: what a BIM coordinator's
- * viewer checks first — entity counts, unique GlobalIds, resolvable references, storeys and which
- * storey contains each element. Shares no code with llull's IFC writer.
+ * IFC (ISO 10303-21 STEP physical file) checks a BIM coordinator's viewer makes first: entity counts, unique GlobalIds, resolvable references, storeys and which
+ * storey contains each element. The tokenizer is `@lib/stepRead` (promoted from this file, plant 08 DAT-M3); it shares no code with llull's IFC writer.
  */
 
-export type StepValue = string | StepValue[];
+import { readStep, stepReferences, stepString, type StepEntity, type StepFile, type StepValue } from '@lib/stepRead';
 
-export interface StepEntity {
-  id: number;
-  type: string;
-  args: StepValue[];
-}
-
-export interface IfcFile {
-  schema: string;
-  entities: Map<number, StepEntity>;
-  /** Parse or structure errors (an empty list means the file is well-formed). */
-  errors: string[];
-}
-
-/** Split a STEP argument list into values; strings keep their quotes, lists become arrays. */
-function parseArgs(text: string): StepValue[] {
-  const root: StepValue[] = [];
-  const stack: StepValue[][] = [root];
-  let token = '';
-  let inString = false;
-  const flush = (): void => {
-    const trimmed = token.trim();
-    if (trimmed !== '') stack[stack.length - 1]?.push(trimmed);
-    token = '';
-  };
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i] ?? '';
-    if (inString) {
-      token += ch;
-      if (ch === "'") {
-        if (text[i + 1] === "'") {
-          token += "'";
-          i++;
-        } else inString = false;
-      }
-      continue;
-    }
-    if (ch === "'") {
-      inString = true;
-      token += ch;
-    } else if (ch === '(') {
-      // A typed value `IFCMASSMEASURE(55000.)` becomes one list whose first item is its type name.
-      const typeName = token.trim();
-      token = '';
-      const list: StepValue[] = typeName === '' ? [] : [typeName];
-      stack[stack.length - 1]?.push(list);
-      stack.push(list);
-    } else if (ch === ')') {
-      flush();
-      stack.pop();
-    } else if (ch === ',') {
-      flush();
-    } else token += ch;
-  }
-  flush();
-  return root;
-}
+export type { StepEntity, StepValue };
+export type IfcFile = StepFile;
+export { stepString };
 
 /** Parse an IFC file: header schema + DATA section entities. */
-export function parseIfc(text: string): IfcFile {
-  const errors: string[] = [];
-  const schema = /FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/.exec(text)?.[1] ?? '';
-  if (!text.startsWith('ISO-10303-21;')) errors.push('missing ISO-10303-21 header');
-  if (!/END-ISO-10303-21;\s*$/.test(text)) errors.push('missing END-ISO-10303-21 trailer');
-  const data = /DATA;([\s\S]*?)ENDSEC;/.exec(text)?.[1] ?? '';
-  const entities = new Map<number, StepEntity>();
-  for (const statement of splitStatements(data)) {
-    const match = /^#(\d+)\s*=\s*([A-Z0-9_]+)\s*\(([\s\S]*)\)$/.exec(statement);
-    if (!match) {
-      errors.push(`unparsable statement: ${statement.slice(0, 60)}`);
-      continue;
-    }
-    const id = Number(match[1]);
-    if (entities.has(id)) errors.push(`duplicate entity #${id}`);
-    entities.set(id, { id, type: match[2] ?? '', args: parseArgs(match[3] ?? '') });
-  }
-  for (const entity of entities.values()) {
-    for (const ref of references(entity.args)) {
-      if (!entities.has(ref)) errors.push(`#${entity.id} ${entity.type} references missing #${ref}`);
-    }
-  }
-  return { schema, entities, errors };
-}
-
-/** Statements end with ';' outside strings. */
-function splitStatements(data: string): string[] {
-  const statements: string[] = [];
-  let current = '';
-  let inString = false;
-  for (const ch of data) {
-    if (ch === "'") inString = !inString;
-    if (ch === ';' && !inString) {
-      if (current.trim() !== '') statements.push(current.trim());
-      current = '';
-    } else current += ch;
-  }
-  return statements;
-}
+export const parseIfc = (text: string): IfcFile => readStep(text);
 
 /** Every `#n` reference inside a value tree. */
-export function references(values: StepValue[]): number[] {
-  const refs: number[] = [];
-  for (const value of values) {
-    if (Array.isArray(value)) refs.push(...references(value));
-    else if (/^#\d+$/.test(value)) refs.push(Number(value.slice(1)));
-  }
-  return refs;
-}
+export const references = (values: StepValue[]): number[] => stepReferences(values);
 
 export function ofType(file: IfcFile, type: string): StepEntity[] {
   return [...file.entities.values()].filter((entity) => entity.type === type);
@@ -122,12 +23,6 @@ export function countByType(file: IfcFile): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const entity of file.entities.values()) counts[entity.type] = (counts[entity.type] ?? 0) + 1;
   return counts;
-}
-
-/** Unquote a STEP string value ('' → '); '$' and non-strings → ''. */
-export function stepString(value: StepValue | undefined): string {
-  if (typeof value !== 'string' || !value.startsWith("'")) return '';
-  return value.slice(1, -1).replace(/''/g, "'");
 }
 
 const GUID_ALPHABET = /^[0-9A-Za-z_$]{22}$/;

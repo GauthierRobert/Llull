@@ -2,6 +2,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { Draft, fail, findAny, isFail, refuse } from '../authoring/refs';
 import { removeItem } from '../authoring/remove';
+import { dropLinks } from '../link3d/links';
 import { getPid, withPid } from '../state';
 
 /**
@@ -35,7 +36,7 @@ export const deletePidItem = defineCommand({
     const draft = new Draft(pid);
     const { removed, healed } = removeItem(draft, item, params.heal ?? true);
     return {
-      document: withPid(doc, draft.model()),
+      document: withPid(doc, dropLinks(draft.model(), removed)),
       summary: `delete_pid_item: removed ${removed.length} item(s) (${removed.join(', ')}) for ${item.kind} ${item.tag ?? item.id}${healed ? ', segments healed' : ''}`,
       affected: removed,
       data: { removed, healed },

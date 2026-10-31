@@ -8,9 +8,11 @@ import type { TakeoffAccumulator } from '../../../building/quantities/takeoffBas
 import { round } from '../../../shared/numeric';
 import { gratingAreaM2, gratingMassKg } from '../grating/gratingMeasure';
 import { ladderQuantities } from '../ladder/ladderMeasure';
-import { railingQuantities } from '../railing/railingMeasure';
 
-/** Adds `grating.<type>.m2|kg|ea`, `railing.<part>.m|ea|kg` and `ladder.<part>.ea|m|kg` lines. */
+import { railingQuantities } from '../railing/railingMeasure';
+import { stairGeometryMm, stairQuantities } from '../stair/steelStairMeasure';
+
+/** Adds `steelStair.<part>.m|ea|kg`, `grating.<type>.m2|kg|ea`, `railing.<part>.m|ea|kg` and `ladder.<part>.ea|m|kg` lines. */
 export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, takeoff: TakeoffAccumulator): void {
   for (const grating of elementsOf(building, 'grating')) {
     takeoff.add('grating', grating.gratingType, `Grating ${grating.gratingType}`, [
@@ -34,6 +36,13 @@ export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, take
     if (quantities.cageM > 0) takeoff.add('ladder', 'cage', 'Ladder cages', [['m', 'height, first hoop to stile top', quantities.cageM]]);
     if (quantities.landings > 0) takeoff.add('ladder', 'landing', 'Ladder landings', [['ea', 'count', quantities.landings]]);
     takeoff.add('ladder', 'steel', 'Ladder steel', [['kg', 'stiles, rungs, cage and landings', quantities.steelKg]]);
+  }
+  for (const stair of elementsOf(building, 'steelStair')) {
+    const quantities = stairQuantities(doc, stair);
+    takeoff.add('steelStair', 'stringer', 'Steel stair stringers', [['m', 'centre-line length, both sides', quantities.stringerM]]);
+    takeoff.add('steelStair', 'tread', 'Steel stair treads', [['ea', 'count', quantities.treads]]);
+    if (quantities.landings > 0) takeoff.add('steelStair', 'landing', 'Steel stair landings', [['ea', 'count', quantities.landings]]);
+    takeoff.add('steelStair', 'steel', 'Steel stair steel', [['kg', 'stringers, treads and landings', quantities.steelKg]]);
   }
 }
 
@@ -83,4 +92,26 @@ export function ladderScheduleRows(doc: CadDocument, building: BuildingModel): R
     round(ladderQuantities(doc, ladder).steelKg, 1),
     building.levels[ladder.levelId]?.name ?? ladder.levelId,
   ]);
+}
+
+/** Steel stair schedule: mark, rise (mm), risers, riser (mm), going (mm), width (mm), pitch (deg), 2h+g (mm), landings, stringer, tread, steel kg, level. */
+export function steelStairScheduleRows(doc: CadDocument, building: BuildingModel): Row[] {
+  return elementsOf(building, 'steelStair').map((stair) => {
+    const geometry = stairGeometryMm(doc, stair);
+    return [
+      stair.mark,
+      round(toMm(doc, stair.rise), 1),
+      stair.riserCount,
+      round(geometry.riser, 3),
+      round(geometry.going, 1),
+      round(toMm(doc, stair.width), 1),
+      round(geometry.pitchDeg, 3),
+      round(geometry.blondel, 2),
+      stair.landings.length,
+      stair.stringerProfile,
+      stair.tread.kind === 'grating' ? stair.tread.gratingType : `plate ${round(toMm(doc, stair.tread.thickness), 1)}`,
+      round(stairQuantities(doc, stair).steelKg, 1),
+      building.levels[stair.levelId]?.name ?? stair.levelId,
+    ];
+  });
 }

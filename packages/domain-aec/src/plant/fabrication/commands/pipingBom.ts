@@ -4,6 +4,7 @@ import { report } from '@core/commands/noop';
 import { analyseLine, isAnalysis, type LineAnalysis } from '../analysis';
 import { bomRows, boltingOf, type BomRow, type Bolting } from '../bom';
 import { isoIssue, refuseIso } from '../codes';
+import { definedPlan } from '../iso/isoSheets';
 import { allLineIds } from '../lineNetwork';
 
 /**
@@ -17,21 +18,29 @@ export const pipingBom = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Bill of material of piping: rows by item code with description, quantity and unit (pipe in metres of centreline length, everything else in pieces; unverified: true when the catalogue row is not verified), for one line, ' +
-    'one spool, or the whole document. With includeBolting the flanged joints add gaskets and stud bolts: one gasket and one bolt set per flange pair, and per flanged line end when matingFlanges is assume_in_scope ' +
+    'one spool, one sheet of the isometric (define_isometric), or the whole document. With includeBolting the flanged joints add gaskets and stud bolts: one gasket and one bolt set per flange pair, and per flanged line end when matingFlanges is assume_in_scope ' +
     '(the mating flange is assumed in scope; default this_side_only counts pairs of the line only); bolts per set and diameter come from the ASME B16.5 table by DN and pressure class, the class being read from the ' +
-    'flange item code (FLWN-100-150 = class 150). Gaskets and bolts are erection items. Scope: line (needs lineId), spool (lineId + spoolId, a name from spool_list), document (every line). ' +
+    'flange item code (FLWN-100-150 = class 150). Gaskets and bolts are erection items. Scope: line (needs lineId), spool (lineId + spoolId, a name from spool_list), sheet (lineId + sheet number; the sheet BOMs add up to the line), document (every line). ' +
     'Returns data = { scope, rows: [{ itemCode, type, description, quantity, unit, unverified? }], bolting?: { joints, gaskets, studBolts, diameter, groups: [{ dn, pressureClass, boltsPerSet, boltDiameterIn, sets, unverified }], unresolved }, ' +
-    'withoutItemCode: [componentId], warnings, provenance: { catalogue, sources } }. Refusals: ISO_LINE_NOT_FOUND, ISO_SPOOL_NOT_FOUND, ISO_NO_PIPING, ISO_PARAM_INVALID.',
+    'withoutItemCode: [componentId], warnings, provenance: { catalogue, sources } }. Refusals: ISO_LINE_NOT_FOUND, ISO_SPOOL_NOT_FOUND, ISO_ISOMETRIC_NOT_DEFINED, ISO_SHEET_NOT_FOUND, ISO_NO_PIPING, ISO_PARAM_INVALID.',
   params: z.object({
     scope: z
-      .enum(['line', 'spool', 'document'])
-      .describe('line = one line (lineId), spool = one spool (lineId + spoolId), document = every line with piping.'),
+      .enum(['line', 'spool', 'sheet', 'document'])
+      .describe(
+        'line = one line (lineId), spool = one spool (lineId + spoolId), sheet = the components of one isometric sheet (lineId + sheet, needs define_isometric), document = every line with piping.',
+      ),
     lineId: z
       .string()
       .min(1)
       .optional()
       .describe('The line: routed line id, imported PCF line number or legacy line number. Needed for scope line and spool.'),
     spoolId: z.string().min(1).optional().describe('The spool name from spool_list, e.g. L-101-SP02. Needed for scope spool.'),
+    sheet: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe('Sheet number (1-based) of the isometric of the line, from define_isometric / export_isometric. Needed for scope sheet.'),
     includeBolting: z
       .boolean()
       .optional()
@@ -44,14 +53,18 @@ export const pipingBom = defineCommand({
       ),
   }),
   run: (doc, params): CommandResult => {
-    if ((params.scope !== 'document' && params.lineId === undefined) || (params.scope === 'spool' && params.spoolId === undefined))
+    if (
+      (params.scope !== 'document' && params.lineId === undefined) ||
+      (params.scope === 'spool' && params.spoolId === undefined) ||
+      (params.scope === 'sheet' && params.sheet === undefined)
+    )
       return refuseIso(
         doc,
         'piping_bom',
         'ISO_PARAM_INVALID',
-        `scope ${params.scope} needs ${params.scope === 'spool' ? 'lineId and spoolId' : 'lineId'}`,
+        `scope ${params.scope} needs ${params.scope === 'spool' ? 'lineId and spoolId' : params.scope === 'sheet' ? 'lineId and sheet' : 'lineId'}`,
         [],
-        ['lineId', 'spoolId'],
+        ['lineId', 'spoolId', 'sheet'],
       );
     const lineIds = params.scope === 'document' ? allLineIds(doc) : [params.lineId as string];
     if (lineIds.length === 0) return refuseIso(doc, 'piping_bom', 'ISO_NO_PIPING', 'the document has no piping');
@@ -71,12 +84,37 @@ export const pipingBom = defineCommand({
         [params.lineId as string],
         ['spoolId'],
       );
+    const sheetPlan =
+      params.scope === 'sheet'
+        ? definedPlan(analyses[0] as LineAnalysis, (analyses[0] as LineAnalysis).fabrication.isometrics?.[params.lineId as string])
+        : null;
+    if (params.scope === 'sheet' && sheetPlan === null)
+      return refuseIso(
+        doc,
+        'piping_bom',
+        'ISO_ISOMETRIC_NOT_DEFINED',
+        `line ${params.lineId} has no isometric definition: run define_isometric first`,
+        [params.lineId as string],
+        ['sheet'],
+      );
+    const sheetInfo = sheetPlan?.sheets.find((sheet) => sheet.index === params.sheet);
+    if (sheetPlan !== null && sheetInfo === undefined)
+      return refuseIso(
+        doc,
+        'piping_bom',
+        'ISO_SHEET_NOT_FOUND',
+        `line ${params.lineId} has ${sheetPlan.sheets.length} sheet(s), not sheet ${params.sheet}`,
+        [params.lineId as string],
+        ['sheet'],
+      );
+    const sheetIndices = new Set(sheetInfo?.indices ?? []);
     const rows = new Map<string, BomRow>();
     const missing: string[] = [];
     const bolting: Bolting[] = [];
     for (const analysis of analyses) {
       const spoolPosition = params.scope === 'spool' ? names.indexOf(params.spoolId as string) : -1;
-      const inScope = (index: number): boolean => spoolPosition < 0 || analysis.spools.spoolOf.get(index) === spoolPosition;
+      const inScope = (index: number): boolean =>
+        params.scope === 'sheet' ? sheetIndices.has(index) : spoolPosition < 0 || analysis.spools.spoolOf.get(index) === spoolPosition;
       const result = bomRows(analysis.read.network.components, inScope);
       missing.push(...result.withoutItemCode);
       for (const row of result.rows) {
@@ -142,7 +180,7 @@ export const pipingBom = defineCommand({
     const list = [...rows.values()];
     return report(
       doc,
-      `piping_bom: ${params.scope}${params.scope === 'document' ? '' : ` ${params.lineId}${params.spoolId === undefined ? '' : `/${params.spoolId}`}`}: ${list.length} item(s)` +
+      `piping_bom: ${params.scope}${params.scope === 'document' ? '' : ` ${params.lineId}${params.spoolId === undefined ? '' : `/${params.spoolId}`}${params.scope === 'sheet' ? `/sheet ${params.sheet}` : ''}`}: ${list.length} item(s)` +
         `${list.some((row) => row.unit === 'm') ? `, pipe ${list.filter((row) => row.unit === 'm').reduce((sum, row) => sum + row.quantity, 0)} m` : ''}` +
         `${merged === undefined ? '' : `; bolting: ${merged.joints} flanged joint(s), ${merged.gaskets} gasket(s), ${merged.studBolts} stud bolt(s)${merged.diameter === null ? '' : ` ${merged.diameter} in`}`}` +
         `${warnings.length === 0 ? '' : `; warnings: ${warnings.map((warning) => warning.code).join(', ')}`}`,

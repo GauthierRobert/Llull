@@ -20,7 +20,7 @@ const largest = (values: ReadonlyArray<readonly [number, string]>): readonly [nu
  * Height = the highest of the active rulesets' nominal (else minimum) top-rail height; toe plate = the highest minimum; knee rails = the fewest
  * for which the clear space between rails (top rail and toe plate included) is within the smallest limit of the active rulesets.
  */
-export function railingDefaults(rulesets: ReadonlyArray<RulesetName>, railDepthMm: number): RailingDefaults {
+export function railingDefaults(rulesets: ReadonlyArray<RulesetName>, railDepthMm: number, withToePlate = true): RailingDefaults {
   const iso = rulesets.includes('iso_14122');
   const osha = rulesets.includes('osha_1910');
   const tops: Array<readonly [number, string]> = [];
@@ -38,7 +38,8 @@ export function railingDefaults(rulesets: ReadonlyArray<RulesetName>, railDepthM
     gaps.push([ruleById('OSHA-GRD-MID').maxOpening ?? Infinity, 'OSHA-GRD-MID']);
   }
   const [heightMm, heightRow] = largest(tops);
-  const [toePlateMm, toeRow] = largest(toes);
+  const [toeRuleMm, toeRow] = largest(toes);
+  const toePlateMm = withToePlate ? toeRuleMm : 0;
   const [gapLimit, gapRow] = gaps.reduce((best, value) => (value[0] < best[0] ? value : best));
   let kneeRails = 0;
   while (kneeRails < 10 && (heightMm - toePlateMm - (kneeRails + 1) * railDepthMm) / (kneeRails + 1) > gapLimit) kneeRails++;
@@ -48,7 +49,7 @@ export function railingDefaults(rulesets: ReadonlyArray<RulesetName>, railDepthM
     kneeRails,
     basis: [
       `height ${heightMm} mm (${heightRow})`,
-      `toePlate ${toePlateMm} mm (${toeRow})`,
+      `toePlate ${toePlateMm} mm (${withToePlate ? toeRow : 'none on a stair side'})`,
       `kneeRails ${kneeRails} (clear space <= ${gapLimit} mm, ${gapRow})`,
     ],
   };

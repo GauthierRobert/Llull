@@ -3,6 +3,7 @@
 import { z } from '@core/commands/schema';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { isRecord } from '@lib/isRecord';
+import { PAPER_SIZES } from '@core/model/sheet';
 import { PCF_COMPONENT_TYPES } from './model';
 
 const vec3 = z.array(z.number()).length(3);
@@ -69,6 +70,25 @@ const weld = z.object({
   status: z.enum(['active', 'orphaned']),
 });
 
+const isometric = z.object({
+  lineId: z.string(),
+  style: z.enum(['check', 'final', 'spool']),
+  paper: z.enum(PAPER_SIZES),
+  maxPipePiecesPerSheet: z.number().int().min(1).optional(),
+  splitAt: z.enum(['weld', 'flange']),
+  northArrow: z.enum(['up_right', 'up_left']),
+  sheetAssignment: z.record(z.string(), z.number().int().min(1)),
+});
+const issued = z.object({
+  id: z.string().min(1),
+  lineId: z.string(),
+  revision: z.string().min(1),
+  purpose: z.enum(['for_construction', 'for_fabrication']),
+  signer: z.string().min(1),
+  signatureId: z.string().min(1),
+  basisSha256: z.string().length(64),
+});
+
 const fabrication = z.object({
   version: z.literal(1),
   pcfLines: z.record(z.string(), line),
@@ -77,6 +97,8 @@ const fabrication = z.object({
   welds: z.record(z.string(), weld).optional(),
   highestWeldNumber: z.record(z.string(), z.number().int().min(0)).optional(),
   spoolBreaks: z.record(z.string(), z.array(z.enum(['field_welds', 'flanged_joints', 'line_ends']))).optional(),
+  isometrics: z.record(z.string(), isometric).optional(),
+  issues: z.record(z.string(), issued).optional(),
 });
 
 const ROOT = 'plant.fabrication';
@@ -101,7 +123,7 @@ function crossErrors(pcfLines: unknown): string[] {
 }
 
 /** Weld records: the key equals the id and is `<lineId>#<n>`, a number is used once per line. */
-function weldErrors(welds: unknown, fieldWelds: unknown): string[] {
+function weldErrors(welds: unknown, fieldWelds: unknown, isometrics: unknown, issues: unknown): string[] {
   const errors: string[] = [];
   const seen = new Set<string>();
   if (isRecord(welds))
@@ -114,6 +136,12 @@ function weldErrors(welds: unknown, fieldWelds: unknown): string[] {
       if (seen.has(number)) errors.push(`${path}.number: ${String(value['number'])} is used twice on the line`);
       seen.add(number);
     }
+  if (isRecord(isometrics))
+    for (const [key, value] of Object.entries(isometrics))
+      if (isRecord(value) && value['lineId'] !== key) errors.push(`${ROOT}.isometrics.${key}.lineId: must equal its key`);
+  if (isRecord(issues))
+    for (const [key, value] of Object.entries(issues))
+      if (isRecord(value) && value['id'] !== key) errors.push(`${ROOT}.issues.${key}.id: must equal its key`);
   if (isRecord(fieldWelds))
     for (const [key, value] of Object.entries(fieldWelds))
       if (isRecord(value) && value['id'] !== key) errors.push(`${ROOT}.fieldWelds.${key}.id: must equal its key`);
@@ -124,5 +152,7 @@ function weldErrors(welds: unknown, fieldWelds: unknown): string[] {
 export function fabricationErrors(raw: unknown): string[] {
   if (raw === undefined) return [];
   const shape = sliceSchemaErrors(fabrication, raw, ROOT);
-  return isRecord(raw) ? [...shape, ...crossErrors(raw['pcfLines']), ...weldErrors(raw['welds'], raw['fieldWelds'])] : shape;
+  return isRecord(raw)
+    ? [...shape, ...crossErrors(raw['pcfLines']), ...weldErrors(raw['welds'], raw['fieldWelds'], raw['isometrics'], raw['issues'])]
+    : shape;
 }

@@ -16,8 +16,8 @@ export const INSTRUMENT_INDEX_COLUMNS = [
   'sheet',
 ] as const;
 
-/** `measuredLine` = where the measuring signal into the instrument taps (line number or nozzle); `controls` = the valves whose actuating system it controls. */
-export function instrumentIndex(pid: PidModel, sheetId?: string): ListResult {
+/** Rows with the id of their instrument (the P&ID instrument provider of 08 DAT joins on it). `measuredLine` = where the measuring signal into the instrument taps (line number or nozzle); `controls` = the valves whose actuating system it controls. */
+export function instrumentEntries(pid: PidModel, sheetId?: string): Entry[] {
   const measured = new Map<string, string>();
   const controls = new Map<string, string[]>();
   for (const id of pid.itemOrder) {
@@ -46,5 +46,10 @@ export function instrumentIndex(pid: PidModel, sheetId?: string): ListResult {
       },
     });
   }
-  return { columns: INSTRUMENT_INDEX_COLUMNS, rows: sortedRows(entries, 'tag') };
+  return entries;
 }
+
+export const instrumentIndex = (pid: PidModel, sheetId?: string): ListResult => ({
+  columns: INSTRUMENT_INDEX_COLUMNS,
+  rows: sortedRows(instrumentEntries(pid, sheetId), 'tag'),
+});

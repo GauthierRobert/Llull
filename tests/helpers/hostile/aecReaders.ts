@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
+import { readStep } from '@lib/stepRead';
 import { parseDn, parseNps } from '@aec/plant/catalog/nominal';
 import { parseCatalogFile } from '@aec/plant/catalog/file';
 import { parseTagFormat } from '@aec/plant/data/tagFormat';
@@ -88,6 +89,9 @@ const SPEC = '02-spec-driven-routing/validation/data/spec_cs150.json';
 const CATALOG = '02-spec-driven-routing/validation/data/catalog_stub_cs150.json';
 
 const LINE_NUMBER_FIELDS = { dn: 100, service: 'HC', sequence: '001', spec: 'A1A' } as const;
+
+const STEP_HEAD = "ISO-10303-21;\nHEADER;\nFILE_SCHEMA(('IFC4X3_ADD2'));\nENDSEC;\nDATA;\n";
+const STEP_TAIL = 'ENDSEC;\nEND-ISO-10303-21;\n';
 
 export const AEC_READERS: readonly HostileReader[] = [
   {
@@ -238,5 +242,25 @@ export const AEC_READERS: readonly HostileReader[] = [
       return [parseNps(text), parseDn(text), parseRating(text), parseCrossingName(text)];
     },
     accepts: () => true,
+  },
+  {
+    name: 'plant: readStep (ISO 10303-21 / IFC physical file)',
+    covers: ['core/src/lib/stepRead.ts:readStep'],
+    input: 'text',
+    build: (records) =>
+      repeated(STEP_HEAD, (k) => `#${k + 1}=IFCPUMP('0abc',$,'P-${k}',$,$,$,$,'P-${k}',.ENDSUCTION.);\n`, STEP_TAIL, records),
+    nest: (depth) => `${STEP_HEAD}#1=A(${'('.repeat(depth)}${')'.repeat(depth)});\n${STEP_TAIL}`,
+    extra: [
+      {
+        name: 'many references to missing entities (the error list is capped)',
+        input: () => repeated(STEP_HEAD, (k) => `#${k + 1}=IFCRELNESTS(#${k + 1_000_000},#${k + 2_000_000});\n`, STEP_TAIL, 100_000),
+      },
+      { name: 'half a million unterminated quotes', input: () => `${STEP_HEAD}#1=A('${"''".repeat(500_000)}` },
+      { name: 'one million open parentheses', input: () => `${STEP_HEAD}#1=A(${'('.repeat(1_000_000)}` },
+      { name: 'many records without a body', input: () => repeated(STEP_HEAD, (k) => `#${k}=\n`, STEP_TAIL, 100_000) },
+    ],
+    read: (input) => readStep(asText(input)),
+    accepts: (result) => (result as ReturnType<typeof readStep>).entities.size === 3,
+    budgetMs: 10_000,
   },
 ];

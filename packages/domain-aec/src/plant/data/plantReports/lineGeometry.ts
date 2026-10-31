@@ -10,7 +10,7 @@ import { routeLength } from '@aec/industrial/piping/routeSupport';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { isProcessLine } from '../lines';
-import { getPlantData, type PlantObject } from '../model';
+import { getPlantData, type PlantDataModel, type PlantObject } from '../model';
 import { getPiping } from '../../piping/model';
 import { round6 } from './types';
 
@@ -28,7 +28,14 @@ export interface LineGeometry {
 
 const NONE: LineGeometry = { lengthM: null, straights: null, bends: null, start: null, end: null, dn: null };
 
-function polylinesOf(doc: CadDocument, object: PlantObject): { points: readonly Vec3[]; dn?: number }[] {
+/** A centreline of a pipe bound to a line; `runId` names the routed run (02 RTE) it comes from, absent for a legacy pipe of the building slice. */
+export interface LinePolyline {
+  readonly points: readonly Vec3[];
+  readonly dn?: number;
+  readonly runId?: string;
+}
+
+export function polylinesOf(doc: CadDocument, object: PlantObject): LinePolyline[] {
   const target = object.target;
   if (target.kind === 'buildingElement') {
     const building = getBuilding(doc);
@@ -44,20 +51,26 @@ function polylinesOf(doc: CadDocument, object: PlantObject): { points: readonly 
       const run = piping.runs[runId];
       if (run === undefined || run.lineId !== target.id) return [];
       const dn = run.dn ?? line?.dn;
-      return [{ points: [run.start.point, ...run.pis, run.end.point], ...(dn === undefined ? {} : { dn }) }];
+      return [{ points: [run.start.point, ...run.pis, run.end.point], runId, ...(dn === undefined ? {} : { dn }) }];
     });
   }
   return [];
 }
 
-/** Geometry of every process line object, by object id. */
-export function lineGeometries(doc: CadDocument): ReadonlyMap<string, LineGeometry> {
-  const data = getPlantData(doc);
+/** Objects that name a line object as their , by line object id. */
+export function membersByLine(data: PlantDataModel): ReadonlyMap<string, PlantObject[]> {
   const members = new Map<string, PlantObject[]>();
   for (const id of data.objectOrder) {
     const object = data.objects[id];
     if (object?.lineId !== undefined) members.set(object.lineId, [...(members.get(object.lineId) ?? []), object]);
   }
+  return members;
+}
+
+/** Geometry of every process line object, by object id. */
+export function lineGeometries(doc: CadDocument): ReadonlyMap<string, LineGeometry> {
+  const data = getPlantData(doc);
+  const members = membersByLine(data);
   const result = new Map<string, LineGeometry>();
   for (const id of data.objectOrder) {
     const line = data.objects[id];

@@ -61,7 +61,7 @@ export const buildingSchedule = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only BUILDING schedule table (like Revit schedules; not a mechanical BOM: see bill_of_materials) for one element category: wall, door, window, room, slab, column, beam, stair, ' +
-    'member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, connection, grating (panels: type, supports, area, mass), railing (length, posts, rails, steel mass), ladder (height, rungs, pitch, fall protection, steel mass) or support (pipe supports: mark, ' +
+    'member (steel cut list), footing, panel, equipment, pipe (line list), tray, plate, connection, grating (panels: type, supports, area, mass), railing (length, posts, rails, steel mass), ladder (height, rungs, pitch, fall protection, steel mass), stair_steel (steel stringer stairs: rise, risers, going, width, landings, steel mass) or support (pipe supports: mark, ' +
     'line, pipe, type, steel it bears on, position, hanger rod length, attached / UNATTACHED) — one row per element with mark, level, ' +
     'dimensions, material and quantities. Column and beam rows give the NET volume (same rule as quantity_takeoff: slab > column > beam, overlaps counted once) in "Volume (m³)" and the raw prism in "Gross volume (m³)". data.csv is spreadsheet-ready.',
   params: z.object({ kind: z.enum(SCHEDULE_KINDS).describe('Which schedule to produce.') }),

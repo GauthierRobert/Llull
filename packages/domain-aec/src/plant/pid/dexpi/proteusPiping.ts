@@ -13,6 +13,7 @@ import {
   portsOf,
   readAttributes,
   register,
+  tagOf,
   type ImportContext,
   type Pending,
 } from './proteusContext';
@@ -21,7 +22,7 @@ function mapComponent(ctx: ImportContext, el: XmlElement, pending: Pending): voi
   const read = readAttributes(ctx, el);
   const known = classify(ctx, el, KNOWN_PIPING_CLASSES);
   const { ports, nodePort } = portsOf(ctx, el);
-  const base = baseOf(ctx, el, known.dexpiClass, read, { passthrough: known.passthrough });
+  const base = baseOf(ctx, el, known.dexpiClass, read, { passthrough: known.passthrough, tag: tagOf(read) });
   const first = ports[0];
   const last = ports[ports.length - 1];
   const at: Vec2 =
@@ -39,6 +40,8 @@ function mapComponent(ctx: ImportContext, el: XmlElement, pending: Pending): voi
     ports: padded,
     ...(dn === undefined ? {} : { dn }),
     ...(pipingClass === undefined ? {} : { pipingClass }),
+    ...(read.passthrough['pid:reversed'] === 'true' ? { reversed: true } : {}),
+    ...(read.passthrough['pid:operated'] === 'true' ? { operated: true } : {}),
   });
   const ref = { type: 'inline', id: base.id, ports: padded, nodePort } as const;
   register(ctx, el, ref);

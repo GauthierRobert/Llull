@@ -14,7 +14,7 @@ export const CATEGORY_LAYER: Readonly<Record<BimCategory, { name: string; color:
   pipe: { name: 'P-PIPE', color: '#2f9c8f' }, tray: { name: 'E-TRAY', color: '#a07c2c' }, plate: { name: 'S-CONN', color: '#5d6f80' },
   curvedWall: { name: 'A-WALL', color: '#8a8a8a' }, connection: { name: 'S-CONN', color: '#5d6f80' },
   pipeSupport: { name: 'P-SUPP', color: '#c9a227' }, grating: { name: 'S-GRAT', color: '#8f9aa3' }, railing: { name: 'S-RAIL', color: '#d4a72c' },
-  ladder: { name: 'S-LADR', color: '#c98a1d' },
+  ladder: { name: 'S-LADR', color: '#c98a1d' }, steelStair: { name: 'S-STAR', color: '#b98a2e' },
 };
 
 /** Layer per steel member role (AIA structural sub-layers). */

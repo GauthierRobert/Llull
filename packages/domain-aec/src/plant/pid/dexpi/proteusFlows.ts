@@ -2,7 +2,7 @@
 
 import { xmlAttr, xmlChildren } from '@lib/xmlRead';
 import type { Vec2 } from '@core/model/vectors';
-import type { PidSignal } from '../model';
+import { PID_SIGNAL_KINDS, type PidSignal } from '../model';
 import { endpointOf, pointOfEndpoint } from './proteusConnect';
 import {
   addItem,
@@ -15,7 +15,9 @@ import {
   type Pending,
 } from './proteusContext';
 
-function signalKind(dexpiClass: string): PidSignal['signalKind'] {
+export function signalKindOf(dexpiClass: string, written?: string | undefined): PidSignal['signalKind'] {
+  const kept = PID_SIGNAL_KINDS.find((kind) => kind === written);
+  if (kept !== undefined) return kept;
   const name = dexpiClass.toLowerCase();
   if (name.includes('measuring')) return 'measuring';
   if (name.includes('pneumatic')) return 'pneumatic';
@@ -36,7 +38,12 @@ export function buildFlows(ctx: ImportContext, pending: Pending): void {
     const to = endpointOf(ctx, toId, node('ToNode'), points[points.length - 1] ?? anchor, connection ?? el);
     const route = points.length >= 2 ? points : [pointOfEndpoint(ctx, from), pointOfEndpoint(ctx, to)];
     const dexpiClass = xmlAttr(el, 'ComponentClass') || 'InformationFlow';
-    const base = baseOf(ctx, el, dexpiClass, readAttributes(ctx, el), { at: route[0] });
-    addItem(ctx, { ...base, kind: 'signal', signalKind: signalKind(dexpiClass), from, to, route });
+    const read = readAttributes(ctx, el);
+    // A flow without a Connection element ends through associations: the exporter writes it the same way (census key connections).
+    const base = baseOf(ctx, el, dexpiClass, read, {
+      at: route[0],
+      ...(connection === undefined ? { passthrough: { 'dexpi:association': 'true' } } : {}),
+    });
+    addItem(ctx, { ...base, kind: 'signal', signalKind: signalKindOf(dexpiClass, read.passthrough['pid:signalKind']), from, to, route });
   }
 }

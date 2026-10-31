@@ -223,6 +223,8 @@ export interface PidModel {
   /** findingKey -> acceptance. */
   readonly acceptances?: Readonly<Record<string, PidAcceptance>>;
   readonly imports?: readonly PidImportRecord[];
+  /** Explicit P&ID item id (equipment or line) -> building element id (equipment or pipe) pairs of `link_pid_item`; `check_pid_3d` pairs them before it matches tags. */
+  readonly links?: Readonly<Record<string, string>>;
   /** Per-prefix counters for generated names (sequence numbers). */
   readonly counters: Readonly<Record<string, number>>;
 }

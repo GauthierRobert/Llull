@@ -1,4 +1,4 @@
-/** Plant 04 PID: the plugin is installed with its toolset (M2: import_dexpi and pid_report) and its document extension validates `plant.pid` only. */
+/** Plant 04 PID: the plugin is installed with its toolset (M2 to M5) and its document extension validates `plant.pid` only. */
 
 import { describe, expect, it } from 'vitest';
 import { pidPlugin } from '@aec/index';
@@ -8,8 +8,13 @@ import { listCommands } from '@core/commands/registry';
 
 const PID_COMMANDS = [
   'import_dexpi',
+  'export_dexpi',
+  'list_pid_symbols',
+  'export_pid_svg',
   'pid_report',
   'check_pid',
+  'check_pid_3d',
+  'link_pid_item',
   'parse_instrument_tag',
   'create_pid_sheet',
   'add_pid_equipment',
@@ -28,7 +33,7 @@ const PID_COMMANDS = [
 ];
 
 describe('pid plugin', () => {
-  it('is the pid toolset with the M2 to M4 commands and adds no derived entity', () => {
+  it('is the pid toolset with the M2 to M7 commands and adds no derived entity', () => {
     expect(pidPlugin).toMatchObject({ name: 'pid', toolset: 'pid' });
     expect(pidPlugin.commands.map((command) => command.name)).toEqual(PID_COMMANDS);
     expect(TOOLSET_NAMES).toContain('pid');

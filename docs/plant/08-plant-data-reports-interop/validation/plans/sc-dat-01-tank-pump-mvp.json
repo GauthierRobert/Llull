@@ -1,6 +1,6 @@
 {
   "id": "SC-DAT-01",
-  "status": "PARTLY BUILT — DAT-M1 built define_plant_hierarchy, define_plant_class, assign_plant_object and check_plant_data, DAT-M2 built plant_report (the steps run in tests/unit/plant/data/scenarioPlans.test.ts); still flagged \"unbuilt\": true: the `schema` param of export_ifc (M3).",
+  "status": "BUILT — DAT-M1 built define_plant_hierarchy, define_plant_class, assign_plant_object and check_plant_data, DAT-M2 plant_report, DAT-M3 the `schema` param of export_ifc: every step runs in tests/unit/plant/data/scenarioPlans.test.ts.",
   "validates": [
     "VC-DAT-01",
     "VC-DAT-02",
@@ -335,11 +335,10 @@
     },
     {
       "command": "export_ifc",
-      "unbuilt": true,
       "params": {
+        "schema": "IFC4X3_ADD2",
         "timestamp": "2026-10-18T00:00:00"
-      },
-      "note": "`schema` param unbuilt; today export_ifc writes IFC4 only"
+      }
     }
   ],
   "expected": [

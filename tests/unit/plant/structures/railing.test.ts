@@ -408,7 +408,7 @@ describe('railing takeoff, schedule and persistence', () => {
         'building element railing-1: role must be guardrail or handrail',
         'building element railing-1: railProfile must be a string',
         'building element railing-1: openings must be { from, to, gate } records',
-        'building element railing-1: host must be { hostId (a slab or grating), ring, edges }',
+        'building element railing-1: host must be { hostId (a slab, grating or steel stair), ring, edges }',
       ]),
     );
     expect(buildingErrors(railed.building)).toEqual([]);

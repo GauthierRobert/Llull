@@ -3,6 +3,7 @@
 import { uint8ArrayToBase64 } from '@lib/base64';
 import { toCsv } from '@lib/csv';
 import { xlsxWrite, type XlsxSheet } from '@lib/xlsxWrite';
+import type { PlantValue } from '../model';
 import { headerOf, type ReportColumn, type ReportRow } from './types';
 
 export type DataFile = { readonly fileName: string; readonly content: string } | { readonly fileName: string; readonly base64: string };
@@ -12,11 +13,17 @@ export interface TableFile {
   readonly rows: readonly ReportRow[];
 }
 
+/** A text a spreadsheet would run as a formula (= + - @ or a control character first) gets a guard quote; import_plant_data removes it. */
+const guarded = (value: PlantValue): PlantValue =>
+  typeof value === 'string' && value !== '' && ('=+@-'.includes(value.charAt(0)) || value.charCodeAt(0) === 9 || value.charCodeAt(0) === 13)
+    ? `'${value}`
+    : value;
+
 export const csvFile = (fileName: string, table: TableFile): DataFile => ({
   fileName,
   content: toCsv(
     table.columns.map(headerOf),
-    table.rows.map((row) => table.columns.map((column) => row[column.name] ?? null)),
+    table.rows.map((row) => table.columns.map((column) => guarded(row[column.name] ?? null))),
   ),
 });
 

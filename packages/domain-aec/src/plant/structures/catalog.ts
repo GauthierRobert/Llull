@@ -8,6 +8,7 @@ import { checkGrating } from './grating/checkGrating';
 import { listGratingTypes } from './grating/listGratingTypes';
 import { updateGrating } from './grating/updateGrating';
 import { addLadder } from './ladder/addLadder';
+import { addSteelStair } from './stair/addSteelStair';
 import { addRailing } from './railing/addRailing';
 import { updateRailing } from './railing/updateRailing';
 
@@ -21,4 +22,5 @@ export const structuresCommands = commandCatalog(
   addRailing,
   updateRailing,
   addLadder,
+  addSteelStair,
 );

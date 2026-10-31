@@ -464,7 +464,7 @@ Coverage gate 90 / 85 / 90 / 90 applies (`packages/domain-aec/src/**`).
 | M2 | Catalogue families FL / RD, grating types, `add_grating`, `check_grating`, takeoff lines. **Built 2026-10-25** (§13.4) | M1 | 1.5 |
 | M3 | `add_railing` (paths, host edges, openings, gates), evaluation, IFC railing, edge coverage in `check_access`. **Built 2026-10-25** (§13.5) | M1 | 1.5 |
 | M4 | `add_ladder` (cage, LSS, landings, exits, back clearance), IFC ladder. **Built 2026-10-31** (§13.6) | M3 | 1.5 |
-| M5 | `add_steel_stair` (stringers, treads, landings, railings) | M2, M3 | 1.5 |
+| M5 | `add_steel_stair` (stringers, treads, landings, railings). **Built 2026-10-31** (§13.7) | M2, M3 | 1.5 |
 | M6 | `add_platform`, `add_circular_platform`, assemblies + derivation guard, `update_platform`, `platform_takeoff` | M2, M3 | 2.0 |
 | M7 | `add_pipe_rack`, `update_pipe_rack`, `check_steel_members` integration | M6 | 1.5 |
 | M8 | Access graph, `check_reachability`, plan symbols, schedules, golden plan, scenario runner | M4–M6 | 1.5 |
@@ -518,10 +518,10 @@ Full list with grades in [validation/sources.md](validation/sources.md). All acc
 - [R13] AISC Engineering Journal, pipe-rack design article — https://ej.aisc.org/index.php/engj/article/download/991/990
 - [R14] Roark's Formulas for Stress and Strain (simply supported beam cases) — closed forms used in §5.4
 
-## 13. As built (M1 2026-10-23, M2 and M3 2026-10-25, M4 2026-10-31)
+## 13. As built (M1 2026-10-23, M2 and M3 2026-10-25, M4 and M5 2026-10-31)
 
-Built: M4 (§13.6: `add_ladder`, ladder rules in `check_access`, evaluation, IFC ladder, takeoff and schedule), M1 (plugin skeleton, codes, rule table, `list_access_rules`, `check_access` on the concrete `stair` and on slab edges), M2 (§13.4: FL / RD bars, grating catalogue, `add_grating`, `update_grating`, `check_grating`, takeoff) and M3 (§13.5: `add_railing`, `update_railing`, evaluation, IFC for railings and gratings, railing rules and edge coverage in `check_access`). Not built:
-steel stair, platforms, pipe rack, reachability, fireproofing, plan symbols; M5..M8 stay open.
+Built: M5 (§13.7: `add_steel_stair`, steel-stair rules in `check_access`, evaluation, IFC, takeoff and schedule), M4 (§13.6: `add_ladder`, ladder rules in `check_access`, evaluation, IFC ladder, takeoff and schedule), M1 (plugin skeleton, codes, rule table, `list_access_rules`, `check_access` on the concrete `stair` and on slab edges), M2 (§13.4: FL / RD bars, grating catalogue, `add_grating`, `update_grating`, `check_grating`, takeoff) and M3 (§13.5: `add_railing`, `update_railing`, evaluation, IFC for railings and gratings, railing rules and edge coverage in `check_access`). Not built:
+platforms, pipe rack, reachability, fireproofing, plan symbols; M6..M8 stay open.
 
 ### 13.1 What exists
 
@@ -549,8 +549,9 @@ steel stair, platforms, pipe rack, reachability, fireproofing, plan symbols; M5.
 | VC-STA-02, 03 (rule rows) | the row limits and the 24 ft boundary are tested at the table level (`accessRules.test.ts`: every limit row passes at its limits and breaches just outside); the element checks are tested on the ladder since M4 (`ladder.test.ts`: every VC-STA-02 / 03 row) |
 | VC-STA-05 | passing (M3): post counts 4 / 5 for 4000 / 6000 mm, the five height / knee-rail / toe-plate rows under both rulesets, `railing.test.ts`, `scenarioPlans.test.ts` (SC-STA-05 railing and edge rows) |
 | VC-STA-06 | passing (M2): closed form against the published 19-W-4 table at every span of the pack, pedestrian span, 0.5176 mm; SC-STA-06 meets all five rows, `grating.test.ts`, `scenarioPlans.test.ts` |
-| VC-STA-12 | railing, grating and the FL / RD profile definitions passing (`ifcAccess.test.ts`, every enum string read from `data/ifc4x3_enums`); ladder (`.LADDER.`, `.STRINGER.`, `.MEMBER.`, landing `.LANDING.`) passing in `ladder.test.ts`; stair and rack strut follow M5..M7 |
+| VC-STA-12 | railing, grating and the FL / RD profile definitions passing (`ifcAccess.test.ts`, every enum string read from `data/ifc4x3_enums`); ladder (`.LADDER.`, `.STRINGER.`, `.MEMBER.`, landing `.LANDING.`) passing in `ladder.test.ts`; steel stair (`.STRAIGHT_RUN_STAIR.` / `.TWO_STRAIGHT_RUN_STAIR.` / `.USERDEFINED.`, `IfcStairFlight` `.STRAIGHT.`, `.STRINGER.`, `.LANDING.`) passing in `steelStair.test.ts`; rack strut follows M7 |
 | VC-STA-01 | passing (M4): the six heights of the pack, `ladder.test.ts`; SC-STA-01 and its 8000 mm variant in `scenarioPlans.test.ts` |
+| VC-STA-04 | passing (M5): the three rows of the pack (17 / 24 / 11 risers, 2h+g, pitch, run, ISO / OSHA outcomes), `steelStair.test.ts`; SC-STA-02 meets all its rows in `scenarioPlans.test.ts` |
 | VC-STA-07..11, 14 | not started |
 
 ### 13.4 M2 as built (2026-10-25): catalogue families FL / RD, gratings, takeoff
@@ -623,3 +624,25 @@ Decisions (owner delegated, quality first):
 - **Not in M4**: `update_ladder` (the remediation texts say to delete the ladder and add it again), plan symbols and DXF (M8), `check_clashes` for ladders, the ISO flight rule (grade C), a ladder following its platform (FR-STA-14, M6). Landings are stored as heights only.
 - **Outside the lane**: `src/ui/panels/building/describeElement.ts` (exhaustive element labels, as in M3: 4 lines). Existing tool text changed: `check_access` (description, `include` enum gains `ladders`, `ids` description) and `building_schedule` (description, `kind` enum gains `ladder`).
 - **Plans**: SC-STA-01 and SC-STA-05 start the ladder on the Grade level (`levelId: $grade`) because the base z is level-relative; the SC-STA-01 variant also raises the platform level to 8000 so that an arrival surface exists. Both plans run in full in `scenarioPlans.test.ts`; `blockedPlanCommands.json` lost their `add_ladder` entries (SC-STA-07 still waits for `add_circular_platform` and `check_reachability`).
+
+### 13.7 M5 as built (2026-10-31): steel stringer stairs
+
+| Part | Where | Notes |
+| ---- | ----- | ----- |
+| Element | `building/types.ts` `SteelStairElement` (category `steelStair`, mark `SS<n>`, layer `S-STAR`), `stair/steelStairLayout.ts`, `stair/steelStairMeasure.ts`, `evaluate/evaluateSteelStair.ts` | Merged meshes, one entity per part: `stringers`, `treads`, `landings` (at most 3 entities). |
+| `add_steel_stair` | `stair/addSteelStair.ts`, registered in `catalog.ts` | Toolset `plant_structures`. |
+| Rules | `access/stairChecks.ts` (`checkSteelStair`), wired into `checkAccess.ts` (`include: "stairs"` covers both stair kinds, `data.checked.stairs` counts both) | Same rows as the concrete stair: ISO Blondel / width / flight rise (B), OSHA riser / tread / angle / width. Flight rise = the longest flight between landings. |
+| IFC | `exchange/ifcSteelStairExport.ts` | `IfcStair` (`.STRAIGHT_RUN_STAIR.`, one landing `.TWO_STRAIGHT_RUN_STAIR.`, more `.USERDEFINED.` with ObjectType) aggregating one `IfcStairFlight` `.STRAIGHT.` per flight (the treads as its body), the `IfcMember` `.STRINGER.` pieces and the `IfcSlab` `.LANDING.` plates; `Pset_llullSteelStair`. Hand-rails export as the usual `IfcRailing` `.HANDRAIL.`. |
+| Takeoff / schedule | `quantities/accessTakeoff.ts` | `steelStair.stringer.m`, `steelStair.tread.ea`, `steelStair.landing.ea`, `steelStair.steel.kg` (the group is the category name); `building_schedule` kind `stair_steel`. Hand-rails are railing lines. |
+| Persistence | `validateAccess.ts` | start, catalogue stringer profile, integer riser count >= 2, tread (catalogue grating or plate with thickness), landings ascending leaving flights of 2+ risers; a hand-rail host may be a steel stair. |
+
+Decisions (owner delegated, quality first):
+
+- **Geometry (§5.2)**: riser i stands at s_i (s_1 = 0), its tread top is i x h and spans s_i .. s_(i+1); a landing after riser k lengthens that span to the landing length. n = ceil(rise / riserMax - 1e-9), h = rise / n, treads = n - 1 - landings, run = s_n = treads x going + landing lengths. The clear `width` is between the stringer webs; the stringers (any catalogue section, default UPN200) stand outside it. Treads and landings are plates between them: grating prisms one bar deep or checker plate of the given thickness.
+- **Stringers** run first to last nosing of each flight, dropped by half the section depth, so a flight needs 2+ risers (a landing leaving fewer is refused). No base plates, end cuts or landing beams (deviation: the spec's "2 stringer members" are two per flight inside the stair element, not `add_steel_member` members with a new role `stringer`: they would add elements that `check_steel_members` and the derivation guards do not need yet).
+- **Hand-rails** (`railings` none / left / right / both, default none): one `railing` element of role `handrail` per side along the nosing line, hosted on the stair (`host { hostId: stair, ring: 'boundary', edges: [0] }` left, `[1]` right of the climb direction), so they move with the stair and are deleted with it; moving one alone is refused. Height is the highest top-rail row of the rulesets (1100 mm with both), knee rails the fewest within the smallest gap limit, no toe plate; all named in `data.defaults`. `check_access` lists hand-rails as not evaluated (no hand-rail rule rows). Deviation: the spec's `railingIds` field is not stored; the rails are found by their host.
+- **Defaults** (named in `data.defaults`, no literal limits except the named section / tread defaults): width = the largest of ISO-STR-WIDTH preferred (800 mm) and OSHA-STR-WIDTH (558.8 mm) among the rulesets; tread grating 19-W-4 1-1/4x3/16; landing length = max(width, OSHA-STR-LANDING 762 mm with osha_1910). `riserMax` and `going` are required (no rule fixes them for both rulesets). `angle` is in radians.
+- **Top surface**: `toSurfaceId` (slab or grating) computes the rise and needs the top end of the stair within 600 mm of the surface in plan (`STA_NO_ARRIVAL_SURFACE`); with an explicit `rise` the nearest surface within 50 mm / 600 mm is only recorded as `arrivalSurfaceId`.
+- **byId**: `data.byId.<id>.findings` holds indices into `data.findings` (as for every element); the pack's SC-STA-02 rows that read `byId.$st2.findings[code=...]` now read `data.findings[code=...]` (plan edited, status line updated).
+- **Not in M5**: `update_steel_stair` (delete and add again; the remediation texts say so), headroom over the pitch line (`ISO-STR-HEADROOM`, still under `notEvaluated`), landing depth (`OSHA-STR-LANDING`), plan symbol and DXF (M8), `check_clashes` for stairs, a stair following its platform (M6), `check_steel_members` loads, quarter-turn / half-turn steel stairs.
+- **Outside the lane**: `src/ui/panels/building/describeElement.ts` (exhaustive element labels, 5 lines). No UI behaviour was added. Existing tool text changed: `check_access` (description, `ids` and `include` descriptions) and `building_schedule` (description, `kind` enum gains `stair_steel`). The remediation texts of the `STA_STAIR_*` codes name the steel-stair params as well.

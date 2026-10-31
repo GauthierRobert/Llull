@@ -45,6 +45,20 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Nothing to fix if the flange is not ASME B16.5: otherwise name the pressure class in the flange item code (e.g. FLWN-100-150) so the bolt table row can be found.',
   ISO_FIELD_WELD_STALE:
     'The weld no longer lies on a pipe of the line (it was edited): it is ignored; delete the line data or re-add the weld.',
+  ISO_DISCONNECTED:
+    'Reconnect the listed components (their connection points must coincide within 0.1 mm) or split them into separate lines.',
+  ISO_DIMENSION_MISMATCH: 'Report a bug with the plan: a dimension string must close to its overall by construction.',
+  ISO_UNVERIFIED_CATALOGUE: 'Verify the spec rows of the listed components (01 PSC) before the isometric is issued.',
+  ISO_SHEET_OVERFLOW:
+    'Use a larger paper, or split the line over sheets: define_isometric with maxPipePiecesPerSheet (a cut is possible only at a weld, or a flanged joint with splitAt flange).',
+  ISO_SHEET_NOT_FOUND: 'Pass a sheet number between 1 and the number of sheets (export_isometric lists them in data.sheets).',
+  ISO_ISOMETRIC_NOT_DEFINED: 'Run define_isometric for the line first: sheets exist only for a defined isometric.',
+  ISO_ISSUE_STALE:
+    'The line changed after it was issued: the isometric is NOT FOR CONSTRUCTION again; a human issues it anew (issue_isometric).',
+  ISO_HUMAN_GATE:
+    'Ask the reviewer to issue the isometric in the desktop app: confirmation is a signature object over the act, produced there.',
+  ISO_CHECK_FAILED: 'Fix the errors check_isometric lists for the line (style final), then issue again.',
+  ISO_REVIEW_REQUIRED: 'An unissued isometric is for review only (NOT FOR CONSTRUCTION): a human issues it.',
   ISO_SPOOL_WEIGHT_INCOMPLETE: 'Components without a WEIGHT are not counted: the spool weight is a lower bound.',
 };
 

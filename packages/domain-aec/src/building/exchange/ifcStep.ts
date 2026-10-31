@@ -41,14 +41,22 @@ export function ifcReal(value: number): string {
 
 export class StepWriter {
   private readonly records: string[] = [];
+  private readonly types = new Map<string, number>();
 
   add(entity: string): string {
     this.records.push(entity);
+    const type = entity.slice(0, entity.indexOf('('));
+    this.types.set(type, (this.types.get(type) ?? 0) + 1);
     return `#${this.records.length}`;
   }
 
   get count(): number {
     return this.records.length;
+  }
+
+  /** Number of records of an entity type (upper case, `IFCPIPESEGMENT`). */
+  countOf(type: string): number {
+    return this.types.get(type) ?? 0;
   }
 
   data(): string {

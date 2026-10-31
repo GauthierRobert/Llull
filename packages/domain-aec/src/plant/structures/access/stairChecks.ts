@@ -1,10 +1,11 @@
-/** Rule evaluation of the existing concrete `stair` element (06 STA M1; steel stairs come with M5). */
+/** Rule evaluation of stairs (06 STA M1 concrete `stair`, M5 `steelStair`): Blondel, riser, tread, pitch, width, flight rise. */
 
 import type { CadDocument } from '@core/model/types';
 import { toMm } from '@core/model/units';
-import type { StairElement } from '@aec/building/types';
+import type { StairElement, SteelStairElement } from '@aec/building/types';
 import type { StaCode } from '../codes';
 import { ruleById, type AccessRule, type RulesetName } from '../rules/ruleTable';
+import { stairGeometryMm } from '../stair/steelStairMeasure';
 import { breachFinding, type Finding } from './finding';
 
 /** Stair quantities in mm / degrees. */
@@ -32,6 +33,21 @@ export function stairMeasures(doc: CadDocument, stair: StairElement): StairMeasu
   };
 }
 
+/** Measures of a steel stair; the longest flight is the largest gap between landings. */
+function steelStairMeasures(doc: CadDocument, stair: SteelStairElement): StairMeasures {
+  const geometry = stairGeometryMm(doc, stair);
+  const cuts = [0, ...stair.landings.map((landing) => landing.afterRiser), stair.riserCount];
+  const longestFlight = Math.max(...cuts.slice(1).map((cut, index) => cut - (cuts[index] as number)));
+  return {
+    riser: geometry.riser,
+    going: geometry.going,
+    width: toMm(doc, stair.width),
+    pitchDeg: geometry.pitchDeg,
+    blondel: geometry.blondel,
+    flightRise: longestFlight * geometry.riser,
+  };
+}
+
 interface StairCheck {
   readonly ruleId: string;
   readonly code: StaCode;
@@ -49,23 +65,28 @@ const STAIR_CHECKS: readonly StairCheck[] = [
   { ruleId: 'OSHA-STR-WIDTH', code: 'STA_STAIR_WIDTH', measure: (m) => m.width },
 ];
 
-/** Rows that need data M1 does not have, reported as not evaluated rather than silently passed. */
+/** Rows that need data the stair checks do not have, reported as not evaluated rather than silently passed. */
 export const STAIR_RULES_NOT_EVALUATED: ReadonlyArray<{ readonly ruleId: string; readonly reason: string }> = [
-  { ruleId: 'ISO-STR-HEADROOM', reason: 'headroom over the pitch line is not evaluated in M1 (use check_model for stair/slab headroom)' },
-  { ruleId: 'OSHA-STR-LANDING', reason: 'landing depth and width are not evaluated in M1' },
-  { ruleId: 'OSHA-STR-UNIFORM', reason: 'a concrete stair has equal risers and treads by construction' },
+  { ruleId: 'ISO-STR-HEADROOM', reason: 'headroom over the pitch line is not evaluated (use check_model for stair/slab headroom)' },
+  { ruleId: 'OSHA-STR-LANDING', reason: 'landing depth and width are not evaluated' },
+  { ruleId: 'OSHA-STR-UNIFORM', reason: 'a stair has equal risers and treads by construction' },
 ];
 
 /** Rows evaluated for the requested rulesets. */
 export const stairRules = (rulesets: readonly RulesetName[]): AccessRule[] =>
   STAIR_CHECKS.map((check) => ruleById(check.ruleId)).filter((rule) => rulesets.includes(rule.ruleset));
 
-export function checkStair(doc: CadDocument, stair: StairElement, rulesets: readonly RulesetName[]): Finding[] {
-  const measures = stairMeasures(doc, stair);
+function findingsOf(measures: StairMeasures, id: string, rulesets: readonly RulesetName[]): Finding[] {
   return STAIR_CHECKS.flatMap((check) => {
     const rule = ruleById(check.ruleId);
     if (!rulesets.includes(rule.ruleset)) return [];
-    const finding = breachFinding(rule, check.code, stair.id, check.measure(measures));
+    const finding = breachFinding(rule, check.code, id, check.measure(measures));
     return finding === null ? [] : [finding];
   });
 }
+
+export const checkStair = (doc: CadDocument, stair: StairElement, rulesets: readonly RulesetName[]): Finding[] =>
+  findingsOf(stairMeasures(doc, stair), stair.id, rulesets);
+
+export const checkSteelStair = (doc: CadDocument, stair: SteelStairElement, rulesets: readonly RulesetName[]): Finding[] =>
+  findingsOf(steelStairMeasures(doc, stair), stair.id, rulesets);

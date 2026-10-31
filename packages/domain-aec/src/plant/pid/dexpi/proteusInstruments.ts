@@ -1,7 +1,7 @@
 /** Proteus ProcessInstrumentationFunction, ActuatingSystem and InstrumentationLoopFunction -> instrument, actuating and loop items (plant 04 PID §6.1). */
 
 import { xmlAttr, xmlChildren, type XmlElement } from '@lib/xmlRead';
-import type { PidActuating, PidInstrument } from '../model';
+import { PID_INSTRUMENT_DISPLAYS } from '../model';
 import {
   addItem,
   associations,
@@ -15,28 +15,7 @@ import {
   type Pending,
   type ReadAttributes,
 } from './proteusContext';
-
-const LOCATIONS: ReadonlyArray<readonly [RegExp, PidInstrument['location']]> = [
-  [/^field/i, 'field'],
-  [/central/i, 'central'],
-  [/panel/i, 'local_panel'],
-  [/auxiliary/i, 'auxiliary'],
-];
-
-const ACTUATORS: ReadonlyArray<readonly [RegExp, PidActuating['actuator']]> = [
-  [/diaphragm/i, 'diaphragm'],
-  [/piston/i, 'piston'],
-  [/motor|electric/i, 'motor'],
-  [/solenoid/i, 'solenoid'],
-  [/hydraulic/i, 'hydraulic'],
-];
-
-const FAIL_ACTIONS: ReadonlyMap<string, NonNullable<PidActuating['failAction']>> = new Map([
-  ['FailClose', 'FC'],
-  ['FailOpen', 'FO'],
-  ['FailLock', 'FL'],
-  ['FailIndeterminate', 'FAI'],
-]);
+import { actuatorOf, failActionOf, locationOf } from './proteusVocab';
 
 /** An instrument (+ its nested signal generating and actuating functions); its information flows are queued for the second pass. */
 export function mapInstrument(ctx: ImportContext, el: XmlElement, pending: Pending): void {
@@ -45,11 +24,14 @@ export function mapInstrument(ctx: ImportContext, el: XmlElement, pending: Pendi
   const functions = read.raw.get('ProcessInstrumentationFunctionsAssignmentClass') ?? '';
   const loopNumber = read.raw.get('ProcessInstrumentationFunctionNumberAssignmentClass') ?? '';
   const letters = `${category}${functions}`;
-  const tag = letters === '' && loopNumber === '' ? undefined : [letters, loopNumber].filter((part) => part !== '').join(' ');
+  const derived = letters === '' && loopNumber === '' ? undefined : [letters, loopNumber].filter((part) => part !== '').join(' ');
+  const tag = read.raw.get('TagNameAssignmentClass') || derived;
   const locationText = read.raw.get('LocationSpecialization') ?? '';
-  const location = LOCATIONS.find(([pattern]) => pattern.test(locationText))?.[1] ?? 'field';
+  const location = locationOf(locationText);
+  const shown = read.passthrough['pid:display'];
+  const display = PID_INSTRUMENT_DISPLAYS.find((name) => name === shown) ?? 'discrete';
   const base = baseOf(ctx, el, xmlAttr(el, 'ComponentClass') || 'ProcessInstrumentationFunction', read, { tag });
-  addItem(ctx, { ...base, kind: 'instrument', category, functions, loopNumber, location, display: 'discrete' });
+  addItem(ctx, { ...base, kind: 'instrument', category, functions, loopNumber, location, display });
   register(ctx, el, { type: 'instrument', id: base.id });
   for (const child of xmlChildren(el)) {
     if (child.local === 'InformationFlow') pending.flows.push(child);
@@ -101,7 +83,7 @@ export function mapActuating(ctx: ImportContext, el: XmlElement, pending: Pendin
     valveReference === undefined ? undefined : readAttributes(ctx, valveReference),
   );
   const device = read.raw.get('DeviceTypeNameAssignmentClass') ?? '';
-  const failAction = FAIL_ACTIONS.get(read.raw.get('FailActionSpecialization') ?? '');
+  const failAction = failActionOf(read.raw.get('FailActionSpecialization') ?? '');
   const controllerId = pending.controllers.get(systemId);
   const base = baseOf(ctx, el, xmlAttr(el, 'ComponentClass') || 'ActuatingSystem', read, {
     tag: read.raw.get('ActuatingSystemNumberAssignmentClass'),
@@ -111,7 +93,7 @@ export function mapActuating(ctx: ImportContext, el: XmlElement, pending: Pendin
     ...base,
     kind: 'actuating',
     valveId: valve.id,
-    actuator: ACTUATORS.find(([pattern]) => pattern.test(device))?.[1] ?? 'general',
+    actuator: actuatorOf(device),
     ...(failAction === undefined ? {} : { failAction }),
     ...(controllerId === undefined ? {} : { controllerId }),
   });

@@ -1,9 +1,13 @@
-/** Tag register (plant 08 DAT §5.9): every tag of the objects in scope with class, hierarchy, the model object it stands for and its status. */
+/**
+ * Tag register (plant 08 DAT §5.9): every tag of the objects in scope with class, hierarchy, the model object it stands for and its status. M5: when the report covers the
+ * whole plant it also lists the tags of the 04 PID instruments no plant object stands for, `reserved` (the P&ID holds the tag; target kind `pidInstrument`).
+ */
 
 import type { CadDocument } from '@core/model/types';
 import { pathOf } from '../hierarchy';
 import { getPlantData, type PlantObject } from '../model';
-import { elementOf } from '../providers';
+import { elementOf, getProvider } from '../providers';
+import { objectRegistry } from '../registry';
 import { columnOf, type ReportColumn, type ReportRow, type ReportTable } from './types';
 
 const COLUMNS: readonly ReportColumn[] = [
@@ -16,7 +20,7 @@ const COLUMNS: readonly ReportColumn[] = [
   columnOf('id', 'ObjectId', 'text', null, 'derived'),
 ];
 
-export function tagRegister(doc: CadDocument, scoped: readonly PlantObject[]): ReportTable {
+export function tagRegister(doc: CadDocument, scoped: readonly PlantObject[], wholePlant: boolean): ReportTable {
   const data = getPlantData(doc);
   const counts = { modelled: 0, reserved: 0, orphan: 0 };
   const rows = scoped.map((object): ReportRow => {
@@ -33,5 +37,19 @@ export function tagRegister(doc: CadDocument, scoped: readonly PlantObject[]): R
       id: object.id,
     };
   });
+  const claimed = objectRegistry(data).byTarget;
+  for (const element of wholePlant ? (getProvider('pidInstrument')?.elements(doc) ?? []) : []) {
+    if (claimed.has(`pidInstrument:${element.id}`)) continue;
+    counts.reserved += 1;
+    rows.push({
+      tag: element.tag ?? null,
+      className: null,
+      hierarchy: null,
+      targetKind: 'pidInstrument',
+      target: element.label,
+      status: 'reserved',
+      id: null,
+    });
+  }
   return { columns: COLUMNS, rows, keyColumn: 'tag', method: 'none', totals: { tags: rows.length, ...counts }, defaults: {} };
 }

@@ -68,6 +68,26 @@ function sheetErrors(raw: Record<string, unknown>): string[] {
   return errors;
 }
 
+/** `links`: pid item id (an equipment or a line of `items`) -> non-empty building element id, each element linked once. */
+function linkErrors(raw: Record<string, unknown>): string[] {
+  const links = raw['links'];
+  if (links === undefined) return [];
+  if (!isRecord(links)) return ['plant.pid.links must be an object'];
+  const items = isRecord(raw['items']) ? raw['items'] : {};
+  const errors: string[] = [];
+  const seen = new Set<string>();
+  for (const [key, value] of Object.entries(links)) {
+    const item = Object.hasOwn(items, key) ? items[key] : undefined;
+    if (isReservedKey(key)) errors.push(`plant.pid.links.${key}: the name is reserved`);
+    else if (!isRecord(item) || (item['kind'] !== 'equipment' && item['kind'] !== 'line'))
+      errors.push(`plant.pid.links.${key} must name an equipment or a line item`);
+    if (!nonEmpty(value)) errors.push(`plant.pid.links.${key} must be a non-empty building element id`);
+    else if (seen.has(value as string)) errors.push(`plant.pid.links.${key}: the element "${String(value)}" is linked twice`);
+    else seen.add(value as string);
+  }
+  return errors;
+}
+
 function recordErrors(raw: Record<string, unknown>): string[] {
   const errors: string[] = [];
   const acceptances = raw['acceptances'];
@@ -107,6 +127,7 @@ function recordErrors(raw: Record<string, unknown>): string[] {
           errors.push(`${path}.census must map names to non-negative integers`);
       });
   }
+  errors.push(...linkErrors(raw));
   const counters = raw['counters'];
   if (!isRecord(counters) || !Object.values(counters).every((n) => Number.isInteger(n) && (n as number) >= 0))
     errors.push('plant.pid.counters must map names to non-negative integers');
