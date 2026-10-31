@@ -37,7 +37,8 @@ describe.skipIf(!hasEsbuild)('desktop main bundle', () => {
     expect(existsSync(path.join(out, 'preload.js'))).toBe(true);
     const main = readFileSync(path.join(out, 'main.js'), 'utf8');
     expect(main).not.toMatch(/resvg/i);
-    expect(main).not.toMatch(/\.node["')]/);
+    // a quoted path ending in .node (an addon), not a property access such as stage.node)
+    expect(main).not.toMatch(/["'`][^"'`\n]*\.node["'`]/);
   });
 
   it('the preload requires only electron and exposes exactly exportThreeMf, which invokes the one channel with no argument', async () => {
