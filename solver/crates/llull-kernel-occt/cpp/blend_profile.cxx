@@ -15,6 +15,7 @@
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -414,6 +415,30 @@ std::vector<Spec> specs_of(rust::Slice<const double> raw) {
   return specs;
 }
 
+// The half space on the outer side of the oblique end plane `end`, as a box of side `2 extent` and depth `extent`.
+static TopoDS_Shape outer_box(const EndPlane &end, double extent) {
+  const gp_Ax2 frame(end.point, gp_Dir(end.normal));
+  const gp_Pnt corner = end.point.Translated(frame.XDirection().XYZ() * (-extent) + frame.YDirection().XYZ() * (-extent));
+  return BRepPrimAPI_MakeBox(gp_Ax2(corner, gp_Dir(end.normal), frame.XDirection()), 2 * extent, 2 * extent, extent).Shape();
+}
+
+// The volume of the solid that stands in the part of a convex tool beyond the oblique end planes (what the cut would notch), or -1 when it cannot be
+// computed.
+static double notched_volume(const TopoDS_Shape &solid, const TopoDS_Shape &tool, const EndPlane (&ends)[2], double extent) {
+  double notched = 0.0;
+  for (const EndPlane &end : ends) {
+    if (!end.oblique) continue;
+    BRepAlgoAPI_Common beyond(tool, outer_box(end, extent));
+    if (!beyond.IsDone() || beyond.HasErrors()) return -1.0;
+    BRepAlgoAPI_Common meeting(beyond.Shape(), solid);
+    if (!meeting.IsDone() || meeting.HasErrors()) return -1.0;
+    GProp_GProps props;
+    BRepGProp::VolumeProperties(meeting.Shape(), props);
+    notched += std::fabs(props.Mass());
+  }
+  return notched;
+}
+
 // A fused tool run past an oblique end is cut back to the solid's side of the end plane (a box on the outer side of each oblique end), so the
 // tool ends flush on the end face; the lateral face keeps the name `blend_name`, the others are renamed by index.
 static bool trim_to_ends(Tool &tool, const EndPlane (&ends)[2], double extent, const std::string &blend_name, std::string &why) {
@@ -425,9 +450,7 @@ static bool trim_to_ends(Tool &tool, const EndPlane (&ends)[2], double extent, c
   arguments.Append(tool.shape);
   for (const EndPlane &end : ends) {
     if (!end.oblique) continue;
-    const gp_Ax2 frame(end.point, gp_Dir(end.normal));
-    const gp_Pnt corner = end.point.Translated(frame.XDirection().XYZ() * (-extent) + frame.YDirection().XYZ() * (-extent));
-    cutters.Append(BRepPrimAPI_MakeBox(gp_Ax2(corner, gp_Dir(end.normal), frame.XDirection()), 2 * extent, 2 * extent, extent).Shape());
+    cutters.Append(outer_box(end, extent));
   }
   BRepAlgoAPI_Cut cut;
   cut.SetArguments(arguments);
@@ -560,7 +583,22 @@ bool make_tool(const TopoDS_Shape &shape, const std::vector<std::string> &edge_n
   }
   const std::string blend_name = "blend(" + edge_names[static_cast<size_t>(spec.edge)] + ")";
   if (!spandrel_tool(tool_start, tool_end, a.Translated(back), b.Translated(back), spec.kind, spec.param, wedge, blend_name, tool, why)) return false;
-  return !oblique || tool.convex || trim_to_ends(tool, ends, 2.0 * (length + before + after + reach), blend_name, why);
+  if (!oblique) return true;
+  const double extent = 2.0 * (length + before + after + reach);
+  if (!tool.convex) return trim_to_ends(tool, ends, extent, blend_name, why);
+  // The cut removes the whole prism: whatever the solid has in the part beyond an end plane (a rib, a boss, a hole rim between the end plane and the far
+  // cap) would be notched with it.
+  const double notched = notched_volume(shape, tool.shape, ends, extent);
+  if (notched < 0.0) {
+    why = "the part of the blend tool beyond an oblique end of " + label + " could not be checked against the solid";
+    return false;
+  }
+  if (notched > 1e-9 * leg1 * leg2 * (length + before + after)) {
+    why = "the solid stands in the way beyond an oblique end of " + label + " (" + std::to_string(notched) +
+          " of volume within the blend tool past the end face: a rib, boss or hole rim next to that end); the cut would notch it";
+    return false;
+  }
+  return true;
 }
 
 }  // namespace
@@ -664,10 +702,12 @@ static thread_local std::string g_last_reason;
 // builder (curved edges and faces, any size law). `specs` is empty when a size varies; `laws` is empty when a leg is asymmetric.
 static std::unique_ptr<Shape> build_blend(const Shape &source, rust::Slice<const double> specs, rust::Slice<const uint32_t> edges,
                                           rust::Slice<const double> laws, double kind, double param, std::string &notes, std::string &why) {
+  std::string prism_why;
   if (!specs.empty()) {
     bool scope = false;
     std::unique_ptr<Shape> built = build_profile(source, specs, notes, why, scope);
     if (built || !scope || laws.empty()) return built;
+    prism_why = why;
   }
   if (laws.empty()) {
     why = why.empty() ? "profile specification is malformed" : why;
@@ -683,7 +723,17 @@ static std::unique_ptr<Shape> build_blend(const Shape &source, rust::Slice<const
       return nullptr;
     }
   }
-  return rails_blend(source, edges, laws, static_cast<int>(kind), param, notes, why);
+  std::unique_ptr<Shape> built = rails_blend(source, edges, laws, static_cast<int>(kind), param, notes, why);
+  if (built || prism_why.empty()) return built;
+  // A straight edge between planar faces is the prism builder's own case: its reason is the specific one, the rail builder's follows.
+  bool straight = true;
+  for (const uint32_t index : edges) {
+    EdgeFrame probe;
+    std::string ignored;
+    straight = straight && edge_frame(source.shape, static_cast<int>(index), "profile blends", probe, ignored);
+  }
+  why = straight ? prism_why + " (the rail builder, tried next, says: " + why + ")" : why + " (the prism builder says: " + prism_why + ")";
+  return nullptr;
 }
 
 std::unique_ptr<Shape> fillet_profile(const Shape &shape, rust::Slice<const double> specs) {
