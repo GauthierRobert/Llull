@@ -134,6 +134,14 @@ struct EdgeSide {
   }
 };
 
+// The length of a loop edge (Simpson over 32 steps of the speed).
+double edge_length(const EdgeSide &edge) {
+  constexpr int kSteps = 32;
+  double sum = 0;
+  for (int step = 0; step <= kSteps; ++step) sum += (step == 0 || step == kSteps ? 1.0 : (step % 2 == 1 ? 4.0 : 2.0)) * edge.tangent(static_cast<double>(step) / kSteps).Magnitude();
+  return sum / (3.0 * kSteps);
+}
+
 // A part [a, b] of loop edge `edge` (in the s of that edge) that covers [s0, s1] of the chain.
 struct Piece {
   size_t edge = 0;
@@ -520,7 +528,7 @@ bool normal_of(const Handle(Geom_BSplineSurface) &surface, double u, double v, V
 }  // namespace
 
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint) {
+           const CentreHint &hint, bool spokes_at_every_vertex) {
   const size_t raw_count = loop.size();
   if (raw_count < 3 || supports.size() != raw_count) {
     why = "the hole has fewer than 3 edges";
@@ -601,13 +609,13 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
       why = "an edge of the hole has no tangent at a vertex";
       return false;
     }
-    if (leaving * arriving < std::cos(kCornerAngle)) cuts.push_back(static_cast<double>(k));
+    if (spokes_at_every_vertex || leaving * arriving < std::cos(kCornerAngle)) cuts.push_back(static_cast<double>(k));
   }
   // Fewer than 3 corners (a hole bounded by smooth curves): spokes also leave from the middles of the longest edges, where one support is smooth.
   const size_t wanted = std::max<size_t>(3, std::min<size_t>(raw_count, kSmoothSpokes));
   if (cuts.size() < wanted) {
     std::vector<std::pair<double, size_t>> by_length;
-    for (size_t k = 0; k < raw_count; ++k) by_length.emplace_back(-star.raw[k].tangent(0.5).Magnitude(), k);
+    for (size_t k = 0; k < raw_count; ++k) by_length.emplace_back(-edge_length(star.raw[k]), k);
     std::sort(by_length.begin(), by_length.end());
     for (size_t at = 0; at < by_length.size() && cuts.size() < wanted; ++at) cuts.push_back(static_cast<double>(by_length[at].second) + 0.5);
     std::sort(cuts.begin(), cuts.end());
@@ -723,9 +731,13 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
   // The centre: 3/8 of the mean height of the tangent planes of the vertices above the centroid. For a hole bounded by a cylinder arc and a plane chord the exact (thin plate) surface
   // passes there to 4e-6 of the volume of the corner (13.21.4).
   double centre_height = 0.375 * height / static_cast<double>(m);
+  bool from_hint = false;
   if (hint) {
     double known = 0;
-    if (hint(gp_Pnt(centroid), gp_Dir(centre_normal), known)) centre_height = known;
+    if (hint(gp_Pnt(centroid), gp_Dir(centre_normal), known)) {
+      centre_height = known;
+      from_hint = true;
+    }
   }
   if (!place(star, centroid, centre_height, scale, why)) return false;
   // The patches.
@@ -743,6 +755,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     const double angle_limit = poles == kPoleCounts[std::size(kPoleCounts) - 1] ? max_angle : 0.25 * max_angle;
     out = Patches();
     out.centre = star.centre;
+    out.centre_from_hint = from_hint;
     std::vector<Handle(Geom_BSplineSurface)> surfaces;
     for (const Patch &patch : patches) {
       Handle(Geom_BSplineSurface) surface = interpolate(patch, poles);

@@ -1206,3 +1206,77 @@ fn the_vertex_of_a_circular_edge_a_straight_edge_and_a_cylinder_gets_the_star() 
     let volume = mass_properties(&built).unwrap().volume;
     assert!((volume - reference).abs() < 1e-3 * reference, "{volume} against the rolling-ball blend {reference}");
 }
+
+fn dshape_vertex() -> (Shape, [f64; 3], Vec<usize>) {
+    let block = make_box([0.0; 3], [10.0, 10.0, 5.0]).unwrap().unwrap();
+    let cylinder = crate::make_cylinder(12.0, 5.0).unwrap().unwrap();
+    let dshape = boolean(BooleanOp::Intersect, &block, &cylinder, true).unwrap().unwrap();
+    let vertex = [10.0, (144.0_f64 - 100.0).sqrt(), 5.0];
+    let meeting = edges_at(&dshape, vertex);
+    (dshape, vertex, meeting)
+}
+
+/// BLD §13.22 review: why the loop is cut into chains with spokes only at corners (or the middles of edges). The loop of a ball cut is smooth at every vertex; with a spoke at EVERY vertex (hook 6)
+/// the twist conditions of the two sub-patches at a smooth vertex disagree where the support curvature jumps (a plane against a blend) and the star leaves its supports by 0.03 to 0.09 rad on the
+/// cylinder block (r 0.5 / 1 / 2) and on the cube; with the chains (hook 5) the same holes pass at 1.4e-3 to 2.2e-3.
+#[test]
+fn a_spoke_at_every_vertex_of_a_smooth_hole_leaves_the_supports_where_chains_do_not() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (dshape, vertex, meeting) = dshape_vertex();
+    crate::test_bridge::set_corner_trim(true);
+    for (radius, setback) in [(0.5, 1.2), (1.0, 2.0), (2.0, 3.0)] {
+        let (edges, corners) = spec(&dshape, &meeting, radius, &[vertex], setback);
+        crate::test_bridge::set_corner_exact_patch(5);
+        let built = fillet_setback(&dshape, &edges, &corners).unwrap().expect("chains: the star is accepted");
+        assert!(worst_patch_angle(&built) < 0.0095, "{radius}: {}", worst_patch_angle(&built));
+        crate::test_bridge::set_corner_exact_patch(6);
+        let reason = setback_reason(&dshape, &edges, &corners).unwrap();
+        let angle: f64 =
+            reason.split("supports by ").nth(1).and_then(|rest| rest.split(' ').next()).and_then(|text| text.parse().ok()).unwrap_or(0.0);
+        assert!(
+            reason.contains("the exact-boundary patch was refused") && angle > 0.0095,
+            "{radius} {setback}: spokes at every vertex: {reason}"
+        );
+    }
+    let (shape, edges, corners) = cube_corner_step();
+    crate::test_bridge::set_corner_exact_patch(6);
+    assert!(setback_reason(&shape, &edges, &corners).unwrap().contains("the exact-boundary patch was refused"));
+    // a 4-valent vertex (the apex of the pyramid: an 8-edge loop, chains of two pieces): chains 1.3e-3 and 3.6e-3 rad, a spoke at every vertex 0.041 and 0.034
+    let pyramid = pyramid();
+    let topo = topology(&pyramid).unwrap();
+    let lateral: Vec<usize> = topo["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|(_, edge)| num(&edge["start"][2]) > 9.0 || num(&edge["end"][2]) > 9.0)
+        .map(|(index, _)| index)
+        .collect();
+    for setback in [1.5, 2.5] {
+        let (edges, corners) = spec(&pyramid, &lateral, 0.5, &[[5.0, 5.0, 10.0]], setback);
+        crate::test_bridge::set_corner_exact_patch(5);
+        let built = fillet_setback(&pyramid, &edges, &corners).unwrap().expect("chains: the star is accepted");
+        assert!(worst_patch_angle(&built) < 0.0095);
+        crate::test_bridge::set_corner_exact_patch(6);
+        let reason = setback_reason(&pyramid, &edges, &corners).unwrap();
+        assert!(reason.contains("the exact-boundary patch was refused") && reason.contains("supports by 0.0"), "{setback}: {reason}");
+    }
+}
+
+/// BLD §13.22 review: the oriented check of the sewn solid is part of the trim path. A star that passes its own measures but fails after the fills (hook 3) is built again with the plate (26 faces on
+/// the cube); when the plate fails too (hook 4) the message carries both.
+#[test]
+fn a_trimmed_step_whose_star_fails_after_the_fills_is_built_again_with_the_plate() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, edges, corners) = cube_corner_step();
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(3);
+    let retried = fillet_setback(&shape, &edges, &corners).unwrap().expect("the plate builds it");
+    assert_eq!(split_faces(topology(&retried).unwrap()["faces"].as_array().unwrap()), (18, 8));
+    crate::test_bridge::set_corner_exact_patch(4);
+    assert!(fillet_setback(&shape, &edges, &corners).unwrap().is_none());
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.contains("(the exact-boundary patch was refused: [BLD_CORNER_FAILED] forced by the test hook"), "{reason}");
+}

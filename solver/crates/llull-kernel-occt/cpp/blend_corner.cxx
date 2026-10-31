@@ -740,6 +740,7 @@ struct FillJob {
   bool has_centre = false;
   std::string exact_problem;          // why the exact star was refused
   TopoDS_Compound hole_copy;          // a copy of the faces the patch replaces, when they are a smooth surface that knows its centre (13.22)
+  bool hinted = false;                // the centre of the star was taken from the replaced surface
   bool allow_star = true;             // false: the plate only (the star failed after the sewing)
   std::vector<size_t> patch_part;     // 1 when the sub-patch starts inside that loop edge
   std::vector<size_t> patch_loop;     // the loop edge each sub-patch of a star has as its bottom (empty for the plate patch)
@@ -798,7 +799,7 @@ bool fill_hole(FillJob &job, const FillSetting &setting, double patch_gap_limit,
 std::atomic<int> g_corner_threads{0};  // 0: LLULL_CORNER_THREADS, else the hardware (test hook: set_corner_threads)
 std::atomic<int> g_last_threads{0};    // the threads the last fill_all used (test hook: last_corner_threads)
 std::atomic<int> g_fault_corner{-1};   // test hook: the corner whose fill throws std::bad_alloc
-std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills, 5: no plate fallback)
+std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills, 5: no plate fallback, 6: like 5 with a spoke at every vertex of the hole)
 std::atomic<bool> g_force_trim{false};   // test hook: set_corner_trim (the rolling-ball trim builder for every step, 13.22)
 std::atomic<int> g_spawn_limit{-1};    // test hook: the worker whose creation fails
 
@@ -839,7 +840,8 @@ bool fill_exact(FillJob &job, double diagonal) {
         }
       return best < 1e299;
     };
-  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint)) return false;
+  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6)) return false;
+  job.hinted = exact.centre_from_hint;
   job.patches = exact.faces;
   job.patch_loop = exact.loop_index;
   job.patch_part = exact.part;
@@ -856,7 +858,7 @@ void fill_corner(FillJob &job, double patch_gap_limit, double diagonal) {
       job.filled = true;
       return;
     }
-    if (g_exact_mode.load() == 5 && !job.exact_problem.empty()) {
+    if (g_exact_mode.load() >= 5 && !job.exact_problem.empty()) {
       job.problem = "was not filled: the exact-boundary patch was refused: " + job.exact_problem;  // test hook 5: no fallback, the reason is the message
       return;
     }
@@ -1092,8 +1094,12 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     add_all(maker.Generated(corner_vertices[c]));
     double minimum = 0;
     for (TopTools_ListIteratorOfListOfShape it(maker.Generated(corner_vertices[c])); it.More(); it.Next())
-      for (TopExp_Explorer vertices(it.Value(), TopAbs_VERTEX); vertices.More(); vertices.Next())
-        minimum = std::max(minimum, BRep_Tool::Pnt(TopoDS::Vertex(vertices.Current())).Distance(corners[c].at));
+      for (TopExp_Explorer edges(it.Value(), TopAbs_EDGE); edges.More(); edges.Next()) {
+        if (BRep_Tool::Degenerated(TopoDS::Edge(edges.Current()))) continue;
+        const BRepAdaptor_Curve curve(TopoDS::Edge(edges.Current()));
+        for (int sample = 0; sample <= 10; ++sample)
+          minimum = std::max(minimum, curve.Value(curve.FirstParameter() + (curve.LastParameter() - curve.FirstParameter()) * sample / 10.0).Distance(corners[c].at));
+      }
     TopTools_IndexedMapOfShape incident_faces;
     for (TopTools_ListIteratorOfListOfShape faces(vertex_faces_all.FindFromKey(corner_vertices[c])); faces.More(); faces.Next()) incident_faces.Add(faces.Value());
     for (int f = 1; f <= incident_faces.Extent(); ++f) {
@@ -1195,9 +1201,16 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   }
   fill_all(jobs, patch_gap_limit, diagonal);
   for (const FillJob &job : jobs) star_used = star_used || !job.patch_loop.empty();
+  if ((g_exact_mode.load() == 3 && star_used) || g_exact_mode.load() == 4) {
+    fill_failed = true;
+    why = std::string(kFailed) + "forced by the test hook after the fills";
+    return nullptr;
+  }
   TopTools_IndexedMapOfShape dropped;
   std::vector<TopoDS_Face> patches;
   std::vector<std::string> patch_names;
+  std::vector<bool> patch_is_star;
+  std::vector<std::string> corner_kinds(corners.size()), corner_centres(corners.size());
   double worst_patch_gap = 0;
   for (size_t c = 0; c < corners.size(); ++c) {
     FillJob &job = jobs[c];
@@ -1227,6 +1240,9 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     for (size_t k = 0; k < job.patches.size(); ++k) {
       patches.push_back(job.patches[k]);
       patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
+      patch_is_star.push_back(!job.patch_loop.empty());
+      corner_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
+      corner_centres[c] = job.hinted ? "surface" : "rule";
     }
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
   }
@@ -1277,12 +1293,38 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     why = std::string(kFailed) + "the corner patches left a solid of volume " + number(volume_after) + " (rolling-ball blend " + number(volume_rounded) + ", the rolling-ball blend holds " + number(ball_volume) + " inside the balls)";
     return nullptr;
   }
+  // The oriented G1 check of every sub-patch of a star on the sewn solid: the star's own measures sample the boundary only, a sign flip inside a sub-patch ends here and the step is built again with the plate.
+  {
+    TopTools_IndexedDataMapOfShapeListOfShape solid_edge_faces;
+    TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, solid_edge_faces);
+    for (size_t p = 0; p < patches.size(); ++p) {
+      if (!patch_is_star[p]) continue;
+      double worst = 0;
+      if (!oriented_patch_angle(TopoDS::Face(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]), solid_edge_faces, worst)) {
+        fill_failed = true;
+        why = std::string(kFailed) + "a sub-patch of the corner star is not tangent to its neighbours in the sewn solid (outward normals differ by " + number(worst) + " rad, limit " +
+              number(kMixedFillAngle) + (worst > kPi / 2 ? ": it faces the other way" : "") + ")";
+        return nullptr;
+      }
+    }
+  }
   const TopTools_IndexedMapOfShape final_faces = query::distinct(solid, TopAbs_FACE);
   std::vector<std::string> names(static_cast<size_t>(final_faces.Extent()));
   for (size_t m = 0; m < members.size(); ++m) {
     const TopoDS_Shape image = sewing.IsModified(members[m]) ? sewing.Modified(members[m]) : members[m];
     const int index = final_faces.FindIndex(image);
     if (index > 0) names[static_cast<size_t>(index - 1)] = member_names[m];
+  }
+  {
+    // the log with the kind of patch and where the centre of the star came from (the replaced surface, or the 3/8 rule of 13.21.4 when it crosses no axis)
+    JsonWriter log;
+    log.begin_array();
+    for (size_t c = 0; c < corners.size(); ++c) {
+      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(corner_kinds[c]).key("centre").string(corner_centres[c]).key("setbacks").begin_array();
+      for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
+      log.end_array().end_object();
+    }
+    corners_json = log.end_array().text();
   }
   return naming::wrap_named(solid, names);
 }
