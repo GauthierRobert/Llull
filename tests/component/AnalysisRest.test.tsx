@@ -48,7 +48,7 @@ vi.mock('@ui/services/localQuery', async (importOriginal) => {
   };
 });
 
-const originalDispatch = useStore.getState().dispatch;
+const originalDispatch = useStore.getInitialState().dispatch;
 let dispatched: Array<{ name: string; params: Record<string, unknown> }> = [];
 
 function seedAnalysis(): string {

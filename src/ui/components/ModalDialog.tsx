@@ -1,7 +1,9 @@
 // Shared modal shell: backdrop closes on a direct hit, role="dialog" with Escape-to-close and a Tab trap, initial
-// focus on open, focus returned to the opener on close.
+// focus on open, focus returned to the opener on close. Portalled to <body>: opened from a menu, an ancestor with
+// backdrop-filter / transform would otherwise become the containing block of its fixed backdrop and trap it there.
 
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { focusableElements, trapTab } from '@ui/focusTrap';
 
 interface ModalDialogProps {
@@ -61,7 +63,7 @@ export function ModalDialog({
     if (event.target === event.currentTarget) onClose();
   };
 
-  return (
+  return createPortal(
     <div className={backdropClassName} {...(closeOn === 'click' ? { onClick: closeOnHit } : { onMouseDown: closeOnHit })}>
       <div
         ref={dialogRef}
@@ -83,6 +85,7 @@ export function ModalDialog({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

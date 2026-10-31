@@ -54,6 +54,9 @@ const DEFORM = [
 const AUDIT: Readonly<Record<string, Answer>> = {
   'core/src/codegen/featureProgram.ts': { commands: ['export_code'] },
   'core/src/codegen/skinLowering.ts': { commands: ['export_code'] },
+  'core/src/commands/brep/faceTriangles.ts': {
+    display: 'inspect_face_triangles labels the display triangles of the viewport tessellation, by design',
+  },
   'core/src/commands/edit/decals.ts': { commands: ['add_decal'] },
   'core/src/commands/deform/sourceMesh.ts': { commands: DEFORM },
   'core/src/commands/deform/target.ts': { commands: DEFORM },

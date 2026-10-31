@@ -62,8 +62,7 @@ export function CageGizmo({ cage, selection, onDraggingChanged }: CageGizmoProps
       const { axis, angleDeg } = quaternionAxisAngle(delta);
       updateGesture({ kind: 'rotate', axis, angleDeg, pivot });
     } else {
-      const factor = (target.scale.x + target.scale.y + target.scale.z) / 3;
-      updateGesture({ kind: 'scale', factor, pivot });
+      updateGesture({ kind: 'scale', factors: [target.scale.x, target.scale.y, target.scale.z], pivot });
     }
   }, [mode]);
 

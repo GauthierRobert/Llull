@@ -215,7 +215,7 @@ function meshNote(subject: string, entity: Entity): string {
     return `WRP_CODEGEN_UNSUPPORTED: ${subject} has an emboss, deboss, scribe or split on a face (03 WRP) that no generated code expresses; exported as the exact result's triangle mesh (export_step through the native kernel, without the Python bridge, keeps the exact faces).`;
   const blend = entity.kind === 'mesh' && entity.brep !== undefined && blendNotExpressible(entity.brep);
   return blend
-    ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with two distances or an angle, a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`
+    ? `BLD_CODEGEN_UNSUPPORTED: ${subject} has a blend (a chamfer with two distances or an angle, a variable distance chamfer, a conic / curvature profile or a two-leg fillet) no generated code expresses; exported as the exact result's triangle mesh.`
     : `${subject} has no analytic form; exported as a triangle mesh.`;
 }
 
@@ -483,9 +483,17 @@ function skippedSurfaceNote(doc: CadDocument): string[] {
 const STRAIGHT_LAW_NOTE =
   'straight radius law exported as a graded-node spline (OCP has no exact straight law), within 1e-8 relative of the exact volume (adaptive reading, measured 3e-10); the native kernel and its STEP carry the exact law.';
 
+/** The note of a program that exports a monotone radius law: OCP interpolates the dense nodes of the exact curve with its own cubic. */
+const MONOTONE_LAW_NOTE =
+  'monotone radius law exported as 12 nodes per piece on the exact curve, interpolated by the own cubic spline of OCP: within 2e-6 relative of the exact volume and 2e-3 of the radius (measured, 06 BLD 13.23); the native kernel and its STEP carry the exact law.';
+
 function withStraightLawNote(program: FeatureProgram): FeatureProgram {
-  const straight = program.features.some((feature) => feature.op === 'fillet' && (feature.laws ?? []).some((law) => law.linear));
-  return straight ? { ...program, notes: [...program.notes, STRAIGHT_LAW_NOTE] } : program;
+  const laws = program.features.flatMap((feature) => (feature.op === 'fillet' ? (feature.laws ?? []) : []));
+  const notes = [
+    ...(laws.some((law) => law.linear) ? [STRAIGHT_LAW_NOTE] : []),
+    ...(laws.some((law) => law.monotone === true) ? [MONOTONE_LAW_NOTE] : []),
+  ];
+  return notes.length === 0 ? program : { ...program, notes: [...program.notes, ...notes] };
 }
 
 function buildProgram(

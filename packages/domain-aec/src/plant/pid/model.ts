@@ -189,6 +189,10 @@ export interface PidImportRecord {
   readonly version: string;
   readonly sha256: string;
   readonly warnings: readonly string[];
+  /** Sheet the import created. */
+  readonly sheetId?: string;
+  /** Source-file counters no item carries (census keys `connections`, `danglingConnections`, `shapeCatalogueEntries`). */
+  readonly census?: Readonly<Record<string, number>>;
 }
 
 /** Accepted finding: who and why (error-severity findings need a human signature, AF-34). */

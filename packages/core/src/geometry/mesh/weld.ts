@@ -10,6 +10,10 @@ export interface WeldedMesh {
   readonly triangles: number[];
   /** Input vertices referenced by a triangle minus welded vertices. */
   readonly mergedVertices: number;
+  /** Welded vertex of every input vertex (-1: unreferenced by a triangle). */
+  readonly remap: Int32Array;
+  /** Input vertex whose coordinates each welded vertex has (the first one that reached it). */
+  readonly origin: number[];
 }
 
 /** Diagonal of the bounding box of flat xyz positions; 0 when empty. */
@@ -37,6 +41,7 @@ export function weldMesh(mesh: MeshData, tolerance: number): WeldedMesh {
   // Buckets are keyed by a 32-bit hash of the cell (or of the exact coordinates); a collision only adds candidates, which are checked by distance.
   const buckets = new Map<number, number[]>();
   const triangles: number[] = [];
+  const origin: number[] = [];
   let referenced = 0;
   const hash = (a: number, b: number, c: number): number =>
     (Math.imul(a, 0x9e3779b1) ^ Math.imul(b, 0x85ebca77) ^ Math.imul(c, 0xc2b2ae3d)) | 0;
@@ -92,10 +97,13 @@ export function weldMesh(mesh: MeshData, tolerance: number): WeldedMesh {
       referenced++;
       const [x, y, z] = [positions[corner * 3] as number, positions[corner * 3 + 1] as number, positions[corner * 3 + 2] as number];
       mapped = lookup(x, y, z);
-      if (mapped < 0) mapped = register(x, y, z);
+      if (mapped < 0) {
+        mapped = register(x, y, z);
+        origin.push(corner);
+      }
       remap[corner] = mapped;
     }
     triangles.push(mapped);
   }
-  return { positions: welded, triangles, mergedVertices: referenced - welded.length / 3 };
+  return { positions: welded, triangles, mergedVertices: referenced - welded.length / 3, remap, origin };
 }

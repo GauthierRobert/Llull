@@ -93,6 +93,18 @@ function recordErrors(raw: Record<string, unknown>): string[] {
           errors.push(`${path}.sha256 must be 64 lowercase hex digits`);
         if (!Array.isArray(record['warnings']) || !record['warnings'].every((w) => typeof w === 'string'))
           errors.push(`${path}.warnings must be an array of strings`);
+        const sheets = raw['sheets'];
+        if (
+          record['sheetId'] !== undefined &&
+          !(isRecord(sheets) && typeof record['sheetId'] === 'string' && Object.hasOwn(sheets, record['sheetId']))
+        )
+          errors.push(`${path}.sheetId must name a sheet`);
+        const census = record['census'];
+        if (
+          census !== undefined &&
+          !(isRecord(census) && Object.entries(census).every(([k, n]) => !isReservedKey(k) && Number.isInteger(n) && (n as number) >= 0))
+        )
+          errors.push(`${path}.census must map names to non-negative integers`);
       });
   }
   const counters = raw['counters'];

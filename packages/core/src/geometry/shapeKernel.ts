@@ -154,7 +154,7 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
       if (recipe.radii === undefined) return ops.fillet(source, recipe.edges, recipe.size, recipe.sizeEnd);
       const [first] = recipe.radii;
       const uniform = first !== undefined && recipe.radii.every((law) => lawsEqual(law, first));
-      const plain = uniform && first.sizes === undefined && first.interpolation !== 'linear';
+      const plain = uniform && first.sizes === undefined && first.interpolation === undefined;
       if (plain) return ops.fillet(source, recipe.edges, first.size, first.sizeEnd);
       return ops.filletEach === undefined ? null : ops.filletEach(source, recipe.edges, recipe.radii);
     }

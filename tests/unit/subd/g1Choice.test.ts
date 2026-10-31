@@ -34,7 +34,7 @@ function solid(cage: Cage, open = false): { doc: CadDocument; id: string } {
   const made = run(empty, 'add_subdivision_solid', {
     vertices: cage.vertices,
     faces: cage.faces,
-    creases: [],
+    creases: cage.creases,
     levels: 1,
     ...(open ? { boundary: 'edge_and_corner' } : {}),
   });
@@ -48,7 +48,7 @@ const convert = (cage: Cage, params: object = {}, open = false): { result: Retur
   return { result, data: result.data as Data };
 };
 
-/** A box without its top face (a bowl: one segment per side): its boundary edges are creases whose quads stay fixed, which the exact solve cannot satisfy (contradiction). */
+/** A box without its top face (a bowl: one segment per side): its boundary edges are creases. */
 function bowl(): Cage {
   const box = boxCage([2, 2, 2], [1, 1, 1]);
   return { vertices: box.vertices, faces: box.faces.filter((face) => !face.every((v) => (box.vertices[v] as Vec3)[2] === 1)), creases: [] };
@@ -103,17 +103,34 @@ describe('g1Solve "auto" keeps the exact solution only when it stays near the li
 });
 
 describe('the exact solve is bounded and refuses by name', () => {
-  it('an open bowl through the command: refused groups are named in the data and the summary, the fit is kept, and it ends within a stated time even with the tightest tolerance (no exact retry on finer levels)', () => {
+  it('an open bowl through the command with the tightest tolerance: only the exact solve meets it, it is solved (boundary quads free, boundary poles fixed) within a stated time', () => {
     const started = performance.now();
     const { result, data } = convert(bowl(), { tangentToleranceDeg: 0.01 }, true);
     const seconds = (performance.now() - started) / 1000;
     expect(seconds).toBeLessThan(120);
+    expect(data.g1Method).toBe('exact');
+    expect(data.exactG1Refused).toEqual([]);
+    expect(result.summary).toContain('G1 exact');
+    expect(data.maxEvG1Deg).toBeLessThan(1e-5);
+  }, 180_000);
+
+  it('the command-level refusal: a crease that ends at smooth vertices has no exact solution (its cross-derivative row is frozen), the fit is kept, and the refused group is named in the data and the summary', () => {
+    const base = boxCage([2, 2, 2], [2, 2, 2]);
+    const topology = buildTopology(base.vertices.length, base.faces);
+    const onRow = (v: number): boolean => {
+      const [, y, z] = base.vertices[v] as Vec3;
+      return z === 1 && y === 1;
+    };
+    const cage: Cage = {
+      ...base,
+      creases: topology.edges.filter((e) => onRow(e.a) && onRow(e.b)).map((e): [number, number] => [e.a, e.b]),
+    };
+    const { result, data } = convert(cage, { g1Solve: 'exact' });
     expect(data.g1Method).toBe('fit');
     expect(data.exactG1Refused.length).toBeGreaterThan(0);
-    expect(data.exactG1Refused.every((group) => group.reason === 'contradiction')).toBe(true);
+    expect(data.exactG1Refused[0]?.reason).toBe('contradiction');
     expect(result.summary).toMatch(/G1 fit \(\d+ group\(s\) refused by the exact solve\)/);
-    expect(data.g1Choice?.reason).toMatch(/exact solve/);
-  }, 180_000);
+  });
 
   it('a work budget too small for the group refuses it as "work budget" (dense path and conjugate-gradient path) and leaves the poles as given', () => {
     for (const [cage, objective] of [
@@ -131,10 +148,22 @@ describe('the exact solve is bounded and refuses by name', () => {
     }
   });
 
-  it('the objective is "start" for a group too big for the dense path (a 24-sided cylinder) and the exact solution still holds', () => {
+  it('a group too big for the dense path (a 24-sided cylinder) keeps the limit-surface objective: the exact solution holds and stays 2.5x nearer to the surface than with the start objective (0.062 against 0.157)', () => {
     const { data } = convert(cylinderCage(1, 2, 24, 2), { g1Solve: 'exact', tangentToleranceDeg: 0.5 });
-    expect(data).toMatchObject({ g1Method: 'exact', g1Exact: { objective: 'start' } });
+    expect(data).toMatchObject({ g1Method: 'exact', g1Exact: { objective: 'limit' } });
+    expect(data.maxDeviation).toBeLessThan(0.1);
+    expect(data.maxEvG1Deg).toBeLessThan(1e-5);
   }, 120_000);
+
+  it('"auto" on a big group skips the limit-surface objective when the nearest-to-start exact solve is already within max(1.25 x the fit, deviationTolerance): objective start, still exact and G1; "exact" spends it', () => {
+    const cage = cylinderCage(1, 2, 24, 2);
+    const auto = convert(cage, { tangentToleranceDeg: 0.5 });
+    expect(auto.data).toMatchObject({ g1Method: 'exact', g1Exact: { objective: 'start' } });
+    expect(auto.data.maxEvG1Deg).toBeLessThan(1e-5);
+    const exactDeviation = auto.data.g1Choice?.exactDeviation as number;
+    expect(exactDeviation).toBeLessThanOrEqual(1.25 * (auto.data.g1Choice?.fitDeviation as number));
+    expect(convert(cage, { g1Solve: 'exact', tangentToleranceDeg: 0.5 }).data.g1Exact?.objective).toBe('limit');
+  }, 180_000);
 
   it('whole-cage fallback: with no ring allowed around the star the box is solved by freeing every quad, and without that fallback it is refused', () => {
     const refined = subdivide(boxCage([2, 2, 2], [2, 2, 2]), 1);
@@ -170,9 +199,9 @@ describe('the exact solve is bounded and refuses by name', () => {
     expect(JSON.stringify(result.patches)).toBe(JSON.stringify(patches));
   });
 
-  it('cageToNurbs: "auto" at a finer level does not retry an exact solve that was refused (an open bowl builds without it)', () => {
+  it('cageToNurbs "auto" on an open bowl: nothing is refused; at the default tolerance the fit is kept because the exact solution moves the shape', () => {
     const result = cageToNurbs(bowl(), { packed: false, samples: 2, fitTangents: true, g1Solve: 'auto', tangentToleranceDeg: 0.5 });
+    expect(result.exactRefused).toEqual([]);
     expect(result.g1Method).toBe('fit');
-    expect(result.exactRefused.length).toBeGreaterThan(0);
   });
 });

@@ -7,6 +7,38 @@ import { elementOf } from '../providers';
 import { assignObject } from './assignObject';
 import { provenanceSchema, refuse, scalarSchema, valueSchema } from './params';
 
+/** One assignment: the parameters of `assign_plant_object`, also the item of `assign_plant_objects`. */
+export const assignItemSchema = z.object({
+  target: z
+    .union([
+      z.string(),
+      z.object({
+        provider: z.string().describe('Provider name, e.g. "pipeLine".'),
+        id: z.string().describe('Id of the object in that provider.'),
+      }),
+    ])
+    .describe('The model object: element id, routed line id, { provider, id }, or "reserved".'),
+  className: z.string().min(1).describe('Concrete class name (not abstract), e.g. "CentrifugalPump".'),
+  hierarchy: z.string().min(1).describe('Hierarchy node: its code (unique), its path S1/P1/U10, or its id.'),
+  tagFields: z
+    .record(z.string(), scalarSchema)
+    .optional()
+    .describe(
+      'Values of the tag format fields that are not class properties, e.g. { "seq": 1 }. Class property fields may be given here too.',
+    ),
+  tag: z
+    .string()
+    .optional()
+    .describe('A typed tag; must match the class format and its fields must agree with the other values. Omit to generate it.'),
+  nextSequence: z
+    .boolean()
+    .optional()
+    .describe('true: use the next free sequence number among the tags with the same other fields (max + 1).'),
+  properties: z.record(z.string(), valueSchema).optional().describe('Property values by name.'),
+  provenance: z.record(z.string(), provenanceSchema).optional().describe('Provenance by property name.'),
+  line: z.string().optional().describe('Id or tag of the process line object this object belongs to.'),
+});
+
 /**
  * @affects creates 1 plant object (plant.data); writes the tag into the model object (equipment mark, legacy pipe line number, routed line number)
  * @invariant tag = generate(class tag format, tag fields, class, hierarchy) and is unique in its tag scope and among the unique model tags; one plant object per target
@@ -26,36 +58,7 @@ export const assignPlantObject = defineCommand({
     'class fields you do not send. properties: values by property name, physical numbers in the unit of the definition (plant_data_table columns) or ' +
     '{ value, unit }; provenance: { source, ref?, unverified? } per property. line: id or tag of the process line object a pipe or component belongs to. ' +
     'A tag held by an ORPHAN plant object of the same class (its model object was deleted) is re-bound to the new target instead of being refused as a duplicate (data.rebound). Returns the plant object id (affected[0]) and data = { objectId, tag, className, hierarchy, scope, seeded, tagWritten, rebound }. Next: set_plant_properties, check_plant_data, plant_data_table.',
-  params: z.object({
-    target: z
-      .union([
-        z.string(),
-        z.object({
-          provider: z.string().describe('Provider name, e.g. "pipeLine".'),
-          id: z.string().describe('Id of the object in that provider.'),
-        }),
-      ])
-      .describe('The model object: element id, routed line id, { provider, id }, or "reserved".'),
-    className: z.string().min(1).describe('Concrete class name (not abstract), e.g. "CentrifugalPump".'),
-    hierarchy: z.string().min(1).describe('Hierarchy node: its code (unique), its path S1/P1/U10, or its id.'),
-    tagFields: z
-      .record(z.string(), scalarSchema)
-      .optional()
-      .describe(
-        'Values of the tag format fields that are not class properties, e.g. { "seq": 1 }. Class property fields may be given here too.',
-      ),
-    tag: z
-      .string()
-      .optional()
-      .describe('A typed tag; must match the class format and its fields must agree with the other values. Omit to generate it.'),
-    nextSequence: z
-      .boolean()
-      .optional()
-      .describe('true: use the next free sequence number among the tags with the same other fields (max + 1).'),
-    properties: z.record(z.string(), valueSchema).optional().describe('Property values by name.'),
-    provenance: z.record(z.string(), provenanceSchema).optional().describe('Provenance by property name.'),
-    line: z.string().optional().describe('Id or tag of the process line object this object belongs to.'),
-  }),
+  params: assignItemSchema,
   run: (doc, params, ctx): CommandResult => {
     const outcome = assignObject(doc, params, ctx);
     if (!outcome.ok) return refuse(doc, 'assign_plant_object', outcome);

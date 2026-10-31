@@ -1,7 +1,7 @@
 // Generic param form for ANY registry command: `paramsSchema` → fields; typed strings → the params passed to `dispatch`.
 // Only input shapes are parsed here; meaning is validated by the command.
 
-import type { ParamSpec, ParamsSchema, ParamType } from '@core/commands/types';
+import type { ParamItemSpec, ParamSpec, ParamsSchema, ParamType } from '@core/commands/types';
 import type { EntityId } from '@core/model/types';
 import { parseNumber } from '@ui/numberText';
 
@@ -15,6 +15,8 @@ export interface FormField {
   description: string;
   required: boolean;
   options: readonly string[];
+  /** JSON fields: a value of the right shape taken from the schema (e.g. `[{"center":[0,0,0]}]`), shown as the placeholder. */
+  example: string;
 }
 
 /** Raw text per field; '' = not provided. */
@@ -22,13 +24,33 @@ export type FormValues = Readonly<Record<string, string>>;
 
 type ParseResult = { ok: true; params: Record<string, unknown> } | { ok: false; errors: Readonly<Record<string, string>> };
 
-/** `add_box` -> "Add box"; `entityId` -> "Entity id". */
+/** Words written in capitals in labels: dimensions (`2d`) and the file formats / domain acronyms command names use. */
+const ACRONYMS: ReadonlySet<string> = new Set([
+  'bom',
+  'cfd',
+  'csv',
+  'dxf',
+  'fea',
+  'gltf',
+  'ifc',
+  'iges',
+  'naca',
+  'nurbs',
+  'pdf',
+  'pmi',
+  'stl',
+  'svg',
+  'tpms',
+]);
+
+/** `add_box` -> "Add box"; `entityId` -> "Entity id"; `fillet_2d` -> "Fillet 2D"; `export_stl` -> "Export STL". */
 export function humanizeName(name: string): string {
   const spaced = name
     .replace(/_/g, ' ')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .toLowerCase()
-    .trim();
+    .trim()
+    .replace(/\b[a-z0-9]+\b/g, (word) => (ACRONYMS.has(word) || /^\d+d$/.test(word) ? word.toUpperCase() : word));
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
@@ -55,6 +77,25 @@ function isNumeric(type: ParamType | undefined): boolean {
   return type === 'number' || type === 'integer';
 }
 
+/** A value of the shape `spec` describes (numbers 0, text "...", the required keys of an object, one element of an array). */
+function exampleValue(spec: ParamItemSpec, depth = 0): unknown {
+  if (depth > 3) return null;
+  if (spec.enum !== undefined && spec.enum.length > 0) return spec.enum[0];
+  if (spec.type === 'number' || spec.type === 'integer') return 0;
+  if (spec.type === 'string') return '...';
+  if (spec.type === 'boolean') return true;
+  if (spec.type === 'array') {
+    const item = spec.items === undefined ? null : exampleValue(spec.items, depth + 1);
+    return isNumeric(spec.items?.type) ? [item, item, item] : [item];
+  }
+  if (spec.type === 'object') {
+    const properties = spec.properties ?? {};
+    const keys = (spec.required ?? Object.keys(properties)).filter((key) => properties[key] !== undefined);
+    return Object.fromEntries(keys.map((key) => [key, exampleValue(properties[key] as ParamSpec, depth + 1)]));
+  }
+  return null;
+}
+
 function fieldKind(spec: ParamSpec): FieldKind {
   if (spec.enum !== undefined && spec.enum.length > 0) return 'enum';
   if (isNumeric(spec.type)) return 'number';
@@ -76,6 +117,7 @@ export function fieldsFromSchema(schema: ParamsSchema): FormField[] {
       description: spec.description,
       required: required.has(name),
       options: (spec.enum ?? []).map(String),
+      example: fieldKind(spec) === 'json' ? JSON.stringify(exampleValue(spec)) : '',
     }),
   );
   return [...fields.filter((f) => f.required), ...fields.filter((f) => !f.required)];
@@ -120,6 +162,16 @@ export function initialValues(fields: readonly FormField[], selection: readonly 
             : '');
   }
   return values;
+}
+
+const BOOLEAN_LABELS: Readonly<Record<string, string>> = { true: 'Yes', false: 'No' };
+
+/**
+ * What a select shows for an option value: multi-word snake_case reads as words ("heat_steady" -> "Heat steady"), booleans as
+ * Yes / No; anything else verbatim (units "mm", axes "+x", codes "M10" keep their case). @pure
+ */
+export function optionLabel(option: string): string {
+  return BOOLEAN_LABELS[option] ?? (/^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(option) ? humanizeName(option) : option);
 }
 
 /**

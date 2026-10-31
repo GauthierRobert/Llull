@@ -21,6 +21,7 @@ import { runEmbossChain } from './embossChain';
 import { buildFreeformRecipe, freeformDepthLimit, isFreeformFailure } from './embossFreeform';
 import { buildPullRecipe, isPullFailure, type PullBuild } from './embossPull';
 import { distortionData, distortionMessage, distortionOf } from './distortion';
+import { embossPreviewResult } from './embossPreview';
 import { SEWING_RATIO, MIN_FIT_TOLERANCE } from './constants';
 import {
   defaultFitTolerance,
@@ -129,7 +130,13 @@ const lineChain = (polygon: readonly Vec2[]): PlaneSegment[] =>
 /**
  * @failure see emboss_on_face and pattern_on_face: every refusal is coded, the document comes back unchanged
  */
-export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, command: string, params: EmbossRequest): CommandResult {
+export function runEmboss(
+  doc: CadDocument,
+  ctx: ExecutionContext | undefined,
+  command: string,
+  params: EmbossRequest,
+  options: { readonly preview?: boolean } = {},
+): CommandResult {
   const session = openFace(doc, ctx, command, params.id, params.face);
   if (isRejection(session)) return session;
   const fail = (code: string, message: string, paths: string[], ids: readonly string[] = [params.id]): CommandResult =>
@@ -242,6 +249,12 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
   if (params.chain !== undefined && params.chain.length > 0) {
     if (engrave || params.grid !== undefined)
       return fail('WRP_PARAM_INVALID', 'chain works with emboss, deboss and scribe, not with engrave or a grid', ['chain']);
+    if (options.preview === true)
+      return fail(
+        'WRP_PARAM_INVALID',
+        'the preview draws a footprint on one face: leave out chain (the chain is built face by face by emboss_on_face)',
+        ['chain'],
+      );
     return runEmbossChain({
       doc,
       ctx,
@@ -324,6 +337,7 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
       draftDeg: params.draftDeg ?? 0,
       anchorOn: resolved.anchorOn,
       tolerance,
+      preview: options.preview === true,
     });
     if (isPullFailure(built)) {
       const refused = fail(built.code, built.message, [built.path ?? 'pullDirection']);
@@ -367,6 +381,26 @@ export function runEmboss(doc: CadDocument, ctx: ExecutionContext | undefined, c
     );
     return { ...result, data: { maxDepth: reach, unit: doc.units } };
   }
+  if (options.preview === true)
+    return embossPreviewResult(doc, command, {
+      chart,
+      pieces: mapped.pieces,
+      holeFlags,
+      mode: params.mode,
+      depth,
+      distortion,
+      requestedMethod: resolved.method,
+      limit,
+      limitDefaulted: params.maxLengthStrain === undefined,
+      expectedVolumeDelta: closed?.delta ?? null,
+      regionArea: closed?.area ?? null,
+      faceKind: session.surface.type,
+      face: session.face,
+      anchor: resolved.anchorOn,
+      normal: recipeParams.direction,
+      draftNotBuilt: pulled && (params.draftDeg ?? 0) > 0,
+      instances: params.grid === undefined ? 1 : params.grid.countX * params.grid.countY,
+    });
   const built = evaluateRecipe(session.kernel, recipe);
   if (typeof built === 'string')
     return fail(

@@ -116,7 +116,7 @@ describeNative('BLD M5: variable chamfer and per-joint blend_union radii (native
     expect(volume(done.doc, done.id)).toBeCloseTo(plain + 0.5 * 20 * (7 / 3), 6);
   });
 
-  it('refusals carry the reason and leave the document unchanged: a reach past the faces, edges that share a vertex, a curved edge, a missing edge list', () => {
+  it('refusals carry the reason and leave the document unchanged: a reach past the faces, a closed edge (a full rim), a missing edge list', () => {
     const { doc, id } = block(1);
     const reach = execute(doc, 'chamfer_edge', { id, edgesNear: [[0, 5, 2.5]], distance: 1, distanceEnd: 6 });
     expect(reach.document).toBe(doc);
@@ -133,16 +133,15 @@ describeNative('BLD M5: variable chamfer and per-joint blend_union radii (native
       distance: 1,
       distanceEnd: 2,
     });
-    expect(corner.error).toMatchObject({ code: 'BLD_CHAMFER_FAILED' });
-    expect(corner.error?.remediation).toContain('unlist edges that share a vertex');
-    expect(corner.summary).toContain('meet at a vertex');
+    // edges that share a vertex build since 13.25 (the mitre of the tools): nativeChamferCorner.test.ts
+    expect(corner.rejected, corner.summary).toBeUndefined();
     const pipe = made(createEmptyDocument(), 'add_cylinder', { radius: 5, height: 10 });
     const rim = execute(pipe.doc, 'chamfer_edge', { id: pipe.id, edgesNear: [[5, 0, 5]], distance: 1, distanceEnd: 2 });
     expect(rim.error).toMatchObject({ code: 'BLD_CHAMFER_FAILED' });
-    expect(rim.summary).toContain('straight');
+    expect(rim.summary).toContain('closed edge');
     const all = execute(doc, 'chamfer_edge', { id, distance: 1, distanceEnd: 2 });
     expect(all.error).toMatchObject({ code: 'BLD_CHAMFER_VARIABLE_PARAMS', paths: ['edgeIndices'] });
-    expect(all.error?.remediation).toBe('distanceEnd: > 0, symmetric legs (no distance2 / angleDeg), list the edges');
+    expect(all.error?.remediation).toContain('distanceEnd > 0 and the edges listed');
   });
 
   /** A plate 40 x 20 x 4 with a stem 10 x 20 x 18 sunk 2 into it: two straight joints of length 20 on the plate top, at x = 15 and x = 25. */

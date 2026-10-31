@@ -9,14 +9,16 @@ interface CheckboxGroupProps {
 
 export function CheckboxGroup({ legend, options, selected, onToggle }: CheckboxGroupProps): React.ReactElement {
   return (
-    <fieldset className="field">
-      <legend className="field__label">{legend}</legend>
-      {options.map(([value, label]) => (
-        <label key={value} className="field">
-          <input type="checkbox" checked={selected.includes(value)} onChange={() => onToggle(value)} />
-          <span>{label}</span>
-        </label>
-      ))}
+    <fieldset className="checkbox-group">
+      <legend className="field__label checkbox-group__legend">{legend}</legend>
+      <div className="checkbox-group__options">
+        {options.map(([value, label]) => (
+          <label key={value} className="checkbox-group__option">
+            <input type="checkbox" checked={selected.includes(value)} onChange={() => onToggle(value)} />
+            <span>{label}</span>
+          </label>
+        ))}
+      </div>
     </fieldset>
   );
 }

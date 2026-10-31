@@ -24,7 +24,11 @@ interface SplitShape {
   readonly volume: number;
   readonly faces: readonly SplitFace[];
   /** Per edge the two faces it joins and `count` points along it. */
-  readonly edges: ReadonlyArray<{ readonly faces: readonly [number, number]; readonly points: (count: number) => Vec3[] }>;
+  readonly edges: ReadonlyArray<{
+    readonly faces: readonly [number, number];
+    readonly points: (count: number) => Vec3[];
+    readonly convexity?: 'convex' | 'concave' | 'unknown';
+  }>;
 }
 
 const azimuth = (p: Vec3): number => ((Math.atan2(p[1], p[0]) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -153,12 +157,59 @@ function torusShape(id: string, major: number, minor: number, options: FakeSplit
   };
 }
 
+/**
+ * Two plane faces meeting along the y axis at (x, z) = (0, 0): face 0 is z = 0 with outward normal +z, face 1 has the normal (cos theta, 0, sin theta) (theta = 0: the plane x = 0), both 40 long in y.
+ * Convex: the faces run to -x and along the tangent (sin theta, 0, -cos theta) (a box corner); concave: to +x and to the opposite tangent (the inside corner of an L).
+ */
+function cornerShape(id: string, convexity: 'convex' | 'concave' | 'unknown', theta: number, edgeHalf: number): SplitShape {
+  const nB: Vec3 = [Math.cos(theta), 0, Math.sin(theta)];
+  const reverse = convexity === 'concave' ? -1 : 1;
+  const tA: Vec3 = [-reverse, 0, 0];
+  const tB: Vec3 = [reverse * Math.sin(theta), 0, -reverse * Math.cos(theta)];
+  const along = (p: Vec3, t: Vec3): number => p[0] * t[0] + p[1] * t[1] + p[2] * t[2];
+  const planeA: SurfaceParams = { type: 'plane', origin: [0, 0, 0], normal: [0, 0, 1], xDir: [1, 0, 0] };
+  const planeB: SurfaceParams = { type: 'plane', origin: [0, 0, 0], normal: nB, xDir: [0, 1, 0] };
+  return {
+    id,
+    volume: 1e5,
+    faces: [
+      {
+        surface: planeA,
+        contains: (p, tol = 0) => Math.abs(p[2]) <= 1e-6 + tol && along(p, tA) >= -tol && Math.abs(p[1]) <= 20 + tol,
+        sample: scaleVec(tA, 5),
+      },
+      {
+        surface: planeB,
+        contains: (p, tol = 0) => Math.abs(along(p, nB)) <= 1e-6 + tol && along(p, tB) >= -tol && Math.abs(p[1]) <= 20 + tol,
+        sample: scaleVec(tB, 5),
+      },
+    ],
+    edges: [
+      {
+        faces: [0, 1],
+        convexity,
+        points: (count) => Array.from({ length: count }, (_, k): Vec3 => [0, -edgeHalf + (2 * edgeHalf * k) / (count - 1), 0]),
+      },
+    ],
+  };
+}
+
+const scaleVec = (v: Vec3, k: number): Vec3 => [v[0] * k, v[1] * k, v[2] * k];
+
+function projectPlane(surface: Extract<SurfaceParams, { type: 'plane' }>, p: Vec3): { point: Vec3; normal: Vec3; distance: number } {
+  const n = surface.normal;
+  const d = p[0] * n[0] + p[1] * n[1] + p[2] * n[2];
+  return { point: [p[0] - d * n[0], p[1] - d * n[1], p[2] - d * n[2]], normal: n, distance: Math.abs(d) };
+}
+
 const project = (surface: SurfaceParams, p: Vec3): { point: Vec3; normal: Vec3; distance: number } =>
-  surface.type === 'cone'
-    ? projectCone(p)
-    : surface.type === 'sphere'
-      ? projectSphere(p, surface.radius)
-      : projectTorus(p, (surface as { major: number }).major, (surface as { minor: number }).minor);
+  surface.type === 'plane'
+    ? projectPlane(surface, p)
+    : surface.type === 'cone'
+      ? projectCone(p)
+      : surface.type === 'sphere'
+        ? projectSphere(p, surface.radius)
+        : projectTorus(p, (surface as { major: number }).major, (surface as { minor: number }).minor);
 
 export interface FakeSplitOptions {
   /** `faceContains` answers true everywhere for this face (the kernel cannot tell which side of an edge it lies on). */
@@ -169,9 +220,18 @@ export interface FakeSplitOptions {
   readonly trim?: number;
   /** The last sample of a closed edge differs from its first by 5e-9 (a kernel's rounding), which decides which of the two is the nearer to a point. */
   readonly closedNoise?: boolean;
+  /** `add_box` is a pair of plane faces meeting in a sharp edge of this kind (face 1 turned by `theta` radians from the plane x = 0). */
+  readonly corner?: {
+    readonly convexity: 'convex' | 'concave' | 'unknown';
+    readonly theta?: number;
+    readonly noNormal?: number;
+    /** Half length of the shared edge along y (default 20, the length of the faces): a shorter edge leaves the rest of the line of the edge to other edges of a chain. */
+    readonly edgeHalf?: number;
+  };
 }
 
 export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel {
+  let midpointProbes = 0;
   const projectOn = (shape: SplitShape, face: number, p: Vec3): FaceProjection => {
     const f = shape.faces[face] as SplitFace;
     const hit = project(f.surface, p);
@@ -194,9 +254,23 @@ export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel 
       }
       if (entity.kind === 'sphere') return sphereShape(entity.id, entity.radius);
       if (entity.kind === 'torus') return torusShape(entity.id, entity.ringRadius, entity.tubeRadius, options);
+      if (entity.kind === 'box' && options.corner !== undefined)
+        return cornerShape(entity.id, options.corner.convexity, options.corner.theta ?? 0, options.corner.edgeHalf ?? 20);
+      if (entity.kind === 'extrusion') {
+        const profile = entity.profile;
+        const shoelace =
+          profile.reduce(
+            (sum, p, k) =>
+              sum +
+              p[0] * (profile[(k + 1) % profile.length] as readonly [number, number])[1] -
+              (profile[(k + 1) % profile.length] as readonly [number, number])[0] * p[1],
+            0,
+          ) / 2;
+        return { id: entity.id, volume: Math.abs(shoelace) * entity.depth, faces: [], edges: [] };
+      }
       return null;
     },
-    boolean: () => null,
+    boolean: (op, a, b) => (op === 'intersect' ? null : { ...a, volume: op === 'union' ? a.volume + b.volume : a.volume - b.volume }),
     fillet: () => null,
     blend: () => null,
     chamfer: () => null,
@@ -251,7 +325,7 @@ export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel 
             uvBounds: [0, 1, 0, 1],
           })),
           edgeFaces: shape.edges.map((edge) => [...edge.faces]),
-          edgeConvexity: shape.edges.map(() => 'smooth' as const),
+          edgeConvexity: shape.edges.map((edge) => edge.convexity ?? ('smooth' as const)),
         }) as unknown as FaceGraph,
       faceGeometry: (shape, face) => ({
         surface: (shape.faces[face] as SplitFace).surface,
@@ -260,7 +334,19 @@ export function fakeSplitKernel(options: FakeSplitOptions = {}): GeometryKernel 
           [Math.PI, 50],
         ],
       }),
-      projectOnFace: (shape, face, points) => points.map((point) => projectOn(shape, face, point)),
+      projectOnFace: (shape, face, points) =>
+        points.map((point) => {
+          // `noNormal`: the kernel answers nothing for the probe of the edge midpoint on face 1, after that many earlier answers
+          if (
+            options.corner?.noNormal !== undefined &&
+            face === 1 &&
+            points.length === 1 &&
+            Math.hypot(point[0], point[1], point[2]) < 1e-9
+          ) {
+            if (midpointProbes++ >= options.corner.noNormal) return null;
+          }
+          return projectOn(shape, face, point);
+        }),
       evaluateFace: () => null,
       tessellateFace: () => null,
       faceSamples: () => null,

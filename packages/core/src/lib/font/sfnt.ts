@@ -82,6 +82,66 @@ export function readHeader(tables: SfntTables): FontHeader {
   };
 }
 
+/**
+ * Advance height (font units) of glyph `glyph` from `vhea` / `vmtx`, or null when the font has no vertical metrics.
+ * @failure a `vmtx` shorter than `vhea` says -> WRP_FONT_PARSE
+ */
+export function verticalAdvanceOf(tables: SfntTables, header: FontHeader, glyph: number): number | null {
+  const vhea = tables.table('vhea');
+  const vmtx = tables.table('vmtx');
+  if (vhea === null || vmtx === null) return null;
+  const count = vhea.u16(34);
+  if (count === 0 || count > header.numGlyphs) throw parseError(`vhea: ${count} vertical metrics for ${header.numGlyphs} glyphs`);
+  if (vmtx.length < 4 * count + 2 * (header.numGlyphs - count)) throw parseError('vmtx: shorter than its glyph count requires');
+  return vmtx.u16(4 * Math.min(glyph, count - 1));
+}
+
+/**
+ * Top side bearing (font units) of glyph `glyph` from `vmtx` (the entry of its long metric, or the side-bearing array after them), null without `vhea` / `vmtx`: the distance from the top of the glyph to its vertical origin.
+ * @failure the same damage as `verticalAdvanceOf` -> WRP_FONT_PARSE
+ */
+export function topSideBearingOf(tables: SfntTables, header: FontHeader, glyph: number): number | null {
+  if (verticalAdvanceOf(tables, header, glyph) === null) return null;
+  const vhea = tables.table('vhea') as ByteView;
+  const vmtx = tables.table('vmtx') as ByteView;
+  const count = vhea.u16(34);
+  return glyph < count ? vmtx.i16(4 * glyph + 2) : vmtx.i16(4 * count + 2 * (glyph - count));
+}
+
+/**
+ * The vertical line metrics of `vhea` (typographic ascender, descender and line gap, font units), null without `vhea`.
+ */
+export function verticalLineOf(
+  tables: SfntTables,
+): { readonly ascender: number; readonly descender: number; readonly lineGap: number } | null {
+  const vhea = tables.table('vhea');
+  if (vhea === null) return null;
+  return { ascender: vhea.i16(4), descender: vhea.i16(6), lineGap: vhea.i16(8) };
+}
+
+/**
+ * Vertical origin y (font units, above the baseline) of glyph `glyph` from the `VORG` table of a CFF font: the record of the glyph, else `defaultVertOriginY`; null when the font has no `VORG`.
+ * @failure a version other than 1.0, a table shorter than its header or its records -> WRP_FONT_PARSE
+ */
+export function verticalOriginOf(tables: SfntTables, glyph: number): number | null {
+  const vorg = tables.table('VORG');
+  if (vorg === null) return null;
+  if (vorg.length < 8) throw parseError('VORG: shorter than its 8-byte header');
+  if (vorg.u16(0) !== 1 || vorg.u16(2) !== 0) throw parseError(`VORG: version ${vorg.u16(0)}.${vorg.u16(2)} is not 1.0`);
+  const count = vorg.u16(6);
+  if (vorg.length < 8 + 4 * count) throw parseError('VORG: shorter than its record count requires');
+  let low = 0;
+  let high = count - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const found = vorg.u16(8 + 4 * middle);
+    if (found === glyph) return vorg.i16(10 + 4 * middle);
+    if (found < glyph) low = middle + 1;
+    else high = middle - 1;
+  }
+  return vorg.i16(4);
+}
+
 /** Advance width (font units) of glyph `glyph`. */
 export function advanceOf(tables: SfntTables, header: FontHeader, glyph: number): number {
   const hmtx = requireTable(tables, 'hmtx');
@@ -119,29 +179,54 @@ export interface FontNames {
   readonly licence?: string;
 }
 
-/** Name records of a platform: Windows (3) / Unicode (0) strings are UTF-16BE, Macintosh (1) strings ASCII. */
-export function readNames(tables: SfntTables): FontNames {
+/** Language preference of a name record: Windows English (0x0409, or the unset language 0 of a careless font), then Unicode, then Macintosh English, then any other Windows language, any other Macintosh one, the rest. */
+function nameRank(platform: number, language: number): number {
+  if (platform === 3) return language === 0x0409 || language === 0 ? 0 : 3;
+  if (platform === 0) return 1;
+  if (platform === 1) return language === 0 ? 2 : 4;
+  return 5;
+}
+
+const MAX_NAME_RECORDS = 65_535;
+const MAX_STRINGS_PER_ID = 16;
+
+/**
+ * The strings of the `name` table by name id, every language, the preferred one first (Windows English, then Unicode, then Macintosh English, then the others in table order), each at most 256
+ * characters and at most 16 per id. Windows (3) / Unicode (0) strings are UTF-16BE, Macintosh (1) strings ASCII; records outside the table are skipped.
+ */
+export function readNameStrings(tables: SfntTables): ReadonlyMap<number, readonly string[]> {
   const name = tables.table('name');
-  const found = new Map<number, string>();
+  const ranked = new Map<number, Array<{ rank: number; text: string }>>();
   if (name !== null) {
-    const count = Math.min(name.u16(2), 512);
+    const count = Math.min(name.u16(2), MAX_NAME_RECORDS);
     const storage = name.u16(4);
     for (let k = 0; k < count; k++) {
       const record = 6 + 12 * k;
       if (record + 12 > name.length) break;
       const platform = name.u16(record);
+      const language = name.u16(record + 4);
       const id = name.u16(record + 6);
       const length = name.u16(record + 8);
       const offset = storage + name.u16(record + 10);
-      if (offset + length > name.length || (platform === 1 && found.has(id))) continue;
-      const text = platform === 1 ? name.ascii(offset, length) : name.utf16(offset, length);
-      if (text.length > 0) found.set(id, text.slice(0, 256));
+      if (offset + length > name.length) continue;
+      const text = (platform === 1 ? name.ascii(offset, length) : name.utf16(offset, length)).slice(0, 256);
+      const list = ranked.get(id) ?? [];
+      if (text.length === 0 || list.length >= MAX_STRINGS_PER_ID || list.some((entry) => entry.text === text)) continue;
+      list.push({ rank: nameRank(platform, language), text });
+      ranked.set(id, list);
     }
   }
-  const licence = found.get(13);
+  return new Map([...ranked].map(([id, list]) => [id, [...list].sort((x, y) => x.rank - y.rank).map((entry) => entry.text)]));
+}
+
+/** The family, style and licence of the font. */
+export function readNames(tables: SfntTables): FontNames {
+  const found = readNameStrings(tables);
+  const first = (id: number): string | undefined => found.get(id)?.[0];
+  const licence = first(13);
   return {
-    family: found.get(16) ?? found.get(1) ?? 'Unknown',
-    style: found.get(17) ?? found.get(2) ?? 'Regular',
+    family: first(16) ?? first(1) ?? 'Unknown',
+    style: first(17) ?? first(2) ?? 'Regular',
     ...(licence !== undefined ? { licence } : {}),
   };
 }

@@ -5,7 +5,7 @@ import { dot3 } from '../../lib/vec3';
 import { DEFAULT_LAW_SAMPLES, MAX_LAW_SAMPLES, MIN_LAW_SAMPLES } from '../../geometry/blend/law';
 import { vec3, z } from '../schema';
 
-const INTERPOLATIONS = ['smooth', 'linear'] as const;
+const INTERPOLATIONS = ['smooth', 'linear', 'monotone'] as const;
 
 export const FILLET_MODES = ['radius', 'chord'] as const;
 export type FilletMode = (typeof FILLET_MODES)[number];
@@ -55,7 +55,7 @@ export const edgeLawSchema = z
     interpolation: z
       .enum(INTERPOLATIONS)
       .describe(
-        'How the radius runs between the control points: "smooth" (default: one smooth curve through them, the kernel interpolation) or "linear" (straight transitions between consecutive points).',
+        'How the radius runs between the stations (start, the sizes control points, end): "smooth" (default: one smooth curve through them, the kernel interpolation, which can overshoot between stations), "linear" (straight transitions between consecutive points) or "monotone" (a C1 cubic that never overshoots a station: between two stations the radius stays between their radii, so it never goes below the smallest station; zero slope at both ends; exact in the kernel; a start and an end alone make one smoothstep, which is not the "smooth" transition of the kernel).',
       )
       .optional(),
     law: z

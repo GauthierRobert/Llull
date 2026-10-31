@@ -44,6 +44,8 @@ export interface TextLayout {
   verticalAnchor?: 'baseline' | 'cap_middle' | 'cap_top';
   /** Document units added after each glyph (default 0). */
   letterSpacing?: number;
+  /** 'horizontal' (default): glyphs along the baseline, lines downward. 'vertical': glyphs stacked top to bottom by their vertical advance, lines (columns) running leftward (03 WRP §14.20). */
+  direction?: 'horizontal' | 'vertical';
   /** Apply `kern` pairs of the font (default true). */
   kerning?: boolean;
   /** Line pitch as a multiple of the font's line height (default 1; lines break at newline). */

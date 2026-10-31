@@ -117,3 +117,22 @@
 .feature-start__note--error {
   color: var(--danger);
 }
+
+/* ---- Control-net box selection and falloff (04 DIR M-UI) ----------------------- */
+
+.net-marquee {
+  position: fixed;
+  z-index: 40;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+
+.net-falloff__radius {
+  width: 4.5em;
+  margin-left: 6px;
+}
+
+.feature-start--falloff {
+  align-items: center;
+}

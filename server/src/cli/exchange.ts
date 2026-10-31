@@ -57,6 +57,7 @@ const FILE_PARAMS: Readonly<Record<string, FileTarget>> = {
   fea_import_results: { key: 'dataBase64', encoding: 'base64' },
   register_material_library: { key: 'libraryJson', encoding: 'utf8' },
   import_pcf: { key: 'text', encoding: 'utf8' },
+  import_dexpi: { key: 'text', encoding: 'utf8' },
 };
 
 /** The value `file=<path>` becomes: its content, or (mesh files) the key of the copy kept in this machine's mesh asset store. */

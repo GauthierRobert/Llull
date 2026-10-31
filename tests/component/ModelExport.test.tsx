@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ModelExport } from '@ui/components/ModelExport';
 import { useStore } from '@ui/store';
 import { execute } from '@core/commands/registry';
@@ -21,6 +21,51 @@ describe('ModelExport', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+  it('offers 3MF only inside the desktop app, where the desktop owns the dialog and the path (no argument crosses the bridge)', async () => {
+    const { unmount } = render(<ModelExport />);
+    expect(screen.queryByRole('option', { name: /3MF/ })).toBeNull();
+    unmount();
+    const exportThreeMf = vi.fn().mockResolvedValue({ ok: true, message: 'C:/out/plate.3mf (1234 bytes)' });
+    Object.defineProperty(window, 'llull', { value: { exportThreeMf }, configurable: true });
+    try {
+      render(<ModelExport />);
+      fireEvent.change(screen.getByLabelText('Export format'), { target: { value: '3mf' } });
+      fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
+      await waitFor(() => expect(screen.getByRole('status').textContent).toBe('C:/out/plate.3mf (1234 bytes)'));
+      expect(exportThreeMf).toHaveBeenCalledTimes(1);
+      expect(exportThreeMf).toHaveBeenCalledWith();
+      expect(downloads).toEqual([]);
+      exportThreeMf.mockResolvedValue({ ok: false, message: 'Export cancelled', cancelled: true });
+      fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
+      await waitFor(() => expect(screen.getByRole('status').textContent).toBe(''));
+    } finally {
+      Reflect.deleteProperty(window, 'llull');
+    }
+  });
+  it('shows a refused or crashed 3MF export as a failure, an answer of the wrong shape as such, and a cancelled dialog as nothing', async () => {
+    const exportThreeMf = vi.fn();
+    Object.defineProperty(window, 'llull', { value: { exportThreeMf }, configurable: true });
+    try {
+      render(<ModelExport />);
+      fireEvent.change(screen.getByLabelText('Export format'), { target: { value: '3mf' } });
+      const status = (): string => screen.getByRole('status').textContent ?? '';
+      const click = (): boolean => fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
+      exportThreeMf.mockRejectedValue(new Error('An object could not be cloned'));
+      click();
+      await waitFor(() => expect(status()).toBe('3MF export failed: An object could not be cloned'));
+      exportThreeMf.mockResolvedValue({ ok: false, message: 'Refused: the caller is not the app window' });
+      click();
+      await waitFor(() => expect(status()).toBe('3MF export failed: Refused: the caller is not the app window'));
+      exportThreeMf.mockResolvedValue('nonsense');
+      click();
+      await waitFor(() => expect(status()).toContain('unexpected shape'));
+      exportThreeMf.mockResolvedValue({ ok: false, message: 'Export cancelled', cancelled: true });
+      click();
+      await waitFor(() => expect(status()).toBe(''));
+    } finally {
+      Reflect.deleteProperty(window, 'llull');
+    }
   });
   it('downloads a binary STL mesh by default', () => {
     render(<ModelExport />);

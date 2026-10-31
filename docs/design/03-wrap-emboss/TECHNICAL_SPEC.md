@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; variable TrueType (`gvar`) instances and `avar` version 2; multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across sharp edges; the silhouette of a torus seen in its equatorial plane and of freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; `VORG` and the side-bearing variations of `VVAR` (read for their structure, not used), vertical text layout (§14.18); multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces with a cusp, a branch point or a tangential view (§14.16); footprint / chart previews of an emboss and a knurl pattern preview (the curves on faces and the face joins are drawn: §14.17). Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -609,9 +609,9 @@ the character codes go through the CFF Standard Encoding to a string id, the cha
    (replay, L3). The specification only asks for a pseudo-random number in (0, 1].
 2. `seac` components are one glyph each and must not be accented themselves (no recursion); `seac` in a CID-keyed font and with a predefined Expert charset is refused (the encoding is the Standard Encoding of name-keyed fonts).
 3. CFF2 refuses what CFF2 removed (`endchar`, arithmetic, `dotsection`); a CFF2 charstring has no width and closes its last contour implicitly.
-4. Only CFF2 outlines can be instanced. A TrueType `fvar` font keeps its default instance (`gvar` is not read); `avar` version 2 only with the default instance. Both refuse a non-default `variation` with `WRP_FONT_VARIATION`.
+4. CFF2 outlines and (since §14.14) TrueType `gvar` outlines can be instanced; `avar` version 2 and `MVAR` are read too. A font with neither refuses a non-default `variation` with `WRP_FONT_VARIATION`.
 5. Normalised coordinates are rounded to 2.14 fixed point (as fontTools does), `avar` segment maps apply to the rounded value, region scalars follow the OpenType interpolation algorithm. Advances come from `HVAR`
-   (rounded to a font unit); a CFF2 font without `HVAR` keeps its `hmtx` advances. Cap height stays the default instance's (`OS/2`; `MVAR` is not read).
+   (rounded to a font unit); a CFF2 font without `HVAR` keeps its `hmtx` advances. Cap height follows `MVAR` (`cpht`) when the font has one (§14.14).
 6. Real fonts: none is pinned in the repository (only Fira Sans, TrueType) and the machine is offline, so the references are generated fonts whose outlines follow from the charstring programs (`tests/unit/wrap/variableFonts.ts`).
    Pin a real CFF2 font (for example Source Serif Variable, OFL) in `validation/sources.md` before relying on this reader for production fonts.
 
@@ -635,7 +635,7 @@ default and at an instance: always a font or a stable code, no internal error te
 
 **Measured.** One instance of the 6-glyph generated font parses and scans in 0.03 ms (2000 instances, node, this machine).
 
-**Left.** `gvar` (variable TrueType) and `avar` version 2, `MVAR` / `VVAR`, named-instance lookup by name, a pinned real CFF / CFF2 font in the validation pack.
+**Left.** `VVAR`, named-instance lookup by name, a pinned real CFF / CFF2 font in the validation pack.
 
 ### 14.6 Multi-face wraps (DES-3c, VC-WRP-36)
 
@@ -653,7 +653,7 @@ it becomes part of the boundary (area 50 - 8 = 42 in the unit test), loops entir
 `WRP_CHAIN_CLIP_FAILED` too. `wrap_to_face` keeps the runs without chords: each becomes a curve on its own face (`data.faces`, `curves[].face`), a loop crossing an edge becomes open pieces.
 
 **Emboss across the faces.** Each face's part is mapped by its chart, checked on the face and embossed in chain order: `recipe_k = emboss(source: recipe_{k-1}, face: the face found again by an interior probe point)`. Walls on a shared smooth edge are the same plane, so the pieces fuse.
-**Deviation (never silent):** one command and one result, but the kernel steps are one per face, not a single multi-face tool; sharp (convex / concave) edges are refused for emboss and deboss (`WRP_CHAIN_EDGE_SHARP`: slabs on both sides would meet in a line, not a surface; a mitre needs a
+**Deviation (never silent):** one command and one result, but the kernel steps are one per face, not a single multi-face tool; sharp (convex / concave) edges are refused for emboss and deboss except plane to plane (mitred since §14.15; otherwise `WRP_CHAIN_EDGE_SHARP`: slabs on both sides would meet in a line, not a surface; a mitre needs a
 native half-space cut of the tools). `scribe` and `wrap_to_face` cross sharp edges. `data.expectedVolumeDelta` is the sum of the closed forms per face.
 
 **Measured (native kernel, `server/tests/nativeWrapChain.test.ts`).** Stadium (box 40 x 20 x 10 + two r 10 cylinders), band 6 x 30, depth 1: areas 60 + 120, volume change 186 = 60 + 120 x 1.05 (1e-6 relative); three faces (band 60 long over plane, cylinder end, opposite plane) 369.4248;
@@ -787,3 +787,137 @@ volume of the same emboss on the whole cone (1e-4). Torus R 10 r 3 split along t
 the chain is refused with `WRP_DISTORTION_EXCEEDED`, and so is any limit below the measured mismatch.
 
 **Deviations (never silent).** The chain of non-developable faces is a first-order unfolding: the join mismatch (over the window and at every crossing of the sketch) and the stretch are measured and refused above the limit, not zero. A sketch that leaves the joined window is refused rather than cut on the extended chord. A closed edge (a meridian) is joined only over the window the chart reaches, so a sketch farther from the edge than that is refused. The sphere / torus chains and the emboss closed form per face (`expectedVolumeDelta`) are checked on the native kernel only for the cone and torus cases above.
+
+### 14.14 Variable TrueType: `gvar`, `avar` version 2, `MVAR` (DES-3c)
+
+`variation` now instances TrueType fonts with a `gvar` table as well as CFF2 ones. Files: `lib/font/gvar.ts` (tuple variation store), `lib/font/variation.ts` (`avar` 2), `lib/font/mvar.ts`, `lib/font/glyf.ts` (the hooks), `lib/font/font.ts` (wiring).
+
+**`gvar`.** Per glyph, a list of tuples: a peak (embedded, or an index into the shared tuples), an optional intermediate region (start / end per axis; without one the region runs from 0 to the peak), point numbers (private, or the glyph's shared ones when the header flag 0x8000 is set; count 0 = every point; runs
+of byte or word steps), and packed deltas (runs of zeros, bytes, words) for x then y. A tuple's scalar at the instance is the product over axes of the usual tent (the region scalar of the `ItemVariationStore`, `regionScalar`); the tuple's deltas times its scalar are summed. The points are those of the glyph followed by four phantom points; a composite glyph's
+points are its component offsets (then the phantoms). **IUP:** a tuple that names only some points leaves the others of a contour to be inferred, per axis, from the touched points before and after them in the contour (cyclic): one touched point moves the whole contour; between two touched points an untouched one takes the delta of the nearer
+(in coordinate) end when it lies outside their range, the linear interpolation inside it, and 0 when the two touched points have the same coordinate but different deltas (the same delta when equal). The advance of a glyph without `HVAR` is the base advance plus (delta of phantom point 2) - (delta of phantom point 1); with `HVAR` that wins. The default instance reads
+no `gvar` at all (the outline is the static one).
+
+**`avar` version 2.** After the segment maps of version 1 (applied first, as before), a delta store: for every axis i (also one left at its default), through the optional axis index map (otherwise row i of subtable 0), `delta_i` is evaluated at the segment-mapped coordinates of all axes and the coordinate becomes
+clamp(c_i + delta_i / 16384, -1, 1) (2.14 fixed point). A table that stops before the two offsets is damaged (`WRP_FONT_PARSE`); a store with more axes than `fvar` too.
+
+**`MVAR`.** Value records (tag, outer, inner) over an `ItemVariationStore`; the deltas at the instance, rounded, are added to `hasc` (ascender), `hdsc` (descender), `hlgp` (line gap) and `cpht` (cap height, when it comes from OS/2). `xhgt` and the other tags are read and ignored (the layout does not use them).
+
+**Bounds (like the CFF work).** At most 64 axes and 4096 shared tuples, the glyph count at most the font's, every offset and run checked by `ByteView`, point numbers inside the glyph (+ 4), runs inside their counts, at most 4095 tuples per glyph, tuples x points of a glyph at most 2e6, and the tuple work of all the glyphs of a font is charged to the same
+operator budget as the CFF charstrings (20e6) when the font is scanned at import. `MVAR` has at most 256 records. Damage is `WRP_FONT_PARSE`; a font without variation data asked for an instance is `WRP_FONT_VARIATION`.
+
+**Measured (`tests/unit/wrap/gvar.test.ts`).** Generated fonts with closed-form outlines: wght 900 moves the right corners by 40 and IUP gives 20 / 40 / 20 / 0 to the points between (x = 0, 70, 140 ...), the advance +40 through the phantom point (HVAR +100 wins when present); wght 650 scales by 0.5 and the intermediate tuple (0.25 / 0.5 / 1) is at its peak (+8);
+wght 550 gives its 0.2 scalar; the wght- tuple's single touched point moves the whole contour by -10 s; composite offsets move by their deltas; a 150-point list (two-byte count), a step of 300 (word point numbers) and a delta of 300 (word delta) are read; `avar` 2 moves wdth to 0.5 at wght 900 (so the wdth tuple scales by 0.5) and to 0.125 through a bent wght map; `MVAR` moves the metrics (+50 / -20 / +10 / +30 at wght 900,
+half at 650). On Bahnschrift (system font, test skipped without it): the I stem grows with wght (144 / 204 / 284 wide at wght 300 / 400 / 700), the H narrows with wdth 75 (advance 1390 -> 870), the point structure is the same at every instance, and all glyphs of three instances read within the budgets. No reference outlines of a third-party renderer were available offline, so the real-font checks are properties, not values.
+
+### 14.15 Mitred walls across a sharp plane-plane edge (DES-3c)
+
+An emboss or deboss chain whose outline crosses a straight edge between two plane faces is built face by face (slabs with walls normal to their face, §14.6) and the corner is closed by a mitre (`embossMitre.ts`).
+With the two outward normals nA, nB at the edge, the depth d and s = +1 (emboss) or -1 (deboss), the offset planes meet at M = s d (nA + nB) / (1 + nA . nB) from the edge. A convex edge with an emboss, or a concave edge with a
+deboss, leaves the column (edge, s d nA, M, s d nB) between the slabs: a prism along the edge over the stretches the outline covers (one per pair of crossings) is united (emboss) or subtracted (deboss). In the other two
+cases (emboss on a concave edge, deboss on a convex edge) the slabs overlap by the same column and the union already is the mitred corner, so no filler is built and the closed form loses the overlap.
+`data.expectedVolumeDelta` includes both: 48 d + d^2 L = 54 for an 8 x 6 rectangle centred on the edge of a box (d 1, L 6), 42 where the slabs overlap. `data.mitre` lists per edge `kind` (filler / overlap), the number of intervals, the covered length and the
+cross-section area, with `fillerVolume`, `overlapVolume` and `exact`.
+
+**Exactness.** The overlap of the two slabs is only as wide as the outline: the closed form is exact (`exact` true) when, over every covered stretch, the outline contains the strip of the clip polygon's reach on both faces, and when no outline comes within that reach of the edge without crossing it; otherwise `exact` is false, `expectedVolumeDelta` null and `data.mitre.reasons` says why. The filler is a column outside both slabs and does not depend on the width of the outline. Only the stretch of the line that is the edge counts (pieces meeting the line beyond its ends belong to another edge of the chain).
+
+**Refused by name (`WRP_CHAIN_EDGE_SHARP`, the message says which):** a convexity the kernel left unknown; an edge between faces that are not both planes; an edge sharper than the mitre can follow (|M| > 20 d); where a filler is needed, an outline that crosses the edge at an angle
+(only segments at right angles to the edge have a column the prism fills), through a vertex, with a curved piece, an odd number of times, or beyond the end of the edge. Where only an overlap is concerned the same crossings are built and `exact` is false (`expectedVolumeDelta` null: the closed form
+does not know the overlap). Scribe crosses sharp edges as before.
+
+**Measured (native kernel, `server/tests/nativeWrapMitre.test.ts`).** Box 60 x 40 x 10, rectangle 8 x 6 centred on the top-side edge, d 1: emboss on the convex edge +54 (the filler 6), deboss -42 (overlap 6); on the concave edge of an L-shaped solid emboss +42, deboss -54; each within 1e-5 of the
+closed form on the exact solid.
+
+### 14.16 Silhouette of freeform (B-spline) faces (DES-3c)
+
+`split_at_silhouette` traces the contour n . d = 0 of a B-spline face on the exact surface of `faceQuery.bspline` (the face's own (u, v)). G = n . d / |n| is sampled on a 48 x 48 grid of the face's parameter box; the sign changes
+are linked by marching squares into polylines (open ones end on the box, closed ones are loops); every crossing is refined to the contour by bisection on its grid edge. A trimmed face is handled with `faceContains`: the
+polyline is cut at the trimming boundary by bisection (each probe re-projected onto F = (S_u x S_v) . d = 0 by Newton on the exact first and second derivatives). Each piece is an interpolating cubic through the refined vertices (decimated to
+a third of a cell), projected back onto the contour at every evaluation, and then fitted as a cubic B-spline within the tolerance (the pcurve in the face's own (u, v) likewise); `deviation` is the larger of the two fits, and the
+fitted curve is checked against `projectOnFace` / `faceContains` at 48 points. A contour along a boundary of the face already is an edge (`onEdge`), a face with |n . d| < 1e-9 at every node is edge-on (`edgeOn`).
+
+**Refused by name** (`WRP_SILHOUETTE_UNSUPPORTED` with the reason, the face left unsplit): no B-spline from the kernel; a periodic B-spline; a pole or collapsed edge (|S_u x S_v| = 0 at a node); a face seen almost tangentially
+(|n . d| < 1e-3 everywhere without a sign change: a double root cannot be traced); a cusp or branch point (the gradient of n . d along the contour falls under 5 % of its largest value, Newton does not converge, or a grid cell
+has four crossings); a fit that misses the tolerance.
+
+**Measured.** Closed forms on the fake freeform kernel (`tests/unit/wrap/freeformSilhouette.test.ts`): a cylinder patch R 20 h 40 seen along (0.2, 1, 0) gives the ruling at azimuth -atan 0.2, length 40 to 1e-6, deviation under the
+tolerance 1e-6; a saddle z = 0.05 (x^2 - y^2) seen along x gives the parabola x = 0, length 2 [(5/2) sqrt(1 + a^2 25) + asinh(5a) / 2a] (a = 0.1) to 1e-6, and the skew view (1, 0.3, 0) the line x = 0.3 y; cut at y = 3 the arc is the
+closed-form partial integral; a bump seen along (1, 0, 0.5) has one closed loop with |n . d| < 1e-7 on the exact surface. Native OCCT (`server/tests/nativeSilhouetteFreeform.test.ts`): a plate bent 90 degrees on R 50 (two B-spline faces,
+R 50 and R 44) seen along (cos 30, 0, sin 30) gives two rulings of length 30 (error under 1e-5) at 30 degrees from the vertical (points within 1e-3 of the cylinder, the bent B-spline's own fit), fit deviation 4e-11; each curve alone
+divides its face into arcs of 30 and 60 degrees times the width (1e-3).
+
+**Deviations (never silent).** Features smaller than a cell of the grid (an island or a fold inside one cell) are not seen; a branch point inside a cell is refused when the contour's gradient falls under 5 % of its maximum or the
+cell has four crossings, a crossing that passes both tests is traced as two smooth branches. Contour features smaller than 1/48 of the parameter box of the face are not seen (`data.silhouette.grid` = 48); the closed loops are fitted with the same direction at both ends (the seam is C1); the guards on Newton failing
+(the sampler answers null, the fit refuses "Newton cannot follow"; after the fit every probe's distance to n . d = 0 is checked) are exercised through the test hooks of `freeformContours` (a field or projection no real surface gives) and by a C0 crease. A kernel defect found on the way (two sequential
+face splits merged the first back, `UnifySameDomain` keep set) is fixed in `split_shape` (fix/split-shape-keep): the bent plate gives 8 faces.
+
+### 14.17 Review overlays: curves on faces and face joins (DES-3c)
+
+The read-only query `wrap_overlay` (`id`, optional `samples`) returns what the viewport draws, in world coordinates: `curves` (every `nurbs_curve` with `onFace` that lies on the solid, or on an earlier solid that no longer exists, as
+`source: "earlier"`, because a silhouette split keeps the curves of the solid it consumed) and `edges` (the B-rep edges of the solid with the faces each joins and their convexity from `faceGraph`; null without the exact kernel, with
+`edgesNote`). It is capped at 64 curves and 400 edges (`truncated` names what was cut). The UI toggle "Wrap" (viewport toolbar, `src/ui/viewport/3d/overlays/WrapOverlay*.tsx`, state in `wrapOverlayStore`, nothing persisted, no command) draws the
+first four selected solids: curves orange (earlier solid: yellow) and the edges by what a chain across them does: smooth green (the sketch develops across), convex orange and concave blue (mitred between two planes, §14.15), unknown grey, with a legend and a layer
+switch for each. Verified on the native kernel through the server and a headless Chromium (a bent plate with its silhouette curves and a stepped block with a convex and a concave edge); the geometry mapping and the toggles are in `tests/component/WrapOverlay.test.tsx`.
+**Left:** the footprint of an emboss on its face and the join mismatch per edge need data the document does not keep (they are results of the command, in `data.edges` of `emboss_on_face`); the join mismatch stays a result of the command. The footprint and the knurl pattern before the command runs are done in 14.19.
+
+### 14.18 Vertical metrics variations and named instances (DES-3c)
+
+**Advance heights.** `ParsedFont.verticalAdvance(glyph)` is the advance height in font units: the `vmtx` entry (the last long metric repeats for the glyphs after `vhea.numOfLongVerMetrics`), else ascender - descender when the font has no
+vertical metrics, moved at an instance by `VVAR` (the delta of the row the advance-height map gives, else row = glyph index of subtable 0; rounded to a font unit) or, for a gvar font without `VVAR`, by the phantom points of the glyph (the
+third minus the fourth phantom point, the vertical counterpart of the width from the first and second). A `VVAR` is read at the instance only when the instance moved an axis; its version must be 1, its store and every offset of its four
+mappings must lie inside the table (the side-bearing and origin mappings are validated and not used). Damage is `WRP_FONT_PARSE`; a `vhea` with more long metrics than glyphs or a `vmtx` shorter than its glyphs need refuses when a height is asked.
+
+**Named instances.** The `fvar` instance records (subfamily name id, flags, one Fixed per axis, optional PostScript name id; the record size must be 4 + 4 axes or 6 + 4 axes, at most 4096 records, every value inside its axis) are listed in
+`ParsedFont.namedInstances` with the strings of the `name` table (an instance whose subfamily name id has no string is left out). `parseFont(bytes, {}, name)` and `import_font instance="Bold"` pick one by its subfamily or PostScript
+name, any case, and mean the axis values of that record (the record stored in the document carries them as `variation`, so `add_text font=<id>` follows). A name the font does not have lists the names it has; a name together with
+`variation`, or on a font without axes, is `WRP_FONT_VARIATION`. `data.namedInstances` of `import_font` lists name, PostScript name and axis values.
+
+**Names in every language.** The `name` table keeps every language of a name id (at most 16 per id, every record read): the preferred string is Windows English (0x0409), then Unicode, then Macintosh English, then the others in table order,
+and a requested name is matched against every language of the instance's subfamily and PostScript name ids, so a localised record that comes later never hides the English one and `instance="Gras"` works as well as `Bold`.
+**A bad instance record is not a bad font.** A record whose values lie outside their axes is left out, a record table that cannot be read (a size that fits neither form, more than 4096, cut short) lists no instance; both are lines of
+`ParsedFont.namedInstanceProblems` and of `data.namedInstanceProblems` of `import_font`. An ItemVariationStore that starts inside the 20-byte header of an HVAR or the 24-byte header of a VVAR is `WRP_FONT_PARSE`.
+**`font_metrics`** (read-only, `font`, optional `text`, `variation` or `instance`) is where the heights are read: the vertical metrics at the instance and the glyph, advance width and advance height of each character, with the sums.
+
+**Measured (closed forms by construction, `tests/unit/wrap/vvar.test.ts`).** Heights 1000..1400 with a VVAR of 0, 10, 20, 30, 40 on wght+: at wght 900 the glyphs read 1000, 1110, 1220, 1330, 1440, at wght 650 (coordinate 0.5)
+1000, 1105, 1210, 1315, 1420; through a map to rows 3 - k: 1030, 1120, 1210, 1300, 1400; without vmtx 1150 + 10 k; the phantom fallback 30 - 10 = 20 on glyph 2. Four instances give four names, and `Bold`, `bold`, `Test-Bold` equal
+the explicit {wght: 700} (instance, advances, outline). **Left:** none: vertical layout of text and `VORG` are §14.20.
+
+### 14.19 Footprint and knurl previews (DES-3c)
+
+**Queries.** `preview_emboss_on_face` and `preview_add_knurl` take exactly the params of `emboss_on_face` / `add_knurl`, run the same placement and refusals (the shared `runEmboss` stops before the kernel build; `planKnurl` is the knurl's own plan), and change nothing (`document` returned as is, `affected: []`). Emboss: `data.footprint` = the loops of the sketch on the face as world polylines (`hole`, `points`, at most 600 points per loop), the chart's distortion, `expectedVolumeDelta` and the method. A chained emboss (`chain`) is refused (`WRP_PARAM_INVALID`). Knurl: `data.lines` = the groove lines (straight, diagonal, diamond; at most 400 lines, every n-th one drawn when thinned, at most 200 points each), `teeth`, `pitch`.
+
+**UI.** The palette form of the two commands (`preview` on) sends the typed params, debounced 250 ms, to the query (backend when online, local otherwise: `useHostQuery`) and draws the answer as a ghost on the face (`FootprintPreviewLayer`: loops cyan, holes magenta, knurl lines amber) with the query's own summary, or its refusal, in a `role="status"` line. Invalid or incomplete params, leaving the form or turning `preview` off clear the ghost. Nothing in the UI derives geometry. Tests: `tests/unit/wrap/preview.test.ts`, `tests/component/FootprintPreview.test.tsx`.
+
+**Review fixes (2026-10-31).** The knurl ghost draws the grooves the recipes sweep: one phase function (\`knurlGeometry.toothAzimuth\`, \`knurlHelix.helicalAzimuth\`, in the frame of \`axisFrame(axis, origin)\`, the helical sweep starting at \`grooveSpan.z0\`) is read by both recipes and the preview, which only clips to the face and thins; a cylinder whose surface frame is turned gets the same lines. With \`model: "geometry"\` the preview and the command share \`planKnurlGeometry\` (tooth angle, depth, land, reach, bore, kernel-time envelope, free end caps), so the refusals before the build are the same code and path. A preview hands no build to the kernel: with \`walls: "pull"\` and a draft the drafted walls are not built (\`data.draftChecked\` says the command builds and checks them; the draft-closing check still runs). The form finds the query in \`annotations.previewQuery\` of the command and the answer says what it is in \`data.kind\` (\`footprint\` or \`lines\`); the query is asked again when the entities of the document change, and a request is aborted when its params change or the form closes.
+
+### 14.20 Vertical text layout (DES-3c)
+
+**Parameter.** `direction: "horizontal" | "vertical"` on `add_text` (stored on the text entity, so `edit_step_params`, replay and every consumer of the entity follow it: `text_outline`, `extrude_profile`, the sketch outlines of `emboss_on_face` / `wrap_to_face`, all through `outlineOfText`) and as an override on `text_outline`
+(like `kerning`). Default horizontal: nothing changes for existing documents (the layout of a horizontal text is the same code path).
+
+**Layout** (`lib/font/layoutVertical.ts`, CJK style, glyphs upright; no `vert` / `vrt2` substitution, no rotated Latin). Per column (a line; a newline starts the next): the glyph k is hung from its VERTICAL ORIGIN, the point of the glyph that sits at the pen,
+and the pen moves DOWN by the vertical advance of the glyph plus `letterSpacing`:
+- vertical advance = `ParsedFont.verticalAdvance` (`vmtx` at the instance, `VVAR` / phantom points, ascender - descender without vertical metrics, §14.18), scaled by cap height / font cap height like the widths;
+- vertical origin = `ParsedFont.verticalOrigin(glyph)`, y above the baseline and its source: (1) `VORG` for a CFF font that has the table: the record of the glyph, else `defaultVertOriginY` (version must be 1.0, at least 8 bytes and 4 per record, else `WRP_FONT_PARSE`; a `VORG` on a TrueType font is not read);
+  (2) `vmtx`: the OpenType default, yMax of the glyph + its top side bearing (the highest CONTROL point: the glyf header yMax of a TrueType glyph at the instance, the charstring points of a CFF / CFF2 glyph; the entry of the glyph's long metric, or the bearing array after them), source `vmtx`;
+  at an instance the bearing is moved by the `VVAR` top-side-bearing mapping when the table has one, and for a gvar font WITHOUT `VVAR` the origin is the default yMax + bearing + the delta of the top phantom point (the one the glyph variations move), as the vertical counterpart of the advance; (3) otherwise (no `vmtx`, a blank glyph) the ascender at the instance (`MVAR` hasc), source `ascender`. The origin in x is the middle of the advance width;
+- glyph point (x, y) in font units goes to (s x + cx - s advance / 2, s y + top - s origin_y), s = document units per font unit, cx the column's x, top the pen's y;
+- `position` of the text is the VERTICAL ORIGIN of the first glyph of the first column (the top of its advance box); the first column sits at position.x, column k at x = -k pitch from it. The pitch is `ParsedFont.verticalLine`: `vhea` vertTypoAscender - vertTypoDescender + vertTypoLineGap moved by `MVAR` `vasc` / `vdsc` / `vlgp` at the instance (source `vhea`), else the horizontal ascender - descender + line gap (source `hhea`), times `lineSpacing`;
+- `anchor`, PER COLUMN (its width is the widest advance in that column, so two columns of different width are aligned by their own width): center puts the middle of the advance widths on the column's x, left the column's left edge, right its right edge;
+- `verticalAnchor`: baseline and cap_top put the top of the first advance box on y = 0 (the text hangs from the position), cap_middle centres the column on y = 0;
+- kerning is not applied (the pairs are horizontal; `vkrn` is not read), `letterSpacing` goes between glyphs vertically.
+`data` of `text_outline`: `direction`, `advanceWidth` (the widest column), `advanceHeight` (the tallest column: vertical advances plus spacing; absent for horizontal text), `lines` (the column count); `font_metrics` lists `verticalOrigin { y, source: "VORG" | "ascender" }` per character.
+Areas, loop counts and outline lengths do not depend on the direction (same glyphs, other places).
+
+**Refusals** (by name, with remediation): `WRP_TEXT_NO_FONT` (vertical without a font), `WRP_TEXT_VERTICAL_CURVE` (vertical together with `onCurve`, in `add_text` and in `text_outline` / the shared outline path: vertical text does not follow a curve); a bad `direction` is an invalid parameter.
+
+**Measured (closed forms by construction, `tests/unit/wrap/verticalText.test.ts`).** Fixture font: heights 1000..1400 (A 1100, B 1200), top side bearings 700 / 650 / 600 / 500 (origins 800 / 750 / 700 / 549), widths 600 / 700, ascender 900, descender -250, line gap 100, cap height 700; height 7 (0.01 per font unit), centre anchor:
+A (square 100) at x -3..-2, y -8..-7; B (triangle) at x -3.5..-2.5, y -18.5..-17.5; advanceWidth 7, advanceHeight 23 (11 + 12), letter spacing 2 moves B to y -20.5..-19.5 (advanceHeight 25); cap_middle: A at y 3.5..4.5; anchor left: B at x 0..1; right: x -7..-6;
+the origin: VVAR top-side-bearing map at wght 900: A 820, B 760; a gvar font without VVAR (top phantom +25 at wght 900): A 825; a vmtx with 2 long metrics: bearings after them; MVAR vasc +100 and vlgp -20 at wght 900: pitch 1230;
+two columns "A
+B": B at x -15..-14 (vhea pitch 1150 = 11.5; 12.5 from hhea on a font without vhea, B at x -16..-15), lineSpacing 2: x -26.5..-25.5; "AB
+A" with anchor left: first column A x 0.5..1.5 / B x 0..1, second column (width 6) x -11.5..-10.5; right: -6.5..-5.5 and -17.5..-16.5; center: -14.5..-13.5. Without vmtx every height is 1150 and the origin the ascender: B at y -20.5..-19.5. CFF with `VORG` (default 950, glyph 2 -> 700): A at y -9.5..-8.5, B at y -18.5..-17.5; negative origins and a 60-record binary search read.
+Real fonts: Fira Sans has no vertical metrics (height = ascender - descender, origin = ascender); Bahnschrift, when installed, takes the same fallback (the test is skipped where the file is absent). Areas stay 1.5 (square + triangle) in both directions.
+**Wrap paths.** `extrude_profile` of the vertical AB (Manifold kernel): volume 3 = 1.5 x depth 2, bbox x [-3.5, -2], y [-18.5, -7], z [0, 2]; `preview_emboss_on_face` on a cylinder R 20 (develop chart, fake exact kernel) with the vertical text as the profile: the same two loops and the relief volume 1.5 x 1.025, 11.5 tall along the axis (1 for the horizontal text).
+**Red-proofs** (each mutation fails these tests of `verticalText.test.ts`): top side bearing ignored (14), `VORG` read on a TrueType font (1), the horizontal pitch in place of the vhea one (2), the top-phantom delta ignored (1), the VVAR bearing map ignored (1); in the first version (origin = ascender): vertical origin 0 (7), horizontal advance in place of the vertical one (10), `VORG` ignored (3).
+**Left:** `vert` / `vrt2` glyph substitution, rotated Latin runs (tate-chu-yoko), `vkrn` vertical kerning, vertical layout on a curve, the VVAR vertical-origin mapping (`vOrgMapping`, read for validation only).

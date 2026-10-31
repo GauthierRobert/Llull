@@ -4,7 +4,7 @@ import type { Vec3 } from '@core/model/types';
 import { dot3 } from '@lib/vec3';
 import { draftAngle, type FaceOp, type FacePick } from './faceEditModel';
 import { snapFaceValue } from './faceDragMath';
-import { heightAbove, parallelPlaneOffsets, planarRegion, raycastTriangles, viewerFacingNormal, type PickRay } from './faceMesh';
+import { heightAbove, parallelPlaneOffsets, raycastTriangles, facetStripRegion, viewerFacingNormal, type PickRay } from './faceMesh';
 import type { PickableTriangles } from './faceTriangles';
 
 const UP: Vec3 = [0, 0, 1];
@@ -15,16 +15,41 @@ export interface FacePicked {
   readonly region: number[];
 }
 
-/** The face under the ray: hit point, viewer-facing (outward) normal, draft lever and its coplanar patch; null on a miss. */
-export function pickFaceAt(source: PickableTriangles, ray: PickRay): FacePicked | null {
+/** The face the kernel named for each display triangle of one entity version (`inspect_face_triangles`): triangle -> face and face -> triangles. */
+export interface FaceLabels {
+  readonly faceOfTriangle: ArrayLike<number>;
+  readonly trianglesOfFace: ReadonlyMap<number, readonly number[]>;
+}
+
+/** Group `faceOfTriangle` by face. */
+export function faceLabels(faceOfTriangle: ArrayLike<number>): FaceLabels {
+  const trianglesOfFace = new Map<number, number[]>();
+  for (let t = 0; t < faceOfTriangle.length; t++) {
+    const face = faceOfTriangle[t] as number;
+    const list = trianglesOfFace.get(face);
+    if (list === undefined) trianglesOfFace.set(face, [t]);
+    else list.push(t);
+  }
+  return { faceOfTriangle, trianglesOfFace };
+}
+
+/**
+ * The face under the ray: hit point, viewer-facing (outward) normal, draft lever and the triangles of its face; null on a miss. With the kernel's `labels` the
+ * face is exactly the B-rep face; without them it is the coplanar patch, or the facet strip of a tessellated curved face (`facetStripRegion`).
+ */
+export function pickFaceAt(source: PickableTriangles, ray: PickRay, labels: FaceLabels | null = null): FacePicked | null {
   const hit = raycastTriangles(source.triangles, ray);
   const triangle = hit === null ? undefined : source.triangles[hit.index];
   if (hit === null || triangle === undefined) return null;
   const normal = viewerFacingNormal(triangle, ray);
   if (normal === null) return null;
+  const labelled =
+    labels === null || hit.index >= labels.faceOfTriangle.length
+      ? undefined
+      : labels.trianglesOfFace.get(labels.faceOfTriangle[hit.index] as number);
   return {
     pick: { point: hit.point, normal, lever: Math.max(0, heightAbove(source.triangles, UP, hit.point)) },
-    region: planarRegion(source.triangles, source.adjacency, hit.index),
+    region: labelled === undefined ? facetStripRegion(source.triangles, source.adjacency, hit.index) : [...labelled],
   };
 }
 

@@ -7,6 +7,7 @@ import { parseDn, parseNps } from '@aec/plant/catalog/nominal';
 import { parseCatalogFile } from '@aec/plant/catalog/file';
 import { parseTagFormat } from '@aec/plant/data/tagFormat';
 import { readPcf } from '@aec/plant/fabrication/pcf/pcfRead';
+import { readProteus } from '@aec/plant/pid/dexpi/proteusRead';
 import { parseLineNumber } from '@aec/plant/piping/lineNumber';
 import { parseSpecFile } from '@aec/plant/spec/file';
 import { parseCrossingName } from '@aec/industrial/framing/gridFraming';
@@ -39,12 +40,74 @@ const pcfBuild = (records: number): string =>
     records,
   );
 
+const PROTEUS_HEAD = '<?xml version="1.0"?><PlantModel><PlantInformation SchemaVersion="4.1.1" Units="mm"/>';
+const PROTEUS_NODES =
+  '<ConnectionPoints><Node ID="d"/><Node Type="process" ID="a"><Position><Location X="1" Y="0" Z="0"/></Position></Node><Node Type="process" ID="b"><Position><Location X="2" Y="0" Z="0"/></Position></Node></ConnectionPoints>';
+const proteusRecord = (k: number): string =>
+  `<Equipment ID="E${k}" ComponentClass="Tank"><GenericAttributes Set="DexpiAttributes"><GenericAttribute Name="TagNameAssignmentClass" Format="string" Value="T-${k}"/></GenericAttributes><Nozzle ID="N${k}" ComponentClass="Nozzle"/></Equipment>` +
+  `<PipingNetworkSystem ID="L${k}"><PipingNetworkSegment ID="S${k}"><CenterLine NumPoints="2"><Coordinate X="0" Y="0"/><Coordinate X="1" Y="0"/></CenterLine><PipingComponent ID="V${k}" ComponentClass="BallValve">${PROTEUS_NODES}</PipingComponent><Connection FromID="N${k}" FromNode="1" ToID="V${k}" ToNode="2"/></PipingNetworkSegment></PipingNetworkSystem>`;
+const proteusBuild = (records: number): string => repeated(PROTEUS_HEAD, proteusRecord, '</PlantModel>', records);
+const proteusNest = (depth: number): string =>
+  PROTEUS_HEAD + '<Equipment ComponentClass="Chamber">'.repeat(depth) + '</Equipment>'.repeat(depth) + '</PlantModel>';
+const proteusExtras = [
+  {
+    name: 'many components in one segment',
+    input: () =>
+      repeated(
+        PROTEUS_HEAD + '<PipingNetworkSystem><PipingNetworkSegment>',
+        (k) => `<PipingComponent ID="V${k}" ComponentClass="BallValve">${PROTEUS_NODES}</PipingComponent>`,
+        '</PipingNetworkSegment></PipingNetworkSystem></PlantModel>',
+        50_000,
+      ),
+  },
+  {
+    name: 'many dangling connections',
+    input: () =>
+      repeated(
+        PROTEUS_HEAD + '<PipingNetworkSystem>',
+        (k) => `<PipingNetworkSegment><Connection FromID="x${k}" ToID="y${k}"/></PipingNetworkSegment>`,
+        '</PipingNetworkSystem></PlantModel>',
+        50_000,
+      ),
+  },
+  { name: 'many unknown elements', input: () => repeated(PROTEUS_HEAD, () => '<Mystery/>', '</PlantModel>', 100_000) },
+  {
+    name: 'many information flows without ends',
+    input: () =>
+      repeated(
+        PROTEUS_HEAD + '<ProcessInstrumentationFunction>',
+        () => '<InformationFlow/>',
+        '</ProcessInstrumentationFunction></PlantModel>',
+        50_000,
+      ),
+  },
+];
+
 const SPEC = '02-spec-driven-routing/validation/data/spec_cs150.json';
 const CATALOG = '02-spec-driven-routing/validation/data/catalog_stub_cs150.json';
 
 const LINE_NUMBER_FIELDS = { dn: 100, service: 'HC', sequence: '001', spec: 'A1A' } as const;
 
 export const AEC_READERS: readonly HostileReader[] = [
+  {
+    name: 'plant: readProteus (DEXPI 1.3 Proteus XML)',
+    covers: ['domain-aec/src/plant/pid/dexpi/proteusRead.ts:readProteus'],
+    input: 'text',
+    build: proteusBuild,
+    nest: proteusNest,
+    extra: proteusExtras,
+    read: (input) => readProteus(asText(input), 'pid-1.1', 'auto'),
+    accepts: (result) => (result as { ok: boolean }).ok,
+  },
+  {
+    name: 'plant: import_dexpi (execute)',
+    covers: ['import_dexpi'],
+    input: 'text',
+    build: proteusBuild,
+    nest: proteusNest,
+    read: (input) => execute(createEmptyDocument(), 'import_dexpi', { text: asText(input) }),
+    accepts: (result) => (result as { summary: string }).summary.startsWith('import_dexpi: DEXPI 1.3'),
+  },
   {
     name: 'plant: readPcf',
     covers: ['domain-aec/src/plant/fabrication/pcf/pcfRead.ts:readPcf'],

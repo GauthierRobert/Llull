@@ -4,29 +4,11 @@
   "description": "VC-BLD-06: chord sqrt 2 on the rim of a cylinder R 5 h 10 (plane against cylinder, right angle): r = 1",
   "source": "analytic",
   "formula": "meridian section = right angle, r = c / sqrt 2 = 1; Pappus (oracle 87)",
-  "kernels": [
-    "occt"
-  ],
+  "kernels": ["occt"],
   "bodies": 1,
   "volume": 778.95743342,
   "area": null,
   "centroid": null,
-  "bbox": {
-    "min": [
-      -5,
-      -5,
-      -5
-    ],
-    "max": [
-      5,
-      5,
-      5
-    ]
-  },
-  "tolerance": {
-    "volume": 0.0000015,
-    "area": 0.001,
-    "centroid": 0.001,
-    "bbox": 0.001
-  }
+  "bbox": { "min": [-5, -5, -5], "max": [5, 5, 5] },
+  "tolerance": { "volume": 0.0000015, "area": 0.001, "centroid": 0.001, "bbox": 0.001 }
 }

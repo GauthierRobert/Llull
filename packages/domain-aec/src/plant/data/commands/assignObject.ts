@@ -219,10 +219,15 @@ function orphanOf(doc: CadDocument, data: PlantDataModel, id: string, className:
     : undefined;
 }
 
+/**
+ * @param scratch the caller owns `doc`'s plant data record (a private copy made for a batch): the new object is appended to its `objects`
+ * and `objectOrder` in place instead of copying them, which keeps a bulk assign linear. Never set on a document that is returned unchanged.
+ */
 export function assignObject(
   doc: CadDocument,
   input: AssignInput,
   ctx: ExecutionContext | undefined,
+  scratch = false,
 ): Outcome<{ readonly assigned: Assigned }> {
   const data = getPlantData(doc);
   const resolution = resolveClass(data, input.className);
@@ -323,12 +328,15 @@ export function assignObject(
     ...(Object.keys(provenance).length === 0 ? {} : { provenance }),
     ...(lineLink === undefined ? {} : { lineId: lineLink }),
   };
+  const objects = scratch ? (data.objects as Record<string, PlantObject>) : { ...data.objects };
+  objects[id] = object;
   const nextData: PlantDataModel = {
     ...data,
-    objects: { ...data.objects, [id]: object },
-    objectOrder: orphan === undefined ? [...data.objectOrder, id] : data.objectOrder,
+    objects,
+    objectOrder: orphan === undefined && !scratch ? [...data.objectOrder, id] : data.objectOrder,
   };
   if (orphan === undefined) extendRegistry(data, nextData, object);
+  if (orphan === undefined && scratch) (data.objectOrder as string[]).push(id);
   const next = withPlantData(doc, nextData);
   const rebound = orphan !== undefined;
   if (provider?.writeTags === undefined || element === undefined || element.tag === tag)

@@ -17,6 +17,7 @@ import { type EdgeLawInput, type FilletMode, sameLaw } from './filletSpec';
 import { chordsToRadii } from './filletChord';
 import { type LawProblem, closedEdge, isLawProblem, periodicProblem, resolveLaw } from '../../geometry/blend/law';
 import { blendRejection } from './blendCodes';
+import { findKink, kinkRefusal, kinkReported } from './filletTangency';
 import {
   type PlannedProfile,
   type ProfileInput,
@@ -51,6 +52,8 @@ export interface FilletRequest {
   readonly profile?: ProfileInput | undefined;
   /** Corner treatments (BLD M3): setback corners; vertices without an entry keep the kernel's rolling-ball corner. */
   readonly corners?: readonly CornerInput[] | undefined;
+  /** Build a fillet whose new blend meets an earlier blend without tangency (the finding is reported, not refused). */
+  readonly allowNonTangent?: boolean | undefined;
 }
 
 interface Planned {
@@ -143,7 +146,7 @@ function recipeOfPlan(
     first !== undefined &&
     planned.every((entry) => sameLaw(entry.law, first.law)) &&
     first.law.sizes === undefined &&
-    first.law.interpolation !== 'linear' &&
+    first.law.interpolation === undefined &&
     first.law.size2 === undefined;
   const profiled = { ...(profile === undefined ? {} : { profile }), ...(corners.length === 0 ? {} : { corners: [...corners] }) };
   if (uniform)
@@ -160,7 +163,7 @@ function recipeOfPlan(
 }
 
 const lawText = (law: EdgeRadius): string =>
-  `${round6(law.size)}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}`}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : 'smooth'} control point(s)`}`;
+  `${round6(law.size)}${law.size2 === undefined ? '' : ` x ${round6(law.size2)}`}${law.sizeEnd === undefined ? '' : `>${round6(law.sizeEnd)}`}${law.sizes === undefined ? '' : ` via ${law.sizes.length} ${law.interpolation === 'linear' ? 'straight' : law.interpolation === 'monotone' ? 'monotone' : 'smooth'} control point(s)`}`;
 
 /**
  * `request` with its edges taken from the recorded persistent names (one per planned edge, plan order), or why they no longer resolve;
@@ -262,11 +265,15 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
     (newId, triangles) =>
       `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${plan.length} edge(s) ${list}${section}${rounded}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
   );
+  const kink = findKink(doc, committed, source, ctx);
+  if (kink !== null && request.allowNonTangent !== true)
+    return kinkRefusal(doc, 'fillet_edge', request.id, kink, request.edges === undefined ? 'radius' : 'edges');
   // how a profile blend was made (builder, measured gap, a reported fallback, corner setbacks): in the summary and in `data`
   const notes = profiled && committed.document !== doc ? readProfileNotes(kernel, modified) : null;
   const described = notes === null ? null : describeProfileNotes(notes, topology, doc.units);
-  const reported: CommandResult =
+  const profiledResult: CommandResult =
     described === null ? committed : { ...committed, summary: `${committed.summary}${described.text}`, data: { profile: described.data } };
+  const reported = kink === null ? profiledResult : kinkReported(profiledResult, kink);
   const record =
     (request.edgeNames ?? []).length > 0
       ? null

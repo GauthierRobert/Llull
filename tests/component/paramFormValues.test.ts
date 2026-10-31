@@ -50,3 +50,12 @@ describe('initialValues', () => {
     expect(initialValues(fields, ['a', 'b'])).toMatchObject({ referenceId: 'a', targetIds: 'a, b' });
   });
 });
+
+describe('the example of a JSON field', () => {
+  it('comes from the schema: the stamps of sculpt_mesh are objects with a centre, not pairs of numbers', () => {
+    const sculpt = getCommand('sculpt_mesh');
+    const field = fieldsFromSchema(sculpt?.paramsSchema as never).find((candidate) => candidate.name === 'stamps');
+    expect(field?.kind).toBe('json');
+    expect(JSON.parse(field?.example ?? 'null')).toEqual([{ center: [0, 0, 0] }]);
+  });
+});

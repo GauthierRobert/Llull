@@ -3,10 +3,12 @@
  * returned as raw contours of on/off-curve points in font units (03 WRP, TECHNICAL_SPEC §5.4).
  * @invariant a hostile font is bounded: glyph ranges inside `glyf`, <= MAX_CONTOURS contours and MAX_GLYPH_POINTS points per glyph (composites
  *   included), composite depth <= MAX_COMPOSITE_DEPTH and <= MAX_COMPONENTS components per glyph tree, so a composite loop cannot recurse forever
- * A mirrored component (negative determinant) has its contours reversed so winding stays consistent.
+ * A mirrored component (negative determinant) has its contours reversed so winding stays consistent. With a `variation` the points of a simple glyph (and the offsets of the components of
+ * a composite one) move by the `gvar` deltas at the instance.
  * @failure any out-of-range read, bad count, point-matching composite -> WRP_FONT_PARSE
  */
 
+import type { GlyphPoints, GlyphVariations } from './gvar';
 import { type ByteView, parseError } from './reader';
 
 interface GlyphPoint {
@@ -25,6 +27,8 @@ const MAX_COMPONENTS = 256;
 interface Budget {
   points: number;
   components: number;
+  /** The work budget shared by the glyphs of one font (the `gvar` tuple work is charged to it). */
+  work: { remaining: number } | undefined;
 }
 
 export interface GlyphSource {
@@ -32,6 +36,8 @@ export interface GlyphSource {
   readonly loca: ByteView;
   readonly longLoca: boolean;
   readonly numGlyphs: number;
+  /** `gvar` glyph variations and the normalised coordinates of the instance (absent: the default outlines). */
+  readonly variation?: { readonly gvar: GlyphVariations; readonly coords: readonly number[] };
 }
 
 function range(source: GlyphSource, glyph: number): readonly [number, number] {
@@ -44,7 +50,14 @@ function range(source: GlyphSource, glyph: number): readonly [number, number] {
   return [start, end];
 }
 
-function simpleGlyph(table: ByteView, count: number, budget: Budget): RawContour[] {
+interface SimpleGeometry {
+  readonly xs: number[];
+  readonly ys: number[];
+  readonly flags: number[];
+  readonly ends: number[];
+}
+
+function readSimple(table: ByteView, count: number, budget: Budget): SimpleGeometry {
   if (count > MAX_CONTOURS) throw parseError(`glyf: ${count} contours`);
   const ends: number[] = [];
   for (let k = 0; k < count; k++) {
@@ -80,6 +93,26 @@ function simpleGlyph(table: ByteView, count: number, budget: Budget): RawContour
   };
   const xs = axis(2, 16);
   const ys = axis(4, 32);
+  return { xs, ys, flags, ends };
+}
+
+/** The points of `geometry` moved by the `gvar` deltas of `glyph` at the instance (a copy). */
+/** @param root the glyph asked for (not a component of a composite): its origin stays at phantom point 1, so the whole outline moves by minus that point's x delta */
+function varied(source: GlyphSource, glyph: number, geometry: SimpleGeometry, budget: Budget, root: boolean): SimpleGeometry {
+  if (source.variation === undefined) return geometry;
+  const points: GlyphPoints = { xs: geometry.xs, ys: geometry.ys, ends: geometry.ends };
+  const deltas = source.variation.gvar.deltas(glyph, source.variation.coords, points, budget.work);
+  if (deltas === null) return geometry;
+  const origin = root ? (deltas.dx[geometry.xs.length] as number) : 0;
+  return {
+    ...geometry,
+    xs: geometry.xs.map((x, k) => x + (deltas.dx[k] as number) - origin),
+    ys: geometry.ys.map((y, k) => y + (deltas.dy[k] as number)),
+  };
+}
+
+function simpleGlyph(source: GlyphSource, glyph: number, table: ByteView, count: number, budget: Budget, root: boolean): RawContour[] {
+  const { xs, ys, flags, ends } = varied(source, glyph, readSimple(table, count, budget), budget, root);
   const contours: GlyphPoint[][] = [];
   let first = 0;
   for (const last of ends) {
@@ -93,8 +126,15 @@ function simpleGlyph(table: ByteView, count: number, budget: Budget): RawContour
 
 const f2dot14 = (table: ByteView, at: number): number => table.i16(at) / 16384;
 
-function compositeGlyph(source: GlyphSource, table: ByteView, depth: number, budget: Budget): RawContour[] {
-  const out: RawContour[] = [];
+interface Component {
+  readonly child: number;
+  dx: number;
+  dy: number;
+  readonly matrix: readonly [number, number, number, number];
+}
+
+/** The component records one by one (lazily: a glyph that includes itself is refused at its first component, before a damaged tail is read). */
+function* readComponents(table: ByteView, budget: Budget): Generator<Component> {
   let at = 10;
   for (;;) {
     if (++budget.components > MAX_COMPONENTS) throw parseError(`glyf: more than ${MAX_COMPONENTS} composite components`);
@@ -125,12 +165,37 @@ function compositeGlyph(source: GlyphSource, table: ByteView, depth: number, bud
       [a, b, c, d] = [f2dot14(table, at), f2dot14(table, at + 2), f2dot14(table, at + 4), f2dot14(table, at + 6)];
       at += 8;
     }
+    yield { child, dx, dy, matrix: [a, b, c, d] };
+    if ((flags & 0x20) === 0) break;
+  }
+}
+
+/** The component offsets of `glyph` moved by its `gvar` deltas (the points of a composite glyph are its component offsets). */
+function variedComponents(source: GlyphSource, glyph: number, components: Component[], budget: Budget, root: boolean): void {
+  if (source.variation === undefined) return;
+  const points: GlyphPoints = { xs: components.map((c) => c.dx), ys: components.map((c) => c.dy), ends: null };
+  const deltas = source.variation.gvar.deltas(glyph, source.variation.coords, points, budget.work);
+  if (deltas === null) return;
+  const origin = root ? (deltas.dx[components.length] as number) : 0;
+  components.forEach((component, k) => {
+    component.dx += (deltas.dx[k] as number) - origin;
+    component.dy += deltas.dy[k] as number;
+  });
+}
+
+function compositeGlyph(source: GlyphSource, glyph: number, table: ByteView, depth: number, budget: Budget): RawContour[] {
+  const out: RawContour[] = [];
+  const records = readComponents(table, budget);
+  // the variation moves all offsets together (its point numbers count the components), so a varied glyph reads its records first
+  const components = source.variation === undefined ? records : Array.from(records);
+  if (Array.isArray(components)) variedComponents(source, glyph, components, budget, depth === 0);
+  for (const { child, dx, dy, matrix } of components) {
+    const [a, b, c, d] = matrix;
     const mirrored = a * d - b * c < 0;
     for (const contour of outline(source, child, depth + 1, budget)) {
       const placed = contour.map((point) => ({ x: a * point.x + c * point.y + dx, y: b * point.x + d * point.y + dy, on: point.on }));
       out.push(mirrored ? placed.reverse() : placed);
     }
-    if ((flags & 0x20) === 0) break;
   }
   return out;
 }
@@ -141,10 +206,47 @@ function outline(source: GlyphSource, glyph: number, depth: number, budget: Budg
   if (end === start) return [];
   const table = source.glyf.sub(start, end - start, `glyph ${glyph}`);
   const count = table.i16(0);
-  return count >= 0 ? simpleGlyph(table, count, budget) : compositeGlyph(source, table, depth, budget);
+  return count >= 0 ? simpleGlyph(source, glyph, table, count, budget, depth === 0) : compositeGlyph(source, glyph, table, depth, budget);
 }
 
-/** The raw contours of `glyph` (empty for a blank glyph such as the space). */
-export function glyphContours(source: GlyphSource, glyph: number): RawContour[] {
-  return outline(source, glyph, 0, { points: 0, components: 0 });
+/** The raw contours of `glyph` (empty for a blank glyph such as the space); `work` is the work budget shared by the glyphs of one font. */
+export function glyphContours(source: GlyphSource, glyph: number, work?: { remaining: number }): RawContour[] {
+  return outline(source, glyph, 0, { points: 0, components: 0, work });
+}
+
+/**
+ * The advance variations of `glyph` from its `gvar` phantom points: the width (the second phantom point minus the first, for a font without `HVAR`) and the height (the third minus the fourth,
+ * for a font without `VVAR`); both 0 for a glyph without variation data.
+ * @failure a damaged glyph or table -> WRP_FONT_PARSE
+ */
+export function phantomAdvanceDeltas(
+  source: GlyphSource,
+  glyph: number,
+  work?: { remaining: number },
+): { readonly width: number; readonly height: number; readonly top: number } {
+  const none = { width: 0, height: 0, top: 0 };
+  if (source.variation === undefined) return none;
+  const [start, end] = range(source, glyph);
+  const budget: Budget = { points: 0, components: 0, work: undefined };
+  let points: GlyphPoints;
+  if (end === start) points = { xs: [], ys: [], ends: [] };
+  else {
+    const table = source.glyf.sub(start, end - start, `glyph ${glyph}`);
+    const count = table.i16(0);
+    if (count >= 0) {
+      const geometry = readSimple(table, count, budget);
+      points = { xs: geometry.xs, ys: geometry.ys, ends: geometry.ends };
+    } else {
+      const components = Array.from(readComponents(table, budget));
+      points = { xs: components.map((c) => c.dx), ys: components.map((c) => c.dy), ends: null };
+    }
+  }
+  const deltas = source.variation.gvar.deltas(glyph, source.variation.coords, points, work);
+  if (deltas === null) return none;
+  const phantom = points.xs.length;
+  return {
+    width: (deltas.dx[phantom + 1] as number) - (deltas.dx[phantom] as number),
+    height: (deltas.dy[phantom + 2] as number) - (deltas.dy[phantom + 3] as number),
+    top: deltas.dy[phantom + 2] as number,
+  };
 }

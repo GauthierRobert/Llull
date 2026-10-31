@@ -39,7 +39,7 @@ fn a_variable_chamfer_removes_half_the_integral_of_the_squared_distance_at_every
         let part = block(scale);
         let edge = edge_at(&part, [10.0 * scale, 0.0, 5.0 * scale], scale);
         for (first, last) in [(1.0, 2.0), (2.0, 1.0), (1.5, 1.5)] {
-            let shape = chamfer_variable(&part, &[edge], first * scale, last * scale).unwrap().expect("builds");
+            let shape = chamfer_variable(&part, &[edge], &[], first * scale, last * scale, f64::NAN, f64::NAN).unwrap().expect("builds");
             let expected = volume_of(&part) - removed(20.0 * scale, first * scale, last * scale);
             let got = volume_of(&shape);
             assert!((got - expected).abs() < 1e-9 * volume_of(&part), "scale {scale} {first}->{last}: {got} vs {expected}");
@@ -60,7 +60,7 @@ fn equal_distances_are_the_constant_chamfer_of_the_kernel() {
     for scale in SCALES {
         let part = block(scale);
         let edge = edge_at(&part, [10.0 * scale, 0.0, 5.0 * scale], scale);
-        let variable = chamfer_variable(&part, &[edge], 1.2 * scale, 1.2 * scale).unwrap().expect("builds");
+        let variable = chamfer_variable(&part, &[edge], &[], 1.2 * scale, 1.2 * scale, f64::NAN, f64::NAN).unwrap().expect("builds");
         let constant = chamfer(&part, &[edge], 1.2 * scale).unwrap().expect("builds");
         assert!((volume_of(&variable) - volume_of(&constant)).abs() < 1e-9 * volume_of(&part));
     }
@@ -74,7 +74,7 @@ fn a_concave_edge_gains_material() {
         let wall = make_box([0.0, 0.0, 0.0], [20.0 * scale, 5.0 * scale, 10.0 * scale]).unwrap().unwrap();
         let part = boolean(BooleanOp::Union, &floor, &wall, true).unwrap().unwrap();
         let edge = edge_at(&part, [10.0 * scale, 5.0 * scale, 5.0 * scale], scale);
-        let shape = chamfer_variable(&part, &[edge], scale, 2.0 * scale).unwrap().expect("builds");
+        let shape = chamfer_variable(&part, &[edge], &[], scale, 2.0 * scale, f64::NAN, f64::NAN).unwrap().expect("builds");
         let expected = volume_of(&part) + removed(20.0 * scale, scale, 2.0 * scale);
         assert!((volume_of(&shape) - expected).abs() < 1e-9 * volume_of(&part), "scale {scale}");
     }
@@ -86,18 +86,19 @@ fn what_it_cannot_build_is_refused_with_the_reason() {
     let part = block(1.0);
     let top = edge_at(&part, [10.0, 0.0, 5.0], 1.0);
     let side = edge_at(&part, [0.0, 0.0, 2.5], 1.0);
-    let reason = |edges: &[u32], first: f64, last: f64| chamfer_variable_reason(&part, edges, first, last).unwrap();
+    let reason = |edges: &[u32], first: f64, last: f64| chamfer_variable_reason(&part, edges, &[], first, last, f64::NAN, f64::NAN).unwrap();
     assert!(reason(&[top], 1.0, 2.0).is_empty());
     assert!(reason(&[], 1.0, 2.0).contains("listed"));
-    assert!(reason(&[top, side], 1.0, 2.0).contains("meet at a vertex"));
+    // edges that share a vertex build: the tools overlap and the mitre is the corner (13.25)
+    assert!(reason(&[top, side], 1.0, 2.0).is_empty());
     assert!(reason(&[top, top], 1.0, 2.0).contains("twice"));
     assert!(reason(&[top], 1.0, 6.0).contains("reaches past the faces"));
     assert!(reason(&[top], 0.0, 2.0).contains("> 0"));
     assert!(reason(&[999], 1.0, 2.0).contains("out of range"));
     let pipe = make_cylinder(5.0, 10.0).unwrap().unwrap();
     let rim = edge_at_circle(&pipe);
-    assert!(chamfer_variable_reason(&pipe, &[rim], 1.0, 2.0).unwrap().contains("straight"));
-    assert!(chamfer_variable(&part, &[top], 1.0, 6.0).unwrap().is_none());
+    assert!(chamfer_variable_reason(&pipe, &[rim], &[], 1.0, 2.0, f64::NAN, f64::NAN).unwrap().contains("closed edge"));
+    assert!(chamfer_variable(&part, &[top], &[], 1.0, 6.0, f64::NAN, f64::NAN).unwrap().is_none());
 }
 
 fn edge_at_circle(shape: &Shape) -> u32 {

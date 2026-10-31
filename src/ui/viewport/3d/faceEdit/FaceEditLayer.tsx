@@ -6,6 +6,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
 import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
+import { runHostQuery } from '@ui/panels/analysis/useHostQuery';
 import { useFaceEditStore } from '@ui/store/faceEditStore';
 import { useDisposable } from '../../useDisposable';
 import { ArrowShape } from '../ArrowShape';
@@ -15,6 +16,7 @@ import { unitsPerPixel } from '../cage/dragMath';
 import { HANDLE_PX } from './faceDragMath';
 import { canEditFaces } from './faceEditModel';
 import { regionPositions } from './faceMesh';
+import { faceLabels } from './facePicking';
 import { pickableTriangles } from './faceTriangles';
 import { useFaceKeys } from './useFaceKeys';
 import { useFacePointer } from './useFacePointer';
@@ -61,7 +63,7 @@ function Handle(): React.ReactElement | null {
     const distance = camera.position.distanceTo(group.getWorldPosition(new THREE.Vector3()));
     group.scale.setScalar(Math.max(1e-6, unitsPerPixel(distance, VIEWPORT_FOV_DEGREES, height) * HANDLE_PX));
   });
-  if (pick === null) return null;
+  if (pick === null || op === 'move_feature') return null;
   const shift = value !== null && op !== 'draft' ? value : 0;
   const position = [
     pick.point[0] + pick.normal[0] * shift,
@@ -86,6 +88,23 @@ export function FaceEditLayer(): React.ReactElement | null {
   useFacePointer(active ? target : undefined);
   useFaceKeys(active && target !== undefined);
 
+  // The kernel names the face of every display triangle (exact highlight); without it (mesh kernel, too many triangles) the picker falls back to its heuristic.
+  useEffect(() => {
+    if (!active || target === undefined) {
+      useFaceEditStore.getState().setLabels(null);
+      return undefined;
+    }
+    let cancelled = false;
+    void runHostQuery('inspect_face_triangles', { entityId: target.id }).then(({ data, isError }) => {
+      if (cancelled) return;
+      const faces =
+        !isError && typeof data === 'object' && data !== null ? (data as { faceOfTriangle?: unknown }).faceOfTriangle : undefined;
+      useFaceEditStore.getState().setLabels(Array.isArray(faces) ? { entity: target, value: faceLabels(faces as number[]) } : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, target]);
   // A pick belongs to one version of one entity: a new selection or a committed edit drops it.
   useEffect(() => {
     const edit = useFaceEditStore.getState();

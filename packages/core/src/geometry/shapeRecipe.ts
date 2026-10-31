@@ -48,7 +48,7 @@ function keyText(recipe: ShapeRecipe): string {
       return `${recipe.boolean}(${recipeKey(recipe.a)},${recipeKey(recipe.b)})`;
     case 'fillet':
     case 'chamfer':
-      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}]${recipe.radii === undefined ? '' : `,radii${JSON.stringify(recipe.radii)}`}${recipe.faces === undefined ? '' : `,sided[${recipe.faces.join(',')}]${recipe.size2 === undefined ? '' : `,d2=${recipe.size2}`}${recipe.angleDeg === undefined ? '' : `,a=${recipe.angleDeg}`}`}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`}${recipe.corners === undefined ? '' : `,corners${JSON.stringify(recipe.corners)}`})`;
+      return `${recipe.op}(${recipeKey(recipe.source)},${recipe.size}${recipe.sizeEnd === undefined ? '' : `>${recipe.sizeEnd}`},[${recipe.edges.join(',')}]${recipe.radii === undefined ? '' : `,radii${JSON.stringify(recipe.radii)}`}${recipe.faces === undefined ? '' : `,sided[${recipe.faces.join(',')}]${recipe.size2 === undefined ? '' : `,d2=${recipe.size2}${recipe.size2End === undefined ? '' : `>${recipe.size2End}`}`}${recipe.angleDeg === undefined ? '' : `,a=${recipe.angleDeg}`}`}${recipe.profile === undefined ? '' : `,profile${JSON.stringify(recipe.profile)}`}${recipe.corners === undefined ? '' : `,corners${JSON.stringify(recipe.corners)}`})`;
     case 'blend':
       return `blend(${recipe.sources.map(recipeKey).join(',')},${recipe.radius}${recipe.joints === undefined ? '' : `,joints${JSON.stringify(recipe.joints)}`})`;
     case 'shell':
@@ -213,8 +213,13 @@ function radiiError(node: Record<string, unknown>, edgeCount: number): string | 
   for (const law of radii) {
     if (!isRecord(law) || !positiveNumber(law['size'])) return 'fillet: every radii entry needs size > 0';
     if (law['sizeEnd'] !== undefined && !positiveNumber(law['sizeEnd'])) return 'fillet: radii sizeEnd must be > 0';
-    if (law['interpolation'] !== undefined && law['interpolation'] !== 'smooth' && law['interpolation'] !== 'linear')
-      return 'fillet: radii interpolation must be "smooth" or "linear"';
+    if (
+      law['interpolation'] !== undefined &&
+      law['interpolation'] !== 'smooth' &&
+      law['interpolation'] !== 'linear' &&
+      law['interpolation'] !== 'monotone'
+    )
+      return 'fillet: radii interpolation must be "smooth", "linear" or "monotone"';
     if (law['size2'] !== undefined && !positiveNumber(law['size2'])) return 'fillet: radii size2 must be > 0';
     const sideFace = law['sideFace'];
     if (
@@ -295,9 +300,12 @@ const radiusProblem = (node: Record<string, unknown>): string | null =>
 
 /** Why the sided-chamfer fields of an untrusted chamfer node are unusable (faces per edge with exactly one of size2 / angleDeg in (0, 90)), or null. */
 function sidedChamferError(node: Record<string, unknown>, edgeCount: number): string | null {
-  const { faces, size2, angleDeg } = node;
-  if (node['op'] === 'chamfer' && node['sizeEnd'] !== undefined && faces !== undefined)
-    return 'chamfer: sizeEnd (a variable distance) is symmetric and takes no faces';
+  const { faces, size2, angleDeg, size2End } = node;
+  const variable = node['op'] === 'chamfer' && node['sizeEnd'] !== undefined;
+  if (size2End !== undefined && (!variable || faces === undefined || !positiveNumber(size2End)))
+    return 'chamfer: size2End needs sizeEnd, faces and size2, and must be > 0';
+  if (variable && faces !== undefined && (size2 === undefined || size2End === undefined || angleDeg !== undefined))
+    return 'chamfer: a variable chamfer with faces gives size2 and size2End (both legs run from start to end), no angleDeg';
   if (faces === undefined) return size2 === undefined && angleDeg === undefined ? null : 'chamfer: size2 / angleDeg need faces';
   if (node['op'] !== 'chamfer') return 'fillet: faces apply to chamfers only';
   if (!Array.isArray(faces) || faces.length !== edgeCount || !faces.every((face) => Number.isInteger(face) && (face as number) >= 0))

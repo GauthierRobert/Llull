@@ -13,6 +13,9 @@ export interface WorldRay {
 
 export type AxisLock = 'x' | 'y' | 'z' | null;
 
+/** The lock after the key of `pressed` axis: it locks, replaces another lock, or (pressed twice) releases. */
+export const nextAxisLock = (current: AxisLock, pressed: 'x' | 'y' | 'z'): AxisLock => (current === pressed ? null : pressed);
+
 const AXES: Readonly<Record<'x' | 'y' | 'z', Vec3>> = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
 
 /** Pixels the pointer must travel before a press becomes a drag (a shorter press is a click). */

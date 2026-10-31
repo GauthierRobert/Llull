@@ -48,7 +48,10 @@ export const outlineErrorCode = (error: TextOutlineError): string =>
         ? 'WRP_TEXT_CURVE_TOO_SHORT'
         : 'WRP_PROFILE_SELF_INTERSECT';
 
-type OutlineEntity = Pick<TextEntity, 'content' | 'height' | 'anchor' | 'verticalAnchor' | 'letterSpacing' | 'kerning' | 'lineSpacing'>;
+type OutlineEntity = Pick<
+  TextEntity,
+  'content' | 'height' | 'anchor' | 'verticalAnchor' | 'letterSpacing' | 'kerning' | 'lineSpacing' | 'direction'
+>;
 
 /** @failure more than MAX_TEXT_CHARACTERS characters, contours that cross in a way the union cannot repair, a glyph the font cannot deliver, text beyond the end of its curve -> `{ error }` */
 export function textOutline(entity: OutlineEntity, font: ParsedFont, mapper?: PointMapper): TextOutlineResult {
@@ -112,6 +115,7 @@ function outlineOf(entity: OutlineEntity, font: ParsedFont, mapper?: PointMapper
     letterSpacing: entity.letterSpacing ?? 0,
     kerning: entity.kerning ?? true,
     lineSpacing: entity.lineSpacing ?? 1,
+    direction: entity.direction ?? 'horizontal',
   });
   const step = entity.height * STEP_RATIO;
   const off = { error: 'off_curve' as const, message: 'the text runs beyond the end of its curve' };

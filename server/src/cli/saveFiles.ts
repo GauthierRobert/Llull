@@ -9,6 +9,7 @@ import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
 import { rasterizeSvg } from '../renderImage';
 import { isHostedExport } from '../exportFiles';
+import { moveHostedFile } from '../hostedFile';
 
 export interface OutputFile {
   readonly name: string | null; // suggested: `fileName`, or a `name` with an extension
@@ -80,34 +81,30 @@ export interface SavedFile {
 }
 
 /** The host file a command wrote itself (`data.file = { path, bytes }`, e.g. `export_3mf` toFile), or null. */
-function hostedFileOf(data: unknown): { path: string; bytes: number; name: string | null } | null {
+function hostedFileOf(data: unknown, exportDir?: string): { path: string; bytes: number; name: string | null } | null {
   if (!isRecord(data)) return null;
   const file = data['file'];
-  if (!isRecord(file) || typeof file['path'] !== 'string' || typeof file['bytes'] !== 'number' || !isHostedExport(file['path']))
+  if (!isRecord(file) || typeof file['path'] !== 'string' || typeof file['bytes'] !== 'number' || !isHostedExport(file['path'], exportDir))
     return null;
   return { path: file['path'], bytes: file['bytes'], name: nonEmptyString(data['fileName']) ?? null };
 }
 
-/** Moves the host file to `target` (a directory keeps the suggested name); copies across volumes. */
+/** Moves the host file to `target` (a directory keeps the suggested name). */
 function saveHostedFile(hosted: { path: string; bytes: number; name: string | null }, target: string): SavedFile[] {
   const directory = target.endsWith('/') || (fs.existsSync(target) && fs.statSync(target).isDirectory());
   const destination = directory ? path.join(target, hosted.name ?? path.basename(hosted.path)) : target;
   fs.mkdirSync(path.dirname(path.resolve(destination)), { recursive: true });
-  try {
-    fs.renameSync(hosted.path, destination);
-  } catch {
-    fs.copyFileSync(hosted.path, destination);
-    fs.rmSync(hosted.path, { force: true });
-  }
+  moveHostedFile(hosted.path, destination);
   return [{ path: destination, bytes: hosted.bytes }];
 }
 
 /**
  * Write `data`'s payload: one file -> `target` path (or a directory: suggested name); several -> `target` dir (created).
+ * `exportDir`: the folder a hosted file must be in (default: the host's own export folder).
  * @failure no payload in data / several files but target is an existing file -> Error
  */
-export function saveDataFiles(data: unknown, target: string): SavedFile[] {
-  const hosted = hostedFileOf(data);
+export function saveDataFiles(data: unknown, target: string, exportDir?: string): SavedFile[] {
+  const hosted = hostedFileOf(data, exportDir);
   if (hosted !== null) return saveHostedFile(hosted, target);
   const wantsPng = path.extname(target).toLowerCase() === '.png';
   const svg = wantsPng ? svgOfData(data) : undefined;

@@ -156,20 +156,36 @@ describe('infill_solid failure inside a composed step', () => {
 });
 
 describe('Voronoi limits', () => {
-  it('builds the 20 mm cube at 0.04 seeds/mm3 that the 5000 beam cap used to refuse, and refuses a box above 10000 seeds by name', () => {
+  it('builds the 20 mm cube at 0.04 seeds/mm3 that the 5000 beam cap used to refuse, builds the 60 mm cube (12000 seeds at 0.04 give about 120000 beams: refused until 14.16), refuses a box above 100000 seeds by name, and a box whose beams exceed the cap', () => {
     const box = ok(empty(), 'add_field_primitive', { shape: 'box', size: [20, 20, 20], position: [10, 10, 10] });
     const dense = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.04, seed: 1, radius: 0.1 });
     expect(dense.data['beams'] as number).toBeGreaterThan(4000);
-    const huge = ok(empty(), 'add_field_primitive', { shape: 'box', size: [60, 60, 60], position: [30, 30, 30] });
+    const large = ok(empty(), 'add_field_primitive', { shape: 'box', size: [60, 60, 60], position: [30, 30, 30] });
+    const built = ok(large.doc, 'add_voronoi_lattice', { region: large.id, density: 0.04, seed: 1, radius: 0.1 });
+    expect(built.data['beams'] as number).toBeGreaterThan(100_000);
+    const huge = ok(empty(), 'add_field_primitive', { shape: 'box', size: [150, 150, 150], position: [75, 75, 75] });
     const refused = run(huge.doc, 'add_voronoi_lattice', { region: huge.id, density: 0.04, seed: 1, radius: 0.1 });
     expectRefused(huge.doc, refused, 'IMP_GRAPH_TOO_LARGE');
-    expect(refused.result.summary).toContain('limit 10000');
+    expect(refused.result.summary).toContain('limit 100000 seeds');
+    // the estimate refuses before any seed is placed when even the least beams per seed pass the cap (97800 seeds and more; 98500 here)
+    const wide = ok(empty(), 'add_field_primitive', { shape: 'box', size: [128, 128, 128], position: [64, 64, 64] });
+    const thick = run(wide.doc, 'add_voronoi_lattice', { region: wide.id, density: 0.04, seed: 1, radius: 0.1 });
+    expectRefused(wide.doc, thick, 'IMP_GRAPH_TOO_LARGE');
+    expect(thick.result.summary).toContain('900000 beams');
+    // 93000 seeds pass the estimate (9.2 per seed) and the build finds 10.8 per seed: refused on the beams it made
+    const ninety = ok(empty(), 'add_field_primitive', { shape: 'box', size: [90, 90, 90], position: [45, 45, 45] });
+    const crowded = run(ninety.doc, 'add_voronoi_lattice', { region: ninety.id, density: 0.1, seed: 1, radius: 0.1 });
+    expectRefused(ninety.doc, crowded, 'IMP_GRAPH_TOO_LARGE');
+    expect(crowded.result.summary).toMatch(/\d+ beams exceed the limit of 900000/);
   });
 
   it('keeps the command object and a deterministic geometry for equal inputs', () => {
     expect(addVoronoiLattice.name).toBe('add_voronoi_lattice');
     const node = { min: [0, 0, 0], max: [10, 10, 10], density: 0.03, seed: 4, radius: 0.3, cap: 'butt' } as const;
-    expect(JSON.stringify(voronoiGeometry(node))).toBe(JSON.stringify(voronoiGeometry(node)));
+    // A, B, A: the last result is reused for equal parameters, so the second A is computed again after B replaced it
+    const first = JSON.stringify(voronoiGeometry(node));
+    expect(JSON.stringify(voronoiGeometry({ ...node, seed: 5 }))).not.toBe(first);
+    expect(JSON.stringify(voronoiGeometry(node))).toBe(first);
   });
 });
 

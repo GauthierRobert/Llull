@@ -26,6 +26,7 @@ import type { PbrMaterial } from './useMaterialProps';
 import { useTransitioningIds } from '@ui/store/transitioningIds';
 import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
 import { type GhostRenderer, LiveFxLayer } from '../liveFx/LiveFxLayer';
+import { useImplicitPreviewStore } from '@ui/store/implicitPreviewStore';
 import { PreviewLayer, type RenderPreviewEntity } from './preview/PreviewLayer';
 
 /** Expands an instance; every sub-mesh click selects the INSTANCE id so it moves as a unit. */
@@ -104,6 +105,8 @@ const EntityRenderer = memo(function EntityRenderer({
 });
 
 const noopSelect = (): void => undefined;
+/** No body is drawn by the GPU preview (stable reference while the preview is off). */
+const NO_GPU_BODIES: Readonly<Record<string, true>> = {};
 
 /** Hologram of the previous version (removed / remotely reshaped) through the same render branch. */
 const renderGhost3D: GhostRenderer = (ghost) => (
@@ -130,6 +133,7 @@ export function Entities(): React.ReactElement {
 
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
+  const gpuDrawn = useImplicitPreviewStore((s) => (s.enabled ? s.drawn : NO_GPU_BODIES));
   const toggleClickAnimation = useViewportStore((s) => s.toggleClickAnimation);
   // Entities mid live-transition leave their instanced batch for the per-entity path (own matrix + materials).
   const transitions = useTransitioningIds();
@@ -160,14 +164,17 @@ export function Entities(): React.ReactElement {
   const visibleEntities = useMemo(() => {
     return order
       .map((id) => entities[id])
-      .filter((entity): entity is Entity => entity !== undefined && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds))
+      .filter(
+        (entity): entity is Entity =>
+          entity !== undefined && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds) && !(entity.id in gpuDrawn),
+      )
       .map((entity) => {
         const shift = explodeOffsets.get(entity.id);
         return shift === undefined
           ? entity
           : { ...entity, position: [entity.position[0] + shift[0], entity.position[1] + shift[1], entity.position[2] + shift[2]] as Vec3 };
       });
-  }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds, explodeOffsets]);
+  }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds, explodeOffsets, gpuDrawn]);
 
   const hasFinish = useCallback(
     (entity: Entity): boolean =>

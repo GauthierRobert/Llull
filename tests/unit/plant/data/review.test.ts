@@ -378,3 +378,26 @@ describe('colliding tag scopes, orphans, patterns and formats', () => {
     );
   });
 });
+
+describe('update_equipment renames its mark through rename_equipment_tag (EQP-R1)', () => {
+  it('a block pump retag rewrites the routed line end and edits the other fields in the same step', () => {
+    const s = scene();
+    const result = ok(s.doc, 'update_equipment', { currentMark: 'P-101', mark: 'P-201', weight: 900 });
+    const pump = Object.values(result.document.building?.elements ?? {}).find(
+      (element) => element.category === 'equipment' && element.mark === 'P-201',
+    );
+    expect(pump?.category === 'equipment' && pump.weight).toBe(900);
+    expect(result.document.plant?.piping?.lines[s.line]?.from).toMatch(/^P-201:/);
+    expect(result.affected).toContain(s.line);
+    expect(result.summary).toMatch(/P-101 -> P-201/);
+  });
+
+  it('an illegal or duplicate tag is refused with the document unchanged', () => {
+    const s = scene();
+    for (const mark of ['P 201', 'a:b', 'V-101']) {
+      const result = execute(s.doc, 'update_equipment', { currentMark: 'P-101', mark });
+      expect(result.document).toBe(s.doc);
+      expect(result.affected).toEqual([]);
+    }
+  });
+});

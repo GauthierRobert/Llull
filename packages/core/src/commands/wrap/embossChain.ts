@@ -18,6 +18,7 @@ import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import type { CommandResult, ExecutionContext } from '../types';
 import { buildChain, type ChainFace } from './chainCharts';
 import { clipRegions } from './clipRegions';
+import { isMitreFailure, mitreFillers } from './embossMitre';
 import { MIN_FIT_TOLERANCE, SEWING_RATIO } from './constants';
 import { wrapRejection } from './codes';
 import { DEFAULT_MAX_LENGTH_STRAIN, MAX_LENGTH_STRAIN_SOURCE, namedDefault, wrapData } from './conventions';
@@ -138,15 +139,10 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
     );
     return { ...refused, data: { distortion: { maxLengthStrain: strain, joinMismatch: joinStrain, limit, method: chain.method } } };
   }
-  // walls meet in a surface only along a smooth edge: an edge the sketch crosses (ink on both faces) must be smooth, a convex / concave / unverified one is refused
+  // walls meet in a surface along a smooth edge; across a sharp edge between two planes the slabs overlap or a mitre filler closes the corner (embossMitre.ts), any other sharp edge is refused
   const inked = new Set(steps.map((step) => step.face.session.face));
-  const sharp = chain.edges.find((edge) => edge.faces.every((face) => inked.has(face)) && edge.convexity !== 'smooth');
-  if (sharp !== undefined && !scribe)
-    return fail(
-      'WRP_CHAIN_EDGE_SHARP',
-      `edge ${sharp.edge} between faces ${sharp.faces.join(' and ')} is a ${sharp.convexity} edge the sketch crosses: raised walls on its two sides would meet in a line, not a surface; use scribe, round the edge first (fillet_edge), or emboss each face separately`,
-      ['chain'],
-    );
+  const mitre = scribe ? null : mitreFillers({ chain, inked, regions, mode: cutting ? 'deboss' : 'emboss', depth });
+  if (mitre !== null && isMitreFailure(mitre)) return fail(mitre.code, mitre.message, ['chain']);
   if (Math.abs(clippedArea - sketchArea) > 1e-9 * Math.max(sketchArea, 1e-12))
     return fail(
       'WRP_CHAIN_CLIP_FAILED',
@@ -171,6 +167,7 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       );
     shape = built;
   }
+  for (const filler of mitre?.fillers ?? []) recipe = { op: 'boolean', boolean: cutting ? 'subtract' : 'union', a: recipe, b: filler };
   const result = evaluateRecipe(session.kernel, recipe);
   if (typeof result === 'string')
     return fail(
@@ -197,7 +194,7 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       ['profileIds'],
       params.profileIds,
     );
-  const expected = steps.reduce((sum, step) => sum + (embossClosedForm(step.recipeParams)?.delta ?? 0), 0);
+  const expected = steps.reduce((sum, step) => sum + (embossClosedForm(step.recipeParams)?.delta ?? 0), 0) + (mitre?.delta ?? 0);
   const faces = steps.map((step) => ({
     face: step.face.session.face,
     ...(step.face.session.faceName !== undefined ? { faceName: step.face.session.faceName } : {}),
@@ -210,7 +207,7 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
     doc,
     {
       volumeDelta,
-      expectedVolumeDelta: expected,
+      expectedVolumeDelta: mitre !== null && !mitre.exact ? null : expected,
       regionArea: sketchArea,
       chainArea: clippedArea,
       regions: regions.length,
@@ -219,6 +216,17 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
       method: chain.method,
       exact: chain.developable,
       faces,
+      ...(mitre === null
+        ? {}
+        : {
+            mitre: {
+              fillerVolume: mitre.fillerVolume,
+              overlapVolume: mitre.overlapVolume,
+              exact: mitre.exact,
+              reasons: mitre.reasons,
+              edges: mitre.edges,
+            },
+          }),
       chain: chain.faces.map((face) => face.session.face),
       edges: chain.edges.map((edge) => ({
         edge: edge.edge,
@@ -260,8 +268,12 @@ export function runEmbossChain(input: ChainEmboss): CommandResult {
     const change =
       volumeDelta === null
         ? 'volume change not measured'
-        : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3 (closed form ${expected.toPrecision(9)})`;
-    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) across ${steps.length} faces${chain.developable ? '' : ` (${chain.method}, max stretch ${(100 * Math.max(strain, joinStrain)).toPrecision(4)} %)`} (${steps.map((s) => `${s.face.session.surface.type} ${s.face.session.face}`).join(', ')}), sketch area ${sketchArea.toPrecision(8)} ${doc.units}^2, depth ${depth} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}. Source solid consumed, profiles kept.`;
+        : `volume ${volumeDelta >= 0 ? '+' : ''}${volumeDelta.toPrecision(9)} ${doc.units}^3 (closed form ${mitre !== null && !mitre.exact ? 'not exact' : expected.toPrecision(9)})`;
+    const mitred =
+      mitre === null
+        ? ''
+        : ` ${mitre.edges.map((e) => (e.kind === 'filler' ? `edge ${e.edge} mitred (filler ${(e.area * e.length).toPrecision(5)} ${doc.units}^3)` : `edge ${e.edge} slabs overlap (${(e.area * e.length).toPrecision(5)} ${doc.units}^3)`)).join(', ')}${mitre.exact ? '' : `; overlap not in the closed form (${mitre.reasons.join('; ')})`}.`;
+    return `${command}: ${params.mode} of ${params.profileIds.length} profile(s) across ${steps.length} faces${chain.developable ? '' : ` (${chain.method}, max stretch ${(100 * Math.max(strain, joinStrain)).toPrecision(4)} %)`} (${steps.map((s) => `${s.face.session.surface.type} ${s.face.session.face}`).join(', ')}), sketch area ${sketchArea.toPrecision(8)} ${doc.units}^2, depth ${depth} of '${params.id}' → mesh '${newId}' (${triangles} triangles), ${change}.${mitred} Source solid consumed, profiles kept.`;
   });
   return { ...committed, data, ...(session.faceName !== undefined ? { recordExtras: { face: { faceName: session.faceName } } } : {}) };
 }

@@ -3,6 +3,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import { elementsOf, getBuilding, isVec2, resolveLevel, toVec2, withElement } from '../../building/model';
 import { codedRejection, noop } from '@core/commands/noop';
+import { execute } from '@core/commands/registry';
 import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { SHAPE_PARAM_TEXT, describeEquipmentShape, equipmentShapeSchema, normaliseEquipmentSize, shapeOf } from './equipmentShape';
 
@@ -33,7 +34,7 @@ export const updateEquipment = defineCommand({
     weight: z.number().optional().describe('New operating weight in kg (>= 0).'),
     levelId: z.string().optional().describe('Move the equipment to this level id.'),
   }),
-  run: (doc, { elementId, currentMark, name, mark, location, size, shape, angle, clearance, weight, levelId }): CommandResult => {
+  run: (doc, { elementId, currentMark, name, mark, location, size, shape, angle, clearance, weight, levelId }, ctx): CommandResult => {
     const building = getBuilding(doc);
     const equipments = elementsOf(building, 'equipment');
     let target: EquipmentElement | undefined;
@@ -93,7 +94,6 @@ export const updateEquipment = defineCommand({
       ...withoutShape,
       ...(newShape !== 'box' ? { shape: newShape } : {}),
       name: newName,
-      mark: newMark,
       location: location !== undefined ? toVec2(location) : equipment.location,
       size: dimensions,
       ...next,
@@ -103,7 +103,7 @@ export const updateEquipment = defineCommand({
       a.length === b.length && a.every((value, index) => value === b[index]);
     if (
       updated.name === equipment.name &&
-      updated.mark === equipment.mark &&
+      newMark === equipment.mark &&
       updated.levelId === equipment.levelId &&
       updated.angle === equipment.angle &&
       updated.clearance === equipment.clearance &&
@@ -114,13 +114,22 @@ export const updateEquipment = defineCommand({
     ) {
       return noop(doc, `update_equipment: ${equipment.id} already has these values; nothing changed.`);
     }
-    return commitBuilding(
+    const edited = commitBuilding(
       doc,
       withElement(building, updated),
       [updated.id],
-      `Updated equipment ${updated.mark} "${updated.name}" (${updated.id}): [${updated.location.join(', ')}] on ${updated.levelId}, ` +
+      `Updated equipment ${newMark} "${updated.name}" (${updated.id}): [${updated.location.join(', ')}] on ${updated.levelId}, ` +
         `${describeEquipmentShape(newShape, updated.size, doc.units)}, clearance ${updated.clearance}, ${updated.weight} kg.`,
       { elementId: updated.id },
     );
+    if (newMark === equipment.mark) return edited;
+    const renamed = execute(edited.document, 'rename_equipment_tag', { renames: [{ equipment: equipment.id, tag: newMark }] }, ctx);
+    if (renamed.rejected === true) return noop(doc, `update_equipment failed: ${renamed.summary}`);
+    return {
+      ...edited,
+      document: renamed.document,
+      summary: `${edited.summary} Tag ${equipment.mark} -> ${newMark}; ${renamed.summary}`,
+      affected: [...new Set([...edited.affected, ...renamed.affected])],
+    };
   },
 });

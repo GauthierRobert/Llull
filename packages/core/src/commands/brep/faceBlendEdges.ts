@@ -4,8 +4,8 @@
  * contact lines, the laws and the checks are the ones of the edge path. The kernel rounds the whole tangent chain of every picked edge, and
  * its chain is the truth: the built result is read back (the new blend faces, by name, with their support faces) and refused when a blend
  * rests on a face outside facesA and facesB, or when a varying size ran over more than one edge.
- * @invariant the blend never rounds a face outside facesA and facesB; a varying size needs a kernel chain of exactly one edge (t runs along an edge)
- * @failure no shared edge (and no flat spandrel build), a built chain that leaves the sets, a varying size over a chain, startNear on a closed edge, a kernel without face adjacency -> BLD_FACE_BLEND_UNSUPPORTED
+ * @invariant the blend never rounds a face outside facesA and facesB; a varying size runs over one edge or one tangent chain of the shared edges (faceBlendChain.ts: one sub-law per edge); the kernel's chain may not be longer than the shared edges
+ * @failure no shared edge (and no flat spandrel build), a built chain that leaves the sets, a varying size over several chains, a branch or a bend at a joint, startNear on a closed edge, a kernel without face adjacency -> BLD_FACE_BLEND_UNSUPPORTED
  */
 
 import { round6 } from '../../lib/compactNumber';
@@ -16,7 +16,9 @@ import { closedEdge, isLawProblem, resolveLaw, reverseLaw } from '../../geometry
 import type { CommandResult, ExecutionContext } from '../types';
 import type { EdgeLawInput } from './filletSpec';
 import { type BlendBuild, type BlendContext, faceBlendData, pickedFaces } from './faceBlendRun';
+import { blendRejection } from './blendCodes';
 import { filletEach } from './filletEach';
+import { type ChainEdge, chainLaws, planChain } from './faceBlendChain';
 import type { ProfileInput } from './filletProfile';
 
 export type SizeLaw = NonNullable<EdgeLawInput['law']>;
@@ -75,6 +77,8 @@ export interface EdgeResultRead {
   readonly rename: (path: string) => string;
   /** Whether the single blend edge is listed from its other end (startNear). */
   readonly flipped: boolean;
+  /** A size law over a chain of several edges (13.27): the walking order; the kernel's chain may be at most these edges. */
+  readonly chain?: readonly ChainEdge[] | undefined;
 }
 
 /**
@@ -124,14 +128,17 @@ export function readEdgeResult(result: CommandResult, read: EdgeResultRead): Ble
   const edges = [...new Set(chain.flatMap((source) => indexOf(source.edge) ?? []))].sort((a, b) => a - b);
   const blended = edges.length === 0 ? [...seeds] : edges;
   const chained = new Set(chain.map((source) => source.edge)).size;
-  if (read.varying && chained > 1)
+  if (read.varying && chained > (read.chain?.length ?? 1))
     return unsupported(
       `a varying size needs the blend to be exactly one edge; the kernel rounded a chain of ${chained} edges (${blended.join(', ')}) from the shared edge(s) ${seeds.join(', ')} (t runs along an edge, not along a chain)`,
       read.varyingPath,
     );
-  const blendEdges = blended.map((index) => {
+  const listed =
+    read.chain === undefined
+      ? blended.map((index) => ({ index, flip: read.flipped && blended.length === 1 }))
+      : read.chain.map((entry) => ({ index: entry.index, flip: !entry.forward }));
+  const blendEdges = listed.map(({ index, flip }) => {
     const own = edgeEnds(context, index);
-    const flip = read.flipped && blended.length === 1;
     return { index, start: flip ? own?.[1] : own?.[0], end: flip ? own?.[0] : own?.[1] };
   });
   const where = (point: Vec3 | undefined): string => (point === undefined ? '?' : `(${point.map(round6).join(', ')})`);
@@ -159,6 +166,35 @@ function reversedEntry(entry: EdgeLawInput): EdgeLawInput {
   };
 }
 
+/** The blend of a tangent chain of shared edges with ONE size law over its total arc length (13.27): one sub-law per edge, continuous at the joints. */
+function chainBlend(request: EdgeBlendRequest, context: BlendContext, seeds: readonly number[], varyingPath: string): BlendBuild {
+  const { size } = request;
+  const plan = planChain(context, seeds, request.startNear, varyingPath);
+  if ('problem' in plan) return unsupported(plan.problem, plan.path);
+  const laws = chainLaws(plan, { start: size.start, end: size.end, law: size.law }, varyingPath);
+  if ('code' in laws) return { result: blendRejection(request.doc, 'fillet_faces', laws.code, laws.message, [request.id], [laws.path]) };
+  const result: CommandResult = filletEach(request.doc, request.ctx, {
+    id: request.id,
+    mode: size.chord ? 'chord' : 'radius',
+    edges: laws,
+    edgeIndices: [],
+    edgesNear: [],
+    radius: undefined,
+    radiusEnd: undefined,
+    profile: request.profile,
+  });
+  return readEdgeResult(result, {
+    doc: request.doc,
+    context,
+    seeds,
+    varying: true,
+    varyingPath,
+    rename: (path) => facesPath(path, size.chord, size.law !== undefined),
+    flipped: false,
+    chain: plan.edges,
+  });
+}
+
 /** The blend of the edges the two sets share, as the result of fillet_edge with the same sizes. */
 export function edgeBlend(request: EdgeBlendRequest, context: BlendContext): BlendBuild {
   const { size } = request;
@@ -183,11 +219,7 @@ export function edgeBlend(request: EdgeBlendRequest, context: BlendContext): Ble
   const varying = size.end !== undefined || size.law !== undefined;
   const varyingPath = size.law === undefined ? (size.chord ? 'widthEnd' : 'radiusEnd') : 'law';
   const [only] = seeds;
-  if (varying && seeds.length > 1)
-    return unsupported(
-      `a varying size needs the blend to be exactly one edge; the sets share edges ${seeds.join(', ')} (t runs along an edge, not along a chain)`,
-      varyingPath,
-    );
+  if (varying && seeds.length > 1) return chainBlend(request, context, seeds, varyingPath);
   const info = only === undefined ? undefined : topology?.edges[only];
   if (varying && request.startNear !== undefined && info !== undefined && closedEdge(info))
     return unsupported(

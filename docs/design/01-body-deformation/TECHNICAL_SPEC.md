@@ -47,7 +47,7 @@ Both are constructive work-arounds an agent must design by hand; neither deforms
 | Mesh-kernel evaluation                                                                                          | `packages/kernel-manifold/src/manifoldKernel.ts`: `deform` op = `refineToLength(h)` + `warpBatch(law)`                                                                                               | Manifold is the in-process mesh kernel (L9)                                                                                  |
 | Exact evaluation                                                                                                | native sidecar: `solver/crates/llull-kernel-occt/cpp/deform.cxx` (+ `deform.hxx`), Rust `src/deform.rs` (ffi) and `src/recipe/nodes.rs::deform`; host payload in `server/src/native/kernelLeaves.ts` | exact B-rep re-approximation needs OCCT (C++), heavy numerics native (C7: OCCT is already the exact kernel; no new language) |
 | Mesh leaves on the exact kernel                                                                                 | lowered in core (`geometry/deform/lowering.ts`, like `geometry/featureLowering.ts`): a `deform` over a triangle-mesh leaf becomes a new mesh leaf warped in TS                                       | deforming planar triangles "exactly" is meaningless; one implementation for meshes                                           |
-| Review overlays                                                                                                 | `src/ui/viewport/3d/overlays/deform*.tsx` fed by `analyze_deformation` `data`                                                                                                                        | presentation only (L1, L4)                                                                                                   |
+| Review overlays                                                                                                 | `src/ui/viewport/3d/overlays/deform*.tsx` fed by `deform_overlay` `data`                                                                                                                             | presentation only (L1, L4)                                                                                                   |
 
 ### 2.2 Data flow
 
@@ -464,7 +464,7 @@ unverified, provenance { method, formula, reference, kernel, inputs } }`. Mass /
 | M1 (MVP mesh)  | `scale_nonuniform` (exact affine on the native kernel from day one: GTransform is a few lines), `twist_body`, `taper_body`, `stretch_body`, `bend_body` on Manifold and without a kernel; `analyze_deformation`, `check_deformation`; golden plans | M0                          | 4                  |
 | M2 (MVP exact) | `deform.cxx` WarpModification + adaptors + approximation + splitting + validity + capability `deform`; host wire; server tests; STEP of results                                                                                                    | M1, native toolchain (SV1)  | 5                  |
 | M3 (V1)        | `deform_lattice`, `deform_by_point`, `flow_along_curve`, curves / sheets path, `ids` multi-body, `keepSource`                                                                                                                                      | M2                          | 4                  |
-| M4 (V1)        | `flow_on_surface` (sheet and face targets), `preserveAnalytic`, UI overlays (frame, region, lattice, Jacobian map)                                                                                                                                 | M3                          | 3                  |
+| M4 (V1)        | `flow_on_surface` (sheet and face targets), `preserveAnalytic`, UI overlays (frame, region, lattice, curves, sheets, reference wire; done §18; the Jacobian map: §18.1)                                                                       | M3                          | 3                  |
 | M5 (V2)        | `deform_curve_to_curve` (RBF / thin-plate displacement fitted to curve pairs, then the generic warp), `morph_bodies`, B-spline lattices and oriented boxes                                                                                         | M4; 04 DIR for drag handles | 3                  |
 
 Total ≈ 21 eng-weeks. Cross-pack: 04 DIR commits these commands from drag gestures; 03 WRP may reuse `geometry/deform/flow.ts` for
@@ -550,7 +550,7 @@ A kernel refusal keeps the core warp's own code (`DEF_BUDGET_EXCEEDED`, `DEF_FRA
 ## 14. As built (DES-1b: M2 to M5, 2026-10-24)
 
 **Done.** M2 exact OCCT warp, M3 lattice / point / flow along a curve, M4 flow on a surface, M5 curve to curve and morph. Not done: `preserveAnalytic`
-(VC-DEF-23: done in §17.11), the UI overlays of M4 (`src/ui` untouched), B-spline lattices and oriented boxes (M5).
+(VC-DEF-23: done in §17.11), the UI overlays of M4 (done in §18), B-spline lattices and oriented boxes (M5).
 
 **Commands added.** `deform_lattice`, `deform_by_point`, `flow_along_curve`, `flow_on_surface`, `deform_curve_to_curve`, `morph_bodies` (meshes are morphed through their placed, world-coordinate vertices; toolset `3d`). All
 deformation commands take `ids` (several bodies, one feature step) and `keepSource`. `bend_body` accepts up to 360 degrees; a bend that closes the whole body is a ring
@@ -594,7 +594,7 @@ non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
 `target_bad_plan_codes` 2/6 ok with the four expected refusals (`DEF_BEND_RADIUS_TOO_SMALL`, `DEF_FOLDOVER`, `DEF_SCALE_SINGULAR`, `DEF_ENTITY_NOT_FOUND`).
 Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
 
-**Left.** UI overlays (`preserveAnalytic` is done, §17.11);
+**Left.** UI overlays are done (§18); `preserveAnalytic` is done (§17.11);
 `compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
 
@@ -1080,3 +1080,58 @@ attempt, -1071 against -52 on a mitre test).
   against 1.5708 before the exchange and the closed form 1.5708 (the fixed rule on the pieces), not flat. `nativeKernelQueries.test.ts` keeps a positive assertion for `bspline`: a box face is a bilinear patch (degree 1 x 1,
   2 x 2 poles; the test used to expect null and was stale since the native `bspline`).
 - **Not tested:** an open shell warped (no catalogue geometry gives a graded open B-spline shell), a `MakeFace` failure of a piece.
+
+## 18. As built (DES-1c: M4 UI overlays, 2026-10-31)
+
+**Command.** `deform_overlay` (read-only, `readsMeshTriangles`; toolset 3d): `{ id, compareTo? }` returns, in world mm, the data of the entity's outermost `deform` node: the frame
+(origin, x, y, z, axis length), the region slab (planes at both ends, `infinite`, radius = 1.3 x the largest radial reach from the frame axis of the REST body, i.e. of the source recipe, because the slab is a rest-frame object; without a source mesh the deformed mesh stands in, capped by the half diagonal of its bounds), the lattice
+(rest and displaced nets, the box; B-spline and oriented lattices included), the `flowCurve` target stations and base curve, the `flowSurface` target and base node grids,
+and the wire of a `compareTo` reference shape (sphere, spheroid, torus, cylinders, cone, plane, helicoid). A straight base on the frame axis is dropped by `flow_along_curve`,
+so `flow.base` is null then. Refusals: `DEF_ENTITY_NOT_FOUND`, `DEF_NOT_DEFORMED`, `DEF_FRAME_DEGENERATE`, `DEF_COMPARE_INVALID`.
+
+**UI.** `src/ui/viewport/3d/overlays/{DeformOverlay,DeformOverlayControl,deformOverlayGeometry}` and `store/deformOverlayStore`: a "Deform" toolbar toggle (off by default) with one
+checkbox per layer (frame, region, lattice, curves, sheets, reference) and a reference-shape picker whose fields are typed; drawn for the first 4 selected deformed meshes
+through `useHostQuery` (depth-tested pass plus a faint pass without depth). UI state only, never a command, the document is never changed.
+
+**Tests.** `tests/unit/deform/overlay.test.ts` (infinite twist, B-spline and oriented lattices, flow with a curved base, flow sheet, torus and all reference wires, refusals);
+`tests/component/DeformOverlay.test.tsx` (toggle without document change, reference fields, segment counts, groups, the cap of 4).
+
+**Verified in the desktop app** (Electron 38, driven over DevTools, bodies selected by clicking): infinite region (frame, slab, axis), B-spline lattice (rest, displaced, box),
+flow-on-surface sheets (target and base grids), a typed torus reference wire. **Verified by tests only:** the oriented lattice, and the flow-along-curve target and base
+curves (in the app the target at x = 200 showed as a thin line and the base was not seen in the framing used).
+
+**Review fixes (DES-1c).** `compareTo` is validated by `referenceDistance` before it is drawn: a missing or unusable field (non-positive radius, a torus with `minorRadius >= majorRadius`, a zero axis or normal, a cone half angle outside 0 to 90) is `DEF_COMPARE_INVALID` naming the field, for `deform_overlay` and `analyze_deformation` alike. The reference text is queried 250 ms after typing stops, the last drawing stays on screen while the next answer loads, and each field shows why it is unusable (`aria-invalid`).
+
+### 18.1 Jacobian map (DES-1c, 2026-10-31)
+
+**Command.** `deform_jacobian_map` (read-only, `readsMeshTriangles`; toolset 3d): `{ id }` re-refines the SOURCE of the entity's outermost `deform` node with the mesh warp, exactly as the deformation did
+(`warpMesh`; its result also returns `restPositions`, the rest point of every vertex), and returns `positions` (deformed body, flat world xyz, `Math.fround`), `indices`, `determinant` (ONE value PER TRIANGLE, 4 significant digits),
+`min`, `max`, `folded` (triangles with det J <= `floor` = `JACOBIAN_FLOOR` 1e-6), `floor`, `law` and `displayTolerance`.
+det J of the map jumps at the region ends (`laws.ts`: inside is `start < z <= end`), so it is NOT read per vertex: `planeRule` cuts the refinement at the region ends (no triangle straddles a jump) and each triangle
+is sampled at its REST centroid nudged 1e-6 of the body size INTO the material (against the outward normal), so a cap lying in a region-end plane reads the side the material is on (a body stretched x2 over its whole height is 2 everywhere,
+as `analyze_deformation` says; before this, per-vertex sampling read 1 at the base). On the exact (kernel) path the map is sampled on the mesh-path refinement of the same node, which approximates the exact body to the node tolerance.
+Size: at most 200000 triangles. A refinement over that (`DEF_BUDGET_EXCEEDED`) or a determinant pass over 2e7 work units (6 evaluations per triangle x the law cost, `evaluationCost`) is retried at tolerance x4, up to 10 times: the picture is coarsened, never the
+deformation, and `displayTolerance` / the summary say so. Refusals: `DEF_ENTITY_NOT_FOUND`, `DEF_NOT_DEFORMED`, `DEF_FRAME_DEGENERATE`, `DEF_SOURCE_UNAVAILABLE`, `DEF_BUDGET_EXCEEDED` (still over after the coarsenings), `DEF_APPROX_TOLERANCE`.
+A chain of deformations is COMPOSED by default (§18.2); `scope: "outermost"` reads the last node alone (`law` names it).
+
+**UI.** A "Det J" layer of the Deform popover (off by default, queried only while on): `overlays/JacobianMap.tsx` draws the answer as non-indexed, flat-coloured triangles over the body (`jacobianColors.ts`: log scale, grey at 1, red towards 2,
+blue towards 0.5, magenta at or below the floor = folded), and the popover legend lists, per drawn body, `outermost deform (law): det J min .. max, n folded (det J <= floor)` (or the refusal summary). UI state only, no command changes the document.
+
+**Tests.** `tests/unit/deform/jacobianMap.test.ts` (twist = 1 and the vertices equal the stored mesh; stretch min = max = 2; taper 0.25 .. 1; bend over the default region (R - 5) / R .. (R + 5) / R; a recipe edited to fold flags `folded` > 0;
+flow onto a straight target = 1; a lattice; the Manifold kernel installed; coarsening; refusals; pure), `tests/unit/ui/jacobianColors.test.ts`, `tests/component/JacobianMap.test.tsx`.
+
+**Verified in the desktop app** (Electron 38): a 40 x 40 x 120 mm box tapered to 0.4 over z 20..100 shows grey at the base shading to blue towards the narrow end, legend `det J 0.160 .. 1.00, 0 folded`.
+Folds cannot be produced through the commands (they refuse `DEF_FOLDOVER`), so the magenta colour is verified by tests only.
+
+### 18.2 Composed det J along a chain of deformations (DES-1c)
+
+`deform_jacobian_map { id, scope? }`, `scope` `"composed"` (default) | `"outermost"`. The composed determinant of a triangle is the product over the nodes of the chain of the node's det J read at the triangle's rest point in THAT node's input space: the volume ratio against the ORIGINAL body.
+- **Chain** (`commands/deform/deformChain.ts`, `chainOf`): the inner nodes are re-run on the mesh path with `warpMesh` at their own tolerance times the display coarsening (`limits.coarsen`; at most 200000 triangles each, `limits.maxTriangles`), each on the output mesh of the one below, starting from the base body's triangles (`sourceMeshOf`). A chain the mesh warp refuses
+  (inner `DEF_BUDGET_EXCEEDED` / `DEF_APPROX_TOLERANCE`) refuses the composed map by that code; the outermost scope is unaffected only when the inner body can be built the way it always was. The budget covers the whole chain: the determinant pass costs 6 x the sum of the `evaluationCost` of every node per triangle (2e7 units), and a chain that is too big (any inner warp over the cap, or the pass over the work) is retried with every tolerance x4 (inner nodes included, so each retry is about 4 times cheaper), up to 10 times, then refused `DEF_BUDGET_EXCEEDED`.
+- **Rest positions carried** (`warpMesh` `options.attributes` / `result.attributes`, `Soup.attributes`): every vertex carries its rest position in the input space of each earlier node through every refinement; a vertex a split creates gets the LINEAR (barycentric) interpolation of its edge ends,
+  and the welded vertices of the input mesh take the attribute of the source vertex they copy BY INDEX (`weldMesh` returns `remap` and `origin`; no coordinate matching, so a miss cannot happen). A weld that joins source vertices whose attributes differ by more than 1e-4 of the attribute's diagonal (a fold, a seam, a taper to a point: two rest points on one position) is refused `DEF_APPROX_TOLERANCE` ("collapses distinct points") instead of taking the first one's. The rest positions of the outermost node are the `restPositions` as before. The interpolation is exact for an affine inner map and approximate between the nodes of a curved one (the edge midpoint of the deformed mesh is not the image of the rest midpoint): the rest point of a vertex is off by O(h² x curvature of the inner map) where h is the edge length of the OUTER refinement (set by the outer chord tolerance, not the inner one), so the composed map is good to the outer chord tolerance; the test bends then tapers at tolerances 0.04, 0.01, 0.0025 and the extremes move by less than 5e-3 and then less than 1e-3 (under the 4-digit display precision).
+- **Product:** each stage's determinant is read at its own centroid nudged 1e-6 of the stage's body size into the body (the §18.1 rule), multiplied, then rounded to 4 significant digits. Data adds `laws` (inner first), `deforms` (their count) and `scope`; the summary says `composed (n deforms)`.
+- **UI:** the Det J legend says `composed (n deforms)` (or `outermost deform (law)` for one node / the outermost scope); the "Outermost only" checkbox under the Det J layer sets `scope: "outermost"` (UI state only).
+**Closed forms** (`tests/unit/deform/jacobianMap.test.ts`, `tests/component/JacobianMap.test.tsx`): twist (det 1) then taper 0.5: composed = the taper alone, 0.25 .. 1, equal triangle for triangle to the outermost scope; stretch x2 then taper 0.5 over the stretched 200: composed 2 s^2 = 0.5 .. 2 (the outermost alone 0.25 .. 1, each composed triangle 2 x the outermost one);
+stretch then bend (the bend splits triangles, the carried positions are used): 2 (R - 5) / R .. 2 (R + 5) / R for R 400; stretch 2 x stretch 1.5 x taper 0.5 over 300: 0.75 .. 3; a refused inner node refuses with its code, the document unchanged.
+**Red-proofs:** the inner determinants not multiplied (3 tests fail), the attributes not interpolated at splits (3), inner nodes not coarsened with the picture (1), the merge check removed (2), the nudge sign ignoring a mirror (1). **Left:** the exact (kernel) path of the inner nodes (the chain is always the mesh-path re-run of the recipe); (none for the orientation: a mirror reads as folded, its det J being negative, and the inward nudge of every stage follows the orientation flips of the nodes from that stage outward; mirror then taper = minus the taper, every triangle folded).

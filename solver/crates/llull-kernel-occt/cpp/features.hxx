@@ -63,10 +63,13 @@ std::unique_ptr<Shape> chamfer_edges(const Shape &shape, rust::Slice<const uint3
 // Chamfer with its first leg on a named face per edge (`faces[k]` = unique face index bounding `edges[k]`): two distances, or with `angle` a distance and an angle (radians) measured on that face.
 std::unique_ptr<Shape> chamfer_sided(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first,
                                      double second, bool angle);
-// Variable chamfer (cpp/blend_chamfer.cxx, BLD M5): symmetric legs running linearly from `first` at the start of each listed straight edge to `last` at
-// its end. Null when it cannot be built; chamfer_variable_reason says why ("" = builds).
-std::unique_ptr<Shape> chamfer_variable(const Shape &shape, rust::Slice<const uint32_t> edges, double first, double last);
-rust::String chamfer_variable_reason(const Shape &shape, rust::Slice<const uint32_t> edges, double first, double last);
+// Variable chamfer (cpp/blend_chamfer.cxx, BLD M5): legs running linearly from `first` at the start of each listed edge to `last` at its end; symmetric when `faces` is
+// empty, else the leg on the unique face `faces[k]` of edge k is the first and the other leg runs from `second` to `second_last`. Straight edges between planes and
+// curved ones (arcs, B-splines, generator lines of a cylinder) between any two faces. Null when it cannot be built; chamfer_variable_reason says why ("" = builds).
+std::unique_ptr<Shape> chamfer_variable(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first, double last,
+                                        double second, double second_last);
+rust::String chamfer_variable_reason(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first,
+                                     double last, double second, double second_last);
 // One fuse of the list whose joint edges are filleted: `radius` for every joint, except the joints nearest to the picks `joints` (x, y, z, radius per pick; a pick
 // rounds its whole tangent chain). Null when it fails; blend_union_reason says why ("" = builds).
 std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius, rust::Slice<const double> joints);

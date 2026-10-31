@@ -40,6 +40,9 @@ import { FocusBanner } from '../FocusBanner';
 import { AnalysisOverlay } from './analysis/AnalysisOverlay';
 import { AnalysisLegend } from './analysis/AnalysisLegend';
 import { SweepFramesOverlay } from './analysis/SweepFramesOverlay';
+import { DeformOverlay } from './overlays/DeformOverlay';
+import { ImplicitGpuPreview } from './implicitPreview/ImplicitGpuPreview';
+import { WrapOverlay } from './overlays/WrapOverlay';
 import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
 import { zoomToFocus } from './zoomToFocus';
 import { FeatureSessionLayer } from './manipulators/FeatureSessionLayer';
@@ -50,6 +53,7 @@ import { FaceEditBar } from './faceEdit/FaceEditBar';
 import { NurbsNetLayer } from './nurbsNet/NurbsNetLayer';
 import { NurbsNetBar } from './nurbsNet/NurbsNetBar';
 import { RemotePreviewLayer } from './preview/RemotePreviewLayer';
+import { FootprintPreviewLayer } from './preview/FootprintPreviewLayer';
 import { CageEditBar } from './cage/CageEditBar';
 import { SpaceMouseControl } from '@ui/input/SpaceMouseControl';
 
@@ -143,6 +147,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <FaceEditLayer />
         <NurbsNetLayer />
         <RemotePreviewLayer />
+        <FootprintPreviewLayer />
         <MeasureBBoxWireframe />
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
@@ -153,6 +158,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <PmiLayer />
         <AnalysisOverlay />
         <SweepFramesOverlay />
+        <DeformOverlay />
+        <ImplicitGpuPreview />
+        <WrapOverlay />
         <FocusOverlay />
       </group>
 
@@ -197,10 +205,12 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
-      <FeatureStartBar />
-      <CageEditBar />
-      <FaceEditBar />
-      <NurbsNetBar />
+      <div className="feature-chips">
+        <FeatureStartBar />
+        <CageEditBar />
+        <FaceEditBar />
+        <NurbsNetBar />
+      </div>
       <SpaceMouseControl />
       <FocusBanner onZoom={zoomToHighlight} />
       <AnalysisLegend />

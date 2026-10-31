@@ -3,12 +3,16 @@
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CommandDefinition } from '@core/commands/types';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '@ui/store';
 import { usePreviewStore } from '@ui/store/previewStore';
 import { isPreviewable } from '@ui/preview/previewable';
+import { previewNote } from '@ui/preview/previewNote';
 import { usePreviewController } from '@ui/preview/usePreviewController';
+import { useFootprintPreview } from '@ui/preview/useFootprintPreview';
+import { useFootprintPreviewStore } from '@ui/store/footprintPreviewStore';
 import { Icon } from '@ui/components/Icon';
-import { commandLabel, fieldsFromSchema, initialValues, matchTypeahead, parseFormValues, valuesFromParams } from './paramForm';
+import { commandLabel, fieldsFromSchema, initialValues, matchTypeahead, optionLabel, parseFormValues, valuesFromParams } from './paramForm';
 import { visibleFields } from './fieldVisibility';
 import type { FormField, FormValues } from './paramForm';
 
@@ -35,7 +39,7 @@ const PLACEHOLDERS: Readonly<Record<FormField['kind'], string>> = {
   boolean: '',
   numberList: 'e.g. 0, 0, 10',
   textList: 'id-1, id-2',
-  json: 'JSON, e.g. [[0,0],[10,0]]',
+  json: 'JSON',
 };
 
 interface FieldControlProps {
@@ -71,16 +75,18 @@ function TypeaheadSelect({ common, value, options, optional, onChange }: Typeahe
         const now = Date.now();
         const text = now - typed.current.at > TYPEAHEAD_RESET_MS ? e.key : typed.current.text + e.key;
         typed.current = { text, at: now };
-        const match = matchTypeahead(options, text);
+        // Typed text matches what the select shows: "y" picks true (Yes), "he" picks heat_steady (Heat steady).
+        const labels = options.map(optionLabel);
+        const match = matchTypeahead(labels, text);
         if (match === undefined) return;
         e.preventDefault();
-        onChange(match);
+        onChange(options[labels.indexOf(match)] ?? match);
       }}
     >
       {optional && <option value="">Default</option>}
       {options.map((option) => (
         <option key={option} value={option}>
-          {option}
+          {optionLabel(option)}
         </option>
       ))}
     </select>
@@ -100,7 +106,7 @@ function FieldControl({ field, id, value, describedBy, invalid, autoFocus, onCha
         rows={3}
         spellCheck={false}
         value={value}
-        placeholder={PLACEHOLDERS.json}
+        placeholder={field.example === '' || field.example === 'null' ? PLACEHOLDERS.json : `JSON, e.g. ${field.example}`}
         onChange={(e) => onChange(e.target.value)}
       />
     );
@@ -139,9 +145,15 @@ export function CommandParamForm({
   const fields = useMemo(() => visibleFields(command.name, allFields, values), [command.name, allFields, values]);
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const baseId = useId();
-  const previewing = preview && isPreviewable(command, fields);
+  const previewQuery = command.annotations?.previewQuery;
+  const footprint = previewQuery !== undefined;
+  const previewing = preview && !footprint && isPreviewable(command, fields);
   const controller = usePreviewController();
   const previewOutcome = usePreviewStore((s) => s.outcome);
+
+  const footprintState = useFootprintPreviewStore(useShallow((s) => ({ status: s.status, summary: s.summary })));
+  const parsedNow = useMemo(() => parseFormValues(fields, values), [fields, values]);
+  useFootprintPreview(previewQuery, parsedNow.ok ? parsedNow.params : null, preview);
 
   // External sync: ghost follows the typed params; invalid / incomplete params clear it.
   useEffect(() => {
@@ -246,8 +258,15 @@ export function CommandParamForm({
       )}
 
       {previewing && previewOutcome !== null && (
-        <p className={`palette-form__preview${previewOutcome.ok ? '' : ' palette-form__preview--refused'}`} role="status">
-          <strong>{previewOutcome.ok ? 'Preview' : 'Preview unavailable'}</strong> {previewOutcome.summary}
+        <p className={`palette-form__preview${previewNote(previewOutcome).refused ? ' palette-form__preview--refused' : ''}`} role="status">
+          <strong>{previewNote(previewOutcome).label}</strong> {previewNote(previewOutcome).text}
+        </p>
+      )}
+
+      {preview && footprint && footprintState.status !== 'idle' && (
+        <p className={`palette-form__preview${footprintState.status === 'refused' ? ' palette-form__preview--refused' : ''}`} role="status">
+          <strong>{footprintState.status === 'refused' ? 'Preview unavailable' : 'Preview'}</strong>{' '}
+          {footprintState.status === 'pending' ? 'computing' : footprintState.summary}
         </p>
       )}
 

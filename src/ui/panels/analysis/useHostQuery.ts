@@ -39,12 +39,13 @@ export function useHostQuery(command: string, params: Record<string, unknown> | 
   useEffect(() => {
     if (paramsKey === null) return;
     let cancelled = false;
+    const controller = new AbortController();
     const settle = (data: unknown, summary: string, isError: boolean): void => {
       if (!cancelled) setAnswer({ key: paramsKey, state: { status: 'done', data, summary, isError } });
     };
     const request = JSON.parse(paramsKey) as Record<string, unknown>;
     if (online) {
-      postCommand(command, request)
+      postCommand(command, request, undefined, controller.signal)
         .then((response) => settle(response.data, response.summary, response.isError))
         .catch((err: unknown) => settle(null, `${command} failed: ${errorMessage(err)}`, true));
     } else {
@@ -53,6 +54,7 @@ export function useHostQuery(command: string, params: Record<string, unknown> | 
     }
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [command, online, paramsKey, refreshKey]);
 

@@ -22,11 +22,15 @@ import { filletEach } from './filletEach';
 import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { blendRefusal } from './blendRefusal';
 import { blendRejection } from './blendCodes';
+import { partialSchema, refusePartial } from './filletPartial';
+import { findKink, kinkRefusal, kinkReported } from './filletTangency';
 import { isSideProblem, sideFaces } from '../../geometry/blend/sides';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
 
 interface EdgeModification {
+  /** fillet_edge: build a blend that meets an earlier blend without tangency (reported, not refused). */
+  readonly allowNonTangent?: boolean | undefined;
   readonly command: 'fillet_edge' | 'chamfer_edge' | 'shell_solid';
   readonly pastTense: string;
   readonly amountName: 'radius' | 'distance' | 'thickness';
@@ -64,7 +68,7 @@ interface RecipeProblem {
 function modifyEdges(
   doc: CadDocument,
   ctx: ExecutionContext | undefined,
-  { command, pastTense, amountName, amount, id, edges = [], near = [], names, recipe }: EdgeModification,
+  { command, pastTense, amountName, amount, id, edges = [], near = [], names, recipe, allowNonTangent }: EdgeModification,
 ): CommandResult {
   if (amount <= 0) return noop(doc, `${command}: ${amountName} must be > 0 (got ${amount}).`);
   const validation = validateSolidTarget(doc, command, id);
@@ -104,15 +108,18 @@ function modifyEdges(
     (newId, triangles) =>
       `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.${picked}${selection.note}`,
   );
+  const kink = command === 'fillet_edge' ? findKink(doc, committed, source, ctx) : null;
+  if (kink !== null && allowNonTangent !== true) return kinkRefusal(doc, command, id, kink, 'radius');
+  const reported = kink === null ? committed : kinkReported(committed, kink);
   return selection.record === null || committed.document === doc
-    ? committed
-    : { ...committed, recordExtras: { edgeNames: selection.record } };
+    ? reported
+    : { ...reported, recordExtras: { edgeNames: selection.record } };
 }
 
 /**
  * @affects removes source entity; creates 1 mesh entity with rounded edges
  * @invariant target must be a 3D solid; radius > 0; geometry kernel must be injected
- * @failure missing id, 2D kind, radius ≤ 0, kernel absent, or kernel null → no-op, affected:[]
+ * @failure missing id, 2D kind, radius ≤ 0, kernel absent, or kernel null → no-op, affected:[]; partial -> BLD_PARTIAL_UNSUPPORTED (a valid range) or BLD_LAW_INVALID (a bad range), see filletPartial.ts
  */
 export const filletEdge = defineCommand({
   name: 'fillet_edge',
@@ -125,7 +132,7 @@ export const filletEdge = defineCommand({
     'robust to parametric edits); with neither, ALL edges are filleted. ' +
     'To give each edge its own radius (optionally varying along the edge) pass edges: [{ index | near, size, sizeEnd?, sizes?, interpolation?, law? }] instead. ' +
     'A radius law runs from size at the start of the edge to sizeEnd at its end, through sizes control points ({ t in (0, 1) along the picked edge, size }): ' +
-    'interpolation "smooth" (default) passes one smooth curve through them with zero slope at the ends, "linear" joins them with straight pieces; ' +
+    'interpolation "smooth" (default) passes one smooth curve through them with zero slope at the ends, "monotone" is a C1 cubic that never overshoots a station, "linear" joins them with straight pieces; ' +
     'or law { expression of t in [0, 1] (pi, cos, ...), samples } sampled at uniform t. On a CLOSED edge (a cylinder rim) the law must close on itself (r(0) = r(1), BLD_LAW_NOT_PERIODIC otherwise). ' +
     'corners [{ near | name | all, type: "setback", setback }] gives a vertex a setback corner instead of the rolling-ball one. A bad value is BLD_LAW_INVALID with the param path; run check_blends afterwards to read the realised radius back. ' +
     'profile { type: "conic", rho } or { type: "curvature", shape } changes the cross-section (conic: rho 0.4142 is the circle at 90 degrees; curvature: zero curvature at both contacts, G2 to planar faces); ' +
@@ -189,6 +196,13 @@ export const filletEdge = defineCommand({
       )
       .optional(),
     profile: profileSchema.optional(),
+    partial: partialSchema.optional(),
+    allowNonTangent: z
+      .boolean()
+      .describe(
+        'Default false. A fillet step whose new blend meets a blend the solid already has with a normal angle over the check_blends G1 default (a radius larger than the round it runs onto: OCCT approximates it) is refused with BLD_FILLET_NOT_TANGENT. true builds it anyway and reports the contact in data.nonTangent and the summary.',
+      )
+      .optional(),
     mode: z
       .enum(FILLET_MODES)
       .describe(
@@ -200,17 +214,47 @@ export const filletEdge = defineCommand({
   }),
   run: (
     doc,
-    { id, edgeIndices = [], edgesNear = [], edgeNames, radius, radiusEnd, edges, mode = 'radius', profile, corners },
+    {
+      id,
+      edgeIndices = [],
+      edgesNear = [],
+      edgeNames,
+      radius,
+      radiusEnd,
+      edges,
+      mode = 'radius',
+      profile,
+      corners,
+      partial,
+      allowNonTangent,
+    },
     ctx,
   ): CommandResult => {
+    const target = validateSolidTarget(doc, 'fillet_edge', id);
+    if ('summary' in target) return target;
+    const refused = refusePartial(doc, id, partial);
+    if (refused !== null) return refused;
     if (edges !== undefined || mode === 'chord' || radiusEnd !== undefined || profile !== undefined || corners !== undefined)
-      return filletEach(doc, ctx, { id, mode, edges, edgeIndices, edgesNear, radius, radiusEnd, edgeNames, profile, corners });
+      return filletEach(doc, ctx, {
+        id,
+        mode,
+        edges,
+        edgeIndices,
+        edgesNear,
+        radius,
+        radiusEnd,
+        edgeNames,
+        profile,
+        corners,
+        allowNonTangent,
+      });
     if (radius === undefined) return noop(doc, 'fillet_edge: give radius (or edges with one size per edge); document unchanged.');
     return modifyEdges(doc, ctx, {
       command: 'fillet_edge',
       pastTense: 'filleted',
       amountName: 'radius',
       amount: radius,
+      allowNonTangent,
       id,
       edges: edgeIndices,
       near: edgesNear,
@@ -243,7 +287,8 @@ export const chamferEdge = defineCommand({
     'distance alone is a symmetric chamfer (equal legs on both faces). Asymmetric: add distance2 (second leg, document units) OR angleDeg ' +
     '(degrees, 0..90 exclusive, measured on the side1 face between that face and the chamfer; on a right-angle edge the second leg is distance * tan(angle)), together with side1Near (a point on the ' +
     'face that carries distance) or side1Name (persistent face name); for each selected edge the one of its two faces nearest to the point is side 1. ' +
-    'distanceEnd makes the symmetric distance vary linearly from distance at the edge start to distanceEnd at its end (a variable chamfer: straight edges between planar faces, flat square ends, listed edges that share no vertex; the exact native kernel builds it as a ruled section loft). ' +
+    'distanceEnd makes the distance vary linearly from distance at the edge start to distanceEnd at its end (a variable chamfer: listed edges that share no vertex, flat square ends, not a closed edge; the exact native kernel builds it as a loft of the sections: a ruled one on a straight edge between planes, a smooth one on a curved edge, an arc or a B-spline between any two faces, with the legs measured on each face from the edge in the plane perpendicular to it). ' +
+    'Asymmetric and variable: add distance2 (the leg on the other face at the edge start) and distance2End (at its end) with side1Near / side1Name, so the leg on side 1 runs distance -> distanceEnd and the other leg distance2 -> distance2End (angleDeg is for a constant chamfer). Edges that meet at a vertex need constant distances (a variable chamfer has no corner patch: BLD_CHAMFER_FAILED names it). ' +
     `Needs the exact kernel (check kernel_info): ${OCC_KERNEL_HINT}; ` +
     'with the mesh kernel it no-ops. ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
@@ -296,17 +341,23 @@ export const chamferEdge = defineCommand({
       .min(1)
       .describe('Persistent face name of side 1 (inspect_topology lists face names on the native kernel); alternative to side1Near.')
       .optional(),
+    distance2End: z
+      .number()
+      .describe(
+        'Variable asymmetric chamfer: the second leg (on the face that is not side 1) at the END of each selected edge (> 0, document units); it runs linearly from distance2 at the edge start. Needs distanceEnd, distance2 and side1Near / side1Name; not with angleDeg.',
+      )
+      .optional(),
     distanceEnd: z
       .number()
       .describe(
-        'Variable chamfer: the symmetric distance at the END of each selected edge (> 0, document units); the distance runs linearly from distance at the edge start to distanceEnd (the removed volume of a right-angle edge is 1/2 x integral of d(s)^2 ds). ' +
-          'The start of an edge is its own start point (inspect_topology lists start and end of every edge). The edges must be listed (edgeIndices / edgesNear / edgeNames), straight, between two planar faces, ending on flat faces square to the edge, with no two chosen edges sharing a vertex; not with distance2 / angleDeg. Omit for a constant chamfer. Chamfers that need other shapes are BLD_CHAMFER_FAILED with the reason.',
+        'Variable chamfer: the distance (the leg on side 1 when distance2 is given) at the END of each selected edge (> 0, document units); the distance runs linearly from distance at the edge start to distanceEnd (the removed volume of a right-angle edge is 1/2 x integral of d1(s) d2(s) ds). ' +
+          'The start of an edge is its own start point (inspect_topology lists start and end of every edge). The edges must be listed (edgeIndices / edgesNear / edgeNames), straight or curved (an arc, a B-spline) between any two faces, not closed, ending on flat faces square to the edge; edges that meet at a vertex (the corner of a box with three edges) may be listed together when all are convex or all concave: the chamfer faces then meet along the mitre lines of their surfaces, without a separate corner face; with distance2 give distance2End too, not angleDeg. Omit for a constant chamfer. Chamfers that need other shapes are BLD_CHAMFER_FAILED with the reason.',
       )
       .optional(),
   }),
   run: (
     doc,
-    { id, edgeIndices = [], edgesNear = [], edgeNames, distance, distance2, angleDeg, side1Near, side1Name, distanceEnd },
+    { id, edgeIndices = [], edgesNear = [], edgeNames, distance, distance2, angleDeg, side1Near, side1Name, distanceEnd, distance2End },
     ctx,
   ): CommandResult => {
     const sided = distance2 !== undefined || angleDeg !== undefined;
@@ -321,24 +372,28 @@ export const chamferEdge = defineCommand({
         [id],
         ['side1Near'],
       );
-    if (distanceEnd !== undefined) {
+    if (distanceEnd !== undefined || distance2End !== undefined) {
       const unlisted = edgeIndices.length + edgesNear.length + (edgeNames?.length ?? 0) === 0;
-      const problem = sided
-        ? 'distanceEnd is a symmetric variable chamfer: give no distance2 / angleDeg'
-        : !(distanceEnd > 0)
-          ? `distanceEnd must be > 0 (got ${distanceEnd})`
-          : unlisted
-            ? 'a variable chamfer needs its edges listed (edgeIndices, edgesNear or edgeNames), not every edge of the solid'
-            : null;
-      if (problem !== null)
-        return blendRejection(
-          doc,
-          'chamfer_edge',
-          'BLD_CHAMFER_VARIABLE_PARAMS',
-          problem,
-          [id],
-          [!sided && distanceEnd > 0 && unlisted ? 'edgeIndices' : 'distanceEnd'],
-        );
+      const found: readonly [string, string] | null =
+        distanceEnd === undefined
+          ? ['distance2End', 'distance2End needs distanceEnd (a variable chamfer runs from distance to distanceEnd)']
+          : angleDeg !== undefined
+            ? ['angleDeg', 'a variable chamfer takes distance2 and distance2End for its second leg, not angleDeg']
+            : distance2 !== undefined && distance2End === undefined
+              ? ['distance2End', 'a variable chamfer with distance2 needs distance2End (the second leg at the end of the edge)']
+              : distance2 === undefined && distance2End !== undefined
+                ? ['distance2End', 'distance2End needs distance2 (the second leg at the start of the edge)']
+                : !(distanceEnd > 0)
+                  ? ['distanceEnd', `distanceEnd must be > 0 (got ${distanceEnd})`]
+                  : distance2End !== undefined && !(distance2End > 0)
+                    ? ['distance2End', `distance2End must be > 0 (got ${distance2End})`]
+                    : unlisted
+                      ? [
+                          'edgeIndices',
+                          'a variable chamfer needs its edges listed (edgeIndices, edgesNear or edgeNames), not every edge of the solid',
+                        ]
+                      : null;
+      if (found !== null) return blendRejection(doc, 'chamfer_edge', 'BLD_CHAMFER_VARIABLE_PARAMS', found[1], [id], [found[0]]);
     }
     if (angleDeg !== undefined && !(angleDeg > 0 && angleDeg < 90))
       return blendRejection(
@@ -376,6 +431,7 @@ export const chamferEdge = defineCommand({
           edges: [...edges],
           size: distance,
           ...(distanceEnd === undefined ? {} : { sizeEnd: distanceEnd }),
+          ...(distance2End === undefined ? {} : { size2End: distance2End }),
           ...(near.length > 0 ? { near } : {}),
         };
         if (!sided) return base;
