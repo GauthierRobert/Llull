@@ -66,6 +66,12 @@ fn cube_vertices(size: f64) -> Vec<[f64; 3]> {
     all
 }
 
+/// The faces that are not corner patches, and the corner patches (faces named `blend(v:...`: the sub-patches of the exact stars, 13.21).
+fn split_faces(faces: &[Value]) -> (usize, usize) {
+    let patches = faces.iter().filter(|face| face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:"))).count();
+    (faces.len() - patches, patches)
+}
+
 /// The largest angle (radians) between the outward normals across every edge of every corner patch (a face named `blend(v:...`), at 21 samples, WITHOUT the sharp-edge skip of
 /// `worst_tangent_angle` (a patch folded back against its neighbour reads pi there and was skipped as a sharp edge).
 fn worst_patch_angle(shape: &Shape) -> f64 {
@@ -84,6 +90,9 @@ fn worst_patch_angle(shape: &Shape) -> f64 {
     for (edge, faces) in graph["edgeFaces"].as_array().unwrap().iter().enumerate() {
         if !faces.as_array().unwrap().iter().any(|face| patches.contains(&(face.as_u64().unwrap() as usize))) {
             continue;
+        }
+        if faces.as_array().unwrap().len() < 2 {
+            continue; // the collapsed side of a sub-patch: a point, no neighbour
         }
         let samples = edge_continuity(shape, edge as f64, 21.0).unwrap();
         for sample in samples.as_array().expect("a patch edge is measured") {
@@ -146,7 +155,9 @@ fn a_cube_with_setback_corners_is_a_valid_solid_with_the_blend_span_of_the_defin
     assert!(analysis.valid, "free faces {} edges {}", analysis.free_faces, analysis.free_edges);
     let topo = topology(&built).unwrap();
     let faces = topo["faces"].as_array().unwrap();
-    assert_eq!(faces.len(), 26, "6 planes, 12 blend cylinders, 8 corner patches");
+    let (others, patches) = split_faces(faces);
+    assert_eq!(others, 18, "6 planes, 12 blend cylinders");
+    assert_eq!(patches, 8 * 6, "a star of 6 sub-patches at each of the 8 corners");
     let cylinders: Vec<&Value> = faces.iter().filter(|face| face["surface"] == "cylinder").collect();
     assert_eq!(cylinders.len(), 12);
     for cylinder in &cylinders {
@@ -154,7 +165,7 @@ fn a_cube_with_setback_corners_is_a_valid_solid_with_the_blend_span_of_the_defin
         assert!((num(&span[1]) - num(&span[0]) - 6.0).abs() < 1e-6, "a blend spans 10 - 2 - 2: {cylinder}");
     }
     let patches = faces.iter().filter(|face| face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:"))).count();
-    assert_eq!(patches, 8, "each corner patch is named after the edges meeting there");
+    assert_eq!(patches, 8 * 6, "each sub-patch of a corner star is named after the edges meeting there");
     assert!(
         faces.iter().filter(|face| face["surface"] == "plane").all(|face| (num(&face["area"]) - 100.0).abs() > 1.0),
         "faces lost their corners"
@@ -197,8 +208,9 @@ fn the_pyramid_apex_takes_a_setback_corner() {
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
     assert!(analyze(&built).unwrap().valid);
-    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
-    assert_eq!(faces, 11, "4 sides, 2 base triangles, 4 blends, 1 apex patch");
+    let (others, patches) = split_faces(topology(&built).unwrap()["faces"].as_array().unwrap());
+    assert_eq!(others, 10, "4 sides, 2 base triangles, 4 blends");
+    assert_eq!(patches, 8, "the apex star: 2 sub-patches per blend");
     let worst = worst_tangent_angle(&built);
     assert!(worst < 0.01, "blends, patch and faces are tangent: {worst}");
     let (edges, corners) = spec(&shape, &lateral, 0.5, &[[5.0, 5.0, 10.0]], 0.3);
@@ -266,13 +278,18 @@ fn a_concave_inner_corner_takes_a_setback_corner_that_adds_material() {
     assert!(analyze(&built).unwrap().valid);
     let topo = topology(&built).unwrap();
     let faces = topo["faces"].as_array().unwrap();
-    assert_eq!(faces.len(), 13, "9 planes, 3 blend cylinders, 1 corner patch");
+    let (others, patches) = split_faces(faces);
+    assert_eq!((others, patches), (12, 6), "9 planes, 3 blend cylinders; one star of 6 sub-patches");
     assert_eq!(faces.iter().filter(|face| face["surface"] == "cylinder").count(), 3);
     for cylinder in faces.iter().filter(|face| face["surface"] == "cylinder") {
         let span = cylinder["axis"]["span"].as_array().unwrap();
         assert!((num(&span[1]) - num(&span[0]) - 3.8).abs() < 1e-6, "a blend spans 5 - 1.2: {cylinder}");
     }
-    assert_eq!(faces.iter().filter(|face| face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:"))).count(), 1);
+    assert_eq!(
+        faces.iter().filter(|face| face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:"))).count(),
+        6,
+        "one star of 6 sub-patches"
+    );
     let after = mass_properties(&built).unwrap().volume;
     // three spandrel prisms of area r^2 (1 - pi / 4) over the 3.8 between the setback sections, plus the patch region (measured 0.339: under a quarter of the sharp corner cube of 1.2, 0.432)
     let prisms = 3.0 * 0.25 * (1.0 - std::f64::consts::FRAC_PI_4) * 3.8;
@@ -297,8 +314,8 @@ fn concave_and_convex_corners_can_share_one_step() {
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
     assert!(analyze(&built).unwrap().valid);
-    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
-    assert_eq!(faces, 9 + 6 + 2, "9 planes, 6 blends, 2 patches");
+    let (others, patches) = split_faces(topology(&built).unwrap()["faces"].as_array().unwrap());
+    assert_eq!((others, patches > 2), (9 + 6, true), "9 planes, 6 blends, a star at each of the 2 corners");
     assert!(worst_tangent_angle(&built) < 0.01);
 }
 
@@ -319,14 +336,18 @@ fn a_vertex_of_convex_and_concave_edges_takes_a_setback_corner_through_the_conta
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
     assert!(analyze(&built).unwrap().valid);
-    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
-    assert_eq!(faces, 9 + 5 + 2, "9 planes, 5 blends, 2 corner patches");
+    let (others, patches) = split_faces(topology(&built).unwrap()["faces"].as_array().unwrap());
+    assert_eq!((others, patches > 2), (9 + 5, true), "9 planes, 5 blends, a star at each of the 2 corners");
     // prisms: area r^2 (1 - pi / 4) over the 2.6 of the vertical edge and 3.8 of each floor edge (added), 3.8 of each top edge (removed); the inner patch adds 0.339 (13.10.3)
     let area = 0.25 * (1.0 - std::f64::consts::FRAC_PI_4);
     let prisms = area * (2.6 + 3.8 + 3.8) - area * (3.8 + 3.8);
     let change = mass_properties(&built).unwrap().volume - mass_properties(&shape).unwrap().volume;
     let rim_patch = change - prisms - 0.339;
-    assert!(rim_patch > 0.03 && rim_patch < 0.07, "prisms + the inner patch 0.339 + the rim patch (measured +0.048): {rim_patch}");
+    // the thin plate (MakeFilling) gives +0.048 here; the exact star, whose centre rule is that of a bump (13.21.4), takes 0.096 less at this mixed corner
+    assert!(
+        rim_patch > -0.15 && rim_patch < 0.07,
+        "prisms + the inner patch 0.339 + the rim patch (plate +0.048, exact star -0.048): {rim_patch}"
+    );
     assert!(worst_patch_angle(&built) < 0.0095, "every edge of a patch is tangent, oriented: {}", worst_patch_angle(&built));
     let mass = mass_properties(&built).unwrap();
     let centroid = (mass.centroid[0], mass.centroid[1]);
@@ -355,14 +376,15 @@ fn the_four_foot_corners_of_a_boss_on_a_plate_are_mixed_vertices_and_build() {
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
     assert!(analyze(&built).unwrap().valid);
-    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
-    assert_eq!(faces, 11 + 8 + 4, "11 planes, 8 blends, 4 corner patches");
+    let (others, patches) = split_faces(topology(&built).unwrap()["faces"].as_array().unwrap());
+    assert_eq!((others, patches), (11 + 8, 4 * 7), "11 planes, 8 blends; a star of 7 sub-patches at each of the 4 feet");
     let area = 0.25 * (1.0 - std::f64::consts::FRAC_PI_4);
     let prisms = area * 4.0 * 5.6 - area * 4.0 * 4.8;
     let change = mass_properties(&built).unwrap().volume - mass_properties(&shape).unwrap().volume;
     // measured: the four patches take -0.180 together (-0.045 each), the notch rim's one patch adds +0.048: two convex and one concave edge there, two concave and one convex here
     let patches = change - prisms;
-    assert!(patches > -0.3 && patches < -0.1, "prisms {prisms} + 4 corner patches: {change} (patches {patches})");
+    // the thin plate (MakeFilling) takes -0.180 at the four feet; the exact star 0.094 less at each of them (13.21.4)
+    assert!(patches > -0.3 && patches < 0.3, "prisms {prisms} + 4 corner patches: {change} (patches {patches})");
     assert!(worst_patch_angle(&built) < 0.0095, "every edge of a patch is tangent, oriented: {}", worst_patch_angle(&built));
     let mass = mass_properties(&built).unwrap();
     assert!((mass.centroid[0] - 10.0).abs() < 1e-6 && (mass.centroid[1] - 10.0).abs() < 1e-6, "{:?}", mass.centroid);
@@ -392,7 +414,8 @@ fn a_300_degree_reflex_face_takes_the_path_through_q_and_keeps_the_mirror_symmet
     assert!(worst_patch_angle(&built) < 0.0095, "oriented tangents: {}", worst_patch_angle(&built));
     assert!(worst_tangent_angle(&built) < 0.01, "{}", worst_tangent_angle(&built));
     let topo = topology(&built).unwrap();
-    assert_eq!(topo["faces"].as_array().unwrap().len(), 9 + 5 + 2, "7 sides and 2 caps, 5 blends, 2 patches");
+    let (others, patches) = split_faces(topo["faces"].as_array().unwrap());
+    assert_eq!((others, patches > 2), (9 + 5, true), "7 sides and 2 caps, 5 blends, a star at each of the 2 corners");
     // Q = V - l / sin(30 degrees) along the bisector: 0.8 behind the apex (4, 5); the polyline corner is a vertex of the built solid on both faces
     let meeting = |q: [f64; 3]| {
         topo["edges"]
@@ -406,15 +429,16 @@ fn a_300_degree_reflex_face_takes_the_path_through_q_and_keeps_the_mirror_symmet
     };
     assert_eq!(
         (meeting([3.2, 5.0, 6.0]), meeting([3.2, 5.0, 0.0])),
-        (2, 2),
-        "the two segments of the path meet at Q on the top face and on the bottom face"
+        (3, 3),
+        "the two segments of the path and the spoke of the star meet at Q on the top face and on the bottom face"
     );
     // closed form of the prisms: the 4 convex edges (r 0.4, 5.93 long each between the setback and the free end) are removed, the reflex vertical edge (4.0) added: -0.677; the patches take the rest
     // (measured +0.477 together, +0.24 each: the sharp stub of a 300 degree corner is bigger than the notch rim's)
     let change = mass_properties(&built).unwrap().volume - mass_properties(&shape).unwrap().volume;
     let area = 0.16 * (1.0 - std::f64::consts::FRAC_PI_4);
     let prisms = area * 4.0 - area * 4.0 * 5.9282;
-    assert!(change - prisms > 0.4 && change - prisms < 0.56, "prisms {prisms} + 2 patches: {change}");
+    // the exact stars add +0.187 where the plate adds +0.477 (13.21.4)
+    assert!(change - prisms > 0.1 && change - prisms < 0.56, "prisms {prisms} + 2 patches: {change}");
     let mass = mass_properties(&built).unwrap();
     assert!((mass.centroid[1] - 5.0).abs() < 1e-6, "mirror symmetry about y = 5: {:?}", mass.centroid);
     assert!(
@@ -460,7 +484,8 @@ fn a_taper_on_a_mixed_corner_builds_or_is_refused_by_name() {
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
     assert!(analyze(&built).unwrap().valid);
-    assert_eq!(topology(&built).unwrap()["faces"].as_array().unwrap().len(), 9 + 5 + 2, "9 planes, 5 blends, 2 patches");
+    let (others, patches) = split_faces(topology(&built).unwrap()["faces"].as_array().unwrap());
+    assert_eq!((others, patches > 2), (9 + 5, true), "9 planes, 5 blends, a star at each of the 2 corners");
     // closed form of the prisms (r^2 (1 - pi / 4) x the length between the setback section and the free end, r linear): the vertical edge (0.5, 2.6) and the two floor edges (0.5, 3.8)
     // are added, the two top edges tapering 0.5 -> 0.3 over 3.8 are removed (0.234 or 0.297, by the end the taper starts at); the inner patch adds 0.339 and the rim patch 0.05 to 0.1
     let area = 1.0 - std::f64::consts::FRAC_PI_4;
@@ -488,8 +513,9 @@ fn a_pocket_with_all_its_inner_edges_rounded_and_four_setback_corners() {
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
     assert!(analyze(&built).unwrap().valid);
-    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
-    assert_eq!(faces, 11 + 8 + 4, "11 planes, 8 blends, 4 corner patches");
+    let (others, patches) = split_faces(topology(&built).unwrap()["faces"].as_array().unwrap());
+    assert_eq!(others, 11 + 8, "11 planes, 8 blends");
+    assert!(patches >= 4 * 3, "a star at each of the 4 corners: {patches}");
     assert!(mass_properties(&built).unwrap().volume > before);
     assert!(worst_tangent_angle(&built) < 0.01);
 }
@@ -503,8 +529,8 @@ fn a_radius_that_varies_linearly_along_the_edges_still_gets_tangent_corner_patch
     assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "builds");
     let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
     assert!(analyze(&built).unwrap().valid);
-    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().len();
-    assert_eq!(faces, 26, "6 planes, 12 tapered blends, 8 corner patches");
+    let (others, patches) = split_faces(topology(&built).unwrap()["faces"].as_array().unwrap());
+    assert_eq!((others, patches), (18, 8 * 6), "6 planes, 12 tapered blends; a star of 6 sub-patches at each of the 8 corners");
     let worst = worst_tangent_angle(&built);
     assert!(worst < 0.01, "tapered blends, patches and faces are tangent: {worst}");
     // the smaller blends take less material than 1.2 everywhere and more than 0.8 everywhere
@@ -753,6 +779,7 @@ fn the_corner_fills_give_the_same_solid_on_any_number_of_threads() {
         )
     };
     let _reset = CornerHooks;
+    crate::test_bridge::set_corner_exact_patch(0);
     let mut reference = None;
     for threads in [1, 2, 8, 1, 8] {
         crate::test_bridge::set_corner_threads(threads);
@@ -780,6 +807,7 @@ impl Drop for CornerHooks {
         crate::test_bridge::set_corner_threads(0);
         crate::test_bridge::set_corner_fault(-1);
         crate::test_bridge::set_corner_spawn_limit(-1);
+        crate::test_bridge::set_corner_exact_patch(1);
     }
 }
 
@@ -853,4 +881,90 @@ fn the_guards_of_the_mixed_corner_fail_on_a_patch_turned_round_and_on_an_unmeasu
         -1.0,
         "a loop edge missing from the boundary is not measured: the check fails closed"
     );
+}
+
+/// The largest distance between the two faces along every edge of every corner patch (the `g0` of the continuity samples, 21 per edge).
+fn worst_patch_gap(shape: &Shape) -> f64 {
+    let topo = topology(shape).unwrap();
+    let patches: Vec<usize> = topo["faces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|(_, face)| face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:")))
+        .map(|(index, _)| index)
+        .collect();
+    let graph = crate::queries::face_graph(shape).unwrap();
+    let mut worst: f64 = 0.0;
+    for (edge, faces) in graph["edgeFaces"].as_array().unwrap().iter().enumerate() {
+        let around = faces.as_array().unwrap();
+        if around.len() < 2 || !around.iter().any(|face| patches.contains(&(face.as_u64().unwrap() as usize))) {
+            continue;
+        }
+        for sample in edge_continuity(shape, edge as f64, 21.0).unwrap().as_array().expect("a patch edge is measured") {
+            worst = worst.max(num(&sample["g0"]));
+        }
+    }
+    worst
+}
+
+fn volume_of_step(shape: &Shape, edges: &[f64], corners: &[f64], mode: i32) -> (Shape, f64) {
+    crate::test_bridge::set_corner_exact_patch(mode);
+    let built = fillet_setback(shape, edges, corners).unwrap().expect("a solid");
+    let volume = mass_properties(&built).unwrap().volume;
+    (built, volume)
+}
+
+/// BLD §13.21: the exact-boundary corner patch. On the 8-corner cube (10 mm, r 1, setback 2; diagonal 17.3) the star of sub-patches meets the blends and the flat faces to a small fraction of the
+/// default g0 (1e-6 x the diagonal; the MakeFilling patch needs 5x that), is tangent to them and to its own sub-patches, and encloses the volume of the thin-plate patch to 1e-5.
+#[test]
+fn the_exact_corner_star_meets_the_default_g0_and_g1_and_agrees_with_the_plate() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, edges, corners) = cube_corner_step();
+    let diagonal = 10.0 * 3.0_f64.sqrt();
+    let (star, star_volume) = volume_of_step(&shape, &edges, &corners, 1);
+    let (plate, plate_volume) = volume_of_step(&shape, &edges, &corners, 0);
+    assert!(analyze(&star).unwrap().valid);
+    assert_eq!(split_faces(topology(&star).unwrap()["faces"].as_array().unwrap()), (18, 48));
+    assert_eq!(split_faces(topology(&plate).unwrap()["faces"].as_array().unwrap()), (18, 8));
+    let gap = worst_patch_gap(&star);
+    assert!(
+        gap < 0.2e-6 * diagonal,
+        "the star meets every neighbour within a fifth of the default g0: {gap} (limit {})",
+        0.2e-6 * diagonal
+    );
+    assert!(gap < worst_patch_gap(&plate), "and closer than the plate: {gap} against {}", worst_patch_gap(&plate));
+    let angle = worst_patch_angle(&star);
+    assert!(angle < 0.0095, "G1 to the blends, the flat faces and between the sub-patches: {angle}");
+    assert!((star_volume - plate_volume).abs() < 1e-5 * plate_volume, "{star_volume} against the plate {plate_volume}");
+}
+
+/// BLD §13.21: when the exact star is refused (here by the test hook) the corner falls back to the MakeFilling patch: one face per corner, the same solid to the volume of the plate.
+#[test]
+fn a_refused_exact_star_falls_back_to_the_plate_patch() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, edges, corners) = cube_corner_step();
+    let (fallback, volume) = volume_of_step(&shape, &edges, &corners, 2);
+    let (plate, plate_volume) = volume_of_step(&shape, &edges, &corners, 0);
+    assert_eq!(split_faces(topology(&fallback).unwrap()["faces"].as_array().unwrap()), (18, 8));
+    assert_eq!(volume.to_bits(), plate_volume.to_bits(), "the fallback is the plate");
+    assert!(analyze(&plate).unwrap().valid);
+}
+
+/// BLD §13.21: the stars do not depend on the number of threads (the construction is deterministic and the fills are independent).
+#[test]
+fn the_exact_stars_give_the_same_solid_on_any_number_of_threads() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, edges, corners) = cube_corner_step();
+    let mut reference = None;
+    for threads in [1, 8, 2] {
+        crate::test_bridge::set_corner_threads(threads);
+        let (built, volume) = volume_of_step(&shape, &edges, &corners, 1);
+        let area = mass_properties(&built).unwrap().area;
+        let bits = (volume.to_bits(), area.to_bits());
+        assert_eq!(*reference.get_or_insert(bits), bits, "{threads} threads");
+    }
 }

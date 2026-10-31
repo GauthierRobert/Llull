@@ -58,6 +58,7 @@
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
+#include "llull-kernel-occt/cpp/blend_corner_exact.hxx"
 #include "llull-kernel-occt/cpp/blend_solid.hxx"
 #include "llull-kernel-occt/cpp/blend_tool.hxx"
 #include "llull-kernel-occt/cpp/features.hxx"
@@ -669,6 +670,13 @@ bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMa
         BRepAdaptor_Surface(sides[side], Standard_False).D1(uv.X(), uv.Y(), point, du, dv);
         gp_Vec normal = du.Crossed(dv);
         if (normal.Magnitude() < 1e-14) {
+          // the pole of an exact corner star (13.21): the normal just inside it
+          const double inside = fraction < 0.5 ? 1e-4 : 1.0 - 1e-4;
+          const gp_Pnt2d shifted = curves[side].first->Value(curves[side].second.first + (curves[side].second.second - curves[side].second.first) * inside);
+          BRepAdaptor_Surface(sides[side], Standard_False).D1(shifted.X(), shifted.Y(), point, du, dv);
+          normal = du.Crossed(dv);
+        }
+        if (normal.Magnitude() < 1e-14) {
           worst = kPi;
           return false;
         }
@@ -718,7 +726,11 @@ struct FillJob {
   double tolerance_3d = 0, tolerance_2d = 0;
   bool mixed = false;
   // results
-  TopoDS_Face patch;
+  TopoDS_Face patch;                  // the MakeFilling patch
+  std::vector<TopoDS_Face> patches;   // what replaces the hole: the exact star (13.21) or the MakeFilling patch
+  gp_Pnt centre;                      // the centre of the exact star
+  bool has_centre = false;
+  std::string exact_problem;          // why the exact star was refused
   double gap = 0;
   std::string problem;
   bool filled = false;
@@ -773,15 +785,48 @@ bool fill_hole(FillJob &job, const FillSetting &setting, double patch_gap_limit,
 std::atomic<int> g_corner_threads{0};  // 0: LLULL_CORNER_THREADS, else the hardware (test hook: set_corner_threads)
 std::atomic<int> g_last_threads{0};    // the threads the last fill_all used (test hook: last_corner_threads)
 std::atomic<int> g_fault_corner{-1};   // test hook: the corner whose fill throws std::bad_alloc
+std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused)
 std::atomic<int> g_spawn_limit{-1};    // test hook: the worker whose creation fails
+
+// The exact star of 13.21 first (G0 to the default 1e-6 x the diagonal, a fifth of it here); MakeFilling when it is refused, with the reason kept for the message.
+bool fill_exact(FillJob &job, double diagonal) {
+  if (g_exact_mode.load() == 2) {
+    job.exact_problem = "refused by the test hook";
+    return false;
+  }
+  std::vector<TopoDS_Face> aligned;
+  for (const TopoDS_Edge &edge : job.loop) {
+    const auto at = std::find_if(job.boundary.begin(), job.boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); });
+    if (at == job.boundary.end()) {
+      job.exact_problem = "an edge of the hole is not in its boundary";
+      return false;
+    }
+    aligned.push_back(job.supports[static_cast<size_t>(at - job.boundary.begin())]);
+  }
+  corner_exact::Patches exact;
+  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem)) return false;
+  job.patches = exact.faces;
+  job.centre = exact.centre;
+  job.has_centre = true;
+  job.gap = exact.gap;
+  return true;
+}
 
 void fill_corner(FillJob &job, double patch_gap_limit, double diagonal) {
   try {
     if (g_fault_corner.load() == static_cast<int>(job.corner)) throw std::bad_alloc();
+    if (g_exact_mode.load() != 0 && fill_exact(job, diagonal)) {
+      job.filled = true;
+      return;
+    }
     for (const FillSetting &setting : kFillSettings) {
       job.filled = fill_hole(job, setting, patch_gap_limit, diagonal);
-      if (job.filled) return;
+      if (job.filled) {
+        job.patches = {job.patch};
+        return;
+      }
     }
+    if (!job.exact_problem.empty()) job.problem += " (the exact-boundary patch was refused: " + job.exact_problem + ")";
   } catch (...) {
     job.filled = false;
     job.error = std::current_exception();
@@ -1184,14 +1229,13 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
       why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " " + job.problem;
       return nullptr;
     }
-    const TopoDS_Face &patch = job.patch;
     worst_patch_gap = std::max(worst_patch_gap, job.gap);
     {
       // A convex corner removes material, a concave one adds it: the centre of the patch lies IN the source solid for the first, OUT of it for the second.
       GProp_GProps props;
-      BRepGProp::SurfaceProperties(patch, props);
+      if (!job.has_centre) BRepGProp::SurfaceProperties(job.patches.front(), props);
       BRepClass3d_SolidClassifier classifier(shape);
-      classifier.Perform(props.CentreOfMass(), std::max(blend::kInsideTolerance, 1e-9 * diagonal));
+      classifier.Perform(job.has_centre ? job.centre : props.CentreOfMass(), std::max(blend::kInsideTolerance, 1e-9 * diagonal));
       const TopAbs_State expected = plan.concave[c] ? TopAbs_OUT : TopAbs_IN;
       if (!plan.mixed[c] && classifier.State() != expected) {
         // deliberately not fill_failed: a patch on the wrong side is a logic failure of the construction, a finer fit would not change it
@@ -1200,11 +1244,13 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
         return nullptr;
       }
     }
-    patches.push_back(patch);
-    patch_corner.push_back(c);
     std::vector<std::string> around;
     for (const int edge : edges_at(vertex_edges, edge_map, plan.vertices[c])) around.push_back(edge_names[static_cast<size_t>(edge)]);
-    patch_names.push_back("blend(v:" + joined_names(around) + ")");
+    for (const TopoDS_Face &patch : job.patches) {
+      patches.push_back(patch);
+      patch_corner.push_back(c);
+      patch_names.push_back("blend(v:" + joined_names(around) + ")");
+    }
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
   }
 
@@ -1315,6 +1361,7 @@ void set_corner_threads(int32_t count) { g_corner_threads.store(count); }
 int32_t last_corner_threads() { return g_last_threads.load(); }
 void set_corner_fault(int32_t corner) { g_fault_corner.store(corner); }
 void set_corner_spawn_limit(int32_t workers) { g_spawn_limit.store(workers); }
+void set_corner_exact_patch(int32_t mode) { g_exact_mode.store(mode); }
 
 // Test seams (src/test_bridge.rs, never called by the build): the guards of the mixed corner on a shape the test chooses.
 // The oriented check on face `face` of the first solid of `shape`, rebuilt into a shell with that face reversed when `reverse`, over the tangent edges only: about 0 for a blend face as built,

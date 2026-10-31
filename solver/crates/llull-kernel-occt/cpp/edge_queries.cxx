@@ -27,6 +27,8 @@ namespace llull {
 namespace {
 
 constexpr int kMaxEdgeSamples = 1001;
+// How far inside an edge (as a fraction of its parameter range) the normal is read where it is undefined at the end point.
+constexpr double kPoleNudge = 1e-4;
 constexpr double kOccCurvatureSign = -1;  // same convention as face_queries.cxx / occtFaceSurface.ts
 
 bool edge_at(const TopoDS_Shape &shape, int32_t index, TopoDS_Edge &edge) {
@@ -160,7 +162,11 @@ rust::String edge_continuity_json(const Shape &shape, int32_t edge_index, int32_
     for (int k = 0; k < 2; ++k) {
       const gp_Pnt2d uv = sides[k].pcurve->Value(sides[k].pc_first + t * (sides[k].pc_last - sides[k].pc_first));
       on_surface[k] = sides[k].surface.Value(uv.X(), uv.Y());
-      if (!normal_curvature(sides[k].surface, sides[k].reversed, uv.X(), uv.Y(), tangent, normals[k], kappas[k])) return rust::String("null");
+      if (normal_curvature(sides[k].surface, sides[k].reversed, uv.X(), uv.Y(), tangent, normals[k], kappas[k])) continue;
+      // The pole of a degenerate parametrization (the centre of an exact corner star, BLD 13.21) has no normal in its parameters: the normal of the surface just inside it stands for it.
+      const double inside = t < 0.5 ? kPoleNudge : 1.0 - kPoleNudge;
+      const gp_Pnt2d shifted = sides[k].pcurve->Value(sides[k].pc_first + inside * (sides[k].pc_last - sides[k].pc_first));
+      if (!normal_curvature(sides[k].surface, sides[k].reversed, shifted.X(), shifted.Y(), tangent, normals[k], kappas[k])) return rust::String("null");
     }
     const double cosine = std::max(-1.0, std::min(1.0, normals[0].Dot(normals[1])));
     out.begin_object().key("t").number(t).key("point").point(point).key("g0").number(on_surface[0].Distance(on_surface[1]));

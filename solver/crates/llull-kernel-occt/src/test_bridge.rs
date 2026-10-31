@@ -23,6 +23,8 @@ mod ffi {
         fn set_corner_fault(corner: i32);
         /// The worker whose creation fails (-1: none).
         fn set_corner_spawn_limit(workers: i32);
+        /// The corner patch: 0 MakeFilling only, 1 the exact star first (default), 2 the exact star refused (MakeFilling is the fallback).
+        fn set_corner_exact_patch(mode: i32);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
@@ -62,6 +64,10 @@ pub fn set_corner_fault(corner: i32) {
 
 pub fn set_corner_spawn_limit(workers: i32) {
     ffi::set_corner_spawn_limit(workers);
+}
+
+pub fn set_corner_exact_patch(mode: i32) {
+    ffi::set_corner_exact_patch(mode);
 }
 
 pub fn adaptive_rule(shape: &Shape) -> bool {
