@@ -17,6 +17,7 @@ import { type EdgeLawInput, type FilletMode, sameLaw } from './filletSpec';
 import { chordsToRadii } from './filletChord';
 import { type LawProblem, closedEdge, isLawProblem, periodicProblem, resolveLaw } from '../../geometry/blend/law';
 import { blendRejection } from './blendCodes';
+import { refuseKinkedFillet } from './filletTangency';
 import {
   type PlannedProfile,
   type ProfileInput,
@@ -262,6 +263,8 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
     (newId, triangles) =>
       `fillet_edge: filleted '${request.id}' (kind '${entity.kind}', ${plan.length} edge(s) ${list}${section}${rounded}${chord}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.`,
   );
+  const kinked = refuseKinkedFillet(doc, 'fillet_edge', request.id, committed, source, ctx);
+  if (kinked !== null) return kinked;
   // how a profile blend was made (builder, measured gap, a reported fallback, corner setbacks): in the summary and in `data`
   const notes = profiled && committed.document !== doc ? readProfileNotes(kernel, modified) : null;
   const described = notes === null ? null : describeProfileNotes(notes, topology, doc.units);

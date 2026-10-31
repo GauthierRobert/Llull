@@ -23,6 +23,7 @@ import { OCC_KERNEL_HINT, validateSolidTarget } from './modifyTarget';
 import { blendRefusal } from './blendRefusal';
 import { blendRejection } from './blendCodes';
 import { partialSchema, refusePartial } from './filletPartial';
+import { refuseKinkedFillet } from './filletTangency';
 import { isSideProblem, sideFaces } from '../../geometry/blend/sides';
 import type { GeometryKernel, ShapeTopology } from '../../geometry/kernel';
 import type { ShapeHandle } from '../../geometry/kernelTypes';
@@ -105,6 +106,8 @@ function modifyEdges(
     (newId, triangles) =>
       `${command}: ${pastTense} '${id}' (kind '${entity.kind}', ${amountName} ${amount}) → mesh '${newId}' (${triangles} triangles). Source entity consumed.${picked}${selection.note}`,
   );
+  const kinked = command === 'fillet_edge' ? refuseKinkedFillet(doc, command, id, committed, source, ctx) : null;
+  if (kinked !== null) return kinked;
   return selection.record === null || committed.document === doc
     ? committed
     : { ...committed, recordExtras: { edgeNames: selection.record } };

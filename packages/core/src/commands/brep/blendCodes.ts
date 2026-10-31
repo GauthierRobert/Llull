@@ -15,6 +15,8 @@ const REMEDIATION = {
     'distanceEnd > 0 and the edges listed; with distance2 (asymmetric legs) also distance2End > 0 and side1Near / side1Name, never with angleDeg; distance2End only with distanceEnd and distance2',
   BLD_JOINT_PARAMS:
     'one radius per tangent chain of joints, every radius > 0, and every near point within 10 x its radius of a joint (the joint nearest to it is rounded)',
+  BLD_FILLET_NOT_TANGENT:
+    'use a radius up to that of the round the new blend meets, round the edges in one step (fillet_edge with all of them), or run check_blends to read the angle',
   BLD_PARTIAL_UNSUPPORTED:
     'round the whole edge, shape the radius with edges[].sizes / sizeEnd, stop a blend short of a vertex with corners (setback), or use chamfer_edge with distanceEnd',
   BLD_CHAMFER_ANGLE_RANGE: 'give the angle in degrees strictly between 0 and 90, measured on the side1 face',
