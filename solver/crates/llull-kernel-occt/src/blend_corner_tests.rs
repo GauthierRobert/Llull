@@ -1123,7 +1123,7 @@ fn a_cube_trimmed_around_its_vertices_is_the_rolling_ball_blend_with_a_star_at_e
     assert!((mass_properties(&plate).unwrap().volume - reference).abs() < 2e-3 * reference);
 }
 
-/// BLD §13.22: what the trim builder does not take is refused by name: setbacks that differ along the edges of a vertex, a radius that varies, balls that overlap, a ball that does not hold
+/// BLD §13.22: what the trim builder does not take is refused by name: balls that overlap, a ball that does not hold
 /// OCCT's own corner (s = 0.7 r, s = r sqrt(2)), a face that does not meet the vertex inside the ball, an edge at the vertex that is not rounded.
 #[test]
 fn the_trim_builder_refuses_by_name_what_it_does_not_take() {
@@ -1133,14 +1133,6 @@ fn the_trim_builder_refuses_by_name_what_it_does_not_take() {
     let shape = cube(10.0);
     let all: Vec<usize> = (0..12).collect();
     let reason = |shape: &Shape, edges: &[f64], corners: &[f64]| setback_reason(shape, edges, corners).unwrap();
-    let (edges, mut corners) = spec(&shape, &all, 1.0, &[[0.0; 3]], 2.0);
-    corners[5] = 3.0; // one edge of the vertex at another setback
-    let text = reason(&shape, &edges, &corners);
-    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("different setbacks"), "{text}");
-    let tapers: Vec<(usize, f64, f64)> = all.iter().map(|&edge| (edge, 0.8, 1.2)).collect();
-    let (edges, corners) = spec_tapered(&shape, &tapers, &[[0.0; 3]], 2.0);
-    let text = reason(&shape, &edges, &corners);
-    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("varies along edge"), "{text}");
     let (edges, corners) = spec(&shape, &all, 1.0, &[[0.0; 3], [10.0, 0.0, 0.0]], 5.5);
     let text = reason(&shape, &edges, &corners);
     assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("overlap"), "{text}");
@@ -1279,4 +1271,308 @@ fn a_trimmed_step_whose_star_fails_after_the_fills_is_built_again_with_the_plate
     assert!(fillet_setback(&shape, &edges, &corners).unwrap().is_none());
     let reason = setback_reason(&shape, &edges, &corners).unwrap();
     assert!(reason.contains("(the exact-boundary patch was refused: [BLD_CORNER_FAILED] forced by the test hook"), "{reason}");
+}
+
+/// BLD §13.22: a radius that varies along the edges on the trim path (OCCT's evolving fillet, linear from 0.8 to 1.2 along every edge of the cube, ball 2 at the 8 vertices): the loop of the
+/// ball cut is still well formed and gets the star; the volume is within 0.2 % of OCCT's evolving fillet of the same edges.
+#[test]
+fn a_radius_that_varies_along_the_edges_is_cut_by_the_ball_and_gets_the_star() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let tapers: Vec<(usize, f64, f64)> = all.iter().map(|&edge| (edge, 0.8, 1.2)).collect();
+    let (edges, corners) = spec_tapered(&shape, &tapers, &cube_vertices(10.0), 2.0);
+    let unique: Vec<u32> = (0..12).collect();
+    let reference =
+        mass_properties(&crate::features::fillet(&shape, &unique, 0.8, Some(1.2)).unwrap().expect("an evolving fillet")).unwrap().volume;
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("the star is accepted on the loops of the evolving fillet");
+    assert!(analyze(&built).unwrap().valid);
+    assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (18, 48));
+    assert!(worst_tangent_angle(&built) < 0.0095 && worst_patch_angle(&built) < 0.0095);
+    let volume = mass_properties(&built).unwrap().volume;
+    assert!((volume - reference).abs() < 2e-3 * reference, "{volume} against the evolving fillet {reference}");
+}
+
+/// BLD §13.22: a rolling-ball neighbour. One of the three edges at the vertex (0, 0, 0) of the cube has the setback 0: OCCT rounds it like the others (r 1), the ball of the other two (2) cuts all
+/// three blends and the hole gets the star. The analytic builder refuses it by name; an edge with NO entry, an entry twice or for an edge that does not meet the vertex is an error of the build.
+#[test]
+fn an_edge_without_a_setback_at_the_vertex_is_a_rolling_ball_neighbour_cut_by_the_same_ball() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let meeting = edges_at(&shape, [0.0; 3]);
+    let (edges, mut corners) = spec(&shape, &all, 1.0, &cube_vertices(10.0), 2.0);
+    // the entry of one edge at the first vertex becomes 0: left to the rolling ball
+    let mut flat = Vec::new();
+    let mut cursor = 0;
+    while cursor < corners.len() {
+        let count = corners[cursor + 3] as usize;
+        let entries: Vec<(f64, f64)> = (0..count).map(|k| (corners[cursor + 4 + 2 * k], corners[cursor + 5 + 2 * k])).collect();
+        let origin = corners[cursor..cursor + 3] == [0.0, 0.0, 0.0];
+        let kept: Vec<(f64, f64)> = entries
+            .into_iter()
+            .map(|(edge, distance)| if origin && edge == meeting[0] as f64 { (edge, 0.0) } else { (edge, distance) })
+            .collect();
+        flat.extend_from_slice(&corners[cursor..cursor + 3]);
+        flat.push(kept.len() as f64);
+        for (edge, distance) in kept {
+            flat.extend([edge, distance]);
+        }
+        cursor += 4 + 2 * count;
+    }
+    corners = flat;
+    let reason = |hook_trim: bool| {
+        crate::test_bridge::set_corner_trim(hook_trim);
+        setback_reason(&shape, &edges, &corners).unwrap()
+    };
+    let text = reason(false);
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("left to the rolling ball"), "{text}");
+    crate::test_bridge::set_corner_exact_patch(5);
+    assert_eq!(reason(true), "", "the trim builder takes it");
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (18, 48));
+    assert!(worst_tangent_angle(&built) < 0.0095 && worst_patch_angle(&built) < 0.0095);
+    let unique: Vec<u32> = (0..12).collect();
+    let reference =
+        mass_properties(&crate::features::fillet(&shape, &unique, 1.0, None).unwrap().expect("a rolling-ball cube")).unwrap().volume;
+    assert!((mass_properties(&built).unwrap().volume - reference).abs() < 2e-3 * reference);
+}
+
+/// BLD §13.22 review: the entries of a corner on the trim path are checked: an edge of the vertex without an entry, an entry twice, an entry for an edge that does not meet the vertex.
+#[test]
+fn the_setback_entries_of_a_trimmed_corner_must_name_each_edge_of_the_vertex_once() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let meeting = edges_at(&shape, [0.0; 3]);
+    let elsewhere = (0..12).find(|edge| !meeting.contains(edge)).unwrap();
+    let (edges, _) = spec(&shape, &all, 1.0, &[[0.0; 3]], 2.0);
+    let corner = |entries: &[(usize, f64)]| {
+        let mut flat = vec![0.0, 0.0, 0.0, entries.len() as f64];
+        for &(edge, distance) in entries {
+            flat.extend([edge as f64, distance]);
+        }
+        flat
+    };
+    let cases: [(&str, Vec<(usize, f64)>); 4] = [
+        ("no setback distance for edge", vec![(meeting[0], 2.0), (meeting[1], 2.0)]),
+        ("is given twice", vec![(meeting[0], 2.0), (meeting[1], 2.0), (meeting[2], 2.0), (meeting[2], 2.0)]),
+        ("does not meet the vertex", vec![(meeting[0], 2.0), (meeting[1], 2.0), (meeting[2], 2.0), (elsewhere, 2.0)]),
+        ("no setback distance at", vec![(meeting[0], 0.0), (meeting[1], 0.0), (meeting[2], 0.0)]),
+    ];
+    for (expected, entries) in cases {
+        let text = setback_reason(&shape, &edges, &corner(&entries)).unwrap();
+        assert!(text.starts_with("[BLD_CORNER_FAILED]") && text.contains(expected), "{expected}: {text}");
+    }
+}
+
+/// BLD §13.22 review: the kernel's evolving radius is one linear law over the whole tangent contour of an edge. An edge of a chain of tangent edges (the tangent-continuous top outline of a box united
+/// with a cylinder: a line and an arc) with a varying radius is refused by name; with a constant radius the chain is taken.
+#[test]
+fn a_varying_radius_on_a_chain_of_tangent_edges_is_refused_by_name() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let block = make_box([0.0, -3.0, 0.0], [10.0, 6.0, 5.0]).unwrap().unwrap();
+    let cylinder = crate::make_cylinder(3.0, 5.0).unwrap().unwrap();
+    let union = boolean(BooleanOp::Union, &block, &cylinder, true).unwrap().unwrap();
+    let topo = topology(&union).unwrap();
+    let on_top = |edge: &Value| num(&edge["start"][2]) > 4.9 && num(&edge["end"][2]) > 4.9;
+    let top: Vec<usize> =
+        topo["edges"].as_array().unwrap().iter().enumerate().filter(|(_, edge)| on_top(edge)).map(|(index, _)| index).collect();
+    assert!(top.len() >= 3, "the outline of the top: {top:?}");
+    crate::test_bridge::set_corner_trim(true);
+    let tapers: Vec<(usize, f64, f64)> = top.iter().map(|&edge| (edge, 0.3, 0.5)).collect();
+    let (edges, corners) = spec_tapered(&union, &tapers, &[[10.0, 3.0, 5.0]], 1.5);
+    let text = setback_reason(&union, &edges, &corners).unwrap();
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("belongs to a chain of 3 tangent edges"), "{text}");
+}
+
+/// BLD §13.22 review: the convention of the evolving radius. On one open edge of the cube (from (0,0,0) to (10,0,0)) the kernel's blend is 0.5 wide at the START of the edge and 1.5 at its end,
+/// which is how the recipe's size / sizeEnd and the trim builder (Add(start, end, edge)) read the edge.
+#[test]
+fn the_evolving_radius_is_the_size_at_the_start_of_the_edge_and_sizeend_at_its_end() {
+    let _serial = crate::serial_blends();
+    let shape = cube(10.0);
+    let topo = topology(&shape).unwrap();
+    let edge = topo["edges"].as_array().unwrap().iter().position(|edge| {
+        let (start, end) = (&edge["start"], &edge["end"]);
+        num(&start[0]) == 0.0
+            && num(&start[1]) == 0.0
+            && num(&start[2]) == 0.0
+            && num(&end[0]) == 10.0
+            && num(&end[1]) == 0.0
+            && num(&end[2]) == 0.0
+    });
+    let edge = edge.expect("the edge from the origin along x") as u32;
+    let built = crate::features::fillet(&shape, &[edge], 0.5, Some(1.5)).unwrap().expect("an evolving fillet");
+    // the contact lines of the blend on the face z = 0 end at (x, w, 0): w is the radius at x
+    let width_at = |x: f64| {
+        let topo = topology(&built).unwrap();
+        let mut found: f64 = 0.0;
+        for edge in topo["edges"].as_array().unwrap() {
+            for end in [&edge["start"], &edge["end"]] {
+                if (num(&end[0]) - x).abs() < 1e-6 && num(&end[2]).abs() < 1e-6 && num(&end[1]) > 1e-6 && num(&end[1]) < 2.0 {
+                    found = found.max(num(&end[1]));
+                }
+            }
+        }
+        found
+    };
+    assert!((width_at(0.0) - 0.5).abs() < 1e-3, "at the start: {}", width_at(0.0));
+    assert!((width_at(10.0) - 1.5).abs() < 1e-3, "at the end: {}", width_at(10.0));
+}
+
+fn cube_with_setbacks_at_origin(distances: [f64; 3]) -> (Shape, Vec<f64>, Vec<f64>) {
+    let (shape, edges, corners) = cube_corner_step();
+    let meeting = edges_at(&shape, [0.0; 3]);
+    let mut flat = Vec::new();
+    let mut cursor = 0;
+    while cursor < corners.len() {
+        let count = corners[cursor + 3] as usize;
+        let origin = corners[cursor..cursor + 3] == [0.0, 0.0, 0.0];
+        flat.extend_from_slice(&corners[cursor..cursor + 4]);
+        for k in 0..count {
+            let edge = corners[cursor + 4 + 2 * k];
+            let distance =
+                if origin { distances[meeting.iter().position(|&m| m as f64 == edge).unwrap()] } else { corners[cursor + 5 + 2 * k] };
+            flat.extend([edge, distance]);
+        }
+        cursor += 4 + 2 * count;
+    }
+    (shape, edges, flat)
+}
+
+fn cylinder_spans(shape: &Shape) -> Vec<f64> {
+    let mut spans: Vec<f64> = topology(shape).unwrap()["faces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|face| face["surface"] == "cylinder")
+        .map(|face| num(&face["axis"]["span"][1]) - num(&face["axis"]["span"][0]))
+        .collect();
+    spans.sort_by(f64::total_cmp);
+    spans
+}
+
+/// BLD §13.22.6: different setbacks at one vertex on the trim path. The cube (r 1, 8 corners at 2) with the setbacks 1.5 / 2 / 2.5 along the three edges of the origin: planes normal to each edge at
+/// its own setback point cut the rolling-ball blend (so the setback is a distance ALONG the edge, as on the analytic path: the blend cylinders span 10 - sqrt(3) - s = 6.768 / 6.268 / 5.768), the star closes the
+/// hole. Valid, tangent, the default g0; the volume differs from the equal-setback cube by 0.023 % (976.513 against 976.292).
+#[test]
+fn a_vertex_with_different_setbacks_is_cut_by_planes_normal_to_its_edges_and_gets_the_star() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let (shape, edges, equal_corners) = cube_with_setbacks_at_origin([2.0, 2.0, 2.0]);
+    let equal = fillet_setback(&shape, &edges, &equal_corners).unwrap().expect("the equal case");
+    let (_, _, corners) = cube_with_setbacks_at_origin([1.5, 2.0, 2.5]);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("the planes isolate the vertex");
+    assert!(analyze(&built).unwrap().valid);
+    assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (18, 48));
+    let spans = cylinder_spans(&built);
+    assert_eq!(spans.len(), 12);
+    // a ball of 2 cuts a blend of r 1 at sqrt(3) along the axis; a plane at s cuts it at s: 10 - sqrt(3) - s at the origin vertex, 10 - 2 sqrt(3) elsewhere
+    let (ball_end, count) = (3.0_f64.sqrt(), |value: f64| spans.iter().filter(|span| (**span - value).abs() < 1e-6).count());
+    assert_eq!(
+        (count(10.0 - ball_end - 1.5), count(10.0 - ball_end - 2.0), count(10.0 - ball_end - 2.5), count(10.0 - 2.0 * ball_end)),
+        (1, 1, 1, 9),
+        "{spans:?}"
+    );
+    assert!(worst_tangent_angle(&built) < 0.0095 && worst_patch_angle(&built) < 0.0095);
+    assert!(worst_patch_gap(&built) < 1e-6 * 10.0 * 3.0_f64.sqrt(), "{}", worst_patch_gap(&built));
+    let (volume, reference) = (mass_properties(&built).unwrap().volume, mass_properties(&equal).unwrap().volume);
+    assert!(
+        (volume - reference).abs() < 1e-3 * reference && (volume - reference).abs() > 1e-5 * reference,
+        "{volume} against the equal setbacks {reference}"
+    );
+    assert!((volume - 976.513).abs() < 0.02, "{volume}");
+}
+
+/// BLD §13.22.6: what the planes do not take is refused by name: a setback not shorter than its edge, a plane inside OCCT's own corner (setback 0.9 against the extent 1), and a region that is not
+/// isolated (a pocket wall that does not meet the vertex falls inside the planes; with shorter setbacks the same vertex builds).
+#[test]
+fn the_planes_of_different_setbacks_are_refused_by_name_when_they_do_not_isolate_the_vertex() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let block = cube(10.0);
+    let meeting_cube = edges_at(&block, [0.0; 3]);
+    let reason = |distances: [f64; 3]| {
+        let (edges, mut corners) = spec(&block, &meeting_cube, 1.0, &[[0.0; 3]], 2.0);
+        for (k, distance) in distances.iter().enumerate() {
+            corners[5 + 2 * k] = *distance;
+        }
+        setback_reason(&block, &edges, &corners).unwrap()
+    };
+    let text = reason([2.0, 2.0, 12.0]);
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("is not shorter than the edge"), "{text}");
+    let text = reason([0.9, 2.0, 2.5]);
+    assert!(text.starts_with("[BLD_SETBACK_TOO_SHORT]") && text.contains("extent of the rolling-ball corner along the edge"), "{text}");
+    // the pocket wall x = 1.5 (y from 0.8, z up to 2) does not meet the vertex
+    let pocket = make_box([1.5, 0.8, 0.0], [2.5, 3.0, 2.0]).unwrap().unwrap();
+    let pocketed = boolean(BooleanOp::Subtract, &cube(10.0), &pocket, true).unwrap().unwrap();
+    let meeting = edges_at(&pocketed, [0.0; 3]);
+    let build = |distances: [f64; 3]| {
+        let (edges, mut corners) = spec(&pocketed, &meeting, 0.5, &[[0.0; 3]], 2.0);
+        for (k, distance) in distances.iter().enumerate() {
+            corners[5 + 2 * k] = *distance;
+        }
+        setback_reason(&pocketed, &edges, &corners).unwrap()
+    };
+    let text = build([2.0, 2.2, 2.4]);
+    assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("the cut planes do not isolate the vertex"), "{text}");
+    assert_eq!(build([1.1, 1.2, 1.3]), "", "clear of the pocket");
+}
+
+/// BLD §13.22.6 review: the region of the planes is found from the vertex, not by the planes alone. A cube with a rib behind its top corner (a wall at x in [-5, -3], joined to the cube low down by a
+/// bar): the wall is inside the half-spaces of the planes at the corner (0, 0, 10) with the setbacks 1.5 / 2 / 2.5 but not connected to it there; the step builds.
+#[test]
+fn a_feature_behind_the_vertex_that_the_planes_enclose_but_does_not_touch_is_not_in_the_way() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let cube_block = cube(10.0);
+    let wall = make_box([-5.0, 0.0, 0.0], [2.0, 10.0, 10.0]).unwrap().unwrap();
+    let bar = make_box([-5.0, 0.0, 0.0], [5.0, 10.0, 2.0]).unwrap().unwrap();
+    let with_wall = boolean(BooleanOp::Union, &cube_block, &bar, true).unwrap().unwrap();
+    let part = boolean(BooleanOp::Union, &with_wall, &wall, true).unwrap().unwrap();
+    let vertex = [0.0, 0.0, 10.0];
+    let meeting = edges_at(&part, vertex);
+    assert_eq!(meeting.len(), 3, "the top corner of the cube");
+    let (edges, mut corners) = spec(&part, &meeting, 0.5, &[vertex], 2.0);
+    for (k, distance) in [1.5, 2.0, 2.5].iter().enumerate() {
+        corners[5 + 2 * k] = *distance;
+    }
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let built = fillet_setback(&part, &edges, &corners).unwrap().unwrap_or_else(|| panic!("{:?}", setback_reason(&part, &edges, &corners)));
+    assert!(analyze(&built).unwrap().valid);
+    assert!(worst_tangent_angle(&built) < 0.0095);
+}
+
+/// BLD §13.22.6 review: a concave vertex (the inner corner of the notch of `notched_cube`) with different setbacks: the planes bound the region on the material side; builds, adds material.
+#[test]
+fn a_concave_vertex_with_different_setbacks_is_cut_by_planes_too() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let shape = notched_cube();
+    let inner = [5.0; 3];
+    let meeting = edges_at(&shape, inner);
+    let (edges, mut corners) = spec(&shape, &meeting, 0.5, &[inner], 1.5);
+    for (k, distance) in [1.2, 1.5, 1.8].iter().enumerate() {
+        corners[5 + 2 * k] = *distance;
+    }
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let built =
+        fillet_setback(&shape, &edges, &corners).unwrap().unwrap_or_else(|| panic!("{:?}", setback_reason(&shape, &edges, &corners)));
+    assert!(analyze(&built).unwrap().valid);
+    assert!(mass_properties(&built).unwrap().volume > mass_properties(&shape).unwrap().volume, "the concave blends add material");
+    assert!(worst_tangent_angle(&built) < 0.0095);
 }

@@ -2,7 +2,8 @@
  * Corner treatment of fillet_edge (BLD M3, TECHNICAL_SPEC §3, §5.5): picks the vertices (persistent name, point, or every vertex where 3 or more
  * rounded edges meet), gives each setback corner the distance from the vertex at which every edge blend stops, and derives the persistent
  * vertex names to record so a regeneration follows the same corners (REF_LOST / REF_SPLIT when one is gone).
- * @invariant a vertex gets one treatment; a setback corner has a distance for every edge meeting at the vertex (non-degenerate edges)
+ * @invariant a vertex gets one treatment; a setback corner has a distance for every edge meeting at the vertex (non-degenerate edges) ; the edges marked rollingBall (rounded by the kernel and cut by the
+ *   same ball) are listed with distance 0 (not absent: a missing edge is an error of the native builder); at least one edge has a distance > 0
  * @failure a selector that is not exactly one of name / near / all, an unknown or repeated vertex, a distance missing for an edge, an override
  *   edge that does not meet the vertex -> a problem; a lost / split vertex or edge name -> REF_LOST / REF_SPLIT; a smooth, multi-station or profiled blend with a
  *   setback corner -> BLD_CORNER_UNSUPPORTED
@@ -49,7 +50,7 @@ export const cornerSchema = z
       .positive()
       .describe(
         'Setback distance in document units, used for every edge meeting there. It must exceed the distance the neighbouring blends reach (about the radius on a right-angle corner), else BLD_SETBACK_TOO_SHORT names the minimum.' +
-          ' Two builders, two meanings: on straight edges between planar faces it is measured ALONG each edge from the vertex; where an edge is curved or a face is not planar (a circle, a B-spline, a cylinder, a cone, a free-form face) the blends are the kernel rolling-ball blends and it is the RADIUS OF A BALL around the vertex (one distance for all the edges there; the ball must exceed the farthest point of the rolling-ball corner, about radius x sqrt(2) on a right-angle corner, else BLD_SETBACK_TOO_SHORT, and must not reach a face that does not meet the vertex). The two agree only at the point of the edge. One step uses one builder: vertices of both kinds are refused.',
+          ' Two builders, two meanings: on straight edges between planar faces it is measured ALONG each edge from the vertex; where an edge is curved or a face is not planar (a circle, a B-spline, a cylinder, a cone, a free-form face) the blends are the kernel rolling-ball blends and with the same distance on every edge of the vertex it is the RADIUS OF A BALL around the vertex (the ball must exceed the farthest point of the rolling-ball corner, about radius x sqrt(2) on a right-angle corner, else BLD_SETBACK_TOO_SHORT, and must not reach a face that does not meet the vertex); with different distances each edge is cut by a plane normal to it at its own distance ALONG the edge (as on straight edges), and the planes must isolate the vertex ("the cut planes do not isolate the vertex" otherwise). The ball and the plane agree only at the point of the edge. One step uses one builder: vertices of both kinds are refused.',
       )
       .optional(),
     setbacks: z
@@ -63,8 +64,15 @@ export const cornerSchema = z
             .number()
             .positive()
             .describe(
-              'Setback of this edge from the vertex, document units (> 0): along the edge on straight edges between planar faces; a vertex on a curved edge or face takes one distance for all its edges (different distances are refused).',
-            ),
+              'Setback of this edge from the vertex, document units (> 0): along the edge on straight edges between planar faces; on a curved edge or face equal distances at a vertex are the radius of a ball, different ones a plane normal to each edge at its distance along it. Give it, or rollingBall: true.',
+            )
+            .optional(),
+          rollingBall: z
+            .boolean()
+            .describe(
+              'true: this edge gets no setback of its own; the kernel rounds it with the rolling ball like the others and the same ball around the vertex cuts its blend (only at a vertex on a curved edge or face; the analytic builder refuses it by name). Instead of distance.',
+            )
+            .optional(),
         }),
       )
       .describe('Per-edge setbacks overriding `setback` (each entry names one edge meeting the vertex).')
@@ -103,13 +111,14 @@ const isVarying = (law: EdgeRadius): boolean =>
   law.size2 !== undefined ||
   (law.sizeEnd !== undefined && law.sizeEnd !== law.size && law.interpolation !== 'linear');
 
-/** The distance of every edge override, by unique-edge index; or why one cannot be resolved. */
+/** The distance of every edge override, by unique-edge index (and the edges left to the rolling ball); or why one cannot be resolved. */
 function overrides(
   topology: ShapeTopology,
   entry: CornerInput,
   path: string,
-): { readonly distances: Map<number, number> } | CornerResolution {
+): { readonly distances: Map<number, number>; readonly rolling: Set<number> } | CornerResolution {
   const distances = new Map<number, number>();
+  const rolling = new Set<number>();
   for (const [at, override] of (entry.setbacks ?? []).entries()) {
     const where = `${path}.setbacks[${at}]`;
     if ((override.near === undefined) === (override.name === undefined)) return { problem: `${where} needs exactly one of near or name` };
@@ -131,10 +140,14 @@ function overrides(
       edge = 'problem' in picked ? undefined : picked.edges[0];
     }
     if (edge === undefined) return { problem: `${where} found no edge` };
-    if (distances.has(edge)) return { problem: `${where}: edge ${edge} is given twice` };
-    distances.set(edge, override.distance);
+    if (distances.has(edge) || rolling.has(edge)) return { problem: `${where}: edge ${edge} is given twice` };
+    if (override.rollingBall === true) {
+      if (override.distance !== undefined) return { problem: `${where} gives both distance and rollingBall` };
+      rolling.add(edge);
+    } else if (override.distance === undefined) return { problem: `${where} needs a distance or rollingBall: true` };
+    else distances.set(edge, override.distance);
   }
-  return { distances };
+  return { distances, rolling };
 }
 
 /** An override as recorded: its edge by persistent name when the name finds exactly this edge, else by a point on it. */
@@ -147,6 +160,14 @@ function recordedEdge(topology: ShapeTopology, edge: number, distance: number): 
 const isOverride = (
   value: ReturnType<typeof overrides>,
 ): value is Extract<ReturnType<typeof overrides>, { distances: Map<number, number> }> => 'distances' in value;
+
+const recordedRolling = (topology: ShapeTopology, edge: number): NonNullable<CornerInput['setbacks']>[number] => {
+  const name = topology.edges[edge]?.name;
+  const unique = name !== undefined && hasNames(topology, 'edge') && resolveNames(topology, 'edge', [name]).ok;
+  return unique
+    ? { name, rollingBall: true }
+    : { near: [...(topology.edges[edge]?.mid ?? [0, 0, 0])] as [number, number, number], rollingBall: true };
+};
 
 /**
  * The corners `inputs` ask for on `topology`, for a fillet of `planned` edges.
@@ -199,7 +220,7 @@ export function resolveCorners(
           path,
         },
       };
-    for (const edge of resolved.distances.keys())
+    for (const edge of [...resolved.distances.keys(), ...resolved.rolling])
       if (!targets.some((target) => vertices[target]?.edges.includes(edge)))
         return { problem: `${path}.setbacks: edge ${edge} does not meet ${targets.length === 1 ? 'the vertex' : 'any of the vertices'}` };
     for (const target of targets) {
@@ -208,9 +229,12 @@ export function resolveCorners(
       if (claimed.has(target)) return { problem: `${path}: the vertex at [${vertex.point.join(', ')}] already has a corner entry` };
       claimed.add(target);
       // Recorded by name when the name finds exactly this vertex (else by point), with only the overrides of edges that meet it.
-      const recordedOverrides = [...resolved.distances]
-        .filter(([edge]) => vertex.edges.includes(edge))
-        .map(([edge, distance]) => recordedEdge(topology, edge, distance));
+      const recordedOverrides = [
+        ...[...resolved.distances]
+          .filter(([edge]) => vertex.edges.includes(edge))
+          .map(([edge, distance]) => recordedEdge(topology, edge, distance)),
+        ...[...resolved.rolling].filter((edge) => vertex.edges.includes(edge)).map((edge) => recordedRolling(topology, edge)),
+      ];
       record.push({
         ...(vertex.name !== undefined && resolveVertexName(vertices, vertex.name).ok
           ? { name: vertex.name }
@@ -222,6 +246,10 @@ export function resolveCorners(
       if (type === 'rolling_ball') continue;
       const distances: SetbackCorner['distances'][number][] = [];
       for (const edge of vertex.edges) {
+        if (resolved.rolling.has(edge)) {
+          distances.push({ edge, distance: 0 });
+          continue;
+        }
         const distance = resolved.distances.get(edge) ?? input.setback;
         if (distance === undefined)
           return {
@@ -229,6 +257,10 @@ export function resolveCorners(
           };
         distances.push({ edge, distance });
       }
+      if (!distances.some((entry) => entry.distance > 0))
+        return {
+          problem: `${path}: at least one edge at the vertex at [${vertex.point.join(', ')}] needs a setback distance (it is the radius of the ball that cuts the blends); not every edge can be rollingBall`,
+        };
       corners.push({ vertex: vertex.point, type: 'setback', distances });
     }
   }

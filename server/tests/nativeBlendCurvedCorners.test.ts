@@ -84,6 +84,97 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(1e-3);
   });
 
+  it('a radius that is linear along the edges (size to sizeEnd) works on the curved edges and faces too: a star, valid, close to the plain evolving fillet', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const laws = edges.map((near) => ({ near, size: 0.5, sizeEnd: 0.7, interpolation: 'linear' as const }));
+    const plain = execute(doc, 'fillet_edge', { id, edges: laws });
+    expect(plain.error, plain.summary).toBeUndefined();
+    const done = execute(doc, 'fillet_edge', { id, edges: laws, corners: [{ near: vertex, type: 'setback', setback: 1.5 }] });
+    expect(done.error, done.summary).toBeUndefined();
+    const result = done.affected[0] as string;
+    const names = faces(done.document, result)
+      .map((face) => face.name ?? '')
+      .filter((name) => name.startsWith('blend(v:'));
+    expect(names.length).toBeGreaterThanOrEqual(3);
+    expect(names.every((name) => /#\d+$/.test(name))).toBe(true);
+    // check_blends reads the realised radius of OCCT's evolving fillet against the law along the curved edge (the law is linear in the parameter): the plain fillet fails that check by itself, the corner must
+    // add no failure of its own
+    type Found = { findings: Array<{ code: string; severity: string }> };
+    const failures = (document: CadDocument, entity: string): string[] =>
+      (execute(document, 'check_blends', { ids: [entity] }).data as Found).findings
+        .filter((finding) => finding.severity === 'fail')
+        .map((finding) => finding.code);
+    const own = failures(plain.document, plain.affected[0] as string);
+    expect(failures(done.document, result).filter((code) => !own.includes(code))).toEqual([]);
+    const rolling = volume(plain.document, plain.affected[0] as string);
+    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(2e-3);
+  });
+
+  it('different setbacks at the vertex (setbacks overrides) cut each edge by a plane at its own distance along it (13.22.6): built within the limits, refused by name when the corner leaves them', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });
+    const withSetback = (distance: number): ReturnType<typeof execute> =>
+      execute(doc, 'fillet_edge', {
+        id,
+        edgesNear: edges,
+        radius: 0.5,
+        corners: [{ near: vertex, type: 'setback', setback: 1.2, setbacks: [{ near: edges[1] as [number, number, number], distance }] }],
+      });
+    const done = withSetback(1.3);
+    expect(done.error, done.summary).toBeUndefined();
+    const result = done.affected[0] as string;
+    expect(faces(done.document, result).some((face) => face.name?.startsWith('blend(v:'))).toBe(true);
+    const checked = execute(done.document, 'check_blends', { ids: [result] }).data as { status: string };
+    expect(checked.status).not.toBe('fail');
+    const rolling = volume(plain.document, plain.affected[0] as string);
+    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(2e-3);
+    // the setback is a distance ALONG the edge: the blend of the straight top edge (length sqrt(44) = 6.633) ends 1.3 from the vertex, so its cylinder spans 6.633 - 1.3 (a ball would cut it at
+    // sqrt(1.3^2 - 0.5^2) = 1.2, or at the largest setback)
+    const spans = faces(done.document, result)
+      .filter((face) => face.surface === 'cylinder')
+      .map((face) => (face.axis?.span?.[1] ?? 0) - (face.axis?.span?.[0] ?? 0));
+    expect(spans.some((span) => Math.abs(span - (Math.sqrt(44) - 1.3)) < 1e-4)).toBe(true);
+    // 1.4 to 1.6 on the third edge of this cylinder: the star leaves its supports by 0.00965 rad in the sewn solid (the limit is 0.0095) and the plate misses the blend ends: refused, with both reasons
+    const refused = withSetback(1.6);
+    expect(refused.error?.code).toBe('BLD_CORNER_FAILED');
+    expect(refused.summary).toContain('the exact-boundary patch was refused');
+  });
+
+  it('an edge of the vertex marked rollingBall has no setback of its own: the kernel rounds it and the same ball cuts it (13.22)', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });
+    const done = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [
+        { near: vertex, type: 'setback', setback: 1.2, setbacks: [{ near: edges[1] as [number, number, number], rollingBall: true }] },
+      ],
+    });
+    expect(done.error, done.summary).toBeUndefined();
+    const result = done.affected[0] as string;
+    expect(faces(done.document, result).filter((face) => face.name?.startsWith('blend(v:'))).toHaveLength(6);
+    const rolling = volume(plain.document, plain.affected[0] as string);
+    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(1e-3);
+    const checked = execute(done.document, 'check_blends', { ids: [result] }).data as { status: string };
+    expect(checked.status).not.toBe('fail');
+    const both = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [
+        {
+          near: vertex,
+          type: 'setback',
+          setback: 1.2,
+          setbacks: [{ near: edges[1] as [number, number, number], rollingBall: true, distance: 1 }],
+        },
+      ],
+    });
+    expect(both.affected).toHaveLength(0);
+    expect(both.summary).toContain('both distance and rollingBall');
+  });
+
   it('refuses by name an edge at the setback vertex that is not rounded, a ball that does not hold the rolling-ball corner, and a step that mixes the two builders', () => {
     const { doc, id, vertex, edges } = dshape();
     const left = execute(doc, 'fillet_edge', {

@@ -14,8 +14,9 @@ export type BlendProfile =
 
 /**
  * A resolved setback corner of a `fillet` node (BLD M3, docs/design/06-variable-blends/TECHNICAL_SPEC.md §5.5): the vertex position and, for every
- * edge of the source that meets there (unique edge indices), how far from the vertex (along the edge, document units) its blend stops; the kernel
- * fills the corner with a patch G1 to the blends and the support faces.
+ * edge of the source that meets there (unique edge indices) with distance 0 for the edges left to the rolling ball (rounded by the kernel, cut by the same ball; at least
+ * one edge has a distance > 0), how far from the vertex its blend stops (along the edge, or the radius of a ball around the vertex on a curved edge or face; document units); the
+ * kernel fills the corner with a patch G1 to the blends and the support faces.
  */
 export interface SetbackCorner {
   readonly vertex: Vec3;
