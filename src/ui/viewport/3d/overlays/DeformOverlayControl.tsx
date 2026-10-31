@@ -65,6 +65,26 @@ function ReferenceFields(): React.ReactElement {
   );
 }
 
+/** The scale of the Jacobian map and, per drawn body, its range and folded vertices (or why there is no map). */
+function JacobianLegend(): React.ReactElement {
+  const stats = useDeformOverlayStore((s) => s.jacobian);
+  return (
+    <div className="vp-deform-jacobian" role="status" aria-label="Jacobian map">
+      <div className="vp-deform-reference__note">
+        det J: blue 0.5, grey 1, red 2 (volume kept at 1); magenta = folded (at or below the floor)
+      </div>
+      {Object.entries(stats).map(([id, entry]) => (
+        <div key={id} className="vp-deform-reference__note">
+          {id}:{' '}
+          {'failure' in entry
+            ? entry.failure
+            : `outermost deform (${entry.law}): det J ${entry.min?.toPrecision(3) ?? '-'} .. ${entry.max?.toPrecision(3) ?? '-'}, ${entry.folded} folded (det J <= ${entry.floor})`}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function DeformOverlayControl(): React.ReactElement {
   const enabled = useDeformOverlayStore((s) => s.enabled);
   const setEnabled = useDeformOverlayStore((s) => s.setEnabled);
@@ -106,6 +126,7 @@ export function DeformOverlayPopover(): React.ReactElement | null {
         </label>
       ))}
       {layers.reference && <ReferenceFields />}
+      {layers.jacobian && <JacobianLegend />}
     </div>
   );
 }

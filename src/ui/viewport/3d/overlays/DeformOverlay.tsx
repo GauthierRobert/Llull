@@ -7,6 +7,7 @@ import type { MeshSolidEntity } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { useDeformOverlayStore } from '@ui/store/deformOverlayStore';
 import { useHostQuery } from '@ui/panels/analysis/useHostQuery';
+import { JacobianMap } from './JacobianMap';
 import { Segments } from './Segments';
 import {
   boxSegments,
@@ -109,6 +110,7 @@ function DeformedBody({ entity }: { entity: MeshSolidEntity }): React.ReactEleme
 
 export function DeformOverlay(): React.ReactElement | null {
   const enabled = useDeformOverlayStore((s) => s.enabled);
+  const jacobian = useDeformOverlayStore((s) => s.layers.jacobian);
   const drawn = useStore(
     useShallow((s) =>
       s.document.selection
@@ -123,7 +125,10 @@ export function DeformOverlay(): React.ReactElement | null {
   return (
     <group name="deform-overlay">
       {drawn.map((entity) => (
-        <DeformedBody key={entity.id} entity={entity} />
+        <React.Fragment key={entity.id}>
+          <DeformedBody entity={entity} />
+          {jacobian && <JacobianMap entity={entity} />}
+        </React.Fragment>
       ))}
     </group>
   );
