@@ -142,8 +142,9 @@ describe('CONVENTIONS_GUIDE blends section (BLD, AF-03)', () => {
     }
   });
 
-  it('says what is not offered', () => {
-    expect(section).toMatch(/partial fillets, cliff \/ trim modes/);
+  it('says what is not offered, and that cliff edges are', () => {
+    expect(section).toMatch(/Not offered \(no param exists\): partial fillets, trim modes of face blends other than the end walls/);
+    expect(section).toMatch(/Cliff edges: `fillet_faces cliff`/);
   });
 });
 
