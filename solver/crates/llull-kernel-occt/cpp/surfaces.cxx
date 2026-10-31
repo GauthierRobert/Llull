@@ -20,6 +20,7 @@
 #include <TopTools_ListIteratorOfListOfShape.hxx>
 #include <TopTools_MapOfShape.hxx>
 #include <TColgp_Array1OfPnt2d.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopTools_ListOfShape.hxx>
 #include <TopExp.hxx>
@@ -370,6 +371,20 @@ std::unique_ptr<Shape> split_shape(const Shape &source, const Shape &tools) {
       const TopoDS_Shape &tool_edge = edge.Current();
       const TopTools_ListOfShape &modified = splitter.Modified(tool_edge);
       if (modified.IsEmpty() && !splitter.IsDeleted(tool_edge)) keep.Add(tool_edge);
+      for (TopTools_ListIteratorOfListOfShape it(modified); it.More(); it.Next()) keep.Add(it.Value());
+    }
+    // An edge the source already had between two distinct faces stays: an earlier split's dividing edge (two halves of one face) must not be merged back. Seam edges (one face on both sides) are not kept.
+    TopTools_IndexedDataMapOfShapeListOfShape ancestors;
+    TopExp::MapShapesAndAncestors(source.shape, TopAbs_EDGE, TopAbs_FACE, ancestors);
+    for (int index = 1; index <= ancestors.Extent(); ++index) {
+      const TopTools_ListOfShape &around = ancestors(index);
+      bool distinct = false;
+      for (TopTools_ListIteratorOfListOfShape face(around); face.More(); face.Next())
+        if (!face.Value().IsSame(around.First())) distinct = true;
+      if (!distinct) continue;
+      const TopoDS_Shape &source_edge = ancestors.FindKey(index);
+      const TopTools_ListOfShape &modified = splitter.Modified(source_edge);
+      if (modified.IsEmpty() && !splitter.IsDeleted(source_edge)) keep.Add(source_edge);
       for (TopTools_ListIteratorOfListOfShape it(modified); it.More(); it.Next()) keep.Add(it.Value());
     }
     try {
