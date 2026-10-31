@@ -1016,9 +1016,11 @@ Native dual contouring is 4x to 17x faster than the TS mesher and 2.5x to 3x fas
 
 The sink halves the memory of a package that still fits in memory and exports the one that does not; the ceiling moves from 375 MB of deflated model to 2 GB of XML (about 24 million triangles of that mesh class; a mesh that compresses worse reaches the 4 GB archive limit first).
 
+**Desktop.** File > Export 3MF… (`desktop/src/exportFile.ts`, `main.ts`): the native save dialog is in the main process, which posts `export_3mf { toFile: true }` to the backend and moves the hosted file to the chosen path (`saveDataFiles`, the `--save` code); the package never passes through the renderer or the main process memory. `export_3mf` is the only command with a file sink. The renderer's Export menu (`ModelExport`) has no 3MF entry. Test: `desktop/tests/backend.e2e.test.ts` (a real backend: empty document refused, written file is a ZIP of the reported size, wrong token refused).
+
 **Tests.** `tests/unit/exchange/threeMfFile.test.ts`: the sink archive equals the in-memory archive byte for byte (312 000 triangles), written in chunks of at most 64 KiB, limit refusal, no chunk held by `DeflateStream(onChunk)`, `toFile` at command level (path instead of base64, `close` once; `EXPORT_SINK_UNAVAILABLE`; `abort` on a refusal; below the automatic threshold the export stays in memory). `server/tests/export3mfFile.test.ts`: the real port writes the same bytes as memory, `--save` moves the file, a limit leaves nothing behind, and the slow test above. Red: `writeThreeMf` without the header patch fails the byte equality; an unlimited archive fails the limit test.
 
-**Left.** The document load and the desktop UI export dialog do not use `toFile` yet (the UI still takes the in-memory package); ZIP64 for archives above 4 GB; `export_3mf` of a level-set or beam-lattice body has no size problem and is unchanged.
+**Left.** The document load does not use `toFile` (it never exports a package); the desktop File > Export 3MF… and the renderer's Export menu ("3MF package", desktop only, through `window.llull.exportThreeMf()`, no argument) do; ZIP64 for archives above 4 GB; `export_3mf` of a level-set or beam-lattice body has no size problem and is unchanged.
 
 ### 14.13 Surface-UV cell maps and maps for strut lattices (DES-5c, 2026-10-30; FR-IMP-17, TR-IMP-07)
 

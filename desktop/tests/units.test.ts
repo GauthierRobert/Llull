@@ -1,12 +1,13 @@
 /** Electron-free desktop modules: layout, backend env, port choice, CLI shim, menu. */
 
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { chooseBackendPort, DEFAULT_DESKTOP_PORT } from '../src/backend';
-import { backendEnv, backendOrigin, desktopKernel, nativeBundleDir } from '../src/backendEnv';
+import { backendEnv, backendOrigin, desktopExportDir, desktopKernel, nativeBundleDir } from '../src/backendEnv';
+import { export3mfToFile } from '../src/exportFile';
 import { cliShimFor, installCliShim } from '../src/cliShim';
 import { bundledPythonOf, desktopLayout } from '../src/layout';
 import { agentHelpText, menuTemplate } from '../src/menu';
@@ -243,6 +244,7 @@ describe('menuTemplate', () => {
     vaultCheckOut: handler('checkout'),
     vaultCheckIn: handler('checkin'),
     showCrashReports: handler('crashes'),
+    export3mf: handler('export3mf'),
   };
 
   it('has File and Help menus wired to the handlers, an app menu only on macOS', () => {
@@ -251,12 +253,95 @@ describe('menuTemplate', () => {
     expect(menuTemplate(handlers, 'darwin', 'llull')[0]?.role).toBe('appMenu');
     const items = linux.flatMap((menu) => (Array.isArray(menu.submenu) ? menu.submenu : []));
     for (const item of items) if (typeof item.click === 'function') (item.click as () => void)();
-    expect(calls).toEqual(['new', 'open', 'save', 'saveAs', 'checkout', 'checkin', 'data', 'trust', 'cli', 'help', 'crashes']);
+    expect(calls).toEqual(['new', 'open', 'save', 'saveAs', 'export3mf', 'checkout', 'checkin', 'data', 'trust', 'cli', 'help', 'crashes']);
   });
 
   it('explains --app and points to the installer until the CLI is installed', () => {
     expect(agentHelpText(false)).toMatch(/--app/);
     expect(agentHelpText(false)).toMatch(/Install Command Line Tool/);
     expect(agentHelpText(true)).toMatch(/is installed/);
+  });
+});
+
+describe('export folder of the desktop', () => {
+  const layout = desktopLayout({ packaged: false, resourcesPath: '/r', repoRoot: '/repo', platform: 'linux' });
+
+  it('is chosen once: LLULL_EXPORT_DIR given at launch, else <userData>/exports, and the backend gets exactly it', () => {
+    expect(desktopExportDir({}, '/u')).toBe(path.resolve('/u', 'exports'));
+    expect(desktopExportDir({ LLULL_EXPORT_DIR: '/x' }, '/u')).toBe(path.resolve('/x'));
+    expect(desktopExportDir({ LLULL_EXPORT_DIR: '' }, '/u')).toBe(path.resolve('/u', 'exports'));
+    const given = backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv: { LLULL_EXPORT_DIR: '/x' } });
+    expect(given['LLULL_EXPORT_DIR']).toBe(path.resolve('/x'));
+    expect(backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv: {} })['LLULL_EXPORT_DIR']).toBe(
+      path.resolve('/u', 'exports'),
+    );
+    expect(backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv: {}, exportDir: '/e' })['LLULL_EXPORT_DIR']).toBe('/e');
+  });
+});
+
+describe('export3mfToFile', () => {
+  const answer =
+    (body: unknown, status = 200) =>
+    (): Promise<Response> =>
+      Promise.resolve(new Response(JSON.stringify(body), { status }));
+  const setup = (): { exportDir: string; target: string; hosted: string } => {
+    const root = scratch();
+    const exportDir = path.join(root, 'exports');
+    mkdirSync(exportDir);
+    const hosted = path.join(exportDir, '1-1-model.3mf');
+    writeFileSync(hosted, 'PK-package');
+    return { exportDir, target: path.join(root, 'out', 'plate.3mf'), hosted };
+  };
+  const run = (fetchImpl: () => Promise<Response>, exportDir: string, target: string): Promise<string> =>
+    export3mfToFile({ url: 'http://127.0.0.1:1', token: 't', target, exportDir, fetchImpl });
+
+  it('moves the hosted package to the chosen file and reports its size', async () => {
+    const { exportDir, target, hosted } = setup();
+    const message = await run(
+      answer({ summary: 'ok', affected: [], data: { file: { path: hosted, bytes: 10 }, fileName: 'model.3mf' } }),
+      exportDir,
+      target,
+    );
+    expect(message).toBe(`${path.resolve(target)} (10 bytes)`);
+    expect(readFileSync(target, 'utf8')).toBe('PK-package');
+    expect(existsSync(hosted)).toBe(false);
+  });
+
+  it('rejects when the request fails, the answer has no file, or the backend refuses; nothing is written', async () => {
+    const { exportDir, target, hosted } = setup();
+    await expect(run(() => Promise.reject(new Error('socket hang up')), exportDir, target)).rejects.toThrow(/socket hang up/);
+    await expect(run(answer({ summary: 'exported', affected: [], data: { base64: 'AAAA' } }), exportDir, target)).rejects.toThrow(
+      /no usable file/,
+    );
+    await expect(run(answer({ summary: 'exported', affected: [], data: { file: { path: hosted } } }), exportDir, target)).rejects.toThrow(
+      /no usable file/,
+    );
+    const refused = {
+      summary: 'export_3mf: toFile needs a host file sink',
+      affected: [],
+      isError: true,
+      error: { code: 'EXPORT_SINK_UNAVAILABLE', remediation: 'x', ids: [] },
+    };
+    await expect(run(answer(refused, 400), exportDir, target)).rejects.toThrow(/toFile needs a host file sink/);
+    expect(existsSync(target)).toBe(false);
+    expect(existsSync(hosted)).toBe(true);
+  });
+
+  it('refuses a reported file outside the export folder and moves nothing', async () => {
+    const { exportDir, target, hosted } = setup();
+    const outside = path.join(path.dirname(exportDir), 'secret.txt');
+    writeFileSync(outside, 'secret');
+    for (const reported of [
+      outside,
+      path.join(exportDir, '..', 'secret.txt'),
+      'C:/Windows/system.ini',
+      path.join(path.dirname(hosted), '..'),
+    ]) {
+      await expect(
+        run(answer({ summary: 'ok', affected: [], data: { file: { path: reported, bytes: 6 } } }), exportDir, target),
+      ).rejects.toThrow(/outside the export folder/);
+    }
+    expect(readFileSync(outside, 'utf8')).toBe('secret');
+    expect(existsSync(target)).toBe(false);
   });
 });

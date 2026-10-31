@@ -7,7 +7,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFile, fork } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -16,8 +16,9 @@ import { writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
 import { nativeBinaryPath, nativeInstallHint } from '@server/native/nativeBinary';
 import { requestJson } from '@server/restClient';
 import { chooseBackendPort, startBackend, type RunningBackend } from '../src/backend';
-import { backendEnv, backendOrigin, nativeBundleDir } from '../src/backendEnv';
+import { backendEnv, backendOrigin, desktopExportDir, nativeBundleDir } from '../src/backendEnv';
 import { createDocumentSession, type DocumentSession } from '../src/documents';
+import { export3mfToFile } from '../src/exportFile';
 import { desktopLayout } from '../src/layout';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
@@ -186,4 +187,40 @@ describe.skipIf(nativeKernelBinary === null)('desktop backend with the native bu
     const reply = await requestJson(`${native!.url}/command`, { token, body: { name: 'kernel_info', params: {} } });
     expect(reply.body).toMatchObject({ data: { active: 'occt', occtVersion: '7.9.2', isolation: 'process' } });
   }, 120_000);
+});
+
+describe('File > Export 3MF', () => {
+  const exportDir = desktopExportDir(process.env, path.join(work, 'userData'));
+  const hostedFiles = (): string[] => (existsSync(exportDir) ? readdirSync(exportDir) : []);
+
+  it('has the backend write the package to the chosen file (no bytes through the app), and refuses an empty document', async () => {
+    const target = path.join(work, 'out', 'plate.3mf');
+    await session.newDocument();
+    const before = hostedFiles();
+    await expect(export3mfToFile({ url: backend.url, token, target, exportDir })).rejects.toThrow(/export_3mf/);
+    expect(existsSync(target)).toBe(false);
+    expect(hostedFiles()).toEqual(before);
+    const made = await requestJson(`${backend.url}/command`, { body: { name: 'add_box', params: { size: [10, 20, 5] } }, token });
+    expect(made.status).toBe(200);
+    const message = await export3mfToFile({ url: backend.url, token, target, exportDir });
+    const bytes = readFileSync(target);
+    expect(bytes.subarray(0, 2).toString('latin1')).toBe('PK');
+    expect(statSync(target).size).toBe(bytes.length);
+    expect(statSync(target).size).toBeGreaterThan(500);
+    expect(message).toBe(`${path.resolve(target)} (${statSync(target).size} bytes)`);
+    // the hosted package was moved, not copied: the export folder holds nothing new
+    expect(hostedFiles()).toEqual(before);
+    await expect(export3mfToFile({ url: backend.url, token: 'wrong', target, exportDir })).rejects.toThrow(/401|HTTP/);
+  });
+
+  it('writes in the folder the desktop chose even when LLULL_EXPORT_DIR was given at launch (the backend env carries it)', () => {
+    const env = backendEnv({
+      port: 1,
+      token: 't',
+      layout,
+      userDataDir: path.join(work, 'userData'),
+      baseEnv: { LLULL_EXPORT_DIR: exportDir },
+    });
+    expect(env['LLULL_EXPORT_DIR']).toBe(exportDir);
+  });
 });

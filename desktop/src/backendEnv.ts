@@ -18,6 +18,8 @@ interface BackendEnvInput {
   readonly baseEnv: Readonly<Record<string, string | undefined>>;
   /** The native binaries bundle when it is present (`nativeBundleDir`), else null: the backend then uses its TypeScript paths. */
   readonly nativeDir?: string | null;
+  /** The folder the backend writes hosted exports to (05 IMP 14.12); default `desktopExportDir(baseEnv, userDataDir)`. */
+  readonly exportDir?: string;
   /** The local vault folder (09 PLM M3): the backend reads externalized release snapshots from it (`ctx.objects`). */
   readonly vaultDir?: string;
 }
@@ -37,6 +39,12 @@ export function nativeBundleDir(dir: string, platform: NodeJS.Platform, exists: 
  */
 export function desktopKernel(inherited: string | undefined): 'manifold' | 'occt-native' {
   return inherited === 'manifold' ? 'manifold' : 'occt-native';
+}
+
+/** The one folder of hosted exports: an LLULL_EXPORT_DIR given at launch, else `<userData>/exports`. The backend gets it explicitly and the desktop checks files against it. */
+export function desktopExportDir(baseEnv: Readonly<Record<string, string | undefined>>, userDataDir: string): string {
+  const configured = baseEnv['LLULL_EXPORT_DIR'];
+  return path.resolve(configured !== undefined && configured !== '' ? configured : path.join(userDataDir, 'exports'));
 }
 
 /** Big documents are opened with one `load_document` call; the server default is 2 MB. */
@@ -64,6 +72,7 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     LLULL_AUTOSAVE_PATH: path.join(input.userDataDir, 'autosave.json'),
     LLULL_BODY_LIMIT: DESKTOP_BODY_LIMIT,
     LLULL_PYTHON: input.layout.python,
+    LLULL_EXPORT_DIR: input.exportDir ?? desktopExportDir(input.baseEnv, input.userDataDir),
     ...(input.vaultDir === undefined ? {} : { LLULL_VAULT: input.vaultDir }),
     // Native compute jobs, the native kernel and the FE mesher (llull-mesh + Netgen), only when bundled.
     ...(input.nativeDir === undefined || input.nativeDir === null ? {} : { LLULL_NATIVE_DIR: input.nativeDir }),
