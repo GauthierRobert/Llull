@@ -6,6 +6,9 @@
 // blend ends and to the support faces along straight chords between the contact points), sewn into a solid.
 // A reason that starts with "[CODE] " carries the stable BLD_* code it maps to.
 #include <algorithm>
+#include <atomic>
+#include <cstdlib>
+#include <thread>
 #include <cmath>
 #include <map>
 #include <memory>
@@ -19,7 +22,10 @@
 #include <BRepAlgoAPI_Splitter.hxx>
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRep_Builder.hxx>
+#include <TopoDS_Compound.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
@@ -688,6 +694,110 @@ double volume_of(const TopoDS_Shape &shape) {
   return props.Mass();
 }
 
+// One corner's fill, with everything it needs OWNED by the job (the faces and edges are copies made on the building thread: no TopoDS handle is shared between threads, so OCCT's reference
+// counts and caches are never touched concurrently, 13.20) and everything it produces. The fit settings are tried in turn until a patch passes.
+struct FillJob {
+  size_t corner = 0;
+  std::string hole_error;                 // the hole could not be isolated: reported in corner order, by the serial finish
+  std::vector<TopoDS_Shape> removed;      // the faces of the split solid that the patch replaces
+  std::vector<TopoDS_Edge> loop, boundary;  // copies
+  std::vector<TopoDS_Face> supports;        // copies, aligned with `boundary`
+  double tolerance_3d = 0, tolerance_2d = 0;
+  bool mixed = false;
+  // results
+  TopoDS_Face patch;
+  double gap = 0;
+  std::string problem;
+  bool filled = false;
+};
+
+// One fill of the hole of `job` with `setting`; false with the reason in job.problem when the patch cannot be used (not built, off its edges, off tangent).
+bool fill_hole(FillJob &job, const FillSetting &setting, double patch_gap_limit, double diagonal) {
+  BRepOffsetAPI_MakeFilling filling(kFillDegree, setting.points, kFillIterations, Standard_False, job.tolerance_2d, job.tolerance_3d, kFillAngle, 0.1, setting.max_degree,
+                                    setting.segments);
+  for (const TopoDS_Edge &edge : job.loop) {
+    const size_t at = static_cast<size_t>(std::find_if(job.boundary.begin(), job.boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); }) - job.boundary.begin());
+    filling.Add(edge, job.supports[at], GeomAbs_G1);
+  }
+  filling.Build();
+  if (!filling.IsDone()) {
+    job.problem = "could not be filled";
+    return false;
+  }
+  job.patch = TopoDS::Face(filling.Shape());
+  job.gap = 0;
+  for (TopExp_Explorer it(job.patch, TopAbs_EDGE); it.More(); it.Next()) {
+    double edge_worst = 0;
+    if (!edge_gap(TopoDS::Edge(it.Current()), job.patch, edge_worst)) {
+      job.problem = "has an edge without a shared parameter on its surface";
+      return false;
+    }
+    job.gap = std::max(job.gap, edge_worst);
+  }
+  if (job.gap > patch_gap_limit) {
+    job.problem = "misses the blend ends by " + number(job.gap) + " (limit " + number(patch_gap_limit) + ")";
+    return false;
+  }
+  if (job.mixed) {
+    double angle = 0;
+    if (!boundary_angle(job.patch, job.loop, job.boundary, job.supports, 1e-4 * diagonal, angle)) {
+      job.problem = "has a boundary that could not be measured against its supports (an edge not matched, or too few samples)";
+      return false;
+    }
+    if (angle > kMixedFillAngle) {
+      job.problem = "leaves its supports by " + number(angle) + " rad at the boundary samples (limit " + number(kMixedFillAngle) + ")";
+      return false;
+    }
+  }
+  if (filling.G1Error() > kFillAngle) {
+    job.problem = "leaves its supports by " + number(filling.G1Error()) + " rad (limit " + number(kFillAngle) + ")";
+    return false;
+  }
+  return true;
+}
+
+void fill_corner(FillJob &job, double patch_gap_limit, double diagonal) {
+  try {
+    for (const FillSetting &setting : kFillSettings) {
+      job.filled = fill_hole(job, setting, patch_gap_limit, diagonal);
+      if (job.filled) return;
+    }
+  } catch (const Standard_Failure &error) {
+    job.filled = false;
+    job.problem = std::string("OCCT failed: ") + (error.GetMessageString() != nullptr ? error.GetMessageString() : "Standard_Failure");
+  }
+}
+
+std::atomic<int> g_corner_threads{0};  // 0: LLULL_CORNER_THREADS, else the hardware (test hook: set_corner_threads)
+
+// The number of threads the fills of `jobs` run on: the override, else LLULL_CORNER_THREADS, else the hardware, at most 8 and at most one per job. The result of a build does not
+// depend on it (the jobs are independent and the finish is serial, in corner order).
+size_t corner_threads(size_t jobs) {
+  long wanted = g_corner_threads.load();
+  if (wanted <= 0)
+    if (const char *text = std::getenv("LLULL_CORNER_THREADS")) wanted = std::atol(text);
+  if (wanted <= 0) wanted = static_cast<long>(std::thread::hardware_concurrency());
+  return static_cast<size_t>(std::max(1L, std::min({wanted, 8L, static_cast<long>(jobs)})));
+}
+
+void fill_all(std::vector<FillJob> &jobs, double patch_gap_limit, double diagonal) {
+  std::vector<size_t> todo;
+  for (size_t j = 0; j < jobs.size(); ++j)
+    if (jobs[j].hole_error.empty()) todo.push_back(j);
+  const size_t threads = corner_threads(todo.size());
+  if (threads <= 1) {
+    for (const size_t j : todo) fill_corner(jobs[j], patch_gap_limit, diagonal);
+    return;
+  }
+  std::atomic<size_t> next{0};
+  std::vector<std::thread> workers;
+  for (size_t t = 0; t < threads; ++t)
+    workers.emplace_back([&]() {
+      for (size_t at = next.fetch_add(1); at < todo.size(); at = next.fetch_add(1)) fill_corner(jobs[todo[at]], patch_gap_limit, diagonal);
+    });
+  for (std::thread &worker : workers) worker.join();
+}
+
 std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const double> edge_raw, rust::Slice<const double> corner_raw, const Mode &mode,
                                      bool &fill_failed, std::string &corners_json, std::string &why) {
   fill_failed = false;
@@ -958,18 +1068,24 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
   std::vector<TopoDS_Face> patches;
   std::vector<size_t> patch_corner;  // the corner of each patch
   std::vector<std::string> patch_names;
+  // Serial: isolate the hole of every corner and give its fill its own copies of the support faces (13.20); parallel: the fills; serial, in corner order: the checks and the patches.
+  std::vector<FillJob> jobs(corners.size());
   for (size_t c = 0; c < corners.size(); ++c) {
+    FillJob &job = jobs[c];
+    job.corner = c;
+    job.mixed = plan.mixed[c];
     TopTools_IndexedMapOfShape removed;
     const TopoDS_Vertex apex = vertex_at(split, corners[c].at, vertex_tolerance);
     if (apex.IsNull()) {
-      why = std::string(kFailed) + "the vertex " + where(corners[c].at) + " is gone after the split";
-      return nullptr;
+      job.hole_error = std::string(kFailed) + "the vertex " + where(corners[c].at) + " is gone after the split";
+      continue;
     }
     for (TopTools_ListIteratorOfListOfShape it(split_vertex_faces.FindFromKey(apex)); it.More(); it.Next()) removed.Add(it.Value());
     for (const Wall &wall : walls[c]) {
       const TopoDS_Face face = wall_in(split, wall, vertex_tolerance);
       if (!face.IsNull()) removed.Add(face);
     }
+    for (int f = 1; f <= removed.Extent(); ++f) job.removed.push_back(removed(f));
     std::vector<TopoDS_Edge> boundary;
     std::vector<TopoDS_Face> supports;
     TopTools_IndexedMapOfShape seen;
@@ -985,75 +1101,42 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     const size_t expected = 2 * plan.stubs[c].size() + plan.reflex[c].size();
     const std::vector<TopoDS_Edge> loop = boundary.size() == expected ? loop_of(boundary) : std::vector<TopoDS_Edge>();
     if (loop.size() != expected) {
-      why = std::string(kFailed) + "the hole at " + where(corners[c].at) + " is bounded by " + std::to_string(boundary.size()) +
-            " edge(s) that do not close one loop (" + std::to_string(expected) + " expected)";
-      return nullptr;
+      job.hole_error = std::string(kFailed) + "the hole at " + where(corners[c].at) + " is bounded by " + std::to_string(boundary.size()) +
+                       " edge(s) that do not close one loop (" + std::to_string(expected) + " expected)";
+      continue;
     }
     // Both tolerances follow the corner: the 3D one is the sewing tolerance but never more than 1e-4 x the smallest setback, the
     // parametric one a fraction of the setback (a fixed value made the fill of a large part slow and a small corner on a large part coarse).
     double smallest = 1e300;
     for (const auto &entry : corners[c].setbacks) smallest = std::min(smallest, entry.second);
-    const double fill_tolerance_3d = std::min(sewing_tolerance, kFillSetbackFraction * smallest);
-    const double fill_tolerance_2d = 1e-5 * smallest / 2;
-    // One fill of the hole; false with the reason in `problem` when the patch cannot be used (not built, off its edges, off tangent).
-    const auto fill_hole = [&](const FillSetting &setting, TopoDS_Face &patch, double &gap, std::string &problem) {
-      BRepOffsetAPI_MakeFilling filling(kFillDegree, setting.points, kFillIterations, Standard_False, fill_tolerance_2d, fill_tolerance_3d, kFillAngle, 0.1,
-                                        setting.max_degree, setting.segments);
-      for (const TopoDS_Edge &edge : loop) {
-        const size_t at = static_cast<size_t>(std::find_if(boundary.begin(), boundary.end(), [&](const TopoDS_Edge &e) { return e.IsSame(edge); }) -
-                                              boundary.begin());
-        filling.Add(edge, supports[at], GeomAbs_G1);
-      }
-      filling.Build();
-      if (!filling.IsDone()) {
-        problem = "could not be filled";
-        return false;
-      }
-      patch = TopoDS::Face(filling.Shape());
-      gap = 0;
-      for (TopExp_Explorer it(patch, TopAbs_EDGE); it.More(); it.Next()) {
-        double edge_worst = 0;
-        if (!edge_gap(TopoDS::Edge(it.Current()), patch, edge_worst)) {
-          problem = "has an edge without a shared parameter on its surface";
-          return false;
-        }
-        gap = std::max(gap, edge_worst);
-      }
-      if (gap > patch_gap_limit) {
-        problem = "misses the blend ends by " + number(gap) + " (limit " + number(patch_gap_limit) + ")";
-        return false;
-      }
-      if (plan.mixed[c]) {
-        double angle = 0;
-        if (!boundary_angle(patch, loop, boundary, supports, 1e-4 * diagonal, angle)) {
-          problem = "has a boundary that could not be measured against its supports (an edge not matched, or too few samples)";
-          return false;
-        }
-        if (angle > kMixedFillAngle) {
-          problem = "leaves its supports by " + number(angle) + " rad at the boundary samples (limit " + number(kMixedFillAngle) + ")";
-          return false;
-        }
-      }
-      if (filling.G1Error() > kFillAngle) {
-        problem = "leaves its supports by " + number(filling.G1Error()) + " rad (limit " + number(kFillAngle) + ")";
-        return false;
-      }
-      return true;
-    };
-    TopoDS_Face patch;
-    double gap = 0;
-    std::string problem;
-    bool filled = false;
-    for (const FillSetting &setting : kFillSettings) {
-      filled = fill_hole(setting, patch, gap, problem);
-      if (filled) break;
-    }
-    if (!filled) {
-      fill_failed = true;
-      why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " " + problem;
+    job.tolerance_3d = std::min(sewing_tolerance, kFillSetbackFraction * smallest);
+    job.tolerance_2d = 1e-5 * smallest / 2;
+    // The copies: the support faces (which carry the boundary edges) in one compound, copied with their geometry; the loop and the boundary are looked up in the copy.
+    BRep_Builder builder;
+    TopoDS_Compound shared;
+    builder.MakeCompound(shared);
+    TopTools_IndexedMapOfShape distinct_supports;
+    for (const TopoDS_Face &support : supports)
+      if (distinct_supports.Add(support)) builder.Add(shared, support);
+    BRepBuilderAPI_Copy copy(shared, Standard_True, Standard_False);
+    for (const TopoDS_Edge &edge : boundary) job.boundary.push_back(TopoDS::Edge(copy.ModifiedShape(edge)));
+    for (const TopoDS_Face &support : supports) job.supports.push_back(TopoDS::Face(copy.ModifiedShape(support)));
+    for (const TopoDS_Edge &edge : loop) job.loop.push_back(TopoDS::Edge(copy.ModifiedShape(edge)));
+  }
+  fill_all(jobs, patch_gap_limit, diagonal);
+  for (size_t c = 0; c < corners.size(); ++c) {
+    FillJob &job = jobs[c];
+    if (!job.hole_error.empty()) {
+      why = job.hole_error;
       return nullptr;
     }
-    worst_patch_gap = std::max(worst_patch_gap, gap);
+    if (!job.filled) {
+      fill_failed = true;
+      why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " " + job.problem;
+      return nullptr;
+    }
+    const TopoDS_Face &patch = job.patch;
+    worst_patch_gap = std::max(worst_patch_gap, job.gap);
     {
       // A convex corner removes material, a concave one adds it: the centre of the patch lies IN the source solid for the first, OUT of it for the second.
       GProp_GProps props;
@@ -1073,7 +1156,7 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
     std::vector<std::string> around;
     for (const int edge : edges_at(vertex_edges, edge_map, plan.vertices[c])) around.push_back(edge_names[static_cast<size_t>(edge)]);
     patch_names.push_back("blend(v:" + joined_names(around) + ")");
-    for (int f = 1; f <= removed.Extent(); ++f) dropped.Add(removed(f));
+    for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
   }
 
   // Shell: every face that stays plus the patches, sewn.
@@ -1168,6 +1251,9 @@ std::unique_ptr<Shape> build_setback(const Shape &source, rust::Slice<const doub
 }
 
 }  // namespace
+
+// Test hook (src/test_bridge.rs): the number of threads the corner fills use (0: LLULL_CORNER_THREADS, else the hardware).
+void set_corner_threads(int32_t count) { g_corner_threads.store(count); }
 
 std::unique_ptr<Shape> fillet_setback(const Shape &shape, rust::Slice<const double> edges, rust::Slice<const double> corners) {
   std::string why;

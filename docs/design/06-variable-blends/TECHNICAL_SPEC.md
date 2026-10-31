@@ -1184,3 +1184,35 @@ R 30 sphere cap cut by a 20 x 12 stadium (corner radius 2), rim of 18 edges, con
   helper skipped any edge with a sample above 0.5 rad, a fold-back included; 21 samples), the rim patch band is +0.03 to +0.07 (measured +0.048), Ixx = Iyy and Ixz = Iyz to 1e-6.
   `nativeBlendCorners.test.ts` pins the reason of the remaining refusal ("the face closing the rounded edge at [0, 0, 0] is too oblique to the edge"). No test provokes an unmeasured boundary or a folded patch: neither is
   reachable by a prism, the checks are closed by construction.
+
+## 13.20 As built: the corner fills run in parallel (DES-6c step 10, 2026-10-31)
+
+### 13.20.1 Where the time of a setback step goes
+
+Profile of the 8-corner cube (10 mm, radius 1, setback 2, release, 1.96 s): plan + tools 4 ms, tools boolean + unify 23 ms, chords + split 11 ms, `BRepOffsetAPI_MakeFilling::Build` 8 x 175 to 225 ms (1.6 s: 82 %), the rest
+of the corner loop 13 ms, sew + solid + `BRepCheck_Analyzer` 197 ms, volume 100 ms. The gap check after a fill is 1 ms and each corner takes one fill attempt. The first fit setting (15 points, degree 12, 60 segments) is the
+cheapest that passes: 45 segments leave one corner at 8.9e-5 against the limit 8.2e-5, 40 at 1.14e-4 (the exact-boundary patch of 13.12.3 is what would change that).
+
+### 13.20.2 Construction
+
+The loop over the corners is three loops (`blend_corner.cxx`):
+
+1. **serial, in corner order:** isolate the hole of every corner (`FillJob`: the faces it replaces, the loop, the boundary edges and their supports, both fill tolerances). A hole that cannot be isolated is recorded in the job
+   (`hole_error`), not returned, so that errors are still reported in the order of the serial run (an earlier corner's fill failure comes before a later corner's hole error);
+2. **parallel:** `fill_all` runs `fill_corner` (the fit settings in turn until a patch passes) on up to `corner_threads` threads, one job per task from an atomic counter;
+3. **serial, in corner order:** the same checks as before (the side of the solid, the patches, the names, the removed faces).
+
+**No TopoDS is shared between threads.** In loop 1 the support faces of a job (which carry its boundary edges) are put in a compound and copied with their geometry (`BRepBuilderAPI_Copy`, `copyGeom` on); the boundary,
+the supports and the loop of the job are the copies (`ModifiedShape`), so the handles and caches OCCT touches in a task belong to that task. The patch is built from the copies, and it is sewn to the split solid by its geometry,
+as before (the patch edges were never the edges of the loop).
+
+**Threads.** `corner_threads`: the test hook `set_corner_threads`, else `LLULL_CORNER_THREADS`, else `std::thread::hardware_concurrency`, at most 8 and at most one per job; 1 runs inline. The build does not depend on the
+number: the jobs are independent, the finish is serial.
+
+### 13.20.3 Measured, and what is the same
+
+- **Byte-identical.** The 8-corner cube and the four feet of the boss, before the change (serial, shared shapes): volume 0x408e4dd9f784d7b7 / 0x409efff50ae3049e, area 0x4080de16eeef0abe / 0x409451df6f694288. After, on 1, 2 and 8
+  threads, twice each: the same bits (test `the_corner_fills_give_the_same_solid_on_any_number_of_threads`: the volume and area to the bit, 26 and 23 faces, valid, the same on every run).
+- **Time** (release, a busy 22-thread machine): cube 2100 ms before; 1990 / 1374 / 1033 / 952 ms on 1 / 2 / 4 / 8 threads; boss feet 7092 ms before; 5851 / 3642 / 2711 / 2854 ms. About 2.1x, not 8x: what is left is
+  serial (sewing, `BRepCheck`, the volume: about 350 ms on the cube) and the machine's other work; OCCT's allocator shares one heap.
+- **Not done:** the serial 350 ms (sew + `BRepCheck_Analyzer` 197 ms, volume 100 ms) have no cheap path: the validity analysis is the guarantee, and the volume is the sign / bound check of 13.18.6.
