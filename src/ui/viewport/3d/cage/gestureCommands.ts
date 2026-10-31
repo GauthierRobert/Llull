@@ -19,7 +19,7 @@ export const DEFAULT_FALLOFF: FalloffSettings = { radius: 0, shape: 'smooth', me
 export type CageGesture =
   | { readonly kind: 'translate'; readonly delta: Vec3 }
   | { readonly kind: 'rotate'; readonly axis: Vec3; readonly angleDeg: number; readonly pivot: Vec3 }
-  | { readonly kind: 'scale'; readonly factor: number; readonly pivot: Vec3 }
+  | { readonly kind: 'scale'; readonly factors: Vec3; readonly pivot: Vec3 }
   | { readonly kind: 'extrude'; readonly distance: number }
   | { readonly kind: 'inset'; readonly thickness: number }
   | {
@@ -54,7 +54,7 @@ export function isIdleGesture(gesture: CageGesture): boolean {
     case 'rotate':
       return Math.abs(gesture.angleDeg) < 1e-4;
     case 'scale':
-      return Math.abs(gesture.factor - 1) < 1e-6;
+      return gesture.factors.every((factor) => Math.abs(factor - 1) < 1e-6);
     case 'extrude':
       return Math.abs(gesture.distance) < 1e-6;
     case 'inset':
@@ -97,8 +97,7 @@ export function gestureCommand(
         params: { ...base, rotate: { axis: roundVec(gesture.axis), angleDeg: round(gesture.angleDeg), pivot: roundVec(gesture.pivot) } },
       };
     case 'scale': {
-      const factor = round(gesture.factor);
-      return { name: 'edit_subdivision_cage', params: { ...base, scale: [factor, factor, factor], pivot: roundVec(gesture.pivot) } };
+      return { name: 'edit_subdivision_cage', params: { ...base, scale: roundVec(gesture.factors), pivot: roundVec(gesture.pivot) } };
     }
   }
 }

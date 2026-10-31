@@ -22,7 +22,16 @@ import {
   selectElements,
   selectionCentroidWorld,
 } from './cageSelection';
-import { type AxisLock, type DragStart, type WorldRay, crossedThreshold, dragGesture, insetThickness, unitsPerPixel } from './dragMath';
+import {
+  type AxisLock,
+  type DragStart,
+  type WorldRay,
+  crossedThreshold,
+  dragGesture,
+  insetThickness,
+  nextAxisLock,
+  unitsPerPixel,
+} from './dragMath';
 import { cancelGesture, commitGesture, updateGesture } from './gestureActions';
 import { capturePointer, releasePointer } from '../pointerCapture';
 import { type LoopCutEdge, cancelsOnCaptureLoss, loopCutEdge, loopCutFactor } from './loopCutDrag';
@@ -250,7 +259,11 @@ export function useCagePointer(entity: SubdivisionEntity | undefined): void {
 
     const onKey = (event: KeyboardEvent): void => {
       const key = event.key.toLowerCase();
-      if ((key === 'x' || key === 'y' || key === 'z') && press?.kind === 'drag' && press.active) axisLock = key;
+      if ((key !== 'x' && key !== 'y' && key !== 'z') || press?.kind !== 'drag' || !press.active) return;
+      axisLock = nextAxisLock(axisLock, key);
+      // the preview follows the lock at once, not on the next pointer move
+      const gesture = dragGesture(press.start, worldRay(lastPointer.x, lastPointer.y), axisLock);
+      if (gesture !== null) updateGesture(gesture);
     };
 
     const unsubscribe = useDirectEditStore.subscribe((state, previous) => {
