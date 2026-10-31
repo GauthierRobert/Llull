@@ -34,6 +34,15 @@ const NEWTON_STEPS = 24;
 const CONVERGED = 1e-12;
 const PROBES = 48;
 
+type FieldFn = (uv: Vec2) => { f: number; fu: number; fv: number; length: number };
+type ProjectFn = (start: Vec2) => Vec2 | null;
+
+/** A seam for the tests: decorates the field F = n . d (with its gradient) and the Newton projection, to build a field no real surface gives (a Newton that does not converge, a gradient that vanishes). */
+interface ContourHooks {
+  readonly field?: (exact: FieldFn) => FieldFn;
+  readonly project?: (exact: ProjectFn) => ProjectFn;
+}
+
 export interface FreeformContours {
   readonly curves: SilhouetteCurve[];
   readonly onEdge: boolean;
@@ -124,6 +133,7 @@ export function freeformContours(
   bounds: readonly [Vec2, Vec2],
   d: Vec3,
   tolerance: number,
+  hooks: ContourHooks = {},
 ): FreeformContours | string {
   const { query, shape, diagonal } = session;
   const port = query.bspline(shape, face);
@@ -148,7 +158,7 @@ export function freeformContours(
     return dot3(n, dir) / length;
   };
   /** F = n . d with its gradient in (u, v), and |n| (n = S_u x S_v). */
-  const field = (uv: Vec2): { f: number; fu: number; fv: number; length: number } => {
+  const exactField: FieldFn = (uv) => {
     const ds = surfaceDerivatives(surface, uv[0], uv[1], 2);
     const at = (k: number, l: number): Vec3 => ((ds[k] as Vec3[])[l] as Vec3) ?? [0, 0, 0];
     const [su, sv] = [at(1, 0), at(0, 1)];
@@ -160,8 +170,9 @@ export function freeformContours(
       length: len3(n),
     };
   };
+  const field = hooks.field?.(exactField) ?? exactField;
   /** Newton projection of `uv` onto F = 0 (steps along the gradient); null when it does not converge inside the box. */
-  const project = (start: Vec2): Vec2 | null => {
+  const exactProject: ProjectFn = (start) => {
     let uv = start;
     for (let step = 0; step < NEWTON_STEPS; step++) {
       const { f, fu, fv, length } = field(uv);
@@ -176,6 +187,7 @@ export function freeformContours(
     const last = field(uv);
     return Math.abs(last.f) / last.length < 1e-9 ? uv : null;
   };
+  const project = hooks.project?.(exactProject) ?? exactProject;
 
   // the grid
   const node = (i: number, j: number): Vec2 => [lo[0] + ((hi[0] - lo[0]) * i) / GRID, lo[1] + ((hi[1] - lo[1]) * j) / GRID];

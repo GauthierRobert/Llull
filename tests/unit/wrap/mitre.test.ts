@@ -179,6 +179,22 @@ describe('emboss_on_face across a sharp edge: the mitre', () => {
     expect(data(column).expectedVolumeDelta).toBeCloseTo(15, 9);
   });
 
+  it('the other refusals: a face with no normal at the edge, and an odd number of crossings (the outline ends beyond a shorter edge)', () => {
+    const blind = run({ corner: { convexity: 'convex', noNormal: 0 } }, 'emboss');
+    expect(blind.error?.code).toBe('WRP_CHAIN_EDGE_SHARP');
+    expect(blind.summary).toContain('no normal');
+    // the edge is 10 long (y in -5..5): the rectangle y -3..8 crosses its line at -3 and 8, only the first is on the edge
+    const odd = run({ corner: { convexity: 'convex', edgeHalf: 5 } }, 'emboss', (doc) =>
+      make(doc, 'draw_rectangle', { width: 8, height: 11, position: [-4, -3, 0] }),
+    );
+    expect(odd.error?.code).toBe('WRP_CHAIN_EDGE_SHARP');
+    expect(odd.summary).toContain('odd number');
+    const inside = run({ corner: { convexity: 'convex', edgeHalf: 5 } }, 'emboss', (doc) =>
+      make(doc, 'draw_rectangle', { width: 8, height: 4, position: [-4, -2, 0] }),
+    );
+    expect(inside.error, inside.summary).toBeUndefined();
+  });
+
   it('where only an overlap is concerned a vertex on the edge or a curved piece crossing it is built without a closed form', () => {
     const diamond = run({ corner: { convexity: 'convex' } }, 'deboss', (doc) =>
       make(doc, 'draw_polyline', {

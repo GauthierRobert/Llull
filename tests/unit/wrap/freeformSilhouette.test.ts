@@ -9,10 +9,11 @@ import { execute } from '@core/commands/registry';
 import { currentContext } from '@core/commands/context';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { surfaceOfPort } from '@core/geometry/freeformChart';
-import { curveDomain, evaluateCurve } from '@core/lib/nurbs/evaluate';
+import { curveDerivatives, curveDomain, evaluateCurve } from '@core/lib/nurbs/evaluate';
 import { surfaceDerivatives } from '@core/lib/nurbs/surface';
 import { isRejection, openSolid } from '@core/commands/wrap/faceSession';
 import { silhouettes, type SilhouetteReport } from '@core/commands/wrap/silhouette';
+import { freeformContours } from '@core/commands/wrap/freeformSilhouette';
 import type { Vec3 } from '@core/model/types';
 import { fakeFreeformKernel, type FakeFreeformOptions } from '../../helpers/fakeFreeformKernel';
 import { cylinderPatch, saddlePatch, type PortSurface } from '../../helpers/freeformSurfaces';
@@ -184,15 +185,12 @@ describe('silhouette of a freeform face', () => {
       1e-6,
     );
     expect(report.curves[0]?.length).toBeGreaterThan(10);
-    // the seam is C1: the direction leaving the first point equals the direction arriving at the last
+    // the seam is C1 with the same speed: the derivative at the start equals the derivative at the end (the fit is given them)
     const curve = report.curves[0]?.curve as NonNullable<(typeof report.curves)[number]>['curve'];
     const [lo, hi] = curveDomain(curve);
-    const h = 1e-6 * (hi - lo);
-    const leave = evaluateCurve(curve, lo + h).map((c, k) => c - (evaluateCurve(curve, lo)[k] as number));
-    const arrive = evaluateCurve(curve, hi).map((c, k) => c - (evaluateCurve(curve, hi - h)[k] as number));
-    const cosine =
-      (leave[0]! * arrive[0]! + leave[1]! * arrive[1]! + leave[2]! * arrive[2]!) / (Math.hypot(...leave) * Math.hypot(...arrive));
-    expect(cosine).toBeGreaterThan(1 - 1e-9);
+    const start = curveDerivatives(curve, lo, 1)[1] as Vec3;
+    const end = curveDerivatives(curve, hi, 1)[1] as Vec3;
+    expect(Math.hypot(start[0] - end[0], start[1] - end[1], start[2] - end[2]) / Math.hypot(...start)).toBeLessThan(1e-6);
     // each point is on the surface with the normal perpendicular to the view: the pcurve gives (u, v)
     const pcurve = report.curves[0]?.pcurve;
     expect(pcurve).toBeDefined();
@@ -343,5 +341,92 @@ describe('silhouette of a freeform face', () => {
     const refused = execute(body.doc, 'split_at_silhouette', { id: body.id, direction: [1, 0, 0] });
     expect(refused.error?.code).toBe('WRP_SILHOUETTE_UNSUPPORTED');
     expect(refused.summary).toContain('B-spline');
+  });
+
+  describe('the guards of a field no real surface gives (hooks on the field and the Newton projection)', () => {
+    type Hooks = NonNullable<Parameters<typeof freeformContours>[5]>;
+    const contoursOf = (
+      patch: PortSurface,
+      direction: Vec3,
+      hooks: Hooks,
+      options: FakeFreeformOptions = {},
+    ): ReturnType<typeof freeformContours> => {
+      setGeometryKernel(fakeFreeformKernel(patch, options));
+      const body = make(emptyDoc(), 'add_box', { size: [10, 10, 10] });
+      const session = openSolid(body.doc, currentContext(), 'split_at_silhouette', body.id);
+      if (isRejection(session)) throw new Error(session.summary);
+      return freeformContours(
+        session,
+        0,
+        [
+          [0, 0],
+          [1, 1],
+        ],
+        direction,
+        TOLERANCE,
+        hooks,
+      );
+    };
+    const cylinder = cylinderPatch(20, -Math.PI / 4, Math.PI / 4, 40);
+    const view: Vec3 = [0.2, 1, 0];
+    const real = contoursOf(cylinder, view, {});
+
+    it('the unhooked contour is the ruling (the baseline of the cases below)', () => {
+      expect(typeof real).toBe('object');
+      if (typeof real === 'string') return;
+      expect(real.curves).toHaveLength(1);
+    });
+
+    it('a Newton that does not converge between two vertices makes the fit refuse by name (the sampler answers null, no off-contour fallback)', () => {
+      const lost = contoursOf(cylinder, view, { project: (exact) => (uv) => (uv[1] > 0.09 && uv[1] < 0.098 ? null : exact(uv)) });
+      expect(lost).toEqual(expect.stringContaining('Newton cannot follow'));
+    });
+
+    it('a cut whose Newton fails counts as outside: the trimmed saddle ends where the projection still works (y 2.95), not at the boundary', () => {
+      const saddle = saddlePatch(0.05, 5);
+      const cut = contoursOf(
+        saddle,
+        [1, 0, 0],
+        { project: (exact) => (uv) => (uv[1] > 0.795 && uv[1] < 0.8 ? null : exact(uv)) },
+        { trim: (point) => point[1] <= 3 },
+      );
+      expect(typeof cut).toBe('object');
+      if (typeof cut === 'string') return;
+      const curve = cut.curves[0]?.curve as NonNullable<(typeof cut.curves)[number]>['curve'];
+      const [first, last] = curveDomain(curve);
+      const top = Math.max(...[0, 1].map((t) => evaluateCurve(curve, first + t * (last - first))[1] as number));
+      expect(top).toBeGreaterThan(2.94);
+      expect(top).toBeLessThan(2.95 + 1e-6);
+    });
+
+    it('a fit that is on the surface but off n . d = 0 (the projection lands 0.003 beside the contour) is refused by the on-contour probe', () => {
+      const shifted = contoursOf(cylinder, view, {
+        project: (exact) => (uv) => {
+          const hit = exact(uv);
+          return hit === null ? null : [hit[0] + 0.003, hit[1]];
+        },
+      });
+      expect(shifted).toEqual(expect.stringContaining('does not lie on the contour'));
+    });
+
+    it('a gradient that vanishes at the middle of a step (the vertices are fine) is a cusp or a tangent: refused', () => {
+      const blind = contoursOf(cylinder, view, {
+        field: (exact) => (uv) => {
+          const hit = exact(uv);
+          return Math.abs(uv[1] * 48 - Math.round(uv[1] * 48)) > 0.25 ? { ...hit, fu: 0, fv: 0 } : hit;
+        },
+      });
+      expect(blind).toEqual(expect.stringContaining('cusp'));
+    });
+
+    it('a gradient that is small everywhere (uniformly, so the relative floor passes) is refused by the absolute floor', () => {
+      const flat = contoursOf(cylinder, view, {
+        field: (exact) => (uv) => {
+          const hit = exact(uv);
+          return { ...hit, f: hit.f * 1e-6, fu: hit.fu * 1e-6, fv: hit.fv * 1e-6 };
+        },
+      });
+      expect(flat).toEqual(expect.stringContaining('cusp'));
+    });
   });
 });
