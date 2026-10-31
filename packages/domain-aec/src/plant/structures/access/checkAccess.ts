@@ -7,12 +7,13 @@ import { refuse } from '../codes';
 import { RULESET_NAMES, RULE_TABLE_VERSION, type AccessRule } from '../rules/ruleTable';
 import { checkEdges, edgeRuleUnsetFinding, type EdgeReport } from './edgeChecks';
 import { unverifiedFindings, type Finding } from './finding';
+import { LADDER_RULES_NOT_EVALUATED, checkLadder, ladderRules } from './ladderChecks';
 import { checkRailing, RAILING_RULES_NOT_EVALUATED, railingRules } from './railingChecks';
 import { checkStair, STAIR_RULES_NOT_EVALUATED, stairRules } from './stairChecks';
 
 type Verdict = 'pass' | 'warn' | 'fail';
 
-const CHECKED_CATEGORIES: ReadonlyArray<BimCategory> = ['stair', 'slab', 'grating', 'railing'];
+const CHECKED_CATEGORIES: ReadonlyArray<BimCategory> = ['stair', 'slab', 'grating', 'railing', 'ladder'];
 
 const verdictOf = (findings: readonly Finding[]): Verdict =>
   findings.some((finding) => finding.severity === 'fail') ? 'fail' : findings.length > 0 ? 'warn' : 'pass';
@@ -27,7 +28,7 @@ export const checkAccess = defineCommand({
   description:
     'Check access means of the BUILDING model against the access rules (ISO 14122, OSHA 29 CFR 1910) and list findings with stable STA_* codes, ' +
     'measured value, limit, clause, source and a one-line fix. It covers concrete stairs (add_stair: Blondel 2h+g, riser, tread, pitch angle, width, ' +
-    'flight rise), guard-rails (add_railing: top-rail height, clear space between rails, toe plate) and open edges of slabs (add_slab) and grating panels (add_grating). Only grade A rules fail; grade B rules warn and add STA_RULE_UNVERIFIED; the result always has ' +
+    'flight rise), guard-rails (add_railing: top-rail height, clear space between rails, toe plate), fixed ladders (add_ladder: rung pitch, clear width, back clearance, stile extension, fall protection by height and installation date, cage start / hoops / diameter, landing interval) and open edges of slabs (add_slab) and grating panels (add_grating). Only grade A rules fail; grade B rules warn and add STA_RULE_UNVERIFIED; the result always has ' +
     'reviewRequired: true (a qualified person signs access means). Lengths in the answer are millimetres and angles degrees, whatever the document units. ' +
     'Open edges need edgeDropThresholdMm (no graded rule exists, so there is no default): without it the edge check is skipped with the warning STA_EDGE_RULE_UNSET. ' +
     'The drop is measured from the slab top to the next surface below (another slab, else the lowest level elevation); an edge is protected when the drop is ' +
@@ -45,13 +46,13 @@ export const checkAccess = defineCommand({
       .array(z.string())
       .optional()
       .describe(
-        'Building element ids (stairs, slabs, gratings, railings) to check. Default: every one. Other element kinds are listed under `skipped`.',
+        'Building element ids (stairs, slabs, gratings, railings, ladders) to check. Default: every one. Other element kinds are listed under `skipped`.',
       ),
     include: z
-      .array(z.enum(['stairs', 'edges', 'railings']))
+      .array(z.enum(['stairs', 'edges', 'railings', 'ladders']))
       .optional()
       .describe(
-        'Which checks to run: "stairs" (concrete stairs), "edges" (open edges of slabs and gratings) and/or "railings" (guard-rail rules). Default all three.',
+        'Which checks to run: "stairs" (concrete stairs), "edges" (open edges of slabs and gratings) and/or "railings" (guard-rail rules) and/or "ladders" (fixed-ladder rules). Default all four.',
       ),
     edgeDropThresholdMm: z
       .number()
@@ -71,23 +72,26 @@ export const checkAccess = defineCommand({
     if (unknown.length > 0)
       return refuse(doc, 'check_access', 'STA_UNKNOWN_ELEMENT', `no building element ${unknown.join(', ')}`, unknown, ['ids']);
     const wanted = params.ids === undefined ? undefined : new Set(params.ids);
-    const include = params.include ?? ['stairs', 'edges', 'railings'];
-    const picked = <T extends { id: string }>(elements: readonly T[], kind: 'stairs' | 'edges' | 'railings'): T[] =>
+    const include = params.include ?? ['stairs', 'edges', 'railings', 'ladders'];
+    const picked = <T extends { id: string }>(elements: readonly T[], kind: 'stairs' | 'edges' | 'railings' | 'ladders'): T[] =>
       include.includes(kind) ? elements.filter((element) => wanted?.has(element.id) ?? true) : [];
     const stairs = picked(elementsOf(building, 'stair'), 'stairs');
     const slabIds = picked(elementsOf(building, 'slab'), 'edges').map((slab) => slab.id);
     const gratingIds = picked(elementsOf(building, 'grating'), 'edges').map((grating) => grating.id);
     const surfaceIds = [...slabIds, ...gratingIds];
     const railings = picked(elementsOf(building, 'railing'), 'railings');
+    const ladders = picked(elementsOf(building, 'ladder'), 'ladders');
     const skipped = (params.ids ?? []).filter((id) => !CHECKED_CATEGORIES.includes(building.elements[id]?.category ?? 'grid'));
 
     const rules: AccessRule[] = [
       ...(stairs.length > 0 ? stairRules(params.rulesets) : []),
       ...(railings.length > 0 ? railingRules(params.rulesets) : []),
+      ...(ladders.length > 0 ? ladderRules(ladders, params.rulesets) : []),
     ];
     const breaches = [
       ...stairs.flatMap((stair) => checkStair(doc, stair, params.rulesets)),
       ...railings.flatMap((railing) => checkRailing(doc, railing, params.rulesets)),
+      ...ladders.flatMap((ladder) => checkLadder(doc, ladder, params.rulesets)),
     ];
     const findings: Finding[] = [...breaches, ...unverifiedFindings(breaches, rules)];
 
@@ -108,7 +112,12 @@ export const checkAccess = defineCommand({
     }
 
     const byId = Object.fromEntries(
-      [...stairs.map((stair) => stair.id), ...railings.map((railing) => railing.id), ...surfaceIds].map((id) => {
+      [
+        ...stairs.map((stair) => stair.id),
+        ...railings.map((railing) => railing.id),
+        ...ladders.map((ladder) => ladder.id),
+        ...surfaceIds,
+      ].map((id) => {
         const own = findings.flatMap((finding, index) => (finding.ids.includes(id) ? [index] : []));
         return [id, { verdict: verdictOf(own.map((index) => findings[index] as Finding)), findings: own }];
       }),
@@ -125,6 +134,7 @@ export const checkAccess = defineCommand({
         slabs: slabIds.length,
         gratings: gratingIds.length,
         railings: railings.length,
+        ladders: ladders.length,
         edges: edges.length,
       },
       skipped,
@@ -135,6 +145,7 @@ export const checkAccess = defineCommand({
       notEvaluated: [
         ...(stairs.length > 0 ? STAIR_RULES_NOT_EVALUATED : []),
         ...(railings.length > 0 ? RAILING_RULES_NOT_EVALUATED : []),
+        ...(ladders.length > 0 ? LADDER_RULES_NOT_EVALUATED : []),
         ...(railings.some((railing) => railing.role === 'handrail')
           ? [{ ruleId: 'handrail', reason: 'no hand-rail rule rows are loaded: hand-rails are listed but not checked' }]
           : []),
@@ -142,7 +153,7 @@ export const checkAccess = defineCommand({
     };
     return report(
       doc,
-      `check_access: ${verdict} — ${stairs.length} stair(s), ${railings.length} railing(s), ${surfaceIds.length} slab/grating surface(s) (${edges.length} edges): ${fails} fail, ${findings.length - fails} warn ` +
+      `check_access: ${verdict} — ${stairs.length} stair(s), ${railings.length} railing(s), ${ladders.length} ladder(s), ${surfaceIds.length} slab/grating surface(s) (${edges.length} edges): ${fails} fail, ${findings.length - fails} warn ` +
         `(rule table ${RULE_TABLE_VERSION}); review required.`,
       data,
     );

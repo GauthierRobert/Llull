@@ -14,7 +14,7 @@ import { columnSectionArea, scaleFor, slabNetArea, stairVolume, wallQuantities }
 import { memberLength, memberMass, panelArea } from './takeoffCompute';
 import { netConcreteVolumes } from './netConcrete';
 import { routeLength } from '../../industrial/piping/routeSupport';
-import { gratingScheduleRows, railingScheduleRows } from '../../plant/structures/quantities/accessTakeoff';
+import { gratingScheduleRows, ladderScheduleRows, railingScheduleRows } from '../../plant/structures/quantities/accessTakeoff';
 
 export const SCHEDULE_KINDS = [
   'wall',
@@ -36,6 +36,7 @@ export const SCHEDULE_KINDS = [
   'support',
   'grating',
   'railing',
+  'ladder',
 ] as const;
 
 type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
@@ -309,6 +310,22 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       return {
         columns: ['Mark', 'Role', 'Length (m)', 'Posts', 'Height (mm)', 'Rails', 'Toe plate (mm)', 'Steel (kg)', 'Level'],
         rows: railingScheduleRows(doc, building),
+      };
+    case 'ladder':
+      return {
+        columns: [
+          'Mark',
+          'Height (mm)',
+          'Rungs',
+          'Pitch (mm)',
+          'Width (mm)',
+          'Fall protection',
+          'Landings',
+          'Back clearance (mm)',
+          'Steel (kg)',
+          'Level',
+        ],
+        rows: ladderScheduleRows(doc, building),
       };
     case 'connection':
       return {

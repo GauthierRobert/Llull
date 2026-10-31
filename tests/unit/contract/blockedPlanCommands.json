@@ -76,17 +76,14 @@
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": ["export_piping_ga"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-07-check-errors.json": ["check_isometric"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-08-supports-skew.json": ["export_isometric"],
-    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-01-caged-ladder.json": ["add_ladder"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-02-steel-stair.json": ["add_steel_stair"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-03-vessel-circular-platform.json": [
       "add_circular_platform",
       "platform_takeoff"
     ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-04-pipe-rack.json": ["add_pipe_rack"],
-    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-05-access-negative.json": ["add_ladder"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": [
       "add_circular_platform",
-      "add_ladder",
       "check_reachability"
     ],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-01-lbend-two-anchors.json": [

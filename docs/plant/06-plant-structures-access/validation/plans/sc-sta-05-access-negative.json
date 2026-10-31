@@ -1,6 +1,6 @@
 {
   "id": "SC-STA-05",
-  "status": "PARTIAL (M3) — add_railing and the railing / edge rows of check_access run in tests/unit/plant/structures/scenarioPlans.test.ts; add_ladder is not built (M4), so the ladder rows wait",
+  "status": "BUILT (M3 railings, M4 ladder) — every step runs in tests/unit/plant/structures/scenarioPlans.test.ts",
   "validates": [
     "VC-STA-05",
     "VC-STA-13"
@@ -19,7 +19,8 @@
         "name": "Grade",
         "elevation": 0,
         "height": 4000
-      }
+      },
+      "as": "grade"
     },
     {
       "command": "add_level",
@@ -82,6 +83,7 @@
     {
       "command": "add_ladder",
       "params": {
+        "levelId": "$grade",
         "base": [
           2000,
           -250,

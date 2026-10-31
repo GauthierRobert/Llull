@@ -19,24 +19,28 @@ export interface Finding {
   readonly location?: string;
 }
 
-/** A measurement checked against one row: the finding of the breach, or null when the value complies. */
-export function breachFinding(rule: AccessRule, code: StaCode, id: string, value: number): Finding | null {
-  const side = breach(rule, value);
-  if (side === null) return null;
+/** A finding of `rule` for `value` with an explicit severity (rules whose trigger is not a plain range). */
+export function ruleFinding(rule: AccessRule, code: StaCode, id: string, value: number, severity: 'fail' | 'warn', note?: string): Finding {
   const unit = rule.unit ?? 'mm';
   return {
     code,
     ruleId: rule.id,
     ruleset: rule.ruleset,
     clause: rule.clause,
-    severity: severityOf(rule, side),
+    severity,
     grade: rule.grade,
     ids: [id],
     measured: { value, unit },
     limit: { ...limitOf(rule), unit },
     remediation: remediationOf(code),
-    source: rule.source,
+    source: note === undefined ? rule.source : `${rule.source}; ${note}`,
   };
+}
+
+/** A measurement checked against one row: the finding of the breach, or null when the value complies. */
+export function breachFinding(rule: AccessRule, code: StaCode, id: string, value: number): Finding | null {
+  const side = breach(rule, value);
+  return side === null ? null : ruleFinding(rule, code, id, value, severityOf(rule, side));
 }
 
 /** The `STA_RULE_UNVERIFIED` warning of every grade B row that was breached, listing all elements concerned. */

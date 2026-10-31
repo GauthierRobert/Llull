@@ -32,7 +32,29 @@ function railingHostErrors(key: string, host: unknown, elements: Record<string, 
   return valid ? [] : [`building element ${key}: host must be { hostId (a slab or grating), ring, edges }`];
 }
 
-/** Problems with the category-specific fields of a `grating` or `railing` element (other categories: none). */
+function ladderErrors(key: string, element: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  if (!isVec3(element['base'])) errors.push(`building element ${key}: base must be [x, y, z]`);
+  if (element['exit'] !== 'through' && element['exit'] !== 'side_step')
+    errors.push(`building element ${key}: exit must be through or side_step`);
+  if (!['none', 'cage', 'ladder_safety_system', 'pfas'].includes(String(element['fallProtection'])))
+    errors.push(`building element ${key}: fallProtection must be none, cage, ladder_safety_system or pfas`);
+  const landings = element['landings'];
+  if (!(Array.isArray(landings) && landings.every(isFiniteNumber)))
+    errors.push(`building element ${key}: landings must be a list of heights`);
+  const cage = element['cage'];
+  if (cage !== undefined) {
+    const valid = isRecord(cage) && ['startHeight', 'hoopSpacing', 'diameter', 'bars'].every((field) => isFiniteNumber(cage[field]));
+    if (!valid) errors.push(`building element ${key}: cage must be { startHeight, hoopSpacing, diameter, bars }`);
+  } else if (element['fallProtection'] === 'cage') errors.push(`building element ${key}: a caged ladder needs its cage data`);
+  for (const field of ['installedOn', 'arrivalSurfaceId']) {
+    if (element[field] !== undefined && typeof element[field] !== 'string')
+      errors.push(`building element ${key}: ${field} must be a string`);
+  }
+  return errors;
+}
+
+/** Problems with the category-specific fields of a `grating`, `railing` or `ladder` element (other categories: none). */
 export function accessElementErrors(key: string, element: Record<string, unknown>, elements: Record<string, unknown>): string[] {
   const category = element['category'];
   const errors: string[] = [];
@@ -60,5 +82,6 @@ export function accessElementErrors(key: string, element: Record<string, unknown
       if (problem !== null) errors.push(`building element ${key}: ${problem.message}`);
     }
   }
+  if (category === 'ladder') errors.push(...ladderErrors(key, element));
   return errors;
 }

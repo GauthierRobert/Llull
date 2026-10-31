@@ -5,7 +5,7 @@ import { tableRejection } from '@core/commands/noop';
 const REMEDIATION = {
   STA_RULESET_UNKNOWN: 'Call list_access_rules to see the loaded rulesets (iso_14122, osha_1910).',
   STA_UNKNOWN_ELEMENT:
-    'Pass ids of building elements of the right kind (describe_building, find_entities): check_access takes stairs, slabs, gratings and railings, check_grating and update_grating gratings, update_railing railings.',
+    'Pass ids of building elements of the right kind (describe_building, find_entities): check_access takes stairs, slabs, gratings, railings and ladders, check_grating and update_grating gratings, update_railing railings.',
   STA_INVALID_GEOMETRY:
     'Fix the geometry: finite numbers, a convex grating boundary of 3+ points or a railing path of 2+ distinct points, a non-zero bar direction.',
   STA_GRATING_TYPE_UNKNOWN: 'Call list_grating_types for the catalogue names.',
@@ -24,6 +24,26 @@ const REMEDIATION = {
     'update_railing { height } to at most the limit (a reviewer may accept a higher guard if every other criterion is met).',
   STA_RAIL_GAP: 'update_railing { kneeRails } adds rails until the clear space between rails, toe plate and top rail is within the limit.',
   STA_TOE_PLATE_MISSING: 'update_railing { toePlate } to at least the limit.',
+  STA_NO_ARRIVAL_SURFACE:
+    'Give climbHeight so that base + climbHeight reaches the top of a slab or grating within 50 mm and within 600 mm in plan of the ladder, or attachTo = the id of that surface.',
+  STA_LADDER_PITCH_INFEASIBLE:
+    'No uniform pitch satisfies every requested ruleset for this height: change climbHeight (or attachTo), pass rulesets with one ruleset, or give rungPitch and accept the finding.',
+  STA_LADDER_PITCH_OUT_OF_RANGE:
+    'delete_building_element the ladder and add_ladder again with rungPitchMax (or no rungPitch) so the pitch is uniform within the range.',
+  STA_LADDER_WIDTH: 'delete_building_element the ladder and add_ladder again with a larger clearWidth.',
+  STA_LADDER_BACK_CLEARANCE:
+    'Move the ladder away from the object behind it (delete_building_element, add_ladder with another base), or move the object.',
+  STA_LADDER_RAIL_EXTENSION: 'delete_building_element the ladder and add_ladder again with a larger railExtension.',
+  STA_LADDER_FALL_PROTECTION_MISSING:
+    'delete_building_element the ladder and add_ladder again with fallProtection cage, ladder_safety_system or pfas as the rulesets allow (leave it unset to take the default).',
+  STA_LADDER_CAGE_NOT_PRIMARY: 'delete_building_element the ladder and add_ladder again with fallProtection ladder_safety_system or pfas.',
+  STA_LADDER_CAGE_RETROFIT:
+    'Plan the retrofit of the existing cage before 2036-11-18 (the date is under a proposed repeal); a reviewer decides, nothing to change in the model.',
+  STA_LADDER_CAGE_START: 'delete_building_element the ladder and add_ladder again with cage.startHeight inside the allowed band.',
+  STA_LADDER_CAGE_GEOMETRY:
+    'delete_building_element the ladder and add_ladder again with cage.hoopSpacing / cage.diameter inside the limits.',
+  STA_LADDER_LANDING_INTERVAL:
+    'delete_building_element the ladder and add_ladder again with landings (leave landings unset to take the generated ones).',
   STA_STAIR_BLONDEL: 'Change riserCount or treadDepth of the stair so that 2 x riser + going is within the ISO range.',
   STA_STAIR_RISER: 'Increase riserCount so the riser height drops under the limit.',
   STA_STAIR_TREAD: 'Increase treadDepth to at least the limit.',

@@ -7,9 +7,10 @@ import { elementsOf } from '../../../building/model';
 import type { TakeoffAccumulator } from '../../../building/quantities/takeoffBasics';
 import { round } from '../../../shared/numeric';
 import { gratingAreaM2, gratingMassKg } from '../grating/gratingMeasure';
+import { ladderQuantities } from '../ladder/ladderMeasure';
 import { railingQuantities } from '../railing/railingMeasure';
 
-/** Adds `grating.<type>.m2|kg|ea` and `railing.<part>.m|ea|kg` lines. */
+/** Adds `grating.<type>.m2|kg|ea`, `railing.<part>.m|ea|kg` and `ladder.<part>.ea|m|kg` lines. */
 export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, takeoff: TakeoffAccumulator): void {
   for (const grating of elementsOf(building, 'grating')) {
     takeoff.add('grating', grating.gratingType, `Grating ${grating.gratingType}`, [
@@ -26,6 +27,13 @@ export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, take
     if (quantities.toeLengthM > 0) takeoff.add('railing', 'toe-plate', 'Railing toe plates', [['m', 'length', quantities.toeLengthM]]);
     if (quantities.gates > 0) takeoff.add('railing', 'gate', 'Railing gates', [['ea', 'count', quantities.gates]]);
     takeoff.add('railing', 'steel', 'Railing steel', [['kg', 'posts, rails, toe plates and gates', quantities.steelKg]]);
+  }
+  for (const ladder of elementsOf(building, 'ladder')) {
+    const quantities = ladderQuantities(doc, ladder);
+    takeoff.add('ladder', 'rung', 'Ladder rungs', [['ea', 'count', quantities.rungs]]);
+    if (quantities.cageM > 0) takeoff.add('ladder', 'cage', 'Ladder cages', [['m', 'height, first hoop to stile top', quantities.cageM]]);
+    if (quantities.landings > 0) takeoff.add('ladder', 'landing', 'Ladder landings', [['ea', 'count', quantities.landings]]);
+    takeoff.add('ladder', 'steel', 'Ladder steel', [['kg', 'stiles, rungs, cage and landings', quantities.steelKg]]);
   }
 }
 
@@ -59,4 +67,20 @@ export function railingScheduleRows(doc: CadDocument, building: BuildingModel): 
       building.levels[railing.levelId]?.name ?? railing.levelId,
     ];
   });
+}
+
+/** Ladder schedule: mark, height (mm), rungs, pitch (mm), clear width (mm), fall protection, landings, back clearance (mm), steel kg, level. */
+export function ladderScheduleRows(doc: CadDocument, building: BuildingModel): Row[] {
+  return elementsOf(building, 'ladder').map((ladder) => [
+    ladder.mark,
+    round(toMm(doc, ladder.climbHeight), 1),
+    ladder.rungCount,
+    round(toMm(doc, ladder.rungPitch), 3),
+    round(toMm(doc, ladder.clearWidth), 1),
+    ladder.fallProtection,
+    ladder.landings.length,
+    round(toMm(doc, ladder.backClearance), 1),
+    round(ladderQuantities(doc, ladder).steelKg, 1),
+    building.levels[ladder.levelId]?.name ?? ladder.levelId,
+  ]);
 }
