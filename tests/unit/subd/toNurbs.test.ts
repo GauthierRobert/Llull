@@ -78,11 +78,28 @@ describe('subdivision_to_nurbs sheets (VC-DIR-08, 09)', () => {
     expect(fitted.patchCount).toBe(24);
     expect(fitted.maxEvG1Deg).toBeLessThan(0.2);
     expect(fitted.maxEvG0).toBe(0);
-    const tighter = dataOf<{ maxEvG1Deg: number; patchCount: number }>(
+    // the exact solve meets any tolerance on a cube with the same 24 patches (data.g1Method "exact")
+    const tighter = dataOf<{ maxEvG1Deg: number; patchCount: number; g1Method: string }>(
       run(cube.document, 'subdivision_to_nurbs', { id: 'c', extraordinary: 'G1', tangentToleranceDeg: 0.01 }),
     );
-    expect(tighter.patchCount).toBeGreaterThan(24);
+    expect(tighter).toMatchObject({ patchCount: 24, g1Method: 'exact' });
     expect(tighter.maxEvG1Deg).toBeLessThanOrEqual(0.01);
+    // a box 2 x 2 x 2 is exact too, with the inner edge poles freed (same 96 patches, the exact solve says how); g1Solve "fit" is the approximate fit, then the refinement until the tolerance is met
+    const box = run(empty, 'add_subdivision_solid', { box: { size: [2, 2, 2], segments: [2, 2, 2] }, id: 'b' });
+    const exactBox = dataOf<{
+      maxEvG1Deg: number;
+      patchCount: number;
+      g1Method: string;
+      g1Exact: { method: string; freeQuads: number; patchCount: number };
+    }>(run(box.document, 'subdivision_to_nurbs', { id: 'b', extraordinary: 'G1', tangentToleranceDeg: 0.01 }));
+    expect(exactBox).toMatchObject({ g1Method: 'exact', patchCount: 96, g1Exact: { method: 'edges-freed', patchCount: 96 } });
+    expect(exactBox.maxEvG1Deg).toBeLessThanOrEqual(0.01);
+    const refined = dataOf<{ maxEvG1Deg: number; patchCount: number; g1Method: string; g1Exact: unknown }>(
+      run(box.document, 'subdivision_to_nurbs', { id: 'b', extraordinary: 'G1', g1Solve: 'fit', tangentToleranceDeg: 0.01 }),
+    );
+    expect(refined).toMatchObject({ g1Method: 'fit', g1Exact: null });
+    expect(refined.patchCount).toBeGreaterThan(96);
+    expect(refined.maxEvG1Deg).toBeLessThanOrEqual(0.01);
   });
 
   it('keeps the SubD with keep and inherits placement', () => {
@@ -256,11 +273,11 @@ describe('subdivision_to_nurbs solid and failures', () => {
   });
 
   it('through execute: a G1 request that no refinement within 4096 patches meets reports DIR_CONVERT_G1_TOLERANCE_NOT_MET in the data and the summary', () => {
-    // a 24-sided cylinder: the valence-24 cap stars keep a break above the smallest tolerance the schema accepts after the fit and every refinement
+    // a 24-sided cylinder with g1Solve "fit": the valence-24 cap stars keep a break above the smallest tolerance the schema accepts after the fit and every refinement (the exact solve meets it)
     const cage = cylinderCage(1, 2, 24, 2);
     const made = run(empty, 'add_subdivision_solid', { vertices: cage.vertices, faces: cage.faces, creases: [], levels: 1 });
     const id = made.affected[0] as string;
-    const result = run(made.document, 'subdivision_to_nurbs', { id, extraordinary: 'G1', tangentToleranceDeg: 0.01 });
+    const result = run(made.document, 'subdivision_to_nurbs', { id, extraordinary: 'G1', g1Solve: 'fit', tangentToleranceDeg: 0.01 });
     expect(dataOf<{ g1ToleranceMet: boolean; warnings: string[] }>(result)).toMatchObject({
       g1ToleranceMet: false,
       warnings: ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'],

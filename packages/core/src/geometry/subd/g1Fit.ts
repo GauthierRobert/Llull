@@ -65,6 +65,9 @@ function normalAt(patch: readonly Vec3[], { bu, bv, du, dv }: Basis): Vec3 {
   return normalize3OrZero(cross3([ux, uy, uz], [vx, vy, vz]));
 }
 
+/** Unit normal of `patch` at (u, v) by analytic derivatives (zero vector at a degenerate point). */
+export const patchNormal = (patch: readonly Vec3[], u: number, v: number): Vec3 => normalAt(patch, basisAt(u, v));
+
 /** Parameter of side `k` (directed v_k -> v_k+1) of a patch at fraction t along it. */
 const sideParameter = (k: number, t: number): readonly [number, number] =>
   k === 0 ? [t, 0] : k === 1 ? [1, t] : k === 2 ? [1 - t, 1] : [0, 1 - t];
