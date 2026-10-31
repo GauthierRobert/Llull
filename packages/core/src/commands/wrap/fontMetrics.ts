@@ -11,7 +11,7 @@ import { variationField } from './variationField';
 const MAX_TEXT = 256;
 
 /**
- * @affects none (read-only); data = unitsPerEm, ascender, descender, lineGap, capHeight (font units, at the instance), the instance, glyphs [{ character, codePoint, glyph, advanceWidth, advanceHeight }] and their sums
+ * @affects none (read-only); data = unitsPerEm, ascender, descender, lineGap, capHeight (font units, at the instance), the instance, glyphs [{ character, codePoint, glyph, advanceWidth, advanceHeight, verticalOrigin { y, source } }] and their sums
  * @invariant advance heights come from vmtx moved by VVAR (or the phantom points of a gvar font), widths from hmtx moved by HVAR (or the phantom points); font units, rounded to a unit like the layout does
  * @failure no such font, a variation / instance the font does not have -> WRP_FONT_UNAVAILABLE / WRP_FONT_VARIATION; text over 256 characters -> WRP_PARAM_INVALID
  */
@@ -20,7 +20,7 @@ export const fontMetrics = defineCommand({
   annotations: { readOnly: true },
   description:
     'Metrics of a font at one instance, in font units (divide by data.unitsPerEm for em): data.ascender / descender / lineGap / capHeight (moved by MVAR for a variable font) and, for each character of `text`, ' +
-    'its glyph index, advanceWidth (hmtx + HVAR) and advanceHeight (vmtx + VVAR, or the phantom points of a TrueType gvar font; ascender - descender when the font has no vertical metrics), plus their sums. ' +
+    'its glyph index, advanceWidth (hmtx + HVAR) and advanceHeight (vmtx + VVAR, or the phantom points of a TrueType gvar font; ascender - descender when the font has no vertical metrics), verticalOrigin (where the glyph hangs in vertical text: VORG of a CFF font, else the ascender), plus their sums. ' +
     '`font` = a font id of the document, a family name, or a bundled font; `variation` = {axisTag: value} or `instance` = a named instance (Bold), not both; omitted = the default instance. ' +
     'Read-only. Next: add_text with the same font and instance, import_font to embed it.',
   params: z.object({
@@ -45,7 +45,14 @@ export const fontMetrics = defineCommand({
     const glyphs = [...(params.text ?? '')].map((character) => {
       const codePoint = character.codePointAt(0) as number;
       const glyph = font.glyphIndex(codePoint);
-      return { character, codePoint, glyph, advanceWidth: font.advance(glyph), advanceHeight: font.verticalAdvance(glyph) };
+      return {
+        character,
+        codePoint,
+        glyph,
+        advanceWidth: font.advance(glyph),
+        advanceHeight: font.verticalAdvance(glyph),
+        verticalOrigin: font.verticalOrigin(glyph),
+      };
     });
     const width = glyphs.reduce((sum, entry) => sum + entry.advanceWidth, 0);
     const height = glyphs.reduce((sum, entry) => sum + entry.advanceHeight, 0);

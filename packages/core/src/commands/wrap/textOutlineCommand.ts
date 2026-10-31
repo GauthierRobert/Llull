@@ -32,7 +32,7 @@ export const textOutlineCommand = defineCommand({
   description:
     'Outline of a text entity that has a font (add_text with font=...): the closed glyph loops that extrude_profile and emboss_on_face use. Returns ' +
     '`data` with loops (every contour), outerLoops, holes, area (document units squared, exact), outlineLength, advanceWidth (widest line, document ' +
-    'units), bbox in the text plane relative to the text position, font {family, sha256}, `unverified` (the font bytes are not pinned), and ' +
+    'units; the widest column of a vertical text), direction and, for vertical text, advanceHeight (tallest column), bbox in the text plane relative to the text position, font {family, sha256}, `unverified` (the font bytes are not pinned), and ' +
     'provenance. Lengths follow the document unit (lengthUnit in the result). `output: "glyphs"` adds per-character topology (contours, holes, area in ' +
     'font units squared) paged by `offset` / `limit`; `output: "loops"` adds each region as flattened polylines (at most 2000 points per loop). ' +
     '`kerning: false` ignores the font kern pairs (advance widths only). Next: emboss_on_face, extrude_profile, wrap_to_face. Unmapped characters ' +
@@ -43,7 +43,16 @@ export const textOutlineCommand = defineCommand({
       .enum(['summary', 'glyphs', 'loops'])
       .optional()
       .describe('summary (default): totals only; glyphs: also one record per character; loops: also the region polylines.'),
-    kerning: z.boolean().optional().describe('Apply the font kern pairs. Default: the text entity setting (true).'),
+    kerning: z
+      .boolean()
+      .optional()
+      .describe('Apply the font kern pairs. Default: the text entity setting (true). Ignored for vertical text.'),
+    direction: z
+      .enum(['horizontal', 'vertical'])
+      .optional()
+      .describe(
+        'Lay the text out horizontally or vertically (glyphs stacked top to bottom). Default: the text entity setting (horizontal).',
+      ),
     offset: z.number().int().min(0).optional().describe('First glyph record returned with output "glyphs". Default 0.'),
     limit: z
       .number()
@@ -63,7 +72,10 @@ export const textOutlineCommand = defineCommand({
       return reject('WRP_TEXT_NO_FONT', `entity '${params.id}' (${entity.kind}) is not a text with a font`, [params.id]);
     const loaded = loadFont(doc, entity.font);
     if (isFontFailure(loaded)) return reject(loaded.code, loaded.message, [params.id]);
-    const outline = outlineOfText(doc, entity, loaded.font, params.kerning === undefined ? {} : { kerning: params.kerning });
+    const outline = outlineOfText(doc, entity, loaded.font, {
+      ...(params.kerning === undefined ? {} : { kerning: params.kerning }),
+      ...(params.direction === undefined ? {} : { direction: params.direction }),
+    });
     if (isOutlineFailure(outline)) return reject(outline.code, outline.message, [params.id]);
     const { layout } = outline;
     const mode = params.output ?? 'summary';
@@ -118,6 +130,8 @@ export const textOutlineCommand = defineCommand({
         area: outline.area,
         outlineLength: outline.outlineLength,
         advanceWidth: layout.advanceWidth,
+        direction: layout.direction,
+        ...(layout.direction === 'vertical' ? { advanceHeight: layout.advanceHeight } : {}),
         lines: layout.lines,
         bbox: outline.bbox,
         height: entity.height,

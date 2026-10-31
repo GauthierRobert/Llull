@@ -28,6 +28,7 @@ import {
   readPermissions,
   requireTable,
   verticalAdvanceOf,
+  verticalOriginOf,
   type Embedding,
   type FontNames,
 } from './sfnt';
@@ -64,6 +65,8 @@ export interface ParsedFont {
   readonly instance: Readonly<Record<string, number>>;
   /** Advance height in font units (`vmtx` + `VVAR`, or the phantom points of a gvar font; ascender - descender without vertical metrics). */
   readonly verticalAdvance: (glyph: number) => number;
+  /** Where the glyph hangs in vertical text: y of its vertical origin above the baseline (font units). `VORG` for a CFF font that has one, else the ascender (the OpenType default; the horizontal origin is the middle of the advance width). */
+  readonly verticalOrigin: (glyph: number) => { readonly y: number; readonly source: 'VORG' | 'ascender' };
   /** Glyph index of a code point; 0 (`.notdef`) when the font has none. */
   readonly glyphIndex: (codePoint: number) => number;
   readonly advance: (glyph: number) => number;
@@ -110,6 +113,7 @@ function buildStroke(bytes: Uint8Array): ParsedFont {
     glyphIndex: font.glyphIndex,
     advance: font.advance,
     verticalAdvance: () => font.ascender - font.descender,
+    verticalOrigin: () => ({ y: font.ascender, source: 'ascender' }),
     kerning: () => 0,
     outline: () => [],
     scanGlyphs: () => undefined,
@@ -260,6 +264,10 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
             : Math.round(base + phantomsOf(glyph).height);
       heights.set(glyph, height);
       return height;
+    },
+    verticalOrigin: (glyph) => {
+      const declared = tables.flavor === 'cff' ? verticalOriginOf(tables, glyph) : null;
+      return declared === null ? { y: header.ascender + metric('hasc'), source: 'ascender' } : { y: declared, source: 'VORG' };
     },
     axes: space?.axes ?? [],
     namedInstances,

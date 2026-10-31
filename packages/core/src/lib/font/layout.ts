@@ -6,6 +6,7 @@
 import type { Vec2 } from '../../model/vectors';
 import { mapLoop, type OutlineLoop } from './outline';
 import type { ParsedFont } from './font';
+import { layoutVertical, type PlacedGlyph } from './layoutVertical';
 
 export interface LayoutOptions {
   /** Cap height in document units. */
@@ -17,16 +18,8 @@ export interface LayoutOptions {
   readonly kerning: boolean;
   /** Line pitch as a multiple of (ascender - descender + line gap). */
   readonly lineSpacing: number;
-}
-
-interface PlacedGlyph {
-  readonly character: string;
-  readonly glyph: number;
-  readonly loops: readonly OutlineLoop[];
-  /** Open strokes of a single-line font in document units (empty for outline fonts). */
-  readonly strokes: readonly (readonly Vec2[])[];
-  /** Advance width in document units (before kerning and letter spacing). */
-  readonly advance: number;
+  /** Default 'horizontal'. 'vertical': glyphs stacked top to bottom, lines as columns running leftward (kerning is not applied). */
+  readonly direction?: 'horizontal' | 'vertical';
 }
 
 export interface TextLayout {
@@ -39,6 +32,9 @@ export interface TextLayout {
   /** Widest line: sum of advances, kerning and letter spacing between glyphs. */
   readonly advanceWidth: number;
   readonly lines: number;
+  readonly direction: 'horizontal' | 'vertical';
+  /** Vertical text: the tallest column (vertical advances plus letter spacing); 0 for horizontal text. */
+  readonly advanceHeight: number;
   /** Distinct characters the font has no glyph for (drawn as nothing). */
   readonly missing: readonly string[];
 }
@@ -55,6 +51,20 @@ export function layoutText(font: ParsedFont, content: string, options: LayoutOpt
     else (lines[lines.length - 1] as string[]).push(character);
   }
   const pitch = options.lineSpacing * (font.ascender - font.descender + font.lineGap) * scale;
+  if (options.direction === 'vertical') {
+    const placed = layoutVertical(font, lines, options, scale, pitch);
+    return {
+      glyphs: placed.glyphs,
+      loops: placed.glyphs.flatMap((glyph) => glyph.loops),
+      strokes: placed.glyphs.flatMap((glyph) => glyph.strokes),
+      scale,
+      advanceWidth: placed.advanceWidth,
+      lines: lines.length,
+      direction: 'vertical',
+      advanceHeight: placed.advanceHeight,
+      missing: placed.missing,
+    };
+  }
   const top = options.verticalAnchor === 'cap_top' ? options.height : options.verticalAnchor === 'cap_middle' ? options.height / 2 : 0;
   const glyphs: PlacedGlyph[] = [];
   const missing = new Set<string>();
@@ -95,6 +105,8 @@ export function layoutText(font: ParsedFont, content: string, options: LayoutOpt
     scale,
     advanceWidth: widest,
     lines: lines.length,
+    direction: 'horizontal',
+    advanceHeight: 0,
     missing: [...missing],
   };
 }

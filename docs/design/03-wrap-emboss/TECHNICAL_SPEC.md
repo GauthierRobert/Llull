@@ -880,7 +880,7 @@ and a requested name is matched against every language of the instance's subfami
 
 **Measured (closed forms by construction, `tests/unit/wrap/vvar.test.ts`).** Heights 1000..1400 with a VVAR of 0, 10, 20, 30, 40 on wght+: at wght 900 the glyphs read 1000, 1110, 1220, 1330, 1440, at wght 650 (coordinate 0.5)
 1000, 1105, 1210, 1315, 1420; through a map to rows 3 - k: 1030, 1120, 1210, 1300, 1400; without vmtx 1150 + 10 k; the phantom fallback 30 - 10 = 20 on glyph 2. Four instances give four names, and `Bold`, `bold`, `Test-Bold` equal
-the explicit {wght: 700} (instance, advances, outline). **Left:** vertical layout of text (the heights are read by font_metrics, nothing lays text out vertically), `VORG`.
+the explicit {wght: 700} (instance, advances, outline). **Left:** none: vertical layout of text and `VORG` are §14.20.
 
 ### 14.19 Footprint and knurl previews (DES-3c)
 
@@ -889,3 +889,30 @@ the explicit {wght: 700} (instance, advances, outline). **Left:** vertical layou
 **UI.** The palette form of the two commands (`preview` on) sends the typed params, debounced 250 ms, to the query (backend when online, local otherwise: `useHostQuery`) and draws the answer as a ghost on the face (`FootprintPreviewLayer`: loops cyan, holes magenta, knurl lines amber) with the query's own summary, or its refusal, in a `role="status"` line. Invalid or incomplete params, leaving the form or turning `preview` off clear the ghost. Nothing in the UI derives geometry. Tests: `tests/unit/wrap/preview.test.ts`, `tests/component/FootprintPreview.test.tsx`.
 
 **Review fixes (2026-10-31).** The knurl ghost draws the grooves the recipes sweep: one phase function (\`knurlGeometry.toothAzimuth\`, \`knurlHelix.helicalAzimuth\`, in the frame of \`axisFrame(axis, origin)\`, the helical sweep starting at \`grooveSpan.z0\`) is read by both recipes and the preview, which only clips to the face and thins; a cylinder whose surface frame is turned gets the same lines. With \`model: "geometry"\` the preview and the command share \`planKnurlGeometry\` (tooth angle, depth, land, reach, bore, kernel-time envelope, free end caps), so the refusals before the build are the same code and path. A preview hands no build to the kernel: with \`walls: "pull"\` and a draft the drafted walls are not built (\`data.draftChecked\` says the command builds and checks them; the draft-closing check still runs). The form finds the query in \`annotations.previewQuery\` of the command and the answer says what it is in \`data.kind\` (\`footprint\` or \`lines\`); the query is asked again when the entities of the document change, and a request is aborted when its params change or the form closes.
+
+### 14.20 Vertical text layout (DES-3c)
+
+**Parameter.** `direction: "horizontal" | "vertical"` on `add_text` (stored on the text entity, so `edit_step_params`, replay and every consumer of the entity follow it: `text_outline`, `extrude_profile`, the sketch outlines of `emboss_on_face` / `wrap_to_face`, all through `outlineOfText`) and as an override on `text_outline`
+(like `kerning`). Default horizontal: nothing changes for existing documents (the layout of a horizontal text is the same code path).
+
+**Layout** (`lib/font/layoutVertical.ts`, CJK style, glyphs upright; no `vert` / `vrt2` substitution, no rotated Latin). Per column (a line; a newline starts the next): the glyph k is hung from its VERTICAL ORIGIN, the point of the glyph that sits at the pen,
+and the pen moves DOWN by the vertical advance of the glyph plus `letterSpacing`:
+- vertical advance = `ParsedFont.verticalAdvance` (`vmtx` at the instance, `VVAR` / phantom points, ascender - descender without vertical metrics, §14.18), scaled by cap height / font cap height like the widths;
+- vertical origin = `ParsedFont.verticalOrigin(glyph)`: the `VORG` record of the glyph (else its `defaultVertOriginY`) for a CFF font that has a `VORG` table, otherwise the OpenType default: the glyph's origin is the middle of its advance width in x
+  and the ascender (at the instance, `MVAR` moved) in y. `VORG` version must be 1.0, the table at least 8 bytes and 4 bytes per record, else `WRP_FONT_PARSE` when a vertical origin is asked; a `VORG` on a TrueType font is not read;
+- glyph point (x, y) in font units goes to (s x + cx - s advance / 2, s y + top - s origin_y), s = document units per font unit, cx the column's x, top the pen's y;
+- `anchor` aligns the COLUMN (its width is the widest advance in it): center puts the middle of the advance widths on x = 0, left the column's left edge, right its right edge; columns after the first lie one line pitch (ascender - descender + line gap, times `lineSpacing`) to the LEFT, each from the same top;
+- `verticalAnchor`: baseline and cap_top put the top of the first advance box on y = 0 (the text hangs from the position), cap_middle centres the column on y = 0;
+- kerning is not applied (the pairs are horizontal; `vkrn` is not read), `letterSpacing` goes between glyphs vertically.
+`data` of `text_outline`: `direction`, `advanceWidth` (the widest column), `advanceHeight` (the tallest column: vertical advances plus spacing; absent for horizontal text), `lines` (the column count); `font_metrics` lists `verticalOrigin { y, source: "VORG" | "ascender" }` per character.
+Areas, loop counts and outline lengths do not depend on the direction (same glyphs, other places).
+
+**Refusals** (by name, with remediation): `WRP_TEXT_NO_FONT` (vertical without a font), `WRP_TEXT_VERTICAL_CURVE` (vertical together with `onCurve`, in `add_text` and in `text_outline` / the shared outline path: vertical text does not follow a curve); a bad `direction` is an invalid parameter.
+
+**Measured (closed forms by construction, `tests/unit/wrap/verticalText.test.ts`).** Fixture font: heights 1000..1400 (A 1100, B 1200), widths 600 / 700, ascender 900, descender -250, line gap 100, cap height 700; height 7 (0.01 per font unit), centre anchor:
+A (square 100) at x -3..-2, y -9..-8; B (triangle) at x -3.5..-2.5, y -20..-19; advanceWidth 7, advanceHeight 23 (11 + 12), letter spacing 2 moves B to y -22..-21 (advanceHeight 25); cap_middle: A at y 2.5..3.5; anchor left: B at x 0..1; right: x -7..-6;
+two columns "A
+B": B at x -16..-15 (pitch 12.5), y -9..-8. Without vmtx every height is 1150: B at y -20.5..-19.5. CFF with `VORG` (default 950, glyph 2 -> 700): A at y -9.5..-8.5, B at y -18.5..-17.5; negative origins and a 60-record binary search read.
+Real fonts: Fira Sans has no vertical metrics (height = ascender - descender, origin = ascender); Bahnschrift, when installed, takes the same fallback (the test is skipped where the file is absent). Areas stay 1.5 (square + triangle) in both directions.
+**Red-proofs:** vertical origin 0 (7 tests fail), horizontal advance in place of the vertical one (10), `VORG` ignored (3).
+**Left:** `vert` / `vrt2` glyph substitution, rotated Latin runs (tate-chu-yoko), `vkrn` vertical kerning, `vmtx` top side bearings as an origin for TrueType, vertical layout on a curve.

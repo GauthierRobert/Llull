@@ -27,6 +27,7 @@ type TextAnchor = NonNullable<TextEntity['anchor']>;
  * @failure height <= 0 -> no-op, affected:[]
  * @failure missing or invalid position -> no-op, affected:[]
  * @invariant with `font` the text is a closed profile (glyph outlines) and the font (a document record, or a bundled one embedded now) travels with the document
+ * @failure direction vertical without a font -> WRP_TEXT_NO_FONT; vertical together with onCurve -> WRP_TEXT_VERTICAL_CURVE
  * @failure unknown font -> WRP_FONT_UNAVAILABLE; over 2000 characters with a font -> WRP_TEXT_TOO_LONG; characters the font lacks -> warning WRP_GLYPH_MISSING in data (the step succeeds)
  */
 export const addText = defineCommand({
@@ -41,7 +42,8 @@ export const addText = defineCommand({
     'Optional `color` is a hex string (e.g. "#333333"). Optional `layer` is the target layer id. ' +
     'Optional `font` (a font id from import_font / list_fonts, or the family of a bundled font such as "Fira Sans") turns the text into a closed outline ' +
     'profile that text_outline, extrude_profile, wrap_to_face and emboss_on_face accept; `height` is then the exact cap height. With a font, ' +
-    '`verticalAnchor` (baseline | cap_middle | cap_top), `letterSpacing` (document units after each glyph), `kerning` and `lineSpacing` (newline breaks lines) apply. ' +
+    '`verticalAnchor` (baseline | cap_middle | cap_top), `letterSpacing` (document units after each glyph), `kerning` and `lineSpacing` (newline breaks lines) apply; ' +
+    '`direction: "vertical"` stacks the glyphs top to bottom (CJK style, columns to the left; see the `direction` parameter). ' +
     'A single-line font (family "LLULL Single Line", bundled) draws open strokes for engraving: wrap_to_face wraps them as curves and emboss_on_face mode engrave cuts a groove along them. ' +
     '`onCurve` { curveId, offset?, reverse? } bends a font text along a line / arc / circle / polyline / spline of the same sketch plane (the baseline follows the curve, glyphs stand on its ' +
     'left; anchor left / center / right aligns the text to the start / middle / end of the curve, `offset` shifts it along; refused when the text is longer than the curve). ' +
@@ -76,7 +78,13 @@ export const addText = defineCommand({
       )
       .optional(),
     letterSpacing: z.number().describe('Font text only: extra distance in document units added after each glyph. Default 0.').optional(),
-    kerning: z.boolean().describe('Font text only: apply the font kern pairs. Default true.').optional(),
+    kerning: z.boolean().describe('Font text only: apply the font kern pairs. Default true. Ignored for vertical text.').optional(),
+    direction: z
+      .enum(['horizontal', 'vertical'])
+      .describe(
+        'Font text only: horizontal (default) sets the glyphs along the baseline; vertical stacks them top to bottom by the vertical advance of the font (vmtx, ascender - descender without it), each hung from its vertical origin (VORG, else the middle of its advance at the ascender), upright; newline starts a new column to the LEFT; position is the top of the first glyph, `verticalAnchor` cap_middle centres the column on it, `anchor` aligns the column. Not with onCurve.',
+      )
+      .optional(),
     lineSpacing: z
       .number()
       .positive()
@@ -114,6 +122,7 @@ export const addText = defineCommand({
       verticalAnchor,
       letterSpacing,
       kerning,
+      direction,
       lineSpacing,
       onCurve,
     },
@@ -146,6 +155,26 @@ export const addText = defineCommand({
           `the curve '${onCurve.curveId}' and the text lie in different planes (rotations differ)`,
           [onCurve.curveId],
           ['rotation'],
+        );
+    }
+    if (direction === 'vertical') {
+      if (font === undefined)
+        return wrapRejection(
+          doc,
+          'add_text',
+          'WRP_TEXT_NO_FONT',
+          'direction vertical lays out outline text: give a font',
+          [],
+          ['direction'],
+        );
+      if (onCurve !== undefined)
+        return wrapRejection(
+          doc,
+          'add_text',
+          'WRP_TEXT_VERTICAL_CURVE',
+          'vertical text cannot follow a curve (onCurve)',
+          [],
+          ['direction'],
         );
     }
     let target = doc;
@@ -186,6 +215,7 @@ export const addText = defineCommand({
       ...(verticalAnchor === undefined ? {} : { verticalAnchor }),
       ...(letterSpacing === undefined ? {} : { letterSpacing }),
       ...(kerning === undefined ? {} : { kerning }),
+      ...(direction === undefined ? {} : { direction }),
       ...(lineSpacing === undefined ? {} : { lineSpacing }),
       ...(onCurve === undefined
         ? {}
