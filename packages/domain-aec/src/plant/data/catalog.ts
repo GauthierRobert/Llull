@@ -1,5 +1,6 @@
 import { commandCatalog } from '@core/commands/schema';
 import { assignPlantObject } from './commands/assignPlantObject';
+import { assignPlantObjects } from './commands/assignPlantObjects';
 import { checkPlantData } from './commands/checkPlantData';
 import { definePlantClass } from './commands/defineClass';
 import { definePlantHierarchy } from './commands/defineHierarchy';
@@ -15,6 +16,7 @@ export const plantDataCatalog = commandCatalog(
   loadPlantClassLibrary,
   setTagFormat,
   assignPlantObject,
+  assignPlantObjects,
   setPlantProperties,
   unassignPlantObject,
   plantDataTable,
