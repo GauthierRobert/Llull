@@ -24,6 +24,10 @@ namespace llull {
 // How the radius runs between the nodes of the law of an edge: the cubic spline of OCCT, exact straight pieces, or the monotone C1 cubic (no overshoot).
 enum class LawKind : int { Smooth = 0, Straight = 1, Monotone = 2 };
 
+// Whether the parameter fraction of `edge` differs from its arc fraction (an ellipse, a B-spline): a law given along its length must then be placed node by node (LawFillet).
+// A failure to invert the arc length abscissa throws Standard_Failure.
+bool uneven_speed(const TopoDS_Edge &edge);
+
 // A fillet spine remembering which law kind each of its edges carries.
 class LawSpine : public ChFiDS_FilSpine {
  public:

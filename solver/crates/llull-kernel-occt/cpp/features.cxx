@@ -400,8 +400,22 @@ std::unique_ptr<Shape> round_edges(const Shape &source, rust::Slice<const uint32
 }  // namespace
 
 std::unique_ptr<Shape> fillet_edges(const Shape &shape, rust::Slice<const uint32_t> edges, double radius, double radius_end) {
-  BRepFilletAPI_MakeFillet maker(shape.shape, ChFi3d_Rational);
   const bool varying = !std::isnan(radius_end);
+  if (varying) {
+    // OCCT reads the radius of Add(r1, r2, e) along the PARAMETER of the edge; on an edge of uneven speed the transition is laid on the arc length instead (law_fillet.cxx)
+    const TopTools_IndexedMapOfShape unique = unique_sub_shapes(shape.shape, TopAbs_EDGE);
+    bool uneven = false;
+    for (int i = 1; i <= unique.Extent() && !uneven; ++i) {
+      bool picked = edges.empty();
+      for (uint32_t index : edges) picked = picked || static_cast<int>(index) + 1 == i;
+      uneven = picked && uneven_speed(TopoDS::Edge(unique(i)));
+    }
+    if (uneven) {
+      LawFillet law_maker(shape.shape);
+      return round_edges(shape, edges, law_maker, [&](LawFillet &target, const TopoDS_Edge &edge) { target.range(edge, radius, radius_end); }, "blend");
+    }
+  }
+  BRepFilletAPI_MakeFillet maker(shape.shape, ChFi3d_Rational);
   return round_edges(
       shape, edges, maker,
       [&](BRepFilletAPI_MakeFillet &target, const TopoDS_Edge &edge) {

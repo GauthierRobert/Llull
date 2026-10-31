@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRep_Tool.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <ChFiDS_Stripe.hxx>
 #include <Law_BSpline.hxx>
@@ -14,6 +16,7 @@
 #include <Law_Laws.hxx>
 #include <Law_Linear.hxx>
 #include <Precision.hxx>
+#include <Standard_Failure.hxx>
 #include <TColgp_Array1OfPnt2d.hxx>
 #include <TColStd_Array1OfInteger.hxx>
 #include <TColStd_Array1OfReal.hxx>
@@ -78,42 +81,117 @@ Handle(Law_BSpFunc) hermite_piece(const Knot &from, double from_slope, const Kno
 
 // OCCT reads the relative position of a node of an edge as a fraction of the edge's PARAMETER range (measured: native test nativeBlendChainEdges), which is
 // not the fraction of its length where the curve does not run at a steady speed (an ellipse, a B-spline). A law is given along the edge's ARC length, so a node at
-// the arc fraction `arc` is placed at the parameter fraction of that point.
+// the arc fraction `arc` is placed at the parameter fraction of that point. Not placing it is a failure (never the arc fraction in its place: that is the old error).
 double parameter_fraction(const BRepAdaptor_Curve &curve, double length, double arc) {
   if (arc <= 0.0) return 0.0;
   if (arc >= 1.0) return 1.0;
   const double first = curve.FirstParameter(), last = curve.LastParameter();
   const GCPnts_AbscissaPoint point(curve, arc * length, first);
-  if (!point.IsDone() || !(last > first)) return arc;
+  if (!point.IsDone() || !(last > first)) throw Standard_Failure("law node not placed: the arc length abscissa of the edge could not be inverted");
   return std::min(1.0, std::max(0.0, (point.Parameter() - first) / (last - first)));
 }
 
-// Pieces a straight stretch between two nodes is cut into on an edge of uneven speed: a straight piece in the parameter is not straight in the arc length, so
-// the stretch becomes this many pieces whose nodes lie on the straight line in the arc length (a gap of about 1 / 256 x the curvature of the map x 1/8).
-constexpr int STRAIGHT_PIECES = 16;
+// A stretch between two nodes on an edge of uneven speed starts as this many pieces, each halved (down to MAX_HALVINGS times) until the law in the PARAMETER
+// differs from the law in the ARC length by less than RADIUS_GAP of the largest radius: a law that is straight (or a cubic) in the arc length is not so in the
+// parameter, so its nodes are laid on the arc-length curve of the law (the gap of a piece grows with the square of its width and the curvature of the map).
+constexpr int BASE_PIECES = 4;
+constexpr int MAX_HALVINGS = 6;
+constexpr double RADIUS_GAP = 1e-6;
 
-// The nodes (arc fraction, radius) of a law along `edge` as the nodes OCCT reads (parameter fraction, radius); a straight law is cut into STRAIGHT_PIECES per stretch where the speed is uneven.
-std::vector<gp_Pnt2d> parameter_nodes(const TopoDS_Edge &edge, const std::vector<gp_Pnt2d> &nodes, LawKind kind) {
+// Whether the parameter fraction of the edge differs from its arc fraction: probed at fractions off the symmetric ones (a closed ellipse is at its arc fraction at 1/4, 1/2 and 3/4).
+bool uneven_curve(const BRepAdaptor_Curve &curve, double length) {
+  double unevenness = 0.0;
+  for (const double arc : {0.1, 0.3, 0.45, 0.7, 0.9}) unevenness = std::max(unevenness, std::abs(parameter_fraction(curve, length, arc) - arc));
+  return unevenness >= 1e-5;
+}
+
+// The cubic Hermite value at `x` between two knots with the given end slopes.
+double hermite_value(const Knot &from, double from_slope, const Knot &to, double to_slope, double x) {
+  const double width = to.position - from.position;
+  const double u = (x - from.position) / width, u2 = u * u, u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * from.radius + (u3 - 2 * u2 + u) * width * from_slope + (-2 * u3 + 3 * u2) * to.radius + (u3 - u2) * width * to_slope;
+}
+
+// The radius of the law of `kind` through `nodes` (arc fraction, radius) at the arc fraction x: the polyline, the monotone cubic, or the cubic spline of OCCT
+// (zero slope at both ends; two nodes alone are its Hermite cubic).
+std::function<double(double)> arc_law(const std::vector<gp_Pnt2d> &nodes, LawKind kind) {
+  std::vector<Knot> knots;
+  for (const gp_Pnt2d &node : nodes) knots.push_back({node.X(), node.Y()});
+  const auto stretch_of = [knots](double x) {
+    size_t k = 0;
+    while (k + 2 < knots.size() && x > knots[k + 1].position) ++k;
+    return k;
+  };
+  if (kind == LawKind::Straight)
+    return [knots, stretch_of](double x) {
+      const size_t k = stretch_of(x);
+      const double u = (x - knots[k].position) / (knots[k + 1].position - knots[k].position);
+      return knots[k].radius + u * (knots[k + 1].radius - knots[k].radius);
+    };
+  if (kind == LawKind::Monotone || knots.size() == 2) {
+    const std::vector<double> slopes = kind == LawKind::Monotone ? monotone_slopes(knots, 0, knots.size() - 1) : std::vector<double>(2, 0.0);
+    return [knots, slopes, stretch_of](double x) {
+      const size_t k = stretch_of(x);
+      return hermite_value(knots[k], slopes[k], knots[k + 1], slopes[k + 1], x);
+    };
+  }
+  TColgp_Array1OfPnt2d points(1, static_cast<int>(nodes.size()));
+  for (size_t k = 0; k < nodes.size(); ++k) points(static_cast<int>(k) + 1) = nodes[k];
+  Handle(Law_Interpol) spline = new Law_Interpol();
+  spline->Set(points, 0.0, 0.0, Standard_False);
+  return [spline](double x) { return spline->Value(x); };
+}
+
+// The nodes (arc fraction, radius) of a law along `edge` as the nodes OCCT reads (parameter fraction, radius). `uneven` is false (and the nodes come back as
+// given) where the parameter fraction is the arc fraction; else every stretch is cut into pieces (BASE_PIECES, refined) whose nodes lie on the law of `kind` in the arc length,
+// so the radius follows the law between the given nodes too, not only at them.
+std::vector<gp_Pnt2d> parameter_nodes(const TopoDS_Edge &edge, const std::vector<gp_Pnt2d> &nodes, LawKind kind, bool &uneven) {
+  uneven = false;
   const BRepAdaptor_Curve curve(edge);
   const double length = GCPnts_AbscissaPoint::Length(curve, curve.FirstParameter(), curve.LastParameter());
   if (!(length > Precision::Confusion())) return nodes;
-  double unevenness = 0.0;
-  for (const double arc : {0.25, 0.5, 0.75}) unevenness = std::max(unevenness, std::abs(parameter_fraction(curve, length, arc) - arc));
-  if (unevenness < 1e-7) return nodes;
+  if (!uneven_curve(curve, length)) return nodes;
+  uneven = true;
+  const std::function<double(double)> law = arc_law(nodes, kind);
+  double scale = 0.0;
+  for (const gp_Pnt2d &node : nodes) scale = std::max(scale, std::abs(node.Y()));
+  const double tolerance = RADIUS_GAP * scale;
   std::vector<gp_Pnt2d> out;
+  // appends the nodes strictly inside the arc piece [x0, x1] (parameter fractions p0, p1 at its ends) where the chord of the law in the parameter misses it
+  const std::function<void(double, double, double, double, int)> refine = [&](double x0, double p0, double x1, double p1, int halvings) {
+    if (halvings <= 0 || !(p1 > p0)) return;
+    const double xm = 0.5 * (x0 + x1), pm = parameter_fraction(curve, length, xm);
+    const double y0 = law(x0), y1 = law(x1), ym = law(xm);
+    if (std::abs(y0 + (y1 - y0) * (pm - p0) / (p1 - p0) - ym) <= tolerance) return;
+    refine(x0, p0, xm, pm, halvings - 1);
+    out.emplace_back(pm, ym);
+    refine(xm, pm, x1, p1, halvings - 1);
+  };
   for (size_t k = 0; k < nodes.size(); ++k) {
-    if (kind == LawKind::Straight && k > 0)
-      for (int piece = 1; piece < STRAIGHT_PIECES; ++piece) {
-        const double share = static_cast<double>(piece) / STRAIGHT_PIECES;
-        out.emplace_back(parameter_fraction(curve, length, nodes[k - 1].X() + share * (nodes[k].X() - nodes[k - 1].X())),
-                         nodes[k - 1].Y() + share * (nodes[k].Y() - nodes[k - 1].Y()));
+    if (k > 0) {
+      double x0 = nodes[k - 1].X(), p0 = parameter_fraction(curve, length, x0);
+      for (int piece = 1; piece <= BASE_PIECES; ++piece) {
+        const double x1 = piece == BASE_PIECES ? nodes[k].X() : nodes[k - 1].X() + (static_cast<double>(piece) / BASE_PIECES) * (nodes[k].X() - nodes[k - 1].X());
+        const double p1 = parameter_fraction(curve, length, x1);
+        refine(x0, p0, x1, p1, MAX_HALVINGS);
+        if (piece < BASE_PIECES) out.emplace_back(p1, law(x1));
+        x0 = x1;
+        p0 = p1;
       }
+    }
     out.emplace_back(parameter_fraction(curve, length, nodes[k].X()), nodes[k].Y());
   }
   return out;
 }
 
 }  // namespace
+
+bool uneven_speed(const TopoDS_Edge &edge) {
+  if (BRep_Tool::Degenerated(edge)) return false;
+  const BRepAdaptor_Curve curve(edge);
+  const double length = GCPnts_AbscissaPoint::Length(curve, curve.FirstParameter(), curve.LastParameter());
+  return length > Precision::Confusion() && uneven_curve(curve, length);
+}
 
 void LawSpine::add_node(double relative, double radius, int edge_in_contour, LawKind kind) {
   SetRadius(gp_XY(relative, radius), edge_in_contour);
@@ -236,20 +314,21 @@ bool LawFillet::constant(const TopoDS_Edge &edge, double radius) {
 bool LawFillet::range(const TopoDS_Edge &edge, double start, double end) {
   // a difference below the confusion is the same radius, as BRepFilletAPI_MakeFillet reads it
   if (std::abs(start - end) < Precision::Confusion()) return constant(edge, 0.5 * (start + end));
-  const Slot target = slot(edge);
-  if (target.spine.IsNull()) return false;
-  target.spine->add_node(0., target.reversed ? end : start, target.index, LawKind::Smooth);
-  target.spine->add_node(1., target.reversed ? start : end, target.index, LawKind::Smooth);
-  return true;
+  return nodes(edge, {gp_Pnt2d(0., start), gp_Pnt2d(1., end)}, LawKind::Smooth);
 }
 
 bool LawFillet::nodes(const TopoDS_Edge &edge, const std::vector<gp_Pnt2d> &nodes, LawKind kind) {
   if (nodes.size() == 1) return constant(edge, nodes.front().Y());
-  // a start and an end alone: OCCT's own transition (its cubic differs from the monotone one by about 8e-5 of the volume: native test)
-  if (nodes.size() == 2 && kind == LawKind::Smooth) return range(edge, nodes.front().Y(), nodes.back().Y());
   const Slot target = slot(edge);
   if (target.spine.IsNull()) return false;
-  const std::vector<gp_Pnt2d> placed = parameter_nodes(edge, nodes, kind);
+  bool uneven = false;
+  const std::vector<gp_Pnt2d> placed = parameter_nodes(edge, nodes, kind, uneven);
+  // a start and an end alone on an even edge: OCCT's own transition (its cubic differs from the monotone one by about 8e-5 of the volume: native test)
+  if (!uneven && nodes.size() == 2 && kind == LawKind::Smooth) {
+    target.spine->add_node(0., target.reversed ? nodes.back().Y() : nodes.front().Y(), target.index, LawKind::Smooth);
+    target.spine->add_node(1., target.reversed ? nodes.front().Y() : nodes.back().Y(), target.index, LawKind::Smooth);
+    return true;
+  }
   if (target.reversed)
     for (auto it = placed.rbegin(); it != placed.rend(); ++it) target.spine->add_node(1. - it->X(), it->Y(), target.index, kind);
   else
