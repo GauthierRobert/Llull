@@ -12,6 +12,7 @@
 #include <GCPnts_AbscissaPoint.hxx>
 #include <Geom2d_Curve.hxx>
 #include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_ListIteratorOfListOfShape.hxx>
 #include <TopoDS_Edge.hxx>
@@ -71,6 +72,13 @@ bool normal_curvature(const BRepAdaptor_Surface &surface, bool reversed, double 
   const double cb = across.Dot(b);
   curvature = k_max * ca * ca + k_min * cb * cb;
   return true;
+}
+
+// The orientation of `edge` in the wire of `face` (+1 forward, -1 reversed, as seen with the face's own orientation); 0 when the edge is not in the face.
+int orientation_in(const TopoDS_Face &face, const TopoDS_Edge &edge) {
+  for (TopExp_Explorer explorer(face, TopAbs_EDGE); explorer.More(); explorer.Next())
+    if (explorer.Current().IsSame(edge)) return explorer.Current().Orientation() == TopAbs_REVERSED ? -1 : 1;
+  return 0;
 }
 
 }  // namespace
@@ -146,6 +154,8 @@ rust::String edge_continuity_json(const Shape &shape, int32_t edge_index, int32_
     if (pcurve.IsNull()) return rust::String("null");
     sides.push_back({BRepAdaptor_Surface(face, Standard_True), query::is_reversed(face), pcurve, pc_first, pc_last});
   }
+  // The face lies to the left of its boundary edge seen from the outside (outward normal x oriented tangent): the fold of the two faces is convex when the other face dips below the plane of this one.
+  const int own_side = orientation_in(faces[1], edge);
   JsonWriter out;
   out.begin_array();
   for (int i = 0; i < count; ++i) {
@@ -174,8 +184,10 @@ rust::String edge_continuity_json(const Shape &shape, int32_t edge_index, int32_
       nudged = true;
     }
     const double cosine = std::max(-1.0, std::min(1.0, normals[0].Dot(normals[1])));
+    const gp_Vec into_second = own_side == 0 ? gp_Vec(0, 0, 0) : normals[1].Crossed(tangent * static_cast<double>(own_side));
+    const double fold = own_side == 0 ? 1.0 : (normals[0].Dot(into_second) <= 0 ? 1.0 : -1.0);
     out.begin_object().key("t").number(t).key("point").point(point).key("g0").number(on_surface[0].Distance(on_surface[1]));
-    out.key("g1").number(std::acos(cosine)).key("normalCurvature").begin_array().number(kappas[0]).number(kappas[1]).end_array();
+    out.key("g1").number(std::acos(cosine)).key("g1Signed").number(fold * std::acos(cosine)).key("normalCurvature").begin_array().number(kappas[0]).number(kappas[1]).end_array();
     if (nudged) out.key("nudged").boolean(true);
     out.end_object();
   }

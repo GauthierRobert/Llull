@@ -29,6 +29,8 @@ mod ffi {
         fn set_corner_trim(on: bool);
         /// The pole count from which a sealed shell of a solid with corner-star faces refuses by name.
         fn set_shell_star_pole_limit(limit: i32);
+        /// 1: the cut of a sealed shell answers the source solid (a result without its cavity); 0: off.
+        fn set_shell_fault(fault: i32);
         /// The most poles in a direction of a star face seen by the last sealed shell (0: none).
         fn last_shell_star_poles() -> i32;
         /// The largest interior crease (rad) of the star sub-patches accepted since the last set_corner_exact_patch.
@@ -112,6 +114,10 @@ pub fn set_corner_trim(on: bool) {
 
 pub fn set_shell_star_pole_limit(limit: i32) {
     ffi::set_shell_star_pole_limit(limit);
+}
+
+pub fn set_shell_fault(fault: i32) {
+    ffi::set_shell_fault(fault);
 }
 
 pub fn last_shell_star_poles() -> i32 {

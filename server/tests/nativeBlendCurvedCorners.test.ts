@@ -182,11 +182,13 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(sealed.affected).toEqual([]);
     expect(sealed.summary).toContain('shell_solid: [SHL_STAR_FACES]');
     expect(sealed.summary).toContain('openFacesNear');
-    // the kernel keeps no words for a recipe it already refused: the same command again says it from the topology
+    // the kernel caches the refusal TEXT with the refused recipe: the same command again gets the same named reason, word for word
+    const reason = kernel.lastRefusal?.();
+    expect(reason).toContain('[SHL_STAR_FACES]');
     const again = execute(rounded.document, 'shell_solid', { id: solid, thickness: 0.2 });
     expect(again.document).toBe(rounded.document);
-    expect(again.summary).toContain('corner-star faces');
-    expect(again.summary).toContain('[SHL_STAR_FACES]');
+    expect(again.summary).toBe(sealed.summary);
+    expect(kernel.lastRefusal?.()).toBe(reason);
     // a plain rounded block of the same shape (no setback corner, no star) is not refused for its faces
     const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });
     const hollow = execute(plain.document, 'shell_solid', { id: plain.affected[0] as string, thickness: 0.2 });

@@ -657,11 +657,12 @@ namespace {
 
 // The faces of an exact corner star (named blend(v:...)#k, blend_corner_exact.cxx) are interpolating B-splines of 8 to 70 poles per direction (the pole counts of the attempts, plus the knots at the
 // joints of a chain). OCCT's inward offset of such a face was measured on the cylinder block of 13.22.6 (thickness 0.2, release): 27 poles 26 s and a valid hollow solid; 54 poles 166 s and 161 s,
-// 70 poles 410 s, and a "hollow solid" of the volume of the full solid (the cut of the cavity silently did nothing). So a sealed shell refuses by name before the offset from 36 poles in a
-// direction (06 BLD 13.33.5); an open shell (shell_open) of the same solid builds in under a second and is not affected.
-constexpr int kShellStarPoleLimit = 36;
+// 70 poles 410 s, and a "hollow solid" of the volume of the full solid (the cut of the cavity silently did nothing). So a sealed shell refuses by name before the offset from 30 poles in a
+// direction (06 BLD 13.33.5, a pre-filter: the result check below is the guarantee); an open shell (shell_open) of the same solid builds in under a second and is not affected.
+constexpr int kShellStarPoleLimit = 30;
 std::atomic<int> g_shell_star_pole_limit{kShellStarPoleLimit};  // test hook: set_shell_star_pole_limit
 std::atomic<int> g_last_star_poles{0};                           // test hook: last_shell_star_poles
+std::atomic<int> g_shell_fault{0};                               // test hook: set_shell_fault (1: the cut answers the source, a solid without its cavity)
 
 // The most poles in a direction of a star face of `shape` (0 without one).
 int most_star_poles(const Shape &shape) {
@@ -675,6 +676,28 @@ int most_star_poles(const Shape &shape) {
     if (!surface.IsNull()) most = std::max({most, static_cast<int>(surface->NbUPoles()), static_cast<int>(surface->NbVPoles())});
   }
   return most;
+}
+
+// The volume and the area of a shape (0 when OCCT cannot integrate it).
+double volume_of(const TopoDS_Shape &shape) {
+  GProp_GProps properties;
+  BRepGProp::VolumeProperties(shape, properties);
+  return properties.Mass();
+}
+
+double area_of(const TopoDS_Shape &shape) {
+  GProp_GProps properties;
+  BRepGProp::SurfaceProperties(shape, properties);
+  return properties.Mass();
+}
+
+// A sealed shell must have lost at least a quarter of area x thickness of volume and carry a cavity (a second shell, or more faces than the source): OCCT's cut of an offset skin
+// of fine B-spline faces was measured to return the full solid (06 BLD 13.33.6).
+bool has_cavity(const TopoDS_Shape &result, const Shape &source, double thickness) {
+  const bool hollow = volume_of(result) < volume_of(source.shape) - 0.25 * area_of(source.shape) * thickness;
+  const bool cavity = unique_sub_shapes(result, TopAbs_SHELL).Extent() > 1 ||
+                      unique_sub_shapes(result, TopAbs_FACE).Extent() > unique_sub_shapes(source.shape, TopAbs_FACE).Extent();
+  return hollow && cavity;
 }
 
 }  // namespace
@@ -703,7 +726,9 @@ std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness) {
   BRepAlgoAPI_Cut cut(shape.shape, cavity);
   cut.Build();
   if (!cut.IsDone()) return nullptr;
-  const TopoDS_Shape result = cut.Shape();
+  const TopoDS_Shape result = g_shell_fault.load() == 1 ? shape.shape : cut.Shape();
+  if (!has_cavity(result, shape, thickness)) throw std::invalid_argument("[SHL_NO_CAVITY] the offset returned a solid without its cavity");
+  if (valid_or_null(result).IsNull()) throw std::invalid_argument("[SHL_INVALID_CAVITY] the offset returned a solid whose cavity is not valid (measured on fine corner-star faces)");
   return keep_mass_rule(naming::wrap_named(result, naming::inherit(result, {source[0], cavity_named}, cut.History(), "inner")), shape);
 }
 
@@ -1022,6 +1047,7 @@ std::unique_ptr<Shape> unified_shape(const Shape &shape) {
 }  // namespace llull
 
 namespace llull {
+void set_shell_fault(int32_t fault) { g_shell_fault.store(fault); }
 void set_shell_star_pole_limit(int32_t limit) { g_shell_star_pole_limit.store(limit); }
 int32_t last_shell_star_poles() { return g_last_star_poles.load(); }
 }  // namespace llull
