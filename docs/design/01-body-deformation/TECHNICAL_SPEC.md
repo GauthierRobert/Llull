@@ -550,7 +550,7 @@ A kernel refusal keeps the core warp's own code (`DEF_BUDGET_EXCEEDED`, `DEF_FRA
 ## 14. As built (DES-1b: M2 to M5, 2026-10-24)
 
 **Done.** M2 exact OCCT warp, M3 lattice / point / flow along a curve, M4 flow on a surface, M5 curve to curve and morph. Not done: `preserveAnalytic`
-(VC-DEF-23: done in §17.11), the UI overlays of M4 (`src/ui` untouched), B-spline lattices and oriented boxes (M5).
+(VC-DEF-23: done in §17.11), the UI overlays of M4 (done in §18), B-spline lattices and oriented boxes (M5).
 
 **Commands added.** `deform_lattice`, `deform_by_point`, `flow_along_curve`, `flow_on_surface`, `deform_curve_to_curve`, `morph_bodies` (meshes are morphed through their placed, world-coordinate vertices; toolset `3d`). All
 deformation commands take `ids` (several bodies, one feature step) and `keepSource`. `bend_body` accepts up to 360 degrees; a bend that closes the whole body is a ring
@@ -594,7 +594,7 @@ non-affine law is refused (`DEF_TARGET_UNSUPPORTED`).
 `target_bad_plan_codes` 2/6 ok with the four expected refusals (`DEF_BEND_RADIUS_TOO_SMALL`, `DEF_FOLDOVER`, `DEF_SCALE_SINGULAR`, `DEF_ENTITY_NOT_FOUND`).
 Twist 90 / 120 / 360 degrees: area error 3e-9 to 1e-8 at tolerance 1e-4 (cargo); quarter and half torus bends 6168.5025 / 12337.0053 against 6168.50275 / 12337.0055.
 
-**Left.** UI overlays (`preserveAnalytic` is done, §17.11);
+**Left.** UI overlays are done (§18); `preserveAnalytic` is done (§17.11);
 `compareTo` for the remaining shapes (a free-form result has none); fit speed for localised features (a non-uniform fit grid; point push on a 100 mm slab takes 5 to 8 s); native `faceQuery.bspline`;
 flow-surface and rbf exactness validated at moderate scale only.
 
@@ -1080,3 +1080,22 @@ attempt, -1071 against -52 on a mitre test).
   against 1.5708 before the exchange and the closed form 1.5708 (the fixed rule on the pieces), not flat. `nativeKernelQueries.test.ts` keeps a positive assertion for `bspline`: a box face is a bilinear patch (degree 1 x 1,
   2 x 2 poles; the test used to expect null and was stale since the native `bspline`).
 - **Not tested:** an open shell warped (no catalogue geometry gives a graded open B-spline shell), a `MakeFace` failure of a piece.
+
+## 18. As built (DES-1c: M4 UI overlays, 2026-10-31)
+
+**Command.** `deform_overlay` (read-only, `readsMeshTriangles`; toolset 3d): `{ id, compareTo? }` returns, in world mm, the data of the entity's outermost `deform` node: the frame
+(origin, x, y, z, axis length), the region slab (planes at both ends, `infinite`, radius = 1.3 x the largest radial reach of the mesh from the frame axis), the lattice
+(rest and displaced nets, the box; B-spline and oriented lattices included), the `flowCurve` target stations and base curve, the `flowSurface` target and base node grids,
+and the wire of a `compareTo` reference shape (sphere, spheroid, torus, cylinders, cone, plane, helicoid). A straight base on the frame axis is dropped by `flow_along_curve`,
+so `flow.base` is null then. Refusals: `DEF_ENTITY_NOT_FOUND`, `DEF_NOT_DEFORMED`, `DEF_FRAME_DEGENERATE`, `DEF_COMPARE_INVALID`.
+
+**UI.** `src/ui/viewport/3d/overlays/{DeformOverlay,DeformOverlayControl,deformOverlayGeometry}` and `store/deformOverlayStore`: a "Deform" toolbar toggle (off by default) with one
+checkbox per layer (frame, region, lattice, curves, sheets, reference) and a reference-shape picker whose fields are typed; drawn for the first 4 selected deformed meshes
+through `useHostQuery` (depth-tested pass plus a faint pass without depth). UI state only, never a command, the document is never changed.
+
+**Tests.** `tests/unit/deform/overlay.test.ts` (infinite twist, B-spline and oriented lattices, flow with a curved base, flow sheet, torus and all reference wires, refusals);
+`tests/component/DeformOverlay.test.tsx` (toggle without document change, reference fields, segment counts, groups, the cap of 4).
+
+**Verified in the desktop app** (Electron 38, driven over DevTools, bodies selected by clicking): infinite region (frame, slab, axis), B-spline lattice (rest, displaced, box),
+flow-on-surface sheets (target and base grids), a typed torus reference wire. **Verified by tests only:** the oriented lattice, and the flow-along-curve target and base
+curves (in the app the target at x = 200 showed as a thin line and the base was not seen in the framing used).
