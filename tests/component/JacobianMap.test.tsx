@@ -63,8 +63,8 @@ describe('Jacobian map layer', () => {
     const entity = document.entities[id];
     const recipe = entity?.kind === 'mesh' ? entity.brep : undefined;
     if (entity?.kind !== 'mesh' || recipe?.op !== 'deform') throw new Error('deform node expected');
-    // a recipe whose refinement cannot be built (a tolerance whose refinement exceeds the budget)
-    const refined = { ...entity, brep: { ...recipe, output: { ...recipe.output, tolerance: 1e-9 } } };
+    // a recipe whose refinement cannot be built (a tolerance whose refinement stays over the budget at any coarsening)
+    const refined = { ...entity, brep: { ...recipe, output: { ...recipe.output, tolerance: 1e-30 } } };
     useStore.setState({ document: { ...document, entities: { ...document.entities, [id]: refined } } });
     useStore.getState().select([id]);
     const { container } = render(

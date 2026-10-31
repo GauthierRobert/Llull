@@ -19,7 +19,14 @@ export function JacobianMap({ entity }: { entity: MeshSolidEntity }): React.Reac
   const view = useMemo(() => (query.status === 'done' && !query.isError ? parseJacobianMap(query.data) : null), [query]);
   const failure = query.status === 'done' && view === null ? query.summary : null;
   useEffect(() => {
-    setStats(entity.id, view === null ? (failure === null ? null : { failure }) : { min: view.min, max: view.max, folded: view.folded });
+    setStats(
+      entity.id,
+      view === null
+        ? failure === null
+          ? null
+          : { failure }
+        : { min: view.min, max: view.max, folded: view.folded, floor: view.floor, law: view.law },
+    );
     return () => setStats(entity.id, null);
   }, [entity.id, view, failure, setStats]);
   const geometry = useDisposable(() => {
@@ -27,7 +34,6 @@ export function JacobianMap({ entity }: { entity: MeshSolidEntity }): React.Reac
     if (view === null) return built;
     built.setAttribute('position', new THREE.BufferAttribute(view.positions, 3));
     built.setAttribute('color', new THREE.BufferAttribute(view.colors, 3));
-    built.setIndex(new THREE.BufferAttribute(view.indices, 1));
     return built;
   }, [view]);
   const material = useDisposable(

@@ -70,13 +70,15 @@ function JacobianLegend(): React.ReactElement {
   const stats = useDeformOverlayStore((s) => s.jacobian);
   return (
     <div className="vp-deform-jacobian" role="status" aria-label="Jacobian map">
-      <div className="vp-deform-reference__note">det J: blue 0.5, grey 1, red 2 (volume kept at 1); magenta = folded (&lt;= 0)</div>
+      <div className="vp-deform-reference__note">
+        det J: blue 0.5, grey 1, red 2 (volume kept at 1); magenta = folded (at or below the floor)
+      </div>
       {Object.entries(stats).map(([id, entry]) => (
         <div key={id} className="vp-deform-reference__note">
           {id}:{' '}
           {'failure' in entry
             ? entry.failure
-            : `det J ${entry.min?.toPrecision(3) ?? '-'} .. ${entry.max?.toPrecision(3) ?? '-'}, ${entry.folded} folded`}
+            : `outermost deform (${entry.law}): det J ${entry.min?.toPrecision(3) ?? '-'} .. ${entry.max?.toPrecision(3) ?? '-'}, ${entry.folded} folded (det J <= ${entry.floor})`}
         </div>
       ))}
     </div>

@@ -20,33 +20,40 @@ describe('jacobianColor', () => {
 });
 
 describe('parseJacobianMap', () => {
+  // two triangles sharing an edge: one determinant per TRIANGLE
   const good = {
-    positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
-    indices: [0, 1, 2],
-    determinant: [1, 2, -1],
+    positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0],
+    indices: [0, 1, 2, 1, 3, 2],
+    determinant: [2, -1],
     floor: 1e-6,
     min: -1,
     max: 2,
     folded: 1,
+    law: 'bend',
   };
-  it('builds the buffers of the answer: one colour per vertex, folded in magenta', () => {
+  it('builds flat-coloured non-indexed triangles: three equal colours per triangle, folded in magenta', () => {
     const view = parseJacobianMap(good);
-    expect(view?.positions).toHaveLength(9);
-    expect(Array.from(view?.indices ?? [])).toEqual([0, 1, 2]);
-    expect(Array.from(view?.colors.slice(6, 9) ?? [])).toEqual([...FOLDED]);
-    expect(view).toMatchObject({ min: -1, max: 2, folded: 1 });
+    expect(view?.positions).toHaveLength(18);
+    expect(Array.from(view?.positions.slice(9, 12) ?? [])).toEqual([1, 0, 0]);
+    const colors = Array.from(view?.colors ?? []);
+    expect(colors.slice(0, 3)).toEqual([...STRETCHED].map(Math.fround));
+    expect(colors.slice(0, 3)).toEqual(colors.slice(3, 6));
+    expect(colors.slice(0, 3)).toEqual(colors.slice(6, 9));
+    expect(colors.slice(9, 12)).toEqual([...FOLDED]);
+    expect(view).toMatchObject({ min: -1, max: 2, folded: 1, floor: 1e-6, law: 'bend' });
   });
-  it('rejects data that is not a map: wrong type, lengths that disagree, a triangle past the vertices, no floor', () => {
+  it('rejects data that is not a map: wrong type, a determinant count that disagrees with the triangles, a triangle past the vertices, no floor', () => {
     expect(parseJacobianMap(null)).toBeNull();
     expect(parseJacobianMap('x')).toBeNull();
-    expect(parseJacobianMap({ ...good, positions: [0, 0, 0] })).toBeNull();
-    expect(parseJacobianMap({ ...good, indices: [0, 1, 3] })).toBeNull();
-    expect(parseJacobianMap({ ...good, indices: [0, 1] })).toBeNull();
+    expect(parseJacobianMap({ ...good, positions: [0, 0, 0, 1] })).toBeNull();
+    expect(parseJacobianMap({ ...good, indices: [0, 1, 2, 1, 3, 4] })).toBeNull();
+    expect(parseJacobianMap({ ...good, indices: [0, 1, 2] })).toBeNull();
     expect(parseJacobianMap({ ...good, floor: undefined })).toBeNull();
-    expect(parseJacobianMap({ ...good, min: undefined, max: undefined, folded: undefined })).toMatchObject({
+    expect(parseJacobianMap({ ...good, min: undefined, max: undefined, folded: undefined, law: undefined })).toMatchObject({
       min: null,
       max: null,
       folded: 0,
+      law: '',
     });
   });
 });

@@ -1,9 +1,10 @@
 /** deform_jacobian_map — read-only per-vertex det J of a deformation on the deformed body, for a colour map in the viewport (01 DEF M4, FR-DEF-21). */
 
 import type { CadDocument } from '../../model/types';
+import type { Vec3 } from '../../model/vectors';
 import { JACOBIAN_FLOOR } from '../../geometry/deform/bounds';
 import { warpOf } from '../../geometry/deform/laws';
-import { warpMesh } from '../../geometry/deform/meshWarp';
+import { evaluationCost, warpMesh } from '../../geometry/deform/meshWarp';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import type { CommandResult } from '../types';
@@ -11,21 +12,55 @@ import { defRejection } from './codes';
 import { deformNodeOf, sourceMeshOf } from './sourceMesh';
 import { idParam } from './schema';
 
-/** Triangles the refinement may reach: a closed body then has about 250000 vertices, each carrying 3 coordinates and a determinant (about 30 MB of JSON). */
-const MAX_TRIANGLES = 500_000;
+/** Triangles the map may return (each carries 3 vertices of 3 coordinates and one determinant: about 10 MB of JSON). */
+const MAX_TRIANGLES = 200_000;
+/** The refinement is coarsened (tolerance x COARSEN) until it fits, at most this many times. */
+const COARSEN = 4;
+const MAX_COARSENINGS = 10;
+/** Work units of the determinant pass (6 evaluations per triangle for the finite-difference laws, weighted by the cost of the law). */
+const MAX_DETERMINANT_WORK = 2e7;
+const DETERMINANT_EVALUATIONS = 6;
+
+/** How far inside the body (along the inward normal, as a fraction of the body size) a triangle is sampled: a cap lying IN a region-end plane then reads the inside of the region. */
+const INWARD = 1e-6;
+
+/** The rest point at which a triangle's det J is read: its centroid, nudged INTO the body (the mesh is outward-oriented), so a cap in a region-end plane reads the side the material is on. */
+function sampleAt(rest: ArrayLike<number>, a: number, b: number, c: number, nudge: number): Vec3 {
+  const at = (v: number, k: number): number => rest[3 * v + k] as number;
+  const [ux, uy, uz] = [at(b, 0) - at(a, 0), at(b, 1) - at(a, 1), at(b, 2) - at(a, 2)];
+  const [vx, vy, vz] = [at(c, 0) - at(a, 0), at(c, 1) - at(a, 1), at(c, 2) - at(a, 2)];
+  const normal: Vec3 = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+  const length = Math.hypot(...normal) || 1;
+  return [0, 1, 2].map((k) => (at(a, k) + at(b, k) + at(c, k)) / 3 - (nudge * (normal[k] as number)) / length) as unknown as Vec3;
+}
+
+const boundsDiagonal = (positions: ArrayLike<number>): number => {
+  const low = [Infinity, Infinity, Infinity];
+  const high = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i + 2 < positions.length; i += 3)
+    for (let k = 0; k < 3; k++) {
+      low[k] = Math.min(low[k] as number, positions[i + k] as number);
+      high[k] = Math.max(high[k] as number, positions[i + k] as number);
+    }
+  return positions.length === 0 ? 1 : Math.hypot(...[0, 1, 2].map((k) => (high[k] as number) - (low[k] as number)));
+};
+
+/** 4 significant digits: the map is a picture, not a measurement (analyze_deformation has the numbers). */
+const roundDet = (value: number): number => Number(value.toPrecision(4));
 
 /**
- * @affects none (read-only); data = positions (flat world xyz of the deformed body, same refinement as the deform result), indices, determinant per vertex, min / max, folded vertex count
- * @invariant computed on read: the source is re-refined exactly as the deformation did, every vertex carries det J of the map at its REST point and its deformed position; nothing is stored
- * @failure unknown id -> DEF_ENTITY_NOT_FOUND; no deform node -> DEF_NOT_DEFORMED; degenerate frame -> DEF_FRAME_DEGENERATE; source not rebuildable -> DEF_SOURCE_UNAVAILABLE; refinement refused or above 500000 triangles -> the warp's code (DEF_BUDGET_EXCEEDED, DEF_APPROX_TOLERANCE)
+ * @affects none (read-only); data = positions (flat world xyz of the deformed body), indices, determinant PER TRIANGLE (at its rest centroid nudged inward), min / max / folded triangle count, law, floor, displayTolerance
+ * @invariant computed on read: the source is re-refined as the deformation did (coarsened when the answer would be too large); planeRule cuts at the region ends so no triangle straddles a jump of det J, and each triangle carries det J of the map at its REST centroid, nudged into the body so a cap in a region-end plane reads the material side; nothing is stored
+ * @failure unknown id -> DEF_ENTITY_NOT_FOUND; no deform node -> DEF_NOT_DEFORMED; degenerate frame -> DEF_FRAME_DEGENERATE; source not rebuildable -> DEF_SOURCE_UNAVAILABLE; refinement still over the budget after coarsening, or refused -> the warp's code (DEF_BUDGET_EXCEEDED, DEF_APPROX_TOLERANCE)
  */
 export const deformJacobianMap = defineCommand({
   name: 'deform_jacobian_map',
   annotations: { readsMeshTriangles: true, readOnly: true },
   description:
-    'Per-vertex Jacobian determinant of a deformation, for a colour map drawn on the deformed body (document units, world coordinates). ' +
-    'data: positions (flat [x, y, z, ...] of the deformed body), indices (triangles), determinant (det J of the map at each vertex: 1 = volume kept, > 1 stretched, < 1 compressed, <= 0 folded), ' +
-    'min, max, folded (vertices with det J <= 1e-6), floor (that threshold). Computed from the recipe of the entity (its outermost deform node) by re-refining the source as the deformation did; read-only, nothing is stored. ' +
+    'Jacobian determinant of the OUTERMOST deform node of a deformed body, per triangle, for a colour map drawn on the body (document units, world coordinates). ' +
+    'data: positions (flat [x, y, z, ...] of the deformed body), indices (triangles), determinant (det J of the map at the rest centroid of each triangle: 1 = volume kept, > 1 stretched, < 1 compressed, <= floor folded), ' +
+    'min, max (of the determinants), folded (triangles with det J <= floor = 1e-6), floor, law (kind of the node), displayTolerance (the refinement tolerance used: coarser than the deformation output.tolerance when the answer would exceed 200000 triangles). ' +
+    'Computed from the recipe by re-refining the source as the deformation did; read-only, nothing is stored. A chain of deformations reports the outermost map only. ' +
     'Next: analyze_deformation for the closed-form range over the whole body, check_deformation for a verdict.',
   params: z.object({ id: idParam.describe('Id of the deformed mesh entity (the id a deformation command returned in affected).') }),
   run: (doc: CadDocument, { id }, ctx): CommandResult => {
@@ -39,38 +74,55 @@ export const deformJacobianMap = defineCommand({
     if (warp === null) return fail('DEF_FRAME_DEGENERATE', 'the recorded frame axis is zero or the reference is parallel to it');
     const source = sourceMeshOf(ctx?.kernel ?? null, node.source, doc);
     if (source === null) return fail('DEF_SOURCE_UNAVAILABLE', 'the deformation source cannot be rebuilt without a geometry kernel');
-    const warped = warpMesh(source, node, { tolerance: node.output.tolerance, maxTriangles: MAX_TRIANGLES });
+    const unitWork = DETERMINANT_EVALUATIONS * evaluationCost(node);
+    let tolerance = node.output.tolerance;
+    let warped = warpMesh(source, node, { tolerance, maxTriangles: MAX_TRIANGLES });
+    // too many triangles (or too much determinant work): coarsen the picture, never the deformation itself
+    const tooBig = (): boolean =>
+      !warped.ok ? warped.code === 'DEF_BUDGET_EXCEEDED' : (warped.mesh.indices.length / 3) * unitWork > MAX_DETERMINANT_WORK;
+    for (let attempt = 0; attempt < MAX_COARSENINGS && tooBig(); attempt++) {
+      tolerance *= COARSEN;
+      warped = warpMesh(source, node, { tolerance, maxTriangles: MAX_TRIANGLES });
+    }
     if (!warped.ok) return fail(warped.code, warped.message);
-    const count = warped.restPositions.length / 3;
+    if (tooBig())
+      return fail(
+        'DEF_BUDGET_EXCEEDED',
+        `the map needs more than ${MAX_TRIANGLES} triangles or ${MAX_DETERMINANT_WORK} work units even at tolerance ${tolerance}`,
+      );
+    const { indices } = warped.mesh;
+    const rest = warped.restPositions;
+    const count = indices.length / 3;
+    const nudge = INWARD * boundsDiagonal(rest);
     const determinant: number[] = new Array<number>(count);
     let min = Infinity;
     let max = -Infinity;
     let folded = 0;
-    for (let v = 0; v < count; v++) {
-      const det = warp.determinant([
-        warped.restPositions[v * 3] as number,
-        warped.restPositions[v * 3 + 1] as number,
-        warped.restPositions[v * 3 + 2] as number,
-      ]);
-      determinant[v] = det;
+    for (let t = 0; t < count; t++) {
+      const [a, b, c] = [indices[3 * t] as number, indices[3 * t + 1] as number, indices[3 * t + 2] as number];
+      const det = roundDet(warp.determinant(sampleAt(rest, a, b, c, nudge)));
+      determinant[t] = det;
       min = Math.min(min, det);
       max = Math.max(max, det);
       if (!(det > JACOBIAN_FLOOR)) folded++;
     }
-    const range = count === 0 ? 'no vertices' : `det J ${min.toPrecision(4)} .. ${max.toPrecision(4)}`;
+    const range = count === 0 ? 'no triangles' : `det J ${min.toPrecision(4)} .. ${max.toPrecision(4)}`;
+    const coarse = tolerance === node.output.tolerance ? '' : `; refinement coarsened to tolerance ${tolerance.toPrecision(3)}`;
     return report(
       doc,
-      `deform_jacobian_map: '${id}' ${node.law.kind}: ${count} vertices, ${range}, ${folded} folded (det J <= ${JACOBIAN_FLOOR}).`,
+      `deform_jacobian_map: '${id}' outermost deform (${node.law.kind}): ${count} triangles, ${range}, ${folded} folded (det J <= ${JACOBIAN_FLOOR})${coarse}.`,
       {
         id,
         unit: doc.units,
-        positions: warped.mesh.positions,
-        indices: warped.mesh.indices,
+        law: node.law.kind,
+        positions: Array.from(warped.mesh.positions, Math.fround),
+        indices: Array.from(indices),
         determinant,
         min: count === 0 ? null : min,
         max: count === 0 ? null : max,
         folded,
         floor: JACOBIAN_FLOOR,
+        displayTolerance: tolerance,
       },
     );
   },

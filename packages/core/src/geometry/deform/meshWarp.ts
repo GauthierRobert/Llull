@@ -49,7 +49,7 @@ const BASE_SOLVE_COST = 10;
 const SEARCH_CELL_COST = 0.2;
 
 /** Cost of one evaluation of a law relative to a closed-form one: the base-frame laws run a Newton solve per point after a coarse search of the table (about sqrt of its size). */
-function evaluationCost(node: DeformNode): number {
+export function evaluationCost(node: DeformNode): number {
   const { law } = node;
   if (law.kind === 'flowCurve' && law.base !== undefined)
     return BASE_SOLVE_COST + SEARCH_CELL_COST * Math.sqrt(law.base.stations.length / 12);

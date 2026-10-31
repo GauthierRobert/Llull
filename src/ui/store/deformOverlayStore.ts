@@ -36,7 +36,7 @@ export interface ReferenceDraft {
 
 /** What the Jacobian map of one body reports: its range and folded vertices, or why it could not be computed. */
 export type JacobianStats =
-  | { readonly min: number | null; readonly max: number | null; readonly folded: number }
+  | { readonly min: number | null; readonly max: number | null; readonly folded: number; readonly floor: number; readonly law: string }
   | { readonly failure: string };
 
 interface DeformOverlayState {

@@ -1105,16 +1105,20 @@ curves (in the app the target at x = 200 showed as a thin line and the base was 
 ### 18.1 Jacobian map (DES-1c, 2026-10-31)
 
 **Command.** `deform_jacobian_map` (read-only, `readsMeshTriangles`; toolset 3d): `{ id }` re-refines the SOURCE of the entity's outermost `deform` node with the mesh warp, exactly as the deformation did
-(`warpMesh`; its result now also returns `restPositions`, the rest point of every vertex), and returns `positions` (deformed body, flat world xyz), `indices`, `determinant` (det J of the node's map at each vertex's rest point),
-`min`, `max`, `folded` (vertices with det J <= `floor` = `JACOBIAN_FLOOR` 1e-6) and `floor`. On the exact (kernel) path the map is sampled on the mesh-path refinement of the same node, which approximates the exact body to the node tolerance.
-The refinement is capped at 500000 triangles (about 250000 vertices, about 30 MB of JSON). Refusals: `DEF_ENTITY_NOT_FOUND`, `DEF_NOT_DEFORMED`, `DEF_FRAME_DEGENERATE`, `DEF_SOURCE_UNAVAILABLE`, and the warp's `DEF_BUDGET_EXCEEDED` / `DEF_APPROX_TOLERANCE`.
-A chain of deformations reports the OUTERMOST map's determinant (the composed one is the product, `analyze_deformation` gives the closed-form range of the node).
+(`warpMesh`; its result also returns `restPositions`, the rest point of every vertex), and returns `positions` (deformed body, flat world xyz, `Math.fround`), `indices`, `determinant` (ONE value PER TRIANGLE, 4 significant digits),
+`min`, `max`, `folded` (triangles with det J <= `floor` = `JACOBIAN_FLOOR` 1e-6), `floor`, `law` and `displayTolerance`.
+det J of the map jumps at the region ends (`laws.ts`: inside is `start < z <= end`), so it is NOT read per vertex: `planeRule` cuts the refinement at the region ends (no triangle straddles a jump) and each triangle
+is sampled at its REST centroid nudged 1e-6 of the body size INTO the material (against the outward normal), so a cap lying in a region-end plane reads the side the material is on (a body stretched x2 over its whole height is 2 everywhere,
+as `analyze_deformation` says; before this, per-vertex sampling read 1 at the base). On the exact (kernel) path the map is sampled on the mesh-path refinement of the same node, which approximates the exact body to the node tolerance.
+Size: at most 200000 triangles. A refinement over that (`DEF_BUDGET_EXCEEDED`) or a determinant pass over 2e7 work units (6 evaluations per triangle x the law cost, `evaluationCost`) is retried at tolerance x4, up to 10 times: the picture is coarsened, never the
+deformation, and `displayTolerance` / the summary say so. Refusals: `DEF_ENTITY_NOT_FOUND`, `DEF_NOT_DEFORMED`, `DEF_FRAME_DEGENERATE`, `DEF_SOURCE_UNAVAILABLE`, `DEF_BUDGET_EXCEEDED` (still over after the coarsenings), `DEF_APPROX_TOLERANCE`.
+A chain of deformations reports the OUTERMOST map only (`law` names it; the legend says "outermost deform"). **Follow-up:** the composed det J along a chain is the product of the nodes' determinants at the successive images; not built.
 
-**UI.** A "Det J" layer of the Deform popover (off by default, queried only while on): `overlays/JacobianMap.tsx` draws the answer as a vertex-coloured mesh over the body (`jacobianColors.ts`: log scale, grey at 1, red towards 2,
-blue towards 0.5, magenta at or below the floor = folded), and the popover legend lists, per drawn body, `det J min .. max` and the folded count (or the refusal summary). UI state only, no command changes the document.
+**UI.** A "Det J" layer of the Deform popover (off by default, queried only while on): `overlays/JacobianMap.tsx` draws the answer as non-indexed, flat-coloured triangles over the body (`jacobianColors.ts`: log scale, grey at 1, red towards 2,
+blue towards 0.5, magenta at or below the floor = folded), and the popover legend lists, per drawn body, `outermost deform (law): det J min .. max, n folded (det J <= floor)` (or the refusal summary). UI state only, no command changes the document.
 
-**Tests.** `tests/unit/deform/jacobianMap.test.ts` (twist = 1 everywhere and the vertices equal the stored mesh; stretch; taper range 0.25 .. 1; a recipe edited to fold flags `folded` > 0; refusals; pure),
-`tests/unit/ui/jacobianColors.test.ts`, `tests/component/JacobianMap.test.tsx`.
+**Tests.** `tests/unit/deform/jacobianMap.test.ts` (twist = 1 and the vertices equal the stored mesh; stretch min = max = 2; taper 0.25 .. 1; bend over the default region (R - 5) / R .. (R + 5) / R; a recipe edited to fold flags `folded` > 0;
+flow onto a straight target = 1; a lattice; the Manifold kernel installed; coarsening; refusals; pure), `tests/unit/ui/jacobianColors.test.ts`, `tests/component/JacobianMap.test.tsx`.
 
 **Verified in the desktop app** (Electron 38): a 40 x 40 x 120 mm box tapered to 0.4 over z 20..100 shows grey at the base shading to blue towards the narrow end, legend `det J 0.160 .. 1.00, 0 folded`.
 Folds cannot be produced through the commands (they refuse `DEF_FOLDOVER`), so the magenta colour is verified by tests only.
