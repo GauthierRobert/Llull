@@ -493,7 +493,7 @@ Coverage gate 90/85/90/90 applies (`packages/domain-aec/src/**`).
 | ISO-M1 | **Built 2026-10-25 (§13).** network port + legacy network; PCF lexer / reader / writer; `import_pcf` (preview + `pcf_line`), `export_pcf`; codes; VC-ISO-01..03 | PSC bend radius rule (fallback: 1.5 × NPS LR90 from the B16.9 table) | 5 d |
 | ISO-M2 | **Built 2026-10-31 (§13.2).** welds + persistent numbering, `add_field_weld`, `set_weld_type`, spools, `set_fabrication_rules`, cut list, BOM with bolting; VC-ISO-05..09, 14 | PSC flange / bolt tables | 5 d |
 | ISO-M3 | **Built 2026-10-31 (§13.3).** iso graph, projection, not-to-scale layout, symbols, dimensions, elevations, slope, tables, SVG / DXF, single sheet; `check_isometric`; VC-ISO-10..12, 16, 17 | — | 8 d |
-| ISO-M4 | sheet split + continuation + stability, spool isos, `define_isometric`, `issue_isometric` (human gate) | 09 PLM signatures (aerospace) | 4 d |
+| ISO-M4 | **Built 2026-10-31 (§13.4); `compareToIssue` and revision clouds stay M6.** sheet split + continuation + stability, spool isos, `define_isometric`, `issue_isometric` (human gate) | 09 PLM signatures (aerospace) | 4 d |
 | ISO-M5 | `import_pcf as=route` via RTE; supports in PCF / iso; skew boxes; piping GA (`export_piping_ga`); VC-ISO-04, 13, 15 | 02 RTE | 5 d |
 | ISO-M6 | performance (VC-ISO-18), ISOGEN conformance check of the fixture (OQ-ISO-01), CSV weld map, revision clouds | licensed tool access | 3 d |
 
@@ -681,4 +681,42 @@ VC-ISO-16 (one positive and one negative per rule on hand-mutated fixtures and l
 The pack plans SC-ISO-01 (now every step, `check_isometric` ok), 03, 04 and 07 (step 4: `E-401-SP01` over the limit, open ends, `ok: false`) run step by step with every expected row. `blockedPlanCommands.json` lost sc-iso-01, 03, 04, 07 and 08 (sc-iso-08 still needs `add_pipe_support` / `includeSupports`, M5; its isometric step has no check yet);
 still blocked: `add_end_flange` (sc-iso-02), `define_isometric` (sc-iso-05), `export_piping_ga` (sc-iso-06).
 
-**Open.** The picture was checked by eye on the fixture (SVG rendered in a browser), not by a golden SVG hash; `tests/golden/plant_iso_l101.json` (VC-ISO-17 golden) and the 1000-component timing (VC-ISO-18) are M6; sheet split, continuation and spool isometrics are M4; skew boxes and supports M5. The 500-line `check_isometric` budget is exercised with 120 lines.
+**Open.** The picture was checked by eye on the fixture (SVG rendered in a browser), not by a golden SVG hash; `tests/golden/plant_iso_l101.json` (VC-ISO-17 golden) and the 1000-component timing (VC-ISO-18) are M6; sheet split, continuation and spool isometrics are M4 (built, §13.4); skew boxes and supports M5. The 500-line `check_isometric` budget is exercised with 120 lines.
+
+### 13.4 ISO-M4 (2026-10-31): sheet split, continuation marks, stable re-issue, spool isometrics, `define_isometric`, `issue_isometric`
+
+Two new commands in `piping-fabrication` (toolset `piping`): `define_isometric` (mutating) and `issue_isometric` (mutating, human gate). Changed existing tools: `export_isometric` (several sheets, style `spool`, `spoolId`, the stored definition applies, issue stamp; description and the `style`, `paper`, `tables`, `northArrow` param texts), `piping_bom` (scope `sheet`, param `sheet`; description and `scope` text), `delete_pcf_line` (also removes the definition and issue stamps), `check_isometric` (rules below, description unchanged).
+
+| File | Content |
+| ---- | ------- |
+| `iso/isoSheets.ts` | `planSheets`: component-to-sheet assignment (budget mode or spool mode), continuation joints, `continuationOf`, `definedPlan` |
+| `issues.ts` | `basisOf` (SHA-256 of the line components and numbered weld joints), `issueState` (latest stamp; current when the basis still matches) |
+| `commands/defineIsometric.ts`, `commands/issueIsometric.ts` | the two commands |
+| `iso/isoSheet.ts`, `isoTables.ts`, `isoGraph.ts` | take a sheet scope: graph of the sheet's components, tables of its components, continuation marks, "n OF m", issue stamp |
+
+Slice `doc.plant.fabrication` gained optional `isometrics` (by line id: style, paper, `maxPipePiecesPerSheet`, `splitAt`, `northArrow`, `sheetAssignment`) and `issues` (by id `iso-issue-<step>.<k>`: line, revision, purpose, signer, signatureId, `basisSha256`); `validate.ts` checks them.
+
+**Split algorithm (§5.10 as built).** Components are walked in flow order. A component takes the sheet of its latest upstream joint partner (a branch follows its tee). A PIPE that makes the sheet exceed the budget triggers the cut: the latest component of the sheet from which the tail (this PIPE included) can move to a new sheet such that every joint the move crosses is a weld joint (`splitAt weld`: shop, site, field-fit) or a bolted pair (`splitAt flange`) and the moved tail stays connected. No such cut: the sheet stays over budget and `ISO_SHEET_OVERFLOW` is a warning (export, define, check). Every joint whose components lie on two sheets is a continuation, printed on both sheets as `CONT. ON SHEET n - W<number>` / `CONT. FROM SHEET n - W<number>` (`FLANGE` for a bolted joint) with its E/N/EL, listed in `data.sheets[].continuation { previous, next, all }`. WELD, GASKET and BOLT records follow the sheet of the joint they sit on. VC-ISO-13: 20 pipe pieces, budget 8 gives 8 + 8 + 4 with the same weld on both sides of each cut.
+
+**Stability.** `define_isometric` stores the component-to-sheet assignment; `export_isometric` (read-only) applies it: a stored component keeps its sheet, a new one takes the sheet of its upstream neighbour, and a new PIPE that overflows a sheet spills (with the new components after it) to a new sheet appended at the end. Running `define_isometric` again stores the new assignment (`resetSheets` cuts afresh). A sheet's content depends only on its own components: after a field weld on the last sheet, sheets 1 and 2 are byte-identical (SC-ISO-05, sha256). Tables are per sheet (BOM, cut list and weld list of the sheet's components; the spool list counts pieces and pipe length on the sheet), so they do not move either. The text "SHEET n OF m" changes on every sheet when a sheet is appended (m).
+
+**Spool style (VC-ISO-20).** `style: spool` (param or stored style) gives one sheet per spool in `spool_list` order with the whole-spool tables; spool boundary joints are continuations. `spoolId` draws one spool (implies the style; with another style `ISO_PARAM_INVALID`; unknown name `ISO_SPOOL_NOT_FOUND`). `check` prints no tables, `final` the four (cut list when a gap is stored).
+
+**`piping_bom scope=sheet`** (`lineId` + `sheet`) sums to the line (identity tested, bolting included: a bolted joint belongs to the sheet of its first component). Refusals `ISO_ISOMETRIC_NOT_DEFINED`, `ISO_SHEET_NOT_FOUND`.
+
+**Human gate (`issue_isometric`, VC-ISO-19).** Uses the core human gate (`@core/model/humanGate`, the port of the export gate and 09 PLM): `confirmation` is a signature object with a nonce, verified and spent by `ctx.humanSignature` over `{ act: "plant:issue_isometric", ids: [line], details: { revision, purpose, basisSha256 } }`. An agent (no value, `true`, no port, a bad signature, no nonce) gets `ISO_HUMAN_GATE`. `check_isometric` (style final) runs first: errors give `ISO_CHECK_FAILED` without spending the signature. Success stores the stamp; `export_isometric` then prints `ISSUED FOR <purpose> REV <rev>` and `APPROVED BY <signer>` instead of NOT FOR CONSTRUCTION, with `reviewRequired: false` and `data.issue`. The stamp is bound to the line content: any later edit makes it stale, the iso is NOT FOR CONSTRUCTION with `reviewRequired: true` again, and `ISO_ISSUE_STALE` is a warning (export and check).
+
+**Check rules changed.** `ISO_SHEET_OVERFLOW` also reports a defined budget that cannot be met; the one-sheet shrink test is skipped for a line with a `maxPipePiecesPerSheet` definition (the split is the answer); `ISO_REVIEW_REQUIRED` (info) is not raised while a current issue exists; new `ISO_ISSUE_STALE` warning.
+
+**Deviations from §3 / §4 (all decided).**
+
+- `issue_isometric` takes `confirmation` (the signature object of the core gate) instead of `signatureId`; the signature id is read from the verified signature and stored. 09 PLM is not imported (the gate is in core); the signer is the identity the port reports.
+- `IsoDefinition.style` is `check | final | spool` (`stress` is V2); `SpoolRecord` is not stored (M2). `define_isometric` params: `lineId`, `style`, `paper`, `maxPipePiecesPerSheet`, `splitAt`, `northArrow`, plus `resetSheets`; `isoId` in the data is the line id (one definition per line). The assignment is stored only by `define_isometric`; `export_isometric` is read-only and applies it.
+- The budget counts PIPE pieces (a field weld splits a pipe, so it adds one). The cut joint for `splitAt flange` is a bolted FL-FL pair.
+- A stored component is never moved: when new components lie before stored components of a full sheet, the sheet stays over budget with the warning (remediation: `resetSheets`).
+- `export_isometric` data: `dimensions[]` and `annotations[]` carry `sheetIndex`; `sheets[]` gain `pipes`, `spool`, `tables`, `layout`; `continuation` is `{ previous?, next?, all }` (a one-sheet iso: `{ all: [] }`, formerly `{}`); file names `<line>_iso_sheet<n>.<fmt>`; top-level `tables` cover the whole line, `layout` is that of sheet 1. `compareToIssue` and revision clouds (VC-ISO-23) are not built (M6).
+- New codes: `ISO_HUMAN_GATE`, `ISO_CHECK_FAILED`, `ISO_SHEET_NOT_FOUND`, `ISO_ISOMETRIC_NOT_DEFINED`, `ISO_ISSUE_STALE`. No kernel (L9); no text reader added (no hostile-input entry); no file params (no `FILE_PARAMS` row).
+
+**Tests.** `tests/unit/plant/fabrication/isoSheets.test.ts` (VC-ISO-13: 8 + 8 + 4, matching welds, stable re-issue by sha256, spill, flange warning, reset, determinism and replay; VC-ISO-20; VC-ISO-19 gate cases, stale stamp, check before gate; sheet BOM identity; refusals with the document unchanged; `is pure`; save/load and corrupt slices; a 200-leg budget) and `scenarioPlans.test.ts` (SC-ISO-05: 3 sheets, continuation pair, sheets 1 and 2 unchanged). `blockedPlanCommands.json` lost sc-iso-05 (`define_isometric`); still blocked: `add_end_flange` (sc-iso-02), `export_piping_ga` (sc-iso-06).
+
+**Open.** Supports, skew boxes, piping GA (M5); `compareToIssue`, revision clouds, CSV weld map, VC-ISO-18 timing (M6); the split pictures were not checked by eye in a browser.

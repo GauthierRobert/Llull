@@ -15,7 +15,9 @@ import { bomRows } from './bom';
 import { isoIssue } from './codes';
 import { cutPieces } from './cutList';
 import { buildIsoGraph } from './iso/isoGraph';
+import { basisOf, issueState } from './issues';
 import { runDimensions } from './iso/isoDimensions';
+import { definedPlan } from './iso/isoSheets';
 import { layoutIso } from './iso/isoLayout';
 import { nodeKey } from './joints';
 import type { IsoIssue } from './model';
@@ -169,12 +171,21 @@ export function checkLine(doc: CadDocument, lineId: string, options: CheckOption
   if (unverified.length > 0)
     add('ISO_UNVERIFIED_CATALOGUE', 'warning', `${unverified.length} component(s) use a catalogue row that is not verified`, unverified);
 
-  if (graph.steps.length > 0) {
+  const definition = analysis.fabrication.isometrics?.[analysis.lineId];
+  const plan = definedPlan(analysis, definition);
+  if (plan !== null) for (const warning of plan.warnings) add(warning.code, warning.severity, warning.message, warning.ids);
+  if (
+    graph.steps.length > 0 &&
+    (definition === undefined || definition.style === 'spool' || definition.maxPipePiecesPerSheet === undefined)
+  ) {
     const [width, height] = PAPER_MM[options.paper];
     const area = sheetDrawingArea(width, height);
     if (layoutIso(graph, 'up_right', { width: area.width - 2 * PAD, height: area.height - 2 * PAD }).overflow)
       add('ISO_SHEET_OVERFLOW', 'warning', `the line does not fit one ${options.paper} sheet`, [lineId]);
   }
-  add('ISO_REVIEW_REQUIRED', 'info', `isometric of ${lineId} is not issued: reviewRequired`, [lineId]);
+  const { latest, current } = issueState(analysis.fabrication, analysis.lineId, basisOf(analysis));
+  if (latest !== undefined && current === undefined)
+    add('ISO_ISSUE_STALE', 'warning', `the line changed after issue ${latest.id} (revision ${latest.revision})`, [latest.id]);
+  if (current === undefined) add('ISO_REVIEW_REQUIRED', 'info', `isometric of ${lineId} is not issued: reviewRequired`, [lineId]);
   return found.map((issue) => ({ ...issue, lineId }));
 }

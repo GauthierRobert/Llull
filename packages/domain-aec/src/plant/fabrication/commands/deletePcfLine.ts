@@ -4,7 +4,7 @@ import { refuseIso } from '../codes';
 import { getFabrication, withFabrication } from '../state';
 
 /**
- * @affects plant.fabrication.pcfLines[lineId] (removed) with the line's field welds, weld numbers and spool breaks
+ * @affects plant.fabrication.pcfLines[lineId] (removed) with the line's field welds, weld numbers, spool breaks, isometric definition and issue stamps
  * @invariant only lines stored by import_pcf are removed; routed and legacy lines are untouched
  * @failure no imported line with that id -> ISO_LINE_NOT_FOUND; the document is unchanged
  */
@@ -40,6 +40,8 @@ export const deletePcfLine = defineCommand({
     const welds = ofOtherLines(fabrication.welds);
     const highestWeldNumber = without(fabrication.highestWeldNumber);
     const spoolBreaks = without(fabrication.spoolBreaks);
+    const isometrics = without(fabrication.isometrics);
+    const issues = ofOtherLines(fabrication.issues);
     return {
       document: withFabrication(doc, {
         version: 1,
@@ -49,6 +51,8 @@ export const deletePcfLine = defineCommand({
         ...(welds === undefined ? {} : { welds }),
         ...(highestWeldNumber === undefined ? {} : { highestWeldNumber }),
         ...(spoolBreaks === undefined ? {} : { spoolBreaks }),
+        ...(isometrics === undefined ? {} : { isometrics }),
+        ...(issues === undefined ? {} : { issues }),
       }),
       summary: `delete_pcf_line: removed line ${params.lineId} (${line.components.length} component(s))`,
       affected: [params.lineId],

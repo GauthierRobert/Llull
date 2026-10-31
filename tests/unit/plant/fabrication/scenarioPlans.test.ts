@@ -1,5 +1,5 @@
 /**
- * Plant 05 ISO M2 / M3: the pack's scenario plans SC-ISO-01, 03, 04 and 07 run step by step through `execute` (the path of `llull run plan.json`; `as` binds the first affected id).
+ * Plant 05 ISO M2 / M3 / M4: the pack's scenario plans SC-ISO-01, 03, 04, 05 and 07 run step by step through `execute` (the path of `llull run plan.json`; `as` binds the first affected id).
  * Steps whose command is not registered yet are skipped with their rows. The `harness` of the plan inlines the fixture text and the TAB mutation.
  */
 
@@ -155,5 +155,26 @@ describe('SC-ISO-07: broken inputs (TAB refusal; a 14 m legacy line against the 
     expect(refused.error?.code).toBe('ISO_SPOOL_TOO_LARGE');
     expect(refused.error?.ids).toEqual(['E-401-SP01']);
     expect(refused.document).toBe(final);
+  });
+});
+
+describe('SC-ISO-05: a 20-segment rack split over sheets, re-issued after an edit (VC-ISO-13)', () => {
+  const { plan, outcomes } = run('sc-iso-05-sheet-split.json');
+  type Sheet = { sha256: string; continuation: { previous?: { weld: string }; next?: { weld: string } } };
+  const sheetsAt = (step: number): Sheet[] => (outcomes[step]?.data as { sheets: Sheet[] }).sheets;
+
+  it('every step is built and the definition is stored', () => {
+    expect(unbuilt(plan)).toEqual([]);
+    expect(outcomes.every((outcome) => outcome !== null && outcome.error === undefined)).toBe(true);
+  });
+
+  it('meets the expected rows: 3 sheets, the same weld on both sides of each cut, sheets 1 and 2 unchanged on re-issue', () => {
+    expect(plan.expected).toHaveLength(4);
+    expect(sheetsAt(3)).toHaveLength(3);
+    expect(sheetsAt(3)[0]?.continuation.next?.weld).toBe(sheetsAt(3)[1]?.continuation.previous?.weld);
+    expect(sheetsAt(3)[0]?.continuation.next?.weld).toBeDefined();
+    expect(sheetsAt(5)[0]?.sha256).toBe(sheetsAt(3)[0]?.sha256);
+    expect(sheetsAt(5)[1]?.sha256).toBe(sheetsAt(3)[1]?.sha256);
+    expect(sheetsAt(5)[2]?.sha256).not.toBe(sheetsAt(3)[2]?.sha256);
   });
 });

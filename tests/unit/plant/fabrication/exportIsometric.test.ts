@@ -44,7 +44,7 @@ describe('the fixture sheet (VC-ISO-10, 11)', () => {
     expect(result.northArrow.angleDeg).toBeCloseTo(30, 9);
     expect(result.sheets).toHaveLength(1);
     expect(result.sheets[0]?.componentIds).toHaveLength(15);
-    expect(result.sheets[0]?.continuation).toEqual({});
+    expect(result.sheets[0]?.continuation).toEqual({ all: [] });
     expect(result.reviewRequired).toBe(true);
   });
 

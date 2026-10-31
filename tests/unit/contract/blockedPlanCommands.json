@@ -68,7 +68,6 @@
       "tank_shell_thickness"
     ],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": ["add_end_flange"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-05-sheet-split.json": ["define_isometric"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": ["export_piping_ga"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-02-steel-stair.json": ["add_steel_stair"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-03-vessel-circular-platform.json": [

@@ -4,6 +4,7 @@
  * Plugin-side types (plant README D2). Coordinates and bores are world millimetres, whatever units the PCF file used.
  */
 
+import type { PaperSize } from '@core/model/sheet';
 import type { Vec3 } from '@core/model/vectors';
 
 export const PCF_COMPONENT_TYPES = [
@@ -188,6 +189,33 @@ export interface WeldRecord {
 
 export type SpoolBreak = 'field_welds' | 'flanged_joints' | 'line_ends';
 
+export type IsoStyle = 'check' | 'final' | 'spool';
+
+/** The isometric of a line as defined by `define_isometric`: paper, split budget and the stored component-to-sheet assignment that keeps a re-issue stable. */
+export interface IsoDefinition {
+  readonly lineId: string;
+  readonly style: IsoStyle;
+  readonly paper: PaperSize;
+  /** PIPE pieces per sheet (styles check and final); absent = one sheet. */
+  readonly maxPipePiecesPerSheet?: number;
+  /** Where a sheet may be cut: at a weld joint or at a flanged (bolted) joint. */
+  readonly splitAt: 'weld' | 'flange';
+  readonly northArrow: 'up_right' | 'up_left';
+  /** Component id -> sheet number (1-based), as of the last define_isometric. */
+  readonly sheetAssignment: Readonly<Record<string, number>>;
+}
+
+/** A human-signed issue of the isometric of one line (`issue_isometric`); `basisSha256` ties it to the line content it was issued for. */
+export interface IssuedIsometric {
+  readonly id: string;
+  readonly lineId: string;
+  readonly revision: string;
+  readonly purpose: 'for_construction' | 'for_fabrication';
+  readonly signer: string;
+  readonly signatureId: string;
+  readonly basisSha256: string;
+}
+
 /** `doc.plant.fabrication`: absent until the first fabrication command (`import_pcf`). Spools and cut lists are derived, never stored. */
 export interface FabricationModel {
   readonly version: 1;
@@ -202,4 +230,8 @@ export interface FabricationModel {
   readonly highestWeldNumber?: Readonly<Record<string, number>>;
   /** Spool break choice of `split_spools` per line. */
   readonly spoolBreaks?: Readonly<Record<string, readonly SpoolBreak[]>>;
+  /** Isometric definition per line id (ISO-M4). */
+  readonly isometrics?: Readonly<Record<string, IsoDefinition>>;
+  /** Issue stamps by id (ISO-M4); the latest per line is the current one. */
+  readonly issues?: Readonly<Record<string, IssuedIsometric>>;
 }

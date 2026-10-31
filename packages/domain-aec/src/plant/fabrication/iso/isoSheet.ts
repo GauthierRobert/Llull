@@ -13,6 +13,7 @@ import { nodeKey } from '../joints';
 import type { IsoIssue } from '../model';
 import { lineAnnotations, mmText, runDimensions, type IsoAnnotation, type RunDimension } from './isoDimensions';
 import { buildIsoGraph, type IsoGraph } from './isoGraph';
+import type { ContinuationMark } from './isoSheets';
 import { LabelPlacer, TEXT_SIZE, dimensionPrimitives } from './isoLabels';
 import { layoutIso, type IsoLayout } from './isoLayout';
 import { axisAngles, type NorthArrow } from './isoProjection';
@@ -20,12 +21,33 @@ import type { IsoPrimitive } from './isoRender';
 import { isoSymbols } from './isoSymbols';
 import { isoTables, type IsoTable, type TableName } from './isoTables';
 
+/** The sheet of a split isometric: which components it prints and the continuation marks at its cuts. */
+export interface SheetScope {
+  readonly index: number;
+  readonly total: number;
+  readonly include: ReadonlySet<string>;
+  readonly indices: ReadonlySet<number>;
+  /** One of several sheets of the same spools (table rows count only what is on the sheet). */
+  readonly partial: boolean;
+  readonly continuation: readonly ContinuationMark[];
+  readonly spool?: string;
+}
+
+/** A current human issue of the line: replaces the NOT FOR CONSTRUCTION stamp by the revision and approver. */
+export interface SheetIssue {
+  readonly revision: string;
+  readonly purpose: string;
+  readonly signer: string;
+}
+
 export interface SheetOptions {
-  readonly style: 'check' | 'final';
+  readonly style: 'check' | 'final' | 'spool';
   readonly paper: PaperSize;
   readonly northArrow: NorthArrow;
   readonly tables: readonly TableName[];
   readonly project: string;
+  readonly sheet?: SheetScope;
+  readonly issue?: SheetIssue;
 }
 
 export interface SheetAnnotation extends IsoAnnotation {
@@ -131,9 +153,13 @@ function titleBlock(width: number, lines: ReadonlyArray<ReadonlyArray<readonly [
 
 export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): IsoSheet {
   const network = analysis.read.network;
-  const graph = buildIsoGraph(network);
+  const graph = buildIsoGraph(network, options.sheet?.include);
   const warnings: IsoIssue[] = [];
-  const { tables, warnings: tableWarnings } = isoTables(analysis, options.tables);
+  const { tables, warnings: tableWarnings } = isoTables(
+    analysis,
+    options.tables,
+    options.sheet === undefined ? undefined : { indices: options.sheet.indices, partial: options.sheet.partial },
+  );
   warnings.push(...tableWarnings);
   const [width, height] = PAPER_MM[options.paper];
   const area = sheetDrawingArea(width, height);
@@ -150,7 +176,7 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
       isoIssue(
         'ISO_SHEET_OVERFLOW',
         'warning',
-        `the line does not fit one ${options.paper} sheet without shrinking to ${Math.round(layout.scale * 100)} %`,
+        `${options.sheet === undefined ? 'the line' : `sheet ${options.sheet.index}`} does not fit one ${options.paper} sheet without shrinking to ${Math.round(layout.scale * 100)} %`,
         [analysis.lineId],
       ),
     );
@@ -243,6 +269,31 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
       [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
     );
   }
+  for (const mark of options.sheet?.continuation ?? []) {
+    const anchor = at2d(mark.at);
+    if (anchor === undefined) continue;
+    primitives.push({ t: 'circle', layer: 'ISO-SYMB', c: anchor, r: 3.4 });
+    label(
+      {
+        kind: 'continuation',
+        text: `CONT. ${mark.sheet > (options.sheet?.index ?? 0) ? 'ON' : 'FROM'} SHEET ${mark.sheet} - ${mark.weld ?? 'FLANGE'}`,
+        at: mark.at,
+        sheetRef: mark.sheet,
+        weld: mark.weld,
+        joint: mark.joint,
+        eastMm: mark.at[0],
+        northMm: mark.at[1],
+        elevationMm: mark.at[2],
+      },
+      anchor,
+    );
+  }
+  const stamp =
+    options.issue === undefined ? 'NOT FOR CONSTRUCTION' : `ISSUED ${options.issue.purpose.toUpperCase()} REV ${options.issue.revision}`;
+  const note =
+    options.issue === undefined
+      ? 'REVIEW REQUIRED - isometric not to scale; dimensions in mm from the 3D centreline'
+      : `APPROVED BY ${options.issue.signer} - isometric not to scale; dimensions in mm from the 3D centreline`;
   const angles = axisAngles(options.northArrow);
   const centre: Vec2 = [area.x + area.width - tableWidth - 12, top - 14];
   const direction: Vec2 = [Math.cos((angles.northArrow * Math.PI) / 180), Math.sin((angles.northArrow * Math.PI) / 180)];
@@ -263,8 +314,8 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
     },
     text([tipOfArrow[0] + direction[0] * 3 - 1, tipOfArrow[1] + direction[1] * 3 - 1], 3, 'N'),
     rect(20, 10, width - 10, height - 10, 'ISO-FRAME'),
-    text([area.x + 2, top - 6], 5, 'NOT FOR CONSTRUCTION'),
-    text([area.x + 2, top - 11], 2.6, 'REVIEW REQUIRED - isometric not to scale; dimensions in mm from the 3D centreline'),
+    text([area.x + 2, top - 6], 5, stamp),
+    text([area.x + 2, top - 11], 2.6, note),
     ...tablePrimitives(tables, area.x + area.width - tableWidth + 3, top - 30),
     ...titleBlock(width, [
       [
@@ -278,11 +329,22 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
         ['REV', network.attributes['REVISION'] ?? '-'],
       ],
       [
-        ['STATUS', 'NOT FOR CONSTRUCTION'],
-        ['SHEET', '1 OF 1'],
+        ['STATUS', options.issue === undefined ? 'NOT FOR CONSTRUCTION' : `ISSUED REV ${options.issue.revision}`],
+        ['SHEET', `${options.sheet?.index ?? 1} OF ${options.sheet?.total ?? 1}`],
         ['PAPER', `${options.paper} ${mmText(layout.scale * 100)} % fit`],
       ],
     ]),
   );
-  return { width, height, primitives, graph, layout, dimensions, annotations, tables, warnings, title: `${analysis.name} isometric` };
+  return {
+    width,
+    height,
+    primitives,
+    graph,
+    layout,
+    dimensions,
+    annotations,
+    tables,
+    warnings,
+    title: `${analysis.name} isometric${options.sheet === undefined ? '' : ` sheet ${options.sheet.index}`}`,
+  };
 }

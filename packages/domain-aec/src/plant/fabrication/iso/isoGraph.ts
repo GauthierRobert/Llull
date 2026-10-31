@@ -112,8 +112,11 @@ function segmentsOf(component: NetworkComponent, componentIndex: number): IsoSeg
   return first === undefined || second === undefined ? [] : make('body', first, second);
 }
 
-export function buildIsoGraph(network: PipingNetwork): IsoGraph {
-  const segments = network.components.flatMap((component, index) => segmentsOf(component, index));
+/** The graph of a line, or of the components named in `include` (one sheet of a split isometric). */
+export function buildIsoGraph(network: PipingNetwork, include?: ReadonlySet<string>): IsoGraph {
+  const segments = network.components.flatMap((component, index) =>
+    include === undefined || include.has(component.id) ? segmentsOf(component, index) : [],
+  );
   const adjacency = new Map<string, number[]>();
   const points = new Map<string, Vec3>();
   segments.forEach((segment, index) => {

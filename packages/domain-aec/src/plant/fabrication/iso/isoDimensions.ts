@@ -40,7 +40,7 @@ export interface RunDimension {
 }
 
 export interface IsoAnnotation {
-  readonly kind: 'elevation' | 'coordinate' | 'slope' | 'weld' | 'spool';
+  readonly kind: 'elevation' | 'coordinate' | 'slope' | 'weld' | 'spool' | 'continuation';
   readonly text: string;
   readonly at: Vec3;
   readonly run?: number;
