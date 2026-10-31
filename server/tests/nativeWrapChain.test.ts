@@ -72,7 +72,7 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP chain' })('WRP multi-
     expect(relative(data['expectedVolumeDelta'] as number, 186)).toBeLessThan(1e-9);
     expect(relative(data['volumeDelta'] as number, 186)).toBeLessThan(1e-6);
     expect(relative(volume(done.document, done.affected[0] as string) - volume(doc, id), 186)).toBeLessThan(1e-6);
-    expect((data['distortion'] as { maxLengthStrain: number }).maxLengthStrain).toBe(0);
+    expect(Math.abs((data['distortion'] as { maxLengthStrain: number }).maxLengthStrain)).toBeLessThan(1e-9); // the strain is a float residual of the edge-sample comparison (2.5e-12 measured), not exactly 0
     expect((data['edges'] as Array<{ convexity: string; length: number }>).map((e) => [e.convexity, e.length])).toEqual([['smooth', 10]]);
   });
 
@@ -163,7 +163,7 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP chain' })('WRP multi-
     expect(lengths[0]?.length3d).toBeCloseTo(10, 9);
     expect(lengths[1]?.length3d).toBeCloseTo(30, 7);
     expect(lengths.reduce((sum, l) => sum + l.length3d, 0)).toBeCloseTo(40, 7);
-    expect((done.data as { distortion: { maxLengthStrain: number } }).distortion.maxLengthStrain).toBe(0);
+    expect(Math.abs((done.data as { distortion: { maxLengthStrain: number } }).distortion.maxLengthStrain)).toBeLessThan(1e-9); // the strain is a float residual of the edge-sample comparison (2.5e-12 measured), not exactly 0
     const entities = done.affected.map((curveId) => done.document.entities[curveId] as { onFace?: { faceIndex: number } });
     expect(entities.map((e) => e.onFace?.faceIndex)).toEqual(lengths.map((l) => l.face));
   });
@@ -224,7 +224,7 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP chain' })('WRP multi-
     expect(JSON.stringify(replayed.document.entities)).toBe(JSON.stringify(done.document.entities));
   });
 
-  it('refuses a sharp edge, a face that shares no edge, a circular edge and a face listed twice, by code', () => {
+  it('mitres a perpendicular sharp edge, refuses an oblique one, a face that shares no edge, a circular edge and a face listed twice, by code', () => {
     const { doc, id } = stadium();
     const sketch = band(doc, 30);
     const base = { id, profileIds: [sketch.id], mode: 'emboss', depth: 1, placement };
@@ -237,7 +237,25 @@ describeNativeWhen({ capabilities: ['emboss'], label: 'WRP chain' })('WRP multi-
       face: FRONT,
       chain: [{ faceNear: [0, 0, 5] }],
     });
-    expect(sharp.error?.code).toBe('WRP_CHAIN_EDGE_SHARP');
+    // a rectangle crossing a convex plane-plane edge at right angles is mitred since 14.15 (the corner column is filled); an oblique outline is still refused by name
+    expect(sharp.error, sharp.summary).toBeUndefined();
+    expect((sharp.data as { mitre: { exact: boolean } }).mitre.exact).toBe(true);
+    const slanted = must(doc, 'draw_polyline', {
+      points: [
+        [0, -4],
+        [8, -3],
+        [8, 4],
+        [0, 3],
+      ],
+      closed: true,
+    });
+    const oblique = execute(slanted.document, 'emboss_on_face', {
+      ...base,
+      profileIds: [slanted.affected[0]],
+      face: FRONT,
+      chain: [{ faceNear: [0, 0, 5] }],
+    });
+    expect(oblique.error?.code).toBe('WRP_CHAIN_EDGE_SHARP');
     expect(codeOf({ face: FRONT, chain: [BACK] })).toBe('WRP_CHAIN_NOT_ADJACENT');
     expect(
       codeOf({ face: END, chain: [{ faceNear: [30, 0, 5] }].slice(0, 0).concat([{ faceNear: [20, 0, 5] }]), placement: undefined }),

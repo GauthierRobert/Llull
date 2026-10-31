@@ -442,12 +442,22 @@ const cases = [
         const t = Math.tan((10 * Math.PI) / 180);
         return { w: 20, l: 10, depth: 2, draftDeg: 10, volume: 20 * 10 * 2 - 30 * t * 4 + (4 / 3) * t * t * 8 };
       })(),
-      cylinder: { radius: 20, region: '30 x 10 on azimuth 0', pull: [1, 0, 0], depth: 1, draftDeg: 5, emboss: 318.067431786, deboss: 277.215041, hinge: 'plane x = 20 through the anchor' },
+      cylinder: {
+        radius: 20,
+        region: '30 x 10 on azimuth 0',
+        pull: [1, 0, 0],
+        depth: 1,
+        draftDeg: 5,
+        emboss: 318.067431786,
+        deboss: 277.215041,
+        hinge: 'plane x = 20 through the anchor',
+      },
     },
     tolerance: 1e-6,
     toleranceKind: 'relative',
     unit: 'mm3',
-    source: '(b) A(h) = (w - 2 h t)(l - 2 h t) integrated over the height; the cylinder case by numeric integration (kernel agreement 1e-4)',
+    source:
+      '(b) A(h) = (w - 2 h t)(l - 2 h t) integrated over the height; the cylinder case by numeric integration (kernel agreement 1e-4)',
     grade: 'A',
     proves: ['FR-WRP-13'],
     cli: { run: `llull emboss_on_face '{"walls":"pull","pullDirection":[0,0,1],"draftDeg":10,...}' ${D}`, assert: 'data.volumeDelta' },

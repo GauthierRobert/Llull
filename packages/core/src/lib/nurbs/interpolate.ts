@@ -22,6 +22,8 @@ export interface InterpolationOptions {
   /** Direction of the curve at the first point (any length; scaled to the polyline length per unit parameter). */
   readonly startTangent?: Vec3 | undefined;
   readonly endTangent?: Vec3 | undefined;
+  /** The end tangents are derivatives with respect to the parameter on [0, 1] as given (default: only their direction counts, the length is the polyline's). */
+  readonly exactTangents?: boolean | undefined;
 }
 
 /** Parameter values t_0 = 0 .. t_n = 1 (chord, centripetal = chord^1/2, or uniform) and the polyline length. */
@@ -89,7 +91,7 @@ export function interpolatePoints(
   const full = averagedKnots(t, degree, startTangent !== undefined, endTangent !== undefined);
   const rows: SparseRow[] = [];
   const rhs: number[][] = [];
-  const unitScale = (tangent: Vec3): Vec3 => scale3(tangent, length / (len3(tangent) || 1));
+  const unitScale = (tangent: Vec3): Vec3 => (options.exactTangents === true ? tangent : scale3(tangent, length / (len3(tangent) || 1)));
   const derivativeRow = (u: number, tangent: Vec3): void => {
     const span = findSpan(unknowns, degree, u, full);
     const ders = basisDerivatives(span, u, degree, 1, full);

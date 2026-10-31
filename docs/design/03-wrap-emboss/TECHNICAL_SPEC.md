@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; `VVAR` / vertical metrics variations and named-instance lookup by name (see 14.14); multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across sharp edges; the silhouette of a torus seen in its equatorial plane and of freeform faces; UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; `VVAR` / vertical metrics variations and named-instance lookup by name (see 14.14); multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces with a cusp, a branch point or a tangential view (§14.16); UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -653,7 +653,7 @@ it becomes part of the boundary (area 50 - 8 = 42 in the unit test), loops entir
 `WRP_CHAIN_CLIP_FAILED` too. `wrap_to_face` keeps the runs without chords: each becomes a curve on its own face (`data.faces`, `curves[].face`), a loop crossing an edge becomes open pieces.
 
 **Emboss across the faces.** Each face's part is mapped by its chart, checked on the face and embossed in chain order: `recipe_k = emboss(source: recipe_{k-1}, face: the face found again by an interior probe point)`. Walls on a shared smooth edge are the same plane, so the pieces fuse.
-**Deviation (never silent):** one command and one result, but the kernel steps are one per face, not a single multi-face tool; sharp (convex / concave) edges are refused for emboss and deboss (`WRP_CHAIN_EDGE_SHARP`: slabs on both sides would meet in a line, not a surface; a mitre needs a
+**Deviation (never silent):** one command and one result, but the kernel steps are one per face, not a single multi-face tool; sharp (convex / concave) edges are refused for emboss and deboss except plane to plane (mitred since §14.15; otherwise `WRP_CHAIN_EDGE_SHARP`: slabs on both sides would meet in a line, not a surface; a mitre needs a
 native half-space cut of the tools). `scribe` and `wrap_to_face` cross sharp edges. `data.expectedVolumeDelta` is the sum of the closed forms per face.
 
 **Measured (native kernel, `server/tests/nativeWrapChain.test.ts`).** Stadium (box 40 x 20 x 10 + two r 10 cylinders), band 6 x 30, depth 1: areas 60 + 120, volume change 186 = 60 + 120 x 1.05 (1e-6 relative); three faces (band 60 long over plane, cylinder end, opposite plane) 369.4248;
@@ -786,6 +786,8 @@ plane and cylinder faces does not hold for the cone's chart, whose axes are (tan
 volume of the same emboss on the whole cone (1e-4). Torus R 10 r 3 split along two meridians (`create_curve_on_face` iso + `split_face_by_curves`): a band of 3 along the outer equator across a meridian, 1.3 + 1.7 with join mismatch 0.0085, ends 0.055 (1.8 % of the band) from the exact equator point; from an anchor 3.9 away (mismatch 6.3 %, the circumferential stretch K rho^2 / 6 of the geodesic chart)
 the chain is refused with `WRP_DISTORTION_EXCEEDED`, and so is any limit below the measured mismatch.
 
+**Deviations (never silent).** The chain of non-developable faces is a first-order unfolding: the join mismatch (over the window and at every crossing of the sketch) and the stretch are measured and refused above the limit, not zero. A sketch that leaves the joined window is refused rather than cut on the extended chord. A closed edge (a meridian) is joined only over the window the chart reaches, so a sketch farther from the edge than that is refused. The sphere / torus chains and the emboss closed form per face (`expectedVolumeDelta`) are checked on the native kernel only for the cone and torus cases above.
+
 ### 14.14 Variable TrueType: `gvar`, `avar` version 2, `MVAR` (DES-3c)
 
 `variation` now instances TrueType fonts with a `gvar` table as well as CFF2 ones. Files: `lib/font/gvar.ts` (tuple variation store), `lib/font/variation.ts` (`avar` 2), `lib/font/mvar.ts`, `lib/font/glyf.ts` (the hooks), `lib/font/font.ts` (wiring).
@@ -807,3 +809,44 @@ operator budget as the CFF charstrings (20e6) when the font is scanned at import
 **Measured (`tests/unit/wrap/gvar.test.ts`).** Generated fonts with closed-form outlines: wght 900 moves the right corners by 40 and IUP gives 20 / 40 / 20 / 0 to the points between (x = 0, 70, 140 ...), the advance +40 through the phantom point (HVAR +100 wins when present); wght 650 scales by 0.5 and the intermediate tuple (0.25 / 0.5 / 1) is at its peak (+8);
 wght 550 gives its 0.2 scalar; the wght- tuple's single touched point moves the whole contour by -10 s; composite offsets move by their deltas; a 150-point list (two-byte count), a step of 300 (word point numbers) and a delta of 300 (word delta) are read; `avar` 2 moves wdth to 0.5 at wght 900 (so the wdth tuple scales by 0.5) and to 0.125 through a bent wght map; `MVAR` moves the metrics (+50 / -20 / +10 / +30 at wght 900,
 half at 650). On Bahnschrift (system font, test skipped without it): the I stem grows with wght (144 / 204 / 284 wide at wght 300 / 400 / 700), the H narrows with wdth 75 (advance 1390 -> 870), the point structure is the same at every instance, and all glyphs of three instances read within the budgets. No reference outlines of a third-party renderer were available offline, so the real-font checks are properties, not values.
+
+### 14.15 Mitred walls across a sharp plane-plane edge (DES-3c)
+
+An emboss or deboss chain whose outline crosses a straight edge between two plane faces is built face by face (slabs with walls normal to their face, §14.6) and the corner is closed by a mitre (`embossMitre.ts`).
+With the two outward normals nA, nB at the edge, the depth d and s = +1 (emboss) or -1 (deboss), the offset planes meet at M = s d (nA + nB) / (1 + nA . nB) from the edge. A convex edge with an emboss, or a concave edge with a
+deboss, leaves the column (edge, s d nA, M, s d nB) between the slabs: a prism along the edge over the stretches the outline covers (one per pair of crossings) is united (emboss) or subtracted (deboss). In the other two
+cases (emboss on a concave edge, deboss on a convex edge) the slabs overlap by the same column and the union already is the mitred corner, so no filler is built and the closed form loses the overlap.
+`data.expectedVolumeDelta` includes both: 48 d + d^2 L = 54 for an 8 x 6 rectangle centred on the edge of a box (d 1, L 6), 42 where the slabs overlap. `data.mitre` lists per edge `kind` (filler / overlap), the number of intervals, the covered length and the
+cross-section area, with `fillerVolume`, `overlapVolume` and `exact`.
+
+**Exactness.** The overlap of the two slabs is only as wide as the outline: the closed form is exact (`exact` true) when, over every covered stretch, the outline contains the strip of the clip polygon's reach on both faces, and when no outline comes within that reach of the edge without crossing it; otherwise `exact` is false, `expectedVolumeDelta` null and `data.mitre.reasons` says why. The filler is a column outside both slabs and does not depend on the width of the outline. Only the stretch of the line that is the edge counts (pieces meeting the line beyond its ends belong to another edge of the chain).
+
+**Refused by name (`WRP_CHAIN_EDGE_SHARP`, the message says which):** a convexity the kernel left unknown; an edge between faces that are not both planes; an edge sharper than the mitre can follow (|M| > 20 d); where a filler is needed, an outline that crosses the edge at an angle
+(only segments at right angles to the edge have a column the prism fills), through a vertex, with a curved piece, an odd number of times, or beyond the end of the edge. Where only an overlap is concerned the same crossings are built and `exact` is false (`expectedVolumeDelta` null: the closed form
+does not know the overlap). Scribe crosses sharp edges as before.
+
+**Measured (native kernel, `server/tests/nativeWrapMitre.test.ts`).** Box 60 x 40 x 10, rectangle 8 x 6 centred on the top-side edge, d 1: emboss on the convex edge +54 (the filler 6), deboss -42 (overlap 6); on the concave edge of an L-shaped solid emboss +42, deboss -54; each within 1e-5 of the
+closed form on the exact solid.
+
+### 14.16 Silhouette of freeform (B-spline) faces (DES-3c)
+
+`split_at_silhouette` traces the contour n . d = 0 of a B-spline face on the exact surface of `faceQuery.bspline` (the face's own (u, v)). G = n . d / |n| is sampled on a 48 x 48 grid of the face's parameter box; the sign changes
+are linked by marching squares into polylines (open ones end on the box, closed ones are loops); every crossing is refined to the contour by bisection on its grid edge. A trimmed face is handled with `faceContains`: the
+polyline is cut at the trimming boundary by bisection (each probe re-projected onto F = (S_u x S_v) . d = 0 by Newton on the exact first and second derivatives). Each piece is an interpolating cubic through the refined vertices (decimated to
+a third of a cell), projected back onto the contour at every evaluation, and then fitted as a cubic B-spline within the tolerance (the pcurve in the face's own (u, v) likewise); `deviation` is the larger of the two fits, and the
+fitted curve is checked against `projectOnFace` / `faceContains` at 48 points. A contour along a boundary of the face already is an edge (`onEdge`), a face with |n . d| < 1e-9 at every node is edge-on (`edgeOn`).
+
+**Refused by name** (`WRP_SILHOUETTE_UNSUPPORTED` with the reason, the face left unsplit): no B-spline from the kernel; a periodic B-spline; a pole or collapsed edge (|S_u x S_v| = 0 at a node); a face seen almost tangentially
+(|n . d| < 1e-3 everywhere without a sign change: a double root cannot be traced); a cusp or branch point (the gradient of n . d along the contour falls under 5 % of its largest value, Newton does not converge, or a grid cell
+has four crossings); a fit that misses the tolerance.
+
+**Measured.** Closed forms on the fake freeform kernel (`tests/unit/wrap/freeformSilhouette.test.ts`): a cylinder patch R 20 h 40 seen along (0.2, 1, 0) gives the ruling at azimuth -atan 0.2, length 40 to 1e-6, deviation under the
+tolerance 1e-6; a saddle z = 0.05 (x^2 - y^2) seen along x gives the parabola x = 0, length 2 [(5/2) sqrt(1 + a^2 25) + asinh(5a) / 2a] (a = 0.1) to 1e-6, and the skew view (1, 0.3, 0) the line x = 0.3 y; cut at y = 3 the arc is the
+closed-form partial integral; a bump seen along (1, 0, 0.5) has one closed loop with |n . d| < 1e-7 on the exact surface. Native OCCT (`server/tests/nativeSilhouetteFreeform.test.ts`): a plate bent 90 degrees on R 50 (two B-spline faces,
+R 50 and R 44) seen along (cos 30, 0, sin 30) gives two rulings of length 30 (error under 1e-5) at 30 degrees from the vertical (points within 1e-3 of the cylinder, the bent B-spline's own fit), fit deviation 4e-11; each curve alone
+divides its face into arcs of 30 and 60 degrees times the width (1e-3).
+
+**Deviations (never silent).** Features smaller than a cell of the grid (an island or a fold inside one cell) are not seen; a branch point inside a cell is refused when the contour's gradient falls under 5 % of its maximum or the
+cell has four crossings, a crossing that passes both tests is traced as two smooth branches. Contour features smaller than 1/48 of the parameter box of the face are not seen (`data.silhouette.grid` = 48); the closed loops are fitted with the same direction at both ends (the seam is C1); the guards on Newton failing
+(the sampler answers null, the fit refuses "Newton cannot follow"; after the fit every probe's distance to n . d = 0 is checked) are exercised through the test hooks of `freeformContours` (a field or projection no real surface gives) and by a C0 crease. A kernel defect found on the way (two sequential
+face splits merged the first back, `UnifySameDomain` keep set) is fixed in `split_shape` (fix/split-shape-keep): the bent plate gives 8 faces.

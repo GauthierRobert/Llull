@@ -58,7 +58,7 @@ export function referenceDistance(reference: ReferenceShape): Distance | { reado
       const { majorRadius, minorRadius, center, axis } = reference;
       const bad =
         need('majorRadius', positive(majorRadius)) ??
-        need('minorRadius', positive(minorRadius)) ??
+        need('minorRadius', positive(minorRadius) && (majorRadius === undefined || minorRadius < majorRadius)) ??
         need('center', center !== undefined) ??
         need('axis', axis !== undefined && len3(axis) > 0);
       if (bad !== null || center === undefined || axis === undefined || majorRadius === undefined || minorRadius === undefined)

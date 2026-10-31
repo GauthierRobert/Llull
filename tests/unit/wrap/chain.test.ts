@@ -92,11 +92,11 @@ describe('emboss_on_face with a chain of faces (fake stadium)', () => {
     expectPure(sketch.doc, () => execute(sketch.doc, 'emboss_on_face', params));
   });
 
-  it('refuses by code: a sharp edge the sketch crosses, a face with no edge to the chain, a circular edge, a duplicate face and a chain with engrave', () => {
-    const sharp = emboss({ chain: [TOP] }, 8, 2);
-    expect(sharp.error?.code).toBe('WRP_CHAIN_EDGE_SHARP');
-    expect(sharp.summary).toContain('convex edge');
-    expect(sharp.document.entities).toBeDefined();
+  it('refuses by code: a face with no edge to the chain, a circular edge, a duplicate face and a chain with engrave', () => {
+    // a convex edge between two planes crossed at right angles is mitred (14.15): 8 x 6 = 48 plus the corner column 1 x 8
+    const mitred = emboss({ chain: [TOP] }, 8, 2);
+    expect(mitred.rejected, mitred.summary).toBeUndefined();
+    expect(data(mitred)['expectedVolumeDelta']).toBeCloseTo(56, 9);
     expect(emboss({ chain: [BACK] }).error?.code).toBe('WRP_CHAIN_NOT_ADJACENT');
     expect(emboss({ chain: [FRONT] }).error?.code).toBe('WRP_PARAM_INVALID');
     expect(emboss({ chain: [END], mode: 'engrave', toolWidth: 1 }).error?.code).toBe('WRP_PARAM_INVALID');

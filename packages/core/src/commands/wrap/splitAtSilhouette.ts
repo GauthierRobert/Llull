@@ -9,6 +9,7 @@ import { defineCommand, vec3, z } from '../schema';
 import type { CommandResult } from '../types';
 import { wrapRejection } from './codes';
 import { isRejection, openSolid } from './faceSession';
+import { FREEFORM_GRID } from './freeformSilhouette';
 import { silhouettes } from './silhouette';
 import { splitFaceByCurves } from './splitFaceByCurves';
 
@@ -16,18 +17,18 @@ import { splitFaceByCurves } from './splitFaceByCurves';
  * @affects creates one \`nurbs_curve\` (with \`onFace\`) per silhouette piece, then replaces the solid by the split result (a new mesh entity with the exact recipe) like split_face_by_curves; the curves stay
  * @invariant the silhouette is where the face normal is perpendicular to \`direction\`: closed form on cylinder (two generatrices), cone (two generatrices through the apex) and sphere (a great circle), none on
  *   a plane; the volume and the total face area do not change; a silhouette that already is an edge of the solid is not split again (data.silhouette.onEdge)
- * @failure zero direction, no exact kernel, a solid with no silhouette inside a face (a box seen along an axis), freeform faces, a torus seen along its equatorial plane, a sphere or torus patch the contour leaves, the split refused by the kernel -> coded no-op
+ * @failure zero direction, no exact kernel, a solid with no silhouette inside a face (a box seen along an axis), a freeform face with a cusp, branch point, pole, periodic B-spline or tangential view, a torus seen along its equatorial plane, a sphere or torus patch the contour leaves, the split refused by the kernel -> coded no-op
  */
 export const splitAtSilhouette = defineCommand({
   name: 'split_at_silhouette',
   description:
     'Split the faces of a solid along its silhouette seen along `direction` (parallel view; the pull direction of a mould, so the cut is its parting line). The silhouette is where the face normal is ' +
     'perpendicular to the direction, found in closed form on the exact faces: a cylinder gives its two generatrices at +-(axis x direction), a cone the generatrices through its apex, a sphere the great circle ' +
-    'perpendicular to the direction, a torus its two contour curves (n . d = 0 solved per meridian angle, fitted B-splines reported with their deviation); a plane has none (it is parallel to the direction or turned toward / away from it: data.silhouette.edgeOn lists the parallel ones, whose boundary is the parting line). ' +
+    'perpendicular to the direction, a torus its two contour curves (n . d = 0 solved per meridian angle, fitted B-splines reported with their deviation), a freeform (B-spline) face its contour n . d = 0 traced on the exact surface (sign changes on a 48 x 48 grid of the face, refined by Newton, fitted B-spline reported with its deviation; closed or open, cut at a trimmed boundary; contour features smaller than 1/48 of the parameter box of the face are not seen, so such a face reports no silhouette: data.silhouette.grid is 48); a plane has none (it is parallel to the direction or turned toward / away from it: data.silhouette.edgeOn lists the parallel ones, whose boundary is the parting line). ' +
     'Each piece is made a curve on its face (a nurbs_curve with onFace, kept in the document) and the faces are divided along them with split_face_by_curves (the divided faces get new persistent names). The curves are a record of the cut: ' +
-    'they reference the solid as it was before the split. A face whose silhouette is not built (freeform, a torus seen along its equatorial plane, a sphere or torus patch the contour leaves) is left unsplit and named in the summary and in data.silhouette.unsupported: the parting line is then partial. A silhouette that already is an edge of the solid (a cylinder seen along a seam) is reported in data.silhouette.onEdge and not split again. ' +
-    'Returns data { facesBefore, facesAfter, faces[], volumeBefore, volumeAfter, silhouette { direction, curves[{ id, face, kind, length }], edgeOn, onEdge, unsupported } }. Refuses with WRP_SILHOUETTE_NONE ' +
-    '(nothing to split for this direction), WRP_SILHOUETTE_UNSUPPORTED (a freeform face, a torus seen along its equatorial plane, or a sphere / torus patch the contour leaves: the reason is named), WRP_PARAM_INVALID (zero direction) and the ' +
+    'they reference the solid as it was before the split. A face whose silhouette is not built (a freeform face with a cusp, a branch point, a pole or a tangential view; a torus seen along its equatorial plane, a sphere or torus patch the contour leaves) is left unsplit and named in the summary and in data.silhouette.unsupported: the parting line is then partial. A silhouette that already is an edge of the solid (a cylinder seen along a seam) is reported in data.silhouette.onEdge and not split again. ' +
+    'Returns data { facesBefore, facesAfter, faces[], volumeBefore, volumeAfter, silhouette { direction, curves[{ id, face, kind, length, deviation }], edgeOn, onEdge, unsupported, grid } }. Refuses with WRP_SILHOUETTE_NONE ' +
+    '(nothing to split for this direction), WRP_SILHOUETTE_UNSUPPORTED (a freeform face with a cusp / branch point / pole / tangential view or a periodic B-spline, a torus seen along its equatorial plane, or a sphere / torus patch the contour leaves: the reason is named), WRP_PARAM_INVALID (zero direction) and the ' +
     'split_face_by_curves codes. Needs the exact (native) kernel. Next: inspect_faces, draft_faces, emboss_on_face.',
   params: z.object({
     id: z.string().describe('Id of the solid to divide.'),
@@ -53,6 +54,7 @@ export const splitAtSilhouette = defineCommand({
       edgeOn: report.edgeOn,
       onEdge: report.onEdge,
       unsupported: report.unsupported,
+      grid: FREEFORM_GRID,
       ...extra,
     });
     if (report.curves.length === 0) {

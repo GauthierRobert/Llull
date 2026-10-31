@@ -215,8 +215,11 @@ describe('reference shape distances', () => {
     expect(referenceDistance({ kind: 'cylinder', point: [0, 0, 0], axis: [0, 0, 1] })).toEqual({ missing: 'radius' });
     expect(referenceDistance({ kind: 'cone', apex: [0, 0, 0], axis: [0, 0, 1], halfAngleDeg: 95 })).toEqual({ missing: 'halfAngleDeg' });
     expect(referenceDistance({ kind: 'spheroid', center: [0, 0, 0], semiAxes: [1, 0, 1] })).toEqual({ missing: 'semiAxes' });
-    expect(referenceDistance({ kind: 'torus', majorRadius: 1, minorRadius: 1, center: [0, 0, 0], axis: [0, 0, 0] })).toEqual({
+    expect(referenceDistance({ kind: 'torus', majorRadius: 1, minorRadius: 0.5, center: [0, 0, 0], axis: [0, 0, 0] })).toEqual({
       missing: 'axis',
+    });
+    expect(referenceDistance({ kind: 'torus', majorRadius: 1, minorRadius: 1, center: [0, 0, 0], axis: [0, 0, 1] })).toEqual({
+      missing: 'minorRadius',
     });
     const unit = referenceDistance({ kind: 'cylinder', radius: 2, point: [0, 0, 0], axis: [0, 0, 1] });
     if ('missing' in unit) throw new Error('unreachable');

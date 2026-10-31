@@ -131,7 +131,10 @@ export const CORE_READERS: readonly HostileReader[] = [
     build: () => variableTrueTypeWithMetrics(),
     extra: [
       { name: 'a glyph of 20 000 points with 4095 size-0 tuples over one run of zero deltas', input: () => gvarTupleFanFont(4095) },
-      { name: 'the same glyph with 90 tuples (just under the per-glyph cap: read within the time budget)', input: () => gvarTupleFanFont(90) },
+      {
+        name: 'the same glyph with 90 tuples (just under the per-glyph cap: read within the time budget)',
+        input: () => gvarTupleFanFont(90),
+      },
     ],
     skipLinear: 'a binary font container: its size is not a record count',
     read: (input) => {
