@@ -14,6 +14,7 @@
 import type { Vec3 } from '../../model/types';
 import type { BezierPatch } from '../subdivisionPatches';
 import type { Cage } from '../subdivision';
+import { DENSE_MAX_UNKNOWNS, type Sample, type SparseRow, gaussSolve, solveDense, solveSparse } from './g1Linear';
 import { surfaceEvaluator } from './limit';
 import { buildTopology } from './topology';
 
@@ -28,27 +29,27 @@ function sidePoles(k: number): { b: number[]; r: number[] } {
 const INTERIOR = [5, 6, 9, 10];
 /** Rings of quads around the quads that touch an extraordinary vertex that stage 2 may free, at most. */
 const MOST_RINGS = 3;
+/** A factor a at or below this is a fold (the two patches lie on the same side of their edge) or no edge at all: the group is refused. */
+const FOLDED = 1e-12;
 /** Last resort of stage 2: free every quad of the cage when it has at most this many. */
 const WHOLE_CAGE_QUADS = 400;
 /** A group whose conditions are met to this fraction of the size of the cage is consistent (rounding of the solve is 1e-15). */
 const CONSISTENT = 1e-9;
-/** Groups up to this many unknown poles are solved by dense orthogonalisation (with the limit-surface objective); larger ones by conjugate gradients on the sparse system. */
-const DENSE_MAX = 900;
-/** Samples per side of every free patch in the limit-surface objective, and iterations of the projected conjugate gradient. */
+/** Samples per side of every free patch in the limit-surface objective. */
 const SAMPLES = 4;
-const OBJECTIVE_ITERATIONS = 80;
-/** Ridge of the limit-surface objective, relative to a sample weight of 1 (a pole moves by at most about 1e-8 of what the samples ask for per unit of freedom it has no sample for). */
-const RIDGE = 1e-8;
-
 export interface ExactG1Group {
   readonly quads: number;
   /** The valences (other than 4) of the vertices of the quads in this group. */
   readonly valences: number[];
   /** Largest violation of a condition after the solve, relative to the size of the cage (the end conditions of the edges included). */
   readonly residual: number;
-  /** Largest misfit of the end fit of a, beta0, beta1 of an edge of this group, relative to the size of the cage. */
+  /** Largest misfit of the end fit of a, beta0, beta1 to the START poles of an edge of this group, relative to the size of the cage (a diagnostic: the end rows are part of the system and are solved with the rest). */
   readonly endMisfit: number;
   readonly consistent: boolean;
+  /** "solved", or why not: "contradiction" (the conditions have no common solution at this degree), "degenerate edge" (an edge without an end fit: no tangent, or a folded pair), "work budget" (too big for the bounded solve). */
+  readonly reason: 'solved' | 'contradiction' | 'degenerate edge' | 'work budget';
+  /** What the free poles approach inside the solution set: "limit" (the limit surface at samples, dense path) or "start" (the geometry poles: groups too big for the dense path). */
+  readonly objective: 'limit' | 'start';
 }
 
 export interface ExactG1 {
@@ -61,33 +62,8 @@ export interface ExactG1 {
   readonly freeQuads: number;
 }
 
-const dot = (p: readonly number[], q: readonly number[]): number => p.reduce((s, v, i) => s + v * (q[i] as number), 0);
+const dot = (p: readonly number[], q: readonly number[]): number => p.reduce((sum, v, i) => sum + v * (q[i] as number), 0);
 const sub = (p: Vec3, q: Vec3): Vec3 => [p[0] - q[0], p[1] - q[1], p[2] - q[2]];
-
-/** Solves a small dense system by Gaussian elimination with partial pivoting; null when singular. */
-function gaussSolve(m: number[][], r: number[]): number[] | null {
-  const n = r.length;
-  for (let c = 0; c < n; c++) {
-    let pivot = c;
-    for (let i = c + 1; i < n; i++)
-      if (Math.abs((m[i] as number[])[c] as number) > Math.abs((m[pivot] as number[])[c] as number)) pivot = i;
-    if (Math.abs((m[pivot] as number[])[c] as number) < 1e-300) return null;
-    [m[c], m[pivot]] = [m[pivot] as number[], m[c] as number[]];
-    [r[c], r[pivot]] = [r[pivot] as number, r[c] as number];
-    for (let i = c + 1; i < n; i++) {
-      const factor = ((m[i] as number[])[c] as number) / ((m[c] as number[])[c] as number);
-      for (let k = c; k < n; k++) (m[i] as number[])[k] = ((m[i] as number[])[k] as number) - factor * ((m[c] as number[])[k] as number);
-      r[i] = (r[i] as number) - factor * (r[c] as number);
-    }
-  }
-  const x = new Array<number>(n).fill(0);
-  for (let i = n - 1; i >= 0; i--) {
-    let sum = r[i] as number;
-    for (let k = i + 1; k < n; k++) sum -= ((m[i] as number[])[k] as number) * (x[k] as number);
-    x[i] = sum / ((m[i] as number[])[i] as number);
-  }
-  return x;
-}
 
 /** One linear condition: sum of coefficient x unknown = rhs (per axis); `face` is the free quad the edge belongs to (the group it is counted in). */
 interface Row {
@@ -96,142 +72,10 @@ interface Row {
   readonly face: number;
 }
 
-/** A sample of the limit-surface objective: sum of weight x unknown + constant - target. */
-interface Sample {
-  readonly terms: Array<readonly [number, number]>;
-  readonly constant: Vec3;
-  readonly target: Vec3;
-}
-
 const bernstein = (t: number): number[] => {
   const s = 1 - t;
   return [s * s * s, 3 * t * s * s, 3 * t * t * s, t * t * t];
 };
-
-/** Largest violation of any row of A x = b for the per-axis solutions `columns`. */
-function violation(a: number[][], b: Vec3[], columns: number[][]): number {
-  let residual = 0;
-  a.forEach((row, i) => {
-    for (let axis = 0; axis < 3; axis++)
-      residual = Math.max(residual, Math.abs(dot(row, columns[axis] as number[]) - ((b[i] as Vec3)[axis] as number)));
-  });
-  return residual;
-}
-
-const asPoints = (columns: number[][], count: number): Vec3[] =>
-  Array.from({ length: count }, (_, k): Vec3 => [columns[0]?.[k] as number, columns[1]?.[k] as number, columns[2]?.[k] as number]);
-
-/**
- * The poles nearest to the objective with A x = b: A has the conditions as dense rows over the unknowns. Independent rows by Gram-Schmidt (twice) with the triangular factor
- * kept: A_k = L Q, so the particular solution is x0 + Q^T L^-1 r (no squared conditioning). `residual` is the largest violation of any row; with `samples` the remaining freedom
- * (the null space of A) minimises the squared distance of the surface to the limit surface at the samples by a projected conjugate gradient.
- */
-function solveDense(a: number[][], b: Vec3[], start: Vec3[], samples: Sample[]): { x: Vec3[]; residual: number } {
-  const n = start.length;
-  const basis: number[][] = [];
-  const factor: number[][] = [];
-  const kept: number[] = [];
-  const largest = Math.max(...a.map((row) => Math.sqrt(dot(row, row))), 1e-300);
-  a.forEach((row, i) => {
-    const w = row.slice();
-    const coefficients = new Array<number>(basis.length).fill(0);
-    for (let pass = 0; pass < 2; pass++)
-      basis.forEach((q, j) => {
-        const c = dot(w, q);
-        coefficients[j] = (coefficients[j] as number) + c;
-        for (let k = 0; k < n; k++) w[k] = (w[k] as number) - c * (q[k] as number);
-      });
-    const length = Math.sqrt(dot(w, w));
-    // independent: a real part of the row is left after the kept ones, relative to the row and to the largest row (noise rows, 1e-16 of the others, are not conditions)
-    if (length > 1e-6 * Math.max(Math.sqrt(dot(row, row)), 1e-300) && length > 1e-8 * largest) {
-      basis.push(w.map((v) => v / length));
-      factor.push([...coefficients, length]);
-      kept.push(i);
-    }
-  });
-  const project = (v: number[]): number[] => {
-    const out = v.slice();
-    for (let pass = 0; pass < 2; pass++)
-      basis.forEach((q) => {
-        const c = dot(out, q);
-        for (let k = 0; k < n; k++) out[k] = (out[k] as number) - c * (q[k] as number);
-      });
-    return out;
-  };
-  const columns: number[][] = [[], [], []];
-  for (let axis = 0; axis < 3; axis++) {
-    const current = start.map((p) => p[axis] as number);
-    const rest = kept.map((i) => ((b[i] as Vec3)[axis] as number) - dot(a[i] as number[], current));
-    const y: number[] = [];
-    factor.forEach((line, i) => {
-      let sum = rest[i] as number;
-      for (let j = 0; j < i; j++) sum -= (line[j] as number) * (y[j] as number);
-      y.push(sum / (line[i] as number));
-    });
-    let x = current.map((value, k) => value + basis.reduce((sum, q, j) => sum + (q[k] as number) * (y[j] as number), 0));
-    // the freedom left: nearest to the limit surface at the samples
-    if (samples.length > 0 && basis.length < n) {
-      const t = samples.map((s) => (s.target[axis] as number) - (s.constant[axis] as number));
-      const applyW = (v: number[]): number[] => samples.map((s) => s.terms.reduce((sum, [u, w]) => sum + w * (v[u] as number), 0));
-      const applyWT = (r: number[]): number[] => {
-        const out = new Array<number>(n).fill(0);
-        samples.forEach((s, i) => s.terms.forEach(([u, w]) => (out[u] = (out[u] as number) + w * (r[i] as number))));
-        return out;
-      };
-      let r = project(applyWT(applyW(x).map((v, i) => v - (t[i] as number)))).map((v) => -v);
-      let p = r.slice();
-      let old = dot(r, r);
-      const stop = 1e-24 * Math.max(old, 1e-300);
-      for (let it = 0; it < OBJECTIVE_ITERATIONS && old > stop; it++) {
-        // a small ridge keeps the directions the samples do not see from running away
-        const ap = project(applyWT(applyW(p))).map((v, k) => v + RIDGE * (p[k] as number));
-        const curvature = dot(p, ap);
-        if (!(curvature > 1e-300)) break;
-        const alpha = old / curvature;
-        x = x.map((v, k) => v + alpha * (p[k] as number));
-        r = r.map((v, k) => v - alpha * (ap[k] as number));
-        const fresh = dot(r, r);
-        p = r.map((v, k) => v + (fresh / old) * (p[k] as number));
-        old = fresh;
-      }
-    }
-    columns[axis] = x;
-  }
-  return { x: asPoints(columns, n), residual: violation(a, b, columns) };
-}
-
-/** Conjugate gradients on the normal equations (CGLS) from `start`: the nearest solution when the system is consistent, the least-squares one otherwise. For groups too big to orthogonalise. */
-function solveSparse(a: number[][], b: Vec3[], start: Vec3[]): { x: Vec3[]; residual: number } {
-  const n = start.length;
-  const columns: number[][] = [[], [], []];
-  for (let axis = 0; axis < 3; axis++) {
-    const x = start.map((p) => p[axis] as number);
-    const applyT = (r: number[]): number[] => {
-      const out = new Array<number>(n).fill(0);
-      a.forEach((row, i) => row.forEach((c, k) => c !== 0 && (out[k] = (out[k] as number) + c * (r[i] as number))));
-      return out;
-    };
-    let r = b.map((v, i) => (v[axis] as number) - dot(a[i] as number[], x));
-    let s = applyT(r);
-    let p = s.slice();
-    let gamma = dot(s, s);
-    const stop = 1e-30 * Math.max(gamma, 1e-300);
-    for (let it = 0; it < 6 * n && gamma > stop; it++) {
-      const q = a.map((row) => dot(row, p));
-      const denominator = dot(q, q);
-      if (!(denominator > 1e-300)) break;
-      const alpha = gamma / denominator;
-      for (let k = 0; k < n; k++) x[k] = (x[k] as number) + alpha * (p[k] as number);
-      r = r.map((v, i) => v - alpha * (q[i] as number));
-      s = applyT(r);
-      const fresh = dot(s, s);
-      p = s.map((v, k) => v + (fresh / gamma) * (p[k] as number));
-      gamma = fresh;
-    }
-    columns[axis] = x;
-  }
-  return { x: asPoints(columns, n), residual: violation(a, b, columns) };
-}
 
 interface Assembly {
   readonly start: Vec3[];
@@ -306,8 +150,8 @@ function assemble(
       columns.map((u) => columns.map((w) => dot(u, w))),
       columns.map((u) => dot(u, target)),
     );
-    if (unknown === null) {
-      degenerate.add(owner);
+    if (unknown === null || (unknown[0] as number) <= FOLDED) {
+      for (const quad of [f, g]) if (free.has(quad)) degenerate.add(quad);
       continue;
     }
     const [a, b0, b1] = unknown as [number, number, number];
@@ -364,6 +208,7 @@ function solveAssembly(
   assembly: Assembly,
   evaluate: ReturnType<typeof surfaceEvaluator>,
   scale: number,
+  maxWork: number | undefined,
 ): { groups: ExactG1Group[]; out: Vec3[][] } {
   const { start, variableOf, rows } = assembly;
   const out: Vec3[][] = patches.map((patch) => patch.map((p): Vec3 => [p[0], p[1], p[2]]));
@@ -397,13 +242,9 @@ function solveAssembly(
       (x, y) => x - y,
     );
     const column = new Map(touched.map((u, i) => [u, i]));
-    const dense = withTerms.map((row) => {
-      const line = new Array<number>(touched.length).fill(0);
-      for (const [u, c] of row.terms) line[column.get(u) as number] = (line[column.get(u) as number] as number) + c;
-      return line;
-    });
+    const sparse: SparseRow[] = withTerms.map((row) => row.terms.map(([u, c]) => [column.get(u) as number, c] as const));
     const initial = touched.map((u) => start[u] as Vec3);
-    const small = touched.length <= DENSE_MAX;
+    const small = touched.length <= DENSE_MAX_UNKNOWNS;
     const samples: Sample[] = [];
     if (small)
       for (const f of faces)
@@ -425,11 +266,16 @@ function solveAssembly(
             samples.push({ terms, constant: [offset[0] as number, offset[1] as number, offset[2] as number], target: hit.point });
           }
     const targets = withTerms.map((row) => row.rhs);
-    const solution = small ? solveDense(dense, targets, initial, samples) : solveSparse(dense, targets, initial);
+    const broken = faces.some((f) => assembly.degenerate.has(f));
+    const solution = broken
+      ? { x: initial, residual: Infinity, status: 'ok' as const }
+      : small
+        ? solveDense(sparse, targets, initial, samples, maxWork)
+        : solveSparse(sparse, targets, initial, maxWork);
     const residual = Math.max(solution.residual, stuck) / scale;
     const endMisfit = Math.max(0, ...faces.map((f) => assembly.endMisfit.get(f) ?? 0));
-    const broken = faces.some((f) => assembly.degenerate.has(f));
-    const consistent = !broken && residual < CONSISTENT && endMisfit < CONSISTENT;
+    const consistent = !broken && solution.status === 'ok' && residual < CONSISTENT;
+    const reason = consistent ? 'solved' : broken ? 'degenerate edge' : solution.status === 'budget' ? 'work budget' : 'contradiction';
     if (consistent)
       touched.forEach((u, i) => {
         for (const key of keysOf[u] as number[]) (out[Math.floor(key / 16)] as Vec3[])[key % 16] = solution.x[i] as Vec3;
@@ -441,6 +287,8 @@ function solveAssembly(
       residual: broken ? Infinity : residual,
       endMisfit,
       consistent,
+      reason,
+      objective: small ? 'limit' : 'start',
     });
   }
   return { groups, out };
@@ -451,7 +299,12 @@ function solveAssembly(
  * `valence[v]` is the number of edges at v (4 for a boundary vertex). Quads at a crease vertex never move. A group of quads that cannot be made G1 at this degree keeps its
  * original poles and is reported.
  */
-export function solveExactG1(refined: Cage, patches: readonly BezierPatch[], valence: ReadonlyArray<number>): ExactG1 {
+export function solveExactG1(
+  refined: Cage,
+  patches: readonly BezierPatch[],
+  valence: ReadonlyArray<number>,
+  options: { readonly mostRings?: number; readonly maxWork?: number } = {},
+): ExactG1 {
   const topology = buildTopology(refined.vertices.length, refined.faces);
   const creased = new Set(refined.creases.flat());
   const blocked = (f: number): boolean => (refined.faces[f] as number[]).some((v) => creased.has(v));
@@ -478,6 +331,7 @@ export function solveExactG1(refined: Cage, patches: readonly BezierPatch[], val
       assemble(refined, patches, topology, free, edgesFree, scale),
       evaluate,
       scale,
+      options.maxWork,
     );
     return {
       patches: solved.out.map((p) => p as BezierPatch),
@@ -491,7 +345,7 @@ export function solveExactG1(refined: Cage, patches: readonly BezierPatch[], val
   // stage 2: the inner poles of the edges between free quads move too, over the star and as many rings around it as it takes
   const sizes = new Set<number>();
   const free = new Set(star);
-  for (let rings = 1; rings <= MOST_RINGS; rings++) {
+  for (let rings = 1; rings <= (options.mostRings ?? MOST_RINGS); rings++) {
     for (const f of [...free])
       for (const v of refined.faces[f] as number[]) for (const g of topology.vertexFaces[v] as number[]) if (!blocked(g)) free.add(g);
     if (sizes.has(free.size)) continue;

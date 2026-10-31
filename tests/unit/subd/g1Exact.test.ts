@@ -232,7 +232,7 @@ describe('solveExactG1', () => {
 describe('cageToNurbs with fitTangents: exact where it exists, the fit otherwise', () => {
   it('a cube is exact (data g1Method "exact", the analytic break below 1e-5 degree), keeps the patch count and its position cost stays within 3.5x of the plain patches', () => {
     const plain = cageToNurbs(boxCage([2, 2, 2], [1, 1, 1]), { packed: false, samples: 4 });
-    const exact = cageToNurbs(boxCage([2, 2, 2], [1, 1, 1]), { packed: false, samples: 4, fitTangents: true });
+    const exact = cageToNurbs(boxCage([2, 2, 2], [1, 1, 1]), { packed: false, samples: 4, fitTangents: true, g1Solve: 'exact' });
     expect(exact).toMatchObject({ g1Method: 'exact', exactMethod: 'boundary-kept', exactFreeQuads: 24, patchCount: plain.patchCount });
     expect(exact.exactRefused).toEqual([]);
     expect(plain.maxEvG1Deg).toBeGreaterThan(2.5);
@@ -247,7 +247,7 @@ describe('cageToNurbs with fitTangents: exact where it exists, the fit otherwise
       [cylinderCage(1, 2, 8, 2), 1.5],
     ] as const) {
       const plain = cageToNurbs(cage, { packed: false, samples: 4 });
-      const result = cageToNurbs(cage, { packed: false, samples: 4, fitTangents: true });
+      const result = cageToNurbs(cage, { packed: false, samples: 4, fitTangents: true, g1Solve: 'exact' });
       expect(result).toMatchObject({ g1Method: 'exact', exactMethod: 'edges-freed', patchCount: plain.patchCount, exactRefused: [] });
       expect(result.exactFreeQuads).toBeGreaterThan(0);
       expect(result.maxEvG1Deg).toBeLessThan(1e-5);
@@ -258,7 +258,7 @@ describe('cageToNurbs with fitTangents: exact where it exists, the fit otherwise
   });
 
   it('a star the exact solve refuses falls back to the tangent-plane fit and lists the groups', () => {
-    const result = cageToNurbs(pentagonCap(), { packed: false, samples: 4, fitTangents: true });
+    const result = cageToNurbs(pentagonCap(), { packed: false, samples: 4, fitTangents: true, g1Solve: 'exact' });
     expect(result.g1Method).toBe('fit');
     expect(result.exactMethod).toBeNull();
     expect(result.exactRefused.length).toBeGreaterThan(0);
@@ -267,7 +267,7 @@ describe('cageToNurbs with fitTangents: exact where it exists, the fit otherwise
 
   it('exactG1 false forces the fit; without a G1 request there is no method', () => {
     const cube = boxCage([2, 2, 2], [1, 1, 1]);
-    expect(cageToNurbs(cube, { packed: false, samples: 4, fitTangents: true, exactG1: false })).toMatchObject({
+    expect(cageToNurbs(cube, { packed: false, samples: 4, fitTangents: true, g1Solve: 'fit' })).toMatchObject({
       g1Method: 'fit',
       exactRefused: [],
     });

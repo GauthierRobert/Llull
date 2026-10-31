@@ -15,6 +15,8 @@ import { buildTopology, faceArea } from '../../geometry/subd/topology';
 import { dirRejection } from './codes';
 import { isEntity, subdivisionOf } from './shared';
 
+/** A G1 solution whose deviation from the limit surface exceeds this multiple of the plain patches carries DIR_CONVERT_G1_SHAPE_MOVED. */
+const SHAPE_MOVED_RATIO = 3;
 const COMMAND = 'subdivision_to_nurbs';
 const MAX_LISTED_EV_EDGES = 200;
 const sig = (value: number): number => roundSignificant(value, 10);
@@ -35,7 +37,7 @@ function starPoints(entity: SubdivisionEntity): Array<{ id: string; kind: 'verte
 
 /**
  * @affects sheets: removes 1 subdivision entity (unless keep), creates one nurbs_surface per patch (or per packed block); solid: creates 1 mesh entity carrying the exact B-rep recipe
- * @invariant regular quads convert exactly (deviation from the Catmull-Clark limit surface ~1e-15); quads next to extraordinary vertices are Loop-Schaefer geometry patches, G0 across every seam (data.maxEvG0 = 0); extraordinary 'G1' (sheets) solves the linear tangent-plane conditions first (g1Solve 'exact', the default): the interior poles of the quads around an extraordinary vertex move, and where that has no solution (a valence-4 vertex beside one extraordinary vertex) the two inner poles of the edges between free quads move too, over as many rings of quads as it takes, same patch count and corner poles: every edge is then G1 to about 1e-8 rad (data.g1Method 'exact', data.g1Exact { method, freeQuads }); that costs position (maxDeviation: 3.3x the plain patches on a cube, 11 to 15x on boxes with several segments, 1.1x on cylinders), reported in data.maxDeviation; a star it cannot solve (data.exactG1Refused) and g1Solve 'fit' get the approximate tangent-plane fit (Levenberg-Marquardt on the normal mismatch, boundary poles untouched: about 0.1 to 0.5 degrees, deviation +6 to 40 %); then refines until the measured tangent break along extraordinary-vertex edges is <= tangentToleranceDeg or 4096 patches are reached; kernel-optional: sheets need no kernel, solid needs the exact native kernel
+ * @invariant regular quads convert exactly (deviation from the Catmull-Clark limit surface ~1e-15); quads next to extraordinary vertices are Loop-Schaefer geometry patches, G0 across every seam (data.maxEvG0 = 0); extraordinary 'G1' (sheets) builds the exact G1 solution (the linear tangent-plane conditions: interior poles, and where that has no solution the inner edge poles between free quads too, same patch count and corner poles; every edge G1 to about 1e-8 rad) and the approximate tangent-plane fit, and keeps by g1Solve: 'auto' (default) the exact one when it meets tangentToleranceDeg and its deviation from the limit surface is at most max(1.25 x the fit, deviationTolerance), else the fit (the exact one when only it meets the tolerance); 'exact' / 'fit' force one; the exact solve costs position (data.maxDeviation against data.plainMaxDeviation: 3.3x on a cube, 11 to 15x on boxes with several segments, 1.1x on cylinders; DIR_CONVERT_G1_SHAPE_MOVED above 3x), its solve is bounded (a work budget, a named refusal per group in data.exactG1Refused, no retry at finer levels once refused); then refines until the measured tangent break along extraordinary-vertex edges is <= tangentToleranceDeg or 4096 patches are reached; kernel-optional: sheets need no kernel, solid needs the exact native kernel
  * @failure missing id (DIR_ENTITY_NOT_FOUND), solid of an open cage (DIR_CAGE_OPEN), zero-area cage face (DIR_CONVERT_DEGENERATE), solid without an exact kernel (DIR_CONVERT_KERNEL), kernel refuses or returns no triangles (DIR_CONVERT_FAILED) -> no-op
  */
 export const subdivisionToNurbs = defineCommand({
@@ -44,10 +46,10 @@ export const subdivisionToNurbs = defineCommand({
     'Convert a subdivision solid to exact NURBS geometry for STEP, CAM and booleans. output "sheets" (default, no kernel needed): one bicubic nurbs_surface ' +
     'per patch of the once-refined cage (`faces` "unpacked") or one B-spline surface per maximal block of regular quads (`faces` "packed", fewer entities); ' +
     'regular quads are the exact Catmull-Clark limit surface, quads next to extraordinary vertices are geometry patches that meet G0 (no gaps) with a measured ' +
-    'tangent break, which `extraordinary` "G1" removes first, with the same patch count and corner points: with `g1Solve` "exact" (default) it solves the linear tangent-plane conditions for the poles of those quads and of the edges between them, which makes every edge EXACTLY G1 (about 1e-8 rad, data.g1Method "exact", data.g1Exact { method, freeQuads }) on cubes, boxes, cylinders and prisms; the price is POSITION: the surface moves off the Catmull-Clark limit surface (data.maxDeviation: 3.3x the plain patches on a cube, 11 to 15x on boxes with several segments, about 1.1x on cylinders; compare it with the plain conversion) and the boundary curves between the quads near an extraordinary vertex change (G0 stays 0). A star it cannot solve is listed in data.exactG1Refused and gets the approximate tangent-plane fit (data.g1Method "fit": about 0.1 to 0.5 degrees, deviation +6 to 40 %); `g1Solve` "fit" asks for the fit only. Then, if `tangentToleranceDeg` is still not met, by refining the cage further (more, smaller patches). output "solid": ' +
+    'tangent break, which `extraordinary` "G1" removes first, with the same patch count and corner points. `g1Solve` "auto" (default) builds both an EXACT solution (the linear tangent-plane conditions for the poles of those quads and of the edges between them: every edge G1 to about 1e-8 rad) and the approximate tangent-plane fit (0.1 to 0.5 degrees), and keeps the exact one only when its deviation from the Catmull-Clark limit surface is at most max(1.25 x the fit deviation, `deviationTolerance`), because exactness costs POSITION (data.maxDeviation against data.plainMaxDeviation and data.deviationRatio: 3.3x on a cube, 11 to 15x on boxes with several segments, about 1.1x on cylinders; DIR_CONVERT_G1_SHAPE_MOVED above 3x) and the boundary curves between the quads near an extraordinary vertex change (G0 stays 0); data.g1Choice says which was kept and why, data.g1Method "exact" or "fit", data.g1Exact { method, freeQuads, objective } for the exact one, data.exactG1Refused the groups it could not solve (contradiction, degenerate edge, work budget). "exact" forces the exact solution (the fit where none exists), "fit" the fit. Then, if `tangentToleranceDeg` is still not met, by refining the cage further (more, smaller patches). output "solid": ' +
     'one exact B-rep solid (patches sewn by the native kernel; needs it, always the G0 patches). The SubD is removed unless `keep`. Returns data { patchCount, ' +
     'sheets[] or solid, maxDeviation (document units, from the limit surface at `samples` x `samples` points per patch), evEdges[] { patches, valence, g0, g1Deg }, ' +
-    'maxEvG0, maxEvG1Deg, g1Method, g1Exact, exactG1Refused[], starPoints[] (extraordinary vertices and n-gon faces) }. Refuses a zero-area face (DIR_CONVERT_DEGENERATE) and a solid without the exact kernel ' +
+    'maxEvG0, maxEvG1Deg, plainMaxDeviation, deviationRatio, g1Method, g1Choice, g1Exact, exactG1Refused[], warnings[], starPoints[] (extraordinary vertices and n-gon faces) }. Refuses a zero-area face (DIR_CONVERT_DEGENERATE) and a solid without the exact kernel ' +
     '(DIR_CONVERT_KERNEL). Next: sew_surfaces, export_step_ap242, check_surface_quality.',
   params: z.object({
     id: z.string().describe('Id of the subdivision solid.'),
@@ -66,9 +68,16 @@ export const subdivisionToNurbs = defineCommand({
       )
       .optional(),
     g1Solve: z
-      .enum(['exact', 'fit'])
+      .enum(['auto', 'exact', 'fit'])
       .describe(
-        'extraordinary "G1": "exact" (default) solves the linear G1 conditions (break about 1e-8 rad; the surface moves off the limit surface: data.maxDeviation, 3x the plain patches on a cube, more on boxes); "fit" is the approximate tangent-plane fit (break 0.1 to 0.5 degrees, a smaller position change).',
+        'extraordinary "G1": "auto" (default) keeps the exact G1 solution (break about 1e-8 rad) when its deviation from the limit surface is at most max(1.25 x the fit, deviationTolerance), else the approximate fit (break 0.1 to 0.5 degrees, a small position change); "exact" / "fit" force one (data.maxDeviation, data.plainMaxDeviation and data.g1Choice show what it cost).',
+      )
+      .optional(),
+    deviationTolerance: z
+      .number()
+      .positive()
+      .describe(
+        'g1Solve "auto": the deviation from the limit surface (document units) up to which the exact solution is accepted whatever the fit does; default 1e-3 x the diagonal of the cage.',
       )
       .optional(),
     tangentToleranceDeg: z
@@ -98,7 +107,8 @@ export const subdivisionToNurbs = defineCommand({
       keep = false,
       samples = 2,
       tangentToleranceDeg = 0.5,
-      g1Solve = 'exact',
+      deviationTolerance,
+      g1Solve = 'auto',
     } = params;
     const reject = (code: string, message: string, path: string[] = []): CommandResult =>
       dirRejection(doc, COMMAND, code, message, [entity.id], path);
@@ -117,9 +127,14 @@ export const subdivisionToNurbs = defineCommand({
       packed: faces === 'packed' && !solid,
       tangentToleranceDeg: effectiveG1 ? tangentToleranceDeg : undefined,
       fitTangents: effectiveG1,
-      exactG1: g1Solve === 'exact',
+      g1Solve,
+      ...(deviationTolerance === undefined ? {} : { deviationTolerance }),
       samples,
     });
+    const shapeRatio =
+      effectiveG1 && converted.plainMaxDeviation !== null && converted.plainMaxDeviation > 0
+        ? converted.maxDeviation / converted.plainMaxDeviation
+        : null;
     const report = {
       patchCount: converted.patchCount,
       refineLevels: converted.refineLevels,
@@ -138,9 +153,27 @@ export const subdivisionToNurbs = defineCommand({
       g1Exact:
         converted.exactMethod === null
           ? null
-          : { method: converted.exactMethod, freeQuads: converted.exactFreeQuads, patchCount: converted.patchCount },
+          : {
+              method: converted.exactMethod,
+              freeQuads: converted.exactFreeQuads,
+              patchCount: converted.patchCount,
+              objective: converted.exactObjective,
+            },
+      g1Choice:
+        converted.g1Choice === null
+          ? null
+          : {
+              ...converted.g1Choice,
+              exactDeviation: converted.g1Choice.exactDeviation === null ? null : sig(converted.g1Choice.exactDeviation),
+              fitDeviation: converted.g1Choice.fitDeviation === null ? null : sig(converted.g1Choice.fitDeviation),
+            },
+      plainMaxDeviation: converted.plainMaxDeviation === null ? null : sig(converted.plainMaxDeviation),
+      deviationRatio: shapeRatio === null ? null : sig(shapeRatio),
       exactG1Refused: converted.exactRefused.map((group) => ({ ...group, residual: sig(group.residual) })),
-      warnings: effectiveG1 && converted.g1ToleranceMet === false ? ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'] : [],
+      warnings: [
+        ...(effectiveG1 && converted.g1ToleranceMet === false ? ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'] : []),
+        ...(shapeRatio !== null && shapeRatio > SHAPE_MOVED_RATIO ? ['DIR_CONVERT_G1_SHAPE_MOVED'] : []),
+      ],
       packedQuads: converted.packedQuads,
       packedBlocks: converted.packedBlocks,
       unit: doc.units,
@@ -156,8 +189,11 @@ export const subdivisionToNurbs = defineCommand({
           : 'G1';
     const measured =
       `max deviation ${report.maxDeviation} ${doc.units} over ${report.deviationSamples} samples, EV seams: gap ${report.maxEvG0} ${doc.units}, tangent break ${report.maxEvG1Deg} deg` +
-      (report.warnings.length > 0
+      (report.warnings.includes('DIR_CONVERT_G1_TOLERANCE_NOT_MET')
         ? ` [DIR_CONVERT_G1_TOLERANCE_NOT_MET: ${report.maxEvG1Deg} deg > ${tangentToleranceDeg} deg at the 4096-patch budget]`
+        : '') +
+      (report.warnings.includes('DIR_CONVERT_G1_SHAPE_MOVED')
+        ? ` [DIR_CONVERT_G1_SHAPE_MOVED: ${g1Label}, deviation ${report.maxDeviation} ${doc.units} = ${report.deviationRatio}x the G0 patches]`
         : '');
     if (solid && kernel !== null) {
       const built = evaluateRecipe(kernel, recipeOf(entity));

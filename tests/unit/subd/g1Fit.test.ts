@@ -74,7 +74,7 @@ describe('cageToNurbs with fitTangents', () => {
   it('cube: the tangent break (32 stations off the fit stations) at the eight valence-3 stars falls from 2.74 to under 0.2 degrees with the same 24 patches, gap 0, deviation within 10 %', () => {
     const cube = boxCage([2, 2, 2], [1, 1, 1]);
     const plain = cageToNurbs(cube, { packed: false, samples: 3 });
-    const fit = cageToNurbs(cube, { packed: false, samples: 3, fitTangents: true, exactG1: false });
+    const fit = cageToNurbs(cube, { packed: false, samples: 3, fitTangents: true, g1Solve: 'fit' });
     expect(plain.maxEvG1Deg).toBeCloseTo(2.7416, 3);
     expect(fit.patchCount).toBe(24);
     expect(fit.maxEvG1Deg).toBeLessThan(0.2);
@@ -90,7 +90,7 @@ describe('cageToNurbs with fitTangents', () => {
     ] as const) {
       const cage = boxCage([2, 2, 2], segments);
       const plain = cageToNurbs(cage, { packed: false, samples: 3 });
-      const fit = cageToNurbs(cage, { packed: false, samples: 3, fitTangents: true, exactG1: false });
+      const fit = cageToNurbs(cage, { packed: false, samples: 3, fitTangents: true, g1Solve: 'fit' });
       expect(fit.patchCount, `${segments}`).toBe(plain.patchCount);
       expect(fit.maxEvG1Deg, `${segments}`).toBeLessThan(0.15);
       expect(fit.maxEvG0).toBe(0);
@@ -102,7 +102,7 @@ describe('cageToNurbs with fitTangents', () => {
     const base = boxCage([2, 2, 2], [1, 1, 1]);
     const skewed = { ...base, vertices: base.vertices.map((p, v): Vec3 => (v === 0 ? [p[0] - 0.5, p[1] - 0.2, p[2] - 0.3] : p)) };
     const plain = cageToNurbs(skewed, { packed: false, samples: 3 });
-    const fit = cageToNurbs(skewed, { packed: false, samples: 3, fitTangents: true, exactG1: false });
+    const fit = cageToNurbs(skewed, { packed: false, samples: 3, fitTangents: true, g1Solve: 'fit' });
     expect(plain.maxEvG1Deg).toBeGreaterThan(1);
     expect(fit.maxEvG1Deg).toBeLessThan(0.2);
     expect(fit.maxEvG0).toBe(0);
@@ -111,7 +111,7 @@ describe('cageToNurbs with fitTangents', () => {
   it('a cage with a valence-5 vertex: the break falls by an order of magnitude', () => {
     const cage = pentagonCap();
     const plain = cageToNurbs(cage, { packed: false, samples: 2 });
-    const fit = cageToNurbs(cage, { packed: false, samples: 2, fitTangents: true, exactG1: false });
+    const fit = cageToNurbs(cage, { packed: false, samples: 2, fitTangents: true, g1Solve: 'fit' });
     expect(plain.evEdges.some((edge) => edge.valence === 5)).toBe(true);
     expect(fit.maxEvG1Deg).toBeLessThan(plain.maxEvG1Deg / 10);
     expect(fit.maxEvG0).toBe(0);
@@ -119,7 +119,7 @@ describe('cageToNurbs with fitTangents', () => {
 
   it('does not depend on units or position: a cube scaled by 1000, by 0.001 and moved 500 away gives the same break and the same relative deviation', () => {
     const cube = boxCage([2, 2, 2], [1, 1, 1]);
-    const reference = cageToNurbs(cube, { packed: false, samples: 3, fitTangents: true, exactG1: false });
+    const reference = cageToNurbs(cube, { packed: false, samples: 3, fitTangents: true, g1Solve: 'fit' });
     const plain = cageToNurbs(cube, { packed: false, samples: 3 });
     for (const [scale, offset] of [
       [1000, 0],
@@ -130,7 +130,7 @@ describe('cageToNurbs with fitTangents', () => {
         ...cube,
         vertices: cube.vertices.map((p): Vec3 => [p[0] * scale + offset, p[1] * scale + offset, p[2] * scale + offset]),
       };
-      const fit = cageToNurbs(cage, { packed: false, samples: 3, fitTangents: true, exactG1: false });
+      const fit = cageToNurbs(cage, { packed: false, samples: 3, fitTangents: true, g1Solve: 'fit' });
       expect(fit.maxEvG1Deg, `scale ${scale} offset ${offset}`).toBeCloseTo(reference.maxEvG1Deg, 3);
       expect(fit.maxDeviation / scale, `scale ${scale}`).toBeCloseTo(reference.maxDeviation, 6);
       expect(fit.maxDeviation / scale).toBeLessThanOrEqual(plain.maxDeviation * 1.1);
@@ -145,7 +145,7 @@ describe('cageToNurbs with fitTangents', () => {
     ];
     const creased = { ...cube, creases };
     const plain = cageToNurbs(creased, { packed: false, samples: 3 });
-    const fit = cageToNurbs(creased, { packed: false, samples: 3, fitTangents: true, exactG1: false });
+    const fit = cageToNurbs(creased, { packed: false, samples: 3, fitTangents: true, g1Solve: 'fit' });
     const smooth = cageToNurbs(cube, { packed: false, samples: 3 });
     expect(fit.maxDeviation).toBeLessThanOrEqual(plain.maxDeviation * 1.01);
     // the two creases refine to four edges, which leave the list; every smooth edge (also those at the crease vertices) stays
@@ -158,7 +158,7 @@ describe('cageToNurbs with fitTangents', () => {
     const cage = cylinderCage(1, 2, 32, 2);
     const started = performance.now();
     const plain = cageToNurbs(cage, { packed: false, samples: 2 });
-    const fit = cageToNurbs(cage, { packed: false, samples: 2, fitTangents: true, exactG1: false });
+    const fit = cageToNurbs(cage, { packed: false, samples: 2, fitTangents: true, g1Solve: 'fit' });
     expect(performance.now() - started).toBeLessThan(30_000);
     expect(fit.patchCount).toBe(plain.patchCount);
     expect(fit.maxEvG1Deg).toBeLessThanOrEqual(plain.maxEvG1Deg + 1e-9);
