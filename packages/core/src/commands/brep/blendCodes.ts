@@ -14,7 +14,11 @@ const REMEDIATION = {
   BLD_CHAMFER_VARIABLE_PARAMS:
     'distanceEnd > 0 and the edges listed; with distance2 (asymmetric legs) also distance2End > 0 and side1Near / side1Name, never with angleDeg; distance2End only with distanceEnd and distance2',
   BLD_JOINT_PARAMS:
-    'one radius per tangent chain of joints, every radius > 0, and every near point within 10 x its radius of a joint (the joint nearest to it is rounded)',
+    'one radius per tangent chain of joints, every radius > 0, and every near point within 10 x its radius of a joint (the joint nearest to it is rounded); a pick needs near or name, and a radius that varies along a joint needs a joint alone in its tangent chain',
+  REF_LOST:
+    'edit_step_params on this step: remove the name of that joint to pick it by near again, or give a current joint name (data.joints[].name of a blend_union, sourceEdges of check_blends)',
+  REF_SPLIT:
+    'edit_step_params on this step: give the full name of the one joint you mean ("e(<face>|<face>)#k", listed by check_blends sourceEdges), or remove the name to pick by near',
   BLD_FILLET_NOT_TANGENT:
     'use a radius up to that of the round the new blend meets, round the edges in one step (fillet_edge with all of them), or pass allowNonTangent: true to build it and read the angle in data.nonTangent',
   BLD_PARTIAL_UNSUPPORTED:

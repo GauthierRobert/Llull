@@ -45,10 +45,18 @@ export interface FullRoundParams {
   readonly side2: readonly number[];
 }
 
-/** A joint radius of `blend_union` (BLD M5): the joint (and its tangent chain) nearest to `near` is rounded with `radius` (document units). */
+/**
+ * A joint pick of `blend_union` (BLD M5, 13.32): the joint named `name` (a persistent edge name of the union, which wins) or else the one nearest to `near`, with
+ * its whole tangent chain, is rounded with `radius` (document units). `radiusEnd`, `sizes` and `interpolation` make it a radius law along the joint (the laws
+ * of fillet_edge, relative position 0 at the start of the joint edge); a law that varies needs a joint alone in its tangent chain.
+ */
 export interface JointRadius {
-  readonly near: Vec3;
+  readonly near?: Vec3;
+  readonly name?: string;
   readonly radius: number;
+  readonly radiusEnd?: number;
+  readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
+  readonly interpolation?: 'smooth' | 'linear' | 'monotone';
 }
 
 /**

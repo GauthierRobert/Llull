@@ -305,7 +305,7 @@ fn full_round_spec(recipe: &Value) -> Option<[f64; 3]> {
 }
 
 /// The evaluated operands of a `blend` node and its flat joint picks.
-type BlendOperands = (Vec<Rc<Shape>>, Vec<f64>);
+type BlendOperands = (Vec<Rc<Shape>>, Vec<f64>, String);
 
 impl Evaluator {
     /// BLD M4 `faceBlend`: a rolling-ball blend between two planar faces (`features::face_blend`).
@@ -382,7 +382,7 @@ impl Evaluator {
             return Ok(blend_stage_report(stage, &reason));
         }
         if op == Some("blend") {
-            let Some((shapes, picks)) = self.blend_operands(recipe)? else { return Ok(Value::Null) };
+            let Some((shapes, picks, names)) = self.blend_operands(recipe)? else { return Ok(Value::Null) };
             let borrowed: Vec<&Shape> = shapes.iter().map(Rc::as_ref).collect();
             let radius = number(recipe, "radius").unwrap_or(f64::NAN);
             // built (cached by the evaluation that asked): what the union reported about its picks and contours, no second build
@@ -392,7 +392,7 @@ impl Evaluator {
                 report["notes"] = serde_json::from_str(&notes).unwrap_or(Value::Null);
                 return Ok(report);
             }
-            let reason = features::blend_reason(&borrowed, radius, &picks).map_err(EvalError::Failure)?;
+            let reason = features::blend_reason(&borrowed, radius, &picks, &names).map_err(EvalError::Failure)?;
             return Ok(blend_stage_report("blend", &reason));
         }
         if op == Some("chamfer") && number(recipe, "sizeEnd").is_some() {
@@ -459,7 +459,8 @@ impl Evaluator {
         crate::queries::fillet_report(&source, &edges, &laws).map_err(EvalError::Failure)
     }
 
-    /// The operands of a `blend` node and its flat joint picks (x, y, z, radius per entry of `joints`; `None` when a pick is malformed).
+    /// The operands of a `blend` node, its flat joint picks (per entry of `joints`: by_name, x, y, z, then the radius law in the `fillet_laws` layout) and the
+    /// joint names joined by newlines; `None` when a pick is malformed (neither `near` nor `name`, or a law the fillet laws refuse).
     fn blend_operands(&mut self, recipe: &Value) -> Result<Option<BlendOperands>, EvalError> {
         let Some(sources) = recipe.get("sources").and_then(Value::as_array) else { return Ok(None) };
         let mut shapes: Vec<Rc<Shape>> = Vec::with_capacity(sources.len());
@@ -468,22 +469,35 @@ impl Evaluator {
             shapes.push(shape);
         }
         let mut picks: Vec<f64> = Vec::new();
+        let mut names: Vec<&str> = Vec::new();
         for joint in recipe.get("joints").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default() {
-            let (Some(near), Some(radius)) = (numbers(joint.get("near")), number(joint, "radius")) else { return Ok(None) };
-            if near.len() != 3 || !positive(radius) {
-                return Ok(None);
-            }
-            picks.extend(near);
-            picks.push(radius);
+            let name = joint.get("name").and_then(Value::as_str).filter(|name| !name.is_empty() && !name.contains('\n'));
+            let near = numbers(joint.get("near"));
+            let at = match (name, &near) {
+                (Some(_), _) => vec![0.0; 3],
+                (None, Some(near)) if near.len() == 3 => near.clone(),
+                _ => return Ok(None),
+            };
+            let law = serde_json::json!({
+                "size": joint.get("radius"),
+                "sizeEnd": joint.get("radiusEnd"),
+                "sizes": joint.get("sizes"),
+                "interpolation": joint.get("interpolation"),
+            });
+            let Some(flat) = radius_laws(&Value::Array(vec![law]), 1) else { return Ok(None) };
+            picks.push(if name.is_some() { 1.0 } else { 0.0 });
+            picks.extend(at);
+            picks.extend(flat);
+            names.push(name.unwrap_or(""));
         }
-        Ok(Some((shapes, picks)))
+        Ok(Some((shapes, picks, names.join("\n"))))
     }
 
     /// `blend` (`blendedUnion`): every joint `radius`, the joints nearest to the `joints` picks their own radius (BLD M5).
     pub(super) fn blend(&mut self, recipe: &Value) -> Evaluated {
-        let Some((shapes, picks)) = self.blend_operands(recipe)? else { return refused() };
+        let Some((shapes, picks, names)) = self.blend_operands(recipe)? else { return refused() };
         let borrowed: Vec<&Shape> = shapes.iter().map(Rc::as_ref).collect();
-        shape_of(features::blend(&borrowed, number(recipe, "radius").unwrap_or(f64::NAN), &picks))
+        shape_of(features::blend(&borrowed, number(recipe, "radius").unwrap_or(f64::NAN), &picks, &names))
     }
 
     /// `shell`: open where the faces nearest to `openNear` were (`openShell`), else a sealed cavity (`hollow`).

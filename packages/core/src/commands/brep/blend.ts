@@ -5,11 +5,12 @@
 
 import { type Entity, type ShapeRecipe, is3D } from '../../model/types';
 import type { CommandResult } from '../types';
-import { defineCommand, vec3, z } from '../schema';
+import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { noop, failer } from '../noop';
 import { blendRejection } from './blendCodes';
+import { jointSchema, planJoints } from './blendJoints';
 import { commitKernelResult, evaluateRecipe } from '../kernelShape';
 import { round6 } from '../../lib/compactNumber';
 import { operandRecipe } from '../../geometry/operandRecipe';
@@ -17,12 +18,16 @@ import { OCC_KERNEL_HINT } from './modifyTarget';
 
 const MAX_BLEND_OPERANDS = 200;
 
+/** `[CODE] joints[i].path: message` as the kernel words a refusal about a pick. */
+const KERNEL_PICK_REFUSAL =
+  /^\[(BLD_JOINT_PARAMS|BLD_LAW_NOT_PERIODIC|REF_LOST|REF_SPLIT)\]\s*(joints(?:\[\d+\])?(?:\.\w+)?):\s*([\s\S]*)$/;
+
 /**
  * @affects removes the operand solids; creates 1 mesh entity (their union, joints filleted)
- * @invariant >= 2 distinct 3D solids; radius > 0; a kernel with fillets (OCC); every joint has `radius` except the joints (and their tangent chains) nearest to a `joints` pick, which have the pick's radius
+ * @invariant >= 2 distinct 3D solids; radius > 0; a kernel with fillets (OCC); every joint has `radius` except the joints (and their tangent chains) a `joints` pick names (by persistent name, else nearest to near), which have the pick's radius or radius law; a pick by near records the name of its joint (recordExtras joints[].name) so regeneration follows the joint
  * @failure missing / duplicate / 2D / instance operand, bad radius, no kernel, kernel lacks blends, kernel refusal (radius too large for a
- *   joint) -> no-op, affected:[]; a joint radius <= 0, two radii on one tangent chain, a pick farther than 10 x its radius from every joint, no joint to pick -> BLD_JOINT_PARAMS (path joints[i].near / .radius)
- * data = { joints [{ index, distanceToJoint, radius }], unit } when joints were given
+ *   joint) -> no-op, affected:[]; a joint radius <= 0, two radii (laws) on one tangent chain, a pick farther than 10 x its radius from every joint, no joint to pick, a pick with neither near nor name, a varying law on a joint chained with others -> BLD_JOINT_PARAMS (path joints[i].near / .radius / .radiusEnd); a bad law -> BLD_LAW_INVALID; a law that does not close on a closed joint -> BLD_LAW_NOT_PERIODIC; a joint name that no joint has (REF_LOST) or that several have (REF_SPLIT) (path joints[i].name)
+ * data = { joints [{ index, distanceToJoint, radius, radiusEnd?, name, start, end }], unit } when joints were given
  */
 export const blendUnion = defineCommand({
   name: 'blend_union',
@@ -31,8 +36,10 @@ export const blendUnion = defineCommand({
     'Weld 2+ solids into ONE exact solid and round every joint where they meet with a fillet: ' +
     'the one-piece frame operation (bike frame tubes, lugs and dropouts; pipe tees; brackets welded to ' +
     'plates; organic joints between swept or lofted parts). All intersection curves created by the ' +
-    'union are filleted with `radius` (for a radius that varies along one edge, use fillet_edge ' +
-    'radiusEnd on the result); `joints` [{ near, radius }] gives the joint nearest to each point its own radius (the whole tangent chain of that joint: one radius per chain, two different radii on one chain are refused). The operands are consumed and replaced by one mesh entity that ' +
+    'union are filleted with `radius`; `joints` [{ near | name, radius, radiusEnd?, sizes?, interpolation?, law? }] gives a joint (picked by its persistent name, or the one nearest to a point) ' +
+    'its own radius or a radius law along it (the whole tangent chain of that joint: one radius per chain, two different radii on one chain are refused; a radius that varies along a joint ' +
+    'needs a joint alone in its tangent chain). The name of a joint picked by point is recorded in the step and used on regeneration (REF_LOST / REF_SPLIT when the joint is gone or split); ' +
+    'data.joints[].name lists it, with the start and end of the joint edge (the law runs from start to end). The operands are consumed and replaced by one mesh entity that ' +
     'keeps the exact construction (STEP export, further fillets and booleans see true faces). ' +
     `Needs the exact kernel (check kernel_info): ${OCC_KERNEL_HINT}; with the mesh kernel it cannot fillet and no-ops ` +
     '(use boolean op union there). If the kernel refuses, try another radius: a blend must fit inside ' +
@@ -41,16 +48,9 @@ export const blendUnion = defineCommand({
     ids: z.array(z.string()).describe('Ids of the 3D solids to weld (>= 2, distinct). The first one styles the result.'),
     radius: z.number().describe('Joint fillet radius in document units (> 0), for every joint that has no entry in joints.'),
     joints: z
-      .array(
-        z.object({
-          near: vec3(
-            'A point [x, y, z] in document units on or near the joint (the intersection curve the union creates) to give its own radius; the joint nearest to it is picked.',
-          ),
-          radius: z.number().describe('Fillet radius of that joint and its tangent chain in document units (> 0).'),
-        }),
-      )
+      .array(jointSchema)
       .describe(
-        'Per-joint radii: each entry picks the joint nearest to near and rounds it (with the joints tangent to it) with radius instead of the default radius. Several entries may name the same chain only with the same radius; a point farther than 10 x its radius from every joint is refused (BLD_JOINT_PARAMS). The result reports each pick distance to its joint (distanceToJoint) in data.joints.',
+        'Per-joint radii and radius laws: each entry picks a joint by name (wins) or the joint nearest to near and rounds it (with the joints tangent to it) with its radius (law) instead of the default radius. Several entries may name the same chain only with the same radius; a point farther than 10 x its radius from every joint is refused (BLD_JOINT_PARAMS). The result reports each pick distance to its joint (distanceToJoint), its name, start and end in data.joints.',
       )
       .optional(),
   }),
@@ -70,24 +70,21 @@ export const blendUnion = defineCommand({
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('blend_union'));
     if (!kernel.supports('blend')) return fail(`this kernel cannot fillet joints; use ${OCC_KERNEL_HINT}, or boolean op union`);
-    for (const [at, joint] of (joints ?? []).entries())
-      if (!(joint.radius > 0))
-        return blendRejection(doc, 'blend_union', 'BLD_JOINT_PARAMS', `joints[${at}].radius must be > 0 (got ${joint.radius})`, ids, [
-          `joints[${at}].radius`,
-        ]);
+    const given = joints ?? [];
+    const planned = planJoints(given);
+    if ('refusal' in planned)
+      return blendRejection(doc, 'blend_union', planned.refusal.code, planned.refusal.message, ids, [planned.refusal.path]);
     const recipe: ShapeRecipe = {
       op: 'blend',
       sources: operands.map((entity) => operandRecipe(kernel, entity)),
       radius,
-      ...(joints === undefined || joints.length === 0
-        ? {}
-        : { joints: joints.map((joint) => ({ near: joint.near, radius: joint.radius })) }),
+      ...(planned.joints.length === 0 ? {} : { joints: planned.joints }),
     };
     const result = evaluateRecipe(kernel, recipe);
     if (result === 'refused') {
       const why = kernel.blendReport?.(recipe)?.message;
-      const coded = /^\[BLD_JOINT_PARAMS\]\s*(joints(?:\[\d+\])?(?:\.\w+)?):\s*([\s\S]*)$/.exec(why ?? '');
-      if (coded !== null) return blendRejection(doc, 'blend_union', 'BLD_JOINT_PARAMS', coded[2] ?? '', ids, [coded[1] ?? 'joints']);
+      const coded = KERNEL_PICK_REFUSAL.exec(why ?? '');
+      if (coded !== null) return blendRejection(doc, 'blend_union', coded[1] ?? '', coded[3] ?? '', ids, [coded[2] ?? 'joints']);
       return fail(
         `the kernel could not blend the joints of [${ids.join(', ')}] with radius ${radius}${why === undefined || why === '' ? '' : ` (${why})`}; try another radius (smaller usually fits; a crotch where 3 solids meet can reject specific radii)`,
       );
@@ -103,12 +100,25 @@ export const blendUnion = defineCommand({
     );
     const picks = kernel.blendReport?.(recipe)?.notes?.picks;
     if (committed.document === doc || picks === undefined || picks.length === 0) return committed;
+    // a pick by point records the name of its joint, so a later regeneration follows the joint (names win over points)
+    const recorded = given.map((joint, at) =>
+      joint.name === undefined && picks[at]?.name !== undefined ? { ...joint, name: picks[at]?.name } : joint,
+    );
     return {
       ...committed,
       data: {
-        joints: picks.map((pick, at) => ({ index: at, distanceToJoint: round6(pick.distance), radius: pick.radius })),
+        joints: picks.map((pick, at) => ({
+          index: at,
+          distanceToJoint: round6(pick.distance),
+          radius: pick.radius,
+          ...(planned.joints[at]?.radiusEnd === undefined ? {} : { radiusEnd: planned.joints[at]?.radiusEnd }),
+          ...(pick.name === undefined ? {} : { name: pick.name }),
+          ...(pick.start === undefined ? {} : { start: pick.start }),
+          ...(pick.end === undefined ? {} : { end: pick.end }),
+        })),
         unit: doc.units,
       },
+      ...(recorded.every((joint, at) => joint === given[at]) ? {} : { recordExtras: { joints: recorded } }),
     };
   },
 });

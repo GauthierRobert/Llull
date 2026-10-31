@@ -320,7 +320,7 @@ Blends need the exact native kernel (\`kernel_info\`); the mesh kernel refuses t
 | blend two face sets (several faces, curved faces, faces that share an edge) | \`fillet_faces\` \`facesA\` / \`facesB\` with \`radius\`, \`width\`, \`law\` or \`holdLine\` |
 | half-round on the top of a rib | \`fillet_full_round\` \`side1\` / \`center\` / \`side2\` |
 | bevel | \`chamfer_edge\` \`distance\`; \`distance2\` or \`angleDeg\` with \`side1Near\`; \`distanceEnd\` for a distance that runs along the edge |
-| weld solids and round the joints | \`blend_union\` \`radius\`, \`joints: [{ near, radius }]\` for joints with their own radius |
+| weld solids and round the joints | \`blend_union\` \`radius\`, \`joints: [{ near or name, radius, radiusEnd? }]\` for joints with their own radius or radius law (a name from data.joints[].name follows the joint after an edit) |
 | prove it | \`check_blends\` after every blend |
 
 **Laws.** \`t\` runs 0..1 along the picked edge from its start point (\`inspect_topology\` lists start and end; \`fillet_faces\` has \`startNear\`). A radius on a closed edge (a rim)
@@ -340,7 +340,7 @@ and fills the corner with a G1 patch. Profile blends, setback patches and \`blen
 | BLD_LAW_INVALID, BLD_RHO_RANGE, BLD_SHAPE_RANGE, BLD_CHAMFER_PARAMS | fix the param named in the error paths |
 | BLD_CHAMFER_VARIABLE_PARAMS | \`distanceEnd\` > 0, no \`distance2\` / \`angleDeg\`, edges listed |
 | BLD_CHAMFER_FAILED | variable chamfer: smaller distances, unlist edges that share a vertex, or a constant chamfer (no \`distanceEnd\`) |
-| BLD_JOINT_PARAMS | \`blend_union\` \`joints\`: radius > 0, one radius per tangent chain, each point within 10 x its radius of a joint |
+| BLD_JOINT_PARAMS | \`blend_union\` \`joints\`: radius > 0, near or name, one radius per tangent chain (a radiusEnd law only on a joint alone in its chain), each point within 10 x its radius of a joint |
 | BLD_ASYMMETRIC_SIDE_MISSING | add \`side1Near\` (a point on the face that carries the first size) |
 | BLD_FACESET_EMPTY, BLD_FACESETS_OVERLAP | pick points on the faces (\`inspect_topology\`), no face in both sets |
 | BLD_FACE_FILLET_NO_SOLUTION | use at least the reported radius, or a width |

@@ -187,9 +187,28 @@ export interface BlendBuildNotes {
   readonly fallback?: { readonly edges: readonly number[]; readonly reason: string };
   /** Corner builder: the setback factor (x the least distance) that built, and per corner its vertex and the setback of each edge there. */
   readonly factor?: number;
-  /** Union builder (blend_union): per joint pick its distance to the joint it named and its radius; per contour of joints the radius it got, where it came from ("joints[i]" for the pick that named it, "default") and the names of its joint edges. */
-  readonly picks?: ReadonlyArray<{ readonly distance: number; readonly radius: number }>;
-  readonly contours?: ReadonlyArray<{ readonly radius: number; readonly source: string; readonly edges: readonly string[] }>;
+  /**
+   * Union builder (blend_union): per joint pick its distance to the joint it named (0 for a pick by name), its radius at the start, the persistent name of that joint and its
+   * ends; per contour of joints the radius it got (at the start), where it came from ("joints[i]" for the pick that named it, "default"), whether it is a single joint edge (a
+   * law that varies needs that), the names of its joint edges and, for a radius law that varies, the law (radiusEnd, sizes, interpolation) with five points along its joint edge.
+   */
+  readonly picks?: ReadonlyArray<{
+    readonly distance: number;
+    readonly radius: number;
+    readonly name?: string;
+    readonly start?: Vec3;
+    readonly end?: Vec3;
+  }>;
+  readonly contours?: ReadonlyArray<{
+    readonly radius: number;
+    readonly source: string;
+    readonly edges: readonly string[];
+    readonly isolated?: boolean;
+    readonly radiusEnd?: number;
+    readonly sizes?: ReadonlyArray<{ readonly t: number; readonly size: number }>;
+    readonly interpolation?: 'linear' | 'monotone';
+    readonly samples?: readonly Vec3[];
+  }>;
   readonly corners?: ReadonlyArray<{
     readonly vertex: Vec3;
     /** "exact": the corner patch is a star of exact-boundary sub-patches (13.21); "plate": the MakeFilling patch. */

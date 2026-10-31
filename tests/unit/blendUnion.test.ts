@@ -118,7 +118,7 @@ describe('blend_union per-joint radii (BLD M5)', () => {
     expectNoOp(negative, doc, 'joints[0].radius must be > 0');
     expect(negative.error).toMatchObject({ code: 'BLD_JOINT_PARAMS', paths: ['joints[0].radius'] });
     expect(negative.error?.remediation).toBe(
-      'one radius per tangent chain of joints, every radius > 0, and every near point within 10 x its radius of a joint (the joint nearest to it is rounded)',
+      'one radius per tangent chain of joints, every radius > 0, and every near point within 10 x its radius of a joint (the joint nearest to it is rounded); a pick needs near or name, and a radius that varies along a joint needs a joint alone in its tangent chain',
     );
     expect(fake.calls.filter((call) => call.op === 'blend')).toHaveLength(0);
   });

@@ -60,8 +60,8 @@ mod ffi {
             second: f64,
             second_last: f64,
         ) -> Result<String>;
-        fn blend_union(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<UniquePtr<Shape>>;
-        fn blend_union_reason(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<String>;
+        fn blend_union(list: &ShapeList, radius: f64, joints: &[f64], names: &str) -> Result<UniquePtr<Shape>>;
+        fn blend_union_reason(list: &ShapeList, radius: f64, joints: &[f64], names: &str) -> Result<String>;
         fn shell_hollow(shape: &Shape, thickness: f64) -> Result<UniquePtr<Shape>>;
         fn shell_open(shape: &Shape, thickness: f64, open_near: &[f64]) -> Result<UniquePtr<Shape>>;
 
@@ -236,18 +236,19 @@ fn shape_list(shapes: &[&Shape]) -> Result<cxx::UniquePtr<ffi::ShapeList>, Strin
     Ok(list)
 }
 
-/// One fuse of `shapes` whose joint (section) edges are filleted by `radius`, except the joints nearest to the picks `joints` (x, y, z, radius per pick).
-pub fn blend(shapes: &[&Shape], radius: f64, joints: &[f64]) -> Built {
+/// One fuse of `shapes` whose joint (section) edges are filleted by `radius`, except the picked joints: `joints` = per pick by_name (0 | 1), x, y, z, then its radius law in the
+/// `fillet_laws` layout (size, size_end or NaN, mode, n, n x (t, size)); `names` = the persistent joint name of each pick, newline between (empty for a pick by point).
+pub fn blend(shapes: &[&Shape], radius: f64, joints: &[f64], names: &str) -> Built {
     let list = shape_list(shapes)?;
     let Some(list) = list.as_ref() else { return Err("shape list not created".to_string()) };
-    built(ffi::blend_union(list, radius, joints))
+    built(ffi::blend_union(list, radius, joints, names))
 }
 
 /// Why [`blend`] fails (empty when it builds).
-pub fn blend_reason(shapes: &[&Shape], radius: f64, joints: &[f64]) -> OcctResult<String> {
+pub fn blend_reason(shapes: &[&Shape], radius: f64, joints: &[f64], names: &str) -> OcctResult<String> {
     let list = shape_list(shapes)?;
     let Some(list) = list.as_ref() else { return Err("shape list not created".to_string()) };
-    occt(ffi::blend_union_reason(list, radius, joints))
+    occt(ffi::blend_union_reason(list, radius, joints, names))
 }
 
 /// Sealed hollow: the solid minus its inward offset.

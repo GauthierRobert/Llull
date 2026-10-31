@@ -70,10 +70,10 @@ std::unique_ptr<Shape> chamfer_variable(const Shape &shape, rust::Slice<const ui
                                         double second, double second_last);
 rust::String chamfer_variable_reason(const Shape &shape, rust::Slice<const uint32_t> edges, rust::Slice<const uint32_t> faces, double first,
                                      double last, double second, double second_last);
-// One fuse of the list whose joint edges are filleted: `radius` for every joint, except the joints nearest to the picks `joints` (x, y, z, radius per pick; a pick
-// rounds its whole tangent chain). Null when it fails; blend_union_reason says why ("" = builds).
-std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius, rust::Slice<const double> joints);
-rust::String blend_union_reason(const ShapeList &list, double radius, rust::Slice<const double> joints);
+// One fuse of the list whose joint edges are filleted: `radius` for every joint, except the picked joints (per pick by_name, x, y, z and a radius law in the fillet_laws
+// layout; a pick rounds its whole tangent chain; `names` = the persistent joint name of each pick, '\n' between). Null when it fails; blend_union_reason says why ("" = builds).
+std::unique_ptr<Shape> blend_union(const ShapeList &list, double radius, rust::Slice<const double> joints, rust::Str names);
+rust::String blend_union_reason(const ShapeList &list, double radius, rust::Slice<const double> joints, rust::Str names);
 std::unique_ptr<Shape> shell_hollow(const Shape &shape, double thickness);
 std::unique_ptr<Shape> shell_open(const Shape &shape, double thickness, rust::Slice<const double> open_near);
 

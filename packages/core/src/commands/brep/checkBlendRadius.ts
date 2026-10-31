@@ -60,7 +60,7 @@ export interface LawRecord {
   readonly law: EdgeRadius;
   /** The section the recipe asked for (absent = circular). */
   readonly profile?: BlendProfile;
-  /** The source shape and edge the law was given (absent for a blend_union joint, whose law is constant and whose edge exists only inside the union). */
+  /** The source shape and edge the law was given (absent for a blend_union joint, whose edge exists only inside the union: see `joint`). */
   readonly shape?: ShapeHandle;
   readonly topology?: ShapeTopology;
   readonly edge?: number;
@@ -68,6 +68,8 @@ export interface LawRecord {
   readonly chain: ReadonlySet<string>;
   /** blend_union joint contours: the pick that gave the radius ("joints[i]") or "default". */
   readonly source?: string;
+  /** blend_union joint contours: the joint edge is alone in its tangent chain (a varying law is comparable end to end), and five points along it (the direction of the law). */
+  readonly joint?: { readonly isolated: boolean; readonly samples?: readonly Vec3[] };
   /** The node has setback corners: its blends stop short of the edge ends, so a law that varies along the edge is not compared over the blend face. */
   readonly setback: boolean;
 }
@@ -123,10 +125,16 @@ export function lawIndex(kernel: GeometryKernel, recipe: ShapeRecipe): Map<strin
         if (!index.has(name))
           index.set(name, {
             node: first + offset,
-            law: { size: contour.radius },
+            law: {
+              size: contour.radius,
+              ...(contour.radiusEnd === undefined ? {} : { sizeEnd: contour.radiusEnd }),
+              ...(contour.sizes === undefined ? {} : { sizes: contour.sizes }),
+              ...(contour.interpolation === undefined ? {} : { interpolation: contour.interpolation }),
+            },
             chain: new Set(),
             setback: false,
             source: contour.source,
+            joint: { isolated: contour.isolated === true, ...(contour.samples === undefined ? {} : { samples: contour.samples }) },
           });
   }
   return index;
@@ -159,8 +167,10 @@ function directionOf(
 ): boolean | null {
   if (record === undefined) return null;
   if (span !== null) return span.forward;
-  const { shape, edge } = record;
-  if (constantLaw(record.law) || shape === undefined || edge === undefined) return true;
+  const { shape, edge, joint } = record;
+  if (constantLaw(record.law)) return true;
+  if (joint?.samples !== undefined) return sameDirection(sections, (t) => joint.samples?.[Math.round(t * 4)] ?? null);
+  if (shape === undefined || edge === undefined) return true;
   return sameDirection(sections, (t) => kernel.faceQuery?.edgeSamples(shape, edge, 5)?.[Math.round(t * 4)]?.point ?? null);
 }
 
@@ -191,7 +201,9 @@ export function checkRadius(
     direction !== null &&
     (constantLaw(record.law)
       ? true
-      : record.topology !== undefined && record.edge !== undefined && isolatedEdge(record.topology, record.edge));
+      : record.joint !== undefined
+        ? record.joint.isolated
+        : record.topology !== undefined && record.edge !== undefined && isolatedEdge(record.topology, record.edge));
   if (!comparable || record === undefined || direction === null || (record.setback && span === null))
     return { radius, lawChecked: false, deviations: [] };
   const exact = exactParameters(record.law);
