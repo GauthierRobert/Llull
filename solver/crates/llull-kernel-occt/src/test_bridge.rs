@@ -25,6 +25,8 @@ mod ffi {
         fn set_corner_spawn_limit(workers: i32);
         /// The corner patch: 0 MakeFilling only, 1 the exact star first (default), 2 the exact star refused (MakeFilling is the fallback).
         fn set_corner_exact_patch(mode: i32);
+        /// Whether every setback step uses the rolling-ball trim builder (13.22).
+        fn set_corner_trim(on: bool);
         /// How many faces the mass rule by knot span cuts into pieces.
         fn span_cut_count(shape: &Shape) -> i32;
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
@@ -68,6 +70,10 @@ pub fn set_corner_spawn_limit(workers: i32) {
 
 pub fn set_corner_exact_patch(mode: i32) {
     ffi::set_corner_exact_patch(mode);
+}
+
+pub fn set_corner_trim(on: bool) {
+    ffi::set_corner_trim(on);
 }
 
 pub fn adaptive_rule(shape: &Shape) -> bool {

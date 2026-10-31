@@ -65,7 +65,7 @@ export const cornerSchema = z
       .optional(),
   })
   .describe(
-    'Corner treatment at one vertex or all: a setback corner (this build: every edge meeting there is a straight edge between planar faces, all convex or all concave, rounded in this step with a constant radius).',
+    'Corner treatment at one vertex or all: a setback corner (every edge meeting there is rounded in this step with a constant radius: straight edges between planar faces, all convex or all concave, take the analytic builder and a star of exact sub-patches; a circle, a B-spline or a cylinder / cone / free-form face at the vertex takes the rolling-ball blend cut inside a ball of the setback around the vertex, one setback distance per vertex, the hole filled by the plate fit).',
   );
 
 export type CornerInput = z.infer<typeof cornerSchema>;

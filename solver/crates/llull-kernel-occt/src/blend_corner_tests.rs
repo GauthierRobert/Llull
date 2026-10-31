@@ -829,6 +829,7 @@ impl Drop for CornerHooks {
         crate::test_bridge::set_corner_fault(-1);
         crate::test_bridge::set_corner_spawn_limit(-1);
         crate::test_bridge::set_corner_exact_patch(1);
+        crate::test_bridge::set_corner_trim(false);
     }
 }
 
@@ -1090,4 +1091,48 @@ fn the_cube_of_stars_goes_through_step_the_tessellation_and_a_shell() {
             None => {}
         }
     }
+}
+
+/// BLD §13.22: the rolling-ball trim builder (edges the analytic builder cannot take: forced here on the cube, where the exact answer is known). OCCT's own rolling-ball blend of the 12 edges has a
+/// spherical corner; the builder cuts the faces inside a ball of the setback radius around each vertex and fills the hole. The solid is valid, tangent everywhere, its corner patches meet the
+/// blends within the patch gap limit, and its volume is within 0.2 % of the rolling-ball cube (975.587; measured 974.568: the plate fills the hole less full than the sphere).
+#[test]
+fn a_cube_trimmed_around_its_vertices_is_the_rolling_ball_blend_with_a_filled_hole_at_each_corner() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, edges, corners) = cube_corner_step();
+    let all: Vec<u32> = (0..12).collect();
+    let reference =
+        mass_properties(&crate::features::fillet(&shape, &all, 1.0, None).unwrap().expect("a rolling-ball cube")).unwrap().volume;
+    crate::test_bridge::set_corner_trim(true);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    let (others, patches) = split_faces(topology(&built).unwrap()["faces"].as_array().unwrap());
+    assert_eq!(others, 18, "6 planes and the 12 rolling-ball blends");
+    assert!(patches >= 8, "a patch at each corner: {patches}");
+    assert!(worst_tangent_angle(&built) < 0.0095, "{}", worst_tangent_angle(&built));
+    assert!(worst_patch_gap(&built) < 5e-6 * 10.0 * 3.0_f64.sqrt(), "{}", worst_patch_gap(&built));
+    let volume = mass_properties(&built).unwrap().volume;
+    assert!((volume - reference).abs() < 2e-3 * reference, "{volume} against the rolling-ball cube {reference}");
+}
+
+/// BLD §13.22: what the trim builder does not take is refused by name: setbacks that differ along the edges of a vertex, a radius that varies, balls that overlap.
+#[test]
+fn the_trim_builder_refuses_by_name_what_it_does_not_take() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let shape = cube(10.0);
+    let all: Vec<usize> = (0..12).collect();
+    let (edges, mut corners) = spec(&shape, &all, 1.0, &[[0.0; 3]], 2.0);
+    corners[5] = 3.0; // one edge of the vertex at another setback
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("different setbacks"), "{reason}");
+    let tapers: Vec<(usize, f64, f64)> = all.iter().map(|&edge| (edge, 0.8, 1.2)).collect();
+    let (edges, corners) = spec_tapered(&shape, &tapers, &[[0.0; 3]], 2.0);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("varies along edge"), "{reason}");
+    let (edges, corners) = spec(&shape, &all, 1.0, &[[0.0; 3], [10.0, 0.0, 0.0]], 5.5);
+    let reason = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(reason.starts_with("[BLD_CORNER_UNSUPPORTED]") && reason.contains("overlap"), "{reason}");
 }
