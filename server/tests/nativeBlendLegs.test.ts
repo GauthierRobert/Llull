@@ -201,7 +201,7 @@ describeNative('DES-6c 13.34: two legs on curved edges, curved faces and running
     for (const blend of checked.blends) for (const contact of blend.contacts) expect(contact.g1AngleRad).toBeLessThan(1e-4);
   });
 
-  it('refuses by name, with the measured reason: running legs on a closed rim, a leg past its face, a curvature profile on a curved edge, edges at a vertex', () => {
+  it('refuses by name, with the measured reason: running legs on a closed rim, a leg past its face, edges at a vertex', () => {
     const rim = cylinder(10, 20);
     const refuse = (edges: Array<Record<string, unknown>>, extra: Record<string, unknown> = {}, target = rim): ReturnType<typeof execute> =>
       execute(target.doc, 'fillet_edge', { id: target.id, edges, ...extra });
@@ -213,11 +213,6 @@ describeNative('DES-6c 13.34: two legs on curved edges, curved faces and running
     const past = refuse([{ near: [10, 0, 20], size: 25, size2: 1, side1Near: [0, 0, 20] }]);
     expect(past.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });
     expect(past.summary).toContain('reaches past');
-    const curvature = refuse([{ near: [10, 0, 20], size: 1, size2: 2, side1Near: [0, 0, 20] }], {
-      profile: { type: 'curvature', shape: 0.5 },
-    });
-    expect(curvature.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });
-    expect(curvature.summary).toContain('curvature profile');
     const block = made(createEmptyDocument(), 'add_box', { size: [20, 10, 5], anchor: 'min' });
     const atVertex = refuse(
       [

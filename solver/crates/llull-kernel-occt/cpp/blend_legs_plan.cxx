@@ -107,6 +107,117 @@ std::string number_text(double value) {
   return text.str();
 }
 
+std::vector<gp_Pnt> curvature_poles(const Section &s, double shape) {
+  const double lead = 0.8 * shape, reach = 0.4 * shape + 0.6;
+  return {s.a,
+          s.a.Translated(gp_Vec(s.a, s.t) * lead),
+          s.a.Translated(gp_Vec(s.a, s.t) * reach + s.bend_a),
+          s.b.Translated(gp_Vec(s.b, s.t) * reach + s.bend_b),
+          s.b.Translated(gp_Vec(s.b, s.t) * lead),
+          s.b};
+}
+
+namespace {
+
+// The bends that give the quintic the normal curvature of each support at its contact (the offset of the 3rd pole along the support normal is 1.25 kappa
+// lead^2: Suu . N / |Su|^2 = 0.8 h / lead^2 at the start of a degree-5 Bezier), then the section measured: it must stay in the triangle A, T, B (the
+// side of the chord that holds the corner, and the corner side of both tangent lines) and turn by less than pi (a loop turns by more).
+bool curvature_section(const EdgePlan &plan, double shape, double s, Section &out, std::string &why) {
+  const gp_Pnt ends[2] = {out.a, out.b};
+  double kappas[2] = {0, 0}, offsets[2] = {0, 0};
+  // How far the section may pass a tangent line: a support that curves away from the corner (kappa < 0 toward the other contact) falls away from its tangent line by
+  // |kappa| lead^2 / 2 over the lead of the section, and the bent pole moves the section by at most 0.43 |kappa| lead^2 (the Bernstein weight of the 3rd pole peaks at 0.346);
+  // a support that curves toward the corner or is flat allows nothing. Sides: A -> T, T -> B, the chord B -> A (nothing).
+  double allowed[3] = {0, 0, 0};
+  for (int side = 0; side < 2; ++side) {
+    const gp_Pnt &from = ends[side];
+    const double reach = from.Distance(out.t);
+    gp_Vec nu;
+    if (!support_curvature(plan.faces[side], from, gp_Vec(from, out.t), gp_Vec(from, ends[1 - side]), nu, kappas[side])) {
+      why = "edge " + std::to_string(plan.index) + ": internal error (report it): the curvature of a support could not be read at a contact point (" + number_text(s) + " along it)";
+      return false;
+    }
+    const double lead = 0.8 * shape * reach;
+    offsets[side] = 1.25 * kappas[side] * lead * lead;
+    allowed[side] = kappas[side] < 0 ? -0.5 * kappas[side] * lead * lead : 0.0;
+    (side == 0 ? out.bend_a : out.bend_b) = nu * offsets[side];
+  }
+  const std::vector<gp_Pnt> poles = curvature_poles(out, shape);
+  const gp_Vec along_chord(out.a, out.b);
+  const double chord = along_chord.Magnitude();
+  const gp_Vec x_axis = along_chord / chord;
+  gp_Vec up(out.a, out.t);
+  up -= x_axis * up.Dot(x_axis);
+  if (up.Magnitude() < 1e-12 * chord) {
+    why = "edge " + std::to_string(plan.index) + ": internal error (report it): the tangent lines of the supports meet on the chord at " + number_text(s) + " along it (no corner)";
+    return false;
+  }
+  const gp_Vec y_axis = up.Normalized();
+  const auto plane = [&](const gp_Pnt &p) { return std::pair<double, double>(gp_Vec(out.a, p).Dot(x_axis), gp_Vec(out.a, p).Dot(y_axis)); };
+  const std::pair<double, double> corners[3] = {plane(out.a), plane(out.t), plane(out.b)};
+  // signed distance of q to the side k of the triangle, positive inside
+  const auto inside_by = [&](int k, const std::pair<double, double> &q) {
+    const auto &p = corners[k], &r = corners[(k + 1) % 3], &opposite = corners[(k + 2) % 3];
+    const double dx = r.first - p.first, dy = r.second - p.second, length = std::hypot(dx, dy);
+    const double reference = dx * (opposite.second - p.second) - dy * (opposite.first - p.first);
+    const double here = dx * (q.second - p.second) - dy * (q.first - p.first);
+    return (reference < 0 ? -here : here) / length;
+  };
+  double worst = 0, excursion = 0, allowance = 0, drift = 0, turn_low = 0, turn_high = 0, previous = 0;
+  const gp_Vec z_axis = x_axis.Crossed(y_axis);
+  constexpr int kSamples = 64;
+  for (int k = 0; k <= kSamples; ++k) {
+    const double u = static_cast<double>(k) / kSamples, v = 1.0 - u;
+    const double basis[6] = {v * v * v * v * v, 5 * u * v * v * v * v, 10 * u * u * v * v * v, 10 * u * u * u * v * v, 5 * u * u * u * u * v, u * u * u * u * u};
+    const double slope[5] = {5 * v * v * v * v, 20 * u * v * v * v, 30 * u * u * v * v, 20 * u * u * u * v, 5 * u * u * u * u};
+    gp_Vec point(0, 0, 0), tangent(0, 0, 0);
+    for (int i = 0; i < 6; ++i) point += gp_Vec(out.a, poles[static_cast<size_t>(i)]) * basis[i];
+    for (int i = 0; i < 5; ++i) tangent += gp_Vec(poles[static_cast<size_t>(i)], poles[static_cast<size_t>(i + 1)]) * slope[i];
+    const std::pair<double, double> q(point.Dot(x_axis), point.Dot(y_axis));
+    drift = std::max(drift, std::fabs(point.Dot(z_axis)));
+    for (int side = 0; side < 3; ++side) {
+      const double excess = -inside_by(side, q) - allowed[side] - 1e-9 * chord;
+      if (excess > worst) {
+        worst = excess;
+        excursion = -inside_by(side, q);
+        allowance = allowed[side];
+      }
+    }
+    const double angle = std::atan2(tangent.Dot(y_axis), tangent.Dot(x_axis));
+    double unwrapped = angle;
+    if (k > 0) {
+      while (unwrapped - previous > M_PI) unwrapped -= 2 * M_PI;
+      while (unwrapped - previous < -M_PI) unwrapped += 2 * M_PI;
+    } else {
+      turn_low = turn_high = unwrapped;
+    }
+    previous = unwrapped;
+    turn_low = std::min(turn_low, unwrapped);
+    turn_high = std::max(turn_high, unwrapped);
+  }
+  const std::string needs = "the supports' normal curvatures " + number_text(kappas[0]) + " and " + number_text(kappas[1]) + " need pole offsets of " +
+                            number_text(offsets[0]) + " and " + number_text(offsets[1]) + " (shape " + number_text(shape) + ")";
+  if (worst > 0) {
+    why = "edge " + std::to_string(plan.index) + ": the curvature (G2) section leaves the triangle of its tangent lines by " + number_text(excursion) + " (allowed on that side by the sag of a support that curves away: " + number_text(allowance) + ") at " + number_text(s) +
+          " along it (the offsets along the support normals also lift it " + number_text(drift) + " out of the plane of A, T, B): " + needs +
+          "; use smaller legs, a smaller or larger shape, or a conic profile";
+    return false;
+  }
+  if (drift > 0.1 * chord) {
+    why = "edge " + std::to_string(plan.index) + ": internal error (report it): the curvature (G2) section lies " + number_text(drift) + " out of the plane of A, T, B at " + number_text(s) +
+          " along it (limit 0.1 x |A B| = " + number_text(0.1 * chord) + "): " + needs;
+    return false;
+  }
+  if (turn_high - turn_low > M_PI) {
+    why = "edge " + std::to_string(plan.index) + ": internal error (report it): the curvature (G2) section loops (its tangent turns through " + number_text(turn_high - turn_low) + " rad) at " + number_text(s) +
+          " along it: " + needs + "; use smaller legs or a conic profile";
+    return false;
+  }
+  return true;
+}
+
+}  // namespace
+
 // The section of `plan` at arc length `s` from the start of the edge; false with the reason in `why`.
 bool section_at(const EdgePlan &plan, const BRepAdaptor_Curve &curve, double s, int kind, double param, Section &out, std::string &why) {
   GCPnts_AbscissaPoint place(curve, s, curve.FirstParameter());
@@ -189,22 +300,28 @@ bool section_at(const EdgePlan &plan, const BRepAdaptor_Curve &curve, double s, 
   out.b = contact[1];
   out.t = apex;
   out.weight = kind == 0 ? param / (1.0 - param) : std::sin(wedge / 2.0);
-  return true;
+  return kind != 1 || curvature_section(plan, param, s, out, why);
 }
 
 
 // The surface interpolating the sections at `along` (a closed edge: the last section is not repeated and `period_end` closes the period): u runs across (the
 // rational quadratic A, T, B), v along. `rows_out` holds the interpolated pole curves A, w T, B and the weights.
-Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std::vector<double> &along, double period_end, bool closed, double tolerance,
+Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std::vector<double> &along, double period_end, bool closed, double tolerance, double shape, bool polynomial,
                                  std::vector<Handle(Geom_BSplineCurve)> &rows_out, std::string &why) {
   const int count = static_cast<int>(stations.size());
   Handle(TColStd_HArray1OfReal) parameters = new TColStd_HArray1OfReal(1, closed ? count + 1 : count);
   for (int j = 1; j <= parameters->Length(); ++j) parameters->SetValue(j, j <= count ? along[static_cast<size_t>(j - 1)] : period_end);
   std::vector<Handle(Geom_BSplineCurve)> curves;
-  for (int i = 0; i < 4; ++i) {
+  const int pole_rows = polynomial ? 6 : 3;
+  for (int i = 0; i < (polynomial ? 6 : 4); ++i) {
     Handle(TColgp_HArray1OfPnt) points = new TColgp_HArray1OfPnt(1, count);
     for (int j = 0; j < count; ++j) {
       const Section &s = stations[static_cast<size_t>(j)];
+      if (polynomial) {
+        const gp_Pnt pole = curvature_poles(s, shape)[static_cast<size_t>(i)];
+        points->SetValue(j + 1, pole);
+        continue;
+      }
       const gp_Pnt &pole = i == 0 ? s.a : (i == 1 ? s.t : s.b);
       // the apex row is interpolated as w T, the weight row as (w, v): the station parameter keeps equal weights apart (coincident points are refused)
       const double scale = i == 1 ? s.weight : 1.0;
@@ -227,19 +344,19 @@ Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std
       return nullptr;
     }
   rows_out = curves;
-  TColgp_Array2OfPnt grid(1, 3, 1, columns);
-  TColStd_Array2OfReal pole_weights(1, 3, 1, columns);
+  TColgp_Array2OfPnt grid(1, pole_rows, 1, columns);
+  TColStd_Array2OfReal pole_weights(1, pole_rows, 1, columns);
   for (int j = 1; j <= columns; ++j) {
-    const double weight = curves[3]->Pole(j).X();
+    const double weight = polynomial ? 1.0 : curves[3]->Pole(j).X();
     if (!(weight > 1e-9)) {
       why = "the section weights of the blend interpolate to a non-positive weight";
       return nullptr;
     }
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < pole_rows; ++i) {
       const gp_Pnt pole = curves[static_cast<size_t>(i)]->Pole(j);
-      const double divisor = i == 1 ? weight : 1.0;
+      const double divisor = i == 1 && !polynomial ? weight : 1.0;
       grid.SetValue(i + 1, j, gp_Pnt(pole.X() / divisor, pole.Y() / divisor, pole.Z() / divisor));
-      pole_weights.SetValue(i + 1, j, i == 1 ? weight : 1.0);
+      pole_weights.SetValue(i + 1, j, i == 1 && !polynomial ? weight : 1.0);
     }
   }
   TColStd_Array1OfReal u_knots(1, 2), v_knots(1, first->NbKnots());
@@ -247,10 +364,10 @@ Handle(Geom_BSplineSurface) skin(const std::vector<Section> &stations, const std
   u_knots.SetValue(2, 1.0);
   for (int k = 1; k <= first->NbKnots(); ++k) v_knots.SetValue(k, first->Knot(k));
   TColStd_Array1OfInteger u_mults(1, 2), v_mults(1, first->NbKnots());
-  u_mults.SetValue(1, 3);
-  u_mults.SetValue(2, 3);
+  u_mults.SetValue(1, pole_rows);
+  u_mults.SetValue(2, pole_rows);
   for (int k = 1; k <= first->NbKnots(); ++k) v_mults.SetValue(k, first->Multiplicity(k));
-  return new Geom_BSplineSurface(grid, pole_weights, u_knots, v_knots, u_mults, v_mults, 2, first->Degree(), Standard_False,
+  return new Geom_BSplineSurface(grid, pole_weights, u_knots, v_knots, u_mults, v_mults, pole_rows - 1, first->Degree(), Standard_False,
                                  first->IsPeriodic() ? Standard_True : Standard_False);
 }
 
@@ -278,7 +395,7 @@ Handle(Geom_BSplineSurface) skin_edge(const EdgePlan &plan, const BRepAdaptor_Cu
   }
   for (;;) {
     std::vector<Handle(Geom_BSplineCurve)> rows;
-    const Handle(Geom_BSplineSurface) surface = skin(stations, along, plan.length, plan.closed, 1e-14, rows, why);
+    const Handle(Geom_BSplineSurface) surface = skin(stations, along, plan.length, plan.closed, 1e-14, param, kind == 1, rows, why);
     if (surface.IsNull()) return nullptr;
     std::vector<double> added;
     std::vector<Section> added_sections;
@@ -289,9 +406,15 @@ Handle(Geom_BSplineSurface) skin_edge(const EdgePlan &plan, const BRepAdaptor_Cu
       const double at = 0.5 * (from + to);
       const Section *middle = nullptr;
       if (!truth_at(at, middle)) return nullptr;
-      const gp_Pnt want[3] = {middle->a, gp_Pnt(middle->weight * middle->t.X(), middle->weight * middle->t.Y(), middle->weight * middle->t.Z()), middle->b};
-      double gap = std::fabs(rows[3]->Value(at).X() - middle->weight) * middle->a.Distance(middle->t);
-      for (int i = 0; i < 3; ++i) gap = std::max(gap, rows[static_cast<size_t>(i)]->Value(at).Distance(want[i]));
+      double gap = 0;
+      if (kind == 1) {
+        const std::vector<gp_Pnt> want = curvature_poles(*middle, param);
+        for (size_t i = 0; i < want.size(); ++i) gap = std::max(gap, rows[i]->Value(at).Distance(want[i]));
+      } else {
+        const gp_Pnt want[3] = {middle->a, gp_Pnt(middle->weight * middle->t.X(), middle->weight * middle->t.Y(), middle->weight * middle->t.Z()), middle->b};
+        gap = std::fabs(rows[3]->Value(at).X() - middle->weight) * middle->a.Distance(middle->t);
+        for (int i = 0; i < 3; ++i) gap = std::max(gap, rows[static_cast<size_t>(i)]->Value(at).Distance(want[i]));
+      }
       worst = std::max(worst, gap);
       if (gap > limit) {
         if (to - from < 1e-9 * plan.length) {
@@ -382,20 +505,8 @@ bool make_plan(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &uniq
   tangent.Normalize();
   gp_Vec normal[2], inward[2];
   BRepClass3d_SolidClassifier classifier(shape);
+  const double shortest_leg = std::min(std::min(plan.leg[0], plan.leg[1]), std::min(plan.leg[2], plan.leg[3]));
   for (int f = 0; f < 2; ++f) {
-    if (!face_unit_normal(plan.faces[f], corner, normal[f])) {
-      why = label + " meets a face with no normal at its middle";
-      return false;
-    }
-    classifier.Perform(corner.Translated(normal[f] * (1e-4 * diagonal)), 1e-9);
-    plan.flip[f] = classifier.State() == TopAbs_IN;
-    if (plan.flip[f]) normal[f].Reverse();
-    gp_Vec across = normal[f].Crossed(tangent);
-    if (across.Magnitude() < kDegenerate) {
-      why = label + " lies along the normal of a face";
-      return false;
-    }
-    across.Normalize();
     // The face lies to the left of its boundary edge seen from its own (oriented) normal, whatever the orientation flag says about the solid: the way into the
     // face is N x T with both taken with the face's orientation. A seam (the edge twice in the face) has no single way in.
     int seen = 0;
@@ -411,6 +522,30 @@ bool make_plan(const TopoDS_Shape &shape, const TopTools_IndexedMapOfShape &uniq
       return false;
     }
     const gp_Vec way = face_normal.Crossed(tangent * edge_sense);
+    if (way.Magnitude() < kDegenerate) {
+      why = label + " lies along the normal of a face";
+      return false;
+    }
+    // Which way is outward is probed on the face a little way in from the edge, not at the edge: a face that overhangs the other (a ball standing over a plate)
+    // has an outward normal at the edge that points into the material of its neighbour.
+    const gp_Pnt guess = corner.Translated(way.Normalized() * std::min(0.01 * diagonal, 0.25 * shortest_leg));
+    gp_Pnt inside_face;
+    gp_Vec probe_normal = face_normal;
+    if (!project_on_face(plan.faces[f], guess, inside_face) || !face_unit_normal(plan.faces[f], inside_face, probe_normal)) {
+      why = label + " meets a face with no normal near its edge";
+      return false;
+    }
+    const double probe = 1e-3 * std::min(0.01 * diagonal, 0.25 * shortest_leg);
+    classifier.Perform(inside_face.Translated(probe_normal * probe), 1e-9);
+    plan.flip[f] = classifier.State() == TopAbs_IN;
+    normal[f] = face_normal;
+    if (plan.flip[f]) normal[f].Reverse();
+    gp_Vec across = normal[f].Crossed(tangent);
+    if (across.Magnitude() < kDegenerate) {
+      why = label + " lies along the normal of a face";
+      return false;
+    }
+    across.Normalize();
     plan.sign[f] = way.Dot(across) >= 0 ? 1.0 : -1.0;
     inward[f] = across * plan.sign[f];
   }
