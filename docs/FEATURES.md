@@ -210,6 +210,7 @@
 | `trim_surface` | Cut a nurbs_surface sheet, in one of two ways. |  |
 | `twist_body` | Twist a 3D solid or mesh about an axis: each cross-section perpendicular to the axis is rotated by angleDeg times a ramp that goes from 0 at region.start to 1 … |  |
 | `unwrap_face` | Develop a plane, cylinder or cone face of a solid into the flat: the unrolled outline (rectangle for a cylinder, annular sector for a cone, with its sector ang… | read-only, kernel |
+| `wrap_overlay` | Geometry to DRAW the wrap results of a solid for review, in world coordinates (document units): data.curves [{ id, face, faceName, source: "solid" \| "earlier",… | read-only |
 | `wrap_to_face` | Wrap 2D sketch entities onto a face of a solid as curves lying on that face. | kernel |
 
 ## measure

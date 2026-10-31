@@ -585,7 +585,7 @@ Golden plan `plans/golden_wrp_native.json` (bottle: revolved polygon, Fira label
 
 ### 14.4 Left
 
-Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; `VORG` and the side-bearing variations of `VVAR` (read for their structure, not used), vertical text layout (§14.18); multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces with a cusp, a branch point or a tangential view (§14.16); UI render overlays for the new entities. Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
+Freeform (B-spline) faces: `create_curve_on_face` supports only iso/uv there, walls are along the outward normal only, scribe is refused (see 14.10); helical knurls above 8 grooves (kernel time) or on a face with a shoulder at an end; knurl as AP242 PMI; `VORG` and the side-bearing variations of `VVAR` (read for their structure, not used), vertical text layout (§14.18); multi-face wraps across edges that are neither rulings nor geodesics, chains over freeform faces, and mitred walls across curved or non-plane sharp edges (plane to plane is §14.15); the silhouette of a torus seen in its equatorial plane and of freeform faces with a cusp, a branch point or a tangential view (§14.16); footprint / chart previews of an emboss and a knurl pattern preview (the curves on faces and the face joins are drawn: §14.17). Per-file branch coverage below 85 % on a few new files (see the report of DES-3b).
 
 ### DES-3c (2026-10-30)
 
@@ -850,6 +850,15 @@ divides its face into arcs of 30 and 60 degrees times the width (1e-3).
 cell has four crossings, a crossing that passes both tests is traced as two smooth branches. Contour features smaller than 1/48 of the parameter box of the face are not seen (`data.silhouette.grid` = 48); the closed loops are fitted with the same direction at both ends (the seam is C1); the guards on Newton failing
 (the sampler answers null, the fit refuses "Newton cannot follow"; after the fit every probe's distance to n . d = 0 is checked) are exercised through the test hooks of `freeformContours` (a field or projection no real surface gives) and by a C0 crease. A kernel defect found on the way (two sequential
 face splits merged the first back, `UnifySameDomain` keep set) is fixed in `split_shape` (fix/split-shape-keep): the bent plate gives 8 faces.
+
+### 14.17 Review overlays: curves on faces and face joins (DES-3c)
+
+The read-only query `wrap_overlay` (`id`, optional `samples`) returns what the viewport draws, in world coordinates: `curves` (every `nurbs_curve` with `onFace` that lies on the solid, or on an earlier solid that no longer exists, as
+`source: "earlier"`, because a silhouette split keeps the curves of the solid it consumed) and `edges` (the B-rep edges of the solid with the faces each joins and their convexity from `faceGraph`; null without the exact kernel, with
+`edgesNote`). It is capped at 64 curves and 400 edges (`truncated` names what was cut). The UI toggle "Wrap" (viewport toolbar, `src/ui/viewport/3d/overlays/WrapOverlay*.tsx`, state in `wrapOverlayStore`, nothing persisted, no command) draws the
+first four selected solids: curves orange (earlier solid: yellow) and the edges by what a chain across them does: smooth green (the sketch develops across), convex orange and concave blue (mitred between two planes, §14.15), unknown grey, with a legend and a layer
+switch for each. Verified on the native kernel through the server and a headless Chromium (a bent plate with its silhouette curves and a stepped block with a convex and a concave edge); the geometry mapping and the toggles are in `tests/component/WrapOverlay.test.tsx`.
+**Left:** the footprint of an emboss on its face and the join mismatch per edge need data the document does not keep (they are results of the command, in `data.edges` of `emboss_on_face`); a knurl pattern preview before the command runs is param gathering for the knurl panel.
 
 ### 14.18 Vertical metrics variations and named instances (DES-3c)
 

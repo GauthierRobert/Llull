@@ -13,6 +13,7 @@ import { splitAtSilhouette } from './splitAtSilhouette';
 import { splitFaceByCurves } from './splitFaceByCurves';
 import { textOutlineCommand } from './textOutlineCommand';
 import { unwrapFace } from './unwrapFace';
+import { wrapOverlay } from './wrapOverlay';
 import { wrapToFace } from './wrapToFace';
 
 export const wrapCommands = commandCatalog(
@@ -30,4 +31,5 @@ export const wrapCommands = commandCatalog(
   splitFaceByCurves,
   splitAtSilhouette,
   checkWrap,
+  wrapOverlay,
 );
