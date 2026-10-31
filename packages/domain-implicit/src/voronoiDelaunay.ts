@@ -50,12 +50,16 @@ export const facesOf = ([a, b, c, d]: readonly [number, number, number, number])
 ];
 
 const WALK_LIMIT = 4096;
+/** Seeds looked at per grid cell when the walk picks its start: clustered seeds put thousands in a cell, and any one of the nearest few is as good a start. */
+const CANDIDATES_PER_CELL = 8;
 
 export interface Triangulation {
   /** Every tetrahedron of the triangulation (the enclosing ones included), in creation order. */
   readonly tets: readonly Tet[];
   /** Seeds skipped because an earlier seed sits at exactly the same place. */
   readonly skipped: readonly number[];
+  /** Work counters: steps of the visibility walk over all seeds, and seeds for which the walk failed and every tetrahedron was scanned. */
+  readonly stats: { readonly walkSteps: number; readonly scans: number };
 }
 
 /** Opposite-vertex slots of the faces of a tetrahedron in the order `facesOf` lists them: abc (opposite d), abd, acd, bcd. */
@@ -87,7 +91,7 @@ export function triangulate(points: readonly Vec3[], real: number): Triangulatio
     coords[3 * i + 1] = p[1];
     coords[3 * i + 2] = p[2];
   });
-  let capacity = Math.max(64, 16 * count);
+  let capacity = Math.max(64, 28 * count);
   let verts: Int32Array = new Int32Array(4 * capacity);
   let neighbours: Int32Array = new Int32Array(4 * capacity).fill(-1);
   let orientation: Int8Array = new Int8Array(capacity);
@@ -110,10 +114,9 @@ export function triangulate(points: readonly Vec3[], real: number): Triangulatio
   };
   const vertexTet = new Int32Array(count).fill(-1);
 
-  /** A new tetrahedron (a, b, c, d); -1 when it is flat (never for a star-shaped cavity). */
+  /** A new tetrahedron (a, b, c, d). The cavity of a seed is star-shaped with respect to it (exact predicates, 14.14), so none of the tetrahedra made on its boundary is flat. */
   const create = (a: number, b: number, c: number, d: number): number => {
     const side = orient3dIndexed(coords, a, b, c, d);
-    if (side === 0) return -1;
     if (total === capacity) grow();
     const id = total++;
     verts[4 * id] = a;
@@ -141,9 +144,12 @@ export function triangulate(points: readonly Vec3[], real: number): Triangulatio
     ) > 0;
 
   /** Visibility walk from `from` to a tetrahedron that contains point `p` (closed), or -1 when it does not settle. */
+  let walkSteps = 0;
+  let scans = 0;
   const locate = (from: number, p: number): number => {
     let current = from;
     for (let step = 0; step < WALK_LIMIT; step += 1) {
+      walkSteps += 1;
       if (alive[current] !== 1) return -1;
       let moved = false;
       for (let k = 0; k < 4 && !moved; k += 1) {
@@ -187,7 +193,12 @@ export function triangulate(points: readonly Vec3[], real: number): Triangulatio
         for (let dx = -1; dx <= 1; dx += 1) {
           const [x, y, z] = [cx + dx, cy + dy, cz + dz];
           if (x < 0 || y < 0 || z < 0 || x >= side || y >= side || z >= side) continue;
-          for (let q = head[(z * side + y) * side + x] as number; q >= 0; q = chain[q] as number) {
+          let looked = 0;
+          for (
+            let q = head[(z * side + y) * side + x] as number;
+            q >= 0 && looked < CANDIDATES_PER_CELL;
+            q = chain[q] as number, looked += 1
+          ) {
             const d =
               ((coords[3 * q] as number) - (coords[3 * p] as number)) ** 2 +
               ((coords[3 * q + 1] as number) - (coords[3 * p + 1] as number)) ** 2 +
@@ -214,6 +225,7 @@ export function triangulate(points: readonly Vec3[], real: number): Triangulatio
     let start = locate(startFor(p, hint), p);
     if (start < 0 || !holds(start, p)) {
       start = -1;
+      scans += 1;
       for (let id = 0; id < total && start < 0; id += 1) if (holds(id, p)) start = id;
     }
     if (start < 0) continue;
@@ -249,10 +261,6 @@ export function triangulate(points: readonly Vec3[], real: number): Triangulatio
     const open = new Map<number, number>();
     for (const { face, outer, inner } of boundary) {
       const id = create(face[0], face[1], face[2], p);
-      if (id < 0) {
-        if (outer >= 0) neighbours[4 * outer + slotOf(neighbours, outer, inner)] = -1;
-        continue;
-      }
       neighbours[4 * id + 3] = outer;
       if (outer >= 0) neighbours[4 * outer + slotOf(neighbours, outer, inner)] = id;
       // the three faces through the new seed are shared with the tetrahedra on the neighbouring boundary faces: matched by their common edge
@@ -283,7 +291,7 @@ export function triangulate(points: readonly Vec3[], real: number): Triangulatio
     };
     tets.push({ v, ...sphere });
   }
-  return { tets, skipped };
+  return { tets, skipped, stats: { walkSteps, scans } };
 }
 
 /** Delaunay tetrahedra of `points` that do not touch the enclosing tetrahedron (the last four points), and the seeds skipped as duplicates. */

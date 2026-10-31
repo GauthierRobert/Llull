@@ -10,9 +10,10 @@ const region = (): ReturnType<typeof ok> =>
 describe('add_voronoi_lattice', () => {
   it('is deterministic per seed, differs between seeds, and keeps every beam inside the box', () => {
     const box = region();
+    // A, B, A: the last result is reused for equal parameters, so the second A is computed again after B replaced it
     const a = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.02, seed: 7, radius: 0.4 });
-    const b = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.02, seed: 7, radius: 0.4 });
     const c = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.02, seed: 8, radius: 0.4 });
+    const b = ok(box.doc, 'add_voronoi_lattice', { region: box.id, density: 0.02, seed: 7, radius: 0.4 });
     expect(a.doc.implicit?.fields[a.id]).toEqual({ ...b.doc.implicit?.fields[b.id], id: a.id });
     expect(a.data['totalLength']).toBe(b.data['totalLength']);
     expect(a.data['totalLength']).not.toBe(c.data['totalLength']);

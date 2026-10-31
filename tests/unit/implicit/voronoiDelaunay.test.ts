@@ -182,14 +182,17 @@ describe('typed-array Delaunay (14.16): the same list as the exact scan, at a sc
     const cases: Vec3[][] = [];
     for (let n = 0; n < 400; n += 1) cases.push(Array.from({ length: 5 }, (): Vec3 => [random() * 10, random() * 10, random() * 10]));
     for (let n = 0; n < 80; n += 1) {
-      // five points on one sphere (exactly cospherical when the offset is 0), four on one plane
-      const spot = (): Vec3 => {
-        const [u, v] = [random() * 2 - 1, random() * 2 * Math.PI];
-        const s = Math.sqrt(1 - u * u);
-        const offset = n % 2 === 0 ? 0 : 1e-300;
-        return [5 + 5 * s * Math.cos(v) + offset, 5 + 5 * s * Math.sin(v), 5 + 5 * u];
-      };
-      cases.push(Array.from({ length: 5 }, spot));
+      // five integer points on the sphere of radius 5 (exactly cospherical), the last one moved by an exactly representable 1e-300 on a coordinate that is 0 (the double
+      // determinant cannot see it: 5 + x + 1e-300 == 5 + x elsewhere, but a coordinate of 0 keeps it)
+      const rim: Vec3[] = [
+        [3, 4, 0],
+        [-3, 4, 0],
+        [0, 3, 4],
+        [0, -3, -4],
+        [4, 0, 3],
+      ];
+      cases.push(n % 2 === 0 ? rim : rim.map((p, k): Vec3 => (k === 4 ? [4, 1e-300, 3] : p)));
+      cases.push(rim.map((p, k): Vec3 => [p[0] + 0.5 * k, p[1], p[2]]));
       cases.push([
         [0, 0, 0],
         [1, 0, 0],
@@ -213,16 +216,31 @@ describe('typed-array Delaunay (14.16): the same list as the exact scan, at a sc
     expect(triangulate(all, 2500).tets.map((tet) => [...tet.v])).toEqual(referenceTriangulation(all, 2500));
   }, 600_000);
 
+  it('20000 clustered seeds (nine tenths in a ball a hundredth of the box wide: thousands per grid cell) stay near-linear: the walk starts from a few candidates, not the whole cell', () => {
+    const random = mulberry32(11);
+    const points = Array.from(
+      { length: 20_000 },
+      (_, i): Vec3 => (i % 10 === 0 ? [random() * 100, random() * 100, random() * 100] : [50 + random(), 50 + random(), 50 + random()]),
+    );
+    const all = withEnclosure(points, 100);
+    const result = triangulate(all, 20_000);
+    expect(result.stats.scans).toBe(0);
+    expect(result.stats.walkSteps / 20_000).toBeLessThan(40);
+    const enclosing = volumeOf([all[20_000], all[20_001], all[20_002], all[20_003]] as Corners);
+    const total = result.tets.reduce((sum, tet) => sum + volumeOf(tet.v.map((n) => all[n]) as Corners), 0);
+    expect(Math.abs(total - enclosing) / enclosing).toBeLessThan(1e-6);
+  }, 120_000);
+
   it('100000 seeds triangulate in a few seconds, deterministically, and the tetrahedra tile the enclosing tetrahedron', () => {
     const random = mulberry32(7);
     const extent = Math.cbrt(100_000 / 0.04);
     const points = Array.from({ length: 100_000 }, (): Vec3 => [random() * extent, random() * extent, random() * extent]);
     const all = withEnclosure(points, extent);
-    const started = performance.now();
     const first = triangulate(all, 100_000);
-    const seconds = (performance.now() - started) / 1000;
-    expect(seconds).toBeLessThan(30);
     expect(first.skipped).toEqual([]);
+    // counted work, not a clock: a few walk steps a seed, and not one seed that needed the scan of every tetrahedron
+    expect(first.stats.walkSteps / 100_000).toBeLessThan(10);
+    expect(first.stats.scans).toBe(0);
     const enclosing = volumeOf([all[100_000], all[100_001], all[100_002], all[100_003]] as Corners);
     const total = first.tets.reduce((sum, tet) => sum + volumeOf(tet.v.map((n) => all[n]) as Corners), 0);
     expect(Math.abs(total - enclosing) / enclosing).toBeLessThan(1e-6);

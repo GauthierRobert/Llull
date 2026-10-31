@@ -13,10 +13,14 @@ import type { GraphResult } from './graph';
 import type { VoronoiNode } from './model';
 import { type Tet, delaunay, faceKey, facesOf } from './voronoiDelaunay';
 
-/** Seeds beyond this are refused: the Delaunay pass takes 2.4 s for 100000 seeds (14.16) and a seed adds about 9.2 beams (measured), so 100000 seeds give about 1000000 beams, the beam cap below. */
+/** Seeds beyond this are refused: the Delaunay pass takes 2.4 s for 100000 seeds (14.16) and a seed adds 9 to 11 beams (measured), so the beam cap below binds first above about 90000 seeds. */
 const MAX_SEEDS = 100_000;
-/** Beams beyond this are refused (IMP_GRAPH_TOO_LARGE): the native field engine realises 1000000 beams in 15 s at a coarse voxel (14.16). */
-const MAX_VORONOI_BEAMS = 1_000_000;
+/** Beams beyond this are refused (IMP_GRAPH_TOO_LARGE): the native field engine realises 1000000 beams in 15 s at a coarse voxel (14.16). A seed adds 9 to 11 beams (9.2 in a small box, 10.8 in a large one). */
+const MAX_VORONOI_BEAMS = 900_000;
+/** The beam estimate that refuses a box before any seed is placed (the least a seed adds). */
+const LEAST_BEAMS_PER_SEED = 9.2;
+/** Results up to this many beams are kept for the next call with the same parameters (about 250 MB at 1000000 beams: bigger ones are rebuilt). */
+const MEMO_MAX_BEAMS = 200_000;
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
@@ -56,7 +60,7 @@ export function voronoiGeometry(node: VoronoiParams): GraphResult {
   const key = JSON.stringify([node.min, node.max, node.density, node.seed, node.radius, node.cap]);
   if (last !== null && last.key === key) return last.result;
   const result = buildVoronoi(node);
-  last = { key, result };
+  last = result.ok && result.graph.set.beams.length > MEMO_MAX_BEAMS ? null : { key, result };
   return result;
 }
 
@@ -66,11 +70,11 @@ function buildVoronoi(node: VoronoiParams): GraphResult {
   const margin = 1.2 * spacing;
   const grown = [0, 1, 2].map((axis) => (max[axis] as number) - (min[axis] as number) + 2 * margin);
   const expected = Math.round(node.density * (grown[0] as number) * (grown[1] as number) * (grown[2] as number));
-  if (expected > MAX_SEEDS)
+  if (expected > MAX_SEEDS || expected * LEAST_BEAMS_PER_SEED > MAX_VORONOI_BEAMS)
     return {
       ok: false,
       code: 'IMP_GRAPH_TOO_LARGE',
-      message: `density ${node.density} puts ${expected} seeds in the box (limit ${MAX_SEEDS}, about 9 beams each): lower the density or shrink the region`,
+      message: `density ${node.density} puts ${expected} seeds in the box (limit ${MAX_SEEDS} seeds and ${MAX_VORONOI_BEAMS} beams, 9 to 11 beams each): lower the density or shrink the region`,
       ids: [],
     };
   const count = Math.max(expected, 8);
