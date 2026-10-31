@@ -153,7 +153,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   M7 (OCC reason in `DIR_FACE_MOVE_FAILED`, `render_view overlay=cage|net` DONE 2026-10-30). _Lane 2 + 1 + native_ _deps: —_
 - `[TODO]` **DES-5c** 05 IMP left after M0–M6 (M4–M6 done 2026-10-25, §14.7): (surface-UV cell maps + strut-lattice maps and an exact-predicate Delaunay DONE 2026-10-30, §14.13-14.14);
   (scalar kinds `topology_density` / `fea_result` VC-IMP-29 DONE 2026-10-30, §14.11); (numerical homogenisation on `llull-voxfe` DONE 2026-10-30, §14.15); (BVH for explicit strut sets DONE 2026-10-30, §14.9: caps 100k beams / 6000 seeds;
-  left: a faster Delaunay for Voronoi; native `gradient`, native dual contouring and per-cell DC repair DONE 2026-10-30, §14.10); (3MF file sink DONE 2026-10-30, §14.12;
+  (faster Voronoi Delaunay DONE 2026-10-31, §14.16: ~12x, identical output, 90k seeds / 900k beams); native `gradient`, native dual contouring and per-cell DC repair DONE 2026-10-30, §14.10); (3MF file sink DONE 2026-10-30, §14.12;
   left: desktop export dialog uses toFile); GPU preview. _Lane 1 + native_ _deps: —_
 
 ## Aerospace + physics (spec = the linked pack)
