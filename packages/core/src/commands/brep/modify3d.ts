@@ -307,7 +307,7 @@ export const chamferEdge = defineCommand({
       .number()
       .describe(
         'Variable chamfer: the distance (the leg on side 1 when distance2 is given) at the END of each selected edge (> 0, document units); the distance runs linearly from distance at the edge start to distanceEnd (the removed volume of a right-angle edge is 1/2 x integral of d1(s) d2(s) ds). ' +
-          'The start of an edge is its own start point (inspect_topology lists start and end of every edge). The edges must be listed (edgeIndices / edgesNear / edgeNames), straight or curved (an arc, a B-spline) between any two faces, not closed, ending on flat faces square to the edge, with no two chosen edges sharing a vertex; with distance2 give distance2End too, not angleDeg. Omit for a constant chamfer. Chamfers that need other shapes are BLD_CHAMFER_FAILED with the reason.',
+          'The start of an edge is its own start point (inspect_topology lists start and end of every edge). The edges must be listed (edgeIndices / edgesNear / edgeNames), straight or curved (an arc, a B-spline) between any two faces, not closed, ending on flat faces square to the edge; edges that meet at a vertex (the corner of a box with three edges) may be listed together when all are convex or all concave: the chamfer faces then meet along the mitre lines of their surfaces, without a separate corner face; with distance2 give distance2End too, not angleDeg. Omit for a constant chamfer. Chamfers that need other shapes are BLD_CHAMFER_FAILED with the reason.',
       )
       .optional(),
   }),

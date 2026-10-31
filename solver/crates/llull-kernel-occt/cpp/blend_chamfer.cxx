@@ -10,7 +10,9 @@
 //   extended along itself by a tenth of its length at both ends (the ends lie outside the solid for a convex edge, inside it for a concave one) and offset
 //   past the corner by its height plus the same margin, so the tool shares no face with the solid and cannot reach a support the legs do not.
 // CUT for a convex edge, FUSE for a concave one (blend_tool.hxx `apply_tools`).
-// Scope: no two chosen edges sharing a vertex, flat square ends, an edge that is not closed.
+// Chosen edges may share a vertex when all are convex or all concave: the tools overlap there and the boolean leaves the chamfer faces meeting along the mitre
+// lines of their surfaces, a point (three planes) or a line, so the corner needs no patch and is G0 by construction (13.25).
+// Scope: flat square ends, an edge that is not closed.
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -402,9 +404,10 @@ std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> ed
   const TopTools_IndexedMapOfShape unique_edges = query::distinct(source.shape, TopAbs_EDGE);
   TopTools_IndexedMapOfShape all;
   TopExp::MapShapes(source.shape, TopAbs_VERTEX, all);
-  std::map<int, int> at_vertex;  // vertex -> number of chosen edges that end there
+  std::map<int, std::vector<size_t>> at_vertex;  // vertex -> the chosen edges (positions in `edges`) that end there
   std::set<uint32_t> seen;
-  for (const uint32_t index : edges) {
+  for (size_t position = 0; position < edges.size(); ++position) {
+    const uint32_t index = edges[position];
     if (static_cast<int>(index) >= unique_edges.Extent()) {
       why = "edge index out of range";
       return nullptr;
@@ -417,10 +420,7 @@ std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> ed
     TopTools_IndexedMapOfShape ends;
     TopExp::MapShapes(edge, TopAbs_VERTEX, ends);
     for (int v = 1; v <= ends.Extent(); ++v) {
-      if (++at_vertex[all.FindIndex(ends(v))] > 1) {
-        why = "chamfered edges that meet at a vertex need a constant distance (a variable chamfer has no corner patch)";
-        return nullptr;
-      }
+      at_vertex[all.FindIndex(ends(v))].push_back(position);
     }
   }
   const naming::Named input = naming::named(source);
@@ -437,6 +437,14 @@ std::unique_ptr<Shape> build(const Shape &source, rust::Slice<const uint32_t> ed
     if (!built) return nullptr;
     tools.push_back(std::move(tool));
   }
+  // Edges that meet at a vertex are cut (or fused) one after the other: the chamfer faces then meet along the mitre lines of their planes, which is the corner
+  // (no separate patch), provided all of them are cut or all fused.
+  for (const auto &entry : at_vertex)
+    for (const size_t other : entry.second)
+      if (tools[other].convex != tools[entry.second.front()].convex) {
+        why = "chamfered edges that meet at a vertex must be all convex or all concave";
+        return nullptr;
+      }
   naming::Named current = input;
   if (!apply_tools(current, tools, why)) return nullptr;
   const bool all_convex = std::all_of(tools.begin(), tools.end(), [](const Tool &tool) { return tool.convex; });
