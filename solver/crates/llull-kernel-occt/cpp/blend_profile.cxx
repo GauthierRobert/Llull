@@ -25,7 +25,10 @@
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Dir.hxx>
 #include <TopoDS_Wire.hxx>
 #include <BRep_Tool.hxx>
 #include <GProp_GProps.hxx>
@@ -35,7 +38,9 @@
 #include <Standard_Failure.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TColgp_Array1OfPnt.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <TopExp.hxx>
+#include <TopTools_MapOfShape.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_ListIteratorOfListOfShape.hxx>
@@ -343,6 +348,48 @@ bool ends_square(const TopoDS_Shape &shape, const EdgeFrame &frame, const char *
   return true;
 }
 
+bool end_planes(const TopoDS_Shape &shape, const EdgeFrame &frame, const char *what, EndPlane (&ends)[2], std::string &why) {
+  TopTools_IndexedDataMapOfShapeListOfShape vertex_faces;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_FACE, vertex_faces);
+  const TopoDS_Vertex vertices[2] = {TopExp::FirstVertex(frame.edge), TopExp::LastVertex(frame.edge)};
+  for (int end = 0; end < 2; ++end) {
+    const gp_Pnt at = end == 0 ? frame.start : frame.end;
+    std::vector<TopoDS_Face> others;
+    for (TopTools_ListIteratorOfListOfShape it(vertex_faces.FindFromKey(vertices[end])); it.More(); it.Next()) {
+      const TopoDS_Face face = TopoDS::Face(it.Value());
+      if (face.IsSame(frame.faces[0]) || face.IsSame(frame.faces[1])) continue;
+      if (std::none_of(others.begin(), others.end(), [&](const TopoDS_Face &known) { return known.IsSame(face); })) others.push_back(face);
+    }
+    bool square = false;
+    for (const TopoDS_Face &face : others)
+      if (BRepAdaptor_Surface(face, Standard_True).GetType() == GeomAbs_Plane &&
+          std::fabs(std::fabs(normal_of(face).Dot(frame.direction)) - 1.0) < 1e-9)
+        square = true;
+    if (square) {
+      ends[end] = {at, frame.direction, false};
+      continue;
+    }
+    if (others.size() != 1) {
+      why = "an end of the edge has " + std::to_string(others.size()) + " faces besides the two it joins, none perpendicular to it (" + std::string(what) +
+            " need one flat face closing the edge at each end)";
+      return false;
+    }
+    if (BRepAdaptor_Surface(others[0], Standard_True).GetType() != GeomAbs_Plane) {
+      why = "an end of the edge is on a curved face (" + std::string(what) + " end on a flat face)";
+      return false;
+    }
+    const gp_Vec normal = outward_normal(shape, others[0]);
+    const double cosine = std::fabs(normal.Dot(frame.direction));
+    if (cosine < kMinEndCosine) {
+      why = "an end face is " + std::to_string(std::acos(cosine)) + " rad from square to the edge, past the " + std::to_string(std::acos(kMinEndCosine)) +
+            " rad a prism can be extended across (" + std::string(what) + ")";
+      return false;
+    }
+    ends[end] = {at, normal, true};
+  }
+  return true;
+}
+
 }  // namespace blend
 
 namespace {
@@ -365,6 +412,63 @@ std::vector<Spec> specs_of(rust::Slice<const double> raw) {
   for (size_t at = 0; at + kSpecWidth <= raw.size(); at += kSpecWidth)
     specs.push_back({static_cast<int>(raw[at]), static_cast<int>(raw[at + 1]), raw[at + 2], raw[at + 3], raw[at + 4], static_cast<int>(raw[at + 5])});
   return specs;
+}
+
+// A fused tool run past an oblique end is cut back to the solid's side of the end plane (a box on the outer side of each oblique end), so the
+// tool ends flush on the end face; the lateral face keeps the name `blend_name`, the others are renamed by index.
+static bool trim_to_ends(Tool &tool, const EndPlane (&ends)[2], double extent, const std::string &blend_name, std::string &why) {
+  const TopTools_IndexedMapOfShape before = query::distinct(tool.shape, TopAbs_FACE);
+  TopoDS_Shape lateral;
+  for (int f = 0; f < before.Extent(); ++f)
+    if (tool.names[static_cast<size_t>(f)] == blend_name) lateral = before(f + 1);
+  TopTools_ListOfShape arguments, cutters;
+  arguments.Append(tool.shape);
+  for (const EndPlane &end : ends) {
+    if (!end.oblique) continue;
+    const gp_Ax2 frame(end.point, gp_Dir(end.normal));
+    const gp_Pnt corner = end.point.Translated(frame.XDirection().XYZ() * (-extent) + frame.YDirection().XYZ() * (-extent));
+    cutters.Append(BRepPrimAPI_MakeBox(gp_Ax2(corner, gp_Dir(end.normal), frame.XDirection()), 2 * extent, 2 * extent, extent).Shape());
+  }
+  BRepAlgoAPI_Cut cut;
+  cut.SetArguments(arguments);
+  cut.SetTools(cutters);
+  cut.Build();
+  if (!cut.IsDone() || cut.HasErrors() || lateral.IsNull()) {
+    why = "the blend tool could not be cut back to an oblique end";
+    return false;
+  }
+  tool.shape = cut.Shape();
+  const TopTools_IndexedMapOfShape faces = query::distinct(tool.shape, TopAbs_FACE);
+  tool.names.assign(static_cast<size_t>(faces.Extent()), "");
+  for (int f = 0; f < faces.Extent(); ++f) tool.names[static_cast<size_t>(f)] = "tool." + std::to_string(f);
+  const TopTools_ListOfShape &kept = cut.Modified(lateral);
+  const TopoDS_Shape named = kept.IsEmpty() ? lateral : kept.First();
+  const int index = faces.FindIndex(named);
+  if (index <= 0) {
+    why = "the blend face was lost cutting the tool back to an oblique end";
+    return false;
+  }
+  tool.names[static_cast<size_t>(index - 1)] = blend_name;
+  tool.trimmed = true;
+  return true;
+}
+
+// The end caps of trimmed fused tools ("tool.<k>") lie in end faces of the solid: merge them into those faces. Only the edges of the cap faces may disappear,
+// every other edge is kept, so a face split by split_face or an imported coplanar face keeps its name.
+static void merge_tool_caps(naming::Named &current) {
+  const TopTools_IndexedMapOfShape faces = query::distinct(current.shape, TopAbs_FACE);
+  TopTools_MapOfShape cap_edges, keep;
+  for (int f = 1; f <= faces.Extent(); ++f)
+    if (current.names[static_cast<size_t>(f - 1)].rfind("tool.", 0) == 0)
+      for (TopExp_Explorer it(faces(f), TopAbs_EDGE); it.More(); it.Next()) cap_edges.Add(it.Current());
+  for (TopExp_Explorer it(current.shape, TopAbs_EDGE); it.More(); it.Next())
+    if (!cap_edges.Contains(it.Current())) keep.Add(it.Current());
+  ShapeUpgrade_UnifySameDomain unifier(current.shape, Standard_False, Standard_True, Standard_False);
+  unifier.KeepShapes(keep);
+  unifier.AllowInternalEdges(Standard_False);
+  unifier.Build();
+  const std::vector<naming::Named> fused{current};
+  current = naming::Named{unifier.Shape(), naming::inherit(unifier.Shape(), fused, unifier.History(), "unify")};
 }
 
 // The spandrel prism of one edge, or the reason it cannot be built.
@@ -402,18 +506,61 @@ bool make_tool(const TopoDS_Shape &shape, const std::vector<std::string> &edge_n
   }
   const gp_Pnt a = start.Translated(inward[0] * leg1);
   const gp_Pnt b = start.Translated(inward[1] * leg2);
-  for (double s : {0.0, 0.5, 1.0}) {
-    const gp_Vec along = direction * (s * length);
-    if (!inside(around[0], a.Translated(along)) || !inside(around[1], b.Translated(along))) {
+  EndPlane ends[2];
+  if (!end_planes(shape, frame, "profile blends", ends, why)) {
+    why = label + ": " + why;
+    return false;
+  }
+  // Where each contact line (the offset line of a leg) runs: from the start plane to the end plane, which an oblique end moves along the edge by
+  // -leg (inward . normal) / (direction . normal).
+  const bool oblique = ends[0].oblique || ends[1].oblique;
+  const auto run = [&](const gp_Vec &toward, double leg, double &from, double &to) {
+    from = ends[0].oblique ? -leg * toward.Dot(ends[0].normal) / direction.Dot(ends[0].normal) : 0.0;
+    to = length + (ends[1].oblique ? -leg * toward.Dot(ends[1].normal) / direction.Dot(ends[1].normal) : 0.0);
+  };
+  double from1, to1, from2, to2;
+  run(inward[0], leg1, from1, to1);
+  run(inward[1], leg2, from2, to2);
+  if (!(to1 - from1 > 1e-6 * length) || !(to2 - from2 > 1e-6 * length)) {
+    why = "the end faces of " + label + " cut the contact lines of the legs (" + std::to_string(leg1) + ", " + std::to_string(leg2) +
+          ") to nothing; use a smaller size";
+    return false;
+  }
+  for (const double s : oblique ? std::vector<double>{0.02, 0.5, 0.98} : std::vector<double>{0.0, 0.5, 1.0}) {
+    if (!inside(around[0], a.Translated(direction * (from1 + s * (to1 - from1)))) ||
+        !inside(around[1], b.Translated(direction * (from2 + s * (to2 - from2))))) {
       why = "the legs (" + std::to_string(leg1) + ", " + std::to_string(leg2) + ") reach past the faces of " + label + "; use a smaller size";
       return false;
     }
   }
-  if (!ends_square(shape, frame, "profile blends", why)) {
-    why = label + ": " + why;
-    return false;
+  // An oblique end is made by running the prism past the end face by the most the face can lie from its plane through the end vertex over the
+  // section; the cut keeps only what is inside the solid, so the end face trims the blend exactly.
+  double before = 0.0, after = 0.0;
+  const double reach = leg1 + leg2;
+  for (int k = 0; k < 2; ++k) {
+    if (!ends[k].oblique) continue;
+    const double cosine = std::fabs(ends[k].normal.Dot(direction));
+    (k == 0 ? before : after) = 1.1 * std::sqrt(1.0 - cosine * cosine) * reach / cosine + 1e-3 * length;
   }
-  return spandrel_tool(start, end, a, b, spec.kind, spec.param, wedge, "blend(" + edge_names[static_cast<size_t>(spec.edge)] + ")", tool, why);
+  const gp_Vec back = direction * -before;
+  const gp_Pnt tool_start = start.Translated(back), tool_end = end.Translated(direction * after);
+  if (oblique) {
+    BRepClass3d_SolidClassifier classifier(shape);
+    for (int k = 0; k < 2; ++k) {
+      if (!ends[k].oblique) continue;
+      const gp_Vec lift = k == 0 ? back : direction * (length + after);
+      for (const gp_Pnt &corner : {start, a, b, gp_Pnt((start.XYZ() + a.XYZ() + b.XYZ()) / 3.0)}) {
+        classifier.Perform(corner.Translated(lift), kInsideTolerance);
+        if (classifier.State() == TopAbs_IN) {
+          why = "the prism run past an oblique end of " + label + " is still inside the solid there (the end face does not close the corner)";
+          return false;
+        }
+      }
+    }
+  }
+  const std::string blend_name = "blend(" + edge_names[static_cast<size_t>(spec.edge)] + ")";
+  if (!spandrel_tool(tool_start, tool_end, a.Translated(back), b.Translated(back), spec.kind, spec.param, wedge, blend_name, tool, why)) return false;
+  return !oblique || tool.convex || trim_to_ends(tool, ends, 2.0 * (length + before + after + reach), blend_name, why);
 }
 
 }  // namespace
@@ -499,6 +646,7 @@ static std::unique_ptr<Shape> build_profile(const Shape &source, rust::Slice<con
     return props.Mass();
   }();
   if (!apply_tools(current, tools, why)) return nullptr;
+  if (std::any_of(tools.begin(), tools.end(), [](const Tool &tool) { return tool.trimmed; })) merge_tool_caps(current);
   GProp_GProps props;
   BRepGProp::VolumeProperties(current.shape, props);
   if (!(std::fabs(props.Mass() - volume_before) > 0)) {
