@@ -400,7 +400,8 @@ impl Evaluator {
             let Some(edges) = indices(recipe.get("edges")) else { return Ok(Value::Null) };
             let (first, last) = (number(recipe, "size").unwrap_or(f64::NAN), number(recipe, "sizeEnd").unwrap_or(f64::NAN));
             let Some((faces, second, second_end)) = variable_legs(recipe) else { return Ok(Value::Null) };
-            let reason = features::chamfer_variable_reason(&source, &edges, &faces, first, last, second, second_end).map_err(EvalError::Failure)?;
+            let reason =
+                features::chamfer_variable_reason(&source, &edges, &faces, first, last, second, second_end).map_err(EvalError::Failure)?;
             return Ok(blend_stage_report("chamfer", &reason));
         }
         if op != Some("fillet") {

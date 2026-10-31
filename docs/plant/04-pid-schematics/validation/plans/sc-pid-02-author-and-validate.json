@@ -1,6 +1,6 @@
 {
   "id": "SC-PID-02",
-  "status": "DRAFT \u2014 unbuilt commands: create_pid_sheet, add_pid_equipment, add_pid_line, add_pid_inline, add_pid_instrument, add_pid_signal_line, add_pid_actuating_system, add_pid_off_page_connector, check_pid, pid_report.",
+  "status": "PARTLY BUILT (PID-M3): the authoring commands run (tests/unit/plant/pid/authoringScenario.test.ts); unbuilt: check_pid and pid_report kind=line_list (M4).",
   "validates": [
     "VC-PID-10",
     "VC-PID-13",
@@ -13,7 +13,7 @@
       "params": {
         "number": "PID-001",
         "title": "Feed pump",
-        "size": "A3",
+        "paper": "A3",
         "convention": "ISA-5.1"
       },
       "as": "sheet"

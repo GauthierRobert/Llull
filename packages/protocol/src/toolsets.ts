@@ -169,7 +169,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   get plant_data(): readonly string[] {
     return pluginToolNames('plant_data');
   },
-  /** P&ID schematics (04 PID): contributed by the installed pid plugin (M1 is the data model; the commands arrive with M2 / M3). */
+  /** P&ID schematics (04 PID): contributed by the installed pid plugin (M1 data model, M2 import and report, M3 authoring). */
   get pid(): readonly string[] {
     return pluginToolNames('pid');
   },
