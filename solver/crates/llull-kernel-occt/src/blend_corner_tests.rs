@@ -833,6 +833,7 @@ impl Drop for CornerHooks {
         crate::test_bridge::set_corner_trim(false);
         crate::test_bridge::set_corner_crease_gate(true);
         crate::test_bridge::set_corner_c0_knots(false);
+        crate::test_bridge::set_corner_g2_star(true);
     }
 }
 

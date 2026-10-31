@@ -22,6 +22,8 @@ export interface ProfileData {
   readonly corners?: ReadonlyArray<{
     readonly vertex: readonly [number, number, number];
     readonly patch?: 'exact' | 'plate';
+    readonly continuity?: 'G1' | 'G2';
+    readonly g2Refused?: string;
     readonly setbacks: ReadonlyArray<{ readonly edge: string; readonly distance: number }>;
   }>;
 }
@@ -46,6 +48,8 @@ export function describeProfileNotes(
   const corners = notes.corners?.map((corner) => ({
     vertex: corner.vertex,
     ...(corner.patch === undefined ? {} : { patch: corner.patch }),
+    ...(corner.continuity === undefined ? {} : { continuity: corner.continuity }),
+    ...(corner.g2Refused === undefined ? {} : { g2Refused: corner.g2Refused }),
     setbacks: corner.setbacks.map((entry) => ({ edge: nameOf(topology, entry.edge), distance: entry.distance })),
   }));
   const data: ProfileData = {
@@ -80,5 +84,9 @@ export function describeProfileNotes(
     parts.push(`blends of a chain meet at up to ${notes.junctionG1.toPrecision(3)} rad (limit 0.0095)`);
   if (notes.factor !== undefined && notes.corners !== undefined)
     parts.push(`${notes.corners.length} corner patch(es), setback ${notes.factor} x the least distance`);
+  const stars = notes.corners?.filter((corner) => corner.continuity === 'G2').length ?? 0;
+  const refused = notes.corners?.find((corner) => corner.g2Refused !== undefined);
+  if (stars > 0) parts.push(`${stars} corner star(s) curvature-continuous (G2) to their blends and flat faces, G1 across their own spokes`);
+  if (refused?.g2Refused !== undefined) parts.push(`G2 corner star refused, G1 star built: ${refused.g2Refused}`);
   return { text: parts.length === 0 ? '' : ` Profile: ${parts.join('; ')}.`, data };
 }

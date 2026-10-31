@@ -33,6 +33,8 @@ using Vec = gp_Vec;
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr int kDegree = 5;
+// The degree of the G2 star: the second derivative of the interpolant, which the curvature across the edges reads, converges like h^(degree - 1) (13.36.3).
+constexpr int kDegreeG2 = 7;
 constexpr int kCheckSamples = 100;
 // The poles per direction of the interpolation, tried in turn.
 constexpr int kPoleCounts[] = {8, 11, 14, 24, 36};
@@ -45,6 +47,8 @@ constexpr double kCornerAngle = 0.02;
 constexpr size_t kSmoothSpokes = 6;
 // A crease vertex (13.33.2): its two supports must meet at an angle of at least this many radians (less is a vertex the ordinary star takes) and at most pi minus it (a spike).
 constexpr double kMinCrease = 0.2;
+// The G2 gate: a jump of the normal curvature across a loop edge passes when it is under this share of the larger curvature plus this over the mean length of the chains of the hole.
+constexpr double kG2Relative = 0.02, kG2Floor = 2e-4;
 
 struct Hermite3 {
   double p0, d0, p1, d1;
@@ -73,14 +77,32 @@ double poly(const double *c, double t, int derivative) {
   return sum;
 }
 
-// A quintic curve on [0,1] from p0 (first derivative d0, second q0) to p1 (d1, q1).
+// A quintic curve on [0,1] from p0 (first derivative d0, second q0) to p1 (d1, q1), plus `bump` times v^3 (1 - v)^4 / 6: the value and the first two derivatives at both ends are the quintic's,
+// the third derivative at 0 has `bump` more (13.36.2: the one freedom of a spoke that the two third-order conditions at its vertex need).
 struct Quintic {
   Vec p0, d0, q0, q1, d1, p1;
+  Vec bump = Vec(0, 0, 0);
+  // d^derivative/dt^derivative of t^3 (1 - t)^4 / 6.
+  static double tau(double t, int derivative) {
+    constexpr double c[8] = {0, 0, 0, 1.0 / 6, -4.0 / 6, 1, -4.0 / 6, 1.0 / 6};
+    double sum = 0;
+    for (int k = derivative; k < 8; ++k) {
+      double factor = 1;
+      for (int j = 0; j < derivative; ++j) factor *= (k - j);
+      sum += c[k] * factor * std::pow(t, k - derivative);
+    }
+    return sum;
+  }
   Vec at(double t, int derivative) const {
     const Vec *data[6] = {&p0, &d0, &q0, &q1, &d1, &p1};
-    Vec sum(0, 0, 0);
+    Vec sum = bump * tau(t, derivative);
     for (int k = 0; k < 6; ++k) sum += *data[k] * poly(kQuintic[k], t, derivative);
     return sum;
+  }
+  Vec without_bump(double t) const {
+    Quintic plain = *this;
+    plain.bump = Vec(0, 0, 0);
+    return plain.at(t, 0);
   }
 };
 
@@ -92,6 +114,16 @@ bool unit(Vec &v) {
 }
 
 Vec project(const Vec &v, const Vec &normal) { return v - normal * (v * normal); }
+
+// II(w, w) = n . (a^2 Suu + 2 a b Suv + b^2 Svv) of a surface with the first derivatives `su`, `sv` and the second `suu`, `svv`, `suv`, for the tangent vector w = a su + b sv; false when su, sv are dependent.
+bool second_form(const Vec &su, const Vec &sv, const Vec &suu, const Vec &svv, const Vec &suv, const Vec &w, const Vec &n, double &value) {
+  const double e = su * su, f = su * sv, g = sv * sv, det = e * g - f * f;
+  if (!(det > 1e-24 * e * g)) return false;
+  const double rhs_u = w * su, rhs_v = w * sv;
+  const double a = (rhs_u * g - rhs_v * f) / det, b = (e * rhs_v - f * rhs_u) / det;
+  value = n * (suu * (a * a) + suv * (2 * a * b) + svv * (b * b));
+  return true;
+}
 
 // One loop edge with the support it lies on, parametrized by s in [0,1] along the direction of the loop.
 struct EdgeSide {
@@ -120,6 +152,14 @@ struct EdgeSide {
     if (!unit(n)) return false;
     if (flipped) n.Reverse();
     return true;
+  }
+  // The second fundamental form of the support at s, with the outward normal `n`, on the tangent vector w.
+  bool form(double s, const Vec &w, const Vec &n, double &value) const {
+    const gp_Pnt2d uv = pcurve->Value(param(s));
+    gp_Pnt p;
+    Vec su, sv, suu, svv, suv;
+    surface.D2(uv.X(), uv.Y(), p, su, sv, suu, svv, suv);
+    return second_form(su, sv, suu, svv, suv, w, n, value);
   }
   // d(normal)/ds, by a second-order difference of the normal of the support.
   bool normal_rate(double s, Vec &rate) const {
@@ -211,6 +251,12 @@ struct Side {
     local(sigma, piece, s, rate);
     return (*raw)[piece->edge].normal(s, n);
   }
+  bool form(double sigma, const Vec &w, const Vec &n, double &value) const {
+    const Piece *piece = nullptr;
+    double s = 0, rate = 0;
+    local(sigma, piece, s, rate);
+    return (*raw)[piece->edge].form(s, w, n, value);
+  }
   // d(normal)/dsigma at an end of the chain (a second-order difference inside the end piece).
   bool normal_rate(double sigma, Vec &rate_out) const {
     constexpr double h = 1e-4;
@@ -239,6 +285,7 @@ struct Vertex {
   // normal_right (the support of the edge that ends here) with their own derivatives. At an ordinary vertex both are the shared normal and the shared rate.
   bool crease = false;
   Vec normal_left, normal_right, rate_left, rate_right;
+  Vec accel;  // G2 stars: the second derivative of the normal field along the spoke at the vertex (solved so that the third-order data of the two edges agree, 13.36.2)
 };
 
 struct Star {
@@ -250,13 +297,15 @@ struct Star {
   gp_Pnt centre;
   Vec centre_normal;
   double curvature_at_centre = 0;
+  bool g2 = false;  // the normal field along the spokes is quintic (13.36)
   std::vector<Vec> arrival;  // spoke tangent at the centre
   Vec rate_at_centre(size_t k) const { return arrival[k] * curvature_at_centre; }
 
   // The normal of the shared tangent plane along spoke k at v; `right` selects the field of the sub-patch on the right of a crease spoke (the same field at any other vertex).
   bool spoke_normal(size_t k, double v, Vec &n, bool right = false) const {
-    Vec g = right ? cubic_vec(v, vertices[k].normal_right, vertices[k].rate_right, centre_normal, rate_at_centre(k))
-                  : cubic_vec(v, vertices[k].normal_left, vertices[k].rate_left, centre_normal, rate_at_centre(k));
+    const Vertex &vertex = vertices[k];
+    const Vec &start = right ? vertex.normal_right : vertex.normal_left, &rate = right ? vertex.rate_right : vertex.rate_left;
+    Vec g = g2 ? Quintic{start, rate, vertex.accel, Vec(0, 0, 0), rate_at_centre(k), centre_normal}.at(v, 0) : cubic_vec(v, start, rate, centre_normal, rate_at_centre(k));
     Vec t = spokes[k].at(v, 1);
     if (!unit(t)) return false;
     n = project(g, t);
@@ -310,7 +359,88 @@ struct Patch {
   size_t k, j;
   Vec suv00, suv10, theta;
   mutable bool broken = false;  // a support or spoke had no normal where one was needed
+  bool g2 = false;              // the curvature across the bottom edge is the support's (13.36)
+  // G2: the cross tangents along the spokes as quintic Hermite curves in v (their derivatives up to the second at both ends are numerical), and the vertex mismatch of the normal curvature.
+  Quintic cross_left_hat, cross_right_hat;
+  Vec left_r0, left_r1, right_r0, right_r1;  // second derivative of the cross tangent along the left / right spoke at v = 0 and v = 1
+  double vertex_gap = 0;                     // largest |n . q0 - II(d, d)| at the two vertices of the bottom edge: the spoke and the support must agree there
 
+  // The first and second derivative at both ends of a curve on [0, 1] (one-sided differences of six samples: errors O(h^5) and O(h^4)).
+  template <class F> static void end_derivatives(const F &f, Vec &d1_start, Vec &d2_start, Vec &d1_end, Vec &d2_end) {
+    constexpr double h = 0.004;
+    Vec a[6], b[6];
+    for (int i = 0; i < 6; ++i) {
+      a[i] = f(i * h);
+      b[i] = f(1 - i * h);
+    }
+    const auto first = [&](const Vec *s) { return (s[0] * -137.0 + s[1] * 300.0 - s[2] * 300.0 + s[3] * 200.0 - s[4] * 75.0 + s[5] * 12.0) / (60 * h); };
+    const auto second = [&](const Vec *s) { return (s[0] * 45.0 - s[1] * 154.0 + s[2] * 214.0 - s[3] * 156.0 + s[4] * 61.0 - s[5] * 10.0) / (12 * h * h); };
+    d1_start = first(a);
+    d2_start = second(a);
+    d1_end = first(b) * -1.0;
+    d2_end = second(b);
+  }
+
+  void prepare_g2() {
+    g2 = true;
+    Vec d1_0, d1_1;
+    end_derivatives([&](double v) { return cross_left(v); }, d1_0, left_r0, d1_1, left_r1);
+    cross_left_hat = Quintic{cross_left(0), d1_0, left_r0, left_r1, d1_1, cross_left(1)};
+    end_derivatives([&](double v) { return cross_right(v); }, d1_0, right_r0, d1_1, right_r1);
+    cross_right_hat = Quintic{cross_right(0), d1_0, right_r0, right_r1, d1_1, cross_right(1)};
+    vertex_gap = 0;
+    for (const double u : {0.0, 1.0}) {
+      Vec n;
+      double target = 0;
+      const Quintic &spoke = star.spokes[u == 0 ? k : j];
+      if (!star.sides[k].normal(u, n) || !star.sides[k].form(u, cross_bottom(u), n, target)) {
+        broken = true;
+        continue;
+      }
+      vertex_gap = std::max(vertex_gap, std::fabs(n * spoke.q0 - target));
+    }
+  }
+
+  // The third-order twist residual at the left (u = 0) or right (u = 1) end of the bottom edge (13.36.2): the slope along the edge of the normal curvature the support asks for (T = II(S_v, S_v)) less
+  // the slope the spoke's cross tangent gives, (n . S_vv)' = n' . q0 + n . S_uvv with S_uvv the second derivative of the cross tangent along the spoke. Zero when the spoke's normal field
+  // leaves the tangent plane of the sub-patch unchanged to the second order (no tilt along the spoke).
+  double third_order(bool left_end) const {
+    Vec d1_0, d2_0, d1_1, d2_1;
+    Vec normal_start, normal_end, unused;
+    end_derivatives([&](double u) { Vec n; star.sides[k].normal(u, n); return n; }, normal_start, unused, normal_end, unused);
+    Vec target_start, target_end;
+    end_derivatives(
+        [&](double u) {
+          Vec n;
+          double value = 0;
+          if (!star.sides[k].normal(u, n) || !star.sides[k].form(u, cross_bottom(u), n, value)) broken = true;
+          return Vec(value, 0, 0);
+        },
+        target_start, unused, target_end, unused);
+    Vec n0;
+    star.sides[k].normal(left_end ? 0.0 : 1.0, n0);
+    const double slope = (left_end ? target_start : target_end).X();
+    const Vec &rate = left_end ? normal_start : normal_end;
+    if (left_end) {
+      end_derivatives([&](double v) { return cross_left(v); }, d1_0, d2_0, d1_1, d2_1);
+      return slope - rate * star.spokes[k].q0 - n0 * d2_0;
+    }
+    end_derivatives([&](double v) { return cross_right(v); }, d1_0, d2_0, d1_1, d2_1);
+    return slope - rate * star.spokes[j].q0 - n0 * d2_0;
+  }
+
+  // The second derivative along v of the sub-patch at the bottom edge: the blend of the second derivatives of the two spokes along u, with its component along the support normal replaced by
+  // the normal curvature of the support in the direction of the cross tangent (n . S_vv = II(S_v, S_v)).
+  Vec bottom_second(double u) const {
+    Vec n;
+    double target = 0;
+    if (!star.sides[k].normal(u, n) || !star.sides[k].form(u, cross_bottom(u), n, target)) {
+      broken = true;
+      return Vec(0, 0, 0);
+    }
+    const Vec blended = cubic_vec(u, star.spokes[k].q0, left_r0, star.spokes[j].q0, right_r0);
+    return blended + n * (target - n * blended);
+  }
   Vec cross_bottom(double u) const {
     const Vertex &a = star.vertices[k], &b = star.vertices[j];
     Vec n;
@@ -329,7 +459,22 @@ struct Patch {
   }
   Vec cross_top(double u) const { return star.arrival[k] * (1 - u) + star.arrival[j] * u; }
 
-  gp_Pnt at(double u, double v) const {
+  gp_Pnt at(double u, double v) const { return g2 ? at_g2(u, v) : at_cubic(u, v); }
+
+  // The G2 patch (13.36): the Boolean sum with a quintic Hermite loft along v whose second derivative at the bottom is `bottom_second` and a cubic Hermite loft along u of the spokes and their cross
+  // tangents, less the cubic-by-quintic corner patch. The spokes are quintic in v, so only the cross tangents differ from their quintic Hermite form (zero to the second order at both ends).
+  gp_Pnt at_g2(double u, double v) const {
+    const Vec centre(star.centre.XYZ());
+    const Vec bottom(star.sides[k].point(u).XYZ());
+    const Vec top_second = cubic_vec(u, star.spokes[k].q1, left_r1, star.spokes[j].q1, right_r1);
+    const Quintic section{bottom, cross_bottom(u), bottom_second(u), top_second, cross_top(u), centre};
+    const Hermite3 hu = cubic(u);
+    const Vec sum = section.at(v, 0) + star.spokes[k].bump * (Quintic::tau(v, 0) * hu.p0) + star.spokes[j].bump * (Quintic::tau(v, 0) * hu.p1) + (cross_left(v) - cross_left_hat.at(v, 0)) * hu.d0 +
+                    (cross_right(v) - cross_right_hat.at(v, 0)) * hu.d1;
+    return gp_Pnt(sum.X(), sum.Y(), sum.Z());
+  }
+
+  gp_Pnt at_cubic(double u, double v) const {
     const Vertex &a = star.vertices[k], &b = star.vertices[j];
     const Vec origin(0, 0, 0);
     const Vec centre(star.centre.XYZ());
@@ -354,16 +499,17 @@ struct Patch {
 
 // B-spline basis functions (Cox - de Boor) of the clamped uniform knot vector of `poles` poles.
 struct Basis {
+  int degree;
   int poles;
   std::vector<double> knots;  // flat
-  explicit Basis(std::vector<double> flat) : poles(static_cast<int>(flat.size()) - kDegree - 1), knots(std::move(flat)) {}
+  Basis(std::vector<double> flat, int degree_) : degree(degree_), poles(static_cast<int>(flat.size()) - degree_ - 1), knots(std::move(flat)) {}
   std::vector<double> at(double t) const {
     std::vector<double> values(static_cast<size_t>(poles), 0.0);
-    int span = kDegree;
+    int span = degree;
     while (span < poles - 1 && t >= knots[static_cast<size_t>(span + 1)]) ++span;
-    std::vector<double> n(static_cast<size_t>(kDegree + 1), 0.0), left(kDegree + 1), right(kDegree + 1);
+    std::vector<double> n(static_cast<size_t>(degree + 1), 0.0), left(degree + 1), right(degree + 1);
     n[0] = 1;
-    for (int j = 1; j <= kDegree; ++j) {
+    for (int j = 1; j <= degree; ++j) {
       left[static_cast<size_t>(j)] = t - knots[static_cast<size_t>(span + 1 - j)];
       right[static_cast<size_t>(j)] = knots[static_cast<size_t>(span + j)] - t;
       double saved = 0;
@@ -375,13 +521,13 @@ struct Basis {
       }
       n[static_cast<size_t>(j)] = saved;
     }
-    for (int r = 0; r <= kDegree; ++r) values[static_cast<size_t>(span - kDegree + r)] = n[static_cast<size_t>(r)];
+    for (int r = 0; r <= degree; ++r) values[static_cast<size_t>(span - degree + r)] = n[static_cast<size_t>(r)];
     return values;
   }
   double greville(int index) const {
     double sum = 0;
-    for (int k = 1; k <= kDegree; ++k) sum += knots[static_cast<size_t>(index + k)];
-    return sum / kDegree;
+    for (int k = 1; k <= degree; ++k) sum += knots[static_cast<size_t>(index + k)];
+    return sum / degree;
   }
 };
 
@@ -417,8 +563,8 @@ bool inverse_of(const Basis &basis, std::vector<std::vector<double>> &inverse) {
 
 // The clamped knot vector of about `poles` poles: uniform, with a knot of `multiplicity` (kDegree - 1: C1, kDegree: C0) at each joint of the bottom chain (where the supports change and the
 // curvature of the boundary jumps), the uniform knots next to a joint dropped.
-std::vector<double> flat_knots(int poles, const std::vector<double> &joints, int multiplicity) {
-  const int spans = poles - kDegree;
+std::vector<double> flat_knots(int poles, const std::vector<double> &joints, int multiplicity, int degree) {
+  const int spans = poles - degree;
   std::vector<double> interior;
   for (int k = 1; k < spans; ++k) {
     const double t = static_cast<double>(k) / spans;
@@ -427,20 +573,26 @@ std::vector<double> flat_knots(int poles, const std::vector<double> &joints, int
   for (const double joint : joints)
     for (int k = 0; k < multiplicity; ++k) interior.push_back(joint);
   std::sort(interior.begin(), interior.end());
-  std::vector<double> flat(static_cast<size_t>(kDegree) + 1, 0.0);
+  std::vector<double> flat(static_cast<size_t>(degree) + 1, 0.0);
   flat.insert(flat.end(), interior.begin(), interior.end());
-  flat.insert(flat.end(), static_cast<size_t>(kDegree) + 1, 1.0);
+  flat.insert(flat.end(), static_cast<size_t>(degree) + 1, 1.0);
   return flat;
 }
 
 Handle(Geom_BSplineSurface) interpolate(const Patch &patch, int poles, int multiplicity) {
-  const Basis basis_u(flat_knots(poles, patch.star.sides[patch.k].joints(), multiplicity)), basis_v(flat_knots(poles, {}, kDegree - 1));
+  const int degree = patch.g2 ? kDegreeG2 : kDegree;
+  const Basis basis_u(flat_knots(poles, patch.star.sides[patch.k].joints(), multiplicity, degree), degree), basis_v(flat_knots(poles, {}, degree - 1, degree), degree);
   std::vector<std::vector<double>> inverse_u, inverse_v;
   if (!inverse_of(basis_u, inverse_u) || !inverse_of(basis_v, inverse_v)) return nullptr;
   const size_t nu = static_cast<size_t>(basis_u.poles), nv = static_cast<size_t>(basis_v.poles);
   std::vector<std::vector<gp_Pnt>> samples(nu, std::vector<gp_Pnt>(nv));
-  for (size_t i = 0; i < nu; ++i)
-    for (size_t j = 0; j < nv; ++j) samples[i][j] = patch.at(basis_u.greville(static_cast<int>(i)), basis_v.greville(static_cast<int>(j)));
+  for (size_t i = 0; i < nu; ++i) {
+    const double u = basis_u.greville(static_cast<int>(i));
+    for (size_t j = 0; j < nv; ++j) {
+      const double v = basis_v.greville(static_cast<int>(j));
+      samples[i][j] = patch.at(u, v);
+    }
+  }
   // along u, then along v
   std::vector<std::vector<gp_XYZ>> mid(nu, std::vector<gp_XYZ>(nv, gp_XYZ(0, 0, 0)));
   for (size_t i = 0; i < nu; ++i)
@@ -473,7 +625,7 @@ Handle(Geom_BSplineSurface) interpolate(const Patch &patch, int poles, int multi
     return result;
   };
   const auto along_u = distinct(basis_u), along_v = distinct(basis_v);
-  return new Geom_BSplineSurface(grid, along_u.first, along_v.first, along_u.second, along_v.second, kDegree, kDegree);
+  return new Geom_BSplineSurface(grid, along_u.first, along_v.first, along_u.second, along_v.second, degree, degree);
 }
 
 // Puts the centre at `height` above the centroid along the mean normal and builds the spokes from it; false (with `why`) when the star is degenerate.
@@ -583,7 +735,7 @@ double joint_crease(const Handle(Geom_BSplineSurface) &surface, const std::vecto
 }  // namespace
 
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease) {
+           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease, bool g2) {
   const size_t raw_count = loop.size();
   if (raw_count < 3 || supports.size() != raw_count) {
     why = "the hole has fewer than 3 edges";
@@ -751,6 +903,13 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
       }
   }
   const size_t m = chain_count;
+  if (g2) {
+    const bool joints = std::any_of(star.sides.begin(), star.sides.end(), [](const auto &side) { return !side.joints().empty(); });
+    if (joints || creases > 0) {
+      why = std::string("a G2 star is not built where ") + (creases > 0 ? "an unrounded edge enters the hole (a crease spoke)" : "a chain of the hole has a joint (the supports change along it)");
+      return false;
+    }
+  }
   // The vertices.
   star.vertices.resize(m);
   Vec centre_normal(0, 0, 0);
@@ -815,6 +974,46 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     patch.suv10 = star.vertices[j].normal_right * -(star.vertices[j].rate_arriving * star.vertices[j].spoke_tangent);
     patch.theta = star.arrival[j] - star.arrival[k];
     patches.push_back(patch);
+  }
+  if (g2) {
+    // 13.36.2: the second derivative of the normal field at each vertex, from the two third-order conditions of the sub-patches on its two sides (affine in it: Newton steps with probes)
+    star.g2 = true;
+    for (size_t k = 0; k < m; ++k) {
+      Vertex &vertex = star.vertices[k];
+      const Patch &left = patches[k], &right = patches[(k + m - 1) % m];
+      Vec b1 = vertex.normal ^ vertex.toward;
+      if (!unit(b1)) continue;
+      const Vec b2 = vertex.normal;  // b1: across the spoke in the tangent plane (the second derivative of the normal field); b2: the bump of the spoke along the normal (its third derivative)
+      const auto residual = [&](double x, double bump, double &r0, double &r1) {
+        vertex.accel = b1 * x;
+        star.spokes[k].bump = b2 * bump;
+        r0 = left.third_order(true);
+        r1 = right.third_order(false);
+      };
+      constexpr double kProbe = 0.1;
+      double x = 0, bump = 0;
+      for (int pass = 0; pass < 4; ++pass) {
+        double a0, a1, b_0, b_1, c0, c1;
+        residual(x, bump, a0, a1);
+        residual(x + kProbe, bump, b_0, b_1);
+        residual(x, bump + kProbe, c0, c1);
+        const double m00 = (b_0 - a0) / kProbe, m10 = (b_1 - a1) / kProbe, m01 = (c0 - a0) / kProbe, m11 = (c1 - a1) / kProbe, det = m00 * m11 - m01 * m10;
+        if (!(std::fabs(det) > 1e-12 * (std::fabs(m00 * m11) + std::fabs(m01 * m10) + 1e-300))) break;
+        x += (-a0 * m11 + a1 * m01) / det;
+        bump += (-m00 * a1 + m10 * a0) / det;
+      }
+      double final0 = 0, final1 = 0;
+      residual(x, bump, final0, final1);  // leaves the solved state in place
+    }
+    double mean_length = 0;
+    for (const Side &side : star.sides) mean_length += side.length / static_cast<double>(m);
+    for (Patch &patch : patches) {
+      patch.prepare_g2();
+      if (patch.broken || patch.vertex_gap > 10 * kG2Floor / mean_length) {
+        why = "a G2 star needs the spoke and the supports to have the same normal curvature at the vertices of the hole (they differ by " + std::to_string(patch.vertex_gap) + " /length at the vertices of edge " + std::to_string(patch.k) + ")";
+        return false;
+      }
+    }
   }
   // The attempts, in order (at most 12 interpolate-and-measure passes, 7 when no chain has a joint; 0.17 s on the cylinder block with 1.2 / 1.2 / 1.6 at 36 poles, about 0.45 s when the 48 and 64
   // pole attempts are reached, 13.22.6): C1 knots at the joints of the chains (the pole is steadier); C0 knots, which hold the kink of the cross tangent of a support whose curvature jumps there
@@ -898,7 +1097,32 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
             std::to_string(out.crease) + " rad along a joint of their bottom chain (limit " + std::to_string(max_angle) + ")";
       continue;
     }
-    if (out.gap <= max_gap && out.angle <= angle_limit) {
+    // G2: the normal curvature across each loop edge, the sub-patch against its support, in the direction across the edge (what check_blends reads), at the samples of the G0 measure.
+    double g2_excess = 0;
+    if (g2) {
+      double mean_length = 0;
+      for (const Side &side : star.sides) mean_length += side.length / static_cast<double>(m);
+      for (size_t k = 0; k < m; ++k)
+        for (int s = 0; s <= kCheckSamples; ++s) {
+          const double t = static_cast<double>(s) / kCheckSamples;
+          Vec support, su, sv, suu, svv, suv;
+          gp_Pnt at;
+          surfaces[k]->D2(t, 0, at, su, sv, suu, svv, suv);
+          Vec mine = su ^ sv, across = Vec();
+          double curvature_patch = 0, curvature_support = 0;
+          if (!star.sides[k].normal(t, support) || !unit(mine) || !(across = support ^ star.sides[k].tangent(t), unit(across)) ||
+              !second_form(su, sv, suu, svv, suv, across, support * mine < 0 ? mine.Reversed() : mine, curvature_patch) || !star.sides[k].form(t, across, support, curvature_support)) {
+            g2_excess = std::max(g2_excess, 1e300);
+            continue;
+          }
+          const double gap = std::fabs(curvature_patch - curvature_support), scale = std::max(std::fabs(curvature_patch), std::fabs(curvature_support));
+          out.g2 = std::max(out.g2, gap);
+          if (scale > 1e-9 / std::max(mean_length, 1e-300)) out.g2_relative = std::max(out.g2_relative, gap / scale);
+          g2_excess = std::max(g2_excess, gap - (kG2Relative * scale + kG2Floor / mean_length));
+        }
+    }
+    if (out.gap <= max_gap && out.angle <= angle_limit && g2_excess <= 0) {
+      out.g2_built = g2;
       for (const Handle(Geom_BSplineSurface) &surface : surfaces) {
         BRepBuilderAPI_MakeFace maker(surface, 0.0, 1.0, 0.0, 1.0, 1e-7);
         if (!maker.IsDone()) {
@@ -912,7 +1136,7 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
       return true;
     }
     why = "the sub-patches (" + std::to_string(poles) + " x " + std::to_string(poles) + " poles) leave the edges by " + std::to_string(out.gap) + " and the supports by " +
-          std::to_string(out.angle) + " rad";
+          std::to_string(out.angle) + " rad" + (g2 ? " and the curvature of the supports by " + std::to_string(out.g2) + " /length (relative " + std::to_string(out.g2_relative) + ")" : std::string());
   }
   return false;
 }

@@ -25,12 +25,16 @@ struct Patches {
   double gap = 0;                  // largest distance from a sample of a loop edge to the patch edge at the same parameter
   double angle = 0;                // largest angle between the patch normal and the support normal along the loop, and between neighbouring sub-patches along their shared spokes
   double crease = 0;               // largest angle between the normals on the two sides of a joint knot inside a sub-patch (the interior crease of a C0 knot)
+  double g2 = 0;                   // G2 stars: largest jump (1/length) of the normal curvature across a loop edge between the sub-patch and its support, along the whole edge
+  double g2_relative = 0;          // the same as a share of the larger of the two curvatures (0 where both are flat)
+  bool g2_built = false;           // the patch carries the curvature of the supports (13.36)
 };
 
 // The loop (ordered, closed) with the support face of each edge (`supports[k]` carries `loop[k]`; the faces are the outward ones of the split solid). False with `why` when the
 // construction is refused or its own measures exceed `max_gap` / `max_angle`; the caller falls back to another fill.
 // `allow_crease`: one vertex of the loop may join two supports that are NOT tangent (an unrounded edge of the part enters the hole there, 13.33.2); its spoke is a crease.
+// `g2`: the patch is also curvature-continuous to its supports across every loop edge (13.36): refused (with `why`) at a chain with a joint, a crease vertex, or when the measured jump stays over the gate.
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint = nullptr, bool spokes_at_every_vertex = false, bool gate_crease = true, bool c0_knots_only = false, bool allow_crease = false);
+           const CentreHint &hint = nullptr, bool spokes_at_every_vertex = false, bool gate_crease = true, bool c0_knots_only = false, bool allow_crease = false, bool g2 = false);
 
 }  // namespace llull::corner_exact

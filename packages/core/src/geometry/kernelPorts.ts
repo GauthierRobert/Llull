@@ -194,6 +194,10 @@ export interface BlendBuildNotes {
     readonly vertex: Vec3;
     /** "exact": the corner patch is a star of exact-boundary sub-patches (13.21); "plate": the MakeFilling patch. */
     readonly patch?: 'exact' | 'plate';
+    /** A star: "G2" when it is curvature-continuous to its blend and flat faces (a curvature profile, 13.36), else "G1". */
+    readonly continuity?: 'G1' | 'G2';
+    /** Why the G2 star was refused (the G1 star was built instead). */
+    readonly g2Refused?: string;
     readonly setbacks: ReadonlyArray<{ readonly edge: number; readonly distance: number }>;
   }>;
 }

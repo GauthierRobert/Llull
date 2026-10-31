@@ -797,6 +797,9 @@ struct FillJob {
   TopoDS_Compound hole_copy;          // a copy of the faces the patch replaces, when they are a smooth surface that knows its centre (13.22)
   bool hinted = false;                // the centre of the star was taken from the replaced surface
   bool allow_star = true;             // false: the plate only (the star failed after the sewing)
+  bool g2 = false;                    // the star should be curvature-continuous to its supports (a curvature profile, 13.36)
+  bool g2_built = false;              // it is
+  std::string g2_problem;             // why the G2 star was refused (the G1 star was built instead)
   std::vector<size_t> patch_part;     // 1 when the sub-patch starts inside that loop edge
   std::vector<size_t> patch_loop;     // the loop edge each sub-patch of a star has as its bottom (empty for the plate patch)
   std::vector<std::tuple<std::string, long long, long long, long long>> loop_keys;  // aligned with `loop`: the stable order of the sub-patches (13.21.2)
@@ -856,6 +859,7 @@ std::atomic<int> g_last_threads{0};    // the threads the last fill_all used (te
 std::atomic<double> g_last_crease{0};     // test hook: the largest interior crease of the star sub-patches accepted since set_corner_exact_patch (last_corner_crease)
 std::atomic<bool> g_crease_gate{true};   // test hook: set_corner_crease_gate (false: the interior crease is measured but not gated)
 std::atomic<bool> g_c0_knots_only{false}; // test hook: set_corner_c0_knots (true: only C0 knots at the joints of the chains, no C1 attempt)
+std::atomic<bool> g_g2_star{true};         // test hook: set_corner_g2_star (false: the G1 star for a curvature profile too)
 std::atomic<int> g_fault_corner{-1};   // test hook: the corner whose fill throws std::bad_alloc
 std::atomic<int> g_exact_mode{1};           // test hook: set_corner_exact_patch (0: MakeFilling only, 1: the exact star first, 2: the exact star is refused, 3 / 4: a step fails after the fills, 5: no plate fallback, 6: like 5 with a spoke at every vertex of the hole)
 std::atomic<bool> g_force_trim{false};   // test hook: set_corner_trim (the rolling-ball trim builder for every step, 13.22)
@@ -898,7 +902,16 @@ bool fill_exact(FillJob &job, double diagonal) {
         }
       return best < 1e299;
     };
-  if (!corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load(), job.creased)) return false;
+  const auto make = [&](bool g2) {
+    exact = corner_exact::Patches();
+    return corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load(), job.creased, g2);
+  };
+  // a curvature profile: the G2 star first, the G1 star (with the reason) when the G2 one is refused
+  if (job.g2 && g_g2_star.load()) {
+    if (make(true)) job.g2_built = true;
+    else job.g2_problem = job.exact_problem;
+  }
+  if (!job.g2_built && !make(false)) return false;
   for (double seen = g_last_crease.load(); exact.crease > seen && !g_last_crease.compare_exchange_weak(seen, exact.crease);) {
   }
   job.hinted = exact.centre_from_hint;
@@ -1934,6 +1947,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
   std::vector<TopoDS_Face> patches;
   std::vector<size_t> patch_corner;  // the corner of each patch
   std::vector<std::string> patch_kinds(corners.size());  // "exact" (a star) or "plate" per corner
+  std::vector<std::string> patch_g2(corners.size()), patch_continuity(corners.size());  // the continuity a star reached, and why its G2 form was refused
   std::vector<std::string> patch_names;
   // Serial: isolate the hole of every corner and give its fill its own copies of the support faces (13.20); parallel: the fills; serial, in corner order: the checks and the patches.
   std::vector<FillJob> jobs(corners.size());
@@ -1942,6 +1956,7 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     job.corner = c;
     job.mixed = plan.mixed[c];
     job.creased = plan.sharp[c] >= 0;
+    job.g2 = mode.kind == 1;
     TopTools_IndexedMapOfShape removed;
     const TopoDS_Vertex apex = vertex_at(split, corners[c].at, vertex_tolerance);
     if (apex.IsNull()) {
@@ -2056,6 +2071,8 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
       patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
     }
     patch_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
+    patch_g2[c] = job.g2_built ? "" : job.g2_problem;
+    patch_continuity[c] = job.patch_loop.empty() ? "" : (job.g2_built ? "G2" : "G1");
     for (const TopoDS_Shape &face : job.removed) dropped.Add(face);
   }
 
@@ -2164,7 +2181,10 @@ std::unique_ptr<Shape> build_setback_pass(const Shape &source, rust::Slice<const
     JsonWriter log;
     log.begin_array();
     for (size_t c = 0; c < corners.size(); ++c) {
-      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(patch_kinds[c]).key("setbacks").begin_array();
+      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(patch_kinds[c]);
+      if (!patch_continuity[c].empty()) log.key("continuity").string(patch_continuity[c]);
+      if (!patch_g2[c].empty()) log.key("g2Refused").string(patch_g2[c]);
+      log.key("setbacks").begin_array();
       for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
       log.end_array().end_object();
     }
@@ -2203,6 +2223,7 @@ void set_corner_exact_patch(int32_t mode) {
 double last_corner_crease() { return g_last_crease.load(); }
 void set_corner_crease_gate(bool on) { g_crease_gate.store(on); }
 void set_corner_c0_knots(bool on) { g_c0_knots_only.store(on); }
+void set_corner_g2_star(bool on) { g_g2_star.store(on); }
 void set_corner_trim(bool on) { g_force_trim.store(on); }
 
 // Test seams (src/test_bridge.rs, never called by the build): the guards of the mixed corner on a shape the test chooses.
