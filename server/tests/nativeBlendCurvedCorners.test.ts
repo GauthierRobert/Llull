@@ -110,7 +110,7 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(2e-3);
   });
 
-  it('different setbacks at the vertex (setbacks overrides) cut each edge by a plane at its own distance along it (13.22.6): built within the limits, refused by name when the corner leaves them', () => {
+  it('different setbacks at the vertex (setbacks overrides) cut each edge by a plane at its own distance along it (13.22.6): built within the limits (13.22.6)', () => {
     const { doc, id, vertex, edges } = dshape();
     const plain = execute(doc, 'fillet_edge', { id, edgesNear: edges, radius: 0.5 });
     const withSetback = (distance: number): ReturnType<typeof execute> =>
@@ -134,10 +134,10 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
       .filter((face) => face.surface === 'cylinder')
       .map((face) => (face.axis?.span?.[1] ?? 0) - (face.axis?.span?.[0] ?? 0));
     expect(spans.some((span) => Math.abs(span - (Math.sqrt(44) - 1.3)) < 1e-4)).toBe(true);
-    // 1.4 to 1.6 on the third edge of this cylinder: the star leaves its supports by 0.00965 rad in the sewn solid (the limit is 0.0095) and the plate misses the blend ends: refused, with both reasons
-    const refused = withSetback(1.6);
-    expect(refused.error?.code).toBe('BLD_CORNER_FAILED');
-    expect(refused.summary).toContain('the exact-boundary patch was refused');
+    // 1.6 along the same edge: builds too (C0 knots at the joints of the chains, 13.22.6; before, the star was refused at 0.00965 rad and the plate missed the blend ends)
+    const longer = withSetback(1.6);
+    expect(longer.error, longer.summary).toBeUndefined();
+    expect(Math.abs(volume(longer.document, longer.affected[0] as string) - rolling) / rolling).toBeLessThan(2e-3);
   });
 
   it('an edge of the vertex marked rollingBall has no setback of its own: the kernel rounds it and the same ball cuts it (13.22)', () => {

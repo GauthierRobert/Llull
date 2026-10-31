@@ -1576,3 +1576,31 @@ fn a_concave_vertex_with_different_setbacks_is_cut_by_planes_too() {
     assert!(mass_properties(&built).unwrap().volume > mass_properties(&shape).unwrap().volume, "the concave blends add material");
     assert!(worst_tangent_angle(&built) < 0.0095);
 }
+
+/// BLD §13.22.6: the cylinder block with different setbacks (1.2 / 1.2 / x along the edges of the vertex). The chains of the bottom of a sub-patch join pieces whose supports change (a plane and the
+/// cylinder): the cross tangent of the sub-patch (the support's tangent plane projected) has a kink there, so the surface it defines has a kink in its u derivative along the whole joint, growing
+/// with v. A knot of multiplicity 4 (C1) cannot hold it and left 0.0056 / 0.0063 rad at 36 poles, decaying like h (not h^5: a singularity, always at the same parameter), which the oriented check of
+/// the sewn solid read as 0.0097 (limit 0.0095); a knot of multiplicity 5 (C0) holds it.
+#[test]
+fn a_kink_in_the_cross_tangent_at_the_joint_of_a_chain_needs_a_c0_knot() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (dshape, vertex, meeting) = dshape_vertex();
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    for third in [1.3, 1.4, 1.6] {
+        let (edges, mut corners) = spec(&dshape, &meeting, 0.5, &[vertex], 1.2);
+        corners[7] = third;
+        let built = fillet_setback(&dshape, &edges, &corners)
+            .unwrap()
+            .unwrap_or_else(|| panic!("{third}: {:?}", setback_reason(&dshape, &edges, &corners)));
+        assert!(analyze(&built).unwrap().valid);
+        assert!(
+            worst_tangent_angle(&built) < 0.0095 && worst_patch_angle(&built) < 0.0095,
+            "{third}: {} {}",
+            worst_tangent_angle(&built),
+            worst_patch_angle(&built)
+        );
+        assert!(worst_patch_gap(&built) < 1e-6 * (10.0_f64 * 10.0 + 10.0 * 10.0 + 25.0).sqrt(), "{third}: {}", worst_patch_gap(&built));
+    }
+}

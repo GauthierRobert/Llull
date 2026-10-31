@@ -398,9 +398,9 @@ bool inverse_of(const Basis &basis, std::vector<std::vector<double>> &inverse) {
   return true;
 }
 
-// The clamped knot vector of about `poles` poles: uniform, with a knot of multiplicity kDegree - 1 (C1) at each joint of the bottom chain (where the supports change and the curvature
-// of the boundary jumps), the uniform knots next to a joint dropped.
-std::vector<double> flat_knots(int poles, const std::vector<double> &joints) {
+// The clamped knot vector of about `poles` poles: uniform, with a knot of `multiplicity` (kDegree - 1: C1, kDegree: C0) at each joint of the bottom chain (where the supports change and the
+// curvature of the boundary jumps), the uniform knots next to a joint dropped.
+std::vector<double> flat_knots(int poles, const std::vector<double> &joints, int multiplicity) {
   const int spans = poles - kDegree;
   std::vector<double> interior;
   for (int k = 1; k < spans; ++k) {
@@ -408,7 +408,7 @@ std::vector<double> flat_knots(int poles, const std::vector<double> &joints) {
     if (std::none_of(joints.begin(), joints.end(), [&](double joint) { return std::fabs(t - joint) < 0.5 / spans; })) interior.push_back(t);
   }
   for (const double joint : joints)
-    for (int k = 0; k < kDegree - 1; ++k) interior.push_back(joint);
+    for (int k = 0; k < multiplicity; ++k) interior.push_back(joint);
   std::sort(interior.begin(), interior.end());
   std::vector<double> flat(static_cast<size_t>(kDegree) + 1, 0.0);
   flat.insert(flat.end(), interior.begin(), interior.end());
@@ -416,8 +416,8 @@ std::vector<double> flat_knots(int poles, const std::vector<double> &joints) {
   return flat;
 }
 
-Handle(Geom_BSplineSurface) interpolate(const Patch &patch, int poles) {
-  const Basis basis_u(flat_knots(poles, patch.star.sides[patch.k].joints())), basis_v(flat_knots(poles, {}));
+Handle(Geom_BSplineSurface) interpolate(const Patch &patch, int poles, int multiplicity) {
+  const Basis basis_u(flat_knots(poles, patch.star.sides[patch.k].joints(), multiplicity)), basis_v(flat_knots(poles, {}, kDegree - 1));
   std::vector<std::vector<double>> inverse_u, inverse_v;
   if (!inverse_of(basis_u, inverse_u) || !inverse_of(basis_v, inverse_v)) return nullptr;
   const size_t nu = static_cast<size_t>(basis_u.poles), nv = static_cast<size_t>(basis_v.poles);
@@ -750,15 +750,25 @@ bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> 
     patch.theta = star.arrival[j] - star.arrival[k];
     patches.push_back(patch);
   }
-  for (const int poles : kPoleCounts) {
+  // The attempts: C1 knots at the joints of the chains first (the pole is steadier), C0 knots when the cross tangent of the support has a kink there that C1 cannot hold (the cylinder block:
+  // 0.0056 rad at 36 poles with C1, 13.22.6). A C1 attempt must leave 0.5 of the angle limit at its finest pole count, because the sewn solid is measured again, with the pole included.
+  struct Attempt {
+    int multiplicity, poles;
+    double share;
+  };
+  std::vector<Attempt> attempts;
+  for (const int multiplicity : {kDegree - 1, kDegree})
+    for (const int poles : kPoleCounts) attempts.push_back({multiplicity, poles, poles == kPoleCounts[std::size(kPoleCounts) - 1] ? (multiplicity == kDegree ? 1.0 : 0.5) : 0.25});
+  for (const Attempt &attempt : attempts) {
+    const int poles = attempt.poles;
     // the coarse interpolations must leave a margin under the angle limit; the finest may use all of it
-    const double angle_limit = poles == kPoleCounts[std::size(kPoleCounts) - 1] ? max_angle : 0.25 * max_angle;
+    const double angle_limit = attempt.share * max_angle;
     out = Patches();
     out.centre = star.centre;
     out.centre_from_hint = from_hint;
     std::vector<Handle(Geom_BSplineSurface)> surfaces;
     for (const Patch &patch : patches) {
-      Handle(Geom_BSplineSurface) surface = interpolate(patch, poles);
+      Handle(Geom_BSplineSurface) surface = interpolate(patch, poles, attempt.multiplicity);
       if (patch.broken) {
         why = "a support or a spoke of the hole has no normal along an edge";
         return false;
