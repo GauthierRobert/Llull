@@ -5,10 +5,10 @@
  */
 
 import type { EdgeRadius, Entity, Vec3 } from '../model/types';
-import type { GeometryKernel } from '../geometry/kernel';
+import type { GeometryKernel, ShapeEdge } from '../geometry/kernel';
 import type { MeshData } from '../model/types';
 import type { ShapeRecipe } from '../model/types';
-import type { Feature, FeatureBase, FilletLaw, Term } from './program';
+import type { ChamferLegs, Feature, FeatureBase, FilletLaw, Term } from './program';
 import { lawNodes } from '../geometry/blend/law';
 import { type FeatureRecipe, lowerFeature, needsReach, throughReach } from '../geometry/featureLowering';
 import { floorEdgeIndices } from '../geometry/featureFillet';
@@ -23,6 +23,8 @@ export interface RecipeLowering {
   /** The `solid` feature of a leaf entity (placement included). */
   readonly solid: (entity: Entity, variable: string) => Feature;
   readonly base: (variable: string) => FeatureBase;
+  /** Whether the target rebuilds variable / two-leg chamfers (CadQuery, build123d); false (FreeCAD) lowers them to the exact result's triangles. Default true. */
+  readonly chamferLegs?: boolean;
 }
 
 /** World-space triangle soup (9 numbers per triangle) of an indexed mesh. */
@@ -75,13 +77,47 @@ function filletLaws(recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>, 
   }));
 }
 
+const sameCorner = (a: Vec3, b: Vec3): boolean => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-6;
+
+/** Whether two of the edges meet at a corner: their tools overlap there, so the volume has no closed form and no helper builds it. */
+function touching(edges: readonly ShapeEdge[]): boolean {
+  return edges.some((edge, at) =>
+    edges.slice(at + 1).some((other) => [edge.start, edge.end].some((a) => [other.start, other.end].some((b) => sameCorner(a, b)))),
+  );
+}
+
+/**
+ * The legs of a variable (`sizeEnd`) or two-leg (`faces` + `size2`) chamfer that the OCP construction rebuilds: straight edges (kernel curve `line`) and, with
+ * two legs, ONE listed edge whose leading face is a plane (the kernel gives only planes a normal). Null when the kernel cannot tell, or for an angle chamfer (no second leg), a curved edge or several two-leg edges.
+ */
+function chamferLegs(recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>, kernel: GeometryKernel | null): ChamferLegs | null {
+  const sided = recipe.faces !== undefined;
+  if (recipe.edges.length === 0 || (sided && (recipe.size2 === undefined || recipe.edges.length !== 1))) return null;
+  const shape = kernel === null ? null : kernel.evaluate(recipe.source);
+  const topology = shape === null || kernel === null ? null : kernel.topology(shape);
+  if (topology === null || !recipe.edges.every((index) => topology.edges[index]?.curve === 'line')) return null;
+  const edges = recipe.edges.flatMap((index) => topology.edges[index] ?? []);
+  if (edges.length !== recipe.edges.length || touching(edges)) return null;
+  const end = recipe.sizeEnd ?? recipe.size;
+  const second = recipe.size2 ?? recipe.size;
+  const legs = {
+    end,
+    second,
+    secondEnd: recipe.size2End ?? (recipe.size2 === undefined ? end : recipe.size2),
+    starts: edges.map((edge) => edge.start),
+  };
+  if (!sided) return legs;
+  const lead = topology.faces[recipe.faces?.[0] ?? -1];
+  return lead?.normal === undefined ? null : { ...legs, lead: lead.normal };
+}
+
 /** A fillet with a conic / curvature section, a second leg or a setback corner. */
 const profiledFillet = (recipe: Extract<ShapeRecipe, { op: 'fillet' | 'chamfer' }>): boolean =>
   (recipe.profile !== undefined && recipe.profile.type !== 'circular') ||
   (recipe.radii ?? []).some((law) => law.size2 !== undefined) ||
   (recipe.op === 'fillet' && (recipe.corners ?? []).length > 0);
 
-/** Whether a fillet / chamfer node is one the program ops cannot express (a sided chamfer, a profile or two-leg fillet: BLD_CODEGEN_UNSUPPORTED, the export carries the exact result). */
+/** Whether a fillet / chamfer node is one the program ops cannot express (a chamfer with an angle, a profile or two-leg fillet, or a variable chamfer the lowering later finds inexpressible: BLD_CODEGEN_UNSUPPORTED, the export carries the exact result). */
 export function blendNotExpressible(recipe: ShapeRecipe): boolean {
   switch (recipe.op) {
     case 'chamfer':
@@ -115,10 +151,13 @@ export function modificationFeature(
   kernel: GeometryKernel | null,
   mesh: number[] | undefined,
   size: Term = { value: recipe.op === 'shell' ? recipe.thickness : recipe.size },
+  legsSupported = true,
 ): Feature | null {
   const fallback = mesh === undefined ? {} : { mesh };
   if (recipe.op === 'shell') return { ...base, op: 'shell', thickness: size, ...fallback };
-  if (recipe.op === 'chamfer' && (recipe.faces !== undefined || recipe.sizeEnd !== undefined)) return null;
+  const legs =
+    recipe.op === 'chamfer' && (recipe.faces !== undefined || recipe.sizeEnd !== undefined) ? chamferLegs(recipe, kernel) : undefined;
+  if (legs === null || (legs !== undefined && !legsSupported)) return null;
   if (recipe.op === 'fillet' && profiledFillet(recipe)) return null;
   const varying = recipe.op === 'fillet' && (recipe.sizeEnd !== undefined || recipe.radii !== undefined);
   const laws = varying ? filletLaws(recipe, kernel) : undefined;
@@ -132,6 +171,7 @@ export function modificationFeature(
     edges: recipe.edges,
     size,
     ...(laws === undefined ? {} : { laws }),
+    ...(legs === undefined ? {} : { legs }),
     ...(near === undefined ? {} : { near }),
     ...fallback,
   };
@@ -211,7 +251,7 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
       const source = lowerRecipe(recipe.source, lowering);
       if (source === null) return null;
       const base = lowering.base(source.variable);
-      const feature = modificationFeature(recipe, base, lowering.kernel, soupOf(lowering.kernel, recipe));
+      const feature = modificationFeature(recipe, base, lowering.kernel, soupOf(lowering.kernel, recipe), undefined, lowering.chamferLegs);
       return feature === null ? null : { features: [...source.features, feature], variable: source.variable };
     }
     case 'place': {
