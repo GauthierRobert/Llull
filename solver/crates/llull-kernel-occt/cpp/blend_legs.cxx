@@ -9,7 +9,9 @@
 // 3. The chamfer face is replaced by the surface interpolating the sections (stations inserted where the surface misses a section by 1e-8 x the diagonal),
 //    the end faces it met are rebuilt around the new section curve, and everything is sewn. The measured gap to the supports and the volume window
 //    (between the source and the chamfer, the profile's solid) are the acceptance; reasons carry no BLD code.
-// Scope: edges that do not meet at a vertex, flat square ends (or a closed edge), a conic or circular section; a curvature section is refused by name.#include <algorithm>
+// Scope: edges that do not meet at a vertex, flat square ends (or a closed edge), a conic, circular or curvature section
+// (13.40: the quintic of the rail builder, G2 to the supports in the plane of the section).
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <memory>
@@ -80,10 +82,6 @@ struct Edit {
 }  // namespace
 
 std::unique_ptr<Shape> blend::legs_blend(const Shape &source, rust::Slice<const double> legs, int kind, double param, std::string &notes, std::string &why) {
-  if (kind == 1) {
-    why = "a curvature profile with two legs is built on straight edges between planes only (curved edges and faces take a conic or circular profile)";
-    return nullptr;
-  }
   if (legs.empty() || legs.size() % kLegWidth != 0) {
     why = "the leg specification is malformed";
     return nullptr;
@@ -310,7 +308,8 @@ std::unique_ptr<Shape> blend::legs_blend(const Shape &source, rust::Slice<const 
   const bool convex = plans.front().convex;
   if (!(after > 0) || (convex && !(after > chamfer_volume && after < before)) || (!convex && !(after < chamfer_volume && after > before))) {
     why = "the blend volume " + number_text(after) + " is not between the source's " + number_text(before) + " and the chamfer's " + number_text(chamfer_volume) +
-          ": the section leaves the solid (the tangent lines of the supports meet too far from the corner for these legs; use smaller legs)";
+          ": the section leaves the solid (the tangent lines of the supports meet too far from the corner for these legs; use smaller legs" +
+          std::string(kind == 1 ? ", another shape, or a conic profile: the curvature (G2) section follows the supports' curvature at its contacts and bulges past the solid between them)" : ")");
     return nullptr;
   }
   // the real gap along every edge a new face shares with a neighbour

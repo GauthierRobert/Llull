@@ -6,27 +6,27 @@ use crate::queries::{edge_continuity, topology};
 use crate::{boolean, make_box, make_cylinder, make_sphere, mass_properties, BooleanOp, Shape};
 use serde_json::Value;
 
-const NAN: f64 = f64::NAN;
-const PI: f64 = std::f64::consts::PI;
+pub(crate) const NAN: f64 = f64::NAN;
+pub(crate) const PI: f64 = std::f64::consts::PI;
 const SCALES: [f64; 3] = [1.0, 10.0, 100.0];
 /// Samples per contact line: the sections are interpolated between 24 stations, so 129 samples read the skin between them (off the stations) as well.
 const CONTACT_SAMPLES: f64 = 129.0;
 
-fn num(value: &Value) -> f64 {
+pub(crate) fn num(value: &Value) -> f64 {
     value.as_f64().unwrap()
 }
 
-fn volume_of(shape: &Shape) -> f64 {
+pub(crate) fn volume_of(shape: &Shape) -> f64 {
     mass_properties(shape).unwrap().volume
 }
 
-fn edges_where(shape: &Shape, keep: impl Fn(&Value) -> bool) -> Vec<u32> {
+pub(crate) fn edges_where(shape: &Shape, keep: impl Fn(&Value) -> bool) -> Vec<u32> {
     let topo = topology(shape).unwrap();
     topo["edges"].as_array().unwrap().iter().enumerate().filter(|(_, edge)| keep(edge)).map(|(index, _)| index as u32).collect()
 }
 
 /// The unique index of the plane face whose outward normal is `normal` and whose centre height is `height`.
-fn plane_face(shape: &Shape, normal: [f64; 3]) -> u32 {
+pub(crate) fn plane_face(shape: &Shape, normal: [f64; 3]) -> u32 {
     let topo = topology(shape).unwrap();
     let found = topo["faces"]
         .as_array()
@@ -37,18 +37,18 @@ fn plane_face(shape: &Shape, normal: [f64; 3]) -> u32 {
     found as u32
 }
 
-fn cylinder_face(shape: &Shape) -> u32 {
+pub(crate) fn cylinder_face(shape: &Shape) -> u32 {
     let topo = topology(shape).unwrap();
     topo["faces"].as_array().unwrap().iter().position(|face| face["surface"] == "cylinder").expect("cylinder face") as u32
 }
 
 /// One edge: the numbers of `legs` (unique edge, face carrying the first leg, size, sizeEnd, size2, size2End).
-fn leg_row(edge: u32, side: u32, size: f64, size_end: f64, size2: f64, size2_end: f64) -> [f64; 6] {
+pub(crate) fn leg_row(edge: u32, side: u32, size: f64, size_end: f64, size2: f64, size2_end: f64) -> [f64; 6] {
     [f64::from(edge), f64::from(side), size, size_end, size2, size2_end]
 }
 
 /// The two-leg blend of `rows`, as the evaluator asks for it (no prism specs: the builder under test is the one reached).
-fn blend(shape: &Shape, rows: &[[f64; 6]], kind: f64, param: f64) -> Result<Shape, String> {
+pub(crate) fn blend(shape: &Shape, rows: &[[f64; 6]], kind: f64, param: f64) -> Result<Shape, String> {
     let edges: Vec<u32> = rows.iter().map(|row| row[0] as u32).collect();
     let legs: Vec<f64> = rows.iter().flatten().copied().collect();
     match fillet_profile_legs(shape, &[], &edges, &[], &legs, kind, param).unwrap() {
@@ -57,12 +57,12 @@ fn blend(shape: &Shape, rows: &[[f64; 6]], kind: f64, param: f64) -> Result<Shap
     }
 }
 
-fn built(shape: &Shape, rows: &[[f64; 6]], kind: f64, param: f64) -> Shape {
+pub(crate) fn built(shape: &Shape, rows: &[[f64; 6]], kind: f64, param: f64) -> Shape {
     blend(shape, rows, kind, param).unwrap_or_else(|why| panic!("refused: {why}"))
 }
 
 /// Volume of the revolution about the z axis of the region bounded by the closed polygon `points` (rho, z): 2 pi |closed integral of rho^2 / 2 dz|, exact per segment.
-fn revolved(points: &[(f64, f64)]) -> f64 {
+pub(crate) fn revolved(points: &[(f64, f64)]) -> f64 {
     let mut sum = 0.0;
     for k in 0..points.len() {
         let (p, q) = (points[k], points[(k + 1) % points.len()]);
@@ -91,7 +91,7 @@ fn circular_weight(a: (f64, f64), t: (f64, f64), b: (f64, f64)) -> f64 {
 }
 
 /// Largest position gap and tangent angle over every edge shared by two faces that meet tangentially (the contact lines), and how many there are.
-fn contacts(shape: &Shape) -> (f64, f64, usize) {
+pub(crate) fn contacts(shape: &Shape) -> (f64, f64, usize) {
     let count = topology(shape).unwrap()["edges"].as_array().unwrap().len();
     let (mut g0, mut g1, mut found) = (0.0_f64, 0.0_f64, 0);
     for edge in 0..count {
@@ -119,7 +119,7 @@ fn least_contact_samples(shape: &Shape) -> usize {
         .unwrap_or(0)
 }
 
-fn diagonal(shape: &Shape) -> f64 {
+pub(crate) fn diagonal(shape: &Shape) -> f64 {
     let bounds = mass_properties(shape).unwrap().bounds;
     (0..3).map(|axis| (bounds[3 + axis] - bounds[axis]).powi(2)).sum::<f64>().sqrt()
 }
@@ -187,7 +187,7 @@ fn right_angle_weight(kind: f64, param: f64, d1: f64, d2: f64) -> f64 {
 }
 
 /// Simpson's rule of `f` over [0, 1] with 400 intervals.
-fn integral(f: impl Fn(f64) -> f64) -> f64 {
+pub(crate) fn integral(f: impl Fn(f64) -> f64) -> f64 {
     let n = 400;
     (0..=n)
         .map(|k| {
@@ -356,7 +356,6 @@ fn what_cannot_be_built_is_refused_with_the_reason() {
     };
     says(&cylinder, &[leg_row(rim, top, 25.0, NAN, 1.0, NAN)], 0.0, "reaches past");
     says(&cylinder, &[leg_row(rim, bottom, 1.0, NAN, 2.0, NAN)], 0.0, "side1 is not a face");
-    says(&cylinder, &[leg_row(rim, top, 1.0, NAN, 2.0, NAN)], 1.0, "curvature profile");
     says(&cylinder, &[leg_row(rim, top, 1.0, 2.0, 2.0, 3.0)], 0.0, "no start and end around it");
     says(&cylinder, &[leg_row(rim, top, 0.0, NAN, 2.0, NAN)], 0.0, "> 0");
     says(&cylinder, &[leg_row(99, top, 1.0, NAN, 2.0, NAN)], 0.0, "out of range");

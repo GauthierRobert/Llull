@@ -12,6 +12,7 @@
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Vec.hxx>
 
 namespace llull {
 namespace blend {
@@ -31,11 +32,16 @@ constexpr double kDegenerate = 1e-6;
 // Leg numbers of one edge in the `legs` array.
 constexpr size_t kLegWidth = 6;
 
-// One section of the blend: the contact points, the apex of their tangent lines and the weight of the conic.
+// One section of the blend: the contact points, the apex of their tangent lines and the weight of the conic. A curvature section (kind 1) is the quintic
+// of curvature_poles: `bend_a`, `bend_b` are the offsets of its 3rd and 4th pole along the support normals that give it the supports' normal curvature (13.40).
 struct Section {
   gp_Pnt a, t, b;
   double weight = 1;
+  gp_Vec bend_a{0, 0, 0}, bend_b{0, 0, 0};
 };
+
+// The six poles of the curvature section of `s` for the shape parameter `shape`: A, A + 0.8 shape (T - A), the two bent middle poles, B + 0.8 shape (T - B), B.
+std::vector<gp_Pnt> curvature_poles(const Section &s, double shape);
 
 // One source edge and what its sections need.
 struct EdgePlan {
