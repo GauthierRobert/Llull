@@ -42,8 +42,24 @@ mod ffi {
         fn full_round(shape: &Shape, spec: &[f64]) -> Result<UniquePtr<Shape>>;
         fn full_round_reason(shape: &Shape, spec: &[f64]) -> Result<String>;
         fn chamfer_sided(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, second: f64, angle: bool) -> Result<UniquePtr<Shape>>;
-        fn chamfer_variable(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, last: f64, second: f64, second_last: f64) -> Result<UniquePtr<Shape>>;
-        fn chamfer_variable_reason(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, last: f64, second: f64, second_last: f64) -> Result<String>;
+        fn chamfer_variable(
+            shape: &Shape,
+            edges: &[u32],
+            faces: &[u32],
+            first: f64,
+            last: f64,
+            second: f64,
+            second_last: f64,
+        ) -> Result<UniquePtr<Shape>>;
+        fn chamfer_variable_reason(
+            shape: &Shape,
+            edges: &[u32],
+            faces: &[u32],
+            first: f64,
+            last: f64,
+            second: f64,
+            second_last: f64,
+        ) -> Result<String>;
         fn blend_union(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<UniquePtr<Shape>>;
         fn blend_union_reason(list: &ShapeList, radius: f64, joints: &[f64]) -> Result<String>;
         fn shell_hollow(shape: &Shape, thickness: f64) -> Result<UniquePtr<Shape>>;
@@ -198,7 +214,15 @@ pub fn chamfer_variable(shape: &Shape, edges: &[u32], faces: &[u32], first: f64,
 }
 
 /// Why [`chamfer_variable`] fails (empty when it builds).
-pub fn chamfer_variable_reason(shape: &Shape, edges: &[u32], faces: &[u32], first: f64, last: f64, second: f64, second_last: f64) -> OcctResult<String> {
+pub fn chamfer_variable_reason(
+    shape: &Shape,
+    edges: &[u32],
+    faces: &[u32],
+    first: f64,
+    last: f64,
+    second: f64,
+    second_last: f64,
+) -> OcctResult<String> {
     occt(ffi::chamfer_variable_reason(inner(shape)?, edges, faces, first, last, second, second_last))
 }
 
