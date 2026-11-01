@@ -94,6 +94,7 @@ bool section_at(const BRepAdaptor_Surface &surface, const Blend &blend, double a
   raw.centre = centre;
   raw.circle_weight = half_cos;
   raw.t = centre.Translated(bisector * (radius / half_cos));
+  continue_size(blend, radius, raw);
   apply_mitre(blend, along, raw);
   out = raw;
   const gp_Pnt contacts[2] = {raw.a, raw.b};

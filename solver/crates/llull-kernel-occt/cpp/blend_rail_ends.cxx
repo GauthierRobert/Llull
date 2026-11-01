@@ -59,12 +59,17 @@ TopoDS_Shape outer_box(const gp_Pnt &point, const gp_Vec &normal, double extent)
   return BRepPrimAPI_MakeBox(gp_Ax2(corner, gp_Dir(normal), frame.XDirection()), 2 * extent, 2 * extent, extent).Shape();
 }
 
-// True when every interior sample of `edge` lies in the plane (within `tolerance`).
-bool lies_in_plane(const TopoDS_Edge &edge, const gp_Pnt &point, const gp_Vec &normal, double tolerance) {
+// True when every interior sample of `edge` lies on the end face of oblique end `side` (its plane, or the surface of a curved end face) within `tolerance`.
+bool on_end(const Blend &blend, int side, const TopoDS_Edge &edge, double tolerance) {
   const BRepAdaptor_Curve curve(edge);
   for (int k = 1; k <= 5; ++k) {
     const gp_Pnt at = curve.Value(curve.FirstParameter() + (curve.LastParameter() - curve.FirstParameter()) * k / 6.0);
-    if (std::fabs(gp_Vec(point, at).Dot(normal.Normalized())) > tolerance) return false;
+    if (blend.curved[side]) {
+      gp_Pnt on;
+      if (!project_on_face(blend.end_face[side], at, on) || on.Distance(at) > tolerance) return false;
+    } else if (std::fabs(gp_Vec(blend.end_point[side], at).Dot(blend.end_normal[side].Normalized())) > tolerance) {
+      return false;
+    }
   }
   return true;
 }
@@ -86,6 +91,41 @@ Handle(Geom_Curve) curve_of(const TopoDS_Edge &edge) {
   return spline;
 }
 
+// The pieces joined end to end into ONE curve that starts at the end of a piece nearest `from`; every piece is used.
+bool chain_pieces(const std::vector<Handle(Geom_BSplineCurve)> &pieces, const gp_Pnt &from, double gap_limit, Handle(Geom_Curve) &out, std::string &why) {
+  GeomConvert_CompCurveToBSplineCurve chain;
+  std::vector<bool> used(pieces.size(), false);
+  gp_Pnt at = from;
+  for (size_t count = 0; count < pieces.size(); ++count) {
+    size_t next = pieces.size();
+    bool reversed = false;
+    double nearest = count == 0 ? 1e300 : gap_limit;
+    for (size_t k = 0; k < pieces.size(); ++k) {
+      if (used[k]) continue;
+      const double head = pieces[k]->StartPoint().Distance(at), tail = pieces[k]->EndPoint().Distance(at);
+      if (std::min(head, tail) <= nearest) {
+        nearest = std::min(head, tail);
+        next = k;
+        reversed = tail < head;
+      }
+    }
+    if (next == pieces.size()) {
+      why = "internal error: the pieces of the cut of the blend surface by an oblique end face do not form one chain";
+      return false;
+    }
+    used[next] = true;
+    Handle(Geom_BSplineCurve) piece = Handle(Geom_BSplineCurve)::DownCast(pieces[next]->Copy());
+    if (reversed) piece->Reverse();
+    if (!chain.Add(piece, std::max(gap_limit, 1e-9))) {
+      why = "internal error: the pieces of the cut of the blend surface by an oblique end face could not be joined";
+      return false;
+    }
+    at = piece->EndPoint();
+  }
+  out = chain.BSplineCurve();
+  return true;
+}
+
 }  // namespace
 
 bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diagonal, double gap_limit, TopoDS_Face &trimmed,
@@ -93,32 +133,43 @@ bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diago
   TopTools_ListOfShape arguments, cutters;
   arguments.Append(skin_face);
   for (int side = 0; side < 2; ++side)
-    if (blend.oblique[side]) cutters.Append(outer_box(blend.end_point[side], blend.end_normal[side], 2.0 * diagonal));
-  BRepAlgoAPI_Cut cut;
-  cut.SetArguments(arguments);
-  cut.SetTools(cutters);
-  cut.Build();
-  if (!cut.IsDone() || cut.HasErrors()) {
-    why = "internal error: the skin could not be cut back by the plane of an oblique end face";
-    return false;
+    if (blend.oblique[side] && !blend.curved[side]) cutters.Append(outer_box(blend.end_point[side], blend.end_normal[side], 2.0 * diagonal));
+  trimmed = skin_face;
+  if (!cutters.IsEmpty()) {
+    BRepAlgoAPI_Cut cut;
+    cut.SetArguments(arguments);
+    cut.SetTools(cutters);
+    cut.Build();
+    if (!cut.IsDone() || cut.HasErrors()) {
+      why = "internal error: the skin could not be cut back by the plane of an oblique end face";
+      return false;
+    }
+    TopTools_IndexedMapOfShape faces;
+    TopExp::MapShapes(cut.Shape(), TopAbs_FACE, faces);
+    if (faces.Extent() != 1) {
+      why = "internal error: the plane of an oblique end face cuts the blend surface into " + std::to_string(faces.Extent()) + " pieces (one expected)";
+      return false;
+    }
+    trimmed = TopoDS::Face(faces(1));
   }
-  TopTools_IndexedMapOfShape faces;
-  TopExp::MapShapes(cut.Shape(), TopAbs_FACE, faces);
-  if (faces.Extent() != 1) {
-    why = "internal error: the plane of an oblique end face cuts the blend surface into " + std::to_string(faces.Extent()) + " pieces (one expected)";
-    return false;
-  }
-  trimmed = TopoDS::Face(faces(1));
+  // a curved end face cuts the skin by its surface (13.37)
+  for (int side = 0; side < 2; ++side)
+    if (blend.oblique[side] && blend.curved[side] && !split_by_end_surface(trimmed, blend, side, diagonal, why)) return false;
   // the piece that stays is on the solid's side of each end plane, as the circular blend face is (the outward normal of the end face points away from the blend)
   GProp_GProps kept, circular;
   BRepGProp::SurfaceProperties(trimmed, kept);
   BRepGProp::SurfaceProperties(blend.face, circular);
-  for (int side = 0; side < 2; ++side)
-    if (blend.oblique[side] && (gp_Vec(blend.end_point[side], kept.CentreOfMass()).Dot(blend.end_normal[side]) >= 0 ||
-                                gp_Vec(blend.end_point[side], circular.CentreOfMass()).Dot(blend.end_normal[side]) >= 0)) {
+  for (int side = 0; side < 2; ++side) {
+    double kept_height = 0, circular_height = 0;
+    if (blend.oblique[side] && (!end_height(blend, side, kept.CentreOfMass(), kept_height) || !end_height(blend, side, circular.CentreOfMass(), circular_height))) {
+      why = "internal error: the surface of a curved end face could not be projected on";
+      return false;
+    }
+    if (blend.oblique[side] && (kept_height >= 0 || circular_height >= 0)) {
       why = "the outward side of an oblique end face does not leave the blend on the solid's side (the blend continues past the end face)";
       return false;
     }
+  }
   TopTools_IndexedMapOfShape edges;
   TopExp::MapShapes(trimmed, TopAbs_EDGE, edges);
   // The edges in an end plane. The cut may split the end curve at a vertex of its own, and both ends of an arc can lie in one plane: each end takes the chain of
@@ -126,7 +177,7 @@ bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diago
   std::vector<Handle(Geom_BSplineCurve)> pieces;
   for (int e = 1; e <= edges.Extent(); ++e)
     for (int side = 0; side < 2; ++side)
-      if (blend.oblique[side] && lies_in_plane(TopoDS::Edge(edges(e)), blend.end_point[side], blend.end_normal[side], gap_limit)) {
+      if (blend.oblique[side] && on_end(blend, side, TopoDS::Edge(edges(e)), gap_limit)) {
         const Handle(Geom_Curve) curve = curve_of(TopoDS::Edge(edges(e)));
         if (curve.IsNull()) {
           why = "internal error: the cut of the blend surface by an oblique end face has no 3D curve";
@@ -137,7 +188,23 @@ bool trim_oblique(const TopoDS_Face &skin_face, const Blend &blend, double diago
       }
   for (int side = 0; side < 2; ++side) {
     if (!blend.oblique[side]) continue;
-    const gp_Pnt start = BRep_Tool::Pnt(TopExp::FirstVertex(blend.end[side])), finish = BRep_Tool::Pnt(TopExp::LastVertex(blend.end[side]));
+    if (blend.extend[side].active) {
+      // the size is continued past the end of the edge (13.37): the contact points are new, so the end curve is the chain of ALL the in-plane pieces of this end,
+      // starting from the one nearest the first vertex of the circular blend's end edge
+      std::vector<Handle(Geom_BSplineCurve)> here;
+      for (int e = 1; e <= edges.Extent(); ++e)
+        if (on_end(blend, side, TopoDS::Edge(edges(e)), gap_limit)) {
+          const Handle(Geom_Curve) curve = curve_of(TopoDS::Edge(edges(e)));
+          if (curve.IsNull()) {
+            why = "internal error: the cut of the blend surface by an oblique end face has no 3D curve";
+            return false;
+          }
+          here.push_back(Handle(Geom_BSplineCurve)::DownCast(curve));
+        }
+      if (!chain_pieces(here, BRep_Tool::Pnt(TopExp::FirstVertex(blend.end[side])), gap_limit, end_curves[side], why)) return false;
+      continue;
+    }
+    const gp_Pnt start =BRep_Tool::Pnt(TopExp::FirstVertex(blend.end[side])), finish = BRep_Tool::Pnt(TopExp::LastVertex(blend.end[side]));
     GeomConvert_CompCurveToBSplineCurve chain;
     std::vector<bool> used(pieces.size(), false);
     gp_Pnt at = start;
@@ -267,7 +334,7 @@ bool check_extension(const Blend &blend, double limit, std::string &why) {
     return a.Distance(b);
   };
   for (int side = 0; side < 2; ++side) {
-    if (!blend.oblique[side]) continue;
+    if (!blend.oblique[side] || blend.extend[side].active) continue;
     const double out = blend.reach[side], edge = side == 0 ? blend.core[0] : blend.core[1];
     double step = edge - out;
     if (std::fabs(step) <= 1e-9 * span) continue;

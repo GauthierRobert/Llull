@@ -7,46 +7,46 @@ use crate::queries::{edge_continuity, topology};
 use crate::{boolean, make_box, make_cylinder, mass_properties, BooleanOp, Shape};
 use serde_json::Value;
 
-const NAN: f64 = f64::NAN;
-const PI: f64 = std::f64::consts::PI;
+pub(crate) const NAN: f64 = f64::NAN;
+pub(crate) const PI: f64 = std::f64::consts::PI;
 /// param / (1 - param) = cos 45 degrees: the conic that is the circle at a right angle.
-const CIRCLE_PARAM: f64 = 0.414_213_562_373_095_1;
+pub(crate) const CIRCLE_PARAM: f64 = 0.414_213_562_373_095_1;
 
-fn num(value: &Value) -> f64 {
+pub(crate) fn num(value: &Value) -> f64 {
     value.as_f64().unwrap()
 }
 
-fn volume_of(shape: &Shape) -> f64 {
+pub(crate) fn volume_of(shape: &Shape) -> f64 {
     mass_properties(shape).unwrap().volume
 }
 
-fn edges_where(shape: &Shape, keep: impl Fn(&Value) -> bool) -> Vec<u32> {
+pub(crate) fn edges_where(shape: &Shape, keep: impl Fn(&Value) -> bool) -> Vec<u32> {
     let topo = topology(shape).unwrap();
     topo["edges"].as_array().unwrap().iter().enumerate().filter(|(_, edge)| keep(edge)).map(|(index, _)| index as u32).collect()
 }
 
-fn diagonal(shape: &Shape) -> f64 {
+pub(crate) fn diagonal(shape: &Shape) -> f64 {
     let bounds = mass_properties(shape).unwrap().bounds;
     (0..3).map(|axis| (bounds[3 + axis] - bounds[axis]).powi(2)).sum::<f64>().sqrt()
 }
 
-fn near(a: f64, b: f64, tolerance: f64) -> bool {
+pub(crate) fn near(a: f64, b: f64, tolerance: f64) -> bool {
     (a - b).abs() <= tolerance * b.abs().max(1.0)
 }
 
-fn blend(shape: &Shape, edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Result<Shape, String> {
+pub(crate) fn blend(shape: &Shape, edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Result<Shape, String> {
     match fillet_profile_blend(shape, &[], edges, laws, kind, param).unwrap() {
         Some(built) => Ok(built),
         None => Err(profile_blend_reason(shape, &[], edges, laws, kind, param).unwrap()),
     }
 }
 
-fn built(shape: &Shape, edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Shape {
+pub(crate) fn built(shape: &Shape, edges: &[u32], laws: &[f64], kind: f64, param: f64) -> Shape {
     blend(shape, edges, laws, kind, param).unwrap_or_else(|why| panic!("refused: {why}"))
 }
 
 /// Largest position and tangent gaps over every edge shared by two faces that meet tangentially (the contact lines of the blend), and how many there are.
-fn contacts(shape: &Shape) -> (f64, f64, usize) {
+pub(crate) fn contacts(shape: &Shape) -> (f64, f64, usize) {
     let count = topology(shape).unwrap()["edges"].as_array().unwrap().len();
     let (mut g0, mut g1, mut found) = (0.0_f64, 0.0_f64, 0);
     for edge in 0..count {
@@ -63,12 +63,12 @@ fn contacts(shape: &Shape) -> (f64, f64, usize) {
     (g0, g1, found)
 }
 
-fn face_count(shape: &Shape) -> usize {
+pub(crate) fn face_count(shape: &Shape) -> usize {
     topology(shape).unwrap()["faces"].as_array().unwrap().len()
 }
 
 /// The area of the single planar face with outward normal `normal`; a split or missing end face fails.
-fn end_area(shape: &Shape, normal: [f64; 3]) -> f64 {
+pub(crate) fn end_area(shape: &Shape, normal: [f64; 3]) -> f64 {
     let areas: Vec<f64> = topology(shape).unwrap()["faces"]
         .as_array()
         .unwrap()
@@ -84,7 +84,7 @@ const GAUSS_NODES: [f64; 4] = [0.183_434_642_495_649_8, 0.525_532_409_916_329, 0
 const GAUSS_WEIGHTS: [f64; 4] = [0.362_683_783_378_362, 0.313_706_645_877_887_3, 0.222_381_034_453_374_5, 0.101_228_536_290_376_3];
 
 /// Composite 8-point Gauss-Legendre rule of `f` on [a, b] in `panels` equal panels.
-fn gauss(f: &dyn Fn(f64) -> f64, a: f64, b: f64, panels: usize) -> f64 {
+pub(crate) fn gauss(f: &dyn Fn(f64) -> f64, a: f64, b: f64, panels: usize) -> f64 {
     let width = (b - a) / panels as f64;
     let mut sum = 0.0;
     for p in 0..panels {
@@ -100,10 +100,10 @@ fn gauss(f: &dyn Fn(f64) -> f64, a: f64, b: f64, panels: usize) -> f64 {
 /// Which spandrel of a rim: the corner is at radius `radius` and height `corner_z`; the section runs inward and down (`convex`: the rim of a cylinder top)
 /// or outward and up (concave: the ring around the foot of a boss).
 #[derive(Clone, Copy)]
-struct Rim {
-    radius: f64,
-    corner_z: f64,
-    convex: bool,
+pub(crate) struct Rim {
+    pub(crate) radius: f64,
+    pub(crate) corner_z: f64,
+    pub(crate) convex: bool,
 }
 
 /// The volume of the revolved spandrel of a section, on the solid's side `x cos(tilt) + z sin(tilt) <= c` of a plane parallel to y. The spandrel is
@@ -128,7 +128,7 @@ fn revolved_cut(rim: Rim, tilt: f64, c: f64, curve: &dyn Fn(f64) -> (f64, f64, f
 }
 
 /// The circular spandrel of radius r.
-fn circle_curve(r: f64) -> impl Fn(f64) -> (f64, f64, f64) {
+pub(crate) fn circle_curve(r: f64) -> impl Fn(f64) -> (f64, f64, f64) {
     move |t| {
         let theta = 0.5 * PI * t;
         (r * (1.0 - theta.sin()), r * (1.0 - theta.cos()), r * theta.cos() * 0.5 * PI)
@@ -136,7 +136,7 @@ fn circle_curve(r: f64) -> impl Fn(f64) -> (f64, f64, f64) {
 }
 
 /// The parabola (rho 0.5) with legs d: sqrt(x / d) + sqrt(y / d) <= 1.
-fn parabola_curve(d: f64) -> impl Fn(f64) -> (f64, f64, f64) {
+pub(crate) fn parabola_curve(d: f64) -> impl Fn(f64) -> (f64, f64, f64) {
     move |t| (d * t * t, d * (1.0 - t) * (1.0 - t), 2.0 * d * t)
 }
 
@@ -248,7 +248,7 @@ fn a_concave_ring_ending_on_a_tilted_plane_adds_the_integral_of_the_spandrel() {
 }
 
 /// A prism 3 high over the polygon (x, y), drawn in z = 0.
-fn prism_part(points: &[[f64; 2]]) -> Shape {
+pub(crate) fn prism_part(points: &[[f64; 2]]) -> Shape {
     let mut chain = Vec::new();
     for k in 0..points.len() {
         let (a, b) = (points[k], points[(k + 1) % points.len()]);
@@ -258,7 +258,7 @@ fn prism_part(points: &[[f64; 2]]) -> Shape {
 }
 
 /// The top front edge (y = 0, z = 3) and whether it runs from x = 0 to x = 10.
-fn front_edge(shape: &Shape) -> (Vec<u32>, bool) {
+pub(crate) fn front_edge(shape: &Shape) -> (Vec<u32>, bool) {
     let topo = topology(shape).unwrap();
     let edges = edges_where(shape, |e| (num(&e["mid"][2]) - 3.0).abs() < 1e-9 && num(&e["mid"][1]).abs() < 1e-9);
     assert_eq!(edges.len(), 1);
@@ -267,7 +267,7 @@ fn front_edge(shape: &Shape) -> (Vec<u32>, bool) {
 }
 
 /// The straight law that makes the radius `start` at x = 0 and `end` at x = 10 on an edge that runs `forward` (start vertex at x = 0) or not.
-fn law(start: f64, end: f64, forward: bool) -> [f64; 4] {
+pub(crate) fn law(start: f64, end: f64, forward: bool) -> [f64; 4] {
     if forward {
         [start, end, 1.0, 0.0]
     } else {
@@ -330,24 +330,8 @@ fn a_constant_size_between_flaring_narrowing_and_skewed_end_walls_is_the_closed_
 }
 
 #[test]
-fn a_changing_size_that_needs_the_extension_past_the_end_of_the_edge_is_refused_with_the_measured_chord() {
-    let _serial = crate::serial_blends();
-    let part = prism_part(&[[0.0, 0.0], [10.0, 0.0], [13.0, 6.0], [-3.0, 6.0]]);
-    let (edge, forward) = front_edge(&part);
-    let why = blend(&part, &edge, &law(0.4, 0.8, forward), 0.0, 0.5).err().expect("refused");
-    assert!(why.contains("does not continue past the end of the edge") && why.contains("chord changes"), "{why}");
-}
-
-#[test]
 fn what_an_oblique_end_cannot_have_is_named() {
     let _serial = crate::serial_blends();
-    // a curved end face
-    let slab = make_box([0.0; 3], [10.0, 6.0, 3.0]).unwrap().unwrap();
-    let round = make_cylinder(8.0, 3.0).unwrap().unwrap();
-    let part = boolean(BooleanOp::Intersect, &slab, &round, false).unwrap().unwrap();
-    let edge = edges_where(&part, |e| (num(&e["mid"][2]) - 3.0).abs() < 1e-9 && num(&e["mid"][1]).abs() < 1e-9);
-    let why = blend(&part, &edge, &[0.4, 0.8, 1.0, 0.0], 0.0, 0.5).err().expect("refused");
-    assert!(why.contains("ends obliquely") && why.contains("its end face is curved") && why.contains("rad from the direction"), "{why}");
     // an end face nearly parallel to the edge (a crease of 0.0997 rad)
     let part = prism_part(&[[0.0, 0.0], [10.0, 0.0], [70.0, 6.0], [-60.0, 6.0]]);
     let (edge, _) = front_edge(&part);
@@ -411,5 +395,18 @@ fn a_part_ten_times_larger_holds_the_gap_of_the_new_end_curve_in_the_vertex_tole
         assert!(near(removed / s.powi(3), expected / s.powi(3), 5e-6), "tilt {tilt}: removed {removed} expected {expected}");
         let occt = fillet(&part, &edge, s, None).unwrap().unwrap();
         assert!(near(volume_of(&shape), volume_of(&occt), 1e-6), "tilt {tilt}: {} vs OCCT {}", volume_of(&shape), volume_of(&occt));
+    }
+}
+
+#[test]
+fn a_varying_size_on_a_rim_arc_whose_oblique_end_needs_the_contact_past_the_vertex_keeps_the_kink_refusal() {
+    let _serial = crate::serial_blends();
+    // the extension of a continued size is built for a straight edge between flat faces only (13.37): on a rim arc the chord of OCCT's constant extension kinks (tilt -0.3)
+    // or its surface leaves the support face (tilt 0.3), the guards of 13.35.1
+    for (tilt, reason) in [(-0.3_f64, "does not continue past the end of the edge"), (0.3, "meets the support face at")] {
+        let part = cut_cylinder(tilt, 3.0);
+        let edge = rim_edge(&part, 3.0);
+        let why = blend(&part, &edge, &[0.6, 1.0, 1.0, 0.0], 0.0, 0.5).err().expect("refused");
+        assert!(why.contains(reason), "tilt {tilt}: {why}");
     }
 }
