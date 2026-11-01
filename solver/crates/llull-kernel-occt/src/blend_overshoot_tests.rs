@@ -131,6 +131,81 @@ fn a_star_that_stays_outside_the_part_after_the_rebuilds_is_refused_by_name() {
     let _reset = CornerHooks;
     for third in [1.3, 1.4, 1.6] {
         let reason = cut_block_setback(11.0, third).err().expect("refused");
-        assert!(reason.contains("stands 0.0") && reason.contains("outside the part, above 0.015"), "{third}: {reason}");
+        assert!(reason.contains("stands 0.") && reason.contains("outside the part, above 0.015"), "{third}: {reason}");
     }
+}
+
+/// A MIXED trim corner (the rim of the notch: two convex top edges and the concave vertical edge) has no wrong side of the part: its star is not measured, the key `overshoot` is absent from the
+/// corner log, and the corner is not gated (13.41).
+#[test]
+fn a_mixed_trim_corner_is_not_measured_and_not_gated() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let shape = notched_cube();
+    let rim = [5.0, 5.0, 10.0];
+    let meeting = edges_at(&shape, rim);
+    assert_eq!(meeting.len(), 3);
+    let (edges, corners) = spec(&shape, &meeting, 0.5, &[rim], 1.2);
+    crate::test_bridge::set_corner_trim(true);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let built = fillet_setback(&shape, &edges, &corners)
+        .unwrap()
+        .unwrap_or_else(|| panic!("{}", crate::features::setback_reason(&shape, &edges, &corners).unwrap()));
+    assert!(analyze(&built).unwrap().valid);
+    let notes: Value = serde_json::from_str(&shape_notes(&built).unwrap()).unwrap();
+    assert_eq!(notes["corners"][0]["patch"], "exact");
+    assert!(notes["corners"][0].get("overshoot").is_none(), "{notes}");
+}
+
+/// The shape of the stars of one built solid: the largest |principal curvature| and the largest turn of the normal between neighbouring samples (rad) over a 17 x 17 grid of every star sub-patch.
+fn star_shape(built: &Shape) -> (f64, f64, usize) {
+    let topo = crate::queries::topology(built).unwrap();
+    let (mut curvature, mut turn, mut faces) = (0.0_f64, 0.0_f64, 0);
+    for (index, face) in topo["faces"].as_array().unwrap().iter().enumerate() {
+        if !face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:")) {
+            continue;
+        }
+        faces += 1;
+        let samples = crate::queries::face_samples(built, index as f64, crate::queries::UvRequest::Grid { nu: 17, nv: 17 }).unwrap();
+        let rows = samples.as_array().unwrap();
+        let normal = |k: usize| -> [f64; 3] {
+            let n = &rows[k]["normal"];
+            [n[0].as_f64().unwrap(), n[1].as_f64().unwrap(), n[2].as_f64().unwrap()]
+        };
+        for (k, row) in rows.iter().enumerate() {
+            if row["degenerate"].as_bool() == Some(true) {
+                continue;
+            }
+            curvature = curvature.max(row["k1"].as_f64().unwrap().abs()).max(row["k2"].as_f64().unwrap().abs());
+            for next in [k + 1, k + 17] {
+                if next < rows.len() && (next != k + 1 || (k + 1) % 17 != 0) && rows[next]["degenerate"].as_bool() != Some(true) {
+                    let (a, b) = (normal(k), normal(next));
+                    let dot = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]).clamp(-1.0, 1.0);
+                    turn = turn.max(dot.acos());
+                }
+            }
+        }
+    }
+    (curvature, turn, faces)
+}
+
+/// The shape of the stars after the rebuild with shortened tangents (13.41): MEASURED, not good. The rolling-ball blend of the same edges has |k| = 2 (r 0.5). The star of the d-shape vertex built
+/// with full tangents reads |k| 5.6 and a normal turn of 0.16 rad between neighbouring samples of a 17 x 17 grid. The long thin holes (setbacks 1.2 / 1.2 / 1.6) were already spiky with full
+/// tangents (|k| 39 to 80, turn 0.5 to 0.6 rad, and 0.4 outside the part); at the tangent factors the gate forces (0.25 to 0.35) they read |k| 141 to 294 and 0.74 to 0.91 rad. The bounds pin
+/// these values (about 1.2x), so a worse star is a failure; they are no claim of quality.
+#[test]
+fn the_shape_of_a_star_rebuilt_with_short_tangents_is_pinned_at_its_measured_values() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (curvature, turn, faces) = star_shape(&cut_block_setback(12.0, 1.6).unwrap());
+    assert_eq!(faces, 6);
+    assert!(curvature < 1.2 * 157.6 && turn < 1.2 * 1.0044, "third 1.6: |k| {curvature}, turn {turn}");
+    let (curvature, turn, _) = star_shape(&cut_block_setback(12.0, 1.3).unwrap());
+    assert!(curvature < 1.2 * 255.9 && turn < 1.2 * 0.9491, "third 1.3: |k| {curvature}, turn {turn}");
+    let (shape, vertex, meeting) = cut_block_vertex(12.0);
+    let (edges, corners) = spec(&shape, &meeting, 0.5, &[vertex], 1.2);
+    crate::test_bridge::set_corner_exact_patch(5);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().unwrap();
+    let (curvature, turn, _) = star_shape(&built);
+    assert!(curvature < 1.2 * 5.61 && turn < 1.2 * 0.1628, "d-shape: |k| {curvature}, turn {turn}");
 }

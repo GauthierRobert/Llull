@@ -57,6 +57,8 @@
 #include <GProp_GProps.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepOffset_Analyse.hxx>
+#include <BRepOffset_ListOfInterval.hxx>
 #include <BRepTools.hxx>
 #include <TopTools_MapOfShape.hxx>
 #include <Standard_Failure.hxx>
@@ -854,6 +856,7 @@ struct FillJob {
   std::string exact_problem;          // why the exact star was refused
   TopoDS_Compound hole_copy;          // a copy of the faces the patch replaces, when they are a smooth surface that knows its centre (13.22)
   bool hinted = false;                // the centre of the star was taken from the replaced surface
+  int convexity = 0;                  // 0 every edge at the vertex convex, 1 concave, 2 mixed (13.41)
   bool use_hint = true;               // false: the centre of the star is the 3/8 rule even where the replaced surface knows one (13.41)
   double tangent_scale = 1;           // the spoke tangents of the star as a share of the chord to the centre (13.41)
   bool allow_star = true;             // false: the plate only (the star failed after the sewing)
@@ -1068,12 +1071,27 @@ void fill_all(std::vector<FillJob> &jobs, double patch_gap_limit, double diagona
   work();
 }
 
-// How far the faces of a star stand on the wrong side of the source solid (13.39.3, 13.41): 9 x 9 points on every face, the distance to the source of those it classifies on the wrong side. A
-// convex corner removes material, so its star lies in the source (the centre is IN) and its fault is to go out; a concave corner adds material (the centre is OUT) and its fault is to go in.
-double star_overshoot(const std::vector<TopoDS_Face> &faces, const gp_Pnt &centre, const TopoDS_Shape &shape, BRepClass3d_SolidClassifier &source_solid, double diagonal) {
+// The side of a corner, from the concavity of its edges (BRepOffset_Analyse): 0 every edge convex (the blends remove material), 1 every edge concave (they add it), 2 mixed or undecided.
+int corner_convexity(const BRepOffset_Analyse &analyse, const std::vector<TopoDS_Edge> &edges) {
+  int convex = 0, concave = 0;
+  for (const TopoDS_Edge &edge : edges) {
+    const BRepOffset_ListOfInterval &intervals = analyse.Type(edge);
+    if (intervals.IsEmpty()) return 2;
+    const ChFiDS_TypeOfConcavity type = intervals.First().Type();
+    if (type == ChFiDS_Convex) ++convex;
+    else if (type == ChFiDS_Concave) ++concave;
+    else return 2;
+  }
+  return concave == 0 ? 0 : (convex == 0 ? 1 : 2);
+}
+
+// How far the faces of a star stand on the wrong side of the source solid (13.39.3, 13.41): 9 x 9 points on every face, the distance to the source of those it classifies on the wrong side.
+// A convex corner (convexity 0) removes material, so its star lies in the source and its fault is to go OUT; a concave one (1) adds material and its fault is to go IN. A mixed corner (2) has
+// no wrong side: -1, not measured.
+double star_overshoot(const std::vector<TopoDS_Face> &faces, int convexity, const TopoDS_Shape &shape, BRepClass3d_SolidClassifier &source_solid, double diagonal) {
+  if (convexity == 2) return -1;
   const double measure_tolerance = 1e-9 * diagonal;
-  source_solid.Perform(centre, measure_tolerance);
-  const TopAbs_State wrong = source_solid.State() == TopAbs_OUT ? TopAbs_IN : TopAbs_OUT;
+  const TopAbs_State wrong = convexity == 0 ? TopAbs_OUT : TopAbs_IN;
   double worst = 0;
   for (const TopoDS_Face &face : faces) {
     double u0, u1, v0, v1;
@@ -1091,16 +1109,21 @@ double star_overshoot(const std::vector<TopoDS_Face> &faces, const gp_Pnt &centr
   return worst;
 }
 
+// The most rebuilds of stars one step may make (a rebuild costs 0.1 to 0.2 s on the blocks measured).
+constexpr int kRefineBudget = 40;
+
 // 13.41: a star of a plain (not creased) trimmed hole that stands outside the part by more than the gate is built again, serially, with a lower centre (the 3/8 rule of 13.21.4 instead of the
 // replaced rolling-ball surface) and then with shorter spoke tangents (0.7, 0.5, 0.35, 0.25 of the chord): the first of those inside the gate is kept, else the least overshoot. The outcome after the sewing
 // is gated by build_trimmed.
-void refine_star(FillJob &job, const TopoDS_Shape &shape, BRepClass3d_SolidClassifier &source_solid, double patch_gap_limit, double diagonal) {
-  if (!job.filled || job.patch_loop.empty() || job.creased || !job.has_centre) return;
+void refine_star(FillJob &job, const TopoDS_Shape &shape, BRepClass3d_SolidClassifier &source_solid, double patch_gap_limit, double diagonal, int &budget) {
+  if (!job.filled || job.patch_loop.empty() || job.creased || job.convexity == 2 || job.g2_built) return;
   const double gate = kOvershootFraction * diagonal;
-  double best = star_overshoot(job.patches, job.centre, shape, source_solid, diagonal);
+  double best = star_overshoot(job.patches, job.convexity, shape, source_solid, diagonal);
   if (best <= gate) return;
   for (const double scale : {1.0, 0.7, 0.5, 0.35, 0.25}) {
     if (!job.hinted && scale == 1.0) continue;  // the same build
+    if (budget <= 0) return;  // the rebuilds of a step are capped
+    --budget;
     FillJob trial = job;
     trial.filled = false;
     trial.patches.clear();
@@ -1113,8 +1136,8 @@ void refine_star(FillJob &job, const TopoDS_Shape &shape, BRepClass3d_SolidClass
     trial.use_hint = false;
     trial.tangent_scale = scale;
     fill_corner(trial, patch_gap_limit, diagonal);
-    if (!trial.filled || trial.patch_loop.empty() || !trial.has_centre) continue;
-    const double now = star_overshoot(trial.patches, trial.centre, shape, source_solid, diagonal);
+    if (!trial.filled || trial.patch_loop.empty()) continue;
+    const double now = star_overshoot(trial.patches, trial.convexity, shape, source_solid, diagonal);
     if (now >= best) continue;
     best = now;
     job = trial;
@@ -1230,6 +1253,8 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   const TopTools_IndexedMapOfShape unique_edges = query::distinct(shape, TopAbs_EDGE);
   // Every edge that meets a setback vertex is rounded in this step, and every rounded edge ends at a setback vertex (the ball must be able to cut the whole of each blend).
   std::vector<TopoDS_Vertex> corner_vertices;
+  const BRepOffset_Analyse concavity(shape, 0.01);
+  std::vector<int> convexity_of;  // per corner: corner_convexity of the edges at its vertex
   std::vector<int> sharp_of;  // per corner: the unrounded edge that enters the hole (13.39), -1 when every edge is rounded
   for (const Corner &corner : corners) {
     const TopoDS_Vertex vertex = vertex_at(shape, corner.at, vertex_tolerance);
@@ -1248,6 +1273,9 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     for (const int edge : incident)
       if (radius.find(edge) == radius.end()) unrounded.push_back(edge);
     sharp_of.push_back(unrounded.size() == 1 ? unrounded.front() : -1);
+    std::vector<TopoDS_Edge> at_vertex;
+    for (const int edge : incident) at_vertex.push_back(TopoDS::Edge(unique_edges(edge + 1)));
+    convexity_of.push_back(corner_convexity(concavity, at_vertex));
     // Measured on the cylinder block (sharp edge 1 or 2, the rounded edges at 1.2 and the sharp one at 1.0 / 1.6 / 2.0, 6 cases): the cut planes isolate no face, OCCT generates none at a vertex with a sharp edge.
     if (unrounded.size() == 1 && by_planes[sharp_of.size() - 1]) {
       why = std::string(kUnsupported) + "edge " + std::to_string(unrounded.front()) + " meets the setback vertex " + where(corner.at) +
@@ -1699,11 +1727,13 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     }
     job.allow_star = allow_star;
     job.creased = sharp_of[c] >= 0;
+    job.convexity = convexity_of[c];
   }
   fill_all(jobs, patch_gap_limit, diagonal);
   {
     BRepClass3d_SolidClassifier source_solid(shape);
-    for (FillJob &job : jobs) refine_star(job, shape, source_solid, patch_gap_limit, diagonal);
+    int budget = kRefineBudget;
+    for (FillJob &job : jobs) refine_star(job, shape, source_solid, patch_gap_limit, diagonal, budget);
   }
   for (const FillJob &job : jobs) star_used = star_used || !job.patch_loop.empty();
   if ((g_exact_mode.load() == 3 && star_used) || g_exact_mode.load() == 4) {
@@ -1831,7 +1861,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       std::vector<TopoDS_Face> star;
       for (size_t p = 0; p < patches.size(); ++p)
         if (patch_is_star[p] && patch_corner_of[p] == c) star.push_back(patches[p]);
-      if (!star.empty() && jobs[c].has_centre) overshoot[c] = star_overshoot(star, jobs[c].centre, shape, source_solid, diagonal);
+      if (!star.empty()) overshoot[c] = star_overshoot(star, jobs[c].convexity, shape, source_solid, diagonal);
     }
     for (size_t c = 0; c < corners.size(); ++c)
       if (overshoot[c] > kOvershootFraction * diagonal) {
@@ -1853,7 +1883,9 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     JsonWriter log;
     log.begin_array();
     for (size_t c = 0; c < corners.size(); ++c) {
-      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(corner_kinds[c]).key("centre").string(corner_centres[c]).key("overshoot").number(overshoot[c]).key("setbacks").begin_array();
+      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(corner_kinds[c]).key("centre").string(corner_centres[c]);
+      if (overshoot[c] >= 0) log.key("overshoot").number(overshoot[c]);  // a mixed corner has no wrong side: the key is omitted (13.41)
+      log.key("setbacks").begin_array();
       for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
       log.end_array().end_object();
     }

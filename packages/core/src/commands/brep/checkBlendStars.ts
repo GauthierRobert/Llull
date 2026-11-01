@@ -61,6 +61,41 @@ function runsFromVertex(topology: ShapeTopology, edge: number, contactEdges: rea
 
 type Measured = NonNullable<ReturnType<typeof measureContact>>;
 
+/** A trimmed corner star standing this share of the diagonal on the wrong side of the part is reported (warn); the build refuses above OVERSHOOT_FAIL_FRACTION, so a fail is only read from a foreign shape. */
+const OVERSHOOT_WARN_FRACTION = 1e-6;
+const OVERSHOOT_FAIL_FRACTION = 1e-3;
+
+/**
+ * BLD_CHECK_CORNER_OVERSHOOT for each corner of the blend nodes of `recipe` whose notes record an `overshoot` (the rolling-ball trim builder, 13.41): warn above 1e-6 x the diagonal, fail above
+ * the build gate 1e-3 x the diagonal. A corner without the key (analytic star, plate, mixed corner) raises nothing.
+ */
+export function overshootFindings(
+  kernel: GeometryKernel,
+  recipe: ShapeRecipe,
+  entityId: string,
+  unit: string,
+  diagonal: number,
+): Finding[] {
+  const found: Finding[] = [];
+  for (const node of [...filletNodes(recipe), ...blendNodes(recipe)])
+    for (const corner of kernel.blendReport?.(node)?.notes?.corners ?? []) {
+      const value = corner.overshoot;
+      if (value === undefined || !(diagonal > 0) || value <= OVERSHOOT_WARN_FRACTION * diagonal) continue;
+      const fails = value > OVERSHOOT_FAIL_FRACTION * diagonal;
+      found.push({
+        code: 'BLD_CHECK_CORNER_OVERSHOOT',
+        severity: fails ? 'fail' : 'warn',
+        entityId,
+        value: sig(value),
+        limit: sig(fails ? OVERSHOOT_FAIL_FRACTION * diagonal : OVERSHOOT_WARN_FRACTION * diagonal),
+        unit,
+        remediation: REMEDIATION.BLD_CHECK_CORNER_OVERSHOOT,
+        message: `the corner star at (${corner.vertex.map(sig).join(', ')}) stands ${sig(value)} ${unit} on the wrong side of the part (${sig(value / diagonal)} of its diagonal; the build gate is ${OVERSHOOT_FAIL_FRACTION})`,
+      });
+    }
+  return found;
+}
+
 /** Appends the corner rows and findings of one solid; returns how many contacts the kernel could not measure. */
 export function checkCornerPatches(input: CornerInput, blends: BlendRow[], findings: Finding[]): number {
   const { world, samples, tolerances, plateTolerances, requireG2 } = input;

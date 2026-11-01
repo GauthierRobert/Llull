@@ -127,8 +127,8 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     const checked = execute(done.document, 'check_blends', { ids: [result] }).data as { status: string };
     expect(checked.status).not.toBe('fail');
     const rolling = volume(plain.document, plain.affected[0] as string);
-    // 13.41: the star is rebuilt with shorter tangents so that it stays inside the part (0.0027 of the rolling-ball volume at setback 1.3)
-    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(4e-3);
+    // 13.41: the star is rebuilt with shorter tangents so that it stays inside the part: the volume is 0.00269 / 0.00309 / 0.00349 of the rolling ball at the setbacks 1.3 / 1.4 / 1.6, pinned at 1.2x
+    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(3.3e-3);
     // the setback is a distance ALONG the edge: the blend of the straight top edge (length sqrt(44) = 6.633) ends 1.3 from the vertex, so its cylinder spans 6.633 - 1.3 (a ball would cut it at
     // sqrt(1.3^2 - 0.5^2) = 1.2, or at the largest setback)
     const spans = faces(done.document, result)
@@ -136,13 +136,59 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
       .map((face) => (face.axis?.span?.[1] ?? 0) - (face.axis?.span?.[0] ?? 0));
     expect(spans.some((span) => Math.abs(span - (Math.sqrt(44) - 1.3)) < 1e-4)).toBe(true);
     // 1.4 and 1.6 along the same edge: build too (C1 knots at 48 or 64 poles, 13.22.6; before, the star was refused at 0.00965 rad and the plate missed the blend ends)
-    for (const longer of [withSetback(1.4), withSetback(1.6)]) {
+    for (const [longer, window] of [
+      [withSetback(1.4), 3.7e-3],
+      [withSetback(1.6), 4.2e-3],
+    ] as const) {
       expect(longer.error, longer.summary).toBeUndefined();
-      expect(Math.abs(volume(longer.document, longer.affected[0] as string) - rolling) / rolling).toBeLessThan(4e-3);
+      expect(Math.abs(volume(longer.document, longer.affected[0] as string) - rolling) / rolling).toBeLessThan(window);
       expect(execute(longer.document, 'check_blends', { ids: [longer.affected[0] as string] }).data).toMatchObject({
         status: expect.not.stringMatching(/^fail$/),
       });
     }
+  });
+
+  it('check_blends reads the overshoot of a rebuilt trim star from the corner notes: a BLD_CHECK_CORNER_OVERSHOOT warning naming the value (13.41)', () => {
+    const { doc, id, vertex, edges } = dshape();
+    const done = execute(doc, 'fillet_edge', {
+      id,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [{ near: vertex, type: 'setback', setback: 1.2, setbacks: [{ near: edges[1] as [number, number, number], distance: 1.3 }] }],
+    });
+    expect(done.error, done.summary).toBeUndefined();
+    const checked = execute(done.document, 'check_blends', { ids: [done.affected[0] as string] }).data as {
+      findings: Array<{ code: string; severity: string; value?: number }>;
+    };
+    const found = checked.findings.filter((finding) => finding.code === 'BLD_CHECK_CORNER_OVERSHOOT');
+    expect(found).toHaveLength(1);
+    expect(found[0]?.severity).toBe('warn');
+    expect(found[0]?.value).toBeGreaterThan(5e-3);
+    expect(found[0]?.value).toBeLessThanOrEqual(0.015);
+  });
+
+  it('a star that stays outside the part after every rebuild is refused by name and leaves the document unchanged (r 11 block, 13.41)', () => {
+    const box = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 5], position: [5, 5, 2.5] });
+    const cylinder = execute(box.document, 'add_cylinder', { radius: 11, height: 5, position: [0, 0, 2.5] });
+    const cut = execute(cylinder.document, 'boolean', { op: 'intersect', a: box.affected[0], b: cylinder.affected[0], engine: 'kernel' });
+    const y = Math.sqrt(121 - 100);
+    const edges: Array<[number, number, number]> = [
+      [7.778, 7.778, 5],
+      [10, 3, 5],
+      [10, y, 2.5],
+    ];
+    const done = execute(cut.document, 'fillet_edge', {
+      id: cut.affected[0] as string,
+      edgesNear: edges,
+      radius: 0.5,
+      corners: [
+        { near: [10, y, 5], type: 'setback', setback: 1.2, setbacks: [{ near: edges[1] as [number, number, number], distance: 1.3 }] },
+      ],
+    });
+    expect(done.affected).toEqual([]);
+    expect(done.document).toBe(cut.document);
+    expect(done.summary).toContain('BLD_CORNER_FAILED');
+    expect(done.summary).toContain('outside the part, above');
   });
 
   // Downstream of the star: shell_solid (an inward offset) of the 1.2 / 1.2 / 1.6 block, open at the bottom, is a valid hollow solid in about 0.8 s. The SEALED cavity is refused by name before the offset
