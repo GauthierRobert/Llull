@@ -480,7 +480,7 @@ describeNative('BLD M2 remainder: profiles on curved edges and faces, varying si
     expect(volume(edited.document, result)).toBeGreaterThan(volume(done.doc, done.id));
   });
 
-  it('BLD_PROFILE_FAILED names what is still not built: a third edge left sharp at a vertex, a second leg on a curved edge or with a varying size, a size no fillet has', () => {
+  it('a third edge left sharp at a vertex is built (13.39); BLD_PROFILE_FAILED names what is still not built: a second leg on a curved edge or with a varying size, a size no fillet has', () => {
     const { doc, id } = box([20, 10, 10]);
     const sharp = execute(doc, 'fillet_edge', {
       id,
@@ -491,9 +491,8 @@ describeNative('BLD M2 remainder: profiles on curved edges and faces, varying si
       radius: 1,
       profile: { type: 'conic', rho: 0.5 },
     });
-    expect(sharp.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', ids: [id] });
-    expect(sharp.summary).toContain('not rounded');
-    expect(sharp.document).toBe(doc);
+    expect(sharp.error).toBeUndefined();
+    expect(sharp.document).not.toBe(doc);
     const rim = cylinder(10, 20);
     const legs = execute(rim.doc, 'fillet_edge', { id: rim.id, edges: [{ near: [10, 0, 20], size: 1, size2: 2, side1Near: [0, 0, 20] }] });
     // two legs on a curved edge are built since 13.34 (nativeBlendLegs.test.ts); control points with a leg are still refused
