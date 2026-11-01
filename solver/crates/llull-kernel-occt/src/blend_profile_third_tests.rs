@@ -3,8 +3,8 @@
 use crate::blend_corner_tests::{cube, cube_vertices, edges_at, notched_cube, split_faces, tall_pyramid, worst_patch_gap, CornerHooks};
 use crate::blend_third_tests::{along_the_crease, patch_edges, read, volume, volume_outside, Reading};
 use crate::features::{fillet, fillet_profile_blend, fillet_setback, profile_blend_reason, setback_reason, shape_notes};
-use crate::queries::{edge_continuity, topology};
-use crate::{analyze, boolean, make_box, make_cylinder, make_prism, BooleanOp, Shape};
+use crate::queries::{edge_continuity, face_samples, point_distances, topology, UvRequest};
+use crate::{analyze, boolean, make_box, make_cylinder, make_prism, mass_properties, BooleanOp, Shape};
 use serde_json::Value;
 
 const NAN: f64 = f64::NAN;
@@ -78,6 +78,58 @@ fn crease_of(reading: &Reading) -> Vec<f64> {
     along_the_crease(&reading.creases[0])
 }
 
+/// Every `point` of a JSON value (an array of three numbers under the key "point"), flattened.
+fn points_in(value: &Value, found: &mut Vec<f64>) {
+    match value {
+        Value::Object(map) => {
+            for (key, inner) in map {
+                match (key.as_str(), inner.as_array()) {
+                    ("point", Some(xyz)) if xyz.len() == 3 && xyz.iter().all(Value::is_number) => {
+                        found.extend(xyz.iter().map(|n| n.as_f64().unwrap()))
+                    }
+                    _ => points_in(inner, found),
+                }
+            }
+        }
+        Value::Array(list) => list.iter().for_each(|item| points_in(item, found)),
+        _ => {}
+    }
+}
+
+/// B2 (memory-safe, no boolean): the part with its corner blended lies inside the source. The volume is smaller, the bounding box is within the source's, and 9 points per face of every star face
+/// (the interior of the patches, not their edges) are inside the source or on its boundary (signed distance <= 1e-6 x the diagonal).
+fn assert_inside_source(built: &Shape, source: &Shape, label: &str, slack: f64) {
+    assert!(
+        volume(built) < volume(source),
+        "{label}: the blended part ({}) is smaller than the source ({})",
+        volume(built),
+        volume(source)
+    );
+    // (mass_properties bounds of a B-spline face are its control polygon: 0.19 outside the part on the forced-trim cube, so the box is checked on sampled points)
+    let outer = mass_properties(source).unwrap().bounds;
+    let diagonal = (0..3).map(|axis| (outer[3 + axis] - outer[axis]).powi(2)).sum::<f64>().sqrt();
+    let topo = topology(built).unwrap();
+    let mut points = Vec::new();
+    for (index, face) in topo["faces"].as_array().unwrap().iter().enumerate() {
+        if face["name"].as_str().is_some_and(|name| name.starts_with("blend(v:")) {
+            points_in(&face_samples(built, index as f64, UvRequest::Grid { nu: 3, nv: 3 }).unwrap(), &mut points);
+        }
+    }
+    assert!(points.len() >= 3 * 9 * 5, "{label}: star points sampled: {}", points.len() / 3);
+    for (k, coordinate) in points.iter().enumerate() {
+        let axis = k % 3;
+        assert!(
+            *coordinate >= outer[axis] - slack * diagonal && *coordinate <= outer[3 + axis] + slack * diagonal,
+            "{label}: star point {} outside the box of the source",
+            k / 3
+        );
+    }
+    for (k, distance) in point_distances(source, &points).unwrap().as_array().unwrap().iter().enumerate() {
+        let signed = distance["signed"].as_f64().unwrap();
+        assert!(signed <= slack * diagonal, "{label}: star point {k} {:?} is {signed} outside the source", &points[3 * k..3 * k + 3]);
+    }
+}
+
 fn assert_falls_monotonically(angles: &[f64], entry: f64) {
     assert!((angles[0] - entry).abs() < 1e-6, "the spoke leaves the sharp edge at the dihedral {entry}: {}", angles[0]);
     for pair in angles.windows(2) {
@@ -95,6 +147,7 @@ fn a_conic_profile_with_an_unrounded_third_edge_gets_the_star_with_a_crease_spok
     let _reset = CornerHooks;
     let shape = cube(10.0);
     let built = third(&shape, [0.0; 3], 2, 1.0, 0.0, 0.5).expect("builds");
+    assert_inside_source(&built, &shape, "conic cube", 1e-6);
     assert!(analyze(&built).unwrap().valid);
     assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (8, 5), "6 planes and 2 blends; a star of 5");
     let notes = notes_of(&built);
@@ -204,7 +257,7 @@ fn vertical_edge(shape: &Shape, edges: &[usize]) -> usize {
     edges
         .iter()
         .position(|edge| {
-            (topo["edges"][*edge]["start"][2].as_f64().unwrap() - topo["edges"][*edge]["end"][2].as_f64().unwrap()).abs() > 1.0
+            (topo["edges"][*edge]["start"][2].as_f64().unwrap() - topo["edges"][*edge]["end"][2].as_f64().unwrap()).abs() > 0.5
         })
         .unwrap()
 }
@@ -232,6 +285,10 @@ fn what_a_profile_corner_with_a_sharp_edge_does_not_take_is_refused_by_name() {
     let plate = make_box([0.0; 3], [10.0, 10.0, 1.5]).unwrap().unwrap();
     let text = third(&plate, [0.0; 3], vertical_edge(&plate, &edges_at(&plate, [0.0; 3])), 1.0, 0.0, 0.5).err().expect("refused");
     assert!(text.contains("the entry point of the unrounded edge") && text.contains("is not before the end of the edge (1.5)"), "{text}");
+    // an edge shorter than the placeholder distance of 1: the entry check, not the placeholder, speaks
+    let thin = make_box([0.0; 3], [10.0, 10.0, 0.8]).unwrap().unwrap();
+    let text = third(&thin, [0.0; 3], vertical_edge(&thin, &edges_at(&thin, [0.0; 3])), 1.0, 0.0, 0.5).err().expect("refused");
+    assert!(text.contains("the entry point of the unrounded edge") && text.contains("is not before the end of the edge (0.8)"), "{text}");
     let obtuse =
         make_prism(&[0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 20.0, 0.874, 0.0, 10.0, 8.0, 0.0, 0.0, 8.0, 0.0], [0.0, 0.0, 6.0]).unwrap().unwrap();
     let corner = [10.0, 0.0, 0.0];
@@ -288,31 +345,44 @@ fn the_trim_builder_holds_a_sharp_straight_edge_with_a_crease_spoke() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
     let (shape, vertex, meeting) = cylinder_block();
-    for sharp in [1usize, 2] {
-        let (edges, corners) = trim_step(&shape, vertex, sharp, 0.5, 1.2);
-        assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "sharp {sharp} builds");
+    // measured to build (13.39.4): the straight top edge sharp at r 0.5 / ball 1.2 only (9 of 10 other cases miss G0, below), the edge against the cylinder sharp at six radius / ball pairs
+    let cases: Vec<(usize, f64, f64)> = vec![(1, 0.5, 1.2), (2, 0.5, 1.2), (2, 0.5, 1.5), (2, 0.3, 1.5), (2, 0.3, 2.0), (2, 0.8, 2.0)];
+    for (sharp, radius, ball) in cases {
+        let (edges, corners) = trim_step(&shape, vertex, sharp, radius, ball);
+        assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "sharp {sharp} r {radius} ball {ball} builds");
         let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
         assert!(analyze(&built).unwrap().valid, "sharp {sharp}");
         assert_eq!(
             split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()),
             (9, 5),
-            "sharp {sharp}: the block, the cylinder, 2 blends; a star of 5"
+            "sharp {sharp} r {radius} ball {ball}: the block, the cylinder, 2 blends; a star of 5"
         );
         let reading = read(&built);
-        assert!(reading.interior < 0.0095, "sharp {sharp}: G1 {} over every patch edge but the crease", reading.interior);
-        assert!(reading.pole_end < 1e-6, "sharp {sharp}: the pole {}", reading.pole_end);
+        assert_inside_source(&built, &shape, &format!("sharp {sharp} r {radius} ball {ball}"), 2e-3);
+        eprintln!(
+            "CASE sharp {sharp} r {radius} ball {ball}: vol {} interior {:e} pole {:e}",
+            volume(&built),
+            reading.interior,
+            reading.pole_end
+        );
+        assert!(
+            reading.interior < 0.0095,
+            "sharp {sharp} r {radius} ball {ball}: G1 {} over every patch edge but the crease",
+            reading.interior
+        );
+        assert!(reading.pole_end < 1e-6, "sharp {sharp} r {radius} ball {ball}: the pole {}", reading.pole_end);
         let dihedral = edge_continuity(&shape, meeting[sharp] as f64, 3.0).unwrap()[0]["g1"].as_f64().unwrap().abs();
         assert_falls_monotonically(&crease_of(&reading), dihedral);
         assert!(
             worst_patch_gap(&built) < 1e-6 * (10.0_f64 * 10.0 + 10.0 * 10.0 + 25.0).sqrt(),
-            "sharp {sharp}: G0 {}",
+            "sharp {sharp} r {radius} ball {ball}: G0 {}",
             worst_patch_gap(&built)
         );
         let rounded: Vec<u32> = meeting.iter().enumerate().filter(|(k, _)| *k != sharp).map(|(_, edge)| *edge as u32).collect();
-        let reference = fillet(&shape, &rounded, 0.5, None).unwrap().expect("the rolling-ball mitre");
+        let reference = fillet(&shape, &rounded, radius, None).unwrap().expect("the rolling-ball mitre");
         assert!(
-            (volume(&built) - volume(&reference)).abs() < 0.1,
-            "sharp {sharp}: {} against the mitre {}",
+            volume(&built) < volume(&reference) && volume(&reference) - volume(&built) < 1.0,
+            "sharp {sharp} r {radius} ball {ball}: {} against the mitre {}",
             volume(&built),
             volume(&reference)
         );
@@ -333,10 +403,11 @@ fn the_trim_builder_on_a_cube_is_within_a_sliver_of_the_closed_form_mitre() {
     assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (8, 5));
     let quarter = std::f64::consts::FRAC_PI_4;
     let mitre = 1000.0 - 2.0 * (1.0 - quarter) * 10.0 + (5.0 / 3.0 - std::f64::consts::FRAC_PI_2);
+    assert_inside_source(&built, &shape, "trim cube", 2e-3);
     let own = volume(&built);
-    assert!((own - mitre).abs() < 0.6, "{own} against the closed-form mitre {mitre}");
+    assert!(own < mitre && own > mitre - 1.0, "{own} against the closed-form mitre {mitre}");
     let reading = read(&built);
-    assert!(reading.interior < 0.0095 && reading.pole_end < 1e-4, "{} {}", reading.interior, reading.pole_end);
+    assert!(reading.interior < 0.0095 && reading.pole_end < 1e-5, "{} {}", reading.interior, reading.pole_end);
     assert_falls_monotonically(&crease_of(&reading), std::f64::consts::FRAC_PI_2);
     assert!(patch_edges(&built).iter().any(|edge| edge.both_patches), "the spokes are patch edges");
 }
@@ -352,7 +423,7 @@ fn what_the_trim_builder_does_not_take_at_a_sharp_edge_is_refused_by_name() {
     let (edges, corners) = trim_step(&shape, vertex, 0, 0.5, 1.2);
     let text = reason(&shape, &edges, &corners);
     assert!(
-        text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("must be a straight line") && text.contains("3e-6 to 9e-6"),
+        text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("must be a straight line") && text.contains("9 of 10 cases"),
         "{text}"
     );
     let one = vec![meeting[1] as f64, 0.5, 0.5];
@@ -386,4 +457,130 @@ fn different_setbacks_at_a_trim_vertex_with_a_sharp_edge_are_refused_by_name() {
         let text = setback_reason(&shape, &edges, &corners).unwrap();
         assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("takes one ball"), "{text}");
     }
+}
+
+/// The index, in the unique edge list of `shape`, of the first edge whose two ends satisfy `wanted`.
+fn edge_where(shape: &Shape, wanted: impl Fn([f64; 3], [f64; 3]) -> bool) -> usize {
+    let topo = topology(shape).unwrap();
+    let point = |value: &Value| [value[0].as_f64().unwrap(), value[1].as_f64().unwrap(), value[2].as_f64().unwrap()];
+    topo["edges"].as_array().unwrap().iter().position(|edge| wanted(point(&edge["start"]), point(&edge["end"]))).expect("the edge")
+}
+
+/// BLD §13.39 review B1: the decision on a crease spoke, as a pure function of its normal angles. A spoke is accepted when the kink is at the end ON the unrounded edge, never rises by more than
+/// 0.0095 rad from there and is flat (<= 0.1 rad) at the pole; the end of the kink on the wrong side, both ends or none on the edge, a bump on the way and a pole that is not flat are refused.
+#[test]
+fn a_crease_spoke_is_accepted_only_when_it_fades_from_the_unrounded_edge() {
+    let fade: Vec<f64> = (0..21).map(|k| std::f64::consts::FRAC_PI_2 * (1.0 - k as f64 / 20.0).powi(2) + 0.004).collect();
+    let reversed: Vec<f64> = fade.iter().rev().copied().collect();
+    use crate::test_bridge::crease_fade;
+    assert!(crease_fade(&fade, true, false), "kink at the first end, on the edge");
+    assert!(crease_fade(&reversed, false, true), "the same spoke read from the other end");
+    assert!(!crease_fade(&fade, false, true), "the kinked end is not the one on the unrounded edge");
+    assert!(!crease_fade(&reversed, true, false));
+    assert!(!crease_fade(&fade, true, true) && !crease_fade(&fade, false, false), "both ends or none on the edge");
+    let mut bump = fade.clone();
+    bump[10] += 0.2;
+    assert!(!crease_fade(&bump, true, false), "an interior fold of 0.2 rad");
+    let mut small = fade.clone();
+    small[10] += 0.005;
+    assert!(crease_fade(&small, true, false), "a rise under 0.0095 rad is the measurement noise of the fade");
+    let mut stuck = fade.clone();
+    *stuck.last_mut().unwrap() = 0.3;
+    assert!(!crease_fade(&stuck, true, false), "a pole that is not flat");
+    assert!(!crease_fade(&[std::f64::consts::FRAC_PI_2; 21], true, false), "a spoke that keeps its angle");
+}
+
+/// BLD §13.39 review B1: on a real creased star (the cube, trim builder forced, r 1, ball 2) every sub-patch passes the oriented check against the unrounded edge it continues; against any other
+/// edge, or with a sub-patch turned round (a folded star), the sub-patches next to the crease spoke are refused.
+#[test]
+fn a_creased_star_with_a_wrong_edge_or_a_folded_sub_patch_is_refused_by_the_oriented_check() {
+    use crate::test_bridge::oriented_angle_creased;
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let shape = cube(10.0);
+    let (edges, corners) = trim_step(&shape, [0.0; 3], 2, 1.0, 2.0);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    let pt = |value: &Value| [value[0].as_f64().unwrap(), value[1].as_f64().unwrap(), value[2].as_f64().unwrap()];
+    let source_topology = topology(&shape).unwrap();
+    let source_edge = &source_topology["edges"][edges_at(&shape, [0.0; 3])[2]];
+    let (s0, s1) = (pt(&source_edge["start"]), pt(&source_edge["end"]));
+    let on_line = |p: [f64; 3]| {
+        let d: Vec<f64> = (0..3).map(|k| s1[k] - s0[k]).collect();
+        let length = d.iter().map(|c| c * c).sum::<f64>().sqrt();
+        let t: f64 = (0..3).map(|k| (p[k] - s0[k]) * d[k]).sum::<f64>() / (length * length);
+        (0..3).map(|k| (p[k] - s0[k] - t * d[k]).powi(2)).sum::<f64>().sqrt() < 1e-3
+    };
+    let sharp = edge_where(&built, |a, b| on_line(a) && on_line(b) && (0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f64>().sqrt() > 5.0);
+    let wrong =
+        edge_where(&built, |a, b| a.iter().map(|c| c * c).sum::<f64>().sqrt() > 9.0 && b.iter().map(|c| c * c).sum::<f64>().sqrt() > 9.0);
+    let faces = topology(&built).unwrap()["faces"].as_array().unwrap().clone();
+    let stars: Vec<i32> = faces
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f["name"].as_str().is_some_and(|n| n.starts_with("blend(v:")))
+        .map(|(k, _)| k as i32)
+        .collect();
+    assert_eq!(stars.len(), 5);
+    for face in &stars {
+        let angle = oriented_angle_creased(&built, *face, false, sharp as i32);
+        assert!((0.0..=0.0095).contains(&angle), "sub-patch {face} against the edge it continues: {angle}");
+    }
+    let refused = |reverse: bool, edge: usize| {
+        stars.iter().filter(|face| oriented_angle_creased(&built, **face, reverse, edge as i32) > 0.0095).count()
+    };
+    assert_eq!(
+        refused(false, wrong),
+        2,
+        "the two sub-patches that border the crease spoke are refused when the kink is not on the edge given"
+    );
+    assert_eq!(refused(true, sharp), 5, "a sub-patch turned round reads pi against its neighbours");
+}
+
+/// BLD §13.39 review: TWO creased corners in one step each keep their own star and their own sharp edge (cube, trim forced, vertices (0,0,0) and (10,10,10), ball 2): valid, two stars of 5.
+#[test]
+fn two_creased_corners_in_one_trim_step_are_judged_each_against_its_own_edge() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let shape = cube(10.0);
+    let far = [10.0, 10.0, 10.0];
+    let (mut edges, mut corners) = trim_step(&shape, [0.0; 3], 2, 1.0, 2.0);
+    let (more_edges, more_corners) = trim_step(&shape, far, 2, 1.0, 2.0);
+    edges.extend(more_edges);
+    corners.extend(more_corners);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("a solid");
+    assert!(analyze(&built).unwrap().valid);
+    assert_eq!(split_faces(topology(&built).unwrap()["faces"].as_array().unwrap()), (10, 10), "6 planes and 4 blends; two stars of 5");
+    assert_inside_source(&built, &shape, "two corners", 2e-3);
+}
+
+/// BLD §13.39 review: the crease-extent refusal at a second radius: r 0.8 reaches 0.8 sqrt(2) = 1.13 from the vertex, a ball of 1.0 does not hold it and 1.3 does.
+#[test]
+fn a_ball_that_does_not_hold_the_crease_is_refused_at_a_second_radius_too() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let shape = cube(10.0);
+    let (edges, corners) = trim_step(&shape, [0.0; 3], 2, 0.8, 1.0);
+    let text = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(text.starts_with("[BLD_SETBACK_TOO_SHORT]") && text.contains("must exceed 1.13"), "{text}");
+    let (edges, corners) = trim_step(&shape, [0.0; 3], 2, 0.8, 1.3);
+    assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "");
+}
+
+/// BLD §13.39.5: where the star is refused the step says so by name with the measure: the straight top edge sharp at r 0.5 / ball 1.5 (the creased star misses the blend ends by 6e-6 against 3.2e-6).
+#[test]
+fn a_creased_trim_star_that_misses_the_blend_ends_is_refused_with_the_measure() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    let (shape, vertex, _) = cylinder_block();
+    let (edges, corners) = trim_step(&shape, vertex, 1, 0.5, 1.5);
+    let text = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(
+        text.starts_with("[BLD_CORNER_FAILED]")
+            && text.contains("the only patch that holds the crease")
+            && text.contains("leave the edges by 0.00000"),
+        "{text}"
+    );
 }

@@ -113,6 +113,8 @@ constexpr FillSetting kFillSettings[] = {{15, 12, 60}, {15, 14, 100}, {40, 12, 1
 constexpr double kMarginRelative = 1e-9;
 // The most a creased star may be off tangency at the pole end of its crease spoke: the limit check_blends puts on it (13.33.7).
 constexpr double kCreasePole = 0.1;
+// The end of a crease spoke on the unrounded edge is within this fraction of the spoke from it (the hole is on the edge to the sewing tolerance only).
+constexpr double kOnSharpFraction = 1e-2;
 
 // check_blends samples a contact at up to 101 points (its `samples` limit): the built gap is measured at as many.
 constexpr int kGapSamples = 100;
@@ -708,8 +710,26 @@ bool boundary_angle(const TopoDS_Face &patch, const std::vector<TopoDS_Edge> &lo
 // The ORIENTED check of a patch in the sewn solid: along every edge of the patch image the outward normals of the patch and of the face on the other side (the face orientation applied
 // to both) must agree within kMixedFillAngle. A patch folded to the wrong side, or a surface tangent to its neighbour but facing the other way, reads about pi here and fails; false with the
 // worst angle (pi for an unmeasured edge) otherwise.
+// The star of ONE corner that holds the crease of an unrounded edge: its sub-patches (as faces of the sewn solid) and the unrounded edge it continues.
+struct CreasedStar {
+  TopTools_IndexedMapOfShape faces;
+  TopoDS_Edge sharp;
+};
+
+// Whether the normal angles `angles` (21+ samples, in the order of the edge) along an edge between two sub-patches of a creased star are a crease spoke that fades: the end ON the unrounded edge
+// (`first_on_sharp` / `last_on_sharp`, exactly one) carries the kink, each sample is at most the one before it (from that end) plus kMixedFillAngle, and the far end (the pole) is within kCreasePole.
+bool crease_spoke_fades(const std::vector<double> &angles, bool first_on_sharp, bool last_on_sharp) {
+  if (angles.size() < 2 || first_on_sharp == last_on_sharp) return false;
+  const size_t count = angles.size();
+  for (size_t k = 1; k < count; ++k) {
+    const double before = first_on_sharp ? angles[k - 1] : angles[count - k], now = first_on_sharp ? angles[k] : angles[count - 1 - k];
+    if (now > before + kMixedFillAngle) return false;
+  }
+  return (first_on_sharp ? angles.back() : angles.front()) <= kCreasePole;
+}
+
 bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMapOfShapeListOfShape &edge_faces, double &worst, bool tangent_edges_only = false,
-                          const TopTools_IndexedMapOfShape *creased_star = nullptr) {
+                          const CreasedStar *creased_star = nullptr) {
   worst = 0;
   for (TopExp_Explorer it(patch, TopAbs_EDGE); it.More(); it.Next()) {
     const TopoDS_Edge edge = TopoDS::Edge(it.Current());
@@ -734,7 +754,9 @@ bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMa
       }
       curves.push_back({on_side, {first, last}});
     }
-    double edge_worst = 0, first_angle = 0, last_angle = 0;
+    double edge_worst = 0;
+    std::vector<double> angles;
+    gp_Pnt end_points[2];
     for (int k = 0; k <= kGapSamples; ++k) {
       const double fraction = static_cast<double>(k) / kGapSamples;
       gp_Vec normals[2];
@@ -757,17 +779,27 @@ bool oriented_patch_angle(const TopoDS_Face &patch, const TopTools_IndexedDataMa
         }
         normal.Normalize();
         normals[side] = sides[side].Orientation() == TopAbs_REVERSED ? normal.Reversed() : normal;
+        if (side == 0 && k == 0) end_points[0] = point;
+        if (side == 0 && k == kGapSamples) end_points[1] = point;
       }
       const double angle = normals[0].Angle(normals[1]);
-      if (k == 0) first_angle = angle;
-      if (k == kGapSamples) last_angle = angle;
+      angles.push_back(angle);
       edge_worst = std::max(edge_worst, angle);
     }
-    // The crease spoke of a star that holds an unrounded edge (13.39): two sub-patches of the star that meet at the dihedral angle where the spoke leaves the sharp edge and fade to nothing at the
-    // pole. Its end at the pole must be tangent within kCreasePole (the limit check_blends puts on it); a spoke that is tangent at both ends keeps the ordinary check, and a flip reads pi at both.
-    if (creased_star != nullptr && creased_star->Contains(sides[0]) && creased_star->Contains(sides[1]) && std::max(first_angle, last_angle) > kMixedFillAngle) {
-      const double pole = std::min(first_angle, last_angle);
-      worst = std::max(worst, pole > kCreasePole ? pole : 0.0);
+    // The crease spoke of a star that holds an unrounded edge (13.39): two sub-patches of the SAME star that meet at the dihedral angle where the spoke leaves the unrounded edge and fade to nothing
+    // at the pole. It is accepted only when the kinked end lies on that edge, the angle never rises along the spoke by more than kMixedFillAngle and the pole end is within kCreasePole (the limit
+    // check_blends puts on it); a spoke that is tangent at both ends keeps the ordinary check, a flip reads pi everywhere and fails.
+    if (creased_star != nullptr && creased_star->faces.Contains(sides[0]) && creased_star->faces.Contains(sides[1]) && std::max(angles.front(), angles.back()) > kMixedFillAngle) {
+      // The end that is on the unrounded edge is the nearer one, and within kOnSharpFraction of the length of the spoke from it (the hole's end points are on the edge to the sewing tolerance, 2e-4 on the
+      // cylinder block, not exactly).
+      const auto distance_to_sharp = [&](const gp_Pnt &point) {
+        BRepExtrema_DistShapeShape distance(BRepBuilderAPI_MakeVertex(point).Vertex(), creased_star->sharp);
+        return distance.IsDone() ? distance.Value() : 1e300;
+      };
+      const double first_distance = distance_to_sharp(end_points[0]), last_distance = distance_to_sharp(end_points[1]);
+      const double reach = kOnSharpFraction * end_points[0].Distance(end_points[1]);
+      if (!crease_spoke_fades(angles, first_distance <= reach && first_distance < last_distance, last_distance <= reach && last_distance < first_distance))
+        worst = std::max(worst, std::max(edge_worst, kCreasePole + 1e-9));
       continue;
     }
     // (probe only) an edge where the faces meet at a corner is not a tangent edge: the seam of a test shape
@@ -912,7 +944,7 @@ bool fill_exact(FillJob &job, double diagonal) {
   }
   corner_exact::Patches exact;
   corner_exact::CentreHint hint;
-  if (!job.hole_copy.IsNull())
+  if (!job.hole_copy.IsNull() && !job.creased)
     hint = [&job, diagonal](const gp_Pnt &from, const gp_Dir &axis, double &height) {
       IntCurvesFace_ShapeIntersector intersector;
       intersector.Load(job.hole_copy, 1e-7);
@@ -1175,11 +1207,11 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
                   " but is not rounded: the two rounded edges of a vertex with a sharp edge need a constant radius in this build (edge " + std::to_string(other) + " varies)";
             return nullptr;
           }
-        // Measured on the cylinder block (r 0.3 to 2, ball 1 to 3.5, 7 cases): the star over a hole whose crease vertex lies on a curved sharp edge misses the blend ends by 3e-6 to 9e-6 at 64 poles
-        // (the limit is 0.2e-6 x the diagonal), against 1e-8 on a straight sharp edge.
+        // Measured on the cylinder block (r 0.3 to 2, ball 1 to 3.5, 10 cases; 1 builds): the star over a hole whose crease vertex lies on the curved sharp edge misses the blend ends by 3e-6 to 5e-5 at 64 poles
+        // (the limit is 0.2e-6 x the diagonal). The straight top edge fails the same way in 9 of 10 (13.39.5): the cause is not found.
         if (BRepAdaptor_Curve(TopoDS::Edge(unique_edges(edge + 1))).GetType() != GeomAbs_Line) {
           why = std::string(kUnsupported) + "edge " + std::to_string(edge) + " meets the setback vertex " + where(corner.at) +
-                " but is not rounded: an edge left sharp at a setback corner must be a straight line (the star over a curved sharp edge missed the blend ends by 3e-6 to 9e-6 in every case measured, limit 0.2e-6 x the diagonal)";
+                " but is not rounded: an edge left sharp at a setback corner must be a straight line (the star over it missed the blend ends by 3e-6 to 5e-5 in 9 of 10 cases measured on the cylinder block, limit 0.2e-6 x the diagonal)";
           return nullptr;
         }
         const auto given = std::find_if(corner.setbacks.begin(), corner.setbacks.end(), [&](const auto &entry) { return entry.first == edge; });
@@ -1618,6 +1650,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   std::vector<TopoDS_Face> patches;
   std::vector<std::string> patch_names;
   std::vector<bool> patch_is_star, patch_is_creased;  // per patch: a sub-patch of a star, and of a star that holds the crease of an unrounded edge
+  std::vector<size_t> patch_corner_of;  // per patch: its corner
   std::vector<std::string> corner_kinds(corners.size()), corner_centres(corners.size());
   double worst_patch_gap = 0;
   for (size_t c = 0; c < corners.size(); ++c) {
@@ -1650,6 +1683,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       patch_names.push_back("blend(v:" + joined_names(around) + ")" + (job.patch_loop.empty() ? std::string() : "#" + std::to_string(rank[k] + 1)));
       patch_is_star.push_back(!job.patch_loop.empty());
       patch_is_creased.push_back(!job.patch_loop.empty() && job.creased);
+      patch_corner_of.push_back(c);
       corner_kinds[c] = job.patch_loop.empty() ? "plate" : "exact";
       corner_centres[c] = job.hinted ? "surface" : "rule";
     }
@@ -1706,13 +1740,16 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
   {
     TopTools_IndexedDataMapOfShapeListOfShape solid_edge_faces;
     TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, solid_edge_faces);
-    TopTools_IndexedMapOfShape creased_stars;
+    std::vector<CreasedStar> stars(corners.size());  // one per corner: the sub-patches of a star only meet their own crease
+    for (size_t c = 0; c < corners.size(); ++c) {
+      stars[c].sharp = sharp_of[c] >= 0 ? TopoDS::Edge(unique_edges(sharp_of[c] + 1)) : TopoDS_Edge();
+    }
     for (size_t p = 0; p < patches.size(); ++p)
-      if (patch_is_creased[p]) creased_stars.Add(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]);
+      if (patch_is_creased[p]) stars[patch_corner_of[p]].faces.Add(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]);
     for (size_t p = 0; p < patches.size(); ++p) {
       if (!patch_is_star[p]) continue;
       double worst = 0;
-      if (!oriented_patch_angle(TopoDS::Face(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]), solid_edge_faces, worst, false, &creased_stars)) {
+      if (!oriented_patch_angle(TopoDS::Face(sewing.IsModified(patches[p]) ? sewing.Modified(patches[p]) : patches[p]), solid_edge_faces, worst, false, patch_is_creased[p] ? &stars[patch_corner_of[p]] : nullptr)) {
         fill_failed = true;
         why = std::string(kFailed) + "a sub-patch of the corner star is not tangent to its neighbours in the sewn solid (outward normals differ by " + number(worst) + " rad, limit " +
               number(kMixedFillAngle) + (worst > kPi / 2 ? ": it faces the other way" : "") + ")";
@@ -2336,6 +2373,39 @@ void set_corner_g2_star(bool on) { g_g2_star.store(on); }
 void set_corner_trim(bool on) { g_force_trim.store(on); }
 
 // Test seams (src/test_bridge.rs, never called by the build): the guards of the mixed corner on a shape the test chooses.
+// Like oriented_angle_probe for a creased star (13.39): the star is every B-spline face of the shape, `sharp_edge` (a unique edge index of `shape`) is the unrounded edge it continues. About 0 for
+// a crease spoke that fades from that edge; a value above kMixedFillAngle when the spoke is judged wrong (the kink is not on `sharp_edge`, or the face is reversed).
+double oriented_angle_creased_probe(const Shape &shape, int32_t face, bool reverse, int32_t sharp_edge) {
+  const TopTools_IndexedMapOfShape faces = query::distinct(shape.shape, TopAbs_FACE);
+  const TopTools_IndexedMapOfShape edges = query::distinct(shape.shape, TopAbs_EDGE);
+  if (face < 0 || face >= faces.Extent() || sharp_edge < 0 || sharp_edge >= edges.Extent()) return -1.0;
+  BRep_Builder builder;
+  TopoDS_Shell rebuilt;
+  builder.MakeShell(rebuilt);
+  TopoDS_Face picked;
+  CreasedStar star;
+  star.sharp = TopoDS::Edge(edges(sharp_edge + 1));
+  for (int f = 1; f <= faces.Extent(); ++f) {
+    TopoDS_Shape item = faces(f);
+    if (f - 1 == face) {
+      if (reverse) item = item.Reversed();
+      picked = TopoDS::Face(item);
+    }
+    if (BRepAdaptor_Surface(TopoDS::Face(faces(f)), Standard_False).GetType() == GeomAbs_BSplineSurface) star.faces.Add(faces(f));
+    builder.Add(rebuilt, item);
+  }
+  TopTools_IndexedDataMapOfShapeListOfShape edge_faces;
+  TopExp::MapShapesAndAncestors(rebuilt, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+  double worst = 0;
+  oriented_patch_angle(picked, edge_faces, worst, false, &star);
+  return worst;
+}
+
+// The pure decision on a crease spoke's normal angles (test seam of crease_spoke_fades).
+bool crease_fade_probe(rust::Slice<const double> angles, bool first_on_sharp, bool last_on_sharp) {
+  return crease_spoke_fades(std::vector<double>(angles.begin(), angles.end()), first_on_sharp, last_on_sharp);
+}
+
 // The oriented check on face `face` of the first solid of `shape`, rebuilt into a shell with that face reversed when `reverse`, over the tangent edges only: about 0 for a blend face as built,
 // about pi when it is turned round.
 double oriented_angle_probe(const Shape &shape, int32_t face, bool reverse) {

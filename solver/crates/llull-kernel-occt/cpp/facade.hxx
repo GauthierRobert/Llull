@@ -87,6 +87,8 @@ int32_t last_shell_star_poles();
 int32_t span_cut_count(const Shape &shape);
 // Test-only seams of the mixed corner guards (blend_corner.cxx): the oriented patch angle of face `face` (optionally reversed in a rebuilt shell) and the boundary angle against its neighbours (-1: not measured).
 double oriented_angle_probe(const Shape &shape, int32_t face, bool reverse);
+double oriented_angle_creased_probe(const Shape &shape, int32_t face, bool reverse, int32_t sharp_edge);
+bool crease_fade_probe(rust::Slice<const double> angles, bool first_on_sharp, bool last_on_sharp);
 double boundary_angle_probe(const Shape &shape, int32_t face, bool drop_one);
 
 // Test-only probe of surface_bounds.hxx: [Bezier-patch box, AddOptimal box, dense sample box] of a synthetic many-patch B-spline face (cpp/surface_bounds_probe.cxx).
