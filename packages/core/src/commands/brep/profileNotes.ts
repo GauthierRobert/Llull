@@ -26,6 +26,7 @@ export interface ProfileData {
     readonly continuity?: 'G1' | 'G2';
     readonly spokes?: 'G1';
     readonly g2Refused?: string;
+    readonly overshoot?: number;
     readonly setbacks: ReadonlyArray<{ readonly edge: string; readonly distance: number }>;
   }>;
 }
@@ -53,6 +54,7 @@ export function describeProfileNotes(
     ...(corner.continuity === undefined ? {} : { continuity: corner.continuity }),
     ...(corner.spokes === undefined ? {} : { spokes: corner.spokes }),
     ...(corner.g2Refused === undefined ? {} : { g2Refused: corner.g2Refused }),
+    ...(corner.overshoot === undefined ? {} : { overshoot: corner.overshoot }),
     setbacks: corner.setbacks.map((entry) => ({ edge: nameOf(topology, entry.edge), distance: entry.distance })),
   }));
   const data: ProfileData = {

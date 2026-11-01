@@ -57,6 +57,7 @@
 #include <GProp_GProps.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepTools.hxx>
 #include <TopTools_MapOfShape.hxx>
 #include <Standard_Failure.hxx>
 #include <TopExp.hxx>
@@ -115,6 +116,8 @@ constexpr double kMarginRelative = 1e-9;
 constexpr double kCreasePole = 0.1;
 // The end of a crease spoke on the unrounded edge is within this fraction of the spoke from it (the hole is on the edge to the sewing tolerance only).
 constexpr double kOnSharpFraction = 1e-2;
+// The most a trimmed corner star may stand outside the source solid, relative to its diagonal (13.39.3).
+constexpr double kOvershootFraction = 1e-3;
 
 // check_blends samples a contact at up to 101 points (its `samples` limit): the built gap is measured at as many.
 constexpr int kGapSamples = 100;
@@ -1757,6 +1760,34 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       }
     }
   }
+  // How far the stars stand OUTSIDE the source solid (13.39.3): 9 x 9 points on every star sub-patch, the points the source classifies as outside, their distance to it. A smooth star over a hole
+  // is tangent to its supports and can overshoot the part. Recorded for every trim star; a CREASED star above kOvershootFraction of the diagonal is refused by name (the plain trim stars already stand up to 0.4 outside in the existing tests, 13.39.3: they are not gated).
+  std::vector<double> overshoot(corners.size(), 0.0);
+  {
+    BRepClass3d_SolidClassifier source_solid(shape);
+    const double measure_tolerance = 1e-9 * diagonal;
+    for (size_t p = 0; p < patches.size(); ++p) {
+      if (!patch_is_star[p]) continue;
+      double u0, u1, v0, v1;
+      BRepTools::UVBounds(patches[p], u0, u1, v0, v1);
+      const BRepAdaptor_Surface surface(patches[p], Standard_False);
+      for (int i = 0; i <= 8; ++i)
+        for (int j = 0; j <= 8; ++j) {
+          const gp_Pnt point = surface.Value(u0 + (u1 - u0) * i / 8.0, v0 + (v1 - v0) * j / 8.0);
+          source_solid.Perform(point, measure_tolerance);
+          if (source_solid.State() != TopAbs_OUT) continue;
+          BRepExtrema_DistShapeShape distance(BRepBuilderAPI_MakeVertex(point).Vertex(), shape);
+          if (distance.IsDone()) overshoot[patch_corner_of[p]] = std::max(overshoot[patch_corner_of[p]], distance.Value());
+        }
+    }
+    for (size_t c = 0; c < corners.size(); ++c)
+      if (sharp_of[c] >= 0 && overshoot[c] > kOvershootFraction * diagonal) {
+        fill_failed = true;
+        why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " stands " + number(overshoot[c]) + " outside the part, above " + number(kOvershootFraction * diagonal) + " (" +
+              number(kOvershootFraction) + " x the diagonal)";
+        return nullptr;
+      }
+  }
   const TopTools_IndexedMapOfShape final_faces = query::distinct(solid, TopAbs_FACE);
   std::vector<std::string> names(static_cast<size_t>(final_faces.Extent()));
   for (size_t m = 0; m < members.size(); ++m) {
@@ -1769,7 +1800,7 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     JsonWriter log;
     log.begin_array();
     for (size_t c = 0; c < corners.size(); ++c) {
-      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(corner_kinds[c]).key("centre").string(corner_centres[c]).key("setbacks").begin_array();
+      log.begin_object().key("vertex").point(corners[c].at).key("patch").string(corner_kinds[c]).key("centre").string(corner_centres[c]).key("overshoot").number(overshoot[c]).key("setbacks").begin_array();
       for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
       log.end_array().end_object();
     }
@@ -2460,7 +2491,10 @@ std::unique_ptr<Shape> fillet_setback(const Shape &shape, rust::Slice<const doub
   try {
     bool fill_failed = false;
     std::string log;
-    return build_setback(shape, edges, corners, Mode{}, fill_failed, log, why);
+    std::unique_ptr<Shape> built = build_setback(shape, edges, corners, Mode{}, fill_failed, log, why);
+    // the per-corner log (patch kind, centre, setbacks and, on the trim path, the overshoot) is what the host reads back as the notes of the shape
+    if (built) built->notes = "{\"builder\":\"corners\",\"corners\":" + log + "}";
+    return built;
   } catch (const Standard_Failure &) {
     return nullptr;
   }

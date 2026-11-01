@@ -24,7 +24,11 @@ interface Face {
   readonly name?: string;
 }
 interface Reported {
-  readonly corners: Array<{ readonly vertex: number[]; readonly crease: { readonly sharpEdge: number; readonly entryRad: number } }>;
+  readonly corners: Array<{
+    readonly vertex: number[];
+    readonly crease: { readonly sharpEdge: number; readonly entryRad: number };
+    readonly overshoot?: number;
+  }>;
   readonly profile?: {
     readonly cornerSetbackFactor: number;
     readonly corners: Array<{
@@ -135,6 +139,10 @@ describeNative('DES-6c 13.39: a sharp third edge at a profile corner and at a tr
     const result = done.affected[0] as string;
     expect(patches(done.document, result)).toHaveLength(5);
     const crease = (done.data as Reported).corners[0]?.crease;
+    // the trim builder measures how far the star stands outside the part and reports it (limit 1e-3 x the diagonal = 0.0162)
+    const overshoot = (done.data as Reported).corners[0]?.overshoot;
+    expect(overshoot).toBeGreaterThan(0);
+    expect(overshoot).toBeLessThan(1e-3 * Math.hypot(10, 10, 5));
     expect(crease?.entryRad).toBeCloseTo(Math.PI / 2, 6);
     expect(Math.abs(volume(done.document, result) - volume(plain.document, plain.affected[0] as string))).toBeLessThan(0.25);
     const read = checked(done.document, result);

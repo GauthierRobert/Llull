@@ -477,6 +477,7 @@ describe('fillet_edge corners', () => {
       {
         vertex: [-HALF, -HALF, -HALF] as [number, number, number],
         patch: 'exact' as const,
+        overshoot: 0.002,
         setbacks: atCorner.map((one) => ({ edge: one.index, distance: 2 })),
       },
     ];
@@ -494,9 +495,19 @@ describe('fillet_edge corners', () => {
     const done = run(reportOf(noted));
     expect(done.error).toBeUndefined();
     expect((done.data as { corners: unknown }).corners).toEqual([
-      { vertex: [-HALF, -HALF, -HALF], crease: { sharpEdge: sharp.index, entryRad: 1.570796 } },
+      { vertex: [-HALF, -HALF, -HALF], crease: { sharpEdge: sharp.index, entryRad: 1.570796 }, overshoot: 0.002 },
     ]);
     expect(done.summary).toContain(`Sharp edge kept at 1 corner(s): edge ${sharp.index}`);
+    // a setback step (the trim builder) reads the same notes: the overshoot of the corner star comes back with the crease
+    const { doc, id } = cube();
+    const setback = execute(
+      doc,
+      'fillet_edge',
+      { id, edges, corners: [{ near: corner, type: 'setback', setback: 2 }] },
+      ctxOf({ ...scriptedKernel({ topology: TOPOLOGY }), blendReport: () => reportOf(noted) }),
+    );
+    expect(setback.error).toBeUndefined();
+    expect((setback.data as { corners: Array<{ overshoot?: number }> }).corners[0]?.overshoot).toBe(0.002);
     // a kernel that names no corners reports no crease, and the profile data stays
     const none = run(reportOf(undefined));
     expect((none.data as { corners?: unknown }).corners).toBeUndefined();

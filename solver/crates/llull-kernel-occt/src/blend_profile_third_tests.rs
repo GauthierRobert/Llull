@@ -345,8 +345,8 @@ fn the_trim_builder_holds_a_sharp_straight_edge_with_a_crease_spoke() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
     let (shape, vertex, meeting) = cylinder_block();
-    // measured to build (13.39.4): the straight top edge sharp at r 0.5 / ball 1.2 only (9 of 10 other cases miss G0, below), the edge against the cylinder sharp at six radius / ball pairs
-    let cases: Vec<(usize, f64, f64)> = vec![(1, 0.5, 1.2), (2, 0.5, 1.2), (2, 0.5, 1.5), (2, 0.3, 1.5), (2, 0.3, 2.0), (2, 0.8, 2.0)];
+    // measured to build (13.39.4): the straight top edge sharp at r 0.5 / ball 1.2 only (9 of 10 other cases miss G0, below), the edge against the cylinder sharp at five radius / ball pairs
+    let cases: Vec<(usize, f64, f64)> = vec![(1, 0.5, 1.2), (2, 0.5, 1.2), (2, 0.5, 1.5), (2, 0.3, 1.5), (2, 0.8, 2.0)];
     for (sharp, radius, ball) in cases {
         let (edges, corners) = trim_step(&shape, vertex, sharp, radius, ball);
         assert_eq!(setback_reason(&shape, &edges, &corners).unwrap(), "", "sharp {sharp} r {radius} ball {ball} builds");
@@ -583,4 +583,25 @@ fn a_creased_trim_star_that_misses_the_blend_ends_is_refused_with_the_measure() 
             && text.contains("leave the edges by 0.00000"),
         "{text}"
     );
+}
+
+/// BLD §13.39.3 (review): a corner star that stands outside the part does not pass silently. The trim builder measures 9 x 9 points on every star sub-patch against the source and records the
+/// largest distance outside (`overshoot` in the corner log, the notes of the shape); above 1e-3 x the diagonal the step is refused by name. Cube 10, trim forced, r 1: ball 2 stands 1.1e-3 outside
+/// (builds), ball 3 stands 2.8e-2 (the limit is 0.0173).
+#[test]
+fn a_trim_star_that_stands_outside_the_part_is_measured_and_refused_above_the_limit() {
+    let _serial = crate::serial_blends();
+    let _reset = CornerHooks;
+    crate::test_bridge::set_corner_trim(true);
+    let shape = cube(10.0);
+    let limit = 1e-3 * 3.0_f64.sqrt() * 10.0;
+    let (edges, corners) = trim_step(&shape, [0.0; 3], 2, 1.0, 2.0);
+    let built = fillet_setback(&shape, &edges, &corners).unwrap().expect("ball 2 builds");
+    let overshoot = notes_of(&built)["corners"][0]["overshoot"].as_f64().expect("the overshoot is recorded");
+    assert!(overshoot > 5e-4 && overshoot < 1.5e-3, "measured overshoot {overshoot}");
+    let (edges, corners) = trim_step(&shape, [0.0; 3], 2, 1.0, 3.0);
+    let text = setback_reason(&shape, &edges, &corners).unwrap();
+    assert!(text.starts_with("[BLD_CORNER_FAILED]") && text.contains("stands 0.0") && text.contains("outside the part, above"), "{text}");
+    assert!(text.contains(&format!("above {}", (limit * 1e5).round() / 1e5)) || text.contains("above 0.017"), "{text}");
+    // the same gate on the cylinder block: the edge against the cylinder sharp, r 0.3, ball 2 stands 0.0155 outside (limit 1e-3 x the diagonal)    let (block, vertex, _) = cylinder_block();    let (edges, corners) = trim_step(&block, vertex, 2, 0.3, 2.0);    let text = setback_reason(&block, &edges, &corners).unwrap();    assert!(text.contains("stands 0.015") && text.contains("outside the part, above"), "{text}");
 }

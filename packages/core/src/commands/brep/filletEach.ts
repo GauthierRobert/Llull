@@ -304,6 +304,17 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
     return kinkRefusal(doc, 'fillet_edge', request.id, kink, request.edges === undefined ? 'radius' : 'edges');
   // how a profile blend was made (builder, measured gap, a reported fallback, corner setbacks): in the summary and in `data`
   const notes = profiled && committed.document !== doc ? readProfileNotes(kernel, modified) : null;
+  // the trim builder measures how far each corner star stands outside the part (13.39.3): read from the notes of a setback step too
+  const cornerNotes = notes ?? (corners.length > 0 && committed.document !== doc ? readProfileNotes(kernel, modified) : null);
+  const near = (a: readonly number[], b: readonly number[]): boolean =>
+    Math.hypot((a[0] ?? 0) - (b[0] ?? 0), (a[1] ?? 0) - (b[1] ?? 0), (a[2] ?? 0) - (b[2] ?? 0)) < 1e-6;
+  const creaseCorners =
+    corners.length > 0
+      ? corners.map((one) => {
+          const overshoot = cornerNotes?.corners?.find((noted) => near(noted.vertex, one.vertex))?.overshoot;
+          return overshoot === undefined ? { vertex: one.vertex } : { vertex: one.vertex, overshoot };
+        })
+      : (notes?.corners ?? []);
   const described = notes === null ? null : describeProfileNotes(notes, topology, doc.units);
   const profiledResult: CommandResult =
     described === null ? committed : { ...committed, summary: `${committed.summary}${described.text}`, data: { profile: described.data } };
@@ -314,7 +325,7 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
           kernel,
           shape,
           topology,
-          corners.length > 0 ? corners : (notes?.corners ?? []), // profile corners are found by the kernel: its notes name the vertices (13.39)
+          creaseCorners,
           plan.map((entry) => entry.edge),
         );
   const creased = withCreases(profiledResult, creases);
