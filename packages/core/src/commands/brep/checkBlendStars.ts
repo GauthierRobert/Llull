@@ -65,6 +65,33 @@ type Measured = NonNullable<ReturnType<typeof measureContact>>;
 const OVERSHOOT_WARN_FRACTION = 1e-6;
 const OVERSHOOT_FAIL_FRACTION = 1e-3;
 
+/** A trim corner star whose largest |principal curvature| exceeds this multiple of the curvature 1/r of the blends at its vertex is reported (warn). Measured: 2.8 for the full-tangent star of the d-shape block, 70 to 147 for the long thin holes (setbacks 1.2 / 1.2 / x). */
+const SHAPE_RATIO_WARN = 10;
+
+/**
+ * BLD_CHECK_CORNER_SHAPE for each corner of the blend nodes of `recipe` whose notes record a `shape` (the rolling-ball trim builder, 13.41) with a curvatureRatio above SHAPE_RATIO_WARN: warn,
+ * naming the ratio, the largest curvature and the largest normal turn between neighbouring samples.
+ */
+export function shapeFindings(kernel: GeometryKernel, recipe: ShapeRecipe, entityId: string, unit: string): Finding[] {
+  const found: Finding[] = [];
+  for (const node of [...filletNodes(recipe), ...blendNodes(recipe)])
+    for (const corner of kernel.blendReport?.(node)?.notes?.corners ?? []) {
+      const shape = corner.shape;
+      if (shape === undefined || !(shape.curvatureRatio > SHAPE_RATIO_WARN)) continue;
+      found.push({
+        code: 'BLD_CHECK_CORNER_SHAPE',
+        severity: 'warn',
+        entityId,
+        value: sig(shape.curvatureRatio),
+        limit: SHAPE_RATIO_WARN,
+        unit: 'x blend curvature',
+        remediation: REMEDIATION.BLD_CHECK_CORNER_SHAPE,
+        message: `the corner star at (${corner.vertex.map(sig).join(', ')}) reaches a curvature of ${sig(shape.maxCurvature)} per ${unit}, ${sig(shape.curvatureRatio)} times that of the blends at the vertex (limit ${SHAPE_RATIO_WARN}), and its normal turns by ${sig(shape.maxNormalTurn)} rad between neighbouring samples of a 17 x 17 grid: it is inside the part and tangent, but not fair`,
+      });
+    }
+  return found;
+}
+
 /**
  * BLD_CHECK_CORNER_OVERSHOOT for each corner of the blend nodes of `recipe` whose notes record an `overshoot` (the rolling-ball trim builder, 13.41): warn above 1e-6 x the diagonal, fail above
  * the build gate 1e-3 x the diagonal. A corner without the key (analytic star, plate, mixed corner) raises nothing.

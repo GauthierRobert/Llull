@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <exception>
+#include <optional>
 #include <new>
 #include <system_error>
 #include <thread>
@@ -53,6 +54,7 @@
 #include <BRep_Tool.hxx>
 #include <Geom2d_Curve.hxx>
 #include <Geom_Surface.hxx>
+#include <GeomLProp_SLProps.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <GProp_GProps.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
@@ -1085,6 +1087,42 @@ int corner_convexity(const BRepOffset_Analyse &analyse, const std::vector<TopoDS
   return concave == 0 ? 0 : (convex == 0 ? 1 : 2);
 }
 
+// The shape of a star (13.41): the largest |principal curvature| and the largest turn of the normal between neighbouring points of a 17 x 17 grid of every sub-patch (the pole, where the normal is
+// undefined, is skipped), and the first as a multiple of the curvature 1 / radius of the blends that meet there.
+struct StarShape {
+  double curvature = 0, turn = 0, ratio = 0;
+};
+
+StarShape star_shape(const std::vector<TopoDS_Face> &faces, double blend_radius) {
+  constexpr int kGrid = 17;
+  StarShape shape;
+  for (const TopoDS_Face &face : faces) {
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(face, u0, u1, v0, v1);
+    const Handle(Geom_Surface) surface = BRep_Tool::Surface(face);
+    std::vector<std::optional<gp_Dir>> normals(static_cast<size_t>(kGrid * kGrid));
+    for (int i = 0; i < kGrid; ++i)
+      for (int j = 0; j < kGrid; ++j) {
+        GeomLProp_SLProps props(surface, u0 + (u1 - u0) * i / (kGrid - 1), v0 + (v1 - v0) * j / (kGrid - 1), 2, 1e-9);
+        if (!props.IsNormalDefined()) continue;
+        normals[static_cast<size_t>(i * kGrid + j)] = props.Normal();
+        if (props.IsCurvatureDefined()) shape.curvature = std::max({shape.curvature, std::fabs(props.MaxCurvature()), std::fabs(props.MinCurvature())});
+      }
+    for (int i = 0; i < kGrid; ++i)
+      for (int j = 0; j < kGrid; ++j) {
+        const auto &here = normals[static_cast<size_t>(i * kGrid + j)];
+        if (!here) continue;
+        for (const auto &[di, dj] : {std::pair<int, int>{1, 0}, {0, 1}}) {
+          if (i + di >= kGrid || j + dj >= kGrid) continue;
+          const auto &next = normals[static_cast<size_t>((i + di) * kGrid + j + dj)];
+          if (next) shape.turn = std::max(shape.turn, here->Angle(*next));
+        }
+      }
+  }
+  shape.ratio = blend_radius > 0 ? shape.curvature * blend_radius : 0;
+  return shape;
+}
+
 // How far the faces of a star stand on the wrong side of the source solid (13.39.3, 13.41): 9 x 9 points on every face, the distance to the source of those it classifies on the wrong side.
 // A convex corner (convexity 0) removes material, so its star lies in the source and its fault is to go OUT; a concave one (1) adds material and its fault is to go IN. A mixed corner (2) has
 // no wrong side: -1, not measured.
@@ -1878,6 +1916,21 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     const int index = final_faces.FindIndex(image);
     if (index > 0) names[static_cast<size_t>(index - 1)] = member_names[m];
   }
+  std::vector<StarShape> star_shapes(corners.size());
+  std::vector<bool> has_shape(corners.size(), false);
+  for (size_t c = 0; c < corners.size(); ++c) {
+    std::vector<TopoDS_Face> star;
+    for (size_t p = 0; p < patches.size(); ++p)
+      if (patch_is_star[p] && patch_corner_of[p] == c) star.push_back(patches[p]);
+    if (star.empty()) continue;
+    double blend_radius = 0;  // the largest radius of the blends that meet at the vertex
+    for (const auto &entry : corners[c].setbacks) {
+      const auto found = radius.find(entry.first);
+      if (found != radius.end()) blend_radius = std::max({blend_radius, found->second.start, found->second.end});
+    }
+    star_shapes[c] = star_shape(star, blend_radius);
+    has_shape[c] = true;
+  }
   {
     // the log with the kind of patch and where the centre of the star came from (the replaced surface, or the 3/8 rule of 13.21.4 when it crosses no axis)
     JsonWriter log;
@@ -1885,6 +1938,8 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     for (size_t c = 0; c < corners.size(); ++c) {
       log.begin_object().key("vertex").point(corners[c].at).key("patch").string(corner_kinds[c]).key("centre").string(corner_centres[c]);
       if (overshoot[c] >= 0) log.key("overshoot").number(overshoot[c]);  // a mixed corner has no wrong side: the key is omitted (13.41)
+      if (has_shape[c])
+        log.key("shape").begin_object().key("maxCurvature").number(star_shapes[c].curvature).key("maxNormalTurn").number(star_shapes[c].turn).key("curvatureRatio").number(star_shapes[c].ratio).end_object();
       log.key("setbacks").begin_array();
       for (const auto &[edge, distance] : corners[c].setbacks) log.begin_object().key("edge").integer(edge).key("distance").number(distance).end_object();
       log.end_array().end_object();

@@ -32,6 +32,7 @@ export interface ProfileData {
     readonly spokeRefused?: string;
     readonly g2Refused?: string;
     readonly overshoot?: number;
+    readonly shape?: { readonly maxCurvature: number; readonly maxNormalTurn: number; readonly curvatureRatio: number };
     readonly setbacks: ReadonlyArray<{ readonly edge: string; readonly distance: number }>;
   }>;
 }
@@ -65,6 +66,7 @@ export function describeProfileNotes(
     ...(corner.spokeRefused === undefined ? {} : { spokeRefused: corner.spokeRefused }),
     ...(corner.g2Refused === undefined ? {} : { g2Refused: corner.g2Refused }),
     ...(corner.overshoot === undefined ? {} : { overshoot: corner.overshoot }),
+    ...(corner.shape === undefined ? {} : { shape: corner.shape }),
     setbacks: corner.setbacks.map((entry) => ({ edge: nameOf(topology, entry.edge), distance: entry.distance })),
   }));
   const data: ProfileData = {

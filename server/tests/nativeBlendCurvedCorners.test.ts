@@ -167,6 +167,36 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(found[0]?.value).toBeLessThanOrEqual(0.015);
   });
 
+  it('check_blends warns BLD_CHECK_CORNER_SHAPE for the star of a long thin hole (setbacks 1.2 / 1.2 / 1.3) and not for the star of the uniform setback; data.corners[].shape carries the reading (13.41)', () => {
+    const { doc, id, vertex, edges } = dshape();
+    type Finding = { code: string; severity: string; value?: number };
+    type Shaped = { corners?: Array<{ shape?: { maxCurvature: number; maxNormalTurn: number; curvatureRatio: number } }> };
+    const build = (setbacks: unknown[]): ReturnType<typeof execute> =>
+      execute(doc, 'fillet_edge', {
+        id,
+        edgesNear: edges,
+        radius: 0.5,
+        corners: [{ near: vertex, type: 'setback', setback: 1.2, setbacks }],
+      });
+    const shapeFindings = (done: ReturnType<typeof execute>): Finding[] =>
+      (execute(done.document, 'check_blends', { ids: [done.affected[0] as string] }).data as { findings: Finding[] }).findings.filter(
+        (finding) => finding.code === 'BLD_CHECK_CORNER_SHAPE',
+      );
+    const thin = build([{ near: edges[1] as [number, number, number], distance: 1.3 }]);
+    expect(thin.error, thin.summary).toBeUndefined();
+    const warned = shapeFindings(thin);
+    expect(warned).toHaveLength(1);
+    expect(warned[0]?.severity).toBe('warn');
+    expect(warned[0]?.value).toBeGreaterThan(30);
+    const shape = (thin.data as Shaped).corners?.[0]?.shape;
+    expect(shape?.curvatureRatio).toBeCloseTo(warned[0]?.value ?? 0, 3);
+    expect(shape?.maxNormalTurn).toBeGreaterThan(0.5);
+    const uniform = build([]);
+    expect(uniform.error, uniform.summary).toBeUndefined();
+    expect(shapeFindings(uniform)).toEqual([]);
+    expect((uniform.data as Shaped).corners?.[0]?.shape?.curvatureRatio).toBeLessThan(10);
+  });
+
   it('a star that stays outside the part after every rebuild is refused by name and leaves the document unchanged (r 11 block, 13.41)', () => {
     const box = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 5], position: [5, 5, 2.5] });
     const cylinder = execute(box.document, 'add_cylinder', { radius: 11, height: 5, position: [0, 0, 2.5] });

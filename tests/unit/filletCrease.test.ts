@@ -46,13 +46,13 @@ describe('creaseOfCorners', () => {
       'Sharp edge kept at 1 corner(s): edge 2 (entry 1.570796 rad)',
     );
     // a concave fold reads negative; without a signed reading the unsigned angle stands
-    expect(creaseOfCorners(kernelOf([sample(0.1), sample(1, -1)]), shape, topology, [corner], [0, 1])[0]?.crease.entryRad).toBe(-1);
-    expect(creaseOfCorners(kernelOf([sample(0.1), sample(1)]), shape, topology, [corner], [0, 1])[0]?.crease.entryRad).toBe(1);
+    expect(creaseOfCorners(kernelOf([sample(0.1), sample(1, -1)]), shape, topology, [corner], [0, 1])[0]?.crease?.entryRad).toBe(-1);
+    expect(creaseOfCorners(kernelOf([sample(0.1), sample(1)]), shape, topology, [corner], [0, 1])[0]?.crease?.entryRad).toBe(1);
   });
 
   it('reads the first sample when the sharp edge starts at the vertex', () => {
     const flipped = { ...topology, edges: [topology.edges[0], topology.edges[1], edge(2, [0, 0, 0], [0, 0, 10])] } as ShapeTopology;
-    expect(creaseOfCorners(kernelOf([sample(0.5, 0.5), sample(0.1)]), shape, flipped, [corner], [0, 1])[0]?.crease.entryRad).toBe(0.5);
+    expect(creaseOfCorners(kernelOf([sample(0.5, 0.5), sample(0.1)]), shape, flipped, [corner], [0, 1])[0]?.crease?.entryRad).toBe(0.5);
   });
 
   it('reports nothing when no edge is left sharp, two are, the vertex has other than three edges, the topology or the kernel reading is missing', () => {
@@ -64,6 +64,27 @@ describe('creaseOfCorners', () => {
     expect(creaseOfCorners(kernelOf(null), shape, topology, [corner], [0, 1])).toEqual([]);
     expect(creaseOfCorners({} as GeometryKernel, shape, topology, [corner], [0, 1])).toEqual([]);
     expect(creaseOfCorners(kernelOf([]), shape, topology, [corner], [0, 1])).toEqual([]);
+  });
+});
+
+describe('creaseOfCorners: trim star readings (13.41)', () => {
+  const reading = {
+    vertex: [0, 0, 0] as [number, number, number],
+    overshoot: 0.0123456789,
+    shape: { maxCurvature: 140, maxNormalTurn: 0.9, curvatureRatio: 70 },
+  };
+
+  it('keeps the overshoot and the shape of a corner without a sharp edge in data.corners, with no crease', () => {
+    const found = creaseOfCorners(kernelOf(null), shape, topology, [reading], [0, 1, 2]);
+    expect(found).toEqual([{ vertex: [0, 0, 0], overshoot: 0.012346, shape: reading.shape }]);
+    const merged = withCreases({ document: {}, summary: 'ok', affected: [] } as unknown as CommandResult, found);
+    expect(merged.summary).toBe('ok');
+    expect(merged.data).toEqual({ corners: found });
+  });
+
+  it('adds the readings next to the crease of a corner that keeps one edge sharp', () => {
+    const found = creaseOfCorners(kernelOf([sample(0.1), sample(1)]), shape, topology, [reading], [0, 1]);
+    expect(found[0]).toMatchObject({ crease: { sharpEdge: 2 }, shape: reading.shape, overshoot: 0.012346 });
   });
 });
 

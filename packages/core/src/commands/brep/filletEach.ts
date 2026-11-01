@@ -311,8 +311,12 @@ export function filletEach(doc: CadDocument, ctx: ExecutionContext | undefined, 
   const creaseCorners =
     corners.length > 0
       ? corners.map((one) => {
-          const overshoot = cornerNotes?.corners?.find((noted) => near(noted.vertex, one.vertex))?.overshoot;
-          return overshoot === undefined ? { vertex: one.vertex } : { vertex: one.vertex, overshoot };
+          const noted = cornerNotes?.corners?.find((candidate) => near(candidate.vertex, one.vertex));
+          return {
+            vertex: one.vertex,
+            ...(noted?.overshoot === undefined ? {} : { overshoot: noted.overshoot }),
+            ...(noted?.shape === undefined ? {} : { shape: noted.shape }),
+          };
         })
       : (notes?.corners ?? []);
   const described = notes === null ? null : describeProfileNotes(notes, topology, doc.units);

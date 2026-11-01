@@ -52,6 +52,8 @@ export const REMEDIATION = {
     'none needed unless the whole corner must be curvature-continuous: the sub-patches of a G2 corner star meet each other with G2 beyond the first fifth of each spoke from its vertex (data.profile.corners[].spokes "G2-beyond-reach", spokeReach) and with G1 within that stretch next to the vertices (or all along a spoke when the build could not meet its gate: spokes "G1", spokeRefused); its contacts with the blend and flat faces are G2',
   BLD_CHECK_CORNER_OVERSHOOT:
     'none needed below the build gate: a trimmed corner star (rolling-ball builder) stands that far on the wrong side of the part (outside it for a convex corner, inside for a concave one), as measured at the build; if it matters, use a smaller setback ball or a smaller radius at the vertex, or report the part',
+  BLD_CHECK_CORNER_SHAPE:
+    'the corner star is inside the part and tangent but not fair: its curvature is many times that of the blends that meet there (a long thin hole between unequal setbacks). Use equal setbacks (or the same ball) at the vertex, a smaller radius, or a plate corner (corners[].patch), and check the part visually',
   BLD_CHECK_INVALID: 'rebuild the blend with a smaller radius or fewer edges per step',
   BLD_CHECK_RADIUS_LAW:
     'the realised radius is off the law that was asked for: rebuild with a smaller radius or a smoother law, or split the chain',

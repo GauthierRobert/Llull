@@ -237,6 +237,8 @@ export interface BlendBuildNotes {
     readonly g2Refused?: string;
     /** The rolling-ball trim builder: the largest distance a point of the corner star stands outside the source solid, in document units (13.39.3); refused above 1e-3 x the diagonal. */
     readonly overshoot?: number;
+    /** The rolling-ball trim builder: the shape of the star on a 17 x 17 grid of every sub-patch (13.41): largest |principal curvature| (1/unit), largest normal turn between neighbouring samples (rad) and the first as a multiple of 1 / (largest blend radius at the vertex). */
+    readonly shape?: { readonly maxCurvature: number; readonly maxNormalTurn: number; readonly curvatureRatio: number };
     readonly setbacks: ReadonlyArray<{ readonly edge: number; readonly distance: number }>;
   }>;
 }

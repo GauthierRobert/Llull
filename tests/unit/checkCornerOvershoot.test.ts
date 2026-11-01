@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { ShapeRecipe } from '@core/model/types';
-import { overshootFindings } from '@core/commands/brep/checkBlendStars';
+import { overshootFindings, shapeFindings } from '@core/commands/brep/checkBlendStars';
 import { REMEDIATION } from '@core/commands/brep/checkBlendFindings';
 
 const recipe = { op: 'fillet', source: { op: 'solid' } } as unknown as ShapeRecipe;
@@ -38,5 +38,39 @@ describe('overshootFindings', () => {
     ).toEqual([]);
     expect(overshootFindings({} as unknown as GeometryKernel, recipe, 'mesh-1', 'mm', 17.32)).toEqual([]);
     expect(overshootFindings(kernelWith([{ vertex: [0, 0, 0], overshoot: 1 }]), recipe, 'mesh-1', 'mm', 0)).toEqual([]);
+  });
+});
+
+describe('shapeFindings', () => {
+  const shaped = (curvatureRatio: number): GeometryKernel =>
+    ({
+      blendReport: () => ({
+        notes: {
+          corners: [
+            { vertex: [10, 4.5, 5], setbacks: [], shape: { maxCurvature: curvatureRatio * 2, maxNormalTurn: 0.9, curvatureRatio } },
+          ],
+        },
+      }),
+    }) as unknown as GeometryKernel;
+
+  it('warns above 10 times the blend curvature, naming the ratio, the curvature and the turn', () => {
+    const found = shapeFindings(shaped(70), recipe, 'mesh-1', 'mm');
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({
+      code: 'BLD_CHECK_CORNER_SHAPE',
+      severity: 'warn',
+      value: 70,
+      limit: 10,
+      remediation: REMEDIATION.BLD_CHECK_CORNER_SHAPE,
+    });
+    expect(found[0]?.message).toContain('140');
+    expect(found[0]?.message).toContain('0.9 rad');
+  });
+
+  it('says nothing for the d-shape star (2.8 times), a corner without a shape, or no report', () => {
+    expect(shapeFindings(shaped(2.8), recipe, 'mesh-1', 'mm')).toEqual([]);
+    expect(shapeFindings(shaped(10), recipe, 'mesh-1', 'mm')).toEqual([]);
+    expect(shapeFindings(kernelWith([{ vertex: [0, 0, 0], overshoot: 1 }]), recipe, 'mesh-1', 'mm')).toEqual([]);
+    expect(shapeFindings({} as unknown as GeometryKernel, recipe, 'mesh-1', 'mm')).toEqual([]);
   });
 });
