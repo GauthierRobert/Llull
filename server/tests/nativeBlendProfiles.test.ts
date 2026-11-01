@@ -159,8 +159,8 @@ describeNative('BLD M2: conic, curvature and asymmetric blend sections (native O
     });
     expect(varying.error).toMatchObject({ code: 'BLD_PROFILE_FAILED', paths: ['edges[0].size2'] });
     const corner = execute(doc, 'fillet_edge', { id, edgesNear: [topEdge, [10, 0, 2.5]], radius: 1, profile: { type: 'conic', rho: 0.5 } });
-    expect(corner.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });
-    expect(corner.summary).toContain('not rounded');
+    // a conic corner with a third edge left sharp is built since 13.39 (nativeBlendProfileThird.test.ts)
+    expect(corner.error).toBeUndefined();
     const long = execute(doc, 'fillet_edge', { id, edgesNear: [topEdge], radius: 9, profile: { type: 'conic', rho: 0.5 } });
     expect(long.error).toMatchObject({ code: 'BLD_PROFILE_FAILED' });
     expect(long.summary).toContain('could not be built');
