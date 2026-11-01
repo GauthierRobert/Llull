@@ -9,7 +9,11 @@
 #include <string>
 #include <vector>
 
+#include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepBndLib.hxx>
+#include <Bnd_Box.hxx>
+#include <Geom2d_Curve.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepLib.hxx>
 #include <BRep_Builder.hxx>
@@ -201,6 +205,23 @@ bool rebuild_face(const FaceEdit &edit, TopoDS_Face &out, std::string &why) {
     if (!fixer.FixAddPCurve(edge, out, Standard_False) || BRep_Tool::CurveOnSurface(edge, out, first, last).IsNull()) {
       why = "internal error: the new end curve of an oblique end could not be projected on the curved end face";
       return false;
+    }
+    // the projected pcurve must lie on the curve: sampled at five parameters, within kGapLimit (5e-6) of the diagonal of the face
+    Bnd_Box box;
+    BRepBndLib::Add(out, box);
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    const BRepAdaptor_Surface surface(out, Standard_False);
+    const BRepAdaptor_Curve curve3d(edge);
+    const Handle(Geom2d_Curve) pcurve = BRep_Tool::CurveOnSurface(edge, out, first, last);
+    for (int k = 0; k <= 4; ++k) {
+      const double at = first + (last - first) * k / 4.0;
+      const gp_Pnt2d uv = pcurve->Value(at);
+      const double miss = surface.Value(uv.X(), uv.Y()).Distance(curve3d.Value(at));
+      if (miss > 5e-6 * gp_Pnt(x0, y0, z0).Distance(gp_Pnt(x1, y1, z1))) {
+        why = "internal error: the projection of the new end curve on the curved end face misses the curve by " + number(miss);
+        return false;
+      }
     }
   }
   return true;

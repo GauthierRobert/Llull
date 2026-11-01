@@ -34,15 +34,16 @@ namespace rails {
 
 namespace {
 
-// The end tangent of the size is read from a one-sided quadratic fit through the ball radius at the vertex and at this fraction (and twice it) of the edge's
-// length inside it: exact for a linear law, within about (fraction)^2 of the third derivative for a smooth one.
+// Cross-check of the exact end slope of the law: a one-sided quadratic fit through the ball radius at the vertex and at this fraction (and twice it) of the edge's
+// length inside it.
 constexpr double kBaseline = 0.02;
 // The continued size may fall to this fraction of the size at the vertex at most (a law that reaches zero within the extension has no blend there).
 constexpr double kLeastSize = 0.05;
-// A section whose apex lies less than this fraction of the diagonal beyond the vertex is not beyond it; a size that changes by less than this fraction of
-// the diagonal over the whole extension is constant (the circular blend's own extension is right).
-constexpr double kBeyond = 1e-9, kNegligible = 1e-7;
-// The new contact point of a rail may lie this anchor (x the edge it moves along, or x the end curve of the blend) from the old one at most.
+// A section whose apex lies less than this fraction of the diagonal beyond the vertex is not beyond it.
+constexpr double kBeyond = 1e-9;
+// The slope fitted on the circular blend may differ from the law's exact end slope by this fraction of the size over the fit (twice the baseline) at most.
+constexpr double kSlopeCheck = 2e-3;
+// The new contact point of a rail may lie this far (x the edge it moves along, or x the end curve of the blend) from the old one at most.
 constexpr double kMostMove = 0.25;
 
 // The section of the circular blend at `along` as the skin reads it (before any continuation): its apex's distance beyond the vertex along `outward`, and the
@@ -92,7 +93,16 @@ bool plan_extension(Blend &blend, const TopoDS_Edge &source, double diagonal, st
     const BRepAdaptor_Curve end_curve(blend.end[side]);
     const gp_Pnt middle = end_curve.Value(0.5 * (end_curve.FirstParameter() + end_curve.LastParameter()));
     const int which = ends[0].Distance(middle) <= ends[1].Distance(middle) ? 0 : 1;
-    if (ends[which].Distance(middle) > 0.5 * length) continue;
+    // the exact end slope of the law (13.37.1); an end where the size does not change needs no placed vertex when the circular blend stays inside the edge
+    if (!blend.law_known) {
+      why = "internal error: the size law of the edge a blend with an oblique end rounds is not among the laws given";
+      return false;
+    }
+    if (ends[which].Distance(middle) > 0.5 * length) {
+      why = "internal error: the end vertex of the edge could not be placed for the size law past an oblique end: the end curve of the circular blend lies " + number(ends[which].Distance(middle)) +
+            " from the nearer end of an edge only " + number(length) + " long (more than half of it)";
+      return false;
+    }
     const gp_Pnt vertex = ends[which];
     const gp_Vec outward = gp_Vec(ends[1 - which], vertex) / length;
     // the apex of the middle section is well inside the edge and that of the farthest section of the skin is the farthest
@@ -100,16 +110,35 @@ bool plan_extension(Blend &blend, const TopoDS_Edge &source, double diagonal, st
     double reach_delta = 0, radius = 0, inside_delta = 0;
     if (!probe(surface, blend, outside, vertex, outward, reach_delta, radius, why) || !probe(surface, blend, inside, vertex, outward, inside_delta, radius, why))
       return false;
-    if (reach_delta <= kBeyond * diagonal || inside_delta > -2.5 * kBaseline * length) continue;
-    double a0 = 0, a1 = 0, a2 = 0, r0 = 0, r1 = 0, r2 = 0;
-    if (!find_along(surface, blend, inside, outside, vertex, outward, 0.0, a0, r0, why) ||
-        !find_along(surface, blend, inside, outside, vertex, outward, -kBaseline * length, a1, r1, why) ||
-        !find_along(surface, blend, inside, outside, vertex, outward, -2.0 * kBaseline * length, a2, r2, why))
+    if (reach_delta <= kBeyond * diagonal) continue;
+    if (!(inside_delta < 0)) {
+      why = "internal error: the size law past an oblique end could not be placed: the apex of the middle section of the blend is not inside the edge";
       return false;
-    const double h = kBaseline * length, first = r0 - r1, second = r0 - r2;
-    const double curvature = (2.0 * first - second) / (2.0 * h * h);
-    const double slope = (first + curvature * h * h) / h;
-    if (std::fabs(slope) * reach_delta <= kNegligible * diagonal) continue;
+    }
+    double a0 = 0, r0 = 0;
+    if (!find_along(surface, blend, inside, outside, vertex, outward, 0.0, a0, r0, why)) return false;
+    // the exact slope of the law at this end (outward); the fit on the circular blend is only the cross-check
+    // the kernel's own spline has no end slope derived from its nodes (NaN): it is read from the circular blend by the fit; any other law is exact and the fit only checks it
+    const bool exact = !std::isnan(blend.law_slope[which]);
+    double slope = blend.law_slope[which];
+    if (!exact && !(inside_delta <= -2.5 * kBaseline * length)) {
+      why = "internal error: the end slope of the kernel's own size law past an oblique end could not be measured: the edge is only " + number(length) + " long";
+      return false;
+    }
+    if (inside_delta <= -2.5 * kBaseline * length) {
+      double a1 = 0, a2 = 0, r1 = 0, r2 = 0;
+      if (!find_along(surface, blend, inside, outside, vertex, outward, -kBaseline * length, a1, r1, why) ||
+          !find_along(surface, blend, inside, outside, vertex, outward, -2.0 * kBaseline * length, a2, r2, why))
+        return false;
+      const double h = kBaseline * length, first = r0 - r1, second = r0 - r2;
+      const double measured = (first + (2.0 * first - second) / 2.0) / h;
+      if (!exact) slope = measured;
+      else if (std::fabs(measured - slope) * 2.0 * h > kSlopeCheck * r0) {
+        why = "internal error: the end slope of the size law (" + number(slope) + ") and the slope measured on the circular blend (" + number(measured) + ") differ by more than " +
+              number(kSlopeCheck) + " of the size over the fit";
+        return false;
+      }
+    }
     if (!(r0 + slope * reach_delta >= kLeastSize * r0)) {
       why = "internal error: the size of the blend continued past the end of the edge by its end tangent (" + number(slope) + " per unit, from " + number(r0) +
             ") falls to " + number(r0 + slope * reach_delta) + " within the " + number(reach_delta) + " the oblique end face needs (least " + number(kLeastSize * r0) +
@@ -193,7 +222,7 @@ bool extension_edits(const Blend &blend, const Handle(Geom_BSplineSurface) &skin
     FaceEdit &support = edit_of(blend.supports[rail][0].face);
     support.replacements.push_back({blend.supports[rail][0].edge, piece, {blend.extend[0].active ? new_vertex[0][rail] : TopoDS_Vertex(), blend.extend[1].active ? new_vertex[1][rail] : TopoDS_Vertex()}, gap_limit});
   }
-  // the edge the end face shares with each support moves with the contact point (a segment of the same line, from its anchor vertex to the new point)
+  // the edge the end face shares with each support moves with the contact point (a segment of the same line, from its far vertex to the new point)
   for (int side = 0; side < 2; ++side) {
     if (!blend.extend[side].active) continue;
     for (int rail = 0; rail < 2; ++rail) {

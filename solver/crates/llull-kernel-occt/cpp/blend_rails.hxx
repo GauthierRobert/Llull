@@ -76,6 +76,8 @@ struct Blend {
   std::vector<RailPiece> supports[2];  // the support faces along each rail
   Mitre mitre[2];
   Extension extend[2];          // oblique ends: the size law continued past the end of the edge (13.37)
+  bool law_known = false;       // the law of the edge this blend rounds was found among the laws given: law_slope[0] / [1] is its derivative going outward at the first / last end of the edge (13.37)
+  double law_slope[2] = {0, 0};
 };
 
 // The conic of a blend that ends on the next blend of its chain fades to the circular arc at that end (TECHNICAL_SPEC 13.19): the weight of the

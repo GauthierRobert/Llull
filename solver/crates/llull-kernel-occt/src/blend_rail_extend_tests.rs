@@ -43,9 +43,14 @@ enum End {
 /// past both ends: the integral of the whole section over the edge, plus the flared sections beyond an end, minus the cut ones inside it.
 fn volume_by_law(spandrel: Spandrel, r0: f64, r1: f64, length: f64, start: End, end: End) -> f64 {
     let slope = (r1 - r0) / length;
-    let mut total = gauss(&|s| spandrel(r0 + slope * s, 0.0), 0.0, length, 8);
+    volume_by_function(spandrel, &|s| r0 + slope * s, [slope, slope], length, start, end)
+}
+
+/// `volume_by_law` for the size `size(s)` along the edge, continued past the ends by the derivatives `slopes` there (the derivative going in the direction of s).
+fn volume_by_function(spandrel: Spandrel, size: &dyn Fn(f64) -> f64, slopes: [f64; 2], length: f64, start: End, end: End) -> f64 {
+    let mut total = gauss(&|s| spandrel(size(s), 0.0), 0.0, length, 8);
     // (wall, size at the vertex, derivative of the size going outward)
-    for (wall, size, outward) in [(start, r0, -slope), (end, r1, slope)] {
+    for (wall, size, outward) in [(start, size(0.0), -slopes[0]), (end, size(length), slopes[1])] {
         // u = w^2 removes the sqrt of the depth; the wall depth steep u equals the leg d at the top of the range
         match wall {
             End::Square => {}
@@ -83,7 +88,7 @@ fn a_changing_size_flaring_past_both_ends_is_the_integral_of_the_continued_law()
             assert!(near(box_removed, square_expected, 1e-6), "{name} {r0} -> {r1}: square {box_removed}");
             let wedge = removed - box_removed;
             assert!(
-                wedge > 0.0 && near(wedge, expected - square_expected, 1e-3),
+                (wedge - (expected - square_expected)).abs() < 1e-3 * wedge,
                 "{name} {r0} -> {r1}: wedge {wedge} expected {}",
                 expected - square_expected
             );
@@ -133,6 +138,44 @@ fn a_changing_size_on_a_concave_edge_with_one_end_flaring_and_one_narrowing_is_t
             assert_eq!(found, 2);
             assert!(g0 < 1e-6 * diagonal(&shape) && g1 < 1e-3, "{name} shift {shift}: g0 {g0} g1 {g1}");
             assert_eq!(face_count(&shape), face_count(&part) + 1, "{name} shift {shift}");
+        }
+    }
+}
+
+/// The planar-section integral of the wedge beyond the end walls (leaning 1 in 2: the wall depth 2 u) for a size held at `r0` / `r1` past the start / end.
+fn wedge_of_constant_size(spandrel: Spandrel, r0: f64, r1: f64) -> f64 {
+    [r0, r1].iter().map(|&size| gauss(&|w| 2.0 * w * spandrel(size, 2.0 * w * w), 0.0, (size / 2.0).sqrt(), 16)).sum()
+}
+
+#[test]
+fn a_law_with_zero_end_slopes_is_held_constant_past_the_vertex_and_the_wedge_is_the_integral_of_that_size() {
+    let _serial = crate::serial_blends();
+    let part = prism_part(&[[0.0, 0.0], [4.0, 0.0], [7.0, 6.0], [-3.0, 6.0]]);
+    let (edge, _) = front_edge(&part);
+    let square = prism_part(&[[0.0, 0.0], [4.0, 0.0], [4.0, 6.0], [0.0, 6.0]]);
+    let (square_edge, _) = front_edge(&square);
+    // front_edge reads the direction of a 10 long edge: here the edge is 4 long
+    let runs_forward = |shape: &Shape, edge: &[u32]| num(&topology(shape).unwrap()["edges"][edge[0] as usize]["start"][0]) < 2.0;
+    let (forward, square_forward) = (runs_forward(&part, &edge), runs_forward(&square, &square_edge));
+    // mode 0: the kernel's smooth transition between the two sizes, mode 2: the monotone cubic; both are flat at both ends
+    for (kind, mode) in [("monotone", 2.0)] {
+        for (name, spandrel, param) in [("parabola", parabola_beyond as Spandrel, 0.5), ("circle", circle_beyond as Spandrel, CIRCLE_PARAM)]
+        {
+            let (r0, r1) = (0.3, 0.9);
+            let laws = |forward: bool| if forward { [r0, r1, mode, 0.0] } else { [r1, r0, mode, 0.0] };
+            let shape = built(&part, &edge, &laws(forward), 0.0, param);
+            let box_shape = built(&square, &square_edge, &laws(square_forward), 0.0, param);
+            let removed = volume_of(&part) - volume_of(&shape);
+            let wedge = removed - (volume_of(&square) - volume_of(&box_shape));
+            // the monotone law is the Hermite cubic with zero end slopes, 3 t^2 - 2 t^3 between the sizes, held constant past both ends
+            let smooth = |s: f64| r0 + (r1 - r0) * (3.0 * (s / 4.0).powi(2) - 2.0 * (s / 4.0).powi(3));
+            let total = volume_by_function(spandrel, &smooth, [0.0, 0.0], 4.0, End::Flare(2.0), End::Flare(2.0));
+            let expected = wedge_of_constant_size(spandrel, r0, r1);
+            assert!((removed - total).abs() < 5e-4 * total, "{kind} {name}: removed {removed} expected {total}");
+            assert!((wedge - expected).abs() < 2e-2 * wedge, "{kind} {name}: wedge {wedge} expected {expected}");
+            let (g0, g1, found) = contacts(&shape);
+            assert_eq!(found, 2);
+            assert!(g0 < 1e-6 * diagonal(&shape) && g1 < 1e-3, "{kind} {name}: g0 {g0} g1 {g1}");
         }
     }
 }

@@ -12,10 +12,12 @@
 #include <map>
 #include <memory>
 #include <sstream>
+#include <utility>
 #include <string>
 #include <vector>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
@@ -140,6 +142,37 @@ std::vector<gp_Pnt> section_poles(const Section &s, int kind, double param) {
             s.b};
   }
   return {s.a, s.t, s.b};
+}
+
+// The derivative of the size going outward at the first and the last end of edge `index` (an entry of `edges`) of the given laws: a straight law has the slope of its
+// first / last piece, a constant or monotone law has none (flat ends), the kernel's own spline (the smooth transition and the smooth interpolation) has a slope that is
+// not derived from the nodes: NaN, the end slope is then read from the circular blend (blend_ends_extend.cxx). The law runs along
+// the arc length of the edge, `length` of it. False when the edge has no entry.
+bool law_end_slopes(rust::Slice<const uint32_t> edges, rust::Slice<const double> laws, uint32_t index, const BRepAdaptor_Curve &curve, double (&slopes)[2]) {
+  const double length = GCPnts_AbscissaPoint::Length(curve);
+  size_t offset = 0;
+  for (const uint32_t entry : edges) {
+    if (offset + kLawHeader > laws.size()) return false;
+    const size_t count = static_cast<size_t>(laws[offset + 3]);
+    if (offset + kLawHeader + 2 * count > laws.size()) return false;
+    if (entry == index) {
+      const double start = laws[offset], end = std::isnan(laws[offset + 1]) ? start : laws[offset + 1];
+      slopes[0] = slopes[1] = 0.0;
+      const bool constant = count == 0 && std::isnan(laws[offset + 1]);
+      if (!constant && laws[offset + 2] == 0.0) slopes[0] = slopes[1] = std::nan("");
+      if (!constant && laws[offset + 2] == 1.0 && length > 0) {
+        std::vector<std::pair<double, double>> nodes{{0.0, start}};
+        for (size_t k = 0; k < count; ++k) nodes.emplace_back(laws[offset + kLawHeader + 2 * k], laws[offset + kLawHeader + 2 * k + 1]);
+        nodes.emplace_back(1.0, end);
+        const size_t n = nodes.size();
+        slopes[0] = -(nodes[1].second - nodes[0].second) / ((nodes[1].first - nodes[0].first) * length);
+        slopes[1] = (nodes[n - 1].second - nodes[n - 2].second) / ((nodes[n - 1].first - nodes[n - 2].first) * length);
+      }
+      return true;
+    }
+    offset += kLawHeader + 2 * count;
+  }
+  return false;
 }
 
 // Reads the faces around `face` and fills `blend`; false with the reason in `why`.
@@ -664,6 +697,11 @@ std::unique_ptr<Shape> rails_once(const Shape &source, rust::Slice<const uint32_
     const double margin_lo = blend.oblique[0] ? margin_at(0) : 0.0, margin_hi = blend.oblique[1] ? margin_at(1) : 0.0;
     if (blend.oblique[0]) blend.lo = periodic ? blend.lo - margin_lo : std::max(first, blend.lo - margin_lo);
     if (blend.oblique[1]) blend.hi = periodic ? blend.hi + margin_hi : std::min(last, blend.hi + margin_hi);
+  }
+  for (size_t b = 0; b < faces.size(); ++b) {
+    const TopoDS_Edge &rounded = source_edge[static_cast<int>(b) + 1];
+    if (!rounded.IsNull() && (faces[b].oblique[0] || faces[b].oblique[1]))
+      faces[b].law_known = law_end_slopes(edges, laws, static_cast<uint32_t>(unique.FindIndex(rounded) - 1), BRepAdaptor_Curve(rounded), faces[b].law_slope);
   }
   for (size_t b = 0; b < faces.size(); ++b)
     if ((faces[b].oblique[0] || faces[b].oblique[1]) && !plan_extension(faces[b], source_edge[static_cast<int>(b) + 1], diagonal, why)) return nullptr;

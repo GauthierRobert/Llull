@@ -397,3 +397,16 @@ fn a_part_ten_times_larger_holds_the_gap_of_the_new_end_curve_in_the_vertex_tole
         assert!(near(volume_of(&shape), volume_of(&occt), 1e-6), "tilt {tilt}: {} vs OCCT {}", volume_of(&shape), volume_of(&occt));
     }
 }
+
+#[test]
+fn a_varying_size_on_a_rim_arc_whose_oblique_end_needs_the_contact_past_the_vertex_keeps_the_kink_refusal() {
+    let _serial = crate::serial_blends();
+    // the extension of a continued size is built for a straight edge between flat faces only (13.37): on a rim arc the chord of OCCT's constant extension kinks (tilt -0.3)
+    // or its surface leaves the support face (tilt 0.3), the guards of 13.35.1
+    for (tilt, reason) in [(-0.3_f64, "does not continue past the end of the edge"), (0.3, "meets the support face at")] {
+        let part = cut_cylinder(tilt, 3.0);
+        let edge = rim_edge(&part, 3.0);
+        let why = blend(&part, &edge, &[0.6, 1.0, 1.0, 0.0], 0.0, 0.5).err().expect("refused");
+        assert!(why.contains(reason), "tilt {tilt}: {why}");
+    }
+}
