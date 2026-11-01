@@ -277,12 +277,12 @@ fn what_the_rail_builder_cannot_make_is_named() {
     let specs = [f64::from(rim[0]), 2.0, 0.0, 1.0, 2.0, 0.0, 0.0];
     let why = profile_blend_reason(&cylinder, &specs, &rim, &[], 2.0, 0.0).unwrap();
     assert!(why.contains("straight"), "{why}");
-    // a blend of a straight chain of edges that meet at a corner with an unrounded third edge
+    // two profiled edges that meet at a corner with an unrounded third edge: built since 13.39 (the crease star), valid
     let block = make_box([0.0; 3], [20.0, 10.0, 10.0]).unwrap().unwrap();
     let two = edges_where(&block, |e| num(&e["mid"][2]) > 9.9 && (num(&e["mid"][1]) < 0.1 || num(&e["mid"][0]) > 19.9));
     assert_eq!(two.len(), 2);
-    let why = blend(&block, &two, &[1.0, NAN, 0.0, 0.0].repeat(2), 0.0, 0.5).err().unwrap();
-    assert!(why.contains("not rounded"), "{why}");
+    let built = blend(&block, &two, &[1.0, NAN, 0.0, 0.0].repeat(2), 0.0, 0.5).unwrap();
+    assert!(crate::analyze(&built).unwrap().valid);
 }
 
 #[test]
