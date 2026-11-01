@@ -127,7 +127,8 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     const checked = execute(done.document, 'check_blends', { ids: [result] }).data as { status: string };
     expect(checked.status).not.toBe('fail');
     const rolling = volume(plain.document, plain.affected[0] as string);
-    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(2e-3);
+    // 13.41: the star is rebuilt with shorter tangents so that it stays inside the part (0.0027 of the rolling-ball volume at setback 1.3)
+    expect(Math.abs(volume(done.document, result) - rolling) / rolling).toBeLessThan(4e-3);
     // the setback is a distance ALONG the edge: the blend of the straight top edge (length sqrt(44) = 6.633) ends 1.3 from the vertex, so its cylinder spans 6.633 - 1.3 (a ball would cut it at
     // sqrt(1.3^2 - 0.5^2) = 1.2, or at the largest setback)
     const spans = faces(done.document, result)
@@ -137,7 +138,7 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     // 1.4 and 1.6 along the same edge: build too (C1 knots at 48 or 64 poles, 13.22.6; before, the star was refused at 0.00965 rad and the plate missed the blend ends)
     for (const longer of [withSetback(1.4), withSetback(1.6)]) {
       expect(longer.error, longer.summary).toBeUndefined();
-      expect(Math.abs(volume(longer.document, longer.affected[0] as string) - rolling) / rolling).toBeLessThan(2e-3);
+      expect(Math.abs(volume(longer.document, longer.affected[0] as string) - rolling) / rolling).toBeLessThan(4e-3);
       expect(execute(longer.document, 'check_blends', { ids: [longer.affected[0] as string] }).data).toMatchObject({
         status: expect.not.stringMatching(/^fail$/),
       });

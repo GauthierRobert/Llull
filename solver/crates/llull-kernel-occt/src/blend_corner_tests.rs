@@ -838,7 +838,7 @@ impl Drop for CornerHooks {
     }
 }
 
-fn cube_corner_step() -> (Shape, Vec<f64>, Vec<f64>) {
+pub(crate) fn cube_corner_step() -> (Shape, Vec<f64>, Vec<f64>) {
     let shape = cube(10.0);
     let all: Vec<usize> = (0..12).collect();
     let (edges, corners) = spec(&shape, &all, 1.0, &cube_vertices(10.0), 2.0);
@@ -1433,7 +1433,7 @@ fn the_evolving_radius_is_the_size_at_the_start_of_the_edge_and_sizeend_at_its_e
     assert!((width_at(10.0) - 1.5).abs() < 1e-3, "at the end: {}", width_at(10.0));
 }
 
-fn cube_with_setbacks_at_origin(distances: [f64; 3]) -> (Shape, Vec<f64>, Vec<f64>) {
+pub(crate) fn cube_with_setbacks_at_origin(distances: [f64; 3]) -> (Shape, Vec<f64>, Vec<f64>) {
     let (shape, edges, corners) = cube_corner_step();
     let meeting = edges_at(&shape, [0.0; 3]);
     let mut flat = Vec::new();
@@ -1467,7 +1467,8 @@ fn cylinder_spans(shape: &Shape) -> Vec<f64> {
 
 /// BLD §13.22.6: different setbacks at one vertex on the trim path. The cube (r 1, 8 corners at 2) with the setbacks 1.5 / 2 / 2.5 along the three edges of the origin: planes normal to each edge at
 /// its own setback point cut the rolling-ball blend (so the setback is a distance ALONG the edge, as on the analytic path: the blend cylinders span 10 - sqrt(3) - s = 6.768 / 6.268 / 5.768), the star closes the
-/// hole. Valid, tangent, the default g0; the volume differs from the equal-setback cube by 0.023 % (976.513 against 976.292).
+/// hole. Valid, tangent, the default g0. The star of the origin vertex stood 0.22 outside the cube with the replaced surface as its centre (13.41): it is rebuilt with the 3/8 centre and spoke
+/// tangents of 0.7 of the chord, so the volume differs from the equal-setback cube by 0.135 % (974.975 against 976.292; it was 976.513 before).
 #[test]
 fn a_vertex_with_different_setbacks_is_cut_by_planes_normal_to_its_edges_and_gets_the_star() {
     let _serial = crate::serial_blends();
@@ -1493,10 +1494,10 @@ fn a_vertex_with_different_setbacks_is_cut_by_planes_normal_to_its_edges_and_get
     assert!(worst_patch_gap(&built) < 1e-6 * 10.0 * 3.0_f64.sqrt(), "{}", worst_patch_gap(&built));
     let (volume, reference) = (mass_properties(&built).unwrap().volume, mass_properties(&equal).unwrap().volume);
     assert!(
-        (volume - reference).abs() < 1e-3 * reference && (volume - reference).abs() > 1e-5 * reference,
+        (volume - reference).abs() < 2e-3 * reference && (volume - reference).abs() > 1e-5 * reference,
         "{volume} against the equal setbacks {reference}"
     );
-    assert!((volume - 976.513).abs() < 0.02, "{volume}");
+    assert!((volume - 974.975).abs() < 0.02, "{volume}");
 }
 
 /// BLD §13.22.6: what the planes do not take is refused by name: a setback not shorter than its edge, a plane inside OCCT's own corner (setback 0.9 against the extent 1), and a region that is not
@@ -1582,7 +1583,7 @@ fn a_concave_vertex_with_different_setbacks_is_cut_by_planes_too() {
 }
 
 /// A 10 x 10 x 5 block cut by a cylinder of `radius` about the z axis, and the vertex (10, sqrt(radius^2 - 100), 5) of its straight top edge, the cylinder-plane edge and the circular top edge.
-fn cut_block_vertex(radius: f64) -> (Shape, [f64; 3], Vec<usize>) {
+pub(crate) fn cut_block_vertex(radius: f64) -> (Shape, [f64; 3], Vec<usize>) {
     let block = make_box([0.0; 3], [10.0, 10.0, 5.0]).unwrap().unwrap();
     let cylinder = crate::make_cylinder(radius, 5.0).unwrap().unwrap();
     let cut = boolean(BooleanOp::Intersect, &block, &cylinder, true).unwrap().unwrap();
@@ -1609,12 +1610,12 @@ pub(crate) fn cut_block_setback(radius: f64, third: f64) -> Result<Shape, String
 fn a_kink_in_the_cross_tangent_at_the_joint_of_a_chain_is_held_by_fine_c1_knots_without_an_interior_crease() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
-    for radius in [12.0, 11.0] {
+    // radius 11 (the cylinder meets the side plane at 0.43 rad, a sharp edge of the part near the corner) stands 0.024 to 0.057 out of the part at the shortest tangents: refused by name since 13.41
+    for radius in [12.0] {
         for third in [1.3, 1.4, 1.6] {
             let built = cut_block_setback(radius, third).unwrap_or_else(|reason| panic!("{radius} {third}: {reason}"));
             assert!(analyze(&built).unwrap().valid);
-            // the cylinder meets the side plane at acos(10 / radius): 0.43 rad for radius 11, a sharp edge of the part away from the corner, so only the patches are read there
-            let tangent = if radius == 12.0 { worst_tangent_angle(&built) } else { 0.0 };
+            let tangent = worst_tangent_angle(&built);
             assert!(tangent < 0.0095 && worst_patch_angle(&built) < 0.0095, "{radius} {third}: {tangent} {}", worst_patch_angle(&built));
             let crease = crate::test_bridge::last_corner_crease();
             assert!(crease < 0.0095 && crease > 0.0, "{radius} {third}: the interior jump across the joint lines is {crease}");
@@ -1644,18 +1645,21 @@ fn a_c0_knot_creases_the_interior_of_a_sub_patch_and_the_gate_refuses_it() {
     assert!(worst_tangent_angle(&built) < 0.0095, "the boundary reads fine: the crease is only in the interior");
 }
 
-/// BLD §13.22.6 review: a larger jump of the curvature (a smaller cylinder, radius 11 and 10.2 against 12; the top edge shortens to 4.58 and 2.0) builds with the interior jump under the
-/// limit, or is refused by name (radius 10.5: the hole folds, the star leaves its supports by pi).
+/// BLD §13.22.6 review: a larger jump of the curvature (a smaller cylinder, radius 10.2 against 12; the top edge shortens to 2.0) builds with the interior jump under the limit; radius 11 is
+/// refused because its star stands outside the part (13.41), radius 10.5 because the hole folds (the star leaves its supports by pi).
 #[test]
 fn a_smaller_cylinder_builds_under_the_crease_limit_or_is_refused_by_name() {
     let _serial = crate::serial_blends();
     let _reset = CornerHooks;
-    for radius in [11.0, 10.2] {
-        for third in [1.3, 1.6] {
-            cut_block_setback(radius, third).unwrap_or_else(|reason| panic!("{radius} {third}: {reason}"));
-            let crease = crate::test_bridge::last_corner_crease();
-            assert!(crease < 0.0095, "{radius} {third}: {crease}");
-        }
+    for third in [1.3, 1.6] {
+        cut_block_setback(10.2, third).unwrap_or_else(|reason| panic!("10.2 {third}: {reason}"));
+        let crease = crate::test_bridge::last_corner_crease();
+        assert!(crease < 0.0095, "10.2 {third}: {crease}");
+    }
+    // radius 11 stands 0.024 to 0.057 outside the part at the shortest tangents (limit 0.015): named since 13.41
+    for third in [1.3, 1.6] {
+        let reason = cut_block_setback(11.0, third).err().expect("the star outside the part is refused");
+        assert!(reason.contains("outside the part, above 0.015"), "{reason}");
     }
     let reason = cut_block_setback(10.5, 1.4).err().expect("the folded hole is refused");
     assert!(reason.contains("the exact-boundary patch was refused") && reason.contains("leave the edges by"), "{reason}");

@@ -319,6 +319,7 @@ struct Star {
   gp_Pnt centre;
   Vec centre_normal;
   double curvature_at_centre = 0;
+  double tangent_scale = 1;  // the length of every spoke tangent as a share of its chord (13.41): below 1 the star bulges less out of a long thin hole
   bool g2 = false;  // the normal field along the spokes is quintic (13.36)
   double spoke_reach = 0;  // G2 across the spokes (13.38): the share of a spoke over which the curvature correction fades in from its vertex (0: off)
   // (spoke, v) -> the corrections of the sub-patch before and after the spoke, the curvature across it they agree on, and the two natural curvatures; the sub-patches are built one at a time, so no lock
@@ -750,7 +751,7 @@ bool place(Star &star, const gp_XYZ &centroid, double height, double scale, std:
       return false;
     }
     if (vertex.crease && Vec(vertex.toward) * Vec(vertex.at, star.centre) < 0) vertex.toward.Reverse();
-    vertex.spoke_tangent = vertex.toward * length;
+    vertex.spoke_tangent = vertex.toward * (length * star.tangent_scale);
     if (vertex.crease) {
       // one-sided: the least-norm derivative of each side's normal that holds the twist of its own support along the edge on that side (leaving . Dn = rate . d0)
       const auto one_sided = [&](const Vec &edge, const Vec &support_rate) { return edge * ((support_rate * vertex.spoke_tangent) / edge.SquareMagnitude()); };
@@ -764,7 +765,7 @@ bool place(Star &star, const gp_XYZ &centroid, double height, double scale, std:
     curvature += (vertex.rate * vertex.spoke_tangent) / vertex.spoke_tangent.SquareMagnitude();
     Vec outward = project(Vec(star.centre, vertex.at), centre_normal);
     if (!unit(outward)) outward = vertex.toward * -1.0;
-    star.arrival[k] = outward * (-length);
+    star.arrival[k] = outward * (-length * star.tangent_scale);
   }
   star.curvature_at_centre = curvature / static_cast<double>(m);
   // The spokes must turn the same way around the centre, each wedge less than a half turn (the hole is star-shaped about the centre), or a sub-patch folds.
@@ -880,13 +881,14 @@ SpokeReading read_spokes(const Star &star, const std::vector<Handle(Geom_BSpline
 }  // namespace
 
 bool build(const std::vector<TopoDS_Edge> &loop, const std::vector<TopoDS_Face> &supports, double max_gap, double max_angle, Patches &out, std::string &why,
-           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease, bool g2) {
+           const CentreHint &hint, bool spokes_at_every_vertex, bool gate_crease, bool c0_knots_only, bool allow_crease, bool g2, double tangent_scale) {
   const size_t raw_count = loop.size();
   if (raw_count < 3 || supports.size() != raw_count) {
     why = "the hole has fewer than 3 edges";
     return false;
   }
   Star star;
+  star.tangent_scale = tangent_scale;
   star.raw.resize(raw_count);
   for (size_t k = 0; k < raw_count; ++k) {
     EdgeSide &side = star.raw[k];

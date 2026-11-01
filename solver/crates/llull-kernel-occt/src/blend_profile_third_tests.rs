@@ -98,7 +98,7 @@ fn points_in(value: &Value, found: &mut Vec<f64>) {
 
 /// B2 (memory-safe, no boolean): the part with its corner blended lies inside the source. The volume is smaller, the bounding box is within the source's, and 9 points per face of every star face
 /// (the interior of the patches, not their edges) are inside the source or on its boundary (signed distance <= 1e-6 x the diagonal).
-fn assert_inside_source(built: &Shape, source: &Shape, label: &str, slack: f64) {
+pub(crate) fn assert_inside_source(built: &Shape, source: &Shape, label: &str, slack: f64) {
     assert!(
         volume(built) < volume(source),
         "{label}: the blended part ({}) is smaller than the source ({})",

@@ -854,6 +854,8 @@ struct FillJob {
   std::string exact_problem;          // why the exact star was refused
   TopoDS_Compound hole_copy;          // a copy of the faces the patch replaces, when they are a smooth surface that knows its centre (13.22)
   bool hinted = false;                // the centre of the star was taken from the replaced surface
+  bool use_hint = true;               // false: the centre of the star is the 3/8 rule even where the replaced surface knows one (13.41)
+  double tangent_scale = 1;           // the spoke tangents of the star as a share of the chord to the centre (13.41)
   bool allow_star = true;             // false: the plate only (the star failed after the sewing)
   bool g2 = false;                    // the star should be curvature-continuous to its supports (a curvature profile, 13.36)
   bool g2_built = false;              // it is
@@ -948,7 +950,7 @@ bool fill_exact(FillJob &job, double diagonal) {
   }
   corner_exact::Patches exact;
   corner_exact::CentreHint hint;
-  if (!job.hole_copy.IsNull() && !job.creased)
+  if (!job.hole_copy.IsNull() && !job.creased && job.use_hint)
     hint = [&job, diagonal](const gp_Pnt &from, const gp_Dir &axis, double &height) {
       IntCurvesFace_ShapeIntersector intersector;
       intersector.Load(job.hole_copy, 1e-7);
@@ -963,7 +965,7 @@ bool fill_exact(FillJob &job, double diagonal) {
     };
   const auto make = [&](bool g2) {
     exact = corner_exact::Patches();
-    return corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load(), job.creased, g2);
+    return corner_exact::build(job.loop, aligned, 0.2e-6 * diagonal, kMixedFillAngle, exact, job.exact_problem, hint, g_exact_mode.load() == 6, g_crease_gate.load(), g_c0_knots_only.load(), job.creased, g2, job.tangent_scale);
   };
   // a curvature profile: the G2 star first, the G1 star (with the reason) when the G2 one is refused
   if (job.g2 && g_g2_star.load()) {
@@ -1064,6 +1066,60 @@ void fill_all(std::vector<FillJob> &jobs, double patch_gap_limit, double diagona
   } catch (const std::system_error &) {
   }
   work();
+}
+
+// How far the faces of a star stand on the wrong side of the source solid (13.39.3, 13.41): 9 x 9 points on every face, the distance to the source of those it classifies on the wrong side. A
+// convex corner removes material, so its star lies in the source (the centre is IN) and its fault is to go out; a concave corner adds material (the centre is OUT) and its fault is to go in.
+double star_overshoot(const std::vector<TopoDS_Face> &faces, const gp_Pnt &centre, const TopoDS_Shape &shape, BRepClass3d_SolidClassifier &source_solid, double diagonal) {
+  const double measure_tolerance = 1e-9 * diagonal;
+  source_solid.Perform(centre, measure_tolerance);
+  const TopAbs_State wrong = source_solid.State() == TopAbs_OUT ? TopAbs_IN : TopAbs_OUT;
+  double worst = 0;
+  for (const TopoDS_Face &face : faces) {
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(face, u0, u1, v0, v1);
+    const BRepAdaptor_Surface surface(face, Standard_False);
+    for (int i = 0; i <= 8; ++i)
+      for (int j = 0; j <= 8; ++j) {
+        const gp_Pnt point = surface.Value(u0 + (u1 - u0) * i / 8.0, v0 + (v1 - v0) * j / 8.0);
+        source_solid.Perform(point, measure_tolerance);
+        if (source_solid.State() != wrong) continue;
+        BRepExtrema_DistShapeShape distance(BRepBuilderAPI_MakeVertex(point).Vertex(), shape);
+        if (distance.IsDone()) worst = std::max(worst, distance.Value());
+      }
+  }
+  return worst;
+}
+
+// 13.41: a star of a plain (not creased) trimmed hole that stands outside the part by more than the gate is built again, serially, with a lower centre (the 3/8 rule of 13.21.4 instead of the
+// replaced rolling-ball surface) and then with shorter spoke tangents (0.7, 0.5, 0.35, 0.25 of the chord): the first of those inside the gate is kept, else the least overshoot. The outcome after the sewing
+// is gated by build_trimmed.
+void refine_star(FillJob &job, const TopoDS_Shape &shape, BRepClass3d_SolidClassifier &source_solid, double patch_gap_limit, double diagonal) {
+  if (!job.filled || job.patch_loop.empty() || job.creased || !job.has_centre) return;
+  const double gate = kOvershootFraction * diagonal;
+  double best = star_overshoot(job.patches, job.centre, shape, source_solid, diagonal);
+  if (best <= gate) return;
+  for (const double scale : {1.0, 0.7, 0.5, 0.35, 0.25}) {
+    if (!job.hinted && scale == 1.0) continue;  // the same build
+    FillJob trial = job;
+    trial.filled = false;
+    trial.patches.clear();
+    trial.patch_loop.clear();
+    trial.patch_part.clear();
+    trial.problem.clear();
+    trial.exact_problem.clear();
+    trial.g2_built = false;
+    trial.has_centre = false;
+    trial.use_hint = false;
+    trial.tangent_scale = scale;
+    fill_corner(trial, patch_gap_limit, diagonal);
+    if (!trial.filled || trial.patch_loop.empty() || !trial.has_centre) continue;
+    const double now = star_overshoot(trial.patches, trial.centre, shape, source_solid, diagonal);
+    if (now >= best) continue;
+    best = now;
+    job = trial;
+    if (best <= gate) return;
+  }
 }
 
 // ---- Setback corners on curved edges and faces: the rolling-ball trim (13.22) ----
@@ -1645,6 +1701,10 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
     job.creased = sharp_of[c] >= 0;
   }
   fill_all(jobs, patch_gap_limit, diagonal);
+  {
+    BRepClass3d_SolidClassifier source_solid(shape);
+    for (FillJob &job : jobs) refine_star(job, shape, source_solid, patch_gap_limit, diagonal);
+  }
   for (const FillJob &job : jobs) star_used = star_used || !job.patch_loop.empty();
   if ((g_exact_mode.load() == 3 && star_used) || g_exact_mode.load() == 4) {
     fill_failed = true;
@@ -1762,28 +1822,19 @@ std::unique_ptr<Shape> build_trimmed(const Shape &source, const std::map<int, Ta
       }
     }
   }
-  // How far the stars stand OUTSIDE the source solid (13.39.3): 9 x 9 points on every star sub-patch, the points the source classifies as outside, their distance to it. A smooth star over a hole
-  // is tangent to its supports and can overshoot the part. Recorded for every trim star; a CREASED star above kOvershootFraction of the diagonal is refused by name (the plain trim stars already stand up to 0.4 outside in the existing tests, 13.39.3: they are not gated).
+  // How far the stars stand on the wrong side of the source solid (13.39.3, 13.41), recorded for every trim star. Above kOvershootFraction of the diagonal the step is refused by name; the
+  // caller builds it again with the plate patches (a creased star has none, so for it that is the refusal).
   std::vector<double> overshoot(corners.size(), 0.0);
   {
     BRepClass3d_SolidClassifier source_solid(shape);
-    const double measure_tolerance = 1e-9 * diagonal;
-    for (size_t p = 0; p < patches.size(); ++p) {
-      if (!patch_is_star[p]) continue;
-      double u0, u1, v0, v1;
-      BRepTools::UVBounds(patches[p], u0, u1, v0, v1);
-      const BRepAdaptor_Surface surface(patches[p], Standard_False);
-      for (int i = 0; i <= 8; ++i)
-        for (int j = 0; j <= 8; ++j) {
-          const gp_Pnt point = surface.Value(u0 + (u1 - u0) * i / 8.0, v0 + (v1 - v0) * j / 8.0);
-          source_solid.Perform(point, measure_tolerance);
-          if (source_solid.State() != TopAbs_OUT) continue;
-          BRepExtrema_DistShapeShape distance(BRepBuilderAPI_MakeVertex(point).Vertex(), shape);
-          if (distance.IsDone()) overshoot[patch_corner_of[p]] = std::max(overshoot[patch_corner_of[p]], distance.Value());
-        }
+    for (size_t c = 0; c < corners.size(); ++c) {
+      std::vector<TopoDS_Face> star;
+      for (size_t p = 0; p < patches.size(); ++p)
+        if (patch_is_star[p] && patch_corner_of[p] == c) star.push_back(patches[p]);
+      if (!star.empty() && jobs[c].has_centre) overshoot[c] = star_overshoot(star, jobs[c].centre, shape, source_solid, diagonal);
     }
     for (size_t c = 0; c < corners.size(); ++c)
-      if (sharp_of[c] >= 0 && overshoot[c] > kOvershootFraction * diagonal) {
+      if (overshoot[c] > kOvershootFraction * diagonal) {
         fill_failed = true;
         why = std::string(kFailed) + "the corner patch at " + where(corners[c].at) + " stands " + number(overshoot[c]) + " outside the part, above " + number(kOvershootFraction * diagonal) + " (" +
               number(kOvershootFraction) + " x the diagonal)";
