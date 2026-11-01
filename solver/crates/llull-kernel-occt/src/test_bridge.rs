@@ -50,6 +50,10 @@ mod ffi {
         fn span_cut_count(shape: &Shape) -> i32;
         /// The oriented angle across the tangent edges of a face, the face reversed in a rebuilt shell or not.
         fn oriented_angle_probe(shape: &Shape, face: i32, reverse: bool) -> f64;
+        /// The same for a creased star: every B-spline face is a sub-patch, `sharp_edge` the unrounded edge it continues.
+        fn oriented_angle_creased_probe(shape: &Shape, face: i32, reverse: bool, sharp_edge: i32) -> f64;
+        /// Whether normal angles along an edge between two sub-patches of a creased star are an accepted crease spoke.
+        fn crease_fade_probe(angles: &[f64], first_on_sharp: bool, last_on_sharp: bool) -> bool;
         /// The boundary angle of a face against its neighbours (-1: not measured), with the first loop edge dropped from the boundary or not.
         fn boundary_angle_probe(shape: &Shape, face: i32, drop_one: bool) -> f64;
         /// `[Bezier-patch box, AddOptimal box, dense sample box]` (6 numbers each) of a synthetic many-patch B-spline face; the first box is zeros when the fast path refuses the face.
@@ -145,4 +149,12 @@ pub fn adaptive_rule(shape: &Shape) -> bool {
 
 pub fn spline_bounds(kind: i32) -> Vec<f64> {
     ffi::spline_bounds_probe(kind)
+}
+
+pub fn oriented_angle_creased(shape: &Shape, face: i32, reverse: bool, sharp_edge: i32) -> f64 {
+    ffi::oriented_angle_creased_probe(crate::inner(shape).expect("a shape"), face, reverse, sharp_edge)
+}
+
+pub fn crease_fade(angles: &[f64], first_on_sharp: bool, last_on_sharp: bool) -> bool {
+    ffi::crease_fade_probe(angles, first_on_sharp, last_on_sharp)
 }

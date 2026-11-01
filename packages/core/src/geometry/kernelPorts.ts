@@ -235,6 +235,8 @@ export interface BlendBuildNotes {
     readonly spokeRefused?: string;
     /** Why the G2 star was refused (the G1 star was built instead). */
     readonly g2Refused?: string;
+    /** The rolling-ball trim builder: the largest distance a point of the corner star stands outside the source solid, in document units (13.39.3); refused above 1e-3 x the diagonal. */
+    readonly overshoot?: number;
     readonly setbacks: ReadonlyArray<{ readonly edge: number; readonly distance: number }>;
   }>;
 }

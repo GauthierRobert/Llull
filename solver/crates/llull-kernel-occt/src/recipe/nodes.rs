@@ -446,7 +446,15 @@ impl Evaluator {
             }
             Ok(Some((setback_edges, setback_corners))) => {
                 let reason = features::setback_reason(&source, &setback_edges, &setback_corners).map_err(EvalError::Failure)?;
-                return Ok(blend_stage_report("setback", &reason));
+                let mut report = blend_stage_report("setback", &reason);
+                // built (cached by the evaluation that asked): the per-corner log (patch kind, centre, setbacks and, on the trim builder, the overshoot of the star)
+                if reason.is_empty() {
+                    if let Some(shape) = self.evaluate(recipe)? {
+                        let notes = features::shape_notes(&shape).map_err(EvalError::Failure)?;
+                        report["notes"] = serde_json::from_str(&notes).unwrap_or(Value::Null);
+                    }
+                }
+                return Ok(report);
             }
             Ok(None) => {}
         }

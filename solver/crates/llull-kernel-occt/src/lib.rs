@@ -54,6 +54,8 @@ mod blend_legs_tests;
 #[cfg(test)]
 mod blend_mitre_tests;
 #[cfg(test)]
+mod blend_profile_third_tests;
+#[cfg(test)]
 mod blend_rail_curved_tests;
 #[cfg(test)]
 mod blend_rail_end_tests;

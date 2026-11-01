@@ -5,7 +5,6 @@
  * @failure a vertex whose edges are not all rounded but one, or a kernel without edge continuity -> that corner is omitted
  */
 
-import type { SetbackCorner } from '../../model/blendTypes';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -14,6 +13,8 @@ import { round6 } from '../../lib/compactNumber';
 export interface CornerCrease {
   readonly vertex: Vec3;
   readonly crease: { readonly sharpEdge: number; readonly entryRad: number };
+  /** The trim builder: how far the corner star stands outside the part (document units), when the kernel measured it. */
+  readonly overshoot?: number;
 }
 
 const near = (a: Vec3, b: Vec3, tolerance: number): boolean => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= tolerance;
@@ -22,7 +23,7 @@ export function creaseOfCorners(
   kernel: GeometryKernel,
   shape: ShapeHandle,
   topology: ShapeTopology | null,
-  corners: readonly SetbackCorner[],
+  corners: ReadonlyArray<{ readonly vertex: Vec3; readonly overshoot?: number }>,
   rounded: readonly number[],
 ): CornerCrease[] {
   if (topology === null) return [];
@@ -43,7 +44,11 @@ export function creaseOfCorners(
           ? samples[0]
           : samples[samples.length - 1];
     if (at === undefined) continue;
-    found.push({ vertex: corner.vertex, crease: { sharpEdge: edge.index, entryRad: round6(at.g1Signed ?? at.g1) } });
+    found.push({
+      vertex: corner.vertex,
+      crease: { sharpEdge: edge.index, entryRad: round6(at.g1Signed ?? at.g1) },
+      ...(corner.overshoot === undefined ? {} : { overshoot: round6(corner.overshoot) }),
+    });
   }
   return found;
 }

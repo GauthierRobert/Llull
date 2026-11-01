@@ -1148,7 +1148,7 @@ fn the_trim_builder_refuses_by_name_what_it_does_not_take() {
     }
     // an edge at the setback vertex that is not rounded
     let meeting = edges_at(&shape, [0.0; 3]);
-    let without: Vec<usize> = all.iter().copied().filter(|edge| *edge != meeting[0]).collect();
+    let without: Vec<usize> = all.iter().copied().filter(|edge| *edge != meeting[0] && *edge != meeting[1]).collect();
     let (edges, corners) = spec(&shape, &without, 1.0, &[[0.0; 3]], 2.0);
     let text = reason(&shape, &edges, &corners);
     assert!(text.starts_with("[BLD_CORNER_UNSUPPORTED]") && text.contains("is not rounded"), "{text}");

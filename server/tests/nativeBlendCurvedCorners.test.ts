@@ -230,16 +230,16 @@ describeNative('BLD 13.22: setback corners on curved edges and faces (native OCC
     expect(both.summary).toContain('both distance and rollingBall');
   });
 
-  it('refuses by name an edge at the setback vertex that is not rounded, a ball that does not hold the rolling-ball corner, and a step that mixes the two builders', () => {
+  it('refuses by name two edges left sharp at the setback vertex, a ball that does not hold the rolling-ball corner, and a step that mixes the two builders', () => {
     const { doc, id, vertex, edges } = dshape();
     const left = execute(doc, 'fillet_edge', {
       id,
-      edgesNear: edges.slice(0, 2),
+      edgesNear: edges.slice(0, 1),
       radius: 0.5,
       corners: [{ near: vertex, type: 'setback', setback: 1.2 }],
     });
     expect(left.error?.code).toBe('BLD_CORNER_UNSUPPORTED');
-    expect(left.summary).toContain('not rounded');
+    expect(left.summary).toContain('at most one edge');
     const short = execute(doc, 'fillet_edge', {
       id,
       edgesNear: edges,
