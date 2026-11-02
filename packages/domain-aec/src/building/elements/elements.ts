@@ -29,7 +29,7 @@ import { nextMemberMark } from '../../industrial/common/memberSupport';
 import { copyPipeSupports } from '../../industrial/piping/pipeSupportCopy';
 import { reconcilePipeSupports, reconciliationNote } from '../../industrial/piping/pipeSupportAttach';
 import { levelIdParam } from '../levelParams';
-import { followHosts } from '../../plant/structures/platform/platformRegenerate';
+import { followAssemblyHosts } from '../assemblyHandlers';
 import { fromMm } from '@core/model/units';
 import { STAIR_HEADROOM_MM, stairSlabCrossings } from '../../industrial/clash/clashSlabs';
 
@@ -217,7 +217,7 @@ export const moveBuildingElement = defineCommand({
     if (generated.length > 0)
       return noop(
         doc,
-        `move_building_element refused: ${generated.join(', ')} belong(s) to a generated platform (read-only); change its boundary or vessel with update_access_platform and the parts are regenerated.`,
+        `move_building_element refused: ${generated.join(', ')} belong(s) to a generated assembly (platform or pipe rack, read-only); change it with update_access_platform / update_pipe_rack and the parts are regenerated.`,
       );
     const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const strayOpenings = known.filter((id) => {
@@ -260,7 +260,7 @@ export const moveBuildingElement = defineCommand({
     const issues = openingFitIssues(next, movedLevels);
     if (issues.length > 0) return noop(doc, `move_building_element refused: ${issues[0]}.`);
     // A circular platform follows its vessel: it is re-derived in the same result (ids and marks kept).
-    const followed = followHosts(doc, next, new Set(known));
+    const followed = followAssemblyHosts(doc, next, new Set(known));
     if (!followed.ok) return noop(doc, `move_building_element refused: ${followed.message}.`);
     const supports = reconcilePipeSupports(doc, followed.building);
     const moved = withDependents(building, known);
@@ -340,15 +340,15 @@ export const copyLevelElements = defineCommand({
       (element): element is Exclude<BuildingElement, { category: 'grid' | 'door' | 'window' }> =>
         'levelId' in element && element.levelId === sourceLevelId && allowed.has(element.category),
     );
-    // A generated platform is not copyable: its parts are derived from the assembly, which stays where it is.
-    const isPlatformPart = (element: BuildingElement): boolean => 'assemblyId' in element && element.assemblyId !== undefined;
-    const sourceElements = onSource.filter((element) => !isPlatformPart(element));
+    // A generated assembly is not copyable: its parts are derived from the assembly, which stays where it is.
+    const isAssemblyPart = (element: BuildingElement): boolean => 'assemblyId' in element && element.assemblyId !== undefined;
+    const sourceElements = onSource.filter((element) => !isAssemblyPart(element));
     const skippedParts = onSource.length - sourceElements.length;
     if (sourceElements.length === 0)
       return noop(
         doc,
         skippedParts > 0
-          ? `copy_level_elements: level ${sourceLevelId} only has generated platform parts (not copyable: add_access_platform on the target level); nothing to copy.`
+          ? `copy_level_elements: level ${sourceLevelId} only has generated assembly parts (not copyable: add_access_platform / add_pipe_rack on the target level); nothing to copy.`
           : `copy_level_elements: level ${sourceLevelId} has nothing to copy.`,
       );
     const sourceHeight = building.levels[sourceLevelId]?.height ?? 0;
@@ -428,7 +428,7 @@ export const copyLevelElements = defineCommand({
       doc,
       supports.building,
       created,
-      `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${skippedParts > 0 ? ` Skipped ${skippedParts} generated platform part(s): a platform is not copyable, add_access_platform on the target level.` : ''}${reconciliationNote(supports)}${wellNote}`,
+      `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${skippedParts > 0 ? ` Skipped ${skippedParts} generated assembly part(s): a platform or pipe rack is not copyable, add_access_platform / add_pipe_rack on the target level.` : ''}${reconciliationNote(supports)}${wellNote}`,
       { elementIds: created },
     );
   },

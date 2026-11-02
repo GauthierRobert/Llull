@@ -28,15 +28,15 @@ import { framingBeams } from './platformGeometry';
 import { overlappingPlatform } from './platformOverlap';
 import {
   type PartBase,
-  type PlatformOutcome,
+  type AssemblyOutcome,
   type Slots,
   failure,
   placeGratings,
   placeMembers,
   placeRailings,
-  railingRunsProblem,
   tidyRing,
-} from './platformParts';
+} from '../assembly/assemblyParts';
+import { railingRunsProblem } from './platformRailing';
 import type { PlatformSpec } from './platformSpec';
 
 /** Parts of a deck platform added to `base`. */
@@ -46,7 +46,7 @@ export function buildDeckPlatform(
   assembly: AssemblyElement,
   spec: PlatformSpec,
   slots: Slots,
-): PlatformOutcome {
+): AssemblyOutcome {
   const type = findGratingType(spec.gratingType);
   if (type === undefined) return failure('STA_GRATING_TYPE_UNKNOWN', `no grating type '${spec.gratingType}'`, ['gratingType']);
   const [bx, by] = spec.bearingBarDirection;

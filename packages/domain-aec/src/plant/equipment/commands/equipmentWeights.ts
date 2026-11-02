@@ -9,6 +9,7 @@ import { resolveVessel } from '../geometry/vesselFrame';
 import { TEST_WATER_KG_PER_M3, vesselMass } from '../geometry/vesselMass';
 import { refuse } from '../model';
 import { equipmentRefParam, findEquipment } from './equipmentRef';
+import { otherEquipmentWeights } from './otherWeights';
 
 const sum = (parts: readonly { kg: number }[]): number => parts.reduce((total, part) => total + part.kg, 0);
 
@@ -22,7 +23,8 @@ const sum = (parts: readonly { kg: number }[]): number => parts.reduce((total, p
 export const equipmentWeights = defineCommand({
   name: 'equipment_weights',
   description:
-    'Query: empty, operating and hydrotest weights of a parametric vessel (tag or id). body = shell annulus + both formed heads (exact solid between ' +
+    'Query: empty, operating and hydrotest weights of a parametric vessel, exchanger, tank or pump (tag or id; exchangers: shell, channels, bonnets, tubesheets, tubes, both sides full ' +
+    'at their specific gravity; tanks: courses, bottom, roof plate, liquid at the design level; pumps: the vendor weightKg, EQP_DESIGN_DATA_MISSING without it). Vessels:  body = shell annulus + both formed heads (exact solid between ' +
     'the inside profile and its outward offset by the head thickness) + skirt / base ring / legs, at the metal density of design.materialDensityKgM3 ' +
     '(default 7850 kg/m3, listed in `defaulted`). operatingKg = empty + liquid volume of design.operatingLiquid x specific gravity x 1000 (null when no ' +
     'operating liquid is set, with a warning); testKg = empty + the full inside volume x 1000 kg/m3 of water. include: "body" (default) and/or ' +
@@ -43,6 +45,8 @@ export const equipmentWeights = defineCommand({
     const element = findEquipment(getBuilding(doc), equipment);
     if (element === undefined)
       return refuse(doc, 'equipment_weights', 'EQP_NOT_FOUND', `no equipment with tag or id '${equipment}'`, [], ['equipment']);
+    const other = otherEquipmentWeights(doc, element, include ?? ['body']);
+    if (other !== null) return other;
     const plant = element.plant;
     if (plant?.template.kind !== 'vessel')
       return refuse(

@@ -512,7 +512,7 @@ describe('platform assembly: persistence and IFC', () => {
     };
     const assembly = (elements: Record<string, Record<string, unknown>>): Record<string, unknown> =>
       elements['assembly-1'] as Record<string, unknown>;
-    expect(damage((e) => (assembly(e)['kind'] = 'rack'))).toContain('kind must be platform or circular_platform');
+    expect(damage((e) => (assembly(e)['kind'] = 'rack'))).toContain('kind must be platform, circular_platform or pipe_rack');
     expect(damage((e) => (assembly(e)['params'] = { kind: 'platform' }))).toContain('params are not the resolved generator parameters');
     expect(damage((e) => (assembly(e)['partIds'] = 'x'))).toContain('partIds must be a list');
     expect(damage((e) => delete (e['grating-1'] as Record<string, unknown>)['assemblyId'])).toContain('does not point back');
@@ -522,7 +522,7 @@ describe('platform assembly: persistence and IFC', () => {
     expect(damage((e) => (assembly(e)['generation'] = 1.5))).toContain('generation must be an integer >= 1');
     // back references: a part must be listed by the assembly it names, and only members, gratings and railings have an owner
     expect(damage((e) => (assembly(e)['partIds'] = (assembly(e)['partIds'] as string[]).filter((id) => id !== 'grating-1')))).toContain(
-      'building element grating-1: assemblyId must name a platform assembly that lists it',
+      'building element grating-1: assemblyId must name a platform or pipe rack assembly that lists it',
     );
     expect(damage((e) => ((e['grating-1'] as Record<string, unknown>)['assemblyId'] = 'ghost'))).toContain('assemblyId must name');
     expect(damage((e) => ((e['assembly-1'] as Record<string, unknown>)['assemblyId'] = 'assembly-1'))).toContain('assemblyId must name');

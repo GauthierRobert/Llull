@@ -40,7 +40,7 @@ export interface RunDimension {
 }
 
 export interface IsoAnnotation {
-  readonly kind: 'elevation' | 'coordinate' | 'slope' | 'weld' | 'spool' | 'continuation';
+  readonly kind: 'elevation' | 'coordinate' | 'slope' | 'weld' | 'spool' | 'continuation' | 'support' | 'skew' | 'skew_leg';
   readonly text: string;
   readonly at: Vec3;
   readonly run?: number;
@@ -77,7 +77,7 @@ export function runDimensions(graph: IsoGraph): RunDimension[] {
   });
 }
 
-const signed = (value: number): string => (value === 0 ? '0' : `${value > 0 ? '+' : '-'}${mmText(Math.abs(value))}`);
+export const signed = (value: number): string => (value === 0 ? '0' : `${value > 0 ? '+' : '-'}${mmText(Math.abs(value))}`);
 const HORIZONTAL = new Set(['+E', '-E', '+N', '-N', 'slope']);
 const AXIS_NAME = ['X', 'Y'] as const;
 

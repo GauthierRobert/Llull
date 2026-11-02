@@ -4,7 +4,11 @@ import type { CommandResult } from '@core/commands/types';
 import { MM_PER_UNIT } from '@core/model/units';
 import type { EquipmentElement } from '@aec/building/types';
 import { elementsOf, getBuilding } from '../../../building/model';
-import { checkVessel, type EquipmentIssue } from '../codecheck/checkVessel';
+import { checkExchanger } from '../codecheck/checkExchanger';
+import { checkPump } from '../codecheck/checkPump';
+import { checkTank } from '../codecheck/checkTank';
+import { checkVessel } from '../codecheck/checkVessel';
+import type { ElementCheck, EquipmentIssue } from '../codecheck/findings';
 import { remediationOf } from '../model';
 import { equipmentRefParam, findEquipment } from './equipmentRef';
 import { REVIEW_REASON } from './vesselThickness';
@@ -28,13 +32,15 @@ const byIssue = (a: EquipmentIssue, b: EquipmentIssue): number =>
 export const checkEquipment = defineCommand({
   name: 'check_equipment',
   description:
-    'Query: design review of parametric equipment (all, or the listed tags / ids): ASME VIII-1 shell and head under-thickness (EQP_SHELL_UNDER_THICKNESS, ' +
+    'Query: design review of parametric equipment - vessels, exchangers, tanks, pumps (all, or the listed tags / ids): ASME VIII-1 shell and head under-thickness (EQP_SHELL_UNDER_THICKNESS, ' +
     'EQP_HEAD_UNDER_THICKNESS, corroded) and MAWP below the design pressure (EQP_MAWP_BELOW_DESIGN) as fails; missing design data, a part outside the ' +
     'formulas (EQP_DESIGN_DATA_MISSING, EQP_ALLOWABLE_MISSING, EQP_FORMULA_OUT_OF_RANGE, EQP_HEAD_NOT_COVERED), nozzle layout (EQP_NOZZLE_OVERLAP, ' +
     'EQP_NOZZLE_IN_KNUCKLE, EQP_NOZZLE_IN_SUPPORT), unverified table rows (EQP_TABLE_UNVERIFIED), an allowable stress without source ' +
     '(EQP_VALUE_UNSOURCED) and placeholder flanges (EQP_FLANGE_PLACEHOLDER) as warnings. Returns status (fail > warn > pass_with_review > pass), ' +
     'issues[{code, severity, ids, paths, message, remediation}] sorted by severity then code, checked[{tag, id, status}], reviewRequired (true when a ' +
-    'code thickness was computed: a computed check is not a stamped design) and reviewReason. Findings, not refusals: an unknown reference is a fail ' +
+    'code thickness was computed, and always for exchangers and tanks, whose tubesheets / tubes / roof are never judged: a computed check is not a stamped design), reviewReason ' +
+    'and notChecked per equipment (what the check does not cover). Exchangers: shell against design.shellSide, channels and bonnets against design.tubeSide with the ' +
+    'vessel formulas; tanks: API 650 one-foot thickness of each course against courseThicknesses (a fail only when they are given); pumps: table grade, defaulted vendor data, flanges. Findings, not refusals: an unknown reference is a fail ' +
     'issue EQP_NOT_FOUND. Does not modify the document.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
@@ -63,23 +69,34 @@ export const checkEquipment = defineCommand({
     }
     const mm = MM_PER_UNIT[doc.units];
     let reviewRequired = false;
-    const checked: Array<{ tag: string; id: string; status: Status }> = [];
+    const reasons: string[] = [];
+    const checked: Array<{ tag: string; id: string; status: Status; notChecked?: readonly string[] }> = [];
     for (const element of scope) {
-      if (element.plant?.template.kind !== 'vessel') {
+      const kind = element.plant?.template.kind;
+      if (kind === undefined || kind === 'block') {
         if (equipment !== undefined)
           issues.push({
             code: 'EQP_NOT_PARAMETRIC',
             severity: 'warning',
             ids: [element.id],
             paths: ['equipment'],
-            message: `${element.mark} (${element.id}) is not a parametric vessel: not checked`,
+            message: `${element.mark} (${element.id}) is a legacy block, not parametric equipment: not checked`,
             remediation: remediationOf('EQP_NOT_PARAMETRIC'),
           });
         continue;
       }
-      const check = checkVessel(element, mm);
+      const check: ElementCheck =
+        kind === 'vessel'
+          ? checkVessel(element, mm)
+          : kind === 'exchanger'
+            ? checkExchanger(element, mm)
+            : kind === 'tank'
+              ? checkTank(element, mm)
+              : checkPump(element);
       issues.push(...check.issues);
       reviewRequired ||= check.reviewRequired;
+      const reason = check.reviewRequired ? (check.reviewReason ?? REVIEW_REASON) : undefined;
+      if (reason !== undefined && !reasons.includes(reason)) reasons.push(reason);
       const status: Status = check.issues.some((issue) => issue.severity === 'fail')
         ? 'fail'
         : check.issues.length > 0
@@ -87,7 +104,12 @@ export const checkEquipment = defineCommand({
           : check.reviewRequired
             ? 'pass_with_review'
             : 'pass';
-      checked.push({ tag: element.mark, id: element.id, status });
+      checked.push({
+        tag: element.mark,
+        id: element.id,
+        status,
+        ...(check.notChecked === undefined ? {} : { notChecked: check.notChecked }),
+      });
     }
     issues.sort(byIssue);
     const status: Status = issues.some((issue) => issue.severity === 'fail')
@@ -100,8 +122,8 @@ export const checkEquipment = defineCommand({
     const fails = issues.filter((issue) => issue.severity === 'fail').length;
     return report(
       doc,
-      `check_equipment: ${status}, ${checked.length} vessel(s) checked, ${fails} fail(s), ${issues.length - fails} warning(s)${reviewRequired ? '; review required' : ''}.`,
-      { status, issues, checked, reviewRequired, ...(reviewRequired ? { reviewReason: REVIEW_REASON } : {}) },
+      `check_equipment: ${status}, ${checked.length} equipment checked, ${fails} fail(s), ${issues.length - fails} warning(s)${reviewRequired ? '; review required' : ''}.`,
+      { status, issues, checked, reviewRequired, ...(reviewRequired ? { reviewReason: reasons.join(' | ') } : {}) },
     );
   },
 });

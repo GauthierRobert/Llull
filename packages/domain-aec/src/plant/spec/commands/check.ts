@@ -8,7 +8,7 @@ import { BAR_PER_PSI } from '../../catalog/ptRating';
 import { checkSpec } from '../checks/run';
 import { pipeFindings } from '../checks/document';
 import { SPEC_RULES, sortFindings, type SpecFinding } from '../checks/finding';
-import { getSpecModel, latestSpec } from '../store';
+import { getSpecModel, latestSpec, specRevisions } from '../store';
 import { worstStatus, type CheckStatus } from '@core/model/checkResult';
 import { elementsOf, getBuilding } from '../../../building/model';
 
@@ -67,7 +67,7 @@ export const checkPipeSpec = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   run: (doc, { specId, revision, scope = 'spec', design }): CommandResult => {
     const model = getSpecModel(doc);
-    if ((specId === undefined && scope === 'spec') || (specId !== undefined && model.specs[specId] === undefined))
+    if ((specId === undefined && scope === 'spec') || (specId !== undefined && specRevisions(doc, specId) === undefined))
       return refuse(
         doc,
         'check_pipe_spec',
@@ -105,7 +105,7 @@ export const checkPipeSpec = defineCommand({
     }
     const ids = specId === undefined ? model.specOrder : [specId];
     const specs = ids.flatMap((id) => {
-      const spec = revision === undefined ? latestSpec(doc, id) : model.specs[id]?.find((entry) => entry.revision === revision);
+      const spec = revision === undefined ? latestSpec(doc, id) : specRevisions(doc, id)?.find((entry) => entry.revision === revision);
       return spec === undefined ? [] : [{ spec, check: checkSpec(doc, spec, conditions) }];
     });
     if (specs.length === 0)

@@ -9,6 +9,7 @@ import { headVolume, resolveHead, type HeadRefusal, type ResolvedHead } from '..
 import { headSpecSchema, refuse, type HeadSpec } from '../model';
 import type { VesselDesignData } from '../plantData';
 import { equipmentRefParam, findEquipment } from './equipmentRef';
+import { otherEquipmentVolume } from './otherVolumes';
 
 const isRefusal = (value: ResolvedHead | HeadRefusal): value is HeadRefusal => 'error' in value;
 
@@ -31,6 +32,10 @@ const volumeParams = z.object({
     })
     .optional()
     .describe('Inline form: the two formed heads.'),
+  side: z
+    .enum(['shell', 'tube'])
+    .optional()
+    .describe('Exchangers only: select the shell side or the tube side as totalVolumeM3 (both are always returned).'),
   levels: z
     .array(z.number().min(0))
     .max(200)
@@ -98,10 +103,16 @@ export const vesselVolume = defineCommand({
     'are not subtracted. Returns totalVolumeM3, insideHeight, headDepths, levels[{ level, liquidVolumeM3, percent }], operating (equipment form with an ' +
     'operating liquid: { levelAboveBottomTangent, liquidVolumeM3, percent, liquidMassKg }), method, assumptions, sources and unverified (true when ' +
     'a grade B/C head standard was used). Refusals: EQP_NOT_FOUND, EQP_NOT_PARAMETRIC, EQP_PARAM_INVALID, EQP_HEAD_INVALID, EQP_LEVEL_OUT_OF_RANGE, ' +
-    'EQP_HEAD_NOT_COVERED (horizontal torispherical heads at a partial level, V1). Does not modify the document.',
+    'EQP_HEAD_NOT_COVERED (horizontal torispherical heads at a partial level, V1). `equipment` may also be an exchanger (shellSide.volumeM3, tubeSide.volumeM3, ' +
+    'insideOverallLengthMm, assumptions; `side` selects totalVolumeM3; levels are refused) or a tank from add_storage_tank (levels from the top of the bottom plate, ' +
+    'pi/4 D^2 h, operating = design liquid level). Does not modify the document.',
   annotations: { readOnly: true, idempotent: true },
   params: volumeParams,
   run: (doc, params): CommandResult => {
+    const other = otherEquipmentVolume(doc, params);
+    if (other !== null) return other;
+    if (params.side !== undefined)
+      return refuse(doc, 'vessel_volume', 'EQP_PARAM_INVALID', 'side applies to exchangers only', [], ['side']);
     const source = geometryOf(doc, params);
     if ('result' in source) return source.result;
     const { orientation, insideDiameter, tangentLength } = source.geometry;

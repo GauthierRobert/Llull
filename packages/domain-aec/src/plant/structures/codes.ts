@@ -51,6 +51,14 @@ const REMEDIATION = {
     'Move or reshape the platform (update_access_platform) so it does not overlap the named platform at the same elevation, or change its topOffset / elevation.',
   STA_PLATFORM_STALE:
     'The vessel or the beams the platform was derived from changed: update_access_platform { assemblyId } re-derives it (ids kept); the reason is in the finding.',
+  STA_RACK_SPACING:
+    'Give the rack a length with a bentSpacing (0 < bentSpacing <= length, bays wider than the column section) or ascending stations; widths and bays across likewise. Check the unit: lengths are DOCUMENT UNITS.',
+  STA_RACK_TIERS:
+    'Give tiers as strictly ascending top-of-steel elevations above grade (level-relative, document units), each more than the tier beam depth above the level and more than the beam depth apart.',
+  STA_RACK_BRACING:
+    'bracingBays are 1-based bay numbers (bay k lies between bent k and k + 1), each once, with a bracingProfile and struts other than none (the chords of a braced panel).',
+  STA_RACK_STALE:
+    'The pipe rack no longer matches the parameters it was derived from (a part was changed outside the generator): update_pipe_rack { assemblyId } re-derives it (ids kept); the reason is in the finding.',
   STA_STAIR_BLONDEL:
     'Change riserCount or treadDepth of the stair (a steel stair: delete it and add_steel_stair again with another riserMax / going) so that 2 x riser + going is within the ISO range.',
   STA_STAIR_RISER: 'Increase riserCount (steel stair: lower riserMax) so the riser height drops under the limit.',

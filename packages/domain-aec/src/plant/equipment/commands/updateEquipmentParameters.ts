@@ -67,7 +67,7 @@ export const updateEquipmentParameters = defineCommand({
     'port ids "<tag>:<mark>" are kept; geometry, size, shape and weight are re-derived. Shell nozzles keep their projection from the axis and head ' +
     'nozzles from the tangent line, so a diameter change does not move the flange faces of nozzles that still fit. Every nozzle is re-validated ' +
     '(EQP_NOZZLE_OFF_BODY / EQP_NOZZLE_PROJECTION_TOO_SHORT refuse the whole edit). Returns changed[], movedPorts[{ id, from, to }], connectedPipes[], ' +
-    'angleConvention. Refusals: EQP_NOT_FOUND, EQP_NOT_PARAMETRIC (legacy box equipment), EQP_PARAM_INVALID, EQP_HEAD_INVALID, EQP_SUPPORT_INVALID, ' +
+    'angleConvention. Refusals: EQP_NOT_FOUND, EQP_NOT_PARAMETRIC (legacy box equipment, and exchangers, tanks and pumps, which are not revised in place), EQP_PARAM_INVALID, EQP_HEAD_INVALID, EQP_SUPPORT_INVALID, ' +
     'EQP_TRAYS_DONT_FIT.',
   params: z.object({ equipment: equipmentRefParam, set: changeSet, angleConvention: angleConventionParam }),
   run: (doc, { equipment, set, angleConvention }): CommandResult => {
@@ -81,7 +81,7 @@ export const updateEquipmentParameters = defineCommand({
         doc,
         'update_equipment_parameters',
         'EQP_NOT_PARAMETRIC',
-        `${element.mark} (${element.id}) is a legacy block, not a parametric vessel`,
+        `${element.mark} (${element.id}) is ${plant === undefined || plant.template.kind === 'block' ? 'a legacy block' : `a parametric ${plant.template.kind}`}, not a parametric vessel: only vessels are revised in place, recreate the other equipment`,
         [element.id],
         ['equipment'],
       );

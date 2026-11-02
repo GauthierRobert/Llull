@@ -8,6 +8,7 @@ import type { RailingElement } from '@aec/building/types';
 import { findProfile } from '../../steel/profiles';
 import { findGratingType } from './grating/gratingTypes';
 import { platformParamsValid } from './platform/platformSpec';
+import { rackParamsValid } from './rack/rackSpec';
 import { railingStructureProblem } from './railing/railingValidate';
 
 const isPoint = (value: unknown): boolean => Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
@@ -95,9 +96,9 @@ function steelStairErrors(key: string, element: Record<string, unknown>): string
 
 function assemblyErrors(key: string, element: Record<string, unknown>, elements: Record<string, unknown>): string[] {
   const errors: string[] = [];
-  if (element['kind'] !== 'platform' && element['kind'] !== 'circular_platform')
-    errors.push(`building element ${key}: kind must be platform or circular_platform`);
-  else if (!platformParamsValid(element['kind'], element['params']))
+  if (element['kind'] !== 'platform' && element['kind'] !== 'circular_platform' && element['kind'] !== 'pipe_rack')
+    errors.push(`building element ${key}: kind must be platform, circular_platform or pipe_rack`);
+  else if (element['kind'] === 'pipe_rack' ? !rackParamsValid(element['params']) : !platformParamsValid(element['kind'], element['params']))
     errors.push(`building element ${key}: params are not the resolved generator parameters of a ${element['kind']}`);
   const parts = element['partIds'];
   if (!isStringArray(parts)) return [...errors, `building element ${key}: partIds must be a list of element ids`];
@@ -105,9 +106,12 @@ function assemblyErrors(key: string, element: Record<string, unknown>, elements:
     const part = elements[id];
     if (!(isRecord(part) && part['assemblyId'] === key))
       errors.push(`building element ${key}: part ${id} is missing or does not point back to the assembly (assemblyId)`);
+    else if (element['kind'] === 'pipe_rack' && part['category'] !== 'member')
+      errors.push(`building element ${key}: part ${id} of a pipe rack must be a steel member`);
   }
   const host = element['hostId'];
-  if (
+  if (element['kind'] === 'pipe_rack' && host !== undefined) errors.push(`building element ${key}: a pipe rack has no host (hostId)`);
+  else if (
     host !== undefined &&
     !(typeof host === 'string' && isRecord(elements[host]) && (elements[host] as Record<string, unknown>)['category'] === 'equipment')
   )
@@ -129,7 +133,7 @@ export function accessElementErrors(key: string, element: Record<string, unknown
       isRecord(assembly) && assembly['category'] === 'assembly' && isStringArray(assembly['partIds']) && assembly['partIds'].includes(key);
     if (!(category === 'member' || category === 'grating' || category === 'railing') || !listed)
       errors.push(
-        `building element ${key}: assemblyId must name a platform assembly that lists it as a part (members, gratings and railings only)`,
+        `building element ${key}: assemblyId must name a platform or pipe rack assembly that lists it as a part (members, gratings and railings only)`,
       );
   }
   if (category === 'grating') {

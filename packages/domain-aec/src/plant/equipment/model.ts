@@ -55,6 +55,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Recreate it with add_vessel, or keep it as a block and add nozzles with location { on: "free", position, direction }.',
   EQP_SUPPORT_INVALID:
     'Skirt / legs belong to vertical vessels, saddles to horizontal ones; legs >= 3; saddle stations inside 0..tangentLength.',
+  EQP_TEMA_INVALID:
+    'Use three TEMA letters: front head A, B, C or N; shell E, F, G, H or J; rear head L, M, N, P, S, T, U or W, e.g. BEM, AES, AEU.',
+  EQP_TEMA_UNSUPPORTED:
+    'Use a front A, B, C or N with an E, F, G, H or J shell (front D and shells K, X are not modelled), or model the item with add_vessel.',
+  EQP_PUMP_SIZE_UNKNOWN:
+    'Give envelope { a, f, h1, h2, suctionDn, dischargeDn } from the vendor datasheet, or a size of the shipped tables (ISO 2858: 50-32-160, 50-32-200, 65-40-250, 80-50-200; B73.1: AA, AB, A05, A60).',
   EQP_TRAYS_DONT_FIT: 'Reduce trays.count or trays.spacing so that the last tray is at most tangentLength above the bottom tangent line.',
   EQP_NOZZLE_MARK_DUPLICATE: 'Choose another mark; marks are unique per equipment.',
   EQP_NOZZLE_NOT_FOUND: 'List the marks with equipment_ports.',

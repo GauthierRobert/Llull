@@ -102,11 +102,11 @@ export function summarise(components: readonly NetworkComponent[]): PcfSummary {
   };
 }
 
-/** Ids of the components that need an isometric key (every type but PIPE, GASKET and BOLT) and have none. */
+/** Ids of the components that need an isometric key (every type but PIPE, GASKET, BOLT and SUPPORT, whose symbol is the user's) and have none. */
 export const missingSkeyIds = (components: readonly NetworkComponent[]): string[] =>
   components
     .filter(
       (component) =>
-        !['PIPE', 'GASKET', 'BOLT'].includes(component.type) && component.skey === undefined && component.weldKind === undefined,
+        !['PIPE', 'GASKET', 'BOLT', 'SUPPORT'].includes(component.type) && component.skey === undefined && component.weldKind === undefined,
     )
     .map((component) => component.id);

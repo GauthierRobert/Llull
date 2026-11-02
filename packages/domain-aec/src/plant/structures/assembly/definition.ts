@@ -1,6 +1,6 @@
 /** Comparison of element definitions that ignores key order, evaluated entity ids and (optionally) the generation number. */
 
-import type { BuildingElement } from '@aec/building/types';
+import type { BuildingElement, BuildingModel } from '@aec/building/types';
 
 /** JSON with object keys sorted, so two structurally equal values give the same text. */
 function canonical(value: unknown): string {
@@ -17,3 +17,10 @@ function canonical(value: unknown): string {
 /** The definition of an element as text: everything but the entities generated from it (and the generation number when `ignoreGeneration`). */
 export const definitionOf = (element: BuildingElement | undefined, ignoreGeneration: boolean): string =>
   canonical({ ...element, entityIds: [], ...(ignoreGeneration ? { generation: 0 } : {}) });
+
+/** True when both buildings hold the same assembly and parts (the generation number is ignored). */
+export function sameAssembly(before: BuildingModel, after: BuildingModel, assemblyId: string): boolean {
+  const [a, b] = [before.elements[assemblyId], after.elements[assemblyId]];
+  if (a?.category !== 'assembly' || b?.category !== 'assembly' || definitionOf(a, true) !== definitionOf(b, true)) return false;
+  return a.partIds.every((id) => definitionOf(before.elements[id], true) === definitionOf(after.elements[id], true));
+}

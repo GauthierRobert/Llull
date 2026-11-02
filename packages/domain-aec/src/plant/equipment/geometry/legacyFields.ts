@@ -4,23 +4,14 @@
  * exact offset-solid heads, skirt annulus, square legs, liquid by Jones), never meshes.
  */
 
-import type { CadDocument, Vec3 } from '@core/model/types';
-import type { EquipmentShape } from '@aec/building/types';
+import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
 import type { PlantEquipmentData, VesselTemplate } from '../plantData';
+import { exchangerLegacy, pumpLegacy, tankLegacy, type LegacyFields } from './legacyOthers';
 import { headApexHeight } from './vesselProfile';
 import { resolveVessel, skirtRadii, type VesselGeometry } from './vesselFrame';
 import { vesselMass } from './vesselMass';
-
-export interface LegacyFields {
-  readonly size: Vec3;
-  readonly shape: EquipmentShape;
-  /** Operating weight, kg. */
-  readonly weight: number;
-  /** Named assumptions: density default, liquid not computed, saddles not included. */
-  readonly notes: readonly string[];
-}
 
 /** Footprint radius and top elevation (above the level) of a vertical vessel with its support. */
 function verticalExtent(template: VesselTemplate, geometry: VesselGeometry): { radius: number; top: number } {
@@ -37,12 +28,15 @@ function verticalExtent(template: VesselTemplate, geometry: VesselGeometry): { r
 }
 
 /**
- * @returns size / shape / weight for a vessel template; null for a block (legacy fields stay as the user set them) or an invalid head
+ * @returns size / shape / weight for a vessel, exchanger, tank or pump template; null for a block (legacy fields stay as the user set them) or an invalid head
  * @invariant vertical -> `vertical_vessel` [D, D, top]; horizontal on the floor -> `horizontal_vessel`, raised on saddles -> `box` of the full
  *   height; nozzles are not part of the bounding box (their reach is in the ports); saddle plates are not part of the weight
  */
 export function legacyFields(doc: Pick<CadDocument, 'units'>, plant: PlantEquipmentData): LegacyFields | null {
   const { template } = plant;
+  if (template.kind === 'exchanger') return exchangerLegacy(doc, template);
+  if (template.kind === 'tank') return tankLegacy(doc, template);
+  if (template.kind === 'pump') return pumpLegacy(template);
   if (template.kind !== 'vessel') return null;
   const geometry = resolveVessel(template);
   if ('error' in geometry) return null;

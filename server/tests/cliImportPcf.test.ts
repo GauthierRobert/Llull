@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
-import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
+import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 
 const PCF = [
   'ISOGEN-FILES ISOGEN.FLS',
@@ -48,5 +48,15 @@ describe('llull CLI: PCF files', () => {
     const outDir = `${path.join(dir, 'out')}/`;
     expect(await runCli(['export_pcf', '--save', outDir, '--doc', doc], capture().io)).toBe(EXIT_OK);
     expect(readFileSync(path.join(outDir, 'CLI-1.pcf'), 'utf8')).toBe(PCF);
+  });
+
+  it('import_pcf file= as=route reaches the route mode: a document without the spec is refused with the RTE code', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'llull-pcf-route-'));
+    const pcf = path.join(dir, 'line.pcf');
+    const doc = path.join(dir, 'a.llull');
+    writeFileSync(pcf, PCF);
+    const refused = capture();
+    expect(await runCli(['import_pcf', `file=${pcf}`, 'as=route', 'spec=CS150', '--doc', doc], refused.io)).toBe(EXIT_COMMAND_ERROR);
+    expect(refused.out.join('')).toMatch(/RTE_SPEC_UNKNOWN/);
   });
 });

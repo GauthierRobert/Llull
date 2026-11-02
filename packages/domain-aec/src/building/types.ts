@@ -504,8 +504,8 @@ export interface SteelStairElement extends LevelElementBase {
   arrivalSurfaceId?: string;
 }
 
-/** Generated assemblies (06 STA M6; pipe racks follow in M7). */
-export type AssemblyKind = 'platform' | 'circular_platform';
+/** Generated assemblies (06 STA M6 platforms, M7 pipe racks). */
+export type AssemblyKind = 'platform' | 'circular_platform' | 'pipe_rack';
 
 /**
  * A generated platform: `params` holds the resolved generator parameters (document units; replayed by update_access_platform) and `partIds` the

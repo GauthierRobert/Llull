@@ -31,6 +31,8 @@ interface SupportedPipeLoad {
   readonly warnings: string[];
   /** Column-borne loads: column id → nodes for the column check. */
   readonly columnNodes: Array<readonly [string, ColumnNode]>;
+  /** Weight delivered per steel member, kN. */
+  readonly bearers: Array<{ memberId: string; kn: number }>;
 }
 
 interface TributaryRules {
@@ -83,6 +85,7 @@ export function applySupportedPipe(
   const label = `pipe ${run.element.mark}${run.element.line !== undefined ? ` (${run.element.line})` : ''}`;
   const warnings: string[] = [];
   const columnNodes: Array<readonly [string, ColumnNode]> = [];
+  const bearers: Array<{ memberId: string; kn: number }> = [];
   const stations = supportStations(units, run, supportsOfPipe(units, run.element.id));
   const attached = stations.filter((station) => station.attached && !isLateralOnly(station));
   for (const station of stations.filter((candidate) => !candidate.attached)) {
@@ -110,6 +113,7 @@ export function applySupportedPipe(
       addPointLoad(beam, t * beam.lengthM * 1000, weight, 0, true);
       if (station.type !== 'hanger') beam.lineSupport = true;
       carried += weight;
+      bearers.push({ memberId: beam.bar.id, kn: weight });
     } else if (bar?.kind === 'column') {
       columnNodes.push([
         bar.id,
@@ -122,6 +126,7 @@ export function applySupportedPipe(
         );
       }
       carried += weight;
+      bearers.push({ memberId: bar.id, kn: weight });
     } else {
       const role = member?.category === 'member' ? `${member.role} ${member.mark}` : station.memberId;
       warnings.push(
@@ -129,5 +134,5 @@ export function applySupportedPipe(
       );
     }
   });
-  return { carriedKn: carried, supports: attached.length, warnings, columnNodes };
+  return { carriedKn: carried, supports: attached.length, warnings, columnNodes, bearers };
 }

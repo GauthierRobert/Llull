@@ -14,6 +14,7 @@ import { exportGrating, exportRailing } from '../../plant/structures/exchange/if
 import { exportSteelStair } from '../../plant/structures/exchange/ifcSteelStairExport';
 import { exportLadder } from '../../plant/structures/exchange/ifcLadderExport';
 import { exportAssembly } from '../../plant/structures/exchange/ifcPlatformExport';
+import { isRackStrut } from '../../plant/structures/rack/rackMeasure';
 import { exportPipeSupport } from './ifcSupportExport';
 import { type PipingIfc, exportPipingProducts } from './ifcPipingExport';
 import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
@@ -90,7 +91,10 @@ function exportElement(
       return plant.run.x3
         ? exportPipe(context, element, level, storeyPlacement, plant)
         : exportLegacyPipe(context, element, storeyPlacement, plant);
-    case 'member':
+    case 'member': {
+      const exported = exportIndustrial(context, element, storeyPlacement, undefined, isRackStrut(building, element));
+      return exported ? [exported] : [];
+    }
     case 'footing':
     case 'panel':
     case 'tray': {

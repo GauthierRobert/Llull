@@ -1,29 +1,71 @@
 {
   "id": "SC-ISO-02",
   "validates": ["VC-ISO-04", "VC-ISO-17"],
-  "description": "Route L-101 DN100 in llull with the same geometry as the sample PCF (main run with three 90 deg turns, a vertical branch at x = 7105), let routing place LR elbows, an equal tee and weld-neck flanges from the spec, add a site weld at x = 2500, export the PCF and re-import it as a preview. Pipe length must equal route length minus fitting take-outs.",
-  "status": "UNBUILT - depends on 01-piping-specs-catalog (spec CS150-A1) and 02-spec-driven-routing (fittings, flanges, branch); names of RTE commands are placeholders owned by that pack",
-  "unbuilt": ["import_pipe_spec (PSC)", "add_pipe_run.spec (PSC)", "add_branch (RTE)", "add_end_flange (RTE)", "add_field_weld", "piping_bom"],
+  "description": "Route L-101 DN100 in llull with the same geometry as the sample PCF (main run with three 90 deg turns, a vertical branch at x = 7105) from the 02 RTE validation spec CS150: routing places the LR elbows, the equal tee and the weld-neck flange sets (with their 3 mm gaskets and bolt sets) from the spec; add a site weld at x = 2500, export the PCF and re-import it as a preview. Pipe length must equal the route length 14500 minus the catalogue take-outs 1464 (6 x 152 elbow, 3 x (76 + 3) flange set, 2 x 105 + 105 tee) = 13036; the sample PCF draws the flange alone, so its 13045 differs by the 3 gaskets of 3 mm.",
+  "status": "BUILT (ISO-M5) - run by tests/unit/plant/fabrication/scenarioPlans.test.ts; the imported route of the same file is tested in importRoute.test.ts",
   "actions": [
-    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
-    { "command": "import_pipe_spec", "params": { "spec": "<01-piping-specs-catalog/validation/data/sample_spec_cs150.json>" } },
+    { "command": "set_units", "params": { "units": "mm" } },
     {
-      "command": "add_pipe_run",
-      "params": { "points": [[0, 0, 3000], [5000, 0, 3000], [5000, 4000, 3000], [5000, 4000, 1000], [8000, 4000, 1000]], "dn": 100, "line": "L-101", "service": "process" },
+      "command": "import_piping_catalog",
+      "params": { "catalog": "<../../../02-spec-driven-routing/validation/data/catalog_stub_cs150.json>" }
+    },
+    { "command": "import_pipe_spec", "params": { "spec": "<../../../02-spec-driven-routing/validation/data/spec_cs150.json>" } },
+    {
+      "command": "create_pipeline",
+      "params": { "service": "P", "sequence": "101", "spec": "CS150", "dn": 100, "lineNumber": "L-101" },
+      "as": "line"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "A", "position": [0, 0, 3000], "direction": [1, 0, 0], "dn": 100, "endType": "FL" },
+      "as": "a"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "B", "position": [8000, 4000, 1000], "direction": [-1, 0, 0], "dn": 100, "endType": "FL" },
+      "as": "b"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "C", "position": [7105, 4000, 1500], "direction": [0, 0, -1], "dn": 100, "endType": "FL" },
+      "as": "c"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$a" },
+        "to": { "portId": "$b" },
+        "legs": [
+          { "direction": "+X", "length": 5000 },
+          { "direction": "+Y", "length": 4000 },
+          { "direction": "-Z", "length": 2000 }
+        ]
+      },
       "as": "main"
     },
-    { "command": "add_branch", "params": { "pipeId": "$main", "at": [7105, 4000, 1000], "to": [7105, 4000, 1500], "fitting": "tee" }, "as": "branch" },
-    { "command": "add_end_flange", "params": { "lineId": "L-101", "at": [[0, 0, 3000], [8000, 4000, 1000], [7105, 4000, 1500]], "type": "weld_neck" } },
-    { "command": "add_field_weld", "params": { "lineId": "L-101", "at": [2500, 0, 3000], "type": "site" } },
-    { "command": "export_pcf", "params": { "lineIds": ["L-101"] }, "as": "pcf" },
+    { "command": "add_branch", "params": { "runId": "$main", "at": { "point": [7105, 4000, 1000] }, "dn": 100, "to": { "portId": "$c" } } },
+    { "command": "add_field_weld", "params": { "lineId": "$line", "at": [2500, 0, 3000], "type": "site" } },
+    { "command": "export_pcf", "params": { "lineIds": ["$line"] }, "as": "pcf" },
     { "command": "import_pcf", "params": { "text": "=$pcf.data.files[0].content", "preview": true } },
-    { "command": "piping_bom", "params": { "scope": "line", "lineId": "L-101" } }
+    { "command": "piping_bom", "params": { "scope": "line", "lineId": "$line" } }
   ],
   "expected": [
-    { "step": 6, "path": "data.files.length", "value": 1, "source": "one PCF per line (S12)" },
-    { "step": 7, "path": "data.countsByType", "value": { "FLANGE": 3, "PIPE": 7, "WELD": 1, "ELBOW": 3, "TEE": 1 }, "source": "same topology as the sample" },
-    { "step": 7, "path": "data.totalPipeLengthMm", "value": 13045.0, "abs": 1e-6, "source": "14500 route - 1455 take-out (VC-ISO-04)" },
-    { "step": 8, "path": "data.rows[itemCode~PIPE].quantity", "value": 13.045, "abs": 1e-9, "source": "VC-ISO-08" }
+    { "step": 10, "path": "data.files.length", "value": 1, "source": "one PCF per line (S12)" },
+    {
+      "step": 11,
+      "path": "data.countsByType",
+      "value": { "FLANGE": 3, "PIPE": 7, "WELD": 1, "ELBOW": 3, "TEE": 1, "GASKET": 3, "BOLT": 3 },
+      "source": "same topology as the sample, plus the gasket and bolt set the spec adds to each flange"
+    },
+    {
+      "step": 11,
+      "path": "data.totalPipeLengthMm",
+      "value": 13036,
+      "abs": 0.000001,
+      "source": "14500 route - 1464 take-out (VC-ISO-04): 6 x 152 + 3 x (76 + 3) + 2 x 105 + 105"
+    },
+    { "step": 12, "path": "data.rows[type=PIPE].quantity", "value": 13.036, "abs": 1e-9, "source": "VC-ISO-08" }
   ],
   "determinism": "run twice: data.files[0].sha256 equal (VC-ISO-17)"
 }
