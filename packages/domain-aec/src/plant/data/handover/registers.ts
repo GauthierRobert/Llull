@@ -6,7 +6,7 @@ import { resolvedOrNull } from '../classes';
 import { currentStatus } from '../deliverables';
 import { deliverableContent } from '../deliverableContent';
 import { pathOf } from '../hierarchy';
-import { getPlantData, type PlantObject, type PlantValue } from '../model';
+import { getPlantData, own, type PlantObject, type PlantValue } from '../model';
 import { isEquipmentObject } from '../plantReports/equipmentList';
 import { tagRegister } from '../plantReports/tagRegister';
 import { objectRegistry } from '../registry';
@@ -16,16 +16,17 @@ export type RegisterRow = Readonly<Record<string, PlantValue>>;
 
 const text = (value: PlantValue | undefined): string => (typeof value === 'string' ? value : '');
 
-/** The class id of `className` in the profile's external scheme: the id given with the export first, else the class's own externalIds entry (ids are not inherited); null when none. */
-export function externalClassId(
+/** The class id of `className` in the profile's external scheme and where it came from: the id given with the export, else the class's own externalIds entry (ids are not inherited); null when none. */
+export function classIdOf(
   doc: CadDocument,
   profile: HandoverProfile,
   className: string,
-  given: Readonly<Record<string, string>> = {},
-): string | null {
-  return (
-    given[className] ?? getPlantData(doc).classes[className]?.externalIds?.find((entry) => entry.scheme === profile.scheme)?.id ?? null
-  );
+  given: Readonly<Record<string, string>>,
+): { readonly id: string; readonly source: 'classIds' | 'externalIds' } | null {
+  const fromCall = own(given, className);
+  if (fromCall !== undefined) return { id: fromCall, source: 'classIds' };
+  const fromClass = own(getPlantData(doc).classes, className)?.externalIds?.find((entry) => entry.scheme === profile.scheme)?.id;
+  return fromClass === undefined ? null : { id: fromClass, source: 'externalIds' };
 }
 
 /** The tag of the object that owns `object`: its process line, else the equipment a nozzle belongs to. */
@@ -51,7 +52,7 @@ export function tagRegisterRows(
   return objects.map((object) => ({
     tag: object.tag,
     class: object.className,
-    classId: externalClassId(doc, profile, object.className, given) ?? '',
+    classId: classIdOf(doc, profile, object.className, given)?.id ?? '',
     parentTag: parentTagOf(doc, object),
     hierarchy: pathOf(data, object.hierarchyId),
     description: text(object.properties['Description']),
@@ -92,7 +93,7 @@ export function documentRegisterRows(doc: CadDocument, ctx: ExecutionContext | u
   const hashNow = (deliverable: string, hierarchyId: string | undefined): string | null => {
     const key = `${deliverable}|${hierarchyId ?? ''}`;
     if (!rebuilt.has(key)) {
-      const built = deliverableContent(doc, deliverable, hierarchyId, ctx, confirmExportControlled);
+      const built = deliverableContent(doc, deliverable, { hierarchy: hierarchyId, fixed: true }, ctx, confirmExportControlled);
       rebuilt.set(key, built.ok ? built.content.sha256 : null);
     }
     return rebuilt.get(key) ?? null;
@@ -109,9 +110,15 @@ export function documentRegisterRows(doc: CadDocument, ctx: ExecutionContext | u
           revision: revision.label,
           status,
           contentSha256: step?.contentSha256 ?? '',
-          scope: revision.hierarchyId === undefined ? '' : pathOf(data, revision.hierarchyId),
+          scope:
+            revision.hierarchyId === undefined
+              ? ''
+              : own(data.hierarchy, revision.hierarchyId) === undefined
+                ? `${revision.hierarchyId} (missing)`
+                : pathOf(data, revision.hierarchyId),
           signedBy: step?.signer ?? '',
           signatureId: step?.signatureId ?? '',
+          issuedAt: step?.at ?? '',
           contentCurrent: now === null ? '' : now === step?.contentSha256,
         };
       }),

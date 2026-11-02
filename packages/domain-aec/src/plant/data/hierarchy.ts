@@ -1,6 +1,6 @@
 /** Lookups in the plant hierarchy (plant 08 DAT §3, TR-DAT-09): references by id, code or `S1/P1/U10` path, ancestry, subtrees, tag scopes. */
 
-import { HIERARCHY_KINDS, type HierarchyKind, type HierarchyNode, type PlantDataModel, type TagScope } from './model';
+import { HIERARCHY_KINDS, type HierarchyKind, type HierarchyNode, type PlantDataModel, type TagScope, own } from './model';
 
 export const kindRank = (kind: HierarchyKind): number => HIERARCHY_KINDS.indexOf(kind);
 
@@ -22,7 +22,7 @@ export const pathOf = (data: PlantDataModel, id: string): string =>
 
 /** The node `reference` names: its id, a `S1/P1/U10` path from a root, or a code used by exactly one node. `ambiguous` lists nothing: use the path. */
 export function resolveNode(data: PlantDataModel, reference: string): HierarchyNode | 'ambiguous' | null {
-  const byId = data.hierarchy[reference];
+  const byId = own(data.hierarchy, reference);
   if (byId !== undefined) return byId;
   const nodes = data.hierarchyOrder.flatMap((id) => data.hierarchy[id] ?? []);
   if (reference.includes('/')) return nodes.find((node) => pathOf(data, node.id) === reference) ?? null;

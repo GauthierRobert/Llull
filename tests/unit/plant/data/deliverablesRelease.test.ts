@@ -9,7 +9,8 @@ import { getPlantData } from '@aec/plant/data/model';
 import { expectRefusal } from '../../../helpers/commandAssertions';
 import { inWork, released } from '../../plm/fixtures';
 
-const params = { deliverable: 'tag_register', revision: 'A', status: 'in_work' };
+const AT = '2026-11-02T09:30:00Z';
+const params = { at: AT, deliverable: 'tag_register', revision: 'A', status: 'in_work' };
 
 describe('set_deliverable_status and the PLM release lock', () => {
   it('a released revision refuses the status change (PLM_LOCKED); the document is unchanged', () => {

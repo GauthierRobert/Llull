@@ -8,7 +8,7 @@ import { PROFILE_NAMES, PROFILES, REGISTER_FIELDS, REGISTER_KEYS, registerFileNa
 import {
   documentRegisterRows,
   equipmentRegisterRows,
-  externalClassId,
+  classIdOf,
   tagPropertyRows,
   tagRegisterRows,
   type RegisterRow,
@@ -33,8 +33,8 @@ export const exportHandover = defineCommand({
     'profile cfihos-subset: CFIHOS-like names (TAG_NUMBER, TAG_CLASS_ID, ...) and class ids from classes[].externalIds with scheme cfihos (define_plant_class externalIds); llull ships NO CFIHOS code or release, so this profile is UNVERIFIED: ' +
     'data.unverified is true, the file names carry ".unverified" and handover-manifest.json repeats the notice. Do not deliver it as CFIHOS-compliant. profile generic: llull column names, class ids from the company scheme, not marked. ' +
     'registers: a subset (default all four). hierarchy: restrict the tag registers to a node (code, path or id); the document register is never scoped. A class without an id in the profile scheme gets an empty class id and is listed in data.mapping.missing ' +
-    'with a warning; classIds: ids given with the export for the classes (library classes cannot carry externalIds). requireMapping: true refuses instead (DAT_HANDOVER_MAPPING_MISSING). Returns data = { profile, unverified, mappingSource, notice, files [{ fileName, content }] (the registers and handover-manifest.json with the SHA-256 and row count of each), ' +
-    'registers { <register>: { columns, rows } }, mapping { scheme, mapped, missing[] }, warnings[] }. Refusals: DAT_HIERARCHY_UNKNOWN, DAT_HANDOVER_MAPPING_MISSING, MAT_EXPORT_CONTROLLED.',
+    'with a warning; classIds: ids given with the export for the classes (library classes cannot carry externalIds). requireMapping: true refuses instead (DAT_HANDOVER_MAPPING_MISSING). Returns data = { profile, unverified, mappingSource, notice, files [{ fileName, content }] (the registers and handover-manifest.json with the SHA-256 and row count of each and, per class, its id and whether it came from classIds or externalIds), ' +
+    'registers { <register>: { columns, rows } }, mapping { scheme, mapped (classes with an id), missing[] (no id), unresolvable[] (class does not resolve), unusedClassIds[] (classIds keys matching no exported class; also a warning) }, warnings[] }. Refusals: DAT_HIERARCHY_UNKNOWN, DAT_HANDOVER_MAPPING_MISSING, MAT_EXPORT_CONTROLLED.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     confirmExportControlled,
@@ -65,8 +65,15 @@ export const exportHandover = defineCommand({
     if (!scope.ok) return refuse(doc, 'export_handover', { code: scope.code, message: scope.message, paths: [scope.path] });
     const data = getPlantData(doc);
     const classes = [...new Set(scope.objects.map((object) => object.className))];
-    const missing = classes
-      .filter((name) => resolvedOrNull(data, name) !== null && externalClassId(doc, profile, name, params.classIds ?? {}) === null)
+    const given = params.classIds ?? {};
+    const sources = classes
+      .sort()
+      .map((name) => ({ class: name, resolvable: resolvedOrNull(data, name) !== null, found: classIdOf(doc, profile, name, given) }));
+    const mapped = sources.filter((entry) => entry.found !== null);
+    const missing = sources.filter((entry) => entry.found === null && entry.resolvable).map((entry) => entry.class);
+    const unresolvable = sources.filter((entry) => !entry.resolvable).map((entry) => entry.class);
+    const unusedClassIds = Object.keys(given)
+      .filter((name) => !classes.includes(name))
       .sort();
     if (params.requireMapping === true && missing.length > 0)
       return refuse(doc, 'export_handover', {
@@ -76,7 +83,7 @@ export const exportHandover = defineCommand({
         detail: { missing },
       });
     const rowsOf: Record<RegisterKey, () => RegisterRow[]> = {
-      tag_register: () => tagRegisterRows(doc, profile, scope.objects, params.classIds ?? {}),
+      tag_register: () => tagRegisterRows(doc, profile, scope.objects, given),
       equipment_register: () => equipmentRegisterRows(doc, scope.objects),
       tag_properties: () => tagPropertyRows(doc, scope.objects),
       document_register: () => documentRegisterRows(doc, ctx, params.confirmExportControlled),
@@ -107,6 +114,7 @@ export const exportHandover = defineCommand({
             unverified: profile.unverified,
             notice: profile.notice,
             mappingSource: profile.mappingSource,
+            classIds: mapped.map((entry) => ({ class: entry.class, id: entry.found?.id, source: entry.found?.source })),
             files: manifest,
           }),
         ),
@@ -114,8 +122,15 @@ export const exportHandover = defineCommand({
         2,
       )}\n`,
     });
-    const warnings =
-      missing.length === 0 ? [] : [`DAT_HANDOVER_MAPPING_MISSING: no ${profile.scheme} id for ${missing.join(', ')} (empty class id)`];
+    const warnings = [
+      ...(missing.length === 0 ? [] : [`DAT_HANDOVER_MAPPING_MISSING: no ${profile.scheme} id for ${missing.join(', ')} (empty class id)`]),
+      ...(unresolvable.length === 0
+        ? []
+        : [`class(es) ${unresolvable.join(', ')} do not resolve (unknown parent or cycle): listed in mapping.unresolvable`]),
+      ...(unusedClassIds.length === 0
+        ? []
+        : [`classIds names class(es) of no exported object: ${unusedClassIds.join(', ')} (a typo? mapping.unusedClassIds)`]),
+    ];
     return report(
       doc,
       `export_handover ${profile.name}: ${manifest.length} register(s), ${manifest.reduce((sum, entry) => sum + entry.rows, 0)} row(s)` +
@@ -128,7 +143,7 @@ export const exportHandover = defineCommand({
         notice: profile.notice,
         files,
         registers,
-        mapping: { scheme: profile.scheme, mapped: classes.length - missing.length, missing },
+        mapping: { scheme: profile.scheme, mapped: mapped.length, missing, unresolvable, unusedClassIds },
         warnings,
       },
     );

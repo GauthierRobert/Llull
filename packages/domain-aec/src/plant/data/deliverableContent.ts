@@ -9,7 +9,7 @@ import type { CadDocument } from '@core/model/types';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import { resolveNode } from './hierarchy';
-import { getPlantData } from './model';
+import { getPlantData, own } from './model';
 import type { MtoDimension } from './plantReports/mto';
 import { applyDefinition } from './plantReports/definition';
 import { buildReport } from './plantReports/build';
@@ -39,14 +39,19 @@ export const deliverableIds = (doc: CadDocument): string[] => [
   ),
 ];
 
+/**
+ * The content of `id` in a scope. `scope.fixed` (an existing revision): `scope.hierarchy` is its stored node id (or undefined = the whole plant) and nothing else
+ * decides the scope, a saved definition's own hierarchy included; otherwise (a new revision) `scope.hierarchy` or else the definition's hierarchy is the scope.
+ */
 export function deliverableContent(
   doc: CadDocument,
   id: string,
-  hierarchy: string | undefined,
+  scope: { readonly hierarchy: string | undefined; readonly fixed: boolean },
   ctx: ExecutionContext | undefined,
   confirmExportControlled: unknown,
 ): Outcome<{ content: DeliverableContent }> {
   const data = getPlantData(doc);
+  const hierarchy = scope.hierarchy;
   if (id === IFC_DELIVERABLE) {
     if (hierarchy !== undefined)
       return failure('DAT_PARAM_INVALID', 'the ifc deliverable is the whole plant: omit hierarchy', ['hierarchy']);
@@ -58,22 +63,28 @@ export function deliverableContent(
       ]);
     return { ok: true, content: { sha256: sha256Hex(text) } };
   }
-  const definition = data.reports?.[id];
+  const definition = own(data.reports, id);
   const builtin = (REPORT_DELIVERABLES as readonly string[]).includes(id);
   if (!builtin && definition === undefined)
     return failure('DAT_PARAM_INVALID', `no deliverable "${id}": use ${deliverableIds(doc).join(', ')}`, ['deliverable']);
-  const scope = hierarchy ?? definition?.hierarchy;
-  const node = scope === undefined ? null : resolveNode(data, scope);
-  if (scope !== undefined && (node === null || node === 'ambiguous'))
-    return failure('DAT_HIERARCHY_UNKNOWN', `no (or an ambiguous) hierarchy node "${scope}"`, ['hierarchy']);
+  const wanted = scope.fixed ? hierarchy : (hierarchy ?? definition?.hierarchy);
+  const node = wanted === undefined ? null : resolveNode(data, wanted);
+  if (wanted !== undefined && (node === null || node === 'ambiguous'))
+    return failure(
+      'DAT_HIERARCHY_UNKNOWN',
+      scope.fixed
+        ? `the scope "${wanted}" of this revision no longer exists in the hierarchy (a regenerate or a hierarchy replace dropped it)`
+        : `no (or an ambiguous) hierarchy node "${wanted}"`,
+      ['hierarchy'],
+    );
   const built = buildReport(doc, {
     kind: (builtin ? id : definition?.kind) as ReportKind,
-    hierarchy: scope,
+    hierarchy: wanted,
     groupBy: builtin ? undefined : (definition?.groupBy as readonly MtoDimension[] | undefined),
   });
   const shaped = !built.ok || definition === undefined || builtin ? built : applyDefinition(built.table, definition);
   if (!shaped.ok) return failure(shaped.code, shaped.message, [shaped.path]);
-  const scoped = objectsInScope(doc, scope);
+  const scoped = objectsInScope(doc, wanted);
   const hierarchyId = node === null || node === 'ambiguous' ? undefined : node.id;
   const sha256 = sha256Hex(
     jcsJson({ deliverable: id, columns: shaped.table.columns.map((column) => [column.name, column.unit]), rows: shaped.table.rows }),

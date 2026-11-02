@@ -14,7 +14,10 @@ import type { CadDocument } from '@core/model/types';
 import { copyObject, getPlantData, type DeliverableStep } from '@aec/plant/data/model';
 import { plantDataErrors } from '@aec/plant/data/validate';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
+import { plantDataPlugin } from '@aec/plant/data/plugin';
 import { addEquipment, assignPump, libraryDocument, scDat01Document, withData } from './dataFixtures';
+
+const AT = '2026-11-02T09:30:00Z';
 
 interface Signature {
   readonly payload: string;
@@ -45,11 +48,11 @@ const withPort = (humanSignature: HumanSignaturePort | null): ExecutionContext =
 /** The signature a human would produce in the desktop app for this exact act. */
 const signFor = (
   deliverable: string,
-  details: { revision: string; from: string | null; status: string; contentSha256: string; hierarchyId?: string | null },
+  details: { revision: string; from: string | null; status: string; contentSha256: string; hierarchyId?: string | null; at?: string },
   nonce = 'n1',
   signer?: string,
 ): Signature => ({
-  payload: humanGatePayload('plant:set_deliverable_status', [deliverable], { hierarchyId: null, ...details }, nonce),
+  payload: humanGatePayload('plant:set_deliverable_status', [deliverable], { hierarchyId: null, at: AT, ...details }, nonce),
   nonce,
   ...(signer === undefined ? {} : { signer }),
 });
@@ -66,7 +69,7 @@ const level = (
   status: string,
   extra: Record<string, unknown> = {},
   ctx?: ExecutionContext,
-): CommandResult => execute(doc, 'set_deliverable_status', { deliverable, revision, status, ...extra }, ctx);
+): CommandResult => execute(doc, 'set_deliverable_status', { at: AT, deliverable, revision, status, ...extra }, ctx);
 
 const stepsOf = (doc: CadDocument, deliverable: string, revision: string): readonly DeliverableStep[] =>
   getPlantData(doc).deliverables?.[deliverable]?.revisions.find((entry) => entry.label === revision)?.steps ?? [];
@@ -121,7 +124,7 @@ describe('status machine (agent steps)', () => {
       const result = expectRefusal(
         from,
         'set_deliverable_status',
-        { deliverable: 'tag_register', revision: 'A', status },
+        { at: AT, deliverable: 'tag_register', revision: 'A', status },
         'DAT_STATUS_TRANSITION',
       );
       expect(result.summary).toContain('allowed:');
@@ -140,20 +143,20 @@ describe('status machine (agent steps)', () => {
     expectRefusal(
       doc,
       'set_deliverable_status',
-      { deliverable: 'nope', revision: 'A', status: 'in_work' },
+      { at: AT, deliverable: 'nope', revision: 'A', status: 'in_work' },
       'DAT_PARAM_INVALID',
       'deliverable',
     );
     expectRefusal(
       doc,
       'set_deliverable_status',
-      { deliverable: 'mto', revision: 'A', status: 'in_work', hierarchy: 'ZZ' },
+      { at: AT, deliverable: 'mto', revision: 'A', status: 'in_work', hierarchy: 'ZZ' },
       'DAT_HIERARCHY_UNKNOWN',
     );
     expectRefusal(
       doc,
       'set_deliverable_status',
-      { deliverable: 'ifc', revision: 'A', status: 'in_work', hierarchy: 'U10' },
+      { at: AT, deliverable: 'ifc', revision: 'A', status: 'in_work', hierarchy: 'U10' },
       'DAT_PARAM_INVALID',
       'hierarchy',
     );
@@ -162,7 +165,7 @@ describe('status machine (agent steps)', () => {
     expectRefusal(
       scoped.document,
       'set_deliverable_status',
-      { deliverable: 'tag_register', revision: 'A', status: 'issued_for_review', hierarchy: 'P2' },
+      { at: AT, deliverable: 'tag_register', revision: 'A', status: 'issued_for_review', hierarchy: 'P2' },
       'DAT_PARAM_INVALID',
       'hierarchy',
     );
@@ -212,7 +215,7 @@ describe('the human gate (VC-DAT-15)', () => {
       const result = execute(
         doc,
         'set_deliverable_status',
-        { deliverable: 'equipment_list', revision: 'A', status: 'issued_for_approval', confirmation },
+        { at: AT, deliverable: 'equipment_list', revision: 'A', status: 'issued_for_approval', confirmation },
         ctx,
       );
       expect(result.error?.code, result.summary).toBe('DAT_HUMAN_GATE');
@@ -314,7 +317,7 @@ describe('supersession', () => {
     expectRefusal(
       b.document,
       'set_deliverable_status',
-      { deliverable: 'tag_register', revision: 'A', status: 'issued_for_approval' },
+      { at: AT, deliverable: 'tag_register', revision: 'A', status: 'issued_for_approval' },
       'DAT_STATUS_TRANSITION',
     );
   });
@@ -419,7 +422,7 @@ describe('persistence, replay and regeneration', () => {
       change(copy.deliverables['tag_register']!.revisions[0]!);
       return plantDataErrors(copy);
     };
-    expect(mutate((revision) => delete revision.steps[1]!['signer'])).toEqual([expect.stringContaining('signer and signatureId')]);
+    expect(mutate((revision) => delete revision.steps[1]!['signer'])).toEqual([expect.stringContaining('payloadSha256')]);
     expect(mutate((revision) => (revision.steps[0]!['contentSha256'] = 'abc'))).toEqual([expect.stringContaining('64 hex')]);
     expect(mutate((revision) => (revision.steps[0]!['status'] = 'done'))).toEqual([expect.stringContaining('status')]);
     expect(mutate((revision) => (revision.steps = []))).toEqual([expect.stringContaining('steps must not be empty')]);
@@ -469,5 +472,129 @@ describe('persistence, replay and regeneration', () => {
       Status: 'issued_for_approval',
       ContentCurrent: expect.any(Boolean),
     });
+  });
+});
+
+describe('agent-chosen keys never reach the prototype', () => {
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty'])(
+    '%s is an unknown deliverable, definition, node, class and object',
+    (key) => {
+      const saved = apply(pumpDocument(), 'save_report_definition', { id: 'tags', kind: 'tag_register' });
+      const doc = level(saved, 'tags', 'A', 'in_work').document; // reports and deliverables exist, so a prototype key would find something
+      expectRefusal(
+        doc,
+        'set_deliverable_status',
+        { at: AT, deliverable: key, revision: 'A', status: 'in_work' },
+        'DAT_PARAM_INVALID',
+        'deliverable',
+      );
+      expectRefusal(doc, 'plant_report', { definition: key }, 'DAT_PARAM_INVALID', 'definition');
+      expectRefusal(doc, 'check_plant_data', { hierarchy: key }, 'DAT_HIERARCHY_UNKNOWN');
+      expectRefusal(doc, 'check_plant_data', { classes: [key] }, 'DAT_CLASS_UNKNOWN');
+      expectRefusal(doc, 'plant_data_table', { className: key }, 'DAT_CLASS_UNKNOWN');
+      expectRefusal(doc, 'define_plant_class', { name: 'Ok', parent: key }, 'DAT_CLASS_PARENT_UNKNOWN');
+      expectRefusal(doc, 'renumber_tags', { className: key, startSequence: 1 }, 'DAT_CLASS_UNKNOWN');
+      expectRefusal(doc, 'set_plant_properties', { edits: [{ object: key, property: 'Description', value: 'x' }] }, 'DAT_OBJECT_UNKNOWN');
+      // a revision label is data, not a key: any text is a plain label
+      const labelled = level(doc, 'tag_register', key, 'in_work');
+      expect(labelled.rejected).toBeUndefined();
+      expect(stepsOf(labelled.document, 'tag_register', key)).toHaveLength(1);
+    },
+  );
+});
+
+describe('revision scope', () => {
+  const nodeId = (doc: CadDocument, code: string): string =>
+    Object.values(getPlantData(doc).hierarchy).find((node) => node.code === code)?.id ?? '';
+
+  it('supersession only retires revisions with the same scope (two scoped revisions of one saved report)', () => {
+    const doc = apply(pumpDocument(), 'save_report_definition', { id: 'tags', kind: 'tag_register' });
+    const unit = level(doc, 'tags', 'U', 'issued_for_review', { hierarchy: 'U10' }).document;
+    const plant2 = level(unit, 'tags', 'P', 'issued_for_review', { hierarchy: 'P2' });
+    expect((plant2.data as { superseded: string[] }).superseded).toEqual([]);
+    expect(stepsOf(plant2.document, 'tags', 'U').map((step) => step.status)).toEqual(['issued_for_review']);
+    const unit2 = level(plant2.document, 'tags', 'V', 'issued_for_review', { hierarchy: 'U10' });
+    expect((unit2.data as { superseded: string[] }).superseded).toEqual(['U']);
+    expect(stepsOf(unit2.document, 'tags', 'P').map((step) => step.status)).toEqual(['issued_for_review']);
+    const whole = level(unit2.document, 'tags', 'W', 'issued_for_review');
+    expect((whole.data as { superseded: string[] }).superseded).toEqual([]);
+  });
+
+  it('an existing revision keeps the scope it was created with: a later hierarchy of the saved definition is never used', () => {
+    const base = apply(pumpDocument(), 'save_report_definition', { id: 'tags', kind: 'tag_register' });
+    const first = level(base, 'tags', 'A', 'in_work');
+    expect((first.data as { hierarchy: string | null }).hierarchy).toBeNull();
+    const rescoped = apply(first.document, 'save_report_definition', { id: 'tags', kind: 'tag_register', hierarchy: 'P2' });
+    const second = level(rescoped, 'tags', 'A', 'issued_for_review');
+    expect((second.data as { hierarchy: string | null }).hierarchy).toBeNull();
+    expect(getPlantData(second.document).deliverables?.['tags']?.revisions[0]?.hierarchyId).toBeUndefined();
+    const created = level(rescoped, 'tags', 'B', 'in_work');
+    expect((created.data as { hierarchy: string | null }).hierarchy).toBe('S1/P2');
+    const stored = getPlantData(created.document).deliverables?.['tags']?.revisions.find((revision) => revision.label === 'B');
+    expect(stored?.hierarchyId).toBe(nodeId(rescoped, 'P2'));
+  });
+
+  it('a revision whose scope node was dropped (regenerate) is named in the refusal, the load warning and the document register', () => {
+    const scoped = level(pumpDocument(), 'tag_register', 'A', 'in_work', { hierarchy: 'P2' }).document;
+    const dropped = withData(scoped, (current) => {
+      const id = nodeId(scoped, 'P2');
+      const { [id]: removed, ...hierarchy } = current.hierarchy;
+      void removed;
+      return { ...current, hierarchy, hierarchyOrder: current.hierarchyOrder.filter((entry) => entry !== id) };
+    });
+    const refusal = expectRefusal(
+      dropped,
+      'set_deliverable_status',
+      { at: AT, deliverable: 'tag_register', revision: 'A', status: 'issued_for_review' },
+      'DAT_HIERARCHY_UNKNOWN',
+    );
+    expect(refusal.summary).toContain('no longer exists');
+    expect(plantDataPlugin.document?.afterLoad?.(dropped)).toEqual([expect.stringContaining('no longer exists')]);
+    expect(getPlantData(deserializeDocument(serializeDocument(dropped))).deliverables?.['tag_register']).toBeDefined();
+    const rows = data<{ registers: { document_register: { rows: Array<Record<string, unknown>> } } }>(dropped, 'export_handover', {
+      profile: 'generic',
+      registers: ['document_register'],
+    }).registers.document_register.rows;
+    expect(rows[0]).toMatchObject({ ContentCurrent: '', IssuedAt: AT });
+    expect(String(rows[0]?.['Scope'])).toContain('(missing)');
+  });
+});
+
+describe('what a signed step records', () => {
+  it('stores at, the signer and the payload hash that was signed; a signature over another time does not verify', () => {
+    const reviewed = level(pumpDocument(), 'equipment_list', 'A', 'issued_for_review');
+    const sha = (reviewed.data as { contentSha256: string }).contentSha256;
+    const details = { revision: 'A', from: 'issued_for_review', status: 'issued_for_approval', contentSha256: sha };
+    const { port, spent } = ledgerPort();
+    const later = signFor('equipment_list', { ...details, at: '2026-11-03T00:00:00Z' });
+    const refused = level(reviewed.document, 'equipment_list', 'A', 'issued_for_approval', { confirmation: later }, withPort(port));
+    expect(refused.error?.code).toBe('DAT_HUMAN_GATE');
+    expect(spent).toEqual([]);
+    const good = signFor('equipment_list', details);
+    const approved = level(reviewed.document, 'equipment_list', 'A', 'issued_for_approval', { confirmation: good }, withPort(port));
+    expect(stepsOf(approved.document, 'equipment_list', 'A').at(-1)).toMatchObject({
+      at: AT,
+      payloadSha256: good.payload,
+      signer: 'alice',
+    });
+  });
+
+  it('DAT_CHECK_FAILED on the IFC deliverable refuses before the signature is spent', () => {
+    const reviewed = level(scDat01Document(), 'ifc', 'A', 'issued_for_review');
+    const broken = withData(reviewed.document, (current) => {
+      const id = current.objectOrder[0] as string;
+      return { ...current, objects: { ...current.objects, [id]: copyObject(current.objects[id]!, { tag: 'WRONG-TAG' }) } };
+    });
+    const content = data<{ contentSha256: string }>(broken, 'set_deliverable_status', {
+      at: AT,
+      deliverable: 'ifc',
+      revision: 'B',
+      status: 'in_work',
+    }).contentSha256;
+    const { port, spent } = ledgerPort();
+    const signature = signFor('ifc', { revision: 'A', from: 'issued_for_review', status: 'issued_for_approval', contentSha256: content });
+    const result = level(broken, 'ifc', 'A', 'issued_for_approval', { confirmation: signature }, withPort(port));
+    expect(result.error?.code).toBe('DAT_CHECK_FAILED');
+    expect(spent).toEqual([]);
   });
 });

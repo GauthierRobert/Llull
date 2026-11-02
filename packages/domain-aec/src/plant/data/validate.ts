@@ -217,12 +217,17 @@ function deliverableErrors(raw: unknown): string[] {
           !(DELIVERABLE_STATUSES as readonly string[]).includes(String(step['status'])) ||
           typeof step['contentSha256'] !== 'string' ||
           !/^[0-9a-f]{64}$/.test(step['contentSha256']) ||
+          typeof step['at'] !== 'string' ||
+          !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(step['at']) ||
           (step['signer'] !== undefined && typeof step['signer'] !== 'string') ||
+          (step['payloadSha256'] !== undefined && !/^[0-9a-f]{64}$/.test(String(step['payloadSha256']))) ||
           (step['signatureId'] !== undefined && typeof step['signatureId'] !== 'string') ||
           ((HUMAN_GATED_STATUSES as readonly string[]).includes(String(step['status'])) &&
-            (typeof step['signer'] !== 'string' || typeof step['signatureId'] !== 'string'))
+            (typeof step['signer'] !== 'string' || typeof step['signatureId'] !== 'string' || typeof step['payloadSha256'] !== 'string'))
         )
-          errors.push(`${stepAt} must be { status, contentSha256 (64 hex), signer and signatureId for a signed status }`);
+          errors.push(
+            `${stepAt} must be { status, contentSha256 (64 hex), at (ISO UTC), signer, signatureId and payloadSha256 for a signed status }`,
+          );
       });
     });
   }

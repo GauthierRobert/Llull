@@ -12,7 +12,7 @@ import { getPlantData } from '@aec/plant/data/model';
 import { plantDataErrors } from '@aec/plant/data/validate';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { boxOf, step } from '../../materials/support';
-import { addEquipment, assignPump, libraryDocument, scDat01Document } from './dataFixtures';
+import { addEquipment, assignPump, libraryDocument, scDat01Document, withData } from './dataFixtures';
 
 interface Handover {
   profile: string;
@@ -25,6 +25,7 @@ interface Handover {
   warnings: string[];
 }
 
+const AT = '2026-11-02T09:30:00Z';
 const sc01 = scDat01Document();
 const handover = (doc: CadDocument, params: Record<string, unknown>): Handover => data<Handover>(doc, 'export_handover', params);
 const fileOf = (result: Handover, suffix: string): string => result.files.find((file) => file.fileName.includes(suffix))?.content ?? '';
@@ -108,7 +109,7 @@ describe('export_handover cfihos-subset (unverified)', () => {
     const doc = assignPump(addEquipment(own, { name: 'F' }).doc, 'equipment-1', { className: 'FeedPump' }).doc;
     const mapped = handover(doc, { profile: 'cfihos-subset', requireMapping: true });
     expect(mapped.registers['tag_register']?.rows[0]).toMatchObject({ TAG_CLASS_ID: 'C-77' });
-    expect(mapped.mapping).toEqual({ scheme: 'cfihos', mapped: 1, missing: [] });
+    expect(mapped.mapping).toEqual({ scheme: 'cfihos', mapped: 1, missing: [], unresolvable: [], unusedClassIds: [] });
     expect(mapped.warnings).toEqual([]);
   });
 
@@ -230,7 +231,7 @@ describe('export_handover generic and the other registers', () => {
 
 describe('document register', () => {
   const review = (doc: CadDocument, deliverable: string, revision: string, status = 'issued_for_review'): CommandResult =>
-    execute(doc, 'set_deliverable_status', { deliverable, revision, status });
+    execute(doc, 'set_deliverable_status', { at: AT, deliverable, revision, status });
   const registerOf = (doc: CadDocument): Array<Record<string, unknown>> =>
     handover(doc, { profile: 'generic', registers: ['document_register'] }).registers['document_register']?.rows ?? [];
 
@@ -294,5 +295,45 @@ describe('the export gate and define_plant_class externalIds', () => {
       file.classes['MyPump']!.externalIds = bad;
       expect(plantDataErrors(file), JSON.stringify(bad)).toEqual([expect.stringContaining('externalIds')]);
     }
+  });
+});
+
+describe('class id mapping report', () => {
+  it('mapped counts only classes with an id; an unresolvable class is listed; unused classIds are warned; the manifest records each id source', () => {
+    const own = apply(libraryDocument(), 'define_plant_class', {
+      name: 'FeedPump',
+      parent: 'CentrifugalPump',
+      externalIds: [{ scheme: 'cfihos', id: 'C-77' }],
+    });
+    let doc = assignPump(addEquipment(own, { name: 'F' }).doc, 'equipment-1', { className: 'FeedPump' }).doc;
+    doc = assignPump(addEquipment(doc, { name: 'G' }).doc, 'equipment-2').doc;
+    doc = withData(doc, (current) => {
+      const ghost = { ...current.objects[current.objectOrder[0] as string]!, id: 'plantobj-ghost', className: 'Ghost', tag: 'GHOST-1' };
+      return { ...current, objects: { ...current.objects, [ghost.id]: ghost }, objectOrder: [...current.objectOrder, ghost.id] };
+    });
+    const result = handover(doc, { profile: 'cfihos-subset', classIds: { CentrifugalPump: 'X-PUMP', Typo: 'T-1' } });
+    expect(result.mapping).toEqual({ scheme: 'cfihos', mapped: 2, missing: [], unresolvable: ['Ghost'], unusedClassIds: ['Typo'] });
+    expect(result.warnings.join('\n')).toContain('Typo');
+    expect(result.warnings.join('\n')).toContain('Ghost');
+    const manifest = JSON.parse(fileOf(result, 'handover-manifest')) as { classIds: Array<{ class: string; id: string; source: string }> };
+    expect(manifest.classIds).toEqual([
+      { class: 'CentrifugalPump', id: 'X-PUMP', source: 'classIds' },
+      { class: 'FeedPump', id: 'C-77', source: 'externalIds' },
+    ]);
+    const plain = handover(doc, { profile: 'cfihos-subset' });
+    expect(plain.mapping.mapped).toBe(1);
+    expect(plain.mapping.missing).toEqual(['CentrifugalPump']);
+  });
+
+  it('the document register shows when each revision was last stepped (IssuedAt)', () => {
+    const reviewed = execute(sc01, 'set_deliverable_status', {
+      at: AT,
+      deliverable: 'tag_register',
+      revision: 'A',
+      status: 'issued_for_review',
+    });
+    const rows = handover(reviewed.document, { profile: 'cfihos-subset', registers: ['document_register'] }).registers['document_register']
+      ?.rows;
+    expect(rows?.[0]).toMatchObject({ ISSUED_AT: AT, DOCUMENT_ID: 'tag_register' });
   });
 });

@@ -11,6 +11,7 @@ import {
   type IfcMapping,
   type PlantClass,
   type PropertyDefinition,
+  own,
 } from '../model';
 import { definitionProblem, IDENTIFIER } from '../properties';
 import { parseTagFormat } from '../tagFormat';
@@ -104,12 +105,12 @@ export const definePlantClass = defineCommand({
       refuse(doc, 'define_plant_class', { code, message, paths: [path] });
     if (!CLASS_NAME.test(name))
       return fail('DAT_PROPERTY_DEFINITION_INVALID', `class name "${name}" must be a PascalCase identifier`, 'name');
-    const existing = data.classes[name];
+    const existing = own(data.classes, name);
     if (existing?.source === 'library') return fail('DAT_LIBRARY_CLASS_LOCKED', `${name} is a library class: subclass it`, 'name');
     if (existing !== undefined) return fail('DAT_CLASS_EXISTS', `class ${name} already exists`, 'name');
     const parent = params.parent?.trim();
     if (parent === name) return fail('DAT_CLASS_CYCLE', `class ${name} cannot inherit from itself`, 'parent');
-    if (parent !== undefined && data.classes[parent] === undefined)
+    if (parent !== undefined && own(data.classes, parent) === undefined)
       return fail('DAT_CLASS_PARENT_UNKNOWN', `no parent class "${parent}"`, 'parent');
     const tagFormat = params.tagFormat?.trim();
     if (tagFormat !== undefined) {

@@ -17,7 +17,17 @@ export const REGISTER_FIELDS: Readonly<Record<RegisterKey, readonly string[]>> =
   tag_register: ['tag', 'class', 'classId', 'parentTag', 'hierarchy', 'description', 'status'],
   equipment_register: ['tag', 'manufacturer', 'model', 'serialNumber'],
   tag_properties: ['tag', 'property', 'value', 'unit', 'unverified'],
-  document_register: ['deliverable', 'revision', 'status', 'contentSha256', 'scope', 'signedBy', 'signatureId', 'contentCurrent'],
+  document_register: [
+    'deliverable',
+    'revision',
+    'status',
+    'contentSha256',
+    'scope',
+    'signedBy',
+    'signatureId',
+    'issuedAt',
+    'contentCurrent',
+  ],
 };
 
 export interface HandoverProfile {
@@ -68,6 +78,7 @@ export const PROFILES: Readonly<Record<ProfileName, HandoverProfile>> = {
         scope: 'SCOPE',
         signedBy: 'SIGNED_BY',
         signatureId: 'SIGNATURE_ID',
+        issuedAt: 'ISSUED_AT',
         contentCurrent: 'CONTENT_CURRENT',
       },
     },
@@ -99,6 +110,7 @@ export const PROFILES: Readonly<Record<ProfileName, HandoverProfile>> = {
         scope: 'Scope',
         signedBy: 'SignedBy',
         signatureId: 'SignatureId',
+        issuedAt: 'IssuedAt',
         contentCurrent: 'ContentCurrent',
       },
     },

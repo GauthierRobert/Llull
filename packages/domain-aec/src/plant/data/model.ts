@@ -176,13 +176,17 @@ export interface DeliverableStep {
   readonly status: DeliverableStatus;
   /** SHA-256 of the canonical JSON of the report (or of the IFC text) when this step was taken. */
   readonly contentSha256: string;
+  /** When the step was taken: ISO-8601 UTC, filled by the host (never the caller's clock). */
+  readonly at: string;
   readonly signer?: string;
   readonly signatureId?: string;
+  /** SHA-256 the signature was verified over (signed steps): what the human signed, kept so the step can be audited. Self-asserted in the file: the key store, not this record, proves it. */
+  readonly payloadSha256?: string;
 }
 
 export interface DeliverableRevision {
   readonly label: string;
-  /** Hierarchy node id the revision is scoped to; absent = the whole plant. */
+  /** Hierarchy node id the revision is scoped to, fixed when it is created (a report definition's own scope included); absent = the whole plant. */
   readonly hierarchyId?: string;
   /** Status changes in order; the last one is the current status. */
   readonly steps: readonly DeliverableStep[];
@@ -262,3 +266,7 @@ export const providerIdOf = (target: PlantObjectTarget): string | null =>
 /** `<provider>:<id>` of the model object a target stands for, null for a reserved tag. */
 export const targetKey = (target: PlantObjectTarget): string | null =>
   target.kind === 'reserved' ? null : `${providerIdOf(target)}:${target.id}`;
+
+/** `record[key]` for an agent-chosen key: only an own entry (`constructor`, `__proto__`, `toString` are not entries). */
+export const own = <T>(record: Readonly<Record<string, T>> | undefined, key: string): T | undefined =>
+  record !== undefined && Object.hasOwn(record, key) ? record[key] : undefined;

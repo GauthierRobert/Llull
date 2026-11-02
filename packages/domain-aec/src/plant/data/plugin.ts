@@ -7,7 +7,7 @@
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { plantDataCatalog } from './catalog';
-import { getPlantData, withPlantData } from './model';
+import { getPlantData, own, withPlantData } from './model';
 import { registerBuiltinProviders } from './providersBuiltin';
 import { plantDataErrors } from './validate';
 
@@ -18,6 +18,15 @@ const plantDataDocument: DocumentExtension = {
   },
   derivedEntityIds: () => new Set(),
   restore: (raw) => raw,
+  afterLoad: (doc) =>
+    Object.values(getPlantData(doc).deliverables ?? {}).flatMap((deliverable) =>
+      deliverable.revisions
+        .filter((revision) => revision.hierarchyId !== undefined && own(getPlantData(doc).hierarchy, revision.hierarchyId) === undefined)
+        .map(
+          (revision) =>
+            `plant deliverable ${deliverable.id} revision ${revision.label} is scoped to hierarchy node ${revision.hierarchyId}, which no longer exists (a regenerate dropped it): its content cannot be re-checked`,
+        ),
+    ),
   carry: (prev, next) => {
     const deliverables = prev.plant?.data?.deliverables;
     return deliverables === undefined ? next : withPlantData(next, { ...getPlantData(next), deliverables });

@@ -24,7 +24,7 @@ const issueRank = (status: DeliverableStatus): number => ISSUE_ORDER.indexOf(sta
 
 /**
  * `deliverable` with `label` moved to `step` (and the labels it superseded); when `step` is an issued status the older revisions that are issued at a status of the same or a lower
- * rank get a `superseded` step (an agent issuing for review never retires a signed approval or an as-built).
+ * rank AND the same scope get a `superseded` step (an agent issuing for review never retires a signed approval or an as-built).
  */
 export function withStep(
   deliverable: Deliverable | undefined,
@@ -43,9 +43,18 @@ export function withStep(
   const position = known ? index : all.length - 1;
   const retire = (revision: DeliverableRevision): DeliverableRevision => {
     const status = currentStatus(revision);
-    if (!isIssued(step.status) || !isIssued(status) || issueRank(status) > issueRank(step.status)) return revision;
+    if (
+      revision.hierarchyId !== moved.hierarchyId ||
+      !isIssued(step.status) ||
+      !isIssued(status) ||
+      issueRank(status) > issueRank(step.status)
+    )
+      return revision;
     const last = revision.steps.at(-1);
-    return { ...revision, steps: [...revision.steps, { status: 'superseded', contentSha256: last?.contentSha256 ?? step.contentSha256 }] };
+    return {
+      ...revision,
+      steps: [...revision.steps, { status: 'superseded', contentSha256: last?.contentSha256 ?? step.contentSha256, at: step.at }],
+    };
   };
   const retired = all.map((revision, at) => (at < position ? retire(revision) : revision));
   return {
