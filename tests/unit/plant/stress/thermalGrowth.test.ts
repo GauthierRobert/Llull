@@ -121,6 +121,28 @@ describe('other strain sources', () => {
 });
 
 describe('contract', () => {
+  it('cteReferenceC without a material is refused', () => {
+    expectRefusal(
+      doc,
+      'thermal_growth',
+      { ...TABLE, cteReferenceC: 20, fromC: 21.111, toC: 100, lengthM: 1 },
+      'PST_PARAM_INVALID',
+      'cteReferenceC',
+    );
+  });
+
+  it('a coefficient outside 1e-6..5e-5 /K raises PST_CTE_IMPLAUSIBLE (unit slip); a steel value does not', () => {
+    expect(growth({ meanCtePerK: 12, fromC: 20, toC: 120, lengthM: 1 }).warnings.map((warning) => warning.code)).toContain(
+      'PST_CTE_IMPLAUSIBLE',
+    );
+    expect(growth({ meanCtePerK: 1.2e-5, fromC: 20, toC: 120, lengthM: 1 }).warnings.map((warning) => warning.code)).not.toContain(
+      'PST_CTE_IMPLAUSIBLE',
+    );
+    expect(growth({ ...TABLE, fromC: 21.111, toC: 204.444, lengthM: 1 }).warnings.map((warning) => warning.code)).not.toContain(
+      'PST_CTE_IMPLAUSIBLE',
+    );
+  });
+
   it.each([
     ['no source', { fromC: 20, toC: 120, lengthM: 10 }],
     ['two sources', { ...TABLE, meanCtePerK: 1e-5, fromC: 21.111, toC: 120, lengthM: 10 }],

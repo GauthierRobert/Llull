@@ -59,6 +59,11 @@ describe('VC-PST-01 bend factors (grade A)', () => {
   it('floors every factor at 1 for a stiff thick bend', () => {
     const result = sif({ component: 'bend', odMm: 100, wallMm: 20, bendRadiusMm: 1000, rule: 'B31.3-2016' });
     expect([result.k, result.ii, result.io]).toEqual([1, 1, 1]);
+    expect(result.warnings.map((warning) => warning.code)).toEqual(['PST_SIF_CLAMPED']);
+  });
+
+  it('a fitted-range bend (h <= 1, no floor) raises no clamp warning', () => {
+    expect(sif({ component: 'elbow', odMm: 168.3, wallMm: 7.11, bendRadiusMm: 228.6, rule: 'B31.3-2018' }).warnings).toEqual([]);
   });
 
   it('B31.1 returns one SIF for both planes (the in-plane value)', () => {
@@ -142,6 +147,7 @@ describe('refusals (unchanged document, stable code, path)', () => {
     ['reinforced tee without a pad', { ...elbow, component: 'reinforced_tee' }, 'padMm'],
     ['sweepolet', { ...elbow, component: 'sweepolet' }, 'component'],
     ['reducer', { ...elbow, component: 'reducer' }, 'component'],
+    ['bend radius below the pipe mean radius', { ...elbow, bendRadiusMm: 50 }, 'bendRadiusMm'],
     ['wall at half the diameter', { ...elbow, wallMm: 84.15 }, 'wallMm'],
     ['rule user without factors', { ...elbow, rule: 'user' }, 'userSif'],
   ])('%s -> PST_PARAM_INVALID', (_label, params, path) => {

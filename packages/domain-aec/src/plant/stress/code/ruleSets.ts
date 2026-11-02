@@ -108,7 +108,7 @@ export const RULE_ROWS: Readonly<Record<string, RuleRow>> = {
     clause: 'B31.3-2022 302.3.5(d)',
     formula: 'f = 20 N^(-1/3) (slope 3:1 instead of 5:1), same fm caps and floor',
     sources: ['S12', 'S13', 'S14 (Becht summary, constant not shown)'],
-    grade: 'A',
+    grade: 'B',
   },
   'B313-OCC': {
     id: 'B313-OCC',

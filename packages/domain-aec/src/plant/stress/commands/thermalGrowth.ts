@@ -59,6 +59,8 @@ export const thermalGrowth = defineCommand({
       refuse(doc, 'thermal_growth', code, message, [], paths);
     const given = [params.table, params.materialId, params.meanCtePerK].filter((value) => value !== undefined).length;
     if (given !== 1) return fail('PST_PARAM_INVALID', 'give exactly one of table, materialId, meanCtePerK', ['table']);
+    if (params.cteReferenceC !== undefined && params.materialId === undefined)
+      return fail('PST_PARAM_INVALID', 'cteReferenceC applies only with materialId', ['cteReferenceC']);
     const deltaK = params.toC - params.fromC;
     const warnings: { code: string; message: string }[] = [];
     let strain: number;
@@ -100,6 +102,12 @@ export const thermalGrowth = defineCommand({
       grade = 'C';
       warnings.push({ code: 'PST_MATERIAL_UNVERIFIED', message: 'meanCtePerK is not a sourced material record' });
     }
+    const meanAlpha = deltaK === 0 ? null : strain / deltaK;
+    if (meanAlpha !== null && (Math.abs(meanAlpha) < 1e-6 || Math.abs(meanAlpha) > 5e-5))
+      warnings.push({
+        code: 'PST_CTE_IMPLAUSIBLE',
+        message: `mean coefficient ${meanAlpha.toExponential(2)} /K is outside 1e-6..5e-5 /K (metals): check the unit`,
+      });
     const growthMm = params.lengthM * 1000 * strain;
     return report(
       doc,
@@ -107,7 +115,7 @@ export const thermalGrowth = defineCommand({
       {
         growthMm,
         mmPerM: growthMm / params.lengthM,
-        meanCtePerK: deltaK === 0 ? null : strain / deltaK,
+        meanCtePerK: meanAlpha,
         strain,
         source,
         grade,

@@ -15,6 +15,9 @@ interface Cantilever {
   forceN: number;
   momentNmm: number;
   stressMPa: number;
+  rawStressMPa: number;
+  sif: number;
+  warnings: Array<{ code: string }>;
   minLegMm?: number;
   ratio?: number;
   withinAllowable?: boolean;
@@ -60,6 +63,27 @@ describe('VC-PST-06 guided cantilever (grade A)', () => {
     const shortLeg = cantilever({ ...NPS6, legMm: 3000, displacementMm: 13.5 });
     expectRel(shortLeg.stressMPa, 151.47, 1e-3);
     expect(shortLeg.stressMPa).toBeGreaterThan(106.7912);
+  });
+});
+
+describe('stress intensification and slenderness', () => {
+  it('sif multiplies the stress and Lmin: i 2.2656 at the elbow gives 317.7 MPa, raw value kept, default listed', () => {
+    const result = cantilever({ ...NPS6, sif: 2.26557, SAMPa: 206.85 });
+    expectRel(result.stressMPa, 140.25 * 2.26557, 1e-6);
+    expect(result.rawStressMPa).toBeCloseTo(140.25, 6);
+    expect(result.withinAllowable).toBe(false);
+    expectRel(result.minLegMm as number, 4940.545721 * Math.sqrt(2.26557), 1e-6);
+    const plain = data<{ provenance: { defaulted: string[] } }>(doc, 'guided_cantilever', NPS6);
+    expect(plain.provenance.defaulted).toEqual(['sif=1 (straight pipe)']);
+  });
+
+  it('warns PST_BEAM_SLENDERNESS when leg / OD < 10 and stays silent at 6000 / 168.3', () => {
+    expect(cantilever({ ...NPS6, legMm: 1000 }).warnings.map((warning) => warning.code)).toEqual(['PST_BEAM_SLENDERNESS']);
+    expect(cantilever(NPS6).warnings).toEqual([]);
+  });
+
+  it('rejects sif below 1 at the schema', () => {
+    expect(execute(doc, 'guided_cantilever', { ...NPS6, sif: 0.5 }).rejected).toBe(true);
   });
 });
 

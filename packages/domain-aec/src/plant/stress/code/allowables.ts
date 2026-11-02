@@ -24,6 +24,7 @@ export interface Allowables {
   readonly equation: '1a' | '1b';
   readonly occasionalFactor: number;
   readonly occasionalMPa: number;
+  readonly sustainedExceedsSh: boolean;
   readonly rules: readonly RuleRow[];
 }
 
@@ -41,7 +42,8 @@ export function computeAllowables(set: RuleSet, input: AllowableInput): Allowabl
   const limited = capped < fRaw ? 'cap' : f > capped ? 'floor' : 'none';
   const { ScMPa: sc, ShMPa: sh, sustainedStressMPa: sl } = input;
   const SA1a = f * (1.25 * sc + 0.25 * sh);
-  const SA1b = sl === undefined ? null : f * (1.25 * (sc + sh) - sl);
+  const exceeds = sl !== undefined && sl > sh;
+  const SA1b = sl === undefined || exceeds ? null : f * (1.25 * (sc + sh) - sl);
   const useB = SA1b !== null && sl !== undefined && sh > sl;
   const occasionalFactor = set.occasionalFactors[input.occasionalClass];
   const formRow = set.code === 'B31.1' ? 'B311-F' : set.fForm === 'n-1/3' ? 'B313-F-2022' : 'B313-F-PRE2022';
@@ -54,6 +56,7 @@ export function computeAllowables(set: RuleSet, input: AllowableInput): Allowabl
     SA1bMPa: SA1b,
     SAMPa: useB ? (SA1b as number) : SA1a,
     equation: useB ? '1b' : '1a',
+    sustainedExceedsSh: exceeds,
     occasionalFactor,
     occasionalMPa: occasionalFactor * sh,
     rules: ruleRows(formRow, 'B313-SA-1A', ...(SA1b === null ? [] : ['B313-SA-1B']), set.code === 'B31.1' ? 'B311-OCC' : 'B313-OCC'),

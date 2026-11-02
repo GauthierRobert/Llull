@@ -23,6 +23,7 @@ interface Allowables {
   occasionalFactor: number;
   occasionalMPa: number;
   defaulted: string[];
+  warnings: Array<{ code: string }>;
   reviewRequired: boolean;
   ruleRows: Array<{ id: string; grade: string }>;
 }
@@ -100,7 +101,10 @@ describe('VC-PST-05 S_A by eq. (1a) and (1b) (grade A)', () => {
     expect(without.ruleRows.map((rule) => rule.id)).not.toContain('B313-SA-1B');
     const heavy = allowables({ cycles: 7000, rule: 'B31.3-2018', SLMPa: 150 });
     expect(heavy.equation).toBe('1a');
-    expect(heavy.SA1bMPa).not.toBeNull();
+    expect(heavy.SA1bMPa).toBeNull();
+    expect(heavy.warnings.map((warning) => warning.code)).toEqual(['PST_SUSTAINED_EXCEEDS_SH']);
+    expect(allowables({ cycles: 7000, rule: 'B31.3-2018', SLMPa: 100 }).warnings).toEqual([]);
+    expect(heavy.ruleRows.map((rule) => rule.id)).not.toContain('B313-SA-1B');
   });
 });
 
@@ -137,6 +141,10 @@ describe('VC-PST-13 occasional limit (rule grade B)', () => {
       'PST_PARAM_INVALID',
       'occasionalLoadMPa',
     );
+  });
+
+  it('B31.3-2022 f rule row is grade B (secondary sources, constant 20 not read in a primary text)', () => {
+    expect(allowables({ cycles: 7000, rule: 'B31.3-2022' }).ruleRows.find((row) => row.id === 'B313-F-2022')?.grade).toBe('B');
   });
 
   it('B31.1: 1.15 Sh by default (listed as defaulted), 1.2 Sh for events up to 1 percent', () => {

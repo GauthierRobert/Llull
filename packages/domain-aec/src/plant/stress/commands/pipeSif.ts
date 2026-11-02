@@ -28,7 +28,7 @@ export const pipeSif = defineCommand({
     'unreinforced_tee, reinforced_tee (needs padMm), weldolet, butt_weld; sweepolet and reducer have no factor in a read source and need rule "user". ' +
     'The rule is "B31.3-<edition>" (2016 to 2024) or "B31.1-<edition>" (2016 to 2022) or "user"; there is no default edition. Editions 2020 and later require ASME B31J ' +
     '(tables not public): the appendix D value is still returned with a non-hideable PST_SIF_EDITION warning, or give the B31J values with rule "user" and userSif. ' +
-    'Bends are grade A, tees and olets grade B (named in the result); B31.1 returns one SIF for both planes. All lengths are mm. ' +
+    'For tees and olets odMm and wallMm are those of the matching RUN pipe (not the branch). Bends are grade A, tees and olets grade B (named in the result); B31.1 returns one SIF for both planes. All lengths are mm. ' +
     'Read-only quick check, not a stress analysis; reviewRequired is always true. Next: pipe_stress_allowables for the allowable range.',
   params: z.object({
     component: z.enum(SIF_COMPONENTS).describe('Component whose factors are wanted.'),
@@ -95,7 +95,12 @@ export const pipeSif = defineCommand({
         formula: values.formula,
         grade: values.grade,
         ruleRows: rows,
-        warnings: b31j ? [SIF_EDITION_WARNING] : [],
+        warnings: [
+          ...(b31j ? [SIF_EDITION_WARNING] : []),
+          ...(values.clamped === undefined
+            ? []
+            : [{ code: 'PST_SIF_CLAMPED', message: `${values.clamped}; the value is at the edge of the formula range` }]),
+        ],
         reviewRequired: true,
         provenance: { method: 'closed form', rule: set.id, ruleRow: values.ruleRow, inputs, defaulted: [] },
       },

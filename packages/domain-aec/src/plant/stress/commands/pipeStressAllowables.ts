@@ -112,6 +112,14 @@ export const pipeStressAllowables = defineCommand({
         rule: set.id,
         ...numbers,
         ...occasional,
+        warnings: result.sustainedExceedsSh
+          ? [
+              {
+                code: 'PST_SUSTAINED_EXCEEDS_SH',
+                message: 'SLMPa exceeds ShMPa: the sustained check already fails and eq. (1b) does not apply (SA1bMPa null)',
+              },
+            ]
+          : [],
         ruleRows: rules,
         defaulted,
         reviewRequired: true,

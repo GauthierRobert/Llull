@@ -35,6 +35,8 @@ export interface SifValues {
   readonly ruleRow: string;
   readonly grade: RuleGrade;
   readonly formula: string;
+  /** Elbow / bend only: a factor was raised to its floor of 1, or h > 1 (outside the range the formulas were fitted for). */
+  readonly clamped?: string;
 }
 
 export interface SifRefusal {
@@ -66,7 +68,15 @@ export function computeSif(set: RuleSet, input: SifInput): SifValues | SifRefusa
     case 'bend': {
       const radius = input.bendRadiusMm;
       if (radius === undefined) return { reason: `${component} needs bendRadiusMm (the centreline bend radius R1)`, path: 'bendRadiusMm' };
+      if (radius < meanRadius)
+        return {
+          reason: `bendRadiusMm ${radius} is below the pipe mean radius ${meanRadius.toFixed(2)} mm: not a bend`,
+          path: 'bendRadiusMm',
+        };
       const h = (wallMm * radius) / meanRadius ** 2;
+      const raw = [1.65 / h, 0.9 / power(h), 0.75 / power(h)];
+      const clamped =
+        h > 1 ? `h = ${h.toFixed(3)} > 1` : raw.some((value) => value < 1) ? 'a factor was raised to its floor of 1.0' : undefined;
       const ii = atLeastOne(0.9 / power(h));
       const io = set.code === 'B31.1' ? ii : atLeastOne(0.75 / power(h));
       return {
@@ -76,6 +86,7 @@ export function computeSif(set: RuleSet, input: SifInput): SifValues | SifRefusa
         io,
         ruleRow: 'SIF-BEND',
         grade: 'A',
+        ...(clamped === undefined ? {} : { clamped }),
         formula: 'h = T R1 / r2^2; k = 1.65 / h; ii = 0.9 / h^(2/3); io = 0.75 / h^(2/3) (B31.1: i = 0.9 / h^(2/3) for both); each >= 1',
       };
     }
