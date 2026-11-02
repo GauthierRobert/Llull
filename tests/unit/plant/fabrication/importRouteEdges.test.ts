@@ -206,3 +206,27 @@ describe('untrusted files never throw and never get past the reader unchecked', 
     expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_PCF_TOO_LARGE');
   });
 });
+
+describe('size and magnitude limits', () => {
+  const chain = (count: number): string =>
+    HEADER + Array.from({ length: count }, (_unused, k) => pipe(k + 1, `${k * 100}.0 0.0 0.0`, `${k * 100 + 100}.0 0.0 0.0`)).join('');
+
+  it('exactly 400 components are rebuilt; 401 are ISO_ROUTE_TOO_LARGE', () => {
+    const ok = execute(base, 'import_pcf', { text: chain(400), as: 'route', spec: 'CS150' });
+    expect(ok.rejected, ok.summary).toBeUndefined();
+    expect((ok.data as { route: { runs: unknown[] } }).route.runs).toHaveLength(1);
+    expectRefusal(base, 'import_pcf', { text: chain(401), as: 'route', spec: 'CS150' }, 'ISO_ROUTE_TOO_LARGE', 'as');
+  });
+
+  it('finite but huge coordinates (1e300, a pipe of 1e15 mm) never throw: a coded refusal or a clean import, the document unchanged on refusal', () => {
+    for (const far of ['1e300', '1e15', '1e200']) {
+      const result = execute(base, 'import_pcf', { text: HEADER + pipe(1, '0.0 0.0 0.0', `${far} 0.0 0.0`), as: 'route', spec: 'CS150' });
+      if (result.rejected === true) {
+        expect(result.document).toBe(base);
+        expect(result.error?.code).toBeDefined();
+      } else expect(result.affected.length).toBeGreaterThan(0);
+    }
+    const stored = execute(base, 'import_pcf', { text: HEADER + pipe(1, '0.0 0.0 0.0', '1e300 0.0 0.0') });
+    expect(stored.rejected === true || stored.affected.length > 0).toBe(true);
+  });
+});

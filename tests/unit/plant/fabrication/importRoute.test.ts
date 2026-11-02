@@ -30,7 +30,12 @@ interface RouteData {
     }>;
     portIds: string[];
     fieldWelds: Array<{ kind: string; weldId: string | null }>;
-    supports: { requested: number; placed: string[]; dropped: number };
+    supports: {
+      requested: number;
+      placed: string[];
+      dropped: number;
+      marks: Array<{ id: string; mark: string | null; fileName: string | null }>;
+    };
     comparison: {
       imported: { countsByType: Record<string, number>; totalPipeLengthMm: number };
       routed: { countsByType: Record<string, number>; totalPipeLengthMm: number };
@@ -122,6 +127,9 @@ describe('the pack line as a routed line (VC-ISO-04, SC-ISO-02)', () => {
     expect(Object.keys(piping?.runs ?? {})).toHaveLength(2);
     expect(piping?.lines[routed.lineId]?.lineNumber).toBe('L-101');
     expect(result.affected[0]).toBe(routed.lineId);
+    expect(result.affected).toEqual(
+      expect.arrayContaining([...routed.route.portIds, ...routed.route.fieldWelds.map((weld) => weld.weldId)]),
+    );
     expect(result.document.plant?.fabrication?.fieldWelds).toBeDefined();
     expect(result.document.plant?.fabrication?.pcfLines ?? {}).toEqual({});
   });
@@ -239,6 +247,11 @@ describe('supports of the file', () => {
     const route = (imported.data as RouteData).route;
     expect(route.supports).toMatchObject({ requested: 2, dropped: 0 });
     expect(route.supports.placed).toHaveLength(2);
+    expect(imported.affected).toEqual(expect.arrayContaining(route.supports.placed));
+    expect(route.supports.marks).toEqual([
+      { id: route.supports.placed[0], mark: 'PS1', fileName: 'PS1' },
+      { id: route.supports.placed[1], mark: 'PS2', fileName: 'PS2' },
+    ]);
     const types = Object.values(imported.document.building?.elements ?? {}).flatMap((element) =>
       element.category === 'pipeSupport' ? [element.type] : [],
     );

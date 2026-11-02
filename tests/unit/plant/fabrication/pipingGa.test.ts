@@ -8,6 +8,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { fixturePcf } from './fabricationFixtures';
+import { addTie, cs150Line } from '../piping/rteFixtures';
 import { routedWithSupport, s501 } from './isoM5Fixtures';
 
 interface Label {
@@ -23,7 +24,15 @@ interface Ga {
   labels: Label[];
   arrows: Array<{ lineId: string; run: number; direction: number[]; at: number[] }>;
   files: Array<{ name: string; format: string; content: string; sha256: string }>;
-  lines: Array<{ lineId: string; dn: number; outsideDiameterMm: number; spec: string | null; doubleLine: boolean; drawnSegments: number }>;
+  lines: Array<{
+    lineId: string;
+    dn: number;
+    outsideDiameterMm: number;
+    spec: string | null;
+    doubleLine: boolean;
+    bores: number[];
+    drawnSegments: number;
+  }>;
   warnings: Array<{ code: string }>;
   extentMm: number[];
   fits: boolean;
@@ -207,5 +216,78 @@ describe('refusals leave the document unchanged', () => {
     expect(dxf.files.map((file) => file.format)).toEqual(['svg', 'dxf']);
     expect(dxf.files[1]?.content).toContain('L-101-DN100-A1A');
     expect(ok(doc, 'export_piping_ga', plan).summary).toContain('NOT FOR CONSTRUCTION');
+  });
+});
+
+describe('bore per drawn component (a branch and the run after a reducer are not the main bore)', () => {
+  /** DN150 header at z = 1000 with a DN50 olet branch that rises to z = 1800 and runs on in +Y. */
+  function branched(): { doc: CadDocument; lineId: string } {
+    const line = cs150Line(150, '9301');
+    const a = addTie(line.doc, 'GA-A', [0, 0, 1000], [1, 0, 0], { endType: 'BW', dn: 150 });
+    let doc = apply(a.doc, 'route_pipe', { lineId: line.lineId, from: { portId: a.id }, legs: [{ direction: '+X', length: 5000 }] });
+    doc = apply(doc, 'add_branch', {
+      runId: doc.plant?.piping?.runOrder[0],
+      at: { point: [2500, 0, 1000] },
+      dn: 50,
+      legs: [
+        { direction: '+Z', length: 800 },
+        { direction: '+Y', length: 1500 },
+      ],
+    });
+    return { doc, lineId: line.lineId };
+  }
+
+  it('BOP of each level uses the bore of its own run: 1000 - 168.3 / 2 = 915.85 for DN150 and 1800 - 60.3 / 2 = 1769.85 for DN50', () => {
+    const { doc } = branched();
+    const ga = data<Ga>(doc, 'export_piping_ga', { ...plan, doubleLineFromDn: 40 });
+    const bop = ga.labels.filter((label) => label.kind === 'bop_elevation');
+    expect(bop.map((label) => [label.at[2], label.valueMm])).toEqual([
+      [1000, 915.85],
+      [1800, 1769.85],
+    ]);
+    expect(ga.lines[0]?.bores).toEqual([50, 150]);
+    expect(ga.lines[0]?.dn).toBe(150);
+  });
+
+  it('the line label carries the bore of the longest run (the DN150 header), not of a branch', () => {
+    const { doc } = branched();
+    const ga = data<Ga>(doc, 'export_piping_ga', plan);
+    expect(ga.labels.find((label) => label.kind === 'line')?.text).toMatch(/-DN150-CS150$/);
+  });
+
+  it('double line is decided per component: from DN100 the DN150 header is drawn double and the DN50 branch single', () => {
+    const { doc } = branched();
+    const bothDouble = data<Ga>(doc, 'export_piping_ga', { ...plan, doubleLineFromDn: 40 }).files[0]?.content ?? '';
+    const headerOnly = data<Ga>(doc, 'export_piping_ga', { ...plan, doubleLineFromDn: 100 }).files[0]?.content ?? '';
+    const allSingle = data<Ga>(doc, 'export_piping_ga', { ...plan, doubleLineFromDn: 300 }).files[0]?.content ?? '';
+    const count = (svg: string): number => svg.match(/<line [^>]*class="iso-pipe"/g)?.length ?? 0;
+    expect(count(allSingle)).toBeLessThan(count(headerOnly));
+    expect(count(headerOnly)).toBeLessThan(count(bothDouble));
+  });
+
+  it('a reducer changes the bore drawn after it: DN100 then DN80', () => {
+    const line = cs150Line(100, '9302');
+    const a = addTie(line.doc, 'GA-R', [0, 0, 1000], [1, 0, 0], { endType: 'BW' });
+    const doc = apply(a.doc, 'route_pipe', {
+      lineId: line.lineId,
+      from: { portId: a.id },
+      legs: [{ direction: '+X', length: 6000 }],
+      inline: [{ type: 'reducerConcentric', dn2: 80, at: { leg: 0, centreDistance: 3000 } }],
+    });
+    const ga = data<Ga>(doc, 'export_piping_ga', { ...plan, doubleLineFromDn: 90 });
+    expect(ga.lines[0]?.bores).toEqual([80, 100]);
+    const single = data<Ga>(doc, 'export_piping_ga', { ...plan, doubleLineFromDn: 300 });
+    const count = (svg: string): number => svg.match(/<line [^>]*class="iso-pipe"/g)?.length ?? 0;
+    const mixed = count(ga.files[0]?.content ?? '');
+    expect(mixed).toBeGreaterThan(count(single.files[0]?.content ?? ''));
+    const allDouble = data<Ga>(doc, 'export_piping_ga', { ...plan, doubleLineFromDn: 50 });
+    expect(count(allDouble.files[0]?.content ?? '')).toBeGreaterThan(mixed);
+  });
+
+  it('scale bounds: 0, non-finite and absurd scales are rejected by the schema', () => {
+    const doc = importedL101();
+    for (const scale of [0, -5, Infinity, 1e7, 0.0001])
+      expect(execute(doc, 'export_piping_ga', { ...plan, scale }).rejected, String(scale)).toBe(true);
+    expect(execute(doc, 'export_piping_ga', { ...plan, scale: 1e6 }).rejected).toBeUndefined();
   });
 });

@@ -122,7 +122,16 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
     portIds: composed.portIds,
     fieldWelds: plan.welds.map((weld, at) => ({ componentId: weld.componentId, kind: weld.kind, weldId: composed.weldIds[at] ?? null })),
     shopWeldsDerived: plan.shopWelds,
-    supports: { requested: plan.supports.length, placed: composed.supportIds, dropped: composed.droppedSupports },
+    supports: {
+      requested: plan.supports.length,
+      placed: composed.supportIds,
+      dropped: composed.droppedSupports,
+      // The mark is the document's own numbering (PS1 ...): SUPPORT-NAME of the file is not kept as the mark.
+      marks: composed.supportIds.map((id, at) => {
+        const element = composed.document.building?.elements[id];
+        return { id, mark: element?.category === 'pipeSupport' ? element.mark : null, fileName: plan.supports[at]?.name ?? null };
+      }),
+    },
     rebuiltBySpec: plan.rebuilt,
     droppedAttributes: Object.keys(file.attributes).filter((key) => key !== 'PIPING-SPEC'),
     droppedUnknownRecords: file.unknownRecords.length,
@@ -145,7 +154,13 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
   return {
     document: composed.document,
     summary: `import_pcf: routed line ${composed.lineId} (${args.lineNumber}) from the file, ${text}`,
-    affected: [composed.lineId, ...plan.runs.flatMap((run) => composed.runIds[run.key] ?? [])],
+    affected: [
+      composed.lineId,
+      ...plan.runs.flatMap((run) => composed.runIds[run.key] ?? []),
+      ...composed.portIds,
+      ...composed.weldIds,
+      ...composed.supportIds,
+    ],
     data,
   };
 }

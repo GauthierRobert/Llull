@@ -49,6 +49,7 @@ export { pipingPlugin } from './plant/piping/plugin';
 export { pipingFabricationPlugin } from './plant/fabrication/plugin';
 export { pipingCatalogPlugin } from './plant/catalog/plugin';
 export { structuresPlugin } from './plant/structures/plugin';
+export { pipeStressPlugin } from './plant/stress/plugin';
 export { plantEquipmentPlugin } from './plant/equipment/plugin';
 export { plantDataPlugin } from './plant/data/plugin';
 export { pidPlugin } from './plant/pid/plugin';

@@ -52,7 +52,7 @@ P0 (0,0,3000) flange face ── east 5000 ──► P1 (5000,0,3000) ── nor
 route centreline 5000 + 4000 + 2000 + 3000 + 500 = 14500 mm
 take-outs: 3 LR90 x 2 x 152 = 912; tee run 2 x 105 = 210; tee branch 105; 3 flanges x 76 = 228; total 1455
 pipe = 14500 - 1455 = 13045 mm = 2424 + 2348 + 3696 + 1696 + 1848 + 714 + 319
-(routed with spec CS150 each flange set also holds a 3 mm gasket: take-out 1464, pipe 13036 mm)
+(routed with spec CS150 each flange set also holds a 3 mm gasket - the thickness is an input of the CS150 stub catalogue of the 02 RTE pack (rte-validation-stub, grade C), not a standard value: take-out 1464, pipe 13036 mm)
 ```
 
 ## Real use cases

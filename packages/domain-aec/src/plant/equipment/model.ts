@@ -62,6 +62,26 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EQP_NOZZLE_PROJECTION_TOO_SHORT: 'Increase projection: shell nozzles measure from the vessel axis, head nozzles from the tangent line.',
   EQP_RATING_UNKNOWN: 'Use a rating such as CL150, CL300, CL600 or PN16, and a DN of the nominal-size table (15..600).',
   EQP_PORT_CONNECTED: 'Re-route the connected pipe first, or pass force: true.',
+  EQP_ALLOWABLE_MISSING:
+    'Set design.allowableStress (value, unit, source) and design.jointEfficiency with update_equipment_parameters; llull never defaults S or E.',
+  EQP_FORMULA_OUT_OF_RANGE:
+    'The thin-wall rules need P <= 0.385 S E and t <= R/2; thick-wall design (Appendix 1-2) is out of scope and needs an engineer.',
+  EQP_API650_ONE_FOOT_LIMIT: 'The one-foot method covers D <= 60 m; the variable-design-point method is not built.',
+  EQP_MATERIAL_NOT_IN_TABLE: 'Use A283M Gr C, A36M or A516M Gr 485 (A516-70), or give allowableStress { design, test, source } in MPa.',
+  EQP_COURSES_MISMATCH: 'Make the course heights add up to shellHeight.',
+  EQP_DESIGN_DATA_MISSING: 'Add the missing design data (see paths) with update_equipment_parameters set.design.',
+  EQP_SHELL_UNDER_THICKNESS: 'Increase shellThickness or lower the design pressure (update_equipment_parameters).',
+  EQP_HEAD_UNDER_THICKNESS: 'Increase headThickness (update_equipment_parameters).',
+  EQP_MAWP_BELOW_DESIGN: 'Increase the governing thickness so that the MAWP reaches the design pressure, or lower the design pressure.',
+  EQP_NOZZLE_OVERLAP: 'Move one of the two nozzles (update_nozzle) so that their reinforcement zones do not intersect.',
+  EQP_NOZZLE_IN_KNUCKLE: 'Move the head nozzle toward the head centre (update_nozzle radialOffset).',
+  EQP_NOZZLE_IN_SUPPORT: 'Move the nozzle clear of the saddle / skirt (update_nozzle), or provide an opening in the support.',
+  EQP_TABLE_UNVERIFIED: 'Confirm the value from the licensed standard or a vendor; it comes from a table row below grade A.',
+  EQP_VALUE_UNSOURCED: 'Add the source (standard, datasheet) of the value with update_equipment_parameters.',
+  EQP_FLANGE_PLACEHOLDER: 'Assign a pipe class / catalogue flange: the catalogue has no row for this DN, rating and facing.',
 };
 
 export const refuse = tableRejection(REMEDIATION);
+
+/** One-line remediation of a stable code (a generic pointer for an unknown code). */
+export const remediationOf = (code: string): string => REMEDIATION[code] ?? 'see the command description';

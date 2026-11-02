@@ -9,10 +9,10 @@ import { findProfile, type SteelProfile } from '../../steel/profiles';
 
 // prettier-ignore
 const ROLE_MARK: Readonly<Record<MemberRole, string>> = {
-  column: 'SC', rafter: 'RF', beam: 'SB', brace: 'BR', purlin: 'PU', rail: 'SR', crane: 'CB',
+  column: 'SC', rafter: 'RF', beam: 'SB', brace: 'BR', purlin: 'PU', rail: 'SR', crane: 'CB', bracket: 'BK',
 };
 
-export const MEMBER_ROLES: ReadonlyArray<MemberRole> = ['column', 'rafter', 'beam', 'brace', 'purlin', 'rail', 'crane'];
+export const MEMBER_ROLES: ReadonlyArray<MemberRole> = ['column', 'rafter', 'beam', 'brace', 'purlin', 'rail', 'crane', 'bracket'];
 
 /** Every steel member of the building, in `elements` key order. */
 export function membersOf(building: BuildingModel): SteelMemberElement[] {

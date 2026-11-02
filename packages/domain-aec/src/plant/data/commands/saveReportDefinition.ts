@@ -1,7 +1,7 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
-import { DEFINITION_KINDS, getPlantData, withPlantData, type ReportDefinition } from '../model';
+import { DEFINITION_KINDS, getPlantData, withPlantData, type ReportDefinition, own } from '../model';
 import { buildReport } from '../plantReports/build';
 import { applyDefinition } from '../plantReports/definition';
 import { MTO_DIMENSIONS, type MtoDimension } from '../plantReports/mto';
@@ -77,7 +77,7 @@ export const saveReportDefinition = defineCommand({
         paths: ['id'],
       });
     const data = getPlantData(doc);
-    const existing = data.reports?.[params.id];
+    const existing = own(data.reports, params.id);
     if (existing === undefined && Object.keys(data.reports ?? {}).length >= MAX_DEFINITIONS)
       return refuse(doc, 'save_report_definition', {
         code: 'DAT_PARAM_INVALID',

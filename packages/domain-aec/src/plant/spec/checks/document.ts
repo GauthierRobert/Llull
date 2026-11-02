@@ -4,6 +4,7 @@ import type { CadDocument } from '@core/model/types';
 import { toMm } from '@core/model/units';
 import { elementsOf, getBuilding } from '../../../building/model';
 import { resolveComponent } from '../resolve';
+import { bindingQuery } from '../size';
 import { findSpec, latestApproved, latestSpec, specCatalogs } from '../store';
 import { finding, type SpecFinding } from './finding';
 
@@ -26,7 +27,7 @@ export function pipeFindings(doc: CadDocument): SpecFinding[] {
     }
     const current = latestApproved(doc, binding.specId) ?? latestSpec(doc, binding.specId);
     if (current !== undefined && current.revision !== binding.revision) stale.push(pipe.id);
-    const outcome = resolveComponent(spec, specCatalogs(doc, spec).catalogs, { type: 'pipe', nps: binding.nps });
+    const outcome = resolveComponent(spec, specCatalogs(doc, spec).catalogs, { type: 'pipe', ...bindingQuery(binding) });
     const expected = outcome.ok ? (outcome.resolved.outsideDiameterMm ?? binding.odMm) : binding.odMm;
     if (Math.abs(toMm(doc, pipe.diameter) - expected) > OD_TOLERANCE_MM || Math.abs(binding.odMm - expected) > OD_TOLERANCE_MM)
       mismatched.push(pipe.id);

@@ -8,7 +8,7 @@ import { elementsOf, getBuilding } from '../../../building/model';
 import { refuse } from '../../catalog/codes';
 import { applyEditOps, editOpSchema } from '../edit';
 import { canonicalSpecText, headerShape, parseSpecFile, specToFile, SPEC_FORMAT, SPEC_ID_PATTERN, type SpecIssue } from '../file';
-import { inRange, querySize } from '../size';
+import { bindingQuery, inRange, querySize } from '../size';
 import { getSpecModel, latestSpec, withSpecModel } from '../store';
 import type { PipeSpec } from '../types';
 
@@ -27,6 +27,7 @@ function withRevisions(doc: CadDocument, spec: PipeSpec, replaceLast: boolean): 
   return withSpecModel(doc, {
     specs: { ...model.specs, [spec.id]: replaceLast ? [...revisions.slice(0, -1), spec] : [...revisions, spec] },
     specOrder: revisions.length === 0 ? [...model.specOrder, spec.id] : model.specOrder,
+    ...(model.approvals === undefined ? {} : { approvals: model.approvals }),
   });
 }
 
@@ -161,7 +162,7 @@ function orphanedPipes(doc: CadDocument, edited: PipeSpec): string[] {
   return elementsOf(getBuilding(doc), 'pipe')
     .filter((pipe) => {
       const binding = pipe.spec;
-      const size = binding === undefined ? null : (querySize({ nps: binding.nps }) ?? querySize({ dn: binding.nps }));
+      const size = binding === undefined ? null : querySize(bindingQuery(binding));
       return (
         binding?.specId === edited.id &&
         size !== null &&

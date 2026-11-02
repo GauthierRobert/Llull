@@ -74,16 +74,15 @@ const stressSchema = z.object({
     .describe('Where the value comes from (code table, datasheet): unsourced safety values are flagged by checks.'),
 });
 
+export const pressureSchema = z.object({
+  value: z.number().positive().describe('Pressure, gauge.'),
+  unit: z.enum(['MPa', 'kPa', 'bar', 'psi']).describe('Pressure unit.'),
+  source: z.string().optional().describe('Where the value comes from (design basis, datasheet).'),
+});
+
 export const designInputSchema = z
   .object({
-    pressure: z
-      .object({
-        value: z.number().positive().describe('Pressure, gauge.'),
-        unit: z.enum(['MPa', 'kPa', 'bar', 'psi']).describe('Pressure unit.'),
-        source: z.string().optional().describe('Where the value comes from (design basis, datasheet).'),
-      })
-      .optional()
-      .describe('Internal design pressure, gauge.'),
+    pressure: pressureSchema.optional().describe('Internal design pressure, gauge.'),
     temperatureC: z.number().optional().describe('Design temperature, degrees C.'),
     material: z.string().optional().describe('Material designation, e.g. "SA-516 Gr 70".'),
     allowableStress: stressSchema

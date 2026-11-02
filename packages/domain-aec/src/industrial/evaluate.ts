@@ -23,7 +23,7 @@ import { evaluateVessel } from '../plant/equipment/evaluate/evaluateVessel';
 
 // prettier-ignore
 const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
-  column: 'Column', rafter: 'Rafter', beam: 'Beam', brace: 'Brace', purlin: 'Purlin', rail: 'Side rail', crane: 'Crane beam',
+  column: 'Column', rafter: 'Rafter', beam: 'Beam', brace: 'Brace', purlin: 'Purlin', rail: 'Side rail', crane: 'Crane beam', bracket: 'Bracket',
 };
 
 /** World position of a level-relative point. */

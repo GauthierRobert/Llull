@@ -57,4 +57,9 @@ export const pipingCatalogDocument: DocumentExtension = {
   },
   derivedEntityIds: () => new Set<string>(),
   restore: (raw) => raw,
+  // Replay starts from an empty slice: the approval ledger is kept so a recorded approve_pipe_spec step re-applies its (already verified) approval.
+  replaySeed: (base) => {
+    const approvals = base.plant?.spec?.approvals;
+    return approvals === undefined || approvals.length === 0 ? {} : { plant: { spec: { specs: {}, specOrder: [], approvals } } };
+  },
 };

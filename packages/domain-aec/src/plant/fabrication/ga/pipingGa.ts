@@ -67,7 +67,10 @@ export interface GaLineRow {
   readonly dn: number;
   readonly outsideDiameterMm: number;
   readonly spec: string | null;
+  /** The main bore is double line (the first pipe); a branch or a run after a reducer is judged on its own bore. */
   readonly doubleLine: boolean;
+  /** Distinct nominal bores drawn, ascending. */
+  readonly bores: readonly number[];
   readonly drawnSegments: number;
 }
 
@@ -149,7 +152,21 @@ interface Drawn {
   readonly a: Vec3;
   readonly b: Vec3;
   readonly cut: Vec3 | null;
+  /** Nominal bore of the component behind the segment (a branch, or the run after a reducer, is not the main bore). */
+  readonly bore: number;
 }
+
+/** Nominal bore (mm) of the component behind a drawn step: the branch outlet for a tee branch, the end nearest the step start otherwise. */
+function boreOfStep(line: GaLine, step: IsoGraph['steps'][number]): number {
+  const component = line.network.components[step.segment.componentIndex];
+  const fallback = line.network.components.find((candidate) => candidate.type === 'PIPE')?.ends[0]?.boreMm ?? 0;
+  if (component === undefined) return fallback;
+  if (step.segment.part === 'branch') return component.branch?.boreMm ?? component.ends[0]?.boreMm ?? fallback;
+  const nearest = [...component.ends].sort((a, b) => distance3(a.xyz, step.start) - distance3(b.xyz, step.start))[0];
+  return nearest?.boreMm ?? fallback;
+}
+
+const odOf = (bore: number): number => outsideDiameterMm(bore) ?? bore;
 
 const mix = (p: Vec2, q: Vec2, t: number): Vec2 => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
 
@@ -176,12 +193,13 @@ export function buildPipingGa(lines: readonly GaLine[], options: GaOptions): Ga 
   const drawn: Drawn[] = lines.flatMap((line) =>
     line.graph.steps.flatMap((step): Drawn[] => {
       const part = clip(step.start, step.end, options.cutAt, options.direction);
-      return part === null ? [] : [{ line, ...part }];
+      return part === null ? [] : [{ line, ...part, bore: boreOfStep(line, step) }];
     }),
   );
   const points = drawn.flatMap((segment) => [project(segment.a), project(segment.b)]);
-  const [minX, minY] = [Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1]))];
-  const [maxX, maxY] = [Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))];
+  const lowest = (axis: 0 | 1): number => points.reduce((low, p) => Math.min(low, p[axis]), Infinity);
+  const highest = (axis: 0 | 1): number => points.reduce((high, p) => Math.max(high, p[axis]), -Infinity);
+  const [minX, minY, maxX, maxY] = [lowest(0), lowest(1), highest(0), highest(1)];
   const extent: [number, number] = points.length === 0 ? [0, 0] : [(maxX - minX) / options.scale, (maxY - minY) / options.scale];
   const margin = 24;
   const fits = extent[0] <= area.width - 2 * margin && extent[1] <= area.height - 2 * margin;
@@ -209,19 +227,20 @@ export function buildPipingGa(lines: readonly GaLine[], options: GaOptions): Ga 
   for (const line of lines) {
     const pipe = line.network.components.find((component) => component.type === 'PIPE');
     const dn = pipe?.ends[0]?.boreMm ?? 0;
-    const od = outsideDiameterMm(dn) ?? dn;
+    const od = odOf(dn);
     const spec = line.network.attributes['PIPING-SPEC'] ?? null;
-    const double = dn >= options.doubleLineFromDn;
+    const double = (bore: number): boolean => bore >= options.doubleLineFromDn;
     const own = drawn.filter((segment) => segment.line === line);
     for (const segment of own) {
       const [p, q] = [sheet(segment.a), sheet(segment.b)];
       const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
-      const radius = od / 2 / options.scale;
+      const radius = odOf(segment.bore) / 2 / options.scale;
+      const isDouble = double(segment.bore);
       if (length < 1e-6) {
-        primitives.push({ t: 'circle', layer: 'ISO-PIPE', c: p, r: double ? Math.max(radius, 0.4) : 0.8 });
+        primitives.push({ t: 'circle', layer: 'ISO-PIPE', c: p, r: isDouble ? Math.max(radius, 0.4) : 0.8 });
         continue;
       }
-      if (!double) {
+      if (!isDouble) {
         primitives.push({ t: 'line', layer: 'ISO-PIPE', a: p, b: q });
         continue;
       }
@@ -233,10 +252,27 @@ export function buildPipingGa(lines: readonly GaLine[], options: GaOptions): Ga 
     }
     for (const segment of own)
       if (segment.cut !== null)
-        primitives.push({ t: 'circle', layer: 'ISO-SYMB', c: sheet(segment.cut), r: Math.max(od / 2 / options.scale, 0.8) });
-    rows.push({ lineId: line.id, dn, outsideDiameterMm: od, spec, doubleLine: double, drawnSegments: own.length });
+        primitives.push({
+          t: 'circle',
+          layer: 'ISO-SYMB',
+          c: sheet(segment.cut),
+          r: Math.max(odOf(segment.bore) / 2 / options.scale, 0.8),
+        });
+    rows.push({
+      lineId: line.id,
+      dn,
+      outsideDiameterMm: od,
+      spec,
+      doubleLine: double(dn),
+      bores: [...new Set(own.map((segment) => segment.bore))].sort((a, b) => a - b),
+      drawnSegments: own.length,
+    });
     const runs = line.graph.runs.flatMap((run) => clippedRun(run, options.cutAt, options.direction));
     const longest = longestRun(runs, project);
+    const boreOfRun = (run: IsoRun | undefined): number => {
+      const step = run === undefined ? undefined : line.graph.steps[run.steps[0] as number];
+      return step === undefined ? dn : boreOfStep(line, step);
+    };
     if (options.annotate.includes('line_label') && longest !== undefined) {
       const [first, last] = [longest.points[0] as Vec3, longest.points[longest.points.length - 1] as Vec3];
       const [p, q] = [sheet(first), sheet(last)];
@@ -245,8 +281,8 @@ export function buildPipingGa(lines: readonly GaLine[], options: GaOptions): Ga 
       const rotation = angle > 90 ? angle - 180 : angle <= -90 ? angle + 180 : angle;
       const middle = mix(p, q, 0.5);
       const radians = (rotation * Math.PI) / 180;
-      const lift = od / 2 / options.scale + 3;
-      const label = `${line.network.lineId}-DN${dn}${spec === null ? '' : `-${spec}`}`;
+      const lift = odOf(boreOfRun(longest)) / 2 / options.scale + 3;
+      const label = `${line.network.lineId}-DN${boreOfRun(longest)}${spec === null ? '' : `-${spec}`}`;
       const at: Vec2 = [middle[0] - Math.sin(radians) * lift, middle[1] + Math.cos(radians) * lift];
       primitives.push({ t: 'text', layer: 'ISO-TEXT', at, size: TEXT_SIZE, text: label, anchor: 'middle', rotation });
       labels.push({
@@ -273,7 +309,8 @@ export function buildPipingGa(lines: readonly GaLine[], options: GaOptions): Ga 
       const [p, q] = [sheet(first), sheet(last)];
       const middle = mix(p, q, 0.5);
       const at3: Vec3 = [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2, elevation];
-      const below = od / 2 / options.scale + 3;
+      const runOd = odOf(boreOfRun(run));
+      const below = runOd / 2 / options.scale + 3;
       if (options.annotate.includes('cl_elevation')) {
         const at: Vec2 = [middle[0], middle[1] - below];
         primitives.push({ t: 'text', layer: 'ISO-TEXT', at, size: TEXT_SIZE, text: `CL EL ${signed(elevation)}`, anchor: 'middle' });
@@ -287,7 +324,7 @@ export function buildPipingGa(lines: readonly GaLine[], options: GaOptions): Ga 
         });
       }
       if (options.annotate.includes('bop_elevation')) {
-        const bop = round2(elevation - od / 2);
+        const bop = round2(elevation - runOd / 2);
         const at: Vec2 = [middle[0], middle[1] - below - 4];
         primitives.push({ t: 'text', layer: 'ISO-TEXT', at, size: TEXT_SIZE, text: `BOP EL ${signed2(bop)}`, anchor: 'middle' });
         labels.push({

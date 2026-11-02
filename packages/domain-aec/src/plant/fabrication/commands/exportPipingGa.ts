@@ -36,7 +36,7 @@ export const exportPipingGa = defineCommand({
     '(e.g. L-101-DN100-A1A: PIPELINE-REFERENCE, bore of the first pipe, PIPING-SPEC) along the longest run; cl_elevation = "CL EL +3000" once per distinct horizontal centreline elevation of the line (flow order); ' +
     'bop_elevation = bottom of pipe "BOP EL +2942.85" = CL - OD / 2 (two decimals) for the same levels; flow_arrow = an arrow on every straight run over 1000 mm in the flow direction (component order from the line start). ' +
     'The building is not drawn (combine with export_plan_sheet). levelId keeps the lines whose lowest point is on that level; lineIds keeps the named lines (default all). ' +
-    'Returns data = { view, direction?, cutAt?, paper, scale, files: [{ name, format, content, sha256 }], lines: [{ lineId, dn, outsideDiameterMm, spec, doubleLine, drawnSegments }], ' +
+    'Returns data = { view, direction?, cutAt?, paper, scale, files: [{ name, format, content, sha256 }], lines: [{ lineId, dn, outsideDiameterMm, spec, doubleLine, bores, drawnSegments }], ' +
     'labels: [{ kind line | cl_elevation | bop_elevation, text, lineId, at (3D mm), sheet (paper mm), valueMm?, rotationDeg? }], arrows: [{ lineId, run, at, direction, sheet }], extentMm, fits, warnings, reviewRequired: true }. ' +
     'Refusals (document unchanged): ISO_LINE_NOT_FOUND, ISO_NO_PIPING, ISO_PARAM_INVALID (levelId), MAT_EXPORT_CONTROLLED, or the RTE_* code of a routed run that no longer derives. ISO_GA_OVERFLOW is a warning (the drawing is larger than the paper at that scale). Save with llull export_piping_ga --save <dir>.',
   params: z.object({
@@ -54,7 +54,12 @@ export const exportPipingGa = defineCommand({
         'Section only: the cut plane on the viewing axis, document units (y for north / south, x for east / west). The model nearer to the viewer is removed. Omit for no cut.',
       ),
     paper: z.enum(PAPER_SIZES).describe('Paper size, landscape ISO A0..A4.'),
-    scale: z.number().positive().describe('Drawing scale denominator: 50 = 1:50 (paper mm = world mm / 50).'),
+    scale: z
+      .number()
+      .finite()
+      .min(0.001)
+      .max(1e6)
+      .describe('Drawing scale denominator, 0.001 to 1000000: 50 = 1:50 (paper mm = world mm / 50).'),
     doubleLineFromDn: z
       .number()
       .positive()
