@@ -95,12 +95,6 @@
       "set_pipe_operating_conditions",
       "set_stress_load_cases"
     ],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-03-quick-checks.json": [
-      "guided_cantilever",
-      "pipe_sif",
-      "pipe_stress_allowables",
-      "thermal_growth"
-    ],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-04-supports-guardrails.json": [
       "add_stress_restraint",
       "analyze_pipe_stress",
@@ -115,7 +109,6 @@
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
       "export_caesar_neutral",
       "nozzle_load_check",
-      "pipe_stress_allowables",
       "spring_variability"
     ],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-02-viewpoint-bcf-roundtrip.json": [
