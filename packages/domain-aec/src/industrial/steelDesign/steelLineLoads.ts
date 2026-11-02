@@ -11,7 +11,7 @@ import { GRAVITY, round } from '../../shared/numeric';
 import { type ModelUnits, type SteelBar } from './steelMemberBars';
 import { addPointLoad, type BeamLoads } from './steelBeamLoads';
 import type { ColumnNode } from './steelFraming';
-import { pipeWeightPerMetre } from '../piping/pipeWeight';
+import { pipeWallMm, pipeWeightPerMetre } from '../piping/pipeWeight';
 import { carriedByEnds, pipeRunOf, weightSupportsOf } from '../piping/pipeSupportLayout';
 import { runPipes } from '../piping/pipeCarrier';
 import { applySupportedPipe, tributaryLengths } from './steelSupportLoads';
@@ -92,7 +92,7 @@ function runOf(units: ModelUnits, element: PipeElement | CableTrayElement, param
       label: `${element.service} Ø${round(diameter, 1)}`,
       points,
       halfDepth: diameter / 2,
-      weightPerMetre: pipeWeightPerMetre(diameter, params.pipeContentDensity),
+      weightPerMetre: pipeWeightPerMetre(diameter, params.pipeContentDensity, pipeWallMm(element, diameter)),
       pipe: element,
     };
   }

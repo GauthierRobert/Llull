@@ -49,7 +49,6 @@
       "define_acoustic_spectrum"
     ],
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-03-design-conditions.json": ["pipe_wall_check"],
-    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-04-spec-driven-pipe-run.json": ["approve_pipe_spec"],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": [
       "check_equipment",
       "equipment_datasheet",

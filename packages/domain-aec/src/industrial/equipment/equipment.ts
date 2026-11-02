@@ -3,7 +3,7 @@
 import type { EquipmentElement, PipeElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
-import { fromMm, toMetres } from '@core/model/units';
+import { fromMm, toMetres, toMm } from '@core/model/units';
 import { getBuilding, isVec2, nextElementId, nextMark, resolveLevel, toVec2, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePath } from '../../shared/duplicates';
@@ -12,6 +12,8 @@ import { SHAPE_PARAM_TEXT, describeEquipmentShape, equipmentShapeSchema, normali
 import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from '../piping/pipeSizes';
 import { hasRepeatedPoint, routeLength, routeOrFailure } from '../piping/routeSupport';
 import { levelIdParam } from '../../building/levelParams';
+import { refuse } from '../../plant/catalog/codes';
+import { bindPipe, isBound, type Bound } from '../../plant/spec/binding';
 
 /**
  * @affects creates 1 equipment (box or cylindrical vessel on layer Q-EQPM; clearance drawn in plan)
@@ -90,8 +92,8 @@ export const addEquipment = defineCommand({
 
 /**
  * @affects creates 1 pipe run (segments + bends on layer P-PIPE) carrying its line-list data
- * @invariant diameter from `diameter`, else the DN outside-diameter table, else 114.3 mm (DN100)
- * @failure < 2 points / repeated point / diameter <= 0 / invalid or unknown DN without diameter -> no-op
+ * @invariant diameter from the spec pipe (`spec` + `nps` | `dn`; binding stored on the pipe, data carries outsideDiameterMm / schedule / wallMm), else `diameter`, else the DN outside-diameter table, else 114.3 mm (DN100)
+ * @failure < 2 points / repeated point / diameter <= 0 / invalid or unknown DN without diameter -> no-op; spec without a size, unknown spec or size, `diameter` differing from the spec OD -> coded refusal (PSC_*)
  */
 export const addPipeRun = defineCommand({
   name: 'add_pipe_run',
@@ -101,7 +103,9 @@ export const addPipeRun = defineCommand({
     'taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe ' +
     'lengths feed the takeoff; the pipe schedule (building_schedule kind "pipe") is the line list; clashes are reported by ' +
     'check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. Refused if a pipe of the same ' +
-    'diameter already follows the same route (either direction) on the level.',
+    'diameter already follows the same route (either direction) on the level. With `spec` (a piping spec id, see list_pipe_specs) and a size `nps` (or `dn`) `' +
+    'the outside diameter, wall and schedule come from the spec pipe at that size (e.g. CS150-A1 NPS 2-1/2: 73.0 mm Sch 40, not the legacy table 76.1 mm), the pipe stores the spec binding, and data gains ' +
+    'outsideDiameterMm, schedule and wallMm; the newest approved revision is used (the newest draft with a PSC_SPEC_NOT_APPROVED warning). Without `spec` the legacy DN table applies unchanged.',
   params: z.object({
     points: z.array(z.array(z.number())).describe('Pipe centreline [[x, y, z], …], 2 to 1000 points.'),
     diameter: z.number().optional().describe('Outside diameter in document units. Default: from `dn` when given, else 114.3 mm (DN100).'),
@@ -112,6 +116,17 @@ export const addPipeRun = defineCommand({
         'Nominal size DN as an integer, e.g. 100. Tabulated: 15, 20, 25, 32, 40, 50, 65, 80, 100, 125, ' +
           '150, 200, 250, 300, 350, 400. Sets the outside diameter when `diameter` is omitted (an ' +
           'untabulated DN then needs an explicit `diameter`). Printed "DN100" in the line list.',
+      ),
+    spec: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Piping spec id (list_pipe_specs): OD, wall and schedule come from its pipe component at the size. Needs nps or dn.'),
+    nps: z
+      .union([z.string(), z.number()])
+      .optional()
+      .describe(
+        'Nominal pipe size in inches for `spec`, e.g. "2-1/2" or 2.5 (alternative to dn). Only with spec: nps without spec is refused.',
       ),
     line: z.string().optional().describe('Line number for the line list, e.g. "L-101".'),
     from: z.string().optional().describe('Line origin: equipment tag (e.g. "EQ1") or battery-limit / tie-in id (e.g. "BL-1").'),
@@ -127,17 +142,36 @@ export const addPipeRun = defineCommand({
       .optional()
       .describe('Set by commit_asbuilt_extraction: marks the run as scan-derived (as-built). Do not set it by hand.'),
   }),
-  run: (doc, { points, diameter, dn, line, from, to, service, material, levelId, asBuilt }): CommandResult => {
+  run: (doc, { points, diameter, dn, spec, nps, line, from, to, service, material, levelId, asBuilt }): CommandResult => {
     const path = routeOrFailure('add_pipe_run', points, 'line');
     if (typeof path === 'string') return noop(doc, path);
-    if (dn !== undefined && !(Number.isInteger(dn) && dn > 0))
+    if (spec === undefined && dn !== undefined && !(Number.isInteger(dn) && dn > 0))
       return noop(doc, `add_pipe_run failed: dn must be a positive integer (got ${dn}).`);
-    const tabulated = dn !== undefined ? outsideDiameterMm(dn) : null;
-    if (diameter === undefined && dn !== undefined && tabulated === null) {
+    if (spec === undefined && nps !== undefined)
+      return noop(doc, 'add_pipe_run failed: nps needs spec (a piping spec id); give dn or diameter for a legacy pipe.');
+    let bound: Bound | undefined;
+    if (spec !== undefined) {
+      if (nps !== undefined && dn !== undefined) return noop(doc, 'add_pipe_run failed: give nps or dn with spec, not both.');
+      const outcome = bindPipe(doc, 'add_pipe_run', { specId: spec, nps, dn });
+      if (!isBound(outcome)) return outcome;
+      if (diameter !== undefined && Math.abs(diameter - fromMm(doc, outcome.binding.odMm)) > fromMm(doc, 0.05))
+        return refuse(
+          doc,
+          'add_pipe_run',
+          'PSC_PIPE_SPEC_MISMATCH',
+          `diameter ${diameter} differs from the outside diameter ${outcome.binding.odMm} mm of spec ${spec} at NPS ${outcome.binding.nps}: omit diameter`,
+          [spec],
+          ['diameter'],
+        );
+      bound = outcome;
+    }
+    const tabulated = bound === undefined && dn !== undefined ? outsideDiameterMm(dn) : null;
+    if (bound === undefined && diameter === undefined && dn !== undefined && tabulated === null) {
       const known = Object.keys(PIPE_OUTSIDE_DIAMETER_MM).join(', ');
       return noop(doc, `add_pipe_run failed: DN${dn} is not in the pipe size table (${known}); give an explicit diameter.`);
     }
-    const resolvedDiameter = diameter ?? fromMm(doc, tabulated ?? 114.3);
+    const resolvedDiameter = bound !== undefined ? fromMm(doc, bound.binding.odMm) : (diameter ?? fromMm(doc, tabulated ?? 114.3));
+    const pipeDn = bound !== undefined ? bound.dn : (dn ?? null);
     if (hasRepeatedPoint(path) || resolvedDiameter <= 0)
       return noop(doc, 'add_pipe_run failed: consecutive points must differ and diameter be > 0.');
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
@@ -162,13 +196,14 @@ export const addPipeRun = defineCommand({
       service: service?.trim() || 'process',
       material: material?.trim() || 'steel',
       ...(lineNumber !== undefined ? { line: lineNumber } : {}),
-      ...(dn !== undefined ? { dn } : {}),
+      ...(pipeDn !== null ? { dn: pipeDn } : {}),
+      ...(bound !== undefined ? { spec: bound.binding } : {}),
       ...(origin !== undefined ? { from: origin } : {}),
       ...(destination !== undefined ? { to: destination } : {}),
       ...(asBuilt !== undefined ? { asBuilt } : {}),
     };
     const length = routeLength(path);
-    const label = `${lineNumber !== undefined ? ` line ${lineNumber}` : ''}${dn !== undefined ? ` DN${dn}` : ''}`;
+    const label = `${lineNumber !== undefined ? ` line ${lineNumber}` : ''}${pipeDn !== null ? ` DN${pipeDn}` : ''}${bound === undefined ? '' : ` spec ${bound.binding.specId} r${bound.binding.revision} NPS ${bound.binding.nps} sch ${bound.binding.schedule ?? '-'} wall ${bound.binding.wallMm} mm${bound.warnings.length === 0 ? '' : ` (${bound.warnings.map((entry) => entry.code).join(', ')})`}`}`;
     const ends = origin !== undefined || destination !== undefined;
     return commitBuilding(
       doc,
@@ -176,7 +211,21 @@ export const addPipeRun = defineCommand({
       [pipe.id],
       `Added ${pipe.service} pipe ${pipe.mark} (${pipe.id})${label} Ø${resolvedDiameter}, ${toMetres(doc, length).toFixed(2)} m, ` +
         `${path.length - 2} bend(s)${ends ? `, ${origin ?? '?'} → ${destination ?? '?'}` : ''}.`,
-      { elementId: pipe.id },
+      {
+        elementId: pipe.id,
+        outsideDiameterMm: bound?.binding.odMm ?? toMm(doc, resolvedDiameter),
+        ...(bound === undefined
+          ? {}
+          : {
+              specId: bound.binding.specId,
+              revision: bound.binding.revision,
+              nps: bound.binding.nps,
+              wallMm: bound.binding.wallMm,
+              ...(bound.binding.schedule === undefined ? {} : { schedule: bound.binding.schedule }),
+              verified: bound.binding.verified,
+              ...(bound.warnings.length === 0 ? {} : { warnings: bound.warnings }),
+            }),
+      },
     );
   },
 });
