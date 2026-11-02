@@ -8,7 +8,7 @@ import { xmlAttr, xmlChildren, type XmlElement } from '@lib/xmlRead';
 import type { Vec2 } from '@core/model/vectors';
 import { dexpiIssue, type DexpiIssue } from '../dexpi/codes';
 import { genericAttributes } from './from20Attributes';
-import { orient, readDiagram, type DiagramFacts, type Placement } from './from20Diagram';
+import { orient, readDiagram, sheetOf, type DiagramFacts, type Placement } from './from20Diagram';
 import { ASSOCIATION_PROPERTY } from './names20';
 import { association, classOf, componentObjects, dataOf, idOf, referenceIds, syn } from './syn';
 
@@ -385,6 +385,16 @@ export function proteusFrom20(model: XmlElement): From20 | From20Refusal {
 
   const facts = orient(readDiagram(componentObjects(engineering, 'Diagram')[0]));
   const issues: DexpiIssue[] = [];
+  if (facts.extent !== undefined && sheetOf(facts.extent) === undefined)
+    issues.push(
+      dexpiIssue(
+        'DEXPI_SHEET_SIZE',
+        'warning',
+        `the diagram border (${facts.extent[0]} x ${facts.extent[1]}) fits no sheet from A4 to A0: the sheet is A1 and the Y axis is flipped with its height (594 mm)`,
+        [],
+        [where(model)],
+      ),
+    );
   const ctx: Ctx = { facts, issues, nodeIndex: indexNodes(plantModel) };
   const known = new Set<string>(PLANT_PROPERTIES);
   for (const components of xmlChildren(plantModel, 'Components')) {

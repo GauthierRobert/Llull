@@ -132,16 +132,18 @@ function descendants(root: XmlElement, type: string): XmlElement[] {
 const PAPERS = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
 const clean = (value: number): number => Math.round(value * 1e9) / 1e9;
 
+/** The smallest standard sheet that holds the border (the mapper's rule), or undefined when there is no border or none fits. */
+export function sheetOf(extent: Vec2 | undefined): (typeof PAPERS)[number] | undefined {
+  return extent === undefined ? undefined : PAPERS.find((name) => extent[0] <= PAPER_MM[name][0] && extent[1] <= PAPER_MM[name][1]);
+}
+
 /**
  * The facts in the sheet's own frame. A DEXPI 2.0 diagram has its origin at the top left with Y pointing down (the reference file draws the border
  * from (1, 1) to (419, 296) on an A3 sheet) and angles clockwise; the P&ID model is Y up and counter-clockwise like Proteus. `height` is the height
  * of the smallest standard sheet that holds the border (A1 when the diagram has none, the default of the mapper).
  */
 export function orient(facts: DiagramFacts): DiagramFacts {
-  const paper =
-    facts.extent === undefined
-      ? undefined
-      : PAPERS.find((name) => facts.extent !== undefined && facts.extent[0] <= PAPER_MM[name][0] && facts.extent[1] <= PAPER_MM[name][1]);
+  const paper = sheetOf(facts.extent);
   const height = PAPER_MM[paper ?? 'A1'][1];
   const up = ([x, y]: Vec2): Vec2 => [x, clean(height - y)];
   const turned = (place: Placement): Placement => ({ at: up(place.at), rotationDeg: clean(-place.rotationDeg) + 0 });

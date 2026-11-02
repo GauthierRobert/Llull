@@ -74,6 +74,10 @@ describe('names of the 2.0 encoding', () => {
     'PipingNetworkSegment-12',
     '__proto__',
     'constructor',
+    '_x0041-',
+    'a_x0041-b',
+    '_x0041',
+    '_x0041x',
   ];
 
   it.each(SAMPLES)('encodes %j to a XSD name and decodes it back', (text) => {
@@ -86,7 +90,31 @@ describe('names of the 2.0 encoding', () => {
     const names = SAMPLES.map(encodeName);
     expect(new Set(names).size).toBe(SAMPLES.length);
     expect(encodeName('a-b')).toBe('a_x002D_b');
-    expect(encodeName('_x002D_')).toBe('_x005F_x002D_');
+    expect(encodeName('_x002D_')).toBe('_x005F_x002D_x005F_');
+    expect(encodeName('_x0041-')).toBe('_x005F_x0041_x002D_');
+    expect(decodeName('_x005F_x0041_x002D_')).toBe('_x0041-');
+  });
+
+  it('round-trips every string of _ x 0 A - up to length 8 and of _ x 0 4 1 A F - up to length 6, and the names never collide', () => {
+    const failures: string[] = [];
+    const check = (alphabet: string[], length: number): void => {
+      let layer = [''];
+      const seen = new Map<string, string>();
+      for (let n = 0; n <= length; n++) {
+        for (const text of layer) {
+          const encoded = encodeName(text);
+          const other = seen.get(encoded);
+          if (text !== '' && decodeName(encoded) !== text) failures.push(text + ' -> ' + encoded);
+          if (!/^[A-Za-z_][A-Za-z_0-9]*$/.test(encoded)) failures.push(encoded + ' is not a name');
+          if (other !== undefined) failures.push(text + ' and ' + other + ' share ' + encoded);
+          seen.set(encoded, text);
+        }
+        layer = n === length ? [] : layer.flatMap((text) => alphabet.map((char) => text + char));
+      }
+    };
+    check(['_', 'x', '0', 'A', '-'], 8);
+    check(['_', 'x', '0', '4', '1', 'A', 'F', '-'], 6);
+    expect(failures.slice(0, 5)).toEqual([]);
   });
 
   it('decodes a malformed escape to the replacement character, never throws', () => {
@@ -103,7 +131,7 @@ describe('names of the 2.0 encoding', () => {
     expect(attributeProperty('NominalCapacity(Volume)', 'quantity')).toBe('NominalCapacityVolume');
     expect(attributeProperty('Foo', 'text')).toBe('Llull_Foo');
     expect(attributeProperty('Foo Bar', 'text')).toBe('Llull_Foo_x0020_Bar');
-    expect(attributeProperty('Llull_X', 'text')).toBe('Llull_Llull_X');
+    expect(attributeProperty('Llull_X', 'text')).toBe('Llull_Llull_x005F_X');
     for (const [name, kind] of [
       ['LineNumberAssignmentClass', 'text'],
       ['LocationSpecialization', 'enum'],

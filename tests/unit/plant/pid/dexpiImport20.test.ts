@@ -283,3 +283,37 @@ describe('import_dexpi: 2.0 findings and hostile content', () => {
     expect(note?.kind === 'text' ? note.value.length : 0).toBe(2_000_000);
   });
 });
+
+describe('import_dexpi: a 2.0 border that fits no standard sheet', () => {
+  const border = (width: number, height: number): string =>
+    `<Components property="Diagram"><Object type="Core/Diagram.Diagram"><Components property="Groups"><Object type="Core/Diagram.Border"><Components property="Elements"><Object type="Core/Diagram.PolyLine"><Data property="Points">` +
+    [
+      [0, 0],
+      [width, height],
+    ]
+      .map(
+        ([x, y]) =>
+          `<AggregatedDataValue type="Core/Diagram.Point"><Data property="X"><Double>${x}</Double></Data><Data property="Y"><Double>${y}</Double></Data></AggregatedDataValue>`,
+      )
+      .join('') +
+    `</Data></Object></Components></Object></Components></Object></Components>`;
+  const withBorder = (width: number, height: number): string =>
+    MODEL(components('TaggedPlantItems', tank('T1'))).replace(
+      '</Object></Components></Object></Model>',
+      `</Object></Components>${border(width, height)}</Object></Model>`,
+    );
+
+  it('warns (DEXPI_SHEET_SIZE) and takes A1, the sheet the mapper picks, as the frame', () => {
+    const text = withBorder(2000, 1500);
+    expect(importOf(text).warnings.find((w) => w.code === 'DEXPI_SHEET_SIZE')?.message).toContain('fits no sheet');
+    const pid = apply(empty, 'import_dexpi', { text }).plant?.pid;
+    expect(pid?.sheets[pid.sheetOrder[0] ?? '']?.paper).toBe('A1');
+  });
+
+  it('does not warn for a border that fits (A4) or for no border at all', () => {
+    expect(importOf(withBorder(297, 210)).warnings.some((w) => w.code === 'DEXPI_SHEET_SIZE')).toBe(false);
+    const pid = apply(empty, 'import_dexpi', { text: withBorder(297, 210) }).plant?.pid;
+    expect(pid?.sheets[pid.sheetOrder[0] ?? '']?.paper).toBe('A4');
+    expect(importOf(MODEL(components('TaggedPlantItems', tank('T1')))).warnings.some((w) => w.code === 'DEXPI_SHEET_SIZE')).toBe(false);
+  });
+});

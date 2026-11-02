@@ -7,18 +7,15 @@
 export const NAME_PATTERN = /^[A-Za-z_][A-Za-z_0-9]*$/;
 
 const ESCAPE = /_x([0-9A-F]{4,6})_/g;
-const ESCAPE_HEAD = /^_x[0-9A-F]{4,6}_/;
-
-/** A 1.3 id or any text as a 2.0 name: a character outside `[A-Za-z0-9_]` (or a leading digit) becomes `_xHHHH_`; a literal `_x2D_`-looking run is escaped too. */
+/** Any text as a 2.0 name: every character outside [A-Za-z0-9] (the underscore included) and a leading digit becomes _xHHHH_, so the output has no bare underscore and decoding is a plain left-to-right replace (a bijection). */
 export function encodeName(text: string): string {
   let out = '';
   for (let index = 0; index < text.length; ) {
     const code = text.codePointAt(index) ?? 0;
     const char = String.fromCodePoint(code);
     index += char.length;
-    const plain = /[A-Za-z_]/.test(char) || (out !== '' && /[0-9]/.test(char));
-    if (char === '_' && ESCAPE_HEAD.test(text.slice(index - 1))) out += '_x005F_';
-    else out += plain ? char : `_x${code.toString(16).toUpperCase().padStart(4, '0')}_`;
+    const plain = /[A-Za-z]/.test(char) || (out !== '' && /[0-9]/.test(char));
+    out += plain ? char : `_x${code.toString(16).toUpperCase().padStart(4, '0')}_`;
   }
   return out === '' ? '_x0020_' : out;
 }

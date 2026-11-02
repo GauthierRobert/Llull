@@ -201,3 +201,33 @@ describe.skipIf(xmllint.error !== undefined)('DEXPI_XML_Schema.xsd with xmllint 
     }
   });
 });
+
+describe('export_dexpi version 2.0: the sheet size sets the frame of the Y flip', () => {
+  const sheetDoc = (paper: string, at: [number, number]): CadDocument => {
+    let doc = apply(createEmptyDocument(), 'create_pid_sheet', { number: 'PID-001', title: 'size', paper });
+    doc = apply(doc, 'add_pid_equipment', { sheet: 'PID-001', class: 'Tank', tag: 'T-1', at });
+    return apply(doc, 'add_pid_equipment', {
+      sheet: 'PID-001',
+      class: 'CentrifugalPump',
+      tag: 'P-1',
+      at: [at[0] / 2, Math.round(at[1] / 3)],
+    });
+  };
+
+  it.each([
+    ['A4', [250, 180]],
+    ['A3', [400, 280]],
+    ['A0', [1100, 800]],
+  ] as const)('%s: paper, positions and the geometry fingerprint survive 2.0 unchanged', (paper, at) => {
+    const original = sheetDoc(paper, [at[0], at[1]]);
+    const first = exportOf(original);
+    expect(first.schema?.valid).toBe(true);
+    const again = reimport(first.text);
+    const pid = again.plant?.pid;
+    expect(pid?.sheets[pid.sheetOrder[0] ?? '']?.paper).toBe(paper);
+    const positions = (doc: CadDocument): unknown[] => Object.values(doc.plant?.pid?.items ?? {}).map((item) => [item.tag, item.at]);
+    expect(positions(again)).toEqual(positions(original));
+    expect(fingerprint(again, { geometry: true })).toEqual(fingerprint(reimport(exportOf(original, '1.3').text), { geometry: true }));
+    expect(exportOf(again).text).toBe(first.text);
+  });
+});
