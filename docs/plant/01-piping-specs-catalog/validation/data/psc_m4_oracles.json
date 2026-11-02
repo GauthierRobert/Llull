@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "id": "PSC-DATA-M4",
+    "title": "Reference values for the M4 commands (pipe_wall_check, resolve_joint, component_shape): committed oracles with their source and grade",
+    "note": "Every case says whether it is a published value (grade A/B, source id of sources.md) or a hand derivation (grade D = derived, recomputed here with the arithmetic shown). The tests read this file; they never copy the numbers."
+  },
+  "wallB313": {
+    "formula": "ASME B31.3 304.1.2 eq. (3a): t = P D / (2 (S E W + P Y)); tm = t + c; required nominal = tm / (1 - mill tolerance); valid for t < D/6 and P/(S E) <= 0.385",
+    "published": [
+      {
+        "id": "S18-nps4-1200psig",
+        "source": "S18 whatispiping.com worked example NPS 4, 1200 psig, S 19000 psi (recomputed with S19 formula and Y 0.4), grade A",
+        "odMm": 114.3,
+        "pressurePsi": 1200,
+        "allowableStressPsi": 19000,
+        "jointFactorE": 1,
+        "weldStrengthW": 1,
+        "coefficientY": 0.4,
+        "corrosionAllowanceMm": 3,
+        "millTolerance": 0.125,
+        "pressureThicknessMm": 3.52053,
+        "minimumThicknessMm": 6.52053,
+        "requiredNominalMm": 7.45203,
+        "scheduleStandard": "ASME B36.10M",
+        "selectedSchedule": "80",
+        "selectedWallMm": 8.56,
+        "insufficientSchedule": "40",
+        "insufficientWallMm": 6.02
+      }
+    ],
+    "derived": [
+      {
+        "id": "inverse-mawp",
+        "grade": "D",
+        "how": "eq. (3a) solved for P gives the pressure a wall t carries: P = 2 S E W t / (D - 2 Y t). Feeding the wall back must return the design pressure within 1e-9 relative.",
+        "odMm": 168.3,
+        "pressureMPa": 7.5,
+        "allowableStressMPa": 138,
+        "jointFactorE": 0.85,
+        "weldStrengthW": 0.9,
+        "coefficientY": 0.5
+      },
+      {
+        "id": "thick-wall-ratio",
+        "grade": "D",
+        "how": "P/(S E) = 6/(138 x 1) = 0.0435 is thin, 60/(138 x 1) = 0.435 > 0.385 must be refused (B31.3 304.1.2(a)); the same pressure in psi (8702.26) must be refused too",
+        "refusedPressureMPa": 60,
+        "allowableStressMPa": 138
+      },
+      {
+        "id": "t-over-d6-binds-first",
+        "grade": "D",
+        "how": "t/D = r / (2 (W + r Y)) with r = P/(S E). For Y = 0 and W = 1, t/D reaches 1/6 at r = 1/3, below the 0.385 ratio limit, so r = 0.35 (t = 0.175 D) must be refused by the D/6 gate while the ratio gate still passes. For Y = 0.4 the two limits coincide near r = 0.385 (1/(3 - Y) = 0.3846).",
+        "odMm": 100,
+        "pressureMPa": 48.3,
+        "allowableStressMPa": 138,
+        "jointFactorE": 1,
+        "weldStrengthW": 1,
+        "coefficientY": 0,
+        "ratio": 0.35,
+        "refusedBy": "D/6"
+      }
+    ]
+  },
+  "stud": {
+    "rule": "L = ceil((t1 + RF1 + t2 + RF2 + g + 2 nut + 2 x 2 pitch) / 6.35) x 6.35 mm; nut = nominal bolt diameter; pitch 25.4/11 mm for 5/8 in UNC; B16.5 raised face 1.6 mm Class 150 / 300",
+    "grade": "D (derived: nut height, gasket thickness and projection are named assumptions; no published stud table is in the pack)",
+    "cases": [
+      {
+        "id": "nps4-cl150-rf-swg",
+        "flangeThicknessMm": 22.4,
+        "raisedFaceMm": 1.6,
+        "gasketMm": 4.5,
+        "boltDiameterMm": 15.875,
+        "boltCount": 8,
+        "gripMm": 52.5,
+        "nutsMm": 31.75,
+        "projectionsMm": 9.236364,
+        "exactMm": 93.486364,
+        "studLengthMm": 95.25,
+        "studLengthIn": "3-3/4"
+      }
+    ]
+  },
+  "shapes": {
+    "elbowLr90Nps6": {
+      "source": "VC-PSC-19: closed form from B16.9 A = 228.6 (S8, S9, S10) and B36.10M OD 168.3 (S1, S2)",
+      "centreToEndMm": 228.6,
+      "odMm": 168.3,
+      "boundsMin": [0, 0, -84.15],
+      "boundsMax": [312.75, 312.75, 84.15]
+    },
+    "elbowLr45Nps4": {
+      "source": "spec 5.8: B16.9 LR 45 NPS 4 tabulated B 63.5 (S8, S10) against R tan(22.5 deg) with R = 1.5 x 4 x 25.4 = 152.4; R tan(22.5 deg) = 63.1261 mm, so the straight end is 63.5 - 63.1261 = 0.3739 mm (the spec text rounds R tan to 63.13)",
+      "centreToEndMm": 63.5,
+      "bendRadiusMm": 152.4,
+      "tangentMm": 0.373853
+    }
+  }
+}

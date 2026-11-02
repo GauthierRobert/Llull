@@ -7,6 +7,7 @@
 import { z } from '@core/commands/schema';
 import { LICENCE_FLAGS } from '@core/model/materialLibrary';
 import { canonicalJson } from '@lib/canonicalJson';
+import { familySchemaIssues } from './familySchemas';
 import { parseDn, parseNps } from './nominal';
 import {
   BEND_RADII,
@@ -173,6 +174,14 @@ function parseFamily(family: FileFamily, index: number, issues: CatalogIssue[]):
   const factor = unit === 'in' ? MM_PER_INCH : 1;
   const sizes = family.sizes.map((size, k) => parseSize(size, factor, `${path}.sizes.${k}`, issues));
   if (sizes.some((size) => size === null)) return null;
+  const parsed = buildFamily(family, sizes as ComponentSize[]);
+  const structure = familySchemaIssues(parsed);
+  for (const issue of structure)
+    issues.push({ code: 'PSC_CATALOG_INVALID', path: `${path}.${issue.path}`, message: `${path}.${issue.path}: ${issue.message}` });
+  return structure.length > 0 ? null : parsed;
+}
+
+function buildFamily(family: FileFamily, sizes: ComponentSize[]): ComponentFamily {
   return {
     id: family.id,
     type: family.type,
@@ -180,7 +189,7 @@ function parseFamily(family: FileFamily, index: number, issues: CatalogIssue[]):
     dimensionalStandard: family.dimensionalStandard ?? (/^(EN|DIN)\b/.test(family.standard) ? 'EN' : 'ASME'),
     ...(family.radius === undefined ? {} : { radius: family.radius }),
     ends: family.ends ?? [],
-    sizes: sizes as ComponentSize[],
+    sizes,
   };
 }
 
