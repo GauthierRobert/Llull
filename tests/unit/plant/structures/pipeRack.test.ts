@@ -597,3 +597,50 @@ describe('takeoff, schedule and IFC of a rack', () => {
     expect(aggregates.some((line) => (line.match(/#\d+/g) ?? []).length === 102)).toBe(true);
   });
 });
+
+describe('hostile sizes never allocate before the cap (review fix)', () => {
+  const { doc } = build(SMALL);
+
+  it('refuses a run whose bay count is astronomical or not finite, without throwing', () => {
+    const start = base();
+    expectRefusal(start, 'add_pipe_rack', { ...SMALL, length: 1e12, bentSpacing: 1 }, 'STA_RACK_SPACING', 'bentSpacing');
+    expectRefusal(start, 'add_pipe_rack', { ...SMALL, length: 1e300, bentSpacing: 1e-300 }, 'STA_RACK_SPACING', 'bentSpacing');
+    expectRefusal(start, 'add_pipe_rack', { ...SMALL, length: 1e9, bentSpacing: 0.001 }, 'STA_RACK_SPACING', 'bentSpacing');
+  });
+
+  it('a loaded rack with a tiny bentSpacing is stale, not a crash, in every reader', () => {
+    const copy = JSON.parse(JSON.stringify(doc)) as CadDocument;
+    (copy.building?.elements['assembly-1'] as unknown as { params: { along: unknown } }).params.along = { length: 6000, bentSpacing: 1e-9 };
+    expect(buildingErrors(copy.building)).toEqual([]);
+    const checked = data<{ racks: Array<{ stale: boolean }> }>(copy, 'check_steel_members', {});
+    expect(checked.racks[0]?.stale).toBe(true);
+    expect(
+      data<{ findings: Array<{ code: string }> }>(copy, 'check_access', { rulesets: ['iso_14122'] }).findings.map((f) => f.code),
+    ).toContain('STA_RACK_STALE');
+    expect(execute(copy, 'quantity_takeoff', {}).error).toBeUndefined();
+    expectRefusal(copy, 'update_pipe_rack', { assemblyId: 'assembly-1' }, 'STA_RACK_SPACING');
+  });
+
+  it('the stored spec is bounded: too many tiers, bays across, bracing bays, an empty or long gridPrefix fail to load', () => {
+    const errors = (change: (params: Record<string, unknown>) => void): string => {
+      const copy = JSON.parse(JSON.stringify(doc)) as CadDocument;
+      change((copy.building?.elements['assembly-1'] as unknown as { params: Record<string, unknown> }).params);
+      return buildingErrors(copy.building).join();
+    };
+    expect(errors((p) => (p['tiers'] = Array.from({ length: 13 }, (_, i) => 1000 * (i + 1))))).toContain('params are not');
+    expect(errors((p) => (p['across'] = { baysAcross: Array(9).fill(1000) }))).toContain('params are not');
+    expect(errors((p) => (p['bracingBays'] = Array.from({ length: 202 }, (_, i) => i + 1)))).toContain('params are not');
+    expect(errors((p) => (p['gridPrefix'] = ''))).toContain('params are not');
+    expect(errors((p) => (p['gridPrefix'] = 'ABCDEFGHI'))).toContain('params are not');
+  });
+
+  it('a circular platform with a tiny bracketSpacingMax is refused, not allocated', () => {
+    let vessel = apply(base(), 'add_equipment', { name: 'Column', location: [0, 0], size: [3000, 3000, 18000], shape: 'vertical_vessel' });
+    expectRefusal(
+      vessel,
+      'add_circular_access_platform',
+      { equipmentId: 'equipment-1', elevation: 6000, width: 1000, bracketSpacingMax: 1e-9 },
+      'STA_INVALID_GEOMETRY',
+    );
+  });
+});

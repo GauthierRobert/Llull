@@ -11,10 +11,7 @@ import { findProfile } from '../../../steel/profiles';
 import type { StaCode } from '../codes';
 import type { RackSpec } from './rackSpec';
 
-export const MAX_BENTS = 201;
-export const MAX_COLUMN_LINES = 9;
-export const MAX_TIERS = 12;
-export const MAX_RACK_MEMBERS = 5000;
+import { MAX_BENTS, MAX_COLUMN_LINES, MAX_RACK_MEMBERS, MAX_TIERS } from './rackLimits';
 
 export type RackMemberKind = 'column' | 'tierBeam' | 'strut' | 'brace';
 
@@ -51,10 +48,17 @@ const problem = (code: StaCode, message: string, ...paths: string[]): RackProble
 export const lineLabel = (index: number): string =>
   index < 26 ? String.fromCharCode(65 + index) : `${lineLabel(Math.floor(index / 26) - 1)}${String.fromCharCode(65 + (index % 26))}`;
 
-/** Bent stations of `along`: regular bays are equal and at most `bentSpacing` wide (n = ceil(length / bentSpacing)). */
+/** Number of bays of a regular run (n = ceil(length / bentSpacing)); NaN when it is not a finite count. */
+const baysOf = (along: { length: number; bentSpacing: number }): number => {
+  const bays = Math.ceil(along.length / along.bentSpacing - 1e-9);
+  return Number.isFinite(bays) && bays >= 1 ? bays : Number.NaN;
+};
+
+/** Bent stations of a run: regular bays are equal and at most bentSpacing wide. Empty when the run has no finite bay count or more than MAX_BENTS bents (nothing is allocated first). */
 export function stationsOf(along: RackSpec['along']): number[] {
   if ('stations' in along) return [...along.stations];
-  const bays = Math.ceil(along.length / along.bentSpacing - 1e-9);
+  const bays = baysOf(along);
+  if (!(bays + 1 <= MAX_BENTS)) return [];
   return Array.from({ length: bays + 1 }, (_, index) => (index === bays ? along.length : (index * along.length) / bays));
 }
 
@@ -115,10 +119,10 @@ export function layoutRack(doc: CadDocument, spec: RackSpec): RackLayout | RackP
       'length',
     );
   const stations = stationsOf(spec.along);
-  if (stations.length > MAX_BENTS)
+  if (stations.length > MAX_BENTS || stations.length === 0)
     return problem(
       'STA_RACK_SPACING',
-      `${stations.length} bents (at most ${MAX_BENTS}): check the unit of length and bentSpacing (document units)`,
+      `more than ${MAX_BENTS} bents or no finite bay count (at most ${MAX_BENTS}): check the unit of length and bentSpacing (document units)`,
       'bentSpacing',
       'length',
     );

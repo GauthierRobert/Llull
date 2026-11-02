@@ -1,6 +1,7 @@
 /** Resolved generator parameters of a pipe rack (06 STA M7), stored in `AssemblyElement.params` and replayed by update_pipe_rack. Lengths in document units. */
 
 import { z } from '@core/commands/schema';
+import { MAX_BENTS, MAX_COLUMN_LINES, MAX_TIERS } from './rackLimits';
 
 const point = z.tuple([z.number(), z.number()]);
 
@@ -12,19 +13,27 @@ export const rackSpecSchema = z.object({
   direction: point,
   along: z.union([
     z.object({ length: z.number().positive(), bentSpacing: z.number().positive() }),
-    z.object({ stations: z.array(z.number().min(0)).min(2) }),
+    z.object({ stations: z.array(z.number().min(0)).min(2).max(MAX_BENTS) }),
   ]),
-  across: z.union([z.object({ width: z.number().positive() }), z.object({ baysAcross: z.array(z.number().positive()).min(1) })]),
+  across: z.union([
+    z.object({ width: z.number().positive() }),
+    z.object({
+      baysAcross: z
+        .array(z.number().positive())
+        .min(1)
+        .max(MAX_COLUMN_LINES - 1),
+    }),
+  ]),
   /** Top-of-steel elevations of the tier beams (and struts), level-relative, strictly ascending. */
-  tiers: z.array(z.number()).min(1),
+  tiers: z.array(z.number()).min(1).max(MAX_TIERS),
   columnProfile: z.string(),
   tierBeamProfile: z.string(),
   strutProfile: z.string(),
   struts: z.enum(['every_tier', 'top', 'none']),
-  bracingBays: z.array(z.number().int().min(1)),
+  bracingBays: z.array(z.number().int().min(1)).max(MAX_BENTS),
   bracingProfile: z.string().optional(),
   baseFixity: z.enum(['pinned', 'fixed']).optional(),
-  gridPrefix: z.string(),
+  gridPrefix: z.string().min(1).max(8),
 });
 
 export type RackSpec = z.output<typeof rackSpecSchema>;

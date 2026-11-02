@@ -29,7 +29,7 @@ export function framingBeams(region: ReadonlyArray<Vec2>, direction: Vec2, maxSp
   const along = (p: Vec2): number => p[0] * direction[0] + p[1] * direction[1];
   const [sMin, sMax] = [Math.min(...region.map(along)), Math.max(...region.map(along))];
   const bays = Math.max(1, Math.ceil((sMax - sMin) / maxSpacingMm - 1e-9));
-  if (bays + 1 > MAX_BEAMS) return `maxSpacing gives ${bays + 1} beams (limit ${MAX_BEAMS}): check the unit and the spacing`;
+  if (!(bays + 1 <= MAX_BEAMS)) return `maxSpacing gives ${bays + 1} beams (limit ${MAX_BEAMS}): check the unit and the spacing`;
   const stations = Array.from({ length: bays + 1 }, (_, index) => sMin + ((sMax - sMin) * index) / bays);
   const across: Vec2 = [-direction[1], direction[0]];
   return stations.flatMap((s, index): BeamLine[] => {
@@ -67,7 +67,11 @@ export function sectorLayout(startRad: number, sweepRad: number, outerRadius: nu
   const stepRad = sweepRad / segments;
   const closed = sweepRad >= 2 * Math.PI - 1e-9;
   return {
-    angles: Array.from({ length: closed ? segments : segments + 1 }, (_, index) => startRad + index * stepRad),
+    // At most MAX_BRACKETS + 1 angles are made, enough for the caller to see the cap broken (a tiny spacing must not allocate millions).
+    angles: Array.from(
+      { length: Number.isFinite(segments) ? Math.min(closed ? segments : segments + 1, MAX_BRACKETS + 1) : MAX_BRACKETS + 1 },
+      (_, index) => startRad + index * stepRad,
+    ),
     segments,
     stepRad,
     closed,
