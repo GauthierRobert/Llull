@@ -53,7 +53,7 @@ describe('copy_level_elements and a platform', () => {
     const platformParts = Object.values(result.document.building?.elements ?? {}).filter(
       (element) => 'assemblyId' in element && element.assemblyId !== undefined,
     );
-    expect(platformParts.every((part) => (part as { levelId?: string }).levelId === grade)).toBe(true);
+    expect(platformParts.every((part) => 'levelId' in part && part.levelId === grade)).toBe(true);
     // deleting the platform on the source level leaves the copied slab alone
     const removed = apply(result.document, 'delete_building_element', { elementIds: ['assembly-1'] });
     expect(Object.keys(removed.building?.elements ?? {}).sort()).toEqual(['slab-1', 'slab-2']);

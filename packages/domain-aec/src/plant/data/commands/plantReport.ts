@@ -6,7 +6,7 @@ import { buildReport } from '../plantReports/build';
 import { csvFile, xlsxFile, xlsxSheetOf, type DataFile } from '../plantReports/files';
 import { applyDefinition } from '../plantReports/definition';
 import { MTO_DIMENSIONS, type MtoDimension } from '../plantReports/mto';
-import { getPlantData } from '../model';
+import { getPlantData, own } from '../model';
 import { REPORT_KINDS, type ReportRow } from '../plantReports/types';
 import { refuse } from './params';
 
@@ -74,7 +74,7 @@ export const plantReport = defineCommand({
       const gated = exportRefusal(doc, 'plant_report', 'data', params.confirmExportControlled, ctx);
       if (gated !== null) return gated;
     }
-    const definition = params.definition === undefined ? undefined : getPlantData(doc).reports?.[params.definition];
+    const definition = params.definition === undefined ? undefined : own(getPlantData(doc).reports, params.definition);
     if (params.definition !== undefined && definition === undefined)
       return refuse(doc, 'plant_report', {
         code: 'DAT_PARAM_INVALID',

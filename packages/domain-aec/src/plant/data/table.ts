@@ -6,7 +6,7 @@
 import type { CadDocument } from '@core/model/types';
 import { concreteDescendants, isKindOf, resolvedOrNull } from './classes';
 import { pathOf, resolveNode, subtreeIds } from './hierarchy';
-import { getPlantData, type PlantObject, type PlantValue, type PropertyDefinition } from './model';
+import { getPlantData, type PlantObject, type PlantValue, type PropertyDefinition, own } from './model';
 import { naturalCompare } from './naturalSort';
 import { elementOf } from './providers';
 
@@ -78,7 +78,7 @@ const compareValues = (a: PlantValue | undefined, b: PlantValue | undefined): nu
 
 export function buildDataTable(doc: CadDocument, query: TableQuery): TableResult {
   const data = getPlantData(doc);
-  if (query.className !== undefined && data.classes[query.className] === undefined)
+  if (query.className !== undefined && own(data.classes, query.className) === undefined)
     return {
       ok: false,
       code: 'DAT_CLASS_UNKNOWN',
