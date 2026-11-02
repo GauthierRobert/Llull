@@ -113,7 +113,7 @@ describe('export_dexpi: command contract', () => {
   it('refuses a document without a P&ID, an unknown sheet, and a version it does not write', () => {
     expectRefusal(createEmptyDocument(), 'export_dexpi', { version: '1.3' }, 'PID_SHEET_NOT_FOUND');
     expectRefusal(importFile(C01), 'export_dexpi', { version: '1.3', sheets: ['PID-9'] }, 'PID_SHEET_NOT_FOUND', 'sheets');
-    const result = execute(importFile(C01), 'export_dexpi', { version: '2.0' });
+    const result = execute(importFile(C01), 'export_dexpi', { version: '1.4' });
     expect(result.rejected).toBe(true);
     expect(result.summary).toMatch(/invalid params/);
   });

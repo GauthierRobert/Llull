@@ -8,7 +8,7 @@ import { parseDn, parseNps } from '@aec/plant/catalog/nominal';
 import { parseCatalogFile } from '@aec/plant/catalog/file';
 import { parseTagFormat } from '@aec/plant/data/tagFormat';
 import { readPcf } from '@aec/plant/fabrication/pcf/pcfRead';
-import { readProteus } from '@aec/plant/pid/dexpi/proteusRead';
+import { readDexpi } from '@aec/plant/pid/dexpi/proteusRead';
 import { parseTag } from '@aec/plant/pid/tags/parseTag';
 import { parseLineNumber } from '@aec/plant/piping/lineNumber';
 import { parseSpecFile } from '@aec/plant/spec/file';
@@ -95,13 +95,13 @@ const STEP_TAIL = 'ENDSEC;\nEND-ISO-10303-21;\n';
 
 export const AEC_READERS: readonly HostileReader[] = [
   {
-    name: 'plant: readProteus (DEXPI 1.3 Proteus XML)',
-    covers: ['domain-aec/src/plant/pid/dexpi/proteusRead.ts:readProteus'],
+    name: 'plant: readDexpi (DEXPI 1.3 Proteus and 2.0 XML)',
+    covers: ['domain-aec/src/plant/pid/dexpi/proteusRead.ts:readDexpi'],
     input: 'text',
     build: proteusBuild,
     nest: proteusNest,
     extra: proteusExtras,
-    read: (input) => readProteus(asText(input), 'pid-1.1', 'auto'),
+    read: (input) => readDexpi(asText(input), 'pid-1.1', 'auto'),
     accepts: (result) => (result as { ok: boolean }).ok,
   },
   {

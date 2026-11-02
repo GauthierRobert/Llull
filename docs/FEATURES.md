@@ -866,9 +866,9 @@
 | `check_pid_3d` | Compare the P&ID (doc.plant.pid) with the 3D plant model, read-only. | read-only |
 | `create_pid_sheet` | Create a P&ID sheet (doc.plant.pid) to draw on: the first step of any P&ID. |  |
 | `delete_pid_item` | Delete a P&ID item (equipment, nozzle, line, inline component, instrument, signal, actuating system, off-page connector, loop) by tag or id, with what depends … |  |
-| `export_dexpi` | Export the P&ID of the document (doc.plant.pid) as DEXPI 1.3 Proteus XML (root <PlantModel>, SchemaVersion 4.1.1, Units mm), read-only, deterministic: the same… | read-only |
+| `export_dexpi` | Export the P&ID of the document (doc.plant.pid) as DEXPI XML, read-only, deterministic (the same document gives the same bytes): version 1.3 = Proteus XML (roo… | read-only |
 | `export_pid_svg` | Draw a P&ID sheet (doc.plant.pid) as SVG, read-only and deterministic: paper frame and title block (sheet number, title, revision, status, convention), then on… | read-only |
-| `import_dexpi` | Import a DEXPI 1.3 P&ID (Proteus XML, root <PlantModel>, PlantInformation SchemaVersion 4.1.x) as a new P&ID sheet of the document (doc.plant.pid). |  |
+| `import_dexpi` | Import a DEXPI P&ID as a new P&ID sheet of the document (doc.plant.pid): DEXPI 1.3 (Proteus XML, root <PlantModel>, PlantInformation SchemaVersion 4.1.x) or DE… |  |
 | `link_pid_item` | Pair a P&ID item with a 3D object explicitly, or clear the pair (element null). |  |
 | `list_pid_symbols` | List the built-in P&ID symbols that export_pid_svg draws (read-only): equipment classes (Tank, CentrifugalPump, PlateHeatExchanger ...), piping components (Bal… | read-only |
 | `parse_instrument_tag` | Decode an instrument tag with the ISA 5.1 letter table, read-only (no P&ID needed). | read-only |

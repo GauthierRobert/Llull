@@ -6,7 +6,9 @@ export const DEXPI_REMEDIATION: Readonly<Record<string, string>> = {
   DEXPI_PARSE_ERROR:
     'Fix or re-export the file: it must be well-formed UTF-8 XML without a DOCTYPE, at most 50 MB; the position is in paths ("line N, column M").',
   DEXPI_VERSION_UNSUPPORTED:
-    'Export DEXPI 1.3 (Proteus 4.1.x, root PlantModel) from the source tool; 1.2, 1.4 and 2.0 arrive with later milestones.',
+    'Export DEXPI 1.3 (Proteus 4.1.x, root PlantModel) or DEXPI 2.x (root Model importing .../models/2.x.y/Plant.xml) from the source tool; 1.2 and 1.4 are not read.',
+  DEXPI_SCHEMA_VIOLATION:
+    'The 2.0 file breaks a rule of DEXPI_XML_Schema.xsd (the position is in paths); the data that could be read was imported. Fix the exporter of the source tool.',
   DEXPI_DANGLING_REFERENCE: 'Check the source file: the name of the missing object is in the message; the end was imported as a free end.',
   DEXPI_UNMAPPED_CLASS: 'Nothing to fix if the class is intended: the item was imported as Custom with its class kept in passthrough.',
   DEXPI_GRAPHICS_DROPPED: 'Nothing to fix: the data is intact; the drawing is simplified (symbols come from the llull library).',
