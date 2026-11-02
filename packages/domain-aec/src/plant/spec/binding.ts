@@ -76,6 +76,8 @@ export function bindPipe(doc: CadDocument, command: string, request: BindRequest
       : [{ code: 'PSC_DATA_UNVERIFIED', message: `unverified dimensions: ${resolved.unverifiedDims.join(', ') || 'no catalogue row'}` }]),
   ];
   const dnKey = keyIn(resolved.size, 'DN');
+  const specSystem = spec.sizeRange.from.system;
+  const specKey = keyIn(resolved.size, specSystem);
   return {
     spec,
     dn: dnKey === null ? null : Number(dnKey),
@@ -83,7 +85,8 @@ export function bindPipe(doc: CadDocument, command: string, request: BindRequest
     binding: {
       specId: spec.id,
       revision: spec.revision,
-      nps: keyIn(resolved.size, 'NPS') ?? resolved.size.key,
+      nps: specKey ?? resolved.size.key,
+      sizeSystem: specKey === null ? resolved.size.system : specSystem,
       ...(resolved.schedule === undefined ? {} : { schedule: resolved.schedule }),
       odMm: od,
       wallMm: wall,

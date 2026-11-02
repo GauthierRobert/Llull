@@ -23,6 +23,10 @@ export const inRange = (size: NominalSize, from: NominalSize, to: NominalSize): 
 export const rangesOverlap = (aFrom: NominalSize, aTo: NominalSize, bFrom: NominalSize, bTo: NominalSize): boolean =>
   sizeOrdinal(aFrom) <= sizeOrdinal(bTo) + 1e-9 && sizeOrdinal(bFrom) <= sizeOrdinal(aTo) + 1e-9;
 
+/** The query (`nps` or `dn`) a pipe binding stands for. */
+export const bindingQuery = (binding: { readonly nps: string; readonly sizeSystem: 'NPS' | 'DN' }): { nps: string } | { dn: string } =>
+  binding.sizeSystem === 'DN' ? { dn: binding.nps } : { nps: binding.nps };
+
 export interface QuerySize {
   readonly nps?: string | number | undefined;
   readonly dn?: string | number | undefined;

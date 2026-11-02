@@ -7,6 +7,7 @@ import type { PipeElement } from '../../../building/types';
 import { commitBuilding } from '../../../building/evaluate/evaluateElements';
 import { elementsOf, getBuilding, withElement } from '../../../building/model';
 import { refuse } from '../../catalog/codes';
+import { bindingQuery } from '../size';
 import { bindPipe, isBound, type Bound } from '../binding';
 
 const PIPE_ID_PATTERN = /^[\w.-]+$/;
@@ -57,7 +58,8 @@ export const assignPipeSpec = defineCommand({
       );
     const bound: Array<{ pipe: PipeElement; bound: Bound }> = [];
     for (const pipe of pipes) {
-      const size = nps !== undefined || dn !== undefined ? { nps, dn } : pipe.spec !== undefined ? { nps: pipe.spec.nps } : { dn: pipe.dn };
+      const size: { nps?: string | number | undefined; dn?: string | number | undefined } =
+        nps !== undefined || dn !== undefined ? { nps, dn } : pipe.spec !== undefined ? bindingQuery(pipe.spec) : { dn: pipe.dn };
       if (size.nps === undefined && size.dn === undefined)
         return fail('PSC_SIZE_UNKNOWN', `pipe ${pipe.id} has no binding and no dn: give nps or dn`, [pipe.id], ['nps']);
       const outcome = bindPipe(doc, 'assign_pipe_spec', { specId, revision, schedule, ...size });
@@ -74,7 +76,7 @@ export const assignPipeSpec = defineCommand({
     }
     const warnings = [...new Map(bound.flatMap(({ bound: result }) => result.warnings).map((entry) => [entry.code, entry])).values()];
     const first = (bound[0] as (typeof bound)[number]).bound;
-    return commitBuilding(
+    const committed = commitBuilding(
       doc,
       edited,
       pipes.map((pipe) => pipe.id),
@@ -98,5 +100,7 @@ export const assignPipeSpec = defineCommand({
         ...(warnings.length === 0 ? {} : { warnings }),
       },
     );
+    // The revision the run resolved is replayed as given, so regeneration never depends on which revisions were approved at that moment.
+    return { ...committed, recordExtras: { revision: first.spec.revision } };
   },
 });

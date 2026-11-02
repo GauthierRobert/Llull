@@ -35,12 +35,13 @@ const mm = (doc: CadDocument, id: string): number =>
   (pipeOf(doc, id)?.diameter ?? 0) * (doc.units === 'm' ? 1000 : doc.units === 'cm' ? 10 : 1);
 
 /** A port whose signatures are `{ payload, nonce }` and verify only for that exact payload; `spend` refuses a second use. */
-function portFor(): HumanSignaturePort & { verify: ReturnType<typeof vi.fn> } {
+function portFor(): HumanSignaturePort & { verify: ReturnType<typeof vi.fn>; spend: ReturnType<typeof vi.fn> } {
   const spent = new Set<string>();
   const verify = vi.fn((signature: unknown, payload: string) =>
     (signature as { payload?: string }).payload === payload ? { signer: 'alice', signatureId: `sig-${payload.slice(0, 6)}` } : null,
   );
-  return { verify, spend: (signature: unknown) => !spent.has(JSON.stringify(signature)) && (spent.add(JSON.stringify(signature)), true) };
+  const spend = vi.fn((signature: unknown) => !spent.has(JSON.stringify(signature)) && (spent.add(JSON.stringify(signature)), true));
+  return { verify, spend };
 }
 const ctxWith = (humanSignature: HumanSignaturePort | null): ExecutionContext => ({ ...defaultContext(), humanSignature });
 
@@ -171,18 +172,16 @@ describe('approve_pipe_spec human gate (VC-PSC-16)', () => {
     expectRefusalWith(edited, { ...params, confirmation: signature }, 'PSC_HUMAN_GATE');
   });
 
-  it('a signature is spent once', () => {
+  it('a signature is spent once: the same signature on the same unchanged draft is refused the second time', () => {
     const port = portFor();
     const signature = signApproval(doc, 'CS150-A1');
     const first = execute(doc, 'approve_pipe_spec', { ...params, confirmation: signature }, ctxWith(port));
     expect(first.error).toBeUndefined();
-    const replayed = execute(
-      apply(doc, 'edit_pipe_spec', { specId: 'CS150-A1', ops: [{ op: 'setHeader', fields: { title: 'x' } }] }),
-      'approve_pipe_spec',
-      { ...params, confirmation: signature },
-      ctxWith(port),
-    );
-    expect(replayed.error?.code).toBe('PSC_HUMAN_GATE');
+    const second = execute(doc, 'approve_pipe_spec', { ...params, confirmation: signature }, ctxWith(port));
+    expect(second.error?.code, second.summary).toBe('PSC_HUMAN_GATE');
+    expect(second.document).toBe(doc);
+    expect(port.verify).toHaveBeenCalledTimes(2);
+    expect(port.spend).toHaveBeenCalledTimes(2);
   });
 
   it('a spec with fail findings is refused PSC_SPEC_CHECK_FAILED before any signature is verified or spent', () => {
@@ -385,5 +384,130 @@ describe('a spec pipe without a wall', () => {
     };
     const bare = apply(apply(createEmptyDocument(), 'add_level', { name: 'Grade', elevation: 0 }), 'import_pipe_spec', { spec });
     expectRefusal(bare, 'add_pipe_run', { points: ROUTE, spec: 'MIX-1', dn: 50 }, 'PSC_CATALOG_ROW_MISSING');
+  });
+});
+
+describe('replay and regeneration keep an approval', () => {
+  const approvedThenEdited = (): CadDocument => {
+    const routed = execute(base(), 'add_pipe_run', { points: ROUTE, dn: 65, line: 'P-1' });
+    const approved = approve(routed.document);
+    const assigned = execute(approved, 'assign_pipe_spec', { pipeId: routed.affected[0], specId: 'CS150-A1' }).document;
+    const edited = apply(assigned, 'edit_pipe_spec', { specId: 'CS150-A1', ops: [{ op: 'setHeader', fields: { title: 'rev 2' } }] });
+    return execute(edited, 'assign_pipe_spec', { pipeId: routed.affected[0], specId: 'CS150-A1' }).document;
+  };
+  const statuses = (doc: CadDocument): string[][] => getRevisions(doc);
+
+  it('the history records confirmation { verified: true } and the step is a no-signature replay of the same approval', () => {
+    const doc = approvedThenEdited();
+    expect(doc.featureHistory.find((step) => step.name === 'approve_pipe_spec')?.params).toMatchObject({
+      confirmation: { verified: true },
+    });
+    expect(statuses(doc)).toEqual([
+      ['1', 'approved'],
+      ['2', 'draft'],
+    ]);
+    const replayed = execute(doc, 'replay_history', {}).document;
+    expect(statuses(replayed)).toEqual(statuses(doc));
+    expect(latestSpec(replayed, 'CS150-A1')?.revision).toBe(2);
+    expect(replayed.plant?.spec?.specs['CS150-A1']?.[0]?.approval).toEqual(doc.plant?.spec?.specs['CS150-A1']?.[0]?.approval);
+    // the assign after the edit bound the newest approved revision (1), not the draft: replay keeps that
+    const bound = elementsOf(getBuilding(replayed), 'pipe')[0]?.spec;
+    expect(bound?.revision).toBe(1);
+    expect(bound).toEqual(elementsOf(getBuilding(doc), 'pipe')[0]?.spec);
+  });
+
+  it('a recorded confirmation never approves content no human approved (a forged { verified: true } is refused)', () => {
+    const fresh = base();
+    const forged = execute(
+      fresh,
+      'approve_pipe_spec',
+      { specId: 'CS150-A1', at: AT, confirmation: { verified: true } },
+      ctxWith(portFor()),
+    );
+    expect(forged.error?.code).toBe('PSC_HUMAN_GATE');
+    const approved = approve(fresh);
+    const changed = apply(approved, 'edit_pipe_spec', { specId: 'CS150-A1', ops: [{ op: 'setHeader', fields: { title: 'new content' } }] });
+    const again = execute(
+      changed,
+      'approve_pipe_spec',
+      { specId: 'CS150-A1', at: AT, confirmation: { verified: true } },
+      ctxWith(portFor()),
+    );
+    expect(again.error?.code).toBe('PSC_HUMAN_GATE');
+  });
+
+  it('the approval ledger is saved and loaded, and a malformed ledger is rejected on load', () => {
+    const doc = approve(base());
+    expect(deserializeDocument(serializeDocument(doc)).plant?.spec?.approvals).toEqual(doc.plant?.spec?.approvals);
+    const broken = JSON.parse(serializeDocument(doc)) as { document: { plant: { spec: { approvals: unknown } } } };
+    broken.document.plant.spec.approvals = [{ specId: 'CS150-A1' }];
+    expect(() => deserializeDocument(JSON.stringify(broken))).toThrow();
+  });
+});
+
+describe('a DN with no NPS pairing', () => {
+  it('binds in the DN system and the sweep (no size) re-reads it as a DN', () => {
+    const catalog = {
+      format: 'llull-piping-catalog',
+      schemaVersion: 1,
+      id: 'user-pipes',
+      licence: 'company-proprietary',
+      families: [
+        {
+          id: 'p',
+          type: 'pipe',
+          standard: 'EN 10220',
+          unit: 'mm',
+          sizes: [{ dn: 175, outsideDiameter: 190, wall: 5, schedule: 'S', provenance: { citation: 'company table' } }],
+        },
+      ],
+    };
+    const spec = {
+      format: 'llull-pipe-spec',
+      schemaVersion: 1,
+      id: 'CO-1',
+      dimensionalStandard: 'company',
+      rating: { system: 'EN 1092-1', pn: 16 },
+      corrosionAllowance: { value: 1, unit: 'mm' },
+      sizeRange: { fromDn: 150, toDn: 200 },
+      catalogs: ['user-pipes'],
+      components: [{ id: 'P', type: 'pipe', fromDn: 150, toDn: 200, catalogRef: 'p', schedule: 'S' }],
+    };
+    let doc = apply(createEmptyDocument(), 'add_level', { name: 'Grade', elevation: 0 });
+    doc = apply(apply(doc, 'import_piping_catalog', { catalog }), 'import_pipe_spec', { spec });
+    const routed = execute(doc, 'add_pipe_run', { points: ROUTE, spec: 'CO-1', dn: 175 });
+    expect(routed.error, routed.summary).toBeUndefined();
+    const id = routed.affected[0] as string;
+    expect(pipeOf(routed.document, id)?.spec).toMatchObject({ nps: '175', sizeSystem: 'DN', odMm: 190 });
+    expect(pipeOf(routed.document, id)?.dn).toBe(175);
+    const swept = execute(routed.document, 'assign_pipe_spec', { pipeId: id, specId: 'CO-1' });
+    expect(swept.error, swept.summary).toBeUndefined();
+    expect(pipeOf(swept.document, id)?.spec).toMatchObject({ nps: '175', sizeSystem: 'DN', odMm: 190 });
+    expect(
+      data<{ issues: Array<{ code: string }> }>(swept.document, 'check_pipe_spec', { specId: 'CO-1', scope: 'document' }).issues.map(
+        (issue) => issue.code,
+      ),
+    ).not.toContain('PSC_PIPE_SPEC_MISMATCH');
+  });
+});
+
+describe('add_pipe_run spec parameter combinations', () => {
+  it('names the problem: nps and dn together, a diameter that contradicts the spec, nps without a spec', () => {
+    const both = execute(base(), 'add_pipe_run', { points: ROUTE, spec: 'CS150-A1', nps: 2.5, dn: 65 });
+    expect(both.summary).toContain('nps or dn with spec, not both');
+    const wrong = expectRefusal(
+      base(),
+      'add_pipe_run',
+      { points: ROUTE, spec: 'CS150-A1', nps: 2.5, diameter: 76.1 },
+      'PSC_PIPE_SPEC_MISMATCH',
+    );
+    expect(wrong.error?.paths).toEqual(['diameter']);
+    const bare = execute(base(), 'add_pipe_run', { points: ROUTE, nps: 2.5 });
+    expect(bare.summary).toContain('nps needs spec');
+  });
+
+  it('records the revision it bound, so a replay binds the same one', () => {
+    const result = execute(base(), 'add_pipe_run', { points: ROUTE, spec: 'CS150-A1', nps: 2.5 });
+    expect(result.document.featureHistory.at(-1)?.params).toMatchObject({ revision: 1 });
   });
 });

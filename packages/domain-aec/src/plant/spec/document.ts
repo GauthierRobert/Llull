@@ -55,5 +55,17 @@ export function pipeSpecErrors(raw: unknown): string[] {
   const order = raw['specOrder'] as unknown[];
   const orderErrors =
     order.length === ids.length && ids.every((id) => order.includes(id)) ? [] : ['plant.spec.specOrder must list every spec id once'];
-  return [...orderErrors, ...ids.flatMap((id) => specErrors(id, (raw['specs'] as Record<string, unknown>)[id]))];
+  const approvals = raw['approvals'];
+  const ledgerErrors =
+    approvals === undefined ||
+    (Array.isArray(approvals) &&
+      approvals.every(
+        (entry: unknown) =>
+          isRecord(entry) &&
+          ['specId', 'signer', 'signatureId', 'at', 'contentSha256'].every((key) => typeof entry[key] === 'string') &&
+          Number.isInteger(entry['revision']),
+      ))
+      ? []
+      : ['plant.spec.approvals must be a list of { specId, revision, contentSha256, signer, signatureId, at }'];
+  return [...ledgerErrors, ...orderErrors, ...ids.flatMap((id) => specErrors(id, (raw['specs'] as Record<string, unknown>)[id]))];
 }

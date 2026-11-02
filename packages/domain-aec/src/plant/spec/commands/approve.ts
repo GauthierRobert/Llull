@@ -4,18 +4,31 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { humanGate } from '@core/model/humanGate';
+import { isRecord } from '@lib/isRecord';
 import { sha256Hex } from '@lib/sha256';
 import { elementsOf, getBuilding } from '../../../building/model';
 import { refuse } from '../../catalog/codes';
 import { checkSpec } from '../checks/run';
 import { canonicalSpecText } from '../file';
 import { findSpec, getSpecModel, withSpecModel } from '../store';
+import type { SpecApproval } from '../types';
+
+/** The recorded form of a confirmation (`withoutConfirmations`): exactly { verified: true }. */
+const isRecorded = (confirmation: unknown): boolean =>
+  isRecord(confirmation) && Object.keys(confirmation).length === 1 && confirmation['verified'] === true;
+
+const approvalOf = (outcome: { signer: string; signatureId: string; at: string }): SpecApproval => ({
+  signer: outcome.signer,
+  signatureId: outcome.signatureId,
+  at: outcome.at,
+});
 
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 /**
  * @affects plant.spec.specs[specId]: the revision becomes approved with approval { signer, signatureId, at }; earlier approved revisions become superseded
- * @invariant a human act: confirmation is a signature verified by the signing port over { act plant:approve_pipe_spec, specId, revision, sha256 of the canonical spec } and spent once; an agent, a bare true or a signature for other content never approves; check_pipe_spec fail items are refused before any signature is spent; pipes on older revisions are reported stale, not changed
+ * @invariant replay: the recorded step carries confirmation { verified: true } (the signature is never recorded); it is honoured only for content that a verified human approval in the document's approval ledger already covers (same spec, revision and content hash), so replay_history / regenerate re-apply a real approval and nothing else;
+ * a human act: confirmation is a signature verified by the signing port over { act plant:approve_pipe_spec, specId, revision, sha256 of the canonical spec } and spent once; an agent, a bare true or a signature for other content never approves; check_pipe_spec fail items are refused before any signature is spent; pipes on older revisions are reported stale, not changed
  * @failure unknown spec / revision -> PSC_SPEC_UNKNOWN; not a draft -> PSC_SPEC_INVALID; fail findings -> PSC_SPEC_CHECK_FAILED; no valid human signature -> PSC_HUMAN_GATE; the document is unchanged
  */
 export const approvePipeSpec = defineCommand({
@@ -81,10 +94,21 @@ export const approvePipeSpec = defineCommand({
         ['specId'],
       );
     const contentSha256 = sha256Hex(canonicalSpecText(spec));
-    const outcome = humanGate(ctx?.humanSignature ?? null, 'plant:approve_pipe_spec', [specId], confirmation, {
-      revision: spec.revision,
-      contentSha256,
-    });
+    const recorded = isRecorded(confirmation)
+      ? getSpecModel(doc).approvals?.find(
+          (entry) => entry.specId === specId && entry.revision === spec.revision && entry.contentSha256 === contentSha256,
+        )
+      : undefined;
+    const outcome: { cleared: true; signer: string; signatureId: string; at: string } | { cleared: false; reason: string } =
+      recorded !== undefined
+        ? { cleared: true, signer: recorded.signer, signatureId: recorded.signatureId, at: recorded.at }
+        : (() => {
+            const gate = humanGate(ctx?.humanSignature ?? null, 'plant:approve_pipe_spec', [specId], confirmation, {
+              revision: spec.revision,
+              contentSha256,
+            });
+            return gate.cleared ? { ...gate, at } : gate;
+          })();
     if (!outcome.cleared)
       return refuse(
         doc,
@@ -97,7 +121,7 @@ export const approvePipeSpec = defineCommand({
     const model = getSpecModel(doc);
     const revisions = model.specs[specId] ?? [];
     const superseded = revisions.filter((entry) => entry.status === 'approved').map((entry) => entry.revision);
-    const approved = { ...spec, status: 'approved' as const, approval: { signer: outcome.signer, signatureId: outcome.signatureId, at } };
+    const approved = { ...spec, status: 'approved' as const, approval: approvalOf(outcome) };
     const next = revisions.map((entry) =>
       entry.revision === spec.revision ? approved : entry.status === 'approved' ? { ...entry, status: 'superseded' as const } : entry,
     );
@@ -105,7 +129,15 @@ export const approvePipeSpec = defineCommand({
       .filter((pipe) => pipe.spec?.specId === specId && pipe.spec.revision !== spec.revision)
       .map((pipe) => pipe.id);
     return {
-      document: withSpecModel(doc, { ...model, specs: { ...model.specs, [specId]: next } }),
+      document: withSpecModel(doc, {
+        ...model,
+        specs: { ...model.specs, [specId]: next },
+        ...(recorded !== undefined
+          ? model.approvals === undefined
+            ? {}
+            : { approvals: model.approvals }
+          : { approvals: [...(model.approvals ?? []), { ...approvalOf(outcome), specId, revision: spec.revision, contentSha256 }] }),
+      }),
       summary: `approve_pipe_spec: spec ${specId} r${spec.revision} approved by ${outcome.signer} (signature ${outcome.signatureId})${superseded.length === 0 ? '' : `; superseded r${superseded.join(', r')}`}${stalePipes.length === 0 ? '' : `; ${stalePipes.length} pipe(s) on older revisions are stale (PSC_SPEC_REVISION_STALE): assign_pipe_spec`}.`,
       affected: [],
       data: {

@@ -138,7 +138,9 @@ export interface RatingTable {
 export interface SpecBinding {
   readonly specId: string;
   readonly revision: number;
+  /** The size key in `sizeSystem`: the NPS key ("2-1/2") or the DN ("100"); the spec system, the other one only where the pairing is undefined. */
   readonly nps: string;
+  readonly sizeSystem: 'NPS' | 'DN';
   readonly schedule?: string;
   readonly odMm: number;
   readonly wallMm: number;

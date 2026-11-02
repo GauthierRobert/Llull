@@ -103,7 +103,7 @@ export const addPipeRun = defineCommand({
     'taken from the EN 10220 / ASME B36.10 table (15…400); `diameter` overrides it. Bends are placed at every interior point. Pipe ' +
     'lengths feed the takeoff; the pipe schedule (building_schedule kind "pipe") is the line list; clashes are reported by ' +
     'check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. Refused if a pipe of the same ' +
-    'diameter already follows the same route (either direction) on the level. With `spec` (a piping spec id, see list_pipe_specs) and a size `nps` (or `dn`) `' +
+    'diameter already follows the same route (either direction) on the level. With `spec` (a piping spec id, see list_pipe_specs) and a size `nps` (or `dn`) ' +
     'the outside diameter, wall and schedule come from the spec pipe at that size (e.g. CS150-A1 NPS 2-1/2: 73.0 mm Sch 40, not the legacy table 76.1 mm), the pipe stores the spec binding, and data gains ' +
     'outsideDiameterMm, schedule and wallMm; the newest approved revision is used (the newest draft with a PSC_SPEC_NOT_APPROVED warning). Without `spec` the legacy DN table applies unchanged.',
   params: z.object({
@@ -122,6 +122,14 @@ export const addPipeRun = defineCommand({
       .min(1)
       .optional()
       .describe('Piping spec id (list_pipe_specs): OD, wall and schedule come from its pipe component at the size. Needs nps or dn.'),
+    revision: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Spec revision to bind. Default: the newest approved revision (the newest draft when none is approved); recorded so a replay binds the same one.',
+      ),
     nps: z
       .union([z.string(), z.number()])
       .optional()
@@ -142,7 +150,7 @@ export const addPipeRun = defineCommand({
       .optional()
       .describe('Set by commit_asbuilt_extraction: marks the run as scan-derived (as-built). Do not set it by hand.'),
   }),
-  run: (doc, { points, diameter, dn, spec, nps, line, from, to, service, material, levelId, asBuilt }): CommandResult => {
+  run: (doc, { points, diameter, dn, spec, revision, nps, line, from, to, service, material, levelId, asBuilt }): CommandResult => {
     const path = routeOrFailure('add_pipe_run', points, 'line');
     if (typeof path === 'string') return noop(doc, path);
     if (spec === undefined && dn !== undefined && !(Number.isInteger(dn) && dn > 0))
@@ -152,7 +160,7 @@ export const addPipeRun = defineCommand({
     let bound: Bound | undefined;
     if (spec !== undefined) {
       if (nps !== undefined && dn !== undefined) return noop(doc, 'add_pipe_run failed: give nps or dn with spec, not both.');
-      const outcome = bindPipe(doc, 'add_pipe_run', { specId: spec, nps, dn });
+      const outcome = bindPipe(doc, 'add_pipe_run', { specId: spec, revision, nps, dn });
       if (!isBound(outcome)) return outcome;
       if (diameter !== undefined && Math.abs(diameter - fromMm(doc, outcome.binding.odMm)) > fromMm(doc, 0.05))
         return refuse(
@@ -205,7 +213,7 @@ export const addPipeRun = defineCommand({
     const length = routeLength(path);
     const label = `${lineNumber !== undefined ? ` line ${lineNumber}` : ''}${pipeDn !== null ? ` DN${pipeDn}` : ''}${bound === undefined ? '' : ` spec ${bound.binding.specId} r${bound.binding.revision} NPS ${bound.binding.nps} sch ${bound.binding.schedule ?? '-'} wall ${bound.binding.wallMm} mm${bound.warnings.length === 0 ? '' : ` (${bound.warnings.map((entry) => entry.code).join(', ')})`}`}`;
     const ends = origin !== undefined || destination !== undefined;
-    return commitBuilding(
+    const committed = commitBuilding(
       doc,
       withElement(resolution.building, pipe),
       [pipe.id],
@@ -227,5 +235,7 @@ export const addPipeRun = defineCommand({
             }),
       },
     );
+    // The revision the run resolved is replayed as given, so regeneration never depends on which revisions were approved at that moment.
+    return bound === undefined ? committed : { ...committed, recordExtras: { revision: bound.binding.revision } };
   },
 });

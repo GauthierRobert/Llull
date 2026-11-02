@@ -15,12 +15,15 @@ export interface HostIdentity {
 
 const FILLED = ['at', 'by'] as const;
 
+/** Human-gated acts outside the plm toolset that stamp the time of the act (`at`): the host fills it, exactly like a plm act. Other plant gates (issue_isometric, review issues) carry no time stamp. */
+const HOST_STAMPED: ReadonlySet<string> = new Set(['approve_pipe_spec']);
+
 /** ISO-8601 UTC without milliseconds, e.g. 2026-11-02T09:30:00Z. */
 export const isoSeconds = (date: Date): string => `${date.toISOString().slice(0, 19)}Z`;
 
 function fillCommand(name: string, params: unknown, host: HostIdentity): unknown {
-  // Only the plm toolset: other commands declare their own `at` / `by` params (add_door, edit_nurbs, ...).
-  if (toolsetOf(name) !== 'plm') return params;
+  // Only the plm toolset and the named stamped gates: other commands declare their own `at` / `by` params (add_door, edit_nurbs, ...).
+  if (toolsetOf(name) !== 'plm' && !HOST_STAMPED.has(name)) return params;
   const properties = getCommand(name)?.paramsSchema.properties;
   if (properties === undefined || !FILLED.some((key) => key in properties)) return params;
   const filled: Record<string, unknown> = { ...(isRecord(params) ? params : {}) };
