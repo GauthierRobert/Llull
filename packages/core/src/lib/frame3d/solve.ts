@@ -11,6 +11,8 @@ const PIVOT_TOLERANCE = 1e-12;
 const DEFAULT_MAX_PROFILE = 5e7;
 const INT32_LIMIT = 2 ** 31 - 1;
 const REFINEMENTS = 3;
+/** Backstop for a near-mechanism that passes the pivot test: ||sqrt(K_ii) u|| / ||r / sqrt(K_ii)|| above this (about 1 / smallest scaled eigenvalue) is reported unstable. */
+const MECHANISM_RATIO = 1e9;
 
 interface Numbering {
   /** Free-equation index per global DOF (6 per node), -1 for a rigidly restrained DOF. */
@@ -98,7 +100,8 @@ function solveCase(
   numbering: Numbering,
   sky: Skyline,
   loadCase: FrameLoadCase,
-): FrameCaseResult {
+  diagonal: Float64Array,
+): FrameCaseResult | FrameDof {
   const dofCount = model.nodes.length * 6;
   const { equation } = numbering;
   const applied = new Float64Array(dofCount);
@@ -202,6 +205,24 @@ function solveCase(
     else if (spring > 0) reactions[dof] = -spring * ((displacements[dof] as number) - (prescribed[dof] as number));
   }
   const scaleNorm = Math.max(loadNorm, norm(reduced));
+  // backstop in the Jacobi-scaled system (y = sqrt(K_ii) u, f = r / sqrt(K_ii)): ||y|| / ||f|| is about 1 / lambda_min of the scaled matrix, so a
+  // near-mechanism that slipped past the pivot test shows as a huge ratio while a stiff link next to a soft span (well conditioned once scaled) does not
+  let scaledU = 0;
+  let scaledF = 0;
+  let worst = -1;
+  let worstSize = -1;
+  for (let eq = 0; eq < sky.size; eq++) {
+    const dof = numbering.dofOf[eq] as number;
+    const k = diagonal[dof] as number;
+    const size = k * (displacements[dof] as number) ** 2;
+    scaledU += size;
+    scaledF += (reduced[dof] as number) ** 2 / k;
+    if (!(size <= worstSize)) {
+      worstSize = size;
+      worst = dof;
+    }
+  }
+  if (worst >= 0 && !(scaledU <= MECHANISM_RATIO ** 2 * scaledF || (scaledF === 0 && Number.isFinite(scaledU)))) return toFailureDof(worst);
   const residualSquares = norm(outOfBalance(internal, displacements)) ** 2;
   return {
     name: loadCase.name,
@@ -272,6 +293,10 @@ export function analyzeFrame(
     if (r.stiffness !== undefined && eq >= 0) sky.add(eq, eq, r.stiffness);
   }
   const stats = { nodes: model.nodes.length, dofs: model.nodes.length * 6, freeDofs: size, bandwidth: sky.bandwidth, profile: sky.profile };
+  const diagonal = new Float64Array(model.nodes.length * 6);
+  for (let eq = 0; eq < size; eq++) {
+    diagonal[numbering.dofOf[eq] as number] = sky.values[(sky.offset[eq] as number) + eq - (sky.first[eq] as number)] as number;
+  }
   const bad = sky.factorize(PIVOT_TOLERANCE);
   if (bad >= 0) {
     const dof = toFailureDof(numbering.dofOf[bad] as number);
@@ -282,5 +307,18 @@ export function analyzeFrame(
       dofs: [dof],
     };
   }
-  return { ok: true, cases: cases.map((loadCase) => solveCase(model, prepared, numbering, sky, loadCase)), stats };
+  const solved: FrameCaseResult[] = [];
+  for (const loadCase of cases) {
+    const result = solveCase(model, prepared, numbering, sky, loadCase, diagonal);
+    if ('node' in result) {
+      return {
+        ok: false,
+        code: 'FRAME_UNSTABLE',
+        message: `load case ${loadCase.name}: displacement at node ${result.node} dof ${result.dof} is out of all proportion to the load (near-mechanism or non-finite solve)`,
+        dofs: [result],
+      };
+    }
+    solved.push(result);
+  }
+  return { ok: true, cases: solved, stats };
 }

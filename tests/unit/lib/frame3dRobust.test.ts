@@ -387,3 +387,28 @@ describe('review round 1: size cap, scaling, residual, bend guard, up threshold'
     expect(Math.abs(tip([1, 0.01, 0]) / tip([0, 0, 1]) - 1)).toBeLessThan(1e-12);
   });
 });
+
+describe('near-mechanism backstop (PST-M3)', () => {
+  const KSOFT = 0.1;
+  const KFIRM = 1e3;
+  const pinned: FrameRestraint[] = [0, 1, 2, 4, 5].map((dof) => ({ node: 0, dof }));
+  const torque: FrameLoadCase = { name: 'T', nodal: [{ node: 1, moment: [1000, 0, 0] }] };
+  const withSpring = (stiffness: number): FrameModel => ({ ...beam, restraints: [...pinned, { node: 0, dof: 3, stiffness }] });
+
+  it('a torsion spring 1e-10 of the element torsion stiffness passes the pivot test but is reported FRAME_UNSTABLE', () => {
+    const result = failure(analyzeFrame(withSpring(KSOFT), [torque]));
+    expect(result.code).toBe('FRAME_UNSTABLE');
+    expect(result.message).toMatch(/out of all proportion/);
+    expect(result.dofs).toHaveLength(1);
+  });
+
+  it('a firm but soft torsion spring (1e-6 of the stiffness) is a legitimate support and solves', () => {
+    const result = analyzeFrame(withSpring(KFIRM), [torque]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('a non-finite load is never solved (typed failure, no NaN result)', () => {
+    const result = analyzeFrame(beam, [{ name: 'bad', nodal: [{ node: 1, force: [Number.NaN, 0, 0] }] }]);
+    expect(result.ok).toBe(false);
+  });
+});
