@@ -62,7 +62,7 @@ function portPset(context: Context, port: Port, dn: number | undefined): void {
   ]);
 }
 
-/** One IfcDistributionPort placed at `point` (mm, relative to the storey); `axis` (unit vector) is the local Z of its placement when given. */
+/** One IfcDistributionPort placed at `point` (mm, relative to the storey placement, for pipe and equipment nozzle ports alike); `axis` (unit vector) is the local Z of its placement when given. */
 export function addPort(
   context: Context,
   state: PortState,

@@ -2,7 +2,7 @@
  * Plan representation of equipment nozzles (03 EQP §6, README D3): per nozzle, the neck axis from the point on the wall to the flange face as a line,
  * the flange as a short line across the neck (or, for a nozzle that points up or down, a circle of the flange outside diameter), and the mark as text
  * at the flange. Positions are the same as the 3D ports (`placeNozzle`, equipment frame turned by the plan angle about the location).
- * @invariant pure; one group per nozzle, in nozzle order; a nozzle without a placement draws nothing
+ * @invariant pure; draws ALL nozzles of the equipment (no cut-plane filter: a nozzle above or below the plan cut is shown); one group per nozzle, in nozzle order; a nozzle without a placement draws nothing
  */
 
 import type { DrawingPrimitive } from '@core/model/drawing';

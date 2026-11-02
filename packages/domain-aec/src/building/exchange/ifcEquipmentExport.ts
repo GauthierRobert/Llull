@@ -5,6 +5,9 @@
  * equipment) nested in the product (IfcRelNests). The profile of a revolved part is an IfcIndexedPolyCurve: lines and circular arcs stay exact
  * (IfcLineIndex, IfcArcIndex); the ellipsoidal head offset and cubic Bézier pieces have no IFC curve there and are written as sampled polylines (the reason
  * is stated in the `BodyRepresentation` property). A part that cannot be written is a warning, never silently omitted.
+ * Placements are storey-relative like the pipe ports of `ifcPorts`: the port origin is the world position minus the level elevation (mm); the body is in the frame of the
+ * product placement (plan location at the storey, plan angle). Sampling: ellipse quarter 64 chords (sagitta <= 7.7e-5 x the larger semi-axis, 0.06 mm on a 750 mm head),
+ * Bezier offset pieces 4 chords per 7.5 degrees (<= 1.4e-4 x the local radius).
  * @invariant pure; GlobalId seeds `<equipment id>:nozzle:<mark>`, `<equipment id>:nozzle-ports:nests`
  */
 
@@ -34,7 +37,7 @@ export interface EquipmentBody {
 }
 
 const BODY_NOTE =
-  'IfcRevolvedAreaSolid per revolved part; lines and circular arcs exact (IfcIndexedPolyCurve), the ellipsoidal head offset and Bezier pieces sampled as polylines (no elliptic arc in IfcIndexedPolyCurve)';
+  'IfcRevolvedAreaSolid per revolved part; lines and circular arcs exact (IfcIndexedPolyCurve), the ellipsoidal head offset and Bezier pieces sampled as polylines (no elliptic arc in IfcIndexedPolyCurve): chord sagitta <= 7.7e-5 x the larger semi-axis (ellipse, 64 chords per quarter) and <= 1.4e-4 x the local radius (Bezier, 4 chords per 7.5 degrees)';
 
 const SAMPLES: Readonly<Record<'ellipse' | 'bezier', number>> = { ellipse: 64, bezier: 4 };
 const CLOSE_TOLERANCE = 1e-9;

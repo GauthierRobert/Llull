@@ -34,20 +34,26 @@ const NOZZLE_COLUMNS = [
   'flangeSource',
 ] as const;
 
-/** Unit of a value from the suffix of its key (`emptyKg`, `totalVolumeM3`, `mawpMPa`, `insideDiameterMm`). */
-const UNIT_SUFFIXES: ReadonlyArray<readonly [RegExp, string]> = [
-  [/KgM3$/, 'kg/m3'],
-  [/Kg$/, 'kg'],
-  [/M3$/, 'm3'],
-  [/M2$/, 'm2'],
-  [/Mm$/, 'mm'],
-  [/MPa$/, 'MPa'],
-  [/Deg$/, 'deg'],
-  [/C$/, 'degC'],
-  [/(?:^|[A-Za-z])_m$|[a-z]M$/, 'm'],
-];
-const unitOfKey = (key: string): string | null =>
-  UNIT_SUFFIXES.find(([pattern]) => pattern.test(key))?.[1] ?? (key === 'percent' ? '%' : null);
+/** Keys whose unit is not a camelCase suffix (the exact names the composed queries use). */
+const UNIT_OF_KEY: ReadonlyMap<string, string> = new Map([
+  ['kg', 'kg'],
+  ['mm', 'mm'],
+  ['temperatureC', 'degC'],
+  ['percent', '%'],
+  ['H_m', 'm'],
+  ['bottomM', 'm'],
+  ['heightM', 'm'],
+  ['diameterM', 'm'],
+]);
+/** Unit suffixes, anchored after a lowercase letter, digit or underscore so that `ratingC` or `dnMm2` style names never match: `emptyKg`, `totalVolumeM3`, `SE_MPa`. */
+const UNIT_SUFFIX = /(?<=[a-z0-9_])(KgM3|Kg|M3|M2|Mm|MPa|Deg)$/;
+const SUFFIX_UNIT: Readonly<Record<string, string>> = { KgM3: 'kg/m3', Kg: 'kg', M3: 'm3', M2: 'm2', Mm: 'mm', MPa: 'MPa', Deg: 'deg' };
+const unitOfKey = (key: string): string | null => {
+  const exact = UNIT_OF_KEY.get(key);
+  if (exact !== undefined) return exact;
+  const suffix = UNIT_SUFFIX.exec(key)?.[1];
+  return suffix === undefined ? null : (SUFFIX_UNIT[suffix] ?? null);
+};
 /** The unit of the nearest key of `path` that has one (`headDepthsMm.first` and `boundingBoxMm.0` are millimetres). */
 const unitOf = (path: string): string | null => {
   for (const key of path.split('.').reverse()) {
@@ -64,7 +70,7 @@ function flatten(section: string, path: string, value: unknown, rows: CsvCell[][
   if (value === undefined) return;
   if (typeof value === 'number' && !Number.isFinite(value)) value = null;
   if (isScalar(value)) {
-    rows.push([section, path, value, unitOf(path), null]);
+    rows.push([section, path, value, typeof value === 'number' ? unitOf(path) : null, null]);
     return;
   }
   if (Array.isArray(value)) {

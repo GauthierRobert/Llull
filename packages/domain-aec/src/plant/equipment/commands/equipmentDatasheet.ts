@@ -32,8 +32,8 @@ export const equipmentDatasheet = defineCommand({
     '(status not_reviewed, reviewRequired always true with reasons, unverified, defaulted). Lengths are millimetres whatever the document unit; ' +
     'volumes m3, masses kg, stresses and pressures MPa. A section whose query refuses (for example thickness without design data) is ' +
     '{ available: false, reason, code, message } - never silently left out. format json (default) returns the record; format csv returns `data.text`: ' +
-    'table items (default; one row per value: section,item,value,unit,source) or table nozzles (the schedule, one row per nozzle). The same keys are ' +
-    'returned in `data` for both formats; `data.text` is the file text (use --save FILE) with `fileName` and `sha256`. Refusals: EQP_NOT_FOUND, ' +
+    'table items (default; one row per value of every section EXCEPT the nozzle schedule: section,item,value,unit,source) or table nozzles (the nozzle schedule only, one row per nozzle). The same sections are ' +
+    'returned in `data` for both formats; `data.text` is the file text (for json it repeats the record; use --save FILE) with `fileName` and `sha256`. Refusals: EQP_NOT_FOUND, ' +
     'EQP_NOT_PARAMETRIC (legacy box or nozzle-only block). Does not modify the document.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
@@ -65,8 +65,16 @@ export const equipmentDatasheet = defineCommand({
     const fileName = `${slug(element.mark)}-${format === 'json' ? 'datasheet.json' : table === 'nozzles' ? 'nozzles.csv' : 'datasheet.csv'}`;
     return report(
       doc,
-      `equipment_datasheet: ${element.mark} (${sheet.identification['template']}), ${sheet.nozzles.length} nozzle(s), ${format}${format === 'csv' ? ` ${table}` : ''}, ${text.length} bytes; review required.`,
-      { ...sheet, format, ...(format === 'csv' ? { table } : {}), fileName, text, sha256: sha256Hex(text), bytes: text.length },
+      `equipment_datasheet: ${element.mark} (${sheet.identification['template']}), ${sheet.nozzles.length} nozzle(s), ${format}${format === 'csv' ? ` ${table}` : ''}, ${new TextEncoder().encode(text).length} bytes; review required.`,
+      {
+        ...sheet,
+        format,
+        ...(format === 'csv' ? { table } : {}),
+        fileName,
+        text,
+        sha256: sha256Hex(text),
+        bytes: new TextEncoder().encode(text).length,
+      },
     );
   },
 });

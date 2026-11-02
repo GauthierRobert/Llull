@@ -3,7 +3,7 @@
 export type Obj = Record<string, unknown>;
 
 /** Keys that hold a length (or an array / object of lengths) in document units in the stored template, design, nozzles and volume results. */
-const LENGTH_KEYS: ReadonlySet<string> = new Set([
+export const LENGTH_KEYS: ReadonlySet<string> = new Set([
   'insideDiameter',
   'tangentLength',
   'shellThickness',

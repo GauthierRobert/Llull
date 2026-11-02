@@ -145,7 +145,7 @@ describe('export_ifc IFC4X3_ADD2 of SC-EQP-01 (VC-EQP-20)', () => {
     const pressure = ofType(file, 'IFCPROPERTYSINGLEVALUE').find((property) => stepString(property.args[0]) === 'DesignPressure');
     expect(numbers(String((pressure?.args[2] as string[])[1]))[0]).toBe(1_000_000);
     const note = ofType(file, 'IFCPROPERTYSINGLEVALUE').find((property) => stepString(property.args[0]) === 'BodyRepresentation');
-    expect(stepString((note?.args[2] as string[])[1])).toMatch(/sampled as polylines/);
+    expect(stepString((note?.args[2] as string[])[1])).toMatch(/sampled as polylines.*sagitta <= 7.7e-5.*1.4e-4/);
   });
 
   it('is byte-identical for the same document and honours plant.ports false (body kept, no ports)', () => {
@@ -188,6 +188,18 @@ describe('export_ifc IFC4 (default) of parametric equipment', () => {
     const file = readStep(exportIfc(tankDocument()).ifc);
     expect(ofType(file, 'IFCREVOLVEDAREASOLID').length).toBeGreaterThanOrEqual(1);
     expect(ofType(file, 'IFCDISTRIBUTIONPORT')).toHaveLength(0);
+  });
+});
+
+describe('plant.ports false (both schemas)', () => {
+  it('removes the equipment nozzle ports in IFC4 too and keeps the revolved bodies', () => {
+    const bare = exportIfc(separatorDocument(), { plant: { ports: false } });
+    const file = readStep(bare.ifc);
+    expect(file.schema).toBe('IFC4');
+    expect(bare.ports).toBe(0);
+    expect(ofType(file, 'IFCDISTRIBUTIONPORT')).toHaveLength(0);
+    expect(ofType(file, 'IFCREVOLVEDAREASOLID')).toHaveLength(6);
+    expect(ofType(readStep(exportIfc(separatorDocument()).ifc), 'IFCDISTRIBUTIONPORT')).toHaveLength(4);
   });
 });
 

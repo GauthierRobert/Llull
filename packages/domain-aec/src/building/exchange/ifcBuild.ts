@@ -172,7 +172,7 @@ function exportEquipment(
   });
   if (!exported) return [];
   plant.ports.equipment.set(element.id, { ref: exported.ref, storeyPlacement, level });
-  if (!run.x3 || run.options.ports) exportEquipmentPorts(context, plant.ports, doc, element, level, storeyPlacement, exported.ref);
+  if (run.options.ports) exportEquipmentPorts(context, plant.ports, doc, element, level, storeyPlacement, exported.ref);
   if (!run.x3 || classified === undefined) return [exported];
   const where = containerFor(plant, classified.object.hierarchyId);
   addPlantPsets(
@@ -408,7 +408,7 @@ export const exportIfc = defineCommand({
           .boolean()
           .optional()
           .describe(
-            'IFC4X3_ADD2: write distribution ports, nests, port connections and the nozzle ports inferred from line from/to. Default true.',
+            'Write distribution ports, nests and port connections. IFC4 and IFC4X3_ADD2: the ports of equipment nozzles (03 EQP) and their connections to routed pipes; IFC4X3_ADD2 also the pipe ports and the nozzle ports inferred from line from/to. Default true.',
           ),
         systems: z
           .enum(['line', 'none'])
@@ -422,7 +422,9 @@ export const exportIfc = defineCommand({
           ),
       })
       .optional()
-      .describe('Plant export options (IFC4X3_ADD2 only; ignored with IFC4). Omit for the defaults: ports, line systems and hierarchy on.'),
+      .describe(
+        'Plant export options: ports applies to both schemas, systems and hierarchy to IFC4X3_ADD2 only. Omit for the defaults: ports, line systems and hierarchy on.',
+      ),
   }),
   run: (doc, { confirmExportControlled, timestamp, schema: requested, plant }, ctx): CommandResult => {
     const refused = exportRefusal(doc, 'export_ifc', 'data', confirmExportControlled, ctx);

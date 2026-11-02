@@ -261,6 +261,21 @@ describe('equipment_datasheet CSV', () => {
     expect(result['table']).toBe('items');
   });
 
+  it('units come from anchored key names only: a text value, a count or a name ending in C or M gets none', () => {
+    const rows = csvRows(sheet(doc, 'V-101', { format: 'csv' })['text']);
+    const unitOf = (section: string, item: string): string | undefined => rows.find((row) => row[0] === section && row[1] === item)?.[3];
+    expect(unitOf('design', 'temperatureC')).toBe('degC');
+    expect(unitOf('design', 'materialDensityKgM3')).toBe('kg/m3');
+    expect(unitOf('volumes', 'totalVolumeM3')).toBe('m3');
+    expect(unitOf('geometry', 'insideSurfaceAreaM2')).toBe('m2');
+    expect(unitOf('codeResults', 'thickness.mawpMPa')).toBe('MPa');
+    expect(unitOf('codeResults', 'thickness.components.shell.inputs.SE_MPa')).toBe('MPa');
+    expect(unitOf('design', 'material')).toBe('');
+    expect(unitOf('geometry', 'heads.first.ratio')).toBe('');
+    expect(unitOf('identification', 'tag')).toBe('');
+    expect(unitOf('identification', 'planRotationDeg')).toBe('deg');
+  });
+
   it('nozzles: one row per nozzle with the position, direction and flange columns', () => {
     const result = sheet(doc, 'V-101', { format: 'csv', table: 'nozzles' });
     const rows = csvRows(result['text']);
