@@ -308,3 +308,12 @@ describe('VC-PST-12: two-anchor L-bend (lbend_guided_cantilever.json)', () => {
     expectRel(moment(c, 1, 1), ref.expectedBendingOnly.momentMagnitudeCNmm, 1e-3, 'M at C');
   });
 });
+
+describe('bend guard', () => {
+  it('a near reversal (theta > pi - 0.05) has no bend; a 170 degree turn does', () => {
+    const turn = (deg: number): FramePoint => [Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) / 180), 0];
+    expect(bendChords([0, 0, 0], [1, 0, 0], turn(179), 100)).toBeNull();
+    const bend = bendChords([0, 0, 0], [1, 0, 0], turn(170), 100);
+    expect(bend?.tangentLength).toBeGreaterThan(100 * 10);
+  });
+});

@@ -1,9 +1,20 @@
-/** Skyline (variable-band) symmetric matrix with in-place Cholesky A = L L^T. Row i stores columns first[i]..i. */
+/**
+ * Skyline (variable-band) symmetric matrix with in-place Cholesky of its Jacobi-scaled form (D^-1/2 A D^-1/2 = L L^T).
+ * Row i stores columns first[i]..i.
+ */
 export class Skyline {
   readonly size: number;
   readonly first: Int32Array;
   readonly offset: Int32Array;
   readonly values: Float64Array;
+  private scale: Float64Array = new Float64Array(0);
+
+  /** Stored entries for an envelope, as a plain number (callers cap it before allocating). */
+  static profileSize(first: Int32Array): number {
+    let total = 0;
+    for (let i = 0; i < first.length; i++) total += i - (first[i] as number) + 1;
+    return total;
+  }
 
   constructor(first: Int32Array) {
     this.size = first.length;
@@ -30,9 +41,22 @@ export class Skyline {
     this.values[index] = (this.values[index] as number) + value;
   }
 
-  /** Factorises in place. Returns the first row whose pivot is <= tolerance x its own diagonal (mechanism), or -1. */
+  /** Jacobi-scales then factorises in place. Returns the first row with a non-positive diagonal or a scaled pivot <= tolerance (mechanism), or -1. */
   factorize(pivotTolerance: number): number {
     const { size, first, offset, values } = this;
+    const scale = new Float64Array(size);
+    for (let i = 0; i < size; i++) {
+      const diagonal = values[(offset[i] as number) + i - (first[i] as number)] as number;
+      if (!(diagonal > 0) || !Number.isFinite(diagonal)) return i;
+      scale[i] = 1 / Math.sqrt(diagonal);
+    }
+    for (let i = 0; i < size; i++) {
+      for (let j = first[i] as number; j <= i; j++) {
+        const at = (offset[i] as number) + j - (first[i] as number);
+        values[at] = (values[at] as number) * (scale[i] as number) * (scale[j] as number);
+      }
+    }
+    this.scale = scale;
     for (let i = 0; i < size; i++) {
       const fi = first[i] as number;
       const oi = offset[i] as number;
@@ -56,7 +80,8 @@ export class Skyline {
   /** Solves L L^T x = b after `factorize`; returns a new array. */
   solve(rhs: Float64Array): Float64Array {
     const { size, first, offset, values } = this;
-    const x = Float64Array.from(rhs);
+    const { scale } = this;
+    const x = Float64Array.from(rhs, (v, i) => v * (scale[i] as number));
     for (let i = 0; i < size; i++) {
       const fi = first[i] as number;
       const oi = offset[i] as number;
@@ -71,6 +96,7 @@ export class Skyline {
       x[i] = xi;
       for (let j = fi; j < i; j++) x[j] = (x[j] as number) - (values[oi + j - fi] as number) * xi;
     }
+    for (let i = 0; i < size; i++) x[i] = (x[i] as number) * (scale[i] as number);
     return x;
   }
 }

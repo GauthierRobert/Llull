@@ -571,15 +571,15 @@ API (SI-style consistent units, llull plant stress uses N, mm, MPa, rad; PSI fix
 | `pipeProperties(Do, t, E, nu, timoshenko?)` (`section.ts`) | thin-wall pipe section, A/2 shear area |
 | `reverseCuthillMcKee`, `Skyline` | node ordering and the variable-band Cholesky |
 
-Failures are typed: `FRAME_INVALID_MODEL`, `FRAME_INVALID_LOAD`, `FRAME_UNSTABLE` (with the first mechanism `{ node, dof }`; M3 maps it to `PST_UNSTABLE`).
+Failures are typed: `FRAME_INVALID_MODEL`, `FRAME_INVALID_LOAD`, `FRAME_TOO_LARGE` (skyline above `limits.maxProfile`, default 5e7 entries = 400 MB, and never past the Int32 offset limit), `FRAME_UNSTABLE` (with the first mechanism `{ node, dof }`; M3 maps it to `PST_UNSTABLE`).
 
 Deviations from §5.2 / §5.3 / §5.5, with reasons:
 
 1. **Rigid restraints are eliminated, not penalised (1e12).** Exact, better conditioned, and a prescribed displacement is a right-hand-side term. Only genuinely elastic supports (springs, k_f friction stiffness) add to the diagonal.
-2. **Pivot test is relative to the row's own diagonal (1e-10)**, not to the largest diagonal: force and moment DOFs differ by orders of magnitude of L^2, so a global reference misjudges rotation DOFs. A mechanism leaves a pivot of order 1e-16 of its diagonal.
+2. **The matrix is Jacobi-scaled (D^-1/2 K D^-1/2, unit diagonal) before factoring and the pivot test is 1e-12 on the scaled pivot**, not 1e-12 of the largest diagonal: force and moment DOFs differ by orders of magnitude of L^2, and a stiff rigid link next to a soft span (tested at a 1e10 stiffness ratio) must not read as a mechanism. A true mechanism leaves a pivot of order 1e-16. (The relative pivot test is invariant under the scaling; the scaling gives the factor and the refinement a unit-diagonal system, and the 1e-12 threshold, down from 1e-10, is what stops a 1e10 stiffness ratio from reading as a mechanism: shown by the stiff-link test failing at 1e-9.)
 3. **Bend sub-division is 7.5 degrees (12 chords per 90 degrees), not 15.** The spec's VC (curved-beam flexibility within 1e-3) is not met by 15 degrees: measured error vs the Castigliano closed form (bending k R^3 (3 pi/4 - 2) / EI + axial + shear terms, derived in the test) is 2.4e-2 at 2 chords, 1.9e-3 at 6, 1.0e-3 at 8, 4.4e-4 at 12 (O(1/n^2)); 12 chords is within 1e-3 for k = 1 and k = 3.2. The chord polygon keeps the arc nodes on the arc (arc-length matching made it worse).
 4. **One iterative-refinement step set** (up to 3 passes, accepted only when the out-of-balance norm drops): the unrefined residual on the 12 000-DOF lattice was 1.5e-8, refined 1e-13 (thermal) and below 1e-9 (weight on a supported rim).
-5. Residual (`FrameCaseResult.residual`) is `||K u - F||_free / ||F||`; on a very soft, lightly loaded model (a flat 40 m lattice carrying only its weight on four corners) it floors near 3e-9 from cancellation; the M3 command reports it rather than refusing.
+5. `bendChords` returns null for a near reversal (theta > pi - 0.05 rad); the caller must check each leg is at least `tangentLength` long (`PST_BEND_TOO_TIGHT`). `up` is ignored within ~0.08 degrees of the element axis. Residual (`FrameCaseResult.residual`) is `||K u - F||_free / ||F||`; on a very soft, lightly loaded model (a flat 40 m lattice carrying only its weight on four corners) it floors near 3e-9 from cancellation (0 when the load is zero); the M3 command reports it rather than refusing.
 
 Validation results (`tests/unit/lib/`, references read from `validation/data/*.json`):
 

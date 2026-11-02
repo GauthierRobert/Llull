@@ -4,8 +4,12 @@ import { Skyline } from './skyline';
 import type { FrameAnalysis, FrameCaseResult, FrameDof, FrameLoadCase, FrameModel, FramePoint } from './types';
 import { validateCase, validateModel } from './validate';
 
-/** A pivot at or below this fraction of its own diagonal marks a mechanism (rigid-body mode). */
-const PIVOT_TOLERANCE = 1e-10;
+/** A pivot of the Jacobi-scaled matrix (unit diagonal) at or below this marks a mechanism (rigid-body mode); stiff links stay far above it. */
+const PIVOT_TOLERANCE = 1e-12;
+
+/** Default cap on skyline entries (8 bytes each: 400 MB) and the Int32 offset limit. */
+const DEFAULT_MAX_PROFILE = 5e7;
+const INT32_LIMIT = 2 ** 31 - 1;
 const REFINEMENTS = 3;
 
 interface Numbering {
@@ -197,13 +201,14 @@ function solveCase(
     if ((equation[dof] as number) < 0) reactions[dof] = out;
     else if (spring > 0) reactions[dof] = -spring * ((displacements[dof] as number) - (prescribed[dof] as number));
   }
+  const scaleNorm = Math.max(loadNorm, norm(reduced));
   const residualSquares = norm(outOfBalance(internal, displacements)) ** 2;
   return {
     name: loadCase.name,
     displacements,
     reactions,
     elementForces,
-    residual: Math.sqrt(residualSquares) / Math.max(loadNorm, norm(reduced), 1e-300),
+    residual: scaleNorm > 0 ? Math.sqrt(residualSquares) / scaleNorm : 0,
   };
 }
 
@@ -212,7 +217,11 @@ function solveCase(
  * back-substitution per load case. Pure and deterministic (same input, bit-identical output). Never throws: a malformed model or load,
  * or a mechanism, returns a typed failure naming the offending DOF.
  */
-export function analyzeFrame(model: FrameModel, cases: readonly FrameLoadCase[]): FrameAnalysis {
+export function analyzeFrame(
+  model: FrameModel,
+  cases: readonly FrameLoadCase[],
+  limits: { readonly maxProfile?: number } = {},
+): FrameAnalysis {
   const invalid = validateModel(model);
   if (invalid) return invalid;
   for (const loadCase of cases) {
@@ -235,6 +244,15 @@ export function analyzeFrame(model: FrameModel, cases: readonly FrameLoadCase[])
       .filter((eq) => eq >= 0);
     const lowest = Math.min(...equations);
     for (const eq of equations) if (lowest < (first[eq] as number)) first[eq] = lowest;
+  }
+  const profile = Skyline.profileSize(first);
+  if (!(profile <= Math.min(limits.maxProfile ?? DEFAULT_MAX_PROFILE, INT32_LIMIT))) {
+    return {
+      ok: false,
+      code: 'FRAME_TOO_LARGE',
+      message: `skyline factor would need ${profile} entries (bandwidth too wide for the cap)`,
+      dofs: [],
+    };
   }
   const sky = new Skyline(first);
   model.elements.forEach((element, e) => {

@@ -1,5 +1,8 @@
 import type { FrameElement, FramePoint } from './types';
 
+/** |cos| above which a reference direction counts as parallel to the element axis. */
+const PARALLEL = 0.999999;
+
 /** Prepared element: geometry, local axes (rows x, y, z of the rotation) and stiffness in local and global axes. */
 export interface PreparedElement {
   readonly length: number;
@@ -66,7 +69,7 @@ export function localAxes(p: FramePoint, q: FramePoint, up?: FramePoint): { leng
   const preferred = up ? unit(up) : null;
   let reference: FramePoint = preferred ?? [0, 0, 1];
   const parallel = (r: FramePoint): number => Math.abs(r[0] * x[0] + r[1] * x[1] + r[2] * x[2]);
-  if (parallel(reference) > 0.99) reference = parallel([0, 0, 1]) < 0.99 ? [0, 0, 1] : [1, 0, 0];
+  if (parallel(reference) > PARALLEL) reference = parallel([0, 0, 1]) <= PARALLEL ? [0, 0, 1] : [1, 0, 0];
   const y = unit(cross(reference, x));
   if (!y) return null;
   const z = cross(x, y);

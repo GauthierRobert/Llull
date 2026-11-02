@@ -23,7 +23,7 @@ export interface FrameElement {
   readonly properties: FrameProperties;
   /** Bend flexibility factor k >= 1: bending stiffness EI / k (axial, shear, torsion unchanged). Default 1. */
   readonly flexibility?: number;
-  /** Reference direction for the local z axis (default global Z, or global X when the element is vertical). */
+  /** Reference direction for the local z axis (default global Z, or global X when the element is vertical). Ignored when within ~0.08 degrees of the element axis. */
   readonly up?: FramePoint;
 }
 
@@ -93,7 +93,7 @@ interface FrameStats {
   readonly profile: number;
 }
 
-export type FrameErrorCode = 'FRAME_INVALID_MODEL' | 'FRAME_INVALID_LOAD' | 'FRAME_UNSTABLE';
+export type FrameErrorCode = 'FRAME_INVALID_MODEL' | 'FRAME_INVALID_LOAD' | 'FRAME_UNSTABLE' | 'FRAME_TOO_LARGE';
 
 export type FrameAnalysis =
   | { readonly ok: true; readonly cases: readonly FrameCaseResult[]; readonly stats: FrameStats }

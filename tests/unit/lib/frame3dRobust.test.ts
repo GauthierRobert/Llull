@@ -314,3 +314,76 @@ function permute(model: FrameModel, load: FrameLoadCase): { model: FrameModel; l
     load,
   };
 }
+
+describe('review round 1: size cap, scaling, residual, bend guard, up threshold', () => {
+  it('FRAME_TOO_LARGE above the profile cap, before allocating; profileSize is a plain number past 2^31', () => {
+    const lattice = gridModel(6, 5);
+    expect(failure(analyzeFrame(lattice.model, [lattice.weight], { maxProfile: 1000 })).code).toBe('FRAME_TOO_LARGE');
+    expect(analyzeFrame(lattice.model, [lattice.weight], { maxProfile: 1e7 }).ok).toBe(true);
+    expect(Skyline.profileSize(new Int32Array(70_000))).toBeGreaterThan(2 ** 31);
+  });
+
+  it.each([true, false])(
+    'a stiff rigid link next to a soft span solves (ratio 1e10, link at the root: %s), and the tip matches the soft cantilever',
+    (linkAtRoot) => {
+      const stiff = { ...PIPE, youngs: PIPE.youngs * 1e10 };
+      const model: FrameModel = {
+        nodes: [
+          [0, 0, 0],
+          [linkAtRoot ? 100 : 2000, 0, 0],
+          [2100, 0, 0],
+        ],
+        elements: [
+          { a: 0, b: 1, properties: linkAtRoot ? stiff : PIPE },
+          { a: 1, b: 2, properties: linkAtRoot ? PIPE : stiff },
+        ],
+        restraints: anchor(0),
+      };
+      const result = analyzeFrame(model, [{ name: 'F', nodal: [{ node: 2, force: [0, 0, -1000] }] }]);
+      if (!result.ok) throw new Error(result.message);
+      const tip = (result.cases[0] as FrameCaseResult).displacements[2 * 6 + 2] as number;
+      const { youngs: E, inertia: I } = PIPE;
+      const P = 1000;
+      const L = 2000;
+      const shear = (P * 2100) / (PIPE.shear * PIPE.shearArea);
+      // link at the tip carries the end moment P x 100 into the soft span and rotates rigidly: tip = d1 + 100 theta1
+      const rooted = (P * L ** 3) / (3 * E * I);
+      const tipped = rooted + (P * 100 * L ** 2) / (2 * E * I) + 100 * ((P * L ** 2) / (2 * E * I) + (P * 100 * L) / (E * I));
+      const expected = -((linkAtRoot ? rooted : tipped) + shear);
+      expect(Math.abs(tip / expected - 1)).toBeLessThan(1e-4);
+    },
+  );
+
+  it('a true mechanism behind a stiff link is still FRAME_UNSTABLE', () => {
+    const stiff = { ...PIPE, youngs: PIPE.youngs * 1e10 };
+    const model: FrameModel = {
+      nodes: [
+        [0, 0, 0],
+        [100, 0, 0],
+        [2100, 0, 0],
+      ],
+      elements: [
+        { a: 0, b: 1, properties: stiff },
+        { a: 1, b: 2, properties: PIPE },
+      ],
+      restraints: [0, 1, 2].map((dof) => ({ node: 0, dof })),
+    };
+    expect(failure(analyzeFrame(model, [])).code).toBe('FRAME_UNSTABLE');
+  });
+
+  it('residual is 0, not a floor artefact, for a case with no load', () => {
+    const result = analyzeFrame(beam, [{ name: 'none' }]);
+    if (!result.ok) throw new Error(result.message);
+    expect((result.cases[0] as FrameCaseResult).residual).toBe(0);
+  });
+
+  it('up within 0.08 degrees of the axis is ignored; just outside it is used', () => {
+    const tip = (up: FramePoint): number => {
+      const r = analyzeFrame({ ...beam, elements: [{ a: 0, b: 1, properties: PIPE, up }] }, [LOAD]);
+      if (!r.ok) throw new Error(r.message);
+      return (r.cases[0] as FrameCaseResult).displacements[8] as number;
+    };
+    expect(Math.abs(tip([1, 1e-4, 0]) / tip([0, 0, 1]) - 1)).toBeLessThan(1e-12);
+    expect(Math.abs(tip([1, 0.01, 0]) / tip([0, 0, 1]) - 1)).toBeLessThan(1e-12);
+  });
+});

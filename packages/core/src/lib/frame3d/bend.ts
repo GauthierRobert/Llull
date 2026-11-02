@@ -20,7 +20,8 @@ export function bendSubdivisions(angle: number): number {
 
 /**
  * Circular bend of radius `radius` replacing the sharp corner `corner` between legs travelled along unit directions `incoming`
- * then `outgoing`. Returns null for a straight continuation (no bend), a reversal (theta ~ pi) or non-finite input.
+ * then `outgoing`. Returns null for a straight continuation (no bend), a near reversal (theta > pi - 0.05 rad) or non-finite input.
+ * The caller must check that each leg is at least `tangentLength` long (else the bend does not fit).
  * Interior points lie on the arc; chord elements carry the bend flexibility factor k (stiffness EI / k).
  */
 export function bendChords(
@@ -33,7 +34,7 @@ export function bendChords(
   const cos = incoming[0] * outgoing[0] + incoming[1] * outgoing[1] + incoming[2] * outgoing[2];
   if (![...corner, ...incoming, ...outgoing, radius, cos].every(Number.isFinite) || !(radius > 0)) return null;
   const angle = Math.acos(Math.max(-1, Math.min(1, cos)));
-  if (angle < 1e-6 || angle > Math.PI - 1e-3) return null;
+  if (angle < 1e-6 || angle > Math.PI - 0.05) return null;
   // n: unit vector in the bend plane, perpendicular to `incoming`, pointing toward the centre.
   const raw: FramePoint = [outgoing[0] - cos * incoming[0], outgoing[1] - cos * incoming[1], outgoing[2] - cos * incoming[2]];
   const length = Math.hypot(raw[0], raw[1], raw[2]);
