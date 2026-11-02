@@ -50,34 +50,6 @@
     ],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": ["equipment_datasheet"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": ["check_reachability"],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-01-lbend-two-anchors.json": [
-      "add_stress_restraint",
-      "analyze_pipe_stress",
-      "check_pipe_stress",
-      "create_stress_model",
-      "import_pipe_material_data",
-      "set_pipe_operating_conditions",
-      "set_stress_load_cases"
-    ],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-02-psi-3d-benchmark.json": [
-      "add_stress_restraint",
-      "analyze_pipe_stress",
-      "create_stress_model",
-      "import_pipe_material_data",
-      "set_pipe_operating_conditions",
-      "set_stress_load_cases"
-    ],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-04-supports-guardrails.json": [
-      "add_stress_restraint",
-      "analyze_pipe_stress",
-      "approve_pipe_stress",
-      "check_pipe_stress",
-      "create_stress_model",
-      "import_pipe_material_data",
-      "record_pipe_stress_results",
-      "set_pipe_operating_conditions",
-      "set_stress_load_cases"
-    ],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
       "export_caesar_neutral",
       "nozzle_load_check",

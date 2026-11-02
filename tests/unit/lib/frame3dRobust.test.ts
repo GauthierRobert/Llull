@@ -387,3 +387,58 @@ describe('review round 1: size cap, scaling, residual, bend guard, up threshold'
     expect(Math.abs(tip([1, 0.01, 0]) / tip([0, 0, 1]) - 1)).toBeLessThan(1e-12);
   });
 });
+
+describe('near-mechanism backstop (PST-M3)', () => {
+  const KSOFT = 0.1;
+  const KFIRM = 1e3;
+  const pinned: FrameRestraint[] = [0, 1, 2, 4, 5].map((dof) => ({ node: 0, dof }));
+  const torque: FrameLoadCase = { name: 'T', nodal: [{ node: 1, moment: [1000, 0, 0] }] };
+  const withSpring = (stiffness: number): FrameModel => ({ ...beam, restraints: [...pinned, { node: 0, dof: 3, stiffness }] });
+
+  it('a torsion spring 1e-10 of the element torsion stiffness passes the pivot test but is reported FRAME_UNSTABLE', () => {
+    const result = failure(analyzeFrame(withSpring(KSOFT), [torque]));
+    expect(result.code).toBe('FRAME_UNSTABLE');
+    expect(result.message).toMatch(/out of all proportion/);
+    expect(result.dofs).toHaveLength(1);
+  });
+
+  it('a firm but soft torsion spring (1e-6 of the stiffness) is a legitimate support and solves', () => {
+    const result = analyzeFrame(withSpring(KFIRM), [torque]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('a non-finite load is never solved (typed failure, no NaN result)', () => {
+    const result = analyzeFrame(beam, [{ name: 'bad', nodal: [{ node: 1, force: [Number.NaN, 0, 0] }] }]);
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('backstop does not misfire on legitimate models (PST-M3 review)', () => {
+  it('a 200-element slender cantilever (20 m of OD 60 x 2) solves and matches P L^3 / 3 E I', () => {
+    const slender = pipeProperties(60, 2, 200000, 0.3, false);
+    const count = 200;
+    const nodes: FramePoint[] = Array.from({ length: count + 1 }, (_, i) => [(20000 * i) / count, 0, 0]);
+    const model: FrameModel = {
+      nodes,
+      elements: nodes.slice(1).map((_, i) => ({ a: i, b: i + 1, properties: slender })),
+      restraints: anchor(0),
+    };
+    const result = analyzeFrame(model, [{ name: 'P', nodal: [{ node: count, force: [0, 0, -100] }] }]);
+    if (!result.ok) throw new Error(result.message);
+    const tip = Math.abs(result.cases[0]?.displacements[count * 6 + 2] as number);
+    expect(Math.abs(tip / ((100 * 20000 ** 3) / (3 * 200000 * slender.inertia)) - 1)).toBeLessThan(1e-6);
+  });
+
+  it('loads at roundoff level are not a mechanism: 1e-14 N and 1e-300 N solve, finite and proportional', () => {
+    const solved = (force: number): number => {
+      const result = analyzeFrame(beam, [{ name: 'tiny', nodal: [{ node: 1, force: [0, 0, force] }] }]);
+      if (!result.ok) throw new Error(result.message);
+      return result.cases[0]?.displacements[1 * 6 + 2] as number;
+    };
+    const unit = solved(1);
+    expect(Number.isFinite(solved(1e-14))).toBe(true);
+    expect(solved(1e-14) / unit).toBeCloseTo(1e-14, 20);
+    expect(Number.isFinite(solved(1e-300))).toBe(true);
+    expect(solved(0)).toBe(0);
+  });
+});

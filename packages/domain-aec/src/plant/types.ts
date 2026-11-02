@@ -11,6 +11,7 @@ import type { SpecModel } from './spec/types';
 import type { FabricationModel } from './fabrication/model';
 import type { PlantDataModel } from './data/model';
 import type { PidModel } from './pid/model';
+import type { StressSlice } from './stress/model/schema';
 
 /** Butt weld, flanged, socket weld, screwed, plain end, wafer, lug (02 RTE §3.1). */
 export type EndType = 'BW' | 'FL' | 'SW' | 'SC' | 'PL' | 'WAF' | 'LUG';
@@ -270,6 +271,8 @@ export interface PlantModel {
   readonly data?: PlantDataModel;
   /** 04 PID: P&ID sheets, items (equipment, nozzles, lines, segments, inline items, instruments) and conventions; DEXPI import / export. */
   readonly pid?: PidModel;
+  /** 07 PST: pipe stress models (conditions, load cases, restraints, recorded and approved results). */
+  readonly stress?: StressSlice;
 }
 
 declare module '@core/model/documentExtensions' {

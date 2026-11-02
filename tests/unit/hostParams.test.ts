@@ -15,8 +15,13 @@ describe('fillHostParams', () => {
     expect(fillHostParams('submit_for_review', { at: '2001-01-01T00:00:00Z', by: 'bob' }, host)).toEqual({ ...FILLED, by: 'bob' });
   });
 
-  it('stamps the time of approve_pipe_spec (a plant human gate), overriding a caller-supplied one, and leaves its other params', () => {
+  it('stamps the time of approve_pipe_spec and approve_pipe_stress (plant human gates), overriding a caller-supplied one, and leaves its other params', () => {
     expect(fillHostParams('approve_pipe_spec', { specId: 'S', at: '2001-01-01T00:00:00Z' }, host)).toEqual({ specId: 'S', at: FILLED.at });
+    expect(fillHostParams('approve_pipe_stress', { modelId: 'M', at: '2001-01-01T00:00:00Z' }, host)).toEqual({
+      modelId: 'M',
+      at: FILLED.at,
+    });
+    expect(fillHostParams('approve_pipe_stress', { modelId: 'M' }, host)).toEqual({ modelId: 'M', at: FILLED.at });
     expect(fillHostParams('issue_isometric', { lineId: 'L' }, host)).toEqual({ lineId: 'L' });
     expect(
       fillHostParams('set_deliverable_status', { deliverable: 'mto', revision: 'A', status: 'in_work', at: '2001-01-01T00:00:00Z' }, host),
