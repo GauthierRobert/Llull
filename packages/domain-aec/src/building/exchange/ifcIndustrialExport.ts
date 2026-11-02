@@ -101,6 +101,10 @@ export function sweptSolids(context: Context, profileRef: string, points: Readon
 export interface ProductPlant {
   readonly tag: string;
   readonly product: ProductClass | null;
+  /** Body solids of a parametric plant equipment (placed in the frame of the product placement at the level): replace the footprint solid. */
+  readonly body?: readonly string[];
+  /** Extra `Pset_llullEquipment` properties (STEP records already written). */
+  readonly properties?: readonly string[];
 }
 
 export function exportIndustrial(
@@ -155,22 +159,24 @@ export function exportIndustrial(
         context,
         storeyPlacement,
         element.location,
-        equipmentShape === 'horizontal_vessel' ? mm(width) / 2 : 0,
+        equipmentShape === 'horizontal_vessel' && plant?.body === undefined ? mm(width) / 2 : 0,
         element.angle,
       );
-      const solid =
-        vesselSolid(context, element) ?? extrusion(context, rectangleProfile(context, [0, 0], mm(length), mm(width)), mm(height));
+      const solids = plant?.body ?? [
+        vesselSolid(context, element) ?? extrusion(context, rectangleProfile(context, [0, 0], mm(length), mm(width)), mm(height)),
+      ];
       const tag = ifcString(plant?.tag ?? element.id);
       const product = plant?.product;
       const ref = writer.add(
         product
-          ? `${product.entity}('${guid}',$,${ifcString(product.name)},${ifcString(product.description)},${product.objectType === null ? '$' : ifcString(product.objectType)},${local},${shape(context, [solid])},${tag},.${product.predefined}.)`
-          : `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [solid])},${tag},.ELEMENT.)`,
+          ? `${product.entity}('${guid}',$,${ifcString(product.name)},${ifcString(product.description)},${product.objectType === null ? '$' : ifcString(product.objectType)},${local},${shape(context, solids)},${tag},.${product.predefined}.)`
+          : `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, solids)},${tag},.ELEMENT.)`,
       );
       addPropertySet(context, { id: element.id, ref }, 'Pset_llullEquipment', [
         `IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(${ifcReal(element.weight)}),$)`,
         `IFCPROPERTYSINGLEVALUE('Shape','box, vertical_vessel or horizontal_vessel',IFCLABEL(${ifcString(equipmentShape)}),$)`,
         `IFCPROPERTYSINGLEVALUE('MaintenanceClearance','Free space around the footprint, mm',IFCLENGTHMEASURE(${ifcReal(mm(element.clearance))}),$)`,
+        ...(plant?.properties ?? []),
       ]);
       return { ref, material: null };
     }

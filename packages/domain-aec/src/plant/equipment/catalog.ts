@@ -7,6 +7,7 @@ import { addPump } from './commands/addPump';
 import { addStorageTank } from './commands/addStorageTank';
 import { addVessel } from './commands/addVessel';
 import { checkEquipment } from './commands/checkEquipment';
+import { equipmentDatasheet } from './commands/equipmentDatasheet';
 import { equipmentWeights } from './commands/equipmentWeights';
 import { equipmentPortsQuery } from './commands/equipmentPortsQuery';
 import { addNozzle, deleteNozzle, updateNozzle } from './commands/nozzles';
@@ -33,4 +34,5 @@ export const equipmentCatalog = commandCatalog(
   tankShellThickness,
   equipmentWeights,
   checkEquipment,
+  equipmentDatasheet,
 );

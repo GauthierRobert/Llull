@@ -11,6 +11,7 @@ import type { CadDocument, RevolutionEntity, Vec3 } from '@core/model/types';
 import type { PartPort, RoutedPart } from '@aec/plant/types';
 import { applyEulerXYZ } from '@lib/eulerRotation';
 import { len3, sub3 } from '@lib/vec3';
+import type { PortState } from './ifcPorts';
 import { buildGraph, selectRuns } from '../../plant/piping/graph';
 import { partEntities } from '../../plant/piping/geometryInline';
 import { getPiping } from '../../plant/piping/model';
@@ -241,11 +242,51 @@ function connectedPorts(
   return pairs;
 }
 
+/** A part port within this distance (mm) of a run end is the one that meets the nozzle flange face. */
+const NOZZLE_TOLERANCE = 0.5;
+
+/**
+ * IfcRelConnectsPorts between the IfcDistributionPort of an equipment nozzle (03 EQP, RelatingPort) and the port of the run's part that meets it, for
+ * every run end that references the nozzle (`PortRef` kind nozzle). A run end whose part port cannot be found stays unconnected (the nozzle port is open).
+ */
+function connectNozzles(
+  context: Context,
+  state: PortState,
+  piping: ReturnType<typeof getPiping>,
+  graphRuns: ReturnType<typeof selectRuns>['graphRuns'],
+  refs: ReadonlyMap<string, { product: string; ports: string[] }>,
+): number {
+  let count = 0;
+  for (const { runId, derivation } of graphRuns) {
+    const run = piping.runs[runId];
+    for (const end of ['start', 'end'] as const) {
+      const ref = run?.[end].ref;
+      const nozzle = ref?.kind === 'nozzle' ? state.nozzlePorts.get(ref.equipmentId)?.get(ref.nozzleId) : undefined;
+      if (run === undefined || nozzle === undefined) continue;
+      let best: { ref: string; distance: number } | null = null;
+      for (const part of derivation.parts) {
+        part.ports.forEach((port, index) => {
+          const distance = len3(sub3(port.position, run[end].point));
+          const portRef = refs.get(part.id)?.ports[index];
+          if (portRef !== undefined && distance <= NOZZLE_TOLERANCE && (best === null || distance < best.distance))
+            best = { ref: portRef, distance };
+        });
+      }
+      const found = best as { ref: string } | null;
+      if (found === null) continue;
+      context.writer.add(`IFCRELCONNECTSPORTS('${context.guid(`${runId}:${end}:nozzle`)}',$,$,$,${nozzle.ref},${found.ref},$)`);
+      state.connected.add(nozzle.ref);
+      count += 1;
+    }
+  }
+  return count;
+}
+
 /**
  * Appends the pipe products of `doc` to the IFC being written.
  * @param parentPlacement local placement of the IfcBuilding (world origin): the plant coordinates are absolute
  */
-export function exportPipingProducts(context: Context, doc: CadDocument, parentPlacement: string): PipingIfc {
+export function exportPipingProducts(context: Context, doc: CadDocument, parentPlacement: string, equipmentPorts: PortState): PipingIfc {
   const piping = getPiping(doc);
   const empty: PipingIfc = { products: [], productCount: 0, portCount: 0, connectionCount: 0, systemCount: 0, bodiless: 0, brokenRuns: [] };
   if (piping.runOrder.length === 0 || doc.units !== 'mm') return empty;
@@ -293,7 +334,7 @@ export function exportPipingProducts(context: Context, doc: CadDocument, parentP
   for (const [first, second] of pairs) {
     writer.add(`IFCRELCONNECTSPORTS('${context.guid(`${first.id}:${second.id}:ports`)}',$,$,$,${first.ref},${second.ref},$)`);
   }
-  const connections = pairs.length;
+  const connections = pairs.length + connectNozzles(context, equipmentPorts, piping, selection.graphRuns, refs);
   let systems = 0;
   for (const lineId of piping.lineOrder) {
     const members = byLine.get(lineId);
