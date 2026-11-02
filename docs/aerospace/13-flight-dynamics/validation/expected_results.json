@@ -1,0 +1,152 @@
+{
+  "pack": "13 FLT",
+  "generatedBy": "hand-written index 2026-11-02; derived values computed with a Node.js script from the inputs shown (not by llull)",
+  "cases": [
+    {
+      "id": "VC-FLT-01",
+      "command": "run_flight",
+      "inputs": { "freeBody": true, "g": 9.80665, "t_s": 2 },
+      "expected": { "z_m": -19.6133 },
+      "tolerance": "1e-6 rel",
+      "source": "z = -g t^2 / 2",
+      "grade": "A",
+      "proves": ["FR-FLT-01"]
+    },
+    {
+      "id": "VC-FLT-02",
+      "command": "run_flight",
+      "inputs": { "torqueFree": true, "axes": ["min", "intermediate", "max"], "duration_s": 10 },
+      "expected": { "angularMomentumDriftRel": "< 1e-6", "intermediateAxis": "unstable", "minMaxAxes": "stable" },
+      "tolerance": "as stated",
+      "source": "Euler rigid-body equations",
+      "grade": "A",
+      "proves": ["FR-FLT-01", "FR-FLT-16"]
+    },
+    {
+      "id": "VC-FLT-03",
+      "command": "run_flight",
+      "inputs": { "pitch_deg": 20, "thrust": "m g / cos(20 deg)", "attitudeHeld": true },
+      "expected": { "a_horizontal_mps2": 3.5693, "a_vertical_mps2": 0 },
+      "tolerance": "0.1 % / 1e-3 abs",
+      "source": "a = g tan(theta)",
+      "grade": "A",
+      "proves": ["FR-FLT-01"]
+    },
+    {
+      "id": "VC-FLT-04",
+      "command": "add_rotor + run_flight",
+      "inputs": { "table": "UIUC apcsf_10x4.7_static_kt0835", "rpm": 6528, "CT": 0.1299, "CP": 0.0531, "rho": 1.225, "D_m": 0.254 },
+      "expected": { "thrust_N": 7.8404, "shaftPower_W": 88.57 },
+      "tolerance": "0.5 % rel",
+      "source": "UIUC static file + T = CT rho n^2 D^4, P = CP rho n^3 D^5",
+      "grade": "A",
+      "proves": ["FR-FLT-02"]
+    },
+    {
+      "id": "VC-FLT-05",
+      "command": "run_flight",
+      "inputs": { "table": "UIUC apcsf_10x4.7_rd0839_6023", "rpm": 6023, "J": 0.267, "axialVelocity_mps": 6.8078 },
+      "expected": { "CT": 0.0884, "thrust_N": 4.542 },
+      "tolerance": "0.5 % rel",
+      "source": "UIUC dynamic file row J 0.267",
+      "grade": "A",
+      "proves": ["FR-FLT-02"]
+    },
+    {
+      "id": "VC-FLT-06",
+      "command": "flight_report",
+      "inputs": { "state": "VC-FLT-04" },
+      "expected": { "idealPower_W": 62.308, "figureOfMerit": 0.7035 },
+      "tolerance": "0.5 % rel",
+      "source": "momentum theory P_ideal = T^1.5 / sqrt(2 rho A)",
+      "grade": "A",
+      "proves": ["FR-FLT-07"]
+    },
+    {
+      "id": "VC-FLT-07",
+      "command": "run_flight + flight_report",
+      "inputs": { "vehicle": "wing quad lite v8", "gust": { "shape": "1-cosine", "peak_mps": 3, "duration_s": 1 } },
+      "expected": { "reportFields": ["maxAttitudeDeg", "recoveryTimeS", "saturationFraction", "verdict"], "replay": "bit-identical" },
+      "tolerance": "exact replay",
+      "source": "requirement test",
+      "grade": "-",
+      "proves": ["FR-FLT-04", "FR-FLT-05", "FR-FLT-07"]
+    },
+    {
+      "id": "VC-FLT-08",
+      "command": "run_flight",
+      "inputs": { "Izz_kgm2": 0.012, "netReactionTorque_Nm": 0.01 },
+      "expected": { "yawAccel_radps2": 0.83333 },
+      "tolerance": "1e-6 rel",
+      "source": "Q = Izz * alpha",
+      "grade": "A",
+      "proves": ["FR-FLT-01"]
+    },
+    {
+      "id": "VC-FLT-09",
+      "command": "trim_flight",
+      "inputs": { "mass_kg": 1.115, "g": 9.80665, "rotors": 4, "CT": 0.1158, "CP": 0.0466, "tableRow": "UIUC static 4029 rpm" },
+      "expected": {
+        "thrustPerRotor_N": 2.7336,
+        "rpm": 4082.5,
+        "shaftPowerPerRotor_W": 19.012,
+        "shaftPowerTotal_W": 76.05,
+        "idealPowerTotal_W": 51.31
+      },
+      "tolerance": "1 % rel",
+      "source": "rotor law inverted at the nearest UIUC row",
+      "grade": "B",
+      "proves": ["FR-FLT-02", "FR-FLT-07"]
+    },
+    {
+      "id": "VC-FLT-10",
+      "command": "sitl_bridge",
+      "inputs": { "autopilot": "ardupilot_json", "port": 9002, "magic": 18458 },
+      "expected": { "replyFields": ["timestamp", "imu.gyro", "imu.accel_body", "position", "velocity", "attitude|quaternion"] },
+      "tolerance": "exact",
+      "source": "ArduPilot SITL JSON readme",
+      "grade": "A",
+      "proves": ["FR-FLT-11"]
+    },
+    {
+      "id": "VC-FLT-11",
+      "command": "flight_report",
+      "inputs": { "battery": "4S2P Molicel P28A", "nominalEnergy_Wh": 80.6 },
+      "expected": "TBD - measure hover current on the bench",
+      "tolerance": "-",
+      "source": "TBD",
+      "grade": "C",
+      "proves": ["FR-FLT-06"]
+    },
+    {
+      "id": "VC-FLT-12",
+      "command": "generate_aero_table + run_flight",
+      "inputs": { "alpha_deg": 5, "V_mps": 8 },
+      "expected": { "liftForce": "0.5 rho V^2 S CL(analyze_vortex_lattice)" },
+      "tolerance": "1e-6 rel",
+      "source": "internal consistency",
+      "grade": "A",
+      "proves": ["FR-FLT-03"]
+    },
+    {
+      "id": "VC-FLT-13",
+      "command": "replay_flight_log",
+      "inputs": { "dataset": "NeuroBEM | Blackbird" },
+      "expected": "TBD",
+      "tolerance": "-",
+      "source": "licence and format to confirm",
+      "grade": "C",
+      "proves": ["FR-FLT-15"]
+    },
+    {
+      "id": "VC-FLT-14",
+      "command": "check_timestep_convergence",
+      "inputs": { "scenario": "VC-FLT-07", "dt": ["1 ms", "0.5 ms", "0.25 ms"] },
+      "expected": { "gciMaxAttitude": "< 1 %" },
+      "tolerance": "as stated",
+      "source": "Celik et al. GCI (PHY-00)",
+      "grade": "A",
+      "proves": ["FR-FLT-16"]
+    }
+  ]
+}

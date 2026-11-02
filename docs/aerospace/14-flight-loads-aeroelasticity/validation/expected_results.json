@@ -1,0 +1,96 @@
+{
+  "pack": "14 FLL",
+  "generatedBy": "hand-written index 2026-11-02; closed forms computed with a Node.js script from the inputs shown (not by llull)",
+  "cases": [
+    {
+      "id": "VC-FLL-01",
+      "command": "export_flight_loads + fea_solve",
+      "inputs": { "b_mm": 10, "h_mm": 8, "L_mm": 150, "E_GPa": 2, "tipForce_N": 5.4 },
+      "expected": { "tipDeflection_mm": 7.1191, "rootStress_MPa": 7.5938 },
+      "tolerance": "2 % rel",
+      "source": "Euler-Bernoulli cantilever",
+      "grade": "A",
+      "proves": ["FR-FLL-01"]
+    },
+    {
+      "id": "VC-FLL-02",
+      "command": "set_free_body_support + fea_solve",
+      "inputs": { "accel_mps2": [0, 0, 19.6133] },
+      "expected": { "supportReactionRatio": "< 1e-6" },
+      "tolerance": "as stated",
+      "source": "d'Alembert equilibrium",
+      "grade": "A",
+      "proves": ["FR-FLL-01", "FR-FLL-02"]
+    },
+    {
+      "id": "VC-FLL-03",
+      "command": "add_rotating_load + fea_solve",
+      "inputs": { "rho_kgm3": 1270, "L_m": 0.127, "rpm": 8000 },
+      "expected": { "rootStress_MPa": 7.1882 },
+      "tolerance": "2 % rel",
+      "source": "sigma = rho w^2 L^2 / 2",
+      "grade": "A",
+      "proves": ["FR-FLL-07"]
+    },
+    {
+      "id": "VC-FLL-04",
+      "command": "check_rotor_resonance",
+      "inputs": { "bar": "VC-FLL-01", "rho_kgm3": 1270, "blades": 2 },
+      "expected": { "f1_Hz": 72.078, "crossing2P_rpm": 2162.3, "crossing1P_rpm": 4324.7 },
+      "tolerance": "1 % rel",
+      "source": "cantilever first mode 1.8751^2/(2 pi) sqrt(EI/(m L^4))",
+      "grade": "A",
+      "proves": ["FR-FLL-03"]
+    },
+    {
+      "id": "VC-FLL-05",
+      "command": "create_drop_case + explicit_run",
+      "inputs": { "h_m": 0.5, "m_kg": 1.115, "k_Npm": 20000, "g": 9.80665 },
+      "expected": { "impactVelocity_mps": 3.1316, "peakSpringForce_N": 478.703 },
+      "tolerance": "2 % rel",
+      "source": "energy balance",
+      "grade": "A",
+      "proves": ["FR-FLL-06"]
+    },
+    {
+      "id": "VC-FLL-06",
+      "command": "set_print_idealization",
+      "inputs": { "UTS_MPa": { "XY": 19.27, "XZ": 14.3, "YZ": 16.48 } },
+      "expected": "orientation ratios propagated; allowables TBD - owner coupons",
+      "tolerance": "-",
+      "source": "PMC9230522",
+      "grade": "B",
+      "proves": ["FR-FLL-04"]
+    },
+    {
+      "id": "VC-FLL-07",
+      "command": "run_static_aeroelastic",
+      "inputs": { "Kalpha_Nm_per_rad": 0.5, "e_m": 0.005, "S_m2": 0.0136, "CLalpha_per_rad": 6.283185, "rho": 1.225 },
+      "expected": { "qD_Pa": 1170.26, "VD_mps": 43.711 },
+      "tolerance": "1 % rel",
+      "source": "typical-section divergence q_D = K/(e S CLa)",
+      "grade": "A",
+      "proves": ["FR-FLL-11"]
+    },
+    {
+      "id": "VC-FLL-08",
+      "command": "map_cfd_pressure",
+      "inputs": { "field": "any" },
+      "expected": { "forceMomentError": "< 0.5 %" },
+      "tolerance": "0.5 %",
+      "source": "conservation",
+      "grade": "A",
+      "proves": ["FR-FLL-09"]
+    },
+    {
+      "id": "VC-FLL-09",
+      "command": "fea_mesh source=implicit_field",
+      "inputs": { "design": "lite8.lld f_body", "size_mm": 2 },
+      "expected": { "volumeError": "< 0.5 %", "valid": true },
+      "tolerance": "as stated",
+      "source": "geometric",
+      "grade": "A",
+      "proves": ["FR-FLL-05"]
+    }
+  ]
+}
