@@ -182,7 +182,9 @@ export const ptRating = defineCommand({
     materialGroup: z.string().describe('Material group, "1.1" (bundled) or the group of an imported table.'),
     tableId: z
       .string()
-      .describe('Rating table id (list_piping_catalogs ratingTables). Must belong to standard + materialGroup (else PSC_CATALOG_CONFLICT). Default: the table of standard + materialGroup.')
+      .describe(
+        'Rating table id (list_piping_catalogs ratingTables). Must belong to standard + materialGroup (else PSC_CATALOG_CONFLICT). Default: the table of standard + materialGroup.',
+      )
       .optional(),
     class: z.number().int().positive().describe('ASME pressure class (150 … 2500), or the PN of a table rated by PN.'),
     temperatureC: z.number().describe('Design temperature in degC. Give this or temperature.').optional(),
