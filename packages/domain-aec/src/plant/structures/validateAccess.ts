@@ -7,6 +7,7 @@ import { isVec3 } from '@lib/vec3';
 import type { RailingElement } from '@aec/building/types';
 import { findProfile } from '../../steel/profiles';
 import { findGratingType } from './grating/gratingTypes';
+import { platformParamsValid } from './platform/platformSpec';
 import { railingStructureProblem } from './railing/railingValidate';
 
 const isPoint = (value: unknown): boolean => Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
@@ -92,10 +93,45 @@ function steelStairErrors(key: string, element: Record<string, unknown>): string
   return errors;
 }
 
-/** Problems with the category-specific fields of a `grating`, `railing`, `ladder` or `steelStair` element (other categories: none). */
+function assemblyErrors(key: string, element: Record<string, unknown>, elements: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  if (element['kind'] !== 'platform' && element['kind'] !== 'circular_platform')
+    errors.push(`building element ${key}: kind must be platform or circular_platform`);
+  else if (!platformParamsValid(element['kind'], element['params']))
+    errors.push(`building element ${key}: params are not the resolved generator parameters of a ${element['kind']}`);
+  const parts = element['partIds'];
+  if (!isStringArray(parts)) return [...errors, `building element ${key}: partIds must be a list of element ids`];
+  for (const id of parts) {
+    const part = elements[id];
+    if (!(isRecord(part) && part['assemblyId'] === key))
+      errors.push(`building element ${key}: part ${id} is missing or does not point back to the assembly (assemblyId)`);
+  }
+  const host = element['hostId'];
+  if (
+    host !== undefined &&
+    !(typeof host === 'string' && isRecord(elements[host]) && (elements[host] as Record<string, unknown>)['category'] === 'equipment')
+  )
+    errors.push(`building element ${key}: hostId must be the id of an equipment element`);
+  const generation = element['generation'];
+  if (!(typeof generation === 'number' && Number.isInteger(generation) && generation >= 1))
+    errors.push(`building element ${key}: generation must be an integer >= 1`);
+  return errors;
+}
+
+/** Problems with the category-specific fields of a `grating`, `railing`, `ladder`, `steelStair` or `assembly` element (other categories: none). */
 export function accessElementErrors(key: string, element: Record<string, unknown>, elements: Record<string, unknown>): string[] {
   const category = element['category'];
   const errors: string[] = [];
+  const owner = element['assemblyId'];
+  if (owner !== undefined) {
+    const assembly = typeof owner === 'string' ? elements[owner] : undefined;
+    const listed =
+      isRecord(assembly) && assembly['category'] === 'assembly' && isStringArray(assembly['partIds']) && assembly['partIds'].includes(key);
+    if (!(category === 'member' || category === 'grating' || category === 'railing') || !listed)
+      errors.push(
+        `building element ${key}: assemblyId must name a platform assembly that lists it as a part (members, gratings and railings only)`,
+      );
+  }
   if (category === 'grating') {
     const boundary = element['boundary'];
     if (!(Array.isArray(boundary) && boundary.length >= 3 && boundary.every(isPoint)))
@@ -122,5 +158,6 @@ export function accessElementErrors(key: string, element: Record<string, unknown
   }
   if (category === 'ladder') errors.push(...ladderErrors(key, element));
   if (category === 'steelStair') errors.push(...steelStairErrors(key, element));
+  if (category === 'assembly') errors.push(...assemblyErrors(key, element, elements));
   return errors;
 }

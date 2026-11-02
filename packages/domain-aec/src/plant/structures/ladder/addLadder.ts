@@ -22,7 +22,7 @@ import {
 } from './ladderDefaults';
 import { cutRailingGate } from './ladderGate';
 import { ladderQuantities, ladderSizes } from './ladderMeasure';
-import { arrivalSurface, distanceToRing, walkingSurfaces } from './ladderSurface';
+import { arrivalSurface, distanceToRing, namedSurfaces, nearestSurface, walkingSurfaces } from './ladderSurface';
 
 /** Vertical tolerance between the top of the climb and the arrival surface, and plan reach from the ladder to it, mm (§5.7). */
 const ARRIVAL_Z_MM = 50;
@@ -43,7 +43,7 @@ export const addLadder = defineCommand({
   description:
     'Add a fixed vertical ladder (flat-bar stiles FL70x10, round rungs RD20) from `base` up to a slab or grating panel (the arrival surface). Lengths in DOCUMENT UNITS. ' +
     '`base` = [x, y, z] middle of the ladder at the departure level (z relative to the level; grade = the level elevation). `facing` = plan direction the climber faces, toward the structure ([0, 1] = +Y). ' +
-    'Give `climbHeight` (the surface top must be within 50 mm of base z + climbHeight and within 600 mm in plan) OR `attachTo` (slab / grating id: the height is computed). ' +
+    'Give `climbHeight` (the surface top must be within 50 mm of base z + climbHeight and within 600 mm in plan) OR `attachTo` (slab, grating or platform assembly id: the height is computed; a platform stands for its panel nearest to the base). ' +
     'Unset values follow the rulesets (default both iso_14122 and osha_1910) and are named in data.defaults: rungPitchMax = the smallest pitch maximum (300 mm with both) so spaces = ceil(H / pitchMax), pitch = H / spaces, rungCount = spaces - 1 ' +
     '(rungPitch instead keeps your pitch, rungs at k x pitch, and check_access judges it; the last step to the arrival may then be shorter); clearWidth and railExtension = the largest minimum; ' +
     'fallProtection = ladder_safety_system above 24 ft for OSHA ladders installed from 2018-11-19, else a cage from ISO 3000 mm, else none; a cage starts at 2200 mm with hoops at <= 1500 mm, 650 mm inside diameter, 5 bars (ISO 14122-4 rows, grade A/B); ' +
@@ -59,7 +59,12 @@ export const addLadder = defineCommand({
       .positive()
       .optional()
       .describe('Height from base to the top of the arrival surface, DOCUMENT UNITS. Give climbHeight or attachTo.'),
-    attachTo: z.string().optional().describe('Slab or grating element id the ladder arrives on; climbHeight is computed from its top.'),
+    attachTo: z
+      .string()
+      .optional()
+      .describe(
+        'Slab, grating or platform assembly element id the ladder arrives on (the assembly: its panel nearest to the base); climbHeight is computed from its top.',
+      ),
     clearWidth: z
       .number()
       .positive()
@@ -152,9 +157,9 @@ export const addLadder = defineCommand({
     let height = params.climbHeight;
     let arrival;
     if (params.attachTo !== undefined) {
-      arrival = surfaces.find((surface) => surface.id === params.attachTo);
+      arrival = nearestSurface(namedSurfaces(model, surfaces, params.attachTo), basePoint);
       if (arrival === undefined)
-        return fail('STA_UNKNOWN_ELEMENT', `${params.attachTo} is not a slab or grating`, ['attachTo'], [params.attachTo]);
+        return fail('STA_UNKNOWN_ELEMENT', `${params.attachTo} is not a slab, grating or platform`, ['attachTo'], [params.attachTo]);
       height = arrival.top - departureTop;
       if (!(height > 0) || distanceToRing(basePoint, arrival.ring) > mm(ARRIVAL_REACH_MM))
         return fail(

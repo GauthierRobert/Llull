@@ -17,6 +17,7 @@ import { routeLength } from '../../industrial/piping/routeSupport';
 import {
   gratingScheduleRows,
   ladderScheduleRows,
+  platformScheduleRows,
   railingScheduleRows,
   steelStairScheduleRows,
 } from '../../plant/structures/quantities/accessTakeoff';
@@ -43,6 +44,7 @@ export const SCHEDULE_KINDS = [
   'railing',
   'ladder',
   'stair_steel',
+  'platform',
 ] as const;
 
 type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
@@ -332,6 +334,11 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
           'Level',
         ],
         rows: ladderScheduleRows(doc, building),
+      };
+    case 'platform':
+      return {
+        columns: ['Mark', 'Kind', 'Members', 'Panels', 'Grating (m²)', 'Grating (kg)', 'Railing (m)', 'Posts', 'Steel (kg)', 'Level'],
+        rows: platformScheduleRows(doc, building),
       };
     case 'stair_steel':
       return {

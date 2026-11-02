@@ -89,6 +89,8 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluateLadder(context.doc, leveled, level);
     case 'steelStair':
       return evaluateSteelStair(context.doc, leveled, level);
+    case 'assembly':
+      return [];
     case 'plate': {
       const member = building.elements[leveled.memberId];
       return member?.category === 'member' ? evaluatePlate(context.doc, leveled, member, level) : [];

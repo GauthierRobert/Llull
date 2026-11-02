@@ -87,6 +87,39 @@ function implicitDocument(): CadDocument {
   return run(tpms.document, 'add_strut_lattice', { cell: 'cubic', cellSize: 5, radius: 0.4, map }).document;
 }
 
+/** The house template plus a vessel with a circular platform and a deck platform with railing (06 STA M6 assemblies: parts with assemblyId, host links). */
+function buildingWithPlatforms(): CadDocument {
+  const house = planDocument(plans['building_house_template'], 'building_house_template');
+  const scale = house.units === 'm' ? 0.001 : 1;
+  const mm = (value: number): number => value * scale;
+  const run = (doc: CadDocument, name: string, params: Record<string, unknown>): { document: CadDocument } => {
+    const result = execute(doc, name, params);
+    if (result.error !== undefined) throw new Error('pluginSliceSeeds: ' + name + ' refused: ' + result.summary);
+    return result;
+  };
+  const vessel = run(house, 'add_equipment', {
+    name: 'Column',
+    location: [mm(40000), 0],
+    size: [mm(2000), mm(2000), mm(8000)],
+    shape: 'vertical_vessel',
+  });
+  const ring = run(vessel.document, 'add_circular_access_platform', {
+    equipmentId: 'equipment-1',
+    elevation: mm(3000),
+    width: mm(800),
+    railing: {},
+  });
+  return run(ring.document, 'add_access_platform', {
+    bounds: [
+      [mm(50000), 0],
+      [mm(53000), mm(2000)],
+    ],
+    gratingType: '19-W-4 1-1/4x3/16',
+    bearingBarDirection: [1, 0],
+    railing: {},
+  }).document;
+}
+
 const planOf = (table: Record<string, GoldenAction[]>, name: string) => (): CadDocument => planDocument(table[name], name);
 
 /** The golden PLM plan needs a signature port that accepts a confirmation naming its signer (as tests/golden/golden.test.ts does). */
@@ -121,7 +154,7 @@ const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc
 export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   building: {
     roots: ['building'],
-    build: planOf(plans, 'building_house_template'),
+    build: buildingWithPlatforms,
     query: { name: 'describe_building', params: constant({}) },
     mutate: { name: 'add_level', params: constant({ name: 'Fuzz level', elevation: 90000, height: 3000 }) },
   },
