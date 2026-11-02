@@ -215,3 +215,11 @@ describe('buildShape: inconsistent flange rows', () => {
     mismatch({ ...row, boltCircle: 100 });
   });
 });
+
+describe('buildShape: gasket inner diameter', () => {
+  it('refuses a gasket whose inner diameter is zero or negative (wall at or above the pipe radius)', () => {
+    refusal(buildShape(source('gasketSheet', { outsideDiameter: 190 }, { wallMm: 57.15 })), 'PSC_CATALOG_DIM_MISMATCH');
+    refusal(buildShape(source('gasketSheet', { outsideDiameter: 190 }, { wallMm: 1e9 })), 'PSC_CATALOG_DIM_MISMATCH');
+    refusal(buildShape(source('gasketSpiralWound', { innerRingId: 0, centeringRingOd: 174.8 })), 'PSC_CATALOG_DIM_MISMATCH');
+  });
+});

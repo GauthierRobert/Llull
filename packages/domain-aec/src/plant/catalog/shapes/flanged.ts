@@ -132,6 +132,11 @@ export function gasketShape(source: ShapeSource): ShapeOutcome {
       'PSC_SHAPE_UNSUPPORTED',
       'a gasket shape needs an inner ring ID and an outer ring OD (innerRingId, centeringRingOd or sealingElementOd)',
     );
+  if (!(inner > 0))
+    return refusal(
+      'PSC_CATALOG_DIM_MISMATCH',
+      'the gasket inner diameter is not positive (innerRingId, or pipe outside diameter less twice the wall)',
+    );
   const assumed = source.dims['thickness'] === undefined;
   const thickness = source.dims['thickness'] ?? ASSUMED_GASKET_MM[source.type];
   if (thickness === undefined) return refusal('PSC_CATALOG_ROW_MISSING', `the ${source.type} row has no thickness`);
