@@ -10,7 +10,7 @@ import { bundledCatalog } from '../bundled';
 import { refuse } from '../codes';
 import { resolveCatalogRow } from '../lookup';
 import { en10220OutsideDiameter, sizePair } from '../nominal';
-import { BAR_PER_PSI, findRatingTable, ratingAt, tabulatedPsi, availableRatingTables } from '../ptRating';
+import { BAR_PER_PSI, availableRatingTables, findRatingTable, ratingAt, ratingTableById, tabulatedPsi } from '../ptRating';
 import { sectionProperties, STEEL_DENSITY_KG_M3 } from '../sectionProperties';
 import type { Provenance } from '../types';
 
@@ -176,9 +176,15 @@ export const ptRating = defineCommand({
     'Give temperatureC, or temperature { value, unit: "C" | "F" }. unit "psi" returns the tabulated psig at or below 100 degF (285 for class 150) and otherwise converts bar at 0.0689475729 bar/psi, stating it. ' +
     'verified is true only when every row used is grade A. Ratings are for a qualified engineer to confirm. Next: check_pipe_spec compares design pressure with this rating.',
   params: z.object({
-    standard: z.string().describe('Rating standard, "ASME B16.5" (the only bundled table).'),
-    materialGroup: z.string().describe('Material group, "1.1" (the only bundled group).'),
-    class: z.number().int().positive().describe('ASME pressure class: 150, 300, 600, 900, 1500, 2500.'),
+    standard: z
+      .string()
+      .describe('Rating standard, "ASME B16.5" (bundled, group 1.1) or the standard of an imported table (import_rating_table).'),
+    materialGroup: z.string().describe('Material group, "1.1" (bundled) or the group of an imported table.'),
+    tableId: z
+      .string()
+      .describe('Rating table id (list_piping_catalogs ratingTables). Default: the table of standard + materialGroup.')
+      .optional(),
+    class: z.number().int().positive().describe('ASME pressure class (150 … 2500), or the PN of a table rated by PN.'),
     temperatureC: z.number().describe('Design temperature in degC. Give this or temperature.').optional(),
     temperature: z
       .object({ value: z.number().describe('Temperature value.'), unit: z.enum(TEMPERATURE_UNITS).describe('C or F.') })
@@ -194,12 +200,15 @@ export const ptRating = defineCommand({
     const temperatureC =
       params.temperatureC ??
       (params.temperature?.unit === 'F' ? ((params.temperature.value - 32) * 5) / 9 : (params.temperature?.value as number));
-    const table = findRatingTable(params.standard, params.materialGroup);
+    const table =
+      params.tableId === undefined ? findRatingTable(doc, params.standard, params.materialGroup) : ratingTableById(doc, params.tableId);
     if (table === undefined)
       return fail(
         'PSC_CATALOG_ROW_MISSING',
-        `no rating table for ${params.standard} group ${params.materialGroup} (available: ${availableRatingTables().join(', ')}; others are import-only)`,
-        'standard',
+        params.tableId === undefined
+          ? `no rating table for ${params.standard} group ${params.materialGroup} (available: ${availableRatingTables(doc).join(', ')}; others: import_rating_table)`
+          : `no rating table "${params.tableId}" (available: ${availableRatingTables(doc).join(', ')})`,
+        params.tableId === undefined ? 'standard' : 'tableId',
       );
     const rating = ratingAt(table, params.class, temperatureC);
     if (!rating.ok) return fail(rating.code, rating.message, rating.code === 'PSC_PT_TEMPERATURE_OUT_OF_TABLE' ? 'temperatureC' : 'class');

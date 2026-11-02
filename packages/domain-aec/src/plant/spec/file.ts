@@ -68,7 +68,7 @@ const componentSchema = z
   })
   .catchall(scalar);
 
-const COMPONENT_KEYS: ReadonlySet<string> = new Set(Object.keys(componentSchema.shape));
+export const COMPONENT_KEYS: ReadonlySet<string> = new Set(Object.keys(componentSchema.shape));
 
 /** Header members shared by the file and by `create_pipe_spec` (every safety-relevant member is required: AF-31). */
 export const headerShape = {
@@ -143,14 +143,14 @@ const branchTableSchema = z
   .object({ system: z.enum(['NPS', 'DN']).optional(), cells: z.record(z.string(), z.record(z.string(), z.enum(BRANCH_FITTINGS))) })
   .catchall(z.unknown());
 
-const insulationRowSchema = z
+export const insulationRowSchema = z
   .object({
     code: z.string().min(1).describe('Insulation code written in the line number, e.g. "H".'),
     dnMax: z.number().positive().describe('The row applies to lines up to this DN.'),
     tempMaxC: z.number().describe('... and up to this design temperature, degC.'),
     thicknessMm: z.number().positive().describe('Insulation thickness, mm.'),
     material: z.string().min(1).describe('Insulation material, e.g. "mineral wool".'),
-    conductivityWmK: z.number().positive().optional(),
+    conductivityWmK: z.number().positive().describe('Thermal conductivity of the insulation in W/(m.K).').optional(),
   })
   .strict();
 

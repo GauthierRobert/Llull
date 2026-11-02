@@ -4,7 +4,9 @@
  * @invariant interpolation only inside the table; the result is `verified` only when every row it used is
  */
 
+import type { CadDocument } from '@core/model/types';
 import { BUNDLED_RATING_TABLE_ID, bundledRatingTable } from './bundled';
+import { importedRatingTable, importedRatingTables } from './store';
 import type { RatingRow, RatingTable } from './types';
 
 /** 1 psi in bar (the B16.5 bar and psi tables are separately rounded, so conversions are stated, never compared to tabulated values). */
@@ -61,14 +63,24 @@ export function ratingAt(table: RatingTable, ratingClass: number, temperatureC: 
   };
 }
 
-/** The bundled rating table of a standard and material group (case and spacing ignored), or undefined. */
-export function findRatingTable(standard: string, materialGroup: string): RatingTable | undefined {
-  const table = bundledRatingTable();
-  const same = (a: string, b: string): boolean => a.toLowerCase().replace(/\s+/g, '') === b.toLowerCase().replace(/\s+/g, '');
-  return same(table.standard, standard) && same(table.materialGroup, materialGroup) ? table : undefined;
+const sameText = (a: string, b: string): boolean => a.toLowerCase().replace(/s+/g, '') === b.toLowerCase().replace(/s+/g, '');
+
+/** Rating tables the document can use: the bundled one first, then the imported ones in id order. */
+export const allRatingTables = (doc: Pick<CadDocument, 'plant'>): readonly RatingTable[] => [
+  bundledRatingTable(),
+  ...importedRatingTables(doc),
+];
+
+/** The rating table of a standard and material group (case and spacing ignored; bundled first, then imported), or undefined. */
+export function findRatingTable(doc: Pick<CadDocument, 'plant'>, standard: string, materialGroup: string): RatingTable | undefined {
+  return allRatingTables(doc).find((table) => sameText(table.standard, standard) && sameText(table.materialGroup, materialGroup));
 }
 
-export const availableRatingTables = (): readonly string[] => [BUNDLED_RATING_TABLE_ID];
+/** The rating table with this id (bundled or imported), or undefined. */
+export const ratingTableById = (doc: Pick<CadDocument, 'plant'>, id: string): RatingTable | undefined =>
+  id === BUNDLED_RATING_TABLE_ID ? bundledRatingTable() : importedRatingTable(doc, id);
+
+export const availableRatingTables = (doc: Pick<CadDocument, 'plant'>): readonly string[] => allRatingTables(doc).map((table) => table.id);
 
 /** Tabulated psig of the class at or below 100 degF (-20..100 degF band), or null when the table has no imperial row for it. */
 export function tabulatedPsi(

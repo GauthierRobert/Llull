@@ -2,7 +2,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import { BUNDLED_CATALOG_ID, bundledCatalog } from './bundled';
-import type { CatalogModel, PipingCatalog } from './types';
+import type { CatalogModel, PipingCatalog, RatingTable } from './types';
 
 export const EMPTY_CATALOG_MODEL: CatalogModel = { catalogs: {}, catalogOrder: [] };
 
@@ -34,3 +34,17 @@ export function findCatalog(doc: Pick<CadDocument, 'plant'>, reference: string):
   const pinned = reference.includes('@') ? reference.slice(reference.indexOf('@') + 1) : undefined;
   return found !== undefined && (pinned === undefined || pinned === found.version) ? found : undefined;
 }
+
+/** Imported rating table `id` (own keys only), or undefined. */
+export const importedRatingTable = (doc: Pick<CadDocument, 'plant'>, id: string): RatingTable | undefined => {
+  const tables = getCatalogModel(doc).ratingTables;
+  return tables !== undefined && Object.hasOwn(tables, id) ? tables[id] : undefined;
+};
+
+/** The imported rating tables in id order. */
+export const importedRatingTables = (doc: Pick<CadDocument, 'plant'>): readonly RatingTable[] => {
+  const tables = getCatalogModel(doc).ratingTables ?? {};
+  return Object.keys(tables)
+    .sort()
+    .flatMap((id) => tables[id] ?? []);
+};

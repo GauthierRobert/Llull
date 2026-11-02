@@ -110,6 +110,7 @@ export interface PipingCatalog {
 }
 
 export interface RatingRow {
+  /** ASME class, or the PN of an EN 1092-1 / company table rated by PN. */
   readonly ratingClass: number;
   readonly temperatureC: number;
   readonly bar: Dim;
@@ -152,4 +153,6 @@ export interface SpecBinding {
 export interface CatalogModel {
   readonly catalogs: Readonly<Record<string, PipingCatalog>>;
   readonly catalogOrder: readonly string[];
+  /** Imported rating tables by id (M5); absent until the first `import_rating_table`. */
+  readonly ratingTables?: Readonly<Record<string, RatingTable>>;
 }

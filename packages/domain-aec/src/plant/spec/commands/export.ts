@@ -3,40 +3,22 @@
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import { exportRefusal, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import { canonicalJson } from '@lib/canonicalJson';
 import { csvLines, type CsvCell } from '@lib/csv';
 import { sha256Hex } from '@lib/sha256';
 import { guardRows } from '../../catalog/csvGuard';
 import type { NominalSize } from '../../catalog/types';
 import { componentRows } from '../checks/rows';
-import { canonicalSpecText } from '../file';
+import { canonicalSpecText, specToFile } from '../file';
+import { SPEC_SHEET_COLUMNS } from '../sheetImport';
 import { sizesInRange } from '../size';
 import type { PipeSpec } from '../types';
 import { isLoaded, loadSpec } from './answer';
 
 const sizeText = (size: NominalSize | undefined): string | null => (size === undefined ? null : `${size.system} ${size.key}`);
 
-const COLUMNS = [
-  'component',
-  'type',
-  'from',
-  'to',
-  'branchFrom',
-  'branchTo',
-  'ends',
-  'class',
-  'pn',
-  'facing',
-  'radius',
-  'schedule',
-  'scheduleFromPipe',
-  'wallMm',
-  'priority',
-  'catalogRef',
-  'commodityCode',
-  'description',
-  'material',
-  'verified',
-] as const;
+/** File members the sheets carry (or that are never imported): left out of `data.header`. */
+const SHEET_ONLY: ReadonlySet<string> = new Set(['format', 'schemaVersion', 'components', 'branchTable', 'status', 'approval']);
 
 /** Spec sheet: one row per component and size range; `verified` = every catalogue row it resolves to is grade A. */
 function sheetCsv(spec: PipeSpec, verified: ReadonlyMap<string, boolean>): string {
@@ -57,12 +39,14 @@ function sheetCsv(spec: PipeSpec, verified: ReadonlyMap<string, boolean>): strin
     component.wallMm ?? null,
     component.priority ?? null,
     component.catalogRef,
+    component.standard ?? null,
     component.commodityCode ?? null,
     component.description ?? null,
     component.material ?? null,
     verified.get(component.id) ?? false,
+    component.extra === undefined ? null : canonicalJson(component.extra),
   ]);
-  return csvLines(COLUMNS, guardRows(rows));
+  return csvLines(SPEC_SHEET_COLUMNS, guardRows(rows));
 }
 
 function branchCsv(spec: PipeSpec): string {
@@ -78,7 +62,7 @@ function branchCsv(spec: PipeSpec): string {
 }
 
 /**
- * @affects none; data = { specId, revision, format, text, sha256, bytes, components, branchCsv? }
+ * @affects none; data = { specId, revision, format, text, sha256, bytes, components, branchCsv?, header? } (csv: header = the spec file without components / branch table / status, the `spec` param of import_pipe_spec_sheet)
  * @invariant read-only; json is the canonical file (sorted keys, millimetres) and importing it into an empty document then exporting gives the identical sha256; sha256 is of the text
  * @failure unknown spec or revision -> PSC_SPEC_UNKNOWN; export-controlled content in the document without a human signature -> MAT_EXPORT_CONTROLLED / MAT_HUMAN_GATE
  */
@@ -86,7 +70,7 @@ export const exportPipeSpec = defineCommand({
   name: 'export_pipe_spec',
   description:
     'Export one revision of a piping spec as canonical JSON (format llull-pipe-spec: sorted keys, millimetres, sizes as fromNps / toNps or fromDn / toDn) or as the spec-sheet CSV for reviewers ' +
-    '(one row per component with sizes, ends, class, facing, schedule, catalogue, commodity code and verified; the branch table comes back as a second CSV in data.branchCsv). ' +
+    '(one row per component with sizes, ends, class, facing, schedule, catalogue, standard, commodity code, verified and extra; the branch table comes back as a second CSV in data.branchCsv and the spec header in data.header: import_pipe_spec_sheet reads them back). ' +
     'Returns the text and its sha256: exporting, importing and exporting again gives the identical hash. Next: import_pipe_spec re-imports the JSON; pass --save to write it to a file.',
   params: z.object({
     specId: z.string().describe('Spec id (list_pipe_specs).'),
@@ -103,6 +87,7 @@ export const exportPipeSpec = defineCommand({
     const { spec } = loaded;
     let text: string;
     let table: string | undefined;
+    let header: Record<string, unknown> | undefined;
     if (format === 'csv') {
       const rows = componentRows({
         spec,
@@ -123,6 +108,7 @@ export const exportPipeSpec = defineCommand({
         ),
       );
       table = branchCsv(spec);
+      header = Object.fromEntries(Object.entries(specToFile(spec)).filter(([key]) => !SHEET_ONLY.has(key)));
     } else text = canonicalSpecText(spec);
     return report(
       doc,
@@ -136,6 +122,7 @@ export const exportPipeSpec = defineCommand({
         bytes: new TextEncoder().encode(text).length,
         components: spec.components.length,
         ...(table === undefined ? {} : { branchCsv: table }),
+        ...(header === undefined ? {} : { header }),
       },
     );
   },

@@ -1,6 +1,7 @@
 /** Design-condition pass of `check_pipe_spec` (§5.6 5): design pressure against the spec's P-T rating, design temperature against its limits. */
 
-import { findRatingTable, ratingAt } from '../../catalog/ptRating';
+import { findRatingTable, ratingAt, ratingTableById } from '../../catalog/ptRating';
+import type { CadDocument } from '@core/model/types';
 import { finding, type CheckContext, type SpecFinding } from './finding';
 
 /** Design conditions: pressure in bar gauge, temperature in degC. */
@@ -16,7 +17,7 @@ export interface DesignOutcome {
 
 const round4 = (value: number): number => Math.round(value * 1e4) / 1e4;
 
-export function designFindings({ spec }: CheckContext, design: DesignConditions): DesignOutcome {
+export function designFindings(doc: Pick<CadDocument, 'plant'>, { spec }: CheckContext, design: DesignConditions): DesignOutcome {
   const findings: SpecFinding[] = [];
   const limits = spec.designLimits;
   const base = { designBar: design.pressureBar, temperatureC: design.temperatureC };
@@ -36,8 +37,14 @@ export function designFindings({ spec }: CheckContext, design: DesignConditions)
         { temperatureC: design.temperatureC },
       ),
     );
-  const { system, materialGroup, class: ratingClass } = spec.rating;
-  const table = materialGroup === undefined ? undefined : findRatingTable(system, materialGroup);
+  const { system, materialGroup, ratingTableId } = spec.rating;
+  const ratingClass = spec.rating.class ?? spec.rating.pn;
+  const table =
+    ratingTableId !== undefined
+      ? ratingTableById(doc, ratingTableId)
+      : materialGroup === undefined
+        ? undefined
+        : findRatingTable(doc, system, materialGroup);
   if (table === undefined || ratingClass === undefined) {
     findings.push(
       finding(
@@ -47,7 +54,7 @@ export function designFindings({ spec }: CheckContext, design: DesignConditions)
         'not_run',
         [spec.id],
         ['rating'],
-        `no bundled rating table for ${system} group ${materialGroup ?? '(none)'} class ${ratingClass ?? '(none)'}: the design pressure was NOT checked`,
+        `no rating table (bundled or imported) for ${system} group ${materialGroup ?? '(none)'} class ${ratingClass ?? '(none)'}: the design pressure was NOT checked`,
       ),
     );
     return { findings, data: { ...base, checked: false } };
