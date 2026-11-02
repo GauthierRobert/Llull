@@ -5,6 +5,7 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { bundledRatingTable, IMPORT_ONLY_STANDARDS, BUNDLED_CATALOG_ID } from '../bundled';
 import { refuse } from '../codes';
+import { FAMILY_SCHEMAS } from '../familySchemas';
 import { flatKeys, resolveCatalogRow, type ResolvedRow } from '../lookup';
 import { allCatalogs, findCatalog } from '../store';
 import { BEND_RADII, COMPONENT_TYPES, END_TYPES, FACINGS, type ComponentFamily, type PipingCatalog } from '../types';
@@ -105,6 +106,14 @@ export const listPipingCatalogs = defineCommand({
           },
         ],
         importOnly: IMPORT_ONLY_STANDARDS,
+        familySchemas: FAMILY_SCHEMAS.map((schema) => ({
+          id: schema.id,
+          standard: schema.standardName,
+          types: schema.types,
+          requiredDims: schema.required,
+          optionalDims: schema.optional,
+          ...(schema.classes === undefined ? {} : { classes: schema.classes([]) }),
+        })),
       },
     );
   },
