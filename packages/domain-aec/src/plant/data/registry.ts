@@ -7,7 +7,7 @@
 
 import { resolvedOrNull } from './classes';
 import { ancestry, scopeKey } from './hierarchy';
-import { targetKey, type PlantDataModel, type PlantObject, type TagScope } from './model';
+import { targetKey, type PlantDataModel, type PlantObject, type TagScope, own } from './model';
 import { normaliseTag } from './tagFormat';
 
 export interface ScopeInfo {
@@ -127,7 +127,7 @@ export const idsWithTag = (registry: ObjectRegistry, tag: string): readonly stri
 
 /** The object a caller means by an id or a tag; `ambiguous` when a tag is held in several (disjoint) scopes. */
 export function objectByRef(data: PlantDataModel, reference: string): PlantObject | 'ambiguous' | null {
-  const byId = data.objects[reference];
+  const byId = own(data.objects, reference);
   if (byId !== undefined) return byId;
   const ids = idsWithTag(objectRegistry(data), reference);
   if (ids.length > 1) return 'ambiguous';

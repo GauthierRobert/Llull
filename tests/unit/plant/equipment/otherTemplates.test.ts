@@ -46,6 +46,8 @@ describe('legacy equipment consumers keep working on exchangers, tanks and pumps
   });
 });
 
+type Row = [string, string, (plant: Record<string, unknown>, template: Record<string, unknown>) => unknown, RegExp];
+
 describe('load: a corrupt plant record of a new template is rejected with a description, never a crash', () => {
   const stored = JSON.parse(serializeDocument(plantDocument())) as {
     document: { building: { elements: Record<string, { plant: { template: Record<string, unknown> } & Record<string, unknown> }> } };
@@ -65,7 +67,7 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
   const side = (template: Record<string, unknown>): Record<string, unknown> => template['design'] as Record<string, unknown>;
   const shell = (template: Record<string, unknown>): Record<string, unknown> => side(template)['shellSide'] as Record<string, unknown>;
 
-  it.each([
+  it.each<Row>([
     [
       'exchanger without tema',
       'equipment-1',
@@ -116,13 +118,12 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
       /courses must be a non-empty array/,
     ],
     ...['constructor', '__proto__', 'hasOwnProperty', 'toString', 'valueOf'].map(
-      (kind) =>
-        [
-          `template kind ${kind}`,
-          'equipment-1',
-          (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['kind'] = kind),
-          /template\.kind/,
-        ] as const,
+      (kind): Row => [
+        `template kind ${kind}`,
+        'equipment-1',
+        (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['kind'] = kind),
+        /template\.kind/,
+      ],
     ),
     [
       'exchanger without defaulted',

@@ -29,6 +29,7 @@ import { nextMemberMark } from '../../industrial/common/memberSupport';
 import { copyPipeSupports } from '../../industrial/piping/pipeSupportCopy';
 import { reconcilePipeSupports, reconciliationNote } from '../../industrial/piping/pipeSupportAttach';
 import { levelIdParam } from '../levelParams';
+import { followHosts } from '../../plant/structures/platform/platformRegenerate';
 import { fromMm } from '@core/model/units';
 import { STAIR_HEADROOM_MM, stairSlabCrossings } from '../../industrial/clash/clashSlabs';
 
@@ -158,6 +159,7 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'window':
     case 'plate':
     case 'connection':
+    case 'assembly':
       return element;
   }
 }
@@ -208,6 +210,15 @@ export const moveBuildingElement = defineCommand({
     const known = [...new Set(elementIds)].filter((id) => building.elements[id] !== undefined);
     if (known.length === 0) return noop(doc, 'move_building_element: none of the given ids is a building element.');
     if (delta[0] === 0 && delta[1] === 0) return noop(doc, 'move_building_element: delta is [0, 0]; nothing to move.');
+    const generated = known.filter((id) => {
+      const element = building.elements[id];
+      return element?.category === 'assembly' || (element !== undefined && 'assemblyId' in element && element.assemblyId !== undefined);
+    });
+    if (generated.length > 0)
+      return noop(
+        doc,
+        `move_building_element refused: ${generated.join(', ')} belong(s) to a generated platform (read-only); change its boundary or vessel with update_access_platform and the parts are regenerated.`,
+      );
     const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const strayOpenings = known.filter((id) => {
       const element = building.elements[id];
@@ -248,12 +259,15 @@ export const moveBuildingElement = defineCommand({
     );
     const issues = openingFitIssues(next, movedLevels);
     if (issues.length > 0) return noop(doc, `move_building_element refused: ${issues[0]}.`);
-    const supports = reconcilePipeSupports(doc, next);
+    // A circular platform follows its vessel: it is re-derived in the same result (ids and marks kept).
+    const followed = followHosts(doc, next, new Set(known));
+    if (!followed.ok) return noop(doc, `move_building_element refused: ${followed.message}.`);
+    const supports = reconcilePipeSupports(doc, followed.building);
     const moved = withDependents(building, known);
     return commitBuilding(
       doc,
       supports.building,
-      [...moved, ...[...supports.reattached, ...supports.detached].map((change) => change.id)],
+      [...moved, ...followed.ids, ...[...supports.reattached, ...supports.detached].map((change) => change.id)],
       `Moved ${known.length} element(s) by [${delta[0]}, ${delta[1]}]: ${known.join(', ')}.${ignoredNote(ignored)}${reconciliationNote(supports)}`,
     );
   },
@@ -322,11 +336,21 @@ export const copyLevelElements = defineCommand({
     // Hosted elements (doors, windows, base plates) are copied with their host only.
     const allowed = new Set<string>(categories !== undefined && categories.length > 0 ? categories : COPYABLE);
     const allElements = orderedElements(building);
-    const sourceElements = allElements.filter(
+    const onSource = allElements.filter(
       (element): element is Exclude<BuildingElement, { category: 'grid' | 'door' | 'window' }> =>
         'levelId' in element && element.levelId === sourceLevelId && allowed.has(element.category),
     );
-    if (sourceElements.length === 0) return noop(doc, `copy_level_elements: level ${sourceLevelId} has nothing to copy.`);
+    // A generated platform is not copyable: its parts are derived from the assembly, which stays where it is.
+    const isPlatformPart = (element: BuildingElement): boolean => 'assemblyId' in element && element.assemblyId !== undefined;
+    const sourceElements = onSource.filter((element) => !isPlatformPart(element));
+    const skippedParts = onSource.length - sourceElements.length;
+    if (sourceElements.length === 0)
+      return noop(
+        doc,
+        skippedParts > 0
+          ? `copy_level_elements: level ${sourceLevelId} only has generated platform parts (not copyable: add_access_platform on the target level); nothing to copy.`
+          : `copy_level_elements: level ${sourceLevelId} has nothing to copy.`,
+      );
     const sourceHeight = building.levels[sourceLevelId]?.height ?? 0;
     let next = building;
     const created: string[] = [];
@@ -404,7 +428,7 @@ export const copyLevelElements = defineCommand({
       doc,
       supports.building,
       created,
-      `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${reconciliationNote(supports)}${wellNote}`,
+      `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${skippedParts > 0 ? ` Skipped ${skippedParts} generated platform part(s): a platform is not copyable, add_access_platform on the target level.` : ''}${reconciliationNote(supports)}${wellNote}`,
       { elementIds: created },
     );
   },

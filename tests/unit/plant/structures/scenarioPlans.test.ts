@@ -1,7 +1,7 @@
 /**
  * Plant 06 STA: runs the validation pack's scenario plans (`validation/plans/*.json`) through `build_project` (the path of `llull run plan.json`)
  * and compares each `expected` row with the step's `data`. SC-STA-06 (grating span) is complete since M2, SC-STA-05 (negative access) and
- * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4, SC-STA-02 (steel stair) since M5. SC-STA-03, 04 and 07 wait for M6..M8 (tests/unit/contract/blockedPlanCommands.json).
+ * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4, SC-STA-02 (steel stair) since M5, SC-STA-03 (circular platform) since M6. SC-STA-04 and 07 wait for M7..M8 (tests/unit/contract/blockedPlanCommands.json).
  */
 
 import { readFileSync } from 'node:fs';
@@ -156,5 +156,30 @@ describe('SC-STA-02 steel stair (VC-STA-04)', () => {
 
   it('is deterministic (AF-13)', () => {
     expect(JSON.stringify(run('sc-sta-02-steel-stair.json').report.steps)).toBe(JSON.stringify(report.steps));
+  });
+});
+
+describe('SC-STA-03 vessel circular platform (VC-STA-07)', () => {
+  const { plan, report } = run('sc-sta-03-vessel-circular-platform.json');
+
+  it('runs every step', () => {
+    expect(report.steps.filter((step) => !step.ok).map((step) => step.summary)).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  it('meets every expected row: radii, sector area, grating mass, arc, rail length, posts, brackets, no unprotected edge', () => {
+    expect(plan.expected.length).toBeGreaterThanOrEqual(9);
+    for (const row of plan.expected) compare(pick(report.steps[row.step], row.path), row);
+  });
+
+  it('keeps the reachability row for M8 (STA_ACCESS_NO_EGRESS needs the access graph), which check_access does not report yet', () => {
+    const deferred = (plan as Plan & { deferred: Array<{ path: string; waitsFor: string }> }).deferred;
+    expect(deferred.map((row) => row.waitsFor.split(' ')[0])).toEqual(['check_reachability']);
+    const findings = (report.steps[plan.actions.length - 1]?.data as { findings: Array<{ code: string }> }).findings;
+    expect(findings.map((finding) => finding.code)).not.toContain('STA_ACCESS_NO_EGRESS');
+  });
+
+  it('is deterministic (AF-13)', () => {
+    expect(JSON.stringify(run('sc-sta-03-vessel-circular-platform.json').report.steps)).toBe(JSON.stringify(report.steps));
   });
 });

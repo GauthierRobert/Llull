@@ -48,7 +48,7 @@ const NUMBERS: Readonly<Record<string, ReadonlyArray<string>>> = {
   pipeSupport: ['rodLength', 'pedestalHeight'], grating: ['topOffset', 'bearingBarAngle'],
   railing: ['height', 'kneeRails', 'toePlate', 'postSpacingMax'],
   ladder: ['facing', 'climbHeight', 'clearWidth', 'rungPitch', 'rungCount', 'railExtension', 'backClearance'],
-  steelStair: ['angle', 'rise', 'width', 'riserCount', 'riserHeight', 'going'],
+  steelStair: ['angle', 'rise', 'width', 'riserCount', 'riserHeight', 'going'], assembly: ['generation'],
 };
 
 const CATEGORIES: ReadonlySet<string> = new Set(Object.keys(NUMBERS));

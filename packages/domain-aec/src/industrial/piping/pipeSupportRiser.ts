@@ -9,7 +9,7 @@
 
 import { round, roundedMetres } from '../../shared/numeric';
 import { metres as shown } from '../steelDesign/steelMemberRows';
-import { pipeWeightPerMetre } from './pipeWeight';
+import { pipeWallMm, pipeWeightPerMetre } from './pipeWeight';
 import { riserRuns } from './routeSupport';
 import type { EndCarrier, PipeRun, SupportStation } from './pipeSupportLayout';
 
@@ -92,7 +92,7 @@ export function riserRows(
     );
     const weightBy: RiserRow['weightBy'] =
       carried[0] || carried[1] ? 'carried end' : clamps.length > 0 ? 'clamp' : elbowSupported ? 'elbow support' : null;
-    const weightKn = (pipeWeightPerMetre(run.diameterMm, WATER_DENSITY) * length) / 1000;
+    const weightKn = (pipeWeightPerMetre(run.diameterMm, WATER_DENSITY, pipeWallMm(run.element, run.diameterMm)) * length) / 1000;
     if (weightBy === null) {
       issues.push(
         `${label}: its ${weightKn.toFixed(1)} kN weight is carried by nothing (add a shoe or anchor clamp on the riser, a support within ${shown(overhangLimit)} m of an elbow, or end it in equipment)`,

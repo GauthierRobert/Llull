@@ -11,6 +11,10 @@ import { addLadder } from './ladder/addLadder';
 import { addSteelStair } from './stair/addSteelStair';
 import { addRailing } from './railing/addRailing';
 import { updateRailing } from './railing/updateRailing';
+import { accessPlatformTakeoff } from './platform/accessPlatformTakeoff';
+import { addAccessPlatform } from './platform/addAccessPlatform';
+import { addCircularAccessPlatform } from './platform/addCircularAccessPlatform';
+import { updateAccessPlatform } from './platform/updateAccessPlatform';
 
 export const structuresCommands = commandCatalog(
   listAccessRules,
@@ -23,4 +27,8 @@ export const structuresCommands = commandCatalog(
   updateRailing,
   addLadder,
   addSteelStair,
+  addAccessPlatform,
+  addCircularAccessPlatform,
+  updateAccessPlatform,
+  accessPlatformTakeoff,
 );

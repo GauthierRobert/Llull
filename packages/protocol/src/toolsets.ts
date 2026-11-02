@@ -29,6 +29,7 @@ export const TOOLSET_NAMES = [
   'plant_structures',
   'plant_equipment',
   'plant_data',
+  'pipestress',
   'pid',
   'civil',
   'design',
@@ -168,6 +169,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Plant data (08 DAT): hierarchy, classes, tags, typed properties and the data check, contributed by the installed plant-data plugin. */
   get plant_data(): readonly string[] {
     return pluginToolNames('plant_data');
+  },
+  /** Pipe stress and flexibility (07 PST): closed-form quick checks, contributed by the pipeStress plugin. */
+  get pipestress(): readonly string[] {
+    return pluginToolNames('pipestress');
   },
   /** P&ID schematics (04 PID): contributed by the installed pid plugin (M1 data model, M2 import and report, M3 authoring). */
   get pid(): readonly string[] {

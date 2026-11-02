@@ -1,13 +1,13 @@
 {
   "id": "SC-STA-07",
-  "status": "PROPOSED — add_circular_platform, add_ladder, check_reachability are not built; valve entities belong to 02-spec-driven-routing, so targets are given as explicit points here",
+  "status": "PROPOSED — check_reachability is not built (add_circular_access_platform and add_ladder are since M6 / M4); valve entities belong to 02-spec-driven-routing, so targets are given as explicit points here",
   "validates": ["VC-STA-11"],
   "description": "Access graph: grade -> ladder -> vessel platform at +6000. Three operating points checked against an explicit project operating-height band (no default: AF-31).",
   "actions": [
     { "command": "set_units", "params": { "units": "mm" } },
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0, "height": 6000 } },
     { "command": "add_equipment", "params": { "name": "Column", "mark": "C-101", "location": [0, 0], "size": [3000, 3000, 18000], "shape": "vertical_vessel" }, "as": "vessel" },
-    { "command": "add_circular_platform", "params": { "equipmentId": "$vessel", "elevation": 6000, "startAngleDeg": 0, "sweepDeg": 180, "gap": 150, "width": 1000, "railing": { "edges": ["outer", "ends"], "height": 1100 } }, "as": "plat" },
+    { "command": "add_circular_access_platform", "params": { "equipmentId": "$vessel", "elevation": 6000, "startAngleDeg": 0, "sweepDeg": 180, "gap": 150, "width": 1000, "railing": { "edges": ["outer", "ends"], "height": 1100 } }, "as": "plat" },
     { "command": "add_ladder", "params": { "base": [2150, -250, 0], "climbHeight": 6000, "facing": [0, 1], "attachTo": "$plat", "exit": "through", "fallProtection": "cage" }, "as": "lad" },
     {
       "command": "check_reachability",

@@ -3,7 +3,7 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { isKindOf, resolvedOrNull } from '../classes';
 import { resolveNode, subtreeIds } from '../hierarchy';
-import { getPlantData, type PlantDataModel, type PlantObject } from '../model';
+import { getPlantData, type PlantDataModel, type PlantObject, own } from '../model';
 import { naturalCompare } from '../naturalSort';
 import { formatParts } from '../objectTag';
 import { sequenceField } from '../tagFormat';
@@ -37,7 +37,7 @@ export const renumberTags = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const data = getPlantData(doc);
     const className = params.className;
-    if (data.classes[className] === undefined)
+    if (own(data.classes, className) === undefined)
       return refuse(doc, 'renumber_tags', {
         code: 'DAT_CLASS_UNKNOWN',
         message: `no class "${className}" (${data.classOrder.join(', ')})`,

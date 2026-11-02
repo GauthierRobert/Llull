@@ -10,7 +10,7 @@ const SUPPORT_GAP_MM = 10;
 /** ... and this far above it (rounding of the model), mm. */
 const SUPPORT_OVERLAP_MM = 1;
 /** A support axis may deviate this much from perpendicular to the bars, degrees. */
-const PERPENDICULAR_TOLERANCE_DEG = 5;
+export const PERPENDICULAR_TOLERANCE_DEG = 5;
 /** Supports whose axes are this close along the bars are one support line, mm. */
 const SAME_LINE_MM = 5;
 /** A support must reach this far under the panel width to count, mm. */
@@ -89,7 +89,7 @@ export function isConvex(ring: Ring): boolean {
 }
 
 /** The part of a convex polygon where `value(point) >= limit` (`keep: 'above'`) or `<= limit` (`'below'`). */
-function clip(ring: Ring, value: (point: Vec2) => number, limit: number, keep: 'above' | 'below'): Vec2[] {
+export function clip(ring: Ring, value: (point: Vec2) => number, limit: number, keep: 'above' | 'below'): Vec2[] {
   const sign = keep === 'above' ? 1 : -1;
   const inside = (point: Vec2): boolean => sign * (value(point) - limit) >= 0;
   const result: Vec2[] = [];

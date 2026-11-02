@@ -49,19 +49,11 @@
       "define_acoustic_spectrum"
     ],
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-03-design-conditions.json": ["pipe_wall_check"],
-    "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-04-spec-driven-pipe-run.json": ["approve_pipe_spec"],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": ["equipment_datasheet"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": ["add_end_flange"],
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": ["export_piping_ga"],
-    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-03-vessel-circular-platform.json": [
-      "add_circular_platform",
-      "platform_takeoff"
-    ],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-04-pipe-rack.json": ["add_pipe_rack"],
-    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": [
-      "add_circular_platform",
-      "check_reachability"
-    ],
+    "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": ["check_reachability"],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-01-lbend-two-anchors.json": [
       "add_stress_restraint",
       "analyze_pipe_stress",
@@ -79,12 +71,6 @@
       "set_pipe_operating_conditions",
       "set_stress_load_cases"
     ],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-03-quick-checks.json": [
-      "guided_cantilever",
-      "pipe_sif",
-      "pipe_stress_allowables",
-      "thermal_growth"
-    ],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-04-supports-guardrails.json": [
       "add_stress_restraint",
       "analyze_pipe_stress",
@@ -99,7 +85,6 @@
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
       "export_caesar_neutral",
       "nozzle_load_check",
-      "pipe_stress_allowables",
       "spring_variability"
     ],
     "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-02-viewpoint-bcf-roundtrip.json": [

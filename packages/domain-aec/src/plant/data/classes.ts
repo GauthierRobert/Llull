@@ -5,7 +5,7 @@
  */
 
 import { definitionProblem } from './properties';
-import type { IfcMapping, PlantClass, PlantDataModel, PropertyDefinition, TagScope } from './model';
+import { own as ownEntry, type IfcMapping, type PlantClass, type PlantDataModel, type PropertyDefinition, type TagScope } from './model';
 
 export interface ResolvedClass {
   readonly name: string;
@@ -66,7 +66,7 @@ const cache = new WeakMap<object, Map<string, Resolution>>();
 
 function resolveUncached(data: PlantDataModel, name: string): Resolution {
   const own: PlantClass[] = [];
-  let current: PlantClass | undefined = data.classes[name];
+  let current: PlantClass | undefined = ownEntry(data.classes, name);
   if (current === undefined) return { ok: false, code: 'DAT_CLASS_UNKNOWN', message: `no class "${name}"` };
   const seen = new Set<string>();
   while (current !== undefined) {
@@ -75,7 +75,7 @@ function resolveUncached(data: PlantDataModel, name: string): Resolution {
     seen.add(current.name);
     own.unshift(current);
     if (current.parent === null) break;
-    const parent: PlantClass | undefined = data.classes[current.parent];
+    const parent: PlantClass | undefined = ownEntry(data.classes, current.parent);
     if (parent === undefined)
       return { ok: false, code: 'DAT_CLASS_PARENT_UNKNOWN', message: `class "${current.name}" has the unknown parent "${current.parent}"` };
     current = parent;
