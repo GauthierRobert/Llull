@@ -128,7 +128,16 @@ export interface PipeSpec {
 }
 
 /** `doc.plant.spec`: every revision of every spec, oldest first. */
+/** A human approval kept beside the revisions so replaying the history re-applies it to the same content without a signature (the ledger is the proof). */
+export interface SpecApprovalRecord extends SpecApproval {
+  readonly specId: string;
+  readonly revision: number;
+  /** sha256 of the canonical spec text approved. */
+  readonly contentSha256: string;
+}
+
 export interface SpecModel {
   readonly specs: Readonly<Record<string, readonly PipeSpec[]>>;
   readonly specOrder: readonly string[];
+  readonly approvals?: readonly SpecApprovalRecord[];
 }
