@@ -7,10 +7,10 @@ import { deliverableContent } from '../deliverableContent';
 import { allowedTargets, currentStatus, withStep } from '../deliverables';
 import { pathOf, resolveNode } from '../hierarchy';
 import { DELIVERABLE_STATUSES, getPlantData, HUMAN_GATED_STATUSES, own, withPlantData, type DeliverableStatus } from '../model';
+import { isoUtc } from '../../../shared/isoUtc';
 import { refuse } from './params';
 
 const SETTABLE = DELIVERABLE_STATUSES.filter((status): status is Exclude<DeliverableStatus, 'superseded'> => status !== 'superseded');
-const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const REVIEW_REASON = 'computed by llull, not approved: needs a qualified engineer';
 
 /**
@@ -50,12 +50,9 @@ export const setDeliverableStatus = defineCommand({
       .describe(
         'Scope of a report deliverable (hierarchy node code, path S1/P1/U10 or id), given when the revision is created; omit for the whole plant. Not allowed for ifc.',
       ),
-    at: z
-      .string()
-      .regex(ISO_UTC, 'must be ISO-8601 UTC like 2026-11-02T09:30:00Z')
-      .describe(
-        'When the step happened: ISO-8601 UTC, e.g. 2026-11-02T09:30:00Z. The host (UI / llull CLI) fills it and overwrites a caller value; commands never read a clock. Part of what a human signs.',
-      ),
+    at: isoUtc.describe(
+      'When the step happened: ISO-8601 UTC, e.g. 2026-11-02T09:30:00Z. The host (UI / llull CLI) fills it and overwrites a caller value; commands never read a clock. Part of what a human signs.',
+    ),
     confirmation: z
       .union([z.boolean(), z.record(z.string(), z.unknown())])
       .optional()

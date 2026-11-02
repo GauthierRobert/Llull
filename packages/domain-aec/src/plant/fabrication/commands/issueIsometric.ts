@@ -3,14 +3,13 @@ import type { CommandResult } from '@core/commands/types';
 import { humanGate, humanGatePayload } from '@core/model/humanGate';
 import { isRecord } from '@lib/isRecord';
 import { nextId } from '@lib/id';
+import { isoUtc } from '../../../shared/isoUtc';
 import { analyseLine, isAnalysis } from '../analysis';
 import { checkLine } from '../check';
 import { refuseIso } from '../codes';
 import { basisOf } from '../issues';
 import type { IssueApproval, IssuedIsometric } from '../model';
 import { getFabrication, withFabrication } from '../state';
-
-const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 /** The recorded form of a confirmation (`withoutConfirmations`): exactly { verified: true }. */
 const isRecorded = (confirmation: unknown): boolean =>
@@ -19,7 +18,7 @@ const isRecorded = (confirmation: unknown): boolean =>
 /**
  * @affects plant.fabrication.issues[issueId] (one issue stamp: revision, purpose, signer, signature id, basis hash of the line content)
  * @invariant a human act: the stamp needs a signature verified by the signing port over { act, line, revision, purpose, content hash } and spent once; an agent, a bare true or a foreign signature never issues; any later edit of the line makes the stamp stale (the iso is NOT FOR CONSTRUCTION again)
- * @invariant replay: the recorded step carries confirmation { verified: true } (the signature is never recorded); it is honoured only for an entry of the fabrication issue ledger with the same line, revision, purpose and content hash (stored signed records are self-asserted on load), so replay_history / regenerate re-apply a real issue and nothing else; `at` is host-filled and inside the signed payload
+ * @invariant replay: the recorded step carries confirmation { verified: true } (the signature is never recorded); it is honoured only while the history replay machinery re-runs the step (ctx.replaying, never a param: a direct call with { verified: true } is ISO_HUMAN_GATE) and only for an entry of the fabrication issue ledger with the same line, revision, purpose and content hash (stored signed records are self-asserted on load), so replay_history / regenerate re-apply a real issue and nothing else; `at` is host-filled and inside the signed payload
  * @failure unknown line -> ISO_LINE_NOT_FOUND; check_isometric (style final) errors -> ISO_CHECK_FAILED; no valid human signature -> ISO_HUMAN_GATE; the document is unchanged
  */
 export const issueIsometric = defineCommand({
@@ -40,12 +39,9 @@ export const issueIsometric = defineCommand({
       .describe(
         'Human confirmation: a signature object (with a nonce field) produced in the desktop app over the issue act. An agent cannot give it: true or a missing value is refused with ISO_HUMAN_GATE.',
       ),
-    at: z
-      .string()
-      .regex(ISO_UTC, 'must be ISO-8601 UTC like 2026-11-02T09:30:00Z')
-      .describe(
-        'When the issue happened: ISO-8601 UTC, e.g. 2026-11-02T09:30:00Z. The host (UI / llull CLI) fills it and it is part of the signed payload; commands never read a clock.',
-      ),
+    at: isoUtc.describe(
+      'When the issue happened: ISO-8601 UTC, e.g. 2026-11-02T09:30:00Z. The host (UI / llull CLI) fills it and it is part of the signed payload; commands never read a clock.',
+    ),
   }),
   run: (doc, params, ctx): CommandResult => {
     const analysis = analyseLine(doc, 'issue_isometric', params.lineId);
@@ -63,15 +59,16 @@ export const issueIsometric = defineCommand({
         ['lineId'],
       );
     const basis = basisOf(analysis);
-    const recorded: IssueApproval | undefined = isRecorded(params.confirmation)
-      ? fabrication.issueLedger?.find(
-          (entry) =>
-            entry.lineId === analysis.lineId &&
-            entry.revision === params.revision &&
-            entry.purpose === params.purpose &&
-            entry.basisSha256 === basis,
-        )
-      : undefined;
+    const recorded: IssueApproval | undefined =
+      ctx?.replaying === true && isRecorded(params.confirmation)
+        ? fabrication.issueLedger?.find(
+            (entry) =>
+              entry.lineId === analysis.lineId &&
+              entry.revision === params.revision &&
+              entry.purpose === params.purpose &&
+              entry.basisSha256 === basis,
+          )
+        : undefined;
     const details = { revision: params.revision, purpose: params.purpose, basisSha256: basis, at: params.at };
     const outcome =
       recorded !== undefined

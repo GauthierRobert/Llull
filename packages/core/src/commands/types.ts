@@ -281,6 +281,11 @@ export interface ExecutionContext {
    * same id source and appends no step of its own.
    */
   readonly stepKey?: string;
+  /**
+   * Set ONLY by the history replay machinery (`runReplayStep`) while it re-runs a recorded step: a recorded human confirmation `{ verified: true }` is honoured
+   * only then. Never derived from params, so a direct or agent call cannot set it.
+   */
+  readonly replaying?: true;
   /** Replay prefix cache; null disables it. Results depend on the kernel, so the default context keeps one cache per installed kernel. */
   readonly replayCache: ReplayCache | null;
   /** Memo shared by the runs of one host resolve (TECHNICAL_SPEC 13.9: plan steps and a command's mesh preparation); null/absent = nothing is shared. */

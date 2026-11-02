@@ -64,9 +64,12 @@ export function runReplayStep(
     let result: CommandResult;
     if (scopeIds) {
       const stepKey = stepKeyOf(step.id);
-      const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
+      const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey, replaying: true };
       result = runInContext(stepContext, () => runCommand(cmd, doc, recorded, stepContext));
-    } else result = runCommand(cmd, doc, recorded, context);
+    } else {
+      const replayContext: ExecutionContext = { ...context, replaying: true };
+      result = runInContext(replayContext, () => runCommand(cmd, doc, recorded, replayContext));
+    }
     result = applyReconcile(doc, result);
     extendIdMap(idMap, step.affected, result.affected);
     return result;

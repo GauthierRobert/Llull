@@ -7,6 +7,7 @@ import { humanGate } from '@core/model/humanGate';
 import { isRecord } from '@lib/isRecord';
 import { sha256Hex } from '@lib/sha256';
 import { elementsOf, getBuilding } from '../../../building/model';
+import { isoUtc } from '../../../shared/isoUtc';
 import { refuse } from '../../catalog/codes';
 import { checkSpec } from '../checks/run';
 import { canonicalSpecText } from '../file';
@@ -23,11 +24,9 @@ const approvalOf = (outcome: { signer: string; signatureId: string; at: string }
   at: outcome.at,
 });
 
-const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
-
 /**
  * @affects plant.spec.specs[specId]: the revision becomes approved with approval { signer, signatureId, at }; earlier approved revisions become superseded
- * @invariant replay: the recorded step carries confirmation { verified: true } (the signature is never recorded); it is honoured only for content that a verified human approval in the document's approval ledger already covers (same spec, revision and content hash), so replay_history / regenerate re-apply a real approval and nothing else;
+ * @invariant replay: the recorded step carries confirmation { verified: true } (the signature is never recorded); it is honoured only while the history replay machinery re-runs the step (ctx.replaying, never a param: a direct call with { verified: true } is PSC_HUMAN_GATE) and only for content that a verified human approval in the document's approval ledger already covers (same spec, revision and content hash), so replay_history / regenerate re-apply a real approval and nothing else;
  * a human act: confirmation is a signature verified by the signing port over { act plant:approve_pipe_spec, specId, revision, sha256 of the canonical spec } and spent once; an agent, a bare true or a signature for other content never approves; check_pipe_spec fail items are refused before any signature is spent; pipes on older revisions are reported stale, not changed
  * @failure unknown spec / revision -> PSC_SPEC_UNKNOWN; not a draft -> PSC_SPEC_INVALID; fail findings -> PSC_SPEC_CHECK_FAILED; no valid human signature -> PSC_HUMAN_GATE; the document is unchanged
  */
@@ -49,12 +48,9 @@ export const approvePipeSpec = defineCommand({
       .describe(
         'Human confirmation: a signature object (with a nonce field) produced in the desktop app over the approve act. An agent cannot give it: true or a missing value is refused with PSC_HUMAN_GATE.',
       ),
-    at: z
-      .string()
-      .regex(ISO_UTC, 'must be ISO-8601 UTC like 2026-11-02T09:30:00Z')
-      .describe(
-        'When the approval happened: ISO-8601 UTC, e.g. 2026-11-02T09:30:00Z. The host (UI / llull CLI) fills it; commands never read a clock.',
-      ),
+    at: isoUtc.describe(
+      'When the approval happened: ISO-8601 UTC, e.g. 2026-11-02T09:30:00Z. The host (UI / llull CLI) fills it; commands never read a clock.',
+    ),
   }),
   run: (doc, { specId, revision, confirmation, at }, ctx): CommandResult => {
     const spec = findSpec(doc, specId, revision);
@@ -94,11 +90,12 @@ export const approvePipeSpec = defineCommand({
         ['specId'],
       );
     const contentSha256 = sha256Hex(canonicalSpecText(spec));
-    const recorded = isRecorded(confirmation)
-      ? getSpecModel(doc).approvals?.find(
-          (entry) => entry.specId === specId && entry.revision === spec.revision && entry.contentSha256 === contentSha256,
-        )
-      : undefined;
+    const recorded =
+      ctx?.replaying === true && isRecorded(confirmation)
+        ? getSpecModel(doc).approvals?.find(
+            (entry) => entry.specId === specId && entry.revision === spec.revision && entry.contentSha256 === contentSha256,
+          )
+        : undefined;
     const outcome: { cleared: true; signer: string; signatureId: string; at: string } | { cleared: false; reason: string } =
       recorded !== undefined
         ? { cleared: true, signer: recorded.signer, signatureId: recorded.signatureId, at: recorded.at }

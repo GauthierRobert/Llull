@@ -4,6 +4,7 @@ import { z } from '@core/commands/schema';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { isRecord } from '@lib/isRecord';
 import { PAPER_SIZES } from '@core/model/sheet';
+import { isoUtc } from '../../shared/isoUtc';
 import { PCF_COMPONENT_TYPES } from './model';
 
 const vec3 = z.array(z.number()).length(3);
@@ -87,7 +88,7 @@ const issued = z.object({
   signer: z.string().min(1),
   signatureId: z.string().min(1),
   basisSha256: z.string().length(64),
-  at: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/),
+  at: isoUtc,
   payloadSha256: z.string().length(64),
 });
 const approval = issued.omit({ id: true });
