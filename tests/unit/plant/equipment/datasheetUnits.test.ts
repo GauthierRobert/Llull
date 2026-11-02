@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- the sheet is read as untyped JSON */
 /**
  * Plant 03 EQP M5, review round 1: the data sheet is unit-independent. (a) Every template kind built in mm, m and in with scaled inputs gives the same
  * sheet (numbers within 1e-6 relative; text compared with its numbers masked, since messages quote document units; documentUnits and file hashes ignored).
@@ -10,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { LENGTH_KEYS } from '@aec/plant/equipment/datasheet/millimetres';
+import { at, objectAt, type JsonObject } from '../../../helpers/json';
 import { apply, data } from '../../../helpers/commandAssertions';
 import {
   bemNozzles,
@@ -132,7 +132,7 @@ const FACTORS: Array<[string, number]> = [
   ['in', 1 / 25.4],
 ];
 const unitDocument = (units: string): CadDocument => apply(mmDocument(), 'set_units', { units });
-const sheetOf = (doc: CadDocument, tag: string): Record<string, any> => {
+const sheetOf = (doc: CadDocument, tag: string): JsonObject => {
   const {
     text: _text,
     sha256: _hash,
@@ -140,7 +140,7 @@ const sheetOf = (doc: CadDocument, tag: string): Record<string, any> => {
     fileName: _name,
     ...record
   } = data<Record<string, unknown>>(doc, 'equipment_datasheet', { equipment: tag });
-  return JSON.parse(JSON.stringify(record)) as Record<string, any>;
+  return JSON.parse(JSON.stringify(record)) as JsonObject;
 };
 
 /** First difference between two JSON values (numbers within 1e-6 relative, strings with digits masked), or null. */
@@ -178,10 +178,10 @@ describe('equipment_datasheet is unit-independent (mm, m and in with scaled inpu
 
     it.each(FACTORS)('the sheet built in %s equals the sheet built in mm', (units, factor) => {
       const other = sheetOf(build(unitDocument(units), factor), tag);
-      expect(other['provenance']['documentUnits']).toBe(units);
+      expect(at(other, 'provenance.documentUnits')).toBe(units);
       const [a, b] = [structuredClone(reference), structuredClone(other)];
-      delete a['provenance'].documentUnits;
-      delete b['provenance'].documentUnits;
+      delete objectAt(a, 'provenance')['documentUnits'];
+      delete objectAt(b, 'provenance')['documentUnits'];
       expect(difference(a, b)).toBeNull();
     });
   });

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- the sheet is read as untyped JSON, like a vendor would */
 /**
  * Plant 03 EQP M5 (FR-EQP-13): `equipment_datasheet` of the five equipment kinds. The sheet carries the numbers of the registered queries (one source of
  * truth), lengths in millimetres whatever the document unit, a refused query as an `available: false` section (never omitted), the review flags, CSV with the
@@ -8,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { sha256Hex } from '@lib/sha256';
+import { arrayAt, at, rowsAt, textAt, type JsonObject } from '../../../helpers/json';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
 import {
@@ -21,7 +21,7 @@ import {
   tankDocument,
 } from './equipmentFixtures';
 
-type Json = Record<string, any>;
+type Json = JsonObject;
 const sheet = (doc: Parameters<typeof data>[0], equipment: string, extra: Record<string, unknown> = {}): Json =>
   data<Json>(doc, 'equipment_datasheet', { equipment, ...extra });
 const csvRows = (text: string): string[][] => text.split('\n').map((line) => line.split(','));
@@ -31,16 +31,16 @@ describe('equipment_datasheet of the SC-EQP-01 separator', () => {
   const result = sheet(doc, 'V-101');
 
   it('identifies the equipment and lists the four nozzles with port id, position and direction in millimetres', () => {
-    expect(result['schema']).toBe('llull-equipment-datasheet/1');
-    expect(result['identification']).toMatchObject({
+    expect(at(result, 'schema')).toBe('llull-equipment-datasheet/1');
+    expect(at(result, 'identification')).toMatchObject({
       tag: 'V-101',
       name: 'HP separator',
       template: 'vessel',
       orientation: 'vertical',
       level: 'Level 0',
     });
-    expect(result['nozzles']).toHaveLength(4);
-    const n1 = (result['nozzles'] as Json[])[0] as Json;
+    expect(at(result, 'nozzles')).toHaveLength(4);
+    const n1 = rowsAt(result, 'nozzles')[0];
     expect(n1).toMatchObject({
       mark: 'N1',
       portId: 'V-101:N1',
@@ -53,25 +53,33 @@ describe('equipment_datasheet of the SC-EQP-01 separator', () => {
       positionMm: [5000, 6000, 5200],
       direction: [0, 1, 0],
     });
-    expect(n1['flange']).toMatchObject({ outsideDiameterMm: 279.4, thicknessMm: 23.9, placeholder: false, unverified: true });
+    expect(at(n1, 'flange')).toMatchObject({ outsideDiameterMm: 279.4, thicknessMm: 23.9, placeholder: false, unverified: true });
   });
 
   it('shows the numbers of the queries it composes (weights, volume, thickness, check), not recomputed ones', () => {
     const weights = data<Json>(doc, 'equipment_weights', { equipment: 'V-101', include: ['body', 'nozzles'] });
-    expect(result['weights']['body']).toEqual(weights['body']);
-    expect(result['weights']['breakdown'].map((line: Json) => line['method']).every((method: string) => method.length > 0)).toBe(true);
+    expect(at(result, 'weights.body')).toEqual(at(weights, 'body'));
+    expect(
+      rowsAt(result, 'weights.breakdown')
+        .map((line) => at(line, 'method'))
+        .every((method) => typeof method === 'string' && method.length > 0),
+    ).toBe(true);
     const volume = data<Json>(doc, 'vessel_volume', { equipment: 'V-101' });
-    expect(result['volumes']['totalVolumeM3']).toBe(volume['totalVolumeM3']);
-    expect(result['volumes']['insideHeightMm']).toBe(volume['insideHeight']);
+    expect(at(result, 'volumes.totalVolumeM3')).toBe(at(volume, 'totalVolumeM3'));
+    expect(at(result, 'volumes.insideHeightMm')).toBe(at(volume, 'insideHeight'));
     const thickness = data<Json>(doc, 'vessel_thickness', { equipment: 'V-101' });
-    expect(result['codeResults']['thickness']['mawpMPa']).toBe(thickness['mawpMPa']);
-    expect(result['codeResults']['thickness']['hydrotestPressureMPa']).toBe(thickness['hydrotestPressureMPa']);
+    expect(at(result, 'codeResults.thickness.mawpMPa')).toBe(at(thickness, 'mawpMPa'));
+    expect(at(result, 'codeResults.thickness.hydrotestPressureMPa')).toBe(at(thickness, 'hydrotestPressureMPa'));
     const check = data<Json>(doc, 'check_equipment', { equipment: ['V-101'] });
-    expect(result['codeResults']['check']).toMatchObject({ status: check['status'], issues: check['issues'], reviewRequired: true });
+    expect(at(result, 'codeResults.check')).toMatchObject({
+      status: at(check, 'status'),
+      issues: at(check, 'issues'),
+      reviewRequired: true,
+    });
   });
 
   it('lists the design inputs with their source, the geometry in mm and the inside surface area', () => {
-    expect(result['design']).toMatchObject({
+    expect(at(result, 'design')).toMatchObject({
       pressure: { value: 1, unit: 'MPa' },
       temperatureC: 150,
       material: 'SA-516 Gr 70',
@@ -80,7 +88,7 @@ describe('equipment_datasheet of the SC-EQP-01 separator', () => {
       corrosionAllowanceMm: 3,
       missing: [],
     });
-    expect(result['geometry']).toMatchObject({
+    expect(at(result, 'geometry')).toMatchObject({
       kind: 'vessel',
       insideDiameterMm: 1500,
       tangentLengthMm: 4000,
@@ -88,15 +96,15 @@ describe('equipment_datasheet of the SC-EQP-01 separator', () => {
       support: { type: 'skirt', heightMm: 2000, thicknessMm: 10 },
     });
     // shell 2 pi R L + two 2:1 heads (pi R^2 + pi a^2 / (2 e) ln((1+e)/(1-e)), a = D/4)
-    expect(result['geometry']['insideSurfaceAreaM2']).toBeCloseTo(23.727489942, 9);
+    expect(at(result, 'geometry.insideSurfaceAreaM2')).toBeCloseTo(23.727489942, 9);
   });
 
   it('always requires review, says why, and flags the unverified flange rows and the named defaults', () => {
-    expect(result['review']).toMatchObject({ status: 'not_reviewed', reviewRequired: true, unverified: true });
-    expect(result['review']['reasons']).toContain('ASME VIII-1 thickness computed by llull from the cited formulas; not a stamped design');
-    expect(result['review']['defaulted']).toContain('test water density = 1000 kg/m3 (named default)');
-    expect(result['provenance']['units']).toMatchObject({ length: 'mm', volume: 'm3', mass: 'kg' });
-    expect(result['warnings']).toEqual([]);
+    expect(at(result, 'review')).toMatchObject({ status: 'not_reviewed', reviewRequired: true, unverified: true });
+    expect(at(result, 'review.reasons')).toContain('ASME VIII-1 thickness computed by llull from the cited formulas; not a stamped design');
+    expect(at(result, 'review.defaulted')).toContain('test water density = 1000 kg/m3 (named default)');
+    expect(at(result, 'provenance.units')).toMatchObject({ length: 'mm', volume: 'm3', mass: 'kg' });
+    expect(at(result, 'warnings')).toEqual([]);
   });
 
   it('is a query: the document is returned unchanged and nothing is affected', () => {
@@ -108,18 +116,18 @@ describe('equipment_datasheet of the SC-EQP-01 separator', () => {
 
   it('is byte-deterministic: the canonical JSON text, its sha256 and the file name are identical on a second call', () => {
     const again = sheet(doc, 'equipment-1');
-    expect(again['text']).toBe(result['text']);
-    expect(result['sha256']).toBe(sha256Hex(result['text']));
-    expect(result['bytes']).toBe(result['text'].length);
-    expect(result['fileName']).toBe('V-101-datasheet.json');
-    expect(JSON.parse(result['text'])).toMatchObject({ schema: 'llull-equipment-datasheet/1', nozzles: result['nozzles'] });
-    expect(Object.keys(JSON.parse(result['text']))).toEqual([...Object.keys(JSON.parse(result['text']))].sort());
+    expect(textAt(again, 'text')).toBe(textAt(result, 'text'));
+    expect(at(result, 'sha256')).toBe(sha256Hex(textAt(result, 'text')));
+    expect(at(result, 'bytes')).toBe(new TextEncoder().encode(textAt(result, 'text')).length);
+    expect(at(result, 'fileName')).toBe('V-101-datasheet.json');
+    expect(JSON.parse(textAt(result, 'text'))).toMatchObject({ schema: 'llull-equipment-datasheet/1', nozzles: at(result, 'nozzles') });
+    expect(Object.keys(JSON.parse(textAt(result, 'text')))).toEqual([...Object.keys(JSON.parse(textAt(result, 'text')))].sort());
   });
 
   it('reports angles in the requested convention', () => {
     const east = sheet(doc, 'V-101', { angleConvention: 'east_ccw' });
-    expect(east['identification']['angleConvention']).toBe('east_ccw');
-    expect((east['nozzles'] as Json[])[0]?.['orientationDeg']).toBe(90);
+    expect(at(east, 'identification.angleConvention')).toBe('east_ccw');
+    expect(at(rowsAt(east, 'nozzles')[0], 'orientationDeg')).toBe(90);
   });
 });
 
@@ -128,24 +136,24 @@ describe('equipment_datasheet keeps a refused query as an unavailable section', 
     const { design: _design, ...bare } = separatorParams;
     const doc = apply(mmDocument(), 'add_vessel', bare);
     const result = sheet(doc, 'V-101');
-    expect(result['design']['missing']).toEqual(['pressure', 'temperatureC', 'material', 'allowableStress', 'jointEfficiency']);
-    expect(result['codeResults']['thickness']).toMatchObject({ available: false, reason: 'refused' });
-    expect(typeof result['codeResults']['thickness']['code']).toBe('string');
-    expect(result['codeResults']['thickness']['paths'].length).toBeGreaterThan(0);
-    expect(result['review']['reviewRequired']).toBe(true);
+    expect(at(result, 'design.missing')).toEqual(['pressure', 'temperatureC', 'material', 'allowableStress', 'jointEfficiency']);
+    expect(at(result, 'codeResults.thickness')).toMatchObject({ available: false, reason: 'refused' });
+    expect(typeof at(result, 'codeResults.thickness.code')).toBe('string');
+    expect(arrayAt(result, 'codeResults.thickness.paths').length).toBeGreaterThan(0);
+    expect(at(result, 'review.reviewRequired')).toBe(true);
   });
 
   it('a pump without a vendor weight: weights refused EQP_DESIGN_DATA_MISSING, volumes not applicable; with the weight both read', () => {
     const { weightKg: _weight, ...unweighed } = pumpParams;
     const refused = sheet(apply(mmDocument(), 'add_pump', unweighed), 'P-101');
-    expect(refused['weights']).toMatchObject({ available: false, reason: 'refused', code: 'EQP_DESIGN_DATA_MISSING' });
-    expect(refused['volumes']).toMatchObject({ available: false, reason: 'not_applicable' });
+    expect(at(refused, 'weights')).toMatchObject({ available: false, reason: 'refused', code: 'EQP_DESIGN_DATA_MISSING' });
+    expect(at(refused, 'volumes')).toMatchObject({ available: false, reason: 'not_applicable' });
     const weighed = sheet(pumpDocument(), 'P-101');
-    expect(weighed['weights']['body']['emptyKg']).toBe(310);
-    expect(weighed['geometry']).toMatchObject({ kind: 'pump', standard: 'iso_2858', size: '65-40-250' });
-    expect(weighed['design']).toMatchObject({ api610Type: 'OH1', rating: 'PN16' });
-    expect(weighed['nozzles'].map((row: Json) => row['mark'])).toEqual(['SUC', 'DIS']);
-    expect(weighed['codeResults']['thickness']).toMatchObject({ available: false, reason: 'not_applicable' });
+    expect(at(weighed, 'weights.body.emptyKg')).toBe(310);
+    expect(at(weighed, 'geometry')).toMatchObject({ kind: 'pump', standard: 'iso_2858', size: '65-40-250' });
+    expect(at(weighed, 'design')).toMatchObject({ api610Type: 'OH1', rating: 'PN16' });
+    expect(rowsAt(weighed, 'nozzles').map((row) => at(row, 'mark'))).toEqual(['SUC', 'DIS']);
+    expect(at(weighed, 'codeResults.thickness')).toMatchObject({ available: false, reason: 'not_applicable' });
   });
 
   it('a nozzle without a placeable port keeps its row (null position) and raises a warning with its path', () => {
@@ -180,34 +188,34 @@ describe('equipment_datasheet keeps a refused query as an unavailable section', 
       },
     };
     const result = sheet(broken, 'V-101');
-    expect((result['nozzles'] as Json[])[0]).toMatchObject({ mark: 'N1', portId: null, positionMm: null, direction: null });
-    expect(result['warnings']).toEqual([expect.objectContaining({ code: 'EQP_PARAM_INVALID', paths: ['nozzles.N1'] })]);
+    expect(rowsAt(result, 'nozzles')[0]).toMatchObject({ mark: 'N1', portId: null, positionMm: null, direction: null });
+    expect(at(result, 'warnings')).toEqual([expect.objectContaining({ code: 'EQP_PARAM_INVALID', paths: ['nozzles.N1'] })]);
   });
 });
 
 describe('equipment_datasheet of the other templates', () => {
   it('exchanger: both sides, channel nozzles, thickness judged inside check_equipment', () => {
     const result = sheet(bemDocument(), 'E-301');
-    expect(result['identification']).toMatchObject({ template: 'exchanger', orientation: 'horizontal' });
-    expect(result['geometry']).toMatchObject({ kind: 'exchanger', temaType: 'BEM', shellInsideDiameterMm: 600 });
-    expect(result['volumes']['shellSide']['volumeM3']).toBeCloseTo(0.9421985298921338, 12);
-    expect(result['volumes']['tubeSide']['volumeM3']).toBeCloseTo(0.511174882207871, 12);
-    expect(result['design']['shellSide']).toMatchObject({ pressure: { value: 1, unit: 'MPa' }, temperatureC: 120 });
-    expect(result['design']['shellSide']['missing']).toContain('allowableStress');
-    expect(result['codeResults']['thickness']).toMatchObject({ available: false, reason: 'not_applicable' });
-    expect(result['codeResults']['check']['notChecked'].length).toBeGreaterThan(0);
-    expect(result['nozzles'].map((row: Json) => row['mark'])).toEqual(['S1', 'S2', 'T1', 'T2']);
-    expect(result['nozzles'][2]['direction']).toEqual([0, 0, -1]);
+    expect(at(result, 'identification')).toMatchObject({ template: 'exchanger', orientation: 'horizontal' });
+    expect(at(result, 'geometry')).toMatchObject({ kind: 'exchanger', temaType: 'BEM', shellInsideDiameterMm: 600 });
+    expect(at(result, 'volumes.shellSide.volumeM3')).toBeCloseTo(0.9421985298921338, 12);
+    expect(at(result, 'volumes.tubeSide.volumeM3')).toBeCloseTo(0.511174882207871, 12);
+    expect(at(result, 'design.shellSide')).toMatchObject({ pressure: { value: 1, unit: 'MPa' }, temperatureC: 120 });
+    expect(at(result, 'design.shellSide.missing')).toContain('allowableStress');
+    expect(at(result, 'codeResults.thickness')).toMatchObject({ available: false, reason: 'not_applicable' });
+    expect(arrayAt(result, 'codeResults.check.notChecked').length).toBeGreaterThan(0);
+    expect(rowsAt(result, 'nozzles').map((row) => at(row, 'mark'))).toEqual(['S1', 'S2', 'T1', 'T2']);
+    expect(at(rowsAt(result, 'nozzles')[2], 'direction')).toEqual([0, 0, -1]);
   });
 
   it('tank: the course thicknesses of the one-foot method and the volumes at the design level', () => {
     const result = sheet(tankDocument(), 'T-401');
-    expect(result['geometry']).toMatchObject({ kind: 'tank', diameterMm: 20000, shellHeightMm: 12000 });
-    expect(result['geometry']['courseThicknessesMm'][0]).toBeCloseTo(8.66625, 9);
-    expect(result['codeResults']['thickness']['courses'][0]['governingThicknessMm']).toBeCloseTo(8.66625, 9);
-    expect(result['volumes']['totalVolumeM3']).toBeCloseTo(3769.9111843077517, 6);
-    expect(result['review']['unverified']).toBe(true);
-    expect(result['design']).toMatchObject({ material: 'A36M', specificGravity: 1, designLiquidLevelMm: 12000 });
+    expect(at(result, 'geometry')).toMatchObject({ kind: 'tank', diameterMm: 20000, shellHeightMm: 12000 });
+    expect(arrayAt(result, 'geometry.courseThicknessesMm')[0]).toBeCloseTo(8.66625, 9);
+    expect(at(rowsAt(result, 'codeResults.thickness.courses')[0], 'governingThicknessMm')).toBeCloseTo(8.66625, 9);
+    expect(at(result, 'volumes.totalVolumeM3')).toBeCloseTo(3769.9111843077517, 6);
+    expect(at(result, 'review.unverified')).toBe(true);
+    expect(at(result, 'design')).toMatchObject({ material: 'A36M', specificGravity: 1, designLiquidLevelMm: 12000 });
   });
 });
 
@@ -229,18 +237,18 @@ describe('equipment_datasheet converts to millimetres whatever the document unit
       { equipment: 'V-101', ...separatorNozzles[0], location: { on: 'shell', elevation: 3.2, orientationDeg: 0 }, projection: 1 },
     );
     const result = sheet(metres, 'V-101');
-    expect(result['provenance']['documentUnits']).toBe('m');
-    expect(result['geometry']).toMatchObject({
+    expect(at(result, 'provenance.documentUnits')).toBe('m');
+    expect(at(result, 'geometry')).toMatchObject({
       insideDiameterMm: 1500,
       tangentLengthMm: 4000,
       shellThicknessMm: 10,
       support: { heightMm: 2000 },
     });
-    expect(result['identification']['locationMm']).toEqual([5000, 5000]);
-    expect(result['volumes']['totalVolumeM3']).toBeCloseTo(7.9521564043991635, 9);
-    expect(result['volumes']['insideHeightMm']).toBeCloseTo(4750, 6);
-    expect(result['nozzles'][0]).toMatchObject({ projectionMm: 1000, positionMm: [5000, 6000, 5200] });
-    expect(result['geometry']['insideSurfaceAreaM2']).toBeCloseTo(23.727489942, 8);
+    expect(at(result, 'identification.locationMm')).toEqual([5000, 5000]);
+    expect(at(result, 'volumes.totalVolumeM3')).toBeCloseTo(7.9521564043991635, 9);
+    expect(at(result, 'volumes.insideHeightMm')).toBeCloseTo(4750, 6);
+    expect(rowsAt(result, 'nozzles')[0]).toMatchObject({ projectionMm: 1000, positionMm: [5000, 6000, 5200] });
+    expect(at(result, 'geometry.insideSurfaceAreaM2')).toBeCloseTo(23.727489942, 8);
   });
 });
 
@@ -249,7 +257,7 @@ describe('equipment_datasheet CSV', () => {
 
   it('items: one row per value with section, dotted item, value, unit and source', () => {
     const result = sheet(doc, 'V-101', { format: 'csv' });
-    const rows = csvRows(result['text']);
+    const rows = csvRows(textAt(result, 'text'));
     expect(rows[0]).toEqual(['section', 'item', 'value', 'unit', 'source']);
     expect(rows).toContainEqual(['design', 'allowableStress', '137.9', 'MPa', 'user input']);
     expect(rows).toContainEqual(['geometry', 'insideDiameterMm', '1500', 'mm', '']);
@@ -257,12 +265,12 @@ describe('equipment_datasheet CSV', () => {
     const empty = rows.find((row) => row[1] === 'weights' || row[1] === 'body.emptyKg');
     expect(empty?.[3]).toBe('kg');
     expect(rows.find((row) => row[0] === 'volumes' && row[1] === 'headDepthsMm.first')?.[3]).toBe('mm');
-    expect(result['fileName']).toBe('V-101-datasheet.csv');
-    expect(result['table']).toBe('items');
+    expect(at(result, 'fileName')).toBe('V-101-datasheet.csv');
+    expect(at(result, 'table')).toBe('items');
   });
 
   it('units come from anchored key names only: a text value, a count or a name ending in C or M gets none', () => {
-    const rows = csvRows(sheet(doc, 'V-101', { format: 'csv' })['text']);
+    const rows = csvRows(textAt(sheet(doc, 'V-101', { format: 'csv' }), 'text'));
     const unitOf = (section: string, item: string): string | undefined => rows.find((row) => row[0] === section && row[1] === item)?.[3];
     expect(unitOf('design', 'temperatureC')).toBe('degC');
     expect(unitOf('design', 'materialDensityKgM3')).toBe('kg/m3');
@@ -278,7 +286,7 @@ describe('equipment_datasheet CSV', () => {
 
   it('nozzles: one row per nozzle with the position, direction and flange columns', () => {
     const result = sheet(doc, 'V-101', { format: 'csv', table: 'nozzles' });
-    const rows = csvRows(result['text']);
+    const rows = csvRows(textAt(result, 'text'));
     expect(rows).toHaveLength(5);
     expect(rows[0]).toHaveLength(21);
     expect(rows[1]?.slice(0, 15)).toEqual([
@@ -299,7 +307,7 @@ describe('equipment_datasheet CSV', () => {
       '0',
     ]);
     expect(rows[2]?.slice(12, 15)).toEqual(['0', '0', '-1']);
-    expect(result['fileName']).toBe('V-101-nozzles.csv');
+    expect(at(result, 'fileName')).toBe('V-101-nozzles.csv');
   });
 
   it('guards text cells that a spreadsheet would read as a formula (= + - @), never the numbers', () => {
@@ -312,10 +320,10 @@ describe('equipment_datasheet CSV', () => {
       'add_nozzle',
       { equipment: 'V-101', ...separatorNozzles[0], service: '@SUM(A1)', mark: '-N1' },
     );
-    const items = csvRows(sheet(hostile, 'V-101', { format: 'csv' })['text']).flat();
+    const items = csvRows(textAt(sheet(hostile, 'V-101', { format: 'csv' }), 'text')).flat();
     expect(items).toContain(`'=HYPERLINK("http://x")`.replace(/"/g, '""').replace(/^/, '"').concat('"'));
     expect(items).toContain("'+cmd|calc");
-    const nozzles = csvRows(sheet(hostile, 'V-101', { format: 'csv', table: 'nozzles' })['text']);
+    const nozzles = csvRows(textAt(sheet(hostile, 'V-101', { format: 'csv', table: 'nozzles' }), 'text'));
     expect(nozzles[1]?.slice(0, 3)).toEqual(["'-N1", 'V-101:-N1', "'@SUM(A1)"]);
     expect(nozzles[1]?.[12]).toBe('0');
     expect(nozzles[1]?.[11]).toBe('5200');
@@ -331,9 +339,9 @@ describe('equipment_datasheet CSV', () => {
         location: { on: 'shell', elevation: mark === 'constructor' ? 1000 : 3200, orientationDeg: mark === 'constructor' ? 180 : 0 },
       });
     const result = sheet(hostile, 'V-101');
-    expect(result['nozzles'].map((row: Json) => row['mark'])).toEqual(['__proto__', 'constructor']);
-    expect(result['nozzles'].map((row: Json) => row['portId'])).toEqual(['V-101:__proto__', 'V-101:constructor']);
-    expect(Object.getPrototypeOf(result['nozzles'][0])).toBe(Object.prototype);
+    expect(rowsAt(result, 'nozzles').map((row) => at(row, 'mark'))).toEqual(['__proto__', 'constructor']);
+    expect(rowsAt(result, 'nozzles').map((row) => at(row, 'portId'))).toEqual(['V-101:__proto__', 'V-101:constructor']);
+    expect(Object.getPrototypeOf(rowsAt(result, 'nozzles')[0])).toBe(Object.prototype);
   });
 });
 
