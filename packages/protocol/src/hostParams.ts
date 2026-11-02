@@ -15,8 +15,8 @@ export interface HostIdentity {
 
 const FILLED = ['at', 'by'] as const;
 
-/** Human-gated acts outside the plm toolset that stamp the time of the act (`at`): the host fills it, exactly like a plm act. Other plant gates (issue_isometric, review issues) carry no time stamp. */
-const HOST_STAMPED: ReadonlySet<string> = new Set(['approve_pipe_spec', 'set_deliverable_status']);
+/** Human-gated acts outside the plm toolset that stamp the time of the act (`at`): the host fills it, exactly like a plm act. Other plant gates (review issues) carry no time stamp. */
+const HOST_STAMPED: ReadonlySet<string> = new Set(['approve_pipe_spec', 'set_deliverable_status', 'issue_isometric']);
 
 /** ISO-8601 UTC without milliseconds, e.g. 2026-11-02T09:30:00Z. */
 export const isoSeconds = (date: Date): string => `${date.toISOString().slice(0, 19)}Z`;

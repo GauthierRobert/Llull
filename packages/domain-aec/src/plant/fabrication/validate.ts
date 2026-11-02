@@ -87,7 +87,10 @@ const issued = z.object({
   signer: z.string().min(1),
   signatureId: z.string().min(1),
   basisSha256: z.string().length(64),
+  at: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/),
+  payloadSha256: z.string().length(64),
 });
+const approval = issued.omit({ id: true });
 
 const fabrication = z.object({
   version: z.literal(1),
@@ -99,6 +102,7 @@ const fabrication = z.object({
   spoolBreaks: z.record(z.string(), z.array(z.enum(['field_welds', 'flanged_joints', 'line_ends']))).optional(),
   isometrics: z.record(z.string(), isometric).optional(),
   issues: z.record(z.string(), issued).optional(),
+  issueLedger: z.array(approval).optional(),
 });
 
 const ROOT = 'plant.fabrication';
