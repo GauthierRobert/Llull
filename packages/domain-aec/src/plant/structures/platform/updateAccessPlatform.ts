@@ -5,7 +5,8 @@ import { fromMm } from '@core/model/units';
 import { getBuilding } from '../../../building/model';
 import { refuse } from '../codes';
 import { framingParam, DEFAULT_BEAM_PROFILE, DEFAULT_BEAM_SPACING_MM, ringOfBounds } from './addAccessPlatform';
-import { generate, samePlatform, specOf } from './platformRegenerate';
+import { generate, specOf } from './platformRegenerate';
+import { sameAssembly } from '../assembly/definition';
 import { commitPlatform, refusal } from './platformCommit';
 import { railingFieldParams, resolveRailingFields } from './platformRailing';
 import type { CircularSpec, PlatformSpec } from './platformSpec';
@@ -184,7 +185,7 @@ export const updateAccessPlatform = defineCommand({
           };
     const built = generate(doc, building, assembly, next);
     if (!built.ok) return refusal(doc, 'update_access_platform', built);
-    if (samePlatform(building, built.building, assemblyId))
+    if (sameAssembly(building, built.building, assemblyId))
       return noop(
         doc,
         `update_access_platform: ${assembly.mark} (${assemblyId}) already matches these parameters and its vessel / beams; nothing changed.`,

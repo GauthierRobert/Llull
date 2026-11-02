@@ -36,6 +36,8 @@ export interface LineRunReport {
   readonly basis: 'resting' | 'supports' | 'nozzles';
   /** Weight delivered to beams and columns, kN. */
   readonly carriedKn: number;
+  /** The same weight per steel member (a rack beam, a column), kN. */
+  readonly bearers: ReadonlyArray<{ memberId: string; kn: number }>;
 }
 
 interface LineLoadResult {
@@ -183,12 +185,14 @@ export function applyLineLoads(
         supports: supported.supports,
         basis: 'supports',
         carriedKn: supported.carriedKn,
+        bearers: supported.bearers,
       });
       continue;
     }
     const { supports, length } = supportsOf(run, beams);
     const nozzles = supports.length === 0 && pipeRun !== null && carriedByEnds(units, pipeRun);
     let carried = 0;
+    const bearers: Array<{ memberId: string; kn: number }> = [];
     const arcs = supports.map(({ s }) => s);
     const tributaries = tributaryLengths(arcs, length, { groupDistance: GROUP_DISTANCE });
     supports.forEach((support, index) => {
@@ -196,8 +200,16 @@ export function applyLineLoads(
       addPointLoad(support.beam, support.at, weight, 0, true);
       support.beam.lineSupport = true;
       carried += weight;
+      bearers.push({ memberId: support.beam.bar.id, kn: weight });
     });
-    runs.push({ ...header, lengthM: length / 1000, supports: supports.length, basis: nozzles ? 'nozzles' : 'resting', carriedKn: carried });
+    runs.push({
+      ...header,
+      lengthM: length / 1000,
+      supports: supports.length,
+      basis: nozzles ? 'nozzles' : 'resting',
+      carriedKn: carried,
+      bearers,
+    });
     if (supports.length === 0 && length > 0 && !nozzles) {
       warnings.push(
         `${run.kind} ${run.mark} (${run.label}) rests on no steel beam: its ${((run.weightPerMetre * length) / 1000).toFixed(1)} kN are not carried by any checked member${run.kind === 'pipe' ? ' (add_pipe_support: shoes on steel below or hangers from steel above)' : ''}`,

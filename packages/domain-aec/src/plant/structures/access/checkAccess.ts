@@ -2,9 +2,9 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { elementsOf, getBuilding } from '@aec/building/model';
-import type { BimCategory } from '@aec/building/types';
+import { assemblyStaleReason } from '../../../building/assemblyHandlers';
+import type { AssemblyKind, BimCategory } from '@aec/building/types';
 import { refuse, remediationOf } from '../codes';
-import { staleReason } from '../platform/platformStale';
 import { RULESET_NAMES, RULE_TABLE_VERSION, type AccessRule } from '../rules/ruleTable';
 import { checkEdges, edgeRuleUnsetFinding, type EdgeReport } from './edgeChecks';
 import { unverifiedFindings, type Finding } from './finding';
@@ -16,19 +16,25 @@ type Verdict = 'pass' | 'warn' | 'fail';
 
 const CHECKED_CATEGORIES: ReadonlyArray<BimCategory> = ['stair', 'steelStair', 'slab', 'grating', 'railing', 'ladder', 'assembly'];
 
-const stalePlatformFinding = (id: string, reason: string): Finding => ({
-  code: 'STA_PLATFORM_STALE',
-  ruleId: 'PLATFORM-CURRENT',
-  ruleset: 'project',
-  clause: 'a generated platform matches the vessel and beams it is derived from',
-  severity: 'fail',
-  grade: 'A',
-  ids: [id],
-  measured: { value: 1, unit: 'stale platforms' },
-  limit: { max: 0, unit: 'stale platforms' },
-  remediation: remediationOf('STA_PLATFORM_STALE'),
-  source: reason,
-});
+const staleAssemblyFinding = (id: string, kind: AssemblyKind, reason: string): Finding => {
+  const rack = kind === 'pipe_rack';
+  const code = rack ? 'STA_RACK_STALE' : 'STA_PLATFORM_STALE';
+  return {
+    code,
+    ruleId: rack ? 'RACK-CURRENT' : 'PLATFORM-CURRENT',
+    ruleset: 'project',
+    clause: rack
+      ? 'a generated pipe rack matches the parameters it is derived from'
+      : 'a generated platform matches the vessel and beams it is derived from',
+    severity: 'fail',
+    grade: 'A',
+    ids: [id],
+    measured: { value: 1, unit: rack ? 'stale pipe racks' : 'stale platforms' },
+    limit: { max: 0, unit: rack ? 'stale pipe racks' : 'stale platforms' },
+    remediation: remediationOf(code),
+    source: reason,
+  };
+};
 
 const verdictOf = (findings: readonly Finding[]): Verdict =>
   findings.some((finding) => finding.severity === 'fail') ? 'fail' : findings.length > 0 ? 'warn' : 'pass';
@@ -43,7 +49,7 @@ export const checkAccess = defineCommand({
   description:
     'Check access means of the BUILDING model against the access rules (ISO 14122, OSHA 29 CFR 1910) and list findings with stable STA_* codes, ' +
     'measured value, limit, clause, source and a one-line fix. It covers concrete stairs (add_stair) and steel stairs (add_steel_stair): Blondel 2h+g, riser, tread, pitch angle, width, ' +
-    'flight rise (the longest flight between landings), guard-rails (add_railing: top-rail height, clear space between rails, toe plate), fixed ladders (add_ladder: rung pitch, clear width, back clearance, stile extension, fall protection by height and installation date, cage start / hoops / diameter, landing interval), the gratings and guard-rails of generated platforms (pass the platform assembly id: it stands for its parts; a platform that no longer matches its vessel or beams fails with STA_PLATFORM_STALE) and open edges of slabs (add_slab) and grating panels (add_grating). Only grade A rules fail; grade B rules warn and add STA_RULE_UNVERIFIED; the result always has ' +
+    'flight rise (the longest flight between landings), guard-rails (add_railing: top-rail height, clear space between rails, toe plate), fixed ladders (add_ladder: rung pitch, clear width, back clearance, stile extension, fall protection by height and installation date, cage start / hoops / diameter, landing interval), the gratings and guard-rails of generated platforms (pass the platform assembly id: it stands for its parts; a platform that no longer matches its vessel or beams fails with STA_PLATFORM_STALE, a pipe rack that no longer matches its parameters with STA_RACK_STALE) and open edges of slabs (add_slab) and grating panels (add_grating). Only grade A rules fail; grade B rules warn and add STA_RULE_UNVERIFIED; the result always has ' +
     'reviewRequired: true (a qualified person signs access means). Lengths in the answer are millimetres and angles degrees, whatever the document units. ' +
     'Open edges need edgeDropThresholdMm (no graded rule exists, so there is no default): without it the edge check is skipped with the warning STA_EDGE_RULE_UNSET. ' +
     'The drop is measured from the slab top to the next surface below (another slab, else the lowest level elevation); an edge is protected when the drop is ' +
@@ -121,13 +127,13 @@ export const checkAccess = defineCommand({
       ...ladders.flatMap((ladder) => checkLadder(doc, ladder, params.rulesets)),
     ];
     const findings: Finding[] = [...breaches, ...unverifiedFindings(breaches, rules)];
-    // A generated platform that no longer matches its vessel / beams is never green (it is re-derived by update_access_platform).
+    // A generated platform or pipe rack that no longer matches what it is derived from is never green (update_access_platform / update_pipe_rack re-derive it).
     const platforms = elementsOf(building, 'assembly').filter(
       (assembly) => params.ids === undefined || params.ids.includes(assembly.id) || assembly.partIds.some((id) => params.ids?.includes(id)),
     );
     for (const assembly of platforms) {
-      const reason = staleReason(doc, building, assembly);
-      if (reason !== null) findings.push(stalePlatformFinding(assembly.id, reason));
+      const reason = assemblyStaleReason(doc, building, assembly);
+      if (reason !== null) findings.push(staleAssemblyFinding(assembly.id, assembly.kind, reason));
     }
 
     let edges: EdgeReport[] = [];

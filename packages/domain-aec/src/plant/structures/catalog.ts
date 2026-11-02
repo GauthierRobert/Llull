@@ -15,6 +15,8 @@ import { accessPlatformTakeoff } from './platform/accessPlatformTakeoff';
 import { addAccessPlatform } from './platform/addAccessPlatform';
 import { addCircularAccessPlatform } from './platform/addCircularAccessPlatform';
 import { updateAccessPlatform } from './platform/updateAccessPlatform';
+import { addPipeRack } from './rack/addPipeRack';
+import { updatePipeRack } from './rack/updatePipeRack';
 
 export const structuresCommands = commandCatalog(
   listAccessRules,
@@ -31,4 +33,6 @@ export const structuresCommands = commandCatalog(
   addCircularAccessPlatform,
   updateAccessPlatform,
   accessPlatformTakeoff,
+  addPipeRack,
+  updatePipeRack,
 );

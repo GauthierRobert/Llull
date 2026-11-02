@@ -14,22 +14,22 @@ import { MAX_BRACKETS, MAX_POSTS, polar, railArc, sectorLayout, sectorRing } fro
 import { overlappingPlatform } from './platformOverlap';
 import {
   type PartBase,
-  type PlatformFailure,
-  type PlatformOutcome,
+  type AssemblyFailure,
+  type AssemblyOutcome,
   type Slots,
   failure,
   placeGratings,
   placeMembers,
   placeRailings,
-  railingRunsProblem,
   tidyRing,
-} from './platformParts';
+} from '../assembly/assemblyParts';
+import { railingRunsProblem } from './platformRailing';
 import type { CircularSpec } from './platformSpec';
 
 const RAD = Math.PI / 180;
 
 /** The vertical vessel `equipmentId`, or the refusal when it is unknown or another kind of equipment. */
-export function vesselOf(building: BuildingModel, equipmentId: string): EquipmentElement | PlatformFailure {
+export function vesselOf(building: BuildingModel, equipmentId: string): EquipmentElement | AssemblyFailure {
   const element = building.elements[equipmentId];
   if (element === undefined) return failure('STA_UNKNOWN_ELEMENT', `no element ${equipmentId}`, ['equipmentId'], [equipmentId]);
   if (element.category !== 'equipment' || element.shape !== 'vertical_vessel')
@@ -49,7 +49,7 @@ export function buildCircularPlatform(
   assembly: AssemblyElement,
   spec: CircularSpec,
   slots: Slots,
-): PlatformOutcome {
+): AssemblyOutcome {
   const vessel = vesselOf(base, spec.equipmentId);
   if ('ok' in vessel) return vessel;
   const type = findGratingType(spec.gratingType);
