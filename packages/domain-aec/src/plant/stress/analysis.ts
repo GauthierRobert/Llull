@@ -121,6 +121,16 @@ function findingsOf(
     const code = DEFAULT_CODES[key];
     if (code !== undefined) out.push(finding(code, 'warn', `${key} is a named default`, [], [name]));
   }
+  const broken = rows.filter((row) => !Number.isFinite(row.ratio) || !Number.isFinite(row.stressMPa));
+  if (broken.length > 0)
+    out.push(
+      finding(
+        'PST_STRESS_NOT_FINITE',
+        'fail',
+        `${broken.length} stress station(s) are not finite (non-physical section or load): the code check cannot pass`,
+        [...new Set(broken.map((row) => row.node ?? row.element))],
+      ),
+    );
   const overstress: [string, StressRow['caseType'], string][] = [
     ['PST_SUSTAINED_OVERSTRESS', 'SUS', 'sustained stress S_L above the allowable S_h'],
     ['PST_EXPANSION_OVERSTRESS', 'EXP', 'displacement stress range S_E above the allowable S_A'],

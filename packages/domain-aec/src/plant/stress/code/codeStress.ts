@@ -38,6 +38,8 @@ interface Station {
 }
 
 const BAR_TO_MPA = 0.1;
+/** Intervals sampled along an element to find the interior maximum of the resultant moment. */
+const SAMPLES = 32;
 const nodeId = (index: number): string => `N${index + 1}`;
 
 function stations(forces: ArrayLike<number>, base: number, length: number, load: readonly [number, number, number]): Station[] {
@@ -61,6 +63,17 @@ function stations(forces: ArrayLike<number>, base: number, length: number, load:
   const result = [at(0, 'a'), at(length, 'b')];
   for (const x of [wz === 0 ? NaN : -Vz / wz, wy === 0 ? NaN : -Vy / wy])
     if (x > 1e-6 * length && x < length * (1 - 1e-6)) result.push(at(x, null));
+  // the resultant bending moment of a load that is not in one plane peaks where neither component does: sample it and keep a true interior maximum
+  const resultant = (x: number): number => Math.hypot(at(x, null).my, at(x, null).mz);
+  const ends = Math.max(resultant(0), resultant(length));
+  let best = { x: NaN, m: ends };
+  for (let i = 1; i < SAMPLES; i++) {
+    const x = (length * i) / SAMPLES;
+    const m = resultant(x);
+    if (m > best.m * (1 + 1e-9)) best = { x, m };
+  }
+  if (Number.isFinite(best.x) && !result.some((known) => Math.abs(known.x - best.x) < length / (2 * SAMPLES)))
+    result.push(at(best.x, null));
   return result;
 }
 

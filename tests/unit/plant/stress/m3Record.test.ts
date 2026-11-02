@@ -279,11 +279,55 @@ describe('the approval through replay, regenerate and save / load', () => {
     expect(forged.document.plant?.stress?.models[id]?.approval).toBeUndefined();
   });
 
-  it('a replay whose recorded results changed (a different history) keeps no approval for them', () => {
+  it('a pipe moved after the record step: the live approval is stale and a replay does not carry it', () => {
+    const { doc, id, pipeId } = recorded();
+    const moved = apply(approve(doc, id), 'move_building_element', { elementIds: [pipeId], delta: [0, 500] });
+    expect(moved.plant?.stress?.models[id]?.approval).toBeDefined();
+    expect(execute(moved, 'replay_history', {}).document.plant?.stress?.models[id]?.approval).toBeUndefined();
+  });
+
+  it('a support added after the record step is carried the same way: not at all', () => {
+    const { doc, id, pipeId } = recorded();
+    const edited = apply(approve(doc, id), 'add_pipe_support', { pipeId, at: [[2000, 0, 3000]], type: 'shoe' });
+    expect(execute(edited, 'replay_history', {}).document.plant?.stress?.models[id]?.approval).toBeUndefined();
+  });
+
+  it('a forged record (hashes and status written into the file, results never produced) cannot be approved: the analysis is rerun', () => {
+    const { doc, id } = recorded();
+    const model = doc.plant?.stress?.models[id];
+    if (model?.recorded === undefined) throw new Error('not recorded');
+    const forge = (patch: Record<string, unknown>): CadDocument =>
+      ({
+        ...doc,
+        plant: {
+          ...doc.plant,
+          stress: { ...doc.plant?.stress, models: { [id]: { ...model, recorded: { ...model.recorded, ...patch } } }, modelOrder: [id] },
+        },
+      }) as CadDocument;
+    const port = portFor();
+    for (const patch of [{ resultHash: 'a'.repeat(64) }, { status: 'incomplete' }]) {
+      const forged = forge(patch);
+      const result = execute(forged, 'approve_pipe_stress', { modelId: id, confirmation: sign(forged, id), at: AT }, ctxWith(port));
+      expect(result.error?.code).toBe('PST_RESULTS_STALE');
+    }
+    expect(port.spend).not.toHaveBeenCalled();
+  });
+
+  it('hostile files: an approval without a record, with other hashes or a bad time is rejected on load', () => {
     const { doc, id } = recorded();
     const approved = approve(doc, id);
-    const changed = apply(approved, 'record_pipe_stress_results', { modelId: id });
-    expect(execute(changed, 'replay_history', {}).document.plant?.stress?.models[id]?.approval).toBeUndefined();
+    const load = (mutate: (model: Record<string, unknown>) => void): void => {
+      const raw = JSON.parse(serializeDocument(approved)) as {
+        document: { plant: { stress: { models: Record<string, Record<string, unknown>> } } };
+      };
+      mutate(raw.document.plant.stress.models[id] as Record<string, unknown>);
+      expect(() => deserializeDocument(JSON.stringify(raw))).toThrow();
+    };
+    load((model) => delete model['recorded']);
+    load((model) => ((model['approval'] as Record<string, unknown>)['resultHash'] = 'b'.repeat(64)));
+    load((model) => ((model['approval'] as Record<string, unknown>)['inputHash'] = 'not-a-hash'));
+    load((model) => ((model['approval'] as Record<string, unknown>)['at'] = 'yesterday'));
+    expect(() => deserializeDocument(serializeDocument(approved))).not.toThrow();
   });
 
   it('the approval is saved and loaded; a malformed approval is rejected on load', () => {

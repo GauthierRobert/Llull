@@ -30,6 +30,9 @@ const failure = (code: string, message: string, ids: readonly string[] = [], pat
   paths,
 });
 
+/** Thinnest corroded wall the section formulas are used with (mm): below it the section is not a pipe. */
+const MIN_CORRODED_WALL_MM = 0.1;
+
 export const isBuildFailure = (value: BuiltModel | LayoutFailure): value is LayoutFailure => 'ok' in value;
 
 /**
@@ -65,6 +68,14 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
           : `pipe ${pipe.id}: wall ${wall} mm is not a physical wall for OD ${pipe.odMm} mm`,
         [pipe.id],
         ['conditions.wallMm'],
+      );
+    const corrosion = model.conditions?.corrosionAllowanceMm ?? 0;
+    if (!(wall - corrosion > MIN_CORRODED_WALL_MM))
+      return failure(
+        'PST_CORROSION_EXCEEDS_WALL',
+        `pipe ${pipe.id}: corrosion allowance ${corrosion} mm leaves ${(wall - corrosion).toFixed(3)} mm of the ${wall} mm wall (needs more than ${MIN_CORRODED_WALL_MM} mm)`,
+        [pipe.id],
+        ['conditions.corrosionAllowanceMm'],
       );
     walls.set(pipe.id, wall);
   }

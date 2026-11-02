@@ -29,6 +29,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PST_RESULTS_FAILING: 'Fix the overstress (see check_pipe_stress) and record again; a failing model cannot be approved.',
   PST_RESULTS_INCOMPLETE: 'Add the missing sustained and expansion load cases, then record again.',
   PST_NOT_RECORDED: 'Run record_pipe_stress_results before approve_pipe_stress.',
+  PST_CORROSION_EXCEEDS_WALL: 'Lower corrosionAllowanceMm below the wall thickness, or use a pipe with a thicker wall.',
   PST_HUMAN_GATE: 'A qualified reviewer signs in the desktop app; an agent cannot approve stress results.',
 };
 
@@ -36,6 +37,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
 export const remediationOf = (code: string): string => REMEDIATION[code] ?? FINDING_REMEDIATION[code] ?? 'see the command description';
 
 const FINDING_REMEDIATION: Readonly<Record<string, string>> = {
+  PST_STRESS_NOT_FINITE: 'Check the wall, corrosion allowance and loads named in the message; a non-finite stress never passes.',
   PST_SUSTAINED_OVERSTRESS: 'Add supports near the node (shorter span) or reduce the weight.',
   PST_EXPANSION_OVERSTRESS: 'Add flexibility (loop or offset), or move guides and line stops.',
   PST_OCCASIONAL_OVERSTRESS: 'Add guides or restraints for the occasional direction.',

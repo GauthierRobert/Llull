@@ -138,6 +138,12 @@ export const setPipeOperatingConditions = defineCommand({
       },
       defaulted,
     };
+    if (conditions.wallMm !== undefined && !(conditions.wallMm - conditions.corrosionAllowanceMm > 0.1))
+      return fail(
+        'PST_CORROSION_EXCEEDS_WALL',
+        `corrosion allowance ${conditions.corrosionAllowanceMm} mm leaves no wall of the ${conditions.wallMm} mm wall`,
+        ['corrosionAllowanceMm'],
+      );
     const strains: Record<string, number> = {};
     for (const entry of conditions.temperatures) {
       const strain = thermalStrain(doc, conditions, entry.tempC);

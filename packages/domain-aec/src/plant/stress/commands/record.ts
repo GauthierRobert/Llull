@@ -5,7 +5,7 @@ import { changed, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { humanGate } from '@core/model/humanGate';
 import { isRecord } from '@lib/isRecord';
-import { analyzeStressModel, currentInputHash } from '../analysis';
+import { analyzeStressModel } from '../analysis';
 import { refuse } from '../codes';
 import type { RecordedResults } from '../model/schema';
 import { edited, withModel } from '../model/store';
@@ -72,7 +72,8 @@ const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
 /**
  * @affects plant.stress.models[modelId].approval: { signer, signatureId, at, inputHash, resultHash }
- * @invariant a human act: confirmation is a signature verified by the signing port over { act plant:approve_pipe_stress, modelId, inputHash, resultHash } and spent once; recorded-ness, freshness and status are checked BEFORE a signature is spent;
+ * @invariant `at` is host-stamped metadata outside the signed payload (the human signs before the host stamps the time; residual: an in-process caller holding a valid signature can choose `at`, which is a record of when, not authority);
+ * a human act: confirmation is a signature verified by the signing port over { act plant:approve_pipe_stress, modelId, inputHash, resultHash } and spent once; recorded-ness, freshness (the analysis is rerun and must reproduce the stored input hash, result hash and status) and status are checked BEFORE a signature is spent;
  *   replay: the recorded step carries { verified: true } (the signature is never recorded) and is a no-op; replay_history / regenerate re-attach an approval whose recorded results are unchanged (plugin carry)
  * @failure unknown model -> PST_MODEL_NOT_FOUND; nothing recorded -> PST_NOT_RECORDED; inputs changed since the record -> PST_RESULTS_STALE; fail status -> PST_RESULTS_FAILING; incomplete -> PST_RESULTS_INCOMPLETE; no valid human signature -> PST_HUMAN_GATE; the document is unchanged
  */
@@ -111,8 +112,13 @@ export const approvePipeStress = defineCommand({
     const fail = (code: string, message: string): CommandResult =>
       refuse(doc, 'approve_pipe_stress', code, message, [modelId], ['modelId']);
     if (recorded === undefined) return fail('PST_NOT_RECORDED', `model ${modelId} has no recorded results: run record_pipe_stress_results`);
-    if (currentInputHash(doc, model) !== recorded.inputHash)
-      return fail('PST_RESULTS_STALE', `the inputs of ${modelId} changed since its results were recorded`);
+    // the stored hashes and status are data a file can carry: the analysis is rerun and must reproduce them before a signature is spent
+    const fresh = analyzeStressModel(doc, model);
+    if (!fresh.ok || fresh.inputHash !== recorded.inputHash || fresh.resultHash !== recorded.resultHash || fresh.status !== recorded.status)
+      return fail(
+        'PST_RESULTS_STALE',
+        `the inputs of ${modelId} changed since its results were recorded, or the stored record does not reproduce`,
+      );
     if (recorded.status === 'fail') return fail('PST_RESULTS_FAILING', `the recorded results of ${modelId} fail the code check`);
     if (recorded.status === 'incomplete')
       return fail('PST_RESULTS_INCOMPLETE', `the recorded results of ${modelId} lack a sustained or expansion case`);

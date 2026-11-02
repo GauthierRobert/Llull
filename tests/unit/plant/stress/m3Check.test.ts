@@ -10,8 +10,20 @@ import { execute } from '@core/commands/registry';
 import { deriveRun } from '@aec/plant/piping/routeParts';
 import type { CadDocument } from '@core/model/types';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
-import { cs150Line } from '../piping/rteFixtures';
-import { analyzed, anchorAt, baseDoc, cases, conditioned, DN100, reaction, withModel, withPipe, type AnalysisData } from './m3Fixtures';
+import { cs150Line, valveScene } from '../piping/rteFixtures';
+import {
+  analyzed,
+  anchorAt,
+  baseDoc,
+  cases,
+  conditioned,
+  DN100,
+  reaction,
+  steel,
+  withModel,
+  withPipe,
+  type AnalysisData,
+} from './m3Fixtures';
 import { expectRel, referenceData } from './stressFixtures';
 
 const GRAVITY = 9.80665;
@@ -397,5 +409,61 @@ describe('check_pipe_stress', () => {
     expectRefusal(doc, 'check_pipe_stress', { modelId: id }, 'PST_LOADCASE_INVALID');
     const result = execute(exp(doc, id), 'check_pipe_stress', { modelId: id });
     expect(result.affected).toEqual([]);
+  });
+});
+
+describe('corrosion allowance and non-finite stress', () => {
+  it('a corrosion allowance equal to or above the wall is refused where it is set and where the wall is read from the spec', () => {
+    const { doc, id } = lBend();
+    const set = (corrosionAllowanceMm: number): unknown => ({ modelId: id, ...steel({ corrosionAllowanceMm, wallMm: NPS6.wallMm }) });
+    expectRefusal(doc, 'set_pipe_operating_conditions', set(NPS6.wallMm), 'PST_CORROSION_EXCEEDS_WALL', 'corrosionAllowanceMm');
+    expectRefusal(doc, 'set_pipe_operating_conditions', set(NPS6.wallMm + 3), 'PST_CORROSION_EXCEEDS_WALL');
+    expectRefusal(doc, 'set_pipe_operating_conditions', set(NPS6.wallMm - 0.05), 'PST_CORROSION_EXCEEDS_WALL');
+    ok(doc, 'set_pipe_operating_conditions', set(NPS6.wallMm - 1));
+    // wall from the RTE derivation: the check happens at analysis
+    const scene = valveScene();
+    const created = ok(scene.doc, 'create_stress_model', { name: 'r', pipeIds: [scene.runId], rule: 'B31.3-2018' });
+    const modelId = (created.data as { modelId: string }).modelId;
+    const thin = cases(conditioned(created.document, modelId, { wallMm: undefined, corrosionAllowanceMm: 50 }), modelId, [
+      { name: 'S', type: 'SUS', basic: ['W'] },
+    ]);
+    const refusal = expectRefusal(thin, 'analyze_pipe_stress', { modelId }, 'PST_CORROSION_EXCEEDS_WALL');
+    expect(refusal.error?.ids).toEqual([scene.runId]);
+  });
+
+  it('every stress row of every VC model is finite', () => {
+    const models = [lBend(), lBend({ corrosionAllowanceMm: 2 }, {}, { elbowRadiusFactor: 1.5 }), lBend({}, {}, { rule: 'B31.1-2018' })];
+    for (const { doc, id } of models) {
+      const rows = analyzed(exp(doc, id), id, { include: ['stresses'] }).details?.stresses ?? [];
+      expect(rows.length).toBeGreaterThan(0);
+      for (const entry of rows) {
+        expect(Number.isFinite(entry.stressMPa)).toBe(true);
+        expect(Number.isFinite(entry.ratio)).toBe(true);
+        expect(entry.stressMPa).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+});
+
+describe('interior stations of a span loaded out of one plane', () => {
+  it('an inclined span with a weight and a lateral force: the coarse model finds the maximum a 150 mm mesh finds (within 1 %)', () => {
+    const maxStress = (maxElementLengthMm: number): number => {
+      const { doc: pipes, id: pipeId } = withPipe(
+        baseDoc(),
+        [
+          [0, 0, 3000],
+          [6000, 0, 6000],
+        ],
+        DN100.odMm,
+      );
+      const { doc, id } = withModel(pipes, [pipeId], { maxElementLengthMm, frictionCoefficient: 0 });
+      let d = anchorAt(conditioned(doc, id), id, pipeId, 0);
+      d = apply(d, 'add_stress_restraint', { modelId: id, at: { pipeId, atMm: 6708.2 }, kind: 'translational', axis: 'z', oneWay: '+' });
+      d = apply(d, 'add_stress_restraint', { modelId: id, at: { pipeId, atMm: 6708.2 }, kind: 'translational', axis: 'y' });
+      d = cases(d, id, [{ name: 'S', type: 'SUS', basic: ['W', 'F1'] }], [{ name: 'F1', pipeId, atMm: 2500, forceN: [0, 900, 0] }]);
+      const rows = analyzed(d, id, { include: ['stresses'] }).details?.stresses ?? [];
+      return Math.max(...rows.map((entry) => entry.stressMPa));
+    };
+    expectRel(maxStress(100000), maxStress(150), 0.01, 'coarse vs fine maximum');
   });
 });
