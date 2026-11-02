@@ -1,11 +1,18 @@
-/** P&ID <-> 3D consistency (plant 04 PID §5.6, MVP subset): P&ID equipment / lines / inline items against building equipment and pipe runs. */
+/** P&ID <-> 3D consistency (plant 04 PID §5.6): P&ID equipment / lines / inline items against building equipment, pipe runs and 02 RTE routed lines. */
 
 import { elementsOf } from '@aec/building/model';
-import type { BuildingModel, PipeElement } from '@aec/building/types';
-import type { PidEndpoint, PidEquipment, PidItem, PidLine, PidModel, PidSegment } from '../model';
+import type { BuildingModel } from '@aec/building/types';
+import type { PipingModel } from '@aec/plant/types';
+import type { PidEquipment, PidInline, PidItem, PidLine, PidModel } from '../model';
 import { naturalCompare } from '../lists/sort';
-import { makeFinding3d, compareFindings3d, type Finding3d } from './finding';
-import { pairUp, type ModelObject, type Pairing } from './pairing';
+import { compareEquipmentClass, compareInlineClass, type ClassOutcome } from './classCompare';
+import { equipmentOf } from './classMap';
+import { itemAt, normaliser, text, type Labelled } from './common';
+import { makeFinding3d, compareFindings3d, type Finding3d, type Skip3d } from './finding';
+import { compareLine } from './lineCompare';
+import { collectRuns, inlineObjects } from './lines3d';
+import { compareOrder } from './orderCompare';
+import { pairUp, type Pairing } from './pairing';
 
 export type Scope3d = 'all' | 'equipment' | 'lines' | 'inline';
 
@@ -17,117 +24,22 @@ export interface UnmatchedPid {
 }
 export interface Unmatched3d {
   readonly ids: readonly string[];
-  readonly category: 'equipment' | 'pipe';
+  readonly category: 'equipment' | 'pipe' | 'inline';
   readonly label: string;
   readonly reason: 'not_in_pid' | 'ambiguous';
 }
 export interface Check3dResult {
   readonly findings: readonly Finding3d[];
+  /** Comparisons that could not be made (coded; never a pass). */
+  readonly skipped: readonly Skip3d[];
   readonly matched: { readonly equipment: string[]; readonly lines: string[]; readonly inline: string[] };
   readonly unmatchedPid: readonly UnmatchedPid[];
   readonly unmatched3d: readonly Unmatched3d[];
 }
 
-interface Labelled extends ModelObject {
-  readonly label: string;
-}
-interface Run extends Labelled {
-  readonly pipes: readonly PipeElement[];
-}
-
-const normaliser = (normaliseTags: boolean): ((text: string) => string) =>
-  normaliseTags ? (text) => text.toUpperCase().replace(/[\s_-]+/g, '') : (text) => text.trim();
-
-const itemAt = (pid: PidModel, id: string): PidItem | undefined => (Object.hasOwn(pid.items, id) ? pid.items[id] : undefined);
-const text = (value: string | undefined): string | undefined => (value === undefined || value.trim() === '' ? undefined : value.trim());
-
-interface End {
-  readonly tag: string;
-  readonly nozzle: string | undefined;
-  /** The tag and sub-tag as written, for messages. */
-  readonly shown: string;
-}
-
-/** `{ equipment tag, nozzle sub-tag }` of a segment end on a nozzle; any other end (free, branch, inline, off-page) is not compared. */
-function pidEnd(pid: PidModel, end: PidEndpoint, norm: (text: string) => string): End | undefined {
-  if (end.type !== 'nozzle') return undefined;
-  const nozzle = itemAt(pid, end.itemId);
-  if (nozzle?.kind !== 'nozzle') return undefined;
-  let owner = itemAt(pid, nozzle.equipmentId);
-  for (let depth = 0; depth < 16 && owner?.kind === 'equipment' && owner.parentId !== undefined; depth++)
-    owner = itemAt(pid, owner.parentId);
-  if (owner?.kind !== 'equipment' || owner.tag === undefined) return undefined;
-  return { tag: norm(owner.tag), nozzle: norm(nozzle.subTag), shown: `${owner.tag}/${nozzle.subTag}` };
-}
-
-/** `TAG` or `TAG:NOZZLE` (the 03 EQP port id) of a pipe's from / to. */
-function modelEnd(value: string | undefined, norm: (text: string) => string): End | undefined {
-  const clean = text(value);
-  if (clean === undefined) return undefined;
-  const cut = clean.indexOf(':');
-  return cut < 0
-    ? { tag: norm(clean), nozzle: undefined, shown: clean }
-    : { tag: norm(clean.slice(0, cut)), nozzle: norm(clean.slice(cut + 1)), shown: `${clean.slice(0, cut)}/${clean.slice(cut + 1)}` };
-}
-
-const sameEnd = (pidSide: End, modelSide: End): boolean =>
-  pidSide.tag === modelSide.tag && (modelSide.nozzle === undefined || modelSide.nozzle === pidSide.nozzle);
-
-const segmentsOf = (pid: PidModel, line: PidLine): PidSegment[] =>
-  line.segmentIds.flatMap((id) => {
-    const segment = itemAt(pid, id);
-    return segment?.kind === 'segment' ? [segment] : [];
-  });
-
-const dnList = (values: ReadonlyArray<number | undefined>): number[] =>
-  [...new Set(values.filter((n): n is number => n !== undefined))].sort((a, b) => a - b);
-
-function compareLine(pid: PidModel, line: PidLine, run: Run, norm: (text: string) => string): Finding3d[] {
-  const findings: Finding3d[] = [];
-  const label = line.lineNumber ?? line.id;
-  const segments = segmentsOf(pid, line);
-  const pidDn = dnList(segments.map((s) => s.dn ?? line.dn));
-  const modelDn = dnList(run.pipes.map((p) => p.dn));
-  if (pidDn.length > 0 && modelDn.length > 0 && pidDn.join(',') !== modelDn.join(','))
-    findings.push(
-      makeFinding3d({
-        code: 'P3D_SIZE_MISMATCH',
-        pidIds: [line.id],
-        elementIds: run.ids,
-        item: label,
-        message: `line ${label}: P&ID DN ${pidDn.join('/')} but 3D DN ${modelDn.join('/')}`,
-        values: { pidDn: pidDn.join(','), modelDn: modelDn.join(',') },
-      }),
-    );
-  const first = segments[0];
-  const last = segments[segments.length - 1];
-  const a = first === undefined ? undefined : pidEnd(pid, first.from, norm);
-  const b = last === undefined ? undefined : pidEnd(pid, last.to, norm);
-  const c = modelEnd(run.pipes[0]?.from, norm);
-  const d = modelEnd(run.pipes[run.pipes.length - 1]?.to, norm);
-  if (
-    a !== undefined &&
-    b !== undefined &&
-    c !== undefined &&
-    d !== undefined &&
-    !((sameEnd(a, c) && sameEnd(b, d)) || (sameEnd(a, d) && sameEnd(b, c)))
-  ) {
-    findings.push(
-      makeFinding3d({
-        code: 'P3D_CONNECTIVITY_MISMATCH',
-        pidIds: [line.id],
-        elementIds: run.ids,
-        item: label,
-        message: `line ${label}: P&ID connects ${a.shown} and ${b.shown} but the 3D run goes ${c.shown} to ${d.shown}`,
-        values: { pidEnds: `${a.shown} | ${b.shown}`, modelEnds: `${c.shown} | ${d.shown}` },
-      }),
-    );
-  }
-  return findings;
-}
-
 interface Collector {
   findings: Finding3d[];
+  skipped: Skip3d[];
   unmatchedPid: UnmatchedPid[];
   unmatched3d: Unmatched3d[];
 }
@@ -195,11 +107,23 @@ function report<P extends PidItem, M extends Labelled>(
 
 const sortLabels = (labels: string[]): string[] => labels.sort(naturalCompare);
 
-/** Read-only: derives every answer from the two models. Linear in both sides (hash join). */
-export function check3d(pid: PidModel, building: BuildingModel, scope: Scope3d, normaliseTags: boolean): Check3dResult {
+const outcome = (sink: Collector, result: ClassOutcome): void => {
+  if (result === undefined) return;
+  if ('finding' in result) sink.findings.push(result.finding);
+  else sink.skipped.push(result.skip);
+};
+
+/** Read-only: derives every answer from the models. Linear in both sides (hash join); the inline-order comparison is bounded per line (`MAX_ORDER_CELLS`). */
+export function check3d(
+  pid: PidModel,
+  building: BuildingModel,
+  piping: PipingModel,
+  scope: Scope3d,
+  normaliseTags: boolean,
+): Check3dResult {
   const norm = normaliser(normaliseTags);
   const links = pid.links ?? {};
-  const sink: Collector = { findings: [], unmatchedPid: [], unmatched3d: [] };
+  const sink: Collector = { findings: [], skipped: [], unmatchedPid: [], unmatched3d: [] };
   const matched = { equipment: [] as string[], lines: [] as string[], inline: [] as string[] };
   const items = pid.itemOrder.flatMap((id) => itemAt(pid, id) ?? []);
 
@@ -214,61 +138,55 @@ export function check3d(pid: PidModel, building: BuildingModel, scope: Scope3d, 
       links,
     );
     report(sink, pairing, 'equipment', 'equipment', (i) => i.tag ?? i.id);
-    for (const [item] of pairing.pairs) matched.equipment.push(item.tag ?? item.id);
+    for (const [item, object] of pairing.pairs) {
+      matched.equipment.push(item.tag ?? item.id);
+      const element = equipmentOf(building, object.ids[0] ?? '');
+      if (element !== undefined) outcome(sink, compareEquipmentClass(item, element));
+    }
   }
 
-  if (scope === 'all' || scope === 'lines') {
-    const groups = new Map<string, PipeElement[]>();
-    const runs: Run[] = [];
-    for (const pipe of elementsOf(building, 'pipe')) {
-      const number = text(pipe.line);
-      const key = number === undefined ? undefined : norm(number);
-      const group = key === undefined ? undefined : groups.get(key);
-      if (group !== undefined) group.push(pipe);
-      else {
-        const created = [pipe];
-        if (key !== undefined) groups.set(key, created);
-        runs.push({ ids: [], label: number ?? pipe.mark, pipes: created });
-      }
-    }
-    const objects = runs.map((run): Run => ({ ...run, ids: run.pipes.map((p) => p.id) }));
+  if (scope !== 'equipment') {
+    const runs = collectRuns(building, piping, norm);
     const lines = items.filter((i): i is PidLine => i.kind === 'line');
     const lineKey = (line: PidLine): string | undefined => (text(line.lineNumber) === undefined ? undefined : norm(line.lineNumber ?? ''));
-    const pairing = pairUp(
-      lines,
-      objects,
-      lineKey,
-      (run) => (text(run.pipes[0]?.line) === undefined ? undefined : norm(run.pipes[0]?.line ?? '')),
-      links,
-    );
-    report(sink, pairing, 'line', 'pipe', (line) => line.lineNumber ?? line.id);
-    for (const [line, run] of pairing.pairs) {
-      matched.lines.push(line.lineNumber ?? line.id);
-      sink.findings.push(...compareLine(pid, line, run, norm));
+    const pairing = pairUp(lines, runs, lineKey, (run) => run.key, links);
+    if (scope === 'all' || scope === 'lines') {
+      report(sink, pairing, 'line', 'pipe', (line) => line.lineNumber ?? line.id);
+      for (const [line, run] of pairing.pairs) {
+        matched.lines.push(line.lineNumber ?? line.id);
+        const compared = compareLine(pid, line, run, norm);
+        sink.findings.push(...compared.findings);
+        sink.skipped.push(...compared.skips);
+      }
     }
-  }
-
-  if (scope === 'all' || scope === 'inline') {
-    for (const item of items) {
-      if (item.kind !== 'inline' || text(item.tag) === undefined) continue;
-      const label = item.tag ?? item.id;
-      sink.findings.push(
-        makeFinding3d({
-          code: 'P3D_UNPLACED',
-          pidIds: [item.id],
-          item: label,
-          message: `inline ${label} is on the P&ID; the 3D model has no inline components yet (02 RTE), so it cannot be placed`,
-          values: { dexpiClass: item.dexpiClass },
-        }),
+    if (scope === 'all' || scope === 'inline') {
+      for (const [line, run] of pairing.pairs) {
+        const order = compareOrder(pid, line, run, norm);
+        sink.findings.push(...order.findings);
+        sink.skipped.push(...order.skips);
+      }
+      const tagged = items.filter((i): i is PidInline => i.kind === 'inline' && text(i.tag) !== undefined);
+      const inlinePairing = pairUp(
+        tagged,
+        inlineObjects(piping),
+        (i) => norm(i.tag ?? ''),
+        (o) => norm(o.label),
+        {},
       );
-      sink.unmatchedPid.push({ id: item.id, kind: 'inline', label, reason: 'unplaced' });
+      report(sink, inlinePairing, 'inline', 'inline', (i) => i.tag ?? i.id);
+      for (const [item, component] of inlinePairing.pairs) {
+        matched.inline.push(item.tag ?? item.id);
+        outcome(sink, compareInlineClass(item, component));
+      }
     }
   }
 
   sortLabels(matched.equipment);
   sortLabels(matched.lines);
+  sortLabels(matched.inline);
   return {
     findings: sink.findings.sort(compareFindings3d),
+    skipped: sink.skipped.sort((a, b) => naturalCompare(a.item, b.item) || (a.code < b.code ? -1 : a.code > b.code ? 1 : 0)),
     matched,
     unmatchedPid: sink.unmatchedPid.sort((a, b) => naturalCompare(a.label, b.label)),
     unmatched3d: sink.unmatched3d.sort((a, b) => naturalCompare(a.label, b.label)),
