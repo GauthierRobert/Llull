@@ -281,6 +281,9 @@ describe('set_tag_format', () => {
     expectRefusal(doc, 'set_tag_format', { className: 'MyPump', tagFormat: 'X-{hierarchy.plant.code}', retag: true }, 'DAT_TAG_DUPLICATE');
     expectRefusal(doc, 'set_tag_format', { className: 'Tank', tagFormat: 'T-{seq}' }, 'DAT_LIBRARY_CLASS_LOCKED', 'className');
     expectRefusal(doc, 'set_tag_format', { className: 'Nope', tagFormat: 'T-{seq}' }, 'DAT_CLASS_UNKNOWN', 'className');
+    for (const className of ['constructor', '__proto__', 'toString']) {
+      expectRefusal(doc, 'set_tag_format', { className, tagFormat: 'T-{seq}' }, 'DAT_CLASS_UNKNOWN', 'className');
+    }
   });
 
   it('does nothing when the format is already set', () => {
