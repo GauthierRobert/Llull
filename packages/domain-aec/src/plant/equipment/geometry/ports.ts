@@ -8,6 +8,9 @@
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { BuildingLevel, BuildingModel, EquipmentElement } from '@aec/building/types';
 import type { EquipmentTemplate, NozzleFacing, NozzleRecord } from '../plantData';
+import { exchangerPlacement } from './exchangerFrame';
+import { aroundXAxis, offsetAlong, point, rad, type NozzlePlacement } from './placement';
+import { tankPlacement } from './tankFrame';
 import { headSurfaceHeight, resolveVessel, type VesselGeometry } from './vesselFrame';
 
 /** A world-space connection point of an equipment nozzle (shared with 02 RTE / 07 PST). */
@@ -28,20 +31,9 @@ export interface ConnectionPort {
   readonly facing: NozzleFacing;
 }
 
-/** Nozzle geometry in the equipment frame: `base` (inside the wall), flange-face centre `face`, unit outward `direction`. */
-export interface NozzlePlacement {
-  readonly base: Vec3;
-  readonly face: Vec3;
-  readonly direction: Vec3;
-}
-
 const ROUND = 1e9;
 const round = (value: number): number => Math.round(value * ROUND) / ROUND + 0;
 const roundDirection = (value: number): number => Math.round(value * 1e12) / 1e12 + 0;
-const rad = (degrees: number): number => (degrees * Math.PI) / 180;
-const point = (x: number, y: number, z: number): Vec3 => [x, y, z];
-const offsetAlong = (from: Vec3, direction: Vec3, distance: number): Vec3 =>
-  point(from[0] + direction[0] * distance, from[1] + direction[1] * distance, from[2] + direction[2] * distance);
 
 function unit(vector: Vec3): Vec3 | null {
   const length = Math.hypot(vector[0], vector[1], vector[2]);
@@ -76,13 +68,8 @@ function horizontalPlacement(geometry: VesselGeometry, nozzle: NozzleRecord): No
   const { location, projection } = nozzle;
   const axis = geometry.datum;
   const half = geometry.length / 2;
-  if (location.on === 'shell' && 'station' in location) {
-    const angle = rad(location.orientationDeg);
-    const direction = point(0, Math.sin(angle), Math.cos(angle));
-    const centre = point(-half + location.station, 0, axis);
-    const start = geometry.radius + geometry.shellThickness / 2;
-    return { base: offsetAlong(centre, direction, start), face: offsetAlong(centre, direction, projection), direction };
-  }
+  if (location.on === 'shell' && 'station' in location)
+    return aroundXAxis(-half + location.station, axis, location.orientationDeg, geometry.radius + geometry.shellThickness / 2, projection);
   if (location.on === 'head' && (location.head === 'left' || location.head === 'right')) {
     const angle = rad(location.orientationDeg);
     const y = location.radialOffset * Math.sin(angle);
@@ -97,7 +84,8 @@ function horizontalPlacement(geometry: VesselGeometry, nozzle: NozzleRecord): No
 
 /**
  * Placement of `nozzle` on `template` in the equipment frame (origin = plan location at the level elevation), or null when the location
- * does not suit the template (shell elevation on a horizontal vessel, a left head on a vertical one, a head that cannot be resolved ...).
+ * does not suit the template (shell elevation on a horizontal vessel, a left head on a vertical one, a head that cannot be resolved ...). Exchangers take shell and channel
+ * stations, tanks shell elevations; pump nozzles are free locations.
  * @invariant free locations work on every template, including legacy blocks (`kind: 'block'`)
  */
 export function placeNozzle(template: EquipmentTemplate, nozzle: NozzleRecord): NozzlePlacement | null {
@@ -107,6 +95,8 @@ export function placeNozzle(template: EquipmentTemplate, nozzle: NozzleRecord): 
     if (direction === null) return null;
     return { base: offsetAlong(location.position, direction, -nozzle.projection), face: location.position, direction };
   }
+  if (template.kind === 'exchanger') return exchangerPlacement(template, nozzle);
+  if (template.kind === 'tank') return tankPlacement(template, nozzle);
   if (template.kind !== 'vessel') return null;
   const geometry = resolveVessel(template);
   if ('error' in geometry) return null;

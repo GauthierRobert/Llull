@@ -59,13 +59,13 @@ export const updateEquipment = defineCommand({
       return noop(doc, 'update_equipment failed: give elementId or currentMark.');
     }
     const equipment = target;
-    if (equipment.plant?.template.kind === 'vessel')
+    if (equipment.plant !== undefined && equipment.plant.template.kind !== 'block')
       return codedRejection(
         doc,
         'update_equipment',
         'EQP_NOT_PARAMETRIC',
-        `${equipment.mark} is a parametric vessel; revise it with update_equipment_parameters (its size, shape and weight are derived)`,
-        'Use update_equipment_parameters for a parametric vessel; update_equipment edits plain blocks.',
+        `${equipment.mark} is parametric ${equipment.plant.template.kind} equipment: its size, shape and weight are derived, so update_equipment does not edit it (vessels: update_equipment_parameters; other parametric equipment: recreate it)`,
+        'update_equipment edits plain blocks; revise a parametric vessel with update_equipment_parameters, recreate other parametric equipment.',
         [equipment.id],
         ['elementId'],
       );

@@ -19,7 +19,7 @@ import { findProfile, profileOutline } from '../steel/profiles';
 import { cross3, dot3, normalize3OrZero, sub3 } from '@lib/vec3';
 import { shapeOf } from './equipment/equipmentShape';
 import { evaluateNozzles } from '../plant/equipment/evaluate/evaluateNozzles';
-import { evaluateVessel } from '../plant/equipment/evaluate/evaluateVessel';
+import { evaluateParametricEquipment } from '../plant/equipment/evaluate/evaluateEquipment';
 
 // prettier-ignore
 const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
@@ -117,7 +117,7 @@ const EQUIPMENT_COLOR = '#c27c2c';
  */
 export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLevel): Entity[] {
   const template = equipment.plant?.template;
-  if (template?.kind === 'vessel') return evaluateVessel(equipment, level, template);
+  if (template !== undefined && template.kind !== 'block') return evaluateParametricEquipment(equipment, level, template);
   const body = evaluateLegacyEquipment(equipment, level);
   return equipment.plant === undefined ? body : [...body, ...evaluateNozzles(equipment, level)];
 }

@@ -4,44 +4,17 @@
  * re-derived on load). Trays are internals: data only, no geometry.
  */
 
-import type { BoxEntity, Entity, RevolutionEntity, Vec3 } from '@core/model/types';
+import type { Entity, Vec3 } from '@core/model/types';
 import type { BuildingLevel, EquipmentElement } from '@aec/building/types';
-import { base, orientedBox } from '../../../building/evaluate/entities';
 import { toWorld } from '../geometry/ports';
 import { resolveVessel, skirtRadii, type VesselGeometry } from '../geometry/vesselFrame';
-import { ringSection, vesselBand, type ProfileBand } from '../geometry/vesselProfile';
+import { ringSection, vesselBand } from '../geometry/vesselProfile';
 import type { PlatformClip, VesselTemplate } from '../plantData';
 import { evaluateNozzles } from './evaluateNozzles';
+import { revolutionPart as revolution, supportBox as box } from './revolutionPart';
 
-const BODY_COLOR = '#c27c2c';
-const SUPPORT_COLOR = '#7d8a96';
-const REVOLUTION_SEGMENTS = 64;
 /** Saddle block width across the vessel as a fraction of the outside diameter (the block rests under the shell, tangent at the bottom). */
 const SADDLE_ACROSS = 0.8;
-
-function revolution(
-  element: EquipmentElement,
-  part: { name: string; label: string },
-  position: Vec3,
-  rotation: Vec3,
-  band: ProfileBand,
-  axis: Vec3,
-  angle = 2 * Math.PI,
-): RevolutionEntity {
-  return {
-    ...base(element, { part: part.name, label: part.label }, position, rotation, BODY_COLOR),
-    kind: 'revolution',
-    profile: band.profile,
-    axis,
-    angle,
-    segments: REVOLUTION_SEGMENTS,
-    curves: band.curves,
-  };
-}
-
-function box(element: EquipmentElement, level: BuildingLevel, part: string, label: string, local: Vec3, size: Vec3): BoxEntity {
-  return orientedBox(element, { part, label }, toWorld(element, level, local), element.angle, size, SUPPORT_COLOR);
-}
 
 function verticalSupports(element: EquipmentElement, level: BuildingLevel, template: VesselTemplate, geometry: VesselGeometry): Entity[] {
   const { support } = template;

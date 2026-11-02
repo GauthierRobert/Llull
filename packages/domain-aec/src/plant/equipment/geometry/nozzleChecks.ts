@@ -3,7 +3,9 @@
  * `EQP_NOZZLE_PROJECTION_TOO_SHORT`) and warnings (`EQP_NOZZLE_IN_KNUCKLE`, `EQP_NOZZLE_OVERLAP`).
  */
 
-import type { EquipmentTemplate, NozzleRecord, VesselTemplate } from '../plantData';
+import type { EquipmentTemplate, ExchangerTemplate, NozzleRecord, TankTemplate, VesselTemplate } from '../plantData';
+import { resolveExchanger } from './exchangerFrame';
+import { thicknessAt } from './tankFrame';
 import { headSurfaceHeight, inKnuckleZone, resolveVessel, type VesselGeometry } from './vesselFrame';
 import { placeNozzle } from './ports';
 
@@ -64,6 +66,68 @@ function minimumProjection(geometry: VesselGeometry, nozzle: NozzleRecord): numb
   return flange.thickness;
 }
 
+function exchangerProblem(template: ExchangerTemplate, nozzle: NozzleRecord): NozzleIssue | null {
+  const { location } = nozzle;
+  const geometry = resolveExchanger(template);
+  const wall = (thickness: number): number => geometry.radius + thickness + nozzle.flange.thickness;
+  const tooShort = (minimum: number): NozzleIssue | null =>
+    nozzle.projection >= minimum
+      ? null
+      : issue(
+          'EQP_NOZZLE_PROJECTION_TOO_SHORT',
+          `projection ${nozzle.projection} puts the flange face inside the wall; it must be at least ${minimum} (wall + flange thickness ${nozzle.flange.thickness})`,
+          'projection',
+        );
+  if (location.on === 'shell') {
+    if (!('station' in location))
+      return issue(
+        'EQP_PARAM_INVALID',
+        'an exchanger takes a shell location by station (from the front end of the shell), not elevation',
+        'location.station',
+      );
+    if (!(location.station >= 0 && location.station <= geometry.shellLength))
+      return issue(
+        'EQP_NOZZLE_OFF_BODY',
+        `station ${location.station} is outside the shell 0..${geometry.shellLength}`,
+        'location.station',
+      );
+    return tooShort(wall(geometry.shellThickness));
+  }
+  if (location.on === 'channel') {
+    const end = location.channel === 'front' ? geometry.front : geometry.rear;
+    if (end.channelLength <= 0)
+      return issue(
+        'EQP_PARAM_INVALID',
+        `the ${location.channel} head of TEMA ${template.temaType} has no channel (shell cover)`,
+        'location.channel',
+      );
+    if (!(location.station >= 0 && location.station <= end.channelLength))
+      return issue('EQP_NOZZLE_OFF_BODY', `station ${location.station} is outside the channel 0..${end.channelLength}`, 'location.station');
+    return tooShort(wall(end.channelThickness));
+  }
+  return issue('EQP_PARAM_INVALID', 'an exchanger takes nozzles on the shell, on a channel or free, not on a head', 'location.on');
+}
+
+function tankProblem(template: TankTemplate, nozzle: NozzleRecord): NozzleIssue | null {
+  const { location } = nozzle;
+  if (location.on !== 'shell' || !('elevation' in location))
+    return issue('EQP_PARAM_INVALID', 'a tank takes nozzles on the shell by elevation above the shell base, or free (roof)', 'location.on');
+  if (!(location.elevation >= 0 && location.elevation <= template.shellHeight))
+    return issue(
+      'EQP_NOZZLE_OFF_BODY',
+      `elevation ${location.elevation} is outside the shell 0..${template.shellHeight}`,
+      'location.elevation',
+    );
+  const minimum = template.diameter / 2 + thicknessAt(template, location.elevation) + nozzle.flange.thickness;
+  return nozzle.projection >= minimum
+    ? null
+    : issue(
+        'EQP_NOZZLE_PROJECTION_TOO_SHORT',
+        `projection ${nozzle.projection} puts the flange face inside the wall; it must be at least ${minimum} (wall + flange thickness ${nozzle.flange.thickness})`,
+        'projection',
+      );
+}
+
 /**
  * First reason `nozzle` cannot sit on `template`, or null.
  * @failure location kind not suited to the template -> EQP_PARAM_INVALID; outside the body -> EQP_NOZZLE_OFF_BODY; face inside the wall +
@@ -81,10 +145,20 @@ export function nozzleProblem(template: EquipmentTemplate, nozzle: NozzleRecord)
           'projection',
         );
   }
-  if (template.kind !== 'vessel')
+  if (template.kind === 'exchanger') return exchangerProblem(template, nozzle);
+  if (template.kind === 'tank') return tankProblem(template, nozzle);
+  if (template.kind === 'pump')
     return issue(
       'EQP_PARAM_INVALID',
-      'legacy block equipment has no shell or head: give location { on: "free", position, direction }',
+      'a pump takes its nozzles from the envelope; extra nozzles use location { on: "free", position, direction }',
+      'location.on',
+    );
+  if (template.kind !== 'vessel' || nozzle.location.on === 'channel')
+    return issue(
+      'EQP_PARAM_INVALID',
+      template.kind === 'vessel'
+        ? 'channel nozzles belong to exchangers; a vessel takes shell and head locations'
+        : 'legacy block equipment has no shell or head: give location { on: "free", position, direction }',
       'location.on',
     );
   const geometry = resolveVessel(template);

@@ -1,7 +1,7 @@
 /**
  * Plant 03 EQP: runs the validation pack's scenario plans (`validation/plans/*.json`) step by step through `execute` (the path of
- * `llull run plan.json`) and compares each `expected` row with the step's `data` / `error`. Steps whose command is not registered yet
- * (M3 code checks, data sheet; M4 exchanger, tank) are skipped, and so are their rows. SC-EQP-03 / 04 start with M4 commands and are not run.
+ * `llull run plan.json`) and compares each `expected` row with the step's `data` / `error`. Steps whose command is not registered yet (the
+ * M5 data sheet) are skipped, and so are their rows. A step is allowed to be refused only when an `expected` row of that step names `error.code`.
  */
 
 import { readFileSync } from 'node:fs';
@@ -44,11 +44,13 @@ function pick(root: unknown, expression: string): unknown {
 
 function runPlan(name: string): { plan: Plan; outcomes: Array<Record<string, unknown> | null>; final: CadDocument } {
   const plan = JSON.parse(readFileSync(path.join(PLANS, name), 'utf8')) as Plan;
+  const refusedSteps = new Set(plan.expected.filter((row) => row.path === 'error.code').map((row) => row.step));
   let doc: CadDocument = createEmptyDocument();
-  const outcomes = plan.actions.map((action) => {
+  const outcomes = plan.actions.map((action, step) => {
     if (getCommand(action.command) === undefined) return null;
     const result = execute(doc, action.command, action.params);
-    expect(result.rejected, `${action.command}: ${result.summary}`).toBeUndefined();
+    if (refusedSteps.has(step)) expect(result.rejected, `${action.command} (step ${step}) should be refused`).toBe(true);
+    else expect(result.rejected, `${action.command}: ${result.summary}`).toBeUndefined();
     doc = result.document;
     return { ...(result.data as Record<string, unknown> | undefined), error: result.error } as Record<string, unknown>;
   });
@@ -59,7 +61,7 @@ function compare(actual: unknown, row: Expected): void {
   const tolerance = (value: number): number => row.abs ?? (row.rel === undefined ? 0 : Math.abs(value) * row.rel);
   if (typeof row.value === 'number' && typeof actual === 'number') {
     expect(Math.abs(actual - row.value), `${row.path}: ${actual} vs ${row.value}`).toBeLessThanOrEqual(tolerance(row.value));
-  } else if (Array.isArray(row.value) && Array.isArray(actual)) {
+  } else if (Array.isArray(row.value) && Array.isArray(actual) && row.value.every((value) => typeof value === 'number')) {
     expect(actual, row.path).toHaveLength(row.value.length);
     row.value.forEach((value: number, index: number) =>
       expect(Math.abs((actual[index] as number) - value), `${row.path}[${index}]`).toBeLessThanOrEqual(tolerance(value)),
@@ -67,10 +69,15 @@ function compare(actual: unknown, row: Expected): void {
   } else expect(actual, row.path).toEqual(row.value);
 }
 
-describe.each(['sc-eqp-01-vertical-vessel-skirt.json', 'sc-eqp-02-horizontal-drum-saddles.json'])('scenario plan %s (M2 steps)', (file) => {
+describe.each([
+  'sc-eqp-01-vertical-vessel-skirt.json',
+  'sc-eqp-02-horizontal-drum-saddles.json',
+  'sc-eqp-03-bem-exchanger.json',
+  'sc-eqp-04-api650-tank.json',
+])('scenario plan %s', (file) => {
   const { plan, outcomes } = runPlan(file);
 
-  it('runs every registered step without a refusal and meets the expected rows of those steps (VC-EQP-12, 13, 14 geometry rows)', () => {
+  it('runs every registered step (refusing only the steps that expect an error) and meets the expected rows of those steps (VC-EQP-12..15, 17)', () => {
     const built = plan.expected.filter((row) => outcomes[row.step] != null && typeof row.value !== 'undefined');
     expect(built.length).toBeGreaterThanOrEqual(5);
     for (const row of built) compare(pick(outcomes[row.step], row.path), row);

@@ -1,6 +1,6 @@
 {
   "id": "SC-EQP-04",
-  "status": "PROPOSED - add_storage_tank (M4) not built yet. tank_shell_thickness (M3) is built with the tank given inline (diameter, shellHeight, courses, designLiquidLevel, specificGravity, material, corrosionAllowance), see tests/unit/plant/equipment/api650.test.ts; the equipment form and overrideDiameterM wait for M4.",
+  "status": "BUILT (EQP-M4): add_storage_tank, tank_shell_thickness (equipment form and overrideDiameterM), vessel_volume and check_equipment run this plan in tests/unit/plant/equipment/scenarioPlans.test.ts.",
   "validates": ["VC-EQP-08", "VC-EQP-17"],
   "description": "API 650 cone-roof water tank T-401: D 20 m, shell height 12 m in six 2 m courses, G 1.0, A36M (Sd 160, St 171 MPa from the tank material table, grade A), CA 1.5 mm. One-foot method course by course; the minimum-thickness row for 15..36 m (6 mm) is grade B and must be reported as unverified.",
   "actions": [

@@ -60,7 +60,8 @@ export const addNozzle = defineCommand({
     'per equipment (N1, M1 ...); the connection port is "<tag>:<mark>", e.g. "V-101:N1". Size by dn or nps, rating CL150 / PN16 ..., facing RF / FF / RTJ. ' +
     'location: { on: "shell", elevation (vertical vessel, above the bottom tangent line) or station (horizontal vessel, from the left tangent line), ' +
     'orientationDeg } | { on: "head", head: top | bottom | left | right, radialOffset, orientationDeg } | { on: "free", position, direction } in the ' +
-    'equipment frame (blocks, pumps). projection = distance from the vessel AXIS to the flange face (shell nozzles) or from the TANGENT LINE to the ' +
+    'equipment frame (blocks, pumps, tank roofs). Exchangers: { on: "shell", station from the front end of the shell, orientationDeg } or { on: "channel", channel: front | rear, ' +
+    'station from the tubesheet face, orientationDeg }; tanks: { on: "shell", elevation above the shell base, orientationDeg }. projection = distance from the vessel AXIS to the flange face (shell nozzles) or from the TANGENT LINE to the ' +
     'face (head nozzles), document units. Angles use angleConvention (north_cw default: vertical 0 = plant north growing clockwise; horizontal 0 = top). ' +
     'The flange comes from the piping catalogue (placeholder warning when no row). Returns portId, world position and unit direction of the flange ' +
     'face (what route_pipe / routing connect to), flange, warnings, angleConvention. Refusals: EQP_NOT_FOUND, EQP_NOZZLE_MARK_DUPLICATE, ' +

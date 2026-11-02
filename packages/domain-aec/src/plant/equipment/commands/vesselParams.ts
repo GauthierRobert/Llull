@@ -159,7 +159,7 @@ function pickHeads(input: VesselInput): { first: HeadSpec; second: HeadSpec } | 
   return { first, second };
 }
 
-function resolveSupport(input: SupportInput, vessel: VesselInput, defaulted: string[]): SupportSpec | VesselIssue {
+export function resolveSupport(input: SupportInput, vessel: VesselInput, defaulted: string[]): SupportSpec | VesselIssue {
   const outer = vessel.insideDiameter / 2 + vessel.shellThickness;
   const need = (name: string, value: unknown): VesselIssue | null =>
     value === undefined ? issue('EQP_SUPPORT_INVALID', `support.${name} is required for a ${input.type} support`, `support.${name}`) : null;

@@ -1,6 +1,6 @@
 {
   "id": "SC-EQP-03",
-  "status": "PROPOSED - commands not built yet (add_heat_exchanger, add_nozzle, vessel_volume, equipment_ports, check_equipment).",
+  "status": "BUILT (EQP-M4): add_heat_exchanger, add_nozzle, vessel_volume, equipment_ports and check_equipment run this plan in tests/unit/plant/equipment/scenarioPlans.test.ts.",
   "validates": [
     "VC-EQP-11",
     "VC-EQP-12",
@@ -171,11 +171,16 @@
           12000
         ],
         "shellInsideDiameter": 600,
+        "shellThickness": 8,
         "tubes": {
           "outsideDiameter": 19.05,
           "wallThickness": 1.651,
           "count": 100,
           "length": 3000
+        },
+        "tubesheetThickness": 50,
+        "frontChannel": {
+          "length": 300
         }
       }
     }

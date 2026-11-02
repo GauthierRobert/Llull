@@ -5,7 +5,7 @@
  */
 
 import type { Vec3 } from '@core/model/vectors';
-import type { HeadSpec } from './model';
+import type { HeadSpec, SourceGrade } from './model';
 
 export const PLANT_EQUIPMENT_SCHEMA = 'llull-plant-equipment/1';
 
@@ -83,7 +83,137 @@ export interface BlockTemplate {
   readonly kind: 'block';
 }
 
-export type EquipmentTemplate = VesselTemplate | BlockTemplate;
+/** TEMA designation of an exchanger (`BEM` -> front B, shell E, rear M). */
+export interface TemaDesignation {
+  readonly front: string;
+  readonly shell: string;
+  readonly rear: string;
+  /** Rear head L, M or N: tubesheets at both ends, bundle not removable. */
+  readonly fixedTubesheet: boolean;
+  readonly removableBundle: boolean;
+}
+
+export interface TubeBundle {
+  readonly outsideDiameter: number;
+  readonly wallThickness: number;
+  /** Where the wall comes from: 'user input' or the BWG table row (grade B: `wallUnverified`). */
+  readonly wallSource: string;
+  readonly wallUnverified: boolean;
+  /** Tubes (U-tubes: tubesheet holes). */
+  readonly count: number;
+  /** Tube length between the outer faces of the tubesheets (U-tubes: straight leg). */
+  readonly length: number;
+  readonly passes: number;
+  readonly pitch: number;
+  readonly layoutAngleDeg: 30 | 45 | 60 | 90;
+}
+
+export interface ExchangerChannel {
+  readonly length: number;
+  readonly thickness: number;
+}
+
+/** Design data of one side of an exchanger (same fields and rules as the vessel design, no operating liquid level). */
+export interface ExchangerSideDesign extends Omit<VesselDesignData, 'operatingLiquid' | 'materialDensityKgM3'> {
+  /** Specific gravity of the fluid filling the side in the operating weight (fully filled, named assumption). */
+  readonly specificGravity?: number | undefined;
+}
+
+/** Horizontal shell-and-tube exchanger (TEMA fronts A B C N, shells E F G H J, rears L M N P S T U W). Axis along local X. */
+export interface ExchangerTemplate {
+  readonly kind: 'exchanger';
+  readonly orientation: 'horizontal';
+  readonly temaType: string;
+  readonly tema: TemaDesignation;
+  readonly shellInsideDiameter: number;
+  readonly shellThickness: number;
+  readonly corrosionAllowance: number;
+  readonly tubes: TubeBundle;
+  readonly tubesheetThickness: number;
+  readonly frontChannel: ExchangerChannel;
+  /** Only for a fixed-tubesheet rear head (L, M, N); other rears close the shell with a shell cover. */
+  readonly rearChannel?: ExchangerChannel;
+  /** Saddles or none. */
+  readonly support: SupportSpec;
+  readonly design?: {
+    readonly shellSide?: ExchangerSideDesign | undefined;
+    readonly tubeSide?: ExchangerSideDesign | undefined;
+    readonly materialDensityKgM3?: number | undefined;
+  };
+  /** Names of the defaults the command applied (checks report the safety-relevant ones). */
+  readonly defaulted: readonly string[];
+}
+
+export interface TankRoof {
+  readonly type: 'cone' | 'dome' | 'flat';
+  /** Cone: rise per unit run. */
+  readonly slope?: number;
+  /** Dome: sphere radius. */
+  readonly radius?: number;
+  readonly thickness: number;
+}
+
+export interface TankDesign {
+  readonly specificGravity: number;
+  readonly designLiquidLevel: number;
+  readonly material: string;
+  readonly corrosionAllowance: number;
+  readonly allowableStress?: { readonly design: number; readonly test: number; readonly source?: string | undefined } | undefined;
+  readonly materialDensityKgM3?: number | undefined;
+}
+
+/** API 650 vertical atmospheric tank: `diameter` is the nominal (inside) diameter, the wall grows outward. Levels count from the top of the bottom plate. */
+export interface TankTemplate {
+  readonly kind: 'tank';
+  readonly standard: 'api_650';
+  readonly diameter: number;
+  readonly shellHeight: number;
+  /** Course heights from the bottom. */
+  readonly courses: readonly number[];
+  /** Nominal plate thickness per course (given by the user, else the one-foot governing thickness, see `thicknessSource`). */
+  readonly courseThicknesses: readonly number[];
+  readonly thicknessSource: 'user' | 'one_foot' | 'minimum';
+  readonly roof: TankRoof;
+  readonly bottom: { readonly type: 'flat'; readonly annularPlate: boolean; readonly thickness: number };
+  readonly design: TankDesign;
+  readonly defaulted: readonly string[];
+}
+
+export interface PumpBox {
+  readonly length: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** Pump envelope in document units (ISO 2858 meaning, B73.1 rows are converted): suction face `a` before the discharge centre, frame end `f` after it. */
+export interface PumpEnvelope {
+  readonly a: number;
+  readonly f: number;
+  /** Shaft height above the foot plane (baseplate top). */
+  readonly h1: number;
+  /** Discharge flange face above the shaft. */
+  readonly h2: number;
+  readonly suctionDn: number;
+  readonly dischargeDn: number;
+  readonly rating: string;
+  readonly grade: SourceGrade;
+  readonly source: string;
+}
+
+export interface PumpTemplate {
+  readonly kind: 'pump';
+  readonly standard: 'iso_2858' | 'asme_b73_1' | 'custom';
+  readonly size?: string;
+  readonly api610Type?: string;
+  readonly envelope: PumpEnvelope;
+  readonly baseplate: PumpBox;
+  readonly driver?: PumpBox & { readonly gap: number };
+  /** Vendor weight, kg (the standards give none). */
+  readonly weightKg?: number;
+  readonly defaulted: readonly string[];
+}
+
+export type EquipmentTemplate = VesselTemplate | BlockTemplate | ExchangerTemplate | TankTemplate | PumpTemplate;
 
 /** Where a nozzle sits, in the equipment frame (origin = plan location at the level elevation, +Z up, rotated by the plan rotation). */
 export type NozzleLocation =
@@ -95,6 +225,8 @@ export type NozzleLocation =
       readonly radialOffset: number;
       readonly orientationDeg: number;
     }
+  /** Exchanger channel (front / rear): `station` = distance from the tubesheet face outward, 0..channel length. */
+  | { readonly on: 'channel'; readonly channel: 'front' | 'rear'; readonly station: number; readonly orientationDeg: number }
   | { readonly on: 'free'; readonly position: Vec3; readonly direction: Vec3 };
 
 /** Flange hardware of a nozzle, resolved from the 01 PSC catalogue when a row exists (`placeholder` when none does). */
