@@ -9,6 +9,7 @@ import { toCsv } from '@lib/csv';
 import { briefList } from '../../shared/briefList';
 import { highestUtilisation } from '../common/utilisation';
 import { analyseSteelStructure } from './steelStructureAnalysis';
+import { rackReports } from './steelRackReport';
 
 const ASSUMPTIONS: ReadonlyArray<string> = [
   'Loads: EN 1990 ULS 1.35 G + 1.5 Q; SLS G + Q. G = self weight (catalogue kg/m), floor dead load, equipment operating weight, pipes (steel wall + contents) and cable trays; Q = imposed floor load. No imposed-load reduction factors.',
@@ -52,7 +53,8 @@ export const checkSteelMembers = defineCommand({
     'jointMomentEnd, N + M interaction, storey drift ≤ h / swayRatio, αcr ≥ 3 (moments amplified below 10); data.frames lists them and ' +
     'they count as the lateral system of their direction. A rigid joint to nothing or to a beam, a frame mechanism or a column roll ' +
     'between the principal axes leave the members "not analysed" with the reason. A preliminary check, not a substitute for the engineer ' +
-    'of record. See data.loads.assumptions for every load-path rule.',
+    'of record. data.racks lists each generated pipe rack (add_pipe_rack): members, analysed, failing, maxUtilisation and pipeLoadKn (the weight of the pipes and trays that bear on its steel, the same load path as above); a rack whose members no longer match its stored parameters is stale: data.ok is false and a warning names update_pipe_rack. ' +
+    'See data.loads.assumptions for every load-path rule.',
   params: z.object({
     floorDeadLoad: z
       .number()
@@ -122,6 +124,10 @@ export const checkSteelMembers = defineCommand({
     if (analysis.rows.length === 0) return noop(doc, 'check_steel_members failed: the model has no steel members (add_steel_member).');
     const members = analysis.rows.filter((row) => params.levelId === undefined || row.levelId === params.levelId);
     if (members.length === 0) return noop(doc, `check_steel_members failed: level '${params.levelId ?? ''}' has no steel members.`);
+    const racks = rackReports(doc, analysis.rows, analysis.lines, analysis.massKg).filter(
+      (rack) => params.levelId === undefined || rack.levelId === params.levelId,
+    );
+    const staleRacks = racks.filter((rack) => rack.stale);
     const analysed = members.filter((row) => row.analysed);
     const failing = analysed.filter((row) => !row.ok);
     const notAnalysed = members.filter((row) => !row.analysed);
@@ -150,9 +156,13 @@ export const checkSteelMembers = defineCommand({
       `max utilisation ${worst?.utilisation ?? 0} (${worst?.mark ?? '—'} ${worst?.profile ?? ''}, ${worst?.check ?? '—'}); ` +
       (failing.length === 0 ? 'all analysed members OK' : `${failing.length} failure(s): ${list(failing)}`) +
       (notAnalysed.length === 0 ? '' : `; not analysed: ${list(notAnalysed)}`) +
+      (racks.length === 0 ? '' : `; ${racks.length} pipe rack(s) (data.racks)`) +
+      (staleRacks.length === 0
+        ? ''
+        : `; STALE pipe rack(s) ${staleRacks.map((rack) => rack.mark).join(', ')} no longer match their parameters: update_pipe_rack { assemblyId } re-derives them`) +
       (analysis.warnings.length === 0 ? '.' : `; ${analysis.warnings.length} warning(s) in data.warnings.`);
     return report(doc, summary, {
-      ok: failing.length === 0 && notAnalysed.length === 0,
+      ok: failing.length === 0 && notAnalysed.length === 0 && staleRacks.length === 0,
       members,
       csv,
       totals: {
@@ -181,7 +191,14 @@ export const checkSteelMembers = defineCommand({
       },
       storeys: analysis.storeys,
       frames: analysis.frames,
-      warnings: analysis.warnings,
+      racks,
+      warnings: [
+        ...analysis.warnings,
+        ...staleRacks.map(
+          (rack) =>
+            `pipe rack ${rack.mark} (${rack.assemblyId}) is stale: ${rack.staleReason ?? ''}; its members are checked as they are in the model`,
+        ),
+      ],
     });
   },
 });

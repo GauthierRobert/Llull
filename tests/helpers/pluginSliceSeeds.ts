@@ -87,7 +87,7 @@ function implicitDocument(): CadDocument {
   return run(tpms.document, 'add_strut_lattice', { cell: 'cubic', cellSize: 5, radius: 0.4, map }).document;
 }
 
-/** The house template plus a vessel with a circular platform and a deck platform with railing (06 STA M6 assemblies: parts with assemblyId, host links). */
+/** The house template plus a vessel with a circular platform, a deck platform with railing and a braced pipe rack (06 STA M6 / M7 assemblies: parts with assemblyId, host links). */
 function buildingWithPlatforms(): CadDocument {
   const house = planDocument(plans['building_house_template'], 'building_house_template');
   const scale = house.units === 'm' ? 0.001 : 1;
@@ -109,7 +109,7 @@ function buildingWithPlatforms(): CadDocument {
     width: mm(800),
     railing: {},
   });
-  return run(ring.document, 'add_access_platform', {
+  const deck = run(ring.document, 'add_access_platform', {
     bounds: [
       [mm(50000), 0],
       [mm(53000), mm(2000)],
@@ -117,6 +117,18 @@ function buildingWithPlatforms(): CadDocument {
     gratingType: '19-W-4 1-1/4x3/16',
     bearingBarDirection: [1, 0],
     railing: {},
+  });
+  return run(deck.document, 'add_pipe_rack', {
+    origin: [mm(60000), 0],
+    direction: [1, 0],
+    length: mm(6000),
+    bentSpacing: mm(3000),
+    width: mm(3000),
+    tiers: [mm(2500)],
+    columnProfile: 'HEB200',
+    tierBeamProfile: 'IPE200',
+    bracingBays: [1],
+    bracingProfile: 'L100x10',
   }).document;
 }
 

@@ -7,6 +7,8 @@ import { refuse } from '../codes';
 import { platformQuantities } from './platformMeasure';
 import { staleReason } from './platformStale';
 
+const isPlatform = (assembly: { kind: string }): boolean => assembly.kind !== 'pipe_rack';
+
 /**
  * @affects none: read-only query, answers in `data` { platforms[], totals }
  * @invariant quantities are read from the stored parts; stale = a fresh derivation from the current vessel / beams would differ
@@ -22,14 +24,17 @@ export const accessPlatformTakeoff = defineCommand({
   params: z.object({ ids: z.array(z.string()).optional().describe('Platform assembly ids. Default: every platform.') }),
   run: (doc, { ids }): CommandResult => {
     const building = getBuilding(doc);
-    const unknown = (ids ?? []).filter((id) => building.elements[id]?.category !== 'assembly');
+    const unknown = (ids ?? []).filter((id) => {
+      const element = building.elements[id];
+      return !(element?.category === 'assembly' && isPlatform(element));
+    });
     if (unknown.length > 0)
       return refuse(doc, 'access_platform_takeoff', 'STA_UNKNOWN_ELEMENT', `${unknown.join(', ')} is not a platform assembly`, unknown, [
         'ids',
       ]);
     const wanted = ids === undefined ? undefined : new Set(ids);
     const platforms = elementsOf(building, 'assembly')
-      .filter((assembly) => wanted?.has(assembly.id) ?? true)
+      .filter((assembly) => isPlatform(assembly) && (wanted?.has(assembly.id) ?? true))
       .map((assembly) => {
         const reason = staleReason(doc, building, assembly);
         return { ...platformQuantities(doc, building, assembly), stale: reason !== null, staleReason: reason };

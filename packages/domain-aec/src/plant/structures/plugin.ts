@@ -5,11 +5,18 @@
 
 import type { CadPlugin } from '@core/plugins/plugin';
 import { structuresCommands } from './catalog';
-import { platformAssemblyGuard } from './platform/platformGuard';
+import { registerAssemblyHandler } from '../../building/assemblyHandlers';
+import { assemblyGuard } from './assembly/assemblyGuard';
+import { platformHandler } from './platform/platformHandler';
+import { rackHandler } from './rack/rackHandler';
 
 export const structuresPlugin: CadPlugin = {
   name: 'plantStructures',
   toolset: 'plant_structures',
   commands: structuresCommands,
-  guards: [platformAssemblyGuard],
+  guards: [assemblyGuard],
+  onInstall: () => {
+    registerAssemblyHandler(platformHandler);
+    registerAssemblyHandler(rackHandler);
+  },
 };

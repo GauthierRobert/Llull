@@ -5,10 +5,10 @@ import type { CommandResult } from '@core/commands/types';
 import type { AssemblyElement, BuildingModel } from '@aec/building/types';
 import { commitBuilding } from '../../../building/evaluate/evaluateElements';
 import { refuse } from '../codes';
-import type { PlatformBuilt, PlatformFailure } from './platformParts';
+import type { AssemblyBuilt, AssemblyFailure } from '../assembly/assemblyParts';
 import { platformQuantities } from './platformMeasure';
 
-export const refusal = (doc: CadDocument, command: string, failed: PlatformFailure): CommandResult =>
+export const refusal = (doc: CadDocument, command: string, failed: AssemblyFailure): CommandResult =>
   refuse(doc, command, failed.code, failed.message, failed.ids, failed.paths);
 
 const idsByCategory = (building: BuildingModel, ids: ReadonlyArray<string>, category: 'member' | 'grating' | 'railing'): string[] =>
@@ -19,7 +19,7 @@ export function commitPlatform(
   doc: CadDocument,
   verb: 'Added' | 'Updated',
   assemblyId: string,
-  built: PlatformBuilt,
+  built: AssemblyBuilt,
   defaults: ReadonlyArray<string>,
 ): CommandResult {
   const assembly = built.building.elements[assemblyId] as AssemblyElement;
