@@ -635,12 +635,7 @@ describe('hostile sizes never allocate before the cap (review fix)', () => {
   });
 
   it('a circular platform with a tiny bracketSpacingMax is refused, not allocated', () => {
-    const vessel = apply(base(), 'add_equipment', {
-      name: 'Column',
-      location: [0, 0],
-      size: [3000, 3000, 18000],
-      shape: 'vertical_vessel',
-    });
+    const vessel = apply(base(), 'add_equipment', { name: 'Column', location: [0, 0], size: [3000, 3000, 18000], shape: 'vertical_vessel' });
     expectRefusal(
       vessel,
       'add_circular_access_platform',
