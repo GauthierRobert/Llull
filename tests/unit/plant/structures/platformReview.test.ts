@@ -113,6 +113,7 @@ describe('check_access reports a stale platform (STA_PLATFORM_STALE)', () => {
     data<{ findings: Array<{ code: string }> }>(doc, 'check_access', {
       rulesets: ['iso_14122'],
       edgeDropThresholdMm: 500,
+      include: ['stairs', 'edges', 'railings', 'ladders'],
       ...(ids === undefined ? {} : { ids }),
     }).findings.map((finding) => finding.code);
 

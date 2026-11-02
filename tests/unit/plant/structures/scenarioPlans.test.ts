@@ -1,7 +1,7 @@
 /**
  * Plant 06 STA: runs the validation pack's scenario plans (`validation/plans/*.json`) through `build_project` (the path of `llull run plan.json`)
  * and compares each `expected` row with the step's `data`. SC-STA-06 (grating span) is complete since M2, SC-STA-05 (negative access) and
- * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4, SC-STA-02 (steel stair) since M5, SC-STA-03 (circular platform) since M6, SC-STA-04 (pipe rack) since M7. SC-STA-07 waits for M8 (tests/unit/contract/blockedPlanCommands.json).
+ * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4, SC-STA-02 (steel stair) since M5, SC-STA-03 (circular platform) since M6, SC-STA-04 (pipe rack) since M7, SC-STA-07 (valve reachability, with its no-ladder variant) and the SC-STA-03 egress row since M8.
  */
 
 import { readFileSync } from 'node:fs';
@@ -172,11 +172,9 @@ describe('SC-STA-03 vessel circular platform (VC-STA-07)', () => {
     for (const row of plan.expected) compare(pick(report.steps[row.step], row.path), row);
   });
 
-  it('keeps the reachability row for M8 (STA_ACCESS_NO_EGRESS needs the access graph), which check_access does not report yet', () => {
-    const deferred = (plan as Plan & { deferred: Array<{ path: string; waitsFor: string }> }).deferred;
-    expect(deferred.map((row) => row.waitsFor.split(' ')[0])).toEqual(['check_reachability']);
-    const findings = (report.steps[plan.actions.length - 1]?.data as { findings: Array<{ code: string }> }).findings;
-    expect(findings.map((finding) => finding.code)).not.toContain('STA_ACCESS_NO_EGRESS');
+  it('meets the access-graph row (M8): no ladder or stair reaches the platform, so STA_ACCESS_NO_EGRESS fails it', () => {
+    expect(plan.expected.map((row) => row.path)).toContain('data.findings[code=STA_ACCESS_NO_EGRESS].severity');
+    expect((plan as Plan & { deferred?: unknown }).deferred).toBeUndefined();
   });
 
   it('is deterministic (AF-13)', () => {
@@ -199,5 +197,41 @@ describe('SC-STA-04 two-tier pipe rack (VC-STA-09)', () => {
 
   it('is deterministic (AF-13)', () => {
     expect(JSON.stringify(run('sc-sta-04-pipe-rack.json').report.steps)).toBe(JSON.stringify(report.steps));
+  });
+});
+
+describe('SC-STA-07 valve reachability (VC-STA-11)', () => {
+  const { plan, report } = run('sc-sta-07-valve-reachability.json');
+
+  it('runs every step', () => {
+    expect(report.steps.filter((step) => !step.ok).map((step) => step.summary)).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  it('meets every expected row: HV-101 on the platform (900 mm, grade > ladder > platform), HV-102 over the band, PI-103 from grade', () => {
+    expect(plan.expected.length).toBeGreaterThanOrEqual(8);
+    // The plan names its ids as $names; the command log mints them deterministically.
+    const ids = { $plat: 'assembly-1', $lad: 'ladder-1' } as Record<string, string>;
+    for (const row of plan.expected) {
+      const value = Array.isArray(row.value)
+        ? row.value.map((item: unknown) => ids[String(item)] ?? item)
+        : typeof row.value === 'string'
+          ? (ids[row.value] ?? row.value)
+          : row.value;
+      compare(pick(report.steps[row.step], row.path), { ...row, value });
+    }
+  });
+
+  it('meets the variant: without the ladder the platform has no route to grade (STA_ACCESS_NO_EGRESS)', () => {
+    const variant = (plan as Plan & { variant: { change: { remove_step: number }; expected: Expected[] } }).variant;
+    const changed = run('sc-sta-07-valve-reachability.json', (copy) => {
+      copy.actions.splice(variant.change.remove_step, 1);
+    });
+    expect(changed.report.steps.filter((step) => !step.ok).map((step) => step.summary)).toEqual([]);
+    for (const row of variant.expected) compare(pick(changed.report.steps[row.step], row.path), row);
+  });
+
+  it('is deterministic (AF-13)', () => {
+    expect(JSON.stringify(run('sc-sta-07-valve-reachability.json').report.steps)).toBe(JSON.stringify(report.steps));
   });
 });

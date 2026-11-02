@@ -1,14 +1,34 @@
 {
   "id": "SC-STA-07",
-  "status": "PROPOSED — check_reachability is not built (add_circular_access_platform and add_ladder are since M6 / M4); valve entities belong to 02-spec-driven-routing, so targets are given as explicit points here",
+  "status": "BUILT in M8 (check_reachability, access_graph); valve entities belong to 02-spec-driven-routing, so targets are given as explicit points here (targetsFrom: valves reads the routed piping)",
   "validates": ["VC-STA-11"],
   "description": "Access graph: grade -> ladder -> vessel platform at +6000. Three operating points checked against an explicit project operating-height band (no default: AF-31).",
   "actions": [
     { "command": "set_units", "params": { "units": "mm" } },
     { "command": "add_level", "params": { "name": "Grade", "elevation": 0, "height": 6000 } },
-    { "command": "add_equipment", "params": { "name": "Column", "mark": "C-101", "location": [0, 0], "size": [3000, 3000, 18000], "shape": "vertical_vessel" }, "as": "vessel" },
-    { "command": "add_circular_access_platform", "params": { "equipmentId": "$vessel", "elevation": 6000, "startAngleDeg": 0, "sweepDeg": 180, "gap": 150, "width": 1000, "railing": { "edges": ["outer", "ends"], "height": 1100 } }, "as": "plat" },
-    { "command": "add_ladder", "params": { "base": [2150, -250, 0], "climbHeight": 6000, "facing": [0, 1], "attachTo": "$plat", "exit": "through", "fallProtection": "cage" }, "as": "lad" },
+    {
+      "command": "add_equipment",
+      "params": { "name": "Column", "mark": "C-101", "location": [0, 0], "size": [3000, 3000, 18000], "shape": "vertical_vessel" },
+      "as": "vessel"
+    },
+    {
+      "command": "add_circular_access_platform",
+      "params": {
+        "equipmentId": "$vessel",
+        "elevation": 6000,
+        "startAngleDeg": 0,
+        "sweepDeg": 180,
+        "gap": 150,
+        "width": 1000,
+        "railing": { "edges": ["outer", "ends"], "height": 1100 }
+      },
+      "as": "plat"
+    },
+    {
+      "command": "add_ladder",
+      "params": { "base": [2150, -250, 0], "facing": [0, 1], "attachTo": "$plat", "exit": "through", "fallProtection": "cage" },
+      "as": "lad"
+    },
     {
       "command": "check_reachability",
       "params": {
@@ -31,11 +51,16 @@
     { "step": 5, "path": "data.targets[tag=HV-102].findings[0].code", "value": "STA_OPERATING_HEIGHT", "source": "3500 > 1800" },
     { "step": 5, "path": "data.targets[tag=PI-103].surfaceId", "value": "grade" },
     { "step": 5, "path": "data.targets[tag=PI-103].heightAboveSurfaceMm", "value": 1200, "abs": 0.001 },
-    { "step": 5, "path": "data.operatingHeight.source", "value": "project rule (owner supplied)", "source": "AF-31: the rule used is named in the result" }
+    {
+      "step": 5,
+      "path": "data.operatingHeight.source",
+      "value": "project rule (owner supplied)",
+      "source": "AF-31: the rule used is named in the result"
+    }
   ],
   "variant": {
     "description": "Delete the ladder step: HV-101 stands on a platform with no route to grade",
     "change": { "remove_step": 4 },
-    "expected": [ { "step": 4, "path": "data.targets[tag=HV-101].findings[0].code", "value": "STA_ACCESS_NO_EGRESS" } ]
+    "expected": [{ "step": 4, "path": "data.targets[tag=HV-101].findings[0].code", "value": "STA_ACCESS_NO_EGRESS" }]
   }
 }

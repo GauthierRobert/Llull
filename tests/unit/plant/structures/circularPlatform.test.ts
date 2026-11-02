@@ -18,6 +18,8 @@ const vesselDoc = (size: number[] = [3000, 3000, 18000], location: number[] = [0
   doc = apply(doc, 'add_level', { name: 'Grade', elevation: 0, height: 6000 });
   return apply(doc, 'add_equipment', { name: 'Column', mark: 'C-101', location, size, shape: 'vertical_vessel' });
 };
+/** The edge and railing checks only: the platform egress check (no ladder here) has its own tests in reachability.test.ts. */
+const EDGES_ONLY = ['stairs', 'edges', 'railings', 'ladders'];
 const PACK = {
   equipmentId: 'equipment-1',
   elevation: 6000,
@@ -117,7 +119,7 @@ describe('add_circular_access_platform: closed form (VC-STA-07)', () => {
     const checked = data<{ findings: Array<{ code: string }>; checked: { gratings: number; railings: number } }>(
       built.document,
       'check_access',
-      { ids: ['assembly-1'], rulesets: ['iso_14122'], edgeDropThresholdMm: 500 },
+      { ids: ['assembly-1'], rulesets: ['iso_14122'], edgeDropThresholdMm: 500, include: EDGES_ONLY },
     );
     expect(checked.findings.map((finding) => finding.code)).toEqual([]);
     expect(checked.checked).toMatchObject({ gratings: 6, railings: 3 });
@@ -149,19 +151,29 @@ describe('add_circular_access_platform: edge protection depends on the railing a
       ids: ['assembly-1'],
       rulesets: ['iso_14122'],
       edgeDropThresholdMm: 500,
+      include: EDGES_ONLY,
     });
     expect(checked.findings.filter((finding) => finding.code === 'STA_EDGE_UNPROTECTED').length).toBeGreaterThanOrEqual(6);
     const narrow = apply(vesselDoc(), 'add_circular_access_platform', { ...PACK, gap: 450 });
     expect(
-      data<{ findings: unknown[] }>(narrow, 'check_access', { ids: ['assembly-1'], rulesets: ['iso_14122'], edgeDropThresholdMm: 500 })
-        .findings,
+      data<{ findings: unknown[] }>(narrow, 'check_access', {
+        ids: ['assembly-1'],
+        rulesets: ['iso_14122'],
+        edgeDropThresholdMm: 500,
+        include: EDGES_ONLY,
+      }).findings,
     ).toEqual([]);
   });
 
   it('a low platform does not need guarding: drop 400 mm is under the threshold', () => {
     const doc = apply(vesselDoc(), 'add_circular_access_platform', { ...PACK, elevation: 400, gap: 900, railing: undefined });
     expect(
-      data<{ findings: unknown[] }>(doc, 'check_access', { ids: ['assembly-1'], rulesets: BOTH, edgeDropThresholdMm: 500 }).findings,
+      data<{ findings: unknown[] }>(doc, 'check_access', {
+        ids: ['assembly-1'],
+        rulesets: BOTH,
+        edgeDropThresholdMm: 500,
+        include: EDGES_ONLY,
+      }).findings,
     ).toEqual([]);
   });
 });
