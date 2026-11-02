@@ -1,7 +1,7 @@
 /**
  * One valid seed document per plugin that owns a document slice (tests/unit/contract/pluginSliceFuzz.test.ts). A new plugin with a
  * `document` extension MUST add its row here: the fuzz test fails naming a plugin without one. Seeds are built through real commands (golden /
- * oracle plans and unit fixtures); `pid` slice is written with the model's own `withPid`.
+ * oracle plans and unit fixtures).
  */
 
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
@@ -9,8 +9,7 @@ import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { setSignaturePort } from '@core/commands/signaturePort';
 import type { ExecutionContext } from '@core/commands/types';
-import type { PidItem, PidModel } from '@aec/plant/pid/model';
-import { EMPTY_PID, withPid } from '@aec/plant/pid/state';
+import { FEED_PUMP, runSteps } from '../unit/plant/pid/authoringFixtures';
 import { runPlan } from '../golden/runPlan';
 import { plans, type GoldenAction } from '../golden/plans';
 import { plmPlans } from '../golden/plmPlans';
@@ -103,60 +102,6 @@ function plmDocument(): CadDocument {
   }
 }
 
-const pidBase = { sheetId: 'pid-1.1', rotationDeg: 0, attributes: {} } as const;
-const pidItems: PidItem[] = [
-  { ...pidBase, id: 'pid-2.1', kind: 'equipment', at: [100, 100], dexpiClass: 'Tank', tag: 'T-101' },
-  {
-    ...pidBase,
-    id: 'pid-2.3',
-    kind: 'nozzle',
-    at: [130, 100],
-    dexpiClass: 'Nozzle',
-    equipmentId: 'pid-2.1',
-    subTag: 'N1',
-    dn: 100,
-    access: false,
-    port: [130, 100],
-  },
-  {
-    ...pidBase,
-    id: 'pid-3.1',
-    kind: 'line',
-    at: [0, 0],
-    dexpiClass: 'PipingNetworkSystem',
-    lineNumber: '100-P-1001-A1A',
-    dn: 100,
-    pipingClass: 'A1A',
-    fluidCode: 'P',
-    segmentIds: ['pid-3.2'],
-  },
-  {
-    ...pidBase,
-    id: 'pid-3.2',
-    kind: 'segment',
-    at: [0, 0],
-    dexpiClass: 'PipingNetworkSegment',
-    lineId: 'pid-3.1',
-    from: { type: 'nozzle', itemId: 'pid-2.3' },
-    to: { type: 'free', at: [300, 100] },
-    route: [
-      [130, 100],
-      [300, 100],
-    ],
-    flow: 'forward',
-    dn: 100,
-    primary: true,
-  },
-];
-const pidModel: PidModel = {
-  ...EMPTY_PID,
-  sheets: { 'pid-1.1': { id: 'pid-1.1', number: 'PID-001', title: 'Feed', paper: 'A1', revision: 'A', status: 'draft' } },
-  sheetOrder: ['pid-1.1'],
-  items: Object.fromEntries(pidItems.map((item) => [item.id, item])),
-  itemOrder: pidItems.map((item) => item.id),
-  counters: { seq: 3 },
-};
-
 const scanContext = (): ExecutionContext => ({ ...defaultContext(), pointClouds: fixturePort([{ key: KEY_A, points: [[0, 0, 0]] }]) });
 
 function scanDocument(): CadDocument {
@@ -212,7 +157,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   pid: {
     roots: ['plant.pid'],
-    build: () => withPid(createEmptyDocument(), pidModel),
+    build: () => runSteps(FEED_PUMP).doc,
     query: { name: 'pid_report', params: constant({ kind: 'connectivity' }) },
     mutate: { name: 'create_pid_sheet', params: constant({ number: 'PID-FUZZ' }) },
   },
