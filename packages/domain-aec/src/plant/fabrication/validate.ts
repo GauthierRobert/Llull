@@ -4,6 +4,7 @@ import { z } from '@core/commands/schema';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { isRecord } from '@lib/isRecord';
 import { PAPER_SIZES } from '@core/model/sheet';
+import { isoUtc } from '../../shared/isoUtc';
 import { PCF_COMPONENT_TYPES } from './model';
 
 const vec3 = z.array(z.number()).length(3);
@@ -87,7 +88,10 @@ const issued = z.object({
   signer: z.string().min(1),
   signatureId: z.string().min(1),
   basisSha256: z.string().length(64),
+  at: isoUtc,
+  payloadSha256: z.string().length(64),
 });
+const approval = issued.omit({ id: true });
 
 const fabrication = z.object({
   version: z.literal(1),
@@ -99,6 +103,7 @@ const fabrication = z.object({
   spoolBreaks: z.record(z.string(), z.array(z.enum(['field_welds', 'flanged_joints', 'line_ends']))).optional(),
   isometrics: z.record(z.string(), isometric).optional(),
   issues: z.record(z.string(), issued).optional(),
+  issueLedger: z.array(approval).optional(),
 });
 
 const ROOT = 'plant.fabrication';

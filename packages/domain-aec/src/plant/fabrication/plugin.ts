@@ -16,6 +16,13 @@ const fabricationDocument: DocumentExtension = {
   },
   derivedEntityIds: () => new Set(),
   restore: (raw) => raw,
+  // Replay starts from an empty slice: the issue ledger is kept so a recorded issue_isometric step re-applies its (already verified) human issue.
+  replaySeed: (base) => {
+    const issueLedger = base.plant?.fabrication?.issueLedger;
+    return issueLedger === undefined || issueLedger.length === 0
+      ? {}
+      : { plant: { fabrication: { version: 1, pcfLines: {}, issueLedger } } };
+  },
 };
 
 export const pipingFabricationPlugin: CadPlugin = {

@@ -314,7 +314,7 @@ describe('VC-ISO-19: issue_isometric is a human act', () => {
     verify: (signature) => ((signature as { sig?: string }).sig === 'good' ? { signer: 'alice', signatureId: 'sig-1' } : null),
   });
   const withPort = (humanSignature: HumanSignaturePort | null): ExecutionContext => ({ ...defaultContext(), humanSignature });
-  const params = { lineId: 'L-101', revision: 'A', purpose: 'for_construction' };
+  const params = { lineId: 'L-101', revision: 'A', purpose: 'for_construction', at: '2026-11-02T09:30:00Z' };
 
   it('an agent (no confirmation, true, no port, a bad signature) gets ISO_HUMAN_GATE and the unissued iso stays NOT FOR CONSTRUCTION', () => {
     for (const [confirmation, ctx] of [

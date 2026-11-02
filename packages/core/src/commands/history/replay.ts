@@ -14,6 +14,7 @@ import { nextStateKey } from './replayCache';
 import { deferralCount } from '../../geometry/mesh/engine';
 import { hashText } from '../../lib/hash';
 import { remapIds } from './regenerate';
+import { mergeReplaySeeds } from './replaySeeds';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
 import { parametersFingerprint, trackParameterReads, untrackedParameters } from './replayParameters';
 import { fontSeed } from '../wrap/fontStore';
@@ -152,7 +153,8 @@ export function replayHistory(
     // Embedded fonts (records + bytes): add_text / import_font steps resolve them by reference with no font provider.
     ...fontSeed(base),
     // Plugin identity that survives replay while the slice content is regenerated (e.g. the building's IFC GlobalId salt).
-    ...Object.assign({}, ...documentExtensions().map((extension) => extension.replaySeed?.(base) ?? {})),
+    // Seeds are deep-merged; a leaf two plugins seed differently is reported by mergeReplaySeeds (first wins) and failed by tests/unit/contract/replaySeeds.test.ts.
+    ...mergeReplaySeeds(documentExtensions().map((extension) => extension.replaySeed?.(base) ?? {})).seed,
   };
   let doc: CadDocument = seed;
   // idMap tracks old entity id (from when the step was first recorded) → new id
@@ -196,7 +198,7 @@ export function replayHistory(
       const uidBefore = mintedIdentity(doc);
       const tracking = cache ? trackParameterReads(doc) : null;
       const runDoc = tracking?.doc ?? doc;
-      const result = runReplayStep(cmd, step, runDoc, remapped, idMap, context, true);
+      const result = runReplayStep(cmd, step, runDoc, remapped, idMap, context, true, true);
       // Accept the new geometry but keep OUR featureHistory intact.
       inert = result === null || result.document === runDoc;
       failure = failureOf(result);

@@ -214,7 +214,14 @@ export interface IssuedIsometric {
   readonly signer: string;
   readonly signatureId: string;
   readonly basisSha256: string;
+  /** When the human signed: ISO-8601 UTC, host-filled and part of the signed payload. */
+  readonly at: string;
+  /** SHA-256 the human signed (act, line, { revision, purpose, basisSha256, at }, nonce). Self-asserted on load: nothing re-verifies it. */
+  readonly payloadSha256: string;
 }
+
+/** What a verified human issue leaves for replay: the issue minus its step-scoped id. A recorded `issue_isometric` step re-applies only an entry of the exact line, revision, purpose and content hash. */
+export type IssueApproval = Omit<IssuedIsometric, 'id'>;
 
 /** `doc.plant.fabrication`: absent until the first fabrication command (`import_pcf`). Spools and cut lists are derived, never stored. */
 export interface FabricationModel {
@@ -234,4 +241,6 @@ export interface FabricationModel {
   readonly isometrics?: Readonly<Record<string, IsoDefinition>>;
   /** Issue stamps by id (ISO-M4); the latest per line is the current one. */
   readonly issues?: Readonly<Record<string, IssuedIsometric>>;
+  /** Ledger of verified issue acts, kept across replay (`replaySeed`) so a recorded issue_isometric step re-applies its real approval; inert for undo. */
+  readonly issueLedger?: readonly IssueApproval[];
 }

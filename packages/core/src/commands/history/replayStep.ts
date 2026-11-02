@@ -48,6 +48,7 @@ function withoutUnknownKeys(cmd: CommandDefinition<unknown>, params: unknown): u
  *
  * @param scopeIds true ⇒ ids are minted from the step's own scope (history replay); false ⇒ the
  *   caller's context is used unchanged (recipes mint from the enclosing `instantiate_recipe` step)
+ * @invariant `replaying` (default false, fail-closed) is true ONLY for the history replay (`replayHistory`): it lets a human act honour its recorded confirmation; any other caller (recipes) clears an inherited flag
  * @invariant never throws; unknown top-level params are dropped (fresh calls through `execute` reject them)
  */
 export function runReplayStep(
@@ -58,15 +59,20 @@ export function runReplayStep(
   idMap: Map<string, string>,
   context: ExecutionContext,
   scopeIds: boolean,
+  replaying = false,
 ): CommandResult | null {
   try {
     const recorded = withoutUnknownKeys(cmd, params);
     let result: CommandResult;
+    const { replaying: _inherited, ...plain } = context;
+    const base: ExecutionContext = replaying ? { ...plain, replaying: true } : plain;
     if (scopeIds) {
       const stepKey = stepKeyOf(step.id);
-      const stepContext: ExecutionContext = { ...context, ids: stepIdSource(stepKey), stepKey };
+      const stepContext: ExecutionContext = { ...base, ids: stepIdSource(stepKey), stepKey };
       result = runInContext(stepContext, () => runCommand(cmd, doc, recorded, stepContext));
-    } else result = runCommand(cmd, doc, recorded, context);
+    } else {
+      result = runInContext(base, () => runCommand(cmd, doc, recorded, base));
+    }
     result = applyReconcile(doc, result);
     extendIdMap(idMap, step.affected, result.affected);
     return result;
