@@ -13,13 +13,19 @@ import { fromNorthClockwise, toNorthClockwise, type AngleConvention } from './an
 export const nozzleLocationSchema = z
   .object({
     on: z
-      .enum(['shell', 'head', 'free'])
+      .enum(['shell', 'head', 'channel', 'free'])
       .describe(
-        'shell: on the cylinder (vertical vessel: elevation; horizontal vessel: station). head: on a formed head (top / bottom or left / right) at ' +
-          'radialOffset. free: any equipment, including plain add_equipment blocks and pumps: position + direction in the equipment frame.',
+        'shell: on the cylinder (vertical vessel or tank: elevation; horizontal vessel or exchanger: station). head: on a formed head (top / bottom or left / right) at ' +
+          'radialOffset. channel: exchanger front / rear channel (channel + station + orientationDeg). free: any equipment, including plain add_equipment blocks and pumps: position + direction in the equipment frame.',
       ),
     elevation: z.number().optional().describe('shell, vertical vessel: height above the bottom tangent line, 0..tangentLength.'),
-    station: z.number().optional().describe('shell, horizontal vessel: distance from the left tangent line, 0..tangentLength.'),
+    station: z
+      .number()
+      .optional()
+      .describe(
+        'shell, horizontal vessel: distance from the left tangent line, 0..tangentLength; shell, exchanger: distance from the front end of the shell, 0..shell length; channel: distance from the tubesheet face outward, 0..channel length.',
+      ),
+    channel: z.enum(['front', 'rear']).optional().describe('channel: which exchanger channel (rear exists for TEMA rears L, M, N only).'),
     head: z
       .enum(['top', 'bottom', 'left', 'right'])
       .optional()
@@ -70,6 +76,12 @@ export function parseLocation(input: NozzleLocationInput, convention: AngleConve
     if (input.position === undefined) return fail('EQP_PARAM_INVALID', 'a free location needs position', 'location.position');
     if (input.direction === undefined) return fail('EQP_PARAM_INVALID', 'a free location needs direction', 'location.direction');
     return { on: 'free', position: input.position, direction: input.direction };
+  }
+  if (input.on === 'channel') {
+    if (input.channel === undefined)
+      return fail('EQP_PARAM_INVALID', 'a channel location needs channel (front or rear)', 'location.channel');
+    if (input.station === undefined) return fail('EQP_PARAM_INVALID', 'a channel location needs station', 'location.station');
+    return { on: 'channel', channel: input.channel, station: input.station, orientationDeg };
   }
   if (input.on === 'head') {
     if (input.head === undefined)

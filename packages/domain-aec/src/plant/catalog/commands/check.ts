@@ -19,7 +19,7 @@ const RANK: Readonly<Record<string, number>> = { fail: 0, warn: 1, info: 2 };
 export const checkPipingCatalog = defineCommand({
   name: 'check_piping_catalog',
   description:
-    'Check a piping catalogue (bundled or imported) against dimensional rules of the standards. Rules: b169.lr90 (B16.9 long-radius 90 degree elbow centre-to-end = 1.5 x NPS +/- 2 mm, NPS 3/4 and up), ' +
+    'Check a piping catalogue (bundled or imported) against dimensional rules of the standards. Rules: olet.dims (an olet row with neither centreToOutlet nor height: warn), b169.lr90 (B16.9 long-radius 90 degree elbow centre-to-end = 1.5 x NPS +/- 2 mm, NPS 3/4 and up), ' +
     'b169.sr90 (short radius = 1.0 x NPS), b165.hole (B16.5 bolt hole = bolt diameter + 1/8 in), pipe.odMatch (butt-weld fitting end OD equals the ASME B36.10M / EN 10220 pipe OD +/- 0.2 mm), ' +
     'monotonic (OD, centre-to-end and bolt circle do not fall with size), provenance (every value cites a source), verified (values that are not grade A: PSC_DATA_UNVERIFIED). ' +
     'Each issue has a code (PSC_CATALOG_DIM_MISMATCH, PSC_PROVENANCE_MISSING, PSC_DATA_UNVERIFIED), the file path of the value (families.0.sizes.0.centreToEnd), expected and found values and a fix. ' +

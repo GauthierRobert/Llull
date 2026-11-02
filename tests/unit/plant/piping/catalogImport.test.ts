@@ -210,7 +210,7 @@ describe('check_piping_catalog (VC-PSC-05, TR-PSC-13)', () => {
             { nps: 6, outsideDiameter: 168.3, centreToEndRun: 100, provenance: cite },
           ],
         },
-        { id: 'en-tee', type: 'tee', standard: 'EN 10253', sizes: [{ dn: 65, outsideDiameter: 73, provenance: cite }] },
+        { id: 'en-tee', type: 'tee', standard: 'EN 10253', sizes: [{ dn: 65, outsideDiameter: 73, centreToEndRun: 95, provenance: cite }] },
       ],
     });
     const checked = data<Checked>(importFile(doc, catalog), 'check_piping_catalog', { catalogId: 'user-mixed' });

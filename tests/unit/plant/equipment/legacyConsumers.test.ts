@@ -62,7 +62,7 @@ describe('load: a corrupt plant record is rejected with a description, never a c
 
   it.each([
     ['empty plant', (plant: Record<string, unknown>) => Object.keys(plant).forEach((key) => delete plant[key]), /plant\.schema/],
-    ['unknown template kind', (plant: Record<string, unknown>) => (template(plant)['kind'] = 'tank'), /template\.kind/],
+    ['unknown template kind', (plant: Record<string, unknown>) => (template(plant)['kind'] = 'cooling_tower'), /template\.kind/],
     ['vessel without heads', (plant: Record<string, unknown>) => delete template(plant)['heads'], /heads\.first/],
     ['non-positive diameter', (plant: Record<string, unknown>) => (template(plant)['insideDiameter'] = -5), /insideDiameter/],
     ['unknown support', (plant: Record<string, unknown>) => (template(plant)['support'] = { type: 'wheels' }), /support\.type/],

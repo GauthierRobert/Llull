@@ -11,11 +11,14 @@ import type { LineAnalysis } from '../analysis';
 import { isoIssue } from '../codes';
 import { nodeKey } from '../joints';
 import type { IsoIssue } from '../model';
+import type { LineSupport } from '../supports';
 import { lineAnnotations, mmText, runDimensions, type IsoAnnotation, type RunDimension } from './isoDimensions';
 import { buildIsoGraph, type IsoGraph } from './isoGraph';
 import type { ContinuationMark } from './isoSheets';
 import { LabelPlacer, TEXT_SIZE, dimensionPrimitives } from './isoLabels';
 import { layoutIso, type IsoLayout } from './isoLayout';
+import { skewFigures } from './isoSkew';
+import { supportMarks } from './isoSupports';
 import { axisAngles, type NorthArrow } from './isoProjection';
 import type { IsoPrimitive } from './isoRender';
 import { isoSymbols } from './isoSymbols';
@@ -48,6 +51,8 @@ export interface SheetOptions {
   readonly project: string;
   readonly sheet?: SheetScope;
   readonly issue?: SheetIssue;
+  /** Pipe supports of the line (drawn where they lie on a drawn pipe, listed as annotations). */
+  readonly supports?: readonly LineSupport[];
 }
 
 export interface SheetAnnotation extends IsoAnnotation {
@@ -73,7 +78,7 @@ const CELL = 2.2;
 const CHAR = 1.3;
 const PAD = 16;
 
-const text = (at: Vec2, size: number, content: string, anchor: 'start' | 'middle' | 'end' = 'start'): IsoPrimitive => ({
+export const text = (at: Vec2, size: number, content: string, anchor: 'start' | 'middle' | 'end' = 'start'): IsoPrimitive => ({
   t: 'text',
   layer: 'ISO-TEXT',
   at,
@@ -81,7 +86,7 @@ const text = (at: Vec2, size: number, content: string, anchor: 'start' | 'middle
   text: content,
   anchor,
 });
-const rect = (x0: number, y0: number, x1: number, y1: number, layer: 'ISO-FRAME' | 'ISO-TABLE'): IsoPrimitive => ({
+export const rect = (x0: number, y0: number, x1: number, y1: number, layer: 'ISO-FRAME' | 'ISO-TABLE'): IsoPrimitive => ({
   t: 'poly',
   layer,
   points: [
@@ -135,7 +140,7 @@ function tablePrimitives(tables: readonly IsoTable[], left: number, top: number)
   return out;
 }
 
-function titleBlock(width: number, lines: ReadonlyArray<ReadonlyArray<readonly [string, string]>>): IsoPrimitive[] {
+export function titleBlock(width: number, lines: ReadonlyArray<ReadonlyArray<readonly [string, string]>>): IsoPrimitive[] {
   const blockWidth = Math.min(180, width - 30);
   const x = width - 10 - blockWidth;
   const column = blockWidth / 3;
@@ -206,6 +211,10 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
     nodes: new Map([...layout.nodes].map(([key, point]) => [key, shift(point)])),
   };
   primitives.push(...isoSymbols({ network, graph, layout: shiftedLayout, joints: analysis.graph.joints, classes: analysis.classes }));
+  const skew = skewFigures(graph, shiftedLayout, options.northArrow);
+  primitives.push(...skew.primitives);
+  const placedSupports = supportMarks(options.supports ?? [], graph, shiftedLayout);
+  for (const placed of placedSupports) primitives.push(...placed.primitives);
   const dimensions = runDimensions(graph);
   const dimensionLines = dimensionPrimitives(dimensions, layout, shift);
   primitives.push(...dimensionLines);
@@ -269,6 +278,18 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
       [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
     );
   }
+  for (const mark of skew.marks) label(mark.annotation, mark.anchor);
+  for (const placed of placedSupports)
+    label(
+      {
+        kind: 'support',
+        text: placed.support.mark,
+        at: placed.support.xyz,
+        supportId: placed.support.id,
+        supportType: placed.support.type,
+      },
+      [placed.at[0], placed.at[1] - 5],
+    );
   for (const mark of options.sheet?.continuation ?? []) {
     const anchor = at2d(mark.at);
     if (anchor === undefined) continue;

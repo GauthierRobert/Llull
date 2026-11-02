@@ -23,6 +23,10 @@ export const EXCLUDED_FUNCTIONS: Readonly<Record<string, string>> = {
   'core/src/commands/solids/sweepOrientation.ts:parseOrientation': 'takes the already zod-validated command params, not text',
   'core/src/lib/law/parse.ts:parseLaw': 'takes a structured LawInput (zod-validated params), not text',
   'domain-aec/src/building/elements/wallLayers.ts:parseWallLayers': 'takes the already zod-validated command params, not text',
+  'domain-aec/src/plant/equipment/codecheck/tema.ts:parseTema':
+    'command parameter, not a file or stored field: the zod-validated temaType (max 16 characters) is matched letter by letter against fixed tables',
+  'domain-aec/src/plant/equipment/commands/tankParams.ts:parseSlope':
+    'command parameter, not a file or stored field: the zod-validated slopeRatio (max 32 characters) is read with one anchored regular expression',
   'domain-aec/src/plant/equipment/commands/nozzleParams.ts:parseLocation': 'takes the already zod-validated command params, not text',
   'domain-aec/src/plant/pid/dexpi/proteusContext.ts:readAttributes':
     'reads the GenericAttributes of an element of an already parsed XML tree; its entry point readProteus is in the table',

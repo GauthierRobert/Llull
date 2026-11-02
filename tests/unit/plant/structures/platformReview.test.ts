@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { buildingErrors } from '@aec/building/validate';
-import { platformAssemblyGuard } from '@aec/plant/structures/platform/platformGuard';
+import { assemblyGuard } from '@aec/plant/structures/assembly/assemblyGuard';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { TYPE, rect } from './accessFixtures';
 
@@ -42,18 +42,18 @@ describe('copy_level_elements and a platform', () => {
   it('only generated parts on the level: nothing to copy, nothing changes', () => {
     const result = execute(withDeck, 'copy_level_elements', { sourceLevelId: grade, targetLevelIds: [upper] });
     expect(result.document).toBe(withDeck);
-    expect(result.summary).toContain('generated platform parts');
+    expect(result.summary).toContain('generated assembly parts');
   });
 
   it('copies the other elements, skips the platform parts, reports it and the document still validates', () => {
     const mixed = apply(withDeck, 'add_slab', { boundary: rect(10000, 0, 12000, 2000), thickness: 100, levelId: grade });
     const result = ok(mixed, 'copy_level_elements', { sourceLevelId: grade, targetLevelIds: [upper] });
-    expect(result.summary).toContain('Skipped 4 generated platform part(s)');
+    expect(result.summary).toContain('Skipped 4 generated assembly part(s)');
     expect(buildingErrors(result.document.building)).toEqual([]);
     const platformParts = Object.values(result.document.building?.elements ?? {}).filter(
       (element) => 'assemblyId' in element && element.assemblyId !== undefined,
     );
-    expect(platformParts.every((part) => part.levelId === grade)).toBe(true);
+    expect(platformParts.every((part) => 'levelId' in part && part.levelId === grade)).toBe(true);
     // deleting the platform on the source level leaves the copied slab alone
     const removed = apply(result.document, 'delete_building_element', { elementIds: ['assembly-1'] });
     expect(Object.keys(removed.building?.elements ?? {}).sort()).toEqual(['slab-1', 'slab-2']);
@@ -213,16 +213,16 @@ describe('platform derivation guard: only a regeneration escapes', () => {
       (elements['assembly-1'] as Record<string, unknown>)['mark'] = 'AS9';
       (elements['grating-1'] as Record<string, unknown>)['gratingType'] = '19-W-4 1-1/2x3/16';
     });
-    expect(platformAssemblyGuard.check(built, next, 'x')).toContain('grating-1');
+    expect(assemblyGuard.check(built, next, 'x')).toContain('grating-1');
   });
 
   it('refuses a deleted assembly whose parts survive, allows a deleted assembly with its parts', () => {
     const orphaned = withBuilding((elements) => delete elements['assembly-1']);
-    expect(platformAssemblyGuard.check(built, orphaned, 'x')).toContain('member-1');
+    expect(assemblyGuard.check(built, orphaned, 'x')).toContain('member-1');
     const gone = withBuilding((elements) => {
       for (const id of Object.keys(elements)) delete elements[id];
     });
-    expect(platformAssemblyGuard.check(built, gone, 'x')).toBeNull();
+    expect(assemblyGuard.check(built, gone, 'x')).toBeNull();
   });
 
   it('allows a regeneration: generation raised, parts changed', () => {
@@ -230,7 +230,7 @@ describe('platform derivation guard: only a regeneration escapes', () => {
       (elements['assembly-1'] as Record<string, unknown>)['generation'] = 2;
       (elements['grating-1'] as Record<string, unknown>)['gratingType'] = '19-W-4 1-1/2x3/16';
     });
-    expect(platformAssemblyGuard.check(built, next, 'update_access_platform')).toBeNull();
+    expect(assemblyGuard.check(built, next, 'update_access_platform')).toBeNull();
     expectRefusal(built, 'update_grating', { ids: ['grating-1'], gratingType: '19-W-4 1-1/2x3/16' }, 'CMD_DERIVED_GEOMETRY');
   });
 });

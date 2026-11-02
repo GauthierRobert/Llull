@@ -7,7 +7,7 @@ import { refuse } from '../../catalog/codes';
 import { BEND_RADII, COMPONENT_TYPES, END_TYPES, FACINGS } from '../../catalog/types';
 import { resolveBranch, resolveComponent } from '../resolve';
 import { sizeLabel } from '../size';
-import { getSpecModel } from '../store';
+import { getSpecModel, specRevisions } from '../store';
 import { SPEC_STATUSES, type PipeSpec } from '../types';
 import { componentData, componentLine, isLoaded, loadSpec } from './answer';
 
@@ -49,7 +49,7 @@ export const listPipeSpecs = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   run: (doc, { specId, status }): CommandResult => {
     const model = getSpecModel(doc);
-    if (specId !== undefined && model.specs[specId] === undefined)
+    if (specId !== undefined && specRevisions(doc, specId) === undefined)
       return refuse(
         doc,
         'list_pipe_specs',
@@ -60,7 +60,7 @@ export const listPipeSpecs = defineCommand({
       );
     const specs = model.specOrder
       .filter((id) => specId === undefined || id === specId)
-      .flatMap((id) => model.specs[id] ?? [])
+      .flatMap((id) => specRevisions(doc, id) ?? [])
       .reduce<Map<string, PipeSpec[]>>((groups, spec) => groups.set(spec.id, [...(groups.get(spec.id) ?? []), spec]), new Map());
     const summaries = [...specs.values()]
       .filter((revisions) => status === undefined || revisions.at(-1)?.status === status)

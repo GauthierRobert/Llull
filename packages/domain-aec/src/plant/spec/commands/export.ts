@@ -5,6 +5,7 @@ import { exportRefusal, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { csvLines, type CsvCell } from '@lib/csv';
 import { sha256Hex } from '@lib/sha256';
+import { guardRows } from '../../catalog/csvGuard';
 import type { NominalSize } from '../../catalog/types';
 import { componentRows } from '../checks/rows';
 import { canonicalSpecText } from '../file';
@@ -61,15 +62,17 @@ function sheetCsv(spec: PipeSpec, verified: ReadonlyMap<string, boolean>): strin
     component.material ?? null,
     verified.get(component.id) ?? false,
   ]);
-  return csvLines(COLUMNS, rows);
+  return csvLines(COLUMNS, guardRows(rows));
 }
 
 function branchCsv(spec: PipeSpec): string {
   const cells = spec.branchTable?.cells ?? {};
   return csvLines(
     ['header', 'branch', 'fitting'],
-    Object.keys(cells).flatMap((header) =>
-      Object.entries(cells[header] ?? {}).map(([branch, fitting]): CsvCell[] => [header, branch, fitting]),
+    guardRows(
+      Object.keys(cells).flatMap((header) =>
+        Object.entries(cells[header] ?? {}).map(([branch, fitting]): CsvCell[] => [header, branch, fitting]),
+      ),
     ),
   );
 }

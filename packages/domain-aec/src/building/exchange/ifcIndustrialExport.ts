@@ -108,6 +108,7 @@ export function exportIndustrial(
   element: SteelMemberElement | FootingElement | PanelElement | EquipmentElement | PipeElement | CableTrayElement,
   storeyPlacement: string,
   plant?: ProductPlant,
+  strut = false,
 ): Exported | null {
   const { mm, writer } = context;
   const guid = context.guid(element.id);
@@ -119,7 +120,7 @@ export function exportIndustrial(
       if (!profile || !frame) return null;
       const local = framePlacement(context, storeyPlacement, mm3(element.start), frame.d, frame.u);
       const solid = extrusion(context, steelProfileDef(context, profile), mm(frame.length));
-      const { entity, type } = MEMBER_CLASS[element.role];
+      const { entity, type } = strut ? { entity: 'IFCMEMBER', type: '.STRUT.' } : MEMBER_CLASS[element.role];
       const ref = writer.add(
         `${entity}('${guid}',$,${ifcString(element.mark)},${ifcString(element.note ?? '')},${ifcString(profile.name)},${local},${shape(context, [solid])},${ifcString(element.id)},${type})`,
       );

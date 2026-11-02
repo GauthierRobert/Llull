@@ -5,6 +5,7 @@ import { changed, exportRefusal, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { csvLines, type CsvCell } from '@lib/csv';
+import { guardRows } from '../csvGuard';
 import { sha256Hex } from '@lib/sha256';
 import { BUNDLED_CATALOG_ID } from '../bundled';
 import { refuse } from '../codes';
@@ -131,7 +132,7 @@ function catalogCsv(catalog: PipingCatalog): string {
       Object.values(size.dims).every((dim) => dim.verified),
     ]),
   );
-  return csvLines([...CSV_FIXED, ...names, 'verified'], rows);
+  return csvLines([...CSV_FIXED, ...names, 'verified'], guardRows(rows));
 }
 
 /**

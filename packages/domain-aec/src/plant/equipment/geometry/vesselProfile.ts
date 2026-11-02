@@ -169,3 +169,20 @@ export function ringSection(innerRadius: number, outerRadius: number, from: numb
   const curves: Curves = profile.flatMap((point, index) => line(point, profile[(index + 1) % profile.length] as Vec2));
   return { curves, profile };
 }
+
+/**
+ * Closed wall section of ONE formed head of thickness `thickness` standing on the tangent line at axial position `tangent`, bulging toward
+ * `sign` (+1 / -1 along the axis): rim out along the tangent plane, outer meridian to the apex, across the wall, inner meridian back to the rim.
+ */
+export function headBand(shape: HeadShape, radius: number, thickness: number, tangent: number, sign: 1 | -1): ProfileBand {
+  const outer = headProfileCurves(shape, radius, thickness);
+  const inner = headProfileCurves(shape, radius, 0);
+  const at = ([r, h]: Vec2): Vec2 => [r, tangent + sign * h];
+  const curves: Curves = [
+    ...line([radius, tangent], at([startOf(outer)[0], 0])),
+    ...mapCurves(outer, at),
+    ...line(at(endOf(outer)), at(endOf(inner))),
+    ...mapCurves(reverseChain(inner), at),
+  ];
+  return { curves, profile: sampleProfile(curves).map(onAxis) };
+}

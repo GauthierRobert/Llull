@@ -13,7 +13,7 @@ import { platformQuantities } from '../platform/platformMeasure';
 import { railingQuantities } from '../railing/railingMeasure';
 import { stairGeometryMm, stairQuantities } from '../stair/steelStairMeasure';
 
-/** Adds `steelStair.<part>.m|ea|kg`, `grating.<type>.m2|kg|ea`, `railing.<part>.m|ea|kg`, `ladder.<part>.ea|m|kg` and `platform.<kind>.ea` lines (a platform's parts are counted in their own lines). */
+/** Adds `steelStair.<part>.m|ea|kg`, `grating.<type>.m2|kg|ea`, `railing.<part>.m|ea|kg`, `ladder.<part>.ea|m|kg` and `platform.<kind>.ea` lines (an assembly's parts are counted in their own lines; a pipe rack's members are steel members). */
 export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, takeoff: TakeoffAccumulator): void {
   for (const grating of elementsOf(building, 'grating')) {
     takeoff.add('grating', grating.gratingType, `Grating ${grating.gratingType}`, [
@@ -39,7 +39,13 @@ export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, take
     takeoff.add('ladder', 'steel', 'Ladder steel', [['kg', 'stiles, rungs, cage and landings', quantities.steelKg]]);
   }
   for (const assembly of elementsOf(building, 'assembly'))
-    takeoff.add('assembly', assembly.kind, `Platform (${assembly.kind})`, [['ea', 'count', 1]], 'platform');
+    takeoff.add(
+      'assembly',
+      assembly.kind,
+      `${assembly.kind === 'pipe_rack' ? 'Pipe rack' : 'Platform'} (${assembly.kind})`,
+      [['ea', 'count', 1]],
+      'platform',
+    );
   for (const stair of elementsOf(building, 'steelStair')) {
     const quantities = stairQuantities(doc, stair);
     takeoff.add('steelStair', 'stringer', 'Steel stair stringers', [['m', 'centre-line length, both sides', quantities.stringerM]]);

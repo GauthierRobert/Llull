@@ -1,7 +1,7 @@
 /**
  * Plant 06 STA: runs the validation pack's scenario plans (`validation/plans/*.json`) through `build_project` (the path of `llull run plan.json`)
  * and compares each `expected` row with the step's `data`. SC-STA-06 (grating span) is complete since M2, SC-STA-05 (negative access) and
- * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4, SC-STA-02 (steel stair) since M5, SC-STA-03 (circular platform) since M6. SC-STA-04 and 07 wait for M7..M8 (tests/unit/contract/blockedPlanCommands.json).
+ * SC-STA-01 (caged ladder, with its 8000 mm variant) since M4, SC-STA-02 (steel stair) since M5, SC-STA-03 (circular platform) since M6, SC-STA-04 (pipe rack) since M7. SC-STA-07 waits for M8 (tests/unit/contract/blockedPlanCommands.json).
  */
 
 import { readFileSync } from 'node:fs';
@@ -181,5 +181,23 @@ describe('SC-STA-03 vessel circular platform (VC-STA-07)', () => {
 
   it('is deterministic (AF-13)', () => {
     expect(JSON.stringify(run('sc-sta-03-vessel-circular-platform.json').report.steps)).toBe(JSON.stringify(report.steps));
+  });
+});
+
+describe('SC-STA-04 two-tier pipe rack (VC-STA-09)', () => {
+  const { plan, report } = run('sc-sta-04-pipe-rack.json');
+
+  it('runs every step', () => {
+    expect(report.steps.filter((step) => !step.ok).map((step) => step.summary)).toEqual([]);
+    expect(report.ok).toBe(true);
+  });
+
+  it('meets every expected row: counts, lengths, catalogue mass, and every member analysed by check_steel_members', () => {
+    expect(plan.expected.length).toBeGreaterThanOrEqual(12);
+    for (const row of plan.expected) compare(pick(report.steps[row.step], row.path), row);
+  });
+
+  it('is deterministic (AF-13)', () => {
+    expect(JSON.stringify(run('sc-sta-04-pipe-rack.json').report.steps)).toBe(JSON.stringify(report.steps));
   });
 });

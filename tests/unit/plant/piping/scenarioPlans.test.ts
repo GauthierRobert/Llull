@@ -1,7 +1,7 @@
 /**
  * Plant 01 PSC: runs the validation pack's scenario plans (`validation/plans/*.json`) step by step through `execute` (the path of
  * `llull run plan.json`) and compares each `expected` row with the step's `data` / `error`. `harness.inline` fixture files are inlined into the
- * named params first (the CLI `--param-file`). Steps whose command is not registered yet (M4: wall check) are skipped.
+ * named params first (the CLI `--param-file`). Steps whose command is not registered are skipped (none of the five plans has one left after M4).
  */
 
 import { readFileSync } from 'node:fs';
@@ -87,7 +87,8 @@ describe.each([
       typeof item === 'string' && item.startsWith('$') ? (named[item.slice(1)] ?? item) : item,
     );
 
-  it('runs every registered step and meets the expected rows of those steps', () => {
+  it('runs every step (all commands are registered) and meets the expected rows', () => {
+    expect(outcomes.every((outcome) => outcome !== null)).toBe(true);
     const built = plan.expected.filter((row) => outcomes[row.step] !== null && typeof row.value !== 'undefined');
     expect(built.length).toBeGreaterThan(0);
     for (const row of built) {

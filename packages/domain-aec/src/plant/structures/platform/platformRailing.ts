@@ -2,11 +2,15 @@
 
 import { z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
-import type { CadDocument } from '@core/model/types';
+import type { CadDocument, Vec3 } from '@core/model/types';
 import { findProfile } from '../../../steel/profiles';
 import { openingParam } from '../railing/addRailing';
 import { DEFAULT_POST_SPACING_MM, railingDefaults } from '../railing/railingDefaults';
 import { RULESET_NAMES } from '../rules/ruleTable';
+import { type AssemblyFailure, failure } from '../assembly/assemblyParts';
+import { cumulativeLengths } from '../railing/railingLayout';
+import { railingProblem } from '../railing/railingValidate';
+import { MAX_POSTS } from './platformGeometry';
 import type { RailingSpecFields } from './platformSpec';
 
 const DEFAULT_PROFILE = 'CHS48.3x3.2';
@@ -68,4 +72,22 @@ export function resolveRailingFields(doc: CadDocument, input: RailingInput, defa
       ? {}
       : { openings: input.openings.map((opening) => ({ from: opening.from, to: opening.to, gate: opening.gate === true })) }),
   };
+}
+
+/** The first problem of the railing runs of a platform (openings need one run, post count cap, the add_railing validation), or null. */
+export function railingRunsProblem(doc: CadDocument, fields: RailingSpecFields, paths: ReadonlyArray<Vec3[]>): AssemblyFailure | null {
+  if ((fields.openings ?? []).length > 0 && paths.length !== 1)
+    return failure('STA_RAIL_OPENING', `railing openings need exactly one railing run, the edges give ${paths.length}`, ['railing']);
+  for (const path of paths) {
+    const lengths = cumulativeLengths(path);
+    if ((lengths[lengths.length - 1] as number) / fields.postSpacingMax > MAX_POSTS)
+      return failure(
+        'STA_INVALID_GEOMETRY',
+        `postSpacingMax gives more than ${MAX_POSTS} posts on one railing: check the unit and the spacing`,
+        ['railing'],
+      );
+    const problem = railingProblem(doc, { ...fields, path, openings: fields.openings ?? [], role: 'guardrail' });
+    if (problem !== null) return failure(problem.code, `railing: ${problem.message}`, ['railing']);
+  }
+  return null;
 }

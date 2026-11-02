@@ -2,6 +2,9 @@
 
 import { commandCatalog } from '@core/commands/schema';
 import { addProcessColumn } from './commands/addProcessColumn';
+import { addHeatExchanger } from './commands/addHeatExchanger';
+import { addPump } from './commands/addPump';
+import { addStorageTank } from './commands/addStorageTank';
 import { addVessel } from './commands/addVessel';
 import { checkEquipment } from './commands/checkEquipment';
 import { equipmentWeights } from './commands/equipmentWeights';
@@ -16,6 +19,9 @@ import { vesselVolume } from './commands/vesselVolume';
 export const equipmentCatalog = commandCatalog(
   addVessel,
   addProcessColumn,
+  addHeatExchanger,
+  addStorageTank,
+  addPump,
   addNozzle,
   updateNozzle,
   deleteNozzle,

@@ -42,16 +42,43 @@ function pick(root: unknown, expression: string): unknown {
 function pickRow(outcome: unknown, row: string): unknown {
   const star = row.indexOf('[*].');
   if (star < 0) return pick(outcome, row);
-  const list = pick(outcome, row.slice(0, star)) as unknown[];
+  const left = row.slice(0, star);
+  const filtered = /^(.*)\[(\w+)=([^\]]+)\]$/.exec(left);
+  const list = (
+    filtered === null
+      ? pick(outcome, left)
+      : (pick(outcome, filtered[1] as string) as Array<Record<string, unknown>>).filter(
+          (item) => String(item[filtered[2] as string]) === filtered[3],
+        )
+  ) as unknown[];
   return list.map((item) => pick(item, row.slice(star + 4)));
+}
+
+/** Plan references: "$name" = first affected id of the step bound with `as`, "=$name.path" = a value of its outcome, "<../x.json>" = a JSON file relative to plans/. */
+function resolve(value: unknown, bound: ReadonlyMap<string, { id: string; outcome: Outcome }>): unknown {
+  if (typeof value === 'string') {
+    if (value.startsWith('=$')) {
+      const [name, ...rest] = value.slice(2).split('.');
+      return pick(bound.get(name ?? '')?.outcome, rest.join('.'));
+    }
+    if (value.startsWith('$')) return bound.get(value.slice(1))?.id ?? value;
+    if (value.startsWith('<../') && value.endsWith('>'))
+      return JSON.parse(readFileSync(path.resolve(PACK, 'plans', value.slice(1, -1)), 'utf8'));
+    return value;
+  }
+  if (Array.isArray(value)) return value.map((item) => resolve(item, bound));
+  if (value !== null && typeof value === 'object')
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolve(item, bound)]));
+  return value;
 }
 
 function run(file: string): { plan: Plan; outcomes: Array<Outcome | null>; final: CadDocument } {
   const plan = JSON.parse(readFileSync(path.join(PACK, 'plans', file), 'utf8')) as Plan;
   let doc: CadDocument = createEmptyDocument();
+  const bound = new Map<string, { id: string; outcome: Outcome }>();
   const outcomes = plan.actions.map((action, index) => {
     if (getCommand(action.command) === undefined) return null;
-    const params = { ...action.params };
+    const params = resolve(action.params, bound) as Record<string, unknown>;
     if (typeof params['text'] === 'string' && params['text'].startsWith('<data/')) {
       let text = readFileSync(path.join(PACK, 'data', 'iso-01-L101-dn100.pcf'), 'utf8').replace(/\r\n/g, '\n');
       for (const edit of plan.harness?.mutate ?? [])
@@ -64,7 +91,9 @@ function run(file: string): { plan: Plan; outcomes: Array<Outcome | null>; final
     }
     const result = execute(doc, action.command, params);
     doc = result.document;
-    return { data: result.data, error: result.error };
+    const outcome = { data: result.data, error: result.error };
+    if (action.as !== undefined) bound.set(action.as, { id: result.affected[0] ?? '', outcome });
+    return outcome;
   });
   return { plan, outcomes, final: doc };
 }
@@ -176,5 +205,42 @@ describe('SC-ISO-05: a 20-segment rack split over sheets, re-issued after an edi
     expect(sheetsAt(5)[0]?.sha256).toBe(sheetsAt(3)[0]?.sha256);
     expect(sheetsAt(5)[1]?.sha256).toBe(sheetsAt(3)[1]?.sha256);
     expect(sheetsAt(5)[2]?.sha256).not.toBe(sheetsAt(3)[2]?.sha256);
+  });
+});
+
+describe('SC-ISO-02: route L-101 with the spec, add a site weld, export and re-import as a preview (VC-ISO-04, 17)', () => {
+  const { plan, outcomes } = run('sc-iso-02-route-to-pcf-roundtrip.json');
+
+  it('every step is built; the preview meets the rows: same topology plus the gaskets and bolt sets of the spec, pipe 13036 = 14500 - 1464', () => {
+    expect(unbuilt(plan)).toEqual([]);
+    expect(outcomes.every((outcome) => outcome !== null && outcome.error === undefined)).toBe(true);
+    expect(plan.expected).toHaveLength(4);
+    expectRows(plan, outcomes);
+  });
+
+  it('the exported file is byte-identical on a second run (VC-ISO-17)', () => {
+    const sha = (outcome: Outcome | null | undefined): string =>
+      (outcome?.data as { files: Array<{ sha256: string }> }).files[0]?.sha256 ?? '';
+    expect(sha(run('sc-iso-02-route-to-pcf-roundtrip.json').outcomes[10])).toBe(sha(outcomes[10]));
+    expect(sha(outcomes[10])).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('SC-ISO-06: orthographic piping GA of the sample line (VC-ISO-15)', () => {
+  const { plan, outcomes } = run('sc-iso-06-piping-ga.json');
+
+  it('meets the rows: label L-101-DN100-A1A, CL EL +3000 / +1000, BOP 2942.85, and the section is drawn', () => {
+    expect(unbuilt(plan)).toEqual([]);
+    expectRows(plan, outcomes);
+    expect((outcomes[3]?.data as { view: string; cutAt: number }).cutAt).toBe(2000);
+  });
+});
+
+describe('SC-ISO-08: supports in the PCF and the skew box on the isometric (VC-ISO-21)', () => {
+  const { plan, outcomes } = run('sc-iso-08-supports-skew.json');
+
+  it('meets the rows: 2 SUPPORT records on the centreline, a skew of 1414.2135624 mm with legs 1000 / 1000 at 45 degrees', () => {
+    expect(unbuilt(plan)).toEqual([]);
+    expectRows(plan, outcomes);
   });
 });

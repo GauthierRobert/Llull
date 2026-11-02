@@ -9,7 +9,7 @@ import { refuse } from '../../catalog/codes';
 import { applyEditOps, editOpSchema } from '../edit';
 import { canonicalSpecText, headerShape, parseSpecFile, specToFile, SPEC_FORMAT, SPEC_ID_PATTERN, type SpecIssue } from '../file';
 import { bindingQuery, inRange, querySize } from '../size';
-import { getSpecModel, latestSpec, withSpecModel } from '../store';
+import { getSpecModel, latestSpec, specRevisions, withSpecModel } from '../store';
 import type { PipeSpec } from '../types';
 
 /** The spec as a draft: status draft, no approval block. */
@@ -23,7 +23,7 @@ const content = (spec: PipeSpec): string => canonicalSpecText({ ...draftOf(spec)
 
 function withRevisions(doc: CadDocument, spec: PipeSpec, replaceLast: boolean): CadDocument {
   const model = getSpecModel(doc);
-  const revisions = model.specs[spec.id] ?? [];
+  const revisions = specRevisions(doc, spec.id) ?? [];
   return withSpecModel(doc, {
     specs: { ...model.specs, [spec.id]: replaceLast ? [...revisions.slice(0, -1), spec] : [...revisions, spec] },
     specOrder: revisions.length === 0 ? [...model.specOrder, spec.id] : model.specOrder,
