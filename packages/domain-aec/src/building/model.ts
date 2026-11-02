@@ -51,7 +51,7 @@ export function isVec2List(value: unknown, minimumLength: number): value is Vec2
 // prettier-ignore
 const MARK_PREFIX: Readonly<Record<Exclude<BimCategory, 'grid' | 'room'>, string>> = {
   wall: 'W', door: 'D', window: 'WN', slab: 'SL', column: 'C', beam: 'B', stair: 'ST', member: 'M', footing: 'F', panel: 'CL',
-  equipment: 'EQ', pipe: 'PL', tray: 'CT', plate: 'BP', curvedWall: 'W', connection: 'MC', pipeSupport: 'PS', grating: 'GR', railing: 'RL', ladder: 'LD', steelStair: 'SS',
+  equipment: 'EQ', pipe: 'PL', tray: 'CT', plate: 'BP', curvedWall: 'W', connection: 'MC', pipeSupport: 'PS', grating: 'GR', railing: 'RL', ladder: 'LD', steelStair: 'SS', assembly: 'AS',
 };
 
 /** Largest integer N among keys "<prefix>N" (0 when none). */
@@ -221,10 +221,16 @@ export function followLevelHeight(element: BuildingElement, oldHeight: number, n
 }
 
 /**
- * Host of a hosted element: a door / window's wall, a base plate's column, a moment connection's rafter, a pipe support's pipe, a railing's slab or grating (else null).
+ * Host of a hosted element: a door / window's wall, a base plate's column, a moment connection's rafter, a pipe support's pipe, a railing's slab or grating, a generated platform part's assembly, a circular platform's vessel (else null).
  * The element follows its host.
  */
 export function hostOf(element: BuildingElement): string | null {
+  if (
+    (element.category === 'member' || element.category === 'grating' || element.category === 'railing') &&
+    element.assemblyId !== undefined
+  )
+    return element.assemblyId;
+  if (element.category === 'assembly') return element.hostId ?? null;
   if (element.category === 'door' || element.category === 'window') return element.hostId;
   if (element.category === 'connection') return element.rafterId;
   if (element.category === 'pipeSupport') return element.pipeId;
@@ -242,8 +248,15 @@ function dependenciesOf(element: BuildingElement): string[] {
 /** `ids` plus the elements that depend on any of them (wall openings, column base plates, …). */
 export function withDependents(building: BuildingModel, ids: Iterable<string>): Set<string> {
   const result = new Set(ids);
-  for (const element of Object.values(building.elements)) {
-    if (dependenciesOf(element).some((id) => result.has(id))) result.add(element.id);
+  let grown = true;
+  while (grown) {
+    grown = false;
+    for (const element of Object.values(building.elements)) {
+      if (!result.has(element.id) && dependenciesOf(element).some((id) => result.has(id))) {
+        result.add(element.id);
+        grown = true;
+      }
+    }
   }
   return result;
 }

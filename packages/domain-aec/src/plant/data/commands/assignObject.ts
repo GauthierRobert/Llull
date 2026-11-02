@@ -19,6 +19,7 @@ import {
   type PlantValue,
   type PropertyDefinition,
   type ValueProvenance,
+  own,
 } from '../model';
 import { envOf, fieldValue, formatParts, generateFor, matchTag, nextSequence, type TagEnv } from '../objectTag';
 import { coerceValue, type PlantValueInput } from '../properties';
@@ -55,7 +56,7 @@ const definitionOf = (resolved: ResolvedClass, name: string): PropertyDefinition
 
 /** The process line object `reference` (id or tag) names, or a refusal. */
 export function lineObjectOf(data: PlantDataModel, reference: string): Outcome<{ readonly line: PlantObject }> {
-  const byId = data.objects[reference];
+  const byId = own(data.objects, reference);
   const candidates = byId === undefined ? idsWithTag(objectRegistry(data), reference).flatMap((id) => data.objects[id] ?? []) : [byId];
   const lines = candidates.filter((object) => isProcessLine(data, object));
   if (lines.length === 1) return { ok: true, line: lines[0] as PlantObject };

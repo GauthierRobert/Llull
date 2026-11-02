@@ -4,7 +4,7 @@ import { report } from '@core/commands/noop';
 import { isKindOf } from '../classes';
 import { atLeast, checkFindings, checkStatus } from '../check';
 import { resolveNode, subtreeIds } from '../hierarchy';
-import { getPlantData } from '../model';
+import { getPlantData, own } from '../model';
 import { refuse } from './params';
 
 /**
@@ -45,7 +45,7 @@ export const checkPlantData = defineCommand({
     }
     if (params.classes !== undefined) {
       for (const name of params.classes)
-        if (data.classes[name] === undefined)
+        if (own(data.classes, name) === undefined)
           return refuse(doc, 'check_plant_data', { code: 'DAT_CLASS_UNKNOWN', message: `no class "${name}"`, paths: ['classes'] });
       const byClass = data.objectOrder.filter((id) =>
         params.classes?.some((name) => isKindOf(data, data.objects[id]?.className ?? '', name)),

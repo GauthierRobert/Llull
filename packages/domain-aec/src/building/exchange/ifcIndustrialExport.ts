@@ -79,7 +79,7 @@ const MEMBER_CLASS: Readonly<Record<MemberRole, { entity: string; type: string }
   column: { entity: 'IFCCOLUMN', type: '.COLUMN.' }, rafter: { entity: 'IFCBEAM', type: '.BEAM.' },
   beam: { entity: 'IFCBEAM', type: '.BEAM.' }, crane: { entity: 'IFCBEAM', type: '.BEAM.' },
   brace: { entity: 'IFCMEMBER', type: '.BRACE.' }, purlin: { entity: 'IFCMEMBER', type: '.PURLIN.' },
-  rail: { entity: 'IFCMEMBER', type: '.MEMBER.' },
+  rail: { entity: 'IFCMEMBER', type: '.MEMBER.' }, bracket: { entity: 'IFCMEMBER', type: '.MEMBER.' },
 };
 
 /** One extruded-area solid per non-degenerate segment of a polyline, the profile swept along it. */

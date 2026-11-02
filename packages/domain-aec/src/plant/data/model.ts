@@ -66,6 +66,14 @@ export interface IfcMapping {
 
 export type TagScope = 'plant' | 'site' | 'project';
 
+export const EXTERNAL_SCHEMES = ['cfihos', 'iso15926', 'company'] as const;
+export type ExternalScheme = (typeof EXTERNAL_SCHEMES)[number];
+
+export interface ExternalClassId {
+  readonly scheme: ExternalScheme;
+  readonly id: string;
+}
+
 export interface PlantClass {
   /** Unique PascalCase identifier. */
   readonly name: string;
@@ -79,6 +87,8 @@ export interface PlantClass {
   /** Own definitions; the inherited ones are merged by `resolveClass`. */
   readonly properties: readonly PropertyDefinition[];
   readonly ifc?: IfcMapping;
+  /** Identifiers of this class in external schemes (not inherited: a subclass is not the same external class); read by export_handover. */
+  readonly externalIds?: readonly ExternalClassId[];
   /** `library` classes are read-only; a project extends them by subclassing. */
   readonly source: 'library' | 'project';
 }
@@ -147,6 +157,47 @@ export interface ReportDefinition {
   readonly sort?: readonly string[];
 }
 
+/** Statuses of a deliverable revision (plant 08 DAT §5.14), in issue order;  is only ever set by a newer revision. */
+export const DELIVERABLE_STATUSES = [
+  'in_work',
+  'issued_for_review',
+  'issued_for_approval',
+  'issued_for_construction',
+  'as_built',
+  'superseded',
+] as const;
+export type DeliverableStatus = (typeof DELIVERABLE_STATUSES)[number];
+
+/** Statuses only a human signature can set (AF-34); an agent may set in_work and issued_for_review. */
+export const HUMAN_GATED_STATUSES: readonly DeliverableStatus[] = ['issued_for_approval', 'issued_for_construction', 'as_built'];
+
+/** One status change of a revision: the content it was issued for and, for a human-signed status, who signed. */
+export interface DeliverableStep {
+  readonly status: DeliverableStatus;
+  /** SHA-256 of the canonical JSON of the report (or of the IFC text) when this step was taken. */
+  readonly contentSha256: string;
+  /** When the step was taken: ISO-8601 UTC, filled by the host (never the caller's clock). */
+  readonly at: string;
+  readonly signer?: string;
+  readonly signatureId?: string;
+  /** SHA-256 the signature was verified over (signed steps): what the human signed, kept so the step can be audited. Self-asserted in the file: the key store, not this record, proves it. */
+  readonly payloadSha256?: string;
+}
+
+export interface DeliverableRevision {
+  readonly label: string;
+  /** Hierarchy node id the revision is scoped to, fixed when it is created (a report definition's own scope included); absent = the whole plant. */
+  readonly hierarchyId?: string;
+  /** Status changes in order; the last one is the current status. */
+  readonly steps: readonly DeliverableStep[];
+}
+
+/** A deliverable (a report, a saved report definition or the IFC export) and its revisions in creation order. */
+export interface Deliverable {
+  readonly id: string;
+  readonly revisions: readonly DeliverableRevision[];
+}
+
 export interface PlantDataModel {
   readonly version: 1;
   readonly hierarchy: Readonly<Record<string, HierarchyNode>>;
@@ -158,6 +209,8 @@ export interface PlantDataModel {
   readonly settings: PlantDataSettings;
   /** Saved report definitions by id (M4); absent until the first save_report_definition. */
   readonly reports?: Readonly<Record<string, ReportDefinition>>;
+  /** Deliverable revisions by deliverable id (M6); absent until the first set_deliverable_status. Carried across a history replay (input state, not a recipe step). */
+  readonly deliverables?: Readonly<Record<string, Deliverable>>;
 }
 
 export const DEFAULT_BATTERY_LIMIT_PATTERN = '^(BL|TI)-';
@@ -213,3 +266,7 @@ export const providerIdOf = (target: PlantObjectTarget): string | null =>
 /** `<provider>:<id>` of the model object a target stands for, null for a reserved tag. */
 export const targetKey = (target: PlantObjectTarget): string | null =>
   target.kind === 'reserved' ? null : `${providerIdOf(target)}:${target.id}`;
+
+/** `record[key]` for an agent-chosen key: only an own entry (`constructor`, `__proto__`, `toString` are not entries). */
+export const own = <T>(record: Readonly<Record<string, T>> | undefined, key: string): T | undefined =>
+  record !== undefined && Object.hasOwn(record, key) ? record[key] : undefined;

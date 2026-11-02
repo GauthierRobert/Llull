@@ -2,7 +2,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed, noop } from '@core/commands/noop';
 import { resolvedOrNull } from '../classes';
-import { getPlantData, withPlantData, type PlantDataModel } from '../model';
+import { getPlantData, own, withPlantData, type PlantDataModel } from '../model';
 import { parseTagFormat } from '../tagFormat';
 import { refuse } from './params';
 import { retagObjects } from './retag';
@@ -30,7 +30,7 @@ export const setTagFormat = defineCommand({
     const data = getPlantData(doc);
     const fail = (code: string, message: string, path: string, ids: readonly string[] = []): CommandResult =>
       refuse(doc, 'set_tag_format', { code, message, paths: [path], ids });
-    const cls = data.classes[params.className];
+    const cls = own(data.classes, params.className);
     if (cls === undefined) return fail('DAT_CLASS_UNKNOWN', `no class "${params.className}"`, 'className');
     if (cls.source === 'library') return fail('DAT_LIBRARY_CLASS_LOCKED', `${cls.name} is a library class: subclass it`, 'className');
     const tagFormat = params.tagFormat.trim();

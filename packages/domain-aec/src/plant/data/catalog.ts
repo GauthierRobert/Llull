@@ -3,6 +3,7 @@ import { assignPlantObject } from './commands/assignPlantObject';
 import { assignPlantObjects } from './commands/assignPlantObjects';
 import { checkIfcRequirements } from './commands/checkIfcRequirements';
 import { checkPlantData } from './commands/checkPlantData';
+import { exportHandover } from './commands/exportHandover';
 import { exportPlantData } from './commands/exportPlantData';
 import { definePlantClass } from './commands/defineClass';
 import { definePlantHierarchy } from './commands/defineHierarchy';
@@ -14,6 +15,7 @@ import { plantDataTable } from './commands/plantDataTable';
 import { plantReport } from './commands/plantReport';
 import { renumberTags } from './commands/renumberTags';
 import { saveReportDefinition } from './commands/saveReportDefinition';
+import { setDeliverableStatus } from './commands/setDeliverableStatus';
 import { setPlantProperties } from './commands/setPlantProperties';
 import { setTagFormat } from './commands/setTagFormat';
 import { unassignPlantObject } from './commands/unassignPlantObject';
@@ -37,4 +39,6 @@ export const plantDataCatalog = commandCatalog(
   saveReportDefinition,
   ifcSummary,
   checkIfcRequirements,
+  setDeliverableStatus,
+  exportHandover,
 );

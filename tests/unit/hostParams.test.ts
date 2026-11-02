@@ -18,6 +18,9 @@ describe('fillHostParams', () => {
   it('stamps the time of approve_pipe_spec (a plant human gate), overriding a caller-supplied one, and leaves its other params', () => {
     expect(fillHostParams('approve_pipe_spec', { specId: 'S', at: '2001-01-01T00:00:00Z' }, host)).toEqual({ specId: 'S', at: FILLED.at });
     expect(fillHostParams('issue_isometric', { lineId: 'L' }, host)).toEqual({ lineId: 'L' });
+    expect(
+      fillHostParams('set_deliverable_status', { deliverable: 'mto', revision: 'A', status: 'in_work', at: '2001-01-01T00:00:00Z' }, host),
+    ).toEqual({ deliverable: 'mto', revision: 'A', status: 'in_work', at: FILLED.at });
   });
 
   it('leaves other commands, unknown names and commands without at/by alone', () => {

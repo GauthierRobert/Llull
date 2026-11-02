@@ -29,9 +29,9 @@ interop and review.
 ## 2. Target architecture
 
 ```
-packages/core/src/lib/frame3d.ts            pure 3D frame/pipe-beam numerics (stiffness, assembly, banded Cholesky, RCM)   [new, core lib]
+packages/core/src/lib/frame3d/                     pure 3D frame/pipe-beam numerics (stiffness, assembly, banded Cholesky, RCM)   [new, core lib]
 packages/core/src/model/propertyCatalog.ts  + rows 'pipingAllowableStress' (Pa, strength, owner 07 PST) and 'meanCteFromInstall' (1/K)
-packages/domain-aec/src/plant/stress/       plugin `plant` (toolset `pipestress`) — the PST commands
+packages/domain-aec/src/plant/stress/       plugin `pipeStress` (toolset `pipestress`; built name, M1) — the PST commands
   model/        stressModel.ts (types), buildModel.ts (pipes+supports → nodes/elements/restraints), components.ts
   solve/        loads.ts, nonlinear.ts (supports active set + friction), cases.ts (OPE/SUS/EXP/OCC combinations)
   code/         ruleSets.ts (B31.3-2018/2020/2022, B31.1 as data), sif.ts, allowables.ts, codeStress.ts
@@ -219,10 +219,10 @@ release (AF-33, AF-35).
 | `check_pipe_stress` | query | `modelId`, `displacementLimitMm?` | `items[{ code, severity, ids, paths, message, remediation }]`, `ok`, `reviewRequired` | as above plus overstress codes (§7) |
 | `record_pipe_stress_results` | mutating | `modelId` | writes `RecordedResults` (summary + support loads + hash) | `PST_ANALYSIS_FAILED` (the run's own code) |
 | `approve_pipe_stress` | mutating, human gate | `modelId`, `confirmation` (signature) | writes `approval`; refused for agents | `PST_HUMAN_GATE`, `PST_RESULTS_STALE`, `PST_RESULTS_FAILING` (a failing model cannot be approved without a disposition, 09 PLM) |
-| `thermal_growth` | query | `materialId` \| `table: "carbon-steel-c1"`, `fromC`, `toC`, `lengthM` | `growthMm`, `mmPerM`, `meanCtePerK`, source | `PST_TEMPERATURE_OUT_OF_TABLE`, `PST_MATERIAL_NO_DATA` |
-| `pipe_sif` | query | `component: elbow\|bend\|welding_tee\|unreinforced_tee\|reinforced_tee\|weldolet\|sweepolet\|reducer\|butt_weld`, `odMm`, `wallMm`, `bendRadiusMm?`, `padMm?`, `rule` (`B31.3-2018`, `B31.1`, `user`) | `h`, `k`, `ii`, `io`, `formula`, `grade` | `PST_SIF_EDITION` (B31.3 ≥ 2020 without user values), `PST_PARAM_INVALID` |
-| `pipe_stress_allowables` | query | `ScMPa`, `ShMPa` \| `materialId`+`tempC`+`installTempC`, `cycles`, `edition`, `SLMPa?`, `ferrousLowStrength?` | `f` (raw, capped, floored), `SA1aMPa`, `SA1bMPa`, `occasionalMPa` | `PST_PARAM_INVALID` |
-| `guided_cantilever` | query | `legMm`, `displacementMm`, `odMm`, `wallMm`, `EMPa`, `SAMPa?` | `forceN`, `momentNmm`, `stressMPa`, `minLegMm` | `PST_PARAM_INVALID` |
+| `thermal_growth` | query | exactly one of `table: "carbon-steel-c1"`, or `materialId` (+ `cteReferenceC` for a secant cte model), or `meanCtePerK`; `fromC`, `toC`, `lengthM` | `growthMm`, `mmPerM`, `meanCtePerK`, `strain`, `source`, `grade`, `warnings` (`PST_TABLE_EDGE_SNAPPED`, `PST_MATERIAL_UNVERIFIED`, `PST_CTE_IMPLAUSIBLE`) | `PST_TEMPERATURE_OUT_OF_TABLE`, `PST_MATERIAL_NOT_FOUND`, `PST_MATERIAL_NO_DATA`, `PST_PARAM_INVALID` |
+| `pipe_sif` | query | `component`, `odMm`, `wallMm` (matching run pipe), `bendRadiusMm?` (>= mean radius), `padMm?`, `rule` (`B31.3-<2016..2024>`, `B31.1-<2016..2022>`, `user`; required), `userSif?` | `h`, `k`, `ii`, `io`, `formula`, `grade`, `ruleRows`, `warnings` (`PST_SIF_EDITION` for B31J editions, `PST_SIF_CLAMPED`), `reviewRequired` | `PST_PARAM_INVALID` (sweepolet / reducer without `user`) |
+| `pipe_stress_allowables` | query | `rule` (edition required), `ScMPa`, `ShMPa` (both inputs, never defaulted), `cycles`, `SLMPa?`, `ferrousLowStrength?`, `occasionalEvents?` (B31.1), `sustainedMPa?` + `occasionalLoadMPa?` | `f`, `fRaw`, `fCap`, `SA1aMPa`, `SA1bMPa` (null when SL > Sh), `SAMPa`, `equation`, `occasionalMPa`, `occasionalRatio?`, `defaulted`, `warnings` (`PST_SUSTAINED_EXCEEDS_SH`) | `PST_PARAM_INVALID` (materialId + tempC input arrives with M3) |
+| `guided_cantilever` | query | `legMm`, `displacementMm`, `odMm`, `wallMm`, `EMPa`, `sif?` (>= 1, default 1 listed in `defaulted`), `SAMPa?` | `forceN`, `momentNmm`, `stressMPa` (= sif x raw), `rawStressMPa`, `minLegMm?`, `ratio?`, `warnings` (`PST_BEAM_SLENDERNESS` when leg / OD < 10) | `PST_PARAM_INVALID` |
 | `spring_variability` | query | `hotLoadN`, `rateNPerMm`, `travelUpMm` (signed), `maxVariability?` (default 0.25, named) | `coldLoadN`, `variability`, `ok`, rule + grade | `PST_PARAM_INVALID` |
 | `nozzle_load_check` | query | `standard: nema_sm23\|api610\|api617\|user`, `nominalIn`, `forceN`/`forceLbf` [x,y,z], `momentNm`/`momentFtLbf` [x,y,z], `table?` (api610 / user values), `orientation?: top\|side\|end` | per-component and resultant ratios, `De`, governing ratio, rule + grade | `PST_NOZZLE_LIMIT_MISSING`, `PST_PARAM_INVALID` |
 | `select_spring_hangers` (V1) | mutating | `modelId`, `restraintIds[]`, `springTableId`, `maxVariability` (default 0.25, 0.15 near rotating equipment) | writes `SpringSelection` (size, rate, hot / cold load, travel, variability) | `PST_SPRING_NO_SIZE`, `PST_SPRING_VARIABILITY`, `PST_SPRING_TABLE_MISSING` |
@@ -476,7 +476,7 @@ Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/**` (the plugin) a
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
 | M1 quick checks | `pipe_sif`, `pipe_stress_allowables`, `thermal_growth`, `guided_cantilever`, rule-set data, catalogue rows | none | 4 d |
-| M2 solver core | `@lib/frame3d` (Timoshenko, bends with k, RCM + banded Cholesky), unit tests, PSI fixture | none | 6 d |
+| M2 solver core (built, §14) | `@lib/frame3d` (Timoshenko, bends with k, RCM + banded Cholesky), unit tests, PSI fixture | none | 6 d |
 | M3 model + MVP commands | `create_stress_model`, conditions, load cases, restraints, `analyze_pipe_stress`, `check_pipe_stress`, record / approve, non-linear supports | M2; uses `add_pipe_run` / `add_pipe_support` as they are | 10 d |
 | M4 review surface | overlay, panel, `render_view` overlay, report (HTML / CSV) | M3 | 5 d |
 | M5 V1 | tees / olets / reducers / flanges / valves (02 RTE components), insulation, wind / seismic, springs, nozzles (03 EQP), B31.1, steel coupling (06 STA), `.cii` export, PCF attributes (05 ISO) | 01 PSC, 02 RTE, 03 EQP, 05 ISO | 20 d |
@@ -509,3 +509,90 @@ the support loads), 08-plant-data-reports-interop (line list "stress critical" f
 - [R17] AVEVA E3D Pipe Stress Interface User Guide 2.1 — https://help.aveva.com/AVEVA_Everything3D/2.1/PSIUG/PSIUG9.08.2.html (search extract, accessed 2026-10)
 - [R18] CADMATIC Plant Modeller — Interfacing to CAESAR II — https://docs.cadmatic.com/plant/Content/Plant%20Modeller/Model/Interfacing%20to%20CAESAR%20II.htm (search result, not fetched; host blocked)
 - Validation sources S1–S27: [`validation/sources.md`](validation/sources.md)
+
+## 13. As built (M1 quick checks, 2026-11-02)
+
+Plugin `pipeStress` (toolset `pipestress`), folder `packages/domain-aec/src/plant/stress/` (D2: one plant home, one plugin per area). No document state
+yet: the four commands are read-only queries returning `data` (all `reviewRequired: true`, with `provenance`, `grade`, `defaulted`, `warnings`).
+
+| Path | Content |
+| ---- | ------- |
+| `code/ruleSets.ts` | rule sets as data: `B31.3-2016..2024`, `B31.1-2016..2022` (f form, cap, floor, occasional factors, SIF basis) and the rule rows (clause, formula, sources, grade) of `validation/data/{code_rules_b313,sif_flexibility}.json` |
+| `code/sif.ts`, `code/allowables.ts`, `code/thermalStrain.ts`, `data/carbonSteelC1.ts` | the closed forms and the carbon steel strain table (70 degF reference + 8 rows, source and grade per row) |
+| `commands/` | `pipe_sif`, `pipe_stress_allowables`, `thermal_growth`, `guided_cantilever`; `catalog.ts`, `plugin.ts`, `codes.ts` (`PST_*` remediation) |
+
+Section properties come from 01 PSC `sectionProperties` (`plant/catalog/sectionProperties.ts`, imported, not copied).
+
+Decisions (recorded here; owner delegated, long-term-best):
+
+1. **Edition is required (settles Q2, D8).** `pipe_sif` and `pipe_stress_allowables` take `rule` = `B31.3-<edition>` / `B31.1-<edition>`; no default edition, nothing to warn about. `pipe_sif` also accepts `user`. Allowable stresses `ScMPa` / `ShMPa` are inputs, never defaulted (D9).
+2. **`PST_SIF_EDITION` is a warning, not a refusal** (§5.7 and §7 say warn; the §4 failure column said failure): editions that require B31J (B31.3 and B31.1 from 2020) return the appendix D value with the non-hideable warning and the `SIF-B31J` rule row (grade C); `rule: "user"` with `userSif { ii, io, k, source }` returns the caller's B31J factors unchanged and `unverified`.
+3. **B31.1 returns one SIF** for both planes (`ii = io`, the 0.9 / h^(2/3) value); B31.1 f never exceeds 1.0 (no 1.2 cap), grade B rows.
+4. **Components without a read source are refused, not guessed:** `sweepolet` and `reducer` (grade C) need `rule: "user"`. Flange end corrections (V1) are not implemented.
+5. **`ferrousLowStrength`** is an explicit boolean (SMTS <= 517 MPa and T <= 371 degC); when omitted the cap is 1.0 and the result lists `ferrousLowStrength=false (cap 1.0)` in `defaulted`.
+6. **Occasional check** folded into `pipe_stress_allowables` (inputs `sustainedMPa` + `occasionalLoadMPa` give `occasionalRatio`, VC-PST-13); `check_pipe_stress` reuses the same function in M3. B31.1 events class `occasionalEvents` (1.15 / 1.2 Sh).
+7. **`thermal_growth` sources:** built-in table `carbon-steel-c1`, a document material (`thermalStrain` or secant `cte` model, through `materialCteProvider`, so PHY-01 validity ranges and `unverified` reasons apply), or `meanCtePerK`. The table is interpolated in strain from the 70 degF reference (strain 0, grade A) and never extrapolated; a temperature within 0.25 K of a row takes the row (21.1 / 204.4 degC are how SI spells 70 / 400 degF) and the result carries `PST_TABLE_EDGE_SNAPPED`. Grade A only when both ends sit on grade A nodes (the 400 degF row).
+8. **Catalogue rows `pipingAllowableStress` / `meanCteFromInstall` (§2) are not added in M1.** They live in core `propertyCatalog.ts`, outside the M1 write scope, and no M1 command reads allowables from `doc.materials`; they arrive with M3 (`set_pipe_operating_conditions`, `import_pipe_material_data`). `spring_variability` and `nozzle_load_check` (listed in §5.10) belong to M5 with VC-PST-14 / 15.
+9. Toolset name `pipestress` (the spec's §4 name, not the `plant_*` pattern of the sibling toolsets) is registered in `@protocol/toolsets` and the palette titles.
+10. Review round 1: `guided_cantilever` takes `sif` (stress = sif x M/Z; without it an elbow is under-stated, so it no longer claims to be conservative) and warns `PST_BEAM_SLENDERNESS` below leg / OD 10; `pipe_sif` refuses R1 below the mean radius and warns `PST_SIF_CLAMPED`; `SA1b` is null with `PST_SUSTAINED_EXCEEDS_SH` when SL > Sh; `thermal_growth` refuses `cteReferenceC` without `materialId` and warns `PST_CTE_IMPLAUSIBLE` outside 1e-6..5e-5 /K; the B31.3-2022 f row (20 N^(-1/3)) is grade B (secondary sources, constant not read in a primary text).
+
+Validation results (`tests/unit/plant/stress/`, references read from `validation/data/*.json`):
+
+| VC | Result | Reference, tolerance |
+| -- | ------ | -------------------- |
+| 01 | NPS 6 Sch 40 LR / SR and DN150 SI: h, k, ii, io equal the reference | `sif_flexibility.json`, 1e-4 rel (grade A) |
+| 02 | unreinforced 3.47954, welding tee 1.63662, weldolet 1.56981, reinforced (pad 0.25 in) 1.62563 | `closed_forms_output.json`, 1e-4 rel (grade B, named in the result) |
+| 03 | f: 1.021249 / 1.0 / 1.045516 (N 7000), 0.6 / 0.430887 (N 1e5), 0.15 floor (N 2e8), cap crossings at 3125 and 4630 cycles | `code_rules_b313.json`, 1e-5 abs |
+| 04 | 30 m, 70 -> 400 degF: 67.518 mm (reference 67.52), every table row to 0.01 in/100 ft | 0.05 mm |
+| 05 | S_A (1a / 1b): 206.85 / 304.75 (f 1), 124.11 / 182.85 (f 0.6) | 1e-6 rel |
+| 06 | F 6509.017 N, M 1.9527052e7 N.mm, S 140.25 MPa, Lmin 4940.546 mm | `lbend_guided_cantilever.json`, 1e-6 rel |
+| 13 | occasional limit 183.407 MPa, ratio 0.76333 (rule grade B) | 1e-5 rel |
+
+Plans: `plans/sc-pst-03-quick-checks.json` runs complete through `build_project` (plan params aligned to the built schema: `rule` instead of `edition`); `sc-pst-05` step 0 (occasional) runs, its other steps stay blocked (`blockedPlanCommands.json`).
+
+Open: `doc.plant.stress` slice and model commands (M3), B31J import (Q3), flange corrections and reducer / sweepolet factors (V1), `spring_variability` / `nozzle_load_check` (M5), PHY-01 catalogue rows (M3), VC-PST-19 stays TBD.
+
+## 14. As built (M2 solver core, 2026-11-02)
+
+Location: `packages/core/src/lib/frame3d/` (`@lib/frame3d/*`, a directory instead of the single `frame3d.ts` of §2; the pure leaf imports nothing outside `@lib`). Tests: `tests/unit/lib/frame3d{,Psi,Robust}.test.ts` (54 tests). No command and no plugin change: the M3 commands call `analyzeFrame` from `execute`.
+
+**Decision (C7): TypeScript only, no Rust crate now.** The M3 commands run the solver synchronously inside a pure `execute`, so the engine must be callable in-process; `llull-route` (02 RTE V2) is a different shape (a heavy search job `auto_route_pipe` runs out of band and commits afterwards, with the TS A* kept as reference) and does not fit a read-only query. The spec's target sizes solve in TS in well under the budget: a 2 000-node lattice (11 804 free DOF, half bandwidth 243 after RCM, 2.1e6 factor entries) assembles, factors, solves two load cases and refines in about 0.5 s (budget in §8: 400 ms factorisation + 50 ms per 10 vectors; typical pipe networks have bandwidth well under 100). A native port is a later item, to be done only if M5 models (tees, insulation, response spectrum) make the 20 s full-case budget tight; the TS stays the reference and the contract (`FrameModel` in, `FrameAnalysis` out) is already host-transport shaped (plain data, typed arrays).
+
+API (SI-style consistent units, llull plant stress uses N, mm, MPa, rad; PSI fixtures use in, lbf, psi; DOF order `[ux uy uz rx ry rz]`, Z up):
+
+| Export | Role |
+| ------ | ---- |
+| `analyzeFrame(model, cases): FrameAnalysis` (`solve.ts`) | one assembly + factorisation, back-substitution per load case; never throws |
+| `FrameModel { nodes, elements, restraints }` | elements carry `properties` (E, G, A, I, J, shear area; shear area 0 = Euler-Bernoulli), optional `flexibility` k (bending EI / k) and `up` |
+| `FrameRestraint { node, dof, value?, stiffness? }` | no stiffness = rigid (DOF eliminated, `value` = prescribed displacement); with stiffness = ground spring (the hook M3's active-set loop uses for one-way / gap / friction supports) |
+| `FrameLoadCase { name, nodal?, elemental? }` | nodal force / moment; per element global uniform load and free axial strain (thermal alpha dT, also used for the Poisson / pressure strain) |
+| `FrameCaseResult` | displacements, reactions (support force on the pipe at rigid / spring DOFs), local element end forces `[N Vy Vz T My Mz] x 2`, equilibrium residual |
+| `bendChords(corner, in, out, R, n?)`, `bendSubdivisions` (`bend.ts`) | near-to-far points of the arc replacing a corner; chord elements carry k |
+| `pipeProperties(Do, t, E, nu, timoshenko?)` (`section.ts`) | thin-wall pipe section, A/2 shear area |
+| `reverseCuthillMcKee`, `Skyline` | node ordering and the variable-band Cholesky |
+
+Failures are typed: `FRAME_INVALID_MODEL`, `FRAME_INVALID_LOAD`, `FRAME_TOO_LARGE` (skyline above `limits.maxProfile`, default 5e7 entries = 400 MB, and never past the Int32 offset limit), `FRAME_UNSTABLE` (with the first mechanism `{ node, dof }`; M3 maps it to `PST_UNSTABLE`).
+
+Deviations from §5.2 / §5.3 / §5.5, with reasons:
+
+1. **Rigid restraints are eliminated, not penalised (1e12).** Exact, better conditioned, and a prescribed displacement is a right-hand-side term. Only genuinely elastic supports (springs, k_f friction stiffness) add to the diagonal.
+2. **The matrix is Jacobi-scaled (D^-1/2 K D^-1/2, unit diagonal) before factoring and the pivot test is 1e-12 on the scaled pivot**, not 1e-12 of the largest diagonal: force and moment DOFs differ by orders of magnitude of L^2, and a stiff rigid link next to a soft span (tested at a 1e10 stiffness ratio) must not read as a mechanism. A true mechanism leaves a pivot of order 1e-16. (The relative pivot test is invariant under the scaling; the scaling gives the factor and the refinement a unit-diagonal system, and the 1e-12 threshold, down from 1e-10, is what stops a 1e10 stiffness ratio from reading as a mechanism: shown by the stiff-link test failing at 1e-9.)
+3. **Bend sub-division is 7.5 degrees (12 chords per 90 degrees), not 15.** The spec's VC (curved-beam flexibility within 1e-3) is not met by 15 degrees: measured error vs the Castigliano closed form (bending k R^3 (3 pi/4 - 2) / EI + axial + shear terms, derived in the test) is 2.4e-2 at 2 chords, 1.9e-3 at 6, 1.0e-3 at 8, 4.4e-4 at 12 (O(1/n^2)); 12 chords is within 1e-3 for k = 1 and k = 3.2. The chord polygon keeps the arc nodes on the arc (arc-length matching made it worse).
+4. **One iterative-refinement step set** (up to 3 passes, accepted only when the out-of-balance norm drops): the unrefined residual on the 12 000-DOF lattice was 1.5e-8, refined 1e-13 (thermal) and below 1e-9 (weight on a supported rim).
+5. `bendChords` returns null for a near reversal (theta > pi - 0.05 rad); the caller must check each leg is at least `tangentLength` long (`PST_BEND_TOO_TIGHT`). `up` is ignored within ~0.08 degrees of the element axis. Residual (`FrameCaseResult.residual`) is `||K u - F||_free / ||F||`; on a very soft, lightly loaded model (a flat 40 m lattice carrying only its weight on four corners) it floors near 3e-9 from cancellation (0 when the load is zero); the M3 command reports it rather than refusing.
+
+Validation results (`tests/unit/lib/`, references read from `validation/data/*.json`):
+
+| VC | Result | Reference, tolerance |
+| -- | ------ | -------------------- |
+| closed form | cantilever tip P L^3 / 3EI + P L / G As, rotation P L^2 / 2EI, axial, torsion, fixed-fixed thermal E A eps, UDL R = wL/2, M = wL^2/12, cantilever UDL tip, prescribed settlement 3 E I d / L^3, orientation and split invariance | 1e-9 to 1e-12 rel |
+| 03 (§5.3) | 90 degree bend (R = 300 mm, NPS 6) tip flexibility, k = 1 and 3.2; k scales bending only | Castigliano, 1e-3 |
+| 12 | L-bend 6 m x 3 m: Rx, Ry at C (-7872.99, -2406.95 N), end moments C / B / A, residual; axially stiff variant (bending-only, 1e-3) | `lbend_guided_cantilever.json`, 1e-4 rel |
+| 07 | PSI thermal 900 degF node 30: dy, dz, rx within 1 % of PSI (0.758, 1.891, 0.1521 deg), and 5e-4 of the independent python solver; Euler-Bernoulli variant rx 0.1534 | `psi_benchmarks.json` |
+| 08 | PSI weight (steel): dy, dz, rx within 3 % of PSI (0.33, -1.31, -0.40 deg); dz 1e-3 of the python solver; sum of vertical reactions = total weight | `psi_benchmarks.json` |
+| 10 | fully restrained 500 degF axial force 1.00290e6 lbf (PSI 1.00235e6) | 0.1 % |
+| 11 | linear statics only (support switching is M3): simply supported 5000 lbf each end; 6 m DN100 propped cantilever rest 3125 N (Euler) and 3126.19 N (Timoshenko, 1e-4) | `expected_results.json` |
+
+Mutations shown to fail the suite: shear term removed (9 tests), flexibility factor ignored (2), thermal load sign flipped (7), refinement off (1, the 2 000-node residual), pivot test relaxed (2). Dropping the prescribed-displacement term alone is masked by refinement (which corrects it); with refinement off as well the settlement test fails.
+
+Left for M3: `doc.plant.stress` slice and model build (nodes, bend replacement via `bendChords`, supports to restraints), the active-set / gap / friction loop around `analyzeFrame` (re-assembly per iteration; the factorisation is not reused across support-set changes), OPE / SUS / EXP combination, code stresses from `elementForces` (end forces only; mid-element extrema are not recovered), `PST_UNSTABLE` mapping, results hash and staleness, pressure thrust as nodal loads.

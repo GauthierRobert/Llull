@@ -34,14 +34,15 @@ function edgeRuns(count: number, selected: ReadonlySet<number>): number[][] {
   });
 }
 
+export type RingPaths =
+  | { readonly ok: true; readonly paths: Array<{ path: Vec3[]; edges: number[] }> }
+  | { readonly ok: false; readonly reason: string };
+
 /**
- * One path per run of consecutive selected edges of the host ring (one closed path when every edge is selected). Edge i runs from point i to
- * point i + 1 of the ring.
+ * One path per run of consecutive selected edges of a ring (one closed path when every edge is selected), at walking-surface height `z`.
+ * Edge i runs from point i to point i + 1 of the ring.
  */
-export function hostPaths(host: BuildingElement, edges: EdgeSelection, opening: number | undefined): HostPaths {
-  const found = hostRing(host, opening);
-  if (typeof found === 'string') return { ok: false, reason: found };
-  const { ring, z, levelId } = found;
+export function ringPaths(ring: ReadonlyArray<Vec2>, z: number, edges: EdgeSelection): RingPaths {
   const count = ring.length;
   const selected = edges === 'all' ? new Set(Array.from({ length: count }, (_, index) => index)) : new Set(edges);
   const outside = [...selected].filter((index) => !Number.isInteger(index) || index < 0 || index >= count);
@@ -51,10 +52,23 @@ export function hostPaths(host: BuildingElement, edges: EdgeSelection, opening: 
     const [x, y] = ring[index % count] as Vec2;
     return [x, y, z];
   };
-  const ringName: RailingHost['ring'] = opening === undefined ? 'boundary' : opening;
   const paths = edgeRuns(count, selected).map((run) => ({
     path: [...run.map(point), point((run[run.length - 1] as number) + 1)],
-    host: { hostId: host.id, ring: ringName, edges: [...run].sort((a, b) => a - b) },
+    edges: [...run].sort((a, b) => a - b),
   }));
-  return { ok: true, levelId, paths };
+  return { ok: true, paths };
+}
+
+/** One path per run of consecutive selected edges of the host ring, with the host reference of each. */
+export function hostPaths(host: BuildingElement, edges: EdgeSelection, opening: number | undefined): HostPaths {
+  const found = hostRing(host, opening);
+  if (typeof found === 'string') return { ok: false, reason: found };
+  const result = ringPaths(found.ring, found.z, edges);
+  if (!result.ok) return result;
+  const ringName: RailingHost['ring'] = opening === undefined ? 'boundary' : opening;
+  return {
+    ok: true,
+    levelId: found.levelId,
+    paths: result.paths.map(({ path, edges: run }) => ({ path, host: { hostId: host.id, ring: ringName, edges: run } })),
+  };
 }
