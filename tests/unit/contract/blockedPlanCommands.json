@@ -48,7 +48,6 @@
       "define_acoustic_exposure",
       "define_acoustic_spectrum"
     ],
-    "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": ["equipment_datasheet"],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
       "export_caesar_neutral",
       "nozzle_load_check",
