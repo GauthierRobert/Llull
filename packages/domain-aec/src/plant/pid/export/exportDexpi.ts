@@ -1,11 +1,14 @@
 /**
- * Deterministic DEXPI 1.3 (Proteus 4.1.1) writer for `doc.plant.pid` (plant 04 PID §6.3). Ids are the source ids kept from an import, else
+ * Deterministic DEXPI writer for `doc.plant.pid` (plant 04 PID §6.3): 1.3 (Proteus 4.1.1) from the tree built here, 2.0 by converting that tree. Ids are the source ids kept from an import, else
  * `<Class>-<n>` per class in model order; elements and attributes come in a fixed order, so the same model gives the same bytes and
  * export -> import -> export is a fixed point.
  */
 
 import { PAPER_MM } from '@core/model/sheet';
+import { readXml } from '@lib/xmlRead';
 import { sha256Hex } from '@lib/sha256';
+import { toDexpi20 } from '../dexpi20/to20';
+import { checkDexpi20, type SchemaReport } from '../dexpi20/schemaCheck';
 import type { DexpiIssue } from '../dexpi/codes';
 import { COUNT_KEYS, censusCounts, type Counts } from '../lists/counts';
 import type { PidEquipment, PidItem, PidLine, PidModel, PidSheet } from '../model';
@@ -26,6 +29,8 @@ export interface DexpiExport {
   readonly counts: Counts;
   readonly warnings: DexpiIssue[];
   readonly sheets: readonly string[];
+  /** Schema check of the text (DEXPI 2.0 only). */
+  readonly schema?: SchemaReport;
 }
 
 const className = (item: PidItem): string => classWritten(item).replace(/[^A-Za-z0-9_]/g, '') || 'Item';
@@ -78,10 +83,11 @@ function childrenOfEquipment(items: readonly PidItem[]): Map<string, PidItem[]> 
 const sumCounts = (parts: readonly Counts[]): Counts =>
   Object.fromEntries(COUNT_KEYS.map((key) => [key, parts.reduce((total, part) => total + part[key], 0)])) as Counts;
 
-/** Writes the sheets (all when `sheetIds` is absent) as one DEXPI 1.3 Proteus file. */
+/** Writes the sheets (all when `sheetIds` is absent) as one DEXPI file of `version`. */
 export function buildDexpi(
   pid: PidModel,
   sheetIds: readonly string[] | undefined,
+  version: '1.3' | '2.0',
 ): DexpiExport | { readonly ok: false; readonly characters: number } {
   const chosen: PidSheet[] = pid.sheetOrder.flatMap((id) => {
     const sheet = pid.sheets[id];
@@ -169,7 +175,8 @@ export function buildDexpi(
           ]),
     ],
   );
-  const text = writeXml(root);
+  const converted = version === '2.0' ? toDexpi20(root) : undefined;
+  const text = writeXml(converted?.root ?? root);
   if (text.length > MAX_CHARACTERS) return { ok: false, characters: text.length };
   const warnings = [...ctx.warnings];
   if (chosen.length > 1)
@@ -177,17 +184,41 @@ export function buildDexpi(
       dexpiIssue(
         'DEXPI_GRAPHICS_DROPPED',
         'info',
-        `${chosen.length} sheets are merged into one PlantModel: DEXPI 1.3 files hold one drawing`,
+        `${chosen.length} sheets are merged into one ${version === '2.0' ? 'Model' : 'PlantModel'}: DEXPI ${version} files hold one drawing`,
       ),
     );
   warnings.push(
-    dexpiIssue('DEXPI_GRAPHICS_DROPPED', 'info', 'presentation (shape catalogue, labels, text) is not written; the data is complete'),
+    dexpiIssue(
+      'DEXPI_GRAPHICS_DROPPED',
+      'info',
+      converted === undefined
+        ? 'presentation (shape catalogue, labels, text) is not written; the data is complete'
+        : `presentation is not written (${converted.dropped.join(', ')}; one placeholder shape carries the placements); the data is complete`,
+    ),
   );
+  const parsed = converted === undefined ? undefined : readXml(text);
+  const schema = parsed === undefined || !parsed.ok ? undefined : checkDexpi20(parsed.root);
+  if (schema !== undefined && !schema.valid)
+    warnings.push(
+      dexpiIssue(
+        'DEXPI_SCHEMA_VIOLATION',
+        'warning',
+        `the file breaks ${schema.count} rule(s) of DEXPI_XML_Schema.xsd: ${schema.violations[0]?.message ?? ''}`,
+      ),
+    );
   const counts = {
     ...sumCounts(chosen.map((sheet) => censusCounts(pid, sheet.id))),
-    connections: ctx.connections,
+    connections: converted?.connections ?? ctx.connections,
     danglingConnections: 0,
-    shapeCatalogueEntries: 0,
+    shapeCatalogueEntries: converted === undefined ? 0 : 1,
   };
-  return { ok: true, text, sha256: sha256Hex(text), counts, warnings, sheets: chosen.map((sheet) => sheet.number) };
+  return {
+    ok: true,
+    text,
+    sha256: sha256Hex(text),
+    counts,
+    warnings,
+    sheets: chosen.map((sheet) => sheet.number),
+    ...(schema === undefined ? {} : { schema }),
+  };
 }

@@ -1,10 +1,12 @@
 /**
- * DEXPI 1.3 (Proteus 4.1.x) text -> P&ID items (plant 04 PID §6.1). Pure: the text goes through `@lib/xmlRead` only (no DTD, no entities beyond the
+ * DEXPI 1.3 (Proteus 4.1.x) and 2.0 text -> P&ID items (plant 04 PID §6.1, §6.2; a 2.0 file is translated to the Proteus tree first). Pure: the text goes through `@lib/xmlRead` only (no DTD, no entities beyond the
  * five predefined ones, bounded size and depth), nothing is read from disk or network; the result is all or nothing.
  */
 
 import { readXml, xmlAttr, xmlChildren, type XmlElement } from '@lib/xmlRead';
 import type { PidItem } from '../model';
+import { proteusFrom20 } from '../dexpi20/from20';
+import { checkDexpi20 } from '../dexpi20/schemaCheck';
 import { dexpiIssue, type DexpiIssue } from './codes';
 import { DRAWING_UNIT_TO_MM } from './proteusClasses';
 import { drop, pointOf, warn, where, type ImportContext, type Pending } from './proteusContext';
@@ -19,7 +21,7 @@ export type ProteusPaper = 'A0' | 'A1' | 'A2' | 'A3' | 'A4';
 
 export interface ProteusImport {
   readonly ok: true;
-  readonly version: '1.3';
+  readonly version: '1.3' | '2.0';
   readonly schemaVersion: string;
   readonly applicationVersion: string | undefined;
   readonly originatingSystem: string | undefined;
@@ -107,8 +109,19 @@ function summariseIssues(issues: DexpiIssue[], dropped: ReadonlyMap<string, numb
   ];
 }
 
-/** Maps `text`; `sheetId` is the id of the sheet the items go on, `requested` the `version` param. */
-export function readProteus(text: string, sheetId: string, requested: 'auto' | '1.3'): ProteusImport | ProteusRefusal {
+/** The first schema violations of a 2.0 file as import warnings, then their count. */
+function schemaIssues(root: XmlElement): DexpiIssue[] {
+  const report = checkDexpi20(root);
+  const listed = report.violations
+    .slice(0, 20)
+    .map((violation) => dexpiIssue('DEXPI_SCHEMA_VIOLATION', 'warning', violation.message, [], [violation.path]));
+  return report.count > listed.length
+    ? [...listed, dexpiIssue('DEXPI_SCHEMA_VIOLATION', 'warning', `${report.count - listed.length} more schema violation(s) not listed`)]
+    : listed;
+}
+
+/** Maps `text` (DEXPI 1.3 or 2.0); `sheetId` is the id of the sheet the items go on, `requested` the `version` param. */
+export function readDexpi(text: string, sheetId: string, requested: 'auto' | '1.3' | '2.0'): ProteusImport | ProteusRefusal {
   const read = readXml(text);
   if (!read.ok) {
     const { code, message, line, column } = read.error;
@@ -116,14 +129,23 @@ export function readProteus(text: string, sheetId: string, requested: 'auto' | '
     return refusal('DEXPI_PARSE_ERROR', `${reason} (${code})`, [`line ${line}, column ${column}`], { xmlCode: code });
   }
   const root = read.root;
+  if (root.local === 'Model') {
+    if (requested === '1.3')
+      return refusal('DEXPI_VERSION_UNSUPPORTED', 'the root is <Model>: a DEXPI 2.0 file, but version 1.3 was requested', [where(root)]);
+    const converted = proteusFrom20(root);
+    if (!converted.ok) return refusal('DEXPI_VERSION_UNSUPPORTED', converted.message, converted.paths);
+    const plantInformation = xmlChildren(converted.root, 'PlantInformation')[0] as XmlElement;
+    return mapPlant(converted.root, plantInformation, sheetId, '2.0', converted.schemaVersion, [
+      ...converted.issues,
+      ...schemaIssues(root),
+    ]);
+  }
   if (root.local !== 'PlantModel')
-    return refusal(
-      'DEXPI_VERSION_UNSUPPORTED',
-      root.local === 'Model'
-        ? 'the root is <Model>: DEXPI 2.0 XML is not read yet'
-        : `the root <${root.name}> is not a DEXPI Proteus <PlantModel>`,
-      [where(root)],
-    );
+    return refusal('DEXPI_VERSION_UNSUPPORTED', `the root <${root.name}> is neither a DEXPI Proteus <PlantModel> nor a DEXPI 2.0 <Model>`, [
+      where(root),
+    ]);
+  if (requested === '2.0')
+    return refusal('DEXPI_VERSION_UNSUPPORTED', 'the root is <PlantModel>: a DEXPI 1.3 file, but version 2.0 was requested', [where(root)]);
   const information = xmlChildren(root, 'PlantInformation')[0];
   const schemaVersion = information === undefined ? undefined : xmlAttr(information, 'SchemaVersion');
   if (information === undefined || schemaVersion === undefined)
@@ -136,7 +158,17 @@ export function readProteus(text: string, sheetId: string, requested: 'auto' | '
       `Proteus SchemaVersion ${schemaVersion} is not read (only 4.1.x = DEXPI 1.3)${requested === '1.3' ? '; version 1.3 was requested' : ''}`,
       [where(information)],
     );
+  return mapPlant(root, information, sheetId, '1.3', schemaVersion, []);
+}
 
+function mapPlant(
+  root: XmlElement,
+  information: XmlElement,
+  sheetId: string,
+  version: '1.3' | '2.0',
+  schemaVersion: string,
+  inherited: DexpiIssue[],
+): ProteusImport {
   const units = xmlAttr(information, 'Units') ?? 'mm';
   const known = Object.hasOwn(DRAWING_UNIT_TO_MM, units);
   const { ids, connections } = scan(root);
@@ -147,7 +179,7 @@ export function readProteus(text: string, sheetId: string, requested: 'auto' | '
     order: [],
     refs: new Map(),
     allIds: ids,
-    issues: [],
+    issues: [...inherited],
     dropped: new Map(),
     unitsSeen: new Set(),
   };
@@ -208,7 +240,7 @@ export function readProteus(text: string, sheetId: string, requested: 'auto' | '
   );
   return {
     ok: true,
-    version: '1.3',
+    version,
     schemaVersion,
     applicationVersion: xmlAttr(information, 'ApplicationVersion'),
     originatingSystem: xmlAttr(information, 'OriginatingSystem'),

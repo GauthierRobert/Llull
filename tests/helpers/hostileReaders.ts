@@ -1,6 +1,7 @@
 /** The hostile-input table: every reader of untrusted text or bytes, grouped by family (`tests/helpers/hostile/*`). */
 import type { HostileReader } from './hostile/types';
 import { AEC_READERS } from './hostile/aecReaders';
+import { DEXPI20_READERS } from './hostile/dexpi20Readers';
 import { AERO_READERS } from './hostile/aeroReaders';
 import { CAE_READERS } from './hostile/caeReaders';
 import { CORE_READERS } from './hostile/coreReaders';
@@ -18,6 +19,7 @@ export const HOSTILE_READERS: readonly HostileReader[] = [
   ...CAE_READERS,
   ...AERO_READERS,
   ...AEC_READERS,
+  ...DEXPI20_READERS,
   ...PLANT_DATA_READERS,
   ...CORE_READERS,
 ];

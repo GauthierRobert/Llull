@@ -29,7 +29,9 @@ export const EXCLUDED_FUNCTIONS: Readonly<Record<string, string>> = {
     'command parameter, not a file or stored field: the zod-validated slopeRatio (max 32 characters) is read with one anchored regular expression',
   'domain-aec/src/plant/equipment/commands/nozzleParams.ts:parseLocation': 'takes the already zod-validated command params, not text',
   'domain-aec/src/plant/pid/dexpi/proteusContext.ts:readAttributes':
-    'reads the GenericAttributes of an element of an already parsed XML tree; its entry point readProteus is in the table',
+    'reads the GenericAttributes of an element of an already parsed XML tree; its entry point readDexpi is in the table',
+  'domain-aec/src/plant/pid/dexpi20/from20Diagram.ts:readDiagram':
+    'reads the diagram of an already parsed XML tree; its entry point readDexpi (proteusFrom20) is in the table',
   'domain-aero/src/sheetmetal/convert/faces.ts:readSolid': 'reads a face graph produced by the kernel, not external input',
   'domain-aero/src/sheetmetal/profile.ts:readProfile': 'reads an entity of the document, not external input',
   'domain-cae/src/fatigue/feField.ts:readFatigueField': 'reads artifacts through the in-process FeArtifactPort (already parsed results)',

@@ -1,4 +1,4 @@
-/** A minimal deterministic XML writer: elements with attributes only (DEXPI Proteus carries every value in an attribute), two-space indent, LF line ends. */
+/** A minimal deterministic XML writer: elements with attributes (DEXPI Proteus carries every value in one) and optional text (DEXPI 2.0 typed values), two-space indent, LF line ends. */
 
 import { escapeXml } from '@lib/escapeXml';
 
@@ -6,12 +6,20 @@ export interface XNode {
   readonly name: string;
   readonly attrs: ReadonlyArray<readonly [string, string]>;
   readonly children: readonly XNode[];
+  /** Text content of a leaf element (`<String>text</String>`); `children` is empty then. */
+  readonly text?: string;
 }
 
-export const el = (name: string, attrs: ReadonlyArray<readonly [string, string | undefined]>, children: readonly XNode[] = []): XNode => ({
+export const el = (
+  name: string,
+  attrs: ReadonlyArray<readonly [string, string | undefined]>,
+  children: readonly XNode[] = [],
+  text?: string,
+): XNode => ({
   name,
   attrs: attrs.flatMap(([key, value]): Array<readonly [string, string]> => (value === undefined ? [] : [[key, value]])),
   children,
+  ...(text === undefined ? {} : { text }),
 });
 
 /** An attribute value as XML: illegal characters dropped, `& < > "` escaped, tab / line breaks as character references (a parser would turn them into spaces). */
@@ -31,6 +39,11 @@ export function writeXml(root: XNode): string {
       continue;
     }
     const attrs = top.node.attrs.map(([key, value]) => ` ${key}="${xmlValue(value)}"`).join('');
+    if (top.node.text !== undefined) {
+      out.push(`${pad}<${top.node.name}${attrs}>${xmlValue(top.node.text)}</${top.node.name}>
+`);
+      continue;
+    }
     if (top.node.children.length === 0) {
       out.push(`${pad}<${top.node.name}${attrs}/>\n`);
       continue;

@@ -63,8 +63,8 @@ describe('import_dexpi: DEXPI_VERSION_UNSUPPORTED and sheet numbers', () => {
   const model = (information: string): string => `<PlantModel>${information}</PlantModel>`;
 
   it.each([
-    ['another root', '<Foo/>', 'is not a DEXPI Proteus <PlantModel>'],
-    ['a DEXPI 2.0 <Model> root', '<Model/>', 'DEXPI 2.0 XML is not read yet'],
+    ['another root', '<Foo/>', 'is neither a DEXPI Proteus <PlantModel> nor a DEXPI 2.0 <Model>'],
+    ['a <Model> without a Plant import', '<Model/>', 'imports no Plant model of a known version'],
     ['no PlantInformation', model(''), 'no SchemaVersion'],
     ['no SchemaVersion', model('<PlantInformation Units="mm"/>'), 'no SchemaVersion'],
     ['Proteus 4.2 (DEXPI 1.4)', model('<PlantInformation SchemaVersion="4.2.0"/>'), 'SchemaVersion 4.2.0 is not read'],
