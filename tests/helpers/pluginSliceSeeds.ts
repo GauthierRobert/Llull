@@ -15,6 +15,7 @@ import { plans, type GoldenAction } from '../golden/plans';
 import { plmPlans } from '../golden/plmPlans';
 import { implicitPlans } from '../golden/implicitPlans';
 import { rteJson } from '../unit/plant/piping/rteFixtures';
+import { recordedModel } from '../unit/plant/stress/m3Fixtures';
 import { libraryDocument } from '../unit/plant/data/dataFixtures';
 import { fixturePcf } from '../unit/plant/fabrication/fabricationFixtures';
 import { addBody, caseParams, metreDocument, ok } from '../unit/aero/cfd/fixtures';
@@ -175,6 +176,12 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     build: planOf(plans, 'piping_pump_to_vessel'),
     query: { name: 'list_piping_catalogs', params: constant({}) },
     mutate: { name: 'import_piping_catalog', params: constant({ catalog: rteJson('catalog_stub_cs150.json') }) },
+  },
+  pipeStress: {
+    roots: ['plant.stress'],
+    build: () => recordedModel().doc,
+    query: { name: 'check_pipe_stress', params: (doc) => ({ modelId: first(doc.plant?.stress?.models) }) },
+    mutate: { name: 'update_stress_model', params: (doc) => ({ modelId: first(doc.plant?.stress?.models), name: 'Fuzz' }) },
   },
   'plant-data': {
     roots: ['plant.data'],

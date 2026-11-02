@@ -56,34 +56,6 @@
     "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": ["export_piping_ga"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-04-pipe-rack.json": ["add_pipe_rack"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": ["check_reachability"],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-01-lbend-two-anchors.json": [
-      "add_stress_restraint",
-      "analyze_pipe_stress",
-      "check_pipe_stress",
-      "create_stress_model",
-      "import_pipe_material_data",
-      "set_pipe_operating_conditions",
-      "set_stress_load_cases"
-    ],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-02-psi-3d-benchmark.json": [
-      "add_stress_restraint",
-      "analyze_pipe_stress",
-      "create_stress_model",
-      "import_pipe_material_data",
-      "set_pipe_operating_conditions",
-      "set_stress_load_cases"
-    ],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-04-supports-guardrails.json": [
-      "add_stress_restraint",
-      "analyze_pipe_stress",
-      "approve_pipe_stress",
-      "check_pipe_stress",
-      "create_stress_model",
-      "import_pipe_material_data",
-      "record_pipe_stress_results",
-      "set_pipe_operating_conditions",
-      "set_stress_load_cases"
-    ],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
       "export_caesar_neutral",
       "nozzle_load_check",
