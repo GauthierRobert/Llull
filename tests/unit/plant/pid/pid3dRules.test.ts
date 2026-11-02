@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { pidPlugin } from '@aec/index';
 import { check3d } from '@aec/plant/pid/link3d/check';
 import type { PidModel } from '@aec/plant/pid/model';
+import { EMPTY_PIPING } from '@aec/plant/piping/model';
 import { EMPTY_PID } from '@aec/plant/pid/state';
 import { createEmptyBuilding } from '@aec/building/types';
 import { execute } from '@core/commands/registry';
@@ -334,7 +335,7 @@ describe('budget (TECHNICAL_SPEC §8: 2 000 tags each side)', () => {
     const pid = { ...EMPTY_PID, items: pidItems, itemOrder: order } as unknown as PidModel;
     const building = { ...createEmptyBuilding(), elements, elementOrder } as unknown as ReturnType<typeof createEmptyBuilding>;
     const start = performance.now();
-    const result = check3d(pid, building, 'all', true);
+    const result = check3d(pid, building, EMPTY_PIPING, 'all', true);
     const elapsed = performance.now() - start;
     expect(result.findings).toEqual([]);
     expect(result.matched.equipment).toHaveLength(n);

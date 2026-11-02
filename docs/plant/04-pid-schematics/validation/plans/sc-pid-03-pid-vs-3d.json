@@ -1,6 +1,6 @@
 {
   "id": "SC-PID-03",
-  "status": "DRAFT — unbuilt commands: check_pid_3d (the authoring commands exist since PID-M3). The 3D side uses existing commands add_equipment and add_pipe_run (packages/domain-aec/src/industrial/equipment/equipment.ts). P3D_SPEC_MISMATCH and 3D valves need the 02-spec-driven-routing pipe class attribute and inline components; until then the valve is always P3D_UNPLACED.",
+  "status": "check_pid_3d is built (PID-M7, M7b). The 3D side uses add_equipment and add_pipe_run, which carry neither a spec binding nor a vessel kind, so P3D_SPEC_MISMATCH / P3D_CLASS_MISMATCH / P3D_INLINE_ORDER_MISMATCH are not exercised here (tests/unit/plant/pid/pid3dM7b.test.ts covers them on a routed 02 RTE line); the valve HV-104 is always P3D_UNPLACED.",
   "validates": ["VC-PID-11"],
   "description": "A clean P&ID (T-101 -> P-101, line 100-P-1001-A1 DN100) and a 3D model with four seeded inconsistencies: 3D pipe DN 80, extra 3D equipment E-201, the P&ID valve HV-104 not placed, and the 3D pipe starting at T-102. Expected findings are by construction.",
   "actions": [
