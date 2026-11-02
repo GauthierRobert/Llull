@@ -241,7 +241,7 @@ describe('add_vessel: details', () => {
     const doc = ok(mmDocument(), 'add_vessel', { ...separatorParams, heads: { top: cone, bottom: cone } });
     // depth 433.0127; outer radius 770, outer apex 433.0127 x 770 / 750
     expect(equipmentOf(doc.document).size[2]).toBeCloseTo(6000 + (433.0127018922193 * 770) / 750, 6);
-    expect((doc.data as { notes: string[] }).notes).toContain('nozzles are not part of the weight (M3)');
+    expect((doc.data as { notes: string[] }).notes).toContain('nozzles are not part of the weight (see equipment_weights include nozzles)');
   });
 
   it.each([
