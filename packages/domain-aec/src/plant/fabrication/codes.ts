@@ -59,6 +59,17 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Ask the reviewer to issue the isometric in the desktop app: confirmation is a signature object over the act, produced there.',
   ISO_CHECK_FAILED: 'Fix the errors check_isometric lists for the line (style final), then issue again.',
   ISO_REVIEW_REQUIRED: 'An unissued isometric is for review only (NOT FOR CONSTRUCTION): a human issues it.',
+  ISO_GA_OVERFLOW: 'Use a smaller scale (a larger number) or a larger paper, or draw fewer lines (lineIds).',
+  ISO_ROUTE_UNSUPPORTED:
+    'Import the line as pcf_line (as omitted), or edit the PCF: route mode rebuilds a line from its centreline with the spec, so it takes pipes, elbows, bends, tees, olets, reducers, valves, end flanges, field welds and supports only.',
+  ISO_ROUTE_NO_LEVEL:
+    'Add a building level (add_level) so the supports can be placed, or import with supports false (they are then not created).',
+  ISO_ROUTE_TOO_LARGE: 'Split the PCF: route mode rebuilds at most 400 components per line (every component is derived from the spec).',
+  ISO_ROUTE_STEP_FAILED: 'Fix the step named in the message (it is a command that changed nothing), or import the line as pcf_line.',
+  ISO_ROUTE_SPEC_MISSING: 'Pass spec with the id of a spec loaded in the document (list_pipe_specs): the PCF names none (PIPING-SPEC).',
+  ISO_ROUTE_DIMENSIONS_CHANGED:
+    'Nothing to fix if the spec dimensions are intended: the routed line follows the spec (flange sets, gaskets, centre-to-ends), not the file. Compare data.route.comparison, or keep the file as it is with pcf_line.',
+  ISO_ROUTE_SUPPORTS_DROPPED: 'Import with supports true (default) after add_level to create them, or place them with add_pipe_support.',
   ISO_SPOOL_WEIGHT_INCOMPLETE: 'Components without a WEIGHT are not counted: the spool weight is a lower bound.',
 };
 

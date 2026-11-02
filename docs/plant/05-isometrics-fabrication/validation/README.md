@@ -52,6 +52,7 @@ P0 (0,0,3000) flange face ── east 5000 ──► P1 (5000,0,3000) ── nor
 route centreline 5000 + 4000 + 2000 + 3000 + 500 = 14500 mm
 take-outs: 3 LR90 x 2 x 152 = 912; tee run 2 x 105 = 210; tee branch 105; 3 flanges x 76 = 228; total 1455
 pipe = 14500 - 1455 = 13045 mm = 2424 + 2348 + 3696 + 1696 + 1848 + 714 + 319
+(routed with spec CS150 each flange set also holds a 3 mm gasket: take-out 1464, pipe 13036 mm)
 ```
 
 ## Real use cases
@@ -76,7 +77,7 @@ pipe = 14500 - 1455 = 13045 mm = 2424 + 2348 + 3696 + 1696 + 1848 + 714 + 319
 | VC-ISO-01 | Parse the fixture: 15 components (FLANGE 3, PIPE 7, WELD 1, ELBOW 3, TEE 1), total pipe 13045 mm | fixture arithmetic | counts exact, 1e-6 mm | `pcfRead.test.ts` |
 | VC-ISO-02 | Syntax refusals: TAB, > 1024 chars, missing ISOGEN-FILES, short END-POINT, missing units → stable codes with line paths, document unchanged | rules S3, S4, S7 | exact code + path | `pcfRead.test.ts` |
 | VC-ISO-03 | read → write is byte-equal on the MVP subset (sha256 56d1b90a…) | reference writer | byte-equal | `pcfRoundTrip.test.ts` |
-| VC-ISO-04 | llull route → PCF → preview: 14500 route = 13045 pipe + 1455 take-out; same topology | closed form + PSC B16.9 LR90 152 (A), tee 105 (B) | 1e-6 mm | `packReplay05.test.ts` |
+| VC-ISO-04 | llull route (spec CS150) → PCF → preview: 14500 route = 13036 pipe + 1464 take-out (the fixture, flange without gasket: 13045 + 1455); same topology plus 3 gaskets and 3 bolt sets; `import_pcf as route` of the fixture gives the same 13036 | closed form + PSC B16.9 LR90 152 (A), tee 105 (B), flange set 76 + 3 (RTE stub) | 1e-6 mm | `scenarioPlans.test.ts` (SC-ISO-02), `importRoute.test.ts` |
 | VC-ISO-05 | 13 welds (12 shop, 1 field), numbers W1..W13, branch welds after the main run | rule TR-ISO-06; SKEY WS (A) | exact | `welds.test.ts` |
 | VC-ISO-06 | 2 spools split at the site weld; 1 spool without it | S6, S7, S11 (A rule) | exact | `spools.test.ts` |
 | VC-ISO-07 | Cut lengths for gap 0 / 3 mm and WF allowance 100 mm | closed form | 1e-6 mm | `cutList.test.ts` |
@@ -85,15 +86,15 @@ pipe = 14500 - 1455 = 13045 mm = 2424 + 2348 + 3696 + 1696 + 1848 + 714 + 319
 | VC-ISO-10 | Iso axes: east −30°, north +30°, up 90°, 120° apart, scale √(2/3); north arrow +30° | S18, S19 (A) | 1e-9° | `isoProjection.test.ts` |
 | VC-ISO-11 | Dimension labels = 3D centreline distances; east string 76 + 2424 + 2348 + 152 = 5000 | CV-03 (A) + arithmetic | exact | `isoDimensions.test.ts` |
 | VC-ISO-12 | SLOPE 1:100, 1 %, 0.5729386977°, fall +X | closed form, CV-05 (A) | 1e-9° | `isoSlope.test.ts` |
-| VC-ISO-13 | 20 pieces, ≤ 8 per sheet, split at welds → 3 sheets, matching continuation welds, stable re-issue | rule TR-ISO-12; S22 (B) | exact | `isoSheets.test.ts` |
+| VC-ISO-13 | 20 pieces, ≤ 8 per sheet, split at welds → 3 sheets, matching continuation welds, stable re-issue | rule TR-ISO-12; S22 (B) | exact | `isoSheets.test.ts` (legacy rack), `isoSheetsRouted.test.ts` (the same rack routed with the spec through `import_pcf as route`) |
 | VC-ISO-14 | Weld numbers kept after adding a weld; new weld W14 | HIGHEST-WELD-NUMBER (A) | exact | `welds.test.ts` |
-| VC-ISO-15 | GA plan: label L-101-DN100-A1A, CL EL +3000 / +1000, BOP 2942.85 | closed form | 0.01 mm | `pipingGa.test.ts` |
+| VC-ISO-15 | GA plan: label L-101-DN100-A1A, CL EL +3000 / +1000, BOP 2942.85 | closed form | 0.01 mm | `pipingGa.test.ts`, `scenarioPlans.test.ts` (SC-ISO-06) |
 | VC-ISO-16 | `check_isometric` codes ISO_DISCONNECTED, ISO_SKEY_MISSING, ISO_OPEN_END, ISO_SPOOL_TOO_LARGE | spec codes | exact set | `checkIsometric.test.ts` |
 | VC-ISO-17 | Same plan twice → same PCF / SVG bytes and weld numbers | AF-13 | exact | golden |
 | VC-ISO-18 | 1000-component line within the performance budget | TBD — measure with `llull run … --json` | budget | quality gate |
 | VC-ISO-19 | `issue_isometric` by an agent → `ISO_HUMAN_GATE`; unissued iso `reviewRequired: true`, stamped NOT FOR CONSTRUCTION | AF-33 / AF-34 | exact | `issueIsometric.test.ts` |
 | VC-ISO-20 | Styles: check (no tables), final (4 tables), spool (2 sheets for 2 spools) | S11 (A) | exact | `isoStyles.test.ts` |
-| VC-ISO-21 | 2 SUPPORT records with CO-ORDS; 45° offset 1414.2135624 mm with legs 1000 / 1000 in a skew box | closed form; S3, S20 (B) | 1e-6 mm | `isoSkew.test.ts` |
+| VC-ISO-21 | 2 SUPPORT records with CO-ORDS; 45° offset 1414.2135624 mm with legs 1000 / 1000 in a skew box | closed form; S3, S20 (B) | 1e-6 mm | `isoSkew.test.ts`, `supportsPcf.test.ts`, `scenarioPlans.test.ts` (SC-ISO-08) |
 | VC-ISO-22 | Weld map CSV: 13 rows equal to `weld_list` | identity | exact | `welds.test.ts` |
 | VC-ISO-23 | Revision delta after adding a field weld: component 4 changed, W14 added, cloud on sheet 1 | spec rule | exact | `isoSheets.test.ts` |
 
