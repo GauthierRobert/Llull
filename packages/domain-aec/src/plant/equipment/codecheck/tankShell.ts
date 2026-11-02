@@ -39,6 +39,22 @@ export interface TankShellResult {
 export function tankShellResult(input: TankShellInput, mmPerUnit: number): TankShellResult | { readonly refusal: CodeFinding } {
   const metres = (value: number): number => (value * mmPerUnit) / 1000;
   const refuse = (code: string, message: string, path: string): { refusal: CodeFinding } => ({ refusal: { code, message, paths: [path] } });
+  const given0 = input.allowableStress;
+  const numbers = [
+    input.diameter,
+    input.shellHeight,
+    input.designLiquidLevel,
+    input.specificGravity,
+    input.corrosionAllowance,
+    ...input.courses,
+  ];
+  if (given0 !== undefined) numbers.push(given0.design, given0.test);
+  if (!numbers.every(Number.isFinite) || input.corrosionAllowance < 0)
+    return refuse(
+      'EQP_PARAM_INVALID',
+      'a dimension, the specific gravity, the corrosion allowance or an allowable stress is missing or not finite',
+      'design',
+    );
   const diameterM = metres(input.diameter);
   if (diameterM > ONE_FOOT_LIMIT_M)
     return refuse('EQP_API650_ONE_FOOT_LIMIT', `D ${diameterM} m exceeds the one-foot limit of ${ONE_FOOT_LIMIT_M} m`, 'diameter');

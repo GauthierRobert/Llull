@@ -169,13 +169,47 @@ describe('add_pump: vendor envelope and refusals', () => {
     baseplate: { length: 1200, width: 500, height: 120 },
   };
 
-  it('a custom pump takes the user dimensions as they are (source defaulted to "user input") and the baseplate as given', () => {
+  it('a custom pump takes the user dimensions as they are; without a source the envelope is grade B, "user input" and flagged EQP_VALUE_UNSOURCED', () => {
     const result = ok(mmDocument(), 'add_pump', vendor);
     const report = result.data as Report;
-    expect(report.envelope).toMatchObject({ a: 120, f: 450, h1: 200, h2: 250, rating: 'CL300', grade: 'A', source: 'user input' });
+    expect(report.envelope).toMatchObject({ a: 120, f: 450, h1: 200, h2: 250, rating: 'CL300', grade: 'B', source: 'user input' });
     expect(report.defaulted).toEqual(expect.arrayContaining(['envelope.source', 'driver']));
     expect(report.defaulted).not.toContain('baseplate');
     expect(equipmentOf(result.document, 'P-9').size[0]).toBe(1200);
+  });
+
+  it('a sourced vendor envelope is grade A and not flagged; an unsourced one is grade B, unverified and warned at envelope.source', () => {
+    const sourced = { ...vendor, envelope: { ...vendor.envelope, source: 'datasheet 12' } };
+    const codes = (params: object): string[] =>
+      data<{ issues: Array<{ code: string; paths: string[] }> }>(apply(mmDocument(), 'add_pump', params), 'check_equipment', {})
+        .issues.filter((issue) => issue.paths[0]?.startsWith('envelope'))
+        .map((issue) => `${issue.code}@${issue.paths[0]}`);
+    expect(data<Report>(mmDocument(), 'add_pump', sourced)).toMatchObject({
+      unverified: expect.any(Boolean),
+      envelope: { grade: 'A', source: 'datasheet 12' },
+    });
+    expect(codes(sourced)).toEqual([]);
+    expect(data<Report>(mmDocument(), 'add_pump', vendor).unverified).toBe(true);
+    expect(codes(vendor)).toEqual(['EQP_VALUE_UNSOURCED@envelope.source']);
+  });
+
+  it('a pump with nothing else to warn about is pass_with_review, never plain pass', () => {
+    const doc = apply(mmDocument(), 'add_pump', {
+      ...vendor,
+      envelope: { ...vendor.envelope, source: 'datasheet 12' },
+      driver: { length: 500, width: 300, height: 300 },
+      weightKg: 200,
+    });
+    const report = data<{ status: string; reviewRequired: boolean; reviewReason: string; issues: Array<{ code: string }> }>(
+      doc,
+      'check_equipment',
+      {},
+    );
+    expect(
+      report.issues.map((issue) => issue.code).filter((code) => code !== 'EQP_FLANGE_PLACEHOLDER' && code !== 'EQP_TABLE_UNVERIFIED'),
+    ).toEqual([]);
+    expect(report.reviewRequired).toBe(true);
+    expect(report.reviewReason).toContain('nozzle loads');
   });
 
   it('an ISO pump with vendor dimensions keeps the standard label and the rating default', () => {
@@ -238,7 +272,7 @@ describe('pump weights and checks', () => {
     expect(weights.total.emptyKg).toBeCloseTo(310 + weights.nozzles.kg, 9);
   });
 
-  it('check_equipment: defaulted driver / baseplate and a missing weight are warnings (never a pass); no pressure code is computed, so reviewRequired is false', () => {
+  it('check_equipment: defaulted driver / baseplate and a missing weight are warnings (never a pass); hydraulics, casing rating and nozzle loads are not judged, so reviewRequired is true', () => {
     const { driver: _driver, weightKg: _weight, ...bare } = pumpParams;
     const report = data<{
       status: string;
@@ -251,7 +285,7 @@ describe('pump weights and checks', () => {
       expect.arrayContaining(['EQP_DESIGN_DATA_MISSING@driver', 'EQP_DESIGN_DATA_MISSING@baseplate', 'EQP_DESIGN_DATA_MISSING@weightKg']),
     );
     expect(report.status).toBe('warn');
-    expect(report.reviewRequired).toBe(false);
+    expect(report.reviewRequired).toBe(true);
     expect(report.checked[0]?.notChecked.join(' ')).toContain('NPSH');
   });
 

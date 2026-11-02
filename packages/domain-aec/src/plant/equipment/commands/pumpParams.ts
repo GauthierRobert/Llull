@@ -48,7 +48,12 @@ export const pumpShape = {
       h2: z.number().positive().describe('Discharge flange face height above the shaft centre, document units.'),
       suctionDn: z.number().int().positive().describe('Suction nozzle DN.'),
       dischargeDn: z.number().int().positive().describe('Discharge nozzle DN.'),
-      source: z.string().optional().describe('Where the dimensions come from (vendor datasheet, drawing number). Default "user input".'),
+      source: z
+        .string()
+        .optional()
+        .describe(
+          'Where the dimensions come from (vendor datasheet, drawing number). Without it the envelope is grade B (unverified) and check_equipment warns EQP_VALUE_UNSOURCED.',
+        ),
     })
     .optional()
     .describe('Explicit envelope dimensions from a vendor datasheet, for a size outside the shipped tables. Give size OR envelope.'),
@@ -112,7 +117,7 @@ function resolveEnvelope(input: PumpInput, doc: Pick<CadDocument, 'units'>): Res
         h2: envelope.h2,
         suctionDn: envelope.suctionDn,
         dischargeDn: envelope.dischargeDn,
-        grade: 'A',
+        grade: envelope.source === undefined ? 'B' : 'A',
         source: envelope.source ?? 'user input',
       },
       defaulted: envelope.source === undefined ? ['envelope.source'] : [],

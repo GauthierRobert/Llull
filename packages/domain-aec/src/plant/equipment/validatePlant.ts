@@ -66,14 +66,15 @@ export function plantDataErrors(key: string, plant: unknown): string[] {
   if (!isRecord(plant) || plant['schema'] !== PLANT_EQUIPMENT_SCHEMA) return [`${at}.schema must be ${PLANT_EQUIPMENT_SCHEMA}`];
   const errors: string[] = [];
   const template = plant['template'];
-  const checks: Readonly<Record<string, ((record: Record<string, unknown>, at: string) => string[]) | null>> = {
-    vessel: vesselErrors,
-    block: null,
-    exchanger: exchangerErrors,
-    tank: tankErrors,
-    pump: pumpErrors,
-  };
-  const check = isRecord(template) ? checks[template['kind'] as string] : undefined;
+  const checks: ReadonlyMap<string, ((record: Record<string, unknown>, at: string) => string[]) | null> = new Map([
+    ['vessel', vesselErrors],
+    ['block', null],
+    ['exchanger', exchangerErrors],
+    ['tank', tankErrors],
+    ['pump', pumpErrors],
+  ]);
+  const kind = isRecord(template) ? template['kind'] : undefined;
+  const check = typeof kind === 'string' ? checks.get(kind) : undefined;
   if (!isRecord(template) || check === undefined) errors.push(`${at}.template.kind must be vessel, exchanger, tank, pump or block`);
   else if (check !== null) errors.push(...check(template, `${at}.template`));
   if (!Array.isArray(plant['nozzles'])) errors.push(`${at}.nozzles must be an array`);

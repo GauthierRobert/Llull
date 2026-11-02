@@ -44,6 +44,7 @@ export const exchangerShape = {
   temaType: z
     .string()
     .min(1)
+    .max(16)
     .describe(
       'TEMA designation, exactly three letters: front head A | B | C | N, shell E | F | G | H | J, rear head L | M | N (fixed tubesheet) or P | S | T | U | W ' +
         '(removable bundle), e.g. BEM, AES, AEU. D, K and X are valid TEMA letters that are not modelled (EQP_TEMA_UNSUPPORTED).',

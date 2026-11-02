@@ -52,12 +52,16 @@ export function exchangerMass(scale: number, template: ExchangerTemplate, geomet
     }
     const closure =
       end.closure === 'flat'
-        ? { part: `${name}Cover`, method: 'flat cover: disc of the inside radius x channel thickness x density' }
+        ? { part: `${name}Cover`, method: 'flat cover: disc of the outside radius (as drawn) x channel thickness x density' }
         : {
             part: end.closure === 'bonnet' ? `${name}Bonnet` : `${name}ShellCover`,
             method: 'exact solid between the inside profile and its outward offset by t, closed by the tangent plane',
           };
-    parts.push({ ...closure, kg: kg(headMetalVolume(end.head, radius, end.channelThickness)) });
+    const metal =
+      end.closure === 'flat'
+        ? Math.PI * (radius + end.channelThickness) ** 2 * end.channelThickness
+        : headMetalVolume(end.head, radius, end.channelThickness);
+    parts.push({ ...closure, kg: kg(metal) });
     return parts;
   };
   const parts: MassPart[] = [

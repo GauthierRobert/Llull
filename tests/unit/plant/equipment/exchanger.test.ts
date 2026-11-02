@@ -187,6 +187,10 @@ describe('add_heat_exchanger: refusals leave the document unchanged and name the
     expectRefusal(doc, 'add_heat_exchanger', { ...bemParams, ...change }, code, at);
   });
 
+  it('temaType longer than 16 characters is rejected by the schema', () => {
+    expect(execute(doc, 'add_heat_exchanger', { ...bemParams, temaType: 'B'.repeat(17) }).error?.code).toBe('CMD_INVALID_PARAMS');
+  });
+
   it('a duplicate tag is EQP_TAG_DUPLICATE with the existing id', () => {
     const result = expectRefusal(bemDocument(false), 'add_heat_exchanger', bemParams, 'EQP_TAG_DUPLICATE', 'tag');
     expect(result.error?.ids).toEqual(['equipment-1']);
@@ -330,6 +334,16 @@ describe('exchanger masses (equipment_weights)', () => {
     expect(rel(part('frontChannel'), Math.PI * (308 ** 2 - 300 ** 2) * 300 * rho)).toBeLessThan(1e-12);
     expect(rel(part('frontTubesheet'), (Math.PI * 308 ** 2 - (300 * Math.PI * 19.05 ** 2) / 4) * 50 * rho)).toBeLessThan(1e-12);
     expect(rel(part('tubes'), (300 * Math.PI * (19.05 ** 2 - (19.05 - 2 * 1.651) ** 2) * 4877 * rho) / 4)).toBeLessThan(1e-12);
+  });
+
+  it('a flat cover is weighed at the outside radius as drawn: pi (R + t)^2 t', () => {
+    const aes = apply(mmDocument(), 'add_heat_exchanger', { ...bemParams, temaType: 'AES', rearChannel: undefined });
+    const parts = data<{ breakdown: Array<{ part: string; kg: number; method: string }> }>(aes, 'equipment_weights', {
+      equipment: 'E-301',
+    }).breakdown;
+    const cover = parts.find((row) => row.part === 'frontCover');
+    expect(rel(cover?.kg ?? 0, Math.PI * 308 ** 2 * 8 * rho)).toBeLessThan(1e-12);
+    expect(cover?.method).toContain('outside radius');
   });
 
   it('body is the sum of the parts, test = empty + both sides full of water, and the element weight is the empty weight', () => {

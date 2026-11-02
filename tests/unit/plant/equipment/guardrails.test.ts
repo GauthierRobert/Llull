@@ -173,7 +173,7 @@ describe('VC-EQP-16: the error table of the specification', () => {
 });
 
 describe('VC-EQP-16: M4 equipment findings and provenance', () => {
-  it('every kind of equipment says what its check does NOT cover; exchangers and tanks always need review, pumps do not', () => {
+  it('every kind of equipment says what its check does NOT cover; every kind needs review (pumps: hydraulics, casing rating, nozzle loads)', () => {
     const doc = apply(apply(apply(mmDocument(), 'add_heat_exchanger', bemParams), 'add_storage_tank', tankParams), 'add_pump', {
       tag: 'P-101',
       location: [0, 0],
@@ -193,7 +193,7 @@ describe('VC-EQP-16: M4 equipment findings and provenance', () => {
     expect(report.reviewRequired).toBe(true);
     expect(report.reviewReason).toContain('exchanger');
     expect(report.reviewReason).toContain('API 650');
-    expect(data<{ reviewRequired: boolean }>(doc, 'check_equipment', { equipment: ['P-101'] }).reviewRequired).toBe(false);
+    expect(data<{ reviewRequired: boolean }>(doc, 'check_equipment', { equipment: ['P-101'] }).reviewRequired).toBe(true);
   });
 
   it('an explicitly named element that cannot be judged is never a pass: unknown tags fail, legacy blocks warn', () => {

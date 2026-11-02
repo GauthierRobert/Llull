@@ -62,13 +62,15 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
     return undefined;
   };
   const tubes = (template: Record<string, unknown>): Record<string, unknown> => template['tubes'] as Record<string, unknown>;
+  const side = (template: Record<string, unknown>): Record<string, unknown> => template['design'] as Record<string, unknown>;
+  const shell = (template: Record<string, unknown>): Record<string, unknown> => side(template)['shellSide'] as Record<string, unknown>;
 
   it.each([
     [
       'exchanger without tema',
       'equipment-1',
       (_p: Record<string, unknown>, t: Record<string, unknown>) => delete t['tema'],
-      /tema must carry fixedTubesheet/,
+      /tema needs front, shell, rear/,
     ],
     [
       'exchanger tube wall without bore',
@@ -112,6 +114,204 @@ describe('load: a corrupt plant record of a new template is rejected with a desc
       'equipment-2',
       (_p: Record<string, unknown>, t: Record<string, unknown>) => delete t['courses'],
       /courses must be a non-empty array/,
+    ],
+    ...['constructor', '__proto__', 'hasOwnProperty', 'toString', 'valueOf'].map(
+      (kind) =>
+        [
+          `template kind ${kind}`,
+          'equipment-1',
+          (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['kind'] = kind),
+          /template\.kind/,
+        ] as const,
+    ),
+    [
+      'exchanger without defaulted',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete t['defaulted'],
+      /defaulted must be an array of strings/,
+    ],
+    [
+      'exchanger defaulted with a number',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['defaulted'] = [1]),
+      /defaulted must be an array of strings/,
+    ],
+    [
+      'tema front of two letters',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['tema'] as Record<string, unknown>)['front'] = 'BB'),
+      /tema needs front, shell, rear/,
+    ],
+    [
+      'tema without removableBundle',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete (t['tema'] as Record<string, unknown>)['removableBundle'],
+      /tema needs front, shell, rear/,
+    ],
+    [
+      'tubes layout angle 50',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (tubes(t)['layoutAngleDeg'] = 50),
+      /layoutAngleDeg/,
+    ],
+    [
+      'tubes passes 0',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (tubes(t)['passes'] = 0),
+      /tubes\.passes/,
+    ],
+    [
+      'tubes without wallSource',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete tubes(t)['wallSource'],
+      /wallSource/,
+    ],
+    [
+      'tubes wallUnverified a string',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (tubes(t)['wallUnverified'] = 'no'),
+      /wallUnverified/,
+    ],
+    [
+      'exchanger design not an object',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['design'] = 5),
+      /design must be an object/,
+    ],
+    [
+      'shellSide not an object',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (side(t)['shellSide'] = 'x'),
+      /shellSide must be an object/,
+    ],
+    [
+      'shellSide pressure with a bad unit',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (shell(t)['pressure'] = { value: 1, unit: 'atm' }),
+      /shellSide\.pressure/,
+    ],
+    [
+      'shellSide allowable stress negative',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (shell(t)['allowableStress'] = { value: -1, unit: 'MPa' }),
+      /allowableStress/,
+    ],
+    [
+      'shellSide stress at test bad',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (shell(t)['allowableStressAtTest'] = 'x'),
+      /allowableStressAtTest/,
+    ],
+    [
+      'shellSide efficiency above 1',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (shell(t)['jointEfficiency'] = { shell: 2, heads: 1 }),
+      /jointEfficiency/,
+    ],
+    [
+      'shellSide temperature a string',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (shell(t)['temperatureC'] = 'hot'),
+      /temperatureC/,
+    ],
+    [
+      'shellSide material a number',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (shell(t)['material'] = 7),
+      /material/,
+    ],
+    [
+      'shellSide gravity zero',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (shell(t)['specificGravity'] = 0),
+      /specificGravity/,
+    ],
+    [
+      'exchanger density negative',
+      'equipment-1',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (side(t)['materialDensityKgM3'] = -1),
+      /materialDensityKgM3/,
+    ],
+    [
+      'tank without defaulted',
+      'equipment-2',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete t['defaulted'],
+      /defaulted must be an array of strings/,
+    ],
+    [
+      'tank thickness source unknown',
+      'equipment-2',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['thicknessSource'] = 'guess'),
+      /thicknessSource/,
+    ],
+    [
+      'tank without corrosion allowance',
+      'equipment-2',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete (t['design'] as Record<string, unknown>)['corrosionAllowance'],
+      /corrosionAllowance >= 0/,
+    ],
+    [
+      'tank negative corrosion allowance',
+      'equipment-2',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['design'] as Record<string, unknown>)['corrosionAllowance'] = -1),
+      /corrosionAllowance >= 0/,
+    ],
+    [
+      'tank allowable stress without test',
+      'equipment-2',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) =>
+        ((t['design'] as Record<string, unknown>)['allowableStress'] = { design: 160 }),
+      /allowableStress needs/,
+    ],
+    [
+      'tank allowable stress source a number',
+      'equipment-2',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) =>
+        ((t['design'] as Record<string, unknown>)['allowableStress'] = { design: 160, test: 171, source: 3 }),
+      /allowableStress needs/,
+    ],
+    [
+      'tank density negative',
+      'equipment-2',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['design'] as Record<string, unknown>)['materialDensityKgM3'] = -5),
+      /materialDensityKgM3/,
+    ],
+    [
+      'pump without defaulted',
+      'equipment-3',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete t['defaulted'],
+      /defaulted must be an array of strings/,
+    ],
+    [
+      'pump envelope without rating',
+      'equipment-3',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete (t['envelope'] as Record<string, unknown>)['rating'],
+      /envelope\.rating/,
+    ],
+    [
+      'pump envelope grade Z',
+      'equipment-3',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => ((t['envelope'] as Record<string, unknown>)['grade'] = 'Z'),
+      /envelope\.grade/,
+    ],
+    [
+      'pump envelope without source',
+      'equipment-3',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete (t['envelope'] as Record<string, unknown>)['source'],
+      /envelope\.source/,
+    ],
+    ['pump weight negative', 'equipment-3', (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['weightKg'] = -1), /weightKg/],
+    [
+      'tank courses that do not add up',
+      'equipment-2',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => (t['shellHeight'] = 5000),
+      /courses must add up to shellHeight/,
+    ],
+    [
+      'pump driver without a gap',
+      'equipment-3',
+      (_p: Record<string, unknown>, t: Record<string, unknown>) => delete (t['driver'] as Record<string, unknown>)['gap'],
+      /driver\.gap/,
     ],
     [
       'tank with a thickness per course missing',

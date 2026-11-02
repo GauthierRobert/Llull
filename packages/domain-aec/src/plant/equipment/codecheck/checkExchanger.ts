@@ -26,7 +26,7 @@ const NOT_CHECKED = [
   'flat covers (UG-34)',
   'floating head, U-bends, expansion joints, differential thermal expansion',
   'nozzle reinforcement (UG-37) and nozzle loads',
-  'saddle loads',
+  'saddle loads and nozzles over a saddle',
 ];
 
 /** One pressure cylinder with a head at its outer end, judged as a small horizontal vessel under one side's design data. */

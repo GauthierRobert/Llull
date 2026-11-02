@@ -35,7 +35,7 @@ export const tankShape = {
     .object({
       type: z.enum(['cone', 'dome', 'flat']).describe('cone: needs slopeRatio. dome: needs radius. flat: nothing more.'),
       slopeRatio: z
-        .union([z.string(), z.number()])
+        .union([z.string().max(32), z.number()])
         .optional()
         .describe('cone only: rise per unit run, as "1:12" (rise:run) or a number (0.0833). Between 0 and 1.'),
       radius: z

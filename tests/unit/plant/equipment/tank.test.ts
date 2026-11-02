@@ -151,6 +151,32 @@ describe('add_storage_tank: thicknesses, roofs and refusals', () => {
     expect(first?.kind === 'tank' && first.courseThicknesses[0]).toBeCloseTo(design(20, 12, 1, 180, 1.5), 9);
   });
 
+  it('a slopeRatio longer than 32 characters is rejected by the schema', () => {
+    const roof = { type: 'cone', slopeRatio: '1:'.padEnd(40, '2') };
+    expect(execute(mmDocument(), 'add_storage_tank', { ...tankParams, roof }).error?.code).toBe('CMD_INVALID_PARAMS');
+  });
+
+  it('the one-foot computation refuses non-finite or missing inputs instead of reading them as zero', async () => {
+    const { tankShellResult } = await import('@aec/plant/equipment/codecheck/tankShell');
+    const input = {
+      diameter: 20000,
+      shellHeight: 12000,
+      courses: [12000],
+      designLiquidLevel: 12000,
+      specificGravity: 1,
+      material: 'A36M',
+      corrosionAllowance: 1.5,
+    };
+    expect('refusal' in tankShellResult(input, 1)).toBe(false);
+    for (const bad of [
+      { corrosionAllowance: Number.NaN },
+      { corrosionAllowance: -1 },
+      { specificGravity: Number.POSITIVE_INFINITY },
+      { courses: [Number.NaN] },
+    ])
+      expect(tankShellResult({ ...input, ...bad }, 1), JSON.stringify(bad)).toMatchObject({ refusal: { code: 'EQP_PARAM_INVALID' } });
+  });
+
   it('a duplicate tag is EQP_TAG_DUPLICATE', () => {
     expectRefusal(tankDocument(), 'add_storage_tank', tankParams, 'EQP_TAG_DUPLICATE', 'tag');
   });
