@@ -13,6 +13,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-11-02 (end) — plant run stopped by the owner after the in-flight tasks. Merged + pushed: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8,
+  DAT-M6, ISO-M5, ISO-REPLAY (replay-only confirmations via `ctx.replaying`), PID-M6, PID-M7b. Remaining plant TODOs below (PST-M4, PST-GATE,
+  PST-HARDEN, FUZZ-EQP, BLD-UID, EQP-M5-UI, PID-M5b, VIS-*, SCN-M3; ISO-M6 blocked).
+
 - 2026-11-02 — plant track: board reconciled with origin/main (DAT-M2..M5, ISO-M2..M4, STA-M4/M5, PID-M2..M5 / M7 partial,
   VIS-M9 built). WIP: PSC-M3 (lane1), EQP-M3 (lane2), STA-M6 (lane3), PST-M1 (lane4); workers + reviewers on sonnet. Next: ISO-M5,
   DAT-M6, EQP-M4, STA-M7, PST-M2.
@@ -176,6 +180,12 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **VNV-M3** Convergence studies + `check_verification`: `docs/physics/00-vv-harness/`. _deps: FEA artifact store, AERO-4 (09 PLM signing) — both built_
 - `[TODO]` **VNV-M4** Time-step/order refinement, least-squares order, UI: `docs/physics/00-vv-harness/`. _deps: VNV-M3_
 - `[BLOCKED]` **PROP-M6** Seed NIST property library: `docs/physics/01-property-models/` (OQ-PROP-03, needs trc.nist.gov access). _deps: —_
+- Motion video `docs/physics/22-motion-video/` (PHY-22 MOV, spec 2026-11-02 from the teardown-skill analysis; validation = analytic generator + `check_media.py` + suites, VC-MOV-01..25; order M0 → (M1 ∥ M2) → M3 → M4):
+- `[TODO]` **MOV-M0** Spike + decisions (`TECHNICAL_SPEC.md` §11): rav1e speed / determinism / NASM need, AV1 MP4 playback on Windows 11 + PowerPoint (`validation/playback.md`), licence audit; `posesAtTime` interpolation + `render_motion` exact instants (VC-MOV-03, baseline 0.0114 → 0.01218 s). _Lane 1_ _deps: —_
+- `[TODO]` **MOV-M1** `render_animation` (core, read-only): sources simulation / sweep / clips, playbackRate, fixed framed camera, overlays as raster primitives (time, trace, readouts, accent highlight), frames + APNG + `timeline.json` + contact sheet, clip math moved to core (`geometry/animationPose.ts`), `simulate_motion detail: 'poses+series'`; VC-MOV-01..09, 11, 12, 15..19, 24. _Lane 1 (+2 for the `animationMath.ts` switch)_ _deps: MOV-M0_
+- `[TODO]` **MOV-M2** Native encoder: `solver/crates/llull-media` (GIF global palette + Bayer, AV1 via rav1e + own ISOBMFF muxer) as `llull-compute media`, `MediaPort` / `ctx.media`, `server/src/native/mediaPort.ts`, desktop bundling, CLI `--save x.mp4` picks by extension; VC-MOV-10, 13, 14, 20..22, 25. _Lane 1 (crate, port) + 4 (server, CLI)_ _deps: MOV-M0_
+- `[TODO]` **MOV-M3** Camera paths (viewpoint, walkthrough, orbit, `still` source), `llull-cli` skill review-loop recipe (sheet → fix → encode), golden plans; VC-MOV-23. _Lane 1_ _deps: MOV-M1_
+- `[TODO]` **MOV-M4** Desktop "Export animation…" dialog (transport bar, sheet preview, File-dialog save), verified in the app; VC-MOV-10 (human), 19. _Lane 2_ _deps: MOV-M2, MOV-M3_
 - Plant packs `docs/plant/` (order = README "Dependencies and recommended order"; D1 fixed, D2 decided 2026-10-23). Wave 1 done 2026-10-23 (PSC M0–M1, EQP M1, STA M1, VIS-M1; as built = each pack's TECHNICAL_SPEC §13 / 09 §12.6).
 - Decisions 2026-10-23 (owner delegated): README D3, D4, D6; 01 §11; 03 §11.1 (Q1 extend `EquipmentElement`, Q2 both conventions `north_cw` default, Q3 exact ellipse segment, Q7 PSC flanges).
 - `[DONE]` **PSC-M2** 01 PSC spec model, `*_pipe_spec`, `resolve_spec_component`, `resolve_branch`, `check_pipe_spec` + D4 licence flag `open-data` (resolution API `resolveComponent` / `resolveBranch`). Approval, assign and the stud rule stay M3/M4. Merged 2026-10-24.
@@ -195,22 +205,15 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **RTE-V1c** 02 V1 review follow-ups (§13.11): a run's level from its elevation, orphan supports (live = load, `RTE_SUPPORT_ORPHAN`), native OCCT `export_pipe_step` test (true torus elbows), `convert_pipe_run replace` retargets supports. Merged 2026-10-24. Open: UI support tool picks a run (`runId`, viewport lane).
 - `[DONE]` **RTE-V2** 02 V2 finish (§13.12): obstacles from clash bodies, rayon candidates, `auto_route_lines`, edits drop `autoRoute`. Merged 2026-10-25. Open (§13.12): orthogonal visibility graphs [S33], a second-move candidate split, branch off a header in one transaction, 100 m reference-machine time; coverage gate not run on V2. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 - Built since (reconciled 2026-11-02 from git, as built in each spec §13): DAT-M1b, M2–M5; ISO-M2–M4; STA-M4, M5; PID-M2–M4, M5 (no 2D
-  viewport branch), M7 (5 of 8 `P3D_*` codes); EQP-R1; VIS-M9. Remaining plant milestones (one line each, spec §10 of the pack):
-- `[WIP]` **PSC-M4** 01 V1: `pipe_wall_check`, `resolve_joint` (bolt sets, stud length), `component_shape`, `diff_pipe_spec`, CSV sheet, B16.11 / B16.47 / EN 10253 / olet schema. _deps: PSC-M3_
-- `[TODO]` **PSC-M5** 01 V2: Plant 3D CSV import, `.pspc` if feasible, further rating tables. _deps: PSC-M4_
-- `[REVIEW]` **EQP-M4** 03 `add_heat_exchanger` (TEMA), `add_storage_tank`, `add_pump`; VC-10, 11, 15, 17. _deps: EQP-M3 (same folder)_
-- `[TODO]` **EQP-M5** 03 data sheet JSON / CSV, IFC ports + revolved bodies, plan nozzle stubs, UI port glyph + data-sheet panel; VC-20. _deps: EQP-M4_
-- `[WIP]` **STA-M7** 06 `add_pipe_rack`, `update_pipe_rack`, `check_steel_members` integration. _deps: STA-M6_
-- `[TODO]` **STA-M8** 06 access graph, `check_reachability`, plan symbols, schedules, golden plan, scenario runner. _deps: STA-M7_
-- `[WIP]` **PST-M3** 07 `create_stress_model`, conditions, load cases, restraints, `analyze_pipe_stress`, `check_pipe_stress`, record / approve, non-linear supports. _deps: PST-M2_
+  viewport branch), M7 (5 of 8 `P3D_*` codes); EQP-R1; VIS-M9. Built 2026-11-02: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8, DAT-M6, ISO-M5, PID-M6, PID-M7b. Remaining plant milestones (one line each, spec §10 of the pack):
 - `[TODO]` **PST-M4** 07 review surface: overlay, panel, `render_view` overlay, HTML / CSV report. _deps: PST-M3_
-- `[TODO]` **ISO-REPLAY** `issue_isometric` (05 ISO-M4) is a recorded step behind a human gate: `execute` strips the confirmation, so a history regenerate refuses it and the issue silently vanishes. Pin + fix the way PSC-M3 (approval ledger) / DAT-M6 (`carry`) did; host-fill its `at` via `HOST_STAMPED` (found in the DAT-M6 work).
+- `[TODO]` **PST-HARDEN** `analyze_pipe_stress` refuses (coded) when a governing ratio is non-finite instead of recording it; direct test of `carry` when the stored approval resultHash differs from the replayed record (PST-M3 review, non-blocking).
+- `[TODO]` **PST-GATE** `approve_pipe_stress` recorded `{verified:true}` is a no-op report; refuse it (PST_HUMAN_GATE) outside history replay now that ISO-REPLAY put `ctx.replaying` on main (set only by `replayHistory`; PST-M3 review).
+- `[TODO]` **FUZZ-EQP** Building slice fuzz seed (`tests/helpers/pluginSliceSeeds.ts`) has no parametric equipment: add vessel / exchanger / tank / pump, and a string → prototype-key mutation (`hasOwnProperty`, `toString`, `valueOf`) in `tests/helpers/sliceMutations.ts` (EQP-M4 review).
 - `[TODO]` **BLD-UID** `building.uid` is time-based (`uniqueId('building')`, `packages/domain-aec/src/building/model.ts:79`): two replays of one plan differ; derive it from the step / doc id (found in the EQP-M3 review).
-- `[REVIEW]` **ISO-M5** 05 `import_pcf as=route` via RTE, supports in PCF / iso, skew boxes, `export_piping_ga`; VC-ISO-04, 13, 15.
+- `[TODO]` **EQP-M5-UI** 03 UI port glyph + data-sheet panel (the EQP-M5 commands are on main). _Lane 2_
 - `[BLOCKED]` **ISO-M6** 05 performance VC-ISO-18, ISOGEN conformance (OQ-ISO-01, needs a licensed tool), CSV weld map, revision clouds.
-- `[TODO]` **PID-M6** 04 DEXPI 2.0 import / export + XSD check.
 - `[TODO]` **PID-M5b** 04 P&ID 2D viewport branch. _Lane 3_
-- `[WIP]` **PID-M7b** 04 the 3 `P3D_*` codes waiting on PSC / RTE data. _deps: PSC-M3_
 - `[TODO]` **VIS-M3** 09 `renderPlan`, `render_stats`, `PlantBatchRenderer` (LOD, pixel cull), SYN-RACK fixture, perf baseline.
 - `[TODO]` **VIS-M4b/M5b** 09 rest of M4 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET`) and M5 (`create_clash_issues`, `import_bcf`, XSD VC-VIS-15).
 - `[TODO]` **VIS-UI** 09 Review panel, redline tools, section-box gizmo + clipping, profile use in viewport / `render_view`. _Lane 2_
@@ -236,6 +239,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **EN12** Export selection only, batch export, glTF/OBJ materials, DXF layers. _deps: X3_
 - `[TODO]` **KI7** Typed command bindings generated from the registry (low priority). _Lane 1/4_
 - `[TODO]` **P5** WebGPU renderer opt-in (only on a measured GPU bottleneck). _Lane 2_
+- `[TODO]` **VIZ1** Gaps from the teardown comparison (2026-11-02, PHY-22 OQ-MOV-05): presentation look mode on the native raster (studio light, AO, outlines, one accent), render-vs-reference-photo review (beyond `drawing-to-model`), check `.lld` expressiveness (08 ASC M4b / M4c functions, comprehensions, modules) is built. Spec first. _Lane 1+2_
 - Lane 5, continuous: hold the coverage gate; `cad-reviewer` on every `[REVIEW]` diff.
 
 ## Open decisions
