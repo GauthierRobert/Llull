@@ -23,7 +23,7 @@ const byIssue = (a: EquipmentIssue, b: EquipmentIssue): number =>
  * @invariant findings, not refusals: status = fail if any fail, else warn if any warning, else pass_with_review if a code thickness was computed,
  *   else pass; issues sorted by severity then code; reviewRequired is true when a code thickness / MAWP was computed for any checked vessel; the
  *   thickness numbers are those of vessel_thickness (one source of truth)
- * @failure an equipment reference that matches nothing -> a fail issue EQP_NOT_FOUND (a check that could not run never reads as a pass)
+ * @failure an explicitly listed legacy / non-vessel element -> warning EQP_NOT_PARAMETRIC (not checked); an equipment reference that matches nothing -> a fail issue EQP_NOT_FOUND (a check that could not run never reads as a pass)
  */
 export const checkEquipment = defineCommand({
   name: 'check_equipment',
@@ -65,7 +65,18 @@ export const checkEquipment = defineCommand({
     let reviewRequired = false;
     const checked: Array<{ tag: string; id: string; status: Status }> = [];
     for (const element of scope) {
-      if (element.plant?.template.kind !== 'vessel') continue;
+      if (element.plant?.template.kind !== 'vessel') {
+        if (equipment !== undefined)
+          issues.push({
+            code: 'EQP_NOT_PARAMETRIC',
+            severity: 'warning',
+            ids: [element.id],
+            paths: ['equipment'],
+            message: `${element.mark} (${element.id}) is not a parametric vessel: not checked`,
+            remediation: remediationOf('EQP_NOT_PARAMETRIC'),
+          });
+        continue;
+      }
       const check = checkVessel(element, mm);
       issues.push(...check.issues);
       reviewRequired ||= check.reviewRequired;

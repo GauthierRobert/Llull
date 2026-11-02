@@ -145,6 +145,17 @@ describe('tank_shell_thickness: refusals and provenance', () => {
     expect(execute(doc, 'tank_shell_thickness', { ...fireWaterTank, diameter: 60000 }).rejected).toBeUndefined();
   });
 
+  it('edges: D = 60 m takes the grade C 8 mm row; a liquid level below the first course clamps H - 0.3 at 0 (design = CA, minimum governs)', () => {
+    const wide = tank({ diameter: 60000 });
+    expect(rel((wide.courses[0] as Course).designThicknessMm, (4.9 * 60 * 11.7) / 160 + 1.5)).toBeLessThan(1e-12);
+    expect((wide.courses[5] as Course).minimumThickness).toMatchObject({ mm: 8, unverified: true });
+    const low = tank({ designLiquidLevel: 200 });
+    expect((low.courses[0] as Course).H_m).toBe(200 / 1000);
+    expect((low.courses[0] as Course).designThicknessMm).toBe(1.5);
+    expect((low.courses[0] as Course).testThicknessMm).toBe(0);
+    expect((low.courses[0] as Course).governingThicknessMm).toBe(6);
+  });
+
   it('a material outside the table needs Sd / St: EQP_MATERIAL_NOT_IN_TABLE, then accepted with a source (unverified without)', () => {
     expectRefusal(doc, 'tank_shell_thickness', { ...fireWaterTank, material: 'S355J2' }, 'EQP_MATERIAL_NOT_IN_TABLE', 'material');
     const sourced = data<Tank>(doc, 'tank_shell_thickness', {

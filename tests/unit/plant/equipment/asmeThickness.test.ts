@@ -201,7 +201,7 @@ describe('VC-EQP-07: applicability limits, missing allowable, MAWP round trip', 
       set: { design: { pressure: { value: 60, unit: 'MPa' } } },
     });
     expectRefusal(high, 'vessel_thickness', { equipment: 'V-101' }, 'EQP_FORMULA_OUT_OF_RANGE', 'design.pressure');
-    expect(execute(doc, 'vessel_thickness', { equipment: 'V-101', pressure: { value: 53.09, unit: 'MPa' } }).rejected).toBeUndefined();
+    expect(execute(doc, 'vessel_thickness', { equipment: 'V-101', pressure: { value: 52, unit: 'MPa' } }).rejected).toBeUndefined();
     expectRefusal(
       doc,
       'vessel_thickness',
@@ -211,9 +211,54 @@ describe('VC-EQP-07: applicability limits, missing allowable, MAWP round trip', 
     );
   });
 
-  it('a wall thicker than R/2 is outside UG-27(c)(1): refused with the shellThickness path', () => {
-    const doc = inchVessel({ P_psi: 100, S_psi: 20000 }, { D_in: 10, shell: 3 });
+  it('a REQUIRED wall above R/2 is outside UG-27(c)(1): refused with the shellThickness path (P between 0.3846 and 0.385 S E)', () => {
+    const doc = inchVessel({ P_psi: 7696, S_psi: 20000 }, { D_in: 10, shell: 4 });
     expectRefusal(doc, 'vessel_thickness', { equipment: 'V-1' }, 'EQP_FORMULA_OUT_OF_RANGE', 'shellThickness');
+  });
+
+  it('an AVAILABLE wall above R/2 at low pressure is not refused: the shell MAWP is flagged mawpUnverified, is not governing and never fails', () => {
+    const doc = inchVessel({ P_psi: 100, S_psi: 20000 }, { D_in: 10, shell: 3, head: 0.5 });
+    const result = thickness(doc);
+    const shell = result.components.shell as Component & { mawpUnverified?: boolean };
+    expect(shell.mawpUnverified).toBe(true);
+    expect(shell.failures).toEqual([]);
+    expect(result.governingComponent).not.toBe('shell');
+    expect(result.mawpMPa).toBe(Math.min(...['headBottom', 'headTop'].map((key) => (result.components[key] as Component).mawpMPa)));
+    expect((result.components.headTop as Component & { mawpUnverified?: boolean }).mawpUnverified).toBeUndefined();
+  });
+
+  it('UG-32(e): a torispherical head thinner than t/L = 0.002 is EQP_HEAD_NOT_COVERED (query) and a warning (check); 0.00208 is accepted', () => {
+    const fd = { type: 'torispherical', standard: 'asme_fd' };
+    const thin = inchVessel({ P_psi: 10, S_psi: 20000 }, { D_in: 12, shell: 0.5, head: 0.0125, heads: fd });
+    expectRefusal(thin, 'vessel_thickness', { equipment: 'V-1' }, 'EQP_HEAD_NOT_COVERED', 'heads.first');
+    const warned = data<{ issues: Array<{ code: string; severity: string; paths: string[] }> }>(thin, 'check_equipment', {});
+    expect(warned.issues.filter((issue) => issue.code === 'EQP_HEAD_NOT_COVERED').map((issue) => [issue.severity, issue.paths[0]])).toEqual(
+      [
+        ['warning', 'heads.first'],
+        ['warning', 'heads.second'],
+      ],
+    );
+    const ok = inchVessel({ P_psi: 10, S_psi: 20000 }, { D_in: 12, shell: 0.5, head: 0.025, heads: fd });
+    expect((thickness(ok).components.headTop as Component).status).toBe('pass_with_review');
+  });
+
+  it('UG-32(f): a hemispherical head with t > 0.356 L and P > 0.665 S E is EQP_FORMULA_OUT_OF_RANGE (heads.first); P below that limit is accepted', () => {
+    const base = inchVessel({ P_psi: 7400, S_psi: 20000 }, { D_in: 40, shell: 10, head: 10, heads: { type: 'hemispherical' } });
+    const weak = apply(base, 'update_equipment_parameters', {
+      equipment: 'V-1',
+      set: { design: { jointEfficiency: { shell: 1, heads: 0.5 } } },
+    });
+    expectRefusal(weak, 'vessel_thickness', { equipment: 'V-1' }, 'EQP_FORMULA_OUT_OF_RANGE', 'heads.first');
+    const found = data<{ issues: Array<{ code: string; paths: string[] }> }>(weak, 'check_equipment', {}).issues;
+    expect(found.filter((issue) => issue.code === 'EQP_FORMULA_OUT_OF_RANGE').map((issue) => issue.paths[0])).toEqual([
+      'heads.first',
+      'heads.second',
+    ]);
+    const lower = apply(weak, 'update_equipment_parameters', {
+      equipment: 'V-1',
+      set: { design: { pressure: { value: 6000, unit: 'psi' } } },
+    });
+    expect(execute(lower, 'vessel_thickness', { equipment: 'V-1' }).rejected).toBeUndefined();
   });
 
   it('a missing allowable stress or joint efficiency is never defaulted: EQP_ALLOWABLE_MISSING with the design path', () => {

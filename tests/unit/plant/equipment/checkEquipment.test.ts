@@ -227,6 +227,15 @@ describe('check_equipment: nozzle layout findings', () => {
 });
 
 describe('check_equipment: scope, order, purity', () => {
+  it('an explicitly listed legacy block is a warning EQP_NOT_PARAMETRIC (never a silent pass); in the all-equipment scan it stays quiet', () => {
+    const doc = apply(separatorDocument(false), 'add_equipment', { name: 'Skid', mark: 'S-1', location: [0, 0], size: [1000, 1000, 1000] });
+    const listed = check(doc, ['S-1']);
+    expect(listed.checked).toEqual([]);
+    expect(listed.issues).toEqual([expect.objectContaining({ code: 'EQP_NOT_PARAMETRIC', severity: 'warning', paths: ['equipment'] })]);
+    expect(listed.status).toBe('warn');
+    expect(codes(check(doc))).not.toContain('EQP_NOT_PARAMETRIC');
+  });
+
   it('unknown references are fail findings EQP_NOT_FOUND with the index path; duplicates are checked once; the scope list restricts the check', () => {
     const both = apply(separatorDocument(false), 'add_vessel', { ...drumParams, location: [20000, 0] });
     const result = check(both, ['V-101', 'V-101', 'V-404']);

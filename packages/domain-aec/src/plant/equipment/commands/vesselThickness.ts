@@ -19,8 +19,9 @@ export const computedParts = (result: AsmeResult): ComponentResult[] =>
 
 /** MAWP of the vessel (minimum over parts) and the part that governs it. */
 export function governingMawp(components: readonly ComponentResult[]): { mawpMPa: number; component: string } {
-  let best = components[0] as ComponentResult;
-  for (const component of components) if (component.mawpMPa < best.mawpMPa) best = component;
+  const applicable = components.filter((component) => component.mawpUnverified !== true);
+  let best = (applicable[0] ?? components[0]) as ComponentResult;
+  for (const component of applicable) if (component.mawpMPa < best.mawpMPa) best = component;
   return { mawpMPa: best.mawpMPa, component: best.key };
 }
 
@@ -28,9 +29,9 @@ export function governingMawp(components: readonly ComponentResult[]): { mawpMPa
  * @affects none (query: returns the same document; results in `data`)
  * @invariant corroded dimensions (R + CA, D + 2 CA, L + CA; available = nominal - CA) unless corrodedDimensions:false; S and E are never
  *   defaulted; MAWP is the minimum over the parts, at the top; hydrotest = 1.3 x MAWP x (S_test / S_design, 1 and defaulted when S_test is
- *   absent); reviewRequired is always true; an unsourced S or a grade B/C head standard sets unverified
+ *   absent); reviewRequired is always true; an unsourced S sets unverified (grade B/C head standards are not covered, so they refuse instead)
  * @failure no equipment -> EQP_NOT_FOUND; legacy block -> EQP_NOT_PARAMETRIC; no P / S / E -> EQP_DESIGN_DATA_MISSING / EQP_ALLOWABLE_MISSING;
- *   P > 0.385 S E or t > R/2 -> EQP_FORMULA_OUT_OF_RANGE; head type without a formula -> EQP_HEAD_NOT_COVERED; refusals leave the document unchanged
+ *   P > 0.385 S E, required t > R/2, hemispherical t > 0.356 L with P > 0.665 S E -> EQP_FORMULA_OUT_OF_RANGE; head type without a formula -> EQP_HEAD_NOT_COVERED; refusals leave the document unchanged
  */
 export const vesselThickness = defineCommand({
   name: 'vessel_thickness',
@@ -44,7 +45,7 @@ export const vesselThickness = defineCommand({
     'requiredThicknessMm (with CA), requiredCorrodedThicknessMm, nominalThicknessMm, availableThicknessMm (nominal - CA), mawpMPa, status, failures, ' +
     'formula, clause, inputs}, mawpMPa, governingComponent, hydrotestPressureMPa, status (fail | pass_with_review), warnings, unverified, ' +
     'reviewRequired (always true: a computed check is not a stamped design) and provenance. Refusals: EQP_NOT_FOUND, EQP_NOT_PARAMETRIC, ' +
-    'EQP_DESIGN_DATA_MISSING, EQP_ALLOWABLE_MISSING, EQP_FORMULA_OUT_OF_RANGE (P > 0.385 S E or t > R/2: needs an engineer), EQP_HEAD_NOT_COVERED. ' +
+    'EQP_DESIGN_DATA_MISSING, EQP_ALLOWABLE_MISSING, EQP_FORMULA_OUT_OF_RANGE (P > 0.385 S E, required t > R/2, hemisphere limits: needs an engineer; a shell thicker than R/2 only flags its MAWP mawpUnverified), EQP_HEAD_NOT_COVERED. ' +
     'Does not modify the document.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({

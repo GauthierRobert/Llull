@@ -33,6 +33,8 @@ export interface ComponentResult {
   readonly inputs: Readonly<Record<string, number | string | boolean>>;
   readonly longitudinal?: { readonly formula: string; readonly requiredThicknessMm: number; readonly mawpMPa: number };
   readonly pressureLimitMPa?: number;
+  /** True when the MAWP formula is outside its thin-wall range (shell t > R/2): reported, never governing, never failing. */
+  readonly mawpUnverified?: boolean;
 }
 
 export type PartOutcome =
@@ -117,7 +119,7 @@ function finish(
   const failures: string[] = [];
   if (available < requiredCorroded * (1 - TOLERANCE))
     failures.push(basis.isHead ? 'EQP_HEAD_UNDER_THICKNESS' : 'EQP_SHELL_UNDER_THICKNESS');
-  if (mawp < basis.pressure * (1 - TOLERANCE)) failures.push('EQP_MAWP_BELOW_DESIGN');
+  if (extra.mawpUnverified !== true && mawp < basis.pressure * (1 - TOLERANCE)) failures.push('EQP_MAWP_BELOW_DESIGN');
   return {
     key: basis.key,
     clause,
@@ -170,14 +172,17 @@ function shellPart(template: VesselTemplate, mm: number, inputs: Inputs, corrode
   if (inputs.pressure > limit)
     return outOfRange(`UG-27(c)(1) needs P <= 0.385 S E = ${limit.toPrecision(8)} MPa, P is ${inputs.pressure}`, inputs.pressurePath);
   const available = basis.nominal - basis.corrosion;
-  if (available > radius / 2)
-    return outOfRange(`UG-27(c)(1) needs t <= R/2: corroded thickness ${available} mm, R ${radius} mm`, 'shellThickness');
   const p = inputs.pressure;
+  const requiredShell = (p * radius) / (basis.se - 0.6 * p);
+  if (requiredShell > radius / 2)
+    return outOfRange(`UG-27(c)(1) needs the required t <= R/2: required ${requiredShell} mm, R ${radius} mm`, 'shellThickness');
+  // a shell thicker than R/2 is outside the thin-wall rule for its MAWP only: reported, not governing, never failing
+  const thickShell = available > radius / 2;
   const result = finish(
     basis,
     'UG-27(c)(1)',
     't = P R / (S E - 0.6 P); P = S E t / (R + 0.6 t)',
-    (p * radius) / (basis.se - 0.6 * p),
+    requiredShell,
     (basis.se * available) / (radius + 0.6 * available),
     { radiusMm: radius },
     {
@@ -187,6 +192,7 @@ function shellPart(template: VesselTemplate, mm: number, inputs: Inputs, corrode
         mawpMPa: (2 * basis.se * available) / (radius - 0.4 * available),
       },
       pressureLimitMPa: limit,
+      ...(thickShell ? { mawpUnverified: true } : {}),
     },
   );
   return { key: 'shell', result };
@@ -222,6 +228,15 @@ function headPart(
     const crown = (template.insideDiameter * mm) / 2 + grow;
     const formula = 't = P L / (2 S E - 0.2 P); P = 2 S E t / (L + 0.2 t)';
     const required = (p * crown) / (2 * se - 0.2 * p);
+    if (required > 0.356 * crown && p > 0.665 * se)
+      return {
+        key,
+        ...refusal(
+          'EQP_FORMULA_OUT_OF_RANGE',
+          `UG-32(f) needs t <= 0.356 L or P <= 0.665 S E: t ${required} mm, L ${crown} mm, P ${p} MPa, 0.665 S E ${0.665 * se} MPa`,
+          [path],
+        ),
+      };
     return {
       key,
       result: finish(basis, 'UG-32(f)', formula, required, (2 * se * available) / (crown + 0.2 * available), { crownRadiusMm: crown }),
@@ -234,6 +249,8 @@ function headPart(
         `UG-32(e) is built for ASME flanged and dished proportions only (knuckle 6 % of the crown radius, crown radius <= D); this head has k/L ${proportions}`,
       );
     const crown = shape.crownRadius * mm + grow;
+    if (available / crown < 0.002)
+      return notCovered(`UG-32(e) needs t/L >= 0.002 (App. 1-4(f) / UG-33 below it): t ${available} mm, L ${crown} mm`);
     const formula = 't = 0.885 P L / (S E - 0.1 P); P = S E t / (0.885 L + 0.1 t)';
     const required = (0.885 * p * crown) / (se - 0.1 * p);
     return {
