@@ -7,7 +7,7 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { humanGatePayload } from '@core/model/humanGate';
-import type { CadDocument } from '@core/model/types';
+import type { CadDocument, FeatureStep } from '@core/model/types';
 import { fabricationErrors } from '@aec/plant/fabrication/validate';
 import { apply, data } from '../../../helpers/commandAssertions';
 import { loadedL101 } from './isoM2Fixtures';
@@ -27,7 +27,7 @@ const issued = (): CadDocument => {
 const issuesOf = (doc: CadDocument): string[] => Object.keys(doc.plant?.fabrication?.issues ?? {});
 const reviewRequired = (doc: CadDocument): boolean =>
   data<{ reviewRequired: boolean }>(doc, 'export_isometric', { lineId: 'L-101' }).reviewRequired;
-const stepOf = (doc: CadDocument, name: string) => doc.featureHistory.find((step) => step.name === name);
+const stepOf = (doc: CadDocument, name: string): FeatureStep | undefined => doc.featureHistory.find((step) => step.name === name);
 const payloadFor = (basisSha256: string, at: string): string =>
   humanGatePayload('plant:issue_isometric', ['L-101'], { revision: 'A', purpose: 'for_construction', basisSha256, at }, 'n1');
 
