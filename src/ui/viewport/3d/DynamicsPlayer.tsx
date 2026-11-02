@@ -6,16 +6,22 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
-import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
+import type { CadDocument } from '@core/model/types';
+import { getPlaybackTime, useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { bodyFrameAt, carryEntity, createBodyFrame } from './dynamicsPose';
+import { markSceneMoved } from './frameActivity';
 import { SceneObjectCache } from './sceneObjectCache';
+
+type DynamicsBody = NonNullable<CadDocument['dynamics']>['bodies'][string];
 
 export function DynamicsPlayer(): null {
   const objectCache = useMemo(() => new SceneObjectCache(), []);
   const frame = useMemo(createBodyFrame, []);
   const scratch = useMemo(() => ({ position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), euler: new THREE.Euler() }), []);
   // Entities moved by the previous frame: restored to their document pose once playback ends.
-  const moved = useRef<Set<string>>(new Set());
+  // Two pooled sets swapped each frame: no per-frame allocation.
+  const sets = useRef({ moved: new Set<string>(), carried: new Set<string>() });
+  const bodyList = useRef<{ source: unknown; bodies: DynamicsBody[] }>({ source: null, bodies: [] });
   // Demand frameloop: a new result, play, seek or clear must wake the canvas (useFrame keeps it awake while playing).
   const invalidate = useThree((state) => state.invalidate);
   useEffect(() => useDynamicsPlaybackStore.subscribe(() => invalidate()), [invalidate]);
@@ -28,14 +34,18 @@ export function DynamicsPlayer(): null {
     if (playback.result !== null && source !== null && (source.dynamics !== dynamics || source.entities !== entities))
       playback.setResult(null);
     const poses = useDynamicsPlaybackStore.getState().result?.poses;
-    const carried = new Set<string>();
+    const pool = sets.current;
+    const { moved, carried } = pool;
+    carried.clear();
     if (poses !== undefined && dynamics !== undefined) {
       if (playback.playing) {
         playback.advance(delta);
         invalidate();
       }
-      const time = useDynamicsPlaybackStore.getState().time;
-      for (const body of Object.values(dynamics.bodies)) {
+      const time = getPlaybackTime();
+      if (bodyList.current.source !== dynamics.bodies)
+        bodyList.current = { source: dynamics.bodies, bodies: Object.values(dynamics.bodies) };
+      for (const body of bodyList.current.bodies) {
         if (!bodyFrameAt(poses, body.id, time, frame)) continue;
         for (const id of body.entityIds) {
           const entity = entities[id];
@@ -45,19 +55,22 @@ export function DynamicsPlayer(): null {
           object.position.copy(scratch.position);
           object.quaternion.copy(scratch.quaternion);
           carried.add(id);
+          markSceneMoved();
         }
       }
     }
     // anything moved before but not carried now goes back to its document pose
-    for (const id of moved.current) {
+    for (const id of moved) {
       const entity = entities[id];
       const object = objectCache.get(scene, id);
       if (carried.has(id) || entity === undefined || object === undefined) continue;
       object.position.set(entity.position[0], entity.position[1], entity.position[2]);
       object.quaternion.setFromEuler(scratch.euler.set(entity.rotation[0], entity.rotation[1], entity.rotation[2], 'XYZ'));
+      markSceneMoved();
       invalidate();
     }
-    moved.current = carried;
+    pool.moved = carried;
+    pool.carried = moved;
   });
 
   return null;

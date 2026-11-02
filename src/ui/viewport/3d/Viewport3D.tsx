@@ -26,6 +26,7 @@ import { DynamicsPlayer } from './DynamicsPlayer';
 import { useRenderQuality } from './useRenderQuality';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
+import { CANVAS_DPR_RANGE, RenderRig } from './RenderRig';
 import { MechanismOverlay } from './MechanismOverlay';
 import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
 import { AeroOverlay } from './aero/AeroOverlay';
@@ -166,6 +167,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <FocusOverlay />
       </group>
 
+      {/* Last: its useFrame must run after every pose writer (see RenderRig). */}
+      <RenderRig />
+
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
         <GizmoViewport axisColors={palette.axisColors} labelColor={palette.axisLabel} />
       </GizmoHelper>
@@ -197,7 +201,7 @@ export function Viewport3D(): React.ReactElement {
         frameloop="demand"
         shadows
         gl={{ antialias: true, alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
-        dpr={[1, 2]}
+        dpr={CANVAS_DPR_RANGE}
         style={{ width: '100%', height: '100%' }}
         onPointerMissed={handlePointerMissed}
       >

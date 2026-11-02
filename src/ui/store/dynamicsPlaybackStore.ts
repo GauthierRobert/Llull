@@ -20,7 +20,7 @@ interface DynamicsPlaybackState {
   result: SimulationData | null;
   /** The document state the result was computed from (dynamics + entities); any later edit makes the replay stale. */
   source: PlaybackSource | null;
-  /** Simulated seconds shown in the viewport. */
+  /** Simulated seconds shown in panels: published at ~10 Hz while playing (the viewport reads `getPlaybackTime()` every frame). */
   time: number;
   /** The one shared timeline cursor (s) read by the charts and the dock: always equal to `time`, written only here. */
   cursorTime: number;
@@ -40,6 +40,11 @@ interface DynamicsPlaybackState {
   advance(delta: number): void;
 }
 
+/** While playing, subscribers see the clock at most this often (s of real time); the live clock runs every frame. */
+const DISPLAY_INTERVAL_S = 0.1;
+let liveTime = 0;
+let sinceDisplay = 0;
+
 export const useDynamicsPlaybackStore = create<DynamicsPlaybackState>()((set, get) => ({
   result: null,
   source: null,
@@ -49,24 +54,50 @@ export const useDynamicsPlaybackStore = create<DynamicsPlaybackState>()((set, ge
   playing: false,
   speed: 0.1,
   loop: true,
-  setResult: (result, source) =>
-    set({ result, source: result === null ? null : (source ?? null), time: 0, cursorTime: 0, playing: result !== null }),
+  setResult: (result, source) => {
+    liveTime = 0;
+    sinceDisplay = 0;
+    set({ result, source: result === null ? null : (source ?? null), time: 0, cursorTime: 0, playing: result !== null });
+  },
   setTime: (time) => {
     const clamped = Math.max(0, Math.min(time, get().result?.duration ?? 0));
+    liveTime = clamped;
+    sinceDisplay = 0;
     set({ time: clamped, cursorTime: clamped });
   },
-  setPlaying: (playing) => set({ playing }),
+  setPlaying: (playing) => {
+    // the live clock only leads while playing; paused, the store's time (whoever wrote it) is the truth
+    const { playing: wasPlaying, time } = get();
+    if (!wasPlaying) liveTime = time;
+    sinceDisplay = 0;
+    set({ playing, time: liveTime, cursorTime: liveTime });
+  },
   setSpeed: (speed) => set({ speed }),
   setLoop: (loop) => set({ loop }),
   setAxis: (axis) => set({ axis }),
   advance: (delta) => {
-    const { result, time, speed, loop, playing } = get();
+    const { result, speed, loop, playing } = get();
     if (result === null || !playing) return;
-    const next = time + delta * speed;
-    if (next < result.duration) set({ time: next, cursorTime: next });
-    else if (loop) {
-      const wrapped = next % Math.max(result.duration, 1e-9);
-      set({ time: wrapped, cursorTime: wrapped });
-    } else set({ time: result.duration, cursorTime: result.duration, playing: false });
+    const next = liveTime + delta * speed;
+    if (next < result.duration) liveTime = next;
+    else if (loop) liveTime = next % Math.max(result.duration, 1e-9);
+    else {
+      liveTime = result.duration;
+      sinceDisplay = 0;
+      set({ time: liveTime, cursorTime: liveTime, playing: false });
+      return;
+    }
+    sinceDisplay += delta;
+    if (sinceDisplay >= DISPLAY_INTERVAL_S) {
+      sinceDisplay = 0;
+      set({ time: liveTime, cursorTime: liveTime });
+    }
   },
 }));
+
+/** Playback time of the current frame: while playing, the live clock `advance` moves every frame without notifying store
+ *  subscribers (R9); paused, the store's `time`. */
+export function getPlaybackTime(): number {
+  const { playing, time } = useDynamicsPlaybackStore.getState();
+  return playing ? liveTime : time;
+}

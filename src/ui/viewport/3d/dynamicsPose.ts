@@ -10,11 +10,22 @@ export interface DynamicsPoses {
   readonly bodies: Readonly<Record<string, { readonly position: readonly Vec3[]; readonly orientation: readonly (readonly number[])[] }>>;
 }
 
-/** Index i and blend f with times[i] <= t <= times[i+1] (clamped to the ends). */
-export function sampleAt(times: readonly number[], t: number): { index: number; blend: number } {
+interface Sample {
+  index: number;
+  blend: number;
+}
+
+/** Index i and blend f with times[i] <= t <= times[i+1] (clamped to the ends), written into out (no allocation). */
+export function sampleAtInto(times: readonly number[], t: number, out: Sample): Sample {
   const last = times.length - 1;
-  if (last <= 0 || t <= (times[0] ?? 0)) return { index: 0, blend: 0 };
-  if (t >= (times[last] ?? 0)) return { index: Math.max(0, last - 1), blend: last === 0 ? 0 : 1 };
+  out.index = 0;
+  out.blend = 0;
+  if (last <= 0 || t <= (times[0] ?? 0)) return out;
+  if (t >= (times[last] ?? 0)) {
+    out.index = Math.max(0, last - 1);
+    out.blend = 1;
+    return out;
+  }
   let low = 0;
   let high = last;
   while (high - low > 1) {
@@ -24,7 +35,9 @@ export function sampleAt(times: readonly number[], t: number): { index: number; 
   }
   const t0 = times[low] ?? 0;
   const t1 = times[high] ?? t0;
-  return { index: low, blend: t1 > t0 ? (t - t0) / (t1 - t0) : 0 };
+  out.index = low;
+  out.blend = t1 > t0 ? (t - t0) / (t1 - t0) : 0;
+  return out;
 }
 
 export interface BodyFrame {
@@ -42,6 +55,7 @@ export function createBodyFrame(): BodyFrame {
 
 const qa = new THREE.Quaternion();
 const qb = new THREE.Quaternion();
+const sample: Sample = { index: 0, blend: 0 };
 
 /**
  * The body's frame at playback time `t` into `frame`; false when the body has no samples. Rotation: slerp between samples, so the
@@ -51,7 +65,7 @@ export function bodyFrameAt(poses: DynamicsPoses, bodyId: string, t: number, fra
   const body = poses.bodies[bodyId];
   const first = body?.position[0];
   if (body === undefined || first === undefined) return false;
-  const { index, blend } = sampleAt(poses.times, t);
+  const { index, blend } = sampleAtInto(poses.times, t, sample);
   const p0 = body.position[index] ?? first;
   const p1 = body.position[index + 1] ?? p0;
   frame.start.set(first[0], first[1], first[2]);

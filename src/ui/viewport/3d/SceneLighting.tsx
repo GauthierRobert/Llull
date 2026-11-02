@@ -1,6 +1,6 @@
 /** Environment, shadows and light rig scaled by the render-quality tier. Presentation only. */
 
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Environment, Lightformer, ContactShadows, SoftShadows } from '@react-three/drei';
 import type * as THREE from 'three';
@@ -9,6 +9,7 @@ import { mergedEntityBounds } from './fitBounds';
 import { computeContactShadowPlane } from './contactShadowPlane';
 import { computeKeyLightRig } from './keyLightRig';
 import type { RenderQualitySettings } from './useRenderQuality';
+import { getContactBakeTick, markShadowsDirty, subscribeContactBake } from './renderRigState';
 
 /** drei ContactShadows lie in the Y-up XZ plane; rotate them into the +Z-up XY ground plane. */
 export const GROUND_PLANE_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0];
@@ -32,7 +33,13 @@ function useSceneBounds(): SceneBounds {
 function SceneContactShadows({ opacity, bounds }: { opacity: number; bounds: SceneBounds }): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
   const plane = useMemo(() => computeContactShadowPlane(bounds, renderOrigin), [bounds, renderOrigin]);
-  // frames={1} bakes once: remount (re-bake) when the footprint changes.
+  const invalidate = useThree((s) => s.invalidate);
+  // RenderRig requests a re-bake (moving parts, edits): re-rendering ContactShadows with frames={1} bakes once on the next frame.
+  const bakeTick = useSyncExternalStore(subscribeContactBake, getContactBakeTick);
+  useLayoutEffect(() => {
+    invalidate();
+  }, [bakeTick, invalidate]);
+  // frames={1} bakes once per render: remount (re-allocate) only when the footprint changes.
   const bakeKey = `${plane.position.join(',')}|${plane.scale}|${plane.far}`;
   return (
     <ContactShadows
@@ -74,8 +81,9 @@ function SceneKeyLight({ shadowMapSize, bounds }: { shadowMapSize: number; bound
     camera.updateProjectionMatrix();
     light.target = target;
     target.updateMatrixWorld();
+    markShadowsDirty();
     invalidate();
-  }, [rig, invalidate]);
+  }, [rig, shadowMapSize, invalidate]);
 
   return (
     <>

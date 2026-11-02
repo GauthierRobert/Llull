@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { bodyFrameAt, carryEntity, createBodyFrame, sampleAt, type DynamicsPoses } from '@ui/viewport/3d/dynamicsPose';
+import { bodyFrameAt, carryEntity, createBodyFrame, sampleAtInto, type DynamicsPoses } from '@ui/viewport/3d/dynamicsPose';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import type { SimulationData } from '@dynamics/sim/simulationReport';
 
@@ -25,10 +25,10 @@ const spin: DynamicsPoses = {
 
 describe('dynamicsPose', () => {
   it('sampleAt finds the bracketing sample and the blend, clamped at both ends', () => {
-    expect(sampleAt([0, 1, 2], -1)).toEqual({ index: 0, blend: 0 });
-    expect(sampleAt([0, 1, 2], 1.25)).toEqual({ index: 1, blend: 0.25 });
-    expect(sampleAt([0, 1, 2], 5)).toEqual({ index: 1, blend: 1 });
-    expect(sampleAt([0], 3)).toEqual({ index: 0, blend: 0 });
+    expect(sampleAtInto([0, 1, 2], -1, { index: 0, blend: 0 })).toEqual({ index: 0, blend: 0 });
+    expect(sampleAtInto([0, 1, 2], 1.25, { index: 0, blend: 0 })).toEqual({ index: 1, blend: 0.25 });
+    expect(sampleAtInto([0, 1, 2], 5, { index: 0, blend: 0 })).toEqual({ index: 1, blend: 1 });
+    expect(sampleAtInto([0], 3, { index: 0, blend: 0 })).toEqual({ index: 0, blend: 0 });
   });
 
   it('carries a member entity rigidly about the body centre (half a sample = 45°)', () => {

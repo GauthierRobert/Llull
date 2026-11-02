@@ -19,6 +19,7 @@ import {
   type AnimatedPose,
   type AnimationContribution,
 } from './animationMath';
+import { markSceneMoved } from './frameActivity';
 import { SceneObjectCache } from './sceneObjectCache';
 
 /** Unit direction of `v`, or +Z for a near-zero vector. */
@@ -74,6 +75,8 @@ export function AnimationPlayer(): null {
 
   const buffers = useMemo(createFrameBuffers, []);
   const objectCache = useMemo(() => new SceneObjectCache(), []);
+  // Animation list cached per `animations` identity (no Object.values per frame); last poses written, to flag idle frames.
+  const cached = useRef<{ animations: unknown; list: Animation[]; entities: unknown }>({ animations: null, list: [], entities: null });
 
   useFrame(({ scene, invalidate }, delta) => {
     const viewport = useViewportStore.getState();
@@ -82,11 +85,14 @@ export function AnimationPlayer(): null {
     if (viewport.animationResetNonce !== lastResetNonce.current) {
       phaseMap.current.clear();
       lastResetNonce.current = viewport.animationResetNonce;
+      // back to the base pose: this frame's write moves the scene
+      cached.current.entities = null;
     }
 
     const { animationPlaying, activeClickAnimationIds } = viewport;
 
-    const animList = Object.values(animations);
+    if (cached.current.animations !== animations) cached.current = { animations, list: Object.values(animations), entities: null };
+    const animList = cached.current.list;
     if (animList.length === 0) return;
 
     // Keep the demand Canvas alive.
@@ -123,6 +129,9 @@ export function AnimationPlayer(): null {
       }
     }
 
+    // shadows are stale only when time runs or the document poses changed since the last write
+    const moving = animationPlaying || activeClickAnimationIds.size > 0 || cached.current.entities !== entities;
+    cached.current.entities = entities;
     for (const [entityId, parts] of contributionsByEntity) {
       const entity = entities[entityId];
       const object = objectCache.get(scene, entityId);
@@ -130,6 +139,7 @@ export function AnimationPlayer(): null {
       composeAnimatedPoseInto(pose, entity.position, entity.rotation, parts, scratch);
       object.position.copy(pose.position);
       object.quaternion.copy(pose.quaternion);
+      if (moving) markSceneMoved();
     }
   });
 
