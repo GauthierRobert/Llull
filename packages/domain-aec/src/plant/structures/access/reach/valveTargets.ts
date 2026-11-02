@@ -10,6 +10,8 @@ export interface ReachTarget {
   /** Operating point, absolute mm; null = the source could not locate it (reported, never judged as passing). */
   readonly pointMm: readonly [number, number, number] | null;
   readonly source: 'explicit' | 'valves';
+  /** What the target comes from: `explicit` or the inline id of the valve. */
+  readonly ref: string;
 }
 
 export interface ValveTargets {
@@ -43,6 +45,7 @@ export function valveTargets(doc: CadDocument): ValveTargets {
           ? [inline.centre[0] + stem[0] * height, inline.centre[1] + stem[1] * height, inline.centre[2] + stem[2] * height]
           : null,
         source: 'valves',
+        ref: inline.id,
       });
     }
   }

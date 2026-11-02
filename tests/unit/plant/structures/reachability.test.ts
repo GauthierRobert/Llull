@@ -210,6 +210,22 @@ describe('access_graph: touching surfaces, slabs, stairs', () => {
     ]);
   });
 
+  it('a concrete stair whose level is gone is dangling with the reason, not edges', () => {
+    let doc = apply(apply(createEmptyDocument(), 'set_units', { units: 'mm' }), 'add_level', { name: 'Grade', elevation: 0, height: 3000 });
+    doc = apply(doc, 'add_stair', { start: [1000, 1000], angle: 0, width: 1200, riserCount: 17, treadDepth: 280 });
+    const orphan = JSON.parse(JSON.stringify(doc)) as CadDocument;
+    (orphan.building?.elements['stair-1'] as { levelId: string }).levelId = 'gone';
+    const graph = data<{ connectors: unknown[]; dangling: Array<{ elementId: string; kind: string; reason: string }> }>(
+      orphan,
+      'access_graph',
+      {},
+    );
+    expect(graph.connectors).toEqual([]);
+    expect(graph.dangling).toEqual([
+      { elementId: 'stair-1', mark: expect.any(String), kind: 'stair', reason: expect.stringContaining('level does not exist') },
+    ]);
+  });
+
   it('a slab that is not a floor (roof, foundation) is not a walking surface', () => {
     let doc = apply(apply(createEmptyDocument(), 'set_units', { units: 'mm' }), 'add_level', { name: 'Grade', elevation: 0, height: 3000 });
     doc = apply(doc, 'add_slab', { boundary: rect(0, 0, 3000, 2000), thickness: 200, role: 'roof' });

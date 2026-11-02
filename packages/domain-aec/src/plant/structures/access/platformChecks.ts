@@ -28,6 +28,9 @@ export interface PlatformReport {
   /** Clear height over the deck to the lowest modelled obstruction; null = nothing modelled above. */
   readonly headroomMm: number | null;
   readonly routes: number | null;
+  /** Grade the route is searched from: the lowest level; null when the graph could not be built. */
+  readonly gradeLevelId: string | null;
+  readonly gradeElevationMm: number | null;
 }
 
 const projectFinding = (
@@ -201,7 +204,14 @@ export function checkPlatforms(
           );
       }
     }
-    reports.push({ assemblyId: assembly.id, widthMm: width, headroomMm: headroom, routes });
+    reports.push({
+      assemblyId: assembly.id,
+      widthMm: width,
+      headroomMm: headroom,
+      routes,
+      gradeLevelId: isRefusal(graph) ? null : graph.gradeLevelId,
+      gradeElevationMm: isRefusal(graph) ? null : graph.gradeMm,
+    });
   }
   return { findings, reports };
 }

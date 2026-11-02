@@ -32,7 +32,7 @@ export const checkReachability = defineCommand({
     'best one at or below the point within maxHorizontalReachMm in plan (inside the band and connected to grade first, then the highest), with height above it, plan reach and the route from grade. ' +
     'Findings (all fail, ruleset project): STA_OPERATING_HEIGHT (height above the surface outside operatingHeightMm), STA_REACH (no surface at or below the point within reach), STA_ACCESS_NO_EGRESS (the surface has no route to grade); ' +
     'a valve without an operating point is STA_TARGET_UNLOCATED (warn, never a pass). The band and the reach are project inputs with no default (their source is echoed). Points are ABSOLUTE document coordinates in DOCUMENT UNITS (z = elevation, not level-relative); ' +
-    'band, reach and every length in the answer are millimetres. targetsFrom: ["valves"] adds the handwheel centre of every valve of the routed piping (millimetre documents only). Read-only; reviewRequired is always true.',
+    'band, reach and every length in the answer are millimetres. targetsFrom: ["valves"] adds the handwheel centre of every valve of the routed piping (millimetre documents only). Grade is the lowest building level (data.gradeLevelId, data.gradeElevationMm). Read-only; reviewRequired is always true.',
   params: z.object({
     targets: z
       .array(
@@ -101,6 +101,7 @@ export const checkReachability = defineCommand({
           kind: target.kind,
           pointMm: [target.point[0] * factor, target.point[1] * factor, target.point[2] * factor],
           source: 'explicit',
+          ref: 'explicit',
         }),
       ),
       ...sourced.targets,
@@ -111,9 +112,22 @@ export const checkReachability = defineCommand({
     for (const target of targets) counts.set(target.tag, (counts.get(target.tag) ?? 0) + 1);
     const repeated = [...counts].filter(([, count]) => count > 1).map(([tag]) => tag);
     if (repeated.length > 0)
-      return refuse(doc, COMMAND, 'STA_TARGET_DUPLICATE', `tag(s) used by more than one target: ${repeated.join(', ')}`, repeated, [
-        'targets',
-      ]);
+      return refuse(
+        doc,
+        COMMAND,
+        'STA_TARGET_DUPLICATE',
+        `tag(s) used by more than one target: ${repeated
+          .map(
+            (tag) =>
+              `${tag} (${targets
+                .filter((target) => target.tag === tag)
+                .map((target) => target.ref)
+                .join(', ')})`,
+          )
+          .join('; ')}`,
+        repeated,
+        ['targets'],
+      );
     const graph = buildAccessGraph(doc);
     if (isRefusal(graph)) return refuse(doc, COMMAND, graph.code, graph.message);
 
@@ -141,6 +155,7 @@ export const checkReachability = defineCommand({
         maxHorizontalReachMm: params.maxHorizontalReachMm,
         gradeIsWalkable: settings.gradeIsWalkable,
         gradeElevationMm: graph.gradeMm,
+        gradeLevelId: graph.gradeLevelId,
         graph: {
           surfaces: graph.nodes.length - 1,
           edges: graph.edges.length,

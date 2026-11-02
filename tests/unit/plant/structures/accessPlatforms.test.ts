@@ -66,7 +66,9 @@ describe('check_access: platform egress (STA_ACCESS_NO_EGRESS)', () => {
       }),
     ]);
     expect(alone.verdict).toBe('fail');
-    expect(alone.platforms).toEqual([{ assemblyId: 'assembly-1', widthMm: 3000, headroomMm: null, routes: 0 }]);
+    expect(alone.platforms).toEqual([
+      { assemblyId: 'assembly-1', widthMm: 3000, headroomMm: null, routes: 0, gradeLevelId: 'level-1', gradeElevationMm: 0 },
+    ]);
     const reached = check(ladderAt(deck(), 3000));
     expect(reached.findings).toEqual([]);
     expect(reached.verdict).toBe('pass');
@@ -129,6 +131,38 @@ describe('check_access: platform egress (STA_ACCESS_NO_EGRESS)', () => {
     const orphan = check({ ...doc, building: levels });
     expect(orphan.findings.map((finding) => [finding.code, finding.severity])).toContainEqual(['STA_NO_GRADE', 'warn']);
     expect(orphan.verdict).not.toBe('pass');
+  });
+});
+
+describe('check_access: scope of the platform rules and the grade', () => {
+  it('osha_1910 alone judges neither width nor headroom and says so under notEvaluated', () => {
+    const osha = check(ladderAt(deck(500), 3000), { rulesets: ['osha_1910'] });
+    expect(osha.findings).toEqual([]);
+    const entries = osha.notEvaluated.filter((entry) => entry.reason.includes('judged only under iso_14122'));
+    expect(entries.map((entry) => entry.ruleId)).toEqual(['ISO-PLT-WIDTH', 'ISO-PLT-HEADROOM']);
+    expect(check(ladderAt(deck(500), 3000)).notEvaluated.some((entry) => entry.reason.includes('judged only under iso_14122'))).toBe(false);
+  });
+
+  it('grade is the lowest level: a basement is grade, reported by level id and elevation', () => {
+    let doc = apply(apply(createEmptyDocument(), 'set_units', { units: 'mm' }), 'add_level', {
+      name: 'Ground',
+      elevation: 0,
+      height: 4000,
+    });
+    doc = apply(doc, 'add_level', { name: 'Basement', elevation: -3000, height: 3000 });
+    doc = apply(doc, 'add_access_platform', {
+      bounds: [
+        [0, 0],
+        [6000, 3000],
+      ],
+      topOffset: 3000,
+      gratingType: TYPE,
+      bearingBarDirection: [1, 0],
+      levelId: 'level-1',
+    });
+    const graph = data<{ gradeLevelId: string; gradeElevationMm: number }>(doc, 'access_graph', {});
+    expect(graph).toMatchObject({ gradeLevelId: 'level-2', gradeElevationMm: -3000 });
+    expect(check(doc).platforms[0]).toMatchObject({ gradeLevelId: 'level-2', gradeElevationMm: -3000, routes: 0 });
   });
 });
 
@@ -316,6 +350,32 @@ describe('check_reachability: valve targets from the routed piping (02 RTE)', ()
       },
       'STA_TARGET_DUPLICATE',
     );
+  });
+
+  it('two valves with one tag are refused naming both inline ids', () => {
+    const doc = valved();
+    const runId = Object.keys(doc.plant?.piping?.runs ?? {})[0] as string;
+    const twice = apply(doc, 'insert_inline_component', { runId, type: 'valveGate', tag: 'HV-1', at: { leg: 0, centreDistance: 1500 } });
+    const result = expectRefusal(
+      twice,
+      'check_reachability',
+      { targetsFrom: ['valves'], operatingHeightMm: BAND, maxHorizontalReachMm: 600 },
+      'STA_TARGET_DUPLICATE',
+    );
+    expect(result.summary).toContain('HV-1 (valve-');
+    expect(result.summary.match(/valve-/g)).toHaveLength(2);
+    const mixed = expectRefusal(
+      doc,
+      'check_reachability',
+      {
+        targets: [{ tag: 'HV-1', kind: 'x', point: [0, 0, 0] }],
+        targetsFrom: ['valves'],
+        operatingHeightMm: BAND,
+        maxHorizontalReachMm: 600,
+      },
+      'STA_TARGET_DUPLICATE',
+    );
+    expect(mixed.summary).toContain('HV-1 (explicit, valve-');
   });
 
   it('a valve whose catalogue row has no stem height cannot be placed: STA_TARGET_UNLOCATED (warn, never a pass)', () => {

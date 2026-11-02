@@ -83,10 +83,11 @@ export function buildAccessGraph(doc: CadDocument): AccessGraph | GraphRefusal {
     elementsOf(building, 'ladder').length + elementsOf(building, 'steelStair').length + elementsOf(building, 'stair').length;
   if (connectors > GRAPH_LIMITS.connectors)
     return { code: 'STA_ACCESS_GRAPH_LIMIT', message: `${connectors} ladders and stairs (limit ${GRAPH_LIMITS.connectors})` };
-  const gradeMm = Math.min(...levels.map((level) => level.elevation)) * MM_PER_UNIT[doc.units];
+  const lowest = levels.reduce((best, level) => (level.elevation < best.elevation ? level : best), levels[0] as (typeof levels)[number]);
+  const gradeMm = lowest.elevation * MM_PER_UNIT[doc.units];
   const nodes = [gradeNode(gradeMm), ...surfaceNodes(doc, building)];
   const { edges: connected, dangling } = connectorEdges(doc, building, nodes);
   const contacts = contactEdges(nodes, gradeMm);
   if ('code' in contacts) return contacts;
-  return { nodes, edges: [...connected, ...contacts], dangling, gradeMm };
+  return { nodes, edges: [...connected, ...contacts], dangling, gradeMm, gradeLevelId: lowest.id };
 }

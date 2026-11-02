@@ -72,6 +72,8 @@ export interface AccessGraph {
   readonly dangling: readonly DanglingConnector[];
   /** Elevation of the lowest level, mm. */
   readonly gradeMm: number;
+  /** The level whose elevation is grade (the lowest; the first in model order on a tie). */
+  readonly gradeLevelId: string;
 }
 
 export interface GraphRefusal {

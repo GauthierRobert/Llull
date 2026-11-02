@@ -301,6 +301,7 @@ function graphOf(): AccessGraph {
     edges: [edge('a', 'grade', 'P1'), edge('b', 'P1', 'P2'), edge('c', 'grade', 'P2'), edge('d', 'P2', 'P3')],
     dangling: [],
     gradeMm: 0,
+    gradeLevelId: 'level-1',
   };
 }
 
