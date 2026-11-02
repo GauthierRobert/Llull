@@ -186,7 +186,12 @@ export function check3d(
   sortLabels(matched.inline);
   return {
     findings: sink.findings.sort(compareFindings3d),
-    skipped: sink.skipped.sort((a, b) => naturalCompare(a.item, b.item) || (a.code < b.code ? -1 : a.code > b.code ? 1 : 0)),
+    skipped: sink.skipped.sort(
+      (a, b) =>
+        naturalCompare(a.item, b.item) ||
+        (a.code < b.code ? -1 : a.code > b.code ? 1 : 0) ||
+        (a.reason < b.reason ? -1 : a.reason > b.reason ? 1 : 0),
+    ),
     matched,
     unmatchedPid: sink.unmatchedPid.sort((a, b) => naturalCompare(a.label, b.label)),
     unmatched3d: sink.unmatched3d.sort((a, b) => naturalCompare(a.label, b.label)),

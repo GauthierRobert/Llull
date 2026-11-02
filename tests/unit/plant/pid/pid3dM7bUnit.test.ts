@@ -54,7 +54,7 @@ const runOf = (tags: readonly string[]): Run => ({
 describe('longestCommonSubsequence and its bound', () => {
   it('finds a longest common subsequence', () => {
     expect(longestCommonSubsequence(['a', 'b', 'c', 'd'], ['b', 'd', 'a'])).toHaveLength(2);
-    expect(longestCommonSubsequence(['a', 'b', 'c'], ['a', 'b', 'c'])).toEqual(['a', 'b', 'c']);
+    expect(longestCommonSubsequence(['a', 'b', 'c'], ['a', 'b', 'c'])).toEqual([0, 1, 2]);
     expect(longestCommonSubsequence(['a'], ['b'])).toEqual([]);
     expect(longestCommonSubsequence([], ['b'])).toEqual([]);
   });
@@ -218,6 +218,54 @@ describe('routed lines, ends and branches', () => {
     const result = check3d(pid, building({}), model, 'all', true);
     expect(result.matched.inline).toEqual(['__proto__', 'constructor']);
     expect(result.findings.filter((f) => f.code !== 'P3D_UNPLACED' && f.code !== 'P3D_CLASS_MISMATCH')).toEqual([]);
+  });
+
+  it('counts the DN of a branch run on the 3D side and of a non-primary segment on the P&ID side alike', () => {
+    const model = piping({
+      lines: { ln1: routedLine },
+      lineOrder: ['ln1'],
+      runs: {
+        r1: runBase,
+        r2: { ...runBase, id: 'r2', dn: 50, start: { point: [0, 0, 0], ref: { kind: 'branch', runId: 'r1', branchId: 'b1' } } },
+      },
+      runOrder: ['r1', 'r2'],
+    } as unknown as Partial<PipingModel>);
+    const base = pidWithLine([]);
+    const withBranch = pidOf({
+      ...base.items,
+      sb: { id: 'sb', kind: 'segment', lineId: 'l', dn: 50, primary: false, from: { type: 'free' }, to: { type: 'free' } },
+      l: { ...base.items['l'], segmentIds: [...(base.items['l'] as PidLine).segmentIds, 'sb'] },
+    });
+    const dnFindings = (pid: PidModel): string[] =>
+      check3d(pid, building({}), model, 'lines', true)
+        .findings.filter((f) => f.code === 'P3D_SIZE_MISMATCH')
+        .map((f) => String(f.values['modelDn']));
+    expect(dnFindings(withBranch)).toEqual([]);
+    expect(dnFindings(base)).toEqual(['50,100']);
+  });
+
+  it('treats two routed lines sharing a number as one line: runs, ends and inline order of both, in line order', () => {
+    const lineTwo = { ...routedLine, id: 'ln2', from: undefined, to: 'V-101' };
+    const model = piping({
+      lines: { ln1: { ...routedLine, from: 'P-101' }, ln2: lineTwo },
+      lineOrder: ['ln1', 'ln2'],
+      runs: {
+        r1: { ...runBase, inline: [component('c1', 'V-1', 'valveGate', 0, 1), component('c2', 'V-2', 'valveGate', 0, 2)] },
+        r2: { ...runBase, id: 'r2', lineId: 'ln2', inline: [component('c3', 'V-3')] },
+      },
+      runOrder: ['r1', 'r2'],
+    } as unknown as Partial<PipingModel>);
+    const ordered = check3d(pidWithLine(['V-1', 'V-2', 'V-3']), building({}), model, 'all', true);
+    expect(ordered.findings.filter((f) => f.code.endsWith('_MISMATCH') && f.code !== 'P3D_CLASS_MISMATCH')).toEqual([]);
+    const swapped = check3d(pidWithLine(['V-1', 'V-3', 'V-2']), building({}), model, 'all', true);
+    const order = swapped.findings.find((f) => f.code === 'P3D_INLINE_ORDER_MISMATCH');
+    expect(order?.values['modelOrder']).toBe('V-1,V-2,V-3');
+    expect(order?.elementIds).toEqual(['ln1', 'ln2', 'r1', 'r2']);
+  });
+
+  it('accepts a pure reversal, including a two-tag swap, as the opposite route direction', () => {
+    const pid = pidWithLine(['V-2', 'V-1']);
+    expect(compareOrder(pid, line(pid), runOf(['V-1', 'V-2']), norm)).toEqual({ findings: [], skips: [] });
   });
 
   it('scope inline pairs the lines silently for the order check and reports no line-level code', () => {

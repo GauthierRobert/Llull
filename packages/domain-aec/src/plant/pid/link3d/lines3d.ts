@@ -59,8 +59,11 @@ function finalise(draft: Draft, piping: PipingModel, building: BuildingModel, ru
   ].filter((n): n is number => n !== undefined);
   const specs = [...draft.pipes.flatMap((p) => (p.spec === undefined ? [] : [p.spec.specId])), ...draft.lines.map((line) => line.spec)];
   const first = routed[0];
-  const mains = first === undefined ? [] : first.runs.filter((r) => !isBranchRun(r));
-  const main = mains.length > 0 ? mains : (first?.runs ?? []);
+  const last = routed[routed.length - 1];
+  // Every routed line of the number counts, in line order: ends and sequence follow the main (non-branch) runs, DN and specs cover all runs.
+  const allRuns = routed.flatMap((r) => r.runs);
+  const mains = allRuns.filter((r) => !isBranchRun(r));
+  const main = mains.length > 0 ? mains : allRuns;
   const lastPipe = draft.pipes[draft.pipes.length - 1];
   const legacyFrom = text(draft.pipes[0]?.from);
   const legacyTo = text(lastPipe?.to);
@@ -73,7 +76,7 @@ function finalise(draft: Draft, piping: PipingModel, building: BuildingModel, ru
     dns,
     specs,
     from: legacyFrom ?? routedEnd(piping, building, main[0], 'start', first?.line.from),
-    to: legacyTo ?? routedEnd(piping, building, main[main.length - 1], 'end', first?.line.to),
+    to: legacyTo ?? routedEnd(piping, building, main[main.length - 1], 'end', last?.line.to),
     sequence: main.flatMap((run) => [...(run.inline ?? [])].sort(byRoute).flatMap((c) => inlineOf(run, c) ?? [])),
   };
 }

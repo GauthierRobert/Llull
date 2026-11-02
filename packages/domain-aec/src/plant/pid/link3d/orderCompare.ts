@@ -69,23 +69,20 @@ export function compareOrder(pid: PidModel, line: PidLine, run: Run, norm: Norm)
   const reversed = reverse.length > forward.length;
   const common = reversed ? reverse : forward;
   if (common.length === pidSeq.length && common.length === modelSeq.length) return NONE;
-  const shown = new Map(pidSeq.map((t) => [t.key, t.tag]));
-  let matched = 0;
-  const outOfPlace = pidSeq
-    .filter((t) => (matched < common.length && t.key === common[matched] ? (matched++, false) : true))
-    .map((t) => t.tag);
-  const names = (keys: readonly string[]): string => keys.map((k) => shown.get(k) ?? k).join(',');
+  const inLcs = new Set(common);
+  const outOfPlace = pidSeq.filter((_, k) => !inLcs.has(k)).map((t) => t.tag);
+  const lcsNames = common.map((k) => pidSeq[k]?.tag ?? '').join(',');
   const modelOrder = (reversed ? [...modelSeq].reverse() : modelSeq).map((t) => t.tag).join(',');
   return {
     findings: [
       makeFinding3d({
         code: 'P3D_INLINE_ORDER_MISMATCH',
         ...where,
-        message: `line ${label}: inline order differs: P&ID ${pidSeq.map((t) => t.tag).join(' > ')} but 3D ${modelOrder.split(',').join(' > ')}; longest common sequence ${names(common) || 'none'}, out of place ${outOfPlace.join(', ')}`,
+        message: `line ${label}: inline order differs: P&ID ${pidSeq.map((t) => t.tag).join(' > ')} but 3D ${modelOrder.split(',').join(' > ')}; longest common sequence ${lcsNames || 'none'}, out of place ${outOfPlace.join(', ')}`,
         values: {
           pidOrder: pidSeq.map((t) => t.tag).join(','),
           modelOrder,
-          lcs: names(common),
+          lcs: lcsNames,
           lcsLength: common.length,
           outOfPlace: outOfPlace.join(','),
           modelReversed: reversed,
