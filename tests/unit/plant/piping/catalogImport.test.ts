@@ -265,7 +265,9 @@ describe('export_piping_catalog and the document slice (VC-PSC-17)', () => {
     const csv = data<Exported & { families: string[] }>(doc, 'export_piping_catalog', { format: 'csv', familyId: 'asme-b16.9-lr90' });
     expect(csv.families).toEqual(['asme-b16.9-lr90']);
     const lines = csv.text.trim().split('\n');
-    expect(lines[0]).toBe('family,type,standard,size,smallSize,schedule,class,pn,facing,centreToEnd,verified');
+    expect(lines[0]).toBe(
+      'family,type,standard,size,smallSize,schedule,class,pn,facing,dimensionalStandard,radius,ends,sourceId,citation,url,accessed,centreToEnd,verified',
+    );
     expect(lines).toHaveLength(4);
     expect(lines[3]).toContain('NPS 6');
     expect(lines[3]).toContain('228.6');

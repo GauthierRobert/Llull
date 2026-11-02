@@ -27,7 +27,7 @@ export function checkSpec(doc: CadDocument, spec: PipeSpec, design: DesignCondit
   const { catalogs, missing } = specCatalogs(doc, spec);
   const context: CheckContext = { spec, catalogs, missingCatalogs: missing, sizes: sizesInRange(spec.sizeRange.from, spec.sizeRange.to) };
   const rows = componentRows(context);
-  const designOutcome = design === undefined ? undefined : designFindings(context, design);
+  const designOutcome = design === undefined ? undefined : designFindings(doc, context, design);
   const findings = sortFindings([
     ...coverageFindings(context),
     ...overlapFindings(context),

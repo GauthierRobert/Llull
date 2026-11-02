@@ -186,6 +186,87 @@ export const AEC_READERS: readonly HostileReader[] = [
     accepts: imported,
   },
   {
+    name: 'plant: readSheet (piping CSV sheets) + import_piping_catalog_sheet (execute)',
+    covers: ['domain-aec/src/plant/catalog/sheetRead.ts:readSheet', 'import_piping_catalog_sheet'],
+    input: 'text',
+    build: (records) =>
+      repeated('family,type,standard,size,outsideDiameter\n', (k) => `f${k % 7},pipe,ASME B36.10M,NPS ${(k % 20) + 1},60.3\n`, '', records),
+    skipLinear: 'refuses sheets over 20 000 rows up front',
+    extra: [
+      { name: 'a quote opened and never closed', input: () => 'family,type\n"' + 'x,'.repeat(100_000) },
+      { name: 'ten thousand columns', input: () => `${Array.from({ length: 10_000 }, (_, k) => `c${k}`).join(',')}\n1` },
+      { name: 'hostile header names', input: () => 'family,type,standard,size,__proto__,constructor\nf,pipe,s,NPS 2,1,2\n' },
+      {
+        name: 'formula cells everywhere',
+        input: () => repeated('family,type,standard,size,outsideDiameter\n', () => '=1+1,=2,@3,-4,+5\n', '', 1000),
+      },
+    ],
+    read: (input) =>
+      execute(createEmptyDocument(), 'import_piping_catalog_sheet', {
+        sheet: asText(input),
+        catalogId: 'h',
+        licence: 'open-data',
+        provenance: { citation: 'h' },
+      }),
+    accepts: imported,
+  },
+  {
+    name: 'plant: import_pipe_spec_sheet (execute, llull and Plant 3D sheets)',
+    covers: ['import_pipe_spec_sheet'],
+    input: 'text',
+    build: (records) =>
+      repeated('component,type,from,to,catalogRef,schedule\n', (k) => `C${k},pipe,NPS 2,NPS 2,asme-b36.10m,40\n`, '', records),
+    skipLinear: 'refuses sheets over 20 000 rows up front',
+    extra: [
+      {
+        name: 'extra JSON nested 50000 levels',
+        input: () => `component,type,from,to,catalogRef,extra\nC,pipe,NPS 2,NPS 2,x,"${'{""a"":'.repeat(50_000)}"\n`,
+      },
+      {
+        name: 'extra with a prototype key',
+        input: () => 'component,type,from,to,catalogRef,extra\nC,pipe,NPS 2,NPS 2,x,"{""__proto__"":1}"\n',
+      },
+    ],
+    read: (input) => {
+      const sheet = asText(input);
+      const spec = {
+        id: 'H',
+        dimensionalStandard: 'ASME',
+        rating: { system: 'ASME B16.5', class: 150 },
+        corrosionAllowance: { value: 1, unit: 'mm' },
+        sizeRange: { fromNps: 1, toNps: 24 },
+        catalogs: ['llull-open-piping'],
+      };
+      return [
+        execute(createEmptyDocument(), 'import_pipe_spec_sheet', { sheet, spec }),
+        execute(createEmptyDocument(), 'import_pipe_spec_sheet', { sheet, spec, format: 'plant3d', catalogRef: 'x' }),
+      ];
+    },
+    accepts: (result) => (result as Array<{ summary: string }>)[0]?.summary.startsWith('Imported') === true,
+  },
+  {
+    name: 'plant: parseRatingFile + import_rating_table (execute)',
+    covers: ['domain-aec/src/plant/catalog/ratingFile.ts:parseRatingFile', 'import_rating_table'],
+    input: 'text',
+    build: (records) =>
+      JSON.stringify({
+        format: 'llull-rating-table',
+        schemaVersion: 1,
+        id: 'h',
+        standard: 'company',
+        materialGroup: 'h',
+        licence: 'open-data',
+        pressureUnit: 'bar',
+        temperatureUnit: 'C',
+        minTemperature: -50,
+        provenance: { citation: 'h' },
+        rows: Array.from({ length: Math.min(records, 5000) }, (_, k) => ({ class: 150, temperature: k, pressure: 10 })),
+      }),
+    skipLinear: 'a schema-validated JSON file capped at 5000 rows',
+    read: (input) => execute(createEmptyDocument(), 'import_rating_table', { table: recordOf(parsedJson(asText(input))) }),
+    accepts: imported,
+  },
+  {
     name: 'plant: parseTagFormat (tag format string)',
     covers: ['domain-aec/src/plant/data/tagFormat.ts:parseTagFormat'],
     input: 'text',

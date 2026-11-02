@@ -11,6 +11,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'The standard is import-only: import a catalogue that holds it (import_piping_catalog) or accept the unverified selection.',
   PSC_RATING_TABLE_UNKNOWN:
     'Import a rating table for the spec rating basis, or check the pressure by other means; the design pressure was not checked.',
+  PSC_RATING_TABLE_MISMATCH:
+    'Name a rating table whose standard and material group are those of the spec rating (rating.system, rating.materialGroup), or change the spec rating.',
   PSC_CATALOG_DIM_MISMATCH: 'Correct the value or remove the rule claim (standard) from the family.',
   PSC_PROVENANCE_MISSING: 'Add provenance.citation or provenance.sourceId to the size (or dimProvenance for the value).',
   PSC_UNIT_INVALID: 'Use mm or in for the family unit.',

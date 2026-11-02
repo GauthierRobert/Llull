@@ -3,7 +3,8 @@
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { pipeSpecErrors } from '../spec/document';
-import { BUNDLED_CATALOG_ID } from './bundled';
+import { squash } from './ptRating';
+import { BUNDLED_CATALOG_ID, BUNDLED_RATING_TABLE_ID } from './bundled';
 
 const isDim = (value: unknown): boolean =>
   isRecord(value) &&
@@ -33,6 +34,33 @@ function catalogErrors(id: string, catalog: unknown): string[] {
   });
 }
 
+const isRatingRow = (row: unknown): boolean =>
+  isRecord(row) &&
+  typeof row['ratingClass'] === 'number' &&
+  Number.isFinite(row['ratingClass']) &&
+  typeof row['temperatureC'] === 'number' &&
+  Number.isFinite(row['temperatureC']) &&
+  isDim(row['bar']);
+
+/** Errors of a raw `plant.catalog.ratingTables` value (absent is valid). */
+function ratingTableErrors(raw: unknown): string[] {
+  if (raw === undefined) return [];
+  if (!isRecord(raw)) return ['plant.catalog.ratingTables must be an object'];
+  const seen = new Set<string>();
+  return Object.entries(raw).flatMap(([id, table]) => {
+    const path = `plant.catalog.ratingTables.${id}`;
+    if (!isRecord(table) || table['id'] !== id || typeof table['standard'] !== 'string' || typeof table['materialGroup'] !== 'string')
+      return [`${path} must have id "${id}", standard and materialGroup`];
+    if (id === BUNDLED_RATING_TABLE_ID) return [`${path}: the id is reserved for the bundled table`];
+    const basis = squash(`${String(table['standard'])}|${String(table['materialGroup'])}`);
+    const clash = seen.has(basis) ? [`${path} repeats the standard and material group of another table`] : [];
+    seen.add(basis);
+    const rows = table['rows'];
+    const bad = !Array.isArray(rows) || rows.length === 0 || !rows.every(isRatingRow) || typeof table['minTemperatureC'] !== 'number';
+    return [...clash, ...(bad ? [`${path} must have minTemperatureC and rows { ratingClass, temperatureC, bar }`] : [])];
+  });
+}
+
 /** Errors of a raw `plant.catalog` value (empty when valid). */
 export function pipingCatalogErrors(raw: unknown): string[] {
   if (!isRecord(raw) || !isRecord(raw['catalogs']) || !Array.isArray(raw['catalogOrder']))
@@ -43,7 +71,11 @@ export function pipingCatalogErrors(raw: unknown): string[] {
     order.length === ids.length && ids.every((id) => order.includes(id))
       ? []
       : ['plant.catalog.catalogOrder must list every catalogue id once'];
-  return [...orderErrors, ...ids.flatMap((id) => catalogErrors(id, (raw['catalogs'] as Record<string, unknown>)[id]))];
+  return [
+    ...orderErrors,
+    ...ratingTableErrors(raw['ratingTables']),
+    ...ids.flatMap((id) => catalogErrors(id, (raw['catalogs'] as Record<string, unknown>)[id])),
+  ];
 }
 
 export const pipingCatalogDocument: DocumentExtension = {

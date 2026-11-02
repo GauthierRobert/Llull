@@ -3,7 +3,8 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
-import { bundledRatingTable, IMPORT_ONLY_STANDARDS, BUNDLED_CATALOG_ID } from '../bundled';
+import { BUNDLED_CATALOG_ID, BUNDLED_RATING_TABLE_ID, IMPORT_ONLY_STANDARDS } from '../bundled';
+import { allRatingTables } from '../ptRating';
 import { refuse } from '../codes';
 import { FAMILY_SCHEMAS } from '../familySchemas';
 import { flatKeys, resolveCatalogRow, type ResolvedRow } from '../lookup';
@@ -91,20 +92,18 @@ export const listPipingCatalogs = defineCommand({
       ),
     );
     const familyCount = summaries.reduce((count, entry) => count + (entry['families'] as unknown[]).length, 0);
-    const rating = bundledRatingTable();
     return report(
       doc,
       `list_piping_catalogs: ${catalogs.length} catalogue(s), ${familyCount} family(ies) [${catalogs.map((c) => c.id).join(', ')}].`,
       {
         catalogs: summaries,
-        ratingTables: [
-          {
-            id: rating.id,
-            standard: rating.standard,
-            materialGroup: rating.materialGroup,
-            classes: [...new Set(rating.rows.map((row) => row.ratingClass))],
-          },
-        ],
+        ratingTables: allRatingTables(doc).map((rating) => ({
+          id: rating.id,
+          standard: rating.standard,
+          materialGroup: rating.materialGroup,
+          classes: [...new Set(rating.rows.map((row) => row.ratingClass))],
+          imported: rating.id !== BUNDLED_RATING_TABLE_ID,
+        })),
         importOnly: IMPORT_ONLY_STANDARDS,
         familySchemas: FAMILY_SCHEMAS.map((schema) => ({
           id: schema.id,

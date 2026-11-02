@@ -76,13 +76,13 @@ describe('export_pipe_spec (VC-PSC-17)', () => {
     const exported = exportSpec(importedDoc(), { format: 'csv' });
     const lines = exported.text.split('\n');
     expect(lines[0]).toBe(
-      'component,type,from,to,branchFrom,branchTo,ends,class,pn,facing,radius,schedule,scheduleFromPipe,wallMm,priority,catalogRef,commodityCode,description,material,verified',
+      'component,type,from,to,branchFrom,branchTo,ends,class,pn,facing,radius,schedule,scheduleFromPipe,wallMm,priority,catalogRef,standard,commodityCode,description,material,verified,extra',
     );
     expect(lines).toHaveLength(16);
     const row = (id: string): string[] => (lines.find((line) => line.startsWith(`${id},`)) ?? '').split(',');
     expect(row('E90-LR').slice(0, 4)).toEqual(['E90-LR', 'elbow90', 'NPS 2', 'NPS 24']);
-    expect(row('F-WN').at(-1)).toBe('false');
-    expect(row('E90-LR').at(-1)).toBe('false');
+    expect(row('F-WN')[20]).toBe('false');
+    expect(row('E90-LR')[20]).toBe('false');
     expect(row('V-GATE')[0]).toBe('V-GATE');
     expect(exported.branchCsv?.split('\n')[0]).toBe('header,branch,fitting');
     expect(exported.branchCsv?.split('\n')).toHaveLength(10);
@@ -94,7 +94,7 @@ describe('export_pipe_spec (VC-PSC-17)', () => {
       }),
       { specId: 'SMALL', format: 'csv' },
     );
-    expect(verified.text.split('\n')[1]?.endsWith(',true')).toBe(true);
+    expect(verified.text.split('\n')[1]?.split(',')[20]).toBe('true');
   });
 
   it('is read-only and pure', () => {

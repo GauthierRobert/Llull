@@ -8,6 +8,8 @@ import type { CadPlugin } from '@core/plugins/plugin';
 import { commandCatalog } from '@core/commands/schema';
 import { checkPipingCatalog } from './commands/check';
 import { pipeSectionProperties, ptRating } from './commands/engineering';
+import { importPipingCatalogSheet } from './commands/importSheet';
+import { exportRatingTable, importRatingTable } from './commands/ratingTables';
 import { pipeWallCheck } from './commands/wall';
 import { exportPipingCatalog, importPipingCatalog } from './commands/importExport';
 import { listPipingCatalogs, lookupPipingComponent } from './commands/queries';
@@ -18,6 +20,7 @@ import { createPipeSpec, editPipeSpec, importPipeSpec } from '../spec/commands/a
 import { diffPipeSpec } from '../spec/commands/diff';
 import { resolveJointCommand } from '../spec/commands/joint';
 import { componentShape } from '../spec/commands/shape';
+import { importPipeSpecSheet } from '../spec/commands/importSheet';
 import { exportPipeSpec } from '../spec/commands/export';
 import { listPipeSpecs, resolveBranchCommand, resolveSpecComponent } from '../spec/commands/queries';
 import { pipingCatalogDocument } from './document';
@@ -47,6 +50,10 @@ export const pipingCatalogPlugin: CadPlugin = {
     resolveJointCommand,
     componentShape,
     diffPipeSpec,
+    importRatingTable,
+    exportRatingTable,
+    importPipingCatalogSheet,
+    importPipeSpecSheet,
   ),
   document: pipingCatalogDocument,
 };

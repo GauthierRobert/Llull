@@ -1,20 +1,19 @@
 /** Catalogue file commands (plant 01 PSC M1): `import_piping_catalog` (mutating) and `export_piping_catalog` (read-only). */
 
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
-import { changed, exportRefusal, report } from '@core/commands/noop';
+import { exportRefusal, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { csvLines, type CsvCell } from '@lib/csv';
-import { guardRows } from '../csvGuard';
+import { guardCell, guardRows } from '../csvGuard';
 import { sha256Hex } from '@lib/sha256';
 import { BUNDLED_CATALOG_ID } from '../bundled';
 import { refuse } from '../codes';
 import { catalogToFile, parseCatalogFile } from '../file';
-import { allCatalogs, findCatalog, getCatalogModel, withCatalogModel } from '../store';
+import { CATALOG_FIXED_COLUMNS } from '../sheetImport';
+import { storeCatalog } from './storeCatalog';
+import { allCatalogs, findCatalog } from '../store';
 import type { PipingCatalog } from '../types';
-
-const countValues = (catalog: PipingCatalog): number =>
-  catalog.families.reduce((count, family) => count + family.sizes.reduce((inner, size) => inner + Object.keys(size.dims).length, 0), 0);
 
 /**
  * @affects plant.catalog.catalogs[catalog.id] (document slice; the bundled catalogue is never written)
@@ -59,80 +58,48 @@ export const importPipingCatalog = defineCommand({
         data: { issues: parsed.issues },
       };
     }
-    const incoming = parsed.catalog;
-    if (incoming.id === BUNDLED_CATALOG_ID)
-      return refuse(
-        doc,
-        'import_piping_catalog',
-        'PSC_CATALOG_CONFLICT',
-        `the id ${BUNDLED_CATALOG_ID} is reserved for the bundled catalogue; choose another id`,
-        [incoming.id],
-        ['id'],
-      );
-    const model = getCatalogModel(doc);
-    const existing = model.catalogs[incoming.id];
-    if (existing !== undefined && canonicalJson(existing) === canonicalJson(incoming))
-      return report(doc, `import_piping_catalog: catalogue ${incoming.id} already present with identical content; nothing changed.`, {
-        catalogId: incoming.id,
-        unchanged: true,
-      });
-    if (existing !== undefined && !replace)
-      return refuse(
-        doc,
-        'import_piping_catalog',
-        'PSC_CATALOG_CONFLICT',
-        `catalogue ${incoming.id} already exists with different content`,
-        [incoming.id],
-        ['id'],
-      );
-    const next = withCatalogModel(doc, {
-      catalogs: { ...model.catalogs, [incoming.id]: incoming },
-      catalogOrder: existing === undefined ? [...model.catalogOrder, incoming.id] : model.catalogOrder,
-    });
-    const rows = incoming.families.reduce((count, family) => count + family.sizes.length, 0);
-    const unverified = incoming.families.reduce(
-      (count, family) =>
-        count + family.sizes.reduce((inner, size) => inner + Object.values(size.dims).filter((dim) => !dim.verified).length, 0),
-      0,
-    );
-    return {
-      ...changed(
-        next,
-        `Imported piping catalogue ${incoming.id}@${incoming.version}: ${incoming.families.length} family(ies), ${rows} row(s), ${countValues(incoming)} value(s) (${unverified} unverified).`,
-        [],
-      ),
-      data: {
-        catalogId: incoming.id,
-        version: incoming.version,
-        families: incoming.families.map((family) => family.id),
-        rows,
-        unverifiedValues: unverified,
-        replaced: existing !== undefined,
-      },
-    };
+    return storeCatalog(doc, 'import_piping_catalog', parsed.catalog, replace);
   },
 });
 
-const CSV_FIXED = ['family', 'type', 'standard', 'size', 'smallSize', 'schedule', 'class', 'pn', 'facing'] as const;
+const FIXED_NAMES: ReadonlySet<string> = new Set([...CATALOG_FIXED_COLUMNS, 'verified']);
 
+/** One row per size: the fixed columns (family attributes repeated, the provenance of the row = that of its first dimension), then a column per dimension. */
 function catalogCsv(catalog: PipingCatalog): string {
   const names = [...new Set(catalog.families.flatMap((family) => family.sizes.flatMap((size) => Object.keys(size.dims))))].sort();
+  const header = (name: string): string => (FIXED_NAMES.has(name) ? `dim.${name}` : name);
   const rows = catalog.families.flatMap((family) =>
-    family.sizes.map((size): CsvCell[] => [
-      family.id,
-      family.type,
-      family.standard,
-      `${size.size.system} ${size.size.key}`,
-      size.smallSize === undefined ? null : `${size.smallSize.system} ${size.smallSize.key}`,
-      size.schedule ?? null,
-      size.class ?? null,
-      size.pn ?? null,
-      size.facing ?? null,
-      ...names.map((name) => size.dims[name]?.value ?? null),
-      Object.values(size.dims).every((dim) => dim.verified),
-    ]),
+    family.sizes.map((size): CsvCell[] => {
+      const first = Object.keys(size.dims)
+        .sort()
+        .map((name) => size.dims[name])[0];
+      const source = first?.provenance;
+      return [
+        family.id,
+        family.type,
+        family.standard,
+        `${size.size.system} ${size.size.key}`,
+        size.smallSize === undefined ? null : `${size.smallSize.system} ${size.smallSize.key}`,
+        size.schedule ?? null,
+        size.class ?? null,
+        size.pn ?? null,
+        size.facing ?? null,
+        family.dimensionalStandard,
+        family.radius ?? null,
+        family.ends.join(' ') || null,
+        source?.sourceId ?? null,
+        source?.citation ?? null,
+        source?.url ?? null,
+        source?.accessed ?? null,
+        ...names.map((name) => size.dims[name]?.value ?? null),
+        Object.values(size.dims).every((dim) => dim.verified),
+      ];
+    }),
   );
-  return csvLines([...CSV_FIXED, ...names, 'verified'], guardRows(rows));
+  return csvLines(
+    [...CATALOG_FIXED_COLUMNS, ...names.map(header), 'verified'].map((name) => guardCell(name) as string),
+    guardRows(rows),
+  );
 }
 
 /**
