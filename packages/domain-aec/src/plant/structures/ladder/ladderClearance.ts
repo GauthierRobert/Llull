@@ -55,7 +55,7 @@ function rotated(centre: Vec2, angle: number, length: number, width: number): Ve
   );
 }
 
-function obstacleOf(doc: CadDocument, building: BuildingModel, element: BuildingElement): Obstacle | null {
+export function obstacleOf(doc: CadDocument, building: BuildingModel, element: BuildingElement): Obstacle | null {
   if (!('levelId' in element)) return null;
   const level = building.levels[element.levelId];
   if (level === undefined) return null;

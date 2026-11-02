@@ -2,6 +2,9 @@
 
 import { commandCatalog } from '@core/commands/schema';
 import { checkAccess } from './access/checkAccess';
+import { accessGraph } from './access/graph/accessGraphCommand';
+import { checkReachability } from './access/reach/checkReachability';
+import { exportAccessPlan } from './symbols/exportAccessPlan';
 import { listAccessRules } from './access/listAccessRules';
 import { addGrating } from './grating/addGrating';
 import { checkGrating } from './grating/checkGrating';
@@ -35,4 +38,7 @@ export const structuresCommands = commandCatalog(
   accessPlatformTakeoff,
   addPipeRack,
   updatePipeRack,
+  accessGraph,
+  checkReachability,
+  exportAccessPlan,
 );

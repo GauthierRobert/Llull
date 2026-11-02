@@ -1,40 +1,18 @@
 {
   "id": "SC-STA-03",
-  "status": "BUILT in M6 (add_circular_access_platform, access_platform_takeoff, check_access on the assembly id); the final row (STA_ACCESS_NO_EGRESS) waits for check_reachability (M8)",
-  "validates": [
-    "VC-STA-07",
-    "VC-STA-08"
-  ],
+  "status": "BUILT in M6 (add_circular_access_platform, access_platform_takeoff, check_access on the assembly id); the final row (STA_ACCESS_NO_EGRESS) is met since M8 by the access graph in check_access",
+  "validates": ["VC-STA-07", "VC-STA-08"],
   "description": "Half-round (180 deg) platform at +6000 around a 3000 mm OD vertical vessel, 150 mm gap, 1000 mm grating width, 19-W-4 grating 43.45 kg/m2: area, grating mass, railing length and posts in closed form",
   "actions": [
-    {
-      "command": "set_units",
-      "params": {
-        "units": "mm"
-      }
-    },
-    {
-      "command": "add_level",
-      "params": {
-        "name": "Grade",
-        "elevation": 0,
-        "height": 6000
-      }
-    },
+    { "command": "set_units", "params": { "units": "mm" } },
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0, "height": 6000 } },
     {
       "command": "add_equipment",
       "params": {
         "name": "Column",
         "mark": "C-101",
-        "location": [
-          0,
-          0
-        ],
-        "size": [
-          3000,
-          3000,
-          18000
-        ],
+        "location": [0, 0],
+        "size": [3000, 3000, 18000],
         "shape": "vertical_vessel",
         "weight": 42000
       },
@@ -52,62 +30,25 @@
         "gratingType": "19-W-4 1-1/4x3/16",
         "bracketProfile": "UPN160",
         "bracketSpacingMax": 1500,
-        "railing": {
-          "edges": [
-            "outer",
-            "ends"
-          ],
-          "height": 1100,
-          "postSpacingMax": 1500,
-          "kneeRails": 1,
-          "toePlate": 100
-        }
+        "railing": { "edges": ["outer", "ends"], "height": 1100, "postSpacingMax": 1500, "kneeRails": 1, "toePlate": 100 }
       },
       "as": "plat"
     },
-    {
-      "command": "access_platform_takeoff",
-      "params": {
-        "ids": [
-          "$plat"
-        ]
-      }
-    },
+    { "command": "access_platform_takeoff", "params": { "ids": ["$plat"] } },
     {
       "command": "check_access",
       "params": {
-        "ids": [
-          "$plat"
-        ],
-        "rulesets": [
-          "iso_14122"
-        ],
+        "ids": ["$plat"],
+        "rulesets": ["iso_14122"],
         "edgeDropThresholdMm": 500,
         "edgeDropSource": "project rule (owner supplied); no grade-A rule row exists for the edge-protection trigger"
       }
     }
   ],
   "expected": [
-    {
-      "step": 4,
-      "path": "data.platforms[0].innerRadiusMm",
-      "value": 1650,
-      "abs": 0.001,
-      "source": "D/2 + gap"
-    },
-    {
-      "step": 4,
-      "path": "data.platforms[0].outerRadiusMm",
-      "value": 2650,
-      "abs": 0.001
-    },
-    {
-      "step": 4,
-      "path": "data.platforms[0].gratingAreaM2",
-      "value": 6.754424,
-      "rel": 0.000001,
-      "source": "theta/2 (ro^2 - ri^2)"
-    },
+    { "step": 4, "path": "data.platforms[0].innerRadiusMm", "value": 1650, "abs": 0.001, "source": "D/2 + gap" },
+    { "step": 4, "path": "data.platforms[0].outerRadiusMm", "value": 2650, "abs": 0.001 },
+    { "step": 4, "path": "data.platforms[0].gratingAreaM2", "value": 6.754424, "rel": 0.000001, "source": "theta/2 (ro^2 - ri^2)" },
     {
       "step": 4,
       "path": "data.platforms[0].gratingMassKg",
@@ -115,13 +56,7 @@
       "rel": 0.0001,
       "source": "area x 8.9 psf (43.4536 kg/m2, S20/S21)"
     },
-    {
-      "step": 4,
-      "path": "data.platforms[0].outerArcM",
-      "value": 8.325221,
-      "rel": 0.000001,
-      "source": "theta ro"
-    },
+    { "step": 4, "path": "data.platforms[0].outerArcM", "value": 8.325221, "rel": 0.000001, "source": "theta ro" },
     {
       "step": 4,
       "path": "data.platforms[0].railingLengthM",
@@ -146,15 +81,12 @@
       "path": "data.findings[code=STA_EDGE_UNPROTECTED]",
       "value": "absent",
       "source": "outer edge and both ends railed; inner edge gap 150 mm to the vessel"
-    }
-  ],
-  "deferred": [
+    },
     {
       "step": 5,
       "path": "data.findings[code=STA_ACCESS_NO_EGRESS].severity",
       "value": "fail",
-      "source": "no stair or ladder reaches the platform yet — the check must say so",
-      "waitsFor": "check_reachability (M8): the access graph that says no ladder or stair reaches the platform"
+      "source": "no stair or ladder reaches the platform: the access graph says so (STA_ACCESS_NO_EGRESS, 06 STA M8)"
     }
   ]
 }

@@ -70,6 +70,26 @@ const REMEDIATION = {
   STA_EDGE_UNPROTECTED:
     'Protect the edge: add_railing { hostId, edges } (a railing below the top-rail minimum does not count: update_railing { height }) or a guard wall of at least 1100 mm.',
   STA_EDGE_RULE_UNSET: 'Pass edgeDropThresholdMm with its source (edgeDropSource): there is no graded drop-height rule to default to.',
+  STA_NO_GRADE: 'The access graph starts at grade, the lowest building level: add_level first.',
+  STA_ACCESS_GRAPH_LIMIT:
+    'The model is larger than the access graph handles (surfaces, connectors, targets or contact tests): check fewer targets at a time, or reduce the number of loose grating panels (a platform assembly counts as one node).',
+  STA_TARGETS_INVALID:
+    'Give targets (explicit { tag, kind, point } in document units) and/or targetsFrom, and an operatingHeightMm band with min <= max and its source; targetsFrom needs a millimetre document.',
+  STA_TARGET_DUPLICATE: 'Give every target a unique tag (the tag selects the target in the answer).',
+  STA_TARGET_UNLOCATED:
+    'The target has no operating point (a valve whose catalogue row has no stem height or stem direction): pass it as an explicit target with its point, or complete the catalogue row.',
+  STA_OPERATING_HEIGHT:
+    'Add a platform, stair or ladder so that the operating point is within the band above a walking surface, or move the operating point (the band is the project rule given as operatingHeightMm).',
+  STA_REACH:
+    'No walking surface lies at or below the operating point within maxHorizontalReachMm in plan: add a platform under it, or move the operating point.',
+  STA_ACCESS_NO_EGRESS:
+    'The walking surface has no route to grade (or fewer routes than egressRoutesRequired): add a ladder (add_ladder attachTo), a steel stair (add_steel_stair toSurfaceId) or a stair that reaches it.',
+  STA_PLATFORM_WIDTH:
+    'Widen the platform (update_access_platform { boundary } for a deck, { width } for a circular platform) to at least the limit.',
+  STA_PLATFORM_HEADROOM:
+    'Raise the obstruction above the platform, or lower the platform (update_access_platform { elevation }), to at least the limit.',
+  STA_NOTHING_TO_DRAW:
+    'Add access elements (platforms, gratings, ladders, steel stairs, railings) on the level, or drop the levelId filter.',
   STA_RULE_UNVERIFIED: 'The rule is grade B (not confirmed against the full standard): a reviewer confirms it against the standard text.',
 } as const;
 

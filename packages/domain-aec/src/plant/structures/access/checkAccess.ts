@@ -9,6 +9,7 @@ import { RULESET_NAMES, RULE_TABLE_VERSION, type AccessRule } from '../rules/rul
 import { checkEdges, edgeRuleUnsetFinding, type EdgeReport } from './edgeChecks';
 import { unverifiedFindings, type Finding } from './finding';
 import { LADDER_RULES_NOT_EVALUATED, checkLadder, ladderRules } from './ladderChecks';
+import { checkPlatforms, type PlatformReport } from './platformChecks';
 import { checkRailing, RAILING_RULES_NOT_EVALUATED, railingRules } from './railingChecks';
 import { checkStair, checkSteelStair, STAIR_RULES_NOT_EVALUATED, stairRules } from './stairChecks';
 
@@ -49,7 +50,7 @@ export const checkAccess = defineCommand({
   description:
     'Check access means of the BUILDING model against the access rules (ISO 14122, OSHA 29 CFR 1910) and list findings with stable STA_* codes, ' +
     'measured value, limit, clause, source and a one-line fix. It covers concrete stairs (add_stair) and steel stairs (add_steel_stair): Blondel 2h+g, riser, tread, pitch angle, width, ' +
-    'flight rise (the longest flight between landings), guard-rails (add_railing: top-rail height, clear space between rails, toe plate), fixed ladders (add_ladder: rung pitch, clear width, back clearance, stile extension, fall protection by height and installation date, cage start / hoops / diameter, landing interval), the gratings and guard-rails of generated platforms (pass the platform assembly id: it stands for its parts; a platform that no longer matches its vessel or beams fails with STA_PLATFORM_STALE, a pipe rack that no longer matches its parameters with STA_RACK_STALE) and open edges of slabs (add_slab) and grating panels (add_grating). Only grade A rules fail; grade B rules warn and add STA_RULE_UNVERIFIED; the result always has ' +
+    'flight rise (the longest flight between landings), guard-rails (add_railing: top-rail height, clear space between rails, toe plate), fixed ladders (add_ladder: rung pitch, clear width, back clearance, stile extension, fall protection by height and installation date, cage start / hoops / diameter, landing interval), the gratings and guard-rails of generated platforms (pass the platform assembly id: it stands for its parts; a platform that no longer matches its vessel or beams fails with STA_PLATFORM_STALE, a pipe rack that no longer matches its parameters with STA_RACK_STALE), and for generated platforms the walkway width (ISO-PLT-WIDTH, STA_PLATFORM_WIDTH), the headroom over the deck to the lowest modelled obstruction (ISO-PLT-HEADROOM, STA_PLATFORM_HEADROOM: other surfaces, walls, columns, steel, equipment; pipes and trays are not modelled as obstructions) and the route to grade through the access graph (STA_ACCESS_NO_EGRESS: a platform no ladder or stair reaches fails; routes start at grade = the lowest building level, reported per platform as gradeLevelId / gradeElevationMm; egressRoutesRequired asks for several edge-disjoint routes, e.g. 2 for a second means of egress) and open edges of slabs (add_slab) and grating panels (add_grating). Only grade A rules fail; grade B rules warn and add STA_RULE_UNVERIFIED; the result always has ' +
     'reviewRequired: true (a qualified person signs access means). Lengths in the answer are millimetres and angles degrees, whatever the document units. ' +
     'Open edges need edgeDropThresholdMm (no graded rule exists, so there is no default): without it the edge check is skipped with the warning STA_EDGE_RULE_UNSET. ' +
     'The drop is measured from the slab top to the next surface below (another slab, else the lowest level elevation); an edge is protected when the drop is ' +
@@ -71,10 +72,10 @@ export const checkAccess = defineCommand({
         'Building element ids (stairs, steel stairs, slabs, gratings, railings, ladders) to check. Default: every one. Other element kinds are listed under `skipped`.',
       ),
     include: z
-      .array(z.enum(['stairs', 'edges', 'railings', 'ladders']))
+      .array(z.enum(['stairs', 'edges', 'railings', 'ladders', 'platforms']))
       .optional()
       .describe(
-        'Which checks to run: "stairs" (concrete and steel stairs), "edges" (open edges of slabs and gratings) and/or "railings" (guard-rail rules) and/or "ladders" (fixed-ladder rules). Default all four.',
+        'Which checks to run: "stairs" (concrete and steel stairs), "edges" (open edges of slabs and gratings) and/or "railings" (guard-rail rules) and/or "ladders" (fixed-ladder rules) and/or "platforms" (platform width, headroom and route to grade). Default all five.',
       ),
     edgeDropThresholdMm: z
       .number()
@@ -87,6 +88,19 @@ export const checkAccess = defineCommand({
       .string()
       .optional()
       .describe('Where edgeDropThresholdMm comes from (project document, clause); echoed in the findings.'),
+    egressRoutesRequired: z
+      .number()
+      .int()
+      .min(1)
+      .max(4)
+      .optional()
+      .describe(
+        'Platform egress: how many edge-disjoint routes to grade every generated platform needs (a second means of egress = 2). Default 1: only a missing route is a finding. No graded rule gives the number: say where it comes from in egressSource.',
+      ),
+    egressSource: z
+      .string()
+      .optional()
+      .describe('Where egressRoutesRequired comes from (project document, clause); echoed in the findings.'),
   }),
   run: (doc, params): CommandResult => {
     const building = getBuilding(doc);
@@ -103,9 +117,11 @@ export const checkAccess = defineCommand({
               return element?.category === 'assembly' ? element.partIds : [id];
             }),
           );
-    const include = params.include ?? ['stairs', 'edges', 'railings', 'ladders'];
-    const picked = <T extends { id: string }>(elements: readonly T[], kind: 'stairs' | 'edges' | 'railings' | 'ladders'): T[] =>
-      include.includes(kind) ? elements.filter((element) => wanted?.has(element.id) ?? true) : [];
+    const include = params.include ?? ['stairs', 'edges', 'railings', 'ladders', 'platforms'];
+    const picked = <T extends { id: string }>(
+      elements: readonly T[],
+      kind: 'stairs' | 'edges' | 'railings' | 'ladders' | 'platforms',
+    ): T[] => (include.includes(kind) ? elements.filter((element) => wanted?.has(element.id) ?? true) : []);
     const stairs = picked(elementsOf(building, 'stair'), 'stairs');
     const steelStairs = picked(elementsOf(building, 'steelStair'), 'stairs');
     const slabIds = picked(elementsOf(building, 'slab'), 'edges').map((slab) => slab.id);
@@ -134,6 +150,16 @@ export const checkAccess = defineCommand({
     for (const assembly of platforms) {
       const reason = assemblyStaleReason(doc, building, assembly);
       if (reason !== null) findings.push(staleAssemblyFinding(assembly.id, assembly.kind, reason));
+    }
+
+    let platformReports: PlatformReport[] = [];
+    if (include.includes('platforms')) {
+      const judged = checkPlatforms(doc, building, platforms, params.rulesets, {
+        routes: params.egressRoutesRequired ?? 1,
+        source: params.egressSource,
+      });
+      findings.push(...judged.findings);
+      platformReports = judged.reports;
     }
 
     let edges: EdgeReport[] = [];
@@ -178,8 +204,10 @@ export const checkAccess = defineCommand({
         gratings: gratingIds.length,
         railings: railings.length,
         ladders: ladders.length,
+        platforms: platformReports.length,
         edges: edges.length,
       },
+      platforms: platformReports,
       skipped,
       rulesets: params.rulesets,
       ruleTableVersion: RULE_TABLE_VERSION,
@@ -189,6 +217,21 @@ export const checkAccess = defineCommand({
         ...(stairs.length + steelStairs.length > 0 ? STAIR_RULES_NOT_EVALUATED : []),
         ...(railings.length > 0 ? RAILING_RULES_NOT_EVALUATED : []),
         ...(ladders.length > 0 ? LADDER_RULES_NOT_EVALUATED : []),
+        ...(platformReports.length > 0
+          ? [
+              ...(params.rulesets.includes('iso_14122')
+                ? []
+                : ['ISO-PLT-WIDTH', 'ISO-PLT-HEADROOM'].map((ruleId) => ({
+                    ruleId,
+                    reason: 'judged only under iso_14122 (not requested)',
+                  }))),
+              {
+                ruleId: 'ISO-PLT-HEADROOM',
+                reason:
+                  'pipes, cable trays, ducts, ladders and stairs above a platform are not modelled as obstructions; the clear width is the deck width between its edges (posts and toe plates are not deducted)',
+              },
+            ]
+          : []),
         ...(railings.some((railing) => railing.role === 'handrail')
           ? [{ ruleId: 'handrail', reason: 'no hand-rail rule rows are loaded: hand-rails are listed but not checked' }]
           : []),
@@ -196,7 +239,7 @@ export const checkAccess = defineCommand({
     };
     return report(
       doc,
-      `check_access: ${verdict} — ${stairs.length} stair(s)${steelStairs.length > 0 ? `, ${steelStairs.length} steel stair(s)` : ''}, ${railings.length} railing(s), ${ladders.length} ladder(s), ${surfaceIds.length} slab/grating surface(s) (${edges.length} edges): ${fails} fail, ${findings.length - fails} warn ` +
+      `check_access: ${verdict} — ${stairs.length} stair(s)${steelStairs.length > 0 ? `, ${steelStairs.length} steel stair(s)` : ''}, ${railings.length} railing(s), ${ladders.length} ladder(s), ${platformReports.length} platform(s), ${surfaceIds.length} slab/grating surface(s) (${edges.length} edges): ${fails} fail, ${findings.length - fails} warn ` +
         `(rule table ${RULE_TABLE_VERSION}); review required.`,
       data,
     );
