@@ -11,12 +11,12 @@ export interface Valve {
   readonly leg: number;
 }
 /** Leg 0 is vertical (1500), legs 1 and 2 horizontal (3000): one valve per leg fits. Route order: XV-1, XV-2, XV-3 from the pump. */
-export const VALVES: readonly Valve[] = [
+const VALVES: readonly Valve[] = [
   { tag: 'XV-1', type: 'valveGate', leg: 0 },
   { tag: 'XV-2', type: 'valveGate', leg: 1 },
   { tag: 'XV-3', type: 'valveGate', leg: 2 },
 ];
-export const DEXPI_OF: Readonly<Record<string, string>> = { valveGate: 'GateValve' };
+const DEXPI_OF: Readonly<Record<string, string>> = { valveGate: 'GateValve' };
 
 export interface Scene3d {
   readonly doc: CadDocument;
