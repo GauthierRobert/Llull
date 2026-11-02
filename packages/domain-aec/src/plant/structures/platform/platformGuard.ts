@@ -1,11 +1,12 @@
 /** Derivation guard of the platform assemblies (06 STA M6, architecture L8): generated members, gratings and railings are read-only. */
 
 import type { DerivationGuard } from '@core/commands/derivation';
+import type { AssemblyElement } from '@aec/building/types';
 import { definitionOf } from './platformDefinition';
 
 /**
- * A part of an assembly changes or disappears only together with its assembly: while the assembly is unchanged in the result, an edited,
- * replaced or deleted part is refused (CMD_DERIVED_GEOMETRY); deleting the assembly takes its parts along, and update_access_platform changes both.
+ * A part of an assembly changes or disappears only through a regeneration of its assembly, which raises `generation`; deleting the assembly
+ * takes its parts along. An edit of the assembly that does not regenerate it (a mark) is no escape, and a deleted assembly whose parts survive is refused.
  */
 export const platformAssemblyGuard: DerivationGuard = {
   domain: 'platform',
@@ -18,12 +19,17 @@ export const platformAssemblyGuard: DerivationGuard = {
     for (const element of Object.values(before.elements)) {
       if (element.category !== 'assembly') continue;
       const current = after.elements[element.id];
-      if (current === undefined || definitionOf(current, false) !== definitionOf(element, false)) continue;
-      for (const id of element.partIds)
-        if (definitionOf(after.elements[id], false) !== definitionOf(before.elements[id], false)) {
+      const regenerated = current?.category === 'assembly' && (current as AssemblyElement).generation > element.generation;
+      if (regenerated) continue;
+      const deleted = current === undefined;
+      for (const id of element.partIds) {
+        const gone = after.elements[id] === undefined;
+        if (deleted && gone) continue;
+        if (definitionOf(after.elements[id], false) !== definitionOf(before.elements[id], false) || deleted) {
           edited.push(id);
           assemblyId = element.id;
         }
+      }
     }
     if (edited.length === 0) return null;
     return (

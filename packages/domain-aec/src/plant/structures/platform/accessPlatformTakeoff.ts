@@ -5,7 +5,7 @@ import { elementsOf, getBuilding } from '../../../building/model';
 import { round } from '../../../shared/numeric';
 import { refuse } from '../codes';
 import { platformQuantities } from './platformMeasure';
-import { generate, samePlatform, specOf } from './platformRegenerate';
+import { staleReason } from './platformStale';
 
 /**
  * @affects none: read-only query, answers in `data` { platforms[], totals }
@@ -31,17 +31,8 @@ export const accessPlatformTakeoff = defineCommand({
     const platforms = elementsOf(building, 'assembly')
       .filter((assembly) => wanted?.has(assembly.id) ?? true)
       .map((assembly) => {
-        const spec = specOf(assembly);
-        const fresh = spec === null ? null : generate(doc, building, assembly, spec);
-        const staleReason =
-          spec === null
-            ? 'the stored parameters no longer parse'
-            : fresh?.ok !== true
-              ? (fresh?.message ?? 'cannot be derived')
-              : samePlatform(building, fresh.building, assembly.id)
-                ? null
-                : 'the vessel or the beams changed since the parts were derived';
-        return { ...platformQuantities(doc, building, assembly), stale: staleReason !== null, staleReason };
+        const reason = staleReason(doc, building, assembly);
+        return { ...platformQuantities(doc, building, assembly), stale: reason !== null, staleReason: reason };
       });
     const totals = {
       platforms: platforms.length,

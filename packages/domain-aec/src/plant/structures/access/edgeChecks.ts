@@ -13,8 +13,17 @@ import { ruleById, type RulesetName } from '../rules/ruleTable';
 import { guardedSegments } from '../railing/railingLayout';
 import type { Finding } from './finding';
 
-/** Drop samples along an edge: near each end and at mid-edge, inset so that a curved neighbour (a sector panel) still contains the end samples. */
-const SAMPLES: readonly number[] = [0.05, 0.5, 0.95];
+/** Drop samples along an edge: every <= 250 mm, the first and last inset by 5 mm so that a curved neighbour (a sector panel) still contains the end samples; at most 200. */
+const SAMPLE_STEP_MM = 250;
+const END_INSET_MM = 5;
+const MAX_SAMPLES = 200;
+
+/** Parameters t in (0, 1) of the drop samples of an edge of `lengthMm`. */
+function sampleParameters(lengthMm: number): number[] {
+  const inset = Math.min(END_INSET_MM, lengthMm / 4) / lengthMm;
+  const intervals = Math.min(MAX_SAMPLES - 1, Math.max(1, Math.ceil(lengthMm / SAMPLE_STEP_MM)));
+  return Array.from({ length: intervals + 1 }, (_, index) => inset + ((1 - 2 * inset) * index) / intervals);
+}
 /** Sample offset outward from the edge, mm (§5.8). */
 const SAMPLE_OFFSET_MM = 100;
 /** A surface within this height of the slab top is a continuation of it, mm. */
@@ -76,6 +85,7 @@ interface GuardRun {
 interface Shell {
   readonly centre: Vec2;
   readonly radiusMm: number;
+  readonly baseMm: number;
   readonly topMm: number;
 }
 
@@ -164,6 +174,7 @@ function buildScene(doc: CadDocument, building: BuildingModel, rulesets: readonl
       {
         centre: [toMm(doc, equipment.location[0]), toMm(doc, equipment.location[1])],
         radiusMm: toMm(doc, equipment.size[0]) / 2,
+        baseMm: toMm(doc, level.elevation),
         topMm: toMm(doc, level.elevation + equipment.size[2]),
       },
     ];
@@ -223,10 +234,11 @@ function guardCoverage(scene: Scene, surface: Surface, a: Vec2, b: Vec2): number
   return covered / length;
 }
 
-/** True when a vessel shell reaching the guard height above the surface stands within the guard opening of the whole edge `a`-`b`. */
+/** True when a vessel shell standing from below the surface up to the guard height above it is within the guard opening of the whole edge `a`-`b`. */
 function shellCloses(scene: Scene, surface: Surface, a: Vec2, b: Vec2): boolean {
   return scene.shells.some(
     (shell) =>
+      shell.baseMm <= surface.topMm &&
       shell.topMm - surface.topMm >= scene.guardMm &&
       [0, 0.5, 1].every((t) => {
         const gap = Math.hypot(a[0] + (b[0] - a[0]) * t - shell.centre[0], a[1] + (b[1] - a[1]) * t - shell.centre[1]) - shell.radiusMm;
@@ -295,7 +307,7 @@ function surfaceEdges(scene: Scene, id: string, threshold: EdgeThreshold): EdgeR
         a[0] + (b[0] - a[0]) * t + nx * SAMPLE_OFFSET_MM,
         a[1] + (b[1] - a[1]) * t + ny * SAMPLE_OFFSET_MM,
       ];
-      const drop = Math.max(...SAMPLES.map((t) => dropAt(scene, id, surface.topMm, sample(t))));
+      const drop = Math.max(...sampleParameters(length).map((t) => dropAt(scene, id, surface.topMm, sample(t))));
       const guarded = drop > threshold.mm && (shellCloses(scene, surface, a, b) || guardCoverage(scene, surface, a, b) >= COVERAGE);
       const isProtected = drop <= threshold.mm || guarded;
       const location = `${label} edge ${index}`;

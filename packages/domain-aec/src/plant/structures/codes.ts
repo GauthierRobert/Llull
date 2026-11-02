@@ -49,6 +49,8 @@ const REMEDIATION = {
   STA_OUTSIDE_SHELL: 'Give an elevation above the vessel base (level-relative) and not above its top: 0 < elevation <= the vessel height.',
   STA_PLATFORM_OVERLAP:
     'Move or reshape the platform (update_access_platform) so it does not overlap the named platform at the same elevation, or change its topOffset / elevation.',
+  STA_PLATFORM_STALE:
+    'The vessel or the beams the platform was derived from changed: update_access_platform { assemblyId } re-derives it (ids kept); the reason is in the finding.',
   STA_STAIR_BLONDEL:
     'Change riserCount or treadDepth of the stair (a steel stair: delete it and add_steel_stair again with another riserMax / going) so that 2 x riser + going is within the ISO range.',
   STA_STAIR_RISER: 'Increase riserCount (steel stair: lower riserMax) so the riser height drops under the limit.',

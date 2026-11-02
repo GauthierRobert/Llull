@@ -35,3 +35,26 @@ export function samePlatform(before: BuildingModel, after: BuildingModel, assemb
   if (a?.category !== 'assembly' || b?.category !== 'assembly' || definitionOf(a, true) !== definitionOf(b, true)) return false;
   return a.partIds.every((id) => definitionOf(before.elements[id], true) === definitionOf(after.elements[id], true));
 }
+
+export type FollowOutcome =
+  | { readonly ok: true; readonly building: BuildingModel; readonly ids: string[] }
+  | { readonly ok: false; readonly message: string };
+
+/**
+ * Re-derives every platform hosted by one of `hostIds` (a circular platform follows its vessel, 06 STA FR-STA-14) in `building`, where the hosts
+ * already have their new place. Part ids and marks are kept. Refuses (with the reason) when a platform cannot follow, e.g. the vessel no longer reaches its elevation.
+ */
+export function followHosts(doc: CadDocument, building: BuildingModel, hostIds: ReadonlySet<string>): FollowOutcome {
+  let next = building;
+  const ids: string[] = [];
+  for (const assembly of Object.values(building.elements)) {
+    if (assembly.category !== 'assembly' || assembly.hostId === undefined || !hostIds.has(assembly.hostId)) continue;
+    const spec = specOf(assembly);
+    if (spec === null) return { ok: false, message: `the stored parameters of ${assembly.id} no longer parse` };
+    const built = generate(doc, next, assembly, spec);
+    if (!built.ok) return { ok: false, message: `platform ${assembly.id} cannot follow ${assembly.hostId}: ${built.message}` };
+    next = built.building;
+    ids.push(assembly.id, ...built.partIds);
+  }
+  return { ok: true, building: next, ids };
+}
