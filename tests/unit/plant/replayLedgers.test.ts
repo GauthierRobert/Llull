@@ -86,3 +86,25 @@ describe('a recorded { verified: true } is honoured by replay only', () => {
     expect(edited.document).toBe(doc);
   });
 });
+
+describe('a recipe is not a history replay: instantiate_recipe never honours a recorded confirmation', () => {
+  const recipeThenDelete = (stepName: string): CadDocument => {
+    const saved = execute(signedPlantDoc(), 'save_recipe', { name: 'signed' }, signingContext).document;
+    return execute(saved, 'delete_step', { stepId: stepId(saved, stepName) }, signingContext).document;
+  };
+
+  it('issue_isometric: save_recipe, delete the issue step, instantiate_recipe does not re-issue (no signature)', () => {
+    const deleted = recipeThenDelete('issue_isometric');
+    expect(issueCount(deleted)).toBe(0);
+    expect(deleted.plant?.fabrication?.issueLedger).toHaveLength(1);
+    const instantiated = execute(deleted, 'instantiate_recipe', { name: 'signed' }, signingContext).document;
+    expect(issueCount(instantiated)).toBe(0);
+  });
+
+  it('approve_pipe_spec: save_recipe, delete the approval step, instantiate_recipe does not re-approve (no signature)', () => {
+    const deleted = recipeThenDelete('approve_pipe_spec');
+    expect(specStatus(deleted)).toBe('draft');
+    const instantiated = execute(deleted, 'instantiate_recipe', { name: 'signed' }, signingContext).document;
+    expect(specStatus(instantiated)).toBe('draft');
+  });
+});
