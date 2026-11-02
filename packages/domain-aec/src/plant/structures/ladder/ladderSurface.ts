@@ -28,6 +28,23 @@ export function walkingSurfaces(building: BuildingModel): WalkingSurface[] {
   return surfaces;
 }
 
+/**
+ * The surfaces `id` names: a slab or grating panel, or a platform assembly (06 STA M6: all its grating panels, one deck at one top). Empty when
+ * `id` names neither.
+ */
+export function namedSurfaces(building: BuildingModel, surfaces: ReadonlyArray<WalkingSurface>, id: string): WalkingSurface[] {
+  const element = building.elements[id];
+  if (element?.category === 'assembly') return surfaces.filter((surface) => element.partIds.includes(surface.id));
+  return surfaces.filter((surface) => surface.id === id);
+}
+
+/** The surface of `candidates` nearest to `point` in plan (lowest id on a tie). */
+export function nearestSurface(candidates: ReadonlyArray<WalkingSurface>, point: Vec2): WalkingSurface | undefined {
+  return candidates
+    .map((surface) => ({ surface, distance: distanceToRing(point, surface.ring) }))
+    .sort((a, b) => a.distance - b.distance || a.surface.id.localeCompare(b.surface.id))[0]?.surface;
+}
+
 /** Plan distance from `point` to the polygon: 0 inside, else to the nearest edge. */
 export function distanceToRing(point: Vec2, ring: ReadonlyArray<Vec2>): number {
   if (pointInPolygon(point, ring)) return 0;

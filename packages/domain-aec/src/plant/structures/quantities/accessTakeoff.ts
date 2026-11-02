@@ -8,11 +8,12 @@ import type { TakeoffAccumulator } from '../../../building/quantities/takeoffBas
 import { round } from '../../../shared/numeric';
 import { gratingAreaM2, gratingMassKg } from '../grating/gratingMeasure';
 import { ladderQuantities } from '../ladder/ladderMeasure';
+import { platformQuantities } from '../platform/platformMeasure';
 
 import { railingQuantities } from '../railing/railingMeasure';
 import { stairGeometryMm, stairQuantities } from '../stair/steelStairMeasure';
 
-/** Adds `steelStair.<part>.m|ea|kg`, `grating.<type>.m2|kg|ea`, `railing.<part>.m|ea|kg` and `ladder.<part>.ea|m|kg` lines. */
+/** Adds `steelStair.<part>.m|ea|kg`, `grating.<type>.m2|kg|ea`, `railing.<part>.m|ea|kg`, `ladder.<part>.ea|m|kg` and `platform.<kind>.ea` lines (a platform's parts are counted in their own lines). */
 export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, takeoff: TakeoffAccumulator): void {
   for (const grating of elementsOf(building, 'grating')) {
     takeoff.add('grating', grating.gratingType, `Grating ${grating.gratingType}`, [
@@ -37,6 +38,8 @@ export function addAccessTakeoff(doc: CadDocument, building: BuildingModel, take
     if (quantities.landings > 0) takeoff.add('ladder', 'landing', 'Ladder landings', [['ea', 'count', quantities.landings]]);
     takeoff.add('ladder', 'steel', 'Ladder steel', [['kg', 'stiles, rungs, cage and landings', quantities.steelKg]]);
   }
+  for (const assembly of elementsOf(building, 'assembly'))
+    takeoff.add('assembly', assembly.kind, `Platform (${assembly.kind})`, [['ea', 'count', 1]], 'platform');
   for (const stair of elementsOf(building, 'steelStair')) {
     const quantities = stairQuantities(doc, stair);
     takeoff.add('steelStair', 'stringer', 'Steel stair stringers', [['m', 'centre-line length, both sides', quantities.stringerM]]);
@@ -74,6 +77,25 @@ export function railingScheduleRows(doc: CadDocument, building: BuildingModel): 
       round(toMm(doc, railing.toePlate), 1),
       round(quantities?.steelKg ?? 0, 1),
       building.levels[railing.levelId]?.name ?? railing.levelId,
+    ];
+  });
+}
+
+/** Platform schedule: mark, kind, members, panels, grating area (m2) and mass (kg), railing length (m), posts, steel kg, level. */
+export function platformScheduleRows(doc: CadDocument, building: BuildingModel): Row[] {
+  return elementsOf(building, 'assembly').map((assembly) => {
+    const quantities = platformQuantities(doc, building, assembly);
+    return [
+      assembly.mark,
+      assembly.kind,
+      quantities.members,
+      quantities.panels,
+      round(quantities.gratingAreaM2, 3),
+      round(quantities.gratingMassKg, 1),
+      round(quantities.railingLengthM, 2),
+      quantities.posts,
+      round(quantities.steelKg, 1),
+      quantities.level,
     ];
   });
 }

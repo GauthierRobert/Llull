@@ -33,7 +33,8 @@ export type BimCategory =
   | 'grating'
   | 'railing'
   | 'ladder'
-  | 'steelStair';
+  | 'steelStair'
+  | 'assembly';
 
 /** A building storey. `elevation` is the finished-floor height; `height` is floor-to-floor. */
 export interface BuildingLevel {
@@ -183,7 +184,7 @@ export interface RoomElement extends LevelElementBase {
 }
 
 /** Structural role of a steel member (drives layer, mark prefix and IFC class). */
-export type MemberRole = 'column' | 'rafter' | 'beam' | 'brace' | 'purlin' | 'rail' | 'crane';
+export type MemberRole = 'column' | 'rafter' | 'beam' | 'brace' | 'purlin' | 'rail' | 'crane' | 'bracket';
 
 /** End connection of a beam to the column it frames into: moment-transmitting or not. */
 export type JointFixity = 'pinned' | 'rigid';
@@ -210,6 +211,8 @@ export interface SteelMemberElement extends LevelElementBase {
   endJoint?: JointFixity;
   /** Columns: base fixity in check_steel_members; absent = the base plate's fixity, else pinned. */
   baseFixity?: BaseFixity;
+  /** The platform assembly that generated this member (06 STA M6): read-only, edited through the assembly. */
+  assemblyId?: string;
 }
 
 /** A concrete pad footing; its TOP sits at level elevation + `topOffset` (usually negative). */
@@ -381,6 +384,8 @@ export interface GratingElement extends LevelElementBase {
   bearingBarAngle: number;
   /** The members the bars bear on, one list per side in order along the bar direction (end-to-end members share a side). */
   supportIds: [string[], string[]];
+  /** The platform assembly that generated this panel (06 STA M6). */
+  assemblyId?: string;
 }
 
 /** Guard-rail of a platform edge or hand-rail of a stair side. */
@@ -424,6 +429,8 @@ export interface RailingElement extends LevelElementBase {
   openings: RailingOpening[];
   role: RailingRole;
   host?: RailingHost;
+  /** The platform assembly that generated this railing (06 STA M6). */
+  assemblyId?: string;
 }
 
 /** Fall protection of a fixed ladder; `cage` carries the hoop data in `LadderElement.cage`. */
@@ -497,6 +504,23 @@ export interface SteelStairElement extends LevelElementBase {
   arrivalSurfaceId?: string;
 }
 
+/** Generated assemblies (06 STA M6; pipe racks follow in M7). */
+export type AssemblyKind = 'platform' | 'circular_platform';
+
+/**
+ * A generated platform: `params` holds the resolved generator parameters (document units; replayed by update_access_platform) and `partIds` the
+ * members, grating panels and railings it generated, which carry `assemblyId` and are read-only. `hostId` = the vessel a circular platform follows.
+ */
+export interface AssemblyElement extends LevelElementBase {
+  readonly category: 'assembly';
+  kind: AssemblyKind;
+  params: Record<string, unknown>;
+  partIds: string[];
+  hostId?: string;
+  /** Counts the generations of the parts (1 = first); every regeneration changes the assembly, which is what lets the derivation guard tell it from an edit of a part. */
+  generation: number;
+}
+
 export type BuildingElement =
   | GridElement
   | WallElement
@@ -519,7 +543,8 @@ export type BuildingElement =
   | GratingElement
   | RailingElement
   | LadderElement
-  | SteelStairElement;
+  | SteelStairElement
+  | AssemblyElement;
 
 export interface BuildingModel {
   /** Stable unique id of this building; salts IFC GlobalIds so separate projects never collide. */

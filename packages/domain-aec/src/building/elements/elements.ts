@@ -158,6 +158,7 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'window':
     case 'plate':
     case 'connection':
+    case 'assembly':
       return element;
   }
 }
@@ -208,6 +209,15 @@ export const moveBuildingElement = defineCommand({
     const known = [...new Set(elementIds)].filter((id) => building.elements[id] !== undefined);
     if (known.length === 0) return noop(doc, 'move_building_element: none of the given ids is a building element.');
     if (delta[0] === 0 && delta[1] === 0) return noop(doc, 'move_building_element: delta is [0, 0]; nothing to move.');
+    const generated = known.filter((id) => {
+      const element = building.elements[id];
+      return element?.category === 'assembly' || (element !== undefined && 'assemblyId' in element && element.assemblyId !== undefined);
+    });
+    if (generated.length > 0)
+      return noop(
+        doc,
+        `move_building_element refused: ${generated.join(', ')} belong(s) to a generated platform (read-only); change its boundary or vessel with update_access_platform and the parts are regenerated.`,
+      );
     const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const strayOpenings = known.filter((id) => {
       const element = building.elements[id];

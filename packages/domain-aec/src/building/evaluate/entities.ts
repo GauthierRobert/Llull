@@ -14,7 +14,7 @@ export const CATEGORY_LAYER: Readonly<Record<BimCategory, { name: string; color:
   pipe: { name: 'P-PIPE', color: '#2f9c8f' }, tray: { name: 'E-TRAY', color: '#a07c2c' }, plate: { name: 'S-CONN', color: '#5d6f80' },
   curvedWall: { name: 'A-WALL', color: '#8a8a8a' }, connection: { name: 'S-CONN', color: '#5d6f80' },
   pipeSupport: { name: 'P-SUPP', color: '#c9a227' }, grating: { name: 'S-GRAT', color: '#8f9aa3' }, railing: { name: 'S-RAIL', color: '#d4a72c' },
-  ladder: { name: 'S-LADR', color: '#c98a1d' }, steelStair: { name: 'S-STAR', color: '#b98a2e' },
+  ladder: { name: 'S-LADR', color: '#c98a1d' }, steelStair: { name: 'S-STAR', color: '#b98a2e' }, assembly: { name: 'S-PLAT', color: '#a8a8a8' },
 };
 
 /** Layer per steel member role (AIA structural sub-layers). */
@@ -22,7 +22,7 @@ export const CATEGORY_LAYER: Readonly<Record<BimCategory, { name: string; color:
 export const MEMBER_LAYER: Readonly<Record<MemberRole, { name: string; color: string }>> = {
   column: { name: 'S-COLS', color: '#6d6d6d' }, rafter: { name: 'S-BEAM', color: '#7d8a96' }, beam: { name: 'S-BEAM', color: '#7d8a96' },
   brace: { name: 'S-BRAC', color: '#b5556a' }, purlin: { name: 'S-JOIS', color: '#6f9d6a' }, rail: { name: 'S-JOIS', color: '#6f9d6a' },
-  crane: { name: 'S-CRAN', color: '#d39b2a' },
+  crane: { name: 'S-CRAN', color: '#d39b2a' }, bracket: { name: 'S-BEAM', color: '#7d8a96' },
 };
 
 export const BUILDING_LAYER_COLOR: ReadonlyMap<string, string> = new Map(

@@ -44,6 +44,11 @@ const REMEDIATION = {
     'delete_building_element the ladder and add_ladder again with cage.hoopSpacing / cage.diameter inside the limits.',
   STA_LADDER_LANDING_INTERVAL:
     'delete_building_element the ladder and add_ladder again with landings (leave landings unset to take the generated ones).',
+  STA_EQUIPMENT_NOT_VESSEL:
+    'Pass the id of a vertical vessel (add_equipment shape vertical_vessel, or a plant vertical vessel); for any other deck use add_access_platform.',
+  STA_OUTSIDE_SHELL: 'Give an elevation above the vessel base (level-relative) and not above its top: 0 < elevation <= the vessel height.',
+  STA_PLATFORM_OVERLAP:
+    'Move or reshape the platform (update_access_platform) so it does not overlap the named platform at the same elevation, or change its topOffset / elevation.',
   STA_STAIR_BLONDEL:
     'Change riserCount or treadDepth of the stair (a steel stair: delete it and add_steel_stair again with another riserMax / going) so that 2 x riser + going is within the ISO range.',
   STA_STAIR_RISER: 'Increase riserCount (steel stair: lower riserMax) so the riser height drops under the limit.',

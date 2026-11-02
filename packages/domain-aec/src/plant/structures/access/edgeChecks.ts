@@ -13,12 +13,18 @@ import { ruleById, type RulesetName } from '../rules/ruleTable';
 import { guardedSegments } from '../railing/railingLayout';
 import type { Finding } from './finding';
 
+/** Drop samples along an edge: near each end and at mid-edge, inset so that a curved neighbour (a sector panel) still contains the end samples. */
+const SAMPLES: readonly number[] = [0.05, 0.5, 0.95];
 /** Sample offset outward from the edge, mm (§5.8). */
 const SAMPLE_OFFSET_MM = 100;
 /** A surface within this height of the slab top is a continuation of it, mm. */
 const SAME_SURFACE_MM = 1;
 /** Share of the edge length a wall must cover to protect it. */
 const COVERAGE = 0.99;
+/** An edge point may sit this far inside the shell circle (chord of a discretised arc), mm. */
+const SHELL_TOLERANCE_MM = 10;
+/** Railing runs are cut into pieces of at most this length before the offset test, so a curved railing (chords) is judged along its length, mm. */
+const RAILING_PIECE_MM = 250;
 
 /** A railing stands on the surface when its path is this close to the surface top, mm. */
 const RAILING_Z_MM = 50;
@@ -31,6 +37,15 @@ const RAILING_OFFSET_MM = 150;
  */
 const guardHeightMm = (rulesets: readonly RulesetName[]): number =>
   Math.max(0, ...rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0));
+
+/**
+ * Largest clear opening a guard-rail may leave between rails (grade A rows ISO-GRD-GAP 500 mm, OSHA-GRD-MID 19 in): the strictest of the requested
+ * rulesets. A gap between a walking surface and a vessel shell no wider than this is treated like the space between two rails.
+ */
+const guardOpeningMm = (rulesets: readonly RulesetName[]): number =>
+  Math.min(
+    ...rulesets.map((ruleset) => (ruleset === 'iso_14122' ? ruleById('ISO-GRD-GAP').max : ruleById('OSHA-GRD-MID').maxOpening) ?? Infinity),
+  );
 
 type Ring = readonly Vec2[];
 
@@ -57,8 +72,18 @@ interface GuardRun {
   readonly heightMm: number;
 }
 
+/** A vertical vessel: its shell closes the gap to a walking surface that stands within `guardMm` of it. */
+interface Shell {
+  readonly centre: Vec2;
+  readonly radiusMm: number;
+  readonly topMm: number;
+}
+
 interface Scene {
   readonly surfaces: ReadonlyMap<string, Surface>;
+  readonly shells: readonly Shell[];
+  /** Largest clear opening a guard-rail may leave (strictest of the requested rulesets), mm. */
+  readonly openingMm: number;
   readonly groundMm: number;
   readonly walls: readonly GuardWall[];
   readonly railings: readonly GuardRun[];
@@ -105,12 +130,18 @@ function buildScene(doc: CadDocument, building: BuildingModel, rulesets: readonl
   const railings = elementsOf(building, 'railing').flatMap((railing): GuardRun[] => {
     const level = building.levels[railing.levelId];
     if (level === undefined || railing.role !== 'guardrail') return [];
-    return guardedSegments(railing.path, railing.openings).map(([p, q]) => ({
-      a: [toMm(doc, p[0]), toMm(doc, p[1])],
-      b: [toMm(doc, q[0]), toMm(doc, q[1])],
-      zMm: toMm(doc, level.elevation + (p[2] + q[2]) / 2),
-      heightMm: toMm(doc, railing.height),
-    }));
+    return guardedSegments(railing.path, railing.openings).flatMap(([p, q]) => {
+      const pieces = Math.max(1, Math.ceil(toMm(doc, Math.hypot(q[0] - p[0], q[1] - p[1])) / RAILING_PIECE_MM));
+      return Array.from({ length: pieces }, (_, index): GuardRun => {
+        const at = (t: number): Vec2 => [toMm(doc, p[0] + (q[0] - p[0]) * t), toMm(doc, p[1] + (q[1] - p[1]) * t)];
+        return {
+          a: at(index / pieces),
+          b: at((index + 1) / pieces),
+          zMm: toMm(doc, level.elevation + (p[2] + q[2]) / 2),
+          heightMm: toMm(doc, railing.height),
+        };
+      });
+    });
   });
   const walls = elementsOf(building, 'wall').flatMap((wall): GuardWall[] => {
     const level = building.levels[wall.levelId];
@@ -126,8 +157,27 @@ function buildScene(doc: CadDocument, building: BuildingModel, rulesets: readonl
       },
     ];
   });
+  const shells = elementsOf(building, 'equipment').flatMap((equipment): Shell[] => {
+    const level = building.levels[equipment.levelId];
+    if (level === undefined || equipment.shape !== 'vertical_vessel') return [];
+    return [
+      {
+        centre: [toMm(doc, equipment.location[0]), toMm(doc, equipment.location[1])],
+        radiusMm: toMm(doc, equipment.size[0]) / 2,
+        topMm: toMm(doc, level.elevation + equipment.size[2]),
+      },
+    ];
+  });
   const elevations = Object.values(building.levels).map((level) => toMm(doc, level.elevation));
-  return { surfaces, groundMm: elevations.length === 0 ? 0 : Math.min(...elevations), walls, railings, guardMm: guardHeightMm(rulesets) };
+  return {
+    surfaces,
+    shells,
+    openingMm: guardOpeningMm(rulesets),
+    groundMm: elevations.length === 0 ? 0 : Math.min(...elevations),
+    walls,
+    railings,
+    guardMm: guardHeightMm(rulesets),
+  };
 }
 
 const onSurface = (surface: Surface, point: Vec2): boolean =>
@@ -171,6 +221,18 @@ function guardCoverage(scene: Scene, surface: Surface, a: Vec2, b: Vec2): number
     reached = to;
   }
   return covered / length;
+}
+
+/** True when a vessel shell reaching the guard height above the surface stands within the guard opening of the whole edge `a`-`b`. */
+function shellCloses(scene: Scene, surface: Surface, a: Vec2, b: Vec2): boolean {
+  return scene.shells.some(
+    (shell) =>
+      shell.topMm - surface.topMm >= scene.guardMm &&
+      [0, 0.5, 1].every((t) => {
+        const gap = Math.hypot(a[0] + (b[0] - a[0]) * t - shell.centre[0], a[1] + (b[1] - a[1]) * t - shell.centre[1]) - shell.radiusMm;
+        return gap >= -SHELL_TOLERANCE_MM && gap <= scene.openingMm;
+      }),
+  );
 }
 
 const signedArea = (ring: Ring): number =>
@@ -233,8 +295,8 @@ function surfaceEdges(scene: Scene, id: string, threshold: EdgeThreshold): EdgeR
         a[0] + (b[0] - a[0]) * t + nx * SAMPLE_OFFSET_MM,
         a[1] + (b[1] - a[1]) * t + ny * SAMPLE_OFFSET_MM,
       ];
-      const drop = Math.max(...[0, 0.5, 1].map((t) => dropAt(scene, id, surface.topMm, sample(t))));
-      const guarded = drop > threshold.mm && guardCoverage(scene, surface, a, b) >= COVERAGE;
+      const drop = Math.max(...SAMPLES.map((t) => dropAt(scene, id, surface.topMm, sample(t))));
+      const guarded = drop > threshold.mm && (shellCloses(scene, surface, a, b) || guardCoverage(scene, surface, a, b) >= COVERAGE);
       const isProtected = drop <= threshold.mm || guarded;
       const location = `${label} edge ${index}`;
       edges.push({ surfaceId: id, location, lengthMm: length, dropMm: drop, protected: isProtected });

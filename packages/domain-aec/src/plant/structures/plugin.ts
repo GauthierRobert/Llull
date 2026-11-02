@@ -5,5 +5,11 @@
 
 import type { CadPlugin } from '@core/plugins/plugin';
 import { structuresCommands } from './catalog';
+import { platformAssemblyGuard } from './platform/platformGuard';
 
-export const structuresPlugin: CadPlugin = { name: 'plantStructures', toolset: 'plant_structures', commands: structuresCommands };
+export const structuresPlugin: CadPlugin = {
+  name: 'plantStructures',
+  toolset: 'plant_structures',
+  commands: structuresCommands,
+  guards: [platformAssemblyGuard],
+};

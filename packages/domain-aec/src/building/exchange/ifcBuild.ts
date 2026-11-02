@@ -3,7 +3,7 @@ import type { BuildingElement, BuildingLevel, EquipmentElement, PipeElement } fr
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
-import { fileSlug, getBuilding, orderedElements } from '../model';
+import { elementsOf, fileSlug, getBuilding, orderedElements } from '../model';
 import { getPiping } from '../../plant/piping/model';
 import { noop, report, exportRefusal } from '@core/commands/noop';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
@@ -13,6 +13,7 @@ import { exportOther } from './ifcOtherExport';
 import { exportGrating, exportRailing } from '../../plant/structures/exchange/ifcAccessExport';
 import { exportSteelStair } from '../../plant/structures/exchange/ifcSteelStairExport';
 import { exportLadder } from '../../plant/structures/exchange/ifcLadderExport';
+import { exportAssembly } from '../../plant/structures/exchange/ifcPlatformExport';
 import { exportPipeSupport } from './ifcSupportExport';
 import { type PipingIfc, exportPipingProducts } from './ifcPipingExport';
 import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
@@ -116,6 +117,8 @@ function exportElement(
       const exported = exportSteelStair(context, doc, element, storeyPlacement);
       return exported ? [exported] : [];
     }
+    case 'assembly':
+      return [exportAssembly(context, element, storeyPlacement)];
     case 'connection':
       return exportConnection(context, doc, element, building, level, storeyPlacement);
     case 'plate': {
@@ -254,17 +257,27 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
     storeys.push(storey);
     const contained: string[] = [];
     const spaces: string[] = [];
+    const productOf = new Map<string, string>();
     for (const element of orderedElements(building)) {
       if (!('levelId' in element) || element.levelId !== level.id) continue;
       const exportedProducts = exportElement(context, doc, element, level, storeyPlacement, plant);
       if (exportedProducts.length > 0) elementCount += 1;
+      const first = exportedProducts[0];
+      if (first !== undefined) productOf.set(element.id, first.ref);
+      const aggregated = 'assemblyId' in element && element.assemblyId !== undefined;
       for (const exported of exportedProducts) {
         if (exported.container !== undefined) appendTo(plantContained, exported.container, [exported.ref]);
-        else (element.category === 'room' ? spaces : contained).push(exported.ref);
+        else if (!aggregated) (element.category === 'room' ? spaces : contained).push(exported.ref);
         productCount += 1;
         if (exported.material === null) continue;
         appendTo(byMaterial, exported.material, [exported.ref, ...(exported.parts ?? [])]);
       }
+    }
+    for (const assembly of elementsOf(building, 'assembly')) {
+      const refs = assembly.partIds.flatMap((id) => productOf.get(id) ?? []);
+      const assemblyRef = productOf.get(assembly.id);
+      if (assembly.levelId === level.id && assemblyRef !== undefined && refs.length > 0)
+        writer.add(`IFCRELAGGREGATES('${context.guid(`rel:assembly-parts:${assembly.id}`)}',$,$,$,${assemblyRef},(${refs.join(',')}))`);
     }
     if (contained.length > 0) {
       writer.add(

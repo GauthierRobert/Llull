@@ -11,7 +11,7 @@ import { round } from '../../../shared/numeric';
 import { findProfile } from '../../../steel/profiles';
 import { refuse } from '../codes';
 import { findGratingType } from '../grating/gratingTypes';
-import { arrivalSurface, distanceToRing, walkingSurfaces } from '../ladder/ladderSurface';
+import { arrivalSurface, distanceToRing, namedSurfaces, nearestSurface, walkingSurfaces } from '../ladder/ladderSurface';
 import { DEFAULT_POST_SPACING_MM, railingDefaults } from '../railing/railingDefaults';
 import { railingProblem } from '../railing/railingValidate';
 import { RULESET_NAMES, ruleById, type RulesetName } from '../rules/ruleTable';
@@ -48,7 +48,7 @@ export const addSteelStair = defineCommand({
   name: 'add_steel_stair',
   description:
     'Add a steel stringer stair (two stringers outside the clear width, grating or checker-plate treads, optional landings, optional hand-rails on either or both sides). Lengths in DOCUMENT UNITS, angle in RADIANS. ' +
-    '`start` = [x, y, z] middle of the foot of the first riser (z relative to the level); the stair climbs toward `angle` (0 = +X). Give `rise` OR `toSurfaceId` (slab / grating id: the rise is computed and its top must be within 600 mm of the surface in plan). ' +
+    '`start` = [x, y, z] middle of the foot of the first riser (z relative to the level); the stair climbs toward `angle` (0 = +X). Give `rise` OR `toSurfaceId` (slab, grating or platform assembly id: the rise is computed and its top must be within 600 mm of the surface (a platform: of one of its panels) in plan). ' +
     'Risers: n = ceil(rise / riserMax), all equal (h = rise / n); treads = n - 1 - landings; run = treads x going + landing lengths; 2h + g (Blondel) and the pitch are returned. ' +
     'Landings: `landings` [{afterRiser, length?}] explicit, or `landingEvery` (maximum rise of a flight) which splits the stair into equal flights; every flight needs at least 2 risers. ' +
     'Unset values are named in data.defaults: width = the largest of ISO preferred 800 mm / OSHA minimum, stringerProfile UPN200, tread grating 19-W-4 1-1/4x3/16, landing length = max(width, OSHA landing 762 mm with osha_1910), railings none; ' +
@@ -62,7 +62,10 @@ export const addSteelStair = defineCommand({
       .positive()
       .optional()
       .describe('Total rise from the foot to the top walking surface, DOCUMENT UNITS. Give rise or toSurfaceId.'),
-    toSurfaceId: z.string().optional().describe('Slab or grating element id at the top: the rise is computed from its top.'),
+    toSurfaceId: z
+      .string()
+      .optional()
+      .describe('Slab, grating or platform assembly element id at the top: the rise is computed from its top.'),
     width: z
       .number()
       .positive()
@@ -160,10 +163,16 @@ export const addSteelStair = defineCommand({
     const surfaces = walkingSurfaces(model);
     let rise = params.rise;
     let target;
+    const named = params.toSurfaceId === undefined ? [] : namedSurfaces(model, surfaces, params.toSurfaceId);
     if (params.toSurfaceId !== undefined) {
-      target = surfaces.find((surface) => surface.id === params.toSurfaceId);
+      target = nearestSurface(named, [sx, sy]);
       if (target === undefined)
-        return fail('STA_UNKNOWN_ELEMENT', `${params.toSurfaceId} is not a slab or grating`, ['toSurfaceId'], [params.toSurfaceId]);
+        return fail(
+          'STA_UNKNOWN_ELEMENT',
+          `${params.toSurfaceId} is not a slab, grating or platform`,
+          ['toSurfaceId'],
+          [params.toSurfaceId],
+        );
       rise = target.top - (level.elevation + sz);
       if (!(rise > 0))
         return fail(
@@ -220,14 +229,15 @@ export const addSteelStair = defineCommand({
     const run = runPlan * params.going + cuts.reduce((sum, landing) => sum + landing.length, 0);
     const top: Vec2 = [sx + Math.cos(angle) * run, sy + Math.sin(angle) * run];
     const departure = level.elevation + sz;
-    if (target !== undefined && distanceToRing(top, target.ring) > mm(ARRIVAL_REACH_MM))
+    const reached = nearestSurface(named, top);
+    if (target !== undefined && reached !== undefined && distanceToRing(top, reached.ring) > mm(ARRIVAL_REACH_MM))
       return fail(
         'STA_NO_ARRIVAL_SURFACE',
-        `the top of the stair is ${round(toMm(doc, distanceToRing(top, target.ring)), 1)} mm from ${target.id} in plan (limit ${ARRIVAL_REACH_MM} mm): move start / angle`,
+        `the top of the stair is ${round(toMm(doc, distanceToRing(top, reached.ring)), 1)} mm from ${params.toSurfaceId} in plan (limit ${ARRIVAL_REACH_MM} mm): move start / angle`,
         ['start', 'angle', 'toSurfaceId'],
         [target.id],
       );
-    const arrival = target ?? arrivalSurface(surfaces, top, departure + riseValue, mm(ARRIVAL_Z_MM), mm(ARRIVAL_REACH_MM));
+    const arrival = reached ?? arrivalSurface(surfaces, top, departure + riseValue, mm(ARRIVAL_Z_MM), mm(ARRIVAL_REACH_MM));
 
     const twin = findTwin(
       model,

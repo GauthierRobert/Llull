@@ -13,7 +13,7 @@ import { checkStair, checkSteelStair, STAIR_RULES_NOT_EVALUATED, stairRules } fr
 
 type Verdict = 'pass' | 'warn' | 'fail';
 
-const CHECKED_CATEGORIES: ReadonlyArray<BimCategory> = ['stair', 'steelStair', 'slab', 'grating', 'railing', 'ladder'];
+const CHECKED_CATEGORIES: ReadonlyArray<BimCategory> = ['stair', 'steelStair', 'slab', 'grating', 'railing', 'ladder', 'assembly'];
 
 const verdictOf = (findings: readonly Finding[]): Verdict =>
   findings.some((finding) => finding.severity === 'fail') ? 'fail' : findings.length > 0 ? 'warn' : 'pass';
@@ -28,12 +28,13 @@ export const checkAccess = defineCommand({
   description:
     'Check access means of the BUILDING model against the access rules (ISO 14122, OSHA 29 CFR 1910) and list findings with stable STA_* codes, ' +
     'measured value, limit, clause, source and a one-line fix. It covers concrete stairs (add_stair) and steel stairs (add_steel_stair): Blondel 2h+g, riser, tread, pitch angle, width, ' +
-    'flight rise (the longest flight between landings), guard-rails (add_railing: top-rail height, clear space between rails, toe plate), fixed ladders (add_ladder: rung pitch, clear width, back clearance, stile extension, fall protection by height and installation date, cage start / hoops / diameter, landing interval) and open edges of slabs (add_slab) and grating panels (add_grating). Only grade A rules fail; grade B rules warn and add STA_RULE_UNVERIFIED; the result always has ' +
+    'flight rise (the longest flight between landings), guard-rails (add_railing: top-rail height, clear space between rails, toe plate), fixed ladders (add_ladder: rung pitch, clear width, back clearance, stile extension, fall protection by height and installation date, cage start / hoops / diameter, landing interval), the gratings and guard-rails of generated platforms (pass the platform assembly id: it stands for its parts) and open edges of slabs (add_slab) and grating panels (add_grating). Only grade A rules fail; grade B rules warn and add STA_RULE_UNVERIFIED; the result always has ' +
     'reviewRequired: true (a qualified person signs access means). Lengths in the answer are millimetres and angles degrees, whatever the document units. ' +
     'Open edges need edgeDropThresholdMm (no graded rule exists, so there is no default): without it the edge check is skipped with the warning STA_EDGE_RULE_UNSET. ' +
     'The drop is measured from the slab top to the next surface below (another slab, else the lowest level elevation); an edge is protected when the drop is ' +
     'within the threshold or a guard covers it: a wall of the level or a guard-rail (add_railing, role guardrail, gaps without a gate excepted) standing on the surface whose top reaches the ' +
-    'strictest top-rail minimum of the requested rulesets above it (1100 mm for iso_14122, 990.6 mm for osha_1910). Read-only; see list_access_rules for the rows.',
+    'strictest top-rail minimum of the requested rulesets above it (1100 mm for iso_14122, 990.6 mm for osha_1910), or the shell of a vertical vessel that high within the largest guard-rail opening (500 mm iso_14122, 482.6 mm osha_1910) of the edge. ' +
+    'Read-only; see list_access_rules for the rows.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     rulesets: z
@@ -71,7 +72,16 @@ export const checkAccess = defineCommand({
     const unknown = (params.ids ?? []).filter((id) => building.elements[id] === undefined);
     if (unknown.length > 0)
       return refuse(doc, 'check_access', 'STA_UNKNOWN_ELEMENT', `no building element ${unknown.join(', ')}`, unknown, ['ids']);
-    const wanted = params.ids === undefined ? undefined : new Set(params.ids);
+    // A platform assembly stands for its gratings and railings (the parts the rules apply to).
+    const wanted =
+      params.ids === undefined
+        ? undefined
+        : new Set(
+            params.ids.flatMap((id) => {
+              const element = building.elements[id];
+              return element?.category === 'assembly' ? element.partIds : [id];
+            }),
+          );
     const include = params.include ?? ['stairs', 'edges', 'railings', 'ladders'];
     const picked = <T extends { id: string }>(elements: readonly T[], kind: 'stairs' | 'edges' | 'railings' | 'ladders'): T[] =>
       include.includes(kind) ? elements.filter((element) => wanted?.has(element.id) ?? true) : [];
