@@ -2,13 +2,13 @@
   "id": "SC-PST-03",
   "validates": ["VC-PST-01", "VC-PST-03", "VC-PST-04", "VC-PST-05", "VC-PST-06"],
   "description": "Owner questions answered without a model: elbow SIF, f and SA by edition, growth of a 30 m carbon steel line to 204.4 degC, guided cantilever for a 6 m leg",
-  "unbuilt": ["pipe_sif", "pipe_stress_allowables", "thermal_growth", "guided_cantilever"],
+  "unbuilt": [],
   "actions": [
     { "command": "pipe_sif", "params": { "component": "elbow", "odMm": 168.275, "wallMm": 7.112, "bendRadiusMm": 228.6, "rule": "B31.3-2018" } },
-    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 7000, "edition": "2018", "ferrousLowStrength": true, "SLMPa": 40 } },
-    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 100000, "edition": "2018", "SLMPa": 40 } },
-    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 100000, "edition": "2022" } },
-    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 200000000, "edition": "2018" } },
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 7000, "rule": "B31.3-2018", "ferrousLowStrength": true, "SLMPa": 40 } },
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 100000, "rule": "B31.3-2018", "SLMPa": 40 } },
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 100000, "rule": "B31.3-2022" } },
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 200000000, "rule": "B31.3-2018" } },
     { "command": "thermal_growth", "params": { "table": "carbon-steel-c1", "fromC": 21.111, "toC": 204.444, "lengthM": 30 } },
     { "command": "guided_cantilever", "params": { "legMm": 6000, "displacementMm": 50, "odMm": 168.3, "wallMm": 7.11, "EMPa": 200000, "SAMPa": 206.85 } }
   ],
