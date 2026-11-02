@@ -9,17 +9,17 @@
 import type { BuildingLevel, PipeElement } from '@aec/building/types';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { atLevel } from '@aec/industrial/evaluate';
-import { len3, sub3 } from '@lib/vec3';
+import { cross3, len3, normalize3OrZero, sub3 } from '@lib/vec3';
 import { inferredNozzles } from '../../plant/data/plantReports/inferNozzles';
 import { type PlantIfcObject } from '../../plant/data/view';
 import type { Exported } from './ifcElementExport';
 import { addNamedPset, countPredefined, type PlantIfcRun } from './ifcPlant';
 import { sweptSolids } from './ifcIndustrialExport';
-import { type Context, circleProfile, ifcReal, ifcString, placement, shape } from './ifcStep';
+import { type Context, circleProfile, framePlacement, ifcReal, ifcString, placement, shape } from './ifcStep';
 
-type Flow = 'SOURCE' | 'SINK' | 'SOURCEANDSINK';
+export type Flow = 'SOURCE' | 'SINK' | 'SOURCEANDSINK';
 
-interface Port {
+export interface Port {
   readonly ref: string;
   readonly seed: string;
 }
@@ -39,6 +39,8 @@ export interface PortState {
   readonly endPorts: EndPort[];
   /** Equipment element id -> product reference and the placement of its level. */
   readonly equipment: Map<string, { readonly ref: string; readonly storeyPlacement: string; readonly level: BuildingLevel }>;
+  /** Equipment element id -> nozzle mark -> the port written for its own 03 EQP nozzle (the piping export connects pipe ends to it). */
+  readonly nozzlePorts: Map<string, Map<string, Port>>;
 }
 
 export const newPortState = (): PortState => ({
@@ -47,6 +49,7 @@ export const newPortState = (): PortState => ({
   connected: new Set(),
   endPorts: [],
   equipment: new Map(),
+  nozzlePorts: new Map(),
 });
 
 const length = (context: Context, value: number): string => `IFCPOSITIVELENGTHMEASURE(${ifcReal(context.mm(value))})`;
@@ -59,8 +62,8 @@ function portPset(context: Context, port: Port, dn: number | undefined): void {
   ]);
 }
 
-/** One IfcDistributionPort placed at `point` (mm, relative to the storey). */
-function addPort(
+/** One IfcDistributionPort placed at `point` (mm, relative to the storey placement, for pipe and equipment nozzle ports alike); `axis` (unit vector) is the local Z of its placement when given. */
+export function addPort(
   context: Context,
   state: PortState,
   storeyPlacement: string,
@@ -70,8 +73,12 @@ function addPort(
   point: Vec3,
   dn: number | undefined,
   description: string | null = null,
+  axis: Vec3 | null = null,
 ): Port {
-  const local = placement(context, storeyPlacement, point[0], point[1], point[2]);
+  const local =
+    axis === null
+      ? placement(context, storeyPlacement, point[0], point[1], point[2])
+      : framePlacement(context, storeyPlacement, point, axis, perpendicular(axis));
   const ref = context.writer.add(
     `IFCDISTRIBUTIONPORT('${context.guid(seed)}',$,${ifcString(name)},${description === null ? '$' : ifcString(description)},$,${local},$,.${flow}.,.PIPE.,.USERDEFINED.)`,
   );
@@ -90,9 +97,12 @@ function connect(context: Context, state: PortState, relating: Port, related: Po
   state.connected.add(related.ref);
 }
 
-function nest(context: Context, seed: string, product: string, ports: readonly Port[]): void {
+export function nest(context: Context, seed: string, product: string, ports: readonly Port[]): void {
   context.writer.add(`IFCRELNESTS('${context.guid(`${seed}:nests`)}',$,$,$,${product},(${ports.map((port) => port.ref).join(',')}))`);
 }
+
+/** A unit vector perpendicular to `axis` (the local X of a port placement). */
+const perpendicular = (axis: Vec3): Vec3 => normalize3OrZero(cross3(Math.abs(axis[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0], axis));
 
 export interface PipeIfcInput {
   /** Prefix of Name and Tag of the products. */

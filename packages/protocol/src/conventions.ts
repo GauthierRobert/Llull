@@ -402,4 +402,29 @@ An implicit body is a FIELD (signed distance: negative inside, document units) r
 
 Bodies are re-derived on load from their field recipes (\`regenerate_implicit_bodies\` forces it). Resolution and cell size drive the triangle count: lower the
 resolution for a preview, raise it before export.
+
+---
+
+## 17. Plant equipment (toolset plant_equipment, plant 03 EQP)
+
+Process equipment is parametric: you give dimensions, llull derives the bodies, the nozzle ports, the volumes, the weights and the code checks. Equipment is addressed by tag ("V-101") or element id.
+
+1. Units: every length in the call is in DOCUMENT units (\`set_units\` first; the plans use "mm"); pressures are { value, unit } (MPa, kPa, bar, psi, gauge); angles end in Deg.
+2. Create: \`add_vessel\` (vertical or horizontal; heads, skirt / legs / saddles, design data), \`add_process_column\` (vessel + trays + platform clips), \`add_heat_exchanger\` (TEMA type such as "BEM"),
+   \`add_storage_tank\` (API 650), \`add_pump\` (ISO 2858 / ASME B73.1 size or a vendor envelope). Revise a vessel with \`update_equipment_parameters\`: id, tag and port ids stay.
+3. Nozzles: \`add_nozzle\` with a mark (N1, M1 ...), dn, rating, facing, location and projection. Shell nozzle: projection = vessel axis to flange face; head nozzle: tangent line to flange face.
+   Angles ("north_cw", the default): vertical equipment 0 = plant north (+Y), growing clockwise seen from above (90 = east); horizontal equipment 0 = top, 90 = the +Y side.
+   Pass angleConvention "east_ccw" for CAD maths; every result names the convention it used. The port id is "<tag>:<mark>" (V-101:N1): \`equipment_ports\` lists position and outward direction;
+   piping connects to those ids. \`delete_nozzle\` refuses EQP_PORT_CONNECTED while a pipe is attached.
+4. Numbers: \`vessel_volume\` (levels from the lowest inside point), \`equipment_weights\` (empty / operating / test with the method of every line), \`vessel_thickness\` (ASME VIII-1 UG-27 / UG-32 / UG-99,
+   corroded; S and E are never defaulted: EQP_ALLOWABLE_MISSING), \`tank_shell_thickness\` (API 650 one-foot), \`check_equipment\` (status fail > warn > pass_with_review > pass).
+5. Hand-off: \`equipment_datasheet\` returns the whole sheet (lengths in mm, volumes m3, masses kg): \`llull equipment_datasheet '{"equipment":"V-101"}' --save V-101.json\`, or format "csv"
+   (table "items" or "nozzles"). A section whose query refuses is { available: false, code } (never left out). \`export_ifc\` writes the revolved bodies (IfcRevolvedAreaSolid) and one IfcDistributionPort per nozzle,
+   connected to the pipes routed to them; plan views draw each nozzle as a stub with its mark.
+6. Review: every result is reviewRequired: llull computes from the cited formulas and is not a stamped design. Table rows below grade A, named defaults and unsourced allowable stresses are flagged
+   (EQP_TABLE_UNVERIFIED, EQP_VALUE_UNSOURCED, defaulted); a person reviews and signs.
+
+Smallest plan (SC-EQP-01, a 1.5 m x 4 m separator on a 2 m skirt): \`set_units\` mm, \`add_vessel\` (insideDiameter 1500, tangentLength 4000, heads top / bottom { type: "ellipsoidal", ratio: 2 }, shellThickness 10,
+headThickness 10, corrosionAllowance 3, support { type: "skirt", height: 2000 }, design { pressure { value: 1, unit: "MPa" }, allowableStress { value: 137.9, unit: "MPa", source: "..." }, jointEfficiency { shell: 1, heads: 1 } }),
+four \`add_nozzle\` calls, then \`vessel_thickness\`, \`check_equipment\`, \`equipment_datasheet\`.
 `;

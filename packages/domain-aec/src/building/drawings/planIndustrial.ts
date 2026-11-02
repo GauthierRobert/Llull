@@ -13,6 +13,7 @@ import { type PlanSource, annotationText, layerName, thinLine } from './planMode
 import type { DrawingPrimitive } from '@core/model/drawing';
 import { centreMarkLines } from '@core/geometry/centerLines';
 import { columnPrimitive } from './planArchitectural';
+import { nozzlePlanStubs } from '../../plant/equipment/geometry/planStubs';
 
 /** Both edges of a plan polyline offset by ±`half` (mitred at the bends). */
 function offsetPolyline(points: ReadonlyArray<Vec2>, half: number): Vec2[][] {
@@ -124,7 +125,12 @@ export function industrialPrimitives(
                   points: rectangle(length / 2 + element.clearance, width / 2 + element.clearance),
                 },
               ];
-      return [...outline, ...zone, annotationText(layer, element.location, fromMm(doc, 250), `${element.mark} ${element.name}`)];
+      return [
+        ...outline,
+        ...zone,
+        annotationText(layer, element.location, fromMm(doc, 250), `${element.mark} ${element.name}`),
+        ...nozzlePlanStubs(element, layer, fromMm(doc, 150)),
+      ];
     }
     case 'pipe': {
       const points = element.points.map(flat);

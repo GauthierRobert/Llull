@@ -177,3 +177,34 @@ describe('CONVENTIONS_GUIDE wrap / emboss (03 WRP AF-03) and implicit (05 IMP) s
     expect(section).toContain('IMP_TRAPPED_VOID');
   });
 });
+
+describe('CONVENTIONS_GUIDE plant equipment section (plant 03 EQP, AF-03)', () => {
+  const start = CONVENTIONS_GUIDE.indexOf('## 17. Plant equipment');
+  const section = CONVENTIONS_GUIDE.slice(start);
+
+  it('exists and names only registered commands, including every equipment command it teaches', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    expect(start).toBeGreaterThan(0);
+    const names = [...section.matchAll(/`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`/g)].map((match) => match[1] ?? '');
+    expect(names.filter((name) => getCommand(name) === undefined)).toEqual([]);
+    for (const name of [
+      'add_vessel',
+      'add_nozzle',
+      'equipment_ports',
+      'vessel_thickness',
+      'check_equipment',
+      'equipment_datasheet',
+      'export_ifc',
+    ])
+      expect(names).toContain(name);
+  });
+
+  it('states units, the angle convention, the port id form, the review requirement and the never-defaulted stress', () => {
+    expect(section).toMatch(/DOCUMENT units/);
+    expect(section).toMatch(/"north_cw"/);
+    expect(section).toMatch(/<tag>:<mark>/);
+    expect(section).toMatch(/reviewRequired/);
+    expect(section).toMatch(/EQP_ALLOWABLE_MISSING/);
+    expect(section).toMatch(/available: false/);
+  });
+});

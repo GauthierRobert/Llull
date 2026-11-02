@@ -1,6 +1,6 @@
 {
   "id": "SC-EQP-01",
-  "status": "M2 + M3 built: set_units, add_vessel, add_nozzle, vessel_volume, vessel_thickness, equipment_weights, equipment_ports, check_equipment (run by tests/unit/plant/equipment/scenarioPlans.test.ts). PROPOSED, not built yet: equipment_datasheet (M5, toolset plant_equipment). Existing: set_units, add_level is implicit (default level). Run target: tests/unit/plant/equipment/scenarioPlans.test.ts and `llull run sc-eqp-01-vertical-vessel-skirt.json --json`.",
+  "status": "M2 + M3 built: set_units, add_vessel, add_nozzle, vessel_volume, vessel_thickness, equipment_weights, equipment_ports, check_equipment, equipment_datasheet (M5) (run by tests/unit/plant/equipment/scenarioPlans.test.ts). Existing: set_units, add_level is implicit (default level). Run target: tests/unit/plant/equipment/scenarioPlans.test.ts and `llull run sc-eqp-01-vertical-vessel-skirt.json --json`.",
   "validates": [
     "VC-EQP-03",
     "VC-EQP-05",
