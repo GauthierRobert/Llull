@@ -7,12 +7,11 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { BUNDLED_RATING_TABLE_ID } from '../bundled';
 import { refuse } from '../codes';
-import { allRatingTables, ratingTableById } from '../ptRating';
+import { allRatingTables, ratingTableById, squash } from '../ptRating';
 import { parseRatingFile, ratingTableToFile } from '../ratingFile';
 import { getCatalogModel, withCatalogModel } from '../store';
 import type { RatingTable } from '../types';
 
-const squash = (text: string): string => text.toLowerCase().replace(/\s+/g, '');
 const sameBasis = (a: RatingTable, b: RatingTable): boolean =>
   squash(a.standard) === squash(b.standard) && squash(a.materialGroup) === squash(b.materialGroup);
 

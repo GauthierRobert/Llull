@@ -63,7 +63,9 @@ export function ratingAt(table: RatingTable, ratingClass: number, temperatureC: 
   };
 }
 
-const sameText = (a: string, b: string): boolean => a.toLowerCase().replace(/s+/g, '') === b.toLowerCase().replace(/s+/g, '');
+/** Text with case and all whitespace removed (standards are compared as "ASME B16.5" == "asme  b16.5"). */
+export const squash = (text: string): string => text.toLowerCase().replace(/\s+/g, '');
+const sameText = (a: string, b: string): boolean => squash(a) === squash(b);
 
 /** Rating tables the document can use: the bundled one first, then the imported ones in id order. */
 export const allRatingTables = (doc: Pick<CadDocument, 'plant'>): readonly RatingTable[] => [

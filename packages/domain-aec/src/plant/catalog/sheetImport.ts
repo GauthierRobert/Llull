@@ -87,9 +87,6 @@ function rowSize(row: SheetRow, problems: SheetProblem[]): Record<string, unknow
   for (const column of ['sourceId', 'citation', 'url', 'accessed'] as const)
     if (get(column) !== '') provenance[column] = row.cells.get(column) as string;
   if (Object.keys(provenance).length > 0) size['provenance'] = provenance;
-  const verified = get('verified').toLowerCase();
-  if (verified === 'true') size['verified'] = true;
-  else if (verified !== '' && verified !== 'false') bad('verified', `verified "${get('verified')}" must be true or false`);
   return size;
 }
 

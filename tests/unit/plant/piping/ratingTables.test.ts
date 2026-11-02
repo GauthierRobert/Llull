@@ -204,8 +204,8 @@ describe('imported tables are used', () => {
     const byGroup = data<Json>(withTable, 'pt_rating', { standard: 'EN 1092-1', materialGroup: 'test-1', class: 16, temperatureC: 70 });
     expect(byGroup).toMatchObject({ tableId: 'en-pn-test', ratingBar: 15.2, method: 'interpolated', verified: false });
     const byId = data<Json>(withTable, 'pt_rating', {
-      standard: 'x',
-      materialGroup: 'x',
+      standard: 'EN 1092-1',
+      materialGroup: 'test-1',
       tableId: 'en-pn-test',
       class: 40,
       temperatureC: 20,
@@ -292,5 +292,100 @@ describe('imported tables are used', () => {
     expect(slice({ 'asme-b16.5-group-1.1': { ...table, id: 'asme-b16.5-group-1.1' } })[0]).toContain('reserved');
     expect(slice({ a: { ...table, id: 'a' }, b: { ...table, id: 'b' } })[0]).toContain('repeats the standard');
     expect(slice({ 'en-pn-test': { ...table, rows: [] } })[0]).toContain('minTemperatureC and rows');
+  });
+});
+
+describe('standard and group comparison (whitespace only, never letters)', () => {
+  const b165 = (over: Json = {}): Json =>
+    enTable({ id: 'g1', standard: 'ASME B16.5', materialGroup: '1.1S', rows: [{ class: 150, temperature: 20, pressure: 20 }], ...over });
+
+  it('finds the bundled table whatever the spacing and case of the standard', () => {
+    expect(data<Json>(empty, 'pt_rating', { standard: 'asme  B16.5', materialGroup: ' 1.1', class: 150, temperatureC: 20 })).toMatchObject({
+      tableId: 'asme-b16.5-group-1.1',
+    });
+  });
+
+  it('keeps group 1.1S distinct from 1.1 (import, lookup and the load check)', () => {
+    const doc = apply(empty, 'import_rating_table', { table: b165() });
+    expect(data<Json>(doc, 'pt_rating', { standard: 'ASME B16.5', materialGroup: '1.1S', class: 150, temperatureC: 20 })).toMatchObject({
+      tableId: 'g1',
+    });
+    expect(data<Json>(doc, 'pt_rating', { standard: 'ASME B16.5', materialGroup: '1.1', class: 150, temperatureC: 20 })).toMatchObject({
+      tableId: 'asme-b16.5-group-1.1',
+    });
+    const table = doc.plant?.catalog?.ratingTables?.['g1'];
+    const other = { ...table, id: 'g2', materialGroup: '1.1' };
+    expect(pipingCatalogErrors({ catalogs: {}, catalogOrder: [], ratingTables: { g1: table, g2: other } })).toEqual([]);
+    expectRefusal(
+      doc,
+      'import_rating_table',
+      { table: b165({ id: 'g3', standard: 'ASME B16.5', materialGroup: '1.1 s' }) },
+      'PSC_CATALOG_CONFLICT',
+      'standard',
+    );
+  });
+});
+
+describe('a rating table named explicitly must match the rating basis', () => {
+  it('pt_rating refuses a tableId of another standard or group', () => {
+    const wrong = { standard: 'ASME B16.5', materialGroup: '1.1', tableId: 'en-pn-test', class: 16, temperatureC: 20 };
+    expectRefusal(withTable, 'pt_rating', wrong, 'PSC_CATALOG_CONFLICT', 'tableId');
+    expectRefusal(withTable, 'pt_rating', { ...wrong, standard: 'EN 1092-1', materialGroup: 'other' }, 'PSC_CATALOG_CONFLICT', 'tableId');
+  });
+
+  it('check_pipe_spec fails PSC_RATING_TABLE_MISMATCH and does not check the pressure', () => {
+    type Checked = { status: string; issues: Array<{ code: string; status: string; rule: string }>; design?: Json };
+    const run = (rating: Json): Checked => {
+      const doc = apply(importedDoc({ ...mixSpec(), rating }), 'import_rating_table', { table: enTable() });
+      return data<Checked>(doc, 'check_pipe_spec', { specId: 'MIX-1', design: { pressureBar: 1, temperatureC: 70 } });
+    };
+    const wrongStandard = run({ system: 'ASME B16.5', class: 150, materialGroup: '1.1', ratingTableId: 'en-pn-test' });
+    expect(wrongStandard.issues.find((issue) => issue.rule === 'design')).toMatchObject({
+      code: 'PSC_RATING_TABLE_MISMATCH',
+      status: 'fail',
+    });
+    expect(wrongStandard.design).toMatchObject({ checked: false });
+    const wrongGroup = run({ system: 'EN 1092-1', pn: 16, materialGroup: 'other', ratingTableId: 'en-pn-test' });
+    expect(wrongGroup.issues.map((issue) => issue.code)).toContain('PSC_RATING_TABLE_MISMATCH');
+    const fine = run({ system: 'EN 1092-1', pn: 16, materialGroup: 'test-1', ratingTableId: 'en-pn-test' });
+    expect(fine.issues.map((issue) => issue.code)).not.toContain('PSC_RATING_TABLE_MISMATCH');
+    expect(fine.design).toMatchObject({ checked: true });
+  });
+});
+
+describe('one rating key per table', () => {
+  const rows = (key: 'class' | 'pn', count = 2): Json[] =>
+    Array.from({ length: count }, (_, at) => ({ [key]: 150 + at, temperature: 20, pressure: 10 + at }));
+
+  it('EN 1092-1 takes pn only, ASME tables take class only, company takes either but not a mix', () => {
+    expectRefusal(empty, 'import_rating_table', { table: enTable({ rows: rows('class') }) }, 'PSC_CATALOG_INVALID', 'rows.0');
+    expectRefusal(
+      empty,
+      'import_rating_table',
+      { table: enTable({ id: 'a', standard: 'ASME B16.34', rows: rows('pn') }) },
+      'PSC_CATALOG_INVALID',
+      'rows.0',
+    );
+    expectRefusal(
+      empty,
+      'import_rating_table',
+      { table: enTable({ id: 'c', standard: 'company', rows: [...rows('class', 1), { pn: 16, temperature: 20, pressure: 5 }] }) },
+      'PSC_CATALOG_INVALID',
+      'rows.1',
+    );
+  });
+
+  it('a company table keeps the key it was written with on export, and the round trip is stable', () => {
+    for (const key of ['class', 'pn'] as const) {
+      const doc = apply(empty, 'import_rating_table', {
+        table: enTable({ id: `co-${key}`, standard: 'company', materialGroup: key, rows: rows(key) }),
+      });
+      const text = exported(doc, `co-${key}`).text;
+      const file = JSON.parse(text) as { rows: Json[] };
+      expect(Object.keys(file.rows[0] ?? {})).toContain(key);
+      expect(Object.keys(file.rows[0] ?? {})).not.toContain(key === 'pn' ? 'class' : 'pn');
+      const copy = apply(empty, 'import_rating_table', { table: { ...file, id: `co-${key}` } });
+      expect(exported(copy, `co-${key}`).text).toBe(text);
+    }
   });
 });

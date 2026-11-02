@@ -91,12 +91,20 @@ export function parseRatingFile(raw: unknown): { readonly table: RatingTable } |
   const toBar = (value: number): number => (data.pressureUnit === 'psi' ? round6(value * BAR_PER_PSI) : value);
   const toC = (value: number): number => (data.temperatureUnit === 'F' ? round6(((value - 32) * 5) / 9) : value);
   const minTemperatureC = toC(data.minTemperature);
+  const key: 'class' | 'pn' =
+    data.standard === 'EN 1092-1' ? 'pn' : data.standard === 'company' ? (data.rows[0]?.pn !== undefined ? 'pn' : 'class') : 'class';
   const seen = new Set<string>();
   const rows: RatingRow[] = [];
   data.rows.forEach((row, index) => {
     const path = `rows.${index}`;
     if ((row.class === undefined) === (row.pn === undefined))
       issues.push({ code: 'PSC_CATALOG_INVALID', path, message: `${path} needs exactly one of class / pn` });
+    else if (row.pn !== undefined ? key !== 'pn' : key !== 'class')
+      issues.push({
+        code: 'PSC_CATALOG_INVALID',
+        path,
+        message: `${path}: a ${data.standard} table is rated by ${key} on every row, not ${row.pn !== undefined ? 'pn' : 'class'}`,
+      });
     const rated = row.class ?? row.pn;
     const provenance = row.provenance === undefined ? data.provenance : row.provenance;
     const resolved = provenance === undefined ? {} : provenanceOf(provenance);
@@ -105,10 +113,10 @@ export function parseRatingFile(raw: unknown): { readonly table: RatingTable } |
     const temperatureC = toC(row.temperature);
     if (temperatureC < minTemperatureC)
       issues.push({ code: 'PSC_CATALOG_INVALID', path: `${path}.temperature`, message: `${path}.temperature is below minTemperature` });
-    const key = `${rated}|${temperatureC}`;
-    if (seen.has(key))
+    const rowKey = `${rated}|${temperatureC}`;
+    if (seen.has(rowKey))
       issues.push({ code: 'PSC_CATALOG_INVALID', path, message: `${path}: class / pn ${rated} at ${temperatureC} degC is listed twice` });
-    seen.add(key);
+    seen.add(rowKey);
     if (rated !== undefined)
       rows.push({
         ratingClass: rated,
@@ -118,7 +126,7 @@ export function parseRatingFile(raw: unknown): { readonly table: RatingTable } |
   });
   if (issues.length > 0) return { issues };
   rows.sort((a, b) => a.ratingClass - b.ratingClass || a.temperatureC - b.temperatureC);
-  return { table: { id: data.id, standard: data.standard, materialGroup: data.materialGroup, minTemperatureC, rows } };
+  return { table: { id: data.id, standard: data.standard, materialGroup: data.materialGroup, minTemperatureC, rows, ratingKey: key } };
 }
 
 /** The table as a file object in bar and degC, rows in stable order (re-importing it gives the same table). */
@@ -134,7 +142,9 @@ export function ratingTableToFile(table: RatingTable, licence: (typeof LICENCE_F
     temperatureUnit: 'C',
     minTemperature: table.minTemperatureC,
     rows: table.rows.map((row) => ({
-      ...(table.standard === 'EN 1092-1' ? { pn: row.ratingClass } : { class: row.ratingClass }),
+      ...((table.ratingKey ?? (table.standard === 'EN 1092-1' ? 'pn' : 'class')) === 'pn'
+        ? { pn: row.ratingClass }
+        : { class: row.ratingClass }),
       temperature: row.temperatureC,
       pressure: row.bar.value,
       verified: row.bar.verified,

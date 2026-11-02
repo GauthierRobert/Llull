@@ -26,7 +26,7 @@ function originRow(path: string, origin: CatalogSheetOrigin): number | null {
 
 /**
  * @affects plant.catalog.catalogs[catalogId] (document slice; the bundled catalogue is never written)
- * @invariant the sheet becomes a llull-piping-catalog file object and goes through the same parser as import_piping_catalog (provenance, units, family schemas, licence); export_piping_catalog format csv then this command reproduces values, keys and verified flags; a row is verified only when its verified cell says true
+ * @invariant the sheet becomes a llull-piping-catalog file object and goes through the same parser as import_piping_catalog (provenance, units, family schemas, licence); export_piping_catalog format csv then this command reproduces values and keys; a sheet never raises trust: the verified column is ignored and every imported value is unverified (JSON import is the lossless way to carry verified)
  * @failure unreadable / oversized sheet, missing column, hostile header, ragged row, non-numeric cell -> PSC_CATALOG_INVALID (paths name the row); value without provenance -> PSC_PROVENANCE_MISSING; unit not mm / in -> PSC_UNIT_INVALID; licensed-no-redistribution -> PSC_LICENCE_EMBED_FORBIDDEN; id clash -> PSC_CATALOG_CONFLICT
  */
 export const importPipingCatalogSheet = defineCommand({
@@ -35,7 +35,7 @@ export const importPipingCatalogSheet = defineCommand({
     'Import a piping component catalogue from a CSV sheet: the text of export_piping_catalog format csv (one row per size) or a sheet of another tool. ' +
     'Columns: family, type (pipe, elbow90 …), standard, size ("NPS 4" or "DN 100"), smallSize?, schedule?, class?, pn?, facing?, dimensionalStandard?, radius?, ends? (space separated), ' +
     'sourceId? / citation? / url? / accessed? (provenance of the row), then one numeric column per dimension (outsideDiameter, wall, centreToEnd, boltCount …; a blank cell means the size has no such value; ' +
-    'prefix dim. when a dimension is named like a fixed column), and verified? (true / false: a row is unverified unless it says true). Values are in unit (mm default, or in; counts are not scaled). ' +
+    'prefix dim. when a dimension is named like a fixed column), and verified? (an output of the export: IGNORED on import, every sheet value is unverified because a sheet never raises trust; use import_piping_catalog with verified flags for verified data). Values are in unit (mm default, or in; counts are not scaled). ' +
     'A row without provenance in the sheet takes the provenance param; a value with neither is refused (PSC_PROVENANCE_MISSING). Use columns to map a sheet from another tool: { "family": "Part Family", "size": "Nominal Size" }. ' +
     'Cells are read as text: a value starting with = + - @ is never evaluated, and the leading apostrophe our CSV export adds to such a text is removed. ' +
     'Refuses by row: missing column, ragged row, non-numeric dimension, bad size, family rows that disagree on type / standard / radius / ends. Licence licensed-no-redistribution is refused. ' +

@@ -155,6 +155,32 @@ describe('Plant 3D style sheet', () => {
     expect(byId('elbow90-2')).toMatchObject({ class: 150 });
   });
 
+  it('keeps values that match nothing in extra and counts them: facing, class, ends', () => {
+    const sheet = 'Part Category,Size,Face Type,Pressure Class,End Type\nPipe,2,Weird,PN16,Wobbly\nPipe,3,RF,150,BW\n';
+    const params2 = { sheet, format: 'plant3d', spec: P3D_SPEC, catalogRef: 'asme-b16.9' };
+    const result = ok(empty, 'import_pipe_spec_sheet', params2);
+    expect(result.data).toMatchObject({
+      unmapped: expect.arrayContaining([
+        { column: 'ends', count: 1 },
+        { column: 'class', count: 1 },
+        { column: 'facing', count: 1 },
+      ]),
+    });
+    const spec = JSON.parse(jsonOf(result.document, 'P3D-1').text) as { components: Json[] };
+    expect(spec.components[0]).toMatchObject({ 'Face Type': 'Weird', 'Pressure Class': 'PN16', 'End Type': 'Wobbly' });
+    expect(spec.components[0]).not.toHaveProperty('ends');
+    expect(spec.components[0]).not.toHaveProperty('facing');
+    expect(spec.components[0]).not.toHaveProperty('class');
+    expect(spec.components[1]).toMatchObject({ ends: 'BW', facing: 'RF', class: 150 });
+  });
+
+  it('a second column that also looks like the type goes to extra, the first one in file order is the type', () => {
+    const sheet = 'Part Category,Type,Size\nPipe,Widget,2\n';
+    const result = ok(empty, 'import_pipe_spec_sheet', { sheet, format: 'plant3d', spec: P3D_SPEC, catalogRef: 'asme-b16.9' });
+    const spec = JSON.parse(jsonOf(result.document, 'P3D-1').text) as { components: Json[] };
+    expect(spec.components[0]).toMatchObject({ type: 'pipe', Type: 'Widget' });
+  });
+
   it('honours columns, typeMap and sizeSystem, and numbers duplicate ids', () => {
     const sheet = 'Kind;Dia;Name\nGlobe;50;A\nGlobe;50;B\n';
     const doc = apply(empty, 'import_pipe_spec_sheet', {

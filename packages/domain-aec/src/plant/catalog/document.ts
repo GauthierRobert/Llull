@@ -3,6 +3,7 @@
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { pipeSpecErrors } from '../spec/document';
+import { squash } from './ptRating';
 import { BUNDLED_CATALOG_ID, BUNDLED_RATING_TABLE_ID } from './bundled';
 
 const isDim = (value: unknown): boolean =>
@@ -51,7 +52,7 @@ function ratingTableErrors(raw: unknown): string[] {
     if (!isRecord(table) || table['id'] !== id || typeof table['standard'] !== 'string' || typeof table['materialGroup'] !== 'string')
       return [`${path} must have id "${id}", standard and materialGroup`];
     if (id === BUNDLED_RATING_TABLE_ID) return [`${path}: the id is reserved for the bundled table`];
-    const basis = `${table['standard']}|${table['materialGroup']}`.toLowerCase().replace(/s+/g, '');
+    const basis = squash(`${String(table['standard'])}|${String(table['materialGroup'])}`);
     const clash = seen.has(basis) ? [`${path} repeats the standard and material group of another table`] : [];
     seen.add(basis);
     const rows = table['rows'];

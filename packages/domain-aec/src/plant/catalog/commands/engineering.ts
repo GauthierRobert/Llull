@@ -10,7 +10,7 @@ import { bundledCatalog } from '../bundled';
 import { refuse } from '../codes';
 import { resolveCatalogRow } from '../lookup';
 import { en10220OutsideDiameter, sizePair } from '../nominal';
-import { BAR_PER_PSI, availableRatingTables, findRatingTable, ratingAt, ratingTableById, tabulatedPsi } from '../ptRating';
+import { BAR_PER_PSI, availableRatingTables, findRatingTable, ratingAt, ratingTableById, squash, tabulatedPsi } from '../ptRating';
 import { sectionProperties, STEEL_DENSITY_KG_M3 } from '../sectionProperties';
 import type { Provenance } from '../types';
 
@@ -182,7 +182,7 @@ export const ptRating = defineCommand({
     materialGroup: z.string().describe('Material group, "1.1" (bundled) or the group of an imported table.'),
     tableId: z
       .string()
-      .describe('Rating table id (list_piping_catalogs ratingTables). Default: the table of standard + materialGroup.')
+      .describe('Rating table id (list_piping_catalogs ratingTables). Must belong to standard + materialGroup (else PSC_CATALOG_CONFLICT). Default: the table of standard + materialGroup.')
       .optional(),
     class: z.number().int().positive().describe('ASME pressure class (150 … 2500), or the PN of a table rated by PN.'),
     temperatureC: z.number().describe('Design temperature in degC. Give this or temperature.').optional(),
@@ -209,6 +209,12 @@ export const ptRating = defineCommand({
           ? `no rating table for ${params.standard} group ${params.materialGroup} (available: ${availableRatingTables(doc).join(', ')}; others: import_rating_table)`
           : `no rating table "${params.tableId}" (available: ${availableRatingTables(doc).join(', ')})`,
         params.tableId === undefined ? 'standard' : 'tableId',
+      );
+    if (squash(table.standard) !== squash(params.standard) || squash(table.materialGroup) !== squash(params.materialGroup))
+      return fail(
+        'PSC_CATALOG_CONFLICT',
+        `rating table ${table.id} is ${table.standard} group ${table.materialGroup}, not ${params.standard} group ${params.materialGroup}`,
+        'tableId',
       );
     const rating = ratingAt(table, params.class, temperatureC);
     if (!rating.ok) return fail(rating.code, rating.message, rating.code === 'PSC_PT_TEMPERATURE_OUT_OF_TABLE' ? 'temperatureC' : 'class');

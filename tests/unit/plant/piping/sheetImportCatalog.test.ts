@@ -53,6 +53,8 @@ const exportCsv = (doc = withSource, catalogId = 'src'): string =>
   data<Exported>(doc, 'export_piping_catalog', { catalogId, format: 'csv' }).text;
 const exportJson = (doc: typeof withSource, catalogId: string): Exported =>
   data<Exported>(doc, 'export_piping_catalog', { catalogId, format: 'json' });
+/** The sheet as an import gives it back: the verified column (last) is never trusted. */
+const untrusted = (csv: string): string => csv.replace(/,true$/gm, ',false');
 const importSheet = (sheet: string, over: Record<string, unknown> = {}): Record<string, unknown> => ({
   sheet,
   catalogId: 'copy',
@@ -77,9 +79,10 @@ describe('catalogue CSV round trip', () => {
     const imported = apply(empty, 'import_piping_catalog_sheet', importSheet(csv, { provenance: SOURCE }));
     // the sheet carries the row provenance, so the sheet-level one is never used
     const again = exportCsv(imported, 'copy');
-    expect(again).toBe(csv);
+    expect(again).toBe(untrusted(csv));
     const a = exportJson(withSource, 'src').text.replace('"id":"src"', '"id":"copy"');
-    expect(exportJson(imported, 'copy').text).toBe(a);
+    const strip = (text: string): unknown => JSON.parse(text, (key, value: unknown) => (key === 'verified' ? undefined : value));
+    expect(strip(exportJson(imported, 'copy').text)).toEqual(strip(a));
   });
 
   it('keeps unverified rows unverified and verified rows verified, in mm, and a mixed row becomes unverified (never more trusted)', () => {
@@ -103,7 +106,7 @@ describe('catalogue CSV round trip', () => {
     expect(exportJson(copy, 'copy').text).not.toContain('verifiedDims');
   });
 
-  it('round trips the bundled B16.9 family: every value and verified flag survives (the sheet takes the first dimension provenance)', () => {
+  it('round trips the bundled B16.9 family: every value survives, trust does not (the sheet takes the first dimension provenance)', () => {
     const csv = data<Exported>(empty, 'export_piping_catalog', {
       catalogId: 'llull-open-piping',
       familyId: 'asme-b16.9-lr90',
@@ -111,7 +114,16 @@ describe('catalogue CSV round trip', () => {
     }).text;
     const imported = apply(empty, 'import_piping_catalog_sheet', importSheet(csv, { catalogId: 'b169' }));
     const csvAgain = data<Exported>(imported, 'export_piping_catalog', { catalogId: 'b169', format: 'csv' }).text;
-    expect(csvAgain).toBe(csv);
+    expect(csvAgain).toBe(untrusted(csv));
+  });
+
+  it('a sheet never raises trust: a verified cell (true) is ignored and the values come back unverified', () => {
+    const csv = exportCsv();
+    expect(csv).toContain(',true');
+    const copy = apply(empty, 'import_piping_catalog_sheet', importSheet(csv));
+    expect(exportJson(copy, 'copy').text).not.toContain('"verified":true');
+    expect(exportCsv(copy, 'copy')).not.toContain(',true');
+    expect(ok(empty, 'import_piping_catalog_sheet', importSheet(csv)).data).toMatchObject({ unverifiedValues: 6 });
   });
 
   it('is byte-deterministic: the same sheet imported twice stores the same catalogue, and a re-import is a no-op', () => {
@@ -219,13 +231,6 @@ describe('catalogue sheet refusals', () => {
       { provenance: SOURCE },
       'PSC_CATALOG_INVALID',
       'sheet:row 2:smallSize',
-    ],
-    [
-      'bad verified cell',
-      'family,type,standard,size,outsideDiameter,verified\nf,pipe,ASME B36.10M,NPS 2,60.3,maybe\n',
-      { provenance: SOURCE },
-      'PSC_CATALOG_INVALID',
-      'sheet:row 2:verified',
     ],
     [
       'a dimension column that is not a name',

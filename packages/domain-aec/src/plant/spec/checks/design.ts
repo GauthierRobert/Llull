@@ -1,6 +1,6 @@
 /** Design-condition pass of `check_pipe_spec` (§5.6 5): design pressure against the spec's P-T rating, design temperature against its limits. */
 
-import { findRatingTable, ratingAt, ratingTableById } from '../../catalog/ptRating';
+import { findRatingTable, ratingAt, ratingTableById, squash } from '../../catalog/ptRating';
 import type { CadDocument } from '@core/model/types';
 import { finding, type CheckContext, type SpecFinding } from './finding';
 
@@ -58,6 +58,20 @@ export function designFindings(doc: Pick<CadDocument, 'plant'>, { spec }: CheckC
       ),
     );
     return { findings, data: { ...base, checked: false } };
+  }
+  if (squash(table.standard) !== squash(system) || (materialGroup !== undefined && squash(table.materialGroup) !== squash(materialGroup))) {
+    findings.push(
+      finding(
+        spec.id,
+        'design',
+        'PSC_RATING_TABLE_MISMATCH',
+        'fail',
+        [spec.id, table.id],
+        ['rating.ratingTableId'],
+        `rating table ${table.id} is ${table.standard} group ${table.materialGroup} but the spec rates ${system} group ${materialGroup ?? '(none)'}: the design pressure was NOT checked`,
+      ),
+    );
+    return { findings, data: { ...base, checked: false, tableId: table.id } };
   }
   const rating = ratingAt(table, ratingClass, design.temperatureC);
   if (!rating.ok) {
