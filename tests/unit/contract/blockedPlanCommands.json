@@ -50,8 +50,6 @@
     ],
     "docs/plant/01-piping-specs-catalog/validation/plans/sc-psc-03-design-conditions.json": ["pipe_wall_check"],
     "docs/plant/03-parametric-equipment/validation/plans/sc-eqp-01-vertical-vessel-skirt.json": ["equipment_datasheet"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-02-route-to-pcf-roundtrip.json": ["add_end_flange"],
-    "docs/plant/05-isometrics-fabrication/validation/plans/sc-iso-06-piping-ga.json": ["export_piping_ga"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-04-pipe-rack.json": ["add_pipe_rack"],
     "docs/plant/06-plant-structures-access/validation/plans/sc-sta-07-valve-reachability.json": ["check_reachability"],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-01-lbend-two-anchors.json": [

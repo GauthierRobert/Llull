@@ -13,6 +13,7 @@ import { buildIsoSheet, type IsoSheet } from '../iso/isoSheet';
 import { continuationOf, planSheets, type SheetInfo } from '../iso/isoSheets';
 import { isoTables, TABLE_NAMES } from '../iso/isoTables';
 import type { IsoIssue, IsoStyle } from '../model';
+import { lineSupports } from '../supports';
 
 const fileStem = (key: string): string => key.replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -31,14 +32,14 @@ export const exportIsometric = defineCommand({
     'Draw the isometric sheet(s) of one pipe line (routed line, imported PCF line or legacy pipe line) as SVG and / or DXF R12: true isometric projection (east axis -30 degrees, north +30, vertical 90; north arrow up-right, or up-left) ' +
     'NOT TO SCALE. Pipes along their projected axis with readable lengths (log scaled, collisions resolved or broken), symbols by component family (elbow arc, tee dot, flange double bar, reducer, valve bow-tie, cap, ' +
     'instrument) and weld class (shop dot, site cross, field-fit cross in a circle), weld numbers (provisional until number_welds) and spool names, centreline string dimensions per straight run that close to the overall ' +
-    '(76 + 2424 + 2348 + 152 = 5000), EL elevations, E/N coordinates at line ends and branches, and SLOPE 1:n with a fall arrow on a run that falls along a horizontal axis. Style final prints the tables bom, cut_list, weld_list, ' +
+    '(76 + 2424 + 2348 + 152 = 5000), EL elevations, E/N coordinates at line ends and branches, and SLOPE 1:n with a fall arrow on a run that falls along a horizontal axis. A run not parallel to a plant axis (a 45 degree offset, a rolling offset) is drawn at its projected angle in a skew box: the squaring-in legs along the plant axes, each dimensioned, with the length and the angle (annotations kind skew and skew_leg). Pipe supports (add_pipe_support on a routed or legacy line, SUPPORT records of an imported line) are drawn where they lie on a pipe with their mark (annotations kind support; data.supports). Style final prints the tables bom, cut_list, weld_list, ' +
     'spool_list (cut_list needs a stored weld gap, else it is left out with a warning); style check prints none unless tables is given. Without define_isometric the line is one sheet; with it, the stored paper, north arrow, style and ' +
     'sheet split apply (params override paper, northArrow, style): a line over maxPipePiecesPerSheet is cut into sheets only at welds, each cut joint is printed on both sheets as "CONT. ON SHEET n - W<number>" / "CONT. FROM SHEET n - W<number>" ' +
     'with its coordinates, components keep their stored sheet after an edit so unchanged sheets are byte-identical, and the tables of a sheet cover its components. Style spool gives one sheet per spool with its spool tables (spoolId = one spool only). ' +
     'Every sheet carries NOT FOR CONSTRUCTION and reviewRequired true until a human issues the line (issue_isometric); an issue stays valid only while the line content is unchanged. ' +
     'Returns data = { lineId, style, paper, files: [{ name, format, content, sha256 }], sheets: [{ index, files, sha256 (of the first file), componentIds, pipes, spool?, continuation: { previous?, next?, all: [{ sheet, weld, joint, at, componentIds }] }, tables, layout }], ' +
     'projection: { axes: { east, north, up: { angleDeg } }, interAxisAngleDeg, trueIsoScale }, northArrow: { mode, angleDeg }, dimensions: [{ sheetIndex, run, axis, values, overall, labels, overallLabel, points }], dimensionMismatches, ' +
-    'annotations: [{ sheetIndex, kind elevation | coordinate | slope | weld | spool | continuation, text, at, sheet, ... }], tables: { <name>: { rows, columns, data } } (whole line), layout (first sheet), warnings, reviewRequired, issue? }. ' +
+    'annotations: [{ sheetIndex, kind elevation | coordinate | slope | weld | spool | continuation | support | skew | skew_leg, text, at, sheet, ... }] (a skew annotation has lengthMm, legsMm, legAxes, angleDeg, plane), supports: [{ id, mark, type, at, sheetIndex }], tables: { <name>: { rows, columns, data } } (whole line), layout (first sheet), warnings, reviewRequired, issue? }. ' +
     'Refusals (document unchanged): ISO_LINE_NOT_FOUND, ISO_NO_PIPING, ISO_DISCONNECTED, ISO_SPOOL_NOT_FOUND, ISO_PARAM_INVALID, MAT_EXPORT_CONTROLLED. Save with llull export_isometric --save <dir>.',
   params: z.object({
     lineId: z.string().min(1).describe('The line: routed line id, imported PCF line number or legacy pipe line number.'),
@@ -132,6 +133,7 @@ export const exportIsometric = defineCommand({
     const wanted = params.tables ?? (style === 'check' ? [] : TABLE_NAMES);
     const { latest, current } = issueState(analysis.fabrication, analysis.lineId, basisOf(analysis));
     const scoped = style === 'spool' || plan.sheets.length > 1;
+    const supports = lineSupports(doc, analysis.lineId, analysis.read.network);
     const built: Array<{ info: SheetInfo; sheet: IsoSheet; continuation: ReturnType<typeof continuationOf> }> = [];
     for (const info of chosen) {
       const continuation = continuationOf(plan, info.index);
@@ -140,6 +142,7 @@ export const exportIsometric = defineCommand({
         paper,
         northArrow,
         tables: wanted,
+        supports,
         project: doc.building?.project.name.trim() || 'llull',
         ...(current === undefined
           ? {}
@@ -237,6 +240,17 @@ export const exportIsometric = defineCommand({
         dimensions: built.flatMap(({ info, sheet }) => sheet.dimensions.map((dimension) => ({ ...dimension, sheetIndex: info.index }))),
         dimensionMismatches: mismatches,
         annotations: built.flatMap(({ info, sheet }) => sheet.annotations.map((annotation) => ({ ...annotation, sheetIndex: info.index }))),
+        supports: built.flatMap(({ info, sheet }) =>
+          sheet.annotations
+            .filter((annotation) => annotation.kind === 'support')
+            .map((annotation) => ({
+              id: annotation['supportId'],
+              mark: annotation.text,
+              type: annotation['supportType'],
+              at: annotation.at,
+              sheetIndex: info.index,
+            })),
+        ),
         tables: tablesOf({ tables: whole }),
         layout: {
           k: first.layout.k,

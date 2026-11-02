@@ -157,7 +157,7 @@ written by the host, not streamed (AF-12).
 | the pack's PCF fixture (line L-101, 15 records) | `import_pcf preview=true` | 15 components (FLANGE 3, PIPE 7, WELD 1, ELBOW 3, TEE 1), 13045 mm of pipe, document unchanged | VC-ISO-01 |
 | the fixture with a TAB on line 14, or a 1025-char line, or no ISOGEN-FILES, or a short END-POINT | `import_pcf` | refused with `ISO_PCF_TAB` / `ISO_PCF_LINE_TOO_LONG` / `ISO_PCF_HEADER` / `ISO_PCF_RECORD_INVALID`, path `line N`, exit 1 | VC-ISO-02 |
 | the fixture imported | `export_pcf` | byte-identical to the input (canonical writer) | VC-ISO-03 |
-| L-101 routed in llull with the same geometry and spec | `export_pcf` then `import_pcf preview` | same topology; pipe 13045 = route 14500 − take-outs 1455 mm | VC-ISO-04 |
+| L-101 routed in llull with the same geometry and spec | `export_pcf` then `import_pcf preview` | same topology (plus the spec gaskets and bolt sets); pipe 13036 = route 14500 − take-outs 1464 mm with the spec flange sets (the sample draws the flange alone: 13045 = 14500 − 1455) | VC-ISO-04 |
 | the fixture | `weld_list` | 13 welds W1..W13, 12 shop, 1 field at (2500, 0, 3000) | VC-ISO-05 |
 | the fixture | `split_spools`, `spool_list` | 2 spools: {1, 2} and the other 12 components | VC-ISO-06 |
 | the fixture, gap 3 mm; or SKEY WF with 100 mm allowance | `cut_list` | cut lengths exactly as listed in expected_results.json | VC-ISO-07 |

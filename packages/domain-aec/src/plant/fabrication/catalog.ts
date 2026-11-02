@@ -5,6 +5,7 @@ import { cutList } from './commands/cutListCommand';
 import { defineIsometric } from './commands/defineIsometric';
 import { deletePcfLine } from './commands/deletePcfLine';
 import { exportPcf } from './commands/exportPcf';
+import { exportPipingGa } from './commands/exportPipingGa';
 import { exportIsometric } from './commands/exportIsometric';
 import { importPcf } from './commands/importPcf';
 import { issueIsometric } from './commands/issueIsometric';
@@ -30,6 +31,7 @@ export const fabricationCatalog = commandCatalog(
   cutList,
   pipingBom,
   exportIsometric,
+  exportPipingGa,
   checkIsometric,
   defineIsometric,
   issueIsometric,

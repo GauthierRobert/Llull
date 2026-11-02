@@ -126,20 +126,24 @@
       "plan": "plans/sc-iso-02-route-to-pcf-roundtrip.json",
       "expected": {
         "routeCentrelineMm": 14500.0,
-        "pipeLengthMm": 13045.0,
-        "fittingTakeOutMm": 1455.0,
-        "takeOutBreakdown": "3 elbows x 2 x 152 (912) + tee run 2 x 105 (210) + tee branch 105 + 3 flanges x 76 (228) = 1455",
+        "pipeLengthMm": 13036.0,
+        "fittingTakeOutMm": 1464.0,
+        "takeOutBreakdown": "3 elbows x 2 x 152 (912) + tee run 2 x 105 (210) + tee branch 105 + 3 flange sets x (76 flange + 3 gasket) (237) = 1464",
+        "fixtureFlangeOnlyPipeLengthMm": 13045.0,
+        "fixtureFlangeOnlyTakeOutMm": 1455.0,
         "countsByType": {
           "FLANGE": 3,
           "PIPE": 7,
           "WELD": 1,
           "ELBOW": 3,
-          "TEE": 1
+          "TEE": 1,
+          "GASKET": 3,
+          "BOLT": 3
         },
         "reimportedEndPointsMaxDeviationMm": 0.0
       },
       "tolerance": "1e-6 mm (coordinates written with 0.1 mm resolution, model on whole mm)",
-      "source": "route lengths 5000 + 4000 + 2000 + 3000 + branch 500 (plan); LR90 DN100 centre-to-end 152 mm and tee run 105 mm from 01-piping-specs-catalog asme_b16_9_buttweld_fittings.json (LR90 grade A, tee B); flange 76 mm is a fixture length of this pack, not a catalogue claim",
+      "source": "route lengths 5000 + 4000 + 2000 + 3000 + branch 500 (plan); LR90 DN100 centre-to-end 152 mm and tee run 105 mm from 01-piping-specs-catalog asme_b16_9_buttweld_fittings.json (LR90 grade A, tee B); flange 76 mm and gasket 3 mm are the inputs of the 02 RTE validation stub catalogue (CS150), not catalogue claims. The sample PCF draws each flange without its gasket (13045 / 1455, VC-ISO-01); a line routed with the spec has the 3 mm gasket in every flange set (ISO-M5, TECHNICAL_SPEC 13.5)",
       "grade": "closed form + A (elbow) / B (tee)",
       "frs": [
         "FR-ISO-02",
