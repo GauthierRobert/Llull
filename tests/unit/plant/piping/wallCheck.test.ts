@@ -302,3 +302,48 @@ describe('pipe_wall_check, size and schedule selection', () => {
     expect(result.error?.detail?.['lightestSchedule']).toBeUndefined();
   });
 });
+
+describe('pipe_wall_check, exact limits', () => {
+  const base = {
+    odMm: 60,
+    allowableStress: { value: 1000, unit: 'MPa' },
+    jointFactorE: 1,
+    weldStrengthW: 1,
+    coefficientY: 0.7,
+    corrosionAllowance: { value: 0, unit: 'mm' },
+    millTolerance: 0,
+  };
+  it('accepts P/(S E) = 0.385 exactly and refuses 0.3851 (Y 0.7, where the ratio gate binds before D/6)', () => {
+    const at = execute(doc, 'pipe_wall_check', { ...base, pressure: { value: 385, unit: 'MPa' } });
+    expect(at.rejected, at.summary).toBeUndefined();
+    expect((at.data as Record<string, Record<string, number>>)['validity']?.['pressureStressRatio']).toBe(0.385);
+    const over = expectRefusal(
+      doc,
+      'pipe_wall_check',
+      { ...base, pressure: { value: 385.1, unit: 'MPa' } },
+      'PSC_WALL_THICK_PIPE',
+      'pressure',
+    );
+    expect(over.summary).toContain('0.385');
+  });
+
+  it('refuses t exactly D/6 (the limit is strict) and accepts just below it', () => {
+    const thick = { ...base, coefficientY: 0, allowableStress: { value: 300, unit: 'MPa' } };
+    const exact = expectRefusal(
+      doc,
+      'pipe_wall_check',
+      { ...thick, pressure: { value: 100, unit: 'MPa' } },
+      'PSC_WALL_THICK_PIPE',
+      'pressure',
+    );
+    expect(exact.summary).toContain('D/6');
+    const below = execute(doc, 'pipe_wall_check', { ...thick, pressure: { value: 99.99, unit: 'MPa' } });
+    expect(below.rejected, below.summary).toBeUndefined();
+  });
+
+  it('refuses an empty standard and matches the standard exactly, not by substring', () => {
+    expect(execute(doc, 'pipe_wall_check', { ...nps4, standard: '' }).rejected).toBe(true);
+    expectRefusal(doc, 'pipe_wall_check', { ...nps4, standard: 'B36' }, 'PSC_CATALOG_ROW_MISSING', 'nps');
+    expect(execute(doc, 'pipe_wall_check', { ...nps4, standard: 'asme b36.10m' }).rejected).toBeUndefined();
+  });
+});

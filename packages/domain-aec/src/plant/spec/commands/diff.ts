@@ -5,7 +5,7 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { refuse } from '../../catalog/codes';
 import { diffSpecs } from '../diff';
-import { findSpec, getSpecModel } from '../store';
+import { findSpec, getSpecModel, specRevisions } from '../store';
 
 /**
  * @affects none; data = { specId, fromRevision, toRevision, identical, changes, header, status, components: { added, removed, changed }, branchCells, insulation }
@@ -25,7 +25,7 @@ export const diffPipeSpec = defineCommand({
   }),
   annotations: { readOnly: true, idempotent: true },
   run: (doc, { specId, fromRevision, toRevision }): CommandResult => {
-    const revisions = getSpecModel(doc).specs[specId];
+    const revisions = specRevisions(doc, specId);
     if (revisions === undefined || revisions.length === 0)
       return refuse(
         doc,

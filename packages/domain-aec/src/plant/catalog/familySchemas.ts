@@ -19,7 +19,7 @@ export interface FamilySchema {
   readonly required: Readonly<Partial<Record<ComponentType, readonly string[]>>>;
   readonly optional: readonly string[];
   /** Allowed pressure classes: a `class` a size carries must be one of them; absent = the schema does not use `class`. */
-  readonly classes?: (ends: readonly EndType[]) => readonly number[];
+  readonly classes?: (type: ComponentType, ends: readonly EndType[]) => readonly number[] | null;
   /** Every size must carry a class (B16.47 rows are class-keyed; the 02 RTE B16.11 / olet stubs are not). */
   readonly classRequired?: boolean;
   /** Sizes must be NPS within these bounds (inclusive). */
@@ -28,6 +28,8 @@ export interface FamilySchema {
   readonly system?: 'DN';
   /** Olets: the branch size is part of the key. */
   readonly needsSmallSize?: boolean;
+  /** Dimensions that, when present, must be > 0. */
+  readonly positiveWhenPresent?: readonly string[];
   /** The family `standard` text must also match this (B16.47 series). */
   readonly standardDetail?: { readonly pattern: RegExp; readonly message: string };
 }
@@ -37,7 +39,7 @@ const THREADED_CLASSES = [2000, 3000, 6000] as const;
 const B1611_TYPES = ['elbow90', 'elbow45', 'tee', 'coupling', 'cap', 'union'] as const satisfies readonly ComponentType[];
 
 /** B16.11 classes by the family's end types (socket weld 3000 / 6000 / 9000, threaded 2000 / 3000 / 6000). */
-const b1611Classes = (ends: readonly EndType[]): readonly number[] =>
+const b1611Classes = (_type: ComponentType, ends: readonly EndType[]): readonly number[] =>
   [
     ...new Set([
       ...(ends.includes('SW') || ends.length === 0 ? SOCKET_CLASSES : []),
@@ -54,7 +56,7 @@ export const FAMILY_SCHEMAS: readonly FamilySchema[] = [
     required: {
       elbow90: ['centreToEnd'],
       elbow45: ['centreToEnd'],
-      tee: ['centreToEndRun', 'centreToEndBranch'],
+      tee: ['centreToEndRun'],
       coupling: ['length'],
       cap: ['length'],
       union: ['length'],
@@ -64,12 +66,14 @@ export const FAMILY_SCHEMAS: readonly FamilySchema[] = [
   },
   {
     id: 'mss-sp-97',
-    standard: /SP-?97|\bolet/i,
+    standard: /SP-?97|(?:weld|sock|thread)olet/i,
     standardName: 'MSS SP-97 (integrally reinforced forged branch outlets)',
     types: ['weldolet', 'sockolet', 'threadolet'],
-    required: { weldolet: ['centreToOutlet'], sockolet: ['centreToOutlet'], threadolet: ['centreToOutlet'] },
-    optional: ['socketDepth', 'bodyOd', 'branchBore', 'baseWidth'],
-    classes: b1611Classes,
+    required: {},
+    optional: ['centreToOutlet', 'height', 'socketDepth', 'bodyOd', 'branchBore', 'baseWidth'],
+    /** Olets need no distance at import (02 RTE refuses the branch later); a present one is validated. */
+    positiveWhenPresent: ['centreToOutlet', 'height'],
+    classes: (type) => (type === 'sockolet' ? SOCKET_CLASSES : type === 'threadolet' ? THREADED_CLASSES : null),
     needsSmallSize: true,
   },
   {
@@ -124,14 +128,17 @@ const sizeIssues = (schema: FamilySchema, family: ComponentFamily, size: Compone
   for (const name of schema.required[family.type] ?? [])
     if (size.dims[name] === undefined)
       issues.push({ path: `${at}.${name}`, message: `${schema.standardName} ${family.type} needs the dimension "${name}"` });
-  if (schema.classes !== undefined) {
-    const allowed = schema.classes(family.ends);
+  const allowed = schema.classes?.(family.type, family.ends) ?? null;
+  if (allowed !== null) {
     if (size.class === undefined) {
       if (schema.classRequired === true)
         issues.push({ path: `${at}.class`, message: `${schema.standardName} sizes need a class (${allowed.join(', ')})` });
     } else if (!allowed.includes(size.class))
       issues.push({ path: `${at}.class`, message: `class ${size.class} is not a ${schema.standardName} class (${allowed.join(', ')})` });
   }
+  for (const name of schema.positiveWhenPresent ?? [])
+    if (size.dims[name] !== undefined && !((size.dims[name]?.value ?? 0) > 0))
+      issues.push({ path: `${at}.${name}`, message: `${name} must be > 0` });
   if (schema.needsSmallSize === true && size.smallSize === undefined)
     issues.push({ path: `${at}.smallNps`, message: `${schema.standardName} sizes need the branch size (smallNps / smallDn)` });
   if (schema.system !== undefined && size.size.system !== schema.system)

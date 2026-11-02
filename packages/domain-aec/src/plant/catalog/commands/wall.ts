@@ -64,6 +64,7 @@ export const pipeWallCheck = defineCommand({
       .optional(),
     standard: z
       .string()
+      .min(1)
       .describe(
         'Pipe standard whose schedules are searched: "ASME B36.10M" (default) or "ASME B36.19M"; "EN 10220" with an imported catalogue that holds its walls.',
       )
@@ -138,7 +139,7 @@ export const pipeWallCheck = defineCommand({
       const catalog = findCatalog(doc, reference);
       if (catalog === undefined) return fail('PSC_CATALOG_UNKNOWN', `no catalogue "${reference}"`, ['catalogId'], [reference]);
       const rows = catalog.families
-        .filter((family) => family.type === 'pipe' && normalise(family.standard).includes(normalise(standard)))
+        .filter((family) => family.type === 'pipe' && normalise(family.standard) === normalise(standard))
         .flatMap((family) => family.sizes.filter((size) => sameNps(size, nps)));
       const od = rows.find((row) => row.dims['outsideDiameter'] !== undefined)?.dims['outsideDiameter'];
       if (od === undefined)

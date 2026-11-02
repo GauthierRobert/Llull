@@ -8,7 +8,16 @@ import { dnToNps, en10220OutsideDiameter, npsToDn } from './nominal';
 import { remediationFor } from './codes';
 import type { ComponentFamily, ComponentSize, ComponentType, PipingCatalog } from './types';
 
-export const CATALOG_RULES = ['b169.lr90', 'b169.sr90', 'b165.hole', 'pipe.odMatch', 'monotonic', 'provenance', 'verified'] as const;
+export const CATALOG_RULES = [
+  'b169.lr90',
+  'b169.sr90',
+  'b165.hole',
+  'pipe.odMatch',
+  'monotonic',
+  'provenance',
+  'verified',
+  'olet.dims',
+] as const;
 export type CatalogRule = (typeof CATALOG_RULES)[number];
 
 export interface CatalogFinding {
@@ -153,6 +162,28 @@ function odRule(family: ComponentFamily, familyIndex: number): CatalogFinding[] 
   });
 }
 
+const OLET_TYPES: ReadonlySet<ComponentType> = new Set(['weldolet', 'sockolet', 'threadolet']);
+
+/** An olet row with neither the outlet distance nor the height cannot be routed or drawn (02 RTE refuses the branch with RTE_SPEC_NO_COMPONENT). */
+function oletRule(family: ComponentFamily, familyIndex: number): CatalogFinding[] {
+  if (!OLET_TYPES.has(family.type)) return [];
+  return family.sizes.flatMap((size, index) =>
+    size.dims['centreToOutlet'] !== undefined || size.dims['height'] !== undefined
+      ? []
+      : [
+          finding(
+            'olet.dims',
+            'PSC_CATALOG_ROW_MISSING',
+            'warn',
+            family,
+            size,
+            `families.${familyIndex}.sizes.${index}`,
+            `${family.id}: olet NPS ${size.size.key} x ${size.smallSize?.key ?? '?'} has neither centreToOutlet nor height: it cannot be routed or drawn`,
+          ),
+        ],
+  );
+}
+
 function monotonicRule(family: ComponentFamily, familyIndex: number): CatalogFinding[] {
   const out: CatalogFinding[] = [];
   for (const name of MONOTONIC_DIMS) {
@@ -234,5 +265,6 @@ export function checkCatalogRules(catalog: PipingCatalog, rules: readonly Catalo
     ...run('monotonic', () => monotonicRule(family, index)),
     ...run('provenance', () => provenanceRule(family, index)),
     ...run('verified', () => verifiedRule(family, index)),
+    ...run('olet.dims', () => oletRule(family, index)),
   ]);
 }

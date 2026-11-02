@@ -216,9 +216,8 @@ function reducerShape(source: ShapeSource): ShapeOutcome {
 }
 
 function oletShape(source: ShapeSource): ShapeOutcome {
-  const lacking = need(source, 'centreToOutlet');
-  if (lacking !== null) return lacking;
-  const height = dim(source, 'centreToOutlet');
+  const height = source.dims['centreToOutlet'] ?? source.dims['height'];
+  if (height === undefined) return missing(source, 'centreToOutlet (or height)');
   const body = source.dims['bodyOd'] ?? source.smallPipeOdMm;
   if (body === undefined)
     return refusal('PSC_SHAPE_UNSUPPORTED', 'an olet shape needs bodyOd in the row, or the branch pipe outside diameter');

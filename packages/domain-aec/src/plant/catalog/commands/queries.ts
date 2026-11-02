@@ -112,7 +112,9 @@ export const listPipingCatalogs = defineCommand({
           types: schema.types,
           requiredDims: schema.required,
           optionalDims: schema.optional,
-          ...(schema.classes === undefined ? {} : { classes: schema.classes([]) }),
+          ...(schema.classes === undefined
+            ? {}
+            : { classesByType: Object.fromEntries(schema.types.map((type) => [type, schema.classes?.(type, []) ?? null])) }),
         })),
       },
     );

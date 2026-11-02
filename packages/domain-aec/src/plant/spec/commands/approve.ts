@@ -10,7 +10,7 @@ import { elementsOf, getBuilding } from '../../../building/model';
 import { refuse } from '../../catalog/codes';
 import { checkSpec } from '../checks/run';
 import { canonicalSpecText } from '../file';
-import { findSpec, getSpecModel, withSpecModel } from '../store';
+import { findSpec, getSpecModel, specRevisions, withSpecModel } from '../store';
 import type { SpecApproval } from '../types';
 
 /** The recorded form of a confirmation (`withoutConfirmations`): exactly { verified: true }. */
@@ -119,7 +119,7 @@ export const approvePipeSpec = defineCommand({
         ['confirmation'],
       );
     const model = getSpecModel(doc);
-    const revisions = model.specs[specId] ?? [];
+    const revisions = specRevisions(doc, specId) ?? [];
     const superseded = revisions.filter((entry) => entry.status === 'approved').map((entry) => entry.revision);
     const approved = { ...spec, status: 'approved' as const, approval: approvalOf(outcome) };
     const next = revisions.map((entry) =>

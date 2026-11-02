@@ -53,15 +53,13 @@ describe('ASME B16.11 socket-weld and threaded fittings', () => {
     refused(b1611({ class: 9000 }, { ends: ['THD'] }), 'families.0.sizes.0.class');
   });
 
-  it('needs the length of couplings, not a centre-to-end, and the run and branch lengths of tees', () => {
+  it('needs the length of couplings, not a centre-to-end, and the run length of tees (an equal tee has no branch value)', () => {
     const coupling = b1611({ centreToEnd: undefined, length: 45 }, { type: 'coupling' });
     const res = importFamily(coupling);
     expect(res.rejected, res.summary).toBeUndefined();
     refused(b1611({ centreToEnd: 38 }, { type: 'coupling' }), 'families.0.sizes.0.length');
-    refused(b1611({ centreToEnd: undefined, centreToEndRun: 41 }, { type: 'tee' }), 'families.0.sizes.0.centreToEndBranch');
-    expect(
-      importFamily(b1611({ centreToEnd: undefined, centreToEndRun: 41, centreToEndBranch: 41 }, { type: 'tee' })).rejected,
-    ).toBeUndefined();
+    refused(b1611({ centreToEnd: 41 }, { type: 'tee' }), 'families.0.sizes.0.centreToEndRun');
+    expect(importFamily(b1611({ centreToEnd: undefined, centreToEndRun: 41 }, { type: 'tee' })).rejected).toBeUndefined();
   });
 });
 
@@ -91,10 +89,41 @@ describe('MSS SP-97 olets', () => {
     ).toBeUndefined();
   });
 
+  it('needs neither outlet distance nor height at import; check_piping_catalog warns about such a row', () => {
+    const bare = importFamily(olet({ centreToOutlet: undefined, outsideDiameter: 100 }));
+    expect(bare.rejected, bare.summary).toBeUndefined();
+    const checked = data<{ issues: Array<{ rule: string; status: string; code: string; paths: string[] }> }>(
+      bare.document,
+      'check_piping_catalog',
+      { catalogId: 'schema-test', rules: ['olet.dims'] },
+    );
+    expect(checked.issues).toEqual([
+      expect.objectContaining({ rule: 'olet.dims', status: 'warn', code: 'PSC_CATALOG_ROW_MISSING', paths: ['families.0.sizes.0'] }),
+    ]);
+    const fine = importFamily(olet({ height: 60, centreToOutlet: undefined }));
+    expect(
+      data<{ issues: unknown[] }>(fine.document, 'check_piping_catalog', { catalogId: 'schema-test', rules: ['olet.dims'] }).issues,
+    ).toEqual([]);
+  });
+
+  it('has its own class rule per olet: none for a weldolet, socket classes for a sockolet, threaded classes for a threadolet', () => {
+    expect(importFamily(olet({ class: 1500 })).rejected).toBeUndefined();
+    refused(olet({ class: 2000 }, { type: 'sockolet', ends: ['SW'] }), 'families.0.sizes.0.class');
+    expect(importFamily(olet({ class: 9000 }, { type: 'sockolet', ends: ['SW'] })).rejected).toBeUndefined();
+    refused(olet({ class: 9000 }, { type: 'threadolet', ends: ['THD'] }), 'families.0.sizes.0.class');
+  });
+
+  it('matches the standard by SP-97 or by olet type name, not by a bare "Olet"', () => {
+    const named = (standard: string): string | null => schemaFor({ standard, type: 'weldolet' })?.id ?? null;
+    expect(named('MSS SP-97')).toBe('mss-sp-97');
+    expect(named('Bonney Forge Weldolet')).toBe('mss-sp-97');
+    expect(named('Olet catalogue')).toBeNull();
+  });
+
   it.each([
     ['no branch size', { smallNps: undefined }, 'families.0.sizes.0.smallNps'],
-    ['no outlet distance', { centreToOutlet: undefined }, 'families.0.sizes.0.centreToOutlet'],
-    ['a class that is not a B16.11 / SP-97 class', { class: 1500 }, 'families.0.sizes.0.class'],
+    ['a zero outlet distance', { centreToOutlet: 0 }, 'families.0.sizes.0.centreToOutlet'],
+    ['a zero height', { centreToOutlet: undefined, height: 0 }, 'families.0.sizes.0.height'],
   ])('refuses %s', (_what, size, path) => {
     refused(olet(size), path);
   });
@@ -183,14 +212,14 @@ describe('schema lookup and listing', () => {
   });
 
   it('lists the schemas in list_piping_catalogs so an agent can build a conforming file', () => {
-    const listed = data<{ familySchemas: Array<{ id: string; requiredDims: Json; classes?: number[]; types: string[] }> }>(
-      doc,
-      'list_piping_catalogs',
-      {},
-    );
+    const listed = data<{
+      familySchemas: Array<{ id: string; requiredDims: Json; classesByType?: Record<string, number[] | null>; types: string[] }>;
+    }>(doc, 'list_piping_catalogs', {});
     expect(listed.familySchemas.map((schema) => schema.id)).toEqual(FAMILY_SCHEMAS.map((schema) => schema.id));
     const b16 = listed.familySchemas.find((schema) => schema.id === 'asme-b16.11');
-    expect(b16?.classes).toEqual([2000, 3000, 6000, 9000]);
+    expect(b16?.classesByType?.['elbow90']).toEqual([2000, 3000, 6000, 9000]);
+    const olets = listed.familySchemas.find((schema) => schema.id === 'mss-sp-97');
+    expect(olets?.classesByType).toEqual({ weldolet: null, sockolet: [3000, 6000, 9000], threadolet: [2000, 3000, 6000] });
     expect(b16?.requiredDims['elbow90']).toEqual(['centreToEnd']);
   });
 

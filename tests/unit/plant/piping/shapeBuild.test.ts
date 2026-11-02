@@ -189,3 +189,29 @@ describe('buildShape: hostile rows', () => {
     refusal(buildShape(source('valveGate', { faceToFace: 0, flangeOutsideDiameter: 230 })), 'PSC_CATALOG_DIM_MISMATCH');
   });
 });
+
+describe('buildShape: inconsistent flange rows', () => {
+  const row = { outsideDiameter: 228.6, thickness: 22.4, raisedFaceDiameter: 157.2, boltCircle: 190.5, boltCount: 8, boltHole: 19.05 };
+  const ctx = { standard: 'ASME B16.5', ratingClass: 150, facing: 'RF' };
+  const mismatch = (dims: Record<string, number>, over: Partial<ShapeSource> = {}): void => {
+    refusal(buildShape(source('flangeWeldNeck', dims, { ...ctx, ...over })), 'PSC_CATALOG_DIM_MISMATCH');
+  };
+
+  it('refuses a wall that leaves no bore (wall at or above the pipe radius)', () => {
+    mismatch(row, { wallMm: 57.15 });
+    mismatch(row, { wallMm: 1e9 });
+    expect(built(buildShape(source('flangeWeldNeck', row, { ...ctx, wallMm: 6 }))).hollow).toBe(true);
+  });
+
+  it('refuses a bore wider than the flange, a raised face or hub beyond the flange, and a hub inside the bore', () => {
+    mismatch({ ...row, outsideDiameter: 100 });
+    mismatch({ ...row, raisedFaceDiameter: 300 });
+    mismatch({ ...row, hubOd: 300, lengthThroughHub: 60 }, { wallMm: 6 });
+    mismatch({ ...row, hubOd: 100, lengthThroughHub: 60 }, { wallMm: 6 });
+  });
+
+  it('refuses bolt holes that run past the flange edge or into the bore', () => {
+    mismatch({ ...row, boltCircle: 300 });
+    mismatch({ ...row, boltCircle: 100 });
+  });
+});

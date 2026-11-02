@@ -37,7 +37,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PSC_JOINT_INCOMPLETE:
     'Add the missing part (flange, gasket or bolt set) to the spec with edit_pipe_spec, or import a catalogue that has the row.',
   PSC_SHAPE_UNSUPPORTED:
-    'Use a component type with a shape recipe (pipe, elbows, tee, reducers, cap, flanges, gaskets, olets, valves) and a row with its dimensions.',
+    'Use a component type with a shape recipe (pipe, elbows, tee, concentric reducers, flanges, gaskets, olets, valves) and a row with its dimensions.',
   PSC_REVISION_UNKNOWN: 'Call list_pipe_specs for the revisions of the spec.',
   PSC_DIM_STANDARD_MIXED: "Use fittings of the spec's dimensional standard.",
   PSC_DIM_STANDARD_ROUNDING: 'Confirm with the fitting vendor.',

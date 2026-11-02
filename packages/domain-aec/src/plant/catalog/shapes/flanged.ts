@@ -26,6 +26,16 @@ export function flangeShape(source: ShapeSource): ShapeOutcome {
   const faceRadius = (source.dims['raisedFaceDiameter'] ?? 0) / 2;
   const hubOd = source.dims['hubOd'];
   const hubTotal = source.dims['lengthThroughHub'];
+  const inconsistent =
+    (!blind && !(bore > 0)) ||
+    bore >= outer ||
+    faceRadius > outer ||
+    (source.type === 'flangeWeldNeck' && hubOd !== undefined && (hubOd / 2 <= bore || hubOd / 2 > outer));
+  if (inconsistent)
+    return refusal(
+      'PSC_CATALOG_DIM_MISMATCH',
+      'the flange dimensions are inconsistent: need 0 < bore < flange radius, raised face and hub within the flange radius and the hub outside the bore (check outsideDiameter, hubOd, raisedFaceDiameter and the pipe wall)',
+    );
   const hasHub =
     source.type === 'flangeWeldNeck' &&
     hubOd !== undefined &&
@@ -61,6 +71,13 @@ export function flangeShape(source: ShapeSource): ShapeOutcome {
   const count = source.dims['boltCount'];
   const circle = source.dims['boltCircle'];
   const hole = source.dims['boltHole'];
+  const circleRadius = (source.dims['boltCircle'] ?? 0) / 2;
+  const holeRadius = (source.dims['boltHole'] ?? 0) / 2;
+  if (circleRadius + holeRadius > outer || (circleRadius > 0 && circleRadius - holeRadius <= bore))
+    return refusal(
+      'PSC_CATALOG_DIM_MISMATCH',
+      'the bolt holes do not fit between the bore and the flange outside diameter (check boltCircle and the bolt hole)',
+    );
   const canDrill =
     count !== undefined &&
     circle !== undefined &&
