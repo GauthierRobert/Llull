@@ -1,0 +1,9 @@
+# Quick pipe stress checks without a model (07 PST SC-PST-03): elbow SIF, allowable range, growth of a hot 30 m line and a 6 m guided leg
+design hot_line_quick_checks units=mm
+param run = 30
+param leg = 6000
+add_pipe_run hot_line points=[[0,0,3000],[30000,0,3000]] dn=150 line="L-HOT" service="steam"
+check pipe_sif component="elbow" odMm=168.275 wallMm=7.112 bendRadiusMm=228.6 rule="B31.3-2018" path=ii expect ~= 2.26557 ± 0.01%
+check pipe_stress_allowables ScMPa=137.9 ShMPa=137.9 cycles=100000 rule="B31.3-2018" SLMPa=40 path=SAMPa expect ~= 182.85 ± 0.01%
+check thermal_growth table="carbon-steel-c1" fromC=21.111 toC=204.444 lengthM=run path=growthMm expect ~= 67.52 ± 0.1%
+check guided_cantilever legMm=leg displacementMm=50 odMm=168.3 wallMm=7.11 EMPa=200000 SAMPa=206.85 path=withinAllowable expect == true

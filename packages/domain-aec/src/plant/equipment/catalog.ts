@@ -3,10 +3,14 @@
 import { commandCatalog } from '@core/commands/schema';
 import { addProcessColumn } from './commands/addProcessColumn';
 import { addVessel } from './commands/addVessel';
+import { checkEquipment } from './commands/checkEquipment';
+import { equipmentWeights } from './commands/equipmentWeights';
 import { equipmentPortsQuery } from './commands/equipmentPortsQuery';
 import { addNozzle, deleteNozzle, updateNozzle } from './commands/nozzles';
+import { tankShellThickness } from './commands/tankShellThickness';
 import { updateEquipmentParameters } from './commands/updateEquipmentParameters';
 import { renameEquipmentTag } from './commands/renameEquipmentTag';
+import { vesselThickness } from './commands/vesselThickness';
 import { vesselVolume } from './commands/vesselVolume';
 
 export const equipmentCatalog = commandCatalog(
@@ -19,4 +23,8 @@ export const equipmentCatalog = commandCatalog(
   updateEquipmentParameters,
   renameEquipmentTag,
   vesselVolume,
+  vesselThickness,
+  tankShellThickness,
+  equipmentWeights,
+  checkEquipment,
 );

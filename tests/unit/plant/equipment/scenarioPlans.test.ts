@@ -30,11 +30,13 @@ function pick(root: unknown, expression: string): unknown {
   return expression.split('.').reduce<unknown>((node, part) => {
     const match = /^([^[]*)(?:\[(.+)\])?$/.exec(part);
     const key = match?.[1] ?? part;
-    let value = key === '' ? node : (node as Record<string, unknown> | undefined)?.[key];
+    // a filter followed by .length counts the matches; any other property reads the first match
+    const source = Array.isArray(node) && !/^[0-9]+$/.test(key) && key !== 'length' ? node[0] : node;
+    let value = key === '' ? source : (source as Record<string, unknown> | undefined)?.[key];
     const index = match?.[2];
     if (index !== undefined && Array.isArray(value)) {
       const filter = /^(\w+)=(.+)$/.exec(index);
-      value = filter ? value.find((item: Record<string, unknown>) => item[filter[1] as string] === filter[2]) : value[Number(index)];
+      value = filter ? value.filter((item: Record<string, unknown>) => item[filter[1] as string] === filter[2]) : value[Number(index)];
     }
     return value;
   }, root);

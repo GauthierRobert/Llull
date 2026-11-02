@@ -13,6 +13,7 @@ import {
   plantDisplayPlugin,
   plantEquipmentPlugin,
   scanPlugin,
+  pipeStressPlugin,
   structuresPlugin,
 } from '@aec/index';
 import { caePlugin, explicitPlugin, topologyPlugin } from '@cae/index';
@@ -40,6 +41,7 @@ export function installDefaultPlugins(): void {
   installPlugin(pipingFabricationPlugin);
   installPlugin(pipingCatalogPlugin);
   installPlugin(structuresPlugin);
+  installPlugin(pipeStressPlugin);
   installPlugin(plantEquipmentPlugin);
   installPlugin(plantDataPlugin);
   installPlugin(pidPlugin);

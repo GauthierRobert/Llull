@@ -8,11 +8,10 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import type { EquipmentShape } from '@aec/building/types';
 import { toMetres } from '@core/model/units';
 import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
-import type { PlantEquipmentData, VesselDesignData, VesselTemplate } from '../plantData';
-import { headMetalVolume } from './headOffset';
-import { horizontalVolume, verticalVolume } from './partialVolume';
+import type { PlantEquipmentData, VesselTemplate } from '../plantData';
 import { headApexHeight } from './vesselProfile';
 import { resolveVessel, skirtRadii, type VesselGeometry } from './vesselFrame';
+import { vesselMass } from './vesselMass';
 
 export interface LegacyFields {
   readonly size: Vec3;
@@ -22,8 +21,6 @@ export interface LegacyFields {
   /** Named assumptions: density default, liquid not computed, saddles not included. */
   readonly notes: readonly string[];
 }
-
-const annulus = (outer: number, inner: number): number => Math.PI * (outer * outer - inner * inner);
 
 /** Footprint radius and top elevation (above the level) of a vertical vessel with its support. */
 function verticalExtent(template: VesselTemplate, geometry: VesselGeometry): { radius: number; top: number } {
@@ -39,30 +36,6 @@ function verticalExtent(template: VesselTemplate, geometry: VesselGeometry): { r
   return { radius: Math.max(outer, supportRadius), top };
 }
 
-function supportMetalVolume(template: VesselTemplate, geometry: VesselGeometry): number {
-  const { support } = template;
-  const outer = geometry.radius + geometry.shellThickness;
-  if (support.type === 'skirt')
-    return (
-      annulus(skirtRadii(geometry, support.thickness).outer, outer) * support.height +
-      (support.baseRingWidth > 0
-        ? annulus(skirtRadii(geometry, support.thickness).outer + support.baseRingWidth, skirtRadii(geometry, support.thickness).outer) *
-          support.thickness
-        : 0)
-    );
-  if (support.type === 'legs') return support.count * support.legWidth * support.legWidth * support.height;
-  return 0;
-}
-
-function liquidVolume(template: VesselTemplate, geometry: VesselGeometry, design: VesselDesignData | undefined): number | null {
-  const liquid = design?.operatingLiquid;
-  if (liquid === undefined) return 0;
-  const { radius, length, first, second } = geometry;
-  if (template.orientation === 'vertical')
-    return verticalVolume(radius, length, first, second, first.depth + liquid.levelAboveBottomTangent);
-  return horizontalVolume(radius, length, first, second, liquid.levelAboveBottomTangent);
-}
-
 /**
  * @returns size / shape / weight for a vessel template; null for a block (legacy fields stay as the user set them) or an invalid head
  * @invariant vertical -> `vertical_vessel` [D, D, top]; horizontal on the floor -> `horizontal_vessel`, raised on saddles -> `box` of the full
@@ -74,23 +47,14 @@ export function legacyFields(doc: Pick<CadDocument, 'units'>, plant: PlantEquipm
   const geometry = resolveVessel(template);
   if ('error' in geometry) return null;
   const outer = geometry.radius + geometry.shellThickness;
-  const scale = toMetres(doc, 1);
   const notes: string[] = [];
-  const density = plant.design?.materialDensityKgM3 ?? STEEL_DENSITY_KG_PER_M3;
-  if (plant.design?.materialDensityKgM3 === undefined) notes.push(`material density defaulted to ${STEEL_DENSITY_KG_PER_M3} kg/m3 (steel)`);
-  const shell = annulus(outer, geometry.radius) * geometry.length;
-  const heads = [geometry.first, geometry.second].reduce(
-    (sum, head) => sum + headMetalVolume(head, geometry.radius, geometry.headThickness),
-    0,
-  );
-  const metal = (shell + heads + supportMetalVolume(template, geometry)) * scale ** 3 * density;
-  const liquid = liquidVolume(template, geometry, plant.design);
-  if (liquid === null)
+  const mass = vesselMass(toMetres(doc, 1), template, geometry, plant.design);
+  if (mass.densityDefaulted) notes.push(`material density defaulted to ${STEEL_DENSITY_KG_PER_M3} kg/m3 (steel)`);
+  if (mass.operatingKg === null)
     notes.push('operating liquid not added: no closed form at this level for a torispherical head of a horizontal vessel');
-  notes.push('nozzles are not part of the weight (M3)');
+  notes.push('nozzles are not part of the weight (see equipment_weights include nozzles)');
   if (template.support.type === 'saddles') notes.push('saddle plates are not part of the weight');
-  const specificGravity = plant.design?.operatingLiquid?.specificGravity ?? 0;
-  const weight = metal + (liquid ?? 0) * scale ** 3 * specificGravity * 1000;
+  const weight = mass.operatingKg ?? mass.emptyKg;
   if (template.orientation === 'vertical') {
     const { radius, top } = verticalExtent(template, geometry);
     return { size: [2 * radius, 2 * radius, top], shape: 'vertical_vessel', weight, notes };

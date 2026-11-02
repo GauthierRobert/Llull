@@ -9,7 +9,7 @@ import { dot3, len3, sub3 } from '@lib/vec3';
 import { GRAVITY, round } from '../../shared/numeric';
 import { modelUnits } from '../steelDesign/steelMemberBars';
 import { pipeRunOf } from './pipeSupportLayout';
-import { pipeWallThickness } from './pipeWeight';
+import { pipeWallMm } from './pipeWeight';
 import { K_90_DEGREES, bendK, frictionFactor, pipeRoughnessMm, waterDensity, waterViscosity } from './pipeFlow';
 
 /** Deflections below this (degrees) are not counted as bends. */
@@ -29,7 +29,7 @@ export const pipeHydraulics = defineCommand({
     'Read-only pressure drop of one pipe run (add_pipe_run), flowing from its first to its last point. Give the run id (`pipeId`, e.g. ' +
     '"pipe-1") and exactly one flow: `flowM3h` (m³/h) or `massFlowKgS` (kg/s). Fluid is water at `temperatureC` (default 20 °C; ' +
     'density and viscosity from Kell / Vogel fits) unless `density` (kg/m³) and `viscosity` (Pa·s) are given for another liquid. Inner ' +
-    'diameter = outside diameter minus twice the standard wall (Sch 40 / STD table of add_pipe_run, e.g. DN100 -> 102.26 mm). Roughness ' +
+    'diameter = outside diameter minus twice the wall: the wall of the pipe spec binding (assign_pipe_spec) when the run has one, else the standard wall (Sch 40 / STD table of add_pipe_run, e.g. DN100 -> 102.26 mm). Roughness ' +
     'defaults by the pipe material (steel 0.045 mm, stainless 0.015, galvanised 0.15, cast iron 0.26, copper / plastic 0.0015). Friction: ' +
     'laminar 64/Re below Re 2300, else Colebrook-White solved iteratively. Straight loss = f (L/D) ρ v²/2 along the 3D centreline; ' +
     'fittings = ΣK ρ v²/2 with one K per interior bend from its deflection angle (K90 by `bendType`: long_radius 0.30, standard 0.40, ' +
@@ -73,7 +73,7 @@ export const pipeHydraulics = defineCommand({
     const element = Object.values(units.building.elements).find((candidate) => candidate.category === 'pipe' && candidate.id === pipeId);
     if (element?.category !== 'pipe') return fail(`no pipe run '${pipeId}' (add_pipe_run creates one).`);
     const run = pipeRunOf(units, element);
-    const wallMm = pipeWallThickness(run.diameterMm);
+    const wallMm = pipeWallMm(element, run.diameterMm);
     const insideMm = run.diameterMm - 2 * wallMm;
     if (!(insideMm > 0) || !(run.lengthMm > 0)) return fail(`pipe ${element.mark} has no bore or no length.`);
 
@@ -117,7 +117,12 @@ export const pipeHydraulics = defineCommand({
       pipeId: element.id,
       mark: element.mark,
       line: element.line ?? '',
-      diameter: { outsideMm: sig(run.diameterMm), wallMm, insideMm: sig(insideMm) },
+      diameter: {
+        outsideMm: sig(run.diameterMm),
+        wallMm,
+        insideMm: sig(insideMm),
+        wallBasis: element.spec === undefined ? 'legacy wall table' : 'pipe spec',
+      },
       fluid: { name: fluid, densityKgM3: sig(rho), viscosityPaS: sig(mu) },
       flow: { m3h: sig(volumetric * 3600), massKgS: sig(volumetric * rho) },
       lengthM: sig(length),
@@ -140,7 +145,7 @@ export const pipeHydraulics = defineCommand({
       warnings,
       assumptions: [
         'Incompressible single phase; Darcy-Weisbach with Colebrook-White (laminar 64/Re below Re 2300).',
-        'Inner diameter from the standard wall table (Sch 40 / STD); bend K = K90 · sin(θ/2)/sin 45°, K90 long_radius 0.30 / standard 0.40 / mitre 1.10.',
+        'Inner diameter from the wall of the pipe spec binding, else the standard wall table (Sch 40 / STD); bend K = K90 · sin(θ/2)/sin 45°, K90 long_radius 0.30 / standard 0.40 / mitre 1.10.',
         'Flow runs from the first to the last point; static head ρ g Δz uses the end-minus-start elevation.',
       ],
     };
