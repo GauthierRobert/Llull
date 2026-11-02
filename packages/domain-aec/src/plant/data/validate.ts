@@ -8,7 +8,14 @@ import { isRecord } from '@lib/isRecord';
 import { resolveClass } from './classes';
 import { ifcMappingProblem } from './ifcMapping';
 import { kindRank } from './hierarchy';
-import { DEFINITION_KINDS, HIERARCHY_KINDS, type PlantDataModel } from './model';
+import {
+  DEFINITION_KINDS,
+  DELIVERABLE_STATUSES,
+  EXTERNAL_SCHEMES,
+  HIERARCHY_KINDS,
+  HUMAN_GATED_STATUSES,
+  type PlantDataModel,
+} from './model';
 import { definitionProblem } from './properties';
 import { parseTagFormat } from './tagFormat';
 import { objectErrors, isScalar, orderErrors } from './validateObjects';
@@ -111,6 +118,23 @@ function classShapeErrors(key: string, cls: Record<string, unknown>): string[] {
       if (problem !== null) errors.push(`${path}.ifc: ${problem}`);
     }
   }
+  const external = cls['externalIds'];
+  if (external !== undefined) {
+    const schemes = new Set<string>();
+    if (
+      !Array.isArray(external) ||
+      !external.every(
+        (entry) =>
+          isRecord(entry) &&
+          (EXTERNAL_SCHEMES as readonly string[]).includes(String(entry['scheme'])) &&
+          typeof entry['id'] === 'string' &&
+          entry['id'] !== '' &&
+          !schemes.has(String(entry['scheme'])) &&
+          schemes.add(String(entry['scheme'])),
+      )
+    )
+      errors.push(`${path}.externalIds must be an array of { scheme, id }, one per scheme`);
+  }
   return errors;
 }
 
@@ -163,13 +187,55 @@ function reportErrors(raw: unknown): string[] {
   return errors;
 }
 
+/** Deliverable revisions (optional): the shape set_deliverable_status relies on, one step list per revision, a known status in each step. */
+function deliverableErrors(raw: unknown): string[] {
+  if (raw === undefined) return [];
+  if (!isRecord(raw)) return ['plant.data.deliverables must be an object'];
+  const errors: string[] = [];
+  for (const [key, deliverable] of Object.entries(raw)) {
+    const path = `plant.data.deliverables.${key}`;
+    if (!isRecord(deliverable) || deliverable['id'] !== key || !Array.isArray(deliverable['revisions'])) {
+      errors.push(`${path} must be { id (its key), revisions[] }`);
+      continue;
+    }
+    const labels = new Set<string>();
+    deliverable['revisions'].forEach((revision: unknown, index) => {
+      const at = `${path}.revisions[${index}]`;
+      if (!isRecord(revision) || typeof revision['label'] !== 'string' || revision['label'] === '' || !Array.isArray(revision['steps'])) {
+        errors.push(`${at} must be { label, hierarchyId?, steps[] }`);
+        return;
+      }
+      if (labels.has(revision['label'])) errors.push(`${at}.label ${revision['label']} is used twice`);
+      labels.add(revision['label']);
+      if (revision['hierarchyId'] !== undefined && typeof revision['hierarchyId'] !== 'string')
+        errors.push(`${at}.hierarchyId must be a string`);
+      if (revision['steps'].length === 0) errors.push(`${at}.steps must not be empty`);
+      revision['steps'].forEach((step: unknown, stepIndex) => {
+        const stepAt = `${at}.steps[${stepIndex}]`;
+        if (
+          !isRecord(step) ||
+          !(DELIVERABLE_STATUSES as readonly string[]).includes(String(step['status'])) ||
+          typeof step['contentSha256'] !== 'string' ||
+          !/^[0-9a-f]{64}$/.test(step['contentSha256']) ||
+          (step['signer'] !== undefined && typeof step['signer'] !== 'string') ||
+          (step['signatureId'] !== undefined && typeof step['signatureId'] !== 'string') ||
+          ((HUMAN_GATED_STATUSES as readonly string[]).includes(String(step['status'])) &&
+            (typeof step['signer'] !== 'string' || typeof step['signatureId'] !== 'string'))
+        )
+          errors.push(`${stepAt} must be { status, contentSha256 (64 hex), signer and signatureId for a signed status }`);
+      });
+    });
+  }
+  return errors;
+}
+
 /** Problems of a raw `plant.data` (empty = valid or absent). */
 export function plantDataErrors(raw: unknown): string[] {
   if (raw === undefined) return [];
   if (!isRecord(raw)) return ['plant.data must be an object'];
   if (raw['version'] !== 1) return ['plant.data.version must be 1'];
   const structural = [...settingsErrors(raw['settings']), ...hierarchyErrors(raw), ...classErrors(raw)];
-  const reports = reportErrors(raw['reports']);
+  const reports = [...reportErrors(raw['reports']), ...deliverableErrors(raw['deliverables'])];
   if (structural.length > 0 || reports.length > 0) return [...structural, ...reports];
   const data = raw as unknown as PlantDataModel;
   const resolution = data.classOrder.flatMap((name) => {

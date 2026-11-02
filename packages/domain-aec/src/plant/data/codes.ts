@@ -15,6 +15,13 @@ export interface DataFinding {
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   DAT_PARAM_INVALID: 'Fix the parameter named in paths.',
+  DAT_STATUS_TRANSITION:
+    'Move one step forward: in_work, issued_for_review, issued_for_approval, issued_for_construction, as_built (a new revision may start at in_work or issued_for_review); superseded is set by a newer revision, never by hand.',
+  DAT_HUMAN_GATE:
+    'issued_for_approval, issued_for_construction and as_built are human acts: ask the qualified reviewer to sign in the desktop app and pass the signature object (with a nonce) as confirmation.',
+  DAT_CHECK_FAILED: 'Fix the failing findings of check_plant_data (same scope) and issue again; the signature was not spent.',
+  DAT_HANDOVER_MAPPING_MISSING:
+    'Add externalIds { scheme: "cfihos", id } to the class (define_plant_class on a project class), or leave requireMapping off to export the rows with an empty class id.',
   DAT_HIERARCHY_INVALID:
     'Give parent as the code (or S1/P1/U10 path) of an existing node of a higher kind (site > plant > area > unit > system); only a site has no parent.',
   DAT_HIERARCHY_DUPLICATE_CODE: 'Rename one of the two nodes: codes are unique among the children of one parent.',

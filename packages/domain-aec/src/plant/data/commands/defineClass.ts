@@ -3,7 +3,15 @@ import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import { resolveClass } from '../classes';
 import { ifcMappingProblem } from '../ifcMapping';
-import { getPlantData, PROPERTY_TYPES, withPlantData, type IfcMapping, type PlantClass, type PropertyDefinition } from '../model';
+import {
+  EXTERNAL_SCHEMES,
+  getPlantData,
+  PROPERTY_TYPES,
+  withPlantData,
+  type IfcMapping,
+  type PlantClass,
+  type PropertyDefinition,
+} from '../model';
 import { definitionProblem, IDENTIFIER } from '../properties';
 import { parseTagFormat } from '../tagFormat';
 import { unitsOf } from '../units';
@@ -54,6 +62,7 @@ export const definePlantClass = defineCommand({
     'ifc: { entity, predefinedType?, objectType? } with an IFC4X3_ADD2 entity and a value of its type enumeration, or USERDEFINED plus objectType. ' +
     'Returns data = { className, tagFormat, classCode, tagScope, resolvedProperties [{ name, type, unit, required }] }. Refusals: DAT_CLASS_EXISTS, ' +
     'DAT_LIBRARY_CLASS_LOCKED, DAT_CLASS_PARENT_UNKNOWN, DAT_TAG_FORMAT_INVALID, DAT_PROPERTY_DEFINITION_INVALID, DAT_IFC_MAPPING_INVALID. ' +
+    'externalIds: [{ scheme: cfihos | iso15926 | company, id }] identifiers of the class in an external scheme (export_handover). ' +
     'Next: define_plant_hierarchy, assign_plant_object.',
   params: z.object({
     name: z.string().describe('Class name, PascalCase identifier, e.g. "FeedPump".'),
@@ -76,6 +85,17 @@ export const definePlantClass = defineCommand({
       })
       .optional()
       .describe('IFC4X3_ADD2 mapping used by the IFC export.'),
+    externalIds: z
+      .array(
+        z.object({
+          scheme: z.enum(EXTERNAL_SCHEMES).describe('Scheme of the identifier: cfihos, iso15926 or company.'),
+          id: z.string().trim().min(1).describe('The identifier of this class in that scheme, e.g. a CFIHOS class code.'),
+        }),
+      )
+      .optional()
+      .describe(
+        'Identifiers of this class in external schemes (not inherited), read by export_handover. llull ships and checks no CFIHOS code: you supply them, and the handover stays unverified.',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const data = getPlantData(doc);
@@ -114,6 +134,8 @@ export const definePlantClass = defineCommand({
       const problem = ifcMappingProblem(params.ifc);
       if (problem !== null) return fail('DAT_IFC_MAPPING_INVALID', problem, 'ifc');
     }
+    const schemes = (params.externalIds ?? []).map((entry) => entry.scheme);
+    if (new Set(schemes).size !== schemes.length) return fail('DAT_PARAM_INVALID', 'externalIds names a scheme twice', 'externalIds');
     const cls: PlantClass = {
       name,
       parent: parent ?? null,
@@ -123,6 +145,7 @@ export const definePlantClass = defineCommand({
       ...(params.tagScope === undefined ? {} : { tagScope: params.tagScope }),
       properties,
       ...(params.ifc === undefined ? {} : { ifc: params.ifc as IfcMapping }),
+      ...(params.externalIds === undefined ? {} : { externalIds: params.externalIds }),
       source: 'project',
     };
     const next = withPlantData(doc, { ...data, classes: { ...data.classes, [name]: cls }, classOrder: [...data.classOrder, name] });
