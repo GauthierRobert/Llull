@@ -117,3 +117,28 @@ describe('a non-finite governing ratio is refused (PST-HARDEN)', () => {
     expect(apply(doc, 'update_stress_model', { modelId: id, name: 'r' }).plant?.stress?.models[id]?.recorded).toBeUndefined();
   });
 });
+
+describe('a non-finite solve is refused by the frame backstop (PST-HARDEN)', () => {
+  it('an overflowing force gives PST_UNSTABLE on analyze and record; nothing is recorded', () => {
+    const { doc, id, pipeId } = recordedModel();
+    const overflow = apply(doc, 'set_stress_load_cases', {
+      modelId: id,
+      cases: [
+        { name: 'SUS', type: 'SUS', basic: ['W'] },
+        { name: 'OPE', type: 'OPE', basic: ['W', 'T1'] },
+        { name: 'OCC', type: 'OCC', basic: ['W', 'F1'] },
+        {
+          name: 'EXP',
+          type: 'EXP',
+          combine: [
+            { case: 'OPE', factor: 1 },
+            { case: 'SUS', factor: -1 },
+          ],
+        },
+      ],
+      forces: [{ name: 'F1', pipeId, atMm: 2000, forceN: [0, 0, 1e308] }],
+    });
+    expectRefusal(overflow, 'analyze_pipe_stress', { modelId: id }, 'PST_UNSTABLE');
+    expectRefusal(overflow, 'record_pipe_stress_results', { modelId: id }, 'PST_UNSTABLE');
+  });
+});
