@@ -24,6 +24,14 @@ import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
 import { barModel } from '../unit/cae/explicit/support';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
+import {
+  bemNozzles,
+  bemParams,
+  pumpParams,
+  separatorNozzles,
+  separatorParams,
+  tankParams,
+} from '../unit/plant/equipment/equipmentFixtures';
 
 /** A command run on the loaded document: `params` may depend on the document (a missing id is a refusal, never a finding). */
 interface SeedCommand {
@@ -133,6 +141,23 @@ function buildingWithPlatforms(): CadDocument {
   }).document;
 }
 
+/** The platform building plus parametric equipment (06 EQP): a vessel, a heat exchanger, a storage tank and a pump with their nozzles and design data. */
+function buildingWithEquipment(): CadDocument {
+  const run = (doc: CadDocument, name: string, params: object): CadDocument => {
+    const result = execute(doc, name, params);
+    if (result.error !== undefined || result.rejected) throw new Error('pluginSliceSeeds: ' + name + ' refused: ' + result.summary);
+    return result.document;
+  };
+  const withNozzles = (doc: CadDocument, tag: string, nozzles: readonly object[]): CadDocument =>
+    nozzles.reduce<CadDocument>((next, nozzle) => run(next, 'add_nozzle', { equipment: tag, ...nozzle }), doc);
+  let doc = run(buildingWithPlatforms(), 'add_vessel', { ...separatorParams, location: [0, 20000] });
+  doc = withNozzles(doc, 'V-101', separatorNozzles);
+  doc = run(doc, 'add_heat_exchanger', { ...bemParams, location: [15000, 20000] });
+  doc = withNozzles(doc, 'E-301', bemNozzles);
+  doc = run(doc, 'add_storage_tank', { ...tankParams, location: [60000, 30000] });
+  return run(doc, 'add_pump', { ...pumpParams, location: [30000, 20000] });
+}
+
 const planOf = (table: Record<string, GoldenAction[]>, name: string) => (): CadDocument => planDocument(table[name], name);
 
 /** The golden PLM plan needs a signature port that accepts a confirmation naming its signer (as tests/golden/golden.test.ts does). */
@@ -167,7 +192,7 @@ const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc
 export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   building: {
     roots: ['building'],
-    build: buildingWithPlatforms,
+    build: buildingWithEquipment,
     query: { name: 'describe_building', params: constant({}) },
     mutate: { name: 'add_level', params: constant({ name: 'Fuzz level', elevation: 90000, height: 3000 }) },
   },

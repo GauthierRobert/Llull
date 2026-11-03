@@ -12,7 +12,8 @@ import { fitScale } from '@aec/shared/sheetFrame';
 import type { PlanSheet } from '@aec/building/drawings/sheet';
 import { type IfcExport } from '@aec/building/exchange/ifcBuild';
 import { ifcGuid, ifcReal, ifcString } from '@aec/building/exchange/ifcStep';
-import { fileSlug } from '@aec/building/model';
+import { fileSlug, withLevel } from '@aec/building/model';
+import { createEmptyBuilding } from '@aec/building/types';
 import { drawHouseWalls, run } from '../../helpers/runFixtures';
 import { xy } from '../../helpers/xy';
 
@@ -284,14 +285,22 @@ describe('export_ifc', () => {
 });
 
 describe('identity', () => {
-  it('two projects never share IFC GlobalIds; one project keeps them stable', () => {
+  it('one plan keeps its IFC GlobalIds on every run; a different plan, even at the same step number, gets disjoint ones', () => {
     const a = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
-    const b = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
+    const same = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
+    const b = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 2000, 0) });
+    const later = run(run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }), 'draw_walls', { points: xy(0, 0, 1000, 0) });
     const guids = (doc: CadDocument): string[] =>
       [...(execute(doc, 'export_ifc', {}).data as IfcExport).ifc.matchAll(/\('([0-9A-Za-z_$]{22})'/g)].map((match) => match[1]!);
-    const shared = guids(a).filter((guid) => guids(b).includes(guid));
-    expect(shared).toEqual([]);
+    expect(guids(same)).toEqual(guids(a));
+    expect(a.building?.uid?.startsWith('building-1.')).toBe(true);
+    expect(b.building?.uid?.startsWith('building-1.')).toBe(true);
+    expect(guids(a).filter((guid) => guids(b).includes(guid))).toEqual([]);
+    expect(guids(a).filter((guid) => guids(later).includes(guid))).toEqual([]);
     expect(guids(a)).toEqual(guids(run(a, 'set_project_info', { client: 'X' })));
+  });
+  it('creating a building outside execute (no step-scoped id source) is refused, never given a time-based uid', () => {
+    expect(() => withLevel(createEmptyBuilding(), { id: 'level-1', name: 'L', elevation: 0, height: 3000 })).toThrow(/step-scoped/);
   });
   it('element and level numbers are never reused after a delete', () => {
     let doc = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });

@@ -44,7 +44,7 @@ Get the diff (`git diff` if initialized, else inspect changed files). Check, in 
       `packages/domain-aec/src/**` satisfied (run it).
 - [ ] `toToolSchemas()` length == `listCommands()` length; schema snapshot / golden corpus
       diffs are intended and explained.
-- [ ] New ids are step-scoped (`nextId`), never `uniqueId()` / `Date.now()` (replay determinism).
+- [ ] New ids are step-scoped (`nextId`), never `Date.now()` or time-based ids (replay determinism).
 
 ### Correctness (judgment)
 - Model invariants held (`model.md`): id↔order↔selection consistency, valid layerId,

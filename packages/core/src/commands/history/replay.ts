@@ -35,15 +35,6 @@ export interface ReplayStepEvent {
 }
 
 /** Why a replayed step failed, or null: a throw, a refusal (`error`) or a `build_project` report with `ok: false`. */
-/** The globally unique id an installed plugin holds in `doc` (the first one reported), or undefined. */
-function mintedIdentity(doc: CadDocument): string | undefined {
-  for (const extension of documentExtensions()) {
-    const identity = extension.mintedIdentity?.(doc);
-    if (identity !== undefined) return identity;
-  }
-  return undefined;
-}
-
 function failureOf(result: CommandResult | null): string | null {
   if (result === null) return 'the command threw';
   if (result.error !== undefined || result.rejected) return result.summary;
@@ -195,7 +186,6 @@ export function replayHistory(
       failure = hit.failure ?? null;
       parameterFingerprint = hit.parameterFingerprint;
     } else {
-      const uidBefore = mintedIdentity(doc);
       const tracking = cache ? trackParameterReads(doc) : null;
       const runDoc = tracking?.doc ?? doc;
       const result = runReplayStep(cmd, step, runDoc, remapped, idMap, context, true, true);
@@ -219,9 +209,8 @@ export function replayHistory(
         if (before.display !== undefined) doc = { ...doc, display: before.display };
         else delete doc.display;
       }
-      const mintedUid = uidBefore === undefined ? mintedIdentity(doc) : undefined;
       const deferred = deferralCount() !== deferralsAtStart;
-      if (mintedUid === undefined && !deferred) {
+      if (!deferred) {
         const state = {
           doc,
           idMap: new Map(idMap),
@@ -231,13 +220,9 @@ export function replayHistory(
         };
         cache?.set(key, state);
         if (parameterFingerprint !== undefined) cache?.set(variantKey, state);
-      } else if (cache && deferred && mintedUid === undefined) {
+      } else if (cache) {
         // An engine deferred this step or an earlier one (its result is still being computed): the state is a placeholder the host discards and re-runs. Never memoize it, and key every later state apart from the real one.
         key = nextStateKey(key, 'deferred', String(deferralCount()), null);
-      } else if (cache) {
-        // The step minted a globally unique id (uniqueId): never memoize it, and key every later
-        // state by that id so no other document is served this document's identity.
-        key = nextStateKey(key, 'minted-uid', mintedUid ?? String(deferralCount()), null);
       }
     }
     stateKey = parameterFingerprint !== undefined ? nextStateKey(key, 'parameters', parameterFingerprint, null) : key;

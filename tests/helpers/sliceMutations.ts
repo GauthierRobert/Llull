@@ -25,6 +25,7 @@ const MUTATION_KINDS = [
   'dangling-reference',
   'long-string',
   'long-array',
+  'prototype-key-string',
 ] as const;
 export type MutationKind = (typeof MUTATION_KINDS)[number];
 
@@ -32,6 +33,7 @@ export type MutationKind = (typeof MUTATION_KINDS)[number];
 export const NON_JSON_KINDS: ReadonlySet<MutationKind> = new Set(['number-nan', 'number-infinity', 'number-minus-infinity']);
 
 const RESERVED = ['__proto__', 'constructor', 'prototype'] as const;
+const PROTOTYPE_KEYS = ['hasOwnProperty', 'toString', 'valueOf', '__proto__', 'constructor'] as const;
 const LONG_STRING = 20_000;
 const LONG_ARRAY = 1_500;
 
@@ -189,6 +191,15 @@ function candidatesFor(node: Node, ids: ReadonlySet<string>): SliceMutation[] {
         replaceAt(path, () => 'x'.repeat(LONG_STRING)),
       ),
     );
+    for (const proto of PROTOTYPE_KEYS)
+      out.push(
+        build(
+          'prototype-key-string',
+          path,
+          proto,
+          replaceAt(path, () => proto),
+        ),
+      );
     if (ids.has(value) && key !== 'id')
       out.push(
         build(

@@ -183,7 +183,6 @@ nextId(prefix = 'e'): string            // mints from the active source (the run
 stepIdSource(stepKey): IdSource         // `${prefix}-${stepKey}.${k}` — replay re-mints identical ids
 counterIdSource: IdSource               // outside a step: `${prefix}-${base36 time}-${base36 counter}`
 withIdSource(source, fn); stepKeyOf('step-12') === '12'
-uniqueId(prefix): string                // NOT replay-stable; only cross-document identities (IFC salt)
 ```
 
 No id-counter reset exists; tests rely on step-scoped determinism.

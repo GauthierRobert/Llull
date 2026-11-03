@@ -16,15 +16,19 @@ function boxOf(doc: CadDocument): BoxEntity {
 
 afterEach(() => setGeometryKernel(null));
 
-describe('S2: replay cache never shares a minted building uid between documents', () => {
-  it('two fresh documents inserting the same wall get different uids', () => {
-    const insert = (): CadDocument =>
-      execute(createEmptyDocument(), 'insert_step', { name: 'draw_walls', params: { points: xy(0, 0, 5000, 0) } }).document;
+describe('BLD-UID: the building uid is step-scoped, so one plan always yields one uid', () => {
+  const insert = (): CadDocument =>
+    execute(createEmptyDocument(), 'insert_step', { name: 'draw_walls', params: { points: xy(0, 0, 5000, 0) } }).document;
+  it('two fresh documents running the same step get the same uid', () => {
     const a = insert();
-    const b = insert();
     expect(a.building?.uid).toBeDefined();
-    expect(b.building?.uid).toBeDefined();
-    expect(a.building?.uid).not.toBe(b.building?.uid);
+    expect(insert().building?.uid).toBe(a.building?.uid);
+  });
+  it('a replay re-mints the uid, and the IFC export of two runs is byte-identical', () => {
+    const a = insert();
+    expect(execute(a, 'replay_history', {}).document.building?.uid).toBe(a.building?.uid);
+    const ifc = (doc: CadDocument): unknown => execute(doc, 'export_ifc', {}).data;
+    expect(ifc(insert())).toEqual(ifc(a));
   });
 });
 

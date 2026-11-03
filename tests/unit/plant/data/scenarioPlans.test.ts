@@ -108,7 +108,7 @@ describe.each([
 
   it('is deterministic: a second run gives byte-identical step data and the same plant data', () => {
     const again = runPlan(file);
-    // GlobalIds are salted with the building uid, which differs between two fresh documents; the file text of one document is compared in ifc4x3.test.ts.
+    // GlobalIds are salted with the step-scoped building uid; the stable() projection only keeps the IFC text length.
     const stable = (list: Array<Outcome | null>): string =>
       JSON.stringify(list, (key, value: unknown) => (key === 'ifc' && typeof value === 'string' ? value.length : value));
     expect(stable(again.outcomes)).toBe(stable(outcomes));

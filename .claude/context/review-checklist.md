@@ -31,8 +31,8 @@ below catch most of it mechanically, so run them first. `cad-reviewer` checks th
 
 ## 3. Lifecycle (replay, undo, delete, clear, load)
 
-- The result survives history replay (ids included): slices a replay must keep go through `carry` / `replaySeed`; minted identity
-  through `mintedIdentity`.
+- The result survives history replay (ids included): slices a replay must keep go through `carry` / `replaySeed`; identities are
+  step-scoped (`nextId` / `ctx.ids`), never time-based.
 - Undo restores exactly; `clear_document` leaves no slice state behind.
 - Deleting something others reference either cascades (derived runs, supports, welds, branches) or is refused by name: no orphans.
 - An edit of an upstream slice re-derives downstream geometry (`reconcile`), and a second reconcile is a no-op.
