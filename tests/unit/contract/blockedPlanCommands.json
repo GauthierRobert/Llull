@@ -53,11 +53,6 @@
       "nozzle_load_check",
       "spring_variability"
     ],
-    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-02-viewpoint-bcf-roundtrip.json": [
-      "export_bcf_viewpoint",
-      "import_bcf_viewpoint"
-    ],
-    "docs/plant/09-plant-visualization-review/validation/plans/sc-vis-06-clash-review.json": ["create_clash_issues"],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-02-pipe-extraction.json": ["trace_pipe_centreline"],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": ["fit_steel_member"],
     "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": ["export_pdf"],

@@ -11,6 +11,10 @@ import type { IssueStatus, ReviewIssue } from '../../model/review';
 export const STATUS_ACT = 'review:set_issue_status';
 export const DELETE_ACT = 'review:delete_review_issue';
 
+/** An issue whose fields a human signature may cover (a human history entry) or whose status moved: only the gated workflow may change it. */
+export const isProtectedIssue = (issue: ReviewIssue): boolean =>
+  issue.status !== 'open' || issue.history.some((entry) => entry.by === 'human');
+
 export const issueSha256 = (issue: ReviewIssue): string => sha256Hex(jcsJson(issue));
 
 export const statusDetails = (issue: ReviewIssue, to: IssueStatus, reason: string): Record<string, unknown> => ({

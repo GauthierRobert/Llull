@@ -12,6 +12,11 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_WALKTHROUGH_NOT_FOUND: 'create one with create_walkthrough',
   VIS_ENTITY_NOT_FOUND: 'pass ids from find_entities',
   VIS_ISSUE_INVALID: 'give a non-empty title and a due date as YYYY-MM-DD',
+  VIS_CLASH_SOURCE_INVALID:
+    'run check_clashes (building / plant) or check_assembly (solids, needs a kernel) first and pass its params in sourceParams',
+  VIS_BCF_PARSE:
+    'give a BCF 2.1 / 3.0 zip as base64 (bcf=@file.bcf), with bcf.version and <topic>/markup.bcf, entry names without .. or absolute paths',
+  VIS_BCF_VERSION: 'export from the other tool as BCF 2.1 or 3.0',
   VIS_ISSUE_NOT_FOUND: 'create one with create_review_issue',
   VIS_SECTION_BOX_INVALID: 'give min < max on every axis (optionally rotationZ), or 1..6 planes with non-zero normals, not both',
   VIS_SECTION_BOX_NOT_FOUND: 'create one with set_section_box',

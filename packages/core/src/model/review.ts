@@ -129,6 +129,8 @@ export interface ReviewIssue {
   labels: readonly string[];
   viewpointIds: readonly string[];
   entityIds: readonly EntityId[];
+  /** `clash:<a>,<b>|<kind>` (sorted ids) on an issue create_clash_issues opened; re-runs find the issue by it. */
+  clashKey?: string;
   history: readonly IssueHistoryEntry[];
 }
 
@@ -137,6 +139,8 @@ export interface ReviewComment {
   readonly id: string;
   readonly issueId: string;
   text: string;
+  /** Author text a BCF import kept (BCF Author, an unverified label); export_bcf writes it back. */
+  importedAuthor?: string;
   /** A comment refers to at most one viewpoint (BCF). */
   viewpointId?: string;
   author: 'agent' | 'human';

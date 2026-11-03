@@ -17,7 +17,7 @@ import { reviewOf, reviewRejection } from '../../review/reviewModel';
 import { FRAME_BACKGROUND, hexRgb, renderCameraPng, sceneCenter } from '../../render/frames';
 import { nativeRun } from '../../render/rendererProvenance';
 import { rasterScenePixels } from '../../render/raster';
-import { bcfExtensionsXml, bcfMarkupXml, bcfVersionXml, bcfVisualizationXml, type MarkupViewpoint } from './bcfXml';
+import { bcfExtensionsXml, bcfMarkupXml, bcfVersionXml, bcfVisualizationXml, type MarkupComment, type MarkupViewpoint } from './bcfXml';
 
 const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -80,12 +80,14 @@ export const exportBcf = defineCommand({
     let viewpointCount = 0;
     for (const issue of issues) {
       const markupViews: MarkupViewpoint[] = [];
+      const viewpointGuids = new Map<string, string>();
       for (const viewpointId of new Set(issue.viewpointIds)) {
         const viewpoint = review.viewpoints[viewpointId];
         if (viewpoint === undefined) continue;
         const guid = nameUuid(`llull-bcf-viewpoint|${issue.guid}|${viewpoint.guid}`);
         const visinfo = bcfVisualizationXml(doc, guid, viewpoint.camera, width / height, present(issue.entityIds));
         entries.push({ name: `${issue.guid}/${guid}.bcfv`, data: encoder.encode(visinfo) });
+        viewpointGuids.set(viewpointId, guid);
         viewpointCount += 1;
         if (params.snapshots === false) {
           markupViews.push({ guid, file: `${guid}.bcfv` });
@@ -98,9 +100,20 @@ export const exportBcf = defineCommand({
         entries.push({ name: `${issue.guid}/${guid}.png`, data: png });
         markupViews.push({ guid, file: `${guid}.bcfv`, snapshot: `${guid}.png` });
       }
+      const comments: MarkupComment[] = Object.values(review.comments)
+        .filter((comment) => comment.issueId === issue.id)
+        .map((comment) => {
+          const viewpointGuid = comment.viewpointId === undefined ? undefined : viewpointGuids.get(comment.viewpointId);
+          return {
+            guid: nameUuid(`llull-bcf-comment|${issue.guid}|${comment.id}`),
+            text: comment.text,
+            author: comment.importedAuthor ?? comment.author,
+            ...(viewpointGuid === undefined ? {} : { viewpointGuid }),
+          };
+        });
       entries.push({
         name: `${issue.guid}/markup.bcf`,
-        data: encoder.encode(bcfMarkupXml(issue, markupViews, created, params.author ?? 'llull')),
+        data: encoder.encode(bcfMarkupXml(issue, markupViews, created, params.author ?? 'llull', comments)),
       });
     }
     entries.unshift(
