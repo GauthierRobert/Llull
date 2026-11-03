@@ -13,6 +13,7 @@ import type { EntityPropertyProvider } from '../model/entityProperties';
 import type { BeamLatticeAnswer } from '../model/beamLattice';
 import type { LevelSetAnswer } from '../geometry/field/levelSetExport';
 import type { ExecutionContext } from '../commands/types';
+import type { RenderOverlay } from '../model/renderOverlay';
 
 /** Clearance-hole size resolved from a standard-part reference (see `DocumentProjections.fastenerHole`). */
 export interface FastenerHoleSize {
@@ -119,6 +120,11 @@ export interface CadPlugin {
    * @invariant pure query
    */
   readonly beamLattice?: (doc: CadDocument, entityId: string, ctx: ExecutionContext | undefined) => BeamLatticeAnswer;
+  /**
+   * Overlay kinds this plugin adds to render_view `overlay` (drawn over orthographic renders, reported in `data.overlays`).
+   * @invariant pure queries; a kind may not collide with a built-in kind (`cage`, `net`) or an installed plugin's kind (install throws)
+   */
+  readonly renderOverlays?: ReadonlyArray<RenderOverlay>;
   /**
    * Called once when the plugin is installed (`installPlugin`, not when its module is imported), e.g. to register with an extension point of another
    * plugin. Idempotent registration is the plugin's job: install is skipped for a name that is already installed.

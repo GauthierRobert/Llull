@@ -12,8 +12,7 @@ import { escapeXml } from '../../lib/escapeXml';
 import type { ViewName } from './camera';
 import { renderDocument } from './scene';
 import { composeOverlays } from './overlays';
-import { appendCageNetOverlays } from './overlayCage';
-import { OVERLAY_KINDS } from './overlayTypes';
+import { appendCageNetOverlays, overlayKinds } from './overlayCage';
 import { orderedEntities } from '../entity/entityOps';
 import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
@@ -31,6 +30,13 @@ function withoutEntities2D(doc: CadDocument): CadDocument {
   const entities = Object.fromEntries(Object.entries(doc.entities).filter(([, e]) => !is2D(e)));
   return { ...doc, entities, order: doc.order.filter((id) => id in entities) };
 }
+
+/** One overlay kind: refused unless core or an installed plugin registered it (the list is the installed plugins', so it is checked when the command runs). */
+const overlayKind = z
+  .string()
+  .refine((kind) => overlayKinds().includes(kind), {
+    message: 'unknown overlay kind (built in: cage, net; others come from installed plugins)',
+  });
 
 const clampPixels = (value: number | undefined, fallback: number): number => clamp(Math.round(value ?? fallback), 64, 2000);
 
@@ -173,10 +179,10 @@ export const renderView = defineCommand({
           'object placement relative to the world origin. Set to false to suppress.',
       ),
     overlay: z
-      .union([z.enum(OVERLAY_KINDS), z.array(z.enum(OVERLAY_KINDS)).min(1)])
+      .union([overlayKind, z.array(overlayKind).min(1)])
       .optional()
       .describe(
-        '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. One kind or ["cage", "net"]. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective, viewpoint or turntable renders (the summary says so); instances are not expanded (only the entities of the document, in document order); data.overlays reports the entity ids and the counts of segments and dots.',
+        '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. Plugins add kinds (stress plugin: "pipe_stress", pipe elements coloured by the stress ratio of the model: green below 0.8, amber 0.8 to 1, red above 1, grey where a model cannot be analysed); an unregistered kind is refused as invalid params. One kind or an array of kinds. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective, viewpoint or turntable renders (the summary says so); instances are not expanded (only the entities of the document, in document order); data.overlays reports the entity ids and the counts of segments and dots.',
       ),
     hide2D: z
       .boolean()
@@ -256,7 +262,7 @@ export const renderView = defineCommand({
     if (kinds.length > 0 && perspective) summary += ` Overlay ${kinds.join(' + ')} not drawn: it needs an orthographic view.`;
     else if (kinds.length > 0) {
       const isolated = params.isolate === undefined ? undefined : typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
-      const drawn = appendCageNetOverlays(svg, base, orderedEntities(scene), kinds, isolated);
+      const drawn = appendCageNetOverlays(svg, doc, base, orderedEntities(scene), kinds, isolated);
       svg = drawn.svg;
       overlays = drawn.stats;
       summary += ` Overlay: ${kinds.map((kind) => `${kind} ${drawn.stats[kind]?.entities.length ?? 0} entit${drawn.stats[kind]?.entities.length === 1 ? 'y' : 'ies'}`).join(', ')}.`;

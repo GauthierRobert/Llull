@@ -9,6 +9,7 @@ import type { CommandResult, ExecutionContext, RetiredCommandRewrite } from '../
 import type { BeamLatticeAnswer } from '../model/beamLattice';
 import type { LevelSetAnswer } from '../geometry/field/levelSetExport';
 import type { CadDocument } from '../model/types';
+import { BUILTIN_OVERLAY_KINDS, type RenderOverlay } from '../model/renderOverlay';
 import type { EntityPropertyProvider } from '../model/entityProperties';
 
 const installed: CadPlugin[] = [];
@@ -17,10 +18,15 @@ const listeners: Array<(plugin: CadPlugin) => void> = [];
 /**
  * Install `plugin` (no-op when a plugin with the same name is already installed).
  * @invariant `plugin.onInstall` runs once, after every listener accepted the plugin (a rejected plugin has no side effect)
- * @failure a listener rejects it (e.g. a command-name collision) -> not installed, `onInstall` not called, error rethrown
+ * @failure a listener rejects it (e.g. a command-name collision) -> not installed, `onInstall` not called, error rethrown; a render overlay kind that is built in or already taken throws before anything is installed
  */
 export function installPlugin(plugin: CadPlugin): void {
   if (installed.some((existing) => existing.name === plugin.name)) return;
+  const taken = new Set<string>([...BUILTIN_OVERLAY_KINDS, ...pluginRenderOverlays().map((overlay) => overlay.kind)]);
+  for (const overlay of plugin.renderOverlays ?? []) {
+    if (taken.has(overlay.kind)) throw new Error(`plugin ${plugin.name}: render overlay kind "${overlay.kind}" is already taken`);
+    taken.add(overlay.kind);
+  }
   installed.push(plugin);
   try {
     for (const listener of listeners) listener(plugin);
@@ -107,6 +113,11 @@ export function staleEntityIds(doc: CadDocument): Set<string> {
 /** The property providers of the installed plugins, in installation order. */
 export function entityPropertyProviders(): EntityPropertyProvider[] {
   return installed.flatMap((plugin) => (plugin.entityProperties ? [plugin.entityProperties] : []));
+}
+
+/** The render_view overlay kinds of the installed plugins, in installation order. */
+export function pluginRenderOverlays(): RenderOverlay[] {
+  return installed.flatMap((plugin) => plugin.renderOverlays ?? []);
 }
 
 /** The beam lattice of `entityId` from the first installed plugin that knows it (a string is the reason there is none), or null. */
