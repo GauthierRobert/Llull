@@ -16,6 +16,8 @@ import { SOLID_MESHES, type SolidMeshBranch } from './entities/solidMeshes';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
+import { PlantBatchRenderer } from './plant/PlantBatchRenderer';
+import { usePlantCoverage } from './plant/usePlantCoverage';
 import { useGhostStore } from '@ui/store/ghostStore';
 import { useTintStore } from '@ui/store/tintStore';
 import { GridAnnotations3D } from './GridAnnotations3D';
@@ -185,10 +187,29 @@ export function Entities(): React.ReactElement {
     () => new Set([...animatedEntityIds(animations, groups), ...dynamicEntityIds(dynamics)]),
     [animations, groups, dynamics],
   );
+  // Plant-scale scenes: the plan renderer owns every plain solid it can draw; the per-entity path keeps the rest (and anything it must
+  // draw itself: animated, finished, transitioning, ghosted, tinted, exploded, hidden).
+  const visibleIds = useMemo(() => new Set(visibleEntities.map((entity) => entity.id)), [visibleEntities]);
+  const needsOwnPath = useCallback(
+    (entity: Entity): boolean =>
+      !visibleIds.has(entity.id) ||
+      explodeOffsets.has(entity.id) ||
+      animatedIds.has(entity.id) ||
+      hasFinish(entity) ||
+      transitions.has(entity.id) ||
+      ghosted.has(entity.id) ||
+      tints.has(entity.id),
+    [visibleIds, explodeOffsets, animatedIds, hasFinish, transitions, ghosted, tints],
+  );
+  const plant = usePlantCoverage(document, needsOwnPath);
+  const perEntityCandidates = useMemo(
+    () => (plant.covered.size === 0 ? visibleEntities : visibleEntities.filter((entity) => !plant.covered.has(entity.id))),
+    [visibleEntities, plant.covered],
+  );
   const batches = useMemo(
     () =>
       groupEntitiesForInstancing(
-        visibleEntities.filter(
+        perEntityCandidates.filter(
           (entity) =>
             !animatedIds.has(entity.id) &&
             !hasFinish(entity) &&
@@ -198,11 +219,11 @@ export function Entities(): React.ReactElement {
         ),
         materials,
       ),
-    [visibleEntities, animatedIds, materials, hasFinish, transitions, ghosted, tints],
+    [perEntityCandidates, animatedIds, materials, hasFinish, transitions, ghosted, tints],
   );
   const nonBatchableEntities = useMemo(
     () =>
-      visibleEntities.filter(
+      perEntityCandidates.filter(
         (entity) =>
           (!isBatchable(entity) ||
             animatedIds.has(entity.id) ||
@@ -212,7 +233,7 @@ export function Entities(): React.ReactElement {
             tints.has(entity.id)) &&
           layers[entity.layerId]?.name !== GRID_LAYER_NAME,
       ),
-    [visibleEntities, animatedIds, layers, hasFinish, transitions, ghosted, tints],
+    [perEntityCandidates, animatedIds, layers, hasFinish, transitions, ghosted, tints],
   );
 
   return (
@@ -220,6 +241,17 @@ export function Entities(): React.ReactElement {
       <GridAnnotations3D document={document} />
 
       <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
+
+      {plant.scene !== null && (
+        <PlantBatchRenderer
+          scene={plant.scene}
+          covered={plant.covered}
+          entities={entities}
+          materials={materials}
+          selectionSet={selectionSet}
+          onSelect={handleSelect}
+        />
+      )}
 
       {/* Always wrapped (stable tree): a live transition must not remount the entity's geometry when it starts or ends. */}
       {nonBatchableEntities.map((entity) => (

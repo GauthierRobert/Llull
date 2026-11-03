@@ -680,7 +680,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | --------- | ------- | ---------- | ------ |
 | VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).** |
 | VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); Review panel, markup / section-box rendering wait for the UI follow-up, M4 and M6.** |
-| VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Partly built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline; `PlantBatchRenderer` left (VIS-M3b).** |
+| VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline (M3a); `PlantBatchRenderer` + `LodGeometryCache` (M3b). Not verified in the desktop app yet; no live perf HUD.** |
 | VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
 | VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d. **Built 2026-11-03 (§12.2 export, §12.9 clash issues, import, single viewpoint); xmllint test waits for the vendored XSDs.** |
 | VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
@@ -797,7 +797,7 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 ### 12.5 Not built yet (remaining VIS work)
 
-The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (Review panel, redline tools and section-box gizmo in the UI, viewport clipping with a section box; the model and commands are §12.7), VIS-M3b (`PlantBatchRenderer`; the plan and `render_stats` are §12.8), the rest of VIS-M4
+The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (Review panel, redline tools and section-box gizmo in the UI, viewport clipping with a section box; the model and commands are §12.7), the rest of VIS-M4
 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the vendored XSDs for VC-VIS-15 (VIS-M5 itself is §12.9), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
 
@@ -918,7 +918,19 @@ Measured (2026-11-03, Windows 11, shared machine, TypeScript reference, perspect
 
 `render_stats` rebuilds the scene (`planScene`) on every call; the plan itself is ~0.3 s at 10⁶ with the brute-force query. The viewport caches the scene, and the BVH (VIS-M7) replaces the O(N) query.
 
-Not built (VIS-M3b and later): `PlantBatchRenderer`, `LodGeometryCache`, `BatchedMesh` for unique geometry, transparent bucket sorting, instance BVH (`instanceBvh.ts`), `VIS_GPU_LIMIT`, the `render_view` use of the plan.
+VIS-M3b (`PlantBatchRenderer`, `LodGeometryCache`) is built, see the table below. Not built (VIS-M7 and later): `BatchedMesh` for unique geometry, transparent bucket sorting, instance BVH (`instanceBvh.ts`), `VIS_GPU_LIMIT`, the `render_view` use of the plan.
+
+### 12.8b As built — VIS-M3b `PlantBatchRenderer` and `LodGeometryCache`, 2026-11-03
+
+| Area | As built | Files (`src/ui/viewport/3d/plant/`) |
+| ---- | -------- | ----- |
+| Hand-over | `Entities.tsx` asks `usePlantCoverage` for the plan scene (`planScene`, memoized on `order` / `entities` / `layers` / `components`: not on selection or camera) and the covered ids. Active from 1500 visible 3D entities (`PLANT_BATCH_MIN_INSTANCES`); below it nothing changes. Covered = in the plan, kind box / cylinder / cone / sphere / torus / wedge / pyramid / revolution / mesh without face colours, and not claimed by the per-entity path (hidden, exploded, animated, finished / decaled, mid-transition, ghosted, tinted). The per-entity and `InstancedRenderer` paths then skip the covered ids; every other kind is untouched. | `plantBatchPlan.ts`, `usePlantCoverage.ts`, `Entities.tsx` |
+| Buckets | One `InstancedMesh` per plan bucket (prototype x material class x LOD), one per unique-geometry instance, one box bucket per class at LOD2. Re-planned on mount / scene change and 150 ms after the camera or canvas size stops changing, with the previous levels as hysteresis input; the camera is read in document coordinates (floating origin). Matrices: Euler XYZ placement (LOD2: composed with the prototype's local box), pure and checked against three's `Object3D`. | `PlantBatchRenderer.tsx`, `plantMatrices.ts` |
+| Geometry | `LodGeometryCache`: LOD0 the per-entity builders, LOD1 8-segment cylinder / cone / sphere / torus (32 / 24 / 112 / 128 triangles, the plan's caps; other kinds keep LOD0), LOD2 one shared unit box. `retain` disposes prototypes that left the scene, `dispose` on unmount (`useDisposable`). | `LodGeometryCache.ts` |
+| Colour, picking | Instance colour = entity colour (or its material's), selection tinted as the per-entity path; the colour-profile path is not read yet (VIS-M1 viewport use is not built). A click maps `instanceId` to the entity id and goes through the same `handleSelect` (locked layers, additive select, click animations). | `plantInstanceColours.ts`, `plantBatchPlan.ts` |
+| Tests | `tests/unit/plantBatch.test.ts` (coverage, buckets vs the plan, picks, matrices vs three, cache caps / dispose); `tests/component/EntitiesPlantExclusion.test.tsx` (a covered entity is not drawn per entity; a tinted one is) | |
+
+Not built: the dev perf HUD (no existing debug toggle to hang it on), hover highlight (the instanced path has none), `BatchedMesh` for unique geometry (each is a 1-instance mesh), LOD1 decimation of meshes / revolutions (they keep LOD0), edge lines, transparent / x-ray sorting (x-ray uses the shared material), picking through a BVH (three's O(N) instance raycast at click). Desktop-app verification and a measured frame rate on a SYN-RACK scene are open.
 
 ### 12.9 As built — VIS-M5b clash issues, BCF import, single-viewpoint BCF, 2026-11-03
 

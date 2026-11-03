@@ -71,7 +71,7 @@ interface InstanceBatchMeshProps {
 }
 
 /** Buffer size that survives small count changes (the InstancedMesh is rebuilt only on growth or a big shrink). */
-function useBatchCapacity(count: number): number {
+export function useBatchCapacity(count: number): number {
   const capacity = useRef(0);
   if (count > capacity.current || count * 4 < capacity.current)
     capacity.current = Math.max(8, 2 ** Math.ceil(Math.log2(Math.max(count, 1))));
