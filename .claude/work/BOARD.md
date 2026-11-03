@@ -14,7 +14,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 ## NOW (auto-updated by the skill)
 
 - 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). Merged: EQP-M5-UI, PST-GATE + PST-HARDEN, VIS-M3a, BLD-UID + FUZZ-EQP (uid sealed by a content hash of the first step, mintedIdentity removed), PID-M5b (first sheet only; picker + 2D pick of P&ID items left, 04 §13.8), PST-M4 (report, render_view overlay port, geometry, in-app overlay + panel),
-  SCN-M3 (viewport, Scan panel). WIP: VIS-M4b (lane1), PST-M4c (lane2), VIS-M5b (lane3), SCN-M3b (lane4). Server suite: 2 native blend failures (nativeBlendG2Corners,
+  SCN-M3 (viewport, Scan panel). Merged later: VIS-M5b. WIP: VIS-M4b (lane1), PST-M4c (lane2, check), VIS-M3b (lane3), SCN-M3b (lane4). Server suite: 2 native blend failures (nativeBlendG2Corners,
   nativeBlendCurvedCorners), not from the plant diffs. `validationPlanCommands` fails in the main checkout only, from the owner's uncommitted
   `docs/physics/22-motion-video` plans (`render_animation` unregistered). Workers + reviewers on sonnet. Next: VIS-M3b, VIS-UI, VIS-M6..M8.
 
@@ -213,8 +213,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
   viewport branch), M7 (5 of 8 `P3D_*` codes); EQP-R1; VIS-M9. Built 2026-11-02: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8, DAT-M6, ISO-M5, PID-M6, PID-M7b. Remaining plant milestones (one line each, spec §10 of the pack):
 - `[WIP]` **PST-M4c** (lane2 `feat/plant-pst-m4c`; PST-M4 merged 2026-11-03: `pipe_stress_report`, `CadPlugin.renderOverlays` + `render_view overlay:"pipe_stress"`, `analyze_pipe_stress include:"geometry"`, in-app overlay + panel, 07 §17-§18) in-app overlay on the geometry data: per-element colours, support arrows, RTE runs, station beacon, deformed shape.
 - `[BLOCKED]` **ISO-M6** 05 performance VC-ISO-18, ISOGEN conformance (OQ-ISO-01, needs a licensed tool), CSV weld map, revision clouds.
-- `[TODO]` **VIS-M3b** (VIS-M3a merged 2026-11-03: core `renderPlan` + `render_stats`, 09 §12.8; render_stats 4.1 s at 10⁶, target 500 ms needs a cached scene / VIS-M7 BVH) `PlantBatchRenderer` + `LodGeometryCache` UI. _Lane 2_ Rest of original line: 09 `renderPlan`, `render_stats`, `PlantBatchRenderer` (LOD, pixel cull), SYN-RACK fixture, perf baseline.
-- `[WIP]` **VIS-M4b/M5b** (lane3 `feat/plant-vis-m5b`: M5 part; lane1 `feat/plant-vis-m4b`: M4 part) 09 rest of M4 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET`) and M5 (`create_clash_issues`, `import_bcf`, XSD VC-VIS-15).
+- `[WIP]` **VIS-M3b** (lane3 `feat/plant-vis-m3b`) (VIS-M3a merged 2026-11-03: core `renderPlan` + `render_stats`, 09 §12.8; render_stats 4.1 s at 10⁶, target 500 ms needs a cached scene / VIS-M7 BVH) `PlantBatchRenderer` + `LodGeometryCache` UI. _Lane 2_ Rest of original line: 09 `renderPlan`, `render_stats`, `PlantBatchRenderer` (LOD, pixel cull), SYN-RACK fixture, perf baseline.
+- `[WIP]` **VIS-M4b** (lane1 `feat/plant-vis-m4b`; M5b merged 2026-11-03: `create_clash_issues`, `import_bcf`, BCF viewpoints, signed issues frozen, 09 §12.9; VC-VIS-15 runs only with xmllint + `LLULL_BCF_XSD_DIR`, XSDs not vendored) 09 rest of M4 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET`) and M5 (`create_clash_issues`, `import_bcf`, XSD VC-VIS-15).
 - `[TODO]` **VIS-UI** 09 Review panel, redline tools, section-box gizmo + clipping, profile use in viewport / `render_view`. _Lane 2_
 - `[TODO]` **VIS-M6..M8** 09 realism tiers, walk / fly, instance BVH worker, 10⁶ streaming. _deps: VIS-M3_
 - `[WIP]` **SCN-M3b** (lane4 `feat/plant-scn-m3b`; SCN-M3 viewport + Scan panel merged 2026-11-03, 10 §13.6, not tried in the desktop app) per-point rgb / intensity / classification in `query_cloud_points` (only elevation colouring works until then). Left after: `render_view` clouds, EDL, worker kd-tree, 30 fps benchmark.
