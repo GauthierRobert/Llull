@@ -7,18 +7,18 @@ Status: proposed (2026-10-18). Functional view: [`FUNCTIONAL_SPEC.md`](FUNCTIONA
 
 ### 1.1 Viewport (three.js / r3f, `src/ui/viewport/3d/`)
 
-| Area              | What exists                                                                                                                                                                                                                                                                                                                  | Limit for plant scale                                                                                                                                                                                |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Instancing        | `grouping.ts` `entityRenderKey` batches `box` / `cylinder` / `sphere` with identical params (6 significant digits), **colour**, layer and material into one `InstancedMesh` (`InstancedRenderer.tsx`, `instanceWriter.ts`: per-instance matrix + colour, selection tint).                                                    | Every other kind (meshes from `add_pipe_run` sweeps, extrusions, B-rep, instance children) renders per entity: 1 draw call each. Colour in the key splits batches by service.                        |
-| Instances         | `Entities.tsx` `InstanceEntityRenderer` expands a component instance (`expandInstance`) and renders each child through the per-entity path.                                                                                                                                                                                  | A catalogue part used 10⁴ times costs 10⁴ × children draw calls.                                                                                                                                     |
-| LOD               | `lodSegments.ts`: a static radial segment count from the entity size (8..64). Its header says "no three.js LOD objects / per-frame checks".                                                                                                                                                                                  | No distance LOD, no impostors, no pixel-size culling.                                                                                                                                                |
-| Culling / picking | three.js per-object frustum culling; `bvhSetup.ts` patches `Mesh.raycast` with three-mesh-bvh. Its header says "InstancedMesh is not patched … instance counts stay < 10k".                                                                                                                                                  | No instance-level culling or BVH; `InstancedMesh` culls as a whole (fact T1).                                                                                                                        |
-| Quality           | `useRenderQuality.ts`: tier high / medium / low from the entity count (≤ 50, ≤ 200, else low); budget "≤ 16 ms median frame at 500 entities". `SceneLighting.tsx`: drei `Environment` + `Lightformer`, `SoftShadows` (PCSS), baked `ContactShadows`, key light sized to the scene. ACES tone mapping (`Viewport3D.tsx`).     | No SSAO, no edges overlay in shaded mode, no material classes beyond `Material` colour / metalness / roughness / procedural `finish`.                                                                |
-| Materials         | `useMaterialProps.ts`, `useFinishTextures.ts`, `displayMetalness.ts`; `Material` in `packages/core/src/model/types.ts` (color, metalness, roughness, finish).                                                                                                                                                                | Fine for PBR; no plant material-class library.                                                                                                                                                       |
-| Camera            | `PerspectiveCamera` FOV `VIEWPORT_FOV_DEGREES` = 45 (`packages/core/src/model/viewport.ts`), `OrbitControls`, floating origin (`floatingOrigin.ts`), document camera `CameraState {target, azimuth, polar, distance}` written by `set_camera` / `fit_view` (`packages/core/src/commands/document/camera.ts`, `metaHistory`). | Orbit only; no walk / fly.                                                                                                                                                                           |
-| Bookmarks         | `NamedViews.tsx` + `src/ui/store/namedViewStore.ts`: "persisted to localStorage; UI-only, never in the CadDocument".                                                                                                                                                                                                         | Not shareable, not reachable by CLI / MCP: violates the "persisted ⇒ command" rule for this gap. **Retired at VIS-M2 (§12.7).**                                                                      |
-| Section           | `ClippingPlane.tsx` + `clipPlaneMath.ts`: one axis-aligned plane in UI store (`clipPlane`).                                                                                                                                                                                                                                  | No box, not saved.                                                                                                                                                                                   |
-| Colour            | Per-entity `color`; layer colours (`Layer.color`); industrial category layers in `packages/domain-aec/src/building/evaluate/entities.ts` (`P-PIPE` #2f9c8f, `P-SUPP` #c9a227, …); `evaluatePipe` (`packages/domain-aec/src/industrial/evaluate.ts`) colours a pipe by **material** (`colorForMaterial`), not by service.     | No property-driven colour. No command re-colours an existing entity: the edit catalogue (`packages/core/src/commands/edit/`) has none; `assign_material` changes appearance only through a material. |
+| Area | What exists | Limit for plant scale |
+| ---- | ----------- | --------------------- |
+| Instancing | `grouping.ts` `entityRenderKey` batches `box` / `cylinder` / `sphere` with identical params (6 significant digits), **colour**, layer and material into one `InstancedMesh` (`InstancedRenderer.tsx`, `instanceWriter.ts`: per-instance matrix + colour, selection tint). | Every other kind (meshes from `add_pipe_run` sweeps, extrusions, B-rep, instance children) renders per entity: 1 draw call each. Colour in the key splits batches by service. |
+| Instances | `Entities.tsx` `InstanceEntityRenderer` expands a component instance (`expandInstance`) and renders each child through the per-entity path. | A catalogue part used 10⁴ times costs 10⁴ × children draw calls. |
+| LOD | `lodSegments.ts`: a static radial segment count from the entity size (8..64). Its header says "no three.js LOD objects / per-frame checks". | No distance LOD, no impostors, no pixel-size culling. |
+| Culling / picking | three.js per-object frustum culling; `bvhSetup.ts` patches `Mesh.raycast` with three-mesh-bvh. Its header says "InstancedMesh is not patched … instance counts stay < 10k". | No instance-level culling or BVH; `InstancedMesh` culls as a whole (fact T1). |
+| Quality | `useRenderQuality.ts`: tier high / medium / low from the entity count (≤ 50, ≤ 200, else low); budget "≤ 16 ms median frame at 500 entities". `SceneLighting.tsx`: drei `Environment` + `Lightformer`, `SoftShadows` (PCSS), baked `ContactShadows`, key light sized to the scene. ACES tone mapping (`Viewport3D.tsx`). | No SSAO, no edges overlay in shaded mode, no material classes beyond `Material` colour / metalness / roughness / procedural `finish`. |
+| Materials | `useMaterialProps.ts`, `useFinishTextures.ts`, `displayMetalness.ts`; `Material` in `packages/core/src/model/types.ts` (color, metalness, roughness, finish). | Fine for PBR; no plant material-class library. |
+| Camera | `PerspectiveCamera` FOV `VIEWPORT_FOV_DEGREES` = 45 (`packages/core/src/model/viewport.ts`), `OrbitControls`, floating origin (`floatingOrigin.ts`), document camera `CameraState {target, azimuth, polar, distance}` written by `set_camera` / `fit_view` (`packages/core/src/commands/document/camera.ts`, `metaHistory`). | Orbit only; no walk / fly. |
+| Bookmarks | `NamedViews.tsx` + `src/ui/store/namedViewStore.ts`: "persisted to localStorage; UI-only, never in the CadDocument". | Not shareable, not reachable by CLI / MCP: violates the "persisted ⇒ command" rule for this gap. **Retired at VIS-M2 (§12.7).** |
+| Section | `ClippingPlane.tsx` + `clipPlaneMath.ts`: one axis-aligned plane in UI store (`clipPlane`). | No box, not saved. |
+| Colour | Per-entity `color`; layer colours (`Layer.color`); industrial category layers in `packages/domain-aec/src/building/evaluate/entities.ts` (`P-PIPE` #2f9c8f, `P-SUPP` #c9a227, …); `evaluatePipe` (`packages/domain-aec/src/industrial/evaluate.ts`) colours a pipe by **material** (`colorForMaterial`), not by service. | No property-driven colour. No command re-colours an existing entity: the edit catalogue (`packages/core/src/commands/edit/`) has none; `assign_material` changes appearance only through a material. |
 
 ### 1.2 Server raster renderer (`packages/core/src/commands/render/`)
 
@@ -36,13 +36,13 @@ Status: proposed (2026-10-18). Functional view: [`FUNCTIONAL_SPEC.md`](FUNCTIONA
 
 ### 1.3 Review, clash, interop
 
-| Area       | What exists                                                                                                                                                                                                                                                 |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Clash      | `check_clashes` (`packages/domain-aec/src/industrial/clash/clash.ts`): read-only, `data = { clashes: Clash[] }` with `{a, b, kind: 'hard' \| 'clearance', depth}`. The Building panel lists the rows.                                                       |
-| Review     | `packages/core/src/commands/review/` (`intents.ts`, `grounding.ts`): interference intents (`allow_interference`) in `doc.prototype`, with `declaredBy: 'agent'` because `ExecutionContext` has no caller yet. Viewpoints, issues and comments do not exist. |
-| glTF       | `export_gltf` (`packages/core/src/commands/exchange/gltfScene.ts`): one node + mesh per part, one material per appearance, instances expanded. No `EXT_mesh_gpu_instancing`.                                                                                |
-| Site       | civil plugin (`packages/domain-aec/src/civil/`): `create_surface`, `surface_report`, `import_survey_points`, `set_coordinate_system`, `design_site`. Surfaces render as entities. No sky or sun.                                                            |
-| Perf gates | `docs/QUALITY_GATES.md` lists **proposed** gate 2 "Performance budgets" (median frame time while orbiting, +20 % regression) and gate 4 "Visual regression". Neither is implemented.                                                                        |
+| Area | What exists |
+| ---- | ----------- |
+| Clash | `check_clashes` (`packages/domain-aec/src/industrial/clash/clash.ts`): read-only, `data = { clashes: Clash[] }` with `{a, b, kind: 'hard' \| 'clearance', depth}`. The Building panel lists the rows. |
+| Review | `packages/core/src/commands/review/` (`intents.ts`, `grounding.ts`): interference intents (`allow_interference`) in `doc.prototype`, with `declaredBy: 'agent'` because `ExecutionContext` has no caller yet. Viewpoints, issues and comments do not exist. |
+| glTF | `export_gltf` (`packages/core/src/commands/exchange/gltfScene.ts`): one node + mesh per part, one material per appearance, instances expanded. No `EXT_mesh_gpu_instancing`. |
+| Site | civil plugin (`packages/domain-aec/src/civil/`): `create_surface`, `surface_report`, `import_survey_points`, `set_coordinate_system`, `design_site`. Surfaces render as entities. No sky or sun. |
+| Perf gates | `docs/QUALITY_GATES.md` lists **proposed** gate 2 "Performance budgets" (median frame time while orbiting, +20 % regression) and gate 4 "Visual regression". Neither is implemented. |
 
 **Gap** = sections 3–8 below.
 
@@ -100,12 +100,12 @@ How the laws are respected:
 Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme steps **RS-5** and **RS-6**). It adds
 two optional native paths. The pure-TS code stays the default and the reference.
 
-| Item                                                               | Before                                                              | Now                                                                                                                                                                                                |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Headless `render_view`, `render_walkthrough`, BCF snapshots        | pure-TS software raster (`packages/core/src/commands/render/`) only | the TS raster stays the default and the **hash reference**; `renderer: 'native'` draws the same scene on the GPU with `llull-compute raster` (crate `llull-raster`, wgpu offscreen)                |
-| Instance BVH, `render_stats` at 10⁶, model-scale clash broad phase | `geometry/instanceBvh.ts` (TS, worker above 10⁴)                    | `instanceBvh.ts` stays the reference; the shared `llull-bvh` crate is an option: native through `llull-compute geomq` for the CLI, WASM in the viewport worker if the TS build misses 1.5 s at 10⁶ |
-| Viewport                                                           | three.js WebGL                                                      | unchanged                                                                                                                                                                                          |
-| Gate                                                               | Vitest                                                              | plus `npm run native:check` (`cargo test` + `cargo clippy -D warnings`) for `llull-raster` and `llull-bvh`                                                                                         |
+| Item | Before | Now |
+| ---- | ------ | --- |
+| Headless `render_view`, `render_walkthrough`, BCF snapshots | pure-TS software raster (`packages/core/src/commands/render/`) only | the TS raster stays the default and the **hash reference**; `renderer: 'native'` draws the same scene on the GPU with `llull-compute raster` (crate `llull-raster`, wgpu offscreen) |
+| Instance BVH, `render_stats` at 10⁶, model-scale clash broad phase | `geometry/instanceBvh.ts` (TS, worker above 10⁴) | `instanceBvh.ts` stays the reference; the shared `llull-bvh` crate is an option: native through `llull-compute geomq` for the CLI, WASM in the viewport worker if the TS build misses 1.5 s at 10⁶ |
+| Viewport | three.js WebGL | unchanged |
+| Gate | Vitest | plus `npm run native:check` (`cargo test` + `cargo clippy -D warnings`) for `llull-raster` and `llull-bvh` |
 
 **Hash rule (TR-VIS-30, RS1 §2 rule 3).** Only the reference renderer produces `svgSha256`. The digest must stay
 identical across runs and machines (per `rendererVersion`, Q6), so it is never computed from GPU pixels. Native mode
@@ -132,35 +132,35 @@ Native vs reference: VC-VIS-60 (validation README).
 
 ### 2.1 Technical requirements
 
-| Id        | Pri    | Requirement                                                                                                                                                               | FR            | AF                |
-| --------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ----------------- |
-| TR-VIS-01 | MUST   | Pure first-match colour-rule engine `geometry/colourRules.ts` (§5.1); a cached result per (profile, entities identity)                                                    | FR-VIS-01     | AF-13             |
-| TR-VIS-02 | MUST   | Property port: `CadPlugin.entityProperties` + `ctx.properties`; industrial provider for pipes / equipment (§3.3, §3.4)                                                    | FR-VIS-01     | AF-01             |
-| TR-VIS-03 | MUST   | Scheme tables as data with source ids and grades; reports carry category names, `palette` and `approximate: true`; hazard profiles start `reviewRequired`                 | FR-VIS-02, 03 | AF-30, 31, 33, 35 |
-| TR-VIS-04 | SHOULD | A13.1 legend band and placement algorithm (§5.7) with a check command                                                                                                     | FR-VIS-04     | AF-20, 33         |
-| TR-VIS-10 | MUST   | `review` model; viewpoint commands `metaHistory`, ids from `review.nextNumber` (deterministic)                                                                            | FR-VIS-05     | AF-05, 13         |
-| TR-VIS-11 | MUST   | Viewpoint ⇄ `CameraState` ⇄ BCF camera conversion (§5.3)                                                                                                                  | FR-VIS-05     | AF-13             |
-| TR-VIS-12 | SHOULD | BCF 3.0 writer / reader (2.1 read), units and GUID mapping, schema-valid output (§6)                                                                                      | FR-VIS-09     | AF-12             |
-| TR-VIS-13 | MUST   | Section-box classification and rendering conventions (§5.4)                                                                                                               | FR-VIS-06     | AF-21             |
-| TR-VIS-14 | MUST   | Markups, issues and comments as document data; undo / redo; replay-stable ids                                                                                             | FR-VIS-07, 08 | AF-13             |
-| TR-VIS-15 | MUST   | Issue workflow with the human gate (§5.5)                                                                                                                                 | FR-VIS-07     | AF-34, 34a        |
-| TR-VIS-16 | MUST   | `check_review` / `check_display` with the codes of §7                                                                                                                     | FR-VIS-10     | AF-11, 20         |
-| TR-VIS-20 | MUST   | `geometry/renderPlan.ts` R-BATCH-v1 (§5.2), shared by the viewport and `render_stats`                                                                                     | FR-VIS-12, 13 | AF-21             |
-| TR-VIS-21 | MUST   | LOD metric, thresholds `lod:llull-v1`, hysteresis (§5.3)                                                                                                                  | FR-VIS-12     | —                 |
-| TR-VIS-22 | MUST   | Instance bookkeeping (drawn + culled = N) and GPU byte estimate                                                                                                           | FR-VIS-13     | AF-10             |
-| TR-VIS-23 | SHOULD | Static instance BVH (binned SAH) for frustum culling and picking, built in a worker above 10⁴ (`instanceBvh.ts` is the reference)                                         | FR-VIS-14     | AF-40             |
-| TR-VIS-26 | SHOULD | Optional `llull-bvh` path (native `llull-compute geomq` through `ctx.spatialIndex`, or WASM in the viewport worker) returning the same id sets as `instanceBvh.ts` (§2.A) | FR-VIS-13, 14 | AF-13             |
-| TR-VIS-24 | COULD  | Hi-Z occlusion, tiled streaming, impostors (V2)                                                                                                                           | FR-VIS-14     | —                 |
-| TR-VIS-25 | SHOULD | glTF `EXT_mesh_gpu_instancing` export / import                                                                                                                            | FR-VIS-19     | AF-12             |
-| TR-VIS-30 | MUST   | `render_view` determinism on the reference (TS) renderer: `svgSha256`, `rendererVersion`                                                                                  | FR-VIS-16     | AF-13, 22         |
-| TR-VIS-31 | MUST   | Perspective projector with perspective-correct depth                                                                                                                      | FR-VIS-16     | AF-22             |
-| TR-VIS-32 | SHOULD | Review shading: material-class Blinn–Phong, sun shadow, deterministic AO, edges, sky / ground (§5.6)                                                                      | FR-VIS-15, 16 | AF-22             |
-| TR-VIS-33 | SHOULD | Viewport quality tiers keyed by drawn instances; material classes (§5.6)                                                                                                  | FR-VIS-15     | —                 |
-| TR-VIS-34 | SHOULD | Native GPU raster (`renderer: 'native'`, `llull-compute raster` through `ctx.raster`): non-hash, `deterministic: false`, `device` in `data` (§2.A)                        | FR-VIS-16, 17 | AF-22, 35         |
-| TR-VIS-40 | MUST   | `create_clash_issues` with framing (§5.8) and `clashKey` idempotence                                                                                                      | FR-VIS-11     | AF-13             |
-| TR-VIS-41 | MUST   | Clash re-run reconciliation: `created`, `unchanged`, `updated` (depth) and `gone` (clash no longer reported) in `data`                                                    | FR-VIS-11     | AF-10             |
-| TR-VIS-42 | SHOULD | Walkthrough paths and frame rendering (§5.3)                                                                                                                              | FR-VIS-17     | AF-22, 40         |
-| TR-VIS-50 | MUST   | Stable `VIS_*` codes with ids / paths / remediation on every refusal and check (§7)                                                                                       | FR-VIS-20     | AF-11             |
+| Id | Pri | Requirement | FR | AF |
+| -- | --- | ----------- | -- | -- |
+| TR-VIS-01 | MUST | Pure first-match colour-rule engine `geometry/colourRules.ts` (§5.1); a cached result per (profile, entities identity) | FR-VIS-01 | AF-13 |
+| TR-VIS-02 | MUST | Property port: `CadPlugin.entityProperties` + `ctx.properties`; industrial provider for pipes / equipment (§3.3, §3.4) | FR-VIS-01 | AF-01 |
+| TR-VIS-03 | MUST | Scheme tables as data with source ids and grades; reports carry category names, `palette` and `approximate: true`; hazard profiles start `reviewRequired` | FR-VIS-02, 03 | AF-30, 31, 33, 35 |
+| TR-VIS-04 | SHOULD | A13.1 legend band and placement algorithm (§5.7) with a check command | FR-VIS-04 | AF-20, 33 |
+| TR-VIS-10 | MUST | `review` model; viewpoint commands `metaHistory`, ids from `review.nextNumber` (deterministic) | FR-VIS-05 | AF-05, 13 |
+| TR-VIS-11 | MUST | Viewpoint ⇄ `CameraState` ⇄ BCF camera conversion (§5.3) | FR-VIS-05 | AF-13 |
+| TR-VIS-12 | SHOULD | BCF 3.0 writer / reader (2.1 read), units and GUID mapping, schema-valid output (§6) | FR-VIS-09 | AF-12 |
+| TR-VIS-13 | MUST | Section-box classification and rendering conventions (§5.4) | FR-VIS-06 | AF-21 |
+| TR-VIS-14 | MUST | Markups, issues and comments as document data; undo / redo; replay-stable ids | FR-VIS-07, 08 | AF-13 |
+| TR-VIS-15 | MUST | Issue workflow with the human gate (§5.5) | FR-VIS-07 | AF-34, 34a |
+| TR-VIS-16 | MUST | `check_review` / `check_display` with the codes of §7 | FR-VIS-10 | AF-11, 20 |
+| TR-VIS-20 | MUST | `geometry/renderPlan.ts` R-BATCH-v1 (§5.2), shared by the viewport and `render_stats` | FR-VIS-12, 13 | AF-21 |
+| TR-VIS-21 | MUST | LOD metric, thresholds `lod:llull-v1`, hysteresis (§5.3) | FR-VIS-12 | — |
+| TR-VIS-22 | MUST | Instance bookkeeping (drawn + culled = N) and GPU byte estimate | FR-VIS-13 | AF-10 |
+| TR-VIS-23 | SHOULD | Static instance BVH (binned SAH) for frustum culling and picking, built in a worker above 10⁴ (`instanceBvh.ts` is the reference) | FR-VIS-14 | AF-40 |
+| TR-VIS-26 | SHOULD | Optional `llull-bvh` path (native `llull-compute geomq` through `ctx.spatialIndex`, or WASM in the viewport worker) returning the same id sets as `instanceBvh.ts` (§2.A) | FR-VIS-13, 14 | AF-13 |
+| TR-VIS-24 | COULD | Hi-Z occlusion, tiled streaming, impostors (V2) | FR-VIS-14 | — |
+| TR-VIS-25 | SHOULD | glTF `EXT_mesh_gpu_instancing` export / import | FR-VIS-19 | AF-12 |
+| TR-VIS-30 | MUST | `render_view` determinism on the reference (TS) renderer: `svgSha256`, `rendererVersion` | FR-VIS-16 | AF-13, 22 |
+| TR-VIS-31 | MUST | Perspective projector with perspective-correct depth | FR-VIS-16 | AF-22 |
+| TR-VIS-32 | SHOULD | Review shading: material-class Blinn–Phong, sun shadow, deterministic AO, edges, sky / ground (§5.6) | FR-VIS-15, 16 | AF-22 |
+| TR-VIS-33 | SHOULD | Viewport quality tiers keyed by drawn instances; material classes (§5.6) | FR-VIS-15 | — |
+| TR-VIS-34 | SHOULD | Native GPU raster (`renderer: 'native'`, `llull-compute raster` through `ctx.raster`): non-hash, `deterministic: false`, `device` in `data` (§2.A) | FR-VIS-16, 17 | AF-22, 35 |
+| TR-VIS-40 | MUST | `create_clash_issues` with framing (§5.8) and `clashKey` idempotence | FR-VIS-11 | AF-13 |
+| TR-VIS-41 | MUST | Clash re-run reconciliation: `created`, `unchanged`, `updated` (depth) and `gone` (clash no longer reported) in `data` | FR-VIS-11 | AF-10 |
+| TR-VIS-42 | SHOULD | Walkthrough paths and frame rendering (§5.3) | FR-VIS-17 | AF-22, 40 |
+| TR-VIS-50 | MUST | Stable `VIS_*` codes with ids / paths / remediation on every refusal and check (§7) | FR-VIS-20 | AF-11 |
 
 ## 3. Data model
 
@@ -171,39 +171,39 @@ export type PropertyValue = string | number | boolean;
 
 /** Predicate on the entity property bag; all present clauses must hold (AND). `any` = OR of sub-predicates. */
 export interface RulePredicate {
-  readonly property?: string; // e.g. 'service', 'line', 'dn', 'layerId', 'kind', 'tag', 'materialClass'
+  readonly property?: string;                 // e.g. 'service', 'line', 'dn', 'layerId', 'kind', 'tag', 'materialClass'
   readonly equals?: PropertyValue;
   readonly in?: readonly PropertyValue[];
-  readonly matches?: string; // case-insensitive regex, max 200 chars, compiled once, no backrefs
+  readonly matches?: string;                  // case-insensitive regex, max 200 chars, compiled once, no backrefs
   readonly range?: readonly [number, number]; // inclusive, numbers only
   readonly any?: readonly RulePredicate[];
 }
 
 export interface ColourRule {
-  readonly id: string; // stable within the profile
+  readonly id: string;                        // stable within the profile
   readonly when: RulePredicate;
   readonly appearance: {
-    readonly colour: string; // '#rrggbb' or 'scheme:<schemeId>/<category>' resolved through a palette
-    readonly transparency?: number; // 0..1
+    readonly colour: string;                  // '#rrggbb' or 'scheme:<schemeId>/<category>' resolved through a palette
+    readonly transparency?: number;           // 0..1
     readonly hidden?: boolean;
   };
-  readonly legend: string; // e.g. 'Water (A13.1: white on green)'
+  readonly legend: string;                    // e.g. 'Water (A13.1: white on green)'
   readonly scheme?: { readonly id: 'asme_a13_1' | 'iso_14726' | 'bs_1710' | 'din_2403'; readonly rowId: string };
 }
 
 export interface ColourProfile {
   readonly id: string;
   readonly name: string;
-  readonly rules: readonly ColourRule[]; // evaluated in order; first match wins (E3D / Navisworks semantics)
+  readonly rules: readonly ColourRule[];      // evaluated in order; first match wins (E3D / Navisworks semantics)
   readonly defaultAppearance: { readonly colour: 'entity' | string; readonly transparency?: number };
-  readonly palette: string; // 'llull-ral-approx-v1' (named default, approximate: true)
-  readonly reviewRequired: boolean; // true when built from a hazard scheme and not yet signed
+  readonly palette: string;                   // 'llull-ral-approx-v1' (named default, approximate: true)
+  readonly reviewRequired: boolean;           // true when built from a hazard scheme and not yet signed
 }
 
 export interface DisplayModel {
   colourProfiles: Record<string, ColourProfile>;
   activeProfileId?: string;
-  materialClasses: Record<MaterialClassId, MaterialClass>; // seeded with the named defaults of §5.6
+  materialClasses: Record<MaterialClassId, MaterialClass>;   // seeded with the named defaults of §5.6
 }
 ```
 
@@ -218,79 +218,61 @@ export type ViewpointCamera =
 export interface SectionBox {
   readonly id: string;
   name: string;
-  min: Vec3;
-  max: Vec3; // document units, min < max per axis
-  rotationZ?: number; // radians about the box centre
-  planes?: ReadonlyArray<{ normal: Vec3; offset: number }>; // alternative: 1..6 half-spaces, normal points to the removed side (BCF)
+  min: Vec3; max: Vec3;                       // document units, min < max per axis
+  rotationZ?: number;                         // radians about the box centre
+  planes?: ReadonlyArray<{ normal: Vec3; offset: number }>;   // alternative: 1..6 half-spaces, normal points to the removed side (BCF)
 }
 
 export interface Viewpoint {
-  readonly id: string; // 'vp-<n>.<k>'
-  readonly guid: string; // RFC 4122 v5 from (document id, id): stable for BCF
+  readonly id: string;                        // 'vp-<n>.<k>'
+  readonly guid: string;                      // RFC 4122 v5 from (document id, id): stable for BCF
   name: string;
   camera: ViewpointCamera;
   sectionBoxId?: string;
   colourProfileId?: string;
-  visibility?: { defaultVisible: boolean; exceptions: readonly EntityId[] }; // BCF Visibility
+  visibility?: { defaultVisible: boolean; exceptions: readonly EntityId[] };   // BCF Visibility
   selection?: readonly EntityId[];
   realism?: { mode: 'orbit' | 'walk' | 'fly'; eyeHeight?: number; gravity?: boolean; collision?: boolean };
 }
 
 export type MarkupShape = 'line' | 'polyline' | 'arrow' | 'cloud' | 'ellipse' | 'text';
 export interface Markup {
-  readonly id: string; // 'mk-<n>.<k>'
+  readonly id: string;                        // 'mk-<n>.<k>'
   readonly viewpointId: string;
   shape: MarkupShape;
-  space: 'screen' | 'world'; // screen: points in [0,1]² of the viewpoint image; world: Vec3 (BCF Lines)
+  space: 'screen' | 'world';                  // screen: points in [0,1]² of the viewpoint image; world: Vec3 (BCF Lines)
   points: ReadonlyArray<Vec2 | Vec3>;
-  colour: string;
-  text?: string;
-  lineWidthPx?: number;
-  author: 'agent' | 'human';
-  createdStep: number;
+  colour: string; text?: string; lineWidthPx?: number;
+  author: 'agent' | 'human'; createdStep: number;
 }
 
 export type IssueStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 export interface ReviewIssue {
-  readonly id: string; // 'iss-<n>.<k>'
+  readonly id: string;                        // 'iss-<n>.<k>'
   readonly guid: string;
-  title: string;
-  type: string;
-  priority: 'low' | 'normal' | 'high' | 'critical';
-  status: IssueStatus;
-  assignedTo?: string;
-  labels: readonly string[];
-  dueDate?: string; // ISO 8601 date
-  viewpointIds: readonly string[];
-  entityIds: readonly EntityId[];
-  clashKey?: string; // 'clash:<sorted a>|<sorted b>|<kind>' (idempotence)
+  title: string; type: string; priority: 'low' | 'normal' | 'high' | 'critical';
+  status: IssueStatus; assignedTo?: string; labels: readonly string[]; dueDate?: string;  // ISO 8601 date
+  viewpointIds: readonly string[]; entityIds: readonly EntityId[];
+  clashKey?: string;                          // 'clash:<sorted a>|<sorted b>|<kind>' (idempotence)
   history: ReadonlyArray<{ status: IssueStatus; by: 'agent' | 'human'; reason: string; signatureId?: string }>;
 }
 
 export interface ReviewComment {
-  readonly id: string;
-  readonly issueId: string;
-  text: string;
-  viewpointId?: string; // BCF agreement: a comment refers to at most one viewpoint
+  readonly id: string; readonly issueId: string; text: string;
+  viewpointId?: string;                       // BCF agreement: a comment refers to at most one viewpoint
   author: 'agent' | 'human';
 }
 
-export interface Walkthrough {
-  readonly id: string;
-  name: string;
-  keys: ReadonlyArray<{ viewpointId: string; seconds: number }>;
-}
+export interface Walkthrough { readonly id: string; name: string; keys: ReadonlyArray<{ viewpointId: string; seconds: number }> }
 
 export interface ReviewModel {
-  viewpoints: Record<string, Viewpoint>;
-  viewpointOrder: string[];
+  viewpoints: Record<string, Viewpoint>; viewpointOrder: string[];
   sectionBoxes: Record<string, SectionBox>;
   markups: Record<string, Markup>;
-  issues: Record<string, ReviewIssue>;
-  issueOrder: string[];
+  issues: Record<string, ReviewIssue>; issueOrder: string[];
   comments: Record<string, ReviewComment>;
   walkthroughs: Record<string, Walkthrough>;
-  nextNumber: number; // review id counter (metaHistory ⇒ not the feature-step counter)
+  nextNumber: number;                          // review id counter (metaHistory ⇒ not the feature-step counter)
 }
 ```
 
@@ -327,37 +309,37 @@ Toolsets: `review` (core), `display` (core), `render` (core), `exchange` (core),
 are `metaHistory: true` unless marked query. Every command carries `@affects / @invariant / @failure` tags (C2), and
 every refusal sets `CommandResult.error` with a code from §7.
 
-| Command                                         | Kind                             | Params (zod sketch; lengths in document units unless stated)                                                                                                                                                                                                                                                                         | Result `data`                                                                                                                                                                                     | @affects / @invariant / @failure                                                                                                                               |
-| ----------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `define_colour_profile`                         | mutating                         | `id`, `name`, `rules: ColourRule[]` (1..256), `defaultColour?: 'entity' \| hex`, `replace?`                                                                                                                                                                                                                                          | `{profileId, ruleCount}`                                                                                                                                                                          | adds / replaces `display.colourProfiles[id]` · rule ids unique, regex compiles, colours valid · `VIS_RULE_INVALID`, `VIS_COLOUR_INVALID`, `VIS_PROFILE_EXISTS` |
-| `set_active_colour_profile`                     | mutating                         | `profileId \| null`                                                                                                                                                                                                                                                                                                                  | `{active}`                                                                                                                                                                                        | sets `display.activeProfileId` · geometry untouched · `VIS_PROFILE_NOT_FOUND`                                                                                  |
-| `delete_colour_profile`                         | mutating                         | `profileId`                                                                                                                                                                                                                                                                                                                          | —                                                                                                                                                                                                 | removes; refused while a viewpoint references it (`VIS_PROFILE_IN_USE`)                                                                                        |
-| `colour_by_rule_report`                         | query                            | `profileId?` (default active), `entityIds?`, `groupBy?: 'rule' \| 'entity' \| 'property'`, `groupProperty?`, `limit?`                                                                                                                                                                                                                | `{palette, approximate: true, groups: {key: {ruleId, category, fieldColour, letterColour, displayHex, count, ids}}, legend[], unmatched: ids, warnings[]}`                                        | read-only · deterministic order (rule order, then id) · `VIS_COLOUR_UNMATCHED` (warn)                                                                          |
-| `check_display`                                 | query                            | —                                                                                                                                                                                                                                                                                                                                    | `{status, issues[{code, ids, remediation}]}`                                                                                                                                                      | read-only · unmatched entities, profiles referencing unknown properties, `reviewRequired` profiles in use                                                      |
-| `set_section_box`                               | mutating                         | `min`, `max`, `rotationZ?`, `planes?`, `name`, `id?`                                                                                                                                                                                                                                                                                 | `{id}`                                                                                                                                                                                            | adds `review.sectionBoxes` · min < max · `VIS_SECTION_BOX_INVALID`                                                                                             |
-| `delete_section_box`                            | mutating                         | `id`                                                                                                                                                                                                                                                                                                                                 | —                                                                                                                                                                                                 | refused while referenced (`VIS_SECTION_BOX_IN_USE`)                                                                                                            |
-| `section_box_report`                            | query                            | `id`                                                                                                                                                                                                                                                                                                                                 | `{inside[], crossing[], outside[], counts}`                                                                                                                                                       | exact AABB (or OBB for rotationZ) classification, §5.4 · `VIS_SECTION_BOX_EMPTY` (warn)                                                                        |
-| `save_viewpoint`                                | mutating                         | `name`, `camera?: ViewpointCamera` \| `fromDocumentCamera?: true`, `sectionBoxId?`, `colourProfileId?`, `visibility?`, `selection?`, `realism?`, `id?`                                                                                                                                                                               | `{id, guid, camera}`                                                                                                                                                                              | adds viewpoint · camera orthonormal ± 1e-6 (normalised on save, original kept within tolerance) · `VIS_CAMERA_INVALID`, `VIS_VIEWPOINT_NOT_ORTHONORMAL`        |
-| `update_viewpoint` / `delete_viewpoint`         | mutating                         | `id`, fields                                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                                                 | delete cascades to markups; refused while an issue references it unless `force` (`VIS_VIEWPOINT_IN_USE`)                                                       |
-| `apply_viewpoint`                               | mutating (camera + display only) | `id`                                                                                                                                                                                                                                                                                                                                 | `{camera: CameraState, activeProfileId, sectionBoxId}`                                                                                                                                            | writes `doc.camera` (§5.3), active profile, active section box · `VIS_VIEWPOINT_NOT_FOUND`                                                                     |
-| `get_viewpoint` / `list_viewpoints`             | query                            | `id` / `limit?`                                                                                                                                                                                                                                                                                                                      | viewpoint(s) with markups count                                                                                                                                                                   | —                                                                                                                                                              |
-| `add_markup` / `delete_markup`                  | mutating                         | `viewpointId`, `shape`, `space`, `points` (2..256), `colour`, `text?`, `lineWidthPx?`                                                                                                                                                                                                                                                | `{id}`                                                                                                                                                                                            | screen points in [0,1] · `VIS_MARKUP_INVALID`, `VIS_VIEWPOINT_NOT_FOUND`                                                                                       |
-| `create_review_issue`                           | mutating                         | `title`, `type`, `priority`, `viewpointIds?`, `entityIds?`, `labels?`, `assignedTo?`, `dueDate?`                                                                                                                                                                                                                                     | `{id, guid}`                                                                                                                                                                                      | status `open` · ids exist · `VIS_ENTITY_NOT_FOUND`, `VIS_VIEWPOINT_NOT_FOUND`                                                                                  |
-| `add_review_comment`                            | mutating                         | `issueId`, `text`, `viewpointId?`                                                                                                                                                                                                                                                                                                    | `{id}`                                                                                                                                                                                            | `VIS_ISSUE_NOT_FOUND`                                                                                                                                          |
-| `set_issue_status`                              | mutating                         | `issueId`, `status`, `reason`, `signature?`                                                                                                                                                                                                                                                                                          | `{status, history}`                                                                                                                                                                               | transitions §5.5; `closed` (and re-open from `closed`) needs a human signature or session (AF-34a) · `VIS_ISSUE_STATUS_INVALID`, `VIS_HUMAN_GATE`              |
-| `check_review`                                  | query                            | `includeInfo?`                                                                                                                                                                                                                                                                                                                       | `{status: pass\|warn\|fail, issues[{code, ids, paths, remediation}], counts}`                                                                                                                     | read-only (AF-20)                                                                                                                                              |
-| `create_clash_issues`                           | mutating                         | `source: 'check_clashes' \| 'check_assembly'`, `sourceParams?`, `margin` (default 500 mm, named), `priority?`                                                                                                                                                                                                                        | `{created, unchanged, issueIds[]}`                                                                                                                                                                | runs the read-only source via `ctx.registry` execute, reads `data.clashes[] {a, b, kind, depth}` · idempotent on `clashKey` · `VIS_CLASH_SOURCE_INVALID`       |
-| `create_walkthrough` / `delete_walkthrough`     | mutating                         | `name`, `keys: {viewpointId, seconds > 0}[]` (2..500)                                                                                                                                                                                                                                                                                | `{id, durationS}`                                                                                                                                                                                 | `VIS_WALKTHROUGH_INVALID`                                                                                                                                      |
-| `render_walkthrough`                            | query                            | `id`, `fps` (1..30), `width`, `height`, `maxFrames` (≤ 600), `renderer?: 'reference' \| 'native'`                                                                                                                                                                                                                                    | `{frames, svgSha256[]}` (reference; native frames carry no digest); frames written with `--save dir/`                                                                                             | camera slerp between keys (§5.3) · `NATIVE_TOOL_MISSING`                                                                                                       |
-| `export_bcf`                                    | query                            | `issueIds?`, `version: '3.0' \| '2.1'`, `snapshots?: boolean`, `snapshotRenderer?: 'reference' \| 'native'`                                                                                                                                                                                                                          | `{bytes, sha256, topics}`; bcfzip via `--save`                                                                                                                                                    | metres + degrees · `VIS_BCF_GUID_UNMAPPED` (warn)                                                                                                              |
-| `import_bcf`                                    | mutating                         | `bcf: base64` (CLI `@file`), `mergePolicy: 'skip' \| 'update'`                                                                                                                                                                                                                                                                       | `{topics, viewpoints, comments, warnings}`                                                                                                                                                        | `VIS_BCF_PARSE`, `VIS_BCF_VERSION`                                                                                                                             |
-| `export_bcf_viewpoint` / `import_bcf_viewpoint` | query / mutating                 | `id` / `visualizationInfo: string`, `name`                                                                                                                                                                                                                                                                                           | `{visualizationInfo, camera: {cameraViewPointM, …}}` / `{id}`                                                                                                                                     | single-viewpoint form for tests and plans                                                                                                                      |
-| `render_stats`                                  | query                            | `viewpointId?` \| `view` / `direction` / `target`, `projection`, `fovDeg?`, `width`, `height`, `quality?`, `multiDraw?: boolean` (default true)                                                                                                                                                                                      | `{componentCount, buckets[{prototypeKey, lod, instances}], opaqueModelCalls, edgeCalls, shadowCalls, culled{frustum, pixel}, instancesDrawnPlusCulled, triangles, gpuBytesEstimate, planVersion}` | read-only; same `renderPlan` as the viewport                                                                                                                   |
-| `render_view` (extended)                        | query                            | existing + `projection: 'orthographic' \| 'perspective'`, `fovDeg`, `viewpointId`, `colourProfileId`, `sectionBoxId`, `shading: 'flat' \| 'review'`, `edges`, `shadows`, `ambientOcclusion`, `sun?: {azimuthDeg, elevationDeg}`, `background: 'dark' \| 'light' \| css`, `renderer: 'reference' \| 'native'` (default `'reference'`) | existing + `svgSha256` (reference only), `rendererVersion`, `projection`, `visibleEntityIds` (bounded), `legend`; native adds `renderer`, `device`, `deterministic: false`                        | deterministic per `rendererVersion` (reference) · `VIS_RENDER_BUDGET` when pixels × supersample > 16 M · `NATIVE_TOOL_MISSING`                                 |
-| `list_service_colour_schemes` (industrial)      | query                            | `scheme?`                                                                                                                                                                                                                                                                                                                            | rows with `sources[]`, `grade`, `conflict?`                                                                                                                                                       | read-only                                                                                                                                                      |
-| `apply_service_colour_scheme` (industrial)      | mutating                         | `scheme`, `profileId`, `serviceMap: Record<serviceText, category>`, `property?: 'service'` (default), `activate?`, `markerLetters?: boolean`                                                                                                                                                                                         | `{profileId, mapped, unmapped[], reviewRequired: true}`                                                                                                                                           | builds a `ColourProfile` (one rule per mapped service, ordered by the map) · `VIS_SCHEME_UNKNOWN`, `VIS_SCHEME_CATEGORY_UNKNOWN`                               |
-| `add_pipe_markers` (industrial)                 | mutating                         | `lineIds? \| all`, `scheme: 'asme_a13_1'`, `spacing?` (default 7620 mm, named, grade B), `insulationMm?`                                                                                                                                                                                                                             | `{markers, perLine}`                                                                                                                                                                              | decals on pipe segments; legend from §5.7 · `VIS_MARKER_NO_OD`, `VIS_MARKER_BAND_INTERPOLATED` (warn)                                                          |
-| `check_pipe_markers` (industrial)               | query                            | `lineIds?`                                                                                                                                                                                                                                                                                                                           | `{status, rows[{line, odIn, fieldLengthMm, letterHeightMm, bandInterpolated, markers, missingAt[]}]}`                                                                                             | read-only (AF-20)                                                                                                                                              |
+| Command | Kind | Params (zod sketch; lengths in document units unless stated) | Result `data` | @affects / @invariant / @failure |
+| ------- | ---- | ------------------------------------------------------------ | ------------- | -------------------------------- |
+| `define_colour_profile` | mutating | `id`, `name`, `rules: ColourRule[]` (1..256), `defaultColour?: 'entity' \| hex`, `replace?` | `{profileId, ruleCount}` | adds / replaces `display.colourProfiles[id]` · rule ids unique, regex compiles, colours valid · `VIS_RULE_INVALID`, `VIS_COLOUR_INVALID`, `VIS_PROFILE_EXISTS` |
+| `set_active_colour_profile` | mutating | `profileId \| null` | `{active}` | sets `display.activeProfileId` · geometry untouched · `VIS_PROFILE_NOT_FOUND` |
+| `delete_colour_profile` | mutating | `profileId` | — | removes; refused while a viewpoint references it (`VIS_PROFILE_IN_USE`) |
+| `colour_by_rule_report` | query | `profileId?` (default active), `entityIds?`, `groupBy?: 'rule' \| 'entity' \| 'property'`, `groupProperty?`, `limit?` | `{palette, approximate: true, groups: {key: {ruleId, category, fieldColour, letterColour, displayHex, count, ids}}, legend[], unmatched: ids, warnings[]}` | read-only · deterministic order (rule order, then id) · `VIS_COLOUR_UNMATCHED` (warn) |
+| `check_display` | query | — | `{status, issues[{code, ids, remediation}]}` | read-only · unmatched entities, profiles referencing unknown properties, `reviewRequired` profiles in use |
+| `set_section_box` | mutating | `min`, `max`, `rotationZ?`, `planes?`, `name`, `id?` | `{id}` | adds `review.sectionBoxes` · min < max · `VIS_SECTION_BOX_INVALID` |
+| `delete_section_box` | mutating | `id` | — | refused while referenced (`VIS_SECTION_BOX_IN_USE`) |
+| `section_box_report` | query | `id` | `{inside[], crossing[], outside[], counts}` | exact AABB (or OBB for rotationZ) classification, §5.4 · `VIS_SECTION_BOX_EMPTY` (warn) |
+| `save_viewpoint` | mutating | `name`, `camera?: ViewpointCamera` \| `fromDocumentCamera?: true`, `sectionBoxId?`, `colourProfileId?`, `visibility?`, `selection?`, `realism?`, `id?` | `{id, guid, camera}` | adds viewpoint · camera orthonormal ± 1e-6 (normalised on save, original kept within tolerance) · `VIS_CAMERA_INVALID`, `VIS_VIEWPOINT_NOT_ORTHONORMAL` |
+| `update_viewpoint` / `delete_viewpoint` | mutating | `id`, fields | — | delete cascades to markups; refused while an issue references it unless `force` (`VIS_VIEWPOINT_IN_USE`) |
+| `apply_viewpoint` | mutating (camera + display only) | `id` | `{camera: CameraState, activeProfileId, sectionBoxId}` | writes `doc.camera` (§5.3), active profile, active section box · `VIS_VIEWPOINT_NOT_FOUND` |
+| `get_viewpoint` / `list_viewpoints` | query | `id` / `limit?` | viewpoint(s) with markups count | — |
+| `add_markup` / `delete_markup` | mutating | `viewpointId`, `shape`, `space`, `points` (2..256), `colour`, `text?`, `lineWidthPx?` | `{id}` | screen points in [0,1] · `VIS_MARKUP_INVALID`, `VIS_VIEWPOINT_NOT_FOUND` |
+| `create_review_issue` | mutating | `title`, `type`, `priority`, `viewpointIds?`, `entityIds?`, `labels?`, `assignedTo?`, `dueDate?` | `{id, guid}` | status `open` · ids exist · `VIS_ENTITY_NOT_FOUND`, `VIS_VIEWPOINT_NOT_FOUND` |
+| `add_review_comment` | mutating | `issueId`, `text`, `viewpointId?` | `{id}` | `VIS_ISSUE_NOT_FOUND` |
+| `set_issue_status` | mutating | `issueId`, `status`, `reason`, `signature?` | `{status, history}` | transitions §5.5; `closed` (and re-open from `closed`) needs a human signature or session (AF-34a) · `VIS_ISSUE_STATUS_INVALID`, `VIS_HUMAN_GATE` |
+| `check_review` | query | `includeInfo?` | `{status: pass\|warn\|fail, issues[{code, ids, paths, remediation}], counts}` | read-only (AF-20) |
+| `create_clash_issues` | mutating | `source: 'check_clashes' \| 'check_assembly'`, `sourceParams?`, `margin` (default 500 mm, named), `priority?` | `{created, unchanged, issueIds[]}` | runs the read-only source via `ctx.registry` execute, reads `data.clashes[] {a, b, kind, depth}` · idempotent on `clashKey` · `VIS_CLASH_SOURCE_INVALID` |
+| `create_walkthrough` / `delete_walkthrough` | mutating | `name`, `keys: {viewpointId, seconds > 0}[]` (2..500) | `{id, durationS}` | `VIS_WALKTHROUGH_INVALID` |
+| `render_walkthrough` | query | `id`, `fps` (1..30), `width`, `height`, `maxFrames` (≤ 600), `renderer?: 'reference' \| 'native'` | `{frames, svgSha256[]}` (reference; native frames carry no digest); frames written with `--save dir/` | camera slerp between keys (§5.3) · `NATIVE_TOOL_MISSING` |
+| `export_bcf` | query | `issueIds?`, `version: '3.0' \| '2.1'`, `snapshots?: boolean`, `snapshotRenderer?: 'reference' \| 'native'` | `{bytes, sha256, topics}`; bcfzip via `--save` | metres + degrees · `VIS_BCF_GUID_UNMAPPED` (warn) |
+| `import_bcf` | mutating | `bcf: base64` (CLI `@file`), `mergePolicy: 'skip' \| 'update'` | `{topics, viewpoints, comments, warnings}` | `VIS_BCF_PARSE`, `VIS_BCF_VERSION` |
+| `export_bcf_viewpoint` / `import_bcf_viewpoint` | query / mutating | `id` / `visualizationInfo: string`, `name` | `{visualizationInfo, camera: {cameraViewPointM, …}}` / `{id}` | single-viewpoint form for tests and plans |
+| `render_stats` | query | `viewpointId?` \| `view` / `direction` / `target`, `projection`, `fovDeg?`, `width`, `height`, `quality?`, `multiDraw?: boolean` (default true) | `{componentCount, buckets[{prototypeKey, lod, instances}], opaqueModelCalls, edgeCalls, shadowCalls, culled{frustum, pixel}, instancesDrawnPlusCulled, triangles, gpuBytesEstimate, planVersion}` | read-only; same `renderPlan` as the viewport |
+| `render_view` (extended) | query | existing + `projection: 'orthographic' \| 'perspective'`, `fovDeg`, `viewpointId`, `colourProfileId`, `sectionBoxId`, `shading: 'flat' \| 'review'`, `edges`, `shadows`, `ambientOcclusion`, `sun?: {azimuthDeg, elevationDeg}`, `background: 'dark' \| 'light' \| css`, `renderer: 'reference' \| 'native'` (default `'reference'`) | existing + `svgSha256` (reference only), `rendererVersion`, `projection`, `visibleEntityIds` (bounded), `legend`; native adds `renderer`, `device`, `deterministic: false` | deterministic per `rendererVersion` (reference) · `VIS_RENDER_BUDGET` when pixels × supersample > 16 M · `NATIVE_TOOL_MISSING` |
+| `list_service_colour_schemes` (industrial) | query | `scheme?` | rows with `sources[]`, `grade`, `conflict?` | read-only |
+| `apply_service_colour_scheme` (industrial) | mutating | `scheme`, `profileId`, `serviceMap: Record<serviceText, category>`, `property?: 'service'` (default), `activate?`, `markerLetters?: boolean` | `{profileId, mapped, unmapped[], reviewRequired: true}` | builds a `ColourProfile` (one rule per mapped service, ordered by the map) · `VIS_SCHEME_UNKNOWN`, `VIS_SCHEME_CATEGORY_UNKNOWN` |
+| `add_pipe_markers` (industrial) | mutating | `lineIds? \| all`, `scheme: 'asme_a13_1'`, `spacing?` (default 7620 mm, named, grade B), `insulationMm?` | `{markers, perLine}` | decals on pipe segments; legend from §5.7 · `VIS_MARKER_NO_OD`, `VIS_MARKER_BAND_INTERPOLATED` (warn) |
+| `check_pipe_markers` (industrial) | query | `lineIds?` | `{status, rows[{line, odIn, fieldLengthMm, letterHeightMm, bandInterpolated, markers, missingAt[]}]}` | read-only (AF-20) |
 
 Out of the command layer, UI only: walk / fly controllers, transient section-box dragging (dispatches
 `set_section_box` on release), redline drawing (dispatches `add_markup` on finish), and the LOD / culling evaluation
@@ -481,12 +463,12 @@ conservative OBB test, exact for axis-aligned A when θ = 0. Rendering:
 
 ### 5.5 Issue workflow (TR-VIS-15)
 
-| From \ to   | open          | in_progress   | resolved      | closed    |
-| ----------- | ------------- | ------------- | ------------- | --------- |
-| open        | —             | agent / human | agent / human | **human** |
-| in_progress | agent / human | —             | agent / human | **human** |
-| resolved    | agent / human | agent / human | —             | **human** |
-| closed      | **human**     | —             | —             | —         |
+| From \ to | open | in_progress | resolved | closed |
+| --------- | ---- | ----------- | -------- | ------ |
+| open | — | agent / human | agent / human | **human** |
+| in_progress | agent / human | — | agent / human | **human** |
+| resolved | agent / human | agent / human | — | **human** |
+| closed | **human** | — | — | — |
 
 Human = a signature with a human-held key, or an authenticated human session (AF-34a). `ctx.caller` alone only
 selects the message. Each transition appends to `history` with `by`, `reason` and `signatureId`. Exported BCF
@@ -497,27 +479,27 @@ selects the message. Each transition appends to `history` with `by`, `reason` an
 `MaterialClassId` and its named defaults `matclass:llull-v1` give a base colour, metalness and roughness. They are
 llull choices, not standard values, and are editable with `create_material`:
 
-| Class                           | Base colour (display)                   | Metalness | Roughness | Notes                                                             |
-| ------------------------------- | --------------------------------------- | --------- | --------- | ----------------------------------------------------------------- |
-| `structural_steel_painted`      | per paint system (default from profile) | 0.1       | 0.6       | red portal / grey steel in the reference images is a paint colour |
-| `galvanized_steel`              | `#a5a8a6` (RAL 9006 approx)             | 0.8       | 0.45      | grating, handrail                                                 |
-| `carbon_steel_pipe_painted`     | service colour (profile)                | 0.1       | 0.5       |                                                                   |
-| `stainless_steel`               | `#c0c4c8`                               | 0.9       | 0.3       |                                                                   |
-| `insulation_cladding_aluminium` | `#c9ccce`                               | 0.85      | 0.35      | jacketed lines                                                    |
-| `concrete`                      | `#9a9a96`                               | 0.0       | 0.9       | foundations, base slab                                            |
-| `grating`                       | `#8f999f`                               | 0.7       | 0.5       | alpha-tested pattern (procedural finish)                          |
-| `cast_steel_valve`              | profile / `#2f5fa8`                     | 0.3       | 0.5       | blue valves in the reference image are a paint choice             |
-| `alloy_bolting`                 | `#3a3a3a`                               | 0.6       | 0.5       |                                                                   |
-| `frp`                           | `#6f8f6a`                               | 0.0       | 0.7       |                                                                   |
+| Class | Base colour (display) | Metalness | Roughness | Notes |
+| ----- | --------------------- | --------- | --------- | ----- |
+| `structural_steel_painted` | per paint system (default from profile) | 0.1 | 0.6 | red portal / grey steel in the reference images is a paint colour |
+| `galvanized_steel` | `#a5a8a6` (RAL 9006 approx) | 0.8 | 0.45 | grating, handrail |
+| `carbon_steel_pipe_painted` | service colour (profile) | 0.1 | 0.5 | |
+| `stainless_steel` | `#c0c4c8` | 0.9 | 0.3 | |
+| `insulation_cladding_aluminium` | `#c9ccce` | 0.85 | 0.35 | jacketed lines |
+| `concrete` | `#9a9a96` | 0.0 | 0.9 | foundations, base slab |
+| `grating` | `#8f999f` | 0.7 | 0.5 | alpha-tested pattern (procedural finish) |
+| `cast_steel_valve` | profile / `#2f5fa8` | 0.3 | 0.5 | blue valves in the reference image are a paint choice |
+| `alloy_bolting` | `#3a3a3a` | 0.6 | 0.5 | |
+| `frp` | `#6f8f6a` | 0.0 | 0.7 | |
 
 Viewport by quality tier, extending `useRenderQuality.ts`. The tier is chosen by the **instance count drawn** from
 `render_stats`, not by `document.order.length`.
 
-| Tier   | Shadows                                 | Ambient occlusion                             | Edges                                 | Environment |
-| ------ | --------------------------------------- | --------------------------------------------- | ------------------------------------- | ----------- |
-| high   | 3-cascade CSM (three addon `CSM`) 2048² | GTAO half resolution (three addon `GTAOPass`) | screen-space normal / depth edge pass | IBL         |
-| medium | 2 cascades 1024²                        | SSAO quarter resolution                       | LOD0 buckets only                     | IBL         |
-| low    | none (contact shadow off)               | off                                           | off                                   | IBL         |
+| Tier | Shadows | Ambient occlusion | Edges | Environment |
+| ---- | ------- | ----------------- | ----- | ----------- |
+| high | 3-cascade CSM (three addon `CSM`) 2048² | GTAO half resolution (three addon `GTAOPass`) | screen-space normal / depth edge pass | IBL |
+| medium | 2 cascades 1024² | SSAO quarter resolution | LOD0 buckets only | IBL |
+| low | none (contact shadow off) | off | off | IBL |
 
 While the camera moves, drop to the next lower tier and refine after 200 ms idle. This mirrors "guarantee frame rate /
 fill in detail" ([R2]).
@@ -560,16 +542,16 @@ Placement (grade B, named defaults):
 
 Examples (pipe ODs from `packages/domain-aec/src/industrial/piping/pipeSizes.ts`):
 
-| Pipe                     | OD mm | OD in  | Row           | Field mm | Letters mm | Interpolated |
-| ------------------------ | ----- | ------ | ------------- | -------- | ---------- | ------------ |
-| DN20                     | 26.9  | 1.059  | 0.75–1.25     | 203.2    | 12.7       | no           |
-| DN25                     | 33.7  | 1.327  | (gap) → 1.5–2 | 203.2    | 19.05      | yes          |
-| DN50                     | 60.3  | 2.374  | (gap) → 2.5–6 | 304.8    | 31.75      | yes          |
-| DN100                    | 114.3 | 4.500  | 2.5–6         | 304.8    | 31.75      | no           |
-| DN100 + 50 mm insulation | 214.3 | 8.437  | 8–10          | 609.6    | 63.5       | no           |
-| DN150                    | 168.3 | 6.626  | (gap) → 8–10  | 609.6    | 63.5       | yes          |
-| DN200                    | 219.1 | 8.626  | 8–10          | 609.6    | 63.5       | no           |
-| DN300                    | 323.9 | 12.752 | > 10          | 812.8    | 88.9       | no           |
+| Pipe | OD mm | OD in | Row | Field mm | Letters mm | Interpolated |
+| ---- | ----- | ----- | --- | -------- | ---------- | ------------ |
+| DN20 | 26.9 | 1.059 | 0.75–1.25 | 203.2 | 12.7 | no |
+| DN25 | 33.7 | 1.327 | (gap) → 1.5–2 | 203.2 | 19.05 | yes |
+| DN50 | 60.3 | 2.374 | (gap) → 2.5–6 | 304.8 | 31.75 | yes |
+| DN100 | 114.3 | 4.500 | 2.5–6 | 304.8 | 31.75 | no |
+| DN100 + 50 mm insulation | 214.3 | 8.437 | 8–10 | 609.6 | 63.5 | no |
+| DN150 | 168.3 | 6.626 | (gap) → 8–10 | 609.6 | 63.5 | yes |
+| DN200 | 219.1 | 8.626 | 8–10 | 609.6 | 63.5 | no |
+| DN300 | 323.9 | 12.752 | > 10 | 812.8 | 88.9 | no |
 
 ### 5.8 Clash framing (TR-VIS-40)
 
@@ -615,54 +597,54 @@ creation.
 - **UI**: Review panel, redline tools, section-box gizmo, profile picker with legend, walk / fly toggle and a
   performance HUD showing `render_stats` numbers live.
 
-| Code                                                 | Raised by                                                                  | Meaning                                                                     | Remediation                                                                          |
-| ---------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `VIS_PROFILE_NOT_FOUND`                              | profile / report / render commands                                         | unknown profile id                                                          | `list` profiles via `check_display`, or `define_colour_profile`                      |
-| `VIS_PROFILE_EXISTS`                                 | `define_colour_profile`                                                    | id taken                                                                    | pass `replace: true`                                                                 |
-| `VIS_PROFILE_IN_USE`                                 | `delete_colour_profile`                                                    | a viewpoint references it                                                   | update or delete the viewpoint first                                                 |
-| `VIS_RULE_INVALID`                                   | `define_colour_profile`                                                    | bad predicate (unknown operator, regex > 200 chars or invalid, range a > b) | fix the rule at `paths`                                                              |
-| `VIS_COLOUR_INVALID`                                 | profile commands, `add_markup`                                             | not `#rrggbb` nor `scheme:<id>/<category>`                                  | use a hex colour or a listed category                                                |
-| `VIS_COLOUR_UNMATCHED` (warn)                        | report, `check_display`                                                    | entities fell through to the default                                        | extend `serviceMap` / rules, or accept the default                                   |
-| `VIS_SCHEME_UNKNOWN` / `VIS_SCHEME_CATEGORY_UNKNOWN` | `apply_service_colour_scheme`                                              | scheme or category not in the tables                                        | `list_service_colour_schemes`                                                        |
-| `VIS_SCHEME_REVIEW_REQUIRED` (warn)                  | `check_display`                                                            | hazard-scheme profile not approved by a human                               | a qualified reviewer approves the mapping                                            |
-| `VIS_CAMERA_INVALID`                                 | viewpoint commands                                                         | FOV ∉ (0, 180), viewHeight ≤ 0, zero vector                                 | fix the camera                                                                       |
-| `VIS_VIEWPOINT_NOT_ORTHONORMAL`                      | viewpoint commands                                                         | \|dir\| or \|up\| ≠ 1 or dir·up ≠ 0 beyond 1e-6                             | normalise; `up` must be ⟂ `direction`                                                |
-| `VIS_VIEWPOINT_NOT_FOUND` / `VIS_VIEWPOINT_IN_USE`   | viewpoint / markup / issue commands                                        | unknown / referenced                                                        | —                                                                                    |
-| `VIS_VIEWPOINT_STALE` (warn)                         | `check_review`                                                             | viewpoint selection / visibility names deleted entities                     | update the viewpoint                                                                 |
-| `VIS_SECTION_BOX_INVALID` / `VIS_SECTION_BOX_IN_USE` | section commands                                                           | min ≥ max / referenced                                                      | —                                                                                    |
-| `VIS_SECTION_BOX_EMPTY` (warn)                       | `section_box_report`                                                       | nothing inside or crossing                                                  | enlarge the box                                                                      |
-| `VIS_MARKUP_INVALID`                                 | `add_markup`                                                               | screen point ∉ [0,1]², < 2 points, > 256                                    | —                                                                                    |
-| `VIS_ISSUE_NOT_FOUND` / `VIS_ISSUE_STATUS_INVALID`   | issue commands                                                             | unknown issue / transition not in §5.5                                      | —                                                                                    |
-| `VIS_ISSUE_OPEN` (info)                              | `check_review`                                                             | issue in `open` / `in_progress`                                             | work on it or mark `resolved`                                                        |
-| `VIS_ISSUE_AWAITING_APPROVAL` (warn)                 | `check_review`                                                             | `resolved`, waiting for a human                                             | ask the reviewer                                                                     |
-| `VIS_ISSUE_ENTITY_MISSING` (warn)                    | `check_review`                                                             | issue references deleted entities                                           | re-link or resolve                                                                   |
-| `VIS_HUMAN_GATE`                                     | `set_issue_status`, `approve_colour_profile`                               | approval act by a non-human caller                                          | a human signs (AF-34a)                                                               |
-| `VIS_CLASH_SOURCE_INVALID`                           | `create_clash_issues`                                                      | source command missing or no `data.clashes`                                 | run the clash command; check its params                                              |
-| `VIS_BCF_PARSE` / `VIS_BCF_VERSION`                  | `import_bcf*`                                                              | malformed XML or zip / version not 2.1 or 3.0                               | —                                                                                    |
-| `VIS_BCF_GUID_UNMAPPED` (warn)                       | `export_bcf`                                                               | entities without IFC GUID                                                   | run 08-DAT IFC export first, or accept `AuthoringToolId`                             |
-| `VIS_BCF_COLOURING_LARGE` (warn)                     | `export_bcf`                                                               | > 1000 coloured components ([R7])                                           | — (legend written instead)                                                           |
-| `VIS_MARKER_NO_OD`                                   | `add_pipe_markers`                                                         | line has no OD                                                              | set `dn` / `diameter`                                                                |
-| `VIS_MARKER_BAND_INTERPOLATED` (warn)                | marker commands                                                            | OD in a gap of the A13.1 rows                                               | reviewer confirms with the edition in force                                          |
-| `VIS_RENDER_BUDGET`                                  | `render_view`                                                              | pixels × supersample² > 16 M                                                | lower width / height                                                                 |
-| `VIS_WALKTHROUGH_INVALID`                            | walkthrough commands                                                       | < 2 keys, seconds ≤ 0, frames > max                                         | —                                                                                    |
-| `VIS_GPU_LIMIT` (UI warn, `render_stats` field)      | renderer                                                                   | batch texture > `MAX_TEXTURE_SIZE` or instance buffer > limit               | batch split automatically                                                            |
-| `NATIVE_TOOL_MISSING`                                | `render_view`, `render_walkthrough`, `export_bcf` with the native renderer | no raster port or no `llull-compute` in this host                           | use `renderer: 'reference'`, or install the desktop app (it bundles `llull-compute`) |
+| Code | Raised by | Meaning | Remediation |
+| ---- | --------- | ------- | ----------- |
+| `VIS_PROFILE_NOT_FOUND` | profile / report / render commands | unknown profile id | `list` profiles via `check_display`, or `define_colour_profile` |
+| `VIS_PROFILE_EXISTS` | `define_colour_profile` | id taken | pass `replace: true` |
+| `VIS_PROFILE_IN_USE` | `delete_colour_profile` | a viewpoint references it | update or delete the viewpoint first |
+| `VIS_RULE_INVALID` | `define_colour_profile` | bad predicate (unknown operator, regex > 200 chars or invalid, range a > b) | fix the rule at `paths` |
+| `VIS_COLOUR_INVALID` | profile commands, `add_markup` | not `#rrggbb` nor `scheme:<id>/<category>` | use a hex colour or a listed category |
+| `VIS_COLOUR_UNMATCHED` (warn) | report, `check_display` | entities fell through to the default | extend `serviceMap` / rules, or accept the default |
+| `VIS_SCHEME_UNKNOWN` / `VIS_SCHEME_CATEGORY_UNKNOWN` | `apply_service_colour_scheme` | scheme or category not in the tables | `list_service_colour_schemes` |
+| `VIS_SCHEME_REVIEW_REQUIRED` (warn) | `check_display` | hazard-scheme profile not approved by a human | a qualified reviewer approves the mapping |
+| `VIS_CAMERA_INVALID` | viewpoint commands | FOV ∉ (0, 180), viewHeight ≤ 0, zero vector | fix the camera |
+| `VIS_VIEWPOINT_NOT_ORTHONORMAL` | viewpoint commands | \|dir\| or \|up\| ≠ 1 or dir·up ≠ 0 beyond 1e-6 | normalise; `up` must be ⟂ `direction` |
+| `VIS_VIEWPOINT_NOT_FOUND` / `VIS_VIEWPOINT_IN_USE` | viewpoint / markup / issue commands | unknown / referenced | — |
+| `VIS_VIEWPOINT_STALE` (warn) | `check_review` | viewpoint selection / visibility names deleted entities | update the viewpoint |
+| `VIS_SECTION_BOX_INVALID` / `VIS_SECTION_BOX_IN_USE` | section commands | min ≥ max / referenced | — |
+| `VIS_SECTION_BOX_EMPTY` (warn) | `section_box_report` | nothing inside or crossing | enlarge the box |
+| `VIS_MARKUP_INVALID` | `add_markup` | screen point ∉ [0,1]², < 2 points, > 256 | — |
+| `VIS_ISSUE_NOT_FOUND` / `VIS_ISSUE_STATUS_INVALID` | issue commands | unknown issue / transition not in §5.5 | — |
+| `VIS_ISSUE_OPEN` (info) | `check_review` | issue in `open` / `in_progress` | work on it or mark `resolved` |
+| `VIS_ISSUE_AWAITING_APPROVAL` (warn) | `check_review` | `resolved`, waiting for a human | ask the reviewer |
+| `VIS_ISSUE_ENTITY_MISSING` (warn) | `check_review` | issue references deleted entities | re-link or resolve |
+| `VIS_HUMAN_GATE` | `set_issue_status`, `approve_colour_profile` | approval act by a non-human caller | a human signs (AF-34a) |
+| `VIS_CLASH_SOURCE_INVALID` | `create_clash_issues` | source command missing or no `data.clashes` | run the clash command; check its params |
+| `VIS_BCF_PARSE` / `VIS_BCF_VERSION` | `import_bcf*` | malformed XML or zip / version not 2.1 or 3.0 | — |
+| `VIS_BCF_GUID_UNMAPPED` (warn) | `export_bcf` | entities without IFC GUID | run 08-DAT IFC export first, or accept `AuthoringToolId` |
+| `VIS_BCF_COLOURING_LARGE` (warn) | `export_bcf` | > 1000 coloured components ([R7]) | — (legend written instead) |
+| `VIS_MARKER_NO_OD` | `add_pipe_markers` | line has no OD | set `dn` / `diameter` |
+| `VIS_MARKER_BAND_INTERPOLATED` (warn) | marker commands | OD in a gap of the A13.1 rows | reviewer confirms with the edition in force |
+| `VIS_RENDER_BUDGET` | `render_view` | pixels × supersample² > 16 M | lower width / height |
+| `VIS_WALKTHROUGH_INVALID` | walkthrough commands | < 2 keys, seconds ≤ 0, frames > max | — |
+| `VIS_GPU_LIMIT` (UI warn, `render_stats` field) | renderer | batch texture > `MAX_TEXTURE_SIZE` or instance buffer > limit | batch split automatically |
+| `NATIVE_TOOL_MISSING` | `render_view`, `render_walkthrough`, `export_bcf` with the native renderer | no raster port or no `llull-compute` in this host | use `renderer: 'reference'`, or install the desktop app (it bundles `llull-compute`) |
 
 ## 8. Performance and robustness budgets
 
-| Budget                                          | Value                                                                                                                                                                                                           | Basis                                                         |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Opaque model draw calls (SYN-RACK-v1)           | ≤ 2P + C + U = 30                                                                                                                                                                                               | closed form, §5.2                                             |
-| Edge-pass calls                                 | ≤ P (LOD0 buckets only) = 13                                                                                                                                                                                    | §5.6                                                          |
-| Shadow calls (high tier)                        | ≤ cascades × shadow-casting buckets = 3 × 30                                                                                                                                                                    | §5.6                                                          |
-| GPU bytes per instance                          | 76 (+4 state) InstancedMesh; BatchedMesh 1e6 ≈ 84 MB of textures                                                                                                                                                | three facts T1, T2                                            |
-| Median frame time at 1920 × 1080, orbit         | targets 16.7 ms (10⁴, 10⁵), 33.3 ms (10⁶): **TBD — measure**                                                                                                                                                    | 60 / 30 Hz; procedure in `synthetic_pipe_rack_benchmark.json` |
-| Colour profile re-apply, 10⁵ entities, 50 rules | TBD — measure (target < 200 ms, worker)                                                                                                                                                                         | O(N m)                                                        |
-| BVH build 10⁶ instances                         | TBD — measure (target < 1.5 s in a worker; if missed, `llull-bvh` WASM, §2.A)                                                                                                                                   | binned SAH O(N log N)                                         |
-| `render_view` review 1920 × 1080                | TBD — measure with `llull render_view … --json` timing, reference and native; hard cap `VIS_RENDER_BUDGET`                                                                                                      | 8.3 M samples                                                 |
-| `render_stats` 10⁶ instances                    | measured 2026-11-03 (§12.8): 4.1 s total, of which the plan (query + LOD + buckets) is ~0.3 s and `planScene` (bounds + prototype keys) 3.8 s; target < 500 ms is not met until the BVH / cached scene (VIS-M7) | BVH query + bucket counting                                   |
-| `check_review` 10⁴ issues                       | linear, TBD — measure                                                                                                                                                                                           | —                                                             |
-| Document bytes / instance                       | TBD — measure; target ≤ 200 B with instance entities, ≤ 40 B with V2 instance arrays                                                                                                                            | QUALITY_GATES gate 2 metric                                   |
+| Budget | Value | Basis |
+| ------ | ----- | ----- |
+| Opaque model draw calls (SYN-RACK-v1) | ≤ 2P + C + U = 30 | closed form, §5.2 |
+| Edge-pass calls | ≤ P (LOD0 buckets only) = 13 | §5.6 |
+| Shadow calls (high tier) | ≤ cascades × shadow-casting buckets = 3 × 30 | §5.6 |
+| GPU bytes per instance | 76 (+4 state) InstancedMesh; BatchedMesh 1e6 ≈ 84 MB of textures | three facts T1, T2 |
+| Median frame time at 1920 × 1080, orbit | targets 16.7 ms (10⁴, 10⁵), 33.3 ms (10⁶): **TBD — measure** | 60 / 30 Hz; procedure in `synthetic_pipe_rack_benchmark.json` |
+| Colour profile re-apply, 10⁵ entities, 50 rules | TBD — measure (target < 200 ms, worker) | O(N m) |
+| BVH build 10⁶ instances | TBD — measure (target < 1.5 s in a worker; if missed, `llull-bvh` WASM, §2.A) | binned SAH O(N log N) |
+| `render_view` review 1920 × 1080 | TBD — measure with `llull render_view … --json` timing, reference and native; hard cap `VIS_RENDER_BUDGET` | 8.3 M samples |
+| `render_stats` 10⁶ instances | measured 2026-11-03 (§12.8): 4.1 s total, of which the plan (query + LOD + buckets) is ~0.3 s and `planScene` (bounds + prototype keys) 3.8 s; target < 500 ms is not met until the BVH / cached scene (VIS-M7) | BVH query + bucket counting |
+| `check_review` 10⁴ issues | linear, TBD — measure | — |
+| Document bytes / instance | TBD — measure; target ≤ 200 B with instance entities, ≤ 40 B with V2 instance arrays | QUALITY_GATES gate 2 metric |
 
 Robustness:
 
@@ -673,38 +655,38 @@ Robustness:
 
 ## 9. Test strategy
 
-| Layer                                                                                                                            | Test                                                                                                                                                                   | VCs               |
-| -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| unit (`tests/unit/review/`, `tests/unit/display/`)                                                                               | colourRules first-match, unmatched, multi-valued tags; scheme tables load with sources + grades; report ordering                                                       | VC-VIS-01, 02, 03 |
-| unit (`tests/unit/aec/industrial/pipeMarkers.test.ts`)                                                                           | §5.7 table rows incl. gaps                                                                                                                                             | VC-VIS-04         |
-| unit (`viewpointCamera.test.ts`)                                                                                                 | BCF example round trip (reads `data/bcf_3_0/example_viewpoint_orthogonal.bcfv`), azimuth / polar closed form, metres ↔ mm                                              | VC-VIS-10, 11     |
-| unit                                                                                                                             | section box classification, rotated box, empty warning                                                                                                                 | VC-VIS-12         |
-| unit + integration (`store.dispatch`)                                                                                            | markups / issues / comments, undo / redo, ids deterministic, human gate (agent caller refused, signed passes)                                                          | VC-VIS-13, 14     |
-| contract                                                                                                                         | BCF export validates against `visinfo.xsd` / `markup.xsd` (server test with `xmllint --schema` if present, else structural XPath checks)                               | VC-VIS-15         |
-| unit (`renderPlan.test.ts`)                                                                                                      | N(n), bucket count ≤ 30 at four sizes, colour-invariance, LOD thresholds and hysteresis, drawn + culled = N, BVH query = brute-force query on 10⁴ random AABBs         | VC-VIS-20..23     |
-| perf (`tests/perf/plantViewport.perf.ts`, Playwright, not in `npm run check`)                                                    | frame-time baselines                                                                                                                                                   | VC-VIS-24         |
-| unit (`gltfInstancing.test.ts`)                                                                                                  | SimpleInstancing import / export                                                                                                                                       | VC-VIS-25         |
-| golden (`tests/golden/`)                                                                                                         | SC-VIS-05 digests pinned per `rendererVersion` (reference renderer only; native output is never pinned); SC-VIS-03 `render_stats` exact numbers pinned after first run | VC-VIS-30..33     |
-| unit (industrial)                                                                                                                | clash issues idempotence and framing                                                                                                                                   | VC-VIS-40, 41     |
-| native vs reference (`server/tests/visNativeParity.test.ts`; `llull-raster` / `llull-bvh` cargo tests in `npm run native:check`) | BVH id sets and broad-phase pairs equal to `instanceBvh.ts`; native render is non-hash and matches the reference scene                                                 | VC-VIS-60         |
-| scenario replay                                                                                                                  | every `validation/plans/*.json` through `build_project` (`server/tests/packReplay09.test.ts`, like packs 07 / 08)                                                      | all SC-VIS        |
-| component                                                                                                                        | Review panel / redline tool dispatch the right commands (no geometry maths)                                                                                            | —                 |
+| Layer | Test | VCs |
+| ----- | ---- | --- |
+| unit (`tests/unit/review/`, `tests/unit/display/`) | colourRules first-match, unmatched, multi-valued tags; scheme tables load with sources + grades; report ordering | VC-VIS-01, 02, 03 |
+| unit (`tests/unit/aec/industrial/pipeMarkers.test.ts`) | §5.7 table rows incl. gaps | VC-VIS-04 |
+| unit (`viewpointCamera.test.ts`) | BCF example round trip (reads `data/bcf_3_0/example_viewpoint_orthogonal.bcfv`), azimuth / polar closed form, metres ↔ mm | VC-VIS-10, 11 |
+| unit | section box classification, rotated box, empty warning | VC-VIS-12 |
+| unit + integration (`store.dispatch`) | markups / issues / comments, undo / redo, ids deterministic, human gate (agent caller refused, signed passes) | VC-VIS-13, 14 |
+| contract | BCF export validates against `visinfo.xsd` / `markup.xsd` (server test with `xmllint --schema` if present, else structural XPath checks) | VC-VIS-15 |
+| unit (`renderPlan.test.ts`) | N(n), bucket count ≤ 30 at four sizes, colour-invariance, LOD thresholds and hysteresis, drawn + culled = N, BVH query = brute-force query on 10⁴ random AABBs | VC-VIS-20..23 |
+| perf (`tests/perf/plantViewport.perf.ts`, Playwright, not in `npm run check`) | frame-time baselines | VC-VIS-24 |
+| unit (`gltfInstancing.test.ts`) | SimpleInstancing import / export | VC-VIS-25 |
+| golden (`tests/golden/`) | SC-VIS-05 digests pinned per `rendererVersion` (reference renderer only; native output is never pinned); SC-VIS-03 `render_stats` exact numbers pinned after first run | VC-VIS-30..33 |
+| unit (industrial) | clash issues idempotence and framing | VC-VIS-40, 41 |
+| native vs reference (`server/tests/visNativeParity.test.ts`; `llull-raster` / `llull-bvh` cargo tests in `npm run native:check`) | BVH id sets and broad-phase pairs equal to `instanceBvh.ts`; native render is non-hash and matches the reference scene | VC-VIS-60 |
+| scenario replay | every `validation/plans/*.json` through `build_project` (`server/tests/packReplay09.test.ts`, like packs 07 / 08) | all SC-VIS |
+| component | Review panel / redline tool dispatch the right commands (no geometry maths) | — |
 
 Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and `packages/domain-aec/src`.
 
 ## 10. Delivery plan
 
-| Milestone   | Content                                                                                                                                                 | Depends on                               | Effort                                                                                                                      |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| VIS-M1      | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726)        | plugin port review (`cad-reviewer`)      | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).**                                                         |
-| VIS-M2      | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore`                               | AF-34a signature (09 PLM aerospace)      | 8 d. **Built 2026-10-25 (§12.7); Review panel, markup / section-box rendering wait for the UI follow-up, M4 and M6.**       |
-| VIS-M3      | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline                              | —                                        | 10 d. **Partly built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline; `PlantBatchRenderer` left (VIS-M3b).** |
-| VIS-M4      | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests                                               | M1, M2                                   | 8 d                                                                                                                         |
-| VIS-M5      | `create_clash_issues`; BCF 3.0 export / import                                                                                                          | M2                                       | 6 d                                                                                                                         |
-| VIS-M6      | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs                                                                   | M3                                       | 8 d                                                                                                                         |
-| VIS-M7      | instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6)                                                                                             |
-| VIS-M8 (V2) | 10⁶: streaming, Hi-Z occlusion, impostors, instance-array storage; terrain / sky / sun                                                                  | 08-DAT storage decision                  | 15 d                                                                                                                        |
-| VIS-M9      | native GPU raster (RS-5): `ctx.raster`, `llull-compute raster` for `render_view`, walkthroughs and BCF snapshots; VC-VIS-60                             | M4; RS-0                                 | inside RS-5 (4 wk in RS1, shared with aerospace 05). **Built 2026-10-19 with the M2 / M4 / M5 / M6 slices it needs (§12).** |
+| Milestone | Content | Depends on | Effort |
+| --------- | ------- | ---------- | ------ |
+| VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).** |
+| VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); Review panel, markup / section-box rendering wait for the UI follow-up, M4 and M6.** |
+| VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Partly built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline; `PlantBatchRenderer` left (VIS-M3b).** |
+| VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
+| VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d |
+| VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
+| VIS-M7 | instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6) |
+| VIS-M8 (V2) | 10⁶: streaming, Hi-Z occlusion, impostors, instance-array storage; terrain / sky / sun | 08-DAT storage decision | 15 d |
+| VIS-M9 | native GPU raster (RS-5): `ctx.raster`, `llull-compute raster` for `render_view`, walkthroughs and BCF snapshots; VC-VIS-60 | M4; RS-0 | inside RS-5 (4 wk in RS1, shared with aerospace 05). **Built 2026-10-19 with the M2 / M4 / M5 / M6 slices it needs (§12).** |
 
 Sibling dependencies:
 
@@ -748,18 +730,18 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 ### 12.1 What exists
 
-| Area                                      | As built                                                                                                                                                                                                                                                                                                                                                            | Files                                                             |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Review model (VIS-M2 slice)               | `CadDocument.review` with `viewpoints` / `viewpointOrder`, `walkthroughs`, `issues` / `issueOrder`, `nextNumber`; load validation (`reviewProblems`). Section boxes, markups, comments arrived at VIS-M2 (§12.7).                                                                                                                                                   | `model/review.ts`, `commands/persistence/reviewValidation.ts`     |
-| Commands (metaHistory, coded refusals §7) | `save_viewpoint` (camera or `fromDocumentCamera`), `list_viewpoints`, `delete_viewpoint` (refused while used: `VIS_VIEWPOINT_IN_USE`), `create_walkthrough` / `delete_walkthrough`, `create_review_issue` (status `open`)                                                                                                                                           | `commands/review/{viewpoints,walkthroughs,issues,reviewModel}.ts` |
-| Camera maths                              | orthonormalisation, document orbit camera → viewpoint (45°), interpolation: eye linear, direction / up slerp, fov or view height linear                                                                                                                                                                                                                             | `geometry/viewpointCamera.ts`                                     |
-| `render_view` (VIS-M4 slice)              | `projection: 'perspective'` + `fovDeg`, `viewpointId` (perspective or orthographic BCF camera; ortho `viewHeight` = visible height), `renderer: 'reference' \| 'native'`; data `renderer`, `rendererVersion`, `svgSha256` (reference) or `device` / `version` / `engine` / `deterministic: false` (native), `projection`, `viewpointId`                             | `commands/render/{viewRequest,viewSetup,rendererProvenance}.ts`   |
-| Raster seam                               | the old `raster.ts` split, bit-identical (svg sha256 of 7 scenes incl. caps, strokes, turntable, unsupersampled): `prepareRasterScene` (projection, Lambert colour, back-face flip, near-plane clipping) → `RasterScene` → `rasterScenePixels` (reference) or `ctx.raster`                                                                                          | `commands/render/{rasterScene,raster}.ts`, `model/raster.ts`      |
-| `ctx.raster`                              | `ExecutionContext.raster?: RasterPort \| null`, default context reads `setRasterPort` (`commands/rasterPort.ts`)                                                                                                                                                                                                                                                    | `commands/types.ts`, `commands/context.ts`                        |
-| `render_walkthrough` (VIS-M6 slice)       | PNG frames (`data.files`, `--save dir/`), frames = ⌊duration · fps⌋ + 1, `frameSha256[]` (reference), native frames without digests; `maxFrames` ≤ 600, 100 Mpx budget (`VIS_RENDER_BUDGET`)                                                                                                                                                                        | `commands/render/{renderWalkthrough,frames}.ts`                   |
-| `export_bcf` (VIS-M5 slice)               | BCF 3.0 archive: `bcf.version`, `extensions.xml`, per topic `markup.bcf` + `.bcfv` (metres, vertical `FieldOfView`, `ViewToWorldScale`) + PNG snapshot; behind the export gate; `VIS_BCF_GUID_UNMAPPED` warning                                                                                                                                                     | `commands/exchange/bcf/{exportBcf,bcfXml}.ts`, `lib/zip.ts`       |
-| Native job                                | `llull-compute raster <folder>` with `"kind": "scene"`: flat f64 buffers → `rgba.bin`. CPU twin bit-identical to `rasterScenePixels`; wgpu fill (convex faces batched as fans, other faces even-odd via stencil INVERT + stencil-tested cover), strokes / outline / resolve on the twin. `llull-compute` `main.rs` unchanged (dispatch inside `llull_raster::run`). | `solver/crates/llull-raster/src/{scene,scene_cpu,scene_gpu}.rs`   |
-| Host transport                            | `RasterPort` running the job with `spawnSync` (commands are synchronous), hash-checked output, provenance from the NDJSON warnings; installed by the CLI and the backend only when the binary exists                                                                                                                                                                | `server/src/native/rasterPort.ts`                                 |
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Review model (VIS-M2 slice) | `CadDocument.review` with `viewpoints` / `viewpointOrder`, `walkthroughs`, `issues` / `issueOrder`, `nextNumber`; load validation (`reviewProblems`). Section boxes, markups, comments arrived at VIS-M2 (§12.7). | `model/review.ts`, `commands/persistence/reviewValidation.ts` |
+| Commands (metaHistory, coded refusals §7) | `save_viewpoint` (camera or `fromDocumentCamera`), `list_viewpoints`, `delete_viewpoint` (refused while used: `VIS_VIEWPOINT_IN_USE`), `create_walkthrough` / `delete_walkthrough`, `create_review_issue` (status `open`) | `commands/review/{viewpoints,walkthroughs,issues,reviewModel}.ts` |
+| Camera maths | orthonormalisation, document orbit camera → viewpoint (45°), interpolation: eye linear, direction / up slerp, fov or view height linear | `geometry/viewpointCamera.ts` |
+| `render_view` (VIS-M4 slice) | `projection: 'perspective'` + `fovDeg`, `viewpointId` (perspective or orthographic BCF camera; ortho `viewHeight` = visible height), `renderer: 'reference' \| 'native'`; data `renderer`, `rendererVersion`, `svgSha256` (reference) or `device` / `version` / `engine` / `deterministic: false` (native), `projection`, `viewpointId` | `commands/render/{viewRequest,viewSetup,rendererProvenance}.ts` |
+| Raster seam | the old `raster.ts` split, bit-identical (svg sha256 of 7 scenes incl. caps, strokes, turntable, unsupersampled): `prepareRasterScene` (projection, Lambert colour, back-face flip, near-plane clipping) → `RasterScene` → `rasterScenePixels` (reference) or `ctx.raster` | `commands/render/{rasterScene,raster}.ts`, `model/raster.ts` |
+| `ctx.raster` | `ExecutionContext.raster?: RasterPort \| null`, default context reads `setRasterPort` (`commands/rasterPort.ts`) | `commands/types.ts`, `commands/context.ts` |
+| `render_walkthrough` (VIS-M6 slice) | PNG frames (`data.files`, `--save dir/`), frames = ⌊duration · fps⌋ + 1, `frameSha256[]` (reference), native frames without digests; `maxFrames` ≤ 600, 100 Mpx budget (`VIS_RENDER_BUDGET`) | `commands/render/{renderWalkthrough,frames}.ts` |
+| `export_bcf` (VIS-M5 slice) | BCF 3.0 archive: `bcf.version`, `extensions.xml`, per topic `markup.bcf` + `.bcfv` (metres, vertical `FieldOfView`, `ViewToWorldScale`) + PNG snapshot; behind the export gate; `VIS_BCF_GUID_UNMAPPED` warning | `commands/exchange/bcf/{exportBcf,bcfXml}.ts`, `lib/zip.ts` |
+| Native job | `llull-compute raster <folder>` with `"kind": "scene"`: flat f64 buffers → `rgba.bin`. CPU twin bit-identical to `rasterScenePixels`; wgpu fill (convex faces batched as fans, other faces even-odd via stencil INVERT + stencil-tested cover), strokes / outline / resolve on the twin. `llull-compute` `main.rs` unchanged (dispatch inside `llull_raster::run`). | `solver/crates/llull-raster/src/{scene,scene_cpu,scene_gpu}.rs` |
+| Host transport | `RasterPort` running the job with `spawnSync` (commands are synchronous), hash-checked output, provenance from the NDJSON warnings; installed by the CLI and the backend only when the binary exists | `server/src/native/rasterPort.ts` |
 
 ### 12.2 Decisions
 
@@ -825,13 +807,13 @@ and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
 Built: the generic display model, first-match colour rules, profiles, the colour report, `check_display`, the plugin property port and the
 service colour schemes (ASME A13.1, ISO 14726). No viewport rendering of a profile (VIS-M4 / M6); desktop-app verification does not apply yet.
 
-| Area                              | As built                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Files                                                                                                                  |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Display model                     | `CadDocument.display` (`colourProfiles`, `activeProfileId`), optional, no migration; load validation (`displayProblems`); `replay_history` carries it like `review`                                                                                                                                                                                                                                                                                                                                       | `model/display.ts`, `commands/persistence/displayValidation.ts`, `commands/history/replay.ts`                          |
-| Property port (Q1)                | `CadPlugin.entityProperties?: EntityPropertyProvider`; `plugins/host.ts` `entityPropertyProviders()`; `ExecutionContext.properties?: EntityPropertyReader` (default context = core keys merged under the providers'; a provider cannot override a core key). Core keys: `id`, `kind`, `is2D`, `layerId`, `layerName`, `name`, `tag` (multi), `materialId`, `componentId`                                                                                                                                  | `model/entityProperties.ts`, `geometry/entityProperties.ts`, `plugins/{plugin,host}.ts`, `commands/{types,context}.ts` |
-| Colour rules                      | §5.1: validation (`profileProblems`: unique ids, predicate has a clause, `range` a <= b, regex <= 200 chars, no back-reference, no repeated quantified group, nesting <= 4, colours `#rrggbb`), compiled once, first match wins; case-insensitive string equality; multi-valued keys match on any value; a missing property never matches                                                                                                                                                                 | `geometry/colourRules.ts`                                                                                              |
-| Core commands (metaHistory)       | `define_colour_profile`, `set_active_colour_profile`, `delete_colour_profile`; queries `colour_by_rule_report` (`groupBy` `rule` (default) / `entity` / `property` + `groupProperty`, so core knows no plant key; legend with counts, `unmatched`, `outOfScope`, `warnings`), `check_display` (`VIS_PROFILE_NOT_FOUND` error; `VIS_COLOUR_UNMATCHED`, `VIS_RULE_PROPERTY_UNKNOWN`, `VIS_SCHEME_REVIEW_REQUIRED` warnings)                                                                                 | `commands/display/*` (toolset `review`)                                                                                |
-| Plant plugin `plant-display` (D2) | `list_service_colour_schemes`, `apply_service_colour_scheme` (one rule per mapped service in map order, `reviewRequired: true`, `unmapped` services listed, re-applying a `profileId` replaces it); tables with sources, grades and conflicts; palette `llull-ral-approx-v1` (approximate); provider for building pipes (`service`, `line`, `dn`, `odMm`, `material`, `from`, `to`), equipment (`mark`, `equipmentShape`) and plant piping runs (`service`, `line`, `dn`, `spec`, `odMm`, `insulationMm`) | `packages/domain-aec/src/plant/display/*` (toolset `review`)                                                           |
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Display model | `CadDocument.display` (`colourProfiles`, `activeProfileId`), optional, no migration; load validation (`displayProblems`); `replay_history` carries it like `review` | `model/display.ts`, `commands/persistence/displayValidation.ts`, `commands/history/replay.ts` |
+| Property port (Q1) | `CadPlugin.entityProperties?: EntityPropertyProvider`; `plugins/host.ts` `entityPropertyProviders()`; `ExecutionContext.properties?: EntityPropertyReader` (default context = core keys merged under the providers'; a provider cannot override a core key). Core keys: `id`, `kind`, `is2D`, `layerId`, `layerName`, `name`, `tag` (multi), `materialId`, `componentId` | `model/entityProperties.ts`, `geometry/entityProperties.ts`, `plugins/{plugin,host}.ts`, `commands/{types,context}.ts` |
+| Colour rules | §5.1: validation (`profileProblems`: unique ids, predicate has a clause, `range` a <= b, regex <= 200 chars, no back-reference, no repeated quantified group, nesting <= 4, colours `#rrggbb`), compiled once, first match wins; case-insensitive string equality; multi-valued keys match on any value; a missing property never matches | `geometry/colourRules.ts` |
+| Core commands (metaHistory) | `define_colour_profile`, `set_active_colour_profile`, `delete_colour_profile`; queries `colour_by_rule_report` (`groupBy` `rule` (default) / `entity` / `property` + `groupProperty`, so core knows no plant key; legend with counts, `unmatched`, `outOfScope`, `warnings`), `check_display` (`VIS_PROFILE_NOT_FOUND` error; `VIS_COLOUR_UNMATCHED`, `VIS_RULE_PROPERTY_UNKNOWN`, `VIS_SCHEME_REVIEW_REQUIRED` warnings) | `commands/display/*` (toolset `review`) |
+| Plant plugin `plant-display` (D2) | `list_service_colour_schemes`, `apply_service_colour_scheme` (one rule per mapped service in map order, `reviewRequired: true`, `unmapped` services listed, re-applying a `profileId` replaces it); tables with sources, grades and conflicts; palette `llull-ral-approx-v1` (approximate); provider for building pipes (`service`, `line`, `dn`, `odMm`, `material`, `from`, `to`), equipment (`mark`, `equipmentShape`) and plant piping runs (`service`, `line`, `dn`, `spec`, `odMm`, `insulationMm`) | `packages/domain-aec/src/plant/display/*` (toolset `review`) |
 
 Deviations from §2–§4 (law-driven or scoped to M1):
 
@@ -858,15 +840,15 @@ the property port contract in `tests/unit/contract/entityPropertiesPort.test.ts`
 
 Built on the VIS-M9 slice (§12.1: viewpoints, walkthroughs, minimal issues, camera maths, `delete_viewpoint` / `delete_review_issue`), which is extended, not duplicated. Pure commands in core (`commands/review/`, all metaHistory, coded refusals through `reviewRejection`); no plugin is involved (the review model is generic, like the display model of §12.6).
 
-| Area                  | As built                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Files                                                                                        |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Model                 | `ReviewModel` gains `sectionBoxes`, `activeSectionBoxId?`, `markups`, `comments`; `Viewpoint` gains `sectionBoxId?`, `colourProfileId?`, `visibility?`, `selection?`; `ReviewIssue` gains `assignedTo?`, `dueDate?`, `history` (status, `by`, reason, `signatureId`, `signer`). Ids `sb-`, `mk-`, `cm-` from `review.nextNumber`. Load validation checks every section, reference and history entry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `model/review.ts`, `commands/persistence/reviewValidation.ts`                                |
-| Section boxes         | `set_section_box` (box `min` / `max` + `rotationZ`, or 1..6 `planes`; `id` replaces; `activate`), `delete_section_box` (`VIS_SECTION_BOX_IN_USE`), `section_box_report` (inside / crossing / outside in document order, `VIS_SECTION_BOX_EMPTY`). §5.4 maths: exact for axis-aligned boxes, conservative for `rotationZ`; a box face lying on the section box from inside is inside, one touching it only from outside is crossing; plane normals normalised on save.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `commands/review/sectionBoxes.ts`, `geometry/sectionBox.ts`                                  |
-| Viewpoints            | `save_viewpoint` also stores section box, profile, visibility and selection (references checked); `get_viewpoint` (fields + `markups[]`), `update_viewpoint` (null clears a field; id and guid kept), `apply_viewpoint` (writes `doc.camera`, activates the carried profile / section box; `resetDisplay` also clears the ones it does not carry). `viewpointDocumentCamera`: azimuth = atan2(o_x, o_y), polar = acos(o_z) clamped to [0.01, π − 0.01], target = eye + direction · distance to the scene centre (else the current distance). VC-VIS-11 holds to 1e-9. `delete_viewpoint` deletes its markups and uncites it from comments. `delete_colour_profile` is refused while a viewpoint uses the profile (`VIS_PROFILE_IN_USE`).                                                                                                                                                                                                  | `commands/review/{viewpoints,viewpointEdit,viewpointRefs}.ts`, `geometry/viewpointCamera.ts` |
-| Markups, comments     | `add_markup` / `delete_markup` (point counts: line 2, polyline 2..256, arrow 2, cloud 3..256, ellipse 2 bounding corners, text 1 + `text`; screen points in [0, 1]; colour `#rrggbb`), `add_review_comment` (optional viewpoint), `create_review_issue` takes `assignedTo` and `dueDate` (`YYYY-MM-DD`); deleting an issue deletes its comments.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `commands/review/{markups,comments,issues}.ts`                                               |
-| Human gate            | `set_issue_status` follows §5.5. Closing and re-opening a closed issue need `confirmation`: a signature a trusted human key made over `sha256({act: 'review:set_issue_status', ids: [issueId], details: {from, to, reason, historyLength, issueSha256}, nonce})`, where `issueSha256` is the hash of the whole issue (guid, title, entities, viewpoints, history) just before the move, so a signature for one issue cannot be replayed on another `iss-2` in another document. `review_act_payload` returns the bytes. It is the shared `humanGate` of `ctx.humanSignature` (the port 09 PLM installs for releases; also used by 05 FEA dispositions and 08 MAT markings), not a copy; `humanGate` also returns the `signatureId`. A human history entry stores `by: 'human'`, `signatureId`, `signer` and the `proof` (the confirmation). Deleting an issue is a human act too (`review:delete_review_issue`, bound to the issue hash). | `commands/review/{issueStatus,reviewActs,issues}.ts`, `model/humanGate.ts`                   |
-| `check_review`        | `{status, issues[{code, severity, ids, paths, message, remediation}], counts}`; one row per code: `VIS_ISSUE_OPEN` (info), `VIS_ISSUE_AWAITING_APPROVAL`, `VIS_ISSUE_ENTITY_MISSING`, `VIS_VIEWPOINT_STALE` (warn), `VIS_SIGNATURE_UNVERIFIED` (warn: human entries exist but this host has no signature verifier), `VIS_HUMAN_GATE` (error: a closed issue whose last history entry is not a human act, or a human entry whose stored proof does not verify against the act rebuilt from the chain with `ctx.humanSignature.verify`, which is pure and spends nothing; i.e. a file edited outside the commands). Load validation requires a legal chain from `open` ending at `status`, a `proof` on every human entry, and `colourProfileId` to name a display profile. `includeInfo: false` leaves the info rows out.                                                                                                                  | `commands/review/checkReview.ts`                                                             |
-| Saved views in the UI | `NamedViews.tsx` reads `document.review` and dispatches `save_viewpoint` (live orbit camera: eye = camera, direction = target − eye), `apply_viewpoint` (the `CameraReactor` follows `document.camera`) and `delete_viewpoint`. `namedViewStore.ts` and its localStorage key are gone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `src/ui/viewport/3d/{NamedViews.tsx,viewpointParams.ts,cameraBridge.ts}`                     |
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Model | `ReviewModel` gains `sectionBoxes`, `activeSectionBoxId?`, `markups`, `comments`; `Viewpoint` gains `sectionBoxId?`, `colourProfileId?`, `visibility?`, `selection?`; `ReviewIssue` gains `assignedTo?`, `dueDate?`, `history` (status, `by`, reason, `signatureId`, `signer`). Ids `sb-`, `mk-`, `cm-` from `review.nextNumber`. Load validation checks every section, reference and history entry. | `model/review.ts`, `commands/persistence/reviewValidation.ts` |
+| Section boxes | `set_section_box` (box `min` / `max` + `rotationZ`, or 1..6 `planes`; `id` replaces; `activate`), `delete_section_box` (`VIS_SECTION_BOX_IN_USE`), `section_box_report` (inside / crossing / outside in document order, `VIS_SECTION_BOX_EMPTY`). §5.4 maths: exact for axis-aligned boxes, conservative for `rotationZ`; a box face lying on the section box from inside is inside, one touching it only from outside is crossing; plane normals normalised on save. | `commands/review/sectionBoxes.ts`, `geometry/sectionBox.ts` |
+| Viewpoints | `save_viewpoint` also stores section box, profile, visibility and selection (references checked); `get_viewpoint` (fields + `markups[]`), `update_viewpoint` (null clears a field; id and guid kept), `apply_viewpoint` (writes `doc.camera`, activates the carried profile / section box; `resetDisplay` also clears the ones it does not carry). `viewpointDocumentCamera`: azimuth = atan2(o_x, o_y), polar = acos(o_z) clamped to [0.01, π − 0.01], target = eye + direction · distance to the scene centre (else the current distance). VC-VIS-11 holds to 1e-9. `delete_viewpoint` deletes its markups and uncites it from comments. `delete_colour_profile` is refused while a viewpoint uses the profile (`VIS_PROFILE_IN_USE`). | `commands/review/{viewpoints,viewpointEdit,viewpointRefs}.ts`, `geometry/viewpointCamera.ts` |
+| Markups, comments | `add_markup` / `delete_markup` (point counts: line 2, polyline 2..256, arrow 2, cloud 3..256, ellipse 2 bounding corners, text 1 + `text`; screen points in [0, 1]; colour `#rrggbb`), `add_review_comment` (optional viewpoint), `create_review_issue` takes `assignedTo` and `dueDate` (`YYYY-MM-DD`); deleting an issue deletes its comments. | `commands/review/{markups,comments,issues}.ts` |
+| Human gate | `set_issue_status` follows §5.5. Closing and re-opening a closed issue need `confirmation`: a signature a trusted human key made over `sha256({act: 'review:set_issue_status', ids: [issueId], details: {from, to, reason, historyLength, issueSha256}, nonce})`, where `issueSha256` is the hash of the whole issue (guid, title, entities, viewpoints, history) just before the move, so a signature for one issue cannot be replayed on another `iss-2` in another document. `review_act_payload` returns the bytes. It is the shared `humanGate` of `ctx.humanSignature` (the port 09 PLM installs for releases; also used by 05 FEA dispositions and 08 MAT markings), not a copy; `humanGate` also returns the `signatureId`. A human history entry stores `by: 'human'`, `signatureId`, `signer` and the `proof` (the confirmation). Deleting an issue is a human act too (`review:delete_review_issue`, bound to the issue hash). | `commands/review/{issueStatus,reviewActs,issues}.ts`, `model/humanGate.ts` |
+| `check_review` | `{status, issues[{code, severity, ids, paths, message, remediation}], counts}`; one row per code: `VIS_ISSUE_OPEN` (info), `VIS_ISSUE_AWAITING_APPROVAL`, `VIS_ISSUE_ENTITY_MISSING`, `VIS_VIEWPOINT_STALE` (warn), `VIS_SIGNATURE_UNVERIFIED` (warn: human entries exist but this host has no signature verifier), `VIS_HUMAN_GATE` (error: a closed issue whose last history entry is not a human act, or a human entry whose stored proof does not verify against the act rebuilt from the chain with `ctx.humanSignature.verify`, which is pure and spends nothing; i.e. a file edited outside the commands). Load validation requires a legal chain from `open` ending at `status`, a `proof` on every human entry, and `colourProfileId` to name a display profile. `includeInfo: false` leaves the info rows out. | `commands/review/checkReview.ts` |
+| Saved views in the UI | `NamedViews.tsx` reads `document.review` and dispatches `save_viewpoint` (live orbit camera: eye = camera, direction = target − eye), `apply_viewpoint` (the `CameraReactor` follows `document.camera`) and `delete_viewpoint`. `namedViewStore.ts` and its localStorage key are gone. | `src/ui/viewport/3d/{NamedViews.tsx,viewpointParams.ts,cameraBridge.ts}` |
 
 Decisions (owner delegated, quality first):
 
@@ -904,13 +886,13 @@ command by command against its expected values in `tests/unit/review/scVis04.tes
 VIS-M3 is split: M3a (this section: the pure plan, `render_stats`, the SYN-RACK fixture, the perf baseline) and M3b (`PlantBatchRenderer`, `LodGeometryCache`, UI). Built in the plant display plugin, not in core `commands/render/`
 (§2 listed `renderStats.ts` there): a plugin may not import `commands/render`, and the plan only needs `geometry` and `model`.
 
-| Area    | As built                                                                                                                                                                                                                                                                                                                                                                                                                              | Files                                                  |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Plan    | `planScene(doc)` (visible 3D entities -> instances with prototype / material-class indices, AABB, diagonal) and `planRender(scene, camera, { multiDraw, quality, previousLevels?, query? })` -> buckets, unique batches, calls, culling, triangles, bytes, per-instance levels. Pure, deterministic, no three.js. `query` is the injection point of the instance BVH (VIS-M7); the default is a brute-force AABB / plane test (O(N)). | `packages/core/src/geometry/renderPlan.ts`             |
-| Camera  | `PlanCamera`, `framedPlanCamera` (named view / custom direction, perspective or orthographic, fitted on the scene sphere), `viewpointPlanCamera`, `frustumPlanes` (near plane through the eye + 4 side planes, no far plane)                                                                                                                                                                                                          | `packages/core/src/geometry/renderPlanCamera.ts`       |
-| Command | `render_stats` (read-only; toolset review): params `viewpointId?` / `view`, `direction`, `target`, `projection` (default orthographic), `fovDeg`, `width`, `height` (required), `quality`, `multiDraw`. Data: the §4 fields plus `prototypeCount`, `bucketCount`, `uniqueBatches`, `multiDraw`, `quality`, `projection`. `buckets` lists the 200 largest. Refusals: `VIS_VIEWPOINT_NOT_FOUND`, `VIS_CAMERA_INVALID`.                  | `packages/domain-aec/src/plant/display/renderStats.ts` |
-| Fixture | `synRackDocument(bays)` builds SYN-RACK-v1 directly (N(n) = 227 n + 8 floor(n/4), 13 prototypes, 4 material classes as `materialId`)                                                                                                                                                                                                                                                                                                  | `tests/helpers/synRack.ts`                             |
-| Tests   | VC-VIS-20..23 in `tests/unit/render/renderPlan.test.ts` (BVH-vs-brute-force parity waits for VIS-M7; the frustum query is checked against the plane-by-plane test on 10⁴ random AABBs); `render_stats` happy / failure / pure and SC-VIS-03 run through `build_project` with its numbers pinned in `tests/unit/plant/display/renderStats.test.ts`                                                                                     |                                                        |
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Plan | `planScene(doc)` (visible 3D entities -> instances with prototype / material-class indices, AABB, diagonal) and `planRender(scene, camera, { multiDraw, quality, previousLevels?, query? })` -> buckets, unique batches, calls, culling, triangles, bytes, per-instance levels. Pure, deterministic, no three.js. `query` is the injection point of the instance BVH (VIS-M7); the default is a brute-force AABB / plane test (O(N)). | `packages/core/src/geometry/renderPlan.ts` |
+| Camera | `PlanCamera`, `framedPlanCamera` (named view / custom direction, perspective or orthographic, fitted on the scene sphere), `viewpointPlanCamera`, `frustumPlanes` (near plane through the eye + 4 side planes, no far plane) | `packages/core/src/geometry/renderPlanCamera.ts` |
+| Command | `render_stats` (read-only; toolset review): params `viewpointId?` / `view`, `direction`, `target`, `projection` (default orthographic), `fovDeg`, `width`, `height` (required), `quality`, `multiDraw`. Data: the §4 fields plus `prototypeCount`, `bucketCount`, `uniqueBatches`, `multiDraw`, `quality`, `projection`. `buckets` lists the 200 largest. Refusals: `VIS_VIEWPOINT_NOT_FOUND`, `VIS_CAMERA_INVALID`. | `packages/domain-aec/src/plant/display/renderStats.ts` |
+| Fixture | `synRackDocument(bays)` builds SYN-RACK-v1 directly (N(n) = 227 n + 8 floor(n/4), 13 prototypes, 4 material classes as `materialId`) | `tests/helpers/synRack.ts` |
+| Tests | VC-VIS-20..23 in `tests/unit/render/renderPlan.test.ts` (BVH-vs-brute-force parity waits for VIS-M7; the frustum query is checked against the plane-by-plane test on 10⁴ random AABBs); `render_stats` happy / failure / pure and SC-VIS-03 run through `build_project` with its numbers pinned in `tests/unit/plant/display/renderStats.test.ts` | |
 
 Decisions and limits:
 
@@ -928,12 +910,12 @@ Decisions and limits:
 
 Measured (2026-11-03, Windows 11, shared machine, TypeScript reference, perspective iso, 1920 x 1080; `VIS_PERF=1 npx vitest run tests/unit/render/renderStatsPerf.test.ts --disableConsoleIntercept`; no gate):
 
-| N         | `planScene` | `render_stats` total |
-| --------- | ----------- | -------------------- |
-| 1 832     | 12 ms       | 22 ms                |
-| 10 076    | 44 ms       | 47 ms                |
-| 100 071   | 368 ms      | 371 ms               |
-| 1 000 037 | 3 799 ms    | 4 087 ms             |
+| N | `planScene` | `render_stats` total |
+| - | ----------- | ------------------- |
+| 1 832 | 12 ms | 22 ms |
+| 10 076 | 44 ms | 47 ms |
+| 100 071 | 368 ms | 371 ms |
+| 1 000 037 | 3 799 ms | 4 087 ms |
 
 `render_stats` rebuilds the scene (`planScene`) on every call; the plan itself is ~0.3 s at 10⁶ with the brute-force query. The viewport caches the scene, and the BVH (VIS-M7) replaces the O(N) query.
 
