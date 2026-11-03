@@ -99,7 +99,7 @@ export const queryCloudPoints = defineCommand({
     'one column per requested attribute the cloud has, one entry per returned point and in the same order: rgb = 3 × uint8 per point ' +
     '[r, g, b, …] (0-255), intensity = uint16 as stored (LAS raw; E57 and ASCII scaled to 0-65535 at import), classification = ASPRS class code. Attributes the cloud lacks ' +
     'are listed in data.missingAttributes (see describe_point_cloud attributes). The payload is JSON: ~1 MB per 30 k points for positions, ' +
-    'plus ~4 bytes per point per rgb column.',
+    'plus ~12 bytes per point for rgb, ~6 for intensity, ~3 for classification.',
   annotations: { readOnly: true },
   params: z.object({
     cloudId: cloudIdParam,
@@ -126,7 +126,6 @@ export const queryCloudPoints = defineCommand({
     const box = assetBox(cloud, resolved.region);
     const wanted = [...new Set(attributes)];
     const present = wanted.filter((name) => manifest.attributes.includes(name));
-    const missingAttributes = wanted.filter((name) => !manifest.attributes.includes(name));
     const read = port.query(cloud.assetKey, {
       ...(box !== undefined ? { box } : {}),
       ...(present.length > 0 ? { attributes: present } : {}),
@@ -137,6 +136,15 @@ export const queryCloudPoints = defineCommand({
       return refuseScan(doc, 'query_cloud_points', 'SCN_ASSET_MISSING', `asset ${cloud.assetKey} could not be read`, [cloudId]);
     const points: number[] = [];
     const indices: number[] = [];
+    const width = { intensity: 1, rgb: 3, classification: 1 } as const;
+    const short = Object.entries(read.attributes ?? {}).some(
+      ([name, column]) => column.length !== read.indices.length * width[name as keyof typeof width],
+    );
+    if (short)
+      return refuseScan(doc, 'query_cloud_points', 'SCN_ASSET_MISSING', 'the attribute columns do not match the returned points', [
+        cloudId,
+      ]);
+    const missingAttributes = wanted.filter((name) => read.attributes?.[name] === undefined);
     const columns = { intensity: [] as number[], rgb: [] as number[], classification: [] as number[] };
     const source = read.attributes;
     let truncated = false;

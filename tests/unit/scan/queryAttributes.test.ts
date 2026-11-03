@@ -92,4 +92,62 @@ describe('query_cloud_points attributes', () => {
     expect(execute(doc, 'query_cloud_points', params, ctx).data).toEqual(execute(doc, 'query_cloud_points', params, ctx).data);
     expectPure(doc, () => execute(doc, 'query_cloud_points', params, ctx));
   });
+
+  it('filters columns with a seed region on a transformed cloud and keeps them aligned', () => {
+    const attached = execute(
+      createEmptyDocument(),
+      'attach_point_cloud',
+      { assetKey: KEY_A, transform: [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+      ctx,
+    );
+    const base = attached.document;
+    const cloudId = attached.affected[0] ?? '';
+    const shift = 1000;
+    const data = query(base, {
+      cloudId,
+      region: { kind: 'seed', point: [shift + 300, 0, 0], radius: 120 },
+      attributes: ['classification', 'intensity'],
+    });
+    expect(data['indices']).toEqual([2, 3, 4]);
+    expect(data['classification']).toEqual([6, 6, 9]);
+    expect(data['intensity']).toEqual([200, 300, 65535]);
+  });
+
+  it('lists every requested attribute as missing on a cloud without any', () => {
+    const plain = withPort(fixturePort([{ key: KEY_A, points }]));
+    const attached = execute(createEmptyDocument(), 'attach_point_cloud', { assetKey: KEY_A }, plain);
+    const cloudId = attached.affected[0] ?? '';
+    const data = execute(attached.document, 'query_cloud_points', { cloudId, attributes: ['rgb', 'intensity', 'classification'] }, plain)
+      .data as Record<string, unknown>;
+    expect(data['missingAttributes']).toEqual(['rgb', 'intensity', 'classification']);
+    expect(data).not.toHaveProperty('rgb');
+  });
+
+  it('reports a requested attribute the port did not return, and refuses a short column', () => {
+    const inner = fixturePort([{ key: KEY_A, points, attributes: ['intensity', 'rgb', 'classification'], columns }]);
+    const without = withPort({
+      ...inner,
+      query: (key, q) => {
+        const read = inner.query(key, q);
+        if (read === null) return null;
+        const { attributes: _dropped, ...rest } = read;
+        return rest;
+      },
+    });
+    const attached = execute(createEmptyDocument(), 'attach_point_cloud', { assetKey: KEY_A }, without);
+    const cloudId = attached.affected[0] ?? '';
+    const none = execute(attached.document, 'query_cloud_points', { cloudId, attributes: ['rgb', 'intensity'] }, without);
+    expect(none.data).toMatchObject({ count: 6, missingAttributes: ['rgb', 'intensity'] });
+    expect(none.data).not.toHaveProperty('rgb');
+    const shortPort = withPort({
+      ...inner,
+      query: (key, q) => {
+        const read = inner.query(key, q);
+        return read === null ? null : { ...read, attributes: { classification: Uint8Array.from([1, 2]) } };
+      },
+    });
+    const refused = execute(attached.document, 'query_cloud_points', { cloudId, attributes: ['classification'] }, shortPort);
+    expect(refused.error?.code).toBe('SCN_ASSET_MISSING');
+    expect(refused.document).toBe(attached.document);
+  });
 });

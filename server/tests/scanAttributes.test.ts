@@ -5,7 +5,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
@@ -16,6 +16,7 @@ import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runScanImport } from '../src/scan/scanImport';
 import { DEFAULT_IMPORT_OPTIONS } from '../src/scan/scanStore';
 import { createPointCloudPort } from '../src/scan/pointCloudPort';
+import { AssetReader, crc32 } from '../src/scan/assetReader';
 
 const DATA = path.resolve(__dirname, '../../docs/plant/10-pointcloud-brownfield/validation/data');
 const BINARY = nativeBinaryPath('llull-compute');
@@ -77,7 +78,7 @@ afterAll(() => {
 
 async function attach(
   file: string,
-): Promise<{ doc: ReturnType<typeof createEmptyDocument>; cloudId: string; ctx: ReturnType<typeof defaultContext> }> {
+): Promise<{ doc: ReturnType<typeof createEmptyDocument>; cloudId: string; key: string; ctx: ReturnType<typeof defaultContext> }> {
   const imported = await runScanImport(
     { path: file, options: DEFAULT_IMPORT_OPTIONS },
     { runner: createComputeRunner(process.env, BINARY), store, env: process.env },
@@ -85,7 +86,7 @@ async function attach(
   if (!imported.ok) throw new Error(`${imported.code}: ${imported.message}`);
   const ctx = { ...defaultContext(), pointClouds: createPointCloudPort({ store, env: process.env, binary: BINARY }) };
   const attached = execute({ ...createEmptyDocument(), units: 'm' as const }, 'attach_point_cloud', { assetKey: imported.assetKey }, ctx);
-  return { doc: attached.document, cloudId: attached.affected[0] ?? '', ctx };
+  return { doc: attached.document, cloudId: attached.affected[0] ?? '', key: imported.assetKey, ctx };
 }
 
 describe('query_cloud_points attributes on a real asset', () => {
@@ -132,5 +133,61 @@ describe('query_cloud_points attributes on a real asset', () => {
     expect(data['rgb']).toHaveLength(3 * 7680);
     expect(Math.max(...(data['rgb'] ?? []))).toBeLessThanOrEqual(255);
     expect(new Set(data['rgb']).size).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('hostile attribute assets (manifest or block lies, CRC valid)', () => {
+  /** Imports the attribute LAS, copies the asset into a fresh store and lets `mutate` rewrite its files. */
+  async function hostile(
+    mutate: (dir: string, hierarchy: Buffer) => void,
+  ): Promise<{
+    doc: ReturnType<typeof createEmptyDocument>;
+    cloudId: string;
+    ctx: ReturnType<typeof defaultContext>;
+    key: string;
+    reader: AssetReader | null;
+  }> {
+    const file = path.join(work, 'hostile.las');
+    writeFileSync(file, buildLas());
+    const good = await attach(file);
+    const { key } = good;
+    const copy = mkdtempSync(path.join(tmpdir(), 'llull-scan-attr-bad-'));
+    cpSync(path.join(store, key), path.join(copy, key), { recursive: true });
+    const dir = path.join(copy, key);
+    mutate(dir, readFileSync(path.join(dir, 'hierarchy.bin')));
+    const ctx = { ...defaultContext(), pointClouds: createPointCloudPort({ store: copy, env: process.env, binary: BINARY }) };
+    return { doc: good.doc, cloudId: good.cloudId, ctx, key, reader: AssetReader.open(dir, key) };
+  }
+  const setManifest = (dir: string, change: Record<string, unknown>): void => {
+    const manifest = JSON.parse(readFileSync(path.join(dir, 'manifest.json'), 'utf8')) as Record<string, unknown>;
+    writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ ...manifest, ...change }));
+  };
+  const refusal = (h: Awaited<ReturnType<typeof hostile>>): string | undefined =>
+    execute(h.doc, 'query_cloud_points', { cloudId: h.cloudId, attributes: ['rgb', 'intensity', 'classification'] }, h.ctx).error?.code;
+
+  native('refuses a manifest listing columns the blocks do not have', async () => {
+    const h = await hostile((dir) => setManifest(dir, { attributes: ['intensity', 'rgb', 'classification', 'gpsTime', 'normal'] }));
+    expect(h.reader?.readNode(0)).toBeNull();
+    expect(refusal(h)).toBe('SCN_ASSET_MISSING');
+  });
+
+  native('refuses a truncated block whose CRC was recomputed', async () => {
+    const h = await hostile((dir, hierarchy) => {
+      const nodes = readFileSync(path.join(dir, 'nodes.bin'));
+      const size = hierarchy.readUInt32LE(32) - 5;
+      hierarchy.writeUInt32LE(size, 32);
+      hierarchy.writeUInt32LE(crc32(nodes.subarray(hierarchy.readUInt32LE(24), hierarchy.readUInt32LE(24) + size)), 40);
+      writeFileSync(path.join(dir, 'hierarchy.bin'), hierarchy);
+    });
+    expect(h.reader?.readNode(0)).toBeNull();
+    expect(refusal(h)).toBe('SCN_ASSET_MISSING');
+  });
+
+  native('refuses non-array and unknown attribute names in the manifest', async () => {
+    for (const attributes of ['x', ['rgb', 'sparkle'], ['rgb', 'intensity'], ['rgb', 'rgb']]) {
+      const h = await hostile((dir) => setManifest(dir, { attributes }));
+      expect(h.reader, JSON.stringify(attributes)).toBeNull();
+      expect(refusal(h), JSON.stringify(attributes)).toBe('SCN_ASSET_MISSING');
+    }
   });
 });

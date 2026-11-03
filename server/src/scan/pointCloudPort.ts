@@ -75,7 +75,8 @@ function budgetNodes(reader: AssetReader, centre: Vec3, budget: number, query: C
   return selected.sort((a, b) => a - b);
 }
 
-function runQuery(reader: AssetReader, query: CloudQuery): CloudPoints {
+/** Null when a block to read is unreadable (CRC, size or manifest mismatch): the command refuses with SCN_ASSET_MISSING. */
+function runQuery(reader: AssetReader, query: CloudQuery): CloudPoints | null {
   const centre: Vec3 =
     query.sphere?.centre ??
     (query.box !== undefined
@@ -87,6 +88,7 @@ function runQuery(reader: AssetReader, query: CloudQuery): CloudPoints {
       : budgetNodes(reader, centre, query.lod.budget, query);
   const positions: number[] = [];
   const indices: number[] = [];
+  if (nodes.some((i) => reader.readNode(i) === null)) return null;
   const wanted = (query.attributes ?? []).filter((name) => reader.manifest.attributes.includes(name));
   const columns = { intensity: [] as number[], rgb: [] as number[], classification: [] as number[] };
   let truncated = false;

@@ -33,7 +33,29 @@ export interface NodePoints {
   readonly classification?: Uint8Array;
 }
 
-const COLUMN_BYTES: Readonly<Record<string, number>> = { intensity: 2, rgb: 3, gpsTime: 8, normal: 12 };
+/** Bytes per point of each attribute column, in the writer's order (solver/crates/llull-cloud/src/cloud.rs ATTRIBUTE_ORDER). */
+const COLUMN_BYTES: Readonly<Record<string, number>> = {
+  intensity: 2,
+  rgb: 3,
+  classification: 1,
+  returnNumber: 1,
+  numberOfReturns: 1,
+  gpsTime: 8,
+  normal: 12,
+};
+const ATTRIBUTE_ORDER = Object.keys(COLUMN_BYTES);
+
+/** Known names, in writer order (a subsequence of ATTRIBUTE_ORDER), no repeats. */
+function validAttributes(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  let from = 0;
+  for (const name of value) {
+    const at = typeof name === 'string' ? ATTRIBUTE_ORDER.indexOf(name, from) : -1;
+    if (at < 0) return false;
+    from = at + 1;
+  }
+  return true;
+}
 
 let crcTable: Uint32Array | null = null;
 
@@ -60,13 +82,19 @@ function parseManifest(text: string): CloudManifest | null {
   } catch {
     return null;
   }
-  if (!isRecord(value) || typeof value['assetKey'] !== 'string' || typeof value['pointCount'] !== 'number' || !isRecord(value['octree']))
+  if (
+    !isRecord(value) ||
+    typeof value['assetKey'] !== 'string' ||
+    typeof value['pointCount'] !== 'number' ||
+    !isRecord(value['octree']) ||
+    !validAttributes(value['attributes'])
+  )
     return null;
   return value as unknown as CloudManifest;
 }
 
 export class AssetReader {
-  private readonly cache = new LruCache<NodePoints>(64);
+  private readonly cache = new LruCache<NodePoints>(64); // 64 decoded blocks (~20 k points each at most)
 
   private constructor(
     readonly dir: string,
@@ -135,7 +163,7 @@ export class AssetReader {
       if (name === 'intensity') columns.intensity = Uint16Array.from({ length: n }, (_, p) => view.getUint16(from + 2 * p, true));
       else if (name === 'rgb') columns.rgb = Uint8Array.from({ length: 3 * n }, (_, k) => view.getUint8(from + k));
       else if (name === 'classification') columns.classification = Uint8Array.from({ length: n }, (_, p) => view.getUint8(from + p));
-      at += (COLUMN_BYTES[name] ?? 1) * n;
+      at += (COLUMN_BYTES[name] ?? 0) * n;
     }
     return columns;
   }
@@ -158,6 +186,8 @@ export class AssetReader {
       return null;
     }
     if (crc32(block) !== node.crc) return null;
+    const stride = this.manifest.attributes.reduce((sum, name) => sum + (COLUMN_BYTES[name] ?? 0), 0);
+    if (node.byteSize !== node.pointCount * (16 + stride)) return null;
     const view = new DataView(block.buffer, block.byteOffset, block.byteLength);
     const { octree, quantum, offset } = this.manifest;
     const edge = 2 ** (octree.rootBits - node.level);
