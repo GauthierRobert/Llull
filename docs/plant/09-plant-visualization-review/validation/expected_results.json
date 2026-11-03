@@ -330,7 +330,7 @@
       "expected": {
         "opaqueModelCallsMax": 30,
         "invariantUnderServiceColours": true,
-        "opaqueModelCallsExact": "TBD - pin from the first deterministic run per camera"
+        "opaqueModelCallsExact": "pinned in tests/unit/plant/display/renderStats.test.ts (smoke, iso: 8)"
       },
       "tolerance": "<= / equality",
       "source": "R-BATCH-v1: 2 x 13 + 4",

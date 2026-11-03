@@ -6,7 +6,7 @@
     "VC-VIS-22",
     "VC-VIS-23"
   ],
-  "status": "PROPOSED. Steps 0-6 use existing commands (set_parameter, add_box, add_cylinder, array_linear, set_entity_name) and run today; render_stats (step 7) is unbuilt (TR-VIS-20). Loop iterations: 2 x (4 + 4 x 8) = 72 <= MAX_LOOP_ITERATIONS 1000. Scale with set_parameter n (44 / 437 / 4367 bays): array_linear allows up to MAX_COPIES_PER_COMMAND 10000.",
+  "status": "RUNS TODAY. Steps 0-6 use existing commands (set_parameter, add_box, add_cylinder, array_linear, set_entity_name) and run today; render_stats (the last step) is built (VIS-M3a, TECHNICAL_SPEC 12.8). Loop iterations: 2 x (4 + 4 x 8) = 72 <= MAX_LOOP_ITERATIONS 1000. Scale with set_parameter n (44 / 437 / 4367 bays): array_linear allows up to MAX_COPIES_PER_COMMAND 10000.",
   "description": "SYN-RACK-v1 smoke size (n = 8 bays, 1832 components): synthetic pipe rack of 13 repeated prototypes (data/synthetic_pipe_rack_benchmark.json). Checks the component count closed form N(n) = 227 n + 8 floor(n/4), the R-BATCH-v1 draw-call bound (<= 30 opaque model calls, independent of n and of service colours) and the instance bookkeeping (drawn + culled = N).",
   "actions": [
     {

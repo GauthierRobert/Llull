@@ -642,7 +642,7 @@ creation.
 | Colour profile re-apply, 10⁵ entities, 50 rules | TBD — measure (target < 200 ms, worker) | O(N m) |
 | BVH build 10⁶ instances | TBD — measure (target < 1.5 s in a worker; if missed, `llull-bvh` WASM, §2.A) | binned SAH O(N log N) |
 | `render_view` review 1920 × 1080 | TBD — measure with `llull render_view … --json` timing, reference and native; hard cap `VIS_RENDER_BUDGET` | 8.3 M samples |
-| `render_stats` 10⁶ instances | TBD — measure (target < 500 ms; TS and `llull-compute geomq`) | BVH query + bucket counting |
+| `render_stats` 10⁶ instances | measured 2026-11-03 (§12.8): 4.1 s total, of which the plan (query + LOD + buckets) is ~0.3 s and `planScene` (bounds + prototype keys) 3.8 s; target < 500 ms is not met until the BVH / cached scene (VIS-M7) | BVH query + bucket counting |
 | `check_review` 10⁴ issues | linear, TBD — measure | — |
 | Document bytes / instance | TBD — measure; target ≤ 200 B with instance entities, ≤ 40 B with V2 instance arrays | QUALITY_GATES gate 2 metric |
 
@@ -680,7 +680,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | --------- | ------- | ---------- | ------ |
 | VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).** |
 | VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); Review panel, markup / section-box rendering wait for the UI follow-up, M4 and M6.** |
-| VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d |
+| VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Partly built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline; `PlantBatchRenderer` left (VIS-M3b).** |
 | VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
 | VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d |
 | VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
@@ -797,7 +797,7 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 ### 12.5 Not built yet (remaining VIS work)
 
-The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (Review panel, redline tools and section-box gizmo in the UI, viewport clipping with a section box; the model and commands are §12.7), VIS-M3 (`renderPlan`, `render_stats`), the rest of VIS-M4
+The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (Review panel, redline tools and section-box gizmo in the UI, viewport clipping with a section box; the model and commands are §12.7), VIS-M3b (`PlantBatchRenderer`; the plan and `render_stats` are §12.8), the rest of VIS-M4
 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the rest of VIS-M5
 (`create_clash_issues`, `import_bcf`, single-viewpoint BCF commands, XSD validation VC-VIS-15), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
@@ -880,6 +880,46 @@ was not run in the desktop app in this session.
 
 Validation: VC-VIS-11 / 12 / 13 / 14 in `tests/unit/review/` (`sectionBox.test.ts`, `issueWorkflow.test.ts`, `viewpointEdit.test.ts`); SC-VIS-04 is replayed
 command by command against its expected values in `tests/unit/review/scVis04.test.ts`; the UI in `tests/component/NamedViews.test.tsx`.
+
+### 12.8 As built — VIS-M3a render plan and `render_stats`, 2026-11-03
+
+VIS-M3 is split: M3a (this section: the pure plan, `render_stats`, the SYN-RACK fixture, the perf baseline) and M3b (`PlantBatchRenderer`, `LodGeometryCache`, UI). Built in the plant display plugin, not in core `commands/render/`
+(§2 listed `renderStats.ts` there): a plugin may not import `commands/render`, and the plan only needs `geometry` and `model`.
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Plan | `planScene(doc)` (visible 3D entities -> instances with prototype / material-class indices, AABB, diagonal) and `planRender(scene, camera, { multiDraw, quality, previousLevels?, query? })` -> buckets, unique batches, calls, culling, triangles, bytes, per-instance levels. Pure, deterministic, no three.js. `query` is the injection point of the instance BVH (VIS-M7); the default is a brute-force AABB / plane test (O(N)). | `packages/core/src/geometry/renderPlan.ts` |
+| Camera | `PlanCamera`, `framedPlanCamera` (named view / custom direction, perspective or orthographic, fitted on the scene sphere), `viewpointPlanCamera`, `frustumPlanes` (near plane through the eye + 4 side planes, no far plane) | `packages/core/src/geometry/renderPlanCamera.ts` |
+| Command | `render_stats` (read-only; toolset review): params `viewpointId?` / `view`, `direction`, `target`, `projection` (default orthographic), `fovDeg`, `width`, `height` (required), `quality`, `multiDraw`. Data: the §4 fields plus `prototypeCount`, `bucketCount`, `uniqueBatches`, `multiDraw`, `quality`, `projection`. `buckets` lists the 200 largest. Refusals: `VIS_VIEWPOINT_NOT_FOUND`, `VIS_CAMERA_INVALID`. | `packages/domain-aec/src/plant/display/renderStats.ts` |
+| Fixture | `synRackDocument(bays)` builds SYN-RACK-v1 directly (N(n) = 227 n + 8 floor(n/4), 13 prototypes, 4 material classes as `materialId`) | `tests/helpers/synRack.ts` |
+| Tests | VC-VIS-20..23 in `tests/unit/render/renderPlan.test.ts` (BVH-vs-brute-force parity waits for VIS-M7; the frustum query is checked against the plane-by-plane test on 10⁴ random AABBs); `render_stats` happy / failure / pure and SC-VIS-03 run through `build_project` with its numbers pinned in `tests/unit/plant/display/renderStats.test.ts` | |
+
+Decisions and limits:
+
+- **Call bound.** `opaqueModelCalls ≤ 2 · (distinct prototype × material-class pairs drawn) + C + U` (U = unique-geometry batches with multi-draw). It equals `2P + C + U` only when each prototype has one material class, as in SYN-RACK-v1 (30). A seeded property test asserts both forms.
+- **Camera validation.** `target` / `direction` must be 3 finite numbers and a viewpoint camera must be plannable (finite, non-zero direction, fov in (0, 180), view height > 0): otherwise `VIS_CAMERA_INVALID` at path `target` / `direction` / `viewpointId`. `planRender` throws `RangeError` on an invalid camera (`planCameraProblem`); callers validate first.
+- **Determinism.** Buckets sort by code-unit order (never `localeCompare`); mesh prototype keys use sha256; an injected `query` may return unsorted or duplicate indices (deduplicated and sorted once).
+
+- **Material class is `materialId`** (else `unassigned`) until the material-class model of VIS-M4 / M6 exists. The SC-VIS-03 plan assigns none, so its numbers have one class; the four-class bound (30) is tested with the fixture builder.
+- **Unique geometry** = a prototype with exactly one instance in the whole scene (stable under camera moves). Such instances are only frustum / size culled and batched per material class at LOD0; `opaqueModelCalls` counts one call per class with `multiDraw`, one per instance without.
+- **LOD2 boxes** merge per material class (`prototypeKey: '$box'`). Hysteresis is applied from `previousLevels`: a finer level is taken once `p (1 - h) >= threshold`, a coarser one at the threshold (so LOD1 holds down to `d01 (1 - h)`, 2268.416 mm for the M16 stud).
+- **`triangles`** is exact at LOD0 and for boxes (12); LOD1 uses a per-kind cap (cylinder 32, cone 24, sphere 112, torus / revolution 128): an estimate. `gpuBytesEstimate` = 80 B per drawn instance + 72 B per triangle of each distinct drawn (prototype, LOD) geometry.
+- **`instance` entities are one plan instance** (their children are not expanded); sweeps / lofts key on their full parameter record (6 significant figures), not the outline hash of §5.2.
+- **Pinned (SC-VIS-03, smoke n = 8, iso, 1920 x 1080, 45°, one class):** componentCount 1832, 8 buckets / 8 opaque model calls, 4 edge calls, 24 shadow calls, culled 0 by frustum and 973 by size, 859 drawn, 16484 triangles, 88304 bytes.
+- Mesh-reader audit: `render_stats` counts the display triangles of a mesh (by design, listed in `meshAssetProbe` / `meshReaders`).
+
+Measured (2026-11-03, Windows 11, shared machine, TypeScript reference, perspective iso, 1920 x 1080; `VIS_PERF=1 npx vitest run tests/unit/render/renderStatsPerf.test.ts --disableConsoleIntercept`; no gate):
+
+| N | `planScene` | `render_stats` total |
+| - | ----------- | ------------------- |
+| 1 832 | 12 ms | 22 ms |
+| 10 076 | 44 ms | 47 ms |
+| 100 071 | 368 ms | 371 ms |
+| 1 000 037 | 3 799 ms | 4 087 ms |
+
+`render_stats` rebuilds the scene (`planScene`) on every call; the plan itself is ~0.3 s at 10⁶ with the brute-force query. The viewport caches the scene, and the BVH (VIS-M7) replaces the O(N) query.
+
+Not built (VIS-M3b and later): `PlantBatchRenderer`, `LodGeometryCache`, `BatchedMesh` for unique geometry, transparent bucket sorting, instance BVH (`instanceBvh.ts`), `VIS_GPU_LIMIT`, the `render_view` use of the plan.
 
 ## 13. References
 
