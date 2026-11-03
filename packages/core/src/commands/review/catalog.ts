@@ -12,7 +12,7 @@ import { addReviewComment } from './comments';
 import { createClashIssues } from './clashIssues';
 import { checkReview } from './checkReview';
 import { addMarkup, deleteMarkup } from './markups';
-import { deleteSectionBox, sectionBoxReport, setSectionBox } from './sectionBoxes';
+import { deleteSectionBox, sectionBoxReport, setActiveSectionBox, setSectionBox } from './sectionBoxes';
 import { applyViewpoint, getViewpoint, updateViewpoint } from './viewpointEdit';
 
 export const reviewCommands = commandCatalog(
@@ -31,6 +31,7 @@ export const reviewCommands = commandCatalog(
   updateViewpoint,
   applyViewpoint,
   setSectionBox,
+  setActiveSectionBox,
   deleteSectionBox,
   sectionBoxReport,
   addMarkup,
