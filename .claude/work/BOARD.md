@@ -13,8 +13,10 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
-- 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). Merged: EQP-M5-UI, PST-GATE + PST-HARDEN, VIS-M3a, BLD-UID + FUZZ-EQP (uid sealed by a content hash of the first step, mintedIdentity removed), PID-M5b (first sheet only; picker + 2D pick of P&ID items left, 04 §13.8). WIP: PST-M4 report (lane1), PST-M4 UI (lane2),
-  VIS-M5b (lane3), SCN-M3 (lane4); server suite: 2 native blend failures (nativeBlendG2Corners, nativeBlendCurvedCorners), not from the plant diffs; workers + reviewers on sonnet. Next: PST-M4, VIS-M3, VIS-M4b/M5b, VIS-UI, SCN-M3.
+- 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). Merged: EQP-M5-UI, PST-GATE + PST-HARDEN, VIS-M3a, BLD-UID + FUZZ-EQP (uid sealed by a content hash of the first step, mintedIdentity removed), PID-M5b (first sheet only; picker + 2D pick of P&ID items left, 04 §13.8), PST-M4 (report, render_view overlay port, geometry, in-app overlay + panel),
+  SCN-M3 (viewport, Scan panel). WIP: VIS-M4b (lane1), PST-M4c (lane2), VIS-M5b (lane3), SCN-M3b (lane4). Server suite: 2 native blend failures (nativeBlendG2Corners,
+  nativeBlendCurvedCorners), not from the plant diffs. `validationPlanCommands` fails in the main checkout only, from the owner's uncommitted
+  `docs/physics/22-motion-video` plans (`render_animation` unregistered). Workers + reviewers on sonnet. Next: VIS-M3b, VIS-UI, VIS-M6..M8.
 
 - 2026-11-02 (end) — plant run stopped by the owner after the in-flight tasks. Merged + pushed: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8,
   DAT-M6, ISO-M5, ISO-REPLAY (replay-only confirmations via `ctx.replaying`), PID-M6, PID-M7b. Remaining plant TODOs below (PST-M4, PST-GATE,
@@ -209,13 +211,13 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **RTE-V2** 02 V2 finish (§13.12): obstacles from clash bodies, rayon candidates, `auto_route_lines`, edits drop `autoRoute`. Merged 2026-10-25. Open (§13.12): orthogonal visibility graphs [S33], a second-move candidate split, branch off a header in one transaction, 100 m reference-machine time; coverage gate not run on V2. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 - Built since (reconciled 2026-11-02 from git, as built in each spec §13): DAT-M1b, M2–M5; ISO-M2–M4; STA-M4, M5; PID-M2–M4, M5 (no 2D
   viewport branch), M7 (5 of 8 `P3D_*` codes); EQP-R1; VIS-M9. Built 2026-11-02: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8, DAT-M6, ISO-M5, PID-M6, PID-M7b. Remaining plant milestones (one line each, spec §10 of the pack):
-- `[WIP]` **PST-M4** (lane2 `feat/plant-pst-m4-ui`: overlay + panel; lane1 `feat/plant-pst-m4-report`: report + `render_view` overlay via a core render-overlay extension point) 07 review surface: overlay, panel, `render_view` overlay, HTML / CSV report; 
+- `[WIP]` **PST-M4c** (lane2 `feat/plant-pst-m4c`; PST-M4 merged 2026-11-03: `pipe_stress_report`, `CadPlugin.renderOverlays` + `render_view overlay:"pipe_stress"`, `analyze_pipe_stress include:"geometry"`, in-app overlay + panel, 07 §17-§18) in-app overlay on the geometry data: per-element colours, support arrows, RTE runs, station beacon, deformed shape.
 - `[BLOCKED]` **ISO-M6** 05 performance VC-ISO-18, ISOGEN conformance (OQ-ISO-01, needs a licensed tool), CSV weld map, revision clouds.
 - `[TODO]` **VIS-M3b** (VIS-M3a merged 2026-11-03: core `renderPlan` + `render_stats`, 09 §12.8; render_stats 4.1 s at 10⁶, target 500 ms needs a cached scene / VIS-M7 BVH) `PlantBatchRenderer` + `LodGeometryCache` UI. _Lane 2_ Rest of original line: 09 `renderPlan`, `render_stats`, `PlantBatchRenderer` (LOD, pixel cull), SYN-RACK fixture, perf baseline.
-- `[WIP]` **VIS-M4b/M5b** (lane3 `feat/plant-vis-m5b`: M5 part only; M4 shading after the PST-M4 render_view extension point merges) 09 rest of M4 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET`) and M5 (`create_clash_issues`, `import_bcf`, XSD VC-VIS-15).
+- `[WIP]` **VIS-M4b/M5b** (lane3 `feat/plant-vis-m5b`: M5 part; lane1 `feat/plant-vis-m4b`: M4 part) 09 rest of M4 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET`) and M5 (`create_clash_issues`, `import_bcf`, XSD VC-VIS-15).
 - `[TODO]` **VIS-UI** 09 Review panel, redline tools, section-box gizmo + clipping, profile use in viewport / `render_view`. _Lane 2_
 - `[TODO]` **VIS-M6..M8** 09 realism tiers, walk / fly, instance BVH worker, 10⁶ streaming. _deps: VIS-M3_
-- `[WIP]` **SCN-M3** (lane4 `feat/plant-scn-m3`) 10 `PointClouds.tsx` LOD streaming, colour modes, crop / clip, scan snap, Scan panel. _Lane 2_
+- `[WIP]` **SCN-M3b** (lane4 `feat/plant-scn-m3b`; SCN-M3 viewport + Scan panel merged 2026-11-03, 10 §13.6, not tried in the desktop app) per-point rgb / intensity / classification in `query_cloud_points` (only elevation colouring works until then). Left after: `render_view` clouds, EDL, worker kd-tree, 30 fps benchmark.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
