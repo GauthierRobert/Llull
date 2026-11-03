@@ -83,6 +83,12 @@ describe('PipeStressPanel', () => {
     expect(screen.getByTestId('stress-record')).toBeDisabled();
   });
 
+  it('prints the ratio colour legend', () => {
+    load(lBendModel(true).doc);
+    render(<PipeStressPanel />);
+    for (const tone of ['pass', 'warn', 'fail', 'unknown']) expect(screen.getByTestId('stress-legend-' + tone)).toBeInTheDocument();
+  });
+
   it('toggles the overlay and picks its load case through the UI store', () => {
     load(lBendModel(true).doc);
     render(<PipeStressPanel />);

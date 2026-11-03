@@ -9,7 +9,7 @@ export type RatioTone = 'pass' | 'warn' | 'fail' | 'unknown';
 const RATIO_WARN = 0.8;
 const RATIO_FAIL = 1;
 
-export const TONE_COLOR: Readonly<Record<RatioTone, string>> = { pass: '#34d399', warn: '#fbbf24', fail: '#f87171', unknown: '#94a3b8' };
+export const TONE_COLOR: Readonly<Record<RatioTone, string>> = { pass: '#34d399', warn: '#fbbf24', fail: '#f87171', unknown: '#818cf8' };
 
 export function ratioTone(ratio: number | null): RatioTone {
   if (ratio === null) return 'unknown';

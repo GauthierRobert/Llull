@@ -28,7 +28,8 @@ export function PipeStressOverlay(): React.ReactElement | null {
   const pass = useDisposable(() => toneMaterial('pass'), []);
   const warn = useDisposable(() => toneMaterial('warn'), []);
   const fail = useDisposable(() => toneMaterial('fail'), []);
-  const materials: Record<RatioTone, THREE.Material> = { pass, warn, fail, unknown: warn };
+  const unknown = useDisposable(() => toneMaterial('unknown'), []);
+  const materials: Record<RatioTone, THREE.Material> = { pass, warn, fail, unknown };
   const painted = useMemo((): PaintedPipe[] => {
     if (!shown || modelId === null) return [];
     return paintedPipes(document, stressOutcome(document, modelId), caseName);

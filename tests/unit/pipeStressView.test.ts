@@ -6,6 +6,7 @@ import {
   approvalStatus,
   parseStressView,
   ratioTone,
+  TONE_COLOR,
   worstPerPipe,
   worstStations,
   type StressRow,
@@ -24,6 +25,12 @@ const row = (over: Partial<StressRow>): StressRow => ({
   allowableMPa: 20,
   rule: 'B31.3-2018',
   ...over,
+});
+
+describe('TONE_COLOR', () => {
+  it('gives every tone its own colour', () => {
+    expect(new Set(Object.values(TONE_COLOR)).size).toBe(4);
+  });
 });
 
 describe('ratioTone', () => {

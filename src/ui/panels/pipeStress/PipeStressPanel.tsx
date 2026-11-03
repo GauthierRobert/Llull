@@ -52,6 +52,30 @@ const APPROVAL_TONE: Record<ApprovalStatus, StatusTone> = {
 
 const fmtRatio = (ratio: number | null): string => (ratio === null ? 'n/a' : Number.isFinite(ratio) ? ratio.toFixed(2) : 'not finite');
 
+const LEGEND: ReadonlyArray<readonly [RatioTone, string]> = [
+  ['pass', 'below 0.8'],
+  ['warn', '0.8 to 1'],
+  ['fail', 'above 1'],
+  ['unknown', 'no ratio'],
+];
+
+function ToneLegend(): React.ReactElement {
+  return (
+    <ul
+      className="panel__row-meta"
+      data-testid="stress-legend"
+      aria-label="Ratio colours"
+      style={{ display: 'flex', gap: 10, flexWrap: 'wrap', listStyle: 'none', padding: 0, margin: 0 }}
+    >
+      {LEGEND.map(([tone, text]) => (
+        <li key={tone} data-testid={'stress-legend-' + tone}>
+          <span className="panel__swatch" style={{ background: TONE_COLOR[tone] }} aria-hidden="true" /> {text}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function stationFocus(document: CadDocument, row: StressRow): PanelFocus {
   const tone = ratioTone(row.ratio);
   const path = pipePath(document, row.pipeId);
@@ -249,6 +273,7 @@ export function PipeStressPanel({ className }: { className?: string }): React.Re
               <input type="checkbox" checked={shown} data-testid="stress-overlay-toggle" onChange={(e) => setShown(e.target.checked)} />
               <span className="field__label">Colour pipes by stress ratio</span>
             </label>
+            <ToneLegend />
             {outcome.ok && (
               <LabeledSelect
                 label="Overlay case"

@@ -1,5 +1,5 @@
 // The stress analysis of the store document for one model, computed once per document change and shared by the overlay and the panel
-// (the analysis is a read-only query that rebuilds the finite element model: never run it per render or per consumer).
+// (the module cache holds the last document and its outcome only; the analysis is a read-only query that rebuilds the finite element model: never run it per render or per consumer).
 
 import type { CadDocument } from '@core/model/types';
 import { runQuery } from '@ui/services/localQuery';

@@ -659,6 +659,7 @@ Not built, and why:
 
 1. **Station-level colours and support arrows.** The analysis data carries no node or element coordinates (rows have `pipeId`, a `node` id and `xMm` along the element; supports and reactions are keyed by node id), so the overlay paints whole pipes by their worst ratio and the beacon sits at the pipe midpoint. A `model.nodes` list (id and position in mm) in the `analyze_pipe_stress` summary would give per-station colours and reaction arrows without geometry in the UI.
 2. **02 RTE runs.** Their centreline derives inside the plugin and no read-only query exposes it; a stress model on runs shows the panel but no overlay (same data gap: `model.pipes` with points).
-3. Deformed shape x scale (needs displacements with node positions), the `render_view` overlay and the report (a later M4 task).
+3. **Performance (large models).** The analysis runs synchronously in render (once per document change, shared by overlay and panel); a large model needs a debounce or a worker. The overlay draws one mesh per pipe segment; one InstancedMesh per tone would cut the draw calls.
+4. Deformed shape x scale (needs displacements with node positions), the `render_view` overlay and the report (a later M4 task).
 
 Tests: `tests/unit/pipeStressView.test.ts` (helpers), `tests/component/PipeStressPanel.test.tsx` (panel, refusal, record, stale, signing dialog, failing record, rail tab).
