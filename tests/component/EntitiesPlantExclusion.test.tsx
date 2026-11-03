@@ -149,14 +149,14 @@ describe('Entities with the plant batch renderer', () => {
     expect(expectEachDrawnOnce(edited)).toBeGreaterThan(1000);
   });
 
-  it('draws a tinted entity per entity and every other once', () => {
+  it('draws a tinted entity once, in its batch', () => {
     const document = synRackDocument(8);
     useStore.setState({ document });
     render(tree(viewOf(document)));
     const tinted = [...screen.buckets.values()][0]?.[0] as string;
     act(() => useTintStore.getState().setTints(new Map([[tinted, '#ff0000']])));
-    expect(screen.perEntity.get(tinted)).toBe(1);
-    expect([...screen.buckets.values()].flat()).not.toContain(tinted);
+    expect(screen.perEntity.get(tinted)).toBeUndefined();
+    expect([...screen.buckets.values()].flat().filter((id) => id === tinted)).toHaveLength(1);
     expectEachDrawnOnce(document);
   });
 

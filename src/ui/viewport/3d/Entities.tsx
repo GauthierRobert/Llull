@@ -190,7 +190,7 @@ export function Entities(): React.ReactElement {
     [animations, groups, dynamics],
   );
   // Plant-scale scenes: the plan renderer owns every plain solid it can draw; the per-entity path keeps the rest (and anything it must
-  // draw itself: animated, finished, transitioning, ghosted, tinted, exploded, hidden).
+  // draw itself: animated, finished, transitioning, ghosted, exploded, hidden; tints are read by the batch colour buffers).
   const visibleIds = useMemo(() => new Set(visibleEntities.map((entity) => entity.id)), [visibleEntities]);
   const needsOwnPath = useCallback(
     (entity: Entity): boolean =>
@@ -199,9 +199,8 @@ export function Entities(): React.ReactElement {
       animatedIds.has(entity.id) ||
       hasFinish(entity) ||
       transitions.has(entity.id) ||
-      ghosted.has(entity.id) ||
-      tints.has(entity.id),
-    [visibleIds, explodeOffsets, animatedIds, hasFinish, transitions, ghosted, tints],
+      ghosted.has(entity.id),
+    [visibleIds, explodeOffsets, animatedIds, hasFinish, transitions, ghosted],
   );
   const plant = usePlantCoverage(document, needsOwnPath);
   // The plan is computed in this render, for exactly this scene: until one exists (no camera, zero-size canvas) the per-entity path draws everything.
