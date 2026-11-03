@@ -13,7 +13,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
-- 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). WIP: PST-GATE + PST-HARDEN (lane1), EQP-M5-UI (lane2),
+- 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). Merged: EQP-M5-UI. WIP: PST-GATE + PST-HARDEN (lane1, APPROVE + nits), PST-M4 UI (lane2),
   PID-M5b (lane3), BLD-UID + FUZZ-EQP (lane4); workers + reviewers on sonnet. Next: PST-M4, VIS-M3, VIS-M4b/M5b, VIS-UI, SCN-M3.
 
 - 2026-11-02 (end) — plant run stopped by the owner after the in-flight tasks. Merged + pushed: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8,
@@ -209,12 +209,11 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[DONE]` **RTE-V2** 02 V2 finish (§13.12): obstacles from clash bodies, rayon candidates, `auto_route_lines`, edits drop `autoRoute`. Merged 2026-10-25. Open (§13.12): orthogonal visibility graphs [S33], a second-move candidate split, branch off a header in one transaction, 100 m reference-machine time; coverage gate not run on V2. _deps: PSC-M2, EQP-M2 (done)_ · Wave 3: 05 ISO, 08 DAT, 04 PID · Wave 4: 07 PST, 10 SCN.
 - Built since (reconciled 2026-11-02 from git, as built in each spec §13): DAT-M1b, M2–M5; ISO-M2–M4; STA-M4, M5; PID-M2–M4, M5 (no 2D
   viewport branch), M7 (5 of 8 `P3D_*` codes); EQP-R1; VIS-M9. Built 2026-11-02: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8, DAT-M6, ISO-M5, PID-M6, PID-M7b. Remaining plant milestones (one line each, spec §10 of the pack):
-- `[TODO]` **PST-M4** 07 review surface: overlay, panel, `render_view` overlay, HTML / CSV report. _deps: PST-M3_
+- `[WIP]` **PST-M4** (lane2 `feat/plant-pst-m4-ui`: overlay + panel) 07 review surface: overlay, panel, `render_view` overlay, HTML / CSV report; report + `render_view` overlay after PST-GATE merges (same stress files).
 - `[WIP]` **PST-HARDEN** (lane1 `feat/plant-pst-gate`) `analyze_pipe_stress` refuses (coded) when a governing ratio is non-finite instead of recording it; direct test of `carry` when the stored approval resultHash differs from the replayed record (PST-M3 review, non-blocking).
 - `[WIP]` **PST-GATE** (lane1 `feat/plant-pst-gate`) `approve_pipe_stress` recorded `{verified:true}` is a no-op report; refuse it (PST_HUMAN_GATE) outside history replay now that ISO-REPLAY put `ctx.replaying` on main (set only by `replayHistory`; PST-M3 review).
 - `[WIP]` **FUZZ-EQP** (lane4 `feat/plant-bld-uid`) Building slice fuzz seed (`tests/helpers/pluginSliceSeeds.ts`) has no parametric equipment: add vessel / exchanger / tank / pump, and a string → prototype-key mutation (`hasOwnProperty`, `toString`, `valueOf`) in `tests/helpers/sliceMutations.ts` (EQP-M4 review).
 - `[WIP]` **BLD-UID** (lane4 `feat/plant-bld-uid`) `building.uid` is time-based (`uniqueId('building')`, `packages/domain-aec/src/building/model.ts:79`): two replays of one plan differ; derive it from the step / doc id (found in the EQP-M3 review).
-- `[WIP]` **EQP-M5-UI** (lane2 `feat/plant-eqp-m5-ui`) 03 UI port glyph + data-sheet panel (the EQP-M5 commands are on main). _Lane 2_
 - `[BLOCKED]` **ISO-M6** 05 performance VC-ISO-18, ISOGEN conformance (OQ-ISO-01, needs a licensed tool), CSV weld map, revision clouds.
 - `[WIP]` **PID-M5b** (lane3 `feat/plant-pid-m5b`) 04 P&ID 2D viewport branch. _Lane 3_
 - `[TODO]` **VIS-M3** 09 `renderPlan`, `render_stats`, `PlantBatchRenderer` (LOD, pixel cull), SYN-RACK fixture, perf baseline.
