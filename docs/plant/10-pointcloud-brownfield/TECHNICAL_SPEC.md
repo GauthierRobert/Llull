@@ -2,7 +2,7 @@
 
 Companion of [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md). Laws: `.claude/rules/architecture.md` (L1–L10). Operator model:
 `docs/aerospace/AGENT_FIRST.md`. Validation: [validation/README.md](validation/README.md). Status: RS-3 / RS-4 built 2026-10-19
-(M1, M2, M4, M5, M6, M7; M3 viewport and the V1 items not built): see §13 "As built". §1–§12 are the specification as written.
+(M1, M2, M4, M5, M6, M7; M3 viewport built 2026-11-03, `render_view` and the V1 items not built): see §13 "As built". §1–§12 are the specification as written.
 
 ## 1. Current state in llull (2026-10-18)
 
@@ -10,21 +10,21 @@ There is **no point-cloud capability**. `docs/MARKET_READINESS.md` §6 says "no 
 `packages/`, `src/` and `server/` for E57 / LAS / LAZ / point cloud / ICP / RANSAC finds only unrelated hits. The pieces
 this gap builds on:
 
-| Area | What exists | Path | Relevance |
-| ---- | ----------- | ---- | --------- |
-| External artifact pattern | Content-addressed, read-only artifact port in the execution context: `FeArtifactPort.get(hash)`. The host store is `<dir>/<sha256>.json.gz`; a file whose content no longer hashes to its name reads as absent | `packages/core/src/model/analysis.ts` (`FeArtifactPort`), `packages/core/src/commands/types.ts` (`ExecutionContext.feaArtifacts`), `server/src/fea/artifactStore.ts` (`LLULL_FEA_CACHE`) | The model for `PointCloudPort` and the cloud asset store (§2) |
-| Host transport calling a registry command | `fea_import_field`: the host parses a CSV, stores an `fe_table` artifact, then calls `set_temperature_field` with the hash through the command bus | `server/src/fea/feaImportField.ts`, `server/src/fea/transports.ts` (`FeaToolsPort`) | The model for `scan_import` → `attach_point_cloud` |
-| Python bridge | One short-lived CPython process per request (CadQuery / build123d), allow-listed environment, timeout | `server/src/pythonExchange.ts`, desktop bundled CPython | Optional fallback for exotic formats (V1), not used by the MVP readers |
-| Survey points | `import_survey_points` stores a point group in the document (a marker per point up to 2 000 points), `create_surface` builds a TIN | `packages/domain-aec/src/civil/survey/surveyCommands.ts` | Shows why clouds must NOT be document data: survey groups are thousands of points, scans are 10⁶–10⁹ |
-| CRS / site calibration | Grid ↔ local conversion, `coordinates: "grid"` refused without calibration | `packages/domain-aec/src/civil/crs/crs.ts`, `crsCommands.ts` | Georeferenced LAS / E57 placed next to a local plant |
-| Image underlay | Raster stored inline as a data URL (`add_image_underlay`, size-capped) | `packages/core/src/commands/draw2d/underlay.ts` | Precedent for "reference media under the model", but the storage pattern does not scale to clouds |
-| Mesh import | `import_mesh` triangle soup, capped at `MAX_IMPORT_TRIANGLES` = 2 000 000 | `packages/core/src/commands/exchange/importMesh.ts`, `commands/limits.ts` | Clouds cannot go through mesh entities either |
-| Pipes | `add_pipe_run` (3D polyline, `dn` → OD from the EN 10220 / ASME B36.10M table, line number, service, level) | `packages/domain-aec/src/industrial/equipment/equipment.ts`, `industrial/piping/pipeSizes.ts` (`PIPE_SIZES`, `OUTSIDE_DIAMETER_TOLERANCE_MM` = 1.5) | Target of pipe extraction; the DN snap reuses the table |
-| Steel | Catalogue (IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L) and `add_steel_member` | `packages/domain-aec/src/steel/profiles.ts`, `industrial/framing/memberSteelCommands.ts` | Target of steel fit |
-| Clash | `check_clashes`: oriented-box separating-axis test between building elements, hard and clearance | `packages/domain-aec/src/industrial/clash/clash.ts`, `clashBoxes.ts` | Design-vs-design only. Design-vs-scan is new (§5.8) |
-| Plane fit | Least-squares plane of a point set by cyclic Jacobi on the 3 × 3 covariance, deterministic | `packages/domain-cae/src/thermomech/plane.ts` | Same numerical method for PCA normals. Reference only: normals run in `llull-cloud` (§2.A), so no copy or move is needed (Q7 closed) |
-| Viewport | Floating render origin (`RenderOriginSyncer.tsx`, `3d/floatingOrigin`), axis-aligned clipping plane (`3d/ClippingPlane.tsx`), instanced rendering, nearest snap (`viewport/nearestSnap.ts`) | `src/ui/viewport/**` | Cloud rendering plugs into these; LOD streaming is new |
-| Agent plumbing | `CommandResult.error` (`{code, ids, paths, remediation}`), per-step `data` and `aliases` in `build_project` | `packages/core/src/commands/types.ts`, `commands/project/` | Used as is. A data binding between plan steps is new (TR-SCN-03) |
+| Area                                      | What exists                                                                                                                                                                                                    | Path                                                                                                                                                                                     | Relevance                                                                                                                            |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| External artifact pattern                 | Content-addressed, read-only artifact port in the execution context: `FeArtifactPort.get(hash)`. The host store is `<dir>/<sha256>.json.gz`; a file whose content no longer hashes to its name reads as absent | `packages/core/src/model/analysis.ts` (`FeArtifactPort`), `packages/core/src/commands/types.ts` (`ExecutionContext.feaArtifacts`), `server/src/fea/artifactStore.ts` (`LLULL_FEA_CACHE`) | The model for `PointCloudPort` and the cloud asset store (§2)                                                                        |
+| Host transport calling a registry command | `fea_import_field`: the host parses a CSV, stores an `fe_table` artifact, then calls `set_temperature_field` with the hash through the command bus                                                             | `server/src/fea/feaImportField.ts`, `server/src/fea/transports.ts` (`FeaToolsPort`)                                                                                                      | The model for `scan_import` → `attach_point_cloud`                                                                                   |
+| Python bridge                             | One short-lived CPython process per request (CadQuery / build123d), allow-listed environment, timeout                                                                                                          | `server/src/pythonExchange.ts`, desktop bundled CPython                                                                                                                                  | Optional fallback for exotic formats (V1), not used by the MVP readers                                                               |
+| Survey points                             | `import_survey_points` stores a point group in the document (a marker per point up to 2 000 points), `create_surface` builds a TIN                                                                             | `packages/domain-aec/src/civil/survey/surveyCommands.ts`                                                                                                                                 | Shows why clouds must NOT be document data: survey groups are thousands of points, scans are 10⁶–10⁹                                 |
+| CRS / site calibration                    | Grid ↔ local conversion, `coordinates: "grid"` refused without calibration                                                                                                                                     | `packages/domain-aec/src/civil/crs/crs.ts`, `crsCommands.ts`                                                                                                                             | Georeferenced LAS / E57 placed next to a local plant                                                                                 |
+| Image underlay                            | Raster stored inline as a data URL (`add_image_underlay`, size-capped)                                                                                                                                         | `packages/core/src/commands/draw2d/underlay.ts`                                                                                                                                          | Precedent for "reference media under the model", but the storage pattern does not scale to clouds                                    |
+| Mesh import                               | `import_mesh` triangle soup, capped at `MAX_IMPORT_TRIANGLES` = 2 000 000                                                                                                                                      | `packages/core/src/commands/exchange/importMesh.ts`, `commands/limits.ts`                                                                                                                | Clouds cannot go through mesh entities either                                                                                        |
+| Pipes                                     | `add_pipe_run` (3D polyline, `dn` → OD from the EN 10220 / ASME B36.10M table, line number, service, level)                                                                                                    | `packages/domain-aec/src/industrial/equipment/equipment.ts`, `industrial/piping/pipeSizes.ts` (`PIPE_SIZES`, `OUTSIDE_DIAMETER_TOLERANCE_MM` = 1.5)                                      | Target of pipe extraction; the DN snap reuses the table                                                                              |
+| Steel                                     | Catalogue (IPE, HEA, HEB, UPN, C, SHS, RHS, CHS, L) and `add_steel_member`                                                                                                                                     | `packages/domain-aec/src/steel/profiles.ts`, `industrial/framing/memberSteelCommands.ts`                                                                                                 | Target of steel fit                                                                                                                  |
+| Clash                                     | `check_clashes`: oriented-box separating-axis test between building elements, hard and clearance                                                                                                               | `packages/domain-aec/src/industrial/clash/clash.ts`, `clashBoxes.ts`                                                                                                                     | Design-vs-design only. Design-vs-scan is new (§5.8)                                                                                  |
+| Plane fit                                 | Least-squares plane of a point set by cyclic Jacobi on the 3 × 3 covariance, deterministic                                                                                                                     | `packages/domain-cae/src/thermomech/plane.ts`                                                                                                                                            | Same numerical method for PCA normals. Reference only: normals run in `llull-cloud` (§2.A), so no copy or move is needed (Q7 closed) |
+| Viewport                                  | Floating render origin (`RenderOriginSyncer.tsx`, `3d/floatingOrigin`), axis-aligned clipping plane (`3d/ClippingPlane.tsx`), instanced rendering, nearest snap (`viewport/nearestSnap.ts`)                    | `src/ui/viewport/**`                                                                                                                                                                     | Cloud rendering plugs into these; LOD streaming is new                                                                               |
+| Agent plumbing                            | `CommandResult.error` (`{code, ids, paths, remediation}`), per-step `data` and `aliases` in `build_project`                                                                                                    | `packages/core/src/commands/types.ts`, `commands/project/`                                                                                                                               | Used as is. A data binding between plan steps is new (TR-SCN-03)                                                                     |
 
 Sibling gaps own the size tables (`01-piping-specs-catalog`), routing and tie-in connectors (`02-spec-driven-routing`),
 structures (`06-plant-structures-access`), as-built attributes in reports / IFC (`08-plant-data-reports-interop`), and the
@@ -85,20 +85,20 @@ Decisions:
 
 Technical requirements:
 
-| Id | Pri | Requirement | VC |
-| -- | --- | ----------- | -- |
-| TR-SCN-01 | MUST | Content-addressed cloud asset; key = sha256(source ‖ importer version ‖ options); atomic write; per-block CRC | VC-SCN-10 |
-| TR-SCN-02 | MUST | `PointCloudPort` in `ExecutionContext` (interface in core, implementations in server / ui); null port → `SCN_ASSET_UNAVAILABLE` | VC-SCN-50 |
-| TR-SCN-03 | MUST | `build_project` `$fromStep` data binding (core, shared prerequisite) | SC-SCN-02, 03, 05 |
-| TR-SCN-04 | MUST | No mutating command reads points; replay with the port removed gives identical documents and ids (golden test) | golden |
-| TR-SCN-05 | MUST | `llull-cloud` native readers (E57, LAS, LAZ, ASCII) and octree builder, reached only through `scan_import` and `PointCloudPort`; the same crate built to WASM for the browser / no-binary path (≤ 10 M points) | VC-SCN-01..08, 60 |
-| TR-SCN-06 | MUST | Host transport `scan_import` (CLI / MCP / REST) running the `llull-compute cloud import` job, with progress, timeout, proprietary refusal | VC-SCN-02, 03, 11 |
-| TR-SCN-07 | MUST | Lossless int32 coordinates at the source quantum relative to grid-snapped node origins | VC-SCN-09 |
-| TR-SCN-08 | MUST | Seeded RANSAC, canonical point order, deterministic kd-tree; identical results across runs and OSes (Rust-CPU path, §2.A) | VC-SCN-20, 30, 60 |
-| TR-SCN-09 | MUST | Fit uncertainty (covariance, CRLB at σ̂, coverage) in every fit result | VC-SCN-20 |
-| TR-SCN-10 | MUST | Deviation reports its model error bound; clash reports its sampling bound and named noise threshold | VC-SCN-42, 43, 52 |
-| TR-SCN-11 | SHOULD | Viewport LOD with a hard point budget; parents before children; crop / section as clip planes | VC-SCN-10 (query twin) |
-| TR-SCN-12 | MUST | Native vs reference: native and WASM builds give identical `data`; GPU paths (RS-4) never produce recorded numbers on their own (§2.A) | VC-SCN-60 |
+| Id        | Pri    | Requirement                                                                                                                                                                                                    | VC                     |
+| --------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| TR-SCN-01 | MUST   | Content-addressed cloud asset; key = sha256(source ‖ importer version ‖ options); atomic write; per-block CRC                                                                                                  | VC-SCN-10              |
+| TR-SCN-02 | MUST   | `PointCloudPort` in `ExecutionContext` (interface in core, implementations in server / ui); null port → `SCN_ASSET_UNAVAILABLE`                                                                                | VC-SCN-50              |
+| TR-SCN-03 | MUST   | `build_project` `$fromStep` data binding (core, shared prerequisite)                                                                                                                                           | SC-SCN-02, 03, 05      |
+| TR-SCN-04 | MUST   | No mutating command reads points; replay with the port removed gives identical documents and ids (golden test)                                                                                                 | golden                 |
+| TR-SCN-05 | MUST   | `llull-cloud` native readers (E57, LAS, LAZ, ASCII) and octree builder, reached only through `scan_import` and `PointCloudPort`; the same crate built to WASM for the browser / no-binary path (≤ 10 M points) | VC-SCN-01..08, 60      |
+| TR-SCN-06 | MUST   | Host transport `scan_import` (CLI / MCP / REST) running the `llull-compute cloud import` job, with progress, timeout, proprietary refusal                                                                      | VC-SCN-02, 03, 11      |
+| TR-SCN-07 | MUST   | Lossless int32 coordinates at the source quantum relative to grid-snapped node origins                                                                                                                         | VC-SCN-09              |
+| TR-SCN-08 | MUST   | Seeded RANSAC, canonical point order, deterministic kd-tree; identical results across runs and OSes (Rust-CPU path, §2.A)                                                                                      | VC-SCN-20, 30, 60      |
+| TR-SCN-09 | MUST   | Fit uncertainty (covariance, CRLB at σ̂, coverage) in every fit result                                                                                                                                          | VC-SCN-20              |
+| TR-SCN-10 | MUST   | Deviation reports its model error bound; clash reports its sampling bound and named noise threshold                                                                                                            | VC-SCN-42, 43, 52      |
+| TR-SCN-11 | SHOULD | Viewport LOD with a hard point budget; parents before children; crop / section as clip planes                                                                                                                  | VC-SCN-10 (query twin) |
+| TR-SCN-12 | MUST   | Native vs reference: native and WASM builds give identical `data`; GPU paths (RS-4) never produce recorded numbers on their own (§2.A)                                                                         | VC-SCN-60              |
 
 Laws: L1 (every capability is a command; import is a host transport exactly like `fea_import_field`), L2 (native code
 only behind the host transport and the port; I/O in server / ui), L3 (commands return new docs; queries return the input doc), L4 (no entity built outside commands;
@@ -112,17 +112,17 @@ Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme 
 replaces the pure-TS readers, the `packages/pointcloud-io` package and the injected `LazDecoder` (lazrs WASM /
 laz-perf) of the first draft.
 
-| Item | Before | Now |
-| ---- | ------ | --- |
-| E57 / LAS / LAZ / ASCII import | pure TS readers in `packages/pointcloud-io` (`@pcio`); LAZ through an injected `LazDecoder`; parsing in `worker_threads` | `llull-compute cloud import` (crate `llull-cloud` in `solver/`): native `e57`, `las` and `laz` (laz-rs) crates, memory-mapped input, rayon over chunks |
-| Octree build, asset writer | pure TS over typed arrays | `llull-cloud`, out of core; same asset layout (§3.1) |
-| kd-tree, PCA normals, RANSAC, LM fits, ICP, batch pipe extraction (V1) | pure TS modules in `scan/geometry/` | `llull-cloud`, run by `llull-compute cloud <op>` behind `PointCloudPort.compute` |
-| Deviation, design-vs-scan clash | pure TS, BVH, parallel | Rust CPU (`llull-cloud` + `llull-bvh`) gives the recorded numbers; GPU (wgpu) is an optional fast path (RS-4, below) |
-| LAZ / COPC writing | blocked: the laz-perf WASM build decodes only (old Q2) | the `laz` crate writes LAZ, so COPC export is possible (V1) |
-| Native E57 (old Q4) | open: libE57Format C++ + Xerces-C as a Node addon | closed: Rust `e57` crate; no C++ addon, no Xerces |
-| Browser / no binary | TS readers, ≤ 10 M points | the same `llull-cloud` compiled to WASM (one thread), ≤ 10 M points per cloud |
-| Viewport | three.js `Points` + octree LOD | unchanged |
-| Gate | Vitest | `npm run native:check` (`cargo test` + `cargo clippy -D warnings`) for the crate; Vitest for the plugin and the host |
+| Item                                                                   | Before                                                                                                                   | Now                                                                                                                                                    |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| E57 / LAS / LAZ / ASCII import                                         | pure TS readers in `packages/pointcloud-io` (`@pcio`); LAZ through an injected `LazDecoder`; parsing in `worker_threads` | `llull-compute cloud import` (crate `llull-cloud` in `solver/`): native `e57`, `las` and `laz` (laz-rs) crates, memory-mapped input, rayon over chunks |
+| Octree build, asset writer                                             | pure TS over typed arrays                                                                                                | `llull-cloud`, out of core; same asset layout (§3.1)                                                                                                   |
+| kd-tree, PCA normals, RANSAC, LM fits, ICP, batch pipe extraction (V1) | pure TS modules in `scan/geometry/`                                                                                      | `llull-cloud`, run by `llull-compute cloud <op>` behind `PointCloudPort.compute`                                                                       |
+| Deviation, design-vs-scan clash                                        | pure TS, BVH, parallel                                                                                                   | Rust CPU (`llull-cloud` + `llull-bvh`) gives the recorded numbers; GPU (wgpu) is an optional fast path (RS-4, below)                                   |
+| LAZ / COPC writing                                                     | blocked: the laz-perf WASM build decodes only (old Q2)                                                                   | the `laz` crate writes LAZ, so COPC export is possible (V1)                                                                                            |
+| Native E57 (old Q4)                                                    | open: libE57Format C++ + Xerces-C as a Node addon                                                                        | closed: Rust `e57` crate; no C++ addon, no Xerces                                                                                                      |
+| Browser / no binary                                                    | TS readers, ≤ 10 M points                                                                                                | the same `llull-cloud` compiled to WASM (one thread), ≤ 10 M points per cloud                                                                          |
+| Viewport                                                               | three.js `Points` + octree LOD                                                                                           | unchanged                                                                                                                                              |
+| Gate                                                                   | Vitest                                                                                                                   | `npm run native:check` (`cargo test` + `cargo clippy -D warnings`) for the crate; Vitest for the plugin and the host                                   |
 
 Seams (names unchanged; L2, L6, L9):
 
@@ -166,53 +166,69 @@ laspy and `reference_check.py`; their tolerances do not change.
 ```ts
 // packages/core/src/model/pointCloud.ts  (core: interface + document slice types only)
 export type CloudFormat = 'e57' | 'las' | 'laz' | 'xyz' | 'pts' | 'copc';
-export type CloudAttribute = 'intensity' | 'rgb' | 'classification' | 'returnNumber' | 'numberOfReturns' | 'gpsTime' | 'normal' | 'rowColumn';
+export type CloudAttribute =
+  | 'intensity'
+  | 'rgb'
+  | 'classification'
+  | 'returnNumber'
+  | 'numberOfReturns'
+  | 'gpsTime'
+  | 'normal'
+  | 'rowColumn';
 
-export interface CloudManifest {                     // written by the importer, immutable, part of the asset
-  readonly assetKey: string;                         // sha256 hex (decision 1)
+export interface CloudManifest {
+  // written by the importer, immutable, part of the asset
+  readonly assetKey: string; // sha256 hex (decision 1)
   readonly sourceSha256: string;
   readonly sourceName: string;
   readonly format: CloudFormat;
   readonly importerVersion: string;
-  readonly unit: 'm';                                // assets are always metres; documents convert
+  readonly unit: 'm'; // assets are always metres; documents convert
   readonly pointCount: number;
-  readonly scans: readonly {                         // E57 data3D / one per LAS file
+  readonly scans: readonly {
+    // E57 data3D / one per LAS file
     readonly guid: string | null;
     readonly pointCount: number;
     readonly pose: { readonly rotationWXYZ: readonly [number, number, number, number]; readonly translation: Vec3 };
-    readonly stationOrigin: Vec3 | null;             // pose translation in the file frame
+    readonly stationOrigin: Vec3 | null; // pose translation in the file frame
   }[];
-  readonly bounds: { readonly min: Vec3; readonly max: Vec3 };       // recomputed from the data, never copied from a header
+  readonly bounds: { readonly min: Vec3; readonly max: Vec3 }; // recomputed from the data, never copied from a header
   readonly headerBounds?: { readonly min: Vec3; readonly max: Vec3 }; // LAS only, when it disagrees (SCN_LAS_HEADER_BOUNDS)
-  readonly quantum: Vec3;                            // coordinate step of the stored ints (source scale, or 1e-5 m)
+  readonly quantum: Vec3; // coordinate step of the stored ints (source scale, or 1e-5 m)
   readonly attributes: readonly CloudAttribute[];
-  readonly crs?: { readonly wkt?: string; readonly epsg?: number };  // from LAS WKT / GeoTIFF VLR or E57 coordinateMetadata
+  readonly crs?: { readonly wkt?: string; readonly epsg?: number }; // from LAS WKT / GeoTIFF VLR or E57 coordinateMetadata
   readonly octree: { readonly depth: number; readonly rootSpacing: number; readonly maxPointsPerNode: number; readonly nodeCount: number };
   readonly warnings: readonly { readonly code: string; readonly message: string }[];
 }
 
 export interface CloudQuery {
-  readonly box?: { readonly min: Vec3; readonly max: Vec3 };   // in asset (file) frame
+  readonly box?: { readonly min: Vec3; readonly max: Vec3 }; // in asset (file) frame
   readonly slab?: { readonly origin: Vec3; readonly normal: Vec3; readonly thickness: number };
   readonly sphere?: { readonly centre: Vec3; readonly radius: number };
   readonly lod: 'full' | { readonly maxSpacing: number } | { readonly budget: number };
-  readonly maxPoints: number;                        // hard cap, never exceeded
+  readonly maxPoints: number; // hard cap, never exceeded
   readonly attributes?: readonly CloudAttribute[];
 }
 
-export interface CloudPoints {                        // canonical order: node id ascending, then in-node order (AF-13)
-  readonly positions: Float64Array;                   // xyz in metres, asset frame
-  readonly indices: Uint32Array | null;               // global record index when lod = 'full'
+export interface CloudPoints {
+  // canonical order: node id ascending, then in-node order (AF-13)
+  readonly positions: Float64Array; // xyz in metres, asset frame
+  readonly indices: Uint32Array | null; // global record index when lod = 'full'
   readonly attributes: Partial<Record<CloudAttribute, Float32Array | Uint16Array | Uint8Array>>;
-  readonly truncated: boolean;                        // maxPoints reached
-  readonly spacing: number;                           // effective point spacing of the returned set
+  readonly truncated: boolean; // maxPoints reached
+  readonly spacing: number; // effective point spacing of the returned set
 }
 
-export interface PointCloudPort {                     // ExecutionContext.pointClouds
+export interface PointCloudPort {
+  // ExecutionContext.pointClouds
   manifest(assetKey: string): CloudManifest | null;
   query(assetKey: string, query: CloudQuery): CloudPoints | null;
-  nearest(assetKey: string, point: Vec3, maxDistance: number): { readonly index: number; readonly position: Vec3; readonly distance: number } | null;
-  compute(assetKey: string, op: CloudOp): CloudOpResult | null;   // heavy numerics in llull-cloud (§2.A)
+  nearest(
+    assetKey: string,
+    point: Vec3,
+    maxDistance: number,
+  ): { readonly index: number; readonly position: Vec3; readonly distance: number } | null;
+  compute(assetKey: string, op: CloudOp): CloudOpResult | null; // heavy numerics in llull-cloud (§2.A)
 }
 // CloudOp: one variant per heavy query (fit, extract_pipes, slice, register, deviation, clash), params in metres in the
 // asset frame; design entities travel as analytic primitives or triangles. CloudOpResult is the query's `data` before
@@ -228,41 +244,58 @@ export interface ScanModel {
 }
 
 export interface CloudReference {
-  readonly id: string;                                // step-scoped id `cloud-<step>.<k>` (L8)
+  readonly id: string; // step-scoped id `cloud-<step>.<k>` (L8)
   readonly name: string;
   readonly assetKey: string;
   readonly sourceSha256: string;
-  readonly placement: 'local' | 'grid';               // grid → via civil site calibration
-  readonly transform: Mat4;                           // asset frame → document frame (registration applied), metres → doc unit applied at use
+  readonly placement: 'local' | 'grid'; // grid → via civil site calibration
+  readonly transform: Mat4; // asset frame → document frame (registration applied), metres → doc unit applied at use
   readonly registrationId: string | null;
-  readonly display: { readonly visible: boolean; readonly colorBy: 'rgb' | 'intensity' | 'elevation' | 'classification' | 'single'; readonly pointSize: number };
+  readonly display: {
+    readonly visible: boolean;
+    readonly colorBy: 'rgb' | 'intensity' | 'elevation' | 'classification' | 'single';
+    readonly pointSize: number;
+  };
 }
 
 export interface RegistrationRecord {
   readonly id: string;
-  readonly fixed: string; readonly moving: string;    // cloud ids (or 'document' for scan-to-model)
+  readonly fixed: string;
+  readonly moving: string; // cloud ids (or 'document' for scan-to-model)
   readonly method: 'targets' | 'icp_point_to_point' | 'icp_point_to_plane' | 'targets+icp' | 'supplied';
-  readonly transform: Mat4;                            // moving → fixed
+  readonly transform: Mat4; // moving → fixed
   readonly quality: {
     readonly targetResiduals?: readonly { readonly name: string; readonly residual: number }[];
-    readonly rms: number; readonly overlap?: number; readonly iterations?: number; readonly converged: boolean;
-  } | null;                                            // null for 'supplied' → unverified
+    readonly rms: number;
+    readonly overlap?: number;
+    readonly iterations?: number;
+    readonly converged: boolean;
+  } | null; // null for 'supplied' → unverified
   readonly status: 'computed' | 'accepted' | 'unverified';
-  readonly acceptedBy?: { readonly signer: string; readonly signatureId: string };   // human gate (AF-34a)
+  readonly acceptedBy?: { readonly signer: string; readonly signatureId: string }; // human gate (AF-34a)
   readonly provenance: Provenance;
 }
 
 export interface ExtractionRecord {
   readonly id: string;
   readonly kind: 'pipe' | 'pipe_path' | 'steel_member';
-  readonly cloudId: string; readonly assetKey: string; readonly region: RegionSpec;
-  readonly fit: CylinderFit | PipePathFit | SteelFit;  // numbers only (axis, radius, covariance, inliers, rms, coverageDeg, …)
-  readonly snapped?: { readonly table: 'en10220'; readonly dn: number | null; readonly odMm: number; readonly toleranceMm: number; readonly defaulted: boolean };
+  readonly cloudId: string;
+  readonly assetKey: string;
+  readonly region: RegionSpec;
+  readonly fit: CylinderFit | PipePathFit | SteelFit; // numbers only (axis, radius, covariance, inliers, rms, coverageDeg, …)
+  readonly snapped?: {
+    readonly table: 'en10220';
+    readonly dn: number | null;
+    readonly odMm: number;
+    readonly toleranceMm: number;
+    readonly defaulted: boolean;
+  };
   readonly createdEntityIds: readonly string[];
-  readonly unverified: boolean; readonly unverifiedReasons: readonly string[];
+  readonly unverified: boolean;
+  readonly unverifiedReasons: readonly string[];
   readonly status: 'computed' | 'accepted';
-  readonly extractionHash: string;                     // sha256 of the canonical fit + region + assetKey (tamper check on commit)
-  readonly provenance: Provenance;                     // method, algorithm version, seed, thresholds (AF-35)
+  readonly extractionHash: string; // sha256 of the canonical fit + region + assetKey (tamper check on commit)
+  readonly provenance: Provenance; // method, algorithm version, seed, thresholds (AF-35)
 }
 ```
 
@@ -297,36 +330,36 @@ in §7. The heavy queries (fits, extraction, slice, registration, deviation, cla
 
 ### 4.1 Mutating (numbers only, replay-safe)
 
-| Command | Params sketch | Tags |
-| ------- | ------------- | ---- |
-| `attach_point_cloud` | `{ sourceSha256?: string, assetKey?: string, name?, placement?: 'local'\|'grid', transform?: Mat4, applyStationPoses?: boolean = true }` (one of the two keys) | @affects adds 1 `CloudReference` to `doc.scan` (no entities). @invariant no points are copied into the document; the id is step-scoped. @failure key unknown to an installed port → `SCN_ASSET_MISSING`; `grid` without a site calibration → `SCN_CRS_NO_CALIBRATION`; duplicate asset already attached → `SCN_CLOUD_DUPLICATE` |
-| `update_point_cloud` | `{ cloudId, name?, visible?, colorBy?, pointSize?, transform? }` | @affects 1 reference. @invariant a changed `transform` marks the extractions of that cloud stale (seen by `check_point_clouds`). @failure unknown id → `SCN_CLOUD_NOT_FOUND` |
-| `detach_point_cloud` | `{ cloudId }` | @affects removes the reference; the asset stays in the cache. @invariant committed as-built entities remain, with provenance kept |
-| `set_scan_crop` / `clear_scan_crop` | `{ cloudIds?: string[], name, box: { min, max }, keep: 'inside'\|'outside' }` | @affects 1 crop. @failure min ≥ max on any axis → `SCN_CROP_INVALID` |
-| `apply_registration` | `{ record: RegistrationRecord-shaped }` (from `compute_registration`) | @affects sets `moving.transform` and `registrationId`; stores the record (status `computed`). @invariant moving ≠ fixed; transform is rigid (det = 1, orthonormal within 1e-9). @failure non-rigid → `SCN_REG_NOT_RIGID`; unknown clouds → `SCN_CLOUD_NOT_FOUND` |
-| `mark_registration_supplied` | `{ cloudId, reportRef? }` | @affects records method `supplied`, status `unverified` (pre-registered contractor data) |
-| `accept_registration` | `{ registrationId, signature }` | **Human gate** (AF-34a, uses `ctx.humanSignature`). @failure no verifier / agent caller → `SCN_HUMAN_GATE` |
-| `commit_asbuilt_extraction` | `{ extraction: ExtractionRecord-shaped, line?, service?, levelId?, insulationThickness? }` | @affects 1 extraction record + N entities created by `add_pipe_run` / `add_steel_member` through `execute`, flagged `asBuilt`. @invariant `extractionHash` matches the canonical content, else refused; `unverified` is copied from the cloud's registration status and the fit quality. @failure hash mismatch → `SCN_EXTRACTION_TAMPERED`; unknown cloud → `SCN_CLOUD_NOT_FOUND` |
-| `accept_asbuilt_extraction` | `{ extractionId, signature }` | **Human gate**: clears `reviewRequired` for fabrication use |
-| `commit_slice_geometry` (SHOULD) | `{ slice: SliceResult-shaped, as: 'polyline'\|'circles', workPlane? }` | @affects 2D entities through `draw_polyline` / `draw_circle` (L7) |
+| Command                             | Params sketch                                                                                                                                                  | Tags                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attach_point_cloud`                | `{ sourceSha256?: string, assetKey?: string, name?, placement?: 'local'\|'grid', transform?: Mat4, applyStationPoses?: boolean = true }` (one of the two keys) | @affects adds 1 `CloudReference` to `doc.scan` (no entities). @invariant no points are copied into the document; the id is step-scoped. @failure key unknown to an installed port → `SCN_ASSET_MISSING`; `grid` without a site calibration → `SCN_CRS_NO_CALIBRATION`; duplicate asset already attached → `SCN_CLOUD_DUPLICATE`                                                    |
+| `update_point_cloud`                | `{ cloudId, name?, visible?, colorBy?, pointSize?, transform? }`                                                                                               | @affects 1 reference. @invariant a changed `transform` marks the extractions of that cloud stale (seen by `check_point_clouds`). @failure unknown id → `SCN_CLOUD_NOT_FOUND`                                                                                                                                                                                                       |
+| `detach_point_cloud`                | `{ cloudId }`                                                                                                                                                  | @affects removes the reference; the asset stays in the cache. @invariant committed as-built entities remain, with provenance kept                                                                                                                                                                                                                                                  |
+| `set_scan_crop` / `clear_scan_crop` | `{ cloudIds?: string[], name, box: { min, max }, keep: 'inside'\|'outside' }`                                                                                  | @affects 1 crop. @failure min ≥ max on any axis → `SCN_CROP_INVALID`                                                                                                                                                                                                                                                                                                               |
+| `apply_registration`                | `{ record: RegistrationRecord-shaped }` (from `compute_registration`)                                                                                          | @affects sets `moving.transform` and `registrationId`; stores the record (status `computed`). @invariant moving ≠ fixed; transform is rigid (det = 1, orthonormal within 1e-9). @failure non-rigid → `SCN_REG_NOT_RIGID`; unknown clouds → `SCN_CLOUD_NOT_FOUND`                                                                                                                   |
+| `mark_registration_supplied`        | `{ cloudId, reportRef? }`                                                                                                                                      | @affects records method `supplied`, status `unverified` (pre-registered contractor data)                                                                                                                                                                                                                                                                                           |
+| `accept_registration`               | `{ registrationId, signature }`                                                                                                                                | **Human gate** (AF-34a, uses `ctx.humanSignature`). @failure no verifier / agent caller → `SCN_HUMAN_GATE`                                                                                                                                                                                                                                                                         |
+| `commit_asbuilt_extraction`         | `{ extraction: ExtractionRecord-shaped, line?, service?, levelId?, insulationThickness? }`                                                                     | @affects 1 extraction record + N entities created by `add_pipe_run` / `add_steel_member` through `execute`, flagged `asBuilt`. @invariant `extractionHash` matches the canonical content, else refused; `unverified` is copied from the cloud's registration status and the fit quality. @failure hash mismatch → `SCN_EXTRACTION_TAMPERED`; unknown cloud → `SCN_CLOUD_NOT_FOUND` |
+| `accept_asbuilt_extraction`         | `{ extractionId, signature }`                                                                                                                                  | **Human gate**: clears `reviewRequired` for fabrication use                                                                                                                                                                                                                                                                                                                        |
+| `commit_slice_geometry` (SHOULD)    | `{ slice: SliceResult-shaped, as: 'polyline'\|'circles', workPlane? }`                                                                                         | @affects 2D entities through `draw_polyline` / `draw_circle` (L7)                                                                                                                                                                                                                                                                                                                  |
 
 ### 4.2 Queries (read-only, `data` only)
 
-| Command | Params sketch | `data` (AF-10, units in names) |
-| ------- | ------------- | ------------------------------ |
-| `describe_point_cloud` | `{ cloudId }` | manifest summary in document units: `pointCount`, `scans[]` (pose, count), `bounds`, `centroid`, `attributes`, `quantum`, `crs`, `registration` (status + RMS), `warnings[]` |
-| `query_cloud_points` | `{ cloudId, box?, slab?, sphere?, lod: 'full'\|'budget'\|{maxSpacing}, maxPoints ≤ 200 000, attributes? }` | `points` (flat array), `indices?`, `truncated`, `spacing`, `totalPoints`, `maxQuantisationError` |
-| `nearest_cloud_point` | `{ cloudId, point, maxDistance }` | `recordIndex`, `point`, `distance`, `secondNearestDistance` (ambiguity check) |
-| `measure_cloud` | `{ cloudId, from: Vec3\|{nearest}, to: Vec3\|{nearest}\|{entityId} }` | `distance`, `delta`, snapped points |
-| `slice_cloud` | `{ cloudId, origin, normal, thickness, fit?: 'none'\|'circle'\|'lines', maxPoints? }` | section points in plane coordinates (`u,v`), fitted `circles[]` (centre, radius, rms, n), `lines[]` |
-| `fit_primitive` | `{ cloudId, kind: 'plane'\|'cylinder'\|'sphere'\|'circle', region: RegionSpec, noiseSigma?, distanceThreshold?, normalThresholdDeg = 20, seed = 1 }` | parameters, `covariance`, `inliers`, `rms`, `coverageDeg` (cylinder / sphere), `crlb`, `extraction` (ready to commit) |
-| `extract_pipes` | `{ cloudId, region, sizeTable: 'en10220'\|'none', minRadius?, maxRadius?, insulationThickness?, maxPipes = 1 (MVP), seed = 1 }` | `extractions[]` (cylinder fit + DN snap + ends from the inlier extent), `rejected[]` with reasons |
-| `trace_pipe_centreline` (V1) | `{ cloudId, seed: Vec3, sizeTable?, stepLength?, maxLength?, bendDetectionDeg = 3 }` | `straights[]`, `bends[]` (radius, angleDeg, centre), `reducers[]`, `intersectionPoints[]`, `extractions[]` |
-| `fit_steel_member` (V1) | `{ cloudId, region, families?: string[], maxCandidates = 5 }` | `axis`, `measured` (hMm, bMm, twMm, tfMm, rollDeg), `candidates[]` (profile, score, residualRms), `extractions[]` |
-| `compute_registration` | `{ fixed, moving, method, targets?: [{ name, fixedSeed\|fixedPoint, movingSeed\|movingPoint, kind: 'sphere'\|'point', radius? }], initial?: Mat4, maxIterations = 100, trimRatio = 0.9, seed = 1 }` | `record` (ready for `apply_registration`), `quality` (per-target residuals, RMS, overlap, iterations, converged) |
-| `cloud_to_model_deviation` | `{ cloudId, entityIds, model: 'analytic'\|'tessellated', segments?, maxDistance, threshold, signed = true, histogramBins = 20 }` | per entity: `min/max/mean/rms`, `fractionBeyondThreshold`, `histogram`, `modelErrorBound`, `pointsUsed`; pipes add `fittedAxisOffset`, `radiusDelta`; `reviewRequired` |
-| `check_asbuilt_clash` | `{ cloudId, entityIds, clearance, minPointsInVolume?, excludeExtractionsOf? }` | `results[]`: entity, status `hard`/`clearance`/`clear`, `minGap`, `points`, `location`, `cluster bbox`; `minPointsInVolume {value, source, defaulted}`; `reviewRequired` |
-| `check_point_clouds` | `{ cloudIds? }` | AF-20 list `{ severity, code, ids, message, remediation }` |
+| Command                      | Params sketch                                                                                                                                                                                       | `data` (AF-10, units in names)                                                                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `describe_point_cloud`       | `{ cloudId }`                                                                                                                                                                                       | manifest summary in document units: `pointCount`, `scans[]` (pose, count), `bounds`, `centroid`, `attributes`, `quantum`, `crs`, `registration` (status + RMS), `warnings[]` |
+| `query_cloud_points`         | `{ cloudId, box?, slab?, sphere?, lod: 'full'\|'budget'\|{maxSpacing}, maxPoints ≤ 200 000, attributes? }`                                                                                          | `points` (flat array), `indices?`, `truncated`, `spacing`, `totalPoints`, `maxQuantisationError`                                                                             |
+| `nearest_cloud_point`        | `{ cloudId, point, maxDistance }`                                                                                                                                                                   | `recordIndex`, `point`, `distance`, `secondNearestDistance` (ambiguity check)                                                                                                |
+| `measure_cloud`              | `{ cloudId, from: Vec3\|{nearest}, to: Vec3\|{nearest}\|{entityId} }`                                                                                                                               | `distance`, `delta`, snapped points                                                                                                                                          |
+| `slice_cloud`                | `{ cloudId, origin, normal, thickness, fit?: 'none'\|'circle'\|'lines', maxPoints? }`                                                                                                               | section points in plane coordinates (`u,v`), fitted `circles[]` (centre, radius, rms, n), `lines[]`                                                                          |
+| `fit_primitive`              | `{ cloudId, kind: 'plane'\|'cylinder'\|'sphere'\|'circle', region: RegionSpec, noiseSigma?, distanceThreshold?, normalThresholdDeg = 20, seed = 1 }`                                                | parameters, `covariance`, `inliers`, `rms`, `coverageDeg` (cylinder / sphere), `crlb`, `extraction` (ready to commit)                                                        |
+| `extract_pipes`              | `{ cloudId, region, sizeTable: 'en10220'\|'none', minRadius?, maxRadius?, insulationThickness?, maxPipes = 1 (MVP), seed = 1 }`                                                                     | `extractions[]` (cylinder fit + DN snap + ends from the inlier extent), `rejected[]` with reasons                                                                            |
+| `trace_pipe_centreline` (V1) | `{ cloudId, seed: Vec3, sizeTable?, stepLength?, maxLength?, bendDetectionDeg = 3 }`                                                                                                                | `straights[]`, `bends[]` (radius, angleDeg, centre), `reducers[]`, `intersectionPoints[]`, `extractions[]`                                                                   |
+| `fit_steel_member` (V1)      | `{ cloudId, region, families?: string[], maxCandidates = 5 }`                                                                                                                                       | `axis`, `measured` (hMm, bMm, twMm, tfMm, rollDeg), `candidates[]` (profile, score, residualRms), `extractions[]`                                                            |
+| `compute_registration`       | `{ fixed, moving, method, targets?: [{ name, fixedSeed\|fixedPoint, movingSeed\|movingPoint, kind: 'sphere'\|'point', radius? }], initial?: Mat4, maxIterations = 100, trimRatio = 0.9, seed = 1 }` | `record` (ready for `apply_registration`), `quality` (per-target residuals, RMS, overlap, iterations, converged)                                                             |
+| `cloud_to_model_deviation`   | `{ cloudId, entityIds, model: 'analytic'\|'tessellated', segments?, maxDistance, threshold, signed = true, histogramBins = 20 }`                                                                    | per entity: `min/max/mean/rms`, `fractionBeyondThreshold`, `histogram`, `modelErrorBound`, `pointsUsed`; pipes add `fittedAxisOffset`, `radiusDelta`; `reviewRequired`       |
+| `check_asbuilt_clash`        | `{ cloudId, entityIds, clearance, minPointsInVolume?, excludeExtractionsOf? }`                                                                                                                      | `results[]`: entity, status `hard`/`clearance`/`clear`, `minGap`, `points`, `location`, `cluster bbox`; `minPointsInVolume {value, source, defaulted}`; `reviewRequired`     |
+| `check_point_clouds`         | `{ cloudIds? }`                                                                                                                                                                                     | AF-20 list `{ severity, code, ids, message, remediation }`                                                                                                                   |
 
 `RegionSpec = { kind: 'all' } | { kind: 'box', min, max } | { kind: 'seed', point, radius } | { kind: 'crop', cropId }`.
 
@@ -343,7 +376,6 @@ marked DRAFT.
 The behaviour below is the contract. `llull-cloud` adds what the crate does not expose (checksum policy, `SCN_*`
 codes); this is checked at M1.
 
-
 - **Physical layer.** A 48-byte header: `ASTM-E57`, `versionMajor`, `versionMinor` (u32), `filePhysicalLength`,
   `xmlPhysicalOffset`, `xmlLogicalLength`, `pageSize` (u64, little-endian). Pages of `pageSize` (1024) bytes each end in
   a 4-byte big-endian CRC-32C (Castagnoli, polynomial 0x82F63B78 reflected) over the 1020 payload bytes. A logical offset
@@ -358,8 +390,8 @@ codes); this is checked at M1.
   - Float: raw IEEE.
   - Integer: bit-packed with width ⌈log2(max − min + 1)⌉, value = min + raw.
   - ScaledInteger: bit-packed raw, value = raw·scale + offset.
-  Streams are consumed in lock step per record. Spherical scans are converted:
-  x = r cos(el) cos(az), y = r cos(el) sin(az), z = r sin(el).
+    Streams are consumed in lock step per record. Spherical scans are converted:
+    x = r cos(el) cos(az), y = r cos(el) sin(az), z = r sin(el).
 - **Poses.** p_file = R(q)·p_local + t, with R from the unit quaternion (w, x, y, z). A non-unit quaternion (|‖q‖ − 1| > 1e-6)
   gives `SCN_E57_POSE_INVALID`. With `applyStationPoses: false`, local coordinates are kept and the pose is stored.
 - **Invalid points.** `cartesianInvalidState` 2 (no data) is dropped. 1 (direction only) is dropped and counted in the manifest.
@@ -454,9 +486,9 @@ faces, tip-to-tip). tw and tf are reported only when ≥ 10σ, otherwise `null` 
   2. rejection: d > 3 × median, and trimming to `trimRatio` [Chetverikov 2002];
   3. a closed-form update (point-to-point, Horn / SVD) or one linearised Gauss–Newton step (point-to-plane: minimise
      Σ((R p + t − q)·n_q)² with small-angle R).
-  It stops when |ΔRMS| < 1e-9 m or after `maxIterations`. It reports `converged`, the RMS, and the overlap (the fraction
-  of points kept). Overlap < 0.1 or no convergence gives `SCN_REG_NOT_CONVERGED`, and the record is returned with
-  `converged: false`, never applied by default.
+     It stops when |ΔRMS| < 1e-9 m or after `maxIterations`. It reports `converged`, the RMS, and the overlap (the fraction
+     of points kept). Overlap < 0.1 or no convergence gives `SCN_REG_NOT_CONVERGED`, and the record is returned with
+     `converged: false`, never applied by default.
 - **Quality gates** (named defaults, AF-31): target RMS ≤ 3 mm, ICP RMS ≤ 2 × the median spacing. Above them, `warn` +
   `unverified`. The thresholds are company-configurable later.
 
@@ -489,21 +521,21 @@ summary says so.
 
 ## 6. Interop and persistence
 
-| Format | Direction | Notes |
-| ------ | --------- | ----- |
-| E57 1.0 (ASTM E2807) | import MVP; export V1 | Native reader in `llull-cloud` (§5.1); export through the `e57` crate's writer. Export writes one `data3D` per cloud, ScaledInteger at `quantum`, pose identity (registration baked) or the original pose + transform |
-| LAS 1.0–1.4 / LAZ | import MVP | LAZ via the native `laz` crate; WKT / GeoTIFF CRS kept in the manifest; classification kept |
-| COPC 1.0 | import / export V1 | LAZ 1.4 PDRF 6/7/8 + `info` and `hierarchy` VLRs [R6]; written by `llull-compute cloud` with the `laz` encoder; readable by PDAL, QGIS and potree-core. Not the cache format (Q2) |
-| XYZ / PTS / CSV | import MVP | Declared column order and unit; PTS first line = count (checked) |
-| RCP / RCS (ReCap), FLS (Faro), native Leica / Trimble | refused | `SCN_FORMAT_PROPRIETARY` |
-| PLY (binary / ascii) | import V1 | Common from photogrammetry / CloudCompare |
-| Document `.llull` | `scan` slice (references + records) | Assets are never embedded; `pack --with-scans` (V1) |
-| IFC 4.3 | via 08 DAT | As-built pipes and members export like any element, with property `Pset_llullAsBuilt` (extractionId, fit RMS, source) |
+| Format                                                | Direction                           | Notes                                                                                                                                                                                                                 |
+| ----------------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E57 1.0 (ASTM E2807)                                  | import MVP; export V1               | Native reader in `llull-cloud` (§5.1); export through the `e57` crate's writer. Export writes one `data3D` per cloud, ScaledInteger at `quantum`, pose identity (registration baked) or the original pose + transform |
+| LAS 1.0–1.4 / LAZ                                     | import MVP                          | LAZ via the native `laz` crate; WKT / GeoTIFF CRS kept in the manifest; classification kept                                                                                                                           |
+| COPC 1.0                                              | import / export V1                  | LAZ 1.4 PDRF 6/7/8 + `info` and `hierarchy` VLRs [R6]; written by `llull-compute cloud` with the `laz` encoder; readable by PDAL, QGIS and potree-core. Not the cache format (Q2)                                     |
+| XYZ / PTS / CSV                                       | import MVP                          | Declared column order and unit; PTS first line = count (checked)                                                                                                                                                      |
+| RCP / RCS (ReCap), FLS (Faro), native Leica / Trimble | refused                             | `SCN_FORMAT_PROPRIETARY`                                                                                                                                                                                              |
+| PLY (binary / ascii)                                  | import V1                           | Common from photogrammetry / CloudCompare                                                                                                                                                                             |
+| Document `.llull`                                     | `scan` slice (references + records) | Assets are never embedded; `pack --with-scans` (V1)                                                                                                                                                                   |
+| IFC 4.3                                               | via 08 DAT                          | As-built pipes and members export like any element, with property `Pset_llullAsBuilt` (extractionId, fit RMS, source)                                                                                                 |
 
 ## 7. CLI / MCP / UI surfaces and error codes
 
 - **CLI.** `llull scan import FILE [format=xyz|pts|csv] [sourceUnit=m] [columns=xyz] [applyStationPoses=true]
-  [checksum=all|sparse] --json --progress`. `llull scan list` (cache), `llull scan gc` (unreferenced assets), and every
+[checksum=all|sparse] --json --progress`. `llull scan list` (cache), `llull scan gc` (unreferenced assets), and every
   command of §4 as usual. `render_view` draws clouds at a deterministic LOD (budget param) for AF-22.
 - **MCP.** Toolset `scan` (all commands). Host tool `scan_import` (path inside `LLULL_EXCHANGE_DIR`, or an upload).
   Queries respect the existing output cap and page with `maxPoints`.
@@ -514,70 +546,70 @@ summary says so.
 
 ### 7.1 Requirements → AF mapping
 
-| TR / FR | AF |
-| ------- | -- |
-| FR-SCN-01..07, 11, TR-SCN-05/06 (import transport) | AF-01 (`llull search scan`), AF-02 (descriptions), AF-40 (`--progress`, cached by asset key), AF-41 (`llull-compute` bundled per RS1 §2 rule 5, WASM fallback, offline) |
-| All commands, TR-SCN-03 | AF-04 (units in schema), AF-05 (one plan; `$fromStep`), AF-14 (step `data`) |
-| Queries | AF-10 (`data` with units), AF-12 (bounded, `--save` for CSV / PNG), AF-13 (seeded, canonical order) |
-| FR-SCN-20 `check_point_clouds` | AF-20 |
-| Deviation / clash / fit numbers | AF-21 (numbers instead of colour maps), AF-22 (`render_view`) |
-| FR-SCN-21 | AF-11 (table below) |
-| FR-SCN-10, 13, 19, 22 | AF-31 (named defaults: DN tolerance, clash noise threshold, registration RMS gates), AF-32 (`unverified` propagation), AF-33 (`reviewRequired`), AF-34 / 34a (`accept_registration`, `accept_asbuilt_extraction`), AF-35 (provenance) |
+| TR / FR                                            | AF                                                                                                                                                                                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-SCN-01..07, 11, TR-SCN-05/06 (import transport) | AF-01 (`llull search scan`), AF-02 (descriptions), AF-40 (`--progress`, cached by asset key), AF-41 (`llull-compute` bundled per RS1 §2 rule 5, WASM fallback, offline)                                                               |
+| All commands, TR-SCN-03                            | AF-04 (units in schema), AF-05 (one plan; `$fromStep`), AF-14 (step `data`)                                                                                                                                                           |
+| Queries                                            | AF-10 (`data` with units), AF-12 (bounded, `--save` for CSV / PNG), AF-13 (seeded, canonical order)                                                                                                                                   |
+| FR-SCN-20 `check_point_clouds`                     | AF-20                                                                                                                                                                                                                                 |
+| Deviation / clash / fit numbers                    | AF-21 (numbers instead of colour maps), AF-22 (`render_view`)                                                                                                                                                                         |
+| FR-SCN-21                                          | AF-11 (table below)                                                                                                                                                                                                                   |
+| FR-SCN-10, 13, 19, 22                              | AF-31 (named defaults: DN tolerance, clash noise threshold, registration RMS gates), AF-32 (`unverified` propagation), AF-33 (`reviewRequired`), AF-34 / 34a (`accept_registration`, `accept_asbuilt_extraction`), AF-35 (provenance) |
 
 ### 7.2 Error and warning codes (stable)
 
-| Code | Sev | Raised by | Meaning | Remediation |
-| ---- | --- | --------- | ------- | ----------- |
-| `SCN_FORMAT_UNSUPPORTED` | fail | import | Unknown extension / signature | "Convert to E57, LAS or LAZ" |
-| `SCN_FORMAT_PROPRIETARY` | fail | import | RCP / RCS / FLS / native | "Export E57 (or LAS) from the vendor tool, e.g. ReCap → Export → E57" |
-| `SCN_E57_CHECKSUM` | fail | import | Page CRC-32C mismatch (page n) | "The file is corrupt; re-export or re-copy it" |
-| `SCN_E57_STRUCTURE` | fail | import | XML or binary section invalid (path) | "Re-export from the scanner software; report the path" |
-| `SCN_E57_POSE_INVALID` | fail | import | Non-unit quaternion | "Fix the pose in the source, or import with applyStationPoses=false" |
-| `SCN_LAS_HEADER` | fail | import | Bad signature / version / record length | "The file is not LAS 1.0–1.4" |
-| `SCN_LAS_HEADER_BOUNDS` | warn | import | Header bounds disagree with the data | "Bounds were recomputed; no action" |
-| `NATIVE_TOOL_MISSING` | fail | import / queries | `llull-compute` not installed and the cloud is above the WASM fallback cap (10 M points) | "Install the desktop app (it bundles llull-compute), or crop at export" |
-| `SCN_CLOUD_EMPTY` | fail | import / attach | 0 valid points | "Check the export settings (invalid points removed?)" |
-| `SCN_IMPORT_TOO_LARGE` | fail | import | Over the host limit (browser 10 M) | "Use the desktop app or crop at export" |
-| `SCN_ASSET_MISSING` | fail / warn | attach / check | Key not in the store | "Run `llull scan import <file>` on this machine" |
-| `SCN_ASSET_UNAVAILABLE` | fail | queries | No point-cloud port in this host | "Run on the desktop app or the server" |
-| `SCN_CLOUD_NOT_FOUND` | fail | all | Unknown cloud id | "List clouds with `describe_point_cloud` / Scan panel" |
-| `SCN_CLOUD_DUPLICATE` | fail | attach | Asset already attached | "Use the existing cloud id" |
-| `SCN_CRS_NO_CALIBRATION` | fail | attach | `grid` without a site calibration | "Call set_site_calibration first" |
-| `SCN_CROP_INVALID` | fail | crop / region | min ≥ max on an axis | "Give min < max on every axis" |
-| `SCN_QUERY_LIMIT` | warn | queries | `maxPoints` reached (`truncated`) | "Narrow the region or page" |
-| `SCN_FIT_TOO_FEW_POINTS` | fail | fits | < 30 points (cylinder), < 10 (plane / circle) in the region | "Enlarge the region or lower the LOD spacing" |
-| `SCN_FIT_NO_MODEL` | fail | fits | RANSAC found no model with ≥ 20 % inliers | "Tighten the region around one object" |
-| `SCN_FIT_LOW_COVERAGE` | warn | cylinder / sphere | Angular coverage < 60° | "Add a scan from another side; result unverified" |
-| `SCN_FIT_HIGH_RMS` | warn | fits | RMS > 3σ (given) or > 2 × spacing | "Check for insulation, clamps or two objects in the region" |
-| `SCN_FIT_NO_STANDARD_SIZE` | warn | extract | No size-table OD within tolerance | "Kept the measured OD; check insulation thickness or the table" |
-| `SCN_TRACE_SKEW` | warn | trace | Straights do not meet within 1 mm | "Possible offset or 2-plane bend; split the trace" |
-| `SCN_STEEL_NO_MATCH` | warn | steel fit | Best score > 3σ | "Non-catalogue or built-up section; model manually" |
-| `SCN_REG_TARGETS_INSUFFICIENT` | fail | registration | < 3 target pairs | "Add targets or use ICP with an initial transform" |
-| `SCN_REG_DEGENERATE` | fail | registration | Collinear / coincident targets | "Use targets that span a plane" |
-| `SCN_REG_TARGET_NOT_FOUND` | fail | registration | No sphere within 2r of a seed | "Move the seed onto the target" |
-| `SCN_REG_NOT_CONVERGED` | fail | ICP | Not converged / overlap < 10 % | "Give an initial transform (targets) or a larger overlap region" |
-| `SCN_REG_NOT_RIGID` | fail | apply | Transform not orthonormal / det ≠ 1 | "Pass the record from compute_registration unchanged" |
-| `SCN_REGISTRATION_UNVERIFIED` | warn | check | Supplied / computed but not accepted, or gates exceeded | "Ask a reviewer to accept_registration" |
-| `SCN_EXTRACTION_TAMPERED` | fail | commit | `extractionHash` mismatch | "Commit the extraction exactly as returned by the query" |
-| `SCN_EXTRACTION_STALE` | warn | check | Cloud transform changed after the fit | "Re-run the fit and commit again" |
-| `SCN_CLASH_FOUND` | fail | clash | Hard clash cluster | "Re-route or field-verify" |
-| `SCN_CLEARANCE_VIOLATION` | warn | clash | Clearance cluster | "Re-route or accept with a reviewer" |
-| `SCN_HUMAN_GATE` | fail | accept_* | Agent caller / no signature | "A qualified reviewer must sign" |
+| Code                           | Sev         | Raised by         | Meaning                                                                                  | Remediation                                                             |
+| ------------------------------ | ----------- | ----------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `SCN_FORMAT_UNSUPPORTED`       | fail        | import            | Unknown extension / signature                                                            | "Convert to E57, LAS or LAZ"                                            |
+| `SCN_FORMAT_PROPRIETARY`       | fail        | import            | RCP / RCS / FLS / native                                                                 | "Export E57 (or LAS) from the vendor tool, e.g. ReCap → Export → E57"   |
+| `SCN_E57_CHECKSUM`             | fail        | import            | Page CRC-32C mismatch (page n)                                                           | "The file is corrupt; re-export or re-copy it"                          |
+| `SCN_E57_STRUCTURE`            | fail        | import            | XML or binary section invalid (path)                                                     | "Re-export from the scanner software; report the path"                  |
+| `SCN_E57_POSE_INVALID`         | fail        | import            | Non-unit quaternion                                                                      | "Fix the pose in the source, or import with applyStationPoses=false"    |
+| `SCN_LAS_HEADER`               | fail        | import            | Bad signature / version / record length                                                  | "The file is not LAS 1.0–1.4"                                           |
+| `SCN_LAS_HEADER_BOUNDS`        | warn        | import            | Header bounds disagree with the data                                                     | "Bounds were recomputed; no action"                                     |
+| `NATIVE_TOOL_MISSING`          | fail        | import / queries  | `llull-compute` not installed and the cloud is above the WASM fallback cap (10 M points) | "Install the desktop app (it bundles llull-compute), or crop at export" |
+| `SCN_CLOUD_EMPTY`              | fail        | import / attach   | 0 valid points                                                                           | "Check the export settings (invalid points removed?)"                   |
+| `SCN_IMPORT_TOO_LARGE`         | fail        | import            | Over the host limit (browser 10 M)                                                       | "Use the desktop app or crop at export"                                 |
+| `SCN_ASSET_MISSING`            | fail / warn | attach / check    | Key not in the store                                                                     | "Run `llull scan import <file>` on this machine"                        |
+| `SCN_ASSET_UNAVAILABLE`        | fail        | queries           | No point-cloud port in this host                                                         | "Run on the desktop app or the server"                                  |
+| `SCN_CLOUD_NOT_FOUND`          | fail        | all               | Unknown cloud id                                                                         | "List clouds with `describe_point_cloud` / Scan panel"                  |
+| `SCN_CLOUD_DUPLICATE`          | fail        | attach            | Asset already attached                                                                   | "Use the existing cloud id"                                             |
+| `SCN_CRS_NO_CALIBRATION`       | fail        | attach            | `grid` without a site calibration                                                        | "Call set_site_calibration first"                                       |
+| `SCN_CROP_INVALID`             | fail        | crop / region     | min ≥ max on an axis                                                                     | "Give min < max on every axis"                                          |
+| `SCN_QUERY_LIMIT`              | warn        | queries           | `maxPoints` reached (`truncated`)                                                        | "Narrow the region or page"                                             |
+| `SCN_FIT_TOO_FEW_POINTS`       | fail        | fits              | < 30 points (cylinder), < 10 (plane / circle) in the region                              | "Enlarge the region or lower the LOD spacing"                           |
+| `SCN_FIT_NO_MODEL`             | fail        | fits              | RANSAC found no model with ≥ 20 % inliers                                                | "Tighten the region around one object"                                  |
+| `SCN_FIT_LOW_COVERAGE`         | warn        | cylinder / sphere | Angular coverage < 60°                                                                   | "Add a scan from another side; result unverified"                       |
+| `SCN_FIT_HIGH_RMS`             | warn        | fits              | RMS > 3σ (given) or > 2 × spacing                                                        | "Check for insulation, clamps or two objects in the region"             |
+| `SCN_FIT_NO_STANDARD_SIZE`     | warn        | extract           | No size-table OD within tolerance                                                        | "Kept the measured OD; check insulation thickness or the table"         |
+| `SCN_TRACE_SKEW`               | warn        | trace             | Straights do not meet within 1 mm                                                        | "Possible offset or 2-plane bend; split the trace"                      |
+| `SCN_STEEL_NO_MATCH`           | warn        | steel fit         | Best score > 3σ                                                                          | "Non-catalogue or built-up section; model manually"                     |
+| `SCN_REG_TARGETS_INSUFFICIENT` | fail        | registration      | < 3 target pairs                                                                         | "Add targets or use ICP with an initial transform"                      |
+| `SCN_REG_DEGENERATE`           | fail        | registration      | Collinear / coincident targets                                                           | "Use targets that span a plane"                                         |
+| `SCN_REG_TARGET_NOT_FOUND`     | fail        | registration      | No sphere within 2r of a seed                                                            | "Move the seed onto the target"                                         |
+| `SCN_REG_NOT_CONVERGED`        | fail        | ICP               | Not converged / overlap < 10 %                                                           | "Give an initial transform (targets) or a larger overlap region"        |
+| `SCN_REG_NOT_RIGID`            | fail        | apply             | Transform not orthonormal / det ≠ 1                                                      | "Pass the record from compute_registration unchanged"                   |
+| `SCN_REGISTRATION_UNVERIFIED`  | warn        | check             | Supplied / computed but not accepted, or gates exceeded                                  | "Ask a reviewer to accept_registration"                                 |
+| `SCN_EXTRACTION_TAMPERED`      | fail        | commit            | `extractionHash` mismatch                                                                | "Commit the extraction exactly as returned by the query"                |
+| `SCN_EXTRACTION_STALE`         | warn        | check             | Cloud transform changed after the fit                                                    | "Re-run the fit and commit again"                                       |
+| `SCN_CLASH_FOUND`              | fail        | clash             | Hard clash cluster                                                                       | "Re-route or field-verify"                                              |
+| `SCN_CLEARANCE_VIOLATION`      | warn        | clash             | Clearance cluster                                                                        | "Re-route or accept with a reviewer"                                    |
+| `SCN_HUMAN_GATE`               | fail        | accept\_\*        | Agent caller / no signature                                                              | "A qualified reviewer must sign"                                        |
 
 ## 8. Performance and robustness budgets
 
-| Item | Budget (desktop, 8 cores, NVMe, `llull-compute`) | Browser offline / no binary (WASM build) |
-| ---- | ------------------------------- | --------------- |
-| Import + index LAS / E57 uncompressed | ≥ 2 M points/s (100 M in < 60 s parse + < 60 s index) | ≥ 0.5 M points/s, ≤ 10 M points per cloud |
-| Import LAZ | ≥ 1 M points/s (parallel chunks) | ≥ 0.3 M points/s |
-| Peak memory during import | ≤ 1.5 GB regardless of size | ≤ 600 MB |
-| Asset size | ≤ 14 bytes/point + attributes (int32 xyz + 2 B intensity) | same |
-| Viewport | ≥ 30 fps at a 3 M budget; ≤ 150 ms node fetch p95 | ≥ 30 fps at a 1 M budget |
-| `fit_primitive` cylinder, 50 k points in the region | < 300 ms | < 1 s |
-| ICP 100 k × 100 k, 50 iterations | < 3 s | < 10 s |
-| Deviation 10 M points × 500 entities | < 20 s on the Rust-CPU path (BVH, rayon); GPU path (M7) TBD — measure | n/a (desktop only above 2 M) |
-| Design-vs-scan clash 10 M points × 500 entities | CPU TBD — measure; GPU prune + CPU exact (M7) TBD — measure | n/a |
-| Determinism | Same asset key and same results on every run and OS (integer coding, seeded RNG, canonical order, `libm`, fixed-order merges) | same bits as native (VC-SCN-60) |
+| Item                                                | Budget (desktop, 8 cores, NVMe, `llull-compute`)                                                                              | Browser offline / no binary (WASM build)  |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Import + index LAS / E57 uncompressed               | ≥ 2 M points/s (100 M in < 60 s parse + < 60 s index)                                                                         | ≥ 0.5 M points/s, ≤ 10 M points per cloud |
+| Import LAZ                                          | ≥ 1 M points/s (parallel chunks)                                                                                              | ≥ 0.3 M points/s                          |
+| Peak memory during import                           | ≤ 1.5 GB regardless of size                                                                                                   | ≤ 600 MB                                  |
+| Asset size                                          | ≤ 14 bytes/point + attributes (int32 xyz + 2 B intensity)                                                                     | same                                      |
+| Viewport                                            | ≥ 30 fps at a 3 M budget; ≤ 150 ms node fetch p95                                                                             | ≥ 30 fps at a 1 M budget                  |
+| `fit_primitive` cylinder, 50 k points in the region | < 300 ms                                                                                                                      | < 1 s                                     |
+| ICP 100 k × 100 k, 50 iterations                    | < 3 s                                                                                                                         | < 10 s                                    |
+| Deviation 10 M points × 500 entities                | < 20 s on the Rust-CPU path (BVH, rayon); GPU path (M7) TBD — measure                                                         | n/a (desktop only above 2 M)              |
+| Design-vs-scan clash 10 M points × 500 entities     | CPU TBD — measure; GPU prune + CPU exact (M7) TBD — measure                                                                   | n/a                                       |
+| Determinism                                         | Same asset key and same results on every run and OS (integer coding, seeded RNG, canonical order, `libm`, fixed-order merges) | same bits as native (VC-SCN-60)           |
 
 Robustness: every import writes to a temp dir and renames it atomically. A crash leaves no partial asset. The store
 verifies `manifest.assetKey`. Node blocks carry a CRC32 that is checked on read (a corrupt block reads as missing →
@@ -585,30 +617,30 @@ verifies `manifest.assetKey`. Node blocks carry a CRC32 that is checked on read 
 
 ## 9. Test strategy (mapped to VCs)
 
-| Layer | Tests | VCs |
-| ----- | ----- | --- |
-| `llull-cloud` (`cargo test`, in `npm run native:check`) | `tests/e57.rs` (10 files vs `e57_reference.json`, CRC, empty, encodings, pose), `tests/las.rs` (10 files vs `las_reference.json`, LAZ = LAS, bounds warning), `tests/octree.rs` (lossless quantisation on `test1_4.las`, invariants and determinism on `autzen_trim.laz`); fits, ICP, deviation and clash on the synthetic CSVs | VC-SCN-01..10, 20..43 (native side) |
-| `scan` plugin unit (`tests/unit/scan/`) | `nearest`, `cylinderFit`, `centreline`, `steelFit`, `slice`, `icp`, `targets`, `deviation`, `asbuiltClash`, `agentCodes`, `checkPointClouds`; a `PointCloudPort` fixture backed by the `llull-cloud` WASM build over the CSV / E57 files (no binary needed); each command has happy + failure + `is pure` tests (NN-1) | VC-SCN-12, 20..24, 30..32, 40..43, 50..52 |
-| Contract | `toToolSchemas()` snapshot gains the `scan` toolset; `scan` document slice validation and migration; the `$fromStep` binding in `build_project` | TR-SCN-03 |
-| Server | `server/tests/scanImport.test.ts` (transport: proprietary refusal, CRC, empty, atomic write, idempotent key); `server/tests/packReplay10scn.test.ts` runs `validation/plans/*.json` | VC-SCN-02, 03, 11, SC-SCN-01..05 |
-| Golden | one plan per regression: attach + commit extraction replays to identical ids **with the port removed** (proves decision 3) | TR-SCN-04 |
-| Native vs reference | the algorithm VCs on the native binary and on the WASM build, `data` compared bit for bit; GPU vs CPU on CLH-A / DEV-A where an adapter exists (CPU twin otherwise) | VC-SCN-60 |
-| Coverage | `packages/domain-aec/src/scan/**` under the 90/85/90/90 gate; `llull-cloud` gated by `npm run native:check` | — |
-| Reference cross-check (CI, optional job) | `validation/data/tools/reference_check.py` + pye57 / laspy in a venv; fails if the pack's references drift | all A-grade VCs |
-| Production gate | SC-SCN-04 on a real customer tie-in scan with field-measured references (Q6) | — |
+| Layer                                                   | Tests                                                                                                                                                                                                                                                                                                                           | VCs                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `llull-cloud` (`cargo test`, in `npm run native:check`) | `tests/e57.rs` (10 files vs `e57_reference.json`, CRC, empty, encodings, pose), `tests/las.rs` (10 files vs `las_reference.json`, LAZ = LAS, bounds warning), `tests/octree.rs` (lossless quantisation on `test1_4.las`, invariants and determinism on `autzen_trim.laz`); fits, ICP, deviation and clash on the synthetic CSVs | VC-SCN-01..10, 20..43 (native side)       |
+| `scan` plugin unit (`tests/unit/scan/`)                 | `nearest`, `cylinderFit`, `centreline`, `steelFit`, `slice`, `icp`, `targets`, `deviation`, `asbuiltClash`, `agentCodes`, `checkPointClouds`; a `PointCloudPort` fixture backed by the `llull-cloud` WASM build over the CSV / E57 files (no binary needed); each command has happy + failure + `is pure` tests (NN-1)          | VC-SCN-12, 20..24, 30..32, 40..43, 50..52 |
+| Contract                                                | `toToolSchemas()` snapshot gains the `scan` toolset; `scan` document slice validation and migration; the `$fromStep` binding in `build_project`                                                                                                                                                                                 | TR-SCN-03                                 |
+| Server                                                  | `server/tests/scanImport.test.ts` (transport: proprietary refusal, CRC, empty, atomic write, idempotent key); `server/tests/packReplay10scn.test.ts` runs `validation/plans/*.json`                                                                                                                                             | VC-SCN-02, 03, 11, SC-SCN-01..05          |
+| Golden                                                  | one plan per regression: attach + commit extraction replays to identical ids **with the port removed** (proves decision 3)                                                                                                                                                                                                      | TR-SCN-04                                 |
+| Native vs reference                                     | the algorithm VCs on the native binary and on the WASM build, `data` compared bit for bit; GPU vs CPU on CLH-A / DEV-A where an adapter exists (CPU twin otherwise)                                                                                                                                                             | VC-SCN-60                                 |
+| Coverage                                                | `packages/domain-aec/src/scan/**` under the 90/85/90/90 gate; `llull-cloud` gated by `npm run native:check`                                                                                                                                                                                                                     | —                                         |
+| Reference cross-check (CI, optional job)                | `validation/data/tools/reference_check.py` + pye57 / laspy in a venv; fails if the pack's references drift                                                                                                                                                                                                                      | all A-grade VCs                           |
+| Production gate                                         | SC-SCN-04 on a real customer tie-in scan with field-measured references (Q6)                                                                                                                                                                                                                                                    | —                                         |
 
 ## 10. Delivery plan
 
-| Milestone | Content | Depends on | Effort |
-| --------- | ------- | ---------- | ------ |
-| M1 Readers | `llull-cloud` E57 + LAS + LAZ + ASCII readers, `llull-compute cloud import`, WASM build, VC-SCN-01..08, 11 | RS-0 (`solver/` workspace) | 3 wk |
-| M2 Asset + port | Native octree builder, asset store, `PointCloudPort` (Node, `compute` proxy), `scan_import` transport + CLI, `attach / describe / query / nearest`, VC-SCN-09, 10, 12 | M1 | 3 wk |
-| M3 Viewport | `PointClouds.tsx` LOD streaming, colour modes, crop / section clip, scan-point snap, Scan panel (read-only) | M2, 09 VIS budgets | 3 wk |
-| M4 Fit + pipes | RANSAC / LM fits in `llull-cloud`, slice, `extract_pipes`, DN snap, `commit_asbuilt_extraction`, `$fromStep` binding (core), VC-SCN-20, 21, 24 | M2, 01 PSC table API | 3 wk |
-| M5 Registration | targets, ICP (`llull-cloud`), records, human gates, VC-SCN-30..32 | M2 | 2 wk |
-| M6 Compare | deviation, design-vs-scan clash (Rust CPU), `check_point_clouds`, AF flags, VC-SCN-40..43, 50..52, 60 (native vs WASM) | M4 | 2 wk |
-| M7 GPU compare (RS-4) | wgpu deviation and clash prune, `device` param, VC-SCN-60 GPU rows | M6, RS-0 `llull-gpu` / `llull-bvh` | 2 wk |
-| V1 | centreline tracing, steel fit, batch extraction (native, parallel), COPC / E57 export (native writers), global registration, OCC exact distance, browser offline store | M4–M6, 02 RTE, 06 STA | 8 wk |
+| Milestone             | Content                                                                                                                                                                | Depends on                         | Effort |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------ |
+| M1 Readers            | `llull-cloud` E57 + LAS + LAZ + ASCII readers, `llull-compute cloud import`, WASM build, VC-SCN-01..08, 11                                                             | RS-0 (`solver/` workspace)         | 3 wk   |
+| M2 Asset + port       | Native octree builder, asset store, `PointCloudPort` (Node, `compute` proxy), `scan_import` transport + CLI, `attach / describe / query / nearest`, VC-SCN-09, 10, 12  | M1                                 | 3 wk   |
+| M3 Viewport           | `PointClouds.tsx` LOD streaming, colour modes, crop / section clip, scan-point snap, Scan panel (read-only) — **built (desktop viewport; §13.6)**                      | M2, 09 VIS budgets                 | 3 wk   |
+| M4 Fit + pipes        | RANSAC / LM fits in `llull-cloud`, slice, `extract_pipes`, DN snap, `commit_asbuilt_extraction`, `$fromStep` binding (core), VC-SCN-20, 21, 24                         | M2, 01 PSC table API               | 3 wk   |
+| M5 Registration       | targets, ICP (`llull-cloud`), records, human gates, VC-SCN-30..32                                                                                                      | M2                                 | 2 wk   |
+| M6 Compare            | deviation, design-vs-scan clash (Rust CPU), `check_point_clouds`, AF flags, VC-SCN-40..43, 50..52, 60 (native vs WASM)                                                 | M4                                 | 2 wk   |
+| M7 GPU compare (RS-4) | wgpu deviation and clash prune, `device` param, VC-SCN-60 GPU rows                                                                                                     | M6, RS-0 `llull-gpu` / `llull-bvh` | 2 wk   |
+| V1                    | centreline tracing, steel fit, batch extraction (native, parallel), COPC / E57 export (native writers), global registration, OCC exact distance, browser offline store | M4–M6, 02 RTE, 06 STA              | 8 wk   |
 
 MVP (M1–M6) is about 16 engineer-weeks. RS1's RS-3 (≈ 6 wk) is the native part of M1, M2, M4 and M5, not extra work; RS-4
 is M7 (2 wk, after the MVP).
@@ -632,20 +664,20 @@ is M7 (2 wk, after the MVP).
    should supply one anonymised tie-in scan + field measurements for the production gate.
 7. **Q7 — Shared numerics. Closed (RS1).** Scan normals run in `llull-cloud`, so the TS solver in
    `domain-cae/thermomech/plane.ts` stays where it is.
-8. **Q8 — Scan-to-model registration.** Register a cloud to the *design model* (ICP against the tessellated design) for
+8. **Q8 — Scan-to-model registration.** Register a cloud to the _design model_ (ICP against the tessellated design) for
    plants whose design model is trusted. Useful but risky: it hides real deviations. V1 behind a reviewer gate?
 
 ## 13. As built (RS-3 / RS-4, 2026-10-19)
 
 ### 13.1 Layout
 
-| Layer | Path | Content |
-| ----- | ---- | ------- |
-| Native crate | `solver/crates/llull-cloud` | readers (`read/{e57,las,ascii}.rs`), octree + asset (`octree.rs`, `asset.rs`, `manifest.rs`, `store.rs`), `kdtree.rs` (+ seeded xorshift128+), `linalg.rs` (cyclic Jacobi, LU), `lm.rs`, `normals.rs`, `fit/{cylinder,plane,sphere,circle}.rs`, `slice.rs`, `register.rs`, `distance.rs`, `compare.rs`, `compare_op.rs`, `gpu.rs` (feature `gpu`), `job.rs` / `ops.rs` |
-| Job binary | `llull-compute cloud import <folder>`, `llull-compute cloud op <folder>` | job contracts in the module docs of `job.rs` and `ops.rs`; NDJSON events of `llull-protocol` |
-| Core | `packages/core/src/model/pointCloud.ts` | `PointCloudPort`, `CloudManifest`, `CloudOp`, the `ScanModel` slice (`CadDocument.scan`); `ExecutionContext.pointClouds` |
-| Plugin | `packages/domain-aec/src/scan/` (plugin `scan`, toolset `scan`) | 24 commands (below), `document.ts` (slice validation) |
-| Host | `server/src/scan/` | `scanStore.ts` (store, asset key), `assetReader.ts` (synchronous TS reader of the asset), `pointCloudPort.ts` (Node port: reads in TS, `compute` = `spawnSync llull-compute cloud op`), `scanImport.ts` + `scanTools.ts` (`scan_import`, `scan_list`; CLI `llull scan import FILE`, `llull scan list`); installed by `server/src/fea/context.ts` `serverContext()` |
+| Layer        | Path                                                                     | Content                                                                                                                                                                                                                                                                                                                                                                |
+| ------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native crate | `solver/crates/llull-cloud`                                              | readers (`read/{e57,las,ascii}.rs`), octree + asset (`octree.rs`, `asset.rs`, `manifest.rs`, `store.rs`), `kdtree.rs` (+ seeded xorshift128+), `linalg.rs` (cyclic Jacobi, LU), `lm.rs`, `normals.rs`, `fit/{cylinder,plane,sphere,circle}.rs`, `slice.rs`, `register.rs`, `distance.rs`, `compare.rs`, `compare_op.rs`, `gpu.rs` (feature `gpu`), `job.rs` / `ops.rs` |
+| Job binary   | `llull-compute cloud import <folder>`, `llull-compute cloud op <folder>` | job contracts in the module docs of `job.rs` and `ops.rs`; NDJSON events of `llull-protocol`                                                                                                                                                                                                                                                                           |
+| Core         | `packages/core/src/model/pointCloud.ts`                                  | `PointCloudPort`, `CloudManifest`, `CloudOp`, the `ScanModel` slice (`CadDocument.scan`); `ExecutionContext.pointClouds`                                                                                                                                                                                                                                               |
+| Plugin       | `packages/domain-aec/src/scan/` (plugin `scan`, toolset `scan`)          | 24 commands (below), `document.ts` (slice validation)                                                                                                                                                                                                                                                                                                                  |
+| Host         | `server/src/scan/`                                                       | `scanStore.ts` (store, asset key), `assetReader.ts` (synchronous TS reader of the asset), `pointCloudPort.ts` (Node port: reads in TS, `compute` = `spawnSync llull-compute cloud op`), `scanImport.ts` + `scanTools.ts` (`scan_import`, `scan_list`; CLI `llull scan import FILE`, `llull scan list`); installed by `server/src/fea/context.ts` `serverContext()`     |
 
 Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_cloud`, `set_scan_crop`, `clear_scan_crop`,
 `apply_registration`, `mark_registration_supplied`, `accept_registration` (human gate), `commit_asbuilt_extraction`,
@@ -661,7 +693,7 @@ Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_clo
    port does in TypeScript (`describe_point_cloud`, `query_cloud_points`, `nearest_cloud_point`, `measure_cloud`) work on any asset
    already in the store. VC-SCN-60 (a) "native vs WASM" becomes "native reproducibility": identical asset bytes, fits, ICP
    transforms and deviation sums for any thread count (`tests/octree.rs`, `fits.rs`, `registration.rs`, `compare.rs`).
-2. **M3 (viewport) not built** (CLI-first scope). `render_view` does not draw clouds yet.
+2. **M3 (viewport) built in the desktop viewport (§13.6)**; `render_view` still does not draw clouds (the `budget` param of §7 is not built).
 3. **Asset key** (decision 1): `sha256("<sourceSha256>\n<importerVersion>\n<canonicalJson(importOptions with defaults)>")`,
    `importerVersion = "llull-cloud@<crate version>/asset-1"`. Options in the key: `format`, `sourceUnit`, `columns`,
    `applyStationPoses`, `checksum`, `maxPointsPerNode`.
@@ -704,28 +736,28 @@ Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_clo
     supports `device: "gpu"` only when built with `--features gpu` (else `SCN_GPU_FALLBACK`, CPU numbers unchanged).
 14. **Not built**: `$fromStep` plan binding (TR-SCN-03, a core prerequisite: plans stay DRAFT, agents run queries with `--json`),
     `trace_pipe_centreline` (VC-SCN-22), `fit_steel_member` (VC-SCN-23), `commit_slice_geometry`, COPC / E57 export, `llull scan gc`,
-    `server/tests/packReplay10scn.test.ts`, M3 viewport.
+    `server/tests/packReplay10scn.test.ts`, `render_view` clouds.
 
 ### 13.3 Validation status
 
-| VC | Status | Test |
-| -- | ------ | ---- |
-| 01–05 E57 inventory, CRC, empty, encodings, pose | pass | `solver/crates/llull-cloud/tests/e57.rs`; 02, 03 also `server/tests/scanImport.test.ts` |
-| 06–08 LAS / LAZ inventory, LAZ ≡ LAS, header bounds | pass | `tests/las.rs` |
-| 09 large coordinates (bit-exact through the asset) | pass | `tests/octree.rs`, `server/tests/scanImport.test.ts` (TS reader) |
-| 10 octree / LOD invariants, identical bytes | pass | `tests/octree.rs`, `server/tests/scanImport.test.ts` |
-| 11 proprietary refusal | pass | `server/tests/scanImport.test.ts`, `tests/e57.rs` |
-| 12 nearest on the coloured cube | pass | `tests/octree.rs`, `server/tests/scanImport.test.ts` (registry command) |
-| 20a–c cylinders within the CRLB tolerances | pass | `tests/fits.rs`, `server/tests/scanNative.test.ts` |
-| 21 DN snap | pass | `tests/unit/scan/extraction.test.ts`, `server/tests/scanNative.test.ts` |
-| 22, 23 | not built (V1) | — |
-| 24 slice circle | pass | `tests/fits.rs`, `server/tests/scanNative.test.ts` |
-| 30 ICP-A | pass (own seeded 70 % / σ 0.2 mm draw; the pack's numpy draw is not reproducible in Rust) | `tests/registration.rs` |
-| 31 TGT-A | pass | `tests/registration.rs`, `server/tests/scanNative.test.ts` |
-| 32 degenerate registrations | pass | `tests/registration.rs`, `tests/unit/scan/registration.test.ts` |
-| 40–43 C2M-A, DEV-A, 64-facet bound, CLH-A | pass | `tests/compare.rs`, `server/tests/scanNative.test.ts` |
-| 50–52 codes, unverified propagation, review flags | pass | `tests/unit/scan/*.test.ts` |
-| 60 (a) reproducibility, (b) GPU clash, (c) GPU deviation | pass (a re-scoped, decision 1) | `tests/*.rs`, `tests/gpu_parity.rs`, `server/tests/scanNative.test.ts` |
+| VC                                                       | Status                                                                                    | Test                                                                                    |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 01–05 E57 inventory, CRC, empty, encodings, pose         | pass                                                                                      | `solver/crates/llull-cloud/tests/e57.rs`; 02, 03 also `server/tests/scanImport.test.ts` |
+| 06–08 LAS / LAZ inventory, LAZ ≡ LAS, header bounds      | pass                                                                                      | `tests/las.rs`                                                                          |
+| 09 large coordinates (bit-exact through the asset)       | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (TS reader)                        |
+| 10 octree / LOD invariants, identical bytes              | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts`                                    |
+| 11 proprietary refusal                                   | pass                                                                                      | `server/tests/scanImport.test.ts`, `tests/e57.rs`                                       |
+| 12 nearest on the coloured cube                          | pass                                                                                      | `tests/octree.rs`, `server/tests/scanImport.test.ts` (registry command)                 |
+| 20a–c cylinders within the CRLB tolerances               | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
+| 21 DN snap                                               | pass                                                                                      | `tests/unit/scan/extraction.test.ts`, `server/tests/scanNative.test.ts`                 |
+| 22, 23                                                   | not built (V1)                                                                            | —                                                                                       |
+| 24 slice circle                                          | pass                                                                                      | `tests/fits.rs`, `server/tests/scanNative.test.ts`                                      |
+| 30 ICP-A                                                 | pass (own seeded 70 % / σ 0.2 mm draw; the pack's numpy draw is not reproducible in Rust) | `tests/registration.rs`                                                                 |
+| 31 TGT-A                                                 | pass                                                                                      | `tests/registration.rs`, `server/tests/scanNative.test.ts`                              |
+| 32 degenerate registrations                              | pass                                                                                      | `tests/registration.rs`, `tests/unit/scan/registration.test.ts`                         |
+| 40–43 C2M-A, DEV-A, 64-facet bound, CLH-A                | pass                                                                                      | `tests/compare.rs`, `server/tests/scanNative.test.ts`                                   |
+| 50–52 codes, unverified propagation, review flags        | pass                                                                                      | `tests/unit/scan/*.test.ts`                                                             |
+| 60 (a) reproducibility, (b) GPU clash, (c) GPU deviation | pass (a re-scoped, decision 1)                                                            | `tests/*.rs`, `tests/gpu_parity.rs`, `server/tests/scanNative.test.ts`                  |
 
 ### 13.4 Open questions (§11) decided
 
@@ -737,6 +769,25 @@ parameter per extraction (`insulationThickness`, named default 0). Q6 open (owne
 `e57` 0.11.13 (MIT), `las` 0.11.1 (MIT) with `laz` 0.13.0 (Apache-2.0), `libm` 0.2 (MIT / Apache-2.0), `chrono` (via `las`,
 MIT / Apache-2.0), `wgpu` 25 (MIT / Apache-2.0, feature `gpu`). Nothing GPL. Test data: the pack's files (licences in
 `validation/data/licenses/`) and clouds generated in the tests.
+
+### 13.6 Viewport (M3, 2026-11-03)
+
+| Piece          | Path                                                                                                | Content                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Streaming      | `src/ui/viewport/3d/scan/useCloudStreaming.ts`                                                      | one hook per cloud: describe → tile grid → budgeted box queries → drawn tiles; re-plans 200 ms after the camera settles (09 VIS "refine after idle")                                                                                                                                                                                                                                                                                       |
+| Transport      | `scan/cloudClient.ts`                                                                               | the existing read-only commands over the command bus (`POST /command`): `describe_point_cloud`, `query_cloud_points` (`region: box`, `lod: budget`); no new route. No backend (`liveStatus` not connected) → panel says "No backend", nothing drawn                                                                                                                                                                                        |
+| LOD            | `scan/tileGrid.ts`, `scan/lodSelect.ts` (pure)                                                      | ≤ 32 near-cubic tiles per cloud; a tile is one query whose budget is its level (2 k, 8 k, 32 k, 128 k points). Every visible tile gets level 0 first (parents before children), then levels rise one step at a time, biggest projected size first, while Σ budgets ≤ the point budget (500 k – 3 M, default 1 M; §8 targets 30 fps at 3 M). Wanted level = projected area / (3 px)²; tiles outside the frustum or under 4 px are not drawn |
+| Colour         | `scan/colourModes.ts` (pure)                                                                        | elevation (viridis), flat, and rgb / intensity / classification (ASPRS palette) when a tile carries the column; a missing column falls back to elevation and the panel lists the mode as "(no data)"                                                                                                                                                                                                                                       |
+| Crop / section | `scan/cropFilter.ts`, `ClippingPlane.tsx`                                                           | document crop boxes (`set_scan_crop`, keep inside / outside, per cloud) are applied on the CPU when the tile buffers are built (UI toggle). The section plane is the renderer clipping plane, which already cuts the points. Deviation from §7 ("shader clip planes"): CPU filtering handles any number of crops and both senses without per-material plane juggling                                                                       |
+| Render         | `PointClouds.tsx`                                                                                   | one `THREE.Points` per resident tile, positions float32 relative to the tile origin, mounted in the floating-origin group                                                                                                                                                                                                                                                                                                                  |
+| Snap           | `scan/pointSnap.ts` (pure), `scan/scanSnap.ts`, `snap3d.ts` type `scan-point`, `TransformGizmo.tsx` | during a gizmo translate drag the cloud point nearest on screen to the handle within 12 px wins over the grid (never over an object snap). The spec's "worker kd-tree per node" became a bounding-sphere cull + linear scan of the tiles near the pointer (no worker yet)                                                                                                                                                                  |
+| Panel          | `src/ui/panels/scan/ScanPanel.tsx`, store `scanViewStore.ts`                                        | read-only: clouds with status, drawn / total points, registration status; colour mode, point budget, crop and snap toggles (UI state, not the document). Tab `scan` joins the rail once a cloud is attached                                                                                                                                                                                                                                |
+
+Gaps: **(1) per-point attributes** — `query_cloud_points` returns positions and record indices only, so rgb / intensity / classification cannot be drawn
+until the query (or a new read-only command) returns the attribute columns (`rgb`, `intensity`, `classification`, one entry per point, already read by
+`cloudClient.parseTileAnswer`); until then only elevation and flat are live. **(2)** the answer is JSON (≈ 1 MB per 30 k points), adequate for
+≤ 3 M resident points; a binary route is the follow-up if the 150 ms p95 fetch of §8 is missed. **(3)** a refined tile replaces its coarser answer (no
+shared parents), so the budget counts the finest answer per tile. **(4)** EDL shading, `render_view` clouds and the section-box (VIS) clip are not built.
 
 ## 12. References
 

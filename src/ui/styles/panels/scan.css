@@ -1,0 +1,55 @@
+/* Scan panel: point-cloud rows, streaming status, view controls. */
+
+.scan__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.scan__toggle {
+  margin: 0;
+}
+
+.scan__cloud {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+}
+
+.scan__cloud-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.scan__cloud-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.scan__meter {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.scan__meter-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.scan__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}

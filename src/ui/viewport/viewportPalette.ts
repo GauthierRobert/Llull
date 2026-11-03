@@ -35,6 +35,7 @@ export const SNAP_COLORS_3D: Record<Snap3DType, string> = {
   vertex: '#f5c842',
   edge: '#42d4f5',
   'face-center': '#42f5a7',
+  'scan-point': '#f58a42',
   grid: '#8090a0',
   none: '#ffffff',
 };
