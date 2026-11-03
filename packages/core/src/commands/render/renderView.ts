@@ -182,7 +182,7 @@ export const renderView = defineCommand({
       .union([overlayKind, z.array(overlayKind).min(1)])
       .optional()
       .describe(
-        '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. Plugins add kinds (stress plugin: "pipe_stress", pipe elements coloured by the stress ratio of the model: green below 0.8, amber 0.8 to 1, red above 1, grey where a model cannot be analysed); an unregistered kind is refused as invalid params. One kind or an array of kinds. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective, viewpoint or turntable renders (the summary says so); instances are not expanded (only the entities of the document, in document order); data.overlays reports the entity ids and the counts of segments and dots.',
+        '"cage": draw the cage of every subdivision solid (edges and vertices, over the limit surface); "net": draw the control net of every nurbs_surface (rows and columns of poles) and the control polygon of every nurbs_curve. Plugins add kinds (see the tools of their toolset; an installed plugin lists its kinds in its own command descriptions); an unregistered kind is refused as invalid params. One kind or an array of kinds. Not occluded by solids. With `isolate` only those entities get one. Not drawn in perspective, viewpoint or turntable renders (the summary says so); instances are not expanded (only the entities of the document, in document order); data.overlays reports the entity ids and the counts of segments and dots.',
       ),
     hide2D: z
       .boolean()
@@ -265,6 +265,10 @@ export const renderView = defineCommand({
       const drawn = appendCageNetOverlays(svg, doc, base, orderedEntities(scene), kinds, isolated);
       svg = drawn.svg;
       overlays = drawn.stats;
+      for (const kind of kinds) {
+        const failed = drawn.stats[kind]?.detail?.['failed'];
+        if (failed !== undefined) summary += ` Overlay ${kind} failed: ${String(failed)}.`;
+      }
       summary += ` Overlay: ${kinds.map((kind) => `${kind} ${drawn.stats[kind]?.entities.length ?? 0} entit${drawn.stats[kind]?.entities.length === 1 ? 'y' : 'ies'}`).join(', ')}.`;
     }
     return finish(doc, withNotes(summary), { ...base, svg: decorate(svg), ...(overlays === undefined ? {} : { overlays }) });
