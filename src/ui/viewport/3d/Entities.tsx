@@ -18,6 +18,7 @@ import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
 import { PlantBatchRenderer } from './plant/PlantBatchRenderer';
 import { usePlantCoverage } from './plant/usePlantCoverage';
+import { usePlantPlan } from './plant/usePlantPlan';
 import { useGhostStore } from '@ui/store/ghostStore';
 import { useTintStore } from '@ui/store/tintStore';
 import { GridAnnotations3D } from './GridAnnotations3D';
@@ -108,6 +109,7 @@ const EntityRenderer = memo(function EntityRenderer({
 
 const noopSelect = (): void => undefined;
 /** No body is drawn by the GPU preview (stable reference while the preview is off). */
+const NO_COVERAGE: ReadonlySet<EntityId> = new Set();
 const NO_GPU_BODIES: Readonly<Record<string, true>> = {};
 
 /** Hologram of the previous version (removed / remotely reshaped) through the same render branch. */
@@ -202,9 +204,12 @@ export function Entities(): React.ReactElement {
     [visibleIds, explodeOffsets, animatedIds, hasFinish, transitions, ghosted, tints],
   );
   const plant = usePlantCoverage(document, needsOwnPath);
+  // The plan is computed in this render, for exactly this scene: until one exists (no camera, zero-size canvas) the per-entity path draws everything.
+  const plantPlan = usePlantPlan(plant.scene);
+  const plantCovered = plantPlan === null ? NO_COVERAGE : plant.covered;
   const perEntityCandidates = useMemo(
-    () => (plant.covered.size === 0 ? visibleEntities : visibleEntities.filter((entity) => !plant.covered.has(entity.id))),
-    [visibleEntities, plant.covered],
+    () => (plantCovered.size === 0 ? visibleEntities : visibleEntities.filter((entity) => !plantCovered.has(entity.id))),
+    [visibleEntities, plantCovered],
   );
   const batches = useMemo(
     () =>
@@ -242,10 +247,10 @@ export function Entities(): React.ReactElement {
 
       <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
 
-      {plant.scene !== null && (
+      {plantPlan !== null && (
         <PlantBatchRenderer
-          scene={plant.scene}
-          covered={plant.covered}
+          plan={plantPlan}
+          covered={plantCovered}
           entities={entities}
           materials={materials}
           selectionSet={selectionSet}

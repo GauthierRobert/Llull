@@ -1,0 +1,86 @@
+// One InstancedMesh of a draw bucket: matrices, colours, x-ray opacity and picking (`instanceId` -> entity id).
+
+import { useEffect, useRef } from 'react';
+import type { ThreeEvent } from '@react-three/fiber';
+import type * as THREE from 'three';
+import type { Entity, EntityId } from '@core/model/types';
+import type { DisplayMode } from '@ui/store';
+import { isAdditiveSelect } from '../../selectClick';
+import { XRAY_OPACITY } from '../../viewportPalette';
+import { useBatchCapacity } from '../InstancedRenderer';
+import type { LodGeometryCache } from './LodGeometryCache';
+import { type DrawBucket, entityIdAt } from './plantBatchPlan';
+import { writeBucketColours } from './plantInstanceColours';
+import { bucketMatrices, type LocalBox } from './plantMatrices';
+
+export interface PlantBucketMeshProps {
+  bucket: DrawBucket;
+  entities: Readonly<Record<EntityId, Entity>>;
+  cache: LodGeometryCache;
+  material: THREE.MeshStandardMaterial;
+  materialColour: string | undefined;
+  displayMode: DisplayMode;
+  selectionSet: ReadonlySet<EntityId>;
+  onSelect: (id: EntityId, additive: boolean) => void;
+}
+
+export function PlantBucketMesh({
+  bucket,
+  entities,
+  cache,
+  material,
+  materialColour,
+  displayMode,
+  selectionSet,
+  onSelect,
+}: PlantBucketMeshProps): React.ReactElement | null {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const count = bucket.ids.length;
+  const capacity = useBatchCapacity(count);
+  const first = entities[bucket.ids[0] ?? ''];
+  const geometry = first === undefined ? undefined : cache.geometry(bucket.prototypeKey, bucket.lod, first);
+
+  // A new `args` makes r3f build a NEW InstancedMesh: matrices and colours are rewritten on every identity change.
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const placements = bucket.ids.map((id) => entities[id]).filter((entity): entity is Entity => entity !== undefined);
+    const boxes =
+      bucket.lod === 2 ? placements.map((entity, index): LocalBox => cache.localBox(bucket.prototypes[index] ?? '', entity)) : undefined;
+    mesh.instanceMatrix.array.set(bucketMatrices(placements, boxes));
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    mesh.computeBoundingBox();
+  }, [bucket, entities, cache, geometry, material, capacity]);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (mesh) writeBucketColours(mesh, bucket.ids, entities, materialColour, selectionSet);
+  }, [bucket, entities, materialColour, selectionSet, geometry, material, capacity]);
+
+  // No per-instance opacity: in x-ray, any selected entity raises the whole bucket's opacity (as InstancedRenderer).
+  useEffect(() => {
+    if (displayMode !== 'xray') return;
+    material.opacity = bucket.ids.some((id) => selectionSet.has(id)) ? XRAY_OPACITY.selected : XRAY_OPACITY.idle;
+    material.needsUpdate = true;
+  }, [displayMode, bucket, selectionSet, material]);
+
+  if (geometry === undefined || count === 0) return null;
+
+  function handleClick(event: ThreeEvent<MouseEvent>): void {
+    event.stopPropagation();
+    const id = entityIdAt(bucket, event.instanceId);
+    if (id !== undefined) onSelect(id, isAdditiveSelect(event.nativeEvent));
+  }
+
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[geometry, material, capacity]}
+      count={count}
+      onClick={handleClick}
+      castShadow={bucket.lod < 2}
+      receiveShadow
+    />
+  );
+}

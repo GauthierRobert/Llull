@@ -2,7 +2,7 @@
 // (one InstancedMesh each) of a plan. No three.js, no React.
 
 import type { Entity, EntityId } from '@core/model/types';
-import type { PlanScene, RenderPlan } from '@core/geometry/renderPlan';
+import { LEVEL_CULLED, type PlanScene, type RenderPlan } from '@core/geometry/renderPlan';
 
 /** Visible 3D entities from which the plan renderer takes over from the per-entity path (below it the existing renderer is cheaper and exact). */
 export const PLANT_BATCH_MIN_INSTANCES = 1500;
@@ -57,9 +57,11 @@ export interface DrawBucket {
 
 /**
  * The plan's buckets (plus one LOD0 bucket per unique-geometry instance) as draw buckets restricted to `covered`; empty buckets dropped.
- * @invariant order = plan order (buckets sorted by code unit, then unique batches), members ascending
+ * With `keepCulled` (camera in motion) the instances the plan culled by size stay as LOD2 boxes (`$culled`), so nothing inside the
+ * widened frustum blinks out while orbiting; the settled plan culls them.
+ * @invariant order = plan order (buckets sorted by code unit, then unique batches), members ascending, culled boxes last
  */
-export function drawBuckets(scene: PlanScene, plan: RenderPlan, covered: ReadonlySet<EntityId>): DrawBucket[] {
+export function drawBuckets(scene: PlanScene, plan: RenderPlan, covered: ReadonlySet<EntityId>, keepCulled = false): DrawBucket[] {
   const result: DrawBucket[] = [];
   const push = (prototypeKey: string, materialClass: string, lod: 0 | 1 | 2, members: readonly number[]): void => {
     const ids: EntityId[] = [];
@@ -78,6 +80,17 @@ export function drawBuckets(scene: PlanScene, plan: RenderPlan, covered: Readonl
       const instance = scene.instances[index];
       if (instance !== undefined) push(scene.prototypeKeys[instance.prototype] ?? '', batch.materialClass, 0, [index]);
     }
+  }
+  if (keepCulled) {
+    const byClass = new Map<string, number[]>();
+    plan.levels.forEach((level, index) => {
+      if (level !== LEVEL_CULLED) return;
+      const materialClass = scene.materialClasses[scene.instances[index]?.materialClass ?? 0] ?? '';
+      const list = byClass.get(materialClass);
+      if (list === undefined) byClass.set(materialClass, [index]);
+      else list.push(index);
+    });
+    for (const [materialClass, members] of byClass) push('$culled', materialClass, 2, members);
   }
   return result;
 }

@@ -6,6 +6,9 @@ import type { Entity } from '@core/model/types';
 import { LodGeometryCache } from '@ui/viewport/3d/plant/LodGeometryCache';
 import { drawBuckets, entityIdAt, isPlantBatchable, plantCoveredIds } from '@ui/viewport/3d/plant/plantBatchPlan';
 import { bucketMatrices } from '@ui/viewport/3d/plant/plantMatrices';
+import { writeBucketColours } from '@ui/viewport/3d/plant/plantInstanceColours';
+import { motionCamera } from '@ui/viewport/3d/plant/plantPlanCamera';
+import { frustumPlanes } from '@core/geometry/renderPlanCamera';
 import { synRackDocument } from '../helpers/synRack';
 
 const doc = synRackDocument(8);
@@ -32,7 +35,8 @@ describe('plant batch coverage and buckets', () => {
     const buckets = drawBuckets(scene, plan, everything);
     const ids = buckets.flatMap((bucket) => bucket.ids);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBe(everything.size === scene.instances.length ? plan.drawn : ids.length);
+    expect(everything.size).toBe(scene.instances.length);
+    expect(ids.length).toBe(plan.drawn);
     expect(buckets.length).toBeGreaterThanOrEqual(plan.buckets.length);
     expect(new Set(buckets.map((bucket) => bucket.key)).size).toBe(buckets.length);
   });
@@ -56,6 +60,55 @@ describe('plant batch coverage and buckets', () => {
     expect(entityIdAt(bucket as never, 0)).toBe(bucket?.ids[0]);
     expect(entityIdAt({ ids: ['a'] }, 5)).toBeUndefined();
     expect(entityIdAt({ ids: ['a'] }, undefined)).toBeUndefined();
+  });
+});
+
+describe('plant batch: hidden layers, motion, tint', () => {
+  it('draws nothing of a hidden layer', () => {
+    const layerId = Object.keys(doc.layers)[0] as string;
+    const hidden = { ...doc, layers: { ...doc.layers, [layerId]: { ...(doc.layers[layerId] as object), visible: false } } } as typeof doc;
+    const hiddenScene = planScene(hidden);
+    expect(hiddenScene.instances.length).toBeLessThan(scene.instances.length);
+    const hiddenPlan = planRender(hiddenScene, camera, { multiDraw: true, quality: 'medium' });
+    const covered = plantCoveredIds(hiddenScene, hidden.entities, () => false);
+    const ids = new Set(drawBuckets(hiddenScene, hiddenPlan, covered).flatMap((bucket) => bucket.ids));
+    for (const id of hidden.order) if (hidden.entities[id]?.layerId === layerId) expect(ids.has(id)).toBe(false);
+  });
+
+  it('keeps size-culled instances as boxes while the camera moves', () => {
+    const far = framedPlanCamera({ view: 'iso', projection: 'perspective', center: [0, 0, 0], radius: 20000, widthPx: 320, heightPx: 180 });
+    if (typeof far === 'string') throw new Error(far);
+    const farPlan = planRender(scene, far, { multiDraw: true, quality: 'medium' });
+    expect(farPlan.culled.pixel).toBeGreaterThan(0);
+    const settled = drawBuckets(scene, farPlan, everything, false).flatMap((bucket) => bucket.ids).length;
+    const moving = drawBuckets(scene, farPlan, everything, true);
+    expect(moving.flatMap((bucket) => bucket.ids).length).toBe(settled + farPlan.culled.pixel);
+    expect(moving.some((bucket) => bucket.prototypeKey === '$culled')).toBe(true);
+    expect(new Set(moving.map((bucket) => bucket.key)).size).toBe(moving.length);
+  });
+
+  it('widens the frustum by the margin and keeps the pixel density', () => {
+    const wide = motionCamera(camera, 1.5);
+    expect(wide.heightPx / camera.heightPx).toBe(1.5);
+    const [, rightA] = frustumPlanes(camera);
+    const [, rightB] = frustumPlanes(wide);
+    expect(rightB?.normal[0]).not.toBeCloseTo(rightA?.normal[0] ?? 0, 3);
+    const inner = Math.tan((camera.fovDeg * Math.PI) / 360);
+    expect(Math.tan((wide.fovDeg * Math.PI) / 360)).toBeCloseTo(inner * 1.5, 6);
+  });
+
+  it('tints selected instances toward the selection colour', () => {
+    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial(), 2);
+    const ids = drawBuckets(scene, plan, everything)[0]?.ids.slice(0, 2) as string[];
+    writeBucketColours(mesh, ids, doc.entities, undefined, new Set([ids[1] as string]));
+    const plain = new THREE.Color();
+    const tinted = new THREE.Color();
+    mesh.getColorAt(0, plain);
+    mesh.getColorAt(1, tinted);
+    expect(tinted.getHex()).not.toBe(plain.getHex());
+    writeBucketColours(mesh, ids, doc.entities, '#00ff00', new Set());
+    mesh.getColorAt(0, plain);
+    expect(plain.getHexString()).toBe('00ff00');
   });
 });
 
