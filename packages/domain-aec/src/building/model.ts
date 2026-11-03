@@ -5,6 +5,8 @@ import type { BimCategory, BuildingElement, BuildingLevel, BuildingModel } from 
 import { createEmptyBuilding } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
 import { nextId } from '@lib/id';
+import { jcsJson } from '@lib/jcs';
+import { sha256Hex } from '@lib/sha256';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 
 export function getBuilding(doc: Pick<CadDocument, 'building'>): BuildingModel {
@@ -74,9 +76,35 @@ function issued(building: BuildingModel, prefix: string, keys: ReadonlyArray<str
   return Math.max(highestIndex(keys, `${prefix}-`), building.counters?.[prefix] ?? 0);
 }
 
-/** Records that id "<prefix>-<n>" was issued (and gives a new building its step-scoped uid, re-minted identically by a replay). */
+/** A uid as minted inside a step, before the creating command's result sealed it with a content hash. */
+const PENDING_UID = /^building-[^-]+\.\d+$/;
+
+/**
+ * Mints the uid of a new building: the step-scoped id (`building-<step>.<k>`), sealed by the building document extension's `reconcile`.
+ * @failure no step-scoped id source active (called outside `execute`) -> throws: a time-based uid would break replay
+ */
+function mintUid(): string {
+  const uid = nextId('building');
+  if (!PENDING_UID.test(uid)) throw new Error('building uid needs a step-scoped id source: create the building inside execute');
+  return uid;
+}
+
+/**
+ * The pending uid of `building` sealed with a short sha256 of that id, the levels and elements the creating command produced and the project
+ * info, so two different projects never share a uid (IFC GlobalIds must be globally unique); `building` itself when its uid is not pending.
+ * @invariant computed once, at creation: later edits never change it; a replay re-mints it identically; inserting or deleting an earlier
+ *   step renumbers it (the IFC GlobalIds change then); identical plans give identical uids
+ */
+export function sealedBuilding(building: BuildingModel): BuildingModel {
+  const uid = building.uid;
+  if (uid === undefined || !PENDING_UID.test(uid)) return building;
+  const content = jcsJson({ levels: building.levels, elements: building.elements, project: building.project });
+  return { ...building, uid: `${uid}-${sha256Hex(`${uid}|${content}`).slice(0, 16)}` };
+}
+
+/** Records that id "<prefix>-<n>" was issued (and gives a new building its pending uid, see `mintUid`). */
 function withCounter(source: BuildingModel, id: string): BuildingModel {
-  const building = source.uid === undefined ? { ...source, uid: nextId('building') } : source;
+  const building = source.uid === undefined ? { ...source, uid: mintUid() } : source;
   const match = /^(.*)-(\d+)$/.exec(id);
   if (!match) return building;
   const [, prefix = '', number = '0'] = match;

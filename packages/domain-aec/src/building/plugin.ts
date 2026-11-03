@@ -9,6 +9,7 @@ import { buildingDerivationGuard } from './evaluate/integrity';
 import { derivedModelExtension } from '../shared/derived';
 import { aecRetiredCommands } from '../retired';
 import { buildingErrors } from './validate';
+import { sealedBuilding } from './model';
 import { regenerateBuilding } from './evaluate/evaluateElements';
 
 const derivedBuilding = derivedModelExtension({
@@ -18,8 +19,14 @@ const derivedBuilding = derivedModelExtension({
   regenerate: regenerateBuilding,
 });
 
-/** The building uid (IFC GlobalId salt) is step-scoped, so replay re-mints it; the extension only validates and regenerates. */
-const buildingDocument: DocumentExtension = derivedBuilding;
+/** The building uid (IFC GlobalId salt) is step-scoped and sealed by the first command's result, so replay re-mints it; see `sealedBuilding`. */
+const buildingDocument: DocumentExtension = {
+  ...derivedBuilding,
+  reconcile: (_previous, next) => {
+    const sealed = next.building === undefined ? undefined : sealedBuilding(next.building);
+    return { document: sealed === undefined || sealed === next.building ? next : { ...next, building: sealed }, notes: [], affected: [] };
+  },
+};
 
 export const buildingPlugin: CadPlugin = {
   name: 'building',

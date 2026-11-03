@@ -36,7 +36,7 @@ Procedure: `add-command` skill. Human intro: `docs/ADD_A_TOOL.md`.
   `replay_history`, `edit_step_params`, `reorder_step`, `set_step_suppressed`, `insert_step`,
   `delete_step`.
 - Ids: step n mints `<prefix>-<n>.<k>` (`doc.nextStepNumber`, never reused; `@lib/id`
-  `stepIdSource`). Never `uniqueId()` / `Date.now()` in a command.
+  `stepIdSource`). Never `Date.now()` or time-based ids in a command; use the step-scoped `ctx.ids` / `nextId`.
 - Replay prefix cache (`commands/history/replayCache.ts`, `ctx.replayCache`): editing step k re-runs k..n.
 - Parameters (`set_parameter`, `=expr` strings in step params) regenerate only dependents
   (`commands/history/dependents.ts`). Constraints + pure solver (`solve_constraints`), configurations, recipes.

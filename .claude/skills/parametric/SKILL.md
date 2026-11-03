@@ -36,7 +36,7 @@ A full CAD stores HOW a model was built, not just final geometry. Commands are p
 ## Rules for new parametric work
 - A new document-input command (edits a table, not geometry) ⇒ `annotations: { metaHistory: true }`
   and, if geometry depends on it, regenerate via `replayHistory` / `regenerateParameterDependents`.
-- Regeneration must be deterministic: no `Date.now()` / `uniqueId()` in ids, kernel only from
+- Regeneration must be deterministic: no `Date.now()` / time-based ids (use the step-scoped `ctx.ids` / `nextId`) in ids, kernel only from
   `ctx.kernel`; `requiresKernel` steps make replay refuse rather than drop geometry.
 - Keep `affected` order deterministic. Keep the `CommandResult` contract unchanged.
 - Prove it: a test that edits a parameter/step and asserts the regenerated doc, plus a golden

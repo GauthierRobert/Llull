@@ -4,8 +4,6 @@
  * that point). Editing step k or a parameter used only from step k on re-runs steps k..n only.
  *
  *   (commands are pure, ids are step-scoped, the kernel is memoized and deterministic)
- * @invariant a step that mints a globally unique id (a plugin `mintedIdentity`) is never
- *   memoized; replayHistory folds that id into the key of every later state
  */
 
 import type { CadDocument } from '../../model/types';
