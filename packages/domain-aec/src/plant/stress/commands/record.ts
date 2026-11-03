@@ -74,8 +74,8 @@ const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
  * @affects plant.stress.models[modelId].approval: { signer, signatureId, at, inputHash, resultHash }
  * @invariant `at` is host-stamped metadata outside the signed payload (the human signs before the host stamps the time; residual: an in-process caller holding a valid signature can choose `at`, which is a record of when, not authority);
  * a human act: confirmation is a signature verified by the signing port over { act plant:approve_pipe_stress, modelId, inputHash, resultHash } and spent once; recorded-ness, freshness (the analysis is rerun and must reproduce the stored input hash, result hash and status) and status are checked BEFORE a signature is spent;
- *   replay: the recorded step carries { verified: true } (the signature is never recorded) and is a no-op; replay_history / regenerate re-attach an approval whose recorded results are unchanged (plugin carry)
- * @failure unknown model -> PST_MODEL_NOT_FOUND; nothing recorded -> PST_NOT_RECORDED; inputs changed since the record -> PST_RESULTS_STALE; fail status -> PST_RESULTS_FAILING; incomplete -> PST_RESULTS_INCOMPLETE; no valid human signature -> PST_HUMAN_GATE; the document is unchanged
+ *   replay: the recorded step carries { verified: true } (the signature is never recorded); it is a no-op report only while the history replay re-runs it (ctx.replaying, never a param), a live { verified: true } is PST_HUMAN_GATE; replay_history / regenerate re-attach an approval whose recorded results are unchanged (plugin carry)
+ * @failure unknown model -> PST_MODEL_NOT_FOUND; nothing recorded -> PST_NOT_RECORDED; inputs changed since the record -> PST_RESULTS_STALE; fail status -> PST_RESULTS_FAILING; incomplete -> PST_RESULTS_INCOMPLETE; no valid human signature or a live { verified: true } marker -> PST_HUMAN_GATE; the document is unchanged
  */
 export const approvePipeStress = defineCommand({
   name: 'approve_pipe_stress',
@@ -102,12 +102,22 @@ export const approvePipeStress = defineCommand({
   run: (doc, { modelId, confirmation, at }, ctx): CommandResult => {
     const model = modelOr(doc, 'approve_pipe_stress', modelId);
     if (isRefusal(model)) return model;
-    if (isRecordedMarker(confirmation))
+    if (isRecordedMarker(confirmation)) {
+      if (ctx?.replaying !== true)
+        return refuse(
+          doc,
+          'approve_pipe_stress',
+          'PST_HUMAN_GATE',
+          'approve_pipe_stress is a human act: a recorded { verified: true } marker is honoured only while the history replays; a live caller needs a signature',
+          [modelId],
+          ['confirmation'],
+        );
       return report(
         doc,
         `approve_pipe_stress: ${modelId} recorded-approval marker; nothing changed here (replay re-attaches a real approval when the recorded results are unchanged).`,
         { modelId, approved: model.approval !== undefined, marker: true },
       );
+    }
     const recorded = model.recorded;
     const fail = (code: string, message: string): CommandResult =>
       refuse(doc, 'approve_pipe_stress', code, message, [modelId], ['modelId']);

@@ -274,8 +274,9 @@ describe('the approval through replay, regenerate and save / load', () => {
     const edited = apply(approve(doc, id), 'update_stress_model', { modelId: id, frictionCoefficient: 0.1 });
     expect(execute(edited, 'replay_history', {}).document.plant?.stress?.models[id]?.approval).toBeUndefined();
     const forged = execute(doc, 'approve_pipe_stress', { modelId: id, confirmation: { verified: true }, at: AT }, ctxWith(portFor()));
+    expect(forged.rejected).toBe(true);
+    expect(forged.error?.code).toBe('PST_HUMAN_GATE');
     expect(forged.document).toBe(doc);
-    expect(forged.data).toMatchObject({ approved: false, marker: true });
     expect(forged.document.plant?.stress?.models[id]?.approval).toBeUndefined();
   });
 
