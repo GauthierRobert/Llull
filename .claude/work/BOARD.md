@@ -13,6 +13,9 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). WIP: PST-GATE + PST-HARDEN (lane1), EQP-M5-UI (lane2),
+  PID-M5b (lane3), BLD-UID + FUZZ-EQP (lane4); workers + reviewers on sonnet. Next: PST-M4, VIS-M3, VIS-M4b/M5b, VIS-UI, SCN-M3.
+
 - 2026-11-02 (end) — plant run stopped by the owner after the in-flight tasks. Merged + pushed: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8,
   DAT-M6, ISO-M5, ISO-REPLAY (replay-only confirmations via `ctx.replaying`), PID-M6, PID-M7b. Remaining plant TODOs below (PST-M4, PST-GATE,
   PST-HARDEN, FUZZ-EQP, BLD-UID, EQP-M5-UI, PID-M5b, VIS-*, SCN-M3; ISO-M6 blocked).
