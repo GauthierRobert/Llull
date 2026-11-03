@@ -13,6 +13,7 @@ import { ZoomExtents2D } from './ZoomExtents2D';
 import { Entities2D } from './Entities2D';
 import { BuildingPlan2D } from './BuildingPlan2D';
 import { PidSheet2D } from './PidSheet2D';
+import { PidSheetHud } from './PidSheetHud';
 import { SnapIndicator } from './SnapIndicator';
 import { DrawInteraction } from './DrawInteraction';
 import { useDrawTool } from './useDrawTool';
@@ -177,6 +178,7 @@ export function Viewport2D(): React.ReactElement {
 
       <ScreenAnchorOverlay />
       <FocusBanner />
+      <PidSheetHud />
       <AnalysisLegend />
       <ScaleBar zoom={cameraZoom} />
 
