@@ -17,6 +17,8 @@ import { exportIges, importIges } from './igesExchange';
 import { verifyExchangeFile } from './verifyExchangeFile';
 import { geometricValidationProperties } from './gvp';
 import { exportBcf } from './bcf/exportBcf';
+import { importBcf } from './bcf/importBcf';
+import { exportBcfViewpoint, importBcfViewpoint } from './bcf/bcfViewpoint';
 
 export const exchangeCommands = commandCatalog(
   exportStl,
@@ -36,4 +38,7 @@ export const exchangeCommands = commandCatalog(
   verifyExchangeFile,
   geometricValidationProperties,
   exportBcf,
+  importBcf,
+  exportBcfViewpoint,
+  importBcfViewpoint,
 );

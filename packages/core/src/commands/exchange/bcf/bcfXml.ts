@@ -57,8 +57,31 @@ export interface MarkupViewpoint {
   readonly snapshot?: string;
 }
 
-/** markup.bcf of one issue; `created` is an ISO 8601 date-time (commands never read the clock). */
-export function bcfMarkupXml(issue: ReviewIssue, viewpoints: readonly MarkupViewpoint[], created: string, author: string): string {
+export interface MarkupComment {
+  readonly guid: string;
+  readonly text: string;
+  readonly author: string;
+  /** GUID of the topic viewpoint the comment cites (one of the `viewpoints` of the markup). */
+  readonly viewpointGuid?: string;
+}
+
+/** markup.bcf of one issue; `created` is an ISO 8601 date-time (commands never read the clock) and dates every comment too. */
+export function bcfMarkupXml(
+  issue: ReviewIssue,
+  viewpoints: readonly MarkupViewpoint[],
+  created: string,
+  author: string,
+  comments: readonly MarkupComment[] = [],
+): string {
+  const discussion =
+    comments.length === 0
+      ? ''
+      : `<Comments>${comments
+          .map(
+            (comment) =>
+              `<Comment Guid="${comment.guid}">${text('Date', created)}${text('Author', comment.author)}${text('Comment', comment.text)}${comment.viewpointGuid === undefined ? '' : `<Viewpoint Guid="${comment.viewpointGuid}" />`}</Comment>`,
+          )
+          .join('')}</Comments>`;
   const labels = issue.labels.length === 0 ? '' : `<Labels>${issue.labels.map((label) => text('Label', label)).join('')}</Labels>`;
   const views =
     viewpoints.length === 0
@@ -76,7 +99,10 @@ export function bcfMarkupXml(issue: ReviewIssue, viewpoints: readonly MarkupView
     labels +
     text('CreationDate', created) +
     text('CreationAuthor', author) +
+    (issue.dueDate === undefined ? '' : text('DueDate', `${issue.dueDate}T00:00:00Z`)) +
+    (issue.assignedTo === undefined ? '' : text('AssignedTo', issue.assignedTo)) +
     (issue.description === undefined ? '' : text('Description', issue.description)) +
+    discussion +
     views +
     '</Topic></Markup>\n'
   );

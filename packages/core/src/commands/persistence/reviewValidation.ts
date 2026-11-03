@@ -153,6 +153,7 @@ function issueProblem(entry: Record<string, unknown>, viewpoints: Section): stri
   if (typeof entry['guid'] !== 'string' || typeof entry['title'] !== 'string') return 'guid and title must be strings';
   if (!isOneOf(ISSUE_STATUSES, entry['status'])) return 'status is not an issue status';
   if (!isOneOf(ISSUE_PRIORITIES, entry['priority'])) return 'priority is not an issue priority';
+  if (entry['clashKey'] !== undefined && typeof entry['clashKey'] !== 'string') return 'clashKey must be a string';
   const historyIssue = historyProblem(entry['history'], entry['status']);
   if (historyIssue !== null) return historyIssue;
   if (!isStringArray(entry['labels']) || !isStringArray(entry['viewpointIds']) || !isStringArray(entry['entityIds']))

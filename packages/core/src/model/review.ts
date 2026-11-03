@@ -129,6 +129,8 @@ export interface ReviewIssue {
   labels: readonly string[];
   viewpointIds: readonly string[];
   entityIds: readonly EntityId[];
+  /** `clash:<a>,<b>|<kind>` (sorted ids) on an issue create_clash_issues opened; re-runs find the issue by it. */
+  clashKey?: string;
   history: readonly IssueHistoryEntry[];
 }
 

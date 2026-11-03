@@ -682,7 +682,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); Review panel, markup / section-box rendering wait for the UI follow-up, M4 and M6.** |
 | VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Partly built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline; `PlantBatchRenderer` left (VIS-M3b).** |
 | VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
-| VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d |
+| VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d. **Built 2026-11-03 (§12.2 export, §12.9 clash issues, import, single viewpoint); xmllint test waits for the vendored XSDs.** |
 | VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
 | VIS-M7 | instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6) |
 | VIS-M8 (V2) | 10⁶: streaming, Hi-Z occlusion, impostors, instance-array storage; terrain / sky / sun | 08-DAT storage decision | 15 d |
@@ -798,8 +798,7 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 ### 12.5 Not built yet (remaining VIS work)
 
 The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (Review panel, redline tools and section-box gizmo in the UI, viewport clipping with a section box; the model and commands are §12.7), VIS-M3b (`PlantBatchRenderer`; the plan and `render_stats` are §12.8), the rest of VIS-M4
-(profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the rest of VIS-M5
-(`create_clash_issues`, `import_bcf`, single-viewpoint BCF commands, XSD validation VC-VIS-15), VIS-M6 viewport tiers
+(profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the vendored XSDs for VC-VIS-15 (VIS-M5 itself is §12.9), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
 
 ### 12.6 As built — VIS-M1 display profiles and service colours, 2026-10-23
@@ -871,7 +870,7 @@ Decisions (owner delegated, quality first):
   rarely types an exactly orthogonal pair); a parallel or zero vector is `VIS_CAMERA_INVALID`. VC-VIS-50 reads accordingly.
 - **No `force` on `delete_viewpoint`.** It stays refused while a walkthrough or an issue uses the viewpoint (VIS-M9 rule, stricter than §4); delete those first.
 - **Markup `shape` is the param name** (the SC-VIS-04 plan said `kind`; the plan is corrected). A `text` markup takes one point (§4 said 2..256 for all shapes).
-- **No `realism` and no `clashKey`** on the data model yet: walk / fly arrive with VIS-M6, clash issues with VIS-M5.
+- **No `realism` on the data model yet** (walk / fly arrive with VIS-M6); `clashKey` arrived with VIS-M5 (§12.9).
 - **`activeSectionBoxId`** is review data written by `set_section_box` (`activate`) and `apply_viewpoint`; the viewport and `render_view` use it at VIS-M4 / M6.
 
 Not built (VIS-M2 UI part): the Review panel (issues, comments, human sign-off), redline tools, the section-box gizmo, clipping with the active box in the
@@ -920,6 +919,39 @@ Measured (2026-11-03, Windows 11, shared machine, TypeScript reference, perspect
 `render_stats` rebuilds the scene (`planScene`) on every call; the plan itself is ~0.3 s at 10⁶ with the brute-force query. The viewport caches the scene, and the BVH (VIS-M7) replaces the O(N) query.
 
 Not built (VIS-M3b and later): `PlantBatchRenderer`, `LodGeometryCache`, `BatchedMesh` for unique geometry, transparent bucket sorting, instance BVH (`instanceBvh.ts`), `VIS_GPU_LIMIT`, the `render_view` use of the plan.
+
+### 12.9 As built — VIS-M5b clash issues, BCF import, single-viewpoint BCF, 2026-11-03
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| `create_clash_issues` (TR-VIS-40) | runs `source` (`check_clashes` \| `check_assembly`) with `sourceParams` through `execute` on the same context; reads `data.clashes[]` (`check_clashes`) or, for `check_assembly`, its `FPR_PAIR_HARD` / `FPR_PAIR_CONTAINED` pair items (kind `hard` / `contained`, depth = `penetrationEstimateMm`); one issue per clash (type `Clash`, labels `clash` + kind, status `open`, `history: []`) and one viewpoint framed per §5.8; `clashKey` = `clash:` + sorted(a, b) joined by `,` + `\|` + kind, stored on the issue; data `{created, unchanged, updated, skipped, truncated, issueIds}`; ≤ 500 clashes per run; `VIS_CLASH_SOURCE_INVALID` (source unregistered, refused — e.g. no kernel —, or without clashes) | `commands/review/{clashIssues,clashFraming}.ts` |
+| `import_bcf` | BCF 2.1 and 3.0 zip from base64 → issues, viewpoints, comments; `mergePolicy` `skip` (default) / `update` on the topic Guid (the Guid is kept as the issue guid); data `{topics, created, updated, skipped, viewpoints, comments, issueIds, version, warnings[{code, message}]}` | `commands/exchange/bcf/{importBcf,bcfRead,bcfVisualizationRead,bcfViewpointMap}.ts` |
+| `export_bcf_viewpoint` / `import_bcf_viewpoint` | one viewpoint ↔ a `*.bcfv` (metres; data `camera {cameraViewPointM, cameraDirection, cameraUpVector, fieldOfViewDeg \| viewToWorldScaleM}`); the export is behind the export gate | `commands/exchange/bcf/bcfViewpoint.ts` |
+| `export_bcf` additions | `DueDate`, `AssignedTo` and `Comments` (with the viewpoint a comment cites) in `markup.bcf`, in schema order, so a round trip keeps them | `commands/exchange/bcf/{bcfXml,exportBcf}.ts` |
+| Model | `ReviewIssue.clashKey?` (validated on load) | `model/review.ts`, `commands/persistence/reviewValidation.ts` |
+| VC-VIS-15 | structural checks of every exported part in schema order (unit test, always runs); `xmllint --schema` test (`server/tests/bcfSchema.test.ts`) runs when `xmllint` and `LLULL_BCF_XSD_DIR` (`markup.xsd`, `visinfo.xsd`) are present, else it logs and skips: the schemas are CC BY-ND and are not vendored yet (§6 `validation/data/bcf_3_0/` does not exist) | `tests/unit/review/bcfImport.test.ts`, `server/tests/bcfSchema.test.ts` |
+
+Decisions:
+
+- **An import or a clash run is never a human act.** New issues are always `open` with an empty history, whatever `TopicStatus` the file says (a status other than
+  Open / New / Active is warning `VIS_BCF_STATUS_RESET`); `update` and a clash re-run never touch status, history, viewpoints or entities of an existing issue
+  (a clash re-run rewrites only the description, which carries the depth). Closing stays the signed act of §12.7.
+- **Hostile archives.** The zip goes through `lib/zipRead` (only `bcf.version`, `<topic>/markup.bcf` and `<topic>/*.bcfv` are inflated, 128 MiB cap), the XML through
+  `lib/xmlRead` (no DTD, bounded depth / elements / size). An entry name with `..`, a backslash, a leading `/` or a drive is `VIS_BCF_PARSE`; nothing is ever
+  written to a path. Limits: 64 MiB archive, 5000 topics, 64 viewpoints and 500 comments per topic, 20 000 components per list, texts clipped at 20 000 characters.
+  A topic or viewpoint that cannot be read is skipped with a warning (`VIS_BCF_TOPIC_SKIPPED`, `VIS_BCF_VIEWPOINT_SKIPPED`); an archive with no readable topic
+  folder is `VIS_BCF_PARSE`. Both commands are in the hostile-input harness (`tests/helpers/hostile/bcfReaders.ts`).
+- **Components.** Only `OriginatingSystem` `llull` + `AuthoringToolId` name an entity; components that are not llull's, or name an unknown entity, are dropped and
+  counted in warning `VIS_BCF_GUID_UNMAPPED`.
+- **Camera.** Metres × 1000 / mm-per-unit; a camera within 1e-6 of orthonormal is stored as written (the §3.2 invariant, SC-VIS-02 step 7), otherwise normalised.
+  `get_viewpoint` now returns `warnings: []` (no `VIS_VIEWPOINT_NOT_ORTHONORMAL` is emitted, §12.7) so the plan row for it holds.
+- **Clash ids.** `check_clashes` reports building element ids: the issue selects the entities of the elements (`building.elements[id].entityIds`) and frames their
+  AABBs; `check_assembly` ids are entity ids. A clash whose part has no geometry is `skipped`. The framing box is the AABB intersection, or per axis the gap
+  between the closest faces when they do not overlap, grown by `margin` (mm).
+- **Imported comments are `author: 'agent'`** (a label only); BCF author and date are not kept. A viewpoint of an imported topic is named after the topic.
+
+Not built: BCF 2.1 export (`VIS_BCF_VERSION` still refuses it), `VIS_BCF_COLOURING_LARGE`, per-component `IfcGuid` mapping (needs the 08-DAT IFC export), import of
+snapshots, section boxes and markups from a BCF viewpoint (`Lines`, `ClippingPlanes` are ignored), the vendored XSDs for the server test, and the UI for any of it.
 
 ## 13. References
 
