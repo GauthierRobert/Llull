@@ -53,6 +53,9 @@ export { pipeStressPlugin } from './plant/stress/plugin';
 export { plantEquipmentPlugin } from './plant/equipment/plugin';
 export { plantDataPlugin } from './plant/data/plugin';
 export { pidPlugin } from './plant/pid/plugin';
+export { buildPidDrawing, LAYERS as PID_LAYERS } from './plant/pid/render/pidDrawing';
+export type { PidDrawing, PidGlyph } from './plant/pid/render/pidDrawing';
+export type { PidModel, PidSheet, PidItem } from './plant/pid/model';
 
 // plant: display plugin (service colour schemes, entity properties; plant 09 VIS)
 export { plantDisplayPlugin } from './plant/display/plugin';

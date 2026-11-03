@@ -12,6 +12,7 @@ import { computePlanDepth, PLAN_CAMERA_HEIGHT } from './planDepth';
 import { ZoomExtents2D } from './ZoomExtents2D';
 import { Entities2D } from './Entities2D';
 import { BuildingPlan2D } from './BuildingPlan2D';
+import { PidSheet2D } from './PidSheet2D';
 import { SnapIndicator } from './SnapIndicator';
 import { DrawInteraction } from './DrawInteraction';
 import { useDrawTool } from './useDrawTool';
@@ -111,6 +112,7 @@ function SceneContents2D({
       {/* One offset group: pointer e.point resolves in document space, the snap candidate frame. */}
       <group position={groupOffset}>
         <BuildingPlan2D />
+        <PidSheet2D />
         <Entities2D />
 
         {!isDrawing && !isModifying && <SnapIndicator zoom={zoom} />}
