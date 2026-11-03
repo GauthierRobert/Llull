@@ -101,7 +101,11 @@ export function resolveReviewStyle(doc: CadDocument, request: ReviewRequest): Re
   const notes: string[] = [];
   const profileId = request.colourProfileId ?? viewpoint?.colourProfileId ?? doc.display?.activeProfileId;
   const profile = own(doc.display?.colourProfiles, profileId);
-  if (profile === undefined && profileId !== undefined && profileId !== doc.display?.activeProfileId)
+  if (
+    profile === undefined &&
+    profileId !== undefined &&
+    (request.colourProfileId !== undefined || profileId !== doc.display?.activeProfileId)
+  )
     return { code: 'VIS_PROFILE_NOT_FOUND', message: `no colour profile '${profileId}'`, paths: ['colourProfileId'] };
   if (request.sectionBoxId !== undefined && request.cut !== undefined)
     return { code: 'VIS_RENDER_INVALID', message: 'sectionBoxId cannot be combined with cut', paths: ['sectionBoxId'] };
@@ -200,7 +204,8 @@ export function applyReviewStyle(
   const exceptions = new Set(visibility?.exceptions ?? []);
   const all = orderedEntities(scene).map((e) => e.id);
   const shown = visibility === null ? all : all.filter((id) => exceptions.has(id) !== visibility.defaultVisible);
-  const hiddenIds = all.filter((id) => !shown.includes(id));
+  const shownSet = new Set(shown);
+  const hidden = new Set(all.filter((id) => !shownSet.has(id)));
   const rules = new Map((profile === null ? [] : evaluateProfile(scene, ctx, profile, shown)).map((row) => [row.id, row.rule]));
   const counts = new Map<string, number>();
   const entities: Record<string, Entity> = {};
@@ -210,7 +215,7 @@ export function applyReviewStyle(
     let entity = scene.entities[id] as Entity;
     const rule = rules.get(id) ?? null;
     if (rule?.appearance.hidden === true) {
-      hiddenIds.push(id);
+      hidden.add(id);
       continue;
     }
     if (rule !== null) {
@@ -221,6 +226,7 @@ export function applyReviewStyle(
     entities[id] = entity;
     order.push(id);
   }
+  const hiddenIds = all.filter((id) => hidden.has(id));
   const legend = (profile?.rules ?? []).map((rule) => ({
     ruleId: rule.id,
     legend: rule.legend,

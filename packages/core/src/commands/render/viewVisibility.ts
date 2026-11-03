@@ -10,7 +10,7 @@ import { entityBoundsInDoc } from '../../geometry/bounds';
 import { classifyAgainstSection } from '../../geometry/sectionBox';
 import { boxInsideAllPlanes } from '../../geometry/renderPlan';
 import { frustumPlanes, type FrustumPlane } from '../../geometry/renderPlanCamera';
-import { cross3, normalize3, sub3 } from '../../lib/vec3';
+import { cross3, len3, normalize3, sub3 } from '../../lib/vec3';
 import { orderedEntities } from '../entity/entityOps';
 import type { Camera } from './camera';
 import { supersampleFor } from './rasterScene';
@@ -26,10 +26,18 @@ export function renderSamples(width: number, height: number, strip = false): num
   return strip ? pixels : pixels * supersampleFor(width, height) ** 2;
 }
 
-/** Inward frustum planes of a render camera (orthographic: `orthoHalf` is the half-extent the picture is framed with). */
-export function renderFrustum(camera: Camera, orthoHalf: number, width: number, height: number): FrustumPlane[] {
-  const direction = normalize3(sub3(camera.target, camera.position));
-  const right = normalize3(cross3(direction, camera.up));
+/**
+ * Inward frustum planes of a render camera (orthographic: `orthoHalf` is the half-extent the picture is framed with), or the reason there is none.
+ * @failure zero or non-finite direction / up, or up parallel to the direction -> string (never a guessed frustum)
+ */
+export function renderFrustum(camera: Camera, orthoHalf: number, width: number, height: number): FrustumPlane[] | string {
+  const toTarget = sub3(camera.target, camera.position);
+  const sideways = cross3(toTarget, camera.up);
+  if (![...toTarget, ...camera.up].every(Number.isFinite) || len3(toTarget) < 1e-12 || len3(camera.up) < 1e-12)
+    return 'the camera direction or up vector is zero or not finite';
+  if (len3(sideways) < 1e-9 * len3(toTarget) * len3(camera.up)) return 'the camera up vector is parallel to its direction';
+  const direction = normalize3(toTarget);
+  const right = normalize3(sideways);
   const up = cross3(right, direction);
   const base = { eye: camera.position, direction, up, widthPx: width, heightPx: height };
   return frustumPlanes(

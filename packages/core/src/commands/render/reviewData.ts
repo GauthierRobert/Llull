@@ -12,14 +12,23 @@ export function reviewData(
   frustum: boolean,
 ): Pick<
   RenderViewData,
-  'visibleEntityIds' | 'visibleEntityCount' | 'legend' | 'colourProfileId' | 'sectionBoxId' | 'shading' | 'hiddenEntityIds'
+  | 'visibleEntityIds'
+  | 'visibleEntityCount'
+  | 'frustumSkipped'
+  | 'legend'
+  | 'colourProfileId'
+  | 'sectionBoxId'
+  | 'shading'
+  | 'hiddenEntityIds'
 > {
-  const planes = frustum ? renderFrustum(base.camera, base.orthoHalf, base.width, base.height) : null;
+  const built = frustum ? renderFrustum(base.camera, base.orthoHalf, base.width, base.height) : null;
+  const planes = typeof built === 'string' ? null : built;
   const visible = entityIdsInView(styled.scene, style.box, planes);
   return {
     visibleEntityIds: visible.slice(0, MAX_LISTED_VISIBLE),
     visibleEntityCount: visible.length,
     legend: styled.legend,
+    ...(typeof built === 'string' ? { frustumSkipped: built } : {}),
     shading: style.highlight === null ? 'flat' : 'review',
     hiddenEntityIds: styled.hiddenIds.slice(0, MAX_LISTED_VISIBLE),
     ...(style.profile === null ? {} : { colourProfileId: style.profile.id }),

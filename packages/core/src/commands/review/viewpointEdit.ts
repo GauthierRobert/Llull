@@ -17,7 +17,7 @@ import { viewpointStateFields, viewpointStateParams, viewpointStateRejection, ty
 export const getViewpoint = defineCommand({
   name: 'get_viewpoint',
   description:
-    'Read one saved viewpoint (vp-<n>): data { id, guid, name, camera, sectionBoxId?, colourProfileId?, visibility?, selection?, markups[] } ' +
+    'Read one saved viewpoint (vp-<n>): data { id, guid, name, camera, sectionBoxId?, colourProfileId?, visibility?, selection?, markups[], warnings[] (none are emitted today: cameras within 1e-6 of orthonormal are kept as saved) } ' +
     'with the redlines drawn on it (add_markup). Read-only. Error: VIS_VIEWPOINT_NOT_FOUND.',
   annotations: { readOnly: true },
   params: z.object({ id: z.string().describe('Viewpoint id, e.g. "vp-1".') }),
@@ -29,6 +29,7 @@ export const getViewpoint = defineCommand({
     return report(doc, `Viewpoint ${id} "${viewpoint.name}" (${viewpoint.camera.projection}), ${markups.length} markup(s).`, {
       ...viewpoint,
       markups,
+      warnings: [],
     });
   },
 });

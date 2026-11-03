@@ -94,6 +94,8 @@ function commentProblem(entry: Record<string, unknown>, issues: Section, viewpoi
   const issueId = entry['issueId'];
   if (typeof issueId !== 'string' || !Object.hasOwn(issues, issueId)) return 'issueId must name an issue';
   if (typeof entry['text'] !== 'string') return 'text must be a string';
+  if (entry['importedAuthor'] !== undefined && (typeof entry['importedAuthor'] !== 'string' || entry['importedAuthor'].length > 200))
+    return 'importedAuthor must be a string of at most 200 characters';
   const cited = entry['viewpointId'];
   if (cited !== undefined && (typeof cited !== 'string' || !Object.hasOwn(viewpoints, cited))) return 'viewpointId must name a viewpoint';
   return isAuthor(entry['author']) ? null : "author must be 'agent' or 'human'";
@@ -153,6 +155,7 @@ function issueProblem(entry: Record<string, unknown>, viewpoints: Section): stri
   if (typeof entry['guid'] !== 'string' || typeof entry['title'] !== 'string') return 'guid and title must be strings';
   if (!isOneOf(ISSUE_STATUSES, entry['status'])) return 'status is not an issue status';
   if (!isOneOf(ISSUE_PRIORITIES, entry['priority'])) return 'priority is not an issue priority';
+  if (entry['clashKey'] !== undefined && typeof entry['clashKey'] !== 'string') return 'clashKey must be a string';
   const historyIssue = historyProblem(entry['history'], entry['status']);
   if (historyIssue !== null) return historyIssue;
   if (!isStringArray(entry['labels']) || !isStringArray(entry['viewpointIds']) || !isStringArray(entry['entityIds']))

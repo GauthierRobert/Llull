@@ -2,7 +2,9 @@
 
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
-import { frustumPlanes, viewpointPlanCamera } from '../../geometry/renderPlanCamera';
+import { withExplodedPositions } from '../../geometry/explodedOffsets';
+import { frustumPlanes, planCameraProblem, viewpointPlanCamera } from '../../geometry/renderPlanCamera';
+import { cross3, len3 } from '../../lib/vec3';
 import { reviewRejection } from '../review/reviewModel';
 import { applyReviewStyle, resolveReviewStyle } from './reviewStyle';
 import { entityIdsInView } from './viewVisibility';
@@ -19,7 +21,7 @@ export const visibleEntityIds = defineCommand({
     'List the entities a view shows, without rendering: first viewpoint visibility (BCF default + exceptions) and the hidden rules of the colour profile, then the section box ' +
     '(an entity wholly outside it is dropped), then, when `viewpointId` is given, the view frustum of that camera at width x height. ' +
     'Colour profile and section box come from the parameters, else the viewpoint, else the active ones (same rules as render_view). ' +
-    'Returns data { visibleEntityIds (first `limit`, document order), visibleEntityCount, hiddenEntityIds, entityCount, colourProfileId?, sectionBoxId?, frustum: boolean }. Does NOT modify the document.',
+    'Without `viewpointId` there is no view frustum (only visibility, hidden rules and the section box apply; data.frustum is false). Exploded views apply like render_view. Returns data { visibleEntityIds (first `limit`, document order), visibleEntityCount, hiddenEntityIds, entityCount, colourProfileId?, sectionBoxId?, frustum: boolean }. Does NOT modify the document.',
   params: z.object({
     viewpointId: z
       .string()
@@ -54,9 +56,23 @@ export const visibleEntityIds = defineCommand({
     const resolved = resolveReviewStyle(doc, params);
     if ('code' in resolved) return reviewRejection(doc, 'visible_entity_ids', resolved.code, resolved.message, [], resolved.paths);
     const { style } = resolved;
-    const styled = applyReviewStyle(doc, style, ctx, undefined);
-    const planes =
-      viewpoint === undefined ? null : frustumPlanes(viewpointPlanCamera(viewpoint.camera, params.width ?? 1920, params.height ?? 1080));
+    const styled = applyReviewStyle(withExplodedPositions(doc), style, ctx, undefined);
+    let planes: ReturnType<typeof frustumPlanes> | null = null;
+    if (viewpoint !== undefined) {
+      const camera = viewpointPlanCamera(viewpoint.camera, params.width ?? 1920, params.height ?? 1080);
+      const problem =
+        planCameraProblem(camera) ?? (len3(cross3(camera.direction, camera.up)) < 1e-9 ? 'up is parallel to the viewing direction' : null);
+      if (problem !== null)
+        return reviewRejection(
+          doc,
+          'visible_entity_ids',
+          'VIS_CAMERA_INVALID',
+          `viewpoint '${viewpoint.id}': ${problem}`,
+          [],
+          ['viewpointId'],
+        );
+      planes = frustumPlanes(camera);
+    }
     const visible = entityIdsInView(styled.scene, style.box, planes);
     const listed = visible.slice(0, params.limit ?? 1000);
     const data = {

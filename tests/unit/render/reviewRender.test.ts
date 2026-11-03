@@ -7,6 +7,7 @@ import { sectionBoxCut } from '@core/commands/render/reviewStyle';
 import { classifyAgainstSection } from '@core/geometry/sectionBox';
 import { apply, data, expectRefusal, ok } from '../../helpers/commandAssertions';
 import { expectPure } from '../../helpers/expectNoOp';
+import { renderView } from '@core/commands/render/renderView';
 
 /** Three 1000 mm boxes in a row along x (a at 0, b at 3000, c at 6000), named a / b / c. */
 function scene(): CadDocument {
@@ -297,5 +298,109 @@ describe('VIS_RENDER_BUDGET', () => {
     );
     expect(refused.summary).toContain('exceed');
     expect(execute(doc, 'render_view', { turntable: { frames: 2 }, width: 64, height: 64 }).rejected).toBeUndefined();
+  });
+});
+
+describe('VIS-M4b review follow-ups', () => {
+  const ORTHO = (eye: number[], direction: number[], up: number[], viewHeight = 2000): Record<string, unknown> => ({
+    projection: 'orthographic',
+    eye,
+    direction,
+    up,
+    viewHeight,
+  });
+
+  it('visibility over thousands of entities stays linear and lists hidden ids in document order', () => {
+    let doc = createEmptyDocument();
+    const ids: string[] = [];
+    for (let i = 0; i < 3000; i++) {
+      const added = ok(doc, 'add_box', { size: [1, 1, 1], position: [i * 2, 0, 0] });
+      doc = added.document;
+      ids.push(added.affected[0] as string);
+    }
+    const hidden = ids.filter((_, i) => i % 3 === 0);
+    doc = ok(doc, 'save_viewpoint', {
+      name: 'v',
+      camera: ORTHO([3000, 0, 100], [0, 0, -1], [0, 1, 0], 100000),
+      visibility: { defaultVisible: true, exceptions: [...hidden].reverse() },
+    }).document;
+    const started = performance.now();
+    const out = data<Record<string, unknown>>(doc, 'visible_entity_ids', { viewpointId: 'vp-1', limit: 10000 });
+    expect(performance.now() - started).toBeLessThan(5000);
+    expect(out['hiddenEntityIds']).toEqual(hidden);
+    expect(out['visibleEntityCount']).toBe(3000 - hidden.length);
+  });
+
+  it('refuses a viewpoint camera that cannot give a frustum (VIS_CAMERA_INVALID) and skips the frustum in renderFrustum', () => {
+    const doc = scene();
+    const bad = { ...ok(doc, 'save_viewpoint', { name: 'v' }).document };
+    const review = bad.review;
+    const broken = {
+      ...bad,
+      review: {
+        ...review!,
+        viewpoints: {
+          'vp-1': {
+            ...review!.viewpoints['vp-1']!,
+            camera: { ...review!.viewpoints['vp-1']!.camera, up: [0, 0, 0] as [number, number, number] },
+          },
+        },
+      },
+    };
+    expectRefusal(broken as CadDocument, 'visible_entity_ids', { viewpointId: 'vp-1' }, 'VIS_CAMERA_INVALID', 'viewpointId');
+    const parallel = {
+      ...broken,
+      review: {
+        ...broken.review,
+        viewpoints: {
+          'vp-1': {
+            ...broken.review.viewpoints['vp-1']!,
+            camera: {
+              ...broken.review.viewpoints['vp-1']!.camera,
+              direction: [0, 0, -1] as [number, number, number],
+              up: [0, 0, 1] as [number, number, number],
+            },
+          },
+        },
+      },
+    };
+    expectRefusal(parallel as CadDocument, 'visible_entity_ids', { viewpointId: 'vp-1' }, 'VIS_CAMERA_INVALID', 'viewpointId');
+    expect(typeof renderFrustum({ position: [0, 0, 5], target: [0, 0, 0], up: [0, 0, 1] }, 10, 100, 100)).toBe('string');
+    expect(typeof renderFrustum({ position: [0, 0, 5], target: [0, 0, 5], up: [0, 1, 0] }, 10, 100, 100)).toBe('string');
+    expect(typeof renderFrustum({ position: [0, 0, 5], target: [0, 0, 0], up: [0, 0, 0] }, 10, 100, 100)).toBe('string');
+  });
+
+  it('applies the active exploded view before the frustum', () => {
+    const added = ok(createEmptyDocument(), 'add_box', { size: [100, 100, 100], position: [0, 0, 0] });
+    const id = added.affected[0] as string;
+    const withViewpoint = ok(added.document, 'save_viewpoint', {
+      name: 'v',
+      camera: ORTHO([0, 0, 1000], [0, 0, -1], [0, 1, 0], 1000),
+    }).document;
+    const exploded = ok(withViewpoint, 'create_exploded_view', { name: 'v', offsets: [{ target: id, vector: [50000, 0, 0] }] });
+    const active = apply(exploded.document, 'set_active_exploded_view', { id: exploded.affected[0] });
+    expect(data<Record<string, unknown>>(exploded.document, 'visible_entity_ids', { viewpointId: 'vp-1' })['visibleEntityIds']).toEqual([
+      id,
+    ]);
+    expect(data<Record<string, unknown>>(active, 'visible_entity_ids', { viewpointId: 'vp-1' })['visibleEntityIds']).toEqual([]);
+  });
+
+  it('frames on the whole scene when a profile hides entities; a named missing profile always errors', () => {
+    const doc = withProfile(scene());
+    const hiddenRun = dataOf(view(doc, { colourProfileId: 'by-name' }));
+    const plain = dataOf(view(doc));
+    expect(hiddenRun['bounds']).toEqual(plain['bounds']);
+    expect(hiddenRun['camera']).toEqual(plain['camera']);
+    const active = apply(doc, 'set_active_colour_profile', { profileId: 'by-name' });
+    const gone = { ...active, display: { ...active.display!, colourProfiles: {} } } as CadDocument;
+    expect(execute(gone, 'render_view', { colourProfileId: 'by-name' }).error?.code).toBe('VIS_PROFILE_NOT_FOUND');
+    expect(execute(gone, 'render_view', {}).rejected).toBeUndefined();
+  });
+
+  it('refuses a 12-frame 1920x1080 strip and runs render_view with a profile and no context', () => {
+    expectRefusal(scene(), 'render_view', { turntable: { frames: 12 }, width: 1920, height: 1080 }, 'VIS_RENDER_BUDGET', 'width');
+    const doc = withProfile(scene());
+    const result = renderView.run(doc, { colourProfileId: 'by-name', mode: 'vector', width: 100, height: 100 } as never, undefined);
+    expect((result.data as { legend: { count: number }[] }).legend[0]?.count).toBe(1);
   });
 });

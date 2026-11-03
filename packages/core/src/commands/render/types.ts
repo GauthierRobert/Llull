@@ -43,6 +43,8 @@ export interface RenderViewData {
   colourProfileId?: string;
   sectionBoxId?: string;
   shading?: 'flat' | 'review';
+  /** Why the view frustum was not applied to visibleEntityIds (degenerate camera); absent when it was applied or not applicable. */
+  frustumSkipped?: string;
 }
 
 /** One cut plane; the side the normal points to (dot(normal, p) > offset) is the removed side. */

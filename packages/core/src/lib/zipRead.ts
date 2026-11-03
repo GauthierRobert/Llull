@@ -12,6 +12,8 @@ export interface UnzipOptions {
   readonly select?: (name: string) => boolean;
   /** Largest decompressed size of one entry, and of all read entries together. */
   readonly maxBytes?: number;
+  /** Largest decompressed / compressed ratio of one entry (plus 64 KiB of slack); inflating stops at that size. */
+  readonly maxRatio?: number;
 }
 
 /**
@@ -49,7 +51,8 @@ export function unzip(bytes: Uint8Array, options: UnzipOptions = {}): ZipEntry[]
     const stored = bytes.subarray(dataStart, dataStart + compressedSize);
     let data: Uint8Array;
     if (method === 0) data = stored;
-    else if (method === 8) data = inflateRaw(stored, budget);
+    else if (method === 8)
+      data = inflateRaw(stored, options.maxRatio === undefined ? budget : Math.min(budget, stored.length * options.maxRatio + 65536));
     else throw new Error(`ZIP entry ${name} uses unsupported compression method ${method}`);
     budget -= data.length;
     if (budget < 0) throw new Error(`ZIP entries exceed the ${maxBytes} byte limit`);

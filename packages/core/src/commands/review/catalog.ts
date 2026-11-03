@@ -9,6 +9,7 @@ import { createWalkthrough, deleteWalkthrough } from './walkthroughs';
 import { createReviewIssue, deleteReviewIssue } from './issues';
 import { setIssueStatus, reviewActPayload } from './issueStatus';
 import { addReviewComment } from './comments';
+import { createClashIssues } from './clashIssues';
 import { checkReview } from './checkReview';
 import { addMarkup, deleteMarkup } from './markups';
 import { deleteSectionBox, sectionBoxReport, setSectionBox } from './sectionBoxes';
@@ -38,4 +39,5 @@ export const reviewCommands = commandCatalog(
   setIssueStatus,
   reviewActPayload,
   checkReview,
+  createClashIssues,
 );
