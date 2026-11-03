@@ -2,6 +2,14 @@
 // per-pipe worst ratio the overlay paints and the worst-stations list of the panel. No React, no three.js.
 
 import { isRecord } from '@lib/isRecord';
+import {
+  parseDisplacements,
+  parseGeometry,
+  parseReactions,
+  type NodeDisplacement,
+  type StressGeometry,
+  type SupportReaction,
+} from './stressGeometry';
 
 export type RatioTone = 'pass' | 'warn' | 'fail' | 'unknown';
 
@@ -24,6 +32,8 @@ export interface StressRow {
   readonly element: string;
   readonly pipeId: string;
   readonly node: string | null;
+  /** Station position along the element from its first node, mm. */
+  readonly xMm: number;
   readonly ratio: number;
   readonly stressMPa: number;
   readonly allowableMPa: number;
@@ -55,6 +65,10 @@ export interface StressView {
   readonly findings: readonly StressFinding[];
   readonly inputHash: string;
   readonly resultHash: string;
+  /** Node and element positions (mm); null when the answer carries none. */
+  readonly geometry: StressGeometry | null;
+  readonly reactions: readonly SupportReaction[];
+  readonly displacements: readonly NodeDisplacement[];
   /** Recorded results of the model: their status and whether the inputs changed since. Null when nothing is recorded. */
   readonly recorded: { readonly status: string; readonly stale: boolean } | null;
 }
@@ -77,6 +91,7 @@ function parseRow(value: unknown): StressRow | null {
     element: str(value['element']) ?? '',
     pipeId,
     node: str(value['node']),
+    xMm: num(value['xMm']) ?? 0,
     ratio,
     stressMPa: num(value['stressMPa']) ?? 0,
     allowableMPa: num(value['allowableMPa']) ?? 0,
@@ -134,7 +149,7 @@ function parseCases(data: Record<string, unknown>): CaseSummary[] {
   });
 }
 
-/** The view of an `analyze_pipe_stress` answer called with `include: ['stresses']`; null when `data` is not an analysis (a refused query has none). */
+/** The view of an `analyze_pipe_stress` answer called with `include: ['stresses', 'geometry', 'reactions', 'displacements']`; null when `data` is not an analysis (a refused query has none). */
 export function parseStressView(data: unknown): StressView | null {
   if (!isRecord(data)) return null;
   const status = data['status'];
@@ -151,28 +166,23 @@ export function parseStressView(data: unknown): StressView | null {
     findings: list(data['findings']).flatMap((finding) => parseFinding(finding) ?? []),
     inputHash: str(data['inputHash']) ?? '',
     resultHash: str(data['resultHash']) ?? '',
+    geometry: parseGeometry(data['geometry']),
+    reactions: parseReactions(details['reactions']),
+    displacements: parseDisplacements(details['displacements']),
     recorded: recorded === null ? null : { status: str(recorded['status']) ?? '', stale: recorded['stale'] === true },
   };
-}
-
-export interface PipeWorst {
-  readonly pipeId: string;
-  readonly ratio: number;
-  readonly node: string | null;
-  readonly case: string;
 }
 
 /** A non-finite ratio ranks above every finite one. */
 const rank = (ratio: number): number => (Number.isFinite(ratio) ? ratio : Number.POSITIVE_INFINITY);
 
-/** The worst row of every pipe (over `caseName`, or every case when null). */
-export function worstPerPipe(rows: readonly StressRow[], caseName: string | null): Map<string, PipeWorst> {
-  const worst = new Map<string, PipeWorst>();
+/** The worst station ratio of every element (over `caseName`, or every case when null); an element without a station is absent. */
+export function elementRatios(rows: readonly StressRow[], caseName: string | null): Map<string, number> {
+  const worst = new Map<string, number>();
   for (const row of rows) {
     if (caseName !== null && row.case !== caseName) continue;
-    const known = worst.get(row.pipeId);
-    if (known === undefined || rank(row.ratio) > rank(known.ratio))
-      worst.set(row.pipeId, { pipeId: row.pipeId, ratio: row.ratio, node: row.node, case: row.case });
+    const known = worst.get(row.element);
+    if (known === undefined || rank(row.ratio) > rank(known)) worst.set(row.element, row.ratio);
   }
   return worst;
 }

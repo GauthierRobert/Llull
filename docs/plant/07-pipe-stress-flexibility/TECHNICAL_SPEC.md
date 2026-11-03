@@ -5,22 +5,22 @@ Validation: [`validation/README.md`](validation/README.md). Laws: [`.claude/rule
 
 ## 1. Current state in llull (before this gap)
 
-| Area | What exists | Path | Limit for stress analysis |
-| ---- | ----------- | ---- | ------------------------- |
-| Pipe element | `PipeElement { points: Vec3[], diameter, service, material: string, line?, dn?, from?, to? }` in the building model; `add_pipe_run` routes a 3D polyline, bends implied at every interior point | `packages/core/src/model/building.ts` (l. 251), `packages/domain-aec/src/industrial/equipment/equipment.ts` (l. 97) | no wall thickness, schedule, bend radius, temperature, pressure, insulation; material is free text; no connectivity graph between runs (02 RTE) |
-| Pipe sizes | `PIPE_SIZES` [DN, OD, standard wall, MSS SP-69 water span] DN15–DN600 | `industrial/piping/pipeSizes.ts` | STD wall only (DN300 9.53 mm, not Sch 40 10.31 mm); sizing belongs to 01 PSC |
-| Supports | `PipeSupportElement` shoe / guide / anchor / hanger, attached to steel, riser clamps | `industrial/piping/pipeSupports.ts`, `pipeSupportAttach.ts`, `pipeSupportRiser.ts` | geometric only: no restraint directions, gaps, friction, springs |
-| Span check | `check_pipe_supports` (spacing vs MSS SP-69 / B31.1 Table 121.5, riser guides) | `industrial/piping/pipeSupportCheck.ts`, `pipeSpans.ts` | a rule of thumb for weight only; no thermal, no stress |
-| Weight | `pipeWeightPerMetre(OD, contentDensity)` kN/m (steel 7850 kg/m³ + contents) | `industrial/piping/pipeWeight.ts` | no insulation, no components |
-| Hydraulics | `pipe_hydraulics` Darcy–Weisbach / Colebrook | `industrial/piping/pipeHydraulics.ts` | unrelated, but shows the read-only query pattern to follow |
-| Pipe loads on steel | `check_steel_members` loads beams with water-filled pipe weight per tributary length or per attached support | `industrial/steelDesign/steelSupportLoads.ts`, `docs/INDUSTRIAL.md` §"Pipes and trays" | vertical tributary weight only; no thermal friction, anchor or guide loads |
-| Frame solver | linear 2D frame, 3 DOF/node, direct stiffness, hinges | `packages/core/src/lib/frame2d.ts` | 2D only; no 3D, no torsion, no curved elements, no non-linear supports |
-| CAE plugin | CalculiX decks with C3D4 / C3D10 solids only; `set_part_idealization` refuses shells and plane stress; thermo-mechanical CTE handling (secant / instantaneous conversion) | `packages/domain-cae/src/decks/deckBuilder.ts` (l. 81), `commands/parts.ts`, `thermomech/` | no beam / pipe elements (B31, PIPE31, ELBOW31); continuum FEA of a fitting only |
-| Fatigue | rainflow counting, S-N curves, Miner damage | `packages/domain-cae/src/fatigue/` | could count thermal cycles for N (V1 reuse) |
-| Materials | `doc.materials` with PHY-01 property models (E, cte, thermalStrain, Ftu, Fty …), licence flag `licensed-no-redistribution`, CTE conversions | `packages/core/src/model/propertyCatalog.ts`, `materialCte.ts`, `cteConversion.ts`, `materialLibrary.ts` | no piping allowable (S_h), no code-edition qualifier |
-| Human gate | `humanGate(port, act, ids, confirmation)` signature check | `packages/core/src/model/humanGate.ts` | reused for `approve_pipe_stress` |
-| Error codes | `CommandResult.error { code, ids, paths, remediation }`; plan `data.aliases` | `packages/core/src/commands/types.ts`, AGENT_FIRST §2.6 | PST adds its codes |
-| Exchange | IFC4 `IfcPipeSegment`, DXF, sheets | `docs/INDUSTRIAL.md` §Exports | no PCF (05 ISO), no CAESAR II `.cii` |
+| Area                | What exists                                                                                                                                                                                     | Path                                                                                                                | Limit for stress analysis                                                                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipe element        | `PipeElement { points: Vec3[], diameter, service, material: string, line?, dn?, from?, to? }` in the building model; `add_pipe_run` routes a 3D polyline, bends implied at every interior point | `packages/core/src/model/building.ts` (l. 251), `packages/domain-aec/src/industrial/equipment/equipment.ts` (l. 97) | no wall thickness, schedule, bend radius, temperature, pressure, insulation; material is free text; no connectivity graph between runs (02 RTE) |
+| Pipe sizes          | `PIPE_SIZES` [DN, OD, standard wall, MSS SP-69 water span] DN15–DN600                                                                                                                           | `industrial/piping/pipeSizes.ts`                                                                                    | STD wall only (DN300 9.53 mm, not Sch 40 10.31 mm); sizing belongs to 01 PSC                                                                    |
+| Supports            | `PipeSupportElement` shoe / guide / anchor / hanger, attached to steel, riser clamps                                                                                                            | `industrial/piping/pipeSupports.ts`, `pipeSupportAttach.ts`, `pipeSupportRiser.ts`                                  | geometric only: no restraint directions, gaps, friction, springs                                                                                |
+| Span check          | `check_pipe_supports` (spacing vs MSS SP-69 / B31.1 Table 121.5, riser guides)                                                                                                                  | `industrial/piping/pipeSupportCheck.ts`, `pipeSpans.ts`                                                             | a rule of thumb for weight only; no thermal, no stress                                                                                          |
+| Weight              | `pipeWeightPerMetre(OD, contentDensity)` kN/m (steel 7850 kg/m³ + contents)                                                                                                                     | `industrial/piping/pipeWeight.ts`                                                                                   | no insulation, no components                                                                                                                    |
+| Hydraulics          | `pipe_hydraulics` Darcy–Weisbach / Colebrook                                                                                                                                                    | `industrial/piping/pipeHydraulics.ts`                                                                               | unrelated, but shows the read-only query pattern to follow                                                                                      |
+| Pipe loads on steel | `check_steel_members` loads beams with water-filled pipe weight per tributary length or per attached support                                                                                    | `industrial/steelDesign/steelSupportLoads.ts`, `docs/INDUSTRIAL.md` §"Pipes and trays"                              | vertical tributary weight only; no thermal friction, anchor or guide loads                                                                      |
+| Frame solver        | linear 2D frame, 3 DOF/node, direct stiffness, hinges                                                                                                                                           | `packages/core/src/lib/frame2d.ts`                                                                                  | 2D only; no 3D, no torsion, no curved elements, no non-linear supports                                                                          |
+| CAE plugin          | CalculiX decks with C3D4 / C3D10 solids only; `set_part_idealization` refuses shells and plane stress; thermo-mechanical CTE handling (secant / instantaneous conversion)                       | `packages/domain-cae/src/decks/deckBuilder.ts` (l. 81), `commands/parts.ts`, `thermomech/`                          | no beam / pipe elements (B31, PIPE31, ELBOW31); continuum FEA of a fitting only                                                                 |
+| Fatigue             | rainflow counting, S-N curves, Miner damage                                                                                                                                                     | `packages/domain-cae/src/fatigue/`                                                                                  | could count thermal cycles for N (V1 reuse)                                                                                                     |
+| Materials           | `doc.materials` with PHY-01 property models (E, cte, thermalStrain, Ftu, Fty …), licence flag `licensed-no-redistribution`, CTE conversions                                                     | `packages/core/src/model/propertyCatalog.ts`, `materialCte.ts`, `cteConversion.ts`, `materialLibrary.ts`            | no piping allowable (S_h), no code-edition qualifier                                                                                            |
+| Human gate          | `humanGate(port, act, ids, confirmation)` signature check                                                                                                                                       | `packages/core/src/model/humanGate.ts`                                                                              | reused for `approve_pipe_stress`                                                                                                                |
+| Error codes         | `CommandResult.error { code, ids, paths, remediation }`; plan `data.aliases`                                                                                                                    | `packages/core/src/commands/types.ts`, AGENT_FIRST §2.6                                                             | PST adds its codes                                                                                                                              |
+| Exchange            | IFC4 `IfcPipeSegment`, DXF, sheets                                                                                                                                                              | `docs/INDUSTRIAL.md` §Exports                                                                                       | no PCF (05 ISO), no CAESAR II `.cii`                                                                                                            |
 
 Nothing in the repository mentions B31.3, SIFs, PCF or CAESAR II (grep of `packages/`, `src/`, `server/`, `docs/`
 on 2026-10-18). The gap is therefore the whole stress layer: model, solver, code rules, nozzle and spring checks,
@@ -78,23 +78,23 @@ set_pipe_operating_conditions, set_stress_load_cases, add_stress_restraint, impo
 
 Technical requirements (each maps to FRs and AF ids; VCs in `validation/README.md`):
 
-| Id | Pri | Requirement | FR | AF | VC |
-| -- | --- | ----------- | -- | -- | -- |
-| TR-PST-01 | MUST | Model build from pipes + supports with named mapping rules (§5.1) | 01, 02 | AF-05, AF-31 | 07, 12 |
-| TR-PST-02 | MUST | `@lib/frame3d`: 3D Timoshenko pipe beam, banded Cholesky, RCM, residual check (§5.2, §5.5) | 04 | AF-13 | 06, 07, 08, 10, 12 |
-| TR-PST-03 | MUST | Bends as k-scaled curved elements with near / mid / far nodes (§5.3) | 04, 08 | AF-35 | 01, 12 |
-| TR-PST-04 | MUST | Primitive loads W, WW, T, P, D, F, U (V1 WIN, seismic) (§5.4) | 04, 15 | AF-04 | 07, 08, 09, 10 |
-| TR-PST-05 | MUST | Non-linear supports: one-way, gap, friction, iteration cap and status (§5.5) | 05 | AF-11 | 11 |
-| TR-PST-06 | MUST | Rule sets as data (B31.3 by edition, B31.1) with source and grade per row; code stresses and ratios (§5.6) | 06, 07, 22 | AF-30, AF-35 | 03, 05, 09, 13 |
-| TR-PST-07 | MUST | SIF / k table, B31J override, `PST_SIF_EDITION` (§5.7) | 08 | AF-32 | 01, 02, 19 |
-| TR-PST-08 | SHOULD | Spring hanger design from a vendor table (§5.8) | 13 | AF-31 | 14 |
-| TR-PST-09 | SHOULD | Nozzle checks API 610 / NEMA SM 23 / API 617 / user (§5.9) | 14 | AF-30, AF-32 | 15 |
-| TR-PST-10 | MUST | Quick-check queries (§5.10) | 12 | AF-10 | 01, 03, 04, 05, 06 |
-| TR-PST-11 | MUST | `check_pipe_stress` with the codes of §7; `reviewRequired`; `approve_pipe_stress` via `humanGate` | 10, 11 | AF-11, AF-20, AF-33, AF-34 | 18 |
-| TR-PST-12 | MUST | Input hash, staleness, determinism (stable RCM tie-break) | 20 | AF-13, AF-40 | 07, 18 |
-| TR-PST-13 | SHOULD | `.cii` writer, PCF stress attributes via 05 ISO, report writer, overlay | 16, 17, 18 | AF-12, AF-22 | 16, 18 |
-| TR-PST-14 | SHOULD | Coupling: equipment growth in (03 EQP), support loads out (06 STA / `check_steel_members`) | 19 | AF-35 | 12 |
-| TR-PST-15 | COULD | Modal + response spectrum (Lanczos on the same K, lumped mass) | 21 | AF-40 | 17 |
+| Id        | Pri    | Requirement                                                                                                | FR         | AF                         | VC                 |
+| --------- | ------ | ---------------------------------------------------------------------------------------------------------- | ---------- | -------------------------- | ------------------ |
+| TR-PST-01 | MUST   | Model build from pipes + supports with named mapping rules (§5.1)                                          | 01, 02     | AF-05, AF-31               | 07, 12             |
+| TR-PST-02 | MUST   | `@lib/frame3d`: 3D Timoshenko pipe beam, banded Cholesky, RCM, residual check (§5.2, §5.5)                 | 04         | AF-13                      | 06, 07, 08, 10, 12 |
+| TR-PST-03 | MUST   | Bends as k-scaled curved elements with near / mid / far nodes (§5.3)                                       | 04, 08     | AF-35                      | 01, 12             |
+| TR-PST-04 | MUST   | Primitive loads W, WW, T, P, D, F, U (V1 WIN, seismic) (§5.4)                                              | 04, 15     | AF-04                      | 07, 08, 09, 10     |
+| TR-PST-05 | MUST   | Non-linear supports: one-way, gap, friction, iteration cap and status (§5.5)                               | 05         | AF-11                      | 11                 |
+| TR-PST-06 | MUST   | Rule sets as data (B31.3 by edition, B31.1) with source and grade per row; code stresses and ratios (§5.6) | 06, 07, 22 | AF-30, AF-35               | 03, 05, 09, 13     |
+| TR-PST-07 | MUST   | SIF / k table, B31J override, `PST_SIF_EDITION` (§5.7)                                                     | 08         | AF-32                      | 01, 02, 19         |
+| TR-PST-08 | SHOULD | Spring hanger design from a vendor table (§5.8)                                                            | 13         | AF-31                      | 14                 |
+| TR-PST-09 | SHOULD | Nozzle checks API 610 / NEMA SM 23 / API 617 / user (§5.9)                                                 | 14         | AF-30, AF-32               | 15                 |
+| TR-PST-10 | MUST   | Quick-check queries (§5.10)                                                                                | 12         | AF-10                      | 01, 03, 04, 05, 06 |
+| TR-PST-11 | MUST   | `check_pipe_stress` with the codes of §7; `reviewRequired`; `approve_pipe_stress` via `humanGate`          | 10, 11     | AF-11, AF-20, AF-33, AF-34 | 18                 |
+| TR-PST-12 | MUST   | Input hash, staleness, determinism (stable RCM tie-break)                                                  | 20         | AF-13, AF-40               | 07, 18             |
+| TR-PST-13 | SHOULD | `.cii` writer, PCF stress attributes via 05 ISO, report writer, overlay                                    | 16, 17, 18 | AF-12, AF-22               | 16, 18             |
+| TR-PST-14 | SHOULD | Coupling: equipment growth in (03 EQP), support loads out (06 STA / `check_steel_members`)                 | 19         | AF-35                      | 12                 |
+| TR-PST-15 | COULD  | Modal + response spectrum (Lanczos on the same K, lumped mass)                                             | 21         | AF-40                      | 17                 |
 
 `create_stress_model` stores **references and rules**, not a geometry copy: the FE model is rebuilt from the current
 pipes on every analysis, so routing edits are never out of sync (FR-PST-20). The input hash covers the referenced
@@ -107,69 +107,88 @@ existing documents). Sketch:
 
 ```ts
 type PipingCode = 'B31.3' | 'B31.1';
-type CodeEdition = '2016' | '2018' | '2020' | '2022' | '2024';       // rule-set key = `${code}-${edition}`
+type CodeEdition = '2016' | '2018' | '2020' | '2022' | '2024'; // rule-set key = `${code}-${edition}`
 
-interface Sourced<T> { readonly value: T; readonly source: string; readonly defaulted: boolean; readonly unverified: boolean }
+interface Sourced<T> {
+  readonly value: T;
+  readonly source: string;
+  readonly defaulted: boolean;
+  readonly unverified: boolean;
+}
 
 interface StressModel {
-  readonly id: string;                         // stress-<step>.<k>
+  readonly id: string; // stress-<step>.<k>
   readonly name: string;
   readonly scope: { readonly pipeIds: readonly string[] } | { readonly line: string } | { readonly networkFrom: string };
   readonly code: PipingCode;
-  readonly edition: Sourced<CodeEdition>;      // defaulted ⇒ PST_EDITION_DEFAULTED warning
-  readonly maxElementLengthMm: number;         // default 3000 (named)
+  readonly edition: Sourced<CodeEdition>; // defaulted ⇒ PST_EDITION_DEFAULTED warning
+  readonly maxElementLengthMm: number; // default 3000 (named)
   readonly elbowRadiusFactor: Sourced<number>; // R1 / nominal size when the route has sharp corners; default 1.5 (long radius)
   readonly supportMapping: SupportMappingRules; // shoe → rest(+V) with friction, guide → rest + lateral gap, ...
-  readonly friction: Sourced<number>;          // μ, default 0.3 (steel on steel, named)
-  readonly verticalAxis: 'z';                  // llull is Z-up
+  readonly friction: Sourced<number>; // μ, default 0.3 (steel on steel, named)
+  readonly verticalAxis: 'z'; // llull is Z-up
   readonly conditions: readonly OperatingConditions[];
-  readonly loadCases: readonly LoadCaseDef[];  // generated default set unless edited
-  readonly restraints: readonly ExtraRestraint[];   // additions / overrides on top of mapped supports
-  readonly sifOverrides: readonly SifOverride[];    // B31J values typed in by a licensed user
+  readonly loadCases: readonly LoadCaseDef[]; // generated default set unless edited
+  readonly restraints: readonly ExtraRestraint[]; // additions / overrides on top of mapped supports
+  readonly sifOverrides: readonly SifOverride[]; // B31J values typed in by a licensed user
   readonly nozzleChecks: readonly NozzleCheckDef[]; // V1
-  readonly springs: readonly SpringSelection[];     // V1, written by select_spring_hangers
+  readonly springs: readonly SpringSelection[]; // V1, written by select_spring_hangers
   readonly recorded?: RecordedResults;
   readonly approval?: { readonly signer: string; readonly inputHash: string; readonly at: string };
 }
 
 interface OperatingConditions {
-  readonly target: { readonly pipeIds?: readonly string[]; readonly line?: string };  // empty ⇒ whole model
-  readonly installTempC: Sourced<number>;                                           // default 21.1 °C (70 °F), named
-  readonly temperatures: readonly { readonly name: `T${1|2|3|4|5|6|7|8|9}`; readonly tempC: number }[];
-  readonly pressures: readonly { readonly name: `P${1|2|3|4|5|6|7|8|9}`; readonly gaugeBar: number }[];
+  readonly target: { readonly pipeIds?: readonly string[]; readonly line?: string }; // empty ⇒ whole model
+  readonly installTempC: Sourced<number>; // default 21.1 °C (70 °F), named
+  readonly temperatures: readonly { readonly name: `T${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`; readonly tempC: number }[];
+  readonly pressures: readonly { readonly name: `P${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}`; readonly gaugeBar: number }[];
   readonly hydroTestBar?: number;
   readonly fluidDensityKgM3: number;
   readonly insulation?: { readonly thicknessMm: number; readonly densityKgM3: number; readonly claddingKgM2?: number };
-  readonly corrosionAllowanceMm: Sourced<number>;   // from 01 PSC spec when present
-  readonly millTolerancePct: Sourced<number>;       // default 12.5 % (B36.10M seamless, named)
-  readonly cycles: Sourced<number>;                 // default 7000 (named) ⇒ PST_CYCLES_DEFAULTED
-  readonly materialId: string;                      // doc.materials id; PipeElement.material text mapped by import
-  readonly wallMm?: number;                         // else from 01 PSC spec, else STD wall table (flagged)
+  readonly corrosionAllowanceMm: Sourced<number>; // from 01 PSC spec when present
+  readonly millTolerancePct: Sourced<number>; // default 12.5 % (B36.10M seamless, named)
+  readonly cycles: Sourced<number>; // default 7000 (named) ⇒ PST_CYCLES_DEFAULTED
+  readonly materialId: string; // doc.materials id; PipeElement.material text mapped by import
+  readonly wallMm?: number; // else from 01 PSC spec, else STD wall table (flagged)
 }
 
 type LoadCaseType = 'OPE' | 'SUS' | 'EXP' | 'OCC' | 'HYD';
 interface LoadCaseDef {
-  readonly name: string;                            // 'L1'
+  readonly name: string; // 'L1'
   readonly type: LoadCaseType;
   readonly basic?: readonly ('W' | 'WW' | `T${number}` | `P${number}` | `D${number}` | `F${number}` | 'WIN1' | 'U1')[]; // primitive loads
-  readonly combine?: { readonly method: 'algebraic' | 'scalar' | 'srss' | 'abs'; readonly terms: readonly { readonly case: string; readonly factor: number }[] };
+  readonly combine?: {
+    readonly method: 'algebraic' | 'scalar' | 'srss' | 'abs';
+    readonly terms: readonly { readonly case: string; readonly factor: number }[];
+  };
 }
 
-type RestraintKind = 'anchor' | 'rest' | 'guide' | 'line_stop' | 'limit_stop' | 'rod_hanger' | 'spring' | 'constant' | 'translational' | 'rotational';
+type RestraintKind =
+  | 'anchor'
+  | 'rest'
+  | 'guide'
+  | 'line_stop'
+  | 'limit_stop'
+  | 'rod_hanger'
+  | 'spring'
+  | 'constant'
+  | 'translational'
+  | 'rotational';
 interface ExtraRestraint {
   readonly id: string;
   readonly at: { readonly pipeId: string; readonly atMm: number } | { readonly supportId: string };
   readonly kind: RestraintKind;
-  readonly direction?: readonly [number, number, number];   // unit vector (global), for translational / one-way
+  readonly direction?: readonly [number, number, number]; // unit vector (global), for translational / one-way
   readonly oneWay?: '+' | '-';
   readonly gapMm?: number;
-  readonly stiffnessNPerMm?: number;                        // default rigid = 1e12 N/m (named)
+  readonly stiffnessNPerMm?: number; // default rigid = 1e12 N/m (named)
   readonly friction?: number;
-  readonly springRateNPerMm?: number; readonly presetLoadN?: number;
+  readonly springRateNPerMm?: number;
+  readonly presetLoadN?: number;
 }
 
 interface RecordedResults {
-  readonly inputHash: string;                // sha256 of canonical inputs
+  readonly inputHash: string; // sha256 of canonical inputs
   readonly solverVersion: string;
   readonly governing: readonly { readonly case: string; readonly nodeId: string; readonly ratio: number; readonly rule: string }[];
   readonly supportLoads: readonly { readonly supportId: string; readonly case: string; readonly forceN: Vec3; readonly momentNm: Vec3 }[];
@@ -187,16 +206,40 @@ the existing `E`, `cte` / `thermalStrain`, `Fty` (SMYS), `Ftu` (SMTS), `density`
 Analysis-only types (never stored; returned in `data`):
 
 ```ts
-interface FeNode { readonly id: string; readonly xyzMm: Vec3; readonly pipeId: string; readonly atMm: number; readonly tag?: 'bend-near' | 'bend-far' | 'bend-mid' | 'support' | 'branch' | 'end' }
-interface FeElement { readonly id: string; readonly a: number; readonly b: number; readonly kind: 'straight' | 'bend' | 'rigid';
+interface FeNode {
+  readonly id: string;
+  readonly xyzMm: Vec3;
+  readonly pipeId: string;
+  readonly atMm: number;
+  readonly tag?: 'bend-near' | 'bend-far' | 'bend-mid' | 'support' | 'branch' | 'end';
+}
+interface FeElement {
+  readonly id: string;
+  readonly a: number;
+  readonly b: number;
+  readonly kind: 'straight' | 'bend' | 'rigid';
   readonly section: { readonly odMm: number; readonly wallMm: number; readonly corrodedWallMm: number };
   readonly bend?: { readonly radiusMm: number; readonly angleRad: number; readonly k: number; readonly ii: number; readonly io: number };
-  readonly materialId: string }
+  readonly materialId: string;
+}
 interface CaseResult {
   readonly case: string;
   readonly displacements: readonly { readonly node: string; readonly uMm: Vec3; readonly rotDeg: Vec3 }[];
-  readonly reactions: readonly { readonly restraintId: string; readonly forceN: Vec3; readonly momentNm: Vec3; readonly status: 'active' | 'lifted' | 'gap-open' | 'sliding' }[];
-  readonly stresses?: readonly { readonly node: string; readonly element: string; readonly codeStressMPa: number; readonly allowableMPa: number; readonly ratio: number; readonly rule: string; readonly sif: { readonly ii: number; readonly io: number } }[];
+  readonly reactions: readonly {
+    readonly restraintId: string;
+    readonly forceN: Vec3;
+    readonly momentNm: Vec3;
+    readonly status: 'active' | 'lifted' | 'gap-open' | 'sliding';
+  }[];
+  readonly stresses?: readonly {
+    readonly node: string;
+    readonly element: string;
+    readonly codeStressMPa: number;
+    readonly allowableMPa: number;
+    readonly ratio: number;
+    readonly rule: string;
+    readonly sif: { readonly ii: number; readonly io: number };
+  }[];
 }
 ```
 
@@ -206,33 +249,33 @@ All numeric params state their unit in the zod `describe` (AF-04). Every query r
 (method, rule ids, edition, inputs, `defaulted` list) and `data.reviewRequired` where a result could support a
 release (AF-33, AF-35).
 
-| Name | Kind | Params (sketch) | data / effect | Failure codes |
-| ---- | ---- | --------------- | ------------- | ------------- |
-| `create_stress_model` | mutating | `name`, `pipeIds[]` \| `line` \| `networkFrom` (02 RTE), `code`, `edition`, `maxElementLengthMm`, `elbowRadiusFactor`, `friction` | adds `StressModel`; affected [modelId] | `PST_NO_PIPES`, `PST_PIPE_NOT_FOUND`, `PST_PARAM_INVALID` |
-| `update_stress_model` / `delete_stress_model` | mutating | `modelId`, partial fields | edits / removes; clears approval | `PST_MODEL_NOT_FOUND` |
-| `set_pipe_operating_conditions` | mutating | `modelId`, `target`, `installTempC`, `temperatures[]` (°C), `pressures[]` (bar g), `fluidDensityKgM3`, `insulation`, `cycles`, `materialId`, `wallMm`, `corrosionAllowanceMm`, `millTolerancePct` | replaces the conditions of the target | `PST_MODEL_NOT_FOUND`, `PST_MATERIAL_NOT_FOUND`, `PST_PARAM_INVALID` |
-| `import_pipe_material_data` | mutating | `materialId`, `designation`, `rows: [{ tempC, ShMPa, EGPa, meanCtePerK \| growthMmPerM }]`, `SMYSMPa`, `SMTSMPa`, `source`, `licence`, `confirmation?` | writes PHY-01 table models on `doc.materials[materialId]`; `unverified` unless a human signature clears it | `PST_TABLE_INVALID` (non-monotonic T, gaps), `PST_HUMAN_GATE` (only for the `verified` flag) |
-| `set_stress_load_cases` | mutating | `modelId`, `cases[]` \| `preset: "b31.3-default"`, `forces?[{ name: "F1", at: { pipeId, atMm }, forceN: [x,y,z], momentNm?: [x,y,z] }]`, `displacements?[{ name: "D1", restraintId, uMm, rotDeg? }]`, `wind?`, `seismic?` (V1) | replaces load cases | `PST_LOADCASE_INVALID` (unknown primitive, cycle in combinations) |
-| `add_stress_restraint` / `delete_stress_restraint` | mutating | `modelId`, `at`, `kind`, `direction`, `oneWay`, `gapMm`, `stiffnessNPerMm`, `friction` | adds / removes an extra restraint | `PST_POINT_OFF_PIPE`, `PST_PARAM_INVALID` |
-| `set_sif_override` | mutating | `modelId`, `component` (pipe + atMm), `ii`, `io`, `it`, `ia`, `k`, `source` | B31J or test values, `unverified` until signed | `PST_PARAM_INVALID` |
-| `analyze_pipe_stress` | query | `modelId`, `cases?[]`, `nodes?[]`, `include?: ('displacements'\|'reactions'\|'forces'\|'stresses')[]`, `cursor?` | `CaseResult[]`, governing summary, model stats (nodes, elements, DOF), iterations per case, `inputHash`, `provenance` | `PST_MODEL_NOT_FOUND`, `PST_UNSTABLE`, `PST_DISCONNECTED`, `PST_MATERIAL_NO_DATA`, `PST_TEMPERATURE_OUT_OF_TABLE`, `PST_NONLINEAR_NOT_CONVERGED`, `PST_WALL_UNKNOWN` |
-| `check_pipe_stress` | query | `modelId`, `displacementLimitMm?` | `items[{ code, severity, ids, paths, message, remediation }]`, `ok`, `reviewRequired` | as above plus overstress codes (§7) |
-| `record_pipe_stress_results` | mutating | `modelId` | writes `RecordedResults` (summary + support loads + hash) | `PST_ANALYSIS_FAILED` (the run's own code) |
-| `approve_pipe_stress` | mutating, human gate | `modelId`, `confirmation` (signature) | writes `approval`; refused for agents | `PST_HUMAN_GATE`, `PST_RESULTS_STALE`, `PST_RESULTS_FAILING` (a failing model cannot be approved without a disposition, 09 PLM) |
-| `thermal_growth` | query | exactly one of `table: "carbon-steel-c1"`, or `materialId` (+ `cteReferenceC` for a secant cte model), or `meanCtePerK`; `fromC`, `toC`, `lengthM` | `growthMm`, `mmPerM`, `meanCtePerK`, `strain`, `source`, `grade`, `warnings` (`PST_TABLE_EDGE_SNAPPED`, `PST_MATERIAL_UNVERIFIED`, `PST_CTE_IMPLAUSIBLE`) | `PST_TEMPERATURE_OUT_OF_TABLE`, `PST_MATERIAL_NOT_FOUND`, `PST_MATERIAL_NO_DATA`, `PST_PARAM_INVALID` |
-| `pipe_sif` | query | `component`, `odMm`, `wallMm` (matching run pipe), `bendRadiusMm?` (>= mean radius), `padMm?`, `rule` (`B31.3-<2016..2024>`, `B31.1-<2016..2022>`, `user`; required), `userSif?` | `h`, `k`, `ii`, `io`, `formula`, `grade`, `ruleRows`, `warnings` (`PST_SIF_EDITION` for B31J editions, `PST_SIF_CLAMPED`), `reviewRequired` | `PST_PARAM_INVALID` (sweepolet / reducer without `user`) |
-| `pipe_stress_allowables` | query | `rule` (edition required), `ScMPa`, `ShMPa` (both inputs, never defaulted), `cycles`, `SLMPa?`, `ferrousLowStrength?`, `occasionalEvents?` (B31.1), `sustainedMPa?` + `occasionalLoadMPa?` | `f`, `fRaw`, `fCap`, `SA1aMPa`, `SA1bMPa` (null when SL > Sh), `SAMPa`, `equation`, `occasionalMPa`, `occasionalRatio?`, `defaulted`, `warnings` (`PST_SUSTAINED_EXCEEDS_SH`) | `PST_PARAM_INVALID` (materialId + tempC input arrives with M3) |
-| `guided_cantilever` | query | `legMm`, `displacementMm`, `odMm`, `wallMm`, `EMPa`, `sif?` (>= 1, default 1 listed in `defaulted`), `SAMPa?` | `forceN`, `momentNmm`, `stressMPa` (= sif x raw), `rawStressMPa`, `minLegMm?`, `ratio?`, `warnings` (`PST_BEAM_SLENDERNESS` when leg / OD < 10) | `PST_PARAM_INVALID` |
-| `spring_variability` | query | `hotLoadN`, `rateNPerMm`, `travelUpMm` (signed), `maxVariability?` (default 0.25, named) | `coldLoadN`, `variability`, `ok`, rule + grade | `PST_PARAM_INVALID` |
-| `nozzle_load_check` | query | `standard: nema_sm23\|api610\|api617\|user`, `nominalIn`, `forceN`/`forceLbf` [x,y,z], `momentNm`/`momentFtLbf` [x,y,z], `table?` (api610 / user values), `orientation?: top\|side\|end` | per-component and resultant ratios, `De`, governing ratio, rule + grade | `PST_NOZZLE_LIMIT_MISSING`, `PST_PARAM_INVALID` |
-| `select_spring_hangers` (V1) | mutating | `modelId`, `restraintIds[]`, `springTableId`, `maxVariability` (default 0.25, 0.15 near rotating equipment) | writes `SpringSelection` (size, rate, hot / cold load, travel, variability) | `PST_SPRING_NO_SIZE`, `PST_SPRING_VARIABILITY`, `PST_SPRING_TABLE_MISSING` |
-| `import_spring_table` (V1) | mutating | vendor sizes `[{ size, minN, maxN, rateNPerMm, travelMm, series }]`, `source` | document data | `PST_TABLE_INVALID` |
-| `set_nozzle_load_limit` (V1) | mutating | `modelId`, `nozzle` (03 EQP id) \| `restraintId`, `standard: api610\|nema_sm23\|api617\|api661\|user`, `table?`, `nominalIn` | stores check definition | `PST_NOZZLE_NOT_FOUND`, `PST_PARAM_INVALID` |
-| `check_nozzle_loads` (V1) | query | `modelId`, `cases?` | per nozzle, per case: local forces / moments, limits, ratios, rule, grade | `PST_NOZZLE_OVERLOAD`, `PST_NOZZLE_LIMIT_MISSING`, `PST_NOZZLE_LIMIT_UNVERIFIED` |
-| `pipe_stress_report` (V1) | query, file | `modelId`, `format: html\|csv\|sheet` | written with `--save`; data = summary | `PST_RESULTS_STALE` (warning in the report) |
-| `export_caesar_neutral` (V1) | query, file | `modelId`, `units: si\|english` | `.cii` text with `--save`; data = counts, skipped items | `PST_EXPORT_UNSUPPORTED` |
-| `import_caesar_displacements` (V2) | mutating | `modelId`, `file` (CAESAR II `.OUT` displacement table / CSV) | stores comparison set | `PST_IMPORT_UNMATCHED_NODES` |
-| `modal_pipe_analysis` (V2) | query | `modelId`, `modes`, `lumpedMass` | frequencies, mode shapes, participation | `PST_UNSTABLE` |
+| Name                                               | Kind                 | Params (sketch)                                                                                                                                                                                                                | data / effect                                                                                                                                                                 | Failure codes                                                                                                                                                        |
+| -------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_stress_model`                              | mutating             | `name`, `pipeIds[]` \| `line` \| `networkFrom` (02 RTE), `code`, `edition`, `maxElementLengthMm`, `elbowRadiusFactor`, `friction`                                                                                              | adds `StressModel`; affected [modelId]                                                                                                                                        | `PST_NO_PIPES`, `PST_PIPE_NOT_FOUND`, `PST_PARAM_INVALID`                                                                                                            |
+| `update_stress_model` / `delete_stress_model`      | mutating             | `modelId`, partial fields                                                                                                                                                                                                      | edits / removes; clears approval                                                                                                                                              | `PST_MODEL_NOT_FOUND`                                                                                                                                                |
+| `set_pipe_operating_conditions`                    | mutating             | `modelId`, `target`, `installTempC`, `temperatures[]` (°C), `pressures[]` (bar g), `fluidDensityKgM3`, `insulation`, `cycles`, `materialId`, `wallMm`, `corrosionAllowanceMm`, `millTolerancePct`                              | replaces the conditions of the target                                                                                                                                         | `PST_MODEL_NOT_FOUND`, `PST_MATERIAL_NOT_FOUND`, `PST_PARAM_INVALID`                                                                                                 |
+| `import_pipe_material_data`                        | mutating             | `materialId`, `designation`, `rows: [{ tempC, ShMPa, EGPa, meanCtePerK \| growthMmPerM }]`, `SMYSMPa`, `SMTSMPa`, `source`, `licence`, `confirmation?`                                                                         | writes PHY-01 table models on `doc.materials[materialId]`; `unverified` unless a human signature clears it                                                                    | `PST_TABLE_INVALID` (non-monotonic T, gaps), `PST_HUMAN_GATE` (only for the `verified` flag)                                                                         |
+| `set_stress_load_cases`                            | mutating             | `modelId`, `cases[]` \| `preset: "b31.3-default"`, `forces?[{ name: "F1", at: { pipeId, atMm }, forceN: [x,y,z], momentNm?: [x,y,z] }]`, `displacements?[{ name: "D1", restraintId, uMm, rotDeg? }]`, `wind?`, `seismic?` (V1) | replaces load cases                                                                                                                                                           | `PST_LOADCASE_INVALID` (unknown primitive, cycle in combinations)                                                                                                    |
+| `add_stress_restraint` / `delete_stress_restraint` | mutating             | `modelId`, `at`, `kind`, `direction`, `oneWay`, `gapMm`, `stiffnessNPerMm`, `friction`                                                                                                                                         | adds / removes an extra restraint                                                                                                                                             | `PST_POINT_OFF_PIPE`, `PST_PARAM_INVALID`                                                                                                                            |
+| `set_sif_override`                                 | mutating             | `modelId`, `component` (pipe + atMm), `ii`, `io`, `it`, `ia`, `k`, `source`                                                                                                                                                    | B31J or test values, `unverified` until signed                                                                                                                                | `PST_PARAM_INVALID`                                                                                                                                                  |
+| `analyze_pipe_stress`                              | query                | `modelId`, `cases?[]`, `nodes?[]`, `include?: ('displacements'\|'reactions'\|'forces'\|'stresses')[]`, `cursor?`                                                                                                               | `CaseResult[]`, governing summary, model stats (nodes, elements, DOF), iterations per case, `inputHash`, `provenance`                                                         | `PST_MODEL_NOT_FOUND`, `PST_UNSTABLE`, `PST_DISCONNECTED`, `PST_MATERIAL_NO_DATA`, `PST_TEMPERATURE_OUT_OF_TABLE`, `PST_NONLINEAR_NOT_CONVERGED`, `PST_WALL_UNKNOWN` |
+| `check_pipe_stress`                                | query                | `modelId`, `displacementLimitMm?`                                                                                                                                                                                              | `items[{ code, severity, ids, paths, message, remediation }]`, `ok`, `reviewRequired`                                                                                         | as above plus overstress codes (§7)                                                                                                                                  |
+| `record_pipe_stress_results`                       | mutating             | `modelId`                                                                                                                                                                                                                      | writes `RecordedResults` (summary + support loads + hash)                                                                                                                     | `PST_ANALYSIS_FAILED` (the run's own code)                                                                                                                           |
+| `approve_pipe_stress`                              | mutating, human gate | `modelId`, `confirmation` (signature)                                                                                                                                                                                          | writes `approval`; refused for agents                                                                                                                                         | `PST_HUMAN_GATE`, `PST_RESULTS_STALE`, `PST_RESULTS_FAILING` (a failing model cannot be approved without a disposition, 09 PLM)                                      |
+| `thermal_growth`                                   | query                | exactly one of `table: "carbon-steel-c1"`, or `materialId` (+ `cteReferenceC` for a secant cte model), or `meanCtePerK`; `fromC`, `toC`, `lengthM`                                                                             | `growthMm`, `mmPerM`, `meanCtePerK`, `strain`, `source`, `grade`, `warnings` (`PST_TABLE_EDGE_SNAPPED`, `PST_MATERIAL_UNVERIFIED`, `PST_CTE_IMPLAUSIBLE`)                     | `PST_TEMPERATURE_OUT_OF_TABLE`, `PST_MATERIAL_NOT_FOUND`, `PST_MATERIAL_NO_DATA`, `PST_PARAM_INVALID`                                                                |
+| `pipe_sif`                                         | query                | `component`, `odMm`, `wallMm` (matching run pipe), `bendRadiusMm?` (>= mean radius), `padMm?`, `rule` (`B31.3-<2016..2024>`, `B31.1-<2016..2022>`, `user`; required), `userSif?`                                               | `h`, `k`, `ii`, `io`, `formula`, `grade`, `ruleRows`, `warnings` (`PST_SIF_EDITION` for B31J editions, `PST_SIF_CLAMPED`), `reviewRequired`                                   | `PST_PARAM_INVALID` (sweepolet / reducer without `user`)                                                                                                             |
+| `pipe_stress_allowables`                           | query                | `rule` (edition required), `ScMPa`, `ShMPa` (both inputs, never defaulted), `cycles`, `SLMPa?`, `ferrousLowStrength?`, `occasionalEvents?` (B31.1), `sustainedMPa?` + `occasionalLoadMPa?`                                     | `f`, `fRaw`, `fCap`, `SA1aMPa`, `SA1bMPa` (null when SL > Sh), `SAMPa`, `equation`, `occasionalMPa`, `occasionalRatio?`, `defaulted`, `warnings` (`PST_SUSTAINED_EXCEEDS_SH`) | `PST_PARAM_INVALID` (materialId + tempC input arrives with M3)                                                                                                       |
+| `guided_cantilever`                                | query                | `legMm`, `displacementMm`, `odMm`, `wallMm`, `EMPa`, `sif?` (>= 1, default 1 listed in `defaulted`), `SAMPa?`                                                                                                                  | `forceN`, `momentNmm`, `stressMPa` (= sif x raw), `rawStressMPa`, `minLegMm?`, `ratio?`, `warnings` (`PST_BEAM_SLENDERNESS` when leg / OD < 10)                               | `PST_PARAM_INVALID`                                                                                                                                                  |
+| `spring_variability`                               | query                | `hotLoadN`, `rateNPerMm`, `travelUpMm` (signed), `maxVariability?` (default 0.25, named)                                                                                                                                       | `coldLoadN`, `variability`, `ok`, rule + grade                                                                                                                                | `PST_PARAM_INVALID`                                                                                                                                                  |
+| `nozzle_load_check`                                | query                | `standard: nema_sm23\|api610\|api617\|user`, `nominalIn`, `forceN`/`forceLbf` [x,y,z], `momentNm`/`momentFtLbf` [x,y,z], `table?` (api610 / user values), `orientation?: top\|side\|end`                                       | per-component and resultant ratios, `De`, governing ratio, rule + grade                                                                                                       | `PST_NOZZLE_LIMIT_MISSING`, `PST_PARAM_INVALID`                                                                                                                      |
+| `select_spring_hangers` (V1)                       | mutating             | `modelId`, `restraintIds[]`, `springTableId`, `maxVariability` (default 0.25, 0.15 near rotating equipment)                                                                                                                    | writes `SpringSelection` (size, rate, hot / cold load, travel, variability)                                                                                                   | `PST_SPRING_NO_SIZE`, `PST_SPRING_VARIABILITY`, `PST_SPRING_TABLE_MISSING`                                                                                           |
+| `import_spring_table` (V1)                         | mutating             | vendor sizes `[{ size, minN, maxN, rateNPerMm, travelMm, series }]`, `source`                                                                                                                                                  | document data                                                                                                                                                                 | `PST_TABLE_INVALID`                                                                                                                                                  |
+| `set_nozzle_load_limit` (V1)                       | mutating             | `modelId`, `nozzle` (03 EQP id) \| `restraintId`, `standard: api610\|nema_sm23\|api617\|api661\|user`, `table?`, `nominalIn`                                                                                                   | stores check definition                                                                                                                                                       | `PST_NOZZLE_NOT_FOUND`, `PST_PARAM_INVALID`                                                                                                                          |
+| `check_nozzle_loads` (V1)                          | query                | `modelId`, `cases?`                                                                                                                                                                                                            | per nozzle, per case: local forces / moments, limits, ratios, rule, grade                                                                                                     | `PST_NOZZLE_OVERLOAD`, `PST_NOZZLE_LIMIT_MISSING`, `PST_NOZZLE_LIMIT_UNVERIFIED`                                                                                     |
+| `pipe_stress_report` (V1)                          | query, file          | `modelId`, `format: html\|csv\|sheet`                                                                                                                                                                                          | written with `--save`; data = summary                                                                                                                                         | `PST_RESULTS_STALE` (warning in the report)                                                                                                                          |
+| `export_caesar_neutral` (V1)                       | query, file          | `modelId`, `units: si\|english`                                                                                                                                                                                                | `.cii` text with `--save`; data = counts, skipped items                                                                                                                       | `PST_EXPORT_UNSUPPORTED`                                                                                                                                             |
+| `import_caesar_displacements` (V2)                 | mutating             | `modelId`, `file` (CAESAR II `.OUT` displacement table / CSV)                                                                                                                                                                  | stores comparison set                                                                                                                                                         | `PST_IMPORT_UNMATCHED_NODES`                                                                                                                                         |
+| `modal_pipe_analysis` (V2)                         | query                | `modelId`, `modes`, `lumpedMass`                                                                                                                                                                                               | frequencies, mode shapes, participation                                                                                                                                       | `PST_UNSTABLE`                                                                                                                                                       |
 
 Tags on every command source (C2), for example:
 
@@ -343,14 +386,14 @@ and grade of `validation/data/code_rules_b313.json`:
 
 ### 5.7 SIF and flexibility factors (TR-PST-07)
 
-| Component | h | k | i | Grade |
-| --------- | - | - | - | ----- |
-| Bend / welding elbow (B31.3 ≤ 2018 App. D, B31.1) | T R1 / r2² | 1.65 / h | ii 0.9 / h^(2/3), io 0.75 / h^(2/3) (≥ 1) | A |
-| Unreinforced fabricated tee | T / r2 | 1 | io 0.9 / h^(2/3), ii 0.75 io + 0.25 | B |
-| Welding tee (B16.9) | 3.1 T / r2 (B31.3); B31.1 4.4 T / r2 with crotch conditions | 1 | as above | B |
-| Reinforced fabricated tee | (T + t_r/2)^2.5 / (T^1.5 r2) | 1 | as above | B |
-| Weldolet / branch | 3.3 T / r2 | 1 | as above | B |
-| B31.3 ≥ 2020, B31.1 ≥ 2020 | B31J tables (user import) | | | C until imported |
+| Component                                         | h                                                           | k        | i                                         | Grade            |
+| ------------------------------------------------- | ----------------------------------------------------------- | -------- | ----------------------------------------- | ---------------- |
+| Bend / welding elbow (B31.3 ≤ 2018 App. D, B31.1) | T R1 / r2²                                                  | 1.65 / h | ii 0.9 / h^(2/3), io 0.75 / h^(2/3) (≥ 1) | A                |
+| Unreinforced fabricated tee                       | T / r2                                                      | 1        | io 0.9 / h^(2/3), ii 0.75 io + 0.25       | B                |
+| Welding tee (B16.9)                               | 3.1 T / r2 (B31.3); B31.1 4.4 T / r2 with crotch conditions | 1        | as above                                  | B                |
+| Reinforced fabricated tee                         | (T + t_r/2)^2.5 / (T^1.5 r2)                                | 1        | as above                                  | B                |
+| Weldolet / branch                                 | 3.3 T / r2                                                  | 1        | as above                                  | B                |
+| B31.3 ≥ 2020, B31.1 ≥ 2020                        | B31J tables (user import)                                   |          |                                           | C until imported |
 
 Flanged-end corrections (c = (T/r2)^(1/6) one end, ^(1/3) both) as in PSI `b311.py` (grade B, V1). An edition
 that requires B31J with no override present ⇒ the App. D value is used **and** `PST_SIF_EDITION` (warning, cannot
@@ -391,14 +434,14 @@ allowables §5.6.
 
 ## 6. Interop and persistence
 
-| Format | Direction | Phase | Notes |
-| ------ | --------- | ----- | ----- |
-| `.llull` document | read / write | MVP | `doc.pipeStress` slice, plugin `document` hook, version 1 |
-| JSON / CSV results | write | MVP | `--json`, `--save results.csv` (one row per node × case) |
-| CAESAR II neutral file `.cii` | write (V1), read (V2) | V1 | ASCII, sections headed by `#$` in columns 1–2, first section `#$ VERSION` (interface version, CAESAR II release, ANSI code page) [R12]; section list and field layout (elements, bends, restraints, SIF & tees, allowables, coordinates, units) TBD from the Hexagon CAESAR II User's Guide "Neutral file" chapter — **grade C until confirmed by a licensed user**; the writer is golden-tested on structure only until then |
-| PCF (Alias ISOGEN) | write via 05 ISO | V1 | PST adds stress attributes (temperatures, pressures, support types, `COMPONENT-ATTRIBUTE` mapping) to the PCF writer of 05 ISO; CAESAR II imports PCF with a mapping file [R11, R12] |
-| CAESAR II `.OUT` displacement report | read (V2) | V2 | comparison only; E3D uses the same pair (`.OUT` + `.cii`) for its return path [R10] |
-| IFC 4.3 | write via 08 DAT | V2 | `IfcStructuralAnalysisModel` for the stress model is possible; not required |
+| Format                               | Direction             | Phase | Notes                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------ | --------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.llull` document                    | read / write          | MVP   | `doc.pipeStress` slice, plugin `document` hook, version 1                                                                                                                                                                                                                                                                                                                                                                     |
+| JSON / CSV results                   | write                 | MVP   | `--json`, `--save results.csv` (one row per node × case)                                                                                                                                                                                                                                                                                                                                                                      |
+| CAESAR II neutral file `.cii`        | write (V1), read (V2) | V1    | ASCII, sections headed by `#$` in columns 1–2, first section `#$ VERSION` (interface version, CAESAR II release, ANSI code page) [R12]; section list and field layout (elements, bends, restraints, SIF & tees, allowables, coordinates, units) TBD from the Hexagon CAESAR II User's Guide "Neutral file" chapter — **grade C until confirmed by a licensed user**; the writer is golden-tested on structure only until then |
+| PCF (Alias ISOGEN)                   | write via 05 ISO      | V1    | PST adds stress attributes (temperatures, pressures, support types, `COMPONENT-ATTRIBUTE` mapping) to the PCF writer of 05 ISO; CAESAR II imports PCF with a mapping file [R11, R12]                                                                                                                                                                                                                                          |
+| CAESAR II `.OUT` displacement report | read (V2)             | V2    | comparison only; E3D uses the same pair (`.OUT` + `.cii`) for its return path [R10]                                                                                                                                                                                                                                                                                                                                           |
+| IFC 4.3                              | write via 08 DAT      | V2    | `IfcStructuralAnalysisModel` for the stress model is possible; not required                                                                                                                                                                                                                                                                                                                                                   |
 
 ## 7. CLI / MCP / UI surfaces and error codes
 
@@ -411,76 +454,76 @@ allowables §5.6.
   amber 0.8–1, red > 1, support arrows), a results panel reading `analyze_pipe_stress` data, and the approval
   dialog (09 PLM signature). `render_view` gains `overlay: "pipe_stress"` for `--save` (AF-22).
 
-| Code | Severity | Meaning | Remediation |
-| ---- | -------- | ------- | ----------- |
-| `PST_MODEL_NOT_FOUND` | error | no stress model with that id | call `create_stress_model` first |
-| `PST_NO_PIPES` | error | scope resolves to no pipe | give `pipeIds` or a `line` that exists (`building_schedule kind pipe`) |
-| `PST_PIPE_NOT_FOUND` | error | a referenced pipe was deleted | `update_stress_model` scope |
-| `PST_DISCONNECTED` | warn | sub-model not connected to the rest | connect the runs (02 RTE) or analyse separately |
-| `PST_UNSTABLE` | error | singular stiffness: node / DOF free | add an anchor or a guide at the listed node (`add_pipe_support`) |
-| `PST_BEND_TOO_TIGHT` | error | leg shorter than R1 tan(θ/2) | lengthen the leg or reduce `elbowRadiusFactor` |
-| `PST_WALL_UNKNOWN` / `PST_WALL_DEFAULTED` | error / warn | no wall thickness / STD wall assumed | set `wallMm` or a 01 PSC spec |
-| `PST_MATERIAL_NOT_FOUND` / `PST_MATERIAL_NO_DATA` | error | material missing E, α or S_h | `import_pipe_material_data` |
-| `PST_MATERIAL_UNVERIFIED` | warn (not hideable) | allowables / α from an unsigned import | qualified reviewer signs the import |
-| `PST_TEMPERATURE_OUT_OF_TABLE` | error | T outside the material table | extend the table; llull never extrapolates |
-| `PST_EDITION_DEFAULTED`, `PST_CYCLES_DEFAULTED`, `PST_FRICTION_DEFAULTED`, `PST_INSTALL_TEMP_DEFAULTED` | warn | named default used | set the value explicitly |
-| `PST_SIF_EDITION` | warn (not hideable) | edition requires B31J, App. D value used | `set_sif_override` with B31J values |
-| `PST_NONLINEAR_NOT_CONVERGED` | error | support status oscillates | add stiffness / remove gap at listed restraints, or set them linear |
-| `PST_SUPPORT_LIFTOFF` | warn | a rest lifts off in OPE or SUS | move / add a hanger or spring (`select_spring_hangers`) |
-| `PST_SUSTAINED_OVERSTRESS` | fail | S_L > S_h | add supports near the node (span), reduce weight |
-| `PST_EXPANSION_OVERSTRESS` | fail | S_E > S_A | add flexibility: loop / offset (02 RTE), move guides / line stops |
-| `PST_OCCASIONAL_OVERSTRESS` | fail | S_L + S_OCC > 1.33 S_h | add guides / restraints for the occasional direction |
-| `PST_DISPLACEMENT_LIMIT` | warn | displacement > `displacementLimitMm` | check clearances (`check_clashes` on the OPE shape, V1) |
-| `PST_CREEP_RANGE` | warn | T above the creep onset of the material | out of scope: qualified engineer |
-| `PST_SPRING_NO_SIZE`, `PST_SPRING_VARIABILITY`, `PST_SPRING_TABLE_MISSING` | fail / warn | no spring fits, V > limit, no table | import a vendor table; constant hanger |
-| `PST_NOZZLE_OVERLOAD` | fail | ratio > 1 | add flexibility or a restraint near the nozzle |
-| `PST_NOZZLE_LIMIT_MISSING`, `PST_NOZZLE_LIMIT_UNVERIFIED`, `PST_RULE_CONFLICT` | warn | no / unsigned / conflicting limits | import the standard's table under licence; confirm the rule |
-| `PST_RESULTS_STALE` | warn | inputs changed since `record_pipe_stress_results` | re-run and record |
-| `PST_RESULTS_FAILING` | error | approval of a failing model without disposition | fix, or record a non-conformance disposition (09 PLM) |
-| `PST_HUMAN_GATE` | error | approval / verification attempted by an agent | a qualified reviewer signs in the desktop app |
-| `PST_EXPORT_UNSUPPORTED` | warn | element / restraint not representable in `.cii` | listed in `data.skipped` |
-| `PST_LOADCASE_INVALID`, `PST_TABLE_INVALID`, `PST_POINT_OFF_PIPE`, `PST_PARAM_INVALID` | error | malformed input | the `paths` name the param |
+| Code                                                                                                    | Severity            | Meaning                                           | Remediation                                                            |
+| ------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
+| `PST_MODEL_NOT_FOUND`                                                                                   | error               | no stress model with that id                      | call `create_stress_model` first                                       |
+| `PST_NO_PIPES`                                                                                          | error               | scope resolves to no pipe                         | give `pipeIds` or a `line` that exists (`building_schedule kind pipe`) |
+| `PST_PIPE_NOT_FOUND`                                                                                    | error               | a referenced pipe was deleted                     | `update_stress_model` scope                                            |
+| `PST_DISCONNECTED`                                                                                      | warn                | sub-model not connected to the rest               | connect the runs (02 RTE) or analyse separately                        |
+| `PST_UNSTABLE`                                                                                          | error               | singular stiffness: node / DOF free               | add an anchor or a guide at the listed node (`add_pipe_support`)       |
+| `PST_BEND_TOO_TIGHT`                                                                                    | error               | leg shorter than R1 tan(θ/2)                      | lengthen the leg or reduce `elbowRadiusFactor`                         |
+| `PST_WALL_UNKNOWN` / `PST_WALL_DEFAULTED`                                                               | error / warn        | no wall thickness / STD wall assumed              | set `wallMm` or a 01 PSC spec                                          |
+| `PST_MATERIAL_NOT_FOUND` / `PST_MATERIAL_NO_DATA`                                                       | error               | material missing E, α or S_h                      | `import_pipe_material_data`                                            |
+| `PST_MATERIAL_UNVERIFIED`                                                                               | warn (not hideable) | allowables / α from an unsigned import            | qualified reviewer signs the import                                    |
+| `PST_TEMPERATURE_OUT_OF_TABLE`                                                                          | error               | T outside the material table                      | extend the table; llull never extrapolates                             |
+| `PST_EDITION_DEFAULTED`, `PST_CYCLES_DEFAULTED`, `PST_FRICTION_DEFAULTED`, `PST_INSTALL_TEMP_DEFAULTED` | warn                | named default used                                | set the value explicitly                                               |
+| `PST_SIF_EDITION`                                                                                       | warn (not hideable) | edition requires B31J, App. D value used          | `set_sif_override` with B31J values                                    |
+| `PST_NONLINEAR_NOT_CONVERGED`                                                                           | error               | support status oscillates                         | add stiffness / remove gap at listed restraints, or set them linear    |
+| `PST_SUPPORT_LIFTOFF`                                                                                   | warn                | a rest lifts off in OPE or SUS                    | move / add a hanger or spring (`select_spring_hangers`)                |
+| `PST_SUSTAINED_OVERSTRESS`                                                                              | fail                | S_L > S_h                                         | add supports near the node (span), reduce weight                       |
+| `PST_EXPANSION_OVERSTRESS`                                                                              | fail                | S_E > S_A                                         | add flexibility: loop / offset (02 RTE), move guides / line stops      |
+| `PST_OCCASIONAL_OVERSTRESS`                                                                             | fail                | S_L + S_OCC > 1.33 S_h                            | add guides / restraints for the occasional direction                   |
+| `PST_DISPLACEMENT_LIMIT`                                                                                | warn                | displacement > `displacementLimitMm`              | check clearances (`check_clashes` on the OPE shape, V1)                |
+| `PST_CREEP_RANGE`                                                                                       | warn                | T above the creep onset of the material           | out of scope: qualified engineer                                       |
+| `PST_SPRING_NO_SIZE`, `PST_SPRING_VARIABILITY`, `PST_SPRING_TABLE_MISSING`                              | fail / warn         | no spring fits, V > limit, no table               | import a vendor table; constant hanger                                 |
+| `PST_NOZZLE_OVERLOAD`                                                                                   | fail                | ratio > 1                                         | add flexibility or a restraint near the nozzle                         |
+| `PST_NOZZLE_LIMIT_MISSING`, `PST_NOZZLE_LIMIT_UNVERIFIED`, `PST_RULE_CONFLICT`                          | warn                | no / unsigned / conflicting limits                | import the standard's table under licence; confirm the rule            |
+| `PST_RESULTS_STALE`                                                                                     | warn                | inputs changed since `record_pipe_stress_results` | re-run and record                                                      |
+| `PST_RESULTS_FAILING`                                                                                   | error               | approval of a failing model without disposition   | fix, or record a non-conformance disposition (09 PLM)                  |
+| `PST_HUMAN_GATE`                                                                                        | error               | approval / verification attempted by an agent     | a qualified reviewer signs in the desktop app                          |
+| `PST_EXPORT_UNSUPPORTED`                                                                                | warn                | element / restraint not representable in `.cii`   | listed in `data.skipped`                                               |
+| `PST_LOADCASE_INVALID`, `PST_TABLE_INVALID`, `PST_POINT_OFF_PIPE`, `PST_PARAM_INVALID`                  | error               | malformed input                                   | the `paths` name the param                                             |
 
 ## 8. Performance and robustness budgets
 
-| Item | Budget (desktop, single thread) |
-| ---- | ------------------------------- |
-| Model build, 2 000 nodes (≈ 12 000 DOF) | ≤ 150 ms |
-| Linear solve, banded Cholesky after RCM, bandwidth ≤ 300 | ≤ 400 ms per factorisation; 10 load vectors ≤ 50 ms more |
-| Non-linear case (≤ 200 one-way / friction supports) | ≤ 20 iterations typical, ≤ 50 max; ≤ 8 s |
-| Full default B31.3 set (OPE, SUS, EXP, 2 OCC) on 2 000 nodes | ≤ 20 s; `--progress` per case, `--timeout` honoured (AF-40) |
-| Results payload default (governing only) | ≤ 8 kB; full results paged 500 nodes / page |
-| Memory | ≤ 200 MB for 12 000 DOF banded |
-| Numerical | equilibrium residual ‖K u − F‖ / ‖F‖ ≤ 1e-9 checked per case; reported in `data.solver` |
-| Determinism | identical node order (RCM with stable tie-break by node id), identical results bit-for-bit across runs (AF-13) |
+| Item                                                         | Budget (desktop, single thread)                                                                                |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Model build, 2 000 nodes (≈ 12 000 DOF)                      | ≤ 150 ms                                                                                                       |
+| Linear solve, banded Cholesky after RCM, bandwidth ≤ 300     | ≤ 400 ms per factorisation; 10 load vectors ≤ 50 ms more                                                       |
+| Non-linear case (≤ 200 one-way / friction supports)          | ≤ 20 iterations typical, ≤ 50 max; ≤ 8 s                                                                       |
+| Full default B31.3 set (OPE, SUS, EXP, 2 OCC) on 2 000 nodes | ≤ 20 s; `--progress` per case, `--timeout` honoured (AF-40)                                                    |
+| Results payload default (governing only)                     | ≤ 8 kB; full results paged 500 nodes / page                                                                    |
+| Memory                                                       | ≤ 200 MB for 12 000 DOF banded                                                                                 |
+| Numerical                                                    | equilibrium residual ‖K u − F‖ / ‖F‖ ≤ 1e-9 checked per case; reported in `data.solver`                        |
+| Determinism                                                  | identical node order (RCM with stable tie-break by node id), identical results bit-for-bit across runs (AF-13) |
 
 ## 9. Test strategy (mapped to VCs)
 
-| Layer | Test | VC |
-| ----- | ---- | -- |
-| `@lib/frame3d` unit | cantilever tip deflection / rotation (PL³/3EI, Timoshenko term), torsion, axial; PSI element tests (10 ft NPS 10: axial 0.361 in under 1e6 lbf; reactions) | VC-PST-10, 11 |
-| plugin unit `code/` | SIF / k table vs `data/sif_flexibility.json`; f by edition; SA 1a / 1b; occasional; B31.1 variants | VC-PST-01, 02, 03, 05, 13 |
-| plugin unit quick checks | `thermal_growth`, `guided_cantilever` vs data files | VC-PST-04, 06 |
-| plugin unit solver | PSI 3D fixture (thermal, weight, pressure) built from `add_pipe_run` + anchors; L-bend two anchors; limit stop; one-way lift-off | VC-PST-07, 08, 09, 10, 11, 12 |
-| plugin unit springs / nozzles (V1) | variability closed form; NEMA example; API 610 component rule with grade-B inputs | VC-PST-14, 15 |
-| contract | tool-schema snapshot gains `pipestress` tools; error codes present on every refusal; `reviewRequired` on every analysis | VC-PST-18 |
-| golden (`tests/golden`) | `sc-pst-01` … `sc-pst-05` plans id-normalised, replay equality | all plans |
-| integration | edit a pipe after `record_pipe_stress_results` ⇒ `PST_RESULTS_STALE`; agent `approve_pipe_stress` ⇒ `PST_HUMAN_GATE` | VC-PST-18 |
-| production gate (agent driver) | refinery unit scenario: stress-critical lines (> 150 °C or on pumps) get a model, a check and a report unattended; the only stop is the approval gate | VC-AF-05 |
-| reviewer-run (manual, licensed) | `.cii` import in CAESAR II; displacement comparison on 3 lines | VC-PST-16 |
+| Layer                              | Test                                                                                                                                                       | VC                            |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `@lib/frame3d` unit                | cantilever tip deflection / rotation (PL³/3EI, Timoshenko term), torsion, axial; PSI element tests (10 ft NPS 10: axial 0.361 in under 1e6 lbf; reactions) | VC-PST-10, 11                 |
+| plugin unit `code/`                | SIF / k table vs `data/sif_flexibility.json`; f by edition; SA 1a / 1b; occasional; B31.1 variants                                                         | VC-PST-01, 02, 03, 05, 13     |
+| plugin unit quick checks           | `thermal_growth`, `guided_cantilever` vs data files                                                                                                        | VC-PST-04, 06                 |
+| plugin unit solver                 | PSI 3D fixture (thermal, weight, pressure) built from `add_pipe_run` + anchors; L-bend two anchors; limit stop; one-way lift-off                           | VC-PST-07, 08, 09, 10, 11, 12 |
+| plugin unit springs / nozzles (V1) | variability closed form; NEMA example; API 610 component rule with grade-B inputs                                                                          | VC-PST-14, 15                 |
+| contract                           | tool-schema snapshot gains `pipestress` tools; error codes present on every refusal; `reviewRequired` on every analysis                                    | VC-PST-18                     |
+| golden (`tests/golden`)            | `sc-pst-01` … `sc-pst-05` plans id-normalised, replay equality                                                                                             | all plans                     |
+| integration                        | edit a pipe after `record_pipe_stress_results` ⇒ `PST_RESULTS_STALE`; agent `approve_pipe_stress` ⇒ `PST_HUMAN_GATE`                                       | VC-PST-18                     |
+| production gate (agent driver)     | refinery unit scenario: stress-critical lines (> 150 °C or on pumps) get a model, a check and a report unattended; the only stop is the approval gate      | VC-AF-05                      |
+| reviewer-run (manual, licensed)    | `.cii` import in CAESAR II; displacement comparison on 3 lines                                                                                             | VC-PST-16                     |
 
 Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/**` (the plugin) as for the other domain packages.
 
 ## 10. Delivery plan
 
-| Milestone | Content | Depends on | Effort |
-| --------- | ------- | ---------- | ------ |
-| M1 quick checks | `pipe_sif`, `pipe_stress_allowables`, `thermal_growth`, `guided_cantilever`, rule-set data, catalogue rows | none | 4 d |
-| M2 solver core (built, §14) | `@lib/frame3d` (Timoshenko, bends with k, RCM + banded Cholesky), unit tests, PSI fixture | none | 6 d |
-| M3 model + MVP commands (built, §15) | `create_stress_model`, conditions, load cases, restraints, `analyze_pipe_stress`, `check_pipe_stress`, record / approve, non-linear supports | M2; uses `add_pipe_run` / `add_pipe_support` as they are | 10 d |
-| M4 review surface (built: report + `render_view` overlay §17, in-app overlay + panel §18; station colours / support arrows in the app left, §18) | overlay, panel, `render_view` overlay, report (HTML / CSV) | M3 | 5 d |
-| M5 V1 | tees / olets / reducers / flanges / valves (02 RTE components), insulation, wind / seismic, springs, nozzles (03 EQP), B31.1, steel coupling (06 STA), `.cii` export, PCF attributes (05 ISO) | 01 PSC, 02 RTE, 03 EQP, 05 ISO | 20 d |
-| M6 V2 | modal / response spectrum (NUREG/CR-1677), WRC 537 / 297, EN 13480-3, CAESAR II import | M5 | 25 d |
+| Milestone                                                                                                                                        | Content                                                                                                                                                                                       | Depends on                                               | Effort |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------ |
+| M1 quick checks                                                                                                                                  | `pipe_sif`, `pipe_stress_allowables`, `thermal_growth`, `guided_cantilever`, rule-set data, catalogue rows                                                                                    | none                                                     | 4 d    |
+| M2 solver core (built, §14)                                                                                                                      | `@lib/frame3d` (Timoshenko, bends with k, RCM + banded Cholesky), unit tests, PSI fixture                                                                                                     | none                                                     | 6 d    |
+| M3 model + MVP commands (built, §15)                                                                                                             | `create_stress_model`, conditions, load cases, restraints, `analyze_pipe_stress`, `check_pipe_stress`, record / approve, non-linear supports                                                  | M2; uses `add_pipe_run` / `add_pipe_support` as they are | 10 d   |
+| M4 review surface (built: report + `render_view` overlay §17, in-app overlay + panel §18; station colours / support arrows in the app left, §18) | overlay, panel, `render_view` overlay, report (HTML / CSV)                                                                                                                                    | M3                                                       | 5 d    |
+| M5 V1                                                                                                                                            | tees / olets / reducers / flanges / valves (02 RTE components), insulation, wind / seismic, springs, nozzles (03 EQP), B31.1, steel coupling (06 STA), `.cii` export, PCF attributes (05 ISO) | 01 PSC, 02 RTE, 03 EQP, 05 ISO                           | 20 d   |
+| M6 V2                                                                                                                                            | modal / response spectrum (NUREG/CR-1677), WRC 537 / 297, EN 13480-3, CAESAR II import                                                                                                        | M5                                                       | 25 d   |
 
 Sibling dependencies: 01-piping-specs-catalog (wall, schedule, material per spec, component dims and weights),
 02-spec-driven-routing (connectivity graph, fittings with real bend radii, tees), 03-parametric-equipment (nozzle
@@ -515,11 +558,11 @@ the support loads), 08-plant-data-reports-interop (line list "stress critical" f
 Plugin `pipeStress` (toolset `pipestress`), folder `packages/domain-aec/src/plant/stress/` (D2: one plant home, one plugin per area). No document state
 yet: the four commands are read-only queries returning `data` (all `reviewRequired: true`, with `provenance`, `grade`, `defaulted`, `warnings`).
 
-| Path | Content |
-| ---- | ------- |
-| `code/ruleSets.ts` | rule sets as data: `B31.3-2016..2024`, `B31.1-2016..2022` (f form, cap, floor, occasional factors, SIF basis) and the rule rows (clause, formula, sources, grade) of `validation/data/{code_rules_b313,sif_flexibility}.json` |
-| `code/sif.ts`, `code/allowables.ts`, `code/thermalStrain.ts`, `data/carbonSteelC1.ts` | the closed forms and the carbon steel strain table (70 degF reference + 8 rows, source and grade per row) |
-| `commands/` | `pipe_sif`, `pipe_stress_allowables`, `thermal_growth`, `guided_cantilever`; `catalog.ts`, `plugin.ts`, `codes.ts` (`PST_*` remediation) |
+| Path                                                                                  | Content                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `code/ruleSets.ts`                                                                    | rule sets as data: `B31.3-2016..2024`, `B31.1-2016..2022` (f form, cap, floor, occasional factors, SIF basis) and the rule rows (clause, formula, sources, grade) of `validation/data/{code_rules_b313,sif_flexibility}.json` |
+| `code/sif.ts`, `code/allowables.ts`, `code/thermalStrain.ts`, `data/carbonSteelC1.ts` | the closed forms and the carbon steel strain table (70 degF reference + 8 rows, source and grade per row)                                                                                                                     |
+| `commands/`                                                                           | `pipe_sif`, `pipe_stress_allowables`, `thermal_growth`, `guided_cantilever`; `catalog.ts`, `plugin.ts`, `codes.ts` (`PST_*` remediation)                                                                                      |
 
 Section properties come from 01 PSC `sectionProperties` (`plant/catalog/sectionProperties.ts`, imported, not copied).
 
@@ -538,15 +581,15 @@ Decisions (recorded here; owner delegated, long-term-best):
 
 Validation results (`tests/unit/plant/stress/`, references read from `validation/data/*.json`):
 
-| VC | Result | Reference, tolerance |
-| -- | ------ | -------------------- |
-| 01 | NPS 6 Sch 40 LR / SR and DN150 SI: h, k, ii, io equal the reference | `sif_flexibility.json`, 1e-4 rel (grade A) |
-| 02 | unreinforced 3.47954, welding tee 1.63662, weldolet 1.56981, reinforced (pad 0.25 in) 1.62563 | `closed_forms_output.json`, 1e-4 rel (grade B, named in the result) |
-| 03 | f: 1.021249 / 1.0 / 1.045516 (N 7000), 0.6 / 0.430887 (N 1e5), 0.15 floor (N 2e8), cap crossings at 3125 and 4630 cycles | `code_rules_b313.json`, 1e-5 abs |
-| 04 | 30 m, 70 -> 400 degF: 67.518 mm (reference 67.52), every table row to 0.01 in/100 ft | 0.05 mm |
-| 05 | S_A (1a / 1b): 206.85 / 304.75 (f 1), 124.11 / 182.85 (f 0.6) | 1e-6 rel |
-| 06 | F 6509.017 N, M 1.9527052e7 N.mm, S 140.25 MPa, Lmin 4940.546 mm | `lbend_guided_cantilever.json`, 1e-6 rel |
-| 13 | occasional limit 183.407 MPa, ratio 0.76333 (rule grade B) | 1e-5 rel |
+| VC  | Result                                                                                                                   | Reference, tolerance                                                |
+| --- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| 01  | NPS 6 Sch 40 LR / SR and DN150 SI: h, k, ii, io equal the reference                                                      | `sif_flexibility.json`, 1e-4 rel (grade A)                          |
+| 02  | unreinforced 3.47954, welding tee 1.63662, weldolet 1.56981, reinforced (pad 0.25 in) 1.62563                            | `closed_forms_output.json`, 1e-4 rel (grade B, named in the result) |
+| 03  | f: 1.021249 / 1.0 / 1.045516 (N 7000), 0.6 / 0.430887 (N 1e5), 0.15 floor (N 2e8), cap crossings at 3125 and 4630 cycles | `code_rules_b313.json`, 1e-5 abs                                    |
+| 04  | 30 m, 70 -> 400 degF: 67.518 mm (reference 67.52), every table row to 0.01 in/100 ft                                     | 0.05 mm                                                             |
+| 05  | S_A (1a / 1b): 206.85 / 304.75 (f 1), 124.11 / 182.85 (f 0.6)                                                            | 1e-6 rel                                                            |
+| 06  | F 6509.017 N, M 1.9527052e7 N.mm, S 140.25 MPa, Lmin 4940.546 mm                                                         | `lbend_guided_cantilever.json`, 1e-6 rel                            |
+| 13  | occasional limit 183.407 MPa, ratio 0.76333 (rule grade B)                                                               | 1e-5 rel                                                            |
 
 Plans: `plans/sc-pst-03-quick-checks.json` runs complete through `build_project` (plan params aligned to the built schema: `rule` instead of `edition`); `sc-pst-05` step 0 (occasional) runs, its other steps stay blocked (`blockedPlanCommands.json`).
 
@@ -556,20 +599,20 @@ Open: B31J import (Q3), flange corrections and reducer / sweepolet factors (V1),
 
 Location: `packages/core/src/lib/frame3d/` (`@lib/frame3d/*`, a directory instead of the single `frame3d.ts` of §2; the pure leaf imports nothing outside `@lib`). Tests: `tests/unit/lib/frame3d{,Psi,Robust}.test.ts` (54 tests). No command and no plugin change: the M3 commands call `analyzeFrame` from `execute`.
 
-**Decision (C7): TypeScript only, no Rust crate now.** The M3 commands run the solver synchronously inside a pure `execute`, so the engine must be callable in-process; `llull-route` (02 RTE V2) is a different shape (a heavy search job `auto_route_pipe` runs out of band and commits afterwards, with the TS A* kept as reference) and does not fit a read-only query. The spec's target sizes solve in TS in well under the budget: a 2 000-node lattice (11 804 free DOF, half bandwidth 243 after RCM, 2.1e6 factor entries) assembles, factors, solves two load cases and refines in about 0.5 s (budget in §8: 400 ms factorisation + 50 ms per 10 vectors; typical pipe networks have bandwidth well under 100). A native port is a later item, to be done only if M5 models (tees, insulation, response spectrum) make the 20 s full-case budget tight; the TS stays the reference and the contract (`FrameModel` in, `FrameAnalysis` out) is already host-transport shaped (plain data, typed arrays).
+**Decision (C7): TypeScript only, no Rust crate now.** The M3 commands run the solver synchronously inside a pure `execute`, so the engine must be callable in-process; `llull-route` (02 RTE V2) is a different shape (a heavy search job `auto_route_pipe` runs out of band and commits afterwards, with the TS A\* kept as reference) and does not fit a read-only query. The spec's target sizes solve in TS in well under the budget: a 2 000-node lattice (11 804 free DOF, half bandwidth 243 after RCM, 2.1e6 factor entries) assembles, factors, solves two load cases and refines in about 0.5 s (budget in §8: 400 ms factorisation + 50 ms per 10 vectors; typical pipe networks have bandwidth well under 100). A native port is a later item, to be done only if M5 models (tees, insulation, response spectrum) make the 20 s full-case budget tight; the TS stays the reference and the contract (`FrameModel` in, `FrameAnalysis` out) is already host-transport shaped (plain data, typed arrays).
 
 API (SI-style consistent units, llull plant stress uses N, mm, MPa, rad; PSI fixtures use in, lbf, psi; DOF order `[ux uy uz rx ry rz]`, Z up):
 
-| Export | Role |
-| ------ | ---- |
-| `analyzeFrame(model, cases): FrameAnalysis` (`solve.ts`) | one assembly + factorisation, back-substitution per load case; never throws |
-| `FrameModel { nodes, elements, restraints }` | elements carry `properties` (E, G, A, I, J, shear area; shear area 0 = Euler-Bernoulli), optional `flexibility` k (bending EI / k) and `up` |
-| `FrameRestraint { node, dof, value?, stiffness? }` | no stiffness = rigid (DOF eliminated, `value` = prescribed displacement); with stiffness = ground spring (the hook M3's active-set loop uses for one-way / gap / friction supports) |
-| `FrameLoadCase { name, nodal?, elemental? }` | nodal force / moment; per element global uniform load and free axial strain (thermal alpha dT, also used for the Poisson / pressure strain) |
-| `FrameCaseResult` | displacements, reactions (support force on the pipe at rigid / spring DOFs), local element end forces `[N Vy Vz T My Mz] x 2`, equilibrium residual |
-| `bendChords(corner, in, out, R, n?)`, `bendSubdivisions` (`bend.ts`) | near-to-far points of the arc replacing a corner; chord elements carry k |
-| `pipeProperties(Do, t, E, nu, timoshenko?)` (`section.ts`) | thin-wall pipe section, A/2 shear area |
-| `reverseCuthillMcKee`, `Skyline` | node ordering and the variable-band Cholesky |
+| Export                                                               | Role                                                                                                                                                                                |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `analyzeFrame(model, cases): FrameAnalysis` (`solve.ts`)             | one assembly + factorisation, back-substitution per load case; never throws                                                                                                         |
+| `FrameModel { nodes, elements, restraints }`                         | elements carry `properties` (E, G, A, I, J, shear area; shear area 0 = Euler-Bernoulli), optional `flexibility` k (bending EI / k) and `up`                                         |
+| `FrameRestraint { node, dof, value?, stiffness? }`                   | no stiffness = rigid (DOF eliminated, `value` = prescribed displacement); with stiffness = ground spring (the hook M3's active-set loop uses for one-way / gap / friction supports) |
+| `FrameLoadCase { name, nodal?, elemental? }`                         | nodal force / moment; per element global uniform load and free axial strain (thermal alpha dT, also used for the Poisson / pressure strain)                                         |
+| `FrameCaseResult`                                                    | displacements, reactions (support force on the pipe at rigid / spring DOFs), local element end forces `[N Vy Vz T My Mz] x 2`, equilibrium residual                                 |
+| `bendChords(corner, in, out, R, n?)`, `bendSubdivisions` (`bend.ts`) | near-to-far points of the arc replacing a corner; chord elements carry k                                                                                                            |
+| `pipeProperties(Do, t, E, nu, timoshenko?)` (`section.ts`)           | thin-wall pipe section, A/2 shear area                                                                                                                                              |
+| `reverseCuthillMcKee`, `Skyline`                                     | node ordering and the variable-band Cholesky                                                                                                                                        |
 
 Failures are typed: `FRAME_INVALID_MODEL`, `FRAME_INVALID_LOAD`, `FRAME_TOO_LARGE` (skyline above `limits.maxProfile`, default 5e7 entries = 400 MB, and never past the Int32 offset limit), `FRAME_UNSTABLE` (with the first mechanism `{ node, dof }`; M3 maps it to `PST_UNSTABLE`).
 
@@ -583,15 +626,15 @@ Deviations from §5.2 / §5.3 / §5.5, with reasons:
 
 Validation results (`tests/unit/lib/`, references read from `validation/data/*.json`):
 
-| VC | Result | Reference, tolerance |
-| -- | ------ | -------------------- |
-| closed form | cantilever tip P L^3 / 3EI + P L / G As, rotation P L^2 / 2EI, axial, torsion, fixed-fixed thermal E A eps, UDL R = wL/2, M = wL^2/12, cantilever UDL tip, prescribed settlement 3 E I d / L^3, orientation and split invariance | 1e-9 to 1e-12 rel |
-| 03 (§5.3) | 90 degree bend (R = 300 mm, NPS 6) tip flexibility, k = 1 and 3.2; k scales bending only | Castigliano, 1e-3 |
-| 12 | L-bend 6 m x 3 m: Rx, Ry at C (-7872.99, -2406.95 N), end moments C / B / A, residual; axially stiff variant (bending-only, 1e-3) | `lbend_guided_cantilever.json`, 1e-4 rel |
-| 07 | PSI thermal 900 degF node 30: dy, dz, rx within 1 % of PSI (0.758, 1.891, 0.1521 deg), and 5e-4 of the independent python solver; Euler-Bernoulli variant rx 0.1534 | `psi_benchmarks.json` |
-| 08 | PSI weight (steel): dy, dz, rx within 3 % of PSI (0.33, -1.31, -0.40 deg); dz 1e-3 of the python solver; sum of vertical reactions = total weight | `psi_benchmarks.json` |
-| 10 | fully restrained 500 degF axial force 1.00290e6 lbf (PSI 1.00235e6) | 0.1 % |
-| 11 | linear statics only (support switching is M3): simply supported 5000 lbf each end; 6 m DN100 propped cantilever rest 3125 N (Euler) and 3126.19 N (Timoshenko, 1e-4) | `expected_results.json` |
+| VC          | Result                                                                                                                                                                                                                           | Reference, tolerance                     |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| closed form | cantilever tip P L^3 / 3EI + P L / G As, rotation P L^2 / 2EI, axial, torsion, fixed-fixed thermal E A eps, UDL R = wL/2, M = wL^2/12, cantilever UDL tip, prescribed settlement 3 E I d / L^3, orientation and split invariance | 1e-9 to 1e-12 rel                        |
+| 03 (§5.3)   | 90 degree bend (R = 300 mm, NPS 6) tip flexibility, k = 1 and 3.2; k scales bending only                                                                                                                                         | Castigliano, 1e-3                        |
+| 12          | L-bend 6 m x 3 m: Rx, Ry at C (-7872.99, -2406.95 N), end moments C / B / A, residual; axially stiff variant (bending-only, 1e-3)                                                                                                | `lbend_guided_cantilever.json`, 1e-4 rel |
+| 07          | PSI thermal 900 degF node 30: dy, dz, rx within 1 % of PSI (0.758, 1.891, 0.1521 deg), and 5e-4 of the independent python solver; Euler-Bernoulli variant rx 0.1534                                                              | `psi_benchmarks.json`                    |
+| 08          | PSI weight (steel): dy, dz, rx within 3 % of PSI (0.33, -1.31, -0.40 deg); dz 1e-3 of the python solver; sum of vertical reactions = total weight                                                                                | `psi_benchmarks.json`                    |
+| 10          | fully restrained 500 degF axial force 1.00290e6 lbf (PSI 1.00235e6)                                                                                                                                                              | 0.1 %                                    |
+| 11          | linear statics only (support switching is M3): simply supported 5000 lbf each end; 6 m DN100 propped cantilever rest 3125 N (Euler) and 3126.19 N (Timoshenko, 1e-4)                                                             | `expected_results.json`                  |
 
 Mutations shown to fail the suite: shear term removed (9 tests), flexibility factor ignored (2), thermal load sign flipped (7), refinement off (1, the 2 000-node residual), pivot test relaxed (2). Dropping the prescribed-displacement term alone is masked by refinement (which corrects it); with refinement off as well the settlement test fails.
 
@@ -601,13 +644,13 @@ Left for M3: `doc.plant.stress` slice and model build (nodes, bend replacement v
 
 Slice `doc.plant.stress` (D2: `{ models, modelOrder }`, zod-validated on load, plugin `pipeStress` document extension); code in `packages/domain-aec/src/plant/stress/`:
 
-| Path | Content |
-| ---- | ------- |
-| `model/schema.ts`, `store.ts`, `document.ts` | the stored model (zod = type + load validation + tool parameters), accessors, validation, `carry` (approval through replay), `afterLoad` (stale warning) |
-| `model/sources.ts`, `layout.ts`, `restraints.ts`, `build.ts` | what the model reads (building pipes, 02 RTE runs through `deriveRun`, supports), centreline to nodes and elements (`bendChords`, splits at attachments and `maxElementLengthMm`), supports and restraints to anchors and unilateral contacts |
-| `solve/primitives.ts`, `nonlinear.ts`, `cases.ts`, `run.ts` | W / Tn / Pn / Fn primitives, the active-set + friction loop around `analyzeFrame`, the B31.3 default set and case validation, the per-case solve and the EXP combination |
-| `code/codeStress.ts`, `analysis.ts` | S_L / S_E / occasional from element forces with SIFs and mid-element stations; the whole analysis, findings, governing, support loads, input and result hashes |
-| `commands/` | `create_stress_model`, `update_stress_model`, `delete_stress_model`, `set_pipe_operating_conditions`, `set_stress_load_cases`, `add_stress_restraint`, `delete_stress_restraint`, `analyze_pipe_stress`, `check_pipe_stress`, `record_pipe_stress_results`, `approve_pipe_stress` |
+| Path                                                         | Content                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model/schema.ts`, `store.ts`, `document.ts`                 | the stored model (zod = type + load validation + tool parameters), accessors, validation, `carry` (approval through replay), `afterLoad` (stale warning)                                                                                                                          |
+| `model/sources.ts`, `layout.ts`, `restraints.ts`, `build.ts` | what the model reads (building pipes, 02 RTE runs through `deriveRun`, supports), centreline to nodes and elements (`bendChords`, splits at attachments and `maxElementLengthMm`), supports and restraints to anchors and unilateral contacts                                     |
+| `solve/primitives.ts`, `nonlinear.ts`, `cases.ts`, `run.ts`  | W / Tn / Pn / Fn primitives, the active-set + friction loop around `analyzeFrame`, the B31.3 default set and case validation, the per-case solve and the EXP combination                                                                                                          |
+| `code/codeStress.ts`, `analysis.ts`                          | S_L / S_E / occasional from element forces with SIFs and mid-element stations; the whole analysis, findings, governing, support loads, input and result hashes                                                                                                                    |
+| `commands/`                                                  | `create_stress_model`, `update_stress_model`, `delete_stress_model`, `set_pipe_operating_conditions`, `set_stress_load_cases`, `add_stress_restraint`, `delete_stress_restraint`, `analyze_pipe_stress`, `check_pipe_stress`, `record_pipe_stress_results`, `approve_pipe_stress` |
 
 Solver backstop (M2 review): `analyzeFrame` now returns `FRAME_UNSTABLE` when the Jacobi-scaled solution is out of all proportion to the scaled load (`||sqrt(K_ii) u|| / ||r / sqrt(K_ii)|| > 1e9`, about 1 over the smallest scaled eigenvalue) or non-finite; it is unit-free and does not misread a 1e10 stiffness ratio or a 200-element slender cantilever or roundoff-level loads (tested) (the unscaled `||u|| ||diag|| >> ||F||` form did: the stiff-link test failed). Test: a torsion spring of 0.1 N.mm/rad on a 9e8 N.mm/rad torsion stiffness passes the 1e-12 pivot test and is caught here. The commands map `FRAME_UNSTABLE` to `PST_UNSTABLE` (ids = nodes `N<k>`, paths = DOF names), `FRAME_TOO_LARGE` to `PST_MODEL_TOO_LARGE`.
 
@@ -627,15 +670,15 @@ Decisions (owner delegated, long-term-best):
 
 Validation results (`tests/unit/plant/stress/m3*.test.ts`, references from `validation/data/*.json`; the plans `sc-pst-01`, `02`, `04` run end to end through `build_project`, `scenarioPlans.test.ts`):
 
-| VC | Result | Reference, tolerance |
-| -- | ------ | -------------------- |
-| 07 | PSI 3D thermal 900 degF through the commands, node 30: dy 0.758 in, dz 1.891 in, rx 0.1521 deg | `psi_benchmarks.json`, 1 % |
-| 08 | PSI weight, node 30: dy 0.33, dz -1.31 in, rx -0.40 deg; the anchors carry the whole weight | 3 %; 1e-7 |
-| 09 | pressure alone: B31.3 S_a = P Di^2 / (Do^2 - Di^2) = 8.0213 MPa, B31.1 P Do / 4t = 9.4934 MPa at 2 MPa DN100 | 1e-4 |
-| 10 | fully restrained 10 ft NPS 10, 500 degF: 1.00290e6 lbf (PSI 1.00235e6) | 0.1 % |
-| 11 | 6 m DN100 propped cantilever: rest 3126.19 N (5P/16 = 3125, Timoshenko), lift-off (reaction 0, `lifted`, `PST_SUPPORT_LIFTOFF`), 5 mm gap (open / closed at the gap face), friction (a shoe slides and carries mu N exactly; a stiff low-growth case sticks) | 1e-3; 1e-6 |
-| 12 | two-anchor L-bend through the commands: Rx, Ry at C and S_max 106.79 MPa within 2 % of the Euler-Bernoulli reference (the model is Timoshenko: equal to a direct `analyzeFrame` call to 1e-6; 7772.37 vs 7872.99 N) | `lbend_guided_cantilever.json` |
-| 18 | refusals carry codes; `reviewRequired` on every analysis; defaults listed; unsigned thermal source `PST_MATERIAL_UNVERIFIED`; edit after record `PST_RESULTS_STALE`; agent approval `PST_HUMAN_GATE` | exact codes |
+| VC  | Result                                                                                                                                                                                                                                                       | Reference, tolerance           |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| 07  | PSI 3D thermal 900 degF through the commands, node 30: dy 0.758 in, dz 1.891 in, rx 0.1521 deg                                                                                                                                                               | `psi_benchmarks.json`, 1 %     |
+| 08  | PSI weight, node 30: dy 0.33, dz -1.31 in, rx -0.40 deg; the anchors carry the whole weight                                                                                                                                                                  | 3 %; 1e-7                      |
+| 09  | pressure alone: B31.3 S_a = P Di^2 / (Do^2 - Di^2) = 8.0213 MPa, B31.1 P Do / 4t = 9.4934 MPa at 2 MPa DN100                                                                                                                                                 | 1e-4                           |
+| 10  | fully restrained 10 ft NPS 10, 500 degF: 1.00290e6 lbf (PSI 1.00235e6)                                                                                                                                                                                       | 0.1 %                          |
+| 11  | 6 m DN100 propped cantilever: rest 3126.19 N (5P/16 = 3125, Timoshenko), lift-off (reaction 0, `lifted`, `PST_SUPPORT_LIFTOFF`), 5 mm gap (open / closed at the gap face), friction (a shoe slides and carries mu N exactly; a stiff low-growth case sticks) | 1e-3; 1e-6                     |
+| 12  | two-anchor L-bend through the commands: Rx, Ry at C and S_max 106.79 MPa within 2 % of the Euler-Bernoulli reference (the model is Timoshenko: equal to a direct `analyzeFrame` call to 1e-6; 7772.37 vs 7872.99 N)                                          | `lbend_guided_cantilever.json` |
+| 18  | refusals carry codes; `reviewRequired` on every analysis; defaults listed; unsigned thermal source `PST_MATERIAL_UNVERIFIED`; edit after record `PST_RESULTS_STALE`; agent approval `PST_HUMAN_GATE`                                                         | exact codes                    |
 
 Mutations shown to fail the suite: the sign of the mid-element load term, the freshness check of the approval, the approval drop on edit, the replay carry, the friction reaction, the release rule, the signed payload (hashes removed), the supports in the input hash; the backstop test fails with the ratio at 1e99; the host stamp test fails without the `HOST_STAMPED` entry.
 
@@ -657,23 +700,26 @@ Left for M4 / M5: overlay, panel, `render_view` overlay, report (M4); `import_pi
 
 ## 18. As built (M4 UI: overlay and panel, 2026-11-03)
 
-Presentation only; every value comes from the read-only `analyze_pipe_stress` (called with `include: ['stresses']`), every change goes through a command.
+Presentation only; every value comes from ONE read-only `analyze_pipe_stress` call (`include: ['stresses', 'geometry', 'reactions', 'displacements']`, mm / N), every change goes through a command.
 
-| Path | Content |
-| ---- | ------- |
-| `src/ui/viewport/3d/pipeStress/stressView.ts` | pure: parse the answer (`parseStressView`; a refused query has no data), the ratio ramp (`ratioTone`: green < 0.8, amber 0.8 to 1, red > 1; a non-finite ratio is red, never a pass), `worstPerPipe`, `worstStations`, `approvalStatus` |
-| `.../stressQuery.ts` | `stressOutcome(document, modelId)`: one analysis per document identity, shared by overlay and panel; a refusal is `{ ok: false, summary }` |
-| `.../pipePaths.ts`, `paintedPipes.ts`, `PipeStressOverlay.tsx` | the building pipe centreline (z + level elevation), cylinder poses, one tube per pipe toned by its worst ratio over the chosen case (or all cases); mounted in `Viewport3D`, recomputed on document change, not on selection |
-| `src/ui/store/pipeStressStore.ts` | UI-only: model under review, overlay case, overlay shown |
-| `src/ui/panels/pipeStress/PipeStressPanel.tsx` | sidebar tab `pipestress` (a domain tab, on the rail once the document has a stress model): model picker, status, worst ratio, overlay toggle and case, load cases (governing ratio, node, largest displacement), the 8 worst stations (click = beacon on the pipe through the focus store), fail / warn findings, approval |
+| Path                                           | Content                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/ui/viewport/3d/pipeStress/stressView.ts`  | pure: parse the answer (`parseStressView`; a refused query has no data), the ratio ramp (`ratioTone`: green < 0.8, amber 0.8 to 1, red > 1; a non-finite ratio is red, never a pass), `elementRatios` (worst station ratio per element), `worstStations`, `approvalStatus`                                                                                                                                                                         |
+| `.../stressGeometry.ts`                        | pure parsers of `data.geometry` (node positions, elements, pipes / runs), `details.reactions`, `details.displacements`                                                                                                                                                                                                                                                                                                                             |
+| `.../stressQuery.ts`                           | `stressOutcome(document, modelId)`: one analysis per document identity, shared by overlay and panel; a refusal is `{ ok: false, summary }`                                                                                                                                                                                                                                                                                                         |
+| `.../paintedElements.ts`, `segmentPose.ts`     | pure: one tube per finite element (building pipes and 02 RTE runs alike) toned by its worst station ratio over the chosen case (or all cases; an element without a code station is `unknown`), mm to document units (`MM_PER_UNIT`), node positions with the deformed shape (`deformScale` x the displacement of the chosen case), `stationPosition` (a station at its node, else interpolated along the element by `xMm`), cylinder poses         |
+| `.../reactionArrows.ts`                        | pure: one arrow per support node of the reactions (the force of the chosen case, the largest over all cases when none), tip on the node, along the force the support applies to the pipe, length 25 to 100 % of the longest (8 % of the model diagonal, at least 3 outside diameters) by magnitude                                                                                                                                                 |
+| `.../PipeStressOverlay.tsx`                    | one InstancedMesh per tone (4 draw calls whatever the element count) + the arrows; inside the floating-origin group, absolute document coordinates; mounted in `Viewport3D`, recomputed on document change, not on selection                                                                                                                                                                                                                       |
+| `src/ui/store/pipeStressStore.ts`              | UI-only: model under review, overlay case, overlay shown, reactions shown, deformed scale                                                                                                                                                                                                                                                                                                                                                          |
+| `src/ui/panels/pipeStress/PipeStressPanel.tsx` | sidebar tab `pipestress` (a domain tab, on the rail once the document has a stress model): model picker, status, worst ratio, overlay toggle and case, support reactions toggle, deformed shape x10 / 50 / 100 / 500 (offered with an overlay case chosen), load cases (governing ratio, node, largest displacement), the 8 worst stations (click = beacon at the station's real position through the focus store), fail / warn findings, approval |
 
 Approval in the panel: `approvalStatus` is approved (the approval's result hash equals the recorded one and the record is fresh), stale (inputs changed since the record), not recorded, not approved, or cannot verify (analysis refused). **Record** dispatches `record_pipe_stress_results`. **Approve** is enabled only for a fresh, passing record and opens the signing dialog (`SignActDialog`: a trusted enrolled key and its passphrase); the signature covers `humanGatePayload('plant:approve_pipe_stress', [modelId], { inputHash, resultHash }, nonce)` and is dispatched with `at` from the host clock. A failing or incomplete record shows why Approve is disabled.
 
-Not built, and why (items 1, 2 and 4 are unblocked: `analyze_pipe_stress` `include: "geometry"` now gives node, element and run positions, §17; the UI has not adopted it yet):
+Details of the geometry-driven overlay (PST-M4c): a bend is drawn as the straight chord of its arc (the geometry carries its end nodes and `bendRadiusMm`, not the arc); the deformed tubes join the displaced nodes by straight chords (linear in the node displacement, so a large scale exaggerates, as intended); the deformed shape needs a case (displacements are per case) and stays off for "worst of all cases"; reactions are forces only (moments are not drawn); the beacon of a station sits on the undeformed model, and for a bend interior station `xMm` is clamped onto the chord.
 
-1. **Station-level colours and support arrows.** The analysis data carries no node or element coordinates (rows have `pipeId`, a `node` id and `xMm` along the element; supports and reactions are keyed by node id), so the overlay paints whole pipes by their worst ratio and the beacon sits at the pipe midpoint. A `model.nodes` list (id and position in mm) in the `analyze_pipe_stress` summary would give per-station colours and reaction arrows without geometry in the UI.
-2. **02 RTE runs.** Their centreline derives inside the plugin and no read-only query exposes it; a stress model on runs shows the panel but no overlay (same data gap: `model.pipes` with points).
-3. **Performance (large models).** The analysis runs synchronously in render (once per document change, shared by overlay and panel); a large model needs a debounce or a worker. The overlay draws one mesh per pipe segment; one InstancedMesh per tone would cut the draw calls.
-4. Deformed shape x scale (needs displacements with node positions), the `render_view` overlay and the report (a later M4 task).
+Not built, and why:
 
-Tests: `tests/unit/pipeStressView.test.ts` (helpers), `tests/component/PipeStressPanel.test.tsx` (panel, refusal, record, stale, signing dialog, failing record, rail tab).
+1. **Performance (large models).** The analysis runs synchronously in render (once per document change, shared by overlay and panel); a large model needs a debounce or a worker.
+2. Reaction moments, a bend drawn as its arc, an arrow legend with magnitudes in the scene (the panel lists no reactions yet).
+
+Tests: `tests/unit/pipeStressView.test.ts` (parse, tones, ratios, approval), `tests/unit/pipeStressOverlay.test.ts` (elements, runs, deformed shape, station position, arrows), `tests/component/PipeStressPanel.test.tsx` (panel, refusal, record, stale, signing dialog, failing record, rail tab, beacon position, overlay data from the real analysis, deform / reactions controls).

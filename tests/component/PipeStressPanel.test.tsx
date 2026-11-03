@@ -4,6 +4,10 @@ import type { CadDocument } from '@core/model/types';
 import { useLayoutStore, useStore } from '@ui/store';
 import { usePipeStressStore } from '@ui/store/pipeStressStore';
 import { useFocusStore } from '@ui/store/focusStore';
+import { MM_PER_UNIT } from '@core/model/units';
+import { stressOutcome } from '@ui/viewport/3d/pipeStress/stressQuery';
+import { reactionArrows } from '@ui/viewport/3d/pipeStress/reactionArrows';
+import { paintedElements } from '@ui/viewport/3d/pipeStress/paintedElements';
 import { Sidebar } from '@ui/components/Sidebar';
 import { PipeStressPanel } from '@ui/panels/pipeStress/PipeStressPanel';
 import { resetStore } from '../helpers/componentEntities';
@@ -105,8 +109,44 @@ describe('PipeStressPanel', () => {
     const before = useStore.getState().document;
     fireEvent.click(screen.getAllByRole('button').filter((b) => b.closest('[data-testid^="stress-station-"]'))[0] as HTMLElement);
     expect(useFocusStore.getState().focus?.key).toMatch(/^pipestress:station:/);
-    expect(useFocusStore.getState().focus?.markers).toHaveLength(1);
+    const markers = useFocusStore.getState().focus?.markers ?? [];
+    expect(markers).toHaveLength(1);
+    // on the centreline of the L (z 3 m; on the first leg y = 0 or on the second x = 6 m), not the pipe midpoint
+    const mm = MM_PER_UNIT[useStore.getState().document.units];
+    const [x, y, z] = markers[0]?.position ?? [NaN, NaN, NaN];
+    expect(z * mm).toBeCloseTo(3000);
+    expect(y * mm < 1e-6 || Math.abs(x * mm - 6000) < 1e-6).toBe(true);
+    expect([x * mm, y * mm]).not.toEqual([6000, 0]);
     expect(useStore.getState().document).toBe(before);
+  });
+
+  it('feeds the overlay from one analysis: element tubes, support arrows and the deformed shape', () => {
+    const { doc, modelId } = lBendModel(true);
+    load(doc);
+    const outcome = stressOutcome(useStore.getState().document, modelId);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    const mm = MM_PER_UNIT[doc.units];
+    const elements = paintedElements(outcome.view, null, 0, mm);
+    expect(elements.length).toBeGreaterThanOrEqual(2);
+    expect(elements.some((e) => e.tone !== 'unknown')).toBe(true);
+    expect(reactionArrows(outcome.view, 'L2', mm)).toHaveLength(2);
+    const moved = paintedElements(outcome.view, 'L2', 50, mm);
+    expect(moved.map((e) => e.pose.center)).not.toEqual(elements.map((e) => e.pose.center));
+    expect(stressOutcome(useStore.getState().document, modelId)).toBe(outcome);
+  });
+
+  it('shows the deformed-shape choice only with an overlay case, and toggles the arrows', () => {
+    load(lBendModel(true).doc);
+    render(<PipeStressPanel />);
+    expect(screen.queryByTestId('stress-deform-select')).toBeNull();
+    fireEvent.change(screen.getByTestId('stress-case-select'), { target: { value: 'L3' } });
+    fireEvent.change(screen.getByTestId('stress-deform-select'), { target: { value: '100' } });
+    expect(usePipeStressStore.getState().deformScale).toBe(100);
+    fireEvent.change(screen.getByTestId('stress-deform-select'), { target: { value: '' } });
+    expect(usePipeStressStore.getState().deformScale).toBe(0);
+    fireEvent.click(screen.getByTestId('stress-reactions-toggle'));
+    expect(usePipeStressStore.getState().showReactions).toBe(false);
   });
 
   it('records through a command and reflects not approved, then stale after an edit', () => {
