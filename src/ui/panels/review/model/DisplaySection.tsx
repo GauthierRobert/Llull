@@ -80,11 +80,6 @@ export function DisplaySection({ document }: { document: CadDocument }): React.R
           ))}
         </select>
       </label>
-      {activeProfile !== undefined && (
-        <p className="panel__row-meta" data-testid="profile-batch-notice">
-          Batched plant entities (PlantBatchRenderer) do not take profile colours yet.
-        </p>
-      )}
       {activeProfileRules.length > 0 && (
         <ul className="panel__list" aria-label="Colour legend" data-testid="colour-legend">
           {activeProfileRules.map((rule) => (
