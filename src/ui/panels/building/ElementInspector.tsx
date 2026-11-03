@@ -10,6 +10,7 @@ import { PropRow } from '@ui/panels/propertyFields';
 import { CATEGORY_LABEL, describe } from './describeElement';
 import { memberFacts } from './memberFacts';
 import { EquipmentEditor } from './EquipmentEditor';
+import { EquipmentDatasheetSection } from './EquipmentDatasheetSection';
 import { SteelMemberEditor } from './SteelMemberEditor';
 import { WallEditor } from './WallEditor';
 import { useBuildingLevels } from './useBuildingLevels';
@@ -71,6 +72,7 @@ export function ElementInspector({ elementId }: { elementId: string }): React.Re
         )}
       </PanelSection>
       <ElementEditor element={element} />
+      {element.category === 'equipment' && <EquipmentDatasheetSection equipmentId={element.id} />}
       <div className="props-actions">
         <button type="button" className="props-action props-action--danger" onClick={deleteSelection}>
           <Icon name="trash" size={14} />

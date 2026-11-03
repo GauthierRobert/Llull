@@ -32,6 +32,7 @@ import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
 import { AeroOverlay } from './aero/AeroOverlay';
 import { StructuralOverlay } from './structural/StructuralOverlay';
 import { FindingsOverlay } from './findings/FindingsOverlay';
+import { PortGlyphOverlay } from './ports/PortGlyphOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
 import { LiveFxCamera } from '../liveFx/LiveFxCamera';
@@ -156,6 +157,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <AeroOverlay />
         <StructuralOverlay />
         <FindingsOverlay />
+        <PortGlyphOverlay />
         <DimensionLens />
         <PmiLayer />
         <AnalysisOverlay />

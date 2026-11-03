@@ -158,3 +158,47 @@
 .takeoff-item:hover {
   text-decoration: underline;
 }
+
+.datasheet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.datasheet__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.datasheet__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.datasheet__nozzles {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.datasheet__nozzles th {
+  text-align: left;
+  font-weight: var(--weight-medium);
+  color: var(--fg-muted);
+}
+
+.datasheet__nozzles th,
+.datasheet__nozzles td {
+  padding: 2px 4px;
+}
+
+.datasheet__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
