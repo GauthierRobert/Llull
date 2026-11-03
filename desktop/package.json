@@ -1,6 +1,7 @@
 {
   "name": "llull-desktop",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "description": "llull desktop app: the web app + local backend (server/) + CLI + Python/CadQuery in one installable, offline app",
   "type": "commonjs",

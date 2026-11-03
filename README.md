@@ -133,3 +133,16 @@ docs/                    # architecture, contributing, roadmap, domain guides
 
 See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for the full workflow and
 [`docs/ADD_A_TOOL.md`](docs/ADD_A_TOOL.md) for the 3-step recipe to add a new tool.
+
+## License
+
+Copyright © 2026 Gauthier Robert.
+
+llull is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is
+distributed WITHOUT ANY WARRANTY; see [`LICENSE`](LICENSE) for the full text.
+
+Models you create with llull are yours: the GPL covers llull's code, not the documents, drawings or exports it produces.
+Bundled third-party components keep their own licences (OCCT and Netgen LGPL-2.1, CadQuery / Manifold / MuJoCo Apache-2.0,
+CPython PSF, npm packages mostly MIT); their notices ship in the installer. Commercial licences outside the GPL are available
+from the copyright holder. Why GPL: [`docs/decisions/LIC1-license.md`](docs/decisions/LIC1-license.md).

@@ -1,6 +1,7 @@
 {
   "name": "@llull/design-lang",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "The .lld design language (toolset design): a design is one feature step holding its text, re-run on every regeneration. Removable plugin.",

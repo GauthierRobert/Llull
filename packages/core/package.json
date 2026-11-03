@@ -1,6 +1,7 @@
 {
   "name": "@llull/core",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "Model, command layer, execution context, persistence, plugin host (framework-agnostic).",

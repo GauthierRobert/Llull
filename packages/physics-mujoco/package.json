@@ -1,6 +1,7 @@
 {
   "name": "@llull/physics-mujoco",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "MuJoCo (official WASM build) rigid-body physics behind the core PhysicsEngine interface.",

@@ -1,6 +1,7 @@
 {
   "name": "llull",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "llull — a local 2D + 3D CAD desktop app whose every operation is one command, drivable from the UI or the llull CLI.",
