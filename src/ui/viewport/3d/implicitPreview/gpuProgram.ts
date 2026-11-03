@@ -86,8 +86,8 @@ export const MAX_MARCH_STEPS = 320;
 /** Bisection steps between the last point outside and the hit, and how many pixel footprints a march that ran out of steps may still be from the surface. */
 export const REFINE_STEPS = 6;
 export const ACCEPT_FACTOR = 8;
-/** Section planes the preview cuts with (the viewport has one today). */
-export const MAX_CLIP_PLANES = 4;
+/** Section planes the preview cuts with: the view plane (1) plus a section box (6) and one spare. */
+export const MAX_CLIP_PLANES = 8;
 /** Fragment uniform vectors the wrapper needs besides `uC` (matrices, vectors, planes, scalars). */
 export const WRAPPER_UNIFORM_VECTORS = 24;
 

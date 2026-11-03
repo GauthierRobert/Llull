@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { execute } from '@core/commands/registry';
 import { statusPayload } from '@core/commands/review/reviewActs';
+import { humanCtx } from '../unit/review/humanActs';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { ReviewPanel } from '@ui/panels/review/ReviewPanel';
 import { useStore } from '@ui/store';
@@ -86,7 +87,11 @@ describe('Review panel: issues', () => {
     fireEvent.change(within(detail).getByLabelText('Move iss-2 to'), { target: { value: 'in_progress' } });
     fireEvent.change(within(detail).getByLabelText('Reason for moving iss-2'), { target: { value: 'on it' } });
     fireEvent.click(within(detail).getByText('Move'));
-    expect(dispatch).toHaveBeenCalledWith('set_issue_status', { issueId: 'iss-2', status: 'in_progress', reason: 'on it' });
+    expect(dispatch).toHaveBeenCalledWith(
+      'set_issue_status',
+      { issueId: 'iss-2', status: 'in_progress', reason: 'on it' },
+      expect.anything(),
+    );
   });
 
   it('closing is a signed act: the dialog signs the issue-bound payload and the command gets the signature, never a flag', async () => {
@@ -285,5 +290,73 @@ describe('MarkupOverlay', () => {
     const { container } = render(<MarkupOverlay />);
     expect(container.querySelectorAll('polyline')).toHaveLength(1);
     expect(container.querySelector('text')).toHaveTextContent('Look here');
+  });
+});
+
+describe('Review panel: stale signatures and unverified authors', () => {
+  const realDispatch = (
+    name: string,
+    params?: unknown,
+    options?: { onResult?: (r: { summary: string; changed: boolean }) => void },
+  ): void => {
+    const before = useStore.getState().document;
+    const result = execute(before, name, params, humanCtx());
+    useStore.setState({ document: result.document });
+    options?.onResult?.({ summary: result.summary, changed: result.document !== before });
+  };
+
+  it('a signature over a stale issue is refused: the summary is shown and the status is unchanged', async () => {
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      if (String(url).endsWith('/signing/keys'))
+        return Promise.resolve(
+          new Response(JSON.stringify({ keys: [{ keyId: 'k-1', userId: 'u-1', name: 'J. Example', trusted: true }] }), { status: 200 }),
+        );
+      const body = JSON.parse(String(init?.body)) as { payloadSha256: string };
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ signature: { alg: 'Ed25519', keyId: 'k-1', publicKey: 'a'.repeat(64), signature: body.payloadSha256 } }),
+          { status: 200 },
+        ),
+      );
+    });
+    useStore.setState({ dispatch: realDispatch as never });
+    render(<ReviewPanel />);
+    const detail = openIssue();
+    fireEvent.change(within(detail).getByLabelText('Move iss-2 to'), { target: { value: 'closed' } });
+    fireEvent.change(within(detail).getByLabelText('Reason for moving iss-2'), { target: { value: 'done' } });
+    fireEvent.click(within(detail).getByText('Sign and move'));
+    await screen.findByText(/J. Example/);
+    // the issue changes while the dialog is open
+    act(() => {
+      const moved = execute(useStore.getState().document, 'set_issue_status', {
+        issueId: 'iss-2',
+        status: 'in_progress',
+        reason: 'meanwhile',
+      });
+      useStore.setState({ document: moved.document });
+    });
+    fireEvent.change(screen.getByTestId('sign-passphrase'), { target: { value: 'a long passphrase' } });
+    fireEvent.click(screen.getByTestId('sign-confirm'));
+    const notice = await screen.findByTestId('issue-notice');
+    expect(notice).toHaveTextContent(/rejected|human act|did not verify/i);
+    expect(useStore.getState().document.review?.issues['iss-2']?.status).toBe('in_progress');
+    vi.unstubAllGlobals();
+  });
+
+  it('an unsigned human comment is a label only: check_review is unchanged', () => {
+    const doc = useStore.getState().document;
+    const before = execute(doc, 'check_review', {}, humanCtx()).data;
+    const after = execute(
+      execute(doc, 'add_review_comment', { issueId: 'iss-2', text: 'I approve this', author: 'human' }).document,
+      'check_review',
+      {},
+      humanCtx(),
+    ).data;
+    // The comment count rises; no finding, status or issue count moves.
+    const verdict = (data: unknown): unknown => {
+      const { status, issues, counts } = data as { status: string; issues: unknown; counts: { issues: unknown } };
+      return { status, issues, issueCounts: counts.issues };
+    };
+    expect(verdict(after)).toEqual(verdict(before));
   });
 });

@@ -679,9 +679,9 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
 | VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).** |
-| VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); UI (Review panel, redlines, section-box gizmo and clipping) built 2026-11-03 (§12.10); `render_view` use of markups / section box waits for M4.** |
-| VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Partly built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline; `PlantBatchRenderer` left (VIS-M3b).** |
-| VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
+| VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); UI (Review panel, redlines, section-box gizmo and clipping) built 2026-11-03 (§12.11); `render_view` use of markups / section box waits for M4.** |
+| VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline (M3a); `PlantBatchRenderer` + `LodGeometryCache` (M3b). Not verified in the desktop app yet; no live perf HUD.** |
+| VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d. **Built in two slices: perspective / viewpoint / digests 2026-10-19 (§12.1); profile / section box / highlight shading / `visibleEntityIds` / budget 2026-11-03 (§12.10). Shadows, AO and Blinn-Phong stay open.** |
 | VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d. **Built 2026-11-03 (§12.2 export, §12.9 clash issues, import, single viewpoint); xmllint test waits for the vendored XSDs.** |
 | VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
 | VIS-M7 | instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6) |
@@ -797,8 +797,8 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 ### 12.5 Not built yet (remaining VIS work)
 
-The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (the Review panel, redlines, section-box gizmo and clipping are §12.10; left there: switching a section box off, the BCF snapshot from the canvas), VIS-M3b (`PlantBatchRenderer`; the plan and `render_stats` are §12.8), the rest of VIS-M4
-(profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the vendored XSDs for VC-VIS-15 (VIS-M5 itself is §12.9), VIS-M6 viewport tiers
+The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (the Review panel, redlines, section-box gizmo and clipping are §12.11; left there: switching a section box off, the BCF snapshot from the canvas), the rest of VIS-M4
+(shadow, ambient occlusion and Blinn-Phong review shading; the profile, section box, highlight, `visibleEntityIds` and budget are §12.10), the vendored XSDs for VC-VIS-15 (VIS-M5 itself is §12.9), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
 
 ### 12.6 As built — VIS-M1 display profiles and service colours, 2026-10-23
@@ -873,7 +873,7 @@ Decisions (owner delegated, quality first):
 - **No `realism` on the data model yet** (walk / fly arrive with VIS-M6); `clashKey` arrived with VIS-M5 (§12.9).
 - **`activeSectionBoxId`** is review data written by `set_section_box` (`activate`) and `apply_viewpoint`; the viewport and `render_view` use it at VIS-M4 / M6.
 
-Not built in this section (VIS-M2 UI part, built in §12.10): the Review panel (issues, comments, human sign-off), redline tools, the section-box gizmo and clipping with the active box in the
+Not built in this section (VIS-M2 UI part, built in §12.11): the Review panel (issues, comments, human sign-off), redline tools, the section-box gizmo and clipping with the active box in the
 viewport; still open: the BCF snapshot from the UI canvas (Q7). The commands they dispatch exist and are tested. The Views overlay is covered by component tests and
 was not run in the desktop app in this session.
 
@@ -918,7 +918,21 @@ Measured (2026-11-03, Windows 11, shared machine, TypeScript reference, perspect
 
 `render_stats` rebuilds the scene (`planScene`) on every call; the plan itself is ~0.3 s at 10⁶ with the brute-force query. The viewport caches the scene, and the BVH (VIS-M7) replaces the O(N) query.
 
-Not built (VIS-M3b and later): `PlantBatchRenderer`, `LodGeometryCache`, `BatchedMesh` for unique geometry, transparent bucket sorting, instance BVH (`instanceBvh.ts`), `VIS_GPU_LIMIT`, the `render_view` use of the plan.
+VIS-M3b (`PlantBatchRenderer`, `LodGeometryCache`) is built, see the table below. Not built (VIS-M7 and later): `BatchedMesh` for unique geometry, transparent bucket sorting, instance BVH (`instanceBvh.ts`), `VIS_GPU_LIMIT`, the `render_view` use of the plan.
+
+### 12.8b As built — VIS-M3b `PlantBatchRenderer` and `LodGeometryCache`, 2026-11-03
+
+| Area | As built | Files (`src/ui/viewport/3d/plant/`) |
+| ---- | -------- | ----- |
+| Hand-over | `Entities.tsx` asks `usePlantCoverage` for the plan scene (`planScene`, memoized on `order` / `entities` / `layers` / `components`) and the covered ids, and `usePlantPlan` for the plan, computed in the SAME render from the camera published by `PlantCameraProvider` (no effect state, so a plan always belongs to its scene). Active when at least 1500 entities are coverable (`PLANT_BATCH_MIN_INSTANCES`); with no camera view, no scene or an unplannable camera (zero-size canvas) nothing is covered and the per-entity path draws everything. Covered = in the plan, kind box / cylinder / cone / sphere / torus / wedge / pyramid / revolution / mesh without face colours, and not claimed by the per-entity path (hidden, exploded, animated, finished / decaled, mid-transition, ghosted, tinted); the per-entity and `InstancedRenderer` paths skip them. | `plantBatchPlan.ts`, `usePlantCoverage.ts`, `usePlantPlan.ts`, `Entities.tsx` |
+| Buckets | One `InstancedMesh` per plan bucket (prototype x material class x LOD), one per unique-geometry instance, one box bucket per class at LOD2. The camera provider emits a new view on a throttled leading + trailing 250 ms schedule while the camera moves and once 150 ms after it stops. While moving, the plan uses a frustum widened 1.5x (same pixel density) and size-culled instances stay as boxes (`$culled`), so nothing blinks out while orbiting; the settled plan culls. Hysteresis input = the previous levels of the same scene. Matrices: Euler XYZ placement (LOD2: composed with the prototype local box), checked against three `Object3D`. Materials are per bucket (polygon offset 1 / 1 like `SolidMeshShell`; x-ray selected opacity). | `PlantBatchRenderer.tsx`, `PlantBucketMesh.tsx`, `PlantCameraProvider.tsx`, `plantPlanCamera.ts`, `plantMatrices.ts` |
+| Geometry | `LodGeometryCache`: LOD0 the per-entity builders, LOD1 8-segment cylinder / cone / sphere / torus (32 / 24 / 112 / 128 triangles, the plan's caps; other kinds keep LOD0), LOD2 one shared unit box. `retain` disposes prototypes that left the scene, `dispose` on unmount (`useDisposable`). | `LodGeometryCache.ts` |
+| Colour, picking | Instance colour = entity colour (or its material's), selection tinted as the per-entity path; the colour-profile path is not read yet (VIS-M1 viewport use is not built). A click maps `instanceId` to the entity id and goes through the same `handleSelect` (locked layers, additive select, click animations). | `plantInstanceColours.ts`, `plantBatchPlan.ts` |
+| Tests | `tests/unit/plantBatch.test.ts` (coverage, hidden layers, buckets vs the plan, culled boxes while moving, motion camera, tint, picks, matrices vs three, cache caps / dispose); `tests/component/EntitiesPlantExclusion.test.tsx` (real renderer: every entity is on screen exactly once across both paths with a plan, an unplannable camera, no camera view, after an edit, with a tinted entity) | |
+
+The camera view is an external store (`plantCameraStore.ts`) behind a stable context value; `Entities` subscribes (`useSyncExternalStore`) only while a plant scene is active, and the provider's frame hook is one flag check otherwise, so small documents never re-render on camera bumps (component test). **To check in the desktop app:** the settled plan culls covered instances under 1 px (drawn by neither path, tested), which may read as missing detail at plant scale; and the cost of re-planning (and the re-render of `Entities`) at 10^4 instances every 250 ms while orbiting.
+
+Not built: the dev perf HUD (no existing debug toggle to hang it on), hover highlight (the instanced path has none), `BatchedMesh` for unique geometry (each is a 1-instance mesh), LOD1 decimation of meshes / revolutions (they keep LOD0), edge lines, transparent / x-ray sorting (x-ray uses the shared material), picking through a BVH (three's O(N) instance raycast at click). Desktop-app verification and a measured frame rate on a SYN-RACK scene are open.
 
 ### 12.9 As built — VIS-M5b clash issues, BCF import, single-viewpoint BCF, 2026-11-03
 
@@ -957,7 +971,26 @@ Decisions:
 Not built: BCF 2.1 export (`VIS_BCF_VERSION` still refuses it), `VIS_BCF_COLOURING_LARGE`, per-component `IfcGuid` mapping (needs the 08-DAT IFC export), import of
 snapshots, section boxes and markups from a BCF viewpoint (`Lines`, `ClippingPlanes` are ignored), the vendored XSDs for the server test, and the UI for any of it.
 
-### 12.10 As built — VIS-UI Review panel, redlines, section box, colour profile in the viewport, 2026-11-03
+### 12.10 As built — VIS-M4b profile, section box, review highlight, visible entities, 2026-11-03
+
+`render_view` reads the display and review data that already sit in core `model` (§12.6 / §12.7), so no new port was needed (the plant plugin supplies entity properties through the existing property port). Built in `commands/render/`.
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Params | `colourProfileId`, `sectionBoxId`, `shading` (`flat` / `review`), `issueId`, `highlightEntityIds`. Profile: param, else the viewpoint's, else the active profile. Section box: param, else the viewpoint's, else the active box (an explicit `cut` ignores the viewpoint / active box; `sectionBoxId` + `cut` is `VIS_RENDER_INVALID`). | `reviewStyle.ts` |
+| Profile | evaluated with `evaluateProfile` (installed property providers); the first rule's colour replaces the entity colour and its material override; `hidden` rules remove the entity; `defaultColour` colours unmatched 3D entities; data `legend` (every rule with its count), `colourProfileId`, `hiddenEntityIds`. Instance children keep their own colours. Rule `transparency` is not drawn. | `reviewStyle.ts`, `reviewData.ts` |
+| Section box | the box becomes a `cut` of mode union (box: 6 outward planes turned by `rotationZ`; planes as stored), so clipping and hatched caps are those of `cut`; unknown id `VIS_SECTION_BOX_NOT_FOUND`. Framing keeps the whole scene. | `reviewStyle.ts` `sectionBoxCut` |
+| Review shading | `shading: 'review'`: the selection (viewpoint `selection`, entities of `issueId`, `highlightEntityIds`) keeps its colour, everything else is blended 70 % toward the background. A colour change of the scene, so it works in perspective and with the native renderer. With nothing to highlight the picture stays flat and the summary says so. | `reviewStyle.ts` |
+| `visibleEntityIds` | `data.visibleEntityIds` (first 500) + `visibleEntityCount` on every render_view; the read-only query `visible_entity_ids` (toolset review) answers without rendering. Stages: viewpoint visibility, profile hidden rules, section box (entity AABB wholly outside), view frustum (the render camera; the query uses the viewpoint camera at `width` x `height`, no frustum without a viewpoint; a turntable strip has none). Conservative AABB tests: a listed id may be fully occluded. | `viewVisibility.ts`, `visibleEntityIds.ts` |
+| `VIS_RENDER_BUDGET` | pixels x supersample^2 > 16 M is refused before rendering (`supersampleFor` is the raster's own factor). A single picture is clamped to 2000 x 2000 = 4 M samples, so only a turntable strip (frames x width x height pixels, counted once because its frames are drawn one at a time) can reach it: 12 frames at 2000 x 2000 are refused. | `viewVisibility.ts`, `renderView.ts` |
+
+Limits and rules added by review: `visible_entity_ids` applies a frustum only with `viewpointId` (without one `data.frustum` is false); its camera is checked (`VIS_CAMERA_INVALID`, path `viewpointId`, also for an up vector parallel to the direction) and the active exploded view applies as in render_view. In render_view a degenerate camera gives no frustum and `data.frustumSkipped` names the reason. Framing always uses the whole scene, so a profile that hides entities does not change the camera. A named profile that does not exist is always `VIS_PROFILE_NOT_FOUND`, even when it equals the stale active id. The turntable strip budget counts the strip's pixels (frames x width x height); behaviour change for existing callers: a strip over 16 M pixels (12 frames at 1920 x 1080) is now `VIS_RENDER_BUDGET`; the frames are drawn one at a time and only their PNG strings are held together.
+
+Not built (still VIS-M4 / M6): the sun shadow, ambient occlusion, Blinn-Phong with material classes, sky / ground, the `edges` / `shadows` / `ambientOcclusion` / `sun` params, profile transparency, the `rendererVersion` bump. `renderPlan` counts are not used by `render_view`: `planScene` costs 3.8 s at 10^6 instances (§12.8), more than the render it would guard, so the budget uses the sample count and the frustum cull tests AABBs directly.
+
+Validation: `tests/unit/render/reviewRender.test.ts` (SVG fill colours of a recoloured / dimmed picture, clipping, legend counts, visibility stages, frustum culling, refusals, purity, budget).
+
+### 12.11 As built — VIS-UI Review panel, redlines, section box, colour profile in the viewport, 2026-11-03
 
 Presentation and param gathering only: every change is `store.dispatch(command)` with a command of §12.6 / §12.7 / §12.9; no core, plugin or server file changed.
 
@@ -976,6 +1009,11 @@ Decisions and limits:
 - **Tints colour, they do not hide.** A rule's `hidden` / `transparency` is not applied in the viewport yet, only `appearance.colour` and `defaultColour`. A renderer that does not read `tintStore` (the plant batch renderer, another lane) is not coloured until it reads the merged tints.
 - **No way to switch clipping off without deleting the box.** `set_section_box` only activates; `apply_viewpoint` with `resetDisplay` clears it. A core command that deactivates the active box would give the panel a "Clip off" toggle.
 - **BCF snapshots from the UI canvas** (Q7) are not built; the UI export uses `snapshots: false` (the CLI keeps the reference raster default).
+- **`author` of comments and markups is an unverified label.** The UI sends `human`, but only signed history entries are acts; an unsigned human comment leaves `check_review` unchanged (test).
+- **Stale signatures are refused and told.** The signed payload is built from the issue as it was at the click; if the issue changed before signing, the command rejects and the panel shows the summary (`issue-notice`). Every status / delete dispatch shows a refusal this way.
+- **Picking respects the clip.** `ClippingPlane` publishes the active planes (`activeClipPlanes`); `selectOnClick` and the instanced click ignore a hit on the clipped-away side, so the click falls through to what is visible. The implicit GPU preview cap `MAX_CLIP_PLANES` is 8 (view plane + 6 box faces + 1).
+- **Gizmo.** The draft box is kept until the document's box equals it (no snap-back while the command is in flight; a refused command clears it); `pointercancel` restores the orbit controls.
+- **Batched plant entities do not take profile tints yet** (`PlantBatchRenderer`; a `writeBucketColours` task is on the board); the Colour profile UI says so.
 - **Not verified in the desktop app in this session**: covered by unit and component tests; the r3f gizmo drag and `gl.clippingPlanes` were not run in a GPU window.
 
 Tests: `tests/component/reviewViewportMath.test.ts` (section-box clip planes incl. render-origin shift and rotation, face resize, `profileTints`, tint layers, markup maths) and `tests/component/ModelReview.test.tsx` (issue list, create, comment, unsigned move; the signed close compares the signed bytes with `statusPayload` and the dispatched `confirmation`; delete dialog; clash and BCF import dispatch; viewpoints; redline drag to `add_markup`; section box; colour profile).

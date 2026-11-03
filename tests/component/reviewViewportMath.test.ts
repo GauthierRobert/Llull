@@ -156,3 +156,14 @@ describe('markupDraw', () => {
     expect(right[0]).toBeLessThan(100);
   });
 });
+
+describe('activeClipPlanes (picking)', () => {
+  it('rejects a hit on the clipped-away side of the active planes only', async () => {
+    const { isClippedAway, setActiveClipPlanes } = await import('@ui/viewport/3d/review/activeClipPlanes');
+    setActiveClipPlanes(sectionClipPlanes(box(), [0, 0, 0]));
+    expect(isClippedAway({ x: 2, y: 1, z: 1 })).toBe(false);
+    expect(isClippedAway({ x: 5, y: 1, z: 1 })).toBe(true);
+    setActiveClipPlanes([]);
+    expect(isClippedAway({ x: 5, y: 1, z: 1 })).toBe(false);
+  });
+});

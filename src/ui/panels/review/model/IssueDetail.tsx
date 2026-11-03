@@ -21,10 +21,15 @@ export function IssueDetail({ issue, review }: Props): React.ReactElement {
   const [comment, setComment] = useState('');
   const [target, setTarget] = useState<IssueStatus | ''>('');
   const [reason, setReason] = useState('');
+  const [notice, setNotice] = useState('');
   const [signing, setSigning] = useState<SignActRequest | null>(null);
   const comments = commentsOf(review, issue.id);
   const signer = signedBy(issue);
   const moves = nextStatuses(issue.status);
+
+  // A refused command (stale signature, bad transition) is told to the user, never swallowed.
+  const send = (name: string, params: Record<string, unknown>): void =>
+    dispatch(name, params, { onResult: (result) => setNotice(result.changed ? '' : result.summary) });
 
   const addComment = (): void => {
     if (comment.trim() === '') return;
@@ -41,14 +46,14 @@ export function IssueDetail({ issue, review }: Props): React.ReactElement {
     if (target === '' || reason.trim() === '') return;
     const params = { issueId: issue.id, status: target, reason: reason.trim() };
     if (!isHumanMove(issue.status, target)) {
-      dispatch('set_issue_status', params);
+      send('set_issue_status', params);
     } else {
       setSigning({
         title: target === 'closed' ? `Close ${issue.id}` : `Re-open ${issue.id}`,
         summary: `Sign to move ${issue.id} "${issue.title}" from ${STATUS_LABEL[issue.status]} to ${STATUS_LABEL[target]}: ${params.reason}`,
         act: 'set_issue_status',
         payload: (nonce) => statusPayload(issue, target, params.reason, nonce),
-        onSigned: (confirmation) => dispatch('set_issue_status', { ...params, confirmation }),
+        onSigned: (confirmation) => send('set_issue_status', { ...params, confirmation }),
       });
     }
     setTarget('');
@@ -61,7 +66,7 @@ export function IssueDetail({ issue, review }: Props): React.ReactElement {
       summary: `Sign to delete issue ${issue.id} "${issue.title}" and its comments. Deleting an issue is a human act.`,
       act: 'delete_review_issue',
       payload: (nonce) => deletePayload(issue, nonce),
-      onSigned: (confirmation) => dispatch('delete_review_issue', { id: issue.id, confirmation }),
+      onSigned: (confirmation) => send('delete_review_issue', { id: issue.id, confirmation }),
     });
 
   return (
@@ -143,6 +148,11 @@ export function IssueDetail({ issue, review }: Props): React.ReactElement {
           Delete
         </button>
       </div>
+      {notice !== '' && (
+        <p className="issue-detail__notice" role="alert" data-testid="issue-notice">
+          {notice}
+        </p>
+      )}
       {signing !== null && <SignActDialog request={signing} onClose={() => setSigning(null)} />}
     </div>
   );

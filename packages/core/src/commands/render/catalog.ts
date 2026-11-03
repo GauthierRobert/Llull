@@ -4,5 +4,6 @@ import { commandCatalog } from '../schema';
 import { renderView } from './renderView';
 import { renderWalkthrough } from './renderWalkthrough';
 import { renderMotion } from './renderMotion';
+import { visibleEntityIds } from './visibleEntityIds';
 
-export const renderCommands = commandCatalog(renderView, renderWalkthrough, renderMotion);
+export const renderCommands = commandCatalog(renderView, renderWalkthrough, renderMotion, visibleEntityIds);

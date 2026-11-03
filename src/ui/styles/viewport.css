@@ -973,4 +973,89 @@ button.lens-pill:hover .lens-pill__label {
   border: 1px solid currentcolor;
   border-radius: 4px;
   outline: none;
+
+/* ---- P&ID 2D HUD: sheet picker + read-only item inspector (PidSheetHud) ------ */
+
+.pid-hud {
+  position: absolute;
+  top: calc(var(--vp-inset-top, var(--space-3)) + 4px);
+  right: var(--space-4);
+  z-index: 18;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  max-width: 280px;
+  font-size: var(--text-sm);
+  color: var(--fg);
+  pointer-events: none;
+}
+
+.pid-hud > * {
+  pointer-events: auto;
+  border: 1px solid var(--border-float);
+  border-radius: var(--radius);
+  background: var(--surface-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-sm);
+}
+
+.pid-hud__picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 8px;
+}
+
+.pid-hud__caption {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.pid-hud__inspector {
+  min-width: 200px;
+  padding: 6px 10px 8px;
+}
+
+.pid-hud__inspector header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: 4px;
+}
+
+.pid-hud__inspector header button {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 3px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.pid-hud__kind {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+
+.pid-hud__inspector dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-3);
+  margin: 0;
+  font-size: var(--text-xs);
+}
+
+.pid-hud__inspector dt {
+  color: var(--fg-muted);
+}
+
+.pid-hud__inspector dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
 }

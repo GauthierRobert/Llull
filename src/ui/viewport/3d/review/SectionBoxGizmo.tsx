@@ -28,7 +28,7 @@ interface GripProps {
 function FaceGrip({ face, box, scale }: GripProps): React.ReactElement {
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   const renderOrigin = useStore((s) => s.renderOrigin);
-  const drag = useRef<{ param: number; distance: number; origin: Vec3; latest: SectionBox } | null>(null);
+  const drag = useRef<{ param: number; distance: number; origin: Vec3; base: SectionBox; latest: SectionBox } | null>(null);
   const quaternion = useMemo(
     () => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...face.normal)),
     [face.normal],
@@ -51,7 +51,7 @@ function FaceGrip({ face, box, scale }: GripProps): React.ReactElement {
     const ray = rayOf(event);
     const param = axisParamFromRay(origin, face.normal, ray.origin, ray.direction);
     if (param === null) return;
-    drag.current = { param, distance: face.distance, origin, latest: box };
+    drag.current = { param, distance: face.distance, origin, base: box, latest: box };
     capturePointer(event.target as EventTarget, event.pointerId);
     if (controls !== null) controls.enabled = false;
   };
@@ -61,30 +61,45 @@ function FaceGrip({ face, box, scale }: GripProps): React.ReactElement {
     const ray = rayOf(event);
     const param = axisParamFromRay(state.origin, face.normal, ray.origin, ray.direction);
     if (param === null) return;
-    const bounds = resizeSectionFace(box, face.axis, face.sign, state.distance + (param - state.param));
+    const bounds = resizeSectionFace(state.base, face.axis, face.sign, state.distance + (param - state.param));
     if (bounds === null) return;
-    state.latest = withBounds(box, bounds);
+    state.latest = withBounds(state.base, bounds);
     useSectionBoxDraftStore.getState().setDraft(state.latest);
   };
-  const onPointerUp = (event: ThreeEvent<PointerEvent>): void => {
+  const finish = (event: ThreeEvent<PointerEvent>): SectionBox | null => {
     const state = drag.current;
-    if (state === null) return;
+    if (state === null) return null;
     drag.current = null;
     releasePointer(event.target as EventTarget, event.pointerId);
     if (controls !== null) controls.enabled = true;
-    const { latest } = state;
-    useSectionBoxDraftStore.getState().setDraft(null);
-    if (latest === box || latest.min === undefined || latest.max === undefined) return;
+    return state.latest === state.base ? null : state.latest;
+  };
+  // The draft stays until the document's box equals it (SectionBoxGizmo), so nothing snaps back while the command is in flight.
+  const onPointerUp = (event: ThreeEvent<PointerEvent>): void => {
+    const state = drag.current;
+    const latest = finish(event);
+    if (state === null) return;
+    if (latest === null || latest.min === undefined || latest.max === undefined)
+      return void useSectionBoxDraftStore.getState().setDraft(null);
+    const { base } = state;
     useStore
       .getState()
-      .dispatch('set_section_box', {
-        id: box.id,
-        name: box.name,
-        min: latest.min,
-        max: latest.max,
-        ...(box.rotationZ === undefined ? {} : { rotationZ: box.rotationZ }),
-        activate: true,
-      });
+      .dispatch(
+        'set_section_box',
+        {
+          id: base.id,
+          name: base.name,
+          min: latest.min,
+          max: latest.max,
+          ...(base.rotationZ === undefined ? {} : { rotationZ: base.rotationZ }),
+          activate: true,
+        },
+        { onResult: (result) => !result.changed && useSectionBoxDraftStore.getState().setDraft(null) },
+      );
+  };
+  const onPointerCancel = (event: ThreeEvent<PointerEvent>): void => {
+    finish(event);
+    useSectionBoxDraftStore.getState().setDraft(null);
   };
 
   return (
@@ -95,6 +110,7 @@ function FaceGrip({ face, box, scale }: GripProps): React.ReactElement {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       userData={{ sectionFace: `${face.axis}${face.sign > 0 ? '+' : '-'}` }}
     >
       <circleGeometry args={[size, 24]} />
@@ -103,11 +119,18 @@ function FaceGrip({ face, box, scale }: GripProps): React.ReactElement {
   );
 }
 
+const sameBounds = (a: SectionBox, b: SectionBox): boolean =>
+  a.min?.join() === b.min?.join() && a.max?.join() === b.max?.join() && a.rotationZ === b.rotationZ;
+
 export function SectionBoxGizmo(): React.ReactElement | null {
   const review = useStore((s) => s.document.review);
   const draft = useSectionBoxDraftStore((s) => s.draft);
   const stored = review?.activeSectionBoxId === undefined ? undefined : review.sectionBoxes[review.activeSectionBoxId];
   const box = draft ?? stored;
+  // Release the draft once the document holds the same box.
+  useEffect(() => {
+    if (draft !== null && stored !== undefined && sameBounds(draft, stored)) useSectionBoxDraftStore.getState().setDraft(null);
+  }, [draft, stored]);
   const faces = useMemo(() => (box === undefined ? [] : sectionFaces(box)), [box]);
 
   const outline = useMemo(() => {

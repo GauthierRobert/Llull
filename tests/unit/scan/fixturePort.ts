@@ -15,6 +15,12 @@ export interface FixtureCloud {
   readonly key: string;
   readonly points: readonly Vec3[];
   readonly attributes?: CloudManifest['attributes'];
+  /** Per-point values (one entry per point; rgb is [r, g, b] per point) served when a query asks for them. */
+  readonly columns?: {
+    readonly intensity?: readonly number[];
+    readonly rgb?: readonly (readonly number[])[];
+    readonly classification?: readonly number[];
+  };
 }
 
 function manifestOf(cloud: FixtureCloud): CloudManifest {
@@ -80,9 +86,19 @@ export function fixturePort(clouds: readonly FixtureCloud[], answer: (op: CloudO
         );
       const limit = query.lod === 'full' ? query.maxPoints : Math.min(query.maxPoints, query.lod.budget);
       const kept = inside.slice(0, limit);
+      const wanted = (query.attributes ?? []).filter((name) => (cloud.attributes ?? []).includes(name));
+      const columns = cloud.columns ?? {};
+      const attributes = {
+        ...(wanted.includes('intensity') ? { intensity: Uint16Array.from(kept.map(({ index }) => columns.intensity?.[index] ?? 0)) } : {}),
+        ...(wanted.includes('rgb') ? { rgb: Uint8Array.from(kept.flatMap(({ index }) => [...(columns.rgb?.[index] ?? [0, 0, 0])])) } : {}),
+        ...(wanted.includes('classification')
+          ? { classification: Uint8Array.from(kept.map(({ index }) => columns.classification?.[index] ?? 0)) }
+          : {}),
+      };
       return {
         positions: Float64Array.from(kept.flatMap(({ p }) => [...p])),
         indices: Uint32Array.from(kept.map(({ index }) => index)),
+        ...(wanted.length > 0 ? { attributes } : {}),
         truncated: kept.length < inside.length,
         spacing: 0.01,
       };

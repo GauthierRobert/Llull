@@ -10,6 +10,7 @@ import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera } fr
 import * as THREE from 'three';
 import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { Entities } from './Entities';
+import { PlantCameraProvider } from './plant/PlantCameraProvider';
 import { TransformGizmo } from './TransformGizmo';
 import { DimensionLens } from './DimensionLens';
 import { PmiLayer } from './PmiLayer';
@@ -147,7 +148,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       />
 
       <group position={groupOffset}>
-        <Entities />
+        <PlantCameraProvider>
+          <Entities />
+        </PlantCameraProvider>
         <PointClouds />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <FeatureSessionLayer />

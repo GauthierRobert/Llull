@@ -16,6 +16,9 @@ import { SOLID_MESHES, type SolidMeshBranch } from './entities/solidMeshes';
 import { Shape2DRenderer } from '../2d/Shape2DRenderer';
 import { isBatchable, groupEntitiesForInstancing } from './grouping';
 import { InstancedRenderer } from './InstancedRenderer';
+import { PlantBatchRenderer } from './plant/PlantBatchRenderer';
+import { usePlantCoverage } from './plant/usePlantCoverage';
+import { usePlantPlan } from './plant/usePlantPlan';
 import { useGhostStore } from '@ui/store/ghostStore';
 import { useTintStore } from '@ui/store/tintStore';
 import { GridAnnotations3D } from './GridAnnotations3D';
@@ -106,6 +109,7 @@ const EntityRenderer = memo(function EntityRenderer({
 
 const noopSelect = (): void => undefined;
 /** No body is drawn by the GPU preview (stable reference while the preview is off). */
+const NO_COVERAGE: ReadonlySet<EntityId> = new Set();
 const NO_GPU_BODIES: Readonly<Record<string, true>> = {};
 
 /** Hologram of the previous version (removed / remotely reshaped) through the same render branch. */
@@ -185,10 +189,32 @@ export function Entities(): React.ReactElement {
     () => new Set([...animatedEntityIds(animations, groups), ...dynamicEntityIds(dynamics)]),
     [animations, groups, dynamics],
   );
+  // Plant-scale scenes: the plan renderer owns every plain solid it can draw; the per-entity path keeps the rest (and anything it must
+  // draw itself: animated, finished, transitioning, ghosted, tinted, exploded, hidden).
+  const visibleIds = useMemo(() => new Set(visibleEntities.map((entity) => entity.id)), [visibleEntities]);
+  const needsOwnPath = useCallback(
+    (entity: Entity): boolean =>
+      !visibleIds.has(entity.id) ||
+      explodeOffsets.has(entity.id) ||
+      animatedIds.has(entity.id) ||
+      hasFinish(entity) ||
+      transitions.has(entity.id) ||
+      ghosted.has(entity.id) ||
+      tints.has(entity.id),
+    [visibleIds, explodeOffsets, animatedIds, hasFinish, transitions, ghosted, tints],
+  );
+  const plant = usePlantCoverage(document, needsOwnPath);
+  // The plan is computed in this render, for exactly this scene: until one exists (no camera, zero-size canvas) the per-entity path draws everything.
+  const plantPlan = usePlantPlan(plant.scene);
+  const plantCovered = plantPlan === null ? NO_COVERAGE : plant.covered;
+  const perEntityCandidates = useMemo(
+    () => (plantCovered.size === 0 ? visibleEntities : visibleEntities.filter((entity) => !plantCovered.has(entity.id))),
+    [visibleEntities, plantCovered],
+  );
   const batches = useMemo(
     () =>
       groupEntitiesForInstancing(
-        visibleEntities.filter(
+        perEntityCandidates.filter(
           (entity) =>
             !animatedIds.has(entity.id) &&
             !hasFinish(entity) &&
@@ -198,11 +224,11 @@ export function Entities(): React.ReactElement {
         ),
         materials,
       ),
-    [visibleEntities, animatedIds, materials, hasFinish, transitions, ghosted, tints],
+    [perEntityCandidates, animatedIds, materials, hasFinish, transitions, ghosted, tints],
   );
   const nonBatchableEntities = useMemo(
     () =>
-      visibleEntities.filter(
+      perEntityCandidates.filter(
         (entity) =>
           (!isBatchable(entity) ||
             animatedIds.has(entity.id) ||
@@ -212,7 +238,7 @@ export function Entities(): React.ReactElement {
             tints.has(entity.id)) &&
           layers[entity.layerId]?.name !== GRID_LAYER_NAME,
       ),
-    [visibleEntities, animatedIds, layers, hasFinish, transitions, ghosted, tints],
+    [perEntityCandidates, animatedIds, layers, hasFinish, transitions, ghosted, tints],
   );
 
   return (
@@ -220,6 +246,17 @@ export function Entities(): React.ReactElement {
       <GridAnnotations3D document={document} />
 
       <InstancedRenderer batches={batches} selectionSet={selectionSet} onSelect={handleSelect} />
+
+      {plantPlan !== null && (
+        <PlantBatchRenderer
+          plan={plantPlan}
+          covered={plantCovered}
+          entities={entities}
+          materials={materials}
+          selectionSet={selectionSet}
+          onSelect={handleSelect}
+        />
+      )}
 
       {/* Always wrapped (stable tree): a live transition must not remount the entity's geometry when it starts or ends. */}
       {nonBatchableEntities.map((entity) => (

@@ -1,6 +1,6 @@
 // Review tab: runs check_prototype (read-only), shows the readiness checklist, the findings and the Explain drawer. Reviewer statuses go out
 // as set_review_disposition (with the check's inputsHash). Below: the mechanism graph, the motion timeline and the reference overlay.
-// The model review (issues, signed status moves, viewpoints, redlines, section box, colour profile) sits above the checks (09 VIS §12.10).
+// The model review (issues, signed status moves, viewpoints, redlines, section box, colour profile) sits above the checks (09 VIS §12.11).
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { humanGatePayload } from '@core/model/humanGate';
