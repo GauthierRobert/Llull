@@ -121,16 +121,6 @@ function findingsOf(
     const code = DEFAULT_CODES[key];
     if (code !== undefined) out.push(finding(code, 'warn', `${key} is a named default`, [], [name]));
   }
-  const broken = rows.filter((row) => !Number.isFinite(row.ratio) || !Number.isFinite(row.stressMPa));
-  if (broken.length > 0)
-    out.push(
-      finding(
-        'PST_STRESS_NOT_FINITE',
-        'fail',
-        `${broken.length} stress station(s) are not finite (non-physical section or load): the code check cannot pass`,
-        [...new Set(broken.map((row) => row.node ?? row.element))],
-      ),
-    );
   const overstress: [string, StressRow['caseType'], string][] = [
     ['PST_SUSTAINED_OVERSTRESS', 'SUS', 'sustained stress S_L above the allowable S_h'],
     ['PST_EXPANSION_OVERSTRESS', 'EXP', 'displacement stress range S_E above the allowable S_A'],
@@ -173,7 +163,7 @@ function findingsOf(
 }
 
 /**
- * @failure model without conditions -> PST_CONDITIONS_MISSING; the build, solve and load case failures of `buildStressModel` / `solveModel`
+ * @failure model without conditions -> PST_CONDITIONS_MISSING; a non-finite stress or ratio at any station -> PST_STRESS_NOT_FINITE (never recorded); the build, solve and load case failures of `buildStressModel` / `solveModel`
  */
 export function analyzeStressModel(doc: CadDocument, model: StressModel): Analysis | AnalysisFailure {
   const conditions = model.conditions;
@@ -190,6 +180,15 @@ export function analyzeStressModel(doc: CadDocument, model: StressModel): Analys
   const solved = solveModel(doc, model, built, conditions);
   if (!solved.ok) return solved;
   const stress = codeStresses({ built, conditions, states: solved.states });
+  const broken = stress.rows.filter((row) => !Number.isFinite(row.ratio) || !Number.isFinite(row.stressMPa));
+  if (broken.length > 0)
+    return {
+      ok: false,
+      code: 'PST_STRESS_NOT_FINITE',
+      message: `${broken.length} stress station(s) are not finite (non-physical section, allowable or load): the code check cannot run`,
+      ids: [...new Set(broken.map((row) => row.node ?? row.element))],
+      paths: ['conditions.material'],
+    };
   const findings = findingsOf(model, built, conditions, solved.states, stress.rows, solved.warnings);
   const governing: Governing[] = [];
   for (const state of solved.states) {
