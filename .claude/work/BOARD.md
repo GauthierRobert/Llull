@@ -14,7 +14,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 ## NOW (auto-updated by the skill)
 
 - 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). Merged: EQP-M5-UI, PST-GATE + PST-HARDEN, VIS-M3a, BLD-UID + FUZZ-EQP (uid sealed by a content hash of the first step, mintedIdentity removed), PID-M5b (first sheet only; picker + 2D pick of P&ID items left, 04 §13.8), PST-M4 (report, render_view overlay port, geometry, in-app overlay + panel),
-  SCN-M3 (viewport, Scan panel). Merged later: VIS-M5b, PST-M4c (per-element colours, reaction arrows, deformed shape; not tried in the app), VIS-M4b (render_view profile / section box / review shading, visible_entity_ids, VIS_RENDER_BUDGET; turntable strips over 16 M px now refused, 09 §12.10). Also merged: VIS-M3b (PlantBatchRenderer ≥ 1500 coverable solids; not orbited in the desktop app, 09 §12.8b). WIP: PID-M5c (lane1), VIS-UI (lane2), VIS-M7 core (lane3), SCN-M3b (lane4, review fixes). Server suite: 2 native blend failures (nativeBlendG2Corners,
+  SCN-M3 (viewport, Scan panel). Merged later: VIS-M5b, PST-M4c (per-element colours, reaction arrows, deformed shape; not tried in the app), VIS-M4b (render_view profile / section box / review shading, visible_entity_ids, VIS_RENDER_BUDGET; turntable strips over 16 M px now refused, 09 §12.10). Also merged: VIS-M3b (PlantBatchRenderer ≥ 1500 coverable solids; not orbited in the desktop app, 09 §12.8b). WIP: PID-M5c (lane1), VIS-UI (lane2), VIS-M7 core (lane3), SCN-M3c (lane4). SCN-M3b merged 2026-11-04. Server suite: 2 native blend failures (nativeBlendG2Corners,
   nativeBlendCurvedCorners), not from the plant diffs. `validationPlanCommands` fails in the main checkout only, from the owner's uncommitted
   `docs/physics/22-motion-video` plans (`render_animation` unregistered). Workers + reviewers on sonnet. Next: VIS-M3b, VIS-UI, VIS-M6..M8.
 
@@ -215,7 +215,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[WIP]` **PID-M5c** (lane1 `feat/plant-pid-m5c`) 04 P&ID sheet picker + 2D pick / inspector of P&ID items (follow-ups of PID-M5b, §13.8).
 - `[WIP]` **VIS-UI** (lane2 `feat/plant-vis-ui`) 09 Review panel, redline tools, section-box gizmo + clipping, profile use in viewport / `render_view`. _Lane 2_
 - `[WIP]` **VIS-M6..M8** (lane3 `feat/plant-vis-m7`: M7 core part: `instanceBvh.ts`, render_stats cache + BVH, clash broad phase; viewport worker / glTF instancing / pipe markers and M6, M8 left) 09 realism tiers, walk / fly, instance BVH worker, 10⁶ streaming.
-- `[WIP]` **SCN-M3b** (lane4 `feat/plant-scn-m3b`; SCN-M3 viewport + Scan panel merged 2026-11-03, 10 §13.6, not tried in the desktop app) per-point rgb / intensity / classification in `query_cloud_points` (only elevation colouring works until then). Left after: `render_view` clouds, EDL, worker kd-tree, 30 fps benchmark.
+- `[WIP]` **SCN-M3c** (lane4 `feat/plant-scn-m3c`: `render_view` clouds; SCN-M3b merged 2026-11-04: rgb / intensity / classification columns, hostile-asset validation; SCN-M3 viewport + Scan panel merged 2026-11-03, 10 §13.6, not tried in the desktop app) per-point rgb / intensity / classification in `query_cloud_points` (only elevation colouring works until then). Left after: `render_view` clouds, EDL, worker kd-tree, 30 fps benchmark.
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
