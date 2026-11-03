@@ -1,6 +1,7 @@
 {
   "name": "llull-server",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "description": "llull local backend (live document, exchange, exports) and the llull CLI",
   "type": "commonjs",

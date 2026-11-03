@@ -1,6 +1,7 @@
 {
   "name": "@llull/domain-aero",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "Aerospace plugins: sheet metal (07 FTR, toolset manufacturing), standard-part fasteners (08 MAT, toolset fasteners), aerodynamics (10 AER, toolset aerodynamics) and fluids / propulsion (11 FLD, toolset fluids).",

@@ -15,7 +15,7 @@ uses. The previous mesher, its loader crate, its CI steps and its bundling are g
 
 | Component | Licence | How llull uses it | Obligation |
 | --- | --- | --- | --- |
-| Gmsh 4.x (before) | GPL-2.0-or-later | `llull-mesh` loaded `libgmsh` at run time (dlopen) and called its C API | GPL: a program built to call a GPL library is, in the FSF's reading, a combined work, whether linked or dlopened. Incompatible with an `UNLICENSED` (proprietary) llull. |
+| Gmsh 4.x (before) | GPL-2.0-or-later | `llull-mesh` loaded `libgmsh` at run time (dlopen) and called its C API | GPL: a program built to call a GPL library is, in the FSF's reading, a combined work, whether linked or dlopened. Incompatible with the then `UNLICENSED` (proprietary) llull. |
 | Netgen 6.2 (now) | LGPL-2.1 (`LICENSE`, upstream repo) | `llull-mesh` links `nglib` + `ngcore` **dynamically** (shared libraries, unmodified) | LGPL-2.1 §6(b): a "work that uses the Library" may be distributed under our own terms when it uses a suitable shared-library mechanism; we ship the libraries' licence, notice and source location, and must allow users to replace them (relink not needed: drop-in shared libraries). |
 | OCCT 7.9.2 | LGPL-2.1 + Open CASCADE exception | already linked dynamically by `llull-kernel` (RS1 §2 rule 7); now also by `llull-mesh` | unchanged; same prefix, same notices. |
 | zlib 1.3.1 | zlib licence | linked statically into `nglib` (Netgen needs it for its file formats) | keep the licence text (bundled as `Netgen-zlib-LICENSE.txt`). |
@@ -28,7 +28,7 @@ Points the owner should be aware of (not legal advice):
   still a work that uses the library and §6 applies. OCCT's exception covers the same situation for OCCT; Netgen has no such exception.
 - **§6 terms.** For a work under §6 the LGPL requires that our licence terms for `llull-mesh` "permit modification of the work for the
   customer's own use and reverse engineering for debugging such modifications". The bundled `Netgen-NOTICE.txt` states it; **llull's own
-  licence (currently `UNLICENSED`) must not forbid it for `llull-mesh`** when llull is distributed. The same already applied to OCCT.
+  licence must not forbid it for `llull-mesh`** when llull is distributed (met: GPL-3.0-or-later since LIC1). The same already applied to OCCT.
 - Netgen is built from the unmodified upstream release tarball (sha256-pinned); the build recipe is public in our tree
   (`solver/scripts/build-netgen.mjs`), so "the source of the library" requirement is met by pointing at the upstream tag + our recipe.
 

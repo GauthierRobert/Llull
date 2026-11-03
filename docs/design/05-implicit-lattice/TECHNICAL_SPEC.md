@@ -404,7 +404,7 @@ belongs to 07 MSH.
 
 | Option | Licence (crates.io, 2026-10) | Fit | Decision |
 | --- | --- | --- | --- |
-| Own crate `solver/crates/llull-field` (tape interpreter, interval arithmetic, octree, marching tetrahedra, winding number on `llull-bvh`, rayon) | workspace (UNLICENSED, proprietary) | Exact control of determinism (AF-13), same tape as TS, bit-exact CPU twin, no new dependency risk | **Chosen** |
+| Own crate `solver/crates/llull-field` (tape interpreter, interval arithmetic, octree, marching tetrahedra, winding number on `llull-bvh`, rayon) | workspace (GPL-3.0-or-later, LIC1) | Exact control of determinism (AF-13), same tape as TS, bit-exact CPU twin, no new dependency risk | **Chosen** |
 | `fidget` 0.5.1 | MPL-2.0 | JIT tape evaluation with interval simplification and Manifold Dual Contouring; README: "personal-scale experimental project … expect to fork it" [R27] | Reference for the tape / interval design; not a dependency (file-level copyleft + stability) |
 | `manifold3d` 0.4.1 (bindings) | Apache-2.0 OR MIT | LevelSet with a per-point callback | Oracle only (same as F3) |
 | `fast-surface-nets` 0.2.1 | MIT OR Apache-2.0 | Naive surface nets on chunks | COULD for preview meshes |

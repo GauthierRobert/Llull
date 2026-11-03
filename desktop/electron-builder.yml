@@ -3,13 +3,16 @@
 # (CSC_LINK / CSC_KEY_PASSWORD, APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID).
 appId: app.llull.desktop
 productName: llull
-copyright: Copyright © llull
+copyright: Copyright © 2026 Gauthier Robert (GPL-3.0-or-later)
 directories:
   output: release
 files:
   - dist/**
   - package.json
 extraResources:
+  # llull's own licence (LIC1); third-party notices ship with python/ and native/.
+  - from: ../LICENSE
+    to: LICENSE
   # Renderer bundle (npm run build:web); the backend serves it, so the API base is the page origin.
   - from: ../dist
     to: web

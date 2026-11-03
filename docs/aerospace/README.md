@@ -147,7 +147,7 @@ Rules for the steps:
 2. Pure core pieces of a later step (CLT, NACA generator, flat-pattern maths, Ed25519 verify) may be pulled forward when a lane is free.
    They do not change the step order.
 3. Decision 1 (package layout) is needed before AERO-3 (the first `domain-aero` command). Decision 2 (OCC build) is the work of AERO-2.
-   Decision 5 (licensing) is needed before the desktop installer ships CalculiX (the mesher is LGPL Netgen since NG1).
+   Decision 5 (licensing) is settled: llull is GPL-3.0-or-later (LIC1), so the installer may ship CalculiX with its source.
 
 ## Status (2026-10-15)
 
@@ -205,7 +205,7 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
 4b. **Exact STEP import** — *settled in review*: one command, `import_step_exact`, owned by 01 (B-rep blob
    leaf, healing, import report); 04 extends it with validation properties, assembly tree and AP242 PMI, and
    owns `export_step_ap242` and the single GVP band policy.
-5. **Licensing**: shipping GPL CalculiX with the desktop installer (05; the mesher is LGPL Netgen, NG1); licensed MMPDS / NAS /
+5. **Licensing** — *settled 2026-11-03*: llull is GPL-3.0-or-later ([LIC1](../decisions/LIC1-license.md)); bundling GPL CalculiX (05) needs only its source shipped or offered. Licensed MMPDS / NAS /
    CMH-17 data must stay in private libraries that never land in saved files (08).
 5b. **Agent-first plumbing (shared prerequisite, do first)**: plan reports with per-step error codes,
    query `data` and an alias→ids map (AGENT_FIRST AF-14); human gates bound to a human-held signing key

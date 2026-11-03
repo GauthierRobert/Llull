@@ -58,3 +58,18 @@ docs(architecture): clarify dependency direction
 - [ ] New command (if any) has a test and appears in the registry.
 - [ ] `npm run check` is green.
 - [ ] Docs updated if behaviour or architecture changed.
+
+## Licensing of contributions
+
+llull is licensed under GPL-3.0-or-later ([`LICENSE`](../LICENSE), [LIC1](decisions/LIC1-license.md)). The copyright holder
+also offers llull under separate commercial terms, so every contribution needs this grant. By submitting a contribution (a
+pull request, patch or any other change) you agree that:
+
+1. You wrote it, or otherwise have the right to submit it under these terms.
+2. It is licensed under GPL-3.0-or-later.
+3. You grant the copyright holder of llull (Gauthier Robert) a perpetual, worldwide, non-exclusive, royalty-free, irrevocable
+   licence to use, modify, sublicense and distribute your contribution under any terms, including commercial licences, plus a
+   licence to any of your patents the contribution necessarily infringes.
+4. You keep your copyright and may use your own contribution however you like.
+
+Add `Signed-off-by: Your Name <email>` to each commit (`git commit -s`) to confirm.
