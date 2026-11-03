@@ -61,6 +61,8 @@ import { NurbsNetBar } from './nurbsNet/NurbsNetBar';
 import { RemotePreviewLayer } from './preview/RemotePreviewLayer';
 import { FootprintPreviewLayer } from './preview/FootprintPreviewLayer';
 import { CageEditBar } from './cage/CageEditBar';
+import { ReviewViewportLayer } from './review/ReviewViewportLayer';
+import { MarkupOverlay } from './review/MarkupOverlay';
 import { SpaceMouseControl } from '@ui/input/SpaceMouseControl';
 
 // Idempotent, StrictMode-safe.
@@ -174,6 +176,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <WrapOverlay />
         <BlendOverlay />
         <FocusOverlay />
+        <ReviewViewportLayer />
       </group>
 
       {/* Last: its useFrame must run after every pose writer (see RenderRig). */}
@@ -220,6 +223,7 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
+      <MarkupOverlay />
       <div className="feature-chips">
         <FeatureStartBar />
         <CageEditBar />

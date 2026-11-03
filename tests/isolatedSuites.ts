@@ -63,6 +63,7 @@ export const DOM_ISOLATED_SUITES: readonly string[] = [
   'tests/component/PmiPanel.test.tsx',
   'tests/component/ReportIssueDialog.test.tsx',
   'tests/component/ReviewDisposition.test.tsx',
+  'tests/component/ModelReview.test.tsx',
   'tests/component/SolidMeshShell.test.tsx',
   'tests/component/SweepMesh.test.tsx',
   'tests/component/SpaceMouseControl.test.tsx',
