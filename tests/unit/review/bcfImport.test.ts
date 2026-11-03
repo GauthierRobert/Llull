@@ -143,7 +143,7 @@ describe('import_bcf merge policy and the human gate', () => {
     expect(skipped.data).toMatchObject({ created: 0, updated: 0, skipped: 1 });
     expect(skipped.document).toBe(source);
     expect(skipped.affected).toEqual([]);
-    let edited = run(source, 'set_issue_status', { issueId: 'iss-3', status: 'in_progress', reason: 'on it' });
+    let edited = source;
     edited = {
       ...edited,
       review: {
@@ -153,8 +153,8 @@ describe('import_bcf merge policy and the human gate', () => {
     };
     const updated = execute(edited, 'import_bcf', { bcf, mergePolicy: 'update' });
     expect(updated.data).toMatchObject({ created: 0, updated: 1, comments: 0 });
-    expect(updated.document.review?.issues['iss-3']).toMatchObject({ title: 'Clearance < 50 & nozzle', status: 'in_progress' });
-    expect(updated.document.review?.issues['iss-3']?.history).toHaveLength(1);
+    expect(updated.document.review?.issues['iss-3']).toMatchObject({ title: 'Clearance < 50 & nozzle', status: 'open' });
+    expect(updated.document.review?.issues['iss-3']?.history).toHaveLength(0);
     expect(Object.keys(updated.document.review?.viewpoints ?? {})).toEqual(Object.keys(edited.review?.viewpoints ?? {}));
   });
 

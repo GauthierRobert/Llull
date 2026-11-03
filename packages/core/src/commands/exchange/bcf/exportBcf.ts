@@ -107,7 +107,7 @@ export const exportBcf = defineCommand({
           return {
             guid: nameUuid(`llull-bcf-comment|${issue.guid}|${comment.id}`),
             text: comment.text,
-            author: comment.author,
+            author: comment.importedAuthor ?? comment.author,
             ...(viewpointGuid === undefined ? {} : { viewpointGuid }),
           };
         });

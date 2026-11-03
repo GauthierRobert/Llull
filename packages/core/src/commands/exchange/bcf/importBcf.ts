@@ -10,6 +10,7 @@ import { isoDateProblem } from '../../../lib/isoDate';
 import type { CommandResult } from '../../types';
 import { defineCommand, z } from '../../schema';
 import { changed } from '../../noop';
+import { isProtectedIssue } from '../../review/reviewActs';
 import { mintReviewId, reviewOf, reviewRejection } from '../../review/reviewModel';
 import { BCF_MAX_ARCHIVE_BYTES, readBcfArchive, type BcfTopicRead } from './bcfRead';
 import { mapVisualization, viewpointOf } from './bcfViewpointMap';
@@ -50,11 +51,14 @@ function topicFields(
   };
 }
 
+/** Most records (issues + viewpoints + comments) one import creates; the import stops at the first topic past it. */
+const MAX_IMPORTED_RECORDS = 20_000;
+
 const OPEN_STATUSES = new Set(['', 'open', 'new', 'active']);
 
 /**
  * @affects adds issues, viewpoints and comments to doc.review (affected: the issue ids created or updated); metaHistory
- * @invariant bounded hostile input (archive 64 MiB decoded, XML through readXml, entry names checked, nothing is written outside the document); imported issues are always open with no history, so no human gate is bypassed; an update never touches status, history, viewpoints or entities
+ * @invariant bounded hostile input (archive 64 MiB decoded, XML through readXml, entry names checked, nothing is written outside the document); imported issues are always open with no history, so no human gate is bypassed; an update never touches status, history, viewpoints or entities, and leaves an issue that is not open or has a human history entry byte-identical (VIS_BCF_ISSUE_SIGNED, counted skipped), so no signature breaks
  * @failure not base64 / not a zip / unsafe entry name / bad XML / no topics -> VIS_BCF_PARSE; BCF version other than 2.1 / 3.0 -> VIS_BCF_VERSION
  */
 export const importBcf = defineCommand({
@@ -65,8 +69,8 @@ export const importBcf = defineCommand({
     'archive as base64 (CLI: `bcf=@review.bcf`). A topic whose Guid already names an issue follows `mergePolicy`: "skip" (default) leaves it, "update" refreshes ' +
     'its title, type, priority, labels, description, assignedTo and dueDate and appends comments it does not have. Imports are never human acts: new issues are open ' +
     '(a Closed / Resolved status in the file is reported as warning VIS_BCF_STATUS_RESET); status, history, viewpoints and entities of an existing issue are not changed. ' +
-    'Limits: 64 MiB archive, 5000 topics. data { topics, created, updated, skipped, viewpoints, comments, issueIds, warnings[{code, message}] }. Errors: VIS_BCF_PARSE, VIS_BCF_VERSION. ' +
-    'Warnings: VIS_BCF_GUID_UNMAPPED (components without a matching entity), VIS_BCF_VIEWPOINT_SKIPPED, VIS_BCF_TOPIC_SKIPPED, VIS_BCF_FIELD_DROPPED, VIS_BCF_STATUS_RESET.',
+    'Limits: 64 MiB archive, 5000 topics, 20000 created records (VIS_BCF_LIMIT), inflate ratio 200. A comment keeps the BCF Author as importedAuthor (an unverified label). data { topics, created, updated, skipped, viewpoints, comments, issueIds, warnings[{code, message}] }. Errors: VIS_BCF_PARSE, VIS_BCF_VERSION. ' +
+    'Warnings: VIS_BCF_GUID_UNMAPPED (components without a matching entity), VIS_BCF_VIEWPOINT_SKIPPED, VIS_BCF_TOPIC_SKIPPED, VIS_BCF_FIELD_DROPPED, VIS_BCF_STATUS_RESET, VIS_BCF_ISSUE_SIGNED, VIS_BCF_LIMIT.',
   annotations: { metaHistory: true },
   params: z.object({
     bcf: z.string().describe('The BCF archive, base64 (CLI: @file reads a file).'),
@@ -98,9 +102,21 @@ export const importBcf = defineCommand({
         continue;
       }
       seen.add(topic.guid);
+      if (counts.created + counts.viewpoints + counts.comments >= MAX_IMPORTED_RECORDS) {
+        warnings.push({
+          code: 'VIS_BCF_LIMIT',
+          message: `import stopped at ${MAX_IMPORTED_RECORDS} created records (issues + viewpoints + comments); the remaining topics were not read`,
+        });
+        break;
+      }
       const existing = Object.values(review.issues).find((issue) => issue.guid === topic.guid);
-      if (existing !== undefined && policy === 'skip') {
+      if (existing !== undefined && (policy === 'skip' || isProtectedIssue(existing))) {
         counts.skipped += 1;
+        if (policy === 'update')
+          warnings.push({
+            code: 'VIS_BCF_ISSUE_SIGNED',
+            message: `${existing.id} is closed, moved or signed by a human: left unchanged (only the gated workflow edits it)`,
+          });
         continue;
       }
       const viewpointIds = new Map<string, string>();
@@ -149,13 +165,14 @@ export const importBcf = defineCommand({
         issueId = existing.id;
         counts.updated += 1;
       }
+      const keyOf = (text: string, author: string): string => `${author}|${text}`;
       const known = new Set(
         Object.values(review.comments)
           .filter((comment) => comment.issueId === issueId)
-          .map((comment) => comment.text),
+          .map((comment) => keyOf(comment.text, comment.importedAuthor ?? comment.author)),
       );
       for (const entry of topic.comments) {
-        if (entry.text === '' || known.has(entry.text)) continue;
+        if (entry.text === '' || known.has(keyOf(entry.text, entry.author))) continue;
         const [id, next] = mintReviewId(review, 'cm');
         const viewpointId = entry.viewpointGuid === undefined ? undefined : viewpointIds.get(entry.viewpointGuid);
         const comment: ReviewComment = {
@@ -164,9 +181,10 @@ export const importBcf = defineCommand({
           text: entry.text,
           ...(viewpointId === undefined ? {} : { viewpointId }),
           author: 'agent',
+          ...(entry.author === '' ? {} : { importedAuthor: entry.author }),
         };
         review = { ...next, comments: { ...next.comments, [id]: comment } };
-        known.add(entry.text);
+        known.add(keyOf(entry.text, entry.author));
         counts.comments += 1;
       }
       issueIds.push(issueId);

@@ -11,6 +11,7 @@ import { BCF_XML_LIMITS, childText, parseVisualizationInfo, xmlChild, type BcfVi
 /** Largest archive accepted, decoded (bytes), and the largest total of the inflated parts. */
 export const BCF_MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
 const MAX_INFLATED_BYTES = 128 * 1024 * 1024;
+const MAX_RATIO = 200;
 const MAX_TOPICS = 5_000;
 const MAX_VIEWPOINTS_PER_TOPIC = 64;
 const MAX_COMMENTS_PER_TOPIC = 500;
@@ -55,7 +56,14 @@ const clip = (text: string): string => (text.length > MAX_TEXT ? text.slice(0, M
 
 /** True when an archive entry name could leave its folder (parent segment, absolute path, backslash, drive or NUL). */
 function unsafeName(name: string): boolean {
-  return name.startsWith('/') || name.includes('\\') || name.includes('\0') || /^[A-Za-z]:/.test(name) || name.split('/').includes('..');
+  return (
+    name.startsWith('/') ||
+    name.includes('\\') ||
+    name.includes('\0') ||
+    /%(2e|2f|5c)/i.test(name) ||
+    /^[A-Za-z]:/.test(name) ||
+    name.split('/').includes('..')
+  );
 }
 
 const decode = (data: Uint8Array): string => new TextDecoder('utf-8').decode(data);
@@ -149,6 +157,7 @@ export function readBcfArchive(bytes: Uint8Array): BcfRead {
   try {
     raw = unzip(bytes, {
       maxBytes: MAX_INFLATED_BYTES,
+      maxRatio: MAX_RATIO,
       select: (name) => {
         if (unsafeName(name)) {
           unsafe.push(name);

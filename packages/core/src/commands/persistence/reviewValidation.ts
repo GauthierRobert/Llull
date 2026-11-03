@@ -94,6 +94,8 @@ function commentProblem(entry: Record<string, unknown>, issues: Section, viewpoi
   const issueId = entry['issueId'];
   if (typeof issueId !== 'string' || !Object.hasOwn(issues, issueId)) return 'issueId must name an issue';
   if (typeof entry['text'] !== 'string') return 'text must be a string';
+  if (entry['importedAuthor'] !== undefined && (typeof entry['importedAuthor'] !== 'string' || entry['importedAuthor'].length > 200))
+    return 'importedAuthor must be a string of at most 200 characters';
   const cited = entry['viewpointId'];
   if (cited !== undefined && (typeof cited !== 'string' || !Object.hasOwn(viewpoints, cited))) return 'viewpointId must name a viewpoint';
   return isAuthor(entry['author']) ? null : "author must be 'agent' or 'human'";

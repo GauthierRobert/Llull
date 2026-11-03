@@ -9,6 +9,7 @@ import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { execute } from '../execute';
 import { clashBox, clashCamera, clashEntityIds, clashKeyOf, clashesOf, unionBounds, type ClashRecord } from './clashFraming';
+import { isProtectedIssue } from './reviewActs';
 import { mintReviewId, reviewOf, reviewRejection } from './reviewModel';
 
 /** Most clashes turned into issues by one run (the rest are counted in `data.truncated`). */
@@ -19,7 +20,7 @@ const describeClash = (clash: ClashRecord): string =>
 
 /**
  * @affects adds 1 issue (status open, type Clash) and 1 viewpoint per new clash to doc.review (affected: the issue ids, new and existing); metaHistory
- * @invariant idempotent on clashKey: a re-run creates nothing for a clash that has an issue, rewrites only its description (depth), never its status, history or comments, so no human gate is crossed; the source runs read-only
+ * @invariant idempotent on clashKey: a re-run creates nothing for a clash that has an issue, rewrites only its description (depth), never its status, history or comments, and never an issue that is not open or has a human history entry (byte-identical: its signature covers the whole issue; VIS_CLASH_ISSUE_SIGNED warning, counted unchanged); the source runs read-only
  * @failure unknown source, source refused / returned no clashes[] -> VIS_CLASH_SOURCE_INVALID; negative or non-finite margin -> VIS_ISSUE_INVALID
  */
 export const createClashIssues = defineCommand({
@@ -29,7 +30,7 @@ export const createClashIssues = defineCommand({
     'FPR_PAIR_HARD / FPR_PAIR_CONTAINED pairs) with `sourceParams`, and opens one issue per clash (type "Clash", status open, labels clash + kind) with a saved ' +
     'viewpoint framing the pair: iso camera (1,-1,1), perspective 45 degrees, box = overlap of the two bounding boxes (or the gap between them) grown by ' +
     '`margin` mm, the two parts selected. Idempotent: a clash that already has an issue (clashKey "clash:<a>,<b>|<kind>") is not created again, only its ' +
-    'description depth is refreshed; status, history and comments are never touched (closing stays a human act). data { created, unchanged, updated, skipped, ' +
+    'description depth is refreshed (not on an issue that is closed, moved or human-signed: warnings[VIS_CLASH_ISSUE_SIGNED]); status, history and comments are never touched (closing stays a human act). data { created, unchanged, updated, skipped, ' +
     'truncated, issueIds }. At most 500 clashes per run. Errors: VIS_CLASH_SOURCE_INVALID, VIS_ISSUE_INVALID. Then export_bcf to send them.',
   annotations: { metaHistory: true },
   params: z.object({
@@ -69,6 +70,7 @@ export const createClashIssues = defineCommand({
       Object.values(review.issues).flatMap((issue) => (issue.clashKey === undefined ? [] : [[issue.clashKey, issue.id] as const])),
     );
     const issueIds: string[] = [];
+    const signed: string[] = [];
     const counts = { created: 0, unchanged: 0, updated: 0, skipped: 0 };
     for (const clash of found.slice(0, MAX_CLASH_ISSUES)) {
       const key = clashKeyOf(clash);
@@ -79,7 +81,10 @@ export const createClashIssues = defineCommand({
         if (existing !== undefined && !issueIds.includes(existingId)) {
           issueIds.push(existingId);
           if (existing.description === description) counts.unchanged += 1;
-          else {
+          else if (isProtectedIssue(existing)) {
+            counts.unchanged += 1;
+            signed.push(existingId);
+          } else {
             counts.updated += 1;
             review = { ...review, issues: { ...review.issues, [existingId]: { ...existing, description } } };
           }
@@ -136,7 +141,8 @@ export const createClashIssues = defineCommand({
       `create_clash_issues: ${found.length} clash(es) from ${params.source}: ${counts.created} issue(s) created, ${counts.unchanged} unchanged, ` +
       `${counts.updated} refreshed, ${counts.skipped} skipped (part without geometry)${truncated > 0 ? `, ${truncated} over the ${MAX_CLASH_ISSUES} limit` : ''}` +
       `${issueIds.length > 0 ? `: ${issueIds.join(', ')}` : ''}.`;
-    const data = { ...counts, truncated, issueIds };
+    const warnings = signed.length === 0 ? [] : [{ code: 'VIS_CLASH_ISSUE_SIGNED', ids: signed }];
+    const data = { ...counts, truncated, issueIds, warnings };
     if (counts.created === 0 && counts.updated === 0) return { document: doc, summary, affected: [], data };
     return { ...changed({ ...doc, review }, summary, issueIds), data };
   },

@@ -139,6 +139,8 @@ export interface ReviewComment {
   readonly id: string;
   readonly issueId: string;
   text: string;
+  /** Author text a BCF import kept (BCF Author, an unverified label); export_bcf writes it back. */
+  importedAuthor?: string;
   /** A comment refers to at most one viewpoint (BCF). */
   viewpointId?: string;
   author: 'agent' | 'human';

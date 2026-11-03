@@ -950,6 +950,10 @@ Decisions:
   between the closest faces when they do not overlap, grown by `margin` (mm).
 - **Imported comments are `author: 'agent'`** (a label only); BCF author and date are not kept. A viewpoint of an imported topic is named after the topic.
 
+- **Signed issues are frozen.** `issueSha256` covers the whole issue, so an issue that is not open or has a human history entry is left byte-identical by `import_bcf` `update` (`VIS_BCF_ISSUE_SIGNED`, counted skipped) and by a clash re-run (`VIS_CLASH_ISSUE_SIGNED`, counted unchanged); the contract test `reviewSignedIssue.test.ts` checks every writer of `review.issues`.
+- **Imported comments** keep the BCF Author as `importedAuthor` (unverified label, `author` stays `agent`; `export_bcf` writes it back); comments dedupe on author + text. One import creates at most 20 000 records (`VIS_BCF_LIMIT`) and an entry may inflate at most 200 times its size.
+- **VC-VIS-15 runs only when `xmllint` and `LLULL_BCF_XSD_DIR` are present**; elsewhere only the structural unit test covers it.
+
 Not built: BCF 2.1 export (`VIS_BCF_VERSION` still refuses it), `VIS_BCF_COLOURING_LARGE`, per-component `IfcGuid` mapping (needs the 08-DAT IFC export), import of
 snapshots, section boxes and markups from a BCF viewpoint (`Lines`, `ClippingPlanes` are ignored), the vendored XSDs for the server test, and the UI for any of it.
 
