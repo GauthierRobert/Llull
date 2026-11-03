@@ -783,9 +783,11 @@ MIT / Apache-2.0), `wgpu` 25 (MIT / Apache-2.0, feature `gpu`). Nothing GPL. Tes
 | Snap           | `scan/pointSnap.ts` (pure), `scan/scanSnap.ts`, `snap3d.ts` type `scan-point`, `TransformGizmo.tsx` | during a gizmo translate drag the cloud point nearest on screen to the handle within 12 px wins over the grid (never over an object snap). The spec's "worker kd-tree per node" became a bounding-sphere cull + linear scan of the tiles near the pointer (no worker yet)                                                                                                                                                                  |
 | Panel          | `src/ui/panels/scan/ScanPanel.tsx`, store `scanViewStore.ts`                                        | read-only: clouds with status, drawn / total points, registration status; colour mode, point budget, crop and snap toggles (UI state, not the document). Tab `scan` joins the rail once a cloud is attached                                                                                                                                                                                                                                |
 
-Gaps: **(1) per-point attributes** — `query_cloud_points` returns positions and record indices only, so rgb / intensity / classification cannot be drawn
-until the query (or a new read-only command) returns the attribute columns (`rgb`, `intensity`, `classification`, one entry per point, already read by
-`cloudClient.parseTileAnswer`); until then only elevation and flat are live. **(2)** the answer is JSON (≈ 1 MB per 30 k points), adequate for
+Gaps: **(1) per-point attributes — closed (SCN-M3b)**: `query_cloud_points` takes `attributes` (subset of `rgb`, `intensity`, `classification`) and returns one
+column per requested attribute the asset has, one entry per returned point in point order (`rgb` = flat `[r, g, b, …]` 0–255, `intensity` = u16 as stored: LAS raw, E57 / ASCII
+scaled to 0–65535 at import, `classification` = ASPRS code); absent ones are listed in `data.missingAttributes`. The columns were always written to `nodes.bin` by `llull-cloud`;
+only the TypeScript `AssetReader` dropped them (it read positions and record indices). `cloudClient.parseTileAnswer` already reads these keys. Budgets / caps unchanged; rgb adds
+about 4 bytes per point to the JSON. **(2)** the answer is JSON (≈ 1 MB per 30 k points), adequate for
 ≤ 3 M resident points; a binary route is the follow-up if the 150 ms p95 fetch of §8 is missed. **(3)** a refined tile replaces its coarser answer (no
 shared parents), so the budget counts the finest answer per tile. **(4)** EDL shading, `render_view` clouds and the section-box (VIS) clip are not built.
 

@@ -28,7 +28,12 @@ export interface NodeRecord {
 export interface NodePoints {
   readonly positions: Float64Array;
   readonly indices: Uint32Array;
+  readonly intensity?: Uint16Array;
+  readonly rgb?: Uint8Array;
+  readonly classification?: Uint8Array;
 }
+
+const COLUMN_BYTES: Readonly<Record<string, number>> = { intensity: 2, rgb: 3, gpsTime: 8, normal: 12 };
 
 let crcTable: Uint32Array | null = null;
 
@@ -121,6 +126,20 @@ export class AssetReader {
     return this.manifest.octree.rootSpacing / 2 ** level;
   }
 
+  /** The intensity / rgb / classification columns of a block (after positions and indices, in manifest order). */
+  private attributeColumns(view: DataView, n: number): Pick<NodePoints, 'intensity' | 'rgb' | 'classification'> {
+    let at = 16 * n;
+    const columns: { intensity?: Uint16Array; rgb?: Uint8Array; classification?: Uint8Array } = {};
+    for (const name of this.manifest.attributes) {
+      const from = at;
+      if (name === 'intensity') columns.intensity = Uint16Array.from({ length: n }, (_, p) => view.getUint16(from + 2 * p, true));
+      else if (name === 'rgb') columns.rgb = Uint8Array.from({ length: 3 * n }, (_, k) => view.getUint8(from + k));
+      else if (name === 'classification') columns.classification = Uint8Array.from({ length: n }, (_, p) => view.getUint8(from + p));
+      at += (COLUMN_BYTES[name] ?? 1) * n;
+    }
+    return columns;
+  }
+
   /** Positions and record indices of node `i`; null when the block is unreadable or fails its CRC. */
   readNode(i: number): NodePoints | null {
     const cached = this.cache.get(String(i));
@@ -151,7 +170,7 @@ export class AssetReader {
         positions[3 * p + a] = ((origin[a] ?? 0) + view.getUint32((3 * p + a) * 4, true)) * (quantum[a] ?? 0) + (offset[a] ?? 0);
       indices[p] = view.getUint32((3 * n + p) * 4, true);
     }
-    const points = { positions, indices };
+    const points: NodePoints = { positions, indices, ...this.attributeColumns(view, n) };
     this.cache.set(String(i), points);
     return points;
   }

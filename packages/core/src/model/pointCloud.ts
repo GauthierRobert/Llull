@@ -60,6 +60,9 @@ export interface CloudManifest {
   readonly warnings: readonly { readonly code: string; readonly message: string }[];
 }
 
+/** Per-point columns a read can return (the asset's own storage types). */
+type CloudQueryAttribute = 'rgb' | 'intensity' | 'classification';
+
 /** A bounded read of an asset, in the asset frame (metres). */
 export interface CloudQuery {
   readonly box?: CloudBounds;
@@ -68,6 +71,8 @@ export interface CloudQuery {
   readonly lod: 'full' | { readonly budget: number };
   /** Hard cap, never exceeded (the result says `truncated`). */
   readonly maxPoints: number;
+  /** Columns to return alongside the positions (only those the asset has are answered). */
+  readonly attributes?: readonly CloudQueryAttribute[];
 }
 
 /** Points in canonical order (node order, then in-node order). */
@@ -76,6 +81,8 @@ export interface CloudPoints {
   readonly positions: Float64Array;
   /** Source record index of each point. */
   readonly indices: Uint32Array;
+  /** One entry per point: intensity u16 as stored (LAS raw; E57 / ASCII scaled to 0-65535 at import), rgb 3 × u8 per point, ASPRS classification u8. */
+  readonly attributes?: { readonly intensity?: Uint16Array; readonly rgb?: Uint8Array; readonly classification?: Uint8Array };
   readonly truncated: boolean;
   /** Effective point spacing of the returned set (the deepest level read), metres. */
   readonly spacing: number;
