@@ -20,6 +20,10 @@ import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass
 import { is2D } from '../../model/types';
 import { reviewRejection } from '../review/reviewModel';
 import { prepareView, viewParams } from './viewRequest';
+import { applyReviewStyle, resolveReviewStyle, reviewParams, sectionBoxCut } from './reviewStyle';
+import { computeSceneSnapshot } from '../inspect/scene';
+import { reviewData } from './reviewData';
+import { MAX_RENDER_SAMPLES, renderSamples } from './viewVisibility';
 import type { CadDocument } from '../../model/types';
 import type { RenderViewData } from './types';
 import { clamp } from '../../lib/clamp';
@@ -202,22 +206,40 @@ export const renderView = defineCommand({
           'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
       ),
     ...viewParams,
+    ...reviewParams,
   }),
   run: (doc, params, ctx): CommandResult => {
     const exploded = withExplodedPositions(doc);
-    const scene = params.hide2D === true ? withoutEntities2D(exploded) : exploded;
-    const resolved = resolveRenderOptions(scene, params);
+    const unstyled = params.hide2D === true ? withoutEntities2D(exploded) : exploded;
+    const resolved = resolveRenderOptions(unstyled, params);
     if ('error' in resolved) return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
     const { options } = resolved;
     const view: ViewName = options.direction || params.viewpointId !== undefined ? 'custom' : (params.view ?? 'iso');
     const width = clampPixels(params.width, 800);
     const height = clampPixels(params.height, 600);
-    const setup = prepareView(scene, params, options, width, height, ctx);
+    const samples =
+      params.turntable === undefined
+        ? renderSamples(width, height)
+        : renderSamples(width * clamp(params.turntable.frames, 1, 12), height, true);
+    if (samples > MAX_RENDER_SAMPLES)
+      return reviewRejection(doc, 'render_view', 'VIS_RENDER_BUDGET', `${samples} samples exceed ${MAX_RENDER_SAMPLES}`, [], ['width']);
+    const reviewed = resolveReviewStyle(doc, params);
+    if ('code' in reviewed) return reviewRejection(doc, 'render_view', reviewed.code, reviewed.message, [], reviewed.paths);
+    const { style } = reviewed;
+    const styled = applyReviewStyle(unstyled, style, ctx, options.background ?? undefined);
+    const scene = styled.scene;
+    if (style.box !== null) options.cut = sectionBoxCut(style.box);
+    if (styled.hiddenIds.length > 0) options.frame = computeSceneSnapshot(unstyled).bounds;
+    const setup = prepareView(unstyled, params, options, width, height, ctx);
     if ('code' in setup) return reviewRejection(doc, 'render_view', setup.code, setup.message, [], setup.paths);
     const { perspective, finish } = setup;
     const base = renderDocument(scene, view, width, height, options);
     const notes = renderNotes(base, options.cut);
-    const withNotes = (text: string): string => (notes === '' ? text : `${text} ${notes}`);
+    const reviewNotes = [styled.summary, ...style.notes, ...(style.box === null ? [] : [`Section box ${style.box.id} applied.`])].filter(
+      (n) => n !== '',
+    );
+    const withNotes = (text: string): string => [text, notes, ...reviewNotes].filter((n) => n !== '').join(' ');
+    const withReview = (data: RenderViewData): RenderViewData => ({ ...data, ...reviewData(styled, style, data, !params.turntable) });
     const decorate = (svg: string): string => {
       const captions = [
         params.title === undefined
@@ -233,11 +255,11 @@ export const renderView = defineCommand({
       const frames = clamp(params.turntable.frames, 1, 12);
       const strip = buildTurntableSvg(scene, frames, view, width, height, options);
       const dropped = params.overlay === undefined ? '' : ' Overlay not drawn on a turntable strip.';
-      return finish(doc, withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.${dropped}`), {
-        ...base,
-        width: strip.width,
-        svg: decorate(strip.svg),
-      });
+      return finish(
+        doc,
+        withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.${dropped}`),
+        withReview({ ...base, width: strip.width, svg: decorate(strip.svg) }),
+      );
     }
     let svg = base.svg;
     const plural = base.entityCount === 1 ? 'y' : 'ies';
@@ -271,6 +293,6 @@ export const renderView = defineCommand({
       }
       summary += ` Overlay: ${kinds.map((kind) => `${kind} ${drawn.stats[kind]?.entities.length ?? 0} entit${drawn.stats[kind]?.entities.length === 1 ? 'y' : 'ies'}`).join(', ')}.`;
     }
-    return finish(doc, withNotes(summary), { ...base, svg: decorate(svg), ...(overlays === undefined ? {} : { overlays }) });
+    return finish(doc, withNotes(summary), withReview({ ...base, svg: decorate(svg), ...(overlays === undefined ? {} : { overlays }) }));
   },
 });

@@ -31,6 +31,20 @@ export interface RenderViewData {
   cutEntityIds: string[];
   /** What the `overlay` kinds drew (04 DIR FR-DIR-40): entity ids and the counts of segments and dots in the SVG; absent without `overlay`. */
   overlays?: Partial<Record<OverlayKind, OverlayStats>>;
+  /** Ids of the entities the picture shows after viewpoint visibility, profile hidden rules, the section box and the view frustum (first 500, document order). */
+  visibleEntityIds?: string[];
+  /** Number of such entities (the list above is cut at 500). */
+  visibleEntityCount?: number;
+  /** Entities removed by viewpoint visibility or hidden profile rules (first 500). */
+  hiddenEntityIds?: string[];
+  /** One entry per rule of the applied colour profile, in rule order, with the number of entities it coloured. */
+  legend?: { ruleId: string; legend: string; colour: string; count: number }[];
+  /** The colour profile and section box that were applied, and the shading drawn. */
+  colourProfileId?: string;
+  sectionBoxId?: string;
+  shading?: 'flat' | 'review';
+  /** Why the view frustum was not applied to visibleEntityIds (degenerate camera); absent when it was applied or not applicable. */
+  frustumSkipped?: string;
 }
 
 /** One cut plane; the side the normal points to (dot(normal, p) > offset) is the removed side. */
