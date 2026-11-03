@@ -4,7 +4,7 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BimCategory, BuildingElement, BuildingLevel, BuildingModel } from '@aec/building/types';
 import { createEmptyBuilding } from '@aec/building/types';
 import { fromMm } from '@core/model/units';
-import { uniqueId } from '@lib/id';
+import { nextId } from '@lib/id';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 
 export function getBuilding(doc: Pick<CadDocument, 'building'>): BuildingModel {
@@ -74,9 +74,9 @@ function issued(building: BuildingModel, prefix: string, keys: ReadonlyArray<str
   return Math.max(highestIndex(keys, `${prefix}-`), building.counters?.[prefix] ?? 0);
 }
 
-/** Records that id "<prefix>-<n>" was issued (and gives a new building its unique uid). */
+/** Records that id "<prefix>-<n>" was issued (and gives a new building its step-scoped uid, re-minted identically by a replay). */
 function withCounter(source: BuildingModel, id: string): BuildingModel {
-  const building = source.uid === undefined ? { ...source, uid: uniqueId('building') } : source;
+  const building = source.uid === undefined ? { ...source, uid: nextId('building') } : source;
   const match = /^(.*)-(\d+)$/.exec(id);
   if (!match) return building;
   const [, prefix = '', number = '0'] = match;

@@ -84,7 +84,7 @@ export interface DocumentExtension {
    */
   replaySeed?(base: CadDocument): Partial<CadDocument>;
   /**
-   * A globally unique id the plugin's commands may mint into the document (e.g. `uniqueId`); a replay step that mints one is never memoized.
+   * A globally unique id the plugin's commands may mint into the document (`mintedIdentity`); a replay step that mints one is never memoized.
    * @invariant pure; undefined when the document holds none
    */
   mintedIdentity?(doc: CadDocument): string | undefined;

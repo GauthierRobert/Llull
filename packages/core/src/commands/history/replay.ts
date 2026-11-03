@@ -235,7 +235,7 @@ export function replayHistory(
         // An engine deferred this step or an earlier one (its result is still being computed): the state is a placeholder the host discards and re-runs. Never memoize it, and key every later state apart from the real one.
         key = nextStateKey(key, 'deferred', String(deferralCount()), null);
       } else if (cache) {
-        // The step minted a globally unique id (uniqueId): never memoize it, and key every later
+        // The step minted a globally unique id (a plugin mintedIdentity): never memoize it, and key every later
         // state by that id so no other document is served this document's identity.
         key = nextStateKey(key, 'minted-uid', mintedUid ?? String(deferralCount()), null);
       }

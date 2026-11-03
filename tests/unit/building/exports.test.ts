@@ -284,13 +284,14 @@ describe('export_ifc', () => {
 });
 
 describe('identity', () => {
-  it('two projects never share IFC GlobalIds; one project keeps them stable', () => {
+  it('one plan keeps its IFC GlobalIds on every run; a project whose building starts at another step gets others', () => {
     const a = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
-    const b = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
+    const same = run(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 1000, 0) });
+    const b = run(run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }), 'draw_walls', { points: xy(0, 0, 1000, 0) });
     const guids = (doc: CadDocument): string[] =>
       [...(execute(doc, 'export_ifc', {}).data as IfcExport).ifc.matchAll(/\('([0-9A-Za-z_$]{22})'/g)].map((match) => match[1]!);
-    const shared = guids(a).filter((guid) => guids(b).includes(guid));
-    expect(shared).toEqual([]);
+    expect(guids(same)).toEqual(guids(a));
+    expect(guids(a).filter((guid) => guids(b).includes(guid))).toEqual([]);
     expect(guids(a)).toEqual(guids(run(a, 'set_project_info', { client: 'X' })));
   });
   it('element and level numbers are never reused after a delete', () => {

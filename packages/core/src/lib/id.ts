@@ -62,14 +62,6 @@ export function nextId(prefix = 'e'): string {
 }
 
 /**
- * Globally unique id (time + process counter), NOT replay-stable. Only for identities that must
- * differ across documents (e.g. the IFC GlobalId salt) and are carried through replay as data.
- */
-export function uniqueId(prefix: string): string {
-  return counterIdSource.next(prefix);
-}
-
-/**
  * Readable id `<prefix><sep><n>` for the first `n >= start` that `taken` does not claim; `n` is zero-padded to `pad` digits.
  * Not replay-stable across documents on its own: callers pass the document's own ids to `taken`.
  */
