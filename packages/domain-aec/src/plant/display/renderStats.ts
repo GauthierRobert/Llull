@@ -8,8 +8,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec3, z } from '@core/commands/schema';
 import { codedRejection, report } from '@core/commands/noop';
 import { boundsCenter, boundsRadius, mergeBounds, type Bounds } from '@core/geometry/bounds';
-import { type PlanCamera, framedPlanCamera, viewpointPlanCamera } from '@core/geometry/renderPlanCamera';
-import { type PlanScene, planRender, planScene } from '@core/geometry/renderPlan';
+import { type PlanCamera, framedPlanCamera, planCameraProblem, viewpointPlanCamera } from '@core/geometry/renderPlanCamera';
+import { type PlanScene, compareCodepoint, planRender, planScene } from '@core/geometry/renderPlan';
 
 /** Buckets listed in `data.buckets`, largest first; `bucketCount` is the full number. */
 const MAX_LISTED_BUCKETS = 200;
@@ -33,7 +33,16 @@ const cameraOf = (
       : undefined;
     if (viewpoint === undefined)
       return { code: 'VIS_VIEWPOINT_NOT_FOUND', message: `no viewpoint '${params.viewpointId}'`, path: 'viewpointId' };
-    return viewpointPlanCamera(viewpoint.camera, width, height);
+    const fromViewpoint = viewpointPlanCamera(viewpoint.camera, width, height);
+    const problem = planCameraProblem(fromViewpoint);
+    return problem === null
+      ? fromViewpoint
+      : { code: 'VIS_CAMERA_INVALID', message: `viewpoint '${params.viewpointId}': ${problem}`, path: 'viewpointId' };
+  }
+  for (const field of ['target', 'direction'] as const) {
+    const value = params[field];
+    if (value !== undefined && !(Array.isArray(value) && value.length === 3 && value.every(Number.isFinite)))
+      return { code: 'VIS_CAMERA_INVALID', message: `${field} must be 3 finite numbers [x, y, z]`, path: field };
   }
   const bounds = scene.instances.reduce<Bounds | null>(
     (sum, instance) => (sum === null ? instance.aabb : mergeBounds(sum, instance.aabb)),
@@ -49,7 +58,9 @@ const cameraOf = (
     widthPx: width,
     heightPx: height,
   });
-  return typeof framed === 'string' ? { code: 'VIS_CAMERA_INVALID', message: framed, path: 'view' } : framed;
+  if (typeof framed === 'string') return { code: 'VIS_CAMERA_INVALID', message: framed, path: 'view' };
+  const problem = planCameraProblem(framed);
+  return problem === null ? framed : { code: 'VIS_CAMERA_INVALID', message: problem, path: 'view' };
 };
 
 interface RenderStatsParams {
@@ -68,7 +79,8 @@ interface RenderStatsParams {
 /**
  * @affects nothing — read-only; data { componentCount, buckets[{ prototypeKey, materialClass, lod, instances }], bucketCount, uniqueBatches[], opaqueModelCalls,
  *   edgeCalls, shadowCalls, culled{ frustum, pixel }, instancesDrawnPlusCulled, triangles, gpuBytesEstimate, planVersion }
- * @invariant a pure function of document + camera; instancesDrawnPlusCulled = componentCount; opaqueModelCalls ≤ 2P + C + U with multi-draw
+ * @invariant a pure function of document + camera; instancesDrawnPlusCulled = componentCount; opaqueModelCalls ≤ 2·(distinct prototype × material-class pairs) + C + U with multi-draw
+ *   (= 2P + C + U when each prototype has one material class, as in SYN-RACK-v1)
  * @failure unknown viewpointId -> VIS_VIEWPOINT_NOT_FOUND; fovDeg outside (0, 180) or a zero custom direction -> VIS_CAMERA_INVALID
  */
 export const renderStats = defineCommand({
@@ -80,7 +92,7 @@ export const renderStats = defineCommand({
     'Visible 3D entities are the instances; identical shapes (kind + parameters) share a prototype and one InstancedMesh per (prototype, material class, LOD) bucket; ' +
     'LOD2 boxes merge per material class; single-instance prototypes are batched per material class. LOD by projected bounding-box diagonal: >= 48 px LOD0, >= 8 px LOD1, ' +
     '>= 1 px LOD2 box, smaller culled; instances outside the view volume are frustum-culled. Material class = the entity materialId (else "unassigned"). ' +
-    'data { componentCount, buckets[{ prototypeKey, materialClass, lod, instances }] (largest 200 of bucketCount), uniqueBatches, opaqueModelCalls (with multiDraw true, the default, ' +
+    'data { componentCount, buckets[{ prototypeKey, materialClass, lod, instances }] (largest 200 of bucketCount), uniqueBatches, opaqueModelCalls (≤ 2 x distinct prototype-and-material-class pairs + material classes + unique-geometry classes; with multiDraw true, the default, ' +
     'one call per unique-geometry material class; false: one per unique instance), edgeCalls, shadowCalls (3 / 2 cascades for quality high / medium, 0 low), ' +
     'culled { frustum, pixel }, instancesDrawnPlusCulled (= componentCount), triangles (LOD1 / box counts are estimates), gpuBytesEstimate, planVersion }. ' +
     'Read-only. Errors: VIS_VIEWPOINT_NOT_FOUND, VIS_CAMERA_INVALID.',
@@ -111,7 +123,13 @@ export const renderStats = defineCommand({
     const plan = planRender(scene, camera, { multiDraw: params.multiDraw ?? true, quality: params.quality ?? 'high' });
     const buckets = plan.buckets
       .map(({ prototypeKey, materialClass, lod, instances }) => ({ prototypeKey, materialClass, lod, instances }))
-      .sort((a, b) => b.instances - a.instances || a.prototypeKey.localeCompare(b.prototypeKey) || a.lod - b.lod)
+      .sort(
+        (a, b) =>
+          b.instances - a.instances ||
+          compareCodepoint(a.prototypeKey, b.prototypeKey) ||
+          compareCodepoint(a.materialClass, b.materialClass) ||
+          a.lod - b.lod,
+      )
       .slice(0, MAX_LISTED_BUCKETS);
     const uniqueBatches = plan.uniqueBatches.map(({ materialClass, members }) => ({ materialClass, instances: members.length }));
     const instancesDrawnPlusCulled = plan.drawn + plan.culled.frustum + plan.culled.pixel;

@@ -7,7 +7,7 @@
 import type { Vec3 } from '../model/vectors';
 import type { ViewpointCamera } from '../model/review';
 import { VIEWPORT_FOV_DEGREES } from '../model/viewport';
-import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../lib/vec3';
+import { isVec3, add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../lib/vec3';
 
 type PlanViewName = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso' | 'custom';
 
@@ -71,6 +71,8 @@ export function framedPlanCamera(request: FramedViewRequest): PlanCamera | strin
   const fovDeg = request.fovDeg ?? VIEWPORT_FOV_DEGREES;
   if (!(fovDeg > 0 && fovDeg < 180)) return 'fovDeg must be in (0, 180)';
   if (!(radius > 0) || !Number.isFinite(radius)) return 'the scene radius must be positive and finite';
+  if (request.direction !== undefined && !isVec3(request.direction)) return 'direction must be 3 finite numbers [x, y, z]';
+  if (!isVec3(request.center)) return 'target must be 3 finite numbers [x, y, z]';
   let toEye: Vec3;
   let up: Vec3;
   if (view === 'custom') {
@@ -126,4 +128,15 @@ export function frustumPlanes(camera: PlanCamera): FrustumPlane[] {
     plane(u, sub3(eye, scale3(u, halfH))),
     plane(scale3(u, -1), add3(eye, scale3(u, halfH))),
   ];
+}
+
+/** Why `camera` cannot be planned (non-finite or wrongly sized vectors, zero direction, bad fov / view height / image size), or null. */
+export function planCameraProblem(camera: PlanCamera): string | null {
+  if (![camera.eye, camera.direction, camera.up].every(isVec3)) return 'eye, direction and up must be 3 finite numbers';
+  if (len3(camera.direction) < 1e-12 || len3(camera.up) < 1e-12) return 'direction and up must be non-zero';
+  if (!(camera.widthPx > 0 && camera.heightPx > 0)) return 'image size must be positive';
+  if (camera.projection === 'perspective' && !(camera.fovDeg > 0 && camera.fovDeg < 180)) return 'fovDeg must be in (0, 180)';
+  if (camera.projection === 'orthographic' && !(camera.viewHeight > 0 && Number.isFinite(camera.viewHeight)))
+    return 'viewHeight must be > 0';
+  return null;
 }

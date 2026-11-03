@@ -7,12 +7,12 @@
 
 import type { CadDocument, Entity } from '../model/types';
 import { is3D } from '../model/types';
-import { hashText } from '../lib/hash';
+import { sha256Hex } from '../lib/sha256';
 import { dot3 } from '../lib/vec3';
 import type { Bounds } from './bounds';
 import { entityBounds, entityBoundsInDoc } from './bounds';
 import { entityToTriangles } from './entityTriangles';
-import { type FrustumPlane, type PlanCamera, frustumPlanes } from './renderPlanCamera';
+import { type FrustumPlane, type PlanCamera, frustumPlanes, planCameraProblem } from './renderPlanCamera';
 
 const PLAN_VERSION = 'R-BATCH-v1';
 /** `lod:llull-v1`: projected bounding-box diagonal (px) from which LOD0, LOD1, LOD2 are used, and below which an instance is culled. */
@@ -101,6 +101,9 @@ const NON_GEOMETRY_KEYS = new Set([
   'faceColors',
 ]);
 
+/** Locale-independent string order (UTF-16 code units), so plans are identical on every machine. */
+export const compareCodepoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
 const sig6 = (value: number): string => String(Number(value.toPrecision(6)));
 
 function canonical(value: unknown): string {
@@ -109,6 +112,7 @@ function canonical(value: unknown): string {
   if (value !== null && typeof value === 'object')
     return `{${Object.entries(value)
       .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => compareCodepoint(a, b))
       .map(([k, v]) => `${k}:${canonical(v)}`)
       .join(',')}}`;
   return String(value);
@@ -119,7 +123,7 @@ function canonical(value: unknown): string {
  * @invariant two entities share a key iff they have the same kind and shape parameters (meshes: the same vertex / index data)
  */
 export function prototypeKeyOf(entity: Entity): string {
-  if (entity.kind === 'mesh') return `mesh|${hashText(entity.mesh.positions.join(','))}${hashText(entity.mesh.indices.join(','))}`;
+  if (entity.kind === 'mesh') return `mesh|${sha256Hex(`${entity.mesh.positions.join(',')}|${entity.mesh.indices.join(',')}`)}`;
   if (entity.kind === 'instance') return `component:${entity.componentId}|${canonical(entity.scale ?? [1, 1, 1])}`;
   const params = Object.entries(entity).filter(([key]) => !NON_GEOMETRY_KEYS.has(key));
   return `${entity.kind}|${params.map(([key, value]) => `${key}=${canonical(value)}`).join(';')}`;
@@ -244,15 +248,19 @@ const LOD1_TRIANGLE_CAP: Readonly<Record<string, number>> = { cylinder: 32, cone
 const SHADOW_CASCADES = { high: 3, medium: 2, low: 0 } as const;
 
 /**
- * The plan for one camera.
+ * The plan for one camera. Throws RangeError on an invalid camera (`planCameraProblem`); callers validate first.
+ * @invariant call bound: opaqueModelCalls <= 2 * (distinct (prototype, material class) pairs drawn) + C + U, with C = material classes and U = unique-geometry
+ *   classes; this equals 2P + C + U only when each prototype has one material class (SYN-RACK-v1: 2*13 + 4 + 0 = 30)
  * @invariant pure; `drawn + culled.frustum + culled.pixel = componentCount`; unique prototypes (1 instance) are batched per material class
  *   at LOD0 and only size-culled; `opaqueModelCalls` = instanced buckets + unique calls (1 per class with multi-draw, else 1 per instance)
  */
 export function planRender(scene: PlanScene, camera: PlanCamera, options: PlanOptions): RenderPlan {
+  const problem = planCameraProblem(camera);
+  if (problem !== null) throw new RangeError(`planRender: ${problem}`);
   const { instances } = scene;
   const levels = new Uint8Array(instances.length).fill(LEVEL_OUTSIDE);
   const query = options.query ?? bruteForceQuery(instances);
-  const inside = query(frustumPlanes(camera));
+  const inside = [...new Set(query(frustumPlanes(camera)))].sort((a, b) => a - b);
   const classCount = Math.max(scene.materialClasses.length, 1);
   const bucketMembers = new Map<number, number[]>();
   const uniqueMembers = new Map<number, number[]>();
@@ -301,10 +309,12 @@ export function planRender(scene: PlanScene, camera: PlanCamera, options: PlanOp
     triangles += members.length * perInstance;
     geometryBytes += perInstance * GEOMETRY_BYTES_PER_TRIANGLE;
   }
-  buckets.sort((a, b) => a.prototypeKey.localeCompare(b.prototypeKey) || a.materialClass.localeCompare(b.materialClass) || a.lod - b.lod);
+  buckets.sort(
+    (a, b) => compareCodepoint(a.prototypeKey, b.prototypeKey) || compareCodepoint(a.materialClass, b.materialClass) || a.lod - b.lod,
+  );
   const uniqueBatches = [...uniqueMembers.entries()]
     .map(([materialClassIndex, members]) => ({ materialClass: scene.materialClasses[materialClassIndex] ?? '', members }))
-    .sort((a, b) => a.materialClass.localeCompare(b.materialClass));
+    .sort((a, b) => compareCodepoint(a.materialClass, b.materialClass));
   let uniqueDrawn = 0;
   for (const batch of uniqueBatches) {
     uniqueDrawn += batch.members.length;
