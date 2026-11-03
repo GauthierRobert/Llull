@@ -9,7 +9,8 @@ import { defineCommand, looseVec3, z } from '@core/commands/schema';
 import { codedRejection, report } from '@core/commands/noop';
 import { boundsCenter, boundsRadius, mergeBounds, type Bounds } from '@core/geometry/bounds';
 import { type PlanCamera, framedPlanCamera, planCameraProblem, viewpointPlanCamera } from '@core/geometry/renderPlanCamera';
-import { type PlanScene, compareCodepoint, planRender, planScene } from '@core/geometry/renderPlan';
+import { type PlanScene, compareCodepoint, planRender } from '@core/geometry/renderPlan';
+import { planSceneOf } from '@core/geometry/planSceneCache';
 
 /** Buckets listed in `data.buckets`, largest first; `bucketCount` is the full number. */
 const MAX_LISTED_BUCKETS = 200;
@@ -116,11 +117,15 @@ export const renderStats = defineCommand({
       .describe('Count unique-geometry batches with WEBGL_multi_draw (one call per material class). Default true.'),
   }),
   run: (doc, params): CommandResult => {
-    const scene = planScene(doc);
+    const { scene, query } = planSceneOf(doc);
     const camera = cameraOf(doc, scene, params);
     if ('code' in camera)
       return codedRejection(doc, 'render_stats', camera.code, camera.message, REMEDIATION[camera.code] ?? '', [], [camera.path]);
-    const plan = planRender(scene, camera, { multiDraw: params.multiDraw ?? true, quality: params.quality ?? 'high' });
+    const plan = planRender(scene, camera, {
+      multiDraw: params.multiDraw ?? true,
+      quality: params.quality ?? 'high',
+      ...(query !== undefined ? { query } : {}),
+    });
     const buckets = plan.buckets
       .map(({ prototypeKey, materialClass, lod, instances }) => ({ prototypeKey, materialClass, lod, instances }))
       .sort(

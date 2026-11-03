@@ -13,6 +13,7 @@ import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
 import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
+import { CLASH_BVH_THRESHOLD, solidIndex } from './clashBroadPhase';
 import { externalClashes } from './clashPlant';
 import { externalBodies } from './clashSources';
 import { STAIR_HEADROOM_MM, slabPenetrations, stairPenetrations } from './clashSlabs';
@@ -119,8 +120,18 @@ function formatDepthMm(depthMm: number): string {
   return depthMm >= 1 ? String(Math.round(depthMm)) : depthMm.toFixed(2);
 }
 
-/** All clashes on the given levels (or every level). @pure */
-function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tolerance: number): Clash[] {
+/**
+ * All clashes on the given levels (or every level).
+ * @invariant from `bvhThreshold` solids the pair scan and the clearance scan visit only the solids whose extents touch (BVH broad phase); the result is
+ *   bit-identical to the full scan: same pairs, same order
+ * @pure
+ */
+export function findClashes(
+  doc: CadDocument,
+  levelIds: ReadonlySet<string> | null,
+  tolerance: number,
+  bvhThreshold: number = CLASH_BVH_THRESHOLD,
+): Clash[] {
   const building = getBuilding(doc);
   const solids: Solid[] = [];
   for (const element of Object.values(building.elements)) {
@@ -133,8 +144,12 @@ function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tol
     const existing = found.get(key);
     if (!existing || existing.depth < clash.depth) found.set(key, clash);
   };
+  const index = solids.length >= bvhThreshold ? solidIndex(solids.map((solid) => solid.box)) : null;
   for (let i = 0; i < solids.length; i++) {
-    for (let j = i + 1; j < solids.length; j++) {
+    const candidates = index?.nearBox((solids[i] as Solid).box);
+    for (let k = 0; k < (candidates?.length ?? solids.length - i - 1); k++) {
+      const j = candidates === undefined ? i + 1 + k : (candidates[k] as number);
+      if (j <= i) continue;
       const [first, second] = [solids[i] as Solid, solids[j] as Solid];
       if (first.elementId === second.elementId || !relevant(first.category, second.category)) continue;
       const [a, b] = [building.elements[first.elementId] as BuildingElement, building.elements[second.elementId] as BuildingElement];
@@ -170,7 +185,8 @@ function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tol
       ...solid.box,
       half: [solid.box.half[0] + equipment.clearance, solid.box.half[1] + equipment.clearance, solid.box.half[2]],
     };
-    for (const other of solids) {
+    for (const otherIndex of index === null ? solids.keys() : index.nearBox(zone)) {
+      const other = solids[otherIndex] as Solid;
       if (other.elementId === solid.elementId || !CLEARANCE_OBSTACLES.has(other.category)) continue;
       const depth = boxOverlap(zone, other.box);
       if (depth > tolerance && !found.has(`hard:${[solid.elementId, other.elementId].sort().join(':')}`)) {

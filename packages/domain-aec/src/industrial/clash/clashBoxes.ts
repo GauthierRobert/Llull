@@ -17,6 +17,17 @@ import { carrierOfSupport } from '../piping/pipeCarrier';
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
 export type OrientedBox = { readonly center: Vec3; readonly axes: readonly [Vec3, Vec3, Vec3]; readonly half: Vec3 };
 
+/** World axis-aligned extent of an oriented box. */
+export function boxExtent(box: OrientedBox): { min: Vec3; max: Vec3 } {
+  const reach = (axis: 0 | 1 | 2): number =>
+    box.axes.reduce((sum, direction, index) => sum + Math.abs(direction[axis]) * (box.half[index] as number), 0);
+  const [rx, ry, rz] = [reach(0), reach(1), reach(2)];
+  return {
+    min: [box.center[0] - rx, box.center[1] - ry, box.center[2] - rz],
+    max: [box.center[0] + rx, box.center[1] + ry, box.center[2] + rz],
+  };
+}
+
 /** Penetration depth of two oriented boxes along their best separating axis (≤ 0 when apart). */
 export function boxOverlap(a: OrientedBox, b: OrientedBox): number {
   const axes: Vec3[] = [...a.axes, ...b.axes];

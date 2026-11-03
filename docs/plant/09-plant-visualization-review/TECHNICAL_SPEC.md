@@ -123,7 +123,7 @@ host installs them.
 - `ctx.spatialIndex?: SpatialIndexPort | null` (`model/spatialIndex.ts`): frustum queries and broad-phase pairs over
   instance AABBs. The server runs `llull-compute geomq` (crate `llull-geomq` on `llull-bvh`). Results are id sets
   sorted ascending, so they must equal `instanceBvh.ts` exactly. `render_stats` and the `check_clashes` broad phase
-  (industrial plugin) use it only above a size threshold fixed at VIS-M7 (TBD — measure). The narrow phase
+  (industrial plugin) use it only above a size threshold fixed at VIS-M7 (measured, §12.11: `render_stats` from 500 000 instances on a repeated call, `check_clashes` from 64 solids). The narrow phase
   (oriented-box SAT) stays TS. No port → the TS path, with the same result.
 - **Viewport.** `instanceBvh.ts` runs in a worker. If VIS-M7 measures the 10⁶ build above 1.5 s, `llull-bvh` compiled
   to WASM replaces it in the worker, under the same exact-equality test. The decision is recorded at VIS-M7.
@@ -640,9 +640,9 @@ creation.
 | GPU bytes per instance | 76 (+4 state) InstancedMesh; BatchedMesh 1e6 ≈ 84 MB of textures | three facts T1, T2 |
 | Median frame time at 1920 × 1080, orbit | targets 16.7 ms (10⁴, 10⁵), 33.3 ms (10⁶): **TBD — measure** | 60 / 30 Hz; procedure in `synthetic_pipe_rack_benchmark.json` |
 | Colour profile re-apply, 10⁵ entities, 50 rules | TBD — measure (target < 200 ms, worker) | O(N m) |
-| BVH build 10⁶ instances | TBD — measure (target < 1.5 s in a worker; if missed, `llull-bvh` WASM, §2.A) | binned SAH O(N log N) |
+| BVH build 10⁶ instances | measured at VIS-M7 (§12.11): 1.3 - 3.6 s in TypeScript depending on machine load, target 1.5 s missed or borderline; `llull-bvh` WASM / `geomq` stays the RS-6 option | binned SAH O(N log N) |
 | `render_view` review 1920 × 1080 | TBD — measure with `llull render_view … --json` timing, reference and native; hard cap `VIS_RENDER_BUDGET` | 8.3 M samples |
-| `render_stats` 10⁶ instances | measured 2026-11-03 (§12.8): 4.1 s total, of which the plan (query + LOD + buckets) is ~0.3 s and `planScene` (bounds + prototype keys) 3.8 s; target < 500 ms is not met until the BVH / cached scene (VIS-M7) | BVH query + bucket counting |
+| `render_stats` 10⁶ instances | measured 2026-11-03 (§12.8): 4.1 s total, of which the plan (query + LOD + buckets) is ~0.3 s and `planScene` (bounds + prototype keys) 3.8 s; VIS-M7 (§12.11): scene and BVH cached per document object, a repeated call is ~0.3 s; the first call per document is still ~4 s | BVH query + bucket counting |
 | `check_review` 10⁴ issues | linear, TBD — measure | — |
 | Document bytes / instance | TBD — measure; target ≤ 200 B with instance entities, ≤ 40 B with V2 instance arrays | QUALITY_GATES gate 2 metric |
 
@@ -684,7 +684,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d. **Built in two slices: perspective / viewpoint / digests 2026-10-19 (§12.1); profile / section box / highlight shading / `visibleEntityIds` / budget 2026-11-03 (§12.10). Shadows, AO and Blinn-Phong stay open.** |
 | VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d. **Built 2026-11-03 (§12.2 export, §12.9 clash issues, import, single viewpoint); xmllint test waits for the vendored XSDs.** |
 | VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
-| VIS-M7 | instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6) |
+| VIS-M7 | **Core part built 2026-11-04 (§12.11): `instanceBvh.ts`, `planSceneCache.ts`, `check_clashes` broad phase; the viewport worker, glTF instancing and pipe markers are left.** Instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6) |
 | VIS-M8 (V2) | 10⁶: streaming, Hi-Z occlusion, impostors, instance-array storage; terrain / sky / sun | 08-DAT storage decision | 15 d |
 | VIS-M9 | native GPU raster (RS-5): `ctx.raster`, `llull-compute raster` for `render_view`, walkthroughs and BCF snapshots; VC-VIS-60 | M4; RS-0 | inside RS-5 (4 wk in RS1, shared with aerospace 05). **Built 2026-10-19 with the M2 / M4 / M5 / M6 slices it needs (§12).** |
 
@@ -918,7 +918,7 @@ Measured (2026-11-03, Windows 11, shared machine, TypeScript reference, perspect
 
 `render_stats` rebuilds the scene (`planScene`) on every call; the plan itself is ~0.3 s at 10⁶ with the brute-force query. The viewport caches the scene, and the BVH (VIS-M7) replaces the O(N) query.
 
-VIS-M3b (`PlantBatchRenderer`, `LodGeometryCache`) is built, see the table below. Not built (VIS-M7 and later): `BatchedMesh` for unique geometry, transparent bucket sorting, instance BVH (`instanceBvh.ts`), `VIS_GPU_LIMIT`, the `render_view` use of the plan.
+VIS-M3b (`PlantBatchRenderer`, `LodGeometryCache`) is built, see the table below. Not built (VIS-M7 and later): `BatchedMesh` for unique geometry, transparent bucket sorting, `VIS_GPU_LIMIT`, the `render_view` use of the plan.
 
 ### 12.8b As built — VIS-M3b `PlantBatchRenderer` and `LodGeometryCache`, 2026-11-03
 
@@ -989,6 +989,28 @@ Limits and rules added by review: `visible_entity_ids` applies a frustum only wi
 Not built (still VIS-M4 / M6): the sun shadow, ambient occlusion, Blinn-Phong with material classes, sky / ground, the `edges` / `shadows` / `ambientOcclusion` / `sun` params, profile transparency, the `rendererVersion` bump. `renderPlan` counts are not used by `render_view`: `planScene` costs 3.8 s at 10^6 instances (§12.8), more than the render it would guard, so the budget uses the sample count and the frustum cull tests AABBs directly.
 
 Validation: `tests/unit/render/reviewRender.test.ts` (SVG fill colours of a recoloured / dimmed picture, clipping, legend counts, visibility stages, frustum culling, refusals, purity, budget).
+
+### 12.11 As built — VIS-M7 core part: instance BVH, cached scene, clash broad phase, 2026-11-04
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| BVH | `buildInstanceBvh(packBoxes(boxes))`: deterministic binned SAH (16 bins, split on the widest centroid axis, leaves of at most 4 boxes, identical-centroid runs halved by index), flat typed arrays. Queries `frustumQuery(planes)`, `rayQuery(origin, direction)`, `boxQuery(min, max)` return ascending indices. The per-box predicates (`boxInsidePlanes`, `rayHitsBox`, `boxOverlapsBox`) are exported: a node box only prunes (all predicates are monotone in containment) so results equal the brute-force scan exactly; a node fully inside the frustum is taken whole. Boxes must be finite. | `packages/core/src/geometry/instanceBvh.ts` |
+| Scene memo | `planSceneOf(doc)`: `planScene` memoized in a `WeakMap` keyed on the document object, plus the BVH frustum query for `planRender({ query })` from 500 000 instances on the second call for the same document (never on the first: a one-shot would pay the build for nothing). `planRender` skips its dedupe + sort when the query result is already strictly ascending. `render_stats` uses it. | `geometry/planSceneCache.ts`, `plant/display/renderStats.ts` |
+| Clash broad phase | `check_clashes` visits, per solid, only the later solids whose inflated world extent (`boxExtent`, margin 1e-6) touches its own, and for a clearance zone only the solids touching the zone: same pairs in the same order as the full scan, so the result is bit-identical. From 64 solids; the narrow phase (`boxOverlap`) is unchanged. | `industrial/clash/clashBroadPhase.ts`, `clash.ts` |
+| Tests | `tests/unit/geometry/instanceBvh.test.ts` (frustum / ray / box = brute force on 10⁴ random AABBs incl. 300 zero-size boxes, determinism, empty / one / identical boxes, invalid rays); `tests/unit/render/planSceneCache.test.ts` (memo, second-call BVH, `planRender` through the BVH query equals the default plan on SYN-RACK-v1); `tests/unit/building/clashBroadPhase.test.ts` (BVH scan = full scan on randomized buildings of 400 and 900 elements, two tolerances, level filter, empty building; `tests/helpers/clashStress.ts`) | VC-VIS-20..23, VC-VIS-60 (TS side) |
+
+Measured (2026-11-04, Windows 11, shared machine under parallel load, so indicative; `VIS_PERF=1 npx vitest run tests/unit/render/renderStatsPerf.test.ts tests/unit/building/clashBroadPhase.test.ts --disableConsoleIntercept`):
+
+| N | `planScene` | BVH build | frustum query, narrow view: brute / BVH | `render_stats` before (every call) | after: call 1 / call 2 / call 3 |
+| - | ----------- | --------- | -------------------------------------- | ------------------------------- | ------------------------------- |
+| 1 832 | 7 - 13 ms | 10 - 18 ms | 1.4 / 0.2 ms | 12 ms | 22 / 5 / 4 ms |
+| 10 076 | 29 - 65 ms | 22 - 42 ms | 1.0 - 4.9 / 0.1 ms | 35 ms | 67 / 15 / 13 ms |
+| 100 071 | 224 - 418 ms | 125 - 229 ms | 4 - 8 / 0.1 ms | 314 ms | 474 / 44 / 36 ms |
+| 1 000 037 | 2.4 - 4.6 s | 1.3 - 3.6 s (3 axes: 3.7 s) | 49 - 101 / 0.1 ms | 3 389 ms | 4 837 / 4 064 (builds the BVH) / 290 ms (brute query: 517 - 634 ms) |
+
+- **Decisions.** (1) The 10⁶ TypeScript build misses 1.5 s on a loaded machine (1.3 s at best); it stays a build for a worker, and the RS-6 option (`llull-bvh` WASM or `llull-compute geomq`) is not built here. (2) The brute-force frustum scan is only 50 - 100 ms at 10⁶, so the BVH never pays for one `render_stats`: the win is the cached `planScene` (4.8 s to 0.3 s on a repeated call, target < 500 ms met for call 2 and later), and the BVH threshold is 500 000 instances on the second call for the same document (break-even ~15 calls). (3) Split on the widest centroid axis only: SAH over three axes built 1.5x slower for no measurable query gain. (4) `check_clashes` broad phase: from 64 solids (break-even ~40 elements); 400 elements 585 ms to 111 ms, 3 000 elements 6.3 s to 0.4 s, 6 000 elements 30.6 s to 3.1 s (narrow phase dominates from there), identical results.
+- **First call per document** still pays `planScene` (~2.5 - 4.6 s at 10⁶: prototype keys and bounds); only a repeated call on the same document object is fast. The cache lives in one host process; a CLI call on a freshly loaded file does not benefit.
+- **Left (UI lane, later):** the BVH build in a viewport worker, picking through the BVH, glTF instancing (`EXT_mesh_gpu_instancing`), pipe markers, `ctx.spatialIndex` (RS-6) and the native `llull-bvh` parity test (VC-VIS-60 native side).
 
 ## 13. References
 

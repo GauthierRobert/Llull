@@ -7,7 +7,7 @@
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { getBuilding } from '../../building/model';
-import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
+import { type OrientedBox, boxExtent, boxOverlap, elementBoxes } from './clashBoxes';
 import type { ExternalBody } from './clashSources';
 
 export interface ExternalClash {
@@ -30,16 +30,6 @@ interface Item {
   readonly max: Vec3;
 }
 
-function extent(box: OrientedBox): { min: Vec3; max: Vec3 } {
-  const reach = (axis: 0 | 1 | 2): number =>
-    box.axes.reduce((sum, direction, index) => sum + Math.abs(direction[axis]) * (box.half[index] as number), 0);
-  const [rx, ry, rz] = [reach(0), reach(1), reach(2)];
-  return {
-    min: [box.center[0] - rx, box.center[1] - ry, box.center[2] - rz],
-    max: [box.center[0] + rx, box.center[1] + ry, box.center[2] + rz],
-  };
-}
-
 const itemOf = (
   id: string,
   group: string,
@@ -47,7 +37,7 @@ const itemOf = (
   external: boolean,
   connectedTo: readonly string[],
   box: OrientedBox,
-): Item => ({ id, group, envelope, external, connectedTo, box, ...extent(box) });
+): Item => ({ id, group, envelope, external, connectedTo, box, ...boxExtent(box) });
 
 const disjoint = (a: Item, b: Item): boolean =>
   [1, 2].some((axis) => (a.max[axis] as number) < (b.min[axis] as number) || (b.max[axis] as number) < (a.min[axis] as number));
