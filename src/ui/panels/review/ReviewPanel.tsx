@@ -1,6 +1,6 @@
 // Review tab: runs check_prototype (read-only), shows the readiness checklist, the findings and the Explain drawer. Reviewer statuses go out
 // as set_review_disposition (with the check's inputsHash). Below: the mechanism graph, the motion timeline and the reference overlay.
-// No sign-off in the MVP (spec 11 Q5).
+// The model review (issues, signed status moves, viewpoints, redlines, section box, colour profile) sits above the checks (09 VIS §12.10).
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { humanGatePayload } from '@core/model/humanGate';
@@ -15,6 +15,7 @@ import { FindingsList, type DispositionChange } from './FindingsList';
 import { ExplainDrawer } from './ExplainDrawer';
 import { joinDispositions } from './joinDispositions';
 import { MechanismGraph } from './MechanismGraph';
+import { ModelReview } from './model/ModelReview';
 import { ReviewTimeline } from './ReviewTimeline';
 import { ReferenceChart } from './ReferenceChart';
 import { StatusMark } from './StatusMark';
@@ -140,6 +141,7 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
           </p>
         )}
       </div>
+      <ModelReview />
       <StatusLine text={status} testId="review-status" />
       {stale && (
         <p className="review-panel__stale" role="status" data-testid="review-stale">

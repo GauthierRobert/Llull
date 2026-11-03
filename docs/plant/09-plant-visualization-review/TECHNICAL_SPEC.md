@@ -679,7 +679,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
 | VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).** |
-| VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); Review panel, markup / section-box rendering wait for the UI follow-up, M4 and M6.** |
+| VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); UI (Review panel, redlines, section-box gizmo and clipping) built 2026-11-03 (§12.10); `render_view` use of markups / section box waits for M4.** |
 | VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Partly built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline; `PlantBatchRenderer` left (VIS-M3b).** |
 | VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
 | VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d. **Built 2026-11-03 (§12.2 export, §12.9 clash issues, import, single viewpoint); xmllint test waits for the vendored XSDs.** |
@@ -797,7 +797,7 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 ### 12.5 Not built yet (remaining VIS work)
 
-The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (Review panel, redline tools and section-box gizmo in the UI, viewport clipping with a section box; the model and commands are §12.7), VIS-M3b (`PlantBatchRenderer`; the plan and `render_stats` are §12.8), the rest of VIS-M4
+The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (the Review panel, redlines, section-box gizmo and clipping are §12.10; left there: switching a section box off, the BCF snapshot from the canvas), VIS-M3b (`PlantBatchRenderer`; the plan and `render_stats` are §12.8), the rest of VIS-M4
 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the vendored XSDs for VC-VIS-15 (VIS-M5 itself is §12.9), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
 
@@ -873,8 +873,8 @@ Decisions (owner delegated, quality first):
 - **No `realism` on the data model yet** (walk / fly arrive with VIS-M6); `clashKey` arrived with VIS-M5 (§12.9).
 - **`activeSectionBoxId`** is review data written by `set_section_box` (`activate`) and `apply_viewpoint`; the viewport and `render_view` use it at VIS-M4 / M6.
 
-Not built (VIS-M2 UI part): the Review panel (issues, comments, human sign-off), redline tools, the section-box gizmo, clipping with the active box in the
-viewport, and the BCF snapshot from the UI canvas (Q7). The commands they dispatch exist and are tested. The Views overlay is covered by component tests and
+Not built in this section (VIS-M2 UI part, built in §12.10): the Review panel (issues, comments, human sign-off), redline tools, the section-box gizmo and clipping with the active box in the
+viewport; still open: the BCF snapshot from the UI canvas (Q7). The commands they dispatch exist and are tested. The Views overlay is covered by component tests and
 was not run in the desktop app in this session.
 
 Validation: VC-VIS-11 / 12 / 13 / 14 in `tests/unit/review/` (`sectionBox.test.ts`, `issueWorkflow.test.ts`, `viewpointEdit.test.ts`); SC-VIS-04 is replayed
@@ -956,6 +956,29 @@ Decisions:
 
 Not built: BCF 2.1 export (`VIS_BCF_VERSION` still refuses it), `VIS_BCF_COLOURING_LARGE`, per-component `IfcGuid` mapping (needs the 08-DAT IFC export), import of
 snapshots, section boxes and markups from a BCF viewpoint (`Lines`, `ClippingPlanes` are ignored), the vendored XSDs for the server test, and the UI for any of it.
+
+### 12.10 As built — VIS-UI Review panel, redlines, section box, colour profile in the viewport, 2026-11-03
+
+Presentation and param gathering only: every change is `store.dispatch(command)` with a command of §12.6 / §12.7 / §12.9; no core, plugin or server file changed.
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Review panel | `ModelReview` sits at the top of the Review tab (above the prototype checks). **Issues**: list (status chip, title, priority, assignee, "clash" mark), new issue (title, priority, assignee; attaches the selection and the redline viewpoint) = `create_review_issue`; **Issues from clashes** (`check_clashes` or `check_assembly`) = `create_clash_issues`; **Import BCF** (file picker, bytes as base64) = `import_bcf`; **Export BCF** = read-only `export_bcf` (`snapshots: false`, downloaded from `data.base64`; an export-gate refusal shows as its summary). **Detail**: description, viewpoint buttons (`apply_viewpoint`), comments, `add_review_comment` (`author: 'human'`, cites the active redline viewpoint when the issue owns it), status move. | `src/ui/panels/review/model/{ModelReview,IssuesSection,IssueDetail,BcfActions}.tsx`, `issueModel.ts` |
+| Signed acts | Closing, re-opening a closed issue and deleting an issue open `SignActDialog` with `statusPayload` / `deletePayload` of the issue as it is at the click (`reviewActs.ts`: the bytes the command rebuilds); `set_issue_status` / `delete_review_issue` are dispatched only with the returned `confirmation`. Other moves dispatch without one. A signed issue shows "frozen against imports" (§12.9). `isHumanMove` mirrors `ISSUE_TRANSITIONS`. | `IssueDetail.tsx`, `issueModel.ts` |
+| Viewpoints, redlines | Save the live orbit camera (`save_viewpoint`, `viewpointParams`), go to a view (`apply_viewpoint`, which also makes it the redline viewpoint), tools **Line / Arrow / Cloud / Text** + colour, markup list with `delete_markup`. `MarkupOverlay` is a DOM + SVG layer over the canvas: it takes the pointer only while a tool is armed; a drag is ONE `add_markup` (`space: 'screen'`, points normalised to the viewport, origin top-left, `author: 'human'`; cloud = the four corners of the dragged rectangle, drawn as outward arcs; text = one anchor + an inline field). It draws the markups of the redline viewpoint from the document. `redlineStore` holds only the tool, colour and viewpoint. | `ViewpointsSection.tsx`, `src/ui/viewport/3d/review/{MarkupOverlay.tsx,markupDraw.ts}`, `src/ui/store/redlineStore.ts` |
+| Section box | "Section box around selection / model" = `set_section_box` (`activate: true`, 5 % margin from `entityBoundsInDoc`); per box **Clip** (`set_section_box` with `activate`) and **Delete** (`delete_section_box`). `SectionBoxGizmo` draws the active box (outline, turned by `rotationZ`) and a round grip per face; dragging a grip moves that face along its normal (the axis-ray maths of the feature handles; the opposite face stays), live through `sectionBoxDraftStore`, and **release commits one `set_section_box`** (like the transform gizmo). Plane-form boxes have no grips. `resizeSectionFace` is pure (minimum side 1e-3). | `src/ui/viewport/3d/review/{SectionBoxGizmo.tsx,sectionBoxMath.ts}`, `src/ui/store/sectionBoxDraftStore.ts`, `DisplaySection.tsx` |
+| Clipping | `ClippingPlane` puts the View-controls section plane and the 1..6 half-spaces of the active section box (the live draft while dragging) into `gl.clippingPlanes`. Global planes cut every material, so the instanced path and a batch renderer clip without touching their materials (reasoned from three.js, not run against a plant batch scene). A model half-space `n·p > offset` becomes the three.js plane `(-n, offset - n·renderOrigin)`. The gizmo is inset by 3e-4 of its size so the global planes do not cut it on the faces. | `ClippingPlane.tsx`, `sectionBoxMath.ts` |
+| Colour profile | **Colour profile** select = `set_active_colour_profile` (null = entity colours) with a legend of the active profile's rules. `ProfileTintSync` evaluates the active profile with the same `compileProfile` / `entityPropertyBag` / plugin providers as `colour_by_rule_report` and writes the colours to a new profile layer of `tintStore`; the existing tint consumers (per-entity and instanced solids) read the merged map, and an overlay's own tints (structural utilisation) win over the profile's. `profileTints` is pure (an invalid profile colours nothing; `defaultColour: 'entity'` leaves entities alone). | `src/ui/viewport/3d/review/{ProfileTintSync.tsx,profileTints.ts}`, `src/ui/store/tintStore.ts` |
+
+Decisions and limits:
+
+- **Redlines are screen space.** They are valid for the camera of their viewpoint: the layer draws them over whatever the camera shows, and the panel says to keep the camera where the view was saved. World-space markups (BCF Lines) have no drawing tool yet.
+- **Tints colour, they do not hide.** A rule's `hidden` / `transparency` is not applied in the viewport yet, only `appearance.colour` and `defaultColour`. A renderer that does not read `tintStore` (the plant batch renderer, another lane) is not coloured until it reads the merged tints.
+- **No way to switch clipping off without deleting the box.** `set_section_box` only activates; `apply_viewpoint` with `resetDisplay` clears it. A core command that deactivates the active box would give the panel a "Clip off" toggle.
+- **BCF snapshots from the UI canvas** (Q7) are not built; the UI export uses `snapshots: false` (the CLI keeps the reference raster default).
+- **Not verified in the desktop app in this session**: covered by unit and component tests; the r3f gizmo drag and `gl.clippingPlanes` were not run in a GPU window.
+
+Tests: `tests/component/reviewViewportMath.test.ts` (section-box clip planes incl. render-origin shift and rotation, face resize, `profileTints`, tint layers, markup maths) and `tests/component/ModelReview.test.tsx` (issue list, create, comment, unsigned move; the signed close compares the signed bytes with `statusPayload` and the dispatched `confirmation`; delete dialog; clash and BCF import dispatch; viewpoints; redline drag to `add_markup`; section box; colour profile).
 
 ## 13. References
 
