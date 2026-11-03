@@ -1,6 +1,6 @@
 // The render plan of the plant scene for the current camera, computed in the same render as the coverage (no effect state): the plan
 // always belongs to exactly the scene it is used with. Null (so the per-entity path draws everything) without a camera view, without a
-// scene, or while the camera is unplannable (zero-size canvas).
+// scene, or while the camera is unplannable (zero-size canvas). It subscribes to camera bumps only while a scene is active.
 
 import { useMemo, useRef } from 'react';
 import { type PlanScene, type RenderPlan, planRender } from '@core/geometry/renderPlan';
@@ -16,7 +16,7 @@ export interface PlantPlan {
 }
 
 export function usePlantPlan(scene: PlanScene | null): PlantPlan | null {
-  const view = usePlantCameraView();
+  const view = usePlantCameraView(scene !== null);
   const previous = useRef<{ scene: PlanScene; levels: Uint8Array } | null>(null);
   return useMemo(() => {
     if (scene === null || view === null) return null;
