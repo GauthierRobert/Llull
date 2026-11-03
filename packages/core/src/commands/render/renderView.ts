@@ -26,6 +26,7 @@ import { reviewData } from './reviewData';
 import { MAX_RENDER_SAMPLES, renderSamples } from './viewVisibility';
 import type { CadDocument } from '../../model/types';
 import type { RenderViewData } from './types';
+import { cloudParams, cutKeep } from './cloudRequest';
 import { clamp } from '../../lib/clamp';
 import { withExplodedPositions } from '../../geometry/explodedOffsets';
 
@@ -71,6 +72,7 @@ export const renderView = defineCommand({
     'Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), ' +
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
     'showLabels (entity id/name labels + key-point markers, default off), overlay ("cage": the cage edges and vertices of subdivision solids, "net": the control net of nurbs_surface sheets and the control polygon of nurbs_curve entities, drawn over the picture, not occluded; one kind or an array of both; with `isolate` only the isolated entities; orthographic views only). The active exploded view (set_active_exploded_view) is drawn like the viewport: parts at their exploded positions. ' +
+    'clouds (opt-in): draw the attached point clouds as marks within a point budget (colour by elevation, rgb, intensity or classification; orthographic views; cropped by section box / cut; data.clouds has the counts). ' +
     'Does NOT modify the document; `affected` is always [].',
   params: z.object({
     view: z
@@ -205,6 +207,7 @@ export const renderView = defineCommand({
           'orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. ' +
           'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
       ),
+    ...cloudParams,
     ...viewParams,
     ...reviewParams,
   }),
@@ -254,7 +257,9 @@ export const renderView = defineCommand({
     if (params.turntable) {
       const frames = clamp(params.turntable.frames, 1, 12);
       const strip = buildTurntableSvg(scene, frames, view, width, height, options);
-      const dropped = params.overlay === undefined ? '' : ' Overlay not drawn on a turntable strip.';
+      const dropped =
+        (params.overlay === undefined ? '' : ' Overlay not drawn on a turntable strip.') +
+        (params.clouds === undefined ? '' : ' Clouds not drawn on a turntable strip.');
       return finish(
         doc,
         withNotes(`Rendered turntable strip: ${frames} frame(s), ${strip.width}×${height}.${dropped}`),
@@ -279,20 +284,42 @@ export const renderView = defineCommand({
       showGrid: !perspective && params.showGrid !== false,
       showLabels: !perspective && params.showLabels === true,
     });
-    const kinds = params.overlay === undefined ? [] : typeof params.overlay === 'string' ? [params.overlay] : params.overlay;
+    const requested = params.overlay === undefined ? [] : typeof params.overlay === 'string' ? [params.overlay] : params.overlay;
+    const cloudsInstalled = overlayKinds().includes('clouds');
+    if (params.clouds !== undefined && !cloudsInstalled) summary += ' Clouds not drawn: the scan plugin is not installed.';
+    const kinds = params.clouds !== undefined && cloudsInstalled && !requested.includes('clouds') ? [...requested, 'clouds'] : requested;
     let overlays: RenderViewData['overlays'];
+    let clouds: RenderViewData['clouds'];
     if (kinds.length > 0 && perspective) summary += ` Overlay ${kinds.join(' + ')} not drawn: it needs an orthographic view.`;
     else if (kinds.length > 0) {
       const isolated = params.isolate === undefined ? undefined : typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
-      const drawn = appendCageNetOverlays(svg, doc, base, orderedEntities(scene), kinds, isolated);
+      const keep = cutKeep(options.cut);
+      const drawn = appendCageNetOverlays(svg, doc, base, orderedEntities(scene), kinds, isolated, {
+        pointClouds: ctx?.pointClouds ?? null,
+        ...(params.clouds === undefined ? {} : { clouds: params.clouds }),
+        ...(keep === undefined ? {} : { keep }),
+        ...(style.highlight === null ? {} : { dim: true }),
+      });
       svg = drawn.svg;
       overlays = drawn.stats;
+      clouds = drawn.stats['clouds']?.detail;
+      const cloudNote = clouds?.['note'];
+      if (typeof cloudNote === 'string') summary += ` Clouds: ${cloudNote}`;
       for (const kind of kinds) {
         const failed = drawn.stats[kind]?.detail?.['failed'];
         if (failed !== undefined) summary += ` Overlay ${kind} failed: ${String(failed)}.`;
       }
       summary += ` Overlay: ${kinds.map((kind) => `${kind} ${drawn.stats[kind]?.entities.length ?? 0} entit${drawn.stats[kind]?.entities.length === 1 ? 'y' : 'ies'}`).join(', ')}.`;
     }
-    return finish(doc, withNotes(summary), withReview({ ...base, svg: decorate(svg), ...(overlays === undefined ? {} : { overlays }) }));
+    return finish(
+      doc,
+      withNotes(summary),
+      withReview({
+        ...base,
+        svg: decorate(svg),
+        ...(overlays === undefined ? {} : { overlays }),
+        ...(clouds === undefined ? {} : { clouds }),
+      }),
+    );
   },
 });

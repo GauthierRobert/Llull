@@ -119,6 +119,7 @@ export function appendCageNetOverlays(
   entities: ReadonlyArray<Entity>,
   kinds: ReadonlyArray<OverlayKind>,
   only?: ReadonlyArray<string>,
+  extra: Omit<OverlayView, 'project' | 'entities' | 'only' | 'size'> = {},
 ): { svg: string; stats: Partial<Record<OverlayKind, OverlayStats>> } {
   const project = makeProjector(data.camera, data.orthoHalf, data.width, data.height);
   const shown = only === undefined ? entities : entities.filter((entity) => only.includes(entity.id));
@@ -130,7 +131,13 @@ export function appendCageNetOverlays(
     const plugin = contributed.find((overlay) => overlay.kind === kind);
     const layer =
       plugin !== undefined
-        ? drawPlugin(plugin, doc, { project, entities: shown, ...(only === undefined ? {} : { only }) })
+        ? drawPlugin(plugin, doc, {
+            project,
+            entities: shown,
+            size: { width: data.width, height: data.height },
+            ...(only === undefined ? {} : { only }),
+            ...extra,
+          })
         : kind === 'cage'
           ? cageLayer(shown, project)
           : netLayer(shown, project);

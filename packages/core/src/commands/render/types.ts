@@ -31,6 +31,8 @@ export interface RenderViewData {
   cutEntityIds: string[];
   /** What the `overlay` kinds drew (04 DIR FR-DIR-40): entity ids and the counts of segments and dots in the SVG; absent without `overlay`. */
   overlays?: Partial<Record<OverlayKind, OverlayStats>>;
+  /** Point clouds drawn by render_view `clouds` (plant 10 SCN-M3c): counts per cloud, colour mode, notes; absent without `clouds`. */
+  clouds?: Readonly<Record<string, unknown>>;
   /** Ids of the entities the picture shows after viewpoint visibility, profile hidden rules, the section box and the view frustum (first 500, document order). */
   visibleEntityIds?: string[];
   /** Number of such entities (the list above is cut at 500). */
