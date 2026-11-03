@@ -1,11 +1,11 @@
-// 3D gizmo snapping: AABB corners / edge midpoints / face centres of solids (cylinder: disc + rim points, sphere: poles), then grid.
+// 3D gizmo snapping (a cloud point snaps in useFrame, scan/scanSnap): AABB corners / edge midpoints / face centres of solids (cylinder: disc + rim points, sphere: poles), then grid.
 
 import { type Entity, type CadDocument, is3D } from '@core/model/types';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { entityLocalToWorld } from '@core/geometry/entityFrame';
 import { nearestSnap } from '../nearestSnap';
 
-export type Snap3DType = 'vertex' | 'edge' | 'face-center' | 'grid' | 'none';
+export type Snap3DType = 'vertex' | 'edge' | 'face-center' | 'scan-point' | 'grid' | 'none';
 
 export interface SnapPoint3D {
   readonly x: number;
@@ -23,7 +23,7 @@ interface SnapResult3D {
   readonly snapped: boolean;
 }
 
-const SNAP3D_PRIORITY: Record<Snap3DType, number> = { vertex: 0, edge: 1, 'face-center': 2, grid: 3, none: 4 };
+const SNAP3D_PRIORITY: Record<Snap3DType, number> = { vertex: 0, edge: 1, 'face-center': 2, 'scan-point': 3, grid: 4, none: 5 };
 
 type Triple = readonly [number, number, number];
 

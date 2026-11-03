@@ -31,6 +31,7 @@ import { MechanismOverlay } from './MechanismOverlay';
 import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
 import { AeroOverlay } from './aero/AeroOverlay';
 import { StructuralOverlay } from './structural/StructuralOverlay';
+import { PointClouds } from './PointClouds';
 import { FindingsOverlay } from './findings/FindingsOverlay';
 import { PortGlyphOverlay } from './ports/PortGlyphOverlay';
 import { PipeStressOverlay } from './pipeStress/PipeStressOverlay';
@@ -145,6 +146,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       <group position={groupOffset}>
         <Entities />
+        <PointClouds />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <FeatureSessionLayer />
         <CageEditLayer onDraggingChanged={onDraggingChanged} />

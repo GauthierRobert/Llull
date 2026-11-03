@@ -121,6 +121,14 @@ export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
     section: 'domain',
     description: 'Piping code stress, load cases, approval',
   },
+  {
+    tab: 'scan',
+    label: 'Scan',
+    shortLabel: 'Scan',
+    icon: 'pointCloud',
+    section: 'domain',
+    description: 'Point clouds: colour, budget, crops, snap',
+  },
   { tab: 'review', label: 'Review', shortLabel: 'Review', icon: 'review', section: 'domain', description: 'Prototype check findings' },
 ];
 
@@ -143,6 +151,7 @@ export const SIDEBAR_TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) 
   analysis: (doc) => doc.analysis?.caseOrder.length ?? 0,
   aero: (doc) => Object.values(doc.entities).filter((entity) => is3D(entity) && entity.kind !== 'image').length,
   pipestress: (doc) => Object.keys(doc.plant?.stress?.models ?? {}).length,
+  scan: (doc) => doc.scan?.cloudOrder.length ?? 0,
   review: () => 0,
 };
 

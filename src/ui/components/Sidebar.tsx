@@ -24,6 +24,7 @@ import { FastenersPanel } from '@ui/panels/fasteners/FastenersPanel';
 import { AnalysisPanel } from '@ui/panels/analysis/AnalysisPanel';
 import { AeroPanel } from '@ui/panels/aero/AeroPanel';
 import { PipeStressPanel } from '@ui/panels/pipeStress/PipeStressPanel';
+import { ScanPanel } from '@ui/panels/scan/ScanPanel';
 import { ReviewPanel } from '@ui/panels/review/ReviewPanel';
 import { useReviewStore } from '@ui/panels/review/reviewStore';
 import { type SidebarTabSpec, SIDEBAR_TAB_COUNTS, SIDEBAR_TAB_SPECS, isSidebarTabAvailable, partitionSidebarTabs } from './sidebarTabs';
@@ -46,6 +47,7 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
   analysis: AnalysisPanel,
   aero: AeroPanel,
   pipestress: PipeStressPanel,
+  scan: ScanPanel,
   review: ReviewPanel,
 };
 

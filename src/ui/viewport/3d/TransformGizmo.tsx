@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useCallback, useState, type MutableRefObject } from 'react';
 import { TransformControls } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
 import { type GizmoMode, useStore, useViewportStore } from '@ui/store';
@@ -17,6 +17,8 @@ import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { gizmoFramePosition } from './gizmoSpace';
 import { type Snap3DType, type SnapPoint3D, collectSnapCandidates3D, snap3d } from './snap3d';
 import { SnapIndicator3D } from './SnapIndicator3D';
+import { scanSnapFor } from './scan/scanSnap';
+import { useScanViewStore } from '@ui/store/scanViewStore';
 import { gizmoDragCommit, snapBackHint } from './gizmoCommit';
 import { useDirectEditStore } from '@ui/store/directEditStore';
 import { useFaceEditStore } from '@ui/store/faceEditStore';
@@ -54,6 +56,10 @@ export function TransformGizmo({
   const editingCage = useDirectEditStore((s) => s.entityId !== null && s.entityId === selectedId);
   const editingFaces = useFaceEditStore((s) => s.active);
   const onLockedLayer = useStore((s) => entity !== undefined && s.document.layers[entity.layerId]?.locked === true);
+
+  const snapToScan = useScanViewStore((s) => s.snapToScan);
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
 
   const targetRef = useRef<THREE.Group | null>(null);
 
@@ -111,7 +117,7 @@ export function TransformGizmo({
     const target = targetRef.current;
     if (!target) return;
     // the target lives in the offset group, i.e. in document coordinates (gizmoSpace.ts).
-    const result = snap3d(
+    const objectSnap = snap3d(
       target.position.x,
       target.position.y,
       target.position.z,
@@ -119,6 +125,13 @@ export function TransformGizmo({
       SNAP3D_TOLERANCE,
       SNAP3D_GRID_STEP,
     );
+    // A scan point within a few px of the handle beats the grid (never an object snap).
+    const scanPoint =
+      snapToScan && (!objectSnap.snapped || objectSnap.type === 'grid')
+        ? scanSnapFor([target.position.x, target.position.y, target.position.z], camera, size, useStore.getState().renderOrigin)
+        : null;
+    const result =
+      scanPoint === null ? objectSnap : { x: scanPoint[0], y: scanPoint[1], z: scanPoint[2], type: 'scan-point' as const, snapped: true };
 
     activeSnapRef.current = result.snapped ? { x: result.x, y: result.y, z: result.z, type: result.type } : null;
 
