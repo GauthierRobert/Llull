@@ -73,7 +73,7 @@ describe('SC-PST-05 step 0 (VC-PST-13 occasional arithmetic; the V1 steps wait f
 });
 
 describe('toolset pipestress', () => {
-  it('lists the four M1 quick checks and the M3 model, analysis, record and approval commands', () => {
+  it('lists the four M1 quick checks and the M3 model, analysis, record and approval commands and the M4 report', () => {
     expect([...TOOLSETS.pipestress].sort()).toEqual([
       'add_stress_restraint',
       'analyze_pipe_stress',
@@ -85,6 +85,7 @@ describe('toolset pipestress', () => {
       'guided_cantilever',
       'pipe_sif',
       'pipe_stress_allowables',
+      'pipe_stress_report',
       'record_pipe_stress_results',
       'set_pipe_operating_conditions',
       'set_stress_load_cases',

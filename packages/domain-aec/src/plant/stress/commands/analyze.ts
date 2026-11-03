@@ -6,6 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { analyzeStressModel, type Analysis, type Finding } from '../analysis';
 import { remediationOf } from '../codes';
+import { modelGeometry } from '../model/geometry';
 import type { StressModel } from '../model/schema';
 import { SOLVER_VERSION } from '../solve/run';
 import { analysisRefusal, isRefusal, modelOr } from './common';
@@ -97,7 +98,7 @@ function summary(analysis: Analysis, model: StressModel): Record<string, unknown
 }
 
 /**
- * @affects none; data = { status, model, solver, cases, governing, findings, inputHash, resultHash, recorded, reviewRequired, provenance, details? }
+ * @affects none; data = { status, model, solver, cases, governing, findings, inputHash, resultHash, recorded, reviewRequired, provenance, details?, geometry? }
  * @invariant read-only; the FE model is rebuilt from the current pipes / supports on every call and the same document gives the same data
  * @failure unknown model -> PST_MODEL_NOT_FOUND; no conditions -> PST_CONDITIONS_MISSING; PST_WALL_UNKNOWN, PST_BEND_TOO_TIGHT, PST_UNSTABLE (ids = nodes, paths = DOF names), PST_MODEL_TOO_LARGE, PST_NONLINEAR_NOT_CONVERGED (ids = toggling restraints), PST_LOADCASE_INVALID, PST_TEMPERATURE_OUT_OF_TABLE, ...
  */
@@ -106,7 +107,7 @@ export const analyzePipeStress = defineCommand({
   description:
     'Analyse a stress model: rebuild the finite element model from the current pipes and supports, solve every load case (weight, thermal, pressure, force primitives with non-linear supports re-evaluated per case) and apply the code check. ' +
     'Read-only. Default output is the summary: model size, solver residual and iterations per case, the largest displacement per case, the governing station per code case (ratio = stress / allowable), the findings with codes and remediation, the input hash and the support status. ' +
-    '`include` adds details: "displacements" (node, mm, degrees), "reactions" (force N and moment N.mm at every anchor / support node per case), "stresses" (every station with stress, allowable, ratio, rule, SIFs); `cases` and `nodes` (ids like N3 from the summary) filter the details. ' +
+    '`include` adds details: "displacements" (node, mm, degrees), "reactions" (force N and moment N.mm at every anchor / support node per case), "stresses" (every station with stress, allowable, ratio, rule, SIFs); "geometry" (data.geometry: nodes { id, positionMm }, elements { id, pipeId, kind, nodeIds, pointsMm, odMm, wallMm, bendRadiusMm } and pipes { id, kind, pointsMm centreline, elementIds }, mm, building pipes and routed runs alike; use it to place support and reaction arrows); `cases` and `nodes` (ids like N3 from the summary) filter the details. ' +
     'Units: mm, N, N.mm, MPa. reviewRequired is always true: a qualified engineer reviews the result. Refusals carry PST_* codes (PST_UNSTABLE names the free node and DOF; add an anchor or guide there). Next: check_pipe_stress, record_pipe_stress_results.',
   params: z.object({
     modelId: z.string().min(1).describe('Id of the stress model.'),
@@ -116,8 +117,10 @@ export const analyzePipeStress = defineCommand({
       .describe('Only these node ids (N1, N2 ...) in the details. Default all.')
       .optional(),
     include: z
-      .array(z.enum(['displacements', 'reactions', 'stresses']))
-      .describe('Details to add to the summary. Default none (summary only).')
+      .array(z.enum(['displacements', 'reactions', 'stresses', 'geometry']))
+      .describe(
+        'Details to add to the summary. Default none (summary only). "geometry" adds data.geometry (not filtered by cases / nodes).',
+      )
       .optional(),
   }),
   annotations: { readOnly: true, idempotent: true },
@@ -167,7 +170,11 @@ export const analyzePipeStress = defineCommand({
     return report(
       doc,
       `analyze_pipe_stress: ${model.id} ${analysis.states.length} case(s), ${analysis.built.layout.nodes.length} nodes, status ${analysis.status}${worst === null ? '' : `, governing ${worst.case} ratio ${worst.ratio.toFixed(3)}`}; ${analysis.findings.filter((f) => f.severity === 'fail').length} fail, ${analysis.findings.filter((f) => f.severity === 'warn').length} warning finding(s); review required.`,
-      { ...data, ...(Object.keys(details).length > 0 ? { details } : {}) },
+      {
+        ...data,
+        ...(Object.keys(details).length > 0 ? { details } : {}),
+        ...(include.includes('geometry') ? { geometry: modelGeometry(analysis.built) } : {}),
+      },
     );
   },
 });

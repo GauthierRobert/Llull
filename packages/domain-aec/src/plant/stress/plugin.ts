@@ -6,10 +6,12 @@
 import type { CadPlugin } from '@core/plugins/plugin';
 import { pipeStressCommands } from './catalog';
 import { pipeStressDocument } from './model/document';
+import { pipeStressOverlay } from './report/overlay';
 
 export const pipeStressPlugin: CadPlugin = {
   name: 'pipeStress',
   toolset: 'pipestress',
   commands: pipeStressCommands,
   document: pipeStressDocument,
+  renderOverlays: [pipeStressOverlay],
 };

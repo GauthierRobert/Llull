@@ -20,6 +20,7 @@ export const ISOLATED_SUITES: readonly string[] = [
   'tests/unit/plant/piping/convertReplaceGuard.test.ts',
   'tests/unit/contract/entityPropertiesPort.test.ts',
   'tests/unit/contract/plugins.test.ts',
+  'tests/unit/contract/renderOverlays.test.ts',
   'tests/unit/contract/reconcile.test.ts',
   'tests/unit/contract/staleEntities.test.ts',
   'tests/unit/contract/retiredCommands.test.ts',

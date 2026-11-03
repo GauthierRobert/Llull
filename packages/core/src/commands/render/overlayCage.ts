@@ -1,19 +1,22 @@
 /** render_view `overlay` = "cage" | "net" (04 DIR FR-DIR-40, AF-22): the subdivision cage and the NURBS control nets drawn over the picture, so an agent sees what it edits. */
 
-import { type Entity, type Vec3 } from '../../model/types';
+import { type CadDocument, type Entity, type Vec3 } from '../../model/types';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { escapeXml } from '../../lib/escapeXml';
 import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, svgDot, svgLine } from './svg';
-import { OVERLAY_KINDS, type OverlayKind, type OverlayStats } from './overlayTypes';
+import { pluginRenderOverlays } from '../../plugins/host';
+import { BUILTIN_OVERLAY_KINDS, type OverlayKind, type OverlayLayer, type OverlayStats } from '../../model/renderOverlay';
 import type { RenderViewData } from './types';
 
 const CAGE_COLOR = '#ffd24a';
 const NET_COLOR = '#44ddff';
 
-interface Layer {
-  readonly svg: string[];
-  readonly stats: OverlayStats;
+type Layer = OverlayLayer;
+
+/** Every overlay kind `render_view` accepts: the built-in ones, then those of the installed plugins. */
+export function overlayKinds(): string[] {
+  return [...BUILTIN_OVERLAY_KINDS, ...pluginRenderOverlays().map((overlay) => overlay.kind)];
 }
 
 function cageLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
@@ -87,11 +90,12 @@ function netLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
 
 /**
  * `svg` with the requested overlays drawn on top, projected with the camera of `data` (orthographic renders only; the picture is not occluded: the cage and the net are
- * drawn over the surface). `only` limits them to those entity ids (an isolated render).
- * @invariant a cage edge is drawn once however many faces share it; every vertex and pole is one dot; an entity of another kind is not drawn
+ * drawn over the surface). `only` limits them to those entity ids (an isolated render). Plugin kinds draw through `RenderOverlay.draw`.
+ * @invariant a cage edge is drawn once however many faces share it; every vertex and pole is one dot; an entity of another kind is not drawn; layers come in `overlayKinds()` order
  */
 export function appendCageNetOverlays(
   svg: string,
+  doc: CadDocument,
   data: RenderViewData,
   entities: ReadonlyArray<Entity>,
   kinds: ReadonlyArray<OverlayKind>,
@@ -101,9 +105,16 @@ export function appendCageNetOverlays(
   const shown = only === undefined ? entities : entities.filter((entity) => only.includes(entity.id));
   const stats: Partial<Record<OverlayKind, OverlayStats>> = {};
   const layers: string[] = [];
-  for (const kind of OVERLAY_KINDS) {
+  const contributed = pluginRenderOverlays();
+  for (const kind of overlayKinds()) {
     if (!kinds.includes(kind)) continue;
-    const layer = kind === 'cage' ? cageLayer(shown, project) : netLayer(shown, project);
+    const plugin = contributed.find((overlay) => overlay.kind === kind);
+    const layer =
+      plugin !== undefined
+        ? plugin.draw(doc, { project, entities, ...(only === undefined ? {} : { only }) })
+        : kind === 'cage'
+          ? cageLayer(shown, project)
+          : netLayer(shown, project);
     stats[kind] = layer.stats;
     if (layer.svg.length > 0) layers.push(`  <!-- ${kind} overlay -->`, ...layer.svg);
   }
