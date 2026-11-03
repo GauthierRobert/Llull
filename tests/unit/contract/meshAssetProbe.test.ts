@@ -21,7 +21,13 @@ import { scene } from '../../helpers/assetScene';
 import { fakeKernel, TETRA } from '../../helpers/fakeKernel';
 
 /** Commands that draw or preview the display mesh on purpose (a picture, not a number). */
-const DISPLAY_BY_DESIGN: ReadonlySet<string> = new Set(['render_view', 'render_motion', 'render_walkthrough', 'set_face_color']);
+const DISPLAY_BY_DESIGN: ReadonlySet<string> = new Set([
+  'render_view',
+  'render_motion',
+  'render_walkthrough',
+  'render_stats',
+  'set_face_color',
+]);
 
 const ID_LIKE = /^(id|ids|a|b|from|to|source|target|base|tool|tools)$|(Id|Ids)$/;
 

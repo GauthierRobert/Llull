@@ -71,6 +71,9 @@ const AUDIT: Readonly<Record<string, Answer>> = {
   'core/src/commands/render/polygons.ts': { display: 'render_view / render_motion / render_walkthrough draw the display mesh' },
   'core/src/commands/surface/surfaceShared.ts': { commands: ['analyze_draft', 'check_continuity', 'measure_deviation'] },
   'core/src/geometry/instanceExpansion.ts': { helper: 'bakes a component child; callers are the commands of the other entries' },
+  'core/src/geometry/renderPlan.ts': {
+    display: 'render_stats counts the display triangles and hashes the display mesh the viewport draws, by design',
+  },
   'core/src/geometry/resolveMassProperties.ts': { commands: ['mass_properties', 'geometric_validation_properties', 'bill_of_materials'] },
   'core/src/geometry/technicalView.ts': { commands: ['export_sheet_svg'] },
   'domain-aec/src/scan/designPrimitives.ts': { commands: ['cloud_to_model_deviation', 'check_asbuilt_clash'] },
