@@ -4,6 +4,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import type { CadDocument } from '@core/model/types';
+import { MM_PER_UNIT } from '@core/model/units';
 import { humanGatePayload } from '@core/model/humanGate';
 import { classNames } from '@ui/classNames';
 import { SignActDialog, type SignActRequest } from '@ui/components/SignActDialog';
@@ -14,7 +15,7 @@ import { usePipeStressStore } from '@ui/store/pipeStressStore';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { LabeledSelect } from '@ui/panels/LabeledSelect';
 import { KpiStrip, ListRow, PanelEmpty, PanelHeader, PanelSection, StatusChip, StatusLine, type StatusTone } from '@ui/panels/PanelParts';
-import { pathMidpoint, pipePath } from '@ui/viewport/3d/pipeStress/pipePaths';
+import { stationPosition } from '@ui/viewport/3d/pipeStress/paintedElements';
 import { stressOutcome } from '@ui/viewport/3d/pipeStress/stressQuery';
 import {
   approvalStatus,
@@ -32,6 +33,7 @@ type StressModel = NonNullable<NonNullable<CadDocument['plant']>['stress']>['mod
 
 const WORST_LIMIT = 8;
 const ALL_CASES = '';
+const DEFORM_SCALES = [10, 50, 100, 500];
 
 const CHIP_TONE: Record<RatioTone, StatusTone> = { pass: 'ok', warn: 'warn', fail: 'bad', unknown: 'info' };
 const STATUS_TONE: Record<StressView['status'], StatusTone> = { pass: 'ok', fail: 'bad', incomplete: 'warn' };
@@ -76,10 +78,9 @@ function ToneLegend(): React.ReactElement {
   );
 }
 
-function stationFocus(document: CadDocument, row: StressRow): PanelFocus {
+function stationFocus(document: CadDocument, view: StressView, row: StressRow): PanelFocus {
   const tone = ratioTone(row.ratio);
-  const path = pipePath(document, row.pipeId);
-  const position = path === null ? null : pathMidpoint(path.points);
+  const position = stationPosition(view, row, MM_PER_UNIT[document.units]);
   const where = `${row.pipeId}${row.node === null ? '' : ` ${row.node}`}`;
   return {
     key: `pipestress:station:${row.case}:${row.pipeId}:${row.node ?? row.element}`,
@@ -90,8 +91,8 @@ function stationFocus(document: CadDocument, row: StressRow): PanelFocus {
   };
 }
 
-function StationRow({ document, row }: { document: CadDocument; row: StressRow }): React.ReactElement {
-  const focus = stationFocus(document, row);
+function StationRow({ document, view, row }: { document: CadDocument; view: StressView; row: StressRow }): React.ReactElement {
+  const focus = stationFocus(document, view, row);
   const onFocus = useFocusItem();
   const focused = useIsFocused(focus.key);
   const tone = ratioTone(row.ratio);
@@ -189,10 +190,10 @@ function ResultSections({ document, view }: { document: CadDocument; view: Stres
           ))}
         </ul>
       </PanelSection>
-      <PanelSection title="Worst stations" count={stations.length} hint="Click a row to mark the pipe on the model.">
+      <PanelSection title="Worst stations" count={stations.length} hint="Click a row to mark the station on the model.">
         <ul className="panel__list" data-testid="stress-stations">
           {stations.map((row) => (
-            <StationRow key={`${row.case}|${row.pipeId}|${row.node ?? row.element}`} document={document} row={row} />
+            <StationRow key={`${row.case}|${row.pipeId}|${row.node ?? row.element}`} document={document} view={view} row={row} />
           ))}
         </ul>
         {stations.length === 0 && <p className="panel__row-meta">No code stress rows (no sustained, expansion or occasional case).</p>}
@@ -219,7 +220,9 @@ export function PipeStressPanel({ className }: { className?: string }): React.Re
   const storedId = usePipeStressStore((s) => s.modelId);
   const caseName = usePipeStressStore((s) => s.caseName);
   const shown = usePipeStressStore((s) => s.shown);
-  const { setModelId, setCaseName, setShown } = usePipeStressStore.getState();
+  const showReactions = usePipeStressStore((s) => s.showReactions);
+  const deformScale = usePipeStressStore((s) => s.deformScale);
+  const { setModelId, setCaseName, setShown, setShowReactions, setDeformScale } = usePipeStressStore.getState();
   const modelId = storedId !== null && order.includes(storedId) ? storedId : (order[0] ?? null);
   useEffect(() => {
     if (modelId !== storedId) setModelId(modelId);
@@ -271,7 +274,7 @@ export function PipeStressPanel({ className }: { className?: string }): React.Re
             )}
             <label className="field field--inline">
               <input type="checkbox" checked={shown} data-testid="stress-overlay-toggle" onChange={(e) => setShown(e.target.checked)} />
-              <span className="field__label">Colour pipes by stress ratio</span>
+              <span className="field__label">Colour pipes and runs by stress ratio</span>
             </label>
             <ToneLegend />
             {outcome.ok && (
@@ -284,6 +287,26 @@ export function PipeStressPanel({ className }: { className?: string }): React.Re
                 onChange={(value) => setCaseName(value === ALL_CASES ? null : value)}
               />
             )}
+            <label className="field field--inline">
+              <input
+                type="checkbox"
+                checked={showReactions}
+                data-testid="stress-reactions-toggle"
+                onChange={(e) => setShowReactions(e.target.checked)}
+              />
+              <span className="field__label">Show support reactions</span>
+            </label>
+            {outcome.ok && caseName !== null && (
+              <LabeledSelect
+                label="Deformed shape"
+                value={deformScale === 0 ? '' : String(deformScale)}
+                options={DEFORM_SCALES.map((factor) => [String(factor), `x ${factor}`] as const)}
+                blankLabel="Off"
+                testId="stress-deform-select"
+                onChange={(value) => setDeformScale(value === '' ? 0 : Number(value))}
+              />
+            )}
+            {caseName === null && <p className="panel__row-meta">Pick an overlay case to show its deformed shape.</p>}
           </PanelSection>
           {outcome.ok ? (
             <ResultSections document={document} view={outcome.view} />
