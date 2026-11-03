@@ -207,13 +207,13 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - Built since (reconciled 2026-11-02 from git, as built in each spec §13): DAT-M1b, M2–M5; ISO-M2–M4; STA-M4, M5; PID-M2–M4, M5 (no 2D
   viewport branch), M7 (5 of 8 `P3D_*` codes); EQP-R1; VIS-M9. Built 2026-11-02: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8, DAT-M6, ISO-M5, PID-M6, PID-M7b. Remaining plant milestones (one line each, spec §10 of the pack):
 - `[TODO]` **PST-M4** 07 review surface: overlay, panel, `render_view` overlay, HTML / CSV report. _deps: PST-M3_
-- `[TODO]` **PST-HARDEN** `analyze_pipe_stress` refuses (coded) when a governing ratio is non-finite instead of recording it; direct test of `carry` when the stored approval resultHash differs from the replayed record (PST-M3 review, non-blocking).
-- `[TODO]` **PST-GATE** `approve_pipe_stress` recorded `{verified:true}` is a no-op report; refuse it (PST_HUMAN_GATE) outside history replay now that ISO-REPLAY put `ctx.replaying` on main (set only by `replayHistory`; PST-M3 review).
-- `[TODO]` **FUZZ-EQP** Building slice fuzz seed (`tests/helpers/pluginSliceSeeds.ts`) has no parametric equipment: add vessel / exchanger / tank / pump, and a string → prototype-key mutation (`hasOwnProperty`, `toString`, `valueOf`) in `tests/helpers/sliceMutations.ts` (EQP-M4 review).
-- `[TODO]` **BLD-UID** `building.uid` is time-based (`uniqueId('building')`, `packages/domain-aec/src/building/model.ts:79`): two replays of one plan differ; derive it from the step / doc id (found in the EQP-M3 review).
-- `[TODO]` **EQP-M5-UI** 03 UI port glyph + data-sheet panel (the EQP-M5 commands are on main). _Lane 2_
+- `[WIP]` **PST-HARDEN** (lane1 `feat/plant-pst-gate`) `analyze_pipe_stress` refuses (coded) when a governing ratio is non-finite instead of recording it; direct test of `carry` when the stored approval resultHash differs from the replayed record (PST-M3 review, non-blocking).
+- `[WIP]` **PST-GATE** (lane1 `feat/plant-pst-gate`) `approve_pipe_stress` recorded `{verified:true}` is a no-op report; refuse it (PST_HUMAN_GATE) outside history replay now that ISO-REPLAY put `ctx.replaying` on main (set only by `replayHistory`; PST-M3 review).
+- `[WIP]` **FUZZ-EQP** (lane4 `feat/plant-bld-uid`) Building slice fuzz seed (`tests/helpers/pluginSliceSeeds.ts`) has no parametric equipment: add vessel / exchanger / tank / pump, and a string → prototype-key mutation (`hasOwnProperty`, `toString`, `valueOf`) in `tests/helpers/sliceMutations.ts` (EQP-M4 review).
+- `[WIP]` **BLD-UID** (lane4 `feat/plant-bld-uid`) `building.uid` is time-based (`uniqueId('building')`, `packages/domain-aec/src/building/model.ts:79`): two replays of one plan differ; derive it from the step / doc id (found in the EQP-M3 review).
+- `[WIP]` **EQP-M5-UI** (lane2 `feat/plant-eqp-m5-ui`) 03 UI port glyph + data-sheet panel (the EQP-M5 commands are on main). _Lane 2_
 - `[BLOCKED]` **ISO-M6** 05 performance VC-ISO-18, ISOGEN conformance (OQ-ISO-01, needs a licensed tool), CSV weld map, revision clouds.
-- `[TODO]` **PID-M5b** 04 P&ID 2D viewport branch. _Lane 3_
+- `[WIP]` **PID-M5b** (lane3 `feat/plant-pid-m5b`) 04 P&ID 2D viewport branch. _Lane 3_
 - `[TODO]` **VIS-M3** 09 `renderPlan`, `render_stats`, `PlantBatchRenderer` (LOD, pixel cull), SYN-RACK fixture, perf baseline.
 - `[TODO]` **VIS-M4b/M5b** 09 rest of M4 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET`) and M5 (`create_clash_issues`, `import_bcf`, XSD VC-VIS-15).
 - `[TODO]` **VIS-UI** 09 Review panel, redline tools, section-box gizmo + clipping, profile use in viewport / `render_view`. _Lane 2_
