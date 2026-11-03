@@ -354,6 +354,17 @@ describe('analyze_pipe_stress include: "geometry"', () => {
     expect(JSON.stringify(geometryOf(ready, id))).toBe(JSON.stringify(geometry));
   });
 
+  it('a document not in mm is refused with PST_PARAM_INVALID and the overlay lists the model as skipped', () => {
+    const { doc, id } = recordedModel();
+    const inches = { ...doc, units: 'in' } as CadDocument;
+    expectRefusal(inches, 'analyze_pipe_stress', { modelId: id, include: ['geometry'] }, 'PST_PARAM_INVALID', 'units');
+    const out = execute(inches, 'render_view', { view: 'top', mode: 'vector', overlay: 'pipe_stress' }).data as {
+      overlays: { pipe_stress: { lines: number; detail: { skipped: { modelId: string; code: string }[] } } };
+    };
+    expect(out.overlays.pipe_stress.lines).toBe(0);
+    expect(out.overlays.pipe_stress.detail.skipped).toMatchObject([{ modelId: id, code: 'PST_PARAM_INVALID' }]);
+  });
+
   it('is refused like the analysis for an unknown model', () => {
     expectRefusal(recordedModel().doc, 'analyze_pipe_stress', { modelId: 'nope', include: ['geometry'] }, 'PST_MODEL_NOT_FOUND');
   });

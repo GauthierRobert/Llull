@@ -24,7 +24,7 @@ export const pipeStressReport = defineCommand({
     'Contents: model, code and edition, load cases with the governing ratio and PASS / FAIL, findings with codes and remediation, the unverified inputs (unsourced material or edition) and defaulted inputs, support loads (N, N.mm) per case, ' +
     'the station table (stress, allowable, ratio, result; MPa) and the approval status: approved (a human signed these exact results), stale (recorded or approved results were computed from other inputs: PST_RESULTS_STALE finding, re-run record_pipe_stress_results) or none. ' +
     'format html (default) is the whole report; format csv writes one `table`: stations (default), cases, supports or findings. `data` holds the summary (status, record, approval, cases, counts, hashes), `fileName`, `text`, `sha256`, `bytes`. ' +
-    'Read-only; reviewRequired is always true. Refused with the analysis code (PST_MODEL_NOT_FOUND, PST_CONDITIONS_MISSING, PST_UNSTABLE ...) when the model cannot be analysed.',
+    'The same analysis colours pipes in `render_view` with overlay "pipe_stress" (green below ratio 0.8, amber 0.8 to 1, red above 1). Read-only; reviewRequired is always true. Refused with the analysis code (PST_MODEL_NOT_FOUND, PST_CONDITIONS_MISSING, PST_UNSTABLE ...) when the model cannot be analysed.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     modelId: z.string().min(1).describe('Id of the stress model.'),

@@ -6,7 +6,14 @@ import { escapeXml } from '../../lib/escapeXml';
 import { type Projector, makeProjector } from './camera';
 import { appendBeforeClose, svgDot, svgLine } from './svg';
 import { pluginRenderOverlays } from '../../plugins/host';
-import { BUILTIN_OVERLAY_KINDS, type OverlayKind, type OverlayLayer, type OverlayStats } from '../../model/renderOverlay';
+import {
+  BUILTIN_OVERLAY_KINDS,
+  type OverlayKind,
+  type OverlayLayer,
+  type OverlayView,
+  type RenderOverlay,
+  type OverlayStats,
+} from '../../model/renderOverlay';
 import type { RenderViewData } from './types';
 
 const CAGE_COLOR = '#ffd24a';
@@ -88,10 +95,22 @@ function netLayer(entities: ReadonlyArray<Entity>, project: Projector): Layer {
   return { svg, stats: { entities: ids, lines, points } };
 }
 
+/** The layer of a plugin overlay; a throwing `draw` is an empty layer whose stats name the failure (`detail.failed`), so the render still returns. */
+function drawPlugin(plugin: RenderOverlay, doc: CadDocument, view: OverlayView): Layer {
+  try {
+    return plugin.draw(doc, view);
+  } catch (error) {
+    return {
+      svg: [],
+      stats: { entities: [], lines: 0, points: 0, detail: { failed: error instanceof Error ? error.message : String(error) } },
+    };
+  }
+}
+
 /**
  * `svg` with the requested overlays drawn on top, projected with the camera of `data` (orthographic renders only; the picture is not occluded: the cage and the net are
  * drawn over the surface). `only` limits them to those entity ids (an isolated render). Plugin kinds draw through `RenderOverlay.draw`.
- * @invariant a cage edge is drawn once however many faces share it; every vertex and pole is one dot; an entity of another kind is not drawn; layers come in `overlayKinds()` order
+ * @invariant a plugin overlay receives the same isolate-filtered entity list as the built-ins (plus `only`); a throwing plugin overlay does not throw: stats.detail.failed carries its message; a cage edge is drawn once however many faces share it; every vertex and pole is one dot; an entity of another kind is not drawn; layers come in `overlayKinds()` order
  */
 export function appendCageNetOverlays(
   svg: string,
@@ -111,7 +130,7 @@ export function appendCageNetOverlays(
     const plugin = contributed.find((overlay) => overlay.kind === kind);
     const layer =
       plugin !== undefined
-        ? plugin.draw(doc, { project, entities, ...(only === undefined ? {} : { only }) })
+        ? drawPlugin(plugin, doc, { project, entities: shown, ...(only === undefined ? {} : { only }) })
         : kind === 'cage'
           ? cageLayer(shown, project)
           : netLayer(shown, project);

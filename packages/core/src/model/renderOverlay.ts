@@ -22,8 +22,9 @@ export interface OverlayStats {
 }
 
 /** What `RenderOverlay.draw` gets: the orthographic projector of the picture and the entities to cover. */
-interface OverlayView {
+export interface OverlayView {
   readonly project: OverlayProjector;
+  /** The entities the overlay covers: the document's, limited to the isolated ones in an isolated render (the list the built-in kinds get). */
   readonly entities: ReadonlyArray<Entity>;
   /** Entity ids an isolated render is limited to; undefined = no limit. */
   readonly only?: ReadonlyArray<string>;
