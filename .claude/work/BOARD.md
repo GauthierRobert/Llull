@@ -13,8 +13,8 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
-- 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). Merged: EQP-M5-UI. WIP: PST-GATE + PST-HARDEN (lane1, APPROVE + nits), PST-M4 UI (lane2),
-  PID-M5b (lane3), BLD-UID + FUZZ-EQP (lane4); workers + reviewers on sonnet. Next: PST-M4, VIS-M3, VIS-M4b/M5b, VIS-UI, SCN-M3.
+- 2026-11-03 — plant run resumed (owner: until the weekly token budget is at 80 %). Merged: EQP-M5-UI, PID-M5b (first sheet only; picker + 2D pick of P&ID items left, 04 §13.8). WIP: PST-GATE + PST-HARDEN (lane1, APPROVE + nits), PST-M4 UI (lane2),
+  VIS-M3a (lane3), BLD-UID + FUZZ-EQP (lane4); workers + reviewers on sonnet. Next: PST-M4, VIS-M3, VIS-M4b/M5b, VIS-UI, SCN-M3.
 
 - 2026-11-02 (end) — plant run stopped by the owner after the in-flight tasks. Merged + pushed: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8,
   DAT-M6, ISO-M5, ISO-REPLAY (replay-only confirmations via `ctx.replaying`), PID-M6, PID-M7b. Remaining plant TODOs below (PST-M4, PST-GATE,
@@ -215,8 +215,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[WIP]` **FUZZ-EQP** (lane4 `feat/plant-bld-uid`) Building slice fuzz seed (`tests/helpers/pluginSliceSeeds.ts`) has no parametric equipment: add vessel / exchanger / tank / pump, and a string → prototype-key mutation (`hasOwnProperty`, `toString`, `valueOf`) in `tests/helpers/sliceMutations.ts` (EQP-M4 review).
 - `[WIP]` **BLD-UID** (lane4 `feat/plant-bld-uid`) `building.uid` is time-based (`uniqueId('building')`, `packages/domain-aec/src/building/model.ts:79`): two replays of one plan differ; derive it from the step / doc id (found in the EQP-M3 review).
 - `[BLOCKED]` **ISO-M6** 05 performance VC-ISO-18, ISOGEN conformance (OQ-ISO-01, needs a licensed tool), CSV weld map, revision clouds.
-- `[WIP]` **PID-M5b** (lane3 `feat/plant-pid-m5b`) 04 P&ID 2D viewport branch. _Lane 3_
-- `[TODO]` **VIS-M3** 09 `renderPlan`, `render_stats`, `PlantBatchRenderer` (LOD, pixel cull), SYN-RACK fixture, perf baseline.
+- `[WIP]` **VIS-M3** (lane3 `feat/plant-vis-m3a`: core `renderPlan` + `render_stats` + SYN-RACK + perf; `PlantBatchRenderer` UI next, Lane 2) 09 `renderPlan`, `render_stats`, `PlantBatchRenderer` (LOD, pixel cull), SYN-RACK fixture, perf baseline.
 - `[TODO]` **VIS-M4b/M5b** 09 rest of M4 (profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET`) and M5 (`create_clash_issues`, `import_bcf`, XSD VC-VIS-15).
 - `[TODO]` **VIS-UI** 09 Review panel, redline tools, section-box gizmo + clipping, profile use in viewport / `render_view`. _Lane 2_
 - `[TODO]` **VIS-M6..M8** 09 realism tiers, walk / fly, instance BVH worker, 10⁶ streaming. _deps: VIS-M3_
