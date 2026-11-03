@@ -681,7 +681,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/{commands,geometry}` and
 | VIS-M1 | `display` model, colour rules, profiles, report, `check_display`; industrial property provider; `apply_service_colour_scheme` (A13.1, ISO 14726) | plugin port review (`cad-reviewer`) | 6 d. **Built 2026-10-23 without viewport use of profiles (§12.6).** |
 | VIS-M2 | `review` model: viewpoints, section boxes, markups, issues, comments, `check_review`, human gate; retire `namedViewStore` | AF-34a signature (09 PLM aerospace) | 8 d. **Built 2026-10-25 (§12.7); Review panel, markup / section-box rendering wait for the UI follow-up, M4 and M6.** |
 | VIS-M3 | `renderPlan` + `render_stats` + `PlantBatchRenderer` (R-BATCH-v1, LOD, pixel cull), SYN-RACK fixture, perf script baseline | — | 10 d. **Partly built 2026-11-03 (§12.8): plan + `render_stats` + fixture + baseline; `PlantBatchRenderer` left (VIS-M3b).** |
-| VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d |
+| VIS-M4 | `render_view` perspective, viewpoint / profile / section box, review shading (shadow, AO, edges), digests | M1, M2 | 8 d. **Built in two slices: perspective / viewpoint / digests 2026-10-19 (§12.1); profile / section box / highlight shading / `visibleEntityIds` / budget 2026-11-03 (§12.9). Shadows, AO and Blinn-Phong stay open.** |
 | VIS-M5 | `create_clash_issues`; BCF 3.0 export / import | M2 | 6 d |
 | VIS-M6 | viewport realism tiers (CSM, GTAO, edges), material classes, walk / fly, walkthroughs | M3 | 8 d |
 | VIS-M7 | instance BVH in a worker, glTF instancing, pipe markers; measure the 10⁶ build; `llull-bvh` WASM / `llull-compute geomq` if the target is missed (RS-6) | M3; RS-0 `llull-bvh` for the native part | 7 d (+ native part inside RS-6) |
@@ -798,7 +798,7 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 ### 12.5 Not built yet (remaining VIS work)
 
 The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (Review panel, redline tools and section-box gizmo in the UI, viewport clipping with a section box; the model and commands are §12.7), VIS-M3b (`PlantBatchRenderer`; the plan and `render_stats` are §12.8), the rest of VIS-M4
-(profile / section-box / review shading, `visibleEntityIds`, `VIS_RENDER_BUDGET` on render_view), the rest of VIS-M5
+(shadow, ambient occlusion and Blinn-Phong review shading; the profile, section box, highlight, `visibleEntityIds` and budget are §12.9), the rest of VIS-M5
 (`create_clash_issues`, `import_bcf`, single-viewpoint BCF commands, XSD validation VC-VIS-15), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
 
@@ -929,3 +929,21 @@ Not built (VIS-M3b and later): `PlantBatchRenderer`, `LodGeometryCache`, `Batche
 - [R18] ral-colors 1.0.1 (npm, MIT): RAL classic table used only for display approximations — https://registry.npmjs.org/ral-colors/-/ral-colors-1.0.1.tgz (downloaded 2026-10)
 - [R19] llull `docs/QUALITY_GATES.md` (proposed gates 2 and 4) and `docs/INDUSTRIAL.md` (clash coordination).
 - [R20] RS1 native compute programme — [../../decisions/RS1-native-compute.md](../../decisions/RS1-native-compute.md); wgpu https://crates.io/crates/wgpu (version recorded at RS-0)
+
+
+### 12.9 As built — VIS-M4b profile, section box, review highlight, visible entities, 2026-11-03
+
+`render_view` reads the display and review data that already sit in core `model` (§12.6 / §12.7), so no new port was needed (the plant plugin supplies entity properties through the existing property port). Built in `commands/render/`.
+
+| Area | As built | Files |
+| ---- | -------- | ----- |
+| Params | `colourProfileId`, `sectionBoxId`, `shading` (`flat` / `review`), `issueId`, `highlightEntityIds`. Profile: param, else the viewpoint's, else the active profile. Section box: param, else the viewpoint's, else the active box (an explicit `cut` ignores the viewpoint / active box; `sectionBoxId` + `cut` is `VIS_RENDER_INVALID`). | `reviewStyle.ts` |
+| Profile | evaluated with `evaluateProfile` (installed property providers); the first rule's colour replaces the entity colour and its material override; `hidden` rules remove the entity; `defaultColour` colours unmatched 3D entities; data `legend` (every rule with its count), `colourProfileId`, `hiddenEntityIds`. Instance children keep their own colours. Rule `transparency` is not drawn. | `reviewStyle.ts`, `reviewData.ts` |
+| Section box | the box becomes a `cut` of mode union (box: 6 outward planes turned by `rotationZ`; planes as stored), so clipping and hatched caps are those of `cut`; unknown id `VIS_SECTION_BOX_NOT_FOUND`. Framing keeps the whole scene. | `reviewStyle.ts` `sectionBoxCut` |
+| Review shading | `shading: 'review'`: the selection (viewpoint `selection`, entities of `issueId`, `highlightEntityIds`) keeps its colour, everything else is blended 70 % toward the background. A colour change of the scene, so it works in perspective and with the native renderer. With nothing to highlight the picture stays flat and the summary says so. | `reviewStyle.ts` |
+| `visibleEntityIds` | `data.visibleEntityIds` (first 500) + `visibleEntityCount` on every render_view; the read-only query `visible_entity_ids` (toolset review) answers without rendering. Stages: viewpoint visibility, profile hidden rules, section box (entity AABB wholly outside), view frustum (the render camera; the query uses the viewpoint camera at `width` x `height`, no frustum without a viewpoint; a turntable strip has none). Conservative AABB tests: a listed id may be fully occluded. | `viewVisibility.ts`, `visibleEntityIds.ts` |
+| `VIS_RENDER_BUDGET` | pixels x supersample^2 > 16 M is refused before rendering (`supersampleFor` is the raster's own factor). A single picture is clamped to 2000 x 2000 = 4 M samples, so only a turntable strip (frames x width x height pixels, counted once because its frames are drawn one at a time) can reach it: 12 frames at 2000 x 2000 are refused. | `viewVisibility.ts`, `renderView.ts` |
+
+Not built (still VIS-M4 / M6): the sun shadow, ambient occlusion, Blinn-Phong with material classes, sky / ground, the `edges` / `shadows` / `ambientOcclusion` / `sun` params, profile transparency, the `rendererVersion` bump. `renderPlan` counts are not used by `render_view`: `planScene` costs 3.8 s at 10^6 instances (§12.8), more than the render it would guard, so the budget uses the sample count and the frustum cull tests AABBs directly.
+
+Validation: `tests/unit/render/reviewRender.test.ts` (SVG fill colours of a recoloured / dimmed picture, clipping, legend counts, visibility stages, frustum culling, refusals, purity, budget).

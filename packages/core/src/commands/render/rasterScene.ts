@@ -14,6 +14,9 @@ import type { Polygon3D } from './types';
 const SUPERSAMPLE = 2;
 /** Above this many output pixels the render is not supersampled (memory and time stay bounded at 2000 × 2000). */
 const SUPERSAMPLE_MAX_PIXELS = 1_200_000;
+
+/** Linear supersampling factor of a `width` × `height` render. */
+export const supersampleFor = (width: number, height: number): number => (width * height > SUPERSAMPLE_MAX_PIXELS ? 1 : SUPERSAMPLE);
 const LIGHT: Vec3 = (() => {
   const v: Vec3 = [0.6, -0.8, 1.0];
   const length = Math.hypot(...v);
@@ -110,7 +113,7 @@ export function prepareRasterScene(
 ): RasterScene | null {
   const filled = polygons.filter((p) => !p.stroke);
   if (polygons.length === 0) return null;
-  const samples = width * height > SUPERSAMPLE_MAX_PIXELS ? 1 : SUPERSAMPLE;
+  const samples = supersampleFor(width, height);
   const [w, h] = [width * samples, height * samples];
   const projection =
     cam.fovDeg === undefined ? orthographic(cam, orthoHalf, w, h) : perspective(cam, cam.fovDeg, w, h, Math.max(sceneRadius * 1e-3, 1e-6));
