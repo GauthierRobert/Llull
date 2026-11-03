@@ -478,7 +478,7 @@ Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/**` (the plugin) a
 | M1 quick checks | `pipe_sif`, `pipe_stress_allowables`, `thermal_growth`, `guided_cantilever`, rule-set data, catalogue rows | none | 4 d |
 | M2 solver core (built, §14) | `@lib/frame3d` (Timoshenko, bends with k, RCM + banded Cholesky), unit tests, PSI fixture | none | 6 d |
 | M3 model + MVP commands (built, §15) | `create_stress_model`, conditions, load cases, restraints, `analyze_pipe_stress`, `check_pipe_stress`, record / approve, non-linear supports | M2; uses `add_pipe_run` / `add_pipe_support` as they are | 10 d |
-| M4 review surface | overlay, panel, `render_view` overlay, report (HTML / CSV) | M3 | 5 d |
+| M4 review surface (partly built: overlay + panel, §16) | overlay, panel, `render_view` overlay, report (HTML / CSV) | M3 | 5 d |
 | M5 V1 | tees / olets / reducers / flanges / valves (02 RTE components), insulation, wind / seismic, springs, nozzles (03 EQP), B31.1, steel coupling (06 STA), `.cii` export, PCF attributes (05 ISO) | 01 PSC, 02 RTE, 03 EQP, 05 ISO | 20 d |
 | M6 V2 | modal / response spectrum (NUREG/CR-1677), WRC 537 / 297, EN 13480-3, CAESAR II import | M5 | 25 d |
 
@@ -640,3 +640,25 @@ Validation results (`tests/unit/plant/stress/m3*.test.ts`, references from `vali
 Mutations shown to fail the suite: the sign of the mid-element load term, the freshness check of the approval, the approval drop on edit, the replay carry, the friction reaction, the release rule, the signed payload (hashes removed), the supports in the input hash; the backstop test fails with the ratio at 1e99; the host stamp test fails without the `HOST_STAMPED` entry.
 
 Left for M4 / M5: overlay, panel, `render_view` overlay, report (M4); `import_pipe_material_data` with the `pipingAllowableStress` / `meanCteFromInstall` rows, tees / olets / reducers / flanges / valves, insulation, wind / seismic, mill tolerance, springs, nozzles, steel coupling, `.cii` export, PCF attributes, `set_sif_override`, imposed displacements Dn, hydrotest WW, `cursor` paging, rotated (oblique) restraints, E(T) and `scalar` / `srss` combinations (M5); the exact stress at a node shared by a straight pipe and a bend uses both elements' ends and takes the larger.
+
+## 16. As built (M4 UI: overlay and panel, 2026-11-03)
+
+Presentation only; every value comes from the read-only `analyze_pipe_stress` (called with `include: ['stresses']`), every change goes through a command.
+
+| Path | Content |
+| ---- | ------- |
+| `src/ui/viewport/3d/pipeStress/stressView.ts` | pure: parse the answer (`parseStressView`; a refused query has no data), the ratio ramp (`ratioTone`: green < 0.8, amber 0.8 to 1, red > 1; a non-finite ratio is red, never a pass), `worstPerPipe`, `worstStations`, `approvalStatus` |
+| `.../stressQuery.ts` | `stressOutcome(document, modelId)`: one analysis per document identity, shared by overlay and panel; a refusal is `{ ok: false, summary }` |
+| `.../pipePaths.ts`, `paintedPipes.ts`, `PipeStressOverlay.tsx` | the building pipe centreline (z + level elevation), cylinder poses, one tube per pipe toned by its worst ratio over the chosen case (or all cases); mounted in `Viewport3D`, recomputed on document change, not on selection |
+| `src/ui/store/pipeStressStore.ts` | UI-only: model under review, overlay case, overlay shown |
+| `src/ui/panels/pipeStress/PipeStressPanel.tsx` | sidebar tab `pipestress` (a domain tab, on the rail once the document has a stress model): model picker, status, worst ratio, overlay toggle and case, load cases (governing ratio, node, largest displacement), the 8 worst stations (click = beacon on the pipe through the focus store), fail / warn findings, approval |
+
+Approval in the panel: `approvalStatus` is approved (the approval's result hash equals the recorded one and the record is fresh), stale (inputs changed since the record), not recorded, not approved, or cannot verify (analysis refused). **Record** dispatches `record_pipe_stress_results`. **Approve** is enabled only for a fresh, passing record and opens the signing dialog (`SignActDialog`: a trusted enrolled key and its passphrase); the signature covers `humanGatePayload('plant:approve_pipe_stress', [modelId], { inputHash, resultHash }, nonce)` and is dispatched with `at` from the host clock. A failing or incomplete record shows why Approve is disabled.
+
+Not built, and why:
+
+1. **Station-level colours and support arrows.** The analysis data carries no node or element coordinates (rows have `pipeId`, a `node` id and `xMm` along the element; supports and reactions are keyed by node id), so the overlay paints whole pipes by their worst ratio and the beacon sits at the pipe midpoint. A `model.nodes` list (id and position in mm) in the `analyze_pipe_stress` summary would give per-station colours and reaction arrows without geometry in the UI.
+2. **02 RTE runs.** Their centreline derives inside the plugin and no read-only query exposes it; a stress model on runs shows the panel but no overlay (same data gap: `model.pipes` with points).
+3. Deformed shape x scale (needs displacements with node positions), the `render_view` overlay and the report (a later M4 task).
+
+Tests: `tests/unit/pipeStressView.test.ts` (helpers), `tests/component/PipeStressPanel.test.tsx` (panel, refusal, record, stale, signing dialog, failing record, rail tab).
