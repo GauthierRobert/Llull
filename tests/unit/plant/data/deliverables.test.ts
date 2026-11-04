@@ -10,10 +10,12 @@ import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import type { CadDocument } from '@core/model/types';
 import { copyObject, getPlantData, type DeliverableStep } from '@aec/plant/data/model';
 import { plantDataErrors } from '@aec/plant/data/validate';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
+import { expectBoundToDocument } from '../../../helpers/documentBinding';
 import { plantDataPlugin } from '@aec/plant/data/plugin';
 import { addEquipment, assignPump, libraryDocument, scDat01Document, withData } from './dataFixtures';
 
@@ -52,7 +54,12 @@ const signFor = (
   nonce = 'n1',
   signer?: string,
 ): Signature => ({
-  payload: humanGatePayload('plant:set_deliverable_status', [deliverable], { hierarchyId: null, at: AT, ...details }, nonce),
+  payload: humanGatePayload(
+    'plant:set_deliverable_status',
+    [deliverable],
+    withDocumentUid({ hierarchyId: null, at: AT, ...details }, pumpDocument()),
+    nonce,
+  ),
   nonce,
   ...(signer === undefined ? {} : { signer }),
 });
@@ -194,6 +201,14 @@ describe('the human gate (VC-DAT-15)', () => {
   };
   const approval = (sha: string, nonce = 'n1'): Signature =>
     signFor('equipment_list', { revision: 'A', from: 'issued_for_review', status: 'issued_for_approval', contentSha256: sha }, nonce);
+
+  it('a signature made for one document does not verify in a copy of it (GATE-UID)', () => {
+    expectBoundToDocument(
+      reviewed().doc,
+      (document, confirmation, ctx) => level(document, 'equipment_list', 'A', 'issued_for_approval', { confirmation }, ctx),
+      'DAT_HUMAN_GATE',
+    );
+  });
 
   it('an agent (no confirmation, true, no port, a foreign signature, no nonce) never reaches a signed status and nothing is spent', () => {
     const { doc, sha } = reviewed();

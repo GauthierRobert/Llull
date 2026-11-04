@@ -3,6 +3,7 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/documentUid';
 import { caseOf } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
 import { analysisInputHash } from '../hash/inputHash';
@@ -14,7 +15,7 @@ import { refuseMarginsAs } from './refusal';
  * @affects nothing — read-only; data { payloadSha256, rowKey, status, resultsHash }
  * @invariant the hash is exactly what dispose_margin verifies the signature against for the same params and the current results
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; stale / missing results -> FEA_RESULTS_STALE / FEA_RESULTS_MISSING; unknown rowId ->
- *   FEA_MARGIN_ROW_NOT_FOUND; a PASS row -> FEA_MARGIN_PARAM_INVALID (all refusals, unchanged doc)
+ *   FEA_MARGIN_ROW_NOT_FOUND; a document without a uid -> FEA_DOCUMENT_UNIDENTIFIED; a PASS row -> FEA_MARGIN_PARAM_INVALID (all refusals, unchanged doc)
  */
 export const marginDispositionPayloadQuery = defineCommand({
   name: 'margin_disposition_payload',
@@ -22,7 +23,7 @@ export const marginDispositionPayloadQuery = defineCommand({
   description:
     'The SHA-256 a human signs to authorize dispose_margin on one FAIL or MARGINAL row of compute_margins: pass the same analysisId / rowId / ' +
     'decision / justification and the same criterion / allowable / groupBy / loadCases / marginalBand you will send to dispose_margin. The signature ' +
-    '(Ed25519 over the UTF-8 hex hash) goes in dispose_margin as signature. Valid only for the current results. An agent cannot sign. Read-only.',
+    '(Ed25519 over the UTF-8 hex hash) goes in dispose_margin as signature. Valid only for the current results and this document (bound to its uid). An agent cannot sign. Read-only.',
   params: z.object({
     analysisId: analysisIdSchema,
     rowId: z.string().describe('Row id of compute_margins, e.g. "r4" (a FAIL or MARGINAL row).'),
@@ -35,6 +36,7 @@ export const marginDispositionPayloadQuery = defineCommand({
     const fail = (code: string, message: string, ids: readonly string[] = [analysisId, rowId]): CommandResult =>
       refuseMarginsAs(doc, 'margin_disposition_payload', code, message, ids);
     if (caseOf(doc, analysisId) === undefined) return fail('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId]);
+    if (doc.uid === undefined) return fail('FEA_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [analysisId]);
     const table = marginTable(doc, analysisId, query, ctx);
     if ('code' in table) return fail(table.code, table.message, table.ids);
     const row = table.rows.find((candidate) => candidate.rowId === rowId);
@@ -50,6 +52,7 @@ export const marginDispositionPayloadQuery = defineCommand({
       decision,
       justification,
       resultsHash,
+      documentIdentity(doc),
     );
     return report(doc, `Payload to sign for dispose_margin on '${rowId}': sha256 ${payloadSha256}.`, {
       payloadSha256,

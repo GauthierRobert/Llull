@@ -2,6 +2,7 @@ import { changed } from '@core/commands/noop';
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { humanGate, humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { atLeast, checkFindings } from '../check';
 import { deliverableContent } from '../deliverableContent';
 import { allowedTargets, currentStatus, withStep } from '../deliverables';
@@ -101,14 +102,17 @@ export const setDeliverableStatus = defineCommand({
       );
     let signed: { readonly signer: string; readonly signatureId: string; readonly payloadSha256: string } | null = null;
     if (gated) {
-      const details = {
-        revision: params.revision,
-        from,
-        status: params.status,
-        contentSha256: content.sha256,
-        hierarchyId: content.hierarchyId ?? null,
-        at: params.at,
-      };
+      const details = withDocumentUid(
+        {
+          revision: params.revision,
+          from,
+          status: params.status,
+          contentSha256: content.sha256,
+          hierarchyId: content.hierarchyId ?? null,
+          at: params.at,
+        },
+        doc,
+      );
       const outcome = humanGate(
         ctx?.humanSignature ?? null,
         'plant:set_deliverable_status',

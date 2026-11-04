@@ -4,6 +4,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { verifyAndSpend } from '@core/model/humanGate';
+import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/documentUid';
 import { analysisIdSchema } from '../shared/schemas';
 import { isProblem, thermalCaseOf, withThermal } from './access';
 import { refuseThermal } from './codes';
@@ -15,9 +16,9 @@ const ROW_PATTERN = /^(.+):(max|min)$/;
 
 /**
  * @affects doc.analysis.cases[analysisId].thermal.dispositions[rowId] (records decision, justification, resultsHash, signer, signatureId and the verified signature, so readers can re-verify it)
- * @invariant only with a signature verified by `ctx.humanSignature` over the payload sha256 of (analysisId, rowId, decision, justification,
- *   resultsHash); the disposition binds to the current results hash
- * @failure no port or a signature that does not verify -> THM_HUMAN_GATE; unknown row -> THM_LIMIT_NOT_FOUND; stale results -> FEA_RESULTS_STALE;
+ * @invariant only with a signature verified by `ctx.humanSignature` over the payload sha256 of (documentUid, analysisId, rowId, decision, justification,
+ *   resultsHash); the disposition binds to the current results hash and to this document (its uid, recorded with it and re-verified by check_temperature_limits)
+ * @failure no port or a signature that does not verify -> THM_HUMAN_GATE; a document without a uid (checked after the port) -> THM_DOCUMENT_UNIDENTIFIED; unknown row -> THM_LIMIT_NOT_FOUND; stale results -> FEA_RESULTS_STALE;
  *   no results -> FEA_RESULTS_MISSING; empty justification -> THM_LIMIT_INVALID (all refusals, unchanged doc)
  */
 export const disposeThermalLimit = defineCommand({
@@ -57,6 +58,7 @@ export const disposeThermalLimit = defineCommand({
         'THM_HUMAN_GATE',
         'dispositions need a human-held signature and no signing port is available: hand over to the qualified reviewer',
       );
+    if (doc.uid === undefined) return fail('THM_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [analysisId]);
     const record = found.analysisCase.results;
     const artifacts = resultArtifacts(doc, found, ctx?.feaArtifacts);
     if (
@@ -65,10 +67,22 @@ export const disposeThermalLimit = defineCommand({
     )
       return fail(artifacts.code, artifacts.message, artifacts.ids);
     const resultsHash = record?.resultsHash ?? '';
-    const signed = verifyAndSpend(port, signature, dispositionPayload(analysisId, rowId, decision, justification, resultsHash));
+    const signed = verifyAndSpend(
+      port,
+      signature,
+      dispositionPayload(analysisId, rowId, decision, justification, resultsHash, documentIdentity(doc)),
+    );
     if (signed === null)
       return fail('THM_HUMAN_GATE', 'the signature does not verify for this disposition: hand over to the qualified reviewer');
-    const disposition = { decision, justification, resultsHash, signer: signed.signer, signatureId: signed.signatureId, signature };
+    const disposition = {
+      decision,
+      justification,
+      resultsHash,
+      signer: signed.signer,
+      signatureId: signed.signatureId,
+      signature,
+      documentUid: documentIdentity(doc),
+    };
     const thermal = { ...found.thermal, dispositions: { ...found.thermal.dispositions, [rowId]: disposition } };
     return changed(
       withThermal(doc, found, thermal),

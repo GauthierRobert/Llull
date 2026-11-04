@@ -30,7 +30,8 @@ const describeRow = (row: MarginRow): string =>
  * Margin items of a static / thermo_static case with verified results and margins computable from the material strengths with the DEFAULT
  * query (no explicit allowable, no band): FEA_MS_NEGATIVE (error, always, even after a disposition: a FAIL never becomes a pass),
  * FEA_MARGINAL_BAND_UNSET (warning; without a band no row is MARGINAL, so FEA_MS_MARGINAL is a code of compute_margins rows only),
- * FEA_DISPOSITION_PENDING (warning for FAIL rows without a valid human disposition). Empty when no margin can be computed (stale, unverified, no allowable): the other checks name those problems.
+ * FEA_DISPOSITION_PENDING (warning for FAIL rows without a valid human disposition),
+ * FEA_DISPOSITION_FOREIGN_DOCUMENT (error: a recorded disposition signed for another document, e.g. copied in) and FEA_DISPOSITION_UNBOUND (error: one that records no document uid). Empty when no margin can be computed (stale, unverified, no allowable): the other checks name those problems.
  */
 export function marginItems(doc: CadDocument, analysisId: string, ctx: ExecutionContext | undefined): MarginCheckItem[] {
   const band = caseOf(doc, analysisId)?.marginalBand;
@@ -74,6 +75,16 @@ export function marginItems(doc: CadDocument, analysisId: string, ctx: Execution
   for (const text of warnings)
     for (const code of ['FEA_SINGULAR_EXCLUSION_LARGE', 'FEA_COMPOSITE_MARGINS_UNSUPPORTED'])
       if (text.startsWith(`${code}: `)) items.push(item(code, 'warning', text.slice(code.length + 2), [analysisId]));
+  for (const code of ['FEA_DISPOSITION_FOREIGN_DOCUMENT', 'FEA_DISPOSITION_UNBOUND']) {
+    const rejected = table.rows.filter((row) => row['dispositionCode'] === code);
+    if (rejected.length > 0)
+      items.push(
+        item(code, 'error', `${rejected.length} recorded disposition(s) not counted: ${rejected.map(describeRow).join('; ')}`, [
+          analysisId,
+          ...rejected.map((row) => row.rowId),
+        ]),
+      );
+  }
   if (pending.length > 0)
     items.push(
       item(

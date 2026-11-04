@@ -45,6 +45,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_MARGINAL_BAND_UNSET: 'ask the owner or the company rule for a margin band in K and pass marginalBandK',
   THM_DISPOSITION_UNVERIFIED:
     'the stored disposition does not verify (no signing port, or no / a wrong signature): the qualified reviewer records it again with dispose_thermal_limit',
+  THM_DOCUMENT_UNIDENTIFIED:
+    'the document has no uid yet: make any recorded change (or load it with load_document, or run it as its own command, not inside a build_project plan), then sign; the signature is bound to the uid',
+  THM_DISPOSITION_FOREIGN_DOCUMENT:
+    'discard the copied disposition; a qualified reviewer of THIS document dispositions the row again (dispose_thermal_limit signs the document uid)',
+  THM_DISPOSITION_UNBOUND:
+    'the disposition was signed before signatures were bound to their document: the qualified reviewer records it again with dispose_thermal_limit',
   THM_DISPOSITION_PENDING: 'a qualified reviewer dispositions the row in the desktop app (dispose_thermal_limit with a signature)',
   THM_HUMAN_GATE: 'hand over to the qualified reviewer: the disposition needs a human-held signature (09 PLM)',
   THM_TABLE_POINTS: 'narrow the temperature range or use a smoother property model: the solver table would exceed 500 points',

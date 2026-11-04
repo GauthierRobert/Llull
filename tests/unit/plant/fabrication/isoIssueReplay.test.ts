@@ -7,10 +7,12 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import type { CadDocument, FeatureStep } from '@core/model/types';
 import { fabricationErrors } from '@aec/plant/fabrication/validate';
 import { apply, data } from '../../../helpers/commandAssertions';
 import { loadedL101 } from './isoM2Fixtures';
+import { expectBoundToDocument } from '../../../helpers/documentBinding';
 
 const AT = '2026-11-02T09:30:00Z';
 const port: HumanSignaturePort = { verify: () => ({ signer: 'alice', signatureId: 'sig-1' }) };
@@ -29,9 +31,22 @@ const reviewRequired = (doc: CadDocument): boolean =>
   data<{ reviewRequired: boolean }>(doc, 'export_isometric', { lineId: 'L-101' }).reviewRequired;
 const stepOf = (doc: CadDocument, name: string): FeatureStep | undefined => doc.featureHistory.find((step) => step.name === name);
 const payloadFor = (basisSha256: string, at: string): string =>
-  humanGatePayload('plant:issue_isometric', ['L-101'], { revision: 'A', purpose: 'for_construction', basisSha256, at }, 'n1');
+  humanGatePayload(
+    'plant:issue_isometric',
+    ['L-101'],
+    withDocumentUid({ revision: 'A', purpose: 'for_construction', basisSha256, at }, numberedDoc()),
+    'n1',
+  );
 
 describe('issue_isometric: recorded stamp', () => {
+  it('a signature made for one document does not verify in a copy of it (GATE-UID)', () => {
+    expectBoundToDocument(
+      numberedDoc(),
+      (document, confirmation, withSigner) => execute(document, 'issue_isometric', { ...params, confirmation }, withSigner),
+      'ISO_HUMAN_GATE',
+    );
+  });
+
   it('stores the host time and the signed payload hash, and the history keeps no signature', () => {
     const doc = issued();
     const issue = Object.values(doc.plant?.fabrication?.issues ?? {})[0];
@@ -43,9 +58,9 @@ describe('issue_isometric: recorded stamp', () => {
 
   it('the time is part of the signed payload: a signature made for another time does not issue', () => {
     const basis = Object.values(issued().plant?.fabrication?.issues ?? {})[0]?.basisSha256 ?? '';
+    const wanted = payloadFor(basis, '2001-01-01T00:00:00Z');
     const strict: HumanSignaturePort = {
-      verify: (_signature, payload) =>
-        payload === payloadFor(basis, '2001-01-01T00:00:00Z') ? { signer: 'alice', signatureId: 'sig-1' } : null,
+      verify: (_signature, payload) => (payload === wanted ? { signer: 'alice', signatureId: 'sig-1' } : null),
     };
     const numbered = numberedDoc();
     const result = execute(numbered, 'issue_isometric', { ...params, confirmation: { nonce: 'n1' } }, { ...ctx, humanSignature: strict });
