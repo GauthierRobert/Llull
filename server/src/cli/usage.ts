@@ -103,7 +103,9 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
                               asset in $LLULL_SCAN_CACHE (~/.llull/cache/pointcloud); prints assetKey; then attach_point_cloud
                               assetKey=KEY. scan list = the stored assets. Toolset scan (llull list scan)
   register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
-                              import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load`;
+                              import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
+  (piping libraries)          copy an llull-piping-catalog file to $LLULL_PIPING_LIBRARIES_DIR (~/.llull/piping-libraries)/ID@VERSION.llull-piping.json;
+                              then import_piping_library libraryId=ID version=VERSION (a missing file answers PSC_LIBRARY_UNRESOLVED)`;
 
 const PLM = `PLM (09): signing keys, releases, LOTAR, the local vault, the audit chain
   keys list | create --user ID --name NAME | revoke KEYID   enroll a local signing key (09 PLM; $LLULL_KEYS_DIR, default ~/.llull/keys;
