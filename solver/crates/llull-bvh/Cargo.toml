@@ -8,8 +8,8 @@ publish.workspace = true
 
 [dependencies]
 llull-jsmath = { path = "../llull-jsmath" }
-
-[dev-dependencies]
+llull-protocol = { path = "../llull-protocol" }
+serde.workspace = true
 serde_json.workspace = true
 
 [lints]

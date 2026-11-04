@@ -8,6 +8,7 @@
 
 import { getGeometryKernel } from '../geometry/kernel';
 import { getGeometryQueryEngine } from '../geometry/geometryQueries';
+import { getSpatialIndex } from '../geometry/spatialIndex';
 import { getMeshProcessingEngine } from '../geometry/mesh/engine';
 import { getFieldEngine } from '../geometry/field/engine';
 import { getPhysicsEngine } from '../dynamics/physicsEngine';
@@ -47,6 +48,7 @@ export function defaultContext(): ExecutionContext {
     kernel,
     physics: getPhysicsEngine(),
     geometryQueries: getGeometryQueryEngine(),
+    spatialIndex: getSpatialIndex(),
     meshProcessing: getMeshProcessingEngine(),
     fieldEngine: getFieldEngine(),
     libraries: getMaterialLibraryProvider(),

@@ -17,6 +17,7 @@ llull-voxfe = { path = "../../crates/llull-voxfe", default-features = false }
 llull-stats = { path = "../../crates/llull-stats" }
 llull-panel = { path = "../../crates/llull-panel" }
 llull-explicit = { path = "../../crates/llull-explicit" }
+llull-bvh = { path = "../../crates/llull-bvh" }
 llull-geomq = { path = "../../crates/llull-geomq" }
 llull-field = { path = "../../crates/llull-field" }
 llull-meshops = { path = "../../crates/llull-meshops", features = ["quad"] }

@@ -26,6 +26,7 @@ async function prepareKernel(): Promise<void> {
     { installPhysicsEngine },
     { installRasterPort },
     { installGeometryQueryEngine },
+    { installSpatialIndex },
     { installFieldEngine },
     { setMeshAssetPort },
     { defaultMeshAssetStore },
@@ -37,6 +38,7 @@ async function prepareKernel(): Promise<void> {
     import('../physicsEngine'),
     import('../native/rasterPort'),
     import('../native/geometryQueryEngine'),
+    import('../native/spatialIndexPort'),
     import('../native/fieldEngine'),
     import('@core/geometry/mesh/assets'),
     import('../meshAssets/store'),
@@ -46,6 +48,7 @@ async function prepareKernel(): Promise<void> {
   ]);
   installRasterPort();
   installGeometryQueryEngine();
+  installSpatialIndex();
   installFieldEngine();
   setMeshAssetPort(defaultMeshAssetStore());
   installArtifactPort(defaultFeArtifactStore());

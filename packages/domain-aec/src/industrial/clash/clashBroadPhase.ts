@@ -6,7 +6,8 @@
  */
 
 import type { Vec3 } from '@core/model/types';
-import { buildInstanceBvh, packBoxes } from '@core/geometry/instanceBvh';
+import { packBoxes } from '@core/geometry/instanceBvh';
+import { type SpatialIndexPort, resolveSpatialIndex } from '@core/geometry/spatialIndex';
 import { type OrientedBox, boxExtent } from './clashBoxes';
 
 const EXTENT_MARGIN = 1e-6;
@@ -28,10 +29,12 @@ const inflate = (value: Vec3, sign: 1 | -1): Vec3 => [
 /**
  * @invariant null (caller scans every solid) when any extent is not finite; otherwise `nearBox` never misses a touching solid
  */
-export function solidIndex(boxes: readonly OrientedBox[]): SolidIndex | null {
+export function solidIndex(boxes: readonly OrientedBox[], spatialIndex?: SpatialIndexPort | null): SolidIndex | null {
   const extents = boxes.map((box) => boxExtent(box));
   if (!extents.every(({ min, max }) => min.every(Number.isFinite) && max.every(Number.isFinite))) return null;
-  const bvh = buildInstanceBvh(packBoxes(extents.map(({ min, max }) => ({ min: inflate(min, -1), max: inflate(max, 1) }))));
+  const bvh = resolveSpatialIndex(spatialIndex).build(
+    packBoxes(extents.map(({ min, max }) => ({ min: inflate(min, -1), max: inflate(max, 1) }))),
+  );
   return {
     nearBox: (box) => {
       const { min, max } = boxExtent(box);

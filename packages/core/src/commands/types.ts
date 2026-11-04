@@ -7,6 +7,7 @@ import type { CadDocument } from '../model/types';
 import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
 import type { GeometryQueryEngine } from '../geometry/geometryQueries';
+import type { SpatialIndexPort } from '../geometry/spatialIndex';
 import type { MeshProcessingEngine } from '../geometry/mesh/engineTypes';
 import type { FieldEngine } from '../geometry/field/engineTypes';
 import type { SurfaceAnalysisEngine } from '../geometry/surfaceAnalysis/types';
@@ -240,6 +241,8 @@ export interface ExecutionContext {
   readonly physics?: PhysicsEngine | null;
   /** Batch mesh-query engine (distance / ray / occlusion, TR-FPR-19); null/absent = the default `meshBvh` engine. */
   readonly geometryQueries?: GeometryQueryEngine | null;
+  /** Instance-BVH builder (plant 09 VIS-M8e; `render_stats`, `check_clashes` broad phase); null/absent = the TypeScript build. */
+  readonly spatialIndex?: SpatialIndexPort | null;
   /** Extra mesh-processing engine (Manifold, native; 07 MSH TR-MSH-02); null/absent = the built-in TypeScript engine alone (ops it lacks refuse with MESH_ENGINE_UNSUPPORTED). */
   readonly meshProcessing?: MeshProcessingEngine | null;
   /** Implicit-field engine (tape evaluation, interval-pruned meshing, measures; 05 IMP TR-IMP-02); null/absent = the built-in TypeScript engine. */

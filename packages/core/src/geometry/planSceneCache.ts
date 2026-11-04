@@ -8,8 +8,9 @@
  */
 
 import type { CadDocument } from '../model/types';
-import { buildInstanceBvh, packBoxes, type InstanceBvh } from './instanceBvh';
+import { packBoxes, type InstanceBvh } from './instanceBvh';
 import { type InstanceQuery, type PlanScene, planScene } from './renderPlan';
+import { type SpatialIndexPort, resolveSpatialIndex } from './spatialIndex';
 
 /**
  * Instance count from which a document asked about twice gets the BVH frustum query (VIS-M7, 09 spec §12.13). The brute-force scan costs
@@ -32,6 +33,7 @@ let bvhSlot: { readonly entry: SceneEntry; readonly bvh: InstanceBvh } | null = 
 export function planSceneOf(
   doc: CadDocument,
   threshold: number = BVH_QUERY_THRESHOLD,
+  spatialIndex?: SpatialIndexPort | null,
 ): { readonly scene: PlanScene; readonly query: InstanceQuery | undefined } {
   let entry = entries.get(doc);
   if (entry === undefined) {
@@ -41,7 +43,8 @@ export function planSceneOf(
   entry.calls++;
   const { scene } = entry;
   if (scene.instances.length < threshold || (bvhSlot?.entry !== entry && entry.calls < 2)) return { scene, query: undefined };
-  if (bvhSlot?.entry !== entry) bvhSlot = { entry, bvh: buildInstanceBvh(packBoxes(scene.instances.map((instance) => instance.aabb))) };
+  if (bvhSlot?.entry !== entry)
+    bvhSlot = { entry, bvh: resolveSpatialIndex(spatialIndex).build(packBoxes(scene.instances.map((instance) => instance.aabb))) };
   const { bvh } = bvhSlot;
   return { scene, query: (planes) => bvh.frustumQuery(planes) };
 }

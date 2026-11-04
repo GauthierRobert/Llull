@@ -116,8 +116,8 @@ export const renderStats = defineCommand({
       .optional()
       .describe('Count unique-geometry batches with WEBGL_multi_draw (one call per material class). Default true.'),
   }),
-  run: (doc, params): CommandResult => {
-    const { scene, query } = planSceneOf(doc);
+  run: (doc, params, ctx): CommandResult => {
+    const { scene, query } = planSceneOf(doc, undefined, ctx?.spatialIndex);
     const camera = cameraOf(doc, scene, params);
     if ('code' in camera)
       return codedRejection(doc, 'render_stats', camera.code, camera.message, REMEDIATION[camera.code] ?? '', [], [camera.path]);
