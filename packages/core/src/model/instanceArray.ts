@@ -34,7 +34,7 @@ export interface InstanceArray {
 /** Id of member `index` of array `arrayId` (what `planScene`, `render_stats` and picks show): `<arrayId>#<index>`. */
 export const instanceMemberId = (arrayId: string, index: number): string => `${arrayId}#${index}`;
 
-/** Inverse of `instanceMemberId`; null when `id` is not a member id (an Entity id never contains `#`). */
+/** Inverse of `instanceMemberId`; null when `id` has no `<arrayId>#<index>` shape (load refuses an Entity id naming a member of one of the document's arrays). */
 export function parseInstanceMemberId(id: string): { readonly arrayId: string; readonly index: number } | null {
   const at = id.lastIndexOf('#');
   if (at <= 0) return null;

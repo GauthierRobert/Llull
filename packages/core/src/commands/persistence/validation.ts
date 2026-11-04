@@ -1,5 +1,6 @@
 import { type CadDocument, type Component, type JointKind, CONSTRAINT_KINDS } from '../../model/types';
 import { DOCUMENT_UID_PATTERN } from '../../model/documentUid';
+import { parseInstanceMemberId } from '../../model/instanceArray';
 import { isStringArray } from '../../lib/isStringArray';
 import { findComponentCycle } from '../assembly/assemblies';
 import { isRecord } from '../../lib/isRecord';
@@ -205,8 +206,11 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
     errors.push('uid must be a 32-hex string');
   const entities = v['entities'] as Record<string, unknown>;
   const layers = v['layers'] as Record<string, unknown>;
+  const arrays = isRecord(v['instanceArrays']) ? v['instanceArrays'] : {};
   for (const [eid, entity] of Object.entries(entities)) {
-    if (eid.includes('#')) errors.push(`entity id '${eid}' contains '#', which is reserved for instance-array member ids`);
+    const member = parseInstanceMemberId(eid);
+    if (member !== null && Object.hasOwn(arrays, member.arrayId))
+      errors.push(`entity id '${eid}' is a member id of instance array '${member.arrayId}'`);
     const err = validateEntityValue(entity);
     if (err !== null) errors.push(err);
     else {

@@ -344,14 +344,23 @@ describe('add_instance_array overflow and property', () => {
 });
 
 describe('entity ids and member ids', () => {
-  it('a loaded document with an entity id containing # is refused', () => {
-    const doc = apply(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
-    const id = doc.order[0]!;
+  const renamed = (doc: CadDocument, from: string, to: string): Record<string, unknown> => {
     const raw = JSON.parse(serializeDocument(doc)).document as Record<string, unknown>;
     const entities = raw['entities'] as Record<string, Record<string, unknown>>;
-    entities['e#1'] = { ...entities[id]!, id: 'e#1' };
-    delete entities[id];
-    raw['order'] = ['e#1'];
-    expect(validateDocumentValues(raw).join('\n')).toContain("contains '#'");
+    entities[to] = { ...entities[from]!, id: to };
+    delete entities[from];
+    raw['order'] = (raw['order'] as string[]).map((id) => (id === from ? to : id));
+    return raw;
+  };
+
+  it('a loaded document with an entity id naming a member of one of its arrays is refused', () => {
+    const doc = ok(withBolt(), 'add_instance_array', GRID).document;
+    const member = `${arrayOf(doc).id}#1`;
+    expect(validateDocumentValues(renamed(doc, doc.order[0]!, member)).join('\n')).toContain(`is a member id of instance array`);
+  });
+
+  it('old documents with # in entity ids (v1 / v2 "#3:axis") still load when no array claims them', () => {
+    const doc = apply(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
+    for (const id of ['#3:axis', '#1', 'e#1']) expect(validateDocumentValues(renamed(doc, doc.order[0]!, id))).toEqual([]);
   });
 });
