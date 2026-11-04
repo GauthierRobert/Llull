@@ -7,6 +7,7 @@
 
 pub mod geometry;
 pub mod instance;
+pub mod job;
 
 use llull_jsmath::hypot;
 

@@ -14,6 +14,7 @@ import { atLevel } from '../evaluate';
 import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
 import { CLASH_BVH_THRESHOLD, solidIndex } from './clashBroadPhase';
+import type { SpatialIndexPort } from '@core/geometry/spatialIndex';
 import { externalClashes } from './clashPlant';
 import { externalBodies } from './clashSources';
 import { STAIR_HEADROOM_MM, slabPenetrations, stairPenetrations } from './clashSlabs';
@@ -131,6 +132,7 @@ export function findClashes(
   levelIds: ReadonlySet<string> | null,
   tolerance: number,
   bvhThreshold: number = CLASH_BVH_THRESHOLD,
+  spatialIndex?: SpatialIndexPort | null,
 ): Clash[] {
   const building = getBuilding(doc);
   const solids: Solid[] = [];
@@ -144,7 +146,13 @@ export function findClashes(
     const existing = found.get(key);
     if (!existing || existing.depth < clash.depth) found.set(key, clash);
   };
-  const index = solids.length >= bvhThreshold ? solidIndex(solids.map((solid) => solid.box)) : null;
+  const index =
+    solids.length >= bvhThreshold
+      ? solidIndex(
+          solids.map((solid) => solid.box),
+          spatialIndex,
+        )
+      : null;
   for (let i = 0; i < solids.length; i++) {
     const candidates = index?.nearBox((solids[i] as Solid).box);
     for (let k = 0; k < (candidates?.length ?? solids.length - i - 1); k++) {
@@ -221,13 +229,13 @@ export const checkClashes = defineCommand({
     levelId: z.string().optional().describe('Only this level. Default: the whole building.'),
     tolerance: z.number().optional().describe('Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.'),
   }),
-  run: (doc, { levelId, tolerance }): CommandResult => {
+  run: (doc, { levelId, tolerance }, ctx): CommandResult => {
     const building = getBuilding(doc);
     const unknownLevel = unknownLevelFailure(doc, 'check_clashes', levelId);
     if (unknownLevel) return unknownLevel;
     const resolvedTolerance = tolerance ?? fromMm(doc, 5);
     if (!(resolvedTolerance >= 0)) return noop(doc, 'check_clashes failed: tolerance must be >= 0.');
-    const clashes = findClashes(doc, levelId !== undefined ? new Set([levelId]) : null, resolvedTolerance);
+    const clashes = findClashes(doc, levelId !== undefined ? new Set([levelId]) : null, resolvedTolerance, undefined, ctx?.spatialIndex);
     const describe = (clash: Clash): string => {
       const [a, b] = [building.elements[clash.a], building.elements[clash.b]];
       return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${formatDepthMm(toMm(doc, clash.depth))} mm)`;

@@ -12,6 +12,7 @@ import { defaultFeArtifactStore } from './fea/artifactStore';
 import { installFieldEngine } from './native/fieldEngine';
 import { defaultMeshAssetStore } from './meshAssets/store';
 import { installGeometryQueryEngine } from './native/geometryQueryEngine';
+import { installSpatialIndex } from './native/spatialIndexPort';
 import { flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
 import { killAllChildren } from './childProcesses';
 import { checkBindSafety } from './security';
@@ -71,6 +72,7 @@ export async function startServer(app: Express, port: number, host: string): Pro
   installRasterPort();
   installFontProvider();
   installGeometryQueryEngine();
+  installSpatialIndex();
   setMeshAssetPort(defaultMeshAssetStore());
   installArtifactPort(defaultFeArtifactStore());
   installFieldEngine();
