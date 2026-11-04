@@ -174,7 +174,11 @@ export function collectExportTriangles(
 export function exportSummary(
   command: string,
   format: string,
-  { tris, skipped2D, unknownIds }: ReturnType<typeof collectExportTriangles>,
+  {
+    tris,
+    skipped2D,
+    unknownIds,
+  }: Pick<ReturnType<typeof collectExportTriangles>, 'skipped2D' | 'unknownIds'> & { tris: { readonly length: number } },
 ): string {
   const parts = [`${command}: ${tris.length} triangle${tris.length !== 1 ? 's' : ''} exported (format=${format}).`];
   if (skipped2D > 0) parts.push(`${skipped2D} non-solid entit${skipped2D !== 1 ? 'ies' : 'y'} (2D shapes, 3D curves) skipped.`);

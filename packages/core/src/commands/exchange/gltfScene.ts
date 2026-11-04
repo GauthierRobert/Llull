@@ -6,21 +6,22 @@
  * face colours (set_face_color) split it into one part per colour.
  */
 
-import type { CadDocument, Entity, MaterialFinish, Vec3 } from '../../model/types';
+import type { CadDocument, Component, Entity, InstanceEntity, MaterialFinish, Vec3 } from '../../model/types';
 import { decalPatch } from '../../geometry/decal';
 import { decalImage } from '../../geometry/decalImage';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
-import { dot3, vec3At } from '../../lib/vec3';
+import { ORIGIN, dot3, vec3At } from '../../lib/vec3';
 import { parseHexRgb } from '../../lib/isHexColor';
 import { boxUv, finishMaps } from '../../geometry/finishMaps';
 import { encodePng } from '../../lib/png';
 import { GltfBuilder } from './gltfBuilder';
 import type { Triangle } from '../../geometry/triangles';
 import { facetNormal } from '../../geometry/tessellation';
-import { expandInstance } from '../../geometry/instanceExpansion';
+import { UNIT_SCALE, expandInstance } from '../../geometry/instanceExpansion';
 import { localTriangles, solidTriangles } from '../../geometry/solidTriangles';
 import { toRadians } from '../../lib/angle';
 import { faceColorTriangles } from '../../geometry/faceColors';
+import { InstanceTransforms } from './gltfInstancing';
 import { indexedMesh, placementMatrix, positionKey, sharedGeometryGroups } from './gltfMeshData';
 
 /** Metalness / roughness of a solid without an assigned material (matches the viewport). */
@@ -73,43 +74,104 @@ function faceColorGroups(solid: Entity): Map<string | undefined, number[]> | nul
   return groups;
 }
 
-/** Exported parts of the entities named by `ids` (instances expand into one part per child; 2D and empty parts are dropped). */
-export function collectSceneParts(doc: CadDocument, ids: readonly string[]): ScenePart[] {
+/** The parts of one 3D solid: itself, or one per face colour of a mesh solid; its triangles are in the frame the solid is placed in. */
+function partsOfSolid(name: string, entityId: string, solid: Entity, appearance: PartAppearance): ScenePart[] {
+  const tris = solidTriangles(solid);
+  if (tris.length === 0) return [];
+  const localTris = localTriangles(solid);
+  const placement = { position: solid.position, rotation: solid.rotation };
+  const groups = faceColorGroups(solid);
+  if (groups === null) return [{ name, entityId, kind: solid.kind, tris, localTris, appearance, placement }];
   const parts: ScenePart[] = [];
-  const add = (name: string, entityId: string, solid: Entity, appearance: PartAppearance): void => {
-    const tris = solidTriangles(solid);
-    if (tris.length === 0) return;
-    const localTris = localTriangles(solid);
-    const placement = { position: solid.position, rotation: solid.rotation };
-    const groups = faceColorGroups(solid);
-    if (groups === null) {
-      parts.push({ name, entityId, kind: solid.kind, tris, localTris, appearance, placement });
-      return;
+  for (const [color, indices] of groups) {
+    const pick = <T>(list: readonly T[]): T[] => indices.map((t) => list[t] as T);
+    const { metalness, roughness } = appearance;
+    parts.push({
+      name: color === undefined ? name : `${name}/face ${color}`,
+      entityId,
+      kind: solid.kind,
+      tris: pick(tris),
+      localTris: pick(localTris),
+      appearance: color === undefined ? appearance : { name: color, color, metalness, roughness },
+      placement,
+    });
+  }
+  return parts;
+}
+
+/** One prototype drawn by many instances (EXT_mesh_gpu_instancing): `part.tris` are in the component frame, `transforms` place each copy. */
+export interface InstanceBucket {
+  readonly part: ScenePart;
+  /** Instance entity ids, in transform order. */
+  readonly entityIds: string[];
+  readonly transforms: InstanceTransforms;
+}
+
+/** Where `collectSceneParts` puts the instance entities it keeps unexpanded (gpu instancing); `groupOf` splits buckets by entity group. */
+export interface InstancingSink {
+  readonly buckets: InstanceBucket[];
+  readonly groupOf: GroupOf;
+}
+
+/** An instance whose component can be drawn as buckets: it exists and no scale component is zero, negative (mirroring) or non-finite. */
+function bucketable(instance: InstanceEntity, component: Component | undefined): component is Component {
+  return component !== undefined && (instance.scale ?? UNIT_SCALE).every((c) => Number.isFinite(c) && c > 0);
+}
+
+/** Adds `instance` to the buckets of its component's children (a prototype is tessellated once, then reused by every instance). */
+function addToBuckets(
+  doc: CadDocument,
+  instance: InstanceEntity,
+  component: Component,
+  sink: InstancingSink,
+  prototypes: Map<string, InstanceBucket[]>,
+): void {
+  const label = instance.name ?? instance.id;
+  const group = sink.groupOf(instance.id)?.id ?? '';
+  for (const childId of component.order) {
+    const child = component.entities[childId];
+    if (child === undefined) continue;
+    const key = `${instance.componentId}|${childId}|${instance.materialId ?? ''}|${group}`;
+    let buckets = prototypes.get(key);
+    if (buckets === undefined) {
+      const name = `${label}/${child.name ?? child.id}`;
+      buckets = partsOfSolid(name, instance.id, child, appearanceOf(doc, child, instance.materialId)).map((part) => ({
+        part,
+        entityIds: [],
+        transforms: new InstanceTransforms(),
+      }));
+      prototypes.set(key, buckets);
+      sink.buckets.push(...buckets);
     }
-    for (const [color, indices] of groups) {
-      const pick = <T>(list: readonly T[]): T[] => indices.map((t) => list[t] as T);
-      const { metalness, roughness } = appearance;
-      parts.push({
-        name: color === undefined ? name : `${name}/face ${color}`,
-        entityId,
-        kind: solid.kind,
-        tris: pick(tris),
-        localTris: pick(localTris),
-        appearance: color === undefined ? appearance : { name: color, color, metalness, roughness },
-        placement,
-      });
+    for (const bucket of buckets) {
+      bucket.entityIds.push(instance.id);
+      bucket.transforms.add(instance.position, instance.rotation, instance.scale ?? UNIT_SCALE);
     }
-  };
+  }
+}
+
+/**
+ * Exported parts of the entities named by `ids` (instances expand into one part per child; 2D and empty parts are dropped). With `sink`,
+ * instances that can be drawn as buckets go there instead of expanding; the others still expand.
+ */
+export function collectSceneParts(doc: CadDocument, ids: readonly string[], sink?: InstancingSink): ScenePart[] {
+  const parts: ScenePart[] = [];
+  const prototypes = new Map<string, InstanceBucket[]>();
   for (const id of ids) {
     const entity = doc.entities[id];
     if (entity === undefined) continue;
     const label = entity.name ?? entity.id;
-    if (entity.kind !== 'instance') add(label, id, entity, appearanceOf(doc, entity));
-    else {
-      const component = doc.components[entity.componentId];
-      for (const child of component === undefined ? [] : expandInstance(entity, component))
-        add(`${label}/${child.name ?? child.id}`, entity.id, child, appearanceOf(doc, child, entity.materialId));
+    if (entity.kind !== 'instance') {
+      parts.push(...partsOfSolid(label, id, entity, appearanceOf(doc, entity)));
+      continue;
     }
+    const component = doc.components[entity.componentId];
+    if (sink !== undefined && bucketable(entity, component)) {
+      addToBuckets(doc, entity, component, sink, prototypes);
+      continue;
+    }
+    for (const child of component === undefined ? [] : expandInstance(entity, component))
+      parts.push(...partsOfSolid(`${label}/${child.name ?? child.id}`, entity.id, child, appearanceOf(doc, child, entity.materialId)));
   }
   return parts;
 }
@@ -207,6 +269,28 @@ function boxUvs(tris: readonly Triangle[], scale: number): Float32Array {
   return uvs;
 }
 
+/** Per part: the instanced group (members in part order) it belongs to — parts of one shared mesh in the same entity group, 2 or more. */
+function instancedGroups(
+  parts: readonly ScenePart[],
+  shareGroup: readonly (number | undefined)[],
+  groupOf: GroupOf,
+): ({ members: number[] } | undefined)[] {
+  const byKey = new Map<string, { members: number[] }>();
+  parts.forEach((part, p) => {
+    const share = shareGroup[p];
+    if (share === undefined || part.placement === undefined) return;
+    const key = `${share}|${groupOf(part.entityId)?.id ?? ''}`;
+    const bucket = byKey.get(key);
+    if (bucket === undefined) byKey.set(key, { members: [p] });
+    else bucket.members.push(p);
+  });
+  return parts.map((_, p) => {
+    const share = shareGroup[p];
+    const bucket = share === undefined ? undefined : byKey.get(`${share}|${groupOf(parts[p]?.entityId ?? '')?.id ?? ''}`);
+    return bucket !== undefined && bucket.members.length >= 2 ? bucket : undefined;
+  });
+}
+
 /** glTF material of an appearance; a finish embeds its maps (+ clearcoat extension). */
 function materialOf(builder: GltfBuilder, appearance: PartAppearance): Record<string, unknown> {
   const maps = finishMaps(appearance);
@@ -246,7 +330,8 @@ export function buildGltfScene(
   parts: readonly ScenePart[],
   decals: readonly DecalPart[] = [],
   groupOf: GroupOf = () => undefined,
-): { json: Record<string, unknown>; bin: Uint8Array; nodeCount: number; materialCount: number } {
+  gpu?: { readonly buckets: readonly InstanceBucket[] },
+): { json: Record<string, unknown>; bin: Uint8Array; nodeCount: number; materialCount: number; instanceCount: number } {
   const builder = new GltfBuilder();
   const groupNodes = new Map<string, number>();
   const parentOf = (entityId: string): number | undefined => {
@@ -274,11 +359,33 @@ export function buildGltfScene(
     if (data.uvs !== undefined) attributes['TEXCOORD_0'] = builder.vertexData(data.uvs, 2);
     return builder.addMesh(part.name, attributes, material, builder.indexData(data.indices));
   };
+  /** gpu: parts sharing a mesh (and entity group) become one instanced node; the first member emits it, the others are skipped. */
+  const bucketOf = gpu === undefined ? [] : instancedGroups(parts, shareGroup, groupOf);
+  let instanceCount = 0;
   parts.forEach((part, p) => {
     const { appearance } = part;
     const material = builder.material(appearanceKeys[p] ?? '', () => materialOf(builder, appearance));
     const extras = { llullId: part.entityId, kind: part.kind };
     const group = shareGroup[p];
+    const bucket = bucketOf[p];
+    if (bucket !== undefined) {
+      if (bucket.members[0] !== p) return;
+      const transforms = new InstanceTransforms();
+      for (const m of bucket.members) {
+        const { position, rotation } = parts[m]?.placement ?? { position: ORIGIN, rotation: ORIGIN };
+        transforms.add(position, rotation);
+      }
+      instanceCount += bucket.members.length;
+      const ids = bucket.members.map((m) => parts[m]?.entityId ?? '');
+      builder.instancedNode(
+        part.name,
+        partMesh(part, part.localTris, material),
+        { llullIds: ids, kind: part.kind, instanceCount: ids.length },
+        transforms.packed(),
+        parentOf(part.entityId),
+      );
+      return;
+    }
     if (group === undefined || part.placement === undefined) {
       builder.meshNode(part.name, partMesh(part, part.tris, material), extras, parentOf(part.entityId));
       return;
@@ -287,6 +394,17 @@ export function buildGltfScene(
     sharedMeshes.set(group, mesh);
     builder.meshNode(part.name, mesh, extras, parentOf(part.entityId), placementMatrix(part.placement.position, part.placement.rotation));
   });
+  for (const { part, entityIds, transforms } of gpu?.buckets ?? []) {
+    const material = builder.material(JSON.stringify(part.appearance), () => materialOf(builder, part.appearance));
+    instanceCount += entityIds.length;
+    builder.instancedNode(
+      part.name,
+      partMesh(part, part.tris, material),
+      { llullIds: entityIds, kind: part.kind, instanceCount: entityIds.length },
+      transforms.packed(),
+      parentOf(part.entityId),
+    );
+  }
   decals.forEach((decal, index) => {
     const material = builder.material(`decal:${index}`, () => ({
       name: decal.name,
@@ -318,5 +436,5 @@ export function buildGltfScene(
       parentOf(decal.entityId),
     );
   });
-  return builder.result();
+  return { ...builder.result(), instanceCount };
 }
