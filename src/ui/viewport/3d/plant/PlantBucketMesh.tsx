@@ -9,6 +9,7 @@ import { useTintStore } from '@ui/store/tintStore';
 import { isAdditiveSelect } from '../../selectClick';
 import { XRAY_OPACITY } from '../../viewportPalette';
 import { useBatchCapacity } from '../InstancedRenderer';
+import { useRenderQuality } from '../useRenderQuality';
 import type { LodGeometryCache } from './LodGeometryCache';
 import { type DrawBucket, entityIdAt } from './plantBatchPlan';
 import { writeBucketColours } from './plantInstanceColours';
@@ -37,6 +38,7 @@ export function PlantBucketMesh({
 }: PlantBucketMeshProps): React.ReactElement | null {
   // Tints rewrite the colour buffer only (no plan, no matrix rewrite); read here so small documents never render this component.
   const tints = useTintStore((s) => s.tints);
+  const { keyShadows, plantShadowMaxLod } = useRenderQuality();
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = bucket.ids.length;
   const capacity = useBatchCapacity(count);
@@ -82,8 +84,8 @@ export function PlantBucketMesh({
       args={[geometry, material, capacity]}
       count={count}
       onClick={handleClick}
-      castShadow={bucket.lod < 2}
-      receiveShadow
+      castShadow={bucket.lod <= plantShadowMaxLod}
+      receiveShadow={keyShadows}
     />
   );
 }

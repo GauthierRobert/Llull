@@ -7,6 +7,8 @@ import { DeformOverlayControl, DeformOverlayPopover } from './overlays/DeformOve
 import { ImplicitPreviewControl, ImplicitPreviewNote } from './implicitPreview/ImplicitPreviewControl';
 import { WrapOverlayControl, WrapOverlayPopover } from './overlays/WrapOverlayControl';
 import { BlendOverlayControl, BlendOverlayPopover } from './overlays/BlendOverlayControl';
+import { RealismControl } from './RealismControl';
+import { NavigationModeControl } from './navigation/NavigationModeControl';
 import { NumberField } from '@ui/components/NumberField';
 import { type SurfaceMapChoice, useSurfaceOverlayStore } from '@ui/store/surfaceOverlayStore';
 
@@ -306,10 +308,13 @@ export function ViewportControls(): React.ReactElement {
       <div className="vp-toolbar">
         <DisplayModeControl />
         <Divider />
+        <NavigationModeControl />
+        <Divider />
         <SectionToggle />
         <Snap3DToggle />
         <Divider />
         <QualityControl />
+        <RealismControl />
         <Divider />
         <SurfaceOverlayControl />
         <DeformOverlayControl />
