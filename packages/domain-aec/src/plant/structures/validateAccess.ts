@@ -141,6 +141,9 @@ export function accessElementErrors(key: string, element: Record<string, unknown
     if (!(Array.isArray(boundary) && boundary.length >= 3 && boundary.every(isPoint)))
       errors.push(`building element ${key}: boundary must be a polygon of ≥ 3 [x, y] points`);
     if (typeof element['gratingType'] !== 'string') errors.push(`building element ${key}: gratingType must be a string`);
+    const load = element['imposedLoadKPa'];
+    if (load !== undefined && !(isFiniteNumber(load) && load >= 0))
+      errors.push(`building element ${key}: imposedLoadKPa must be a finite number >= 0`);
     const sides = element['supportIds'];
     if (!(Array.isArray(sides) && sides.length === 2 && sides.every((side) => isStringArray(side) && side.length > 0)))
       errors.push(`building element ${key}: supportIds must list the member ids of two support sides`);

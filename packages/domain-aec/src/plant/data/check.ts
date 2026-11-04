@@ -1,7 +1,7 @@
 /**
  * `check_plant_data` rules (plant 08 DAT §5.13, TR-DAT-30), the MVP set of M1: tag format and uniqueness, required properties, line ends, line size,
- * orphans, unclassified elements, hierarchy, unverified values, reserved tags, and the tag the model object still carries. Port and nozzle rules
- * (DAT_OPEN_PORT, DAT_INFERRED_NOZZLE) arrive with the IFC ports and the nozzle schedule (M2 / M3).
+ * orphans, unclassified elements, hierarchy, unverified values, reserved tags, and the tag the model object still carries, plus the two port rules:
+ * DAT_OPEN_PORT (a line end that names nothing and is attached to nothing) and DAT_INFERRED_NOZZLE (a nozzle only inferred from a line end).
  * @invariant a pure function of the document; findings are ordered by rule, then by natural tag order
  */
 
@@ -13,6 +13,8 @@ import { getPlantData, type PlantDataModel, type PlantObject } from './model';
 import { naturalCompare } from './naturalSort';
 import { expectedTag } from './objectTag';
 import { allProviders, elementOf } from './providers';
+import { isOpenEnd } from './openPort';
+import { inferredNozzles } from './plantReports/inferNozzles';
 import { duplicateTags, objectRegistry } from './registry';
 
 const RULE_ORDER = [
@@ -22,10 +24,12 @@ const RULE_ORDER = [
   'DAT_TAG_CASE_COLLISION',
   'DAT_REQUIRED_PROPERTY_MISSING',
   'DAT_LINE_END_UNRESOLVED',
+  'DAT_OPEN_PORT',
   'DAT_LINE_SIZE_MISMATCH',
   'DAT_TAG_MODEL_MISMATCH',
   'DAT_OBJECT_ORPHAN',
   'DAT_UNCLASSIFIED_ELEMENT',
+  'DAT_INFERRED_NOZZLE',
   'DAT_VALUE_UNVERIFIED',
   'DAT_RESERVED_TAG_UNMODELLED',
 ];
@@ -126,6 +130,16 @@ function lineFindings(doc: CadDocument, data: PlantDataModel, line: PlantObject)
           [`${line.tag}.${end}`],
         ),
       );
+    else if (status === 'unset' && isOpenEnd(doc, line, end))
+      findings.push(
+        datFinding(
+          'DAT_OPEN_PORT',
+          'warn',
+          `line ${line.tag}: its ${end} end is open (no ${end} named and nothing attached)`,
+          idsOf(doc, line),
+          [`${line.tag}.${end}`],
+        ),
+      );
     else if (status === 'unset')
       findings.push(
         datFinding('DAT_LINE_END_UNRESOLVED', 'warn', `line ${line.tag} has no ${end}`, idsOf(doc, line), [`${line.tag}.${end}`]),
@@ -187,6 +201,20 @@ function unclassified(doc: CadDocument, data: PlantDataModel): DataFinding[] {
   );
 }
 
+function inferredFindings(doc: CadDocument, included: (id: string) => boolean): DataFinding[] {
+  return inferredNozzles(doc)
+    .filter(({ line }) => included(line.id))
+    .map(({ equipment, name, line, end }) =>
+      datFinding(
+        'DAT_INFERRED_NOZZLE',
+        'info',
+        `nozzle ${equipment.mark}/${name} is inferred from the ${end} end of line ${line.tag} (the equipment has no 03 EQP nozzle)`,
+        [equipment.id, line.id],
+        [`${equipment.mark}/${name}`],
+      ),
+    );
+}
+
 const rank = (finding: DataFinding): number => RULE_ORDER.indexOf(finding.code);
 
 export function checkFindings(doc: CadDocument, scope: CheckScope): DataFinding[] {
@@ -197,6 +225,7 @@ export function checkFindings(doc: CadDocument, scope: CheckScope): DataFinding[
     const object = data.objects[id];
     if (object !== undefined && included(id)) findings.push(...objectFindings(doc, data, object));
   }
+  if (data.objectOrder.length > 0) findings.push(...inferredFindings(doc, included));
   findings.push(...tagFindings(data, (ids) => ids.some(included)));
   if (scope.objects === undefined) findings.push(...unclassified(doc, data));
   return findings.sort((a, b) => rank(a) - rank(b) || naturalCompare(a.paths[0] ?? a.ids[0] ?? '', b.paths[0] ?? b.ids[0] ?? ''));

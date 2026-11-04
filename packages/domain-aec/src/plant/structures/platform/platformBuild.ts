@@ -120,7 +120,12 @@ export function buildDeckPlatform(
     building,
     slots.grating,
     partBase,
-    { topOffset: spec.topOffset, gratingType: type.name, bearingBarAngle: Math.atan2(by, bx) },
+    {
+      topOffset: spec.topOffset,
+      gratingType: type.name,
+      bearingBarAngle: Math.atan2(by, bx),
+      ...(spec.imposedLoadKPa === undefined ? {} : { imposedLoadKPa: spec.imposedLoadKPa }),
+    },
     panels,
   );
   building = gratings.building;

@@ -11,7 +11,9 @@ import { checkGrating } from './grating/checkGrating';
 import { listGratingTypes } from './grating/listGratingTypes';
 import { updateGrating } from './grating/updateGrating';
 import { addLadder } from './ladder/addLadder';
+import { updateLadder } from './ladder/updateLadder';
 import { addSteelStair } from './stair/addSteelStair';
+import { updateSteelStair } from './stair/updateSteelStair';
 import { addRailing } from './railing/addRailing';
 import { updateRailing } from './railing/updateRailing';
 import { accessPlatformTakeoff } from './platform/accessPlatformTakeoff';
@@ -31,7 +33,9 @@ export const structuresCommands = commandCatalog(
   addRailing,
   updateRailing,
   addLadder,
+  updateLadder,
   addSteelStair,
+  updateSteelStair,
   addAccessPlatform,
   addCircularAccessPlatform,
   updateAccessPlatform,

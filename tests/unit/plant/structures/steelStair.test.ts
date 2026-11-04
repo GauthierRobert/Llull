@@ -251,7 +251,7 @@ describe('check_access on steel stairs (VC-STA-04 rule part)', () => {
     expect(checked.verdict).toBe('pass');
     expect(checked.checked.stairs).toBe(1);
     expect(checked.byId['steelStair-1']?.verdict).toBe('pass');
-    expect(checked.notEvaluated.map((row) => row.ruleId)).toContain('ISO-STR-HEADROOM');
+    expect(checked.notEvaluated.map((row) => row.ruleId)).not.toContain('ISO-STR-HEADROOM');
   });
 
   it('fails OSHA tread for going 200 and keeps Blondel inside 600..660', () => {

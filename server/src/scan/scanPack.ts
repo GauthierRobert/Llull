@@ -7,7 +7,7 @@
  * key are accepted, every file is checked against its sha256 and the asset's own manifest, and an asset lands in the store atomically.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, statSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { canonicalJson } from '@lib/canonicalJson';
@@ -17,6 +17,7 @@ import { unzip } from '@lib/zipRead';
 import { renameWithRetry } from '../writeFileAtomic';
 import { sha256Hex } from '../sha256';
 import { AssetReader, crc32 } from './assetReader';
+import { packZipProblem } from './scanPackZip';
 import { assetDir, hasAsset, isAssetKey } from './scanStore';
 
 /** Layout version of `pack.json`. */
@@ -103,6 +104,8 @@ export function packDocument(options: PackOptions): PackResult {
   const maxBytes = options.maxBytes ?? DEFAULT_PACK_MAX_BYTES;
   let documentBytes: Buffer;
   try {
+    if (statSync(options.document).size > maxBytes)
+      return fail('SCN_PACK_TOO_LARGE', `${options.document} is larger than --max-bytes ${maxBytes}`);
     documentBytes = readFileSync(options.document);
   } catch {
     return fail('SCN_PACK_DOCUMENT_UNREADABLE', `cannot read ${options.document}`);
@@ -230,15 +233,20 @@ function readManifest(data: Uint8Array): { documentSha256: string; assetKeys: st
 }
 
 /**
- * @failure not a zip / over the byte cap / bad pack.json / an unexpected entry / missing files -> SCN_PACK_INVALID; a size or sha256 that differs
- *   from the manifest, or an asset whose own manifest is not its key -> SCN_PACK_CHECKSUM; `documentOut` exists -> SCN_PACK_EXISTS. Nothing is
+ * @failure not a zip / not a plain STORED unique-named zip / bad pack.json / document.llull that is not a document / an unexpected entry / missing files -> SCN_PACK_INVALID; a size or sha256 that differs
+ *   from the manifest, an archive over the byte cap -> SCN_PACK_TOO_LARGE, or an asset whose own manifest is not its key -> SCN_PACK_CHECKSUM; `documentOut` exists -> SCN_PACK_EXISTS. Nothing is
  *   installed on failure (every file is verified before the first rename).
  */
 export function unpackDocument(options: UnpackOptions): UnpackResult {
   const maxBytes = options.maxBytes ?? DEFAULT_PACK_MAX_BYTES;
   let entries: ZipEntry[];
   try {
-    entries = unzip(readFileSync(options.archive), { maxBytes, maxRatio: 1 });
+    if (statSync(options.archive).size > maxBytes)
+      return fail('SCN_PACK_TOO_LARGE', `${options.archive} is larger than --max-bytes ${maxBytes}`);
+    const bytes = readFileSync(options.archive);
+    const problem = packZipProblem(bytes);
+    if (problem !== null) return fail('SCN_PACK_INVALID', `${options.archive}: ${problem}`);
+    entries = unzip(bytes, { maxBytes, maxRatio: 1 });
   } catch (error) {
     return fail('SCN_PACK_INVALID', `${options.archive}: ${error instanceof Error ? error.message : 'unreadable archive'}`);
   }
@@ -253,6 +261,11 @@ export function unpackDocument(options: UnpackOptions): UnpackResult {
     return fail('SCN_PACK_INVALID', 'the archive has no pack.json / document.llull');
   const manifest = readManifest(manifestBytes);
   if (typeof manifest === 'string') return fail('SCN_PACK_INVALID', manifest);
+  try {
+    deserializeDocument(Buffer.from(documentBytes).toString('utf8'));
+  } catch {
+    return fail('SCN_PACK_INVALID', 'document.llull is not a llull document');
+  }
   if (sha256Hex(documentBytes) !== manifest.documentSha256) return fail('SCN_PACK_CHECKSUM', 'document.llull does not match its sha256');
   if (existsSync(options.documentOut) && options.overwrite !== true)
     return fail('SCN_PACK_EXISTS', `${options.documentOut} exists; pass --force to replace it`);

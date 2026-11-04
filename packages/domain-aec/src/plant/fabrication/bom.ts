@@ -6,6 +6,7 @@
 
 import { distance3 } from '@lib/vec3';
 import { FLANGES_B16_5 } from '../catalog/data/flanges';
+import { ASSUMED_GASKET_MM, MM_PER_INCH, quarterInchText, raisedFaceHeightMm, studLengthRule } from '../catalog/bolting';
 import { dnToNps, parseDn } from '../catalog/nominal';
 import type { LineAnalysis } from './analysis';
 import type { NetworkComponent } from './model';
@@ -65,6 +66,16 @@ export function bomRows(components: readonly NetworkComponent[], include: (index
   };
 }
 
+/** Stud length of a bolt group by the PSC named rule (derived, never verified): the flange thickness and bolt diameter of the bundled B16.5 row, the raised face of the class, the gasket given or assumed. */
+export interface StudLength {
+  readonly lengthMm: number;
+  readonly lengthIn: string | null;
+  readonly method: 'rule';
+  readonly verified: false;
+  readonly formula: string;
+  readonly assumptions: readonly string[];
+}
+
 export interface BoltGroup {
   readonly dn: number;
   readonly pressureClass: number;
@@ -72,6 +83,8 @@ export interface BoltGroup {
   readonly boltDiameterIn: string;
   readonly sets: number;
   readonly unverified: boolean;
+  /** null when the rule has no input (a bolt thread pitch or a raised-face height that is not tabulated). */
+  readonly stud: StudLength | null;
 }
 
 export interface Bolting {
@@ -85,12 +98,52 @@ export interface Bolting {
   readonly unresolved: readonly string[];
 }
 
+/** "5/8" or "1-1/8" (inches) as millimetres, or null. */
+function inchesToMm(text: string): number | null {
+  const match = /^(?:(\d+)-)?(\d+)(?:\/(\d+))?$/.exec(text);
+  if (match === null) return null;
+  const value = Number(match[1] ?? 0) + (match[3] === undefined ? Number(match[2]) : Number(match[2]) / Number(match[3]));
+  return value * MM_PER_INCH;
+}
+
+function studOf(row: (typeof FLANGES_B16_5)[number], gasketMm: number, gasketGiven: boolean): StudLength | null {
+  const diameter = inchesToMm(row[6]);
+  const raisedFace = raisedFaceHeightMm('ASME B16.5', row[1], 'RF');
+  if (diameter === null || raisedFace === null) return null;
+  const rule = studLengthRule({
+    flangeThicknessAMm: row[3],
+    flangeThicknessBMm: row[3],
+    raisedFaceAMm: raisedFace,
+    raisedFaceBMm: raisedFace,
+    gasketMm,
+    boltDiameterMm: diameter,
+  });
+  if (rule === null) return null;
+  return {
+    lengthMm: rule.lengthMm,
+    lengthIn: quarterInchText(rule.lengthMm),
+    method: 'rule',
+    verified: false,
+    formula: rule.formula,
+    assumptions: [
+      `two flanges of the same row (B16.5 weld-neck, thickness ${row[3]} mm each, raised face ${raisedFace} mm each)`,
+      gasketGiven
+        ? `gasket ${gasketMm} mm given by the caller`
+        : `gasket ${gasketMm} mm ASSUMED (B16.20 spiral wound, nominal): pass gasketThicknessMm`,
+      'the catalogue thickness is the minimum thickness without the raised face (dataset note); B16.5 minimum thickness for Class 150 / 300 may already include the 1.6 mm raised face: to confirm against B16.5 Table 8, in which case the stud is up to 3.2 mm long (one stocking step)',
+      `nut height ${rule.nutHeightMm} mm = nominal bolt diameter (conservative)`,
+      `thread projection ${rule.projectionMm.toFixed(2)} mm = 2 pitches of ${rule.pitchMm.toFixed(3)} mm`,
+    ],
+  };
+}
+
 const CLASS_TOKEN = /(?:^|[-_/ .])(150|300|600|900|1500|2500)(?![0-9])/;
 
 export function boltingOf(
   analysis: LineAnalysis,
   matingFlanges: 'assume_in_scope' | 'this_side_only',
   inScope: (componentIndex: number) => boolean,
+  gasketThicknessMm?: number,
 ): Bolting {
   const components = analysis.read.network.components;
   const sites: Array<{ first: number; others: number[] }> = [
@@ -121,7 +174,15 @@ export function boltingOf(
     }
     const key = `${dn}/${pressureClass}`;
     const group = groups.get(key);
-    groups.set(key, { dn, pressureClass, boltsPerSet: row[5], boltDiameterIn: row[6], sets: (group?.sets ?? 0) + 1, unverified: !row[9] });
+    groups.set(key, {
+      dn,
+      pressureClass,
+      boltsPerSet: row[5],
+      boltDiameterIn: row[6],
+      sets: (group?.sets ?? 0) + 1,
+      unverified: !row[9],
+      stud: group?.stud ?? studOf(row, gasketThicknessMm ?? ASSUMED_GASKET_MM['gasketSpiralWound'] ?? 4.5, gasketThicknessMm !== undefined),
+    });
   }
   const list = [...groups.values()];
   const diameters = new Set(list.map((group) => group.boltDiameterIn));

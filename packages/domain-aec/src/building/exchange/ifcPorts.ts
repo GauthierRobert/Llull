@@ -88,7 +88,7 @@ export function addPort(
   return port;
 }
 
-function connect(context: Context, state: PortState, relating: Port, related: Port): void {
+export function connect(context: Context, state: PortState, relating: Port, related: Port): void {
   context.writer.add(
     `IFCRELCONNECTSPORTS('${context.guid(`${relating.seed}:${related.seed}:conn`)}',$,$,$,${relating.ref},${related.ref},$)`,
   );

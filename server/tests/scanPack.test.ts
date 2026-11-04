@@ -111,7 +111,12 @@ describe('pack refusals', () => {
 });
 
 describe('unpack of hostile archives', () => {
-  const documentBytes = Buffer.from(readFileSync(documentWith('hostile-base', [])));
+  let documentBytes = Buffer.alloc(0);
+  let document: ZipEntry = { name: 'document.llull', data: documentBytes };
+  beforeAll(() => {
+    documentBytes = Buffer.from(readFileSync(documentWith('hostile-base', [])));
+    document = { name: 'document.llull', data: documentBytes };
+  });
   const manifest = (extra: Record<string, unknown> = {}): ZipEntry => ({
     name: 'pack.json',
     data: Buffer.from(
@@ -129,7 +134,6 @@ describe('unpack of hostile archives', () => {
     writeFileSync(file, zipStore(entries));
     return file;
   };
-  const document: ZipEntry = { name: 'document.llull', data: documentBytes };
   const unpack = (file: string, extra: Partial<Parameters<typeof unpackDocument>[0]> = {}): ReturnType<typeof unpackDocument> =>
     unpackDocument({
       archive: file,
@@ -189,7 +193,7 @@ describe('unpack of hostile archives', () => {
     expect(unpack(file, { documentOut: target })).toMatchObject({ ok: true });
     expect(unpack(file, { documentOut: target })).toMatchObject({ ok: false, code: 'SCN_PACK_EXISTS' });
     expect(unpack(file, { documentOut: target, overwrite: true })).toMatchObject({ ok: true });
-    expect(unpack(file, { maxBytes: 10 })).toMatchObject({ ok: false, code: 'SCN_PACK_INVALID' });
+    expect(unpack(file, { maxBytes: 10 })).toMatchObject({ ok: false, code: 'SCN_PACK_TOO_LARGE' });
     const files = [{ path: `scans/${KEY_X}/manifest.json`, bytes: 2, sha256: sha256Hex('{}') }];
     const listed = manifest({ assetKeys: [KEY_X], scans: [{ assetKey: KEY_X, sourceName: 's', pointCount: 1, files }] });
     expect(unpack(archive('lacks', [listed, document]))).toMatchObject({ ok: false, code: 'SCN_PACK_INVALID' });
@@ -224,6 +228,94 @@ describe('unpack of hostile archives', () => {
     expect(result).toMatchObject({ ok: false, code: 'SCN_PACK_CHECKSUM' });
     expect(existsSync(target) ? readdirSync(target) : []).toEqual([]);
     expect(existsSync(path.join(root, 'invalid-asset.zip.out.llull'))).toBe(false);
+  });
+});
+
+describe('unpack of a valid pack mutated at the zip level', () => {
+  const garbageStore = (name: string): string => path.join(root, `store-mutation-${name}`);
+  let good = Buffer.alloc(0);
+  beforeAll(() => {
+    const documentBytes = Buffer.from(readFileSync(documentWith('mutation-base', [])));
+    const manifest = Buffer.from(
+      canonicalJson({ version: 1, document: { name: 'document.llull', sha256: sha256Hex(documentBytes) }, assetKeys: [], scans: [] }),
+    );
+    good = Buffer.from(
+      zipStore([
+        { name: 'pack.json', data: manifest },
+        { name: 'document.llull', data: documentBytes },
+      ]),
+    );
+  });
+  /** Offset of the central-directory record of `name`. */
+  const central = (bytes: Uint8Array, name: string): number => {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let at = view.getUint32(bytes.length - 22 + 16, true);
+    for (;;) {
+      const length = view.getUint16(at + 28, true);
+      if (Buffer.from(bytes.subarray(at + 46, at + 46 + length)).toString() === name) return at;
+      at += 46 + length;
+    }
+  };
+  const mutations: [string, (bytes: Buffer, view: DataView) => void][] = [
+    ['deflate method', (b, v) => v.setUint16(central(b, 'document.llull') + 10, 8, true)],
+    ['central size lie', (b, v) => v.setUint32(central(b, 'document.llull') + 24, 1, true)],
+    ['local size lie', (b, v) => v.setUint32(v.getUint32(central(b, 'document.llull') + 42, true) + 22, 1, true)],
+    [
+      'name mismatch (local header names another file)',
+      (b, v) => b.writeUInt8(0x78, v.getUint32(central(b, 'document.llull') + 42, true) + 30),
+    ],
+    ['symlink attribute', (b, v) => v.setUint32(central(b, 'document.llull') + 38, 0xa000 << 16, true)],
+    ['central offset into the void', (b, v) => v.setUint32(central(b, 'document.llull') + 42, b.length - 5, true)],
+  ];
+
+  it.each(mutations)('refuses %s with SCN_PACK_INVALID and touches nothing', (name, mutate) => {
+    const bytes = Buffer.from(good);
+    mutate(bytes, new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+    const file = path.join(root, `mutation-${name.length}-${name.charCodeAt(0)}.zip`);
+    writeFileSync(file, bytes);
+    const out = path.join(root, `${path.basename(file)}.llull`);
+    expect(unpackDocument({ archive: file, documentOut: out, store: garbageStore(name.slice(0, 6)) })).toMatchObject({
+      ok: false,
+      code: 'SCN_PACK_INVALID',
+    });
+    expect(existsSync(out)).toBe(false);
+    expect(existsSync(garbageStore(name.slice(0, 6)))).toBe(false);
+  });
+
+  it('refuses a duplicate entry name and a document.llull that is not a document (hash right)', () => {
+    const duplicate = path.join(root, 'mutation-duplicate.zip');
+    const entry = { name: 'pack.json', data: Buffer.from('{}') };
+    writeFileSync(duplicate, zipStore([entry, entry]));
+    expect(unpackDocument({ archive: duplicate, documentOut: path.join(root, 'dup.llull'), store: garbageStore('dup') })).toMatchObject({
+      ok: false,
+      code: 'SCN_PACK_INVALID',
+    });
+    const text = Buffer.from('not a document');
+    const manifest = Buffer.from(
+      canonicalJson({ version: 1, document: { name: 'document.llull', sha256: sha256Hex(text) }, assetKeys: [], scans: [] }),
+    );
+    const notDocument = path.join(root, 'mutation-not-document.zip');
+    writeFileSync(
+      notDocument,
+      zipStore([
+        { name: 'pack.json', data: manifest },
+        { name: 'document.llull', data: text },
+      ]),
+    );
+    const out = path.join(root, 'not-document.llull');
+    expect(unpackDocument({ archive: notDocument, documentOut: out, store: garbageStore('nd') })).toMatchObject({
+      ok: false,
+      code: 'SCN_PACK_INVALID',
+    });
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it('refuses to pack a document larger than --max-bytes before reading it', () => {
+    const doc = documentWith('big-doc', []);
+    expect(packDocument({ document: doc, out: path.join(root, 'big.zip'), withScans: false, store, maxBytes: 10 })).toMatchObject({
+      ok: false,
+      code: 'SCN_PACK_TOO_LARGE',
+    });
   });
 });
 

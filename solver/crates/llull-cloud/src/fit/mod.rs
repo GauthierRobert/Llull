@@ -8,6 +8,8 @@ pub mod cylinder;
 pub mod plane;
 pub mod sphere;
 pub mod trace;
+mod trace_next;
+pub mod trace_result;
 
 use crate::cloud::Vec3;
 use crate::error::CloudError;

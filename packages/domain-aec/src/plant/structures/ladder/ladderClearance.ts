@@ -1,6 +1,6 @@
 /**
  * Back clearance of a ladder (06 STA §5.1): from the rung centreline, rays along the facing direction at the middle and both stiles, against the
- * plan footprints of walls, columns, steel members, equipment, slabs and gratings whose height range contains a rung. The arrival surface is
+ * plan footprints of walls, columns, steel members, equipment, pipes and trays (spec-driven runs with their insulation), slabs and gratings whose height range contains a rung. The arrival surface is
  * not an obstacle (the climber steps onto it). Lengths in document units.
  */
 
@@ -11,6 +11,9 @@ import { pointInPolygon, segmentIntersection } from '@lib/polygon';
 import type { BuildingElement, BuildingModel, LadderElement } from '@aec/building/types';
 import { findProfile } from '../../../steel/profiles';
 import { findGratingType } from '../grating/gratingTypes';
+import { elementBoxes } from '../../../industrial/clash/clashBoxes';
+import { pipingClashBodies } from '../../piping/clashBodies';
+import { boxFootprint } from './boxFootprint';
 import { walkingSurfaces } from './ladderSurface';
 
 /** How far behind the rungs the search looks, mm: a ladder with nothing nearer reports this value. */
@@ -146,11 +149,32 @@ export function backClearance(
     }
     const obstacle = obstacleOf(doc, building, element);
     if (obstacle !== null) obstacles.push(obstacle);
+    else if (element.category === 'pipe' || element.category === 'tray')
+      for (const box of elementBoxes(doc, building, element)) obstacles.push(boxFootprint(box));
   }
+  for (const body of pipingClashBodies(doc)) obstacles.push(boxFootprint(body.box));
   let nearest = search;
   for (const obstacle of obstacles) {
     if (!rungHeights.some((height) => height >= obstacle.zMin && height <= obstacle.zMax)) continue;
     for (const origin of origins) nearest = Math.min(nearest, rayDistance(origin, direction, obstacle.ring, search));
   }
   return nearest;
+}
+
+/** Back clearance of an existing ladder against the model as it is now (its arrival surface excluded); document units. */
+export function liveBackClearance(doc: CadDocument, building: BuildingModel, ladder: LadderElement): number {
+  const level = building.levels[ladder.levelId];
+  if (level === undefined) return ladder.backClearance;
+  const departure = level.elevation + ladder.base[2];
+  const rungHeights = Array.from(
+    { length: Math.max(ladder.rungCount, 1) },
+    (_, index) => departure + (ladder.rungCount === 0 ? ladder.climbHeight / 2 : (index + 1) * ladder.rungPitch),
+  );
+  return backClearance(
+    doc,
+    building,
+    { base: [ladder.base[0], ladder.base[1]], facing: ladder.facing, clearWidth: ladder.clearWidth },
+    rungHeights,
+    ladder.arrivalSurfaceId,
+  );
 }

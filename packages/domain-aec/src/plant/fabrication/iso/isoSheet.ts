@@ -21,6 +21,7 @@ import { skewFigures } from './isoSkew';
 import { supportMarks } from './isoSupports';
 import { axisAngles, type NorthArrow } from './isoProjection';
 import type { IsoPrimitive } from './isoRender';
+import { revisionMarks, type RevisionDelta } from './isoRevision';
 import { isoSymbols } from './isoSymbols';
 import { isoTables, type IsoTable, type TableName } from './isoTables';
 
@@ -53,6 +54,8 @@ export interface SheetOptions {
   readonly issue?: SheetIssue;
   /** Pipe supports of the line (drawn where they lie on a drawn pipe, listed as annotations). */
   readonly supports?: readonly LineSupport[];
+  /** Changes since the last issued revision (compareToIssue): drawn as revision clouds with delta triangles. */
+  readonly revision?: RevisionDelta & { readonly issuedRevision: string; readonly removed: number };
 }
 
 export interface SheetAnnotation extends IsoAnnotation {
@@ -215,6 +218,11 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
   primitives.push(...skew.primitives);
   const placedSupports = supportMarks(options.supports ?? [], graph, shiftedLayout);
   for (const placed of placedSupports) primitives.push(...placed.primitives);
+  const revision =
+    options.revision === undefined
+      ? undefined
+      : revisionMarks(graph, shiftedLayout.nodes, shiftedLayout.starts, shiftedLayout.ends, options.revision, (xyz) => nodeKey(xyz));
+  if (revision !== undefined) primitives.push(...revision.primitives);
   const dimensions = runDimensions(graph);
   const dimensionLines = dimensionPrimitives(dimensions, layout, shift);
   primitives.push(...dimensionLines);
@@ -222,7 +230,14 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
     ...drawn,
     ...dimensionLines.flatMap((primitive): Array<readonly [Vec2, Vec2]> => (primitive.t === 'line' ? [[primitive.a, primitive.b]] : [])),
   ]);
-  const annotations: SheetAnnotation[] = [];
+  const annotations: SheetAnnotation[] = (revision?.marks ?? []).map((mark) => ({
+    kind: 'revision',
+    text: `REV ${options.revision?.label ?? ''}`,
+    at: mark.at,
+    sheet: mark.sheet,
+    componentIds: mark.componentIds,
+    welds: mark.welds,
+  }));
   const at2d = (xyz: readonly [number, number, number]): Vec2 | undefined => shiftedLayout.nodes.get(nodeKey(xyz));
   const label = (annotation: IsoAnnotation, anchor: Vec2 | undefined): void => {
     if (anchor === undefined) return;
@@ -337,6 +352,15 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
     rect(20, 10, width - 10, height - 10, 'ISO-FRAME'),
     text([area.x + 2, top - 6], 5, stamp),
     text([area.x + 2, top - 11], 2.6, note),
+    ...(options.revision === undefined
+      ? []
+      : [
+          text(
+            [area.x + 2, top - 15],
+            2.6,
+            `REVISION CLOUDS: CHANGES SINCE REV ${options.revision.issuedRevision} (${revision?.marks.length ?? 0} ON THIS SHEET${options.revision.removed === 0 ? '' : `, ${options.revision.removed} REMOVED`})`,
+          ),
+        ]),
     ...tablePrimitives(tables, area.x + area.width - tableWidth + 3, top - 30),
     ...titleBlock(width, [
       [

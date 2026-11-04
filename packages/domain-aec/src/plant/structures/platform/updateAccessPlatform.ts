@@ -26,7 +26,7 @@ export const updateAccessPlatform = defineCommand({
   description:
     'Change a generated platform (add_access_platform / add_circular_access_platform `assemblyId`) and regenerate its members, grating panels and railings; part ids and marks are kept. ' +
     'Give only the fields to change (lengths in DOCUMENT UNITS, angles in DEGREES). Deck platform: boundary or bounds, topOffset, bearingBarDirection, framing. Circular platform: elevation, startAngleDeg, sweepDeg, gap, width, bracketProfile, bracketSpacingMax (the vessel itself cannot be changed: delete and add again). ' +
-    'Both: gratingType and railing (an object merges into the current railing settings, null removes the guard-rails). With NO field it re-derives the platform from the current vessel and beams (after update_equipment or a move; access_platform_takeoff reports stale: true). ' +
+    'Both: gratingType, imposedLoadKPa and railing (an object merges into the current railing settings, null removes the guard-rails). With NO field it re-derives the platform from the current vessel and beams (after update_equipment or a move; access_platform_takeoff reports stale: true). ' +
     'Result data as the add commands.',
   params: z.object({
     assemblyId: z.string().describe('Assembly element id (the `assemblyId` of the add command).'),
@@ -53,6 +53,13 @@ export const updateAccessPlatform = defineCommand({
       .optional()
       .describe('Circular platform only: largest arc distance between brackets at the outer radius.'),
     gratingType: z.string().optional().describe('New catalogue key from list_grating_types.'),
+    imposedLoadKPa: z
+      .number()
+      .min(0)
+      .optional()
+      .describe(
+        'Imposed (live) load on the walking surface, kN/m² (kPa), fed to check_steel_members with the grating self-weight. Unset keeps the current value.',
+      ),
     railing: z
       .union([
         z.null(),
@@ -149,6 +156,7 @@ export const updateAccessPlatform = defineCommand({
         ? {
             ...spec,
             gratingType: grating,
+            ...(fields.imposedLoadKPa === undefined ? {} : { imposedLoadKPa: fields.imposedLoadKPa }),
             railing: railing as PlatformSpec['railing'],
             ...(fields.boundary === undefined && fields.bounds === undefined
               ? {}
@@ -174,6 +182,7 @@ export const updateAccessPlatform = defineCommand({
         : {
             ...spec,
             gratingType: grating,
+            ...(fields.imposedLoadKPa === undefined ? {} : { imposedLoadKPa: fields.imposedLoadKPa }),
             railing: railing as CircularSpec['railing'],
             ...(fields.elevation === undefined ? {} : { elevation: fields.elevation }),
             ...(fields.startAngleDeg === undefined ? {} : { startAngleDeg: fields.startAngleDeg }),

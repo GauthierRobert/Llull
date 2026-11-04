@@ -1,6 +1,6 @@
 /** Colour profiles (plant 09 VIS §4): define, activate, delete. Display only and metaHistory: they never touch geometry or add a feature step. */
 
-import { storeProfile } from '../../geometry/colourRules';
+import { hasSchemeRules, storeProfile } from '../../geometry/colourRules';
 import { findProfile, type ColourProfile, type ColourRule, type DisplayModel, type RulePredicate } from '../../model/display';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -80,7 +80,8 @@ export const defineColourProfile = defineCommand({
     'otherwise defaultColour. Properties come from the entity itself (id, kind, layerId, layerName, name, tag, materialId, componentId) and from installed domain plugins ' +
     '(each plugin documents the keys it adds). Display only: geometry is never changed. Activate it with set_active_colour_profile, ' +
     'inspect it with colour_by_rule_report and check_display. ' +
-    'Errors: VIS_RULE_INVALID, VIS_COLOUR_INVALID, VIS_PROFILE_EXISTS (pass replace: true). Does not add a feature step.',
+    'Replacing a scheme profile (apply_service_colour_scheme) or an approved one needs clearApproval: true and discards its approval; reviewRequired false cannot stand in for an approval. ' +
+    'Errors: VIS_RULE_INVALID, VIS_COLOUR_INVALID, VIS_PROFILE_EXISTS (pass replace: true), VIS_PROFILE_APPROVED (pass clearApproval: true). Does not add a feature step.',
   annotations: { metaHistory: true },
   params: z.object({
     id: z.string().describe('Profile id, e.g. "by-layer".'),
@@ -90,6 +91,12 @@ export const defineColourProfile = defineCommand({
     palette: z.string().optional().describe('Name of the palette the colours were drawn from (default "custom"); reports echo it.'),
     reviewRequired: z.boolean().optional().describe('true flags the profile as awaiting approval by a qualified reviewer. Default false.'),
     replace: z.boolean().optional().describe('true: overwrite an existing profile with this id.'),
+    clearApproval: z
+      .boolean()
+      .optional()
+      .describe(
+        'true: allow replacing a scheme profile or an approved one, discarding its approval (the new profile has none). Default false.',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const fail = (code: string, message: string, paths: string[] = []): CommandResult =>
@@ -98,6 +105,9 @@ export const defineColourProfile = defineCommand({
     const display = displayOf(doc);
     if (findProfile(display, params.id) !== undefined && params.replace !== true)
       return fail('VIS_PROFILE_EXISTS', `profile '${params.id}' already exists`, ['id']);
+    const existing = findProfile(display, params.id);
+    if (existing !== undefined && (existing.approval !== undefined || hasSchemeRules(existing)) && params.clearApproval !== true)
+      return fail('VIS_PROFILE_APPROVED', `profile '${params.id}' is a scheme or approved profile`, ['id']);
     const profile: ColourProfile = {
       id: params.id,
       name: params.name,

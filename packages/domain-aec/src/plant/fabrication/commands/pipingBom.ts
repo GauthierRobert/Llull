@@ -20,8 +20,8 @@ export const pipingBom = defineCommand({
     'Bill of material of piping: rows by item code with description, quantity and unit (pipe in metres of centreline length, everything else in pieces; unverified: true when the catalogue row is not verified), for one line, ' +
     'one spool, one sheet of the isometric (define_isometric), or the whole document. With includeBolting the flanged joints add gaskets and stud bolts: one gasket and one bolt set per flange pair, and per flanged line end when matingFlanges is assume_in_scope ' +
     '(the mating flange is assumed in scope; default this_side_only counts pairs of the line only); bolts per set and diameter come from the ASME B16.5 table by DN and pressure class, the class being read from the ' +
-    'flange item code (FLWN-100-150 = class 150). Gaskets and bolts are erection items. Scope: line (needs lineId), spool (lineId + spoolId, a name from spool_list), sheet (lineId + sheet number; the sheet BOMs add up to the line), document (every line). ' +
-    'Returns data = { scope, rows: [{ itemCode, type, description, quantity, unit, unverified? }], bolting?: { joints, gaskets, studBolts, diameter, groups: [{ dn, pressureClass, boltsPerSet, boltDiameterIn, sets, unverified }], unresolved }, ' +
+    'flange item code (FLWN-100-150 = class 150). Each bolt group also gets the stud length by the PSC named rule L = ceil((t1 + RF1 + t2 + RF2 + g + 2 nut + 4 pitch) / 6.35) x 6.35 mm (flange thickness and raised face of the B16.5 row, the gasket given by gasketThicknessMm or assumed; DERIVED, never verified; the assumptions are listed). Gaskets and bolts are erection items. Scope: line (needs lineId), spool (lineId + spoolId, a name from spool_list), sheet (lineId + sheet number; the sheet BOMs add up to the line), document (every line). ' +
+    'Returns data = { scope, rows: [{ itemCode, type, description, quantity, unit, unverified? }], bolting?: { joints, gaskets, studBolts, diameter, groups: [{ dn, pressureClass, boltsPerSet, boltDiameterIn, sets, unverified, stud: { lengthMm, lengthIn, method rule, verified false, formula, assumptions } | null }], unresolved }, ' +
     'withoutItemCode: [componentId], warnings, provenance: { catalogue, sources } }. Refusals: ISO_LINE_NOT_FOUND, ISO_SPOOL_NOT_FOUND, ISO_ISOMETRIC_NOT_DEFINED, ISO_SHEET_NOT_FOUND, ISO_NO_PIPING, ISO_PARAM_INVALID.',
   params: z.object({
     scope: z
@@ -50,6 +50,13 @@ export const pipingBom = defineCommand({
       .optional()
       .describe(
         'assume_in_scope = each flanged line end is a joint whose mating flange is supplied here (gasket + bolt set counted); this_side_only (default) = only flange pairs inside the line.',
+      ),
+    gasketThicknessMm: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        'Gasket thickness in mm for the stud length of includeBolting. Default: 4.5 mm (ASME B16.20 spiral wound, nominal), listed as an assumption.',
       ),
   }),
   run: (doc, params): CommandResult => {
@@ -130,7 +137,8 @@ export const pipingBom = defineCommand({
               },
         );
       }
-      if (params.includeBolting === true) bolting.push(boltingOf(analysis, params.matingFlanges ?? 'this_side_only', inScope));
+      if (params.includeBolting === true)
+        bolting.push(boltingOf(analysis, params.matingFlanges ?? 'this_side_only', inScope, params.gasketThicknessMm));
     }
     const warnings = [
       ...(missing.length === 0

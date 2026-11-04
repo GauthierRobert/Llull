@@ -4,18 +4,19 @@
 //! `bendDetectionDeg` from the leg's running direction (bend), has too few points (gap / pipe end) or its free-radius fit moves by more
 //! than 15 % (reducer candidate). Every leg is then refitted (free radius) on all its surface points. After a bend the next straight is
 //! found by a radius-constrained RANSAC on the points around the leg's end that the leg does not explain, accepted only when its axis
-//! meets the leg's within `skewTolerance`; the bend is the arc of [`super::bend`] (torus: R from the surface points near the bend).
+//! meets the leg's within `skewTolerance`; the bend is the arc of [`super::bend`] (torus: R from the surface points near the bend). The result
+//! (straights, bends, centreline, diameter) is assembled in [`super::trace_result`].
 
-use super::bend::{closest_approach, fit_bend, Bend};
+use super::bend::closest_approach;
 use super::cylinder::{self, Cylinder};
-use super::{angular_coverage_deg, ransac_iterations, rms, FitSettings, FitWarning, Threshold};
+use super::trace_result::assemble;
+pub use super::trace_result::TraceResult;
+use super::{angular_coverage_deg, rms, FitSettings, FitWarning};
 use crate::cloud::Vec3;
 use crate::error::{CloudError, CloudResult};
-use crate::kdtree::{KdTree, Rng};
+use crate::kdtree::KdTree;
 use crate::linalg::{add, cross, dot, frame, mean, norm, scale, sub, unit};
 use crate::lm::minimise;
-use crate::normals::pca_normals_within;
-use serde::Serialize;
 
 /// Points a window needs (below it the pipe is not seen there).
 pub const MIN_WINDOW_POINTS: usize = 30;
@@ -32,10 +33,6 @@ const LOOK_AHEAD_RADII: f64 = MAX_PI_RADII + 10.0;
 const MIN_LEG_STEPS: f64 = 2.0;
 /// Hard bound on windows per march.
 const MAX_WINDOWS: usize = 4000;
-/// Normals of the next-leg search: neighbours needed inside r / 2, points scored per RANSAC iteration (stride beyond), inlier fraction.
-const MIN_NORMAL_NEIGHBOURS: usize = 10;
-const MAX_SCORED_POINTS: usize = 20_000;
-const MIN_LEG_FRACTION: f64 = 0.15;
 
 /// Named thresholds of a trace (metres / degrees).
 #[derive(Debug, Clone, Copy)]
@@ -68,7 +65,7 @@ impl Default for TraceSettings {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum Stop {
+pub(super) enum Stop {
     Bend,
     NoPoints,
     Radius(f64),
@@ -77,7 +74,7 @@ enum Stop {
 }
 
 impl Stop {
-    fn reason(self) -> &'static str {
+    pub(super) fn reason(self) -> &'static str {
         match self {
             Stop::Bend => "bend_not_continued",
             Stop::NoPoints => "no_points",
@@ -95,25 +92,25 @@ struct Window {
 }
 
 #[derive(Clone)]
-struct Leg {
-    point: Vec3,
-    dir: Vec3,
-    radius: f64,
+pub(super) struct Leg {
+    pub(super) point: Vec3,
+    pub(super) dir: Vec3,
+    pub(super) radius: f64,
     /// Axial range (from `point` along `dir`) of the windows.
-    t_min: f64,
-    t_max: f64,
+    pub(super) t_min: f64,
+    pub(super) t_max: f64,
     /// Axial range of the inliers after the refit (the ends of a chain).
-    data_lo: f64,
-    data_hi: f64,
-    inliers: usize,
-    rms: f64,
-    coverage: f64,
-    stop_min: Stop,
-    stop_max: Stop,
+    pub(super) data_lo: f64,
+    pub(super) data_hi: f64,
+    pub(super) inliers: usize,
+    pub(super) rms: f64,
+    pub(super) coverage: f64,
+    pub(super) stop_min: Stop,
+    pub(super) stop_max: Stop,
 }
 
 impl Leg {
-    fn at(&self, t: f64) -> Vec3 {
+    pub(super) fn at(&self, t: f64) -> Vec3 {
         add(&self.point, &scale(&self.dir, t))
     }
 
@@ -135,69 +132,11 @@ impl Leg {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Straight {
-    pub start: Vec3,
-    pub end: Vec3,
-    pub direction: Vec3,
-    pub radius: f64,
-    pub length: f64,
-    pub inliers: usize,
-    pub rms: f64,
-    pub coverage_deg: f64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Reducer {
-    pub position: Vec3,
-    pub radius_before: f64,
-    pub radius_after: f64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Diameter {
-    pub value: f64,
-    /// Spread of the leg radii (several legs) or rms / sqrt(n) (one leg).
-    pub std: f64,
-    pub source: &'static str,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Ends {
-    pub start: &'static str,
-    pub end: &'static str,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TraceResult {
-    /// Start, every PI, end: the polyline `add_pipe_run` takes (bends at the interior points).
-    pub centreline: Vec<Vec3>,
-    pub straights: Vec<Straight>,
-    pub bends: Vec<Bend>,
-    pub intersection_points: Vec<Vec3>,
-    pub reducers: Vec<Reducer>,
-    pub diameter: Diameter,
-    pub radius: f64,
-    pub inliers: usize,
-    pub points_in_region: usize,
-    /// RMS of the surface residuals over every leg's inliers.
-    pub rms: f64,
-    pub ends: Ends,
-    pub step_length: f64,
-    pub threshold: Threshold,
-    pub warnings: Vec<FitWarning>,
-}
-
-struct Tracer<'a> {
-    tree: &'a KdTree,
-    settings: &'a TraceSettings,
-    band: f64,
-    max_windows: usize,
+pub(super) struct Tracer<'a> {
+    pub(super) tree: &'a KdTree,
+    pub(super) settings: &'a TraceSettings,
+    pub(super) band: f64,
+    pub(super) max_windows: usize,
 }
 
 /// Fixed-radius axis fit: 2 offsets ⟂ axis, 2 tilts; returns (point, axis).
@@ -384,50 +323,6 @@ impl Tracer<'_> {
         leg.coverage = coverage_of(&inliers, &leg.point, &leg.dir);
     }
 
-    /// The best radius-constrained cylinder in `candidates`: seeded RANSAC on two oriented points (normals from the neighbours within 0.6 r,
-    /// so they do not depend on the point density), radius within ±15 % of `r`, then an LM refit on its inliers. None below 15 % inliers
-    /// (and 3 windows' worth of points).
-    fn next_axis(&self, candidates: &[Vec3], r: f64, seed: u64) -> Option<Cylinder> {
-        let tree = KdTree::build(candidates);
-        let normals = pca_normals_within(&tree, 0.6 * r, MIN_NORMAL_NEIGHBOURS, &mean(candidates));
-        let stride = (candidates.len() / MAX_SCORED_POINTS).max(1);
-        let usable: Vec<usize> = (0..candidates.len()).filter(|&i| normals[i].is_some()).collect();
-        if usable.len() < 2 * MIN_WINDOW_POINTS {
-            return None;
-        }
-        let scored: Vec<usize> = usable.iter().copied().step_by(stride).collect();
-        let cos_alpha = libm::cos(self.settings.fit.normal_threshold_deg.to_radians());
-        let mut rng = Rng::new(seed);
-        let (mut best, mut budget, mut iterations) = (None::<(usize, Cylinder)>, ransac_iterations(0.0, 2), 0);
-        while iterations < budget {
-            iterations += 1;
-            let (i, j) = (usable[rng.below(usable.len())], usable[rng.below(usable.len())]);
-            let (Some(n1), Some(n2)) = (normals[i], normals[j]) else { continue };
-            let Some(model) = cylinder::from_two(&candidates[i], &n1, &candidates[j], &n2) else { continue };
-            if !(model.radius > 0.85 * r && model.radius < 1.15 * r) {
-                continue;
-            }
-            let count = scored
-                .iter()
-                .filter(|&&k| {
-                    let p = &candidates[k];
-                    let radial = sub(&sub(p, &model.point), &scale(&model.axis, dot(&sub(p, &model.point), &model.axis)));
-                    model.distance(p).abs() < self.band && normals[k].is_some_and(|n| dot(&radial, &n).abs() > cos_alpha * norm(&radial))
-                })
-                .count();
-            if best.is_none_or(|(c, _)| count > c) {
-                best = Some((count, model));
-                budget = ransac_iterations(count as f64 / scored.len() as f64, 2);
-            }
-        }
-        let (count, model) = best?;
-        if count < 3 * MIN_WINDOW_POINTS / stride.max(1) || (count as f64) < MIN_LEG_FRACTION * scored.len() as f64 {
-            return None;
-        }
-        let inliers: Vec<Vec3> = candidates.iter().filter(|p| model.distance(p).abs() < self.band).copied().collect();
-        Some(cylinder::refine_cylinder(&inliers, &model))
-    }
-
     /// The leg after the bend at `from`'s forward end, or None (with a warning when the axes skew).
     fn next_leg(&self, from: &Leg, step: f64, seed: u64, warnings: &mut Vec<FitWarning>) -> Option<Leg> {
         let r = from.radius;
@@ -556,94 +451,4 @@ pub fn trace(points: &[Vec3], seed: &Vec3, settings: &TraceSettings) -> CloudRes
     let (stops, legs): ((Stop, Stop), Vec<Leg>) =
         if reverse { ((end_stop, start_stop), legs.iter().rev().map(Leg::flipped).collect()) } else { ((start_stop, end_stop), legs) };
     Ok(assemble(&tracer, &legs, points.len(), stops, (step, threshold), warnings))
-}
-
-fn assemble(
-    tracer: &Tracer,
-    legs: &[Leg],
-    points_in_region: usize,
-    stops: (Stop, Stop),
-    (step, threshold): (f64, Threshold),
-    mut warnings: Vec<FitWarning>,
-) -> TraceResult {
-    let mut bends: Vec<Bend> = Vec::new();
-    for pair in legs.windows(2) {
-        let tube = (pair[0].radius + pair[1].radius) / 2.0;
-        let found = fit_bend(
-            tracer.tree,
-            (&pair[0].point, &pair[0].dir),
-            (&pair[1].point, &pair[1].dir),
-            tube,
-            tracer.band,
-            tracer.settings.max_bend_radius_factor,
-        );
-        if let Some(bend) = found {
-            if !bend.radius_measured {
-                warnings.push(FitWarning {
-                    code: "SCN_TRACE_BEND_RADIUS_UNMEASURED",
-                    message: format!(
-                        "bend at PI {:?}: radius {:.4} m sits on a search bound or has too few arc points",
-                        bend.intersection_point, bend.radius
-                    ),
-                });
-            }
-            bends.push(bend);
-        }
-    }
-    let (first, last) = (&legs[0], &legs[legs.len() - 1]);
-    let mut straights = Vec::new();
-    for (i, leg) in legs.iter().enumerate() {
-        let start = if i == 0 { None } else { bends.get(i - 1).map(|b| b.tangent_end) }.unwrap_or_else(|| leg.at(leg.data_lo));
-        let end = if i + 1 == legs.len() { None } else { bends.get(i).map(|b| b.tangent_start) }.unwrap_or_else(|| leg.at(leg.data_hi));
-        straights.push(Straight {
-            start,
-            end,
-            direction: leg.dir,
-            radius: leg.radius,
-            length: norm(&sub(&end, &start)),
-            inliers: leg.inliers,
-            rms: leg.rms,
-            coverage_deg: leg.coverage,
-        });
-        if leg.coverage < super::LOW_COVERAGE_DEG {
-            warnings.push(FitWarning {
-                code: "SCN_FIT_LOW_COVERAGE",
-                message: format!("straight {i}: angular coverage {:.1} deg below {} deg", leg.coverage, super::LOW_COVERAGE_DEG),
-            });
-        }
-    }
-    let pis: Vec<Vec3> = bends.iter().map(|b| b.intersection_point).collect();
-    let mut centreline = vec![straights[0].start];
-    centreline.extend(&pis);
-    centreline.push(straights[straights.len() - 1].end);
-    let total: f64 = straights.iter().map(|s| s.length).sum::<f64>().max(1e-12);
-    let mean_radius = straights.iter().map(|s| s.radius * s.length).sum::<f64>() / total;
-    let inliers: usize = legs.iter().map(|l| l.inliers).sum();
-    let std = if legs.len() > 1 {
-        (straights.iter().map(|s| s.length * (s.radius - mean_radius).powi(2)).sum::<f64>() / total).sqrt()
-    } else {
-        first.rms / (first.inliers.max(1) as f64).sqrt()
-    };
-    let mut reducers = Vec::new();
-    for (stop, leg, t) in [(stops.0, first, first.data_lo), (stops.1, last, last.data_hi)] {
-        if let Stop::Radius(after) = stop {
-            reducers.push(Reducer { position: leg.at(t), radius_before: leg.radius, radius_after: after });
-        }
-    }
-    TraceResult {
-        centreline,
-        straights,
-        bends,
-        intersection_points: pis,
-        reducers,
-        diameter: Diameter { value: 2.0 * mean_radius, std: 2.0 * std, source: "length-weighted mean of the straights' fitted radii" },
-        radius: mean_radius,
-        inliers,
-        points_in_region,
-        rms: (legs.iter().map(|l| l.inliers as f64 * l.rms * l.rms).sum::<f64>() / inliers.max(1) as f64).sqrt(),
-        ends: Ends { start: stops.0.reason(), end: stops.1.reason() },
-        step_length: step,
-        threshold,
-        warnings,
-    }
 }

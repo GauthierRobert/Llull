@@ -5,11 +5,13 @@ import { PAPER_SIZES } from '@core/model/sheet';
 import { sha256Hex } from '@lib/sha256';
 import { analyseLine, isAnalysis } from '../analysis';
 import { isoIssue, refuseIso } from '../codes';
+import { deltaOf, snapshotOf, type IssueDelta } from '../compareIssue';
 import { basisOf, issueState } from '../issues';
 import { buildIsoGraph } from '../iso/isoGraph';
 import { axisAngles, TRUE_ISO_SCALE } from '../iso/isoProjection';
 import { dxfOf, svgOf } from '../iso/isoRender';
-import { buildIsoSheet, type IsoSheet } from '../iso/isoSheet';
+import type { Vec3 } from '@core/model/vectors';
+import { buildIsoSheet, type IsoSheet, type SheetOptions } from '../iso/isoSheet';
 import { continuationOf, planSheets, type SheetInfo } from '../iso/isoSheets';
 import { isoTables, TABLE_NAMES } from '../iso/isoTables';
 import type { IsoIssue, IsoStyle } from '../model';
@@ -36,11 +38,11 @@ export const exportIsometric = defineCommand({
     'spool_list (cut_list needs a stored weld gap, else it is left out with a warning); style check prints none unless tables is given. Without define_isometric the line is one sheet; with it, the stored paper, north arrow, style and ' +
     'sheet split apply (params override paper, northArrow, style): a line over maxPipePiecesPerSheet is cut into sheets only at welds, each cut joint is printed on both sheets as "CONT. ON SHEET n - W<number>" / "CONT. FROM SHEET n - W<number>" ' +
     'with its coordinates, components keep their stored sheet after an edit so unchanged sheets are byte-identical, and the tables of a sheet cover its components. Style spool gives one sheet per spool with its spool tables (spoolId = one spool only). ' +
-    'Every sheet carries NOT FOR CONSTRUCTION and reviewRequired true until a human issues the line (issue_isometric); an issue stays valid only while the line content is unchanged. ' +
+    'With compareToIssue the line is compared with its last issued revision and what is new or changed is circled by revision clouds with delta triangles (layer ISO-REV). Every sheet carries NOT FOR CONSTRUCTION and reviewRequired true until a human issues the line (issue_isometric); an issue stays valid only while the line content is unchanged. ' +
     'Returns data = { lineId, style, paper, files: [{ name, format, content, sha256 }], sheets: [{ index, files, sha256 (of the first file), componentIds, pipes, spool?, continuation: { previous?, next?, all: [{ sheet, weld, joint, at, componentIds }] }, tables, layout }], ' +
     'projection: { axes: { east, north, up: { angleDeg } }, interAxisAngleDeg, trueIsoScale }, northArrow: { mode, angleDeg }, dimensions: [{ sheetIndex, run, axis, values, overall, labels, overallLabel, points }], dimensionMismatches, ' +
-    'annotations: [{ sheetIndex, kind elevation | coordinate | slope | weld | spool | continuation | support | skew | skew_leg, text, at, sheet, ... }] (a skew annotation has lengthMm, legsMm, legAxes, angleDeg, plane), supports: [{ id, mark, type, at, sheetIndex }], tables: { <name>: { rows, columns, data } } (whole line), layout (first sheet), warnings, reviewRequired, issue? }. ' +
-    'Refusals (document unchanged): ISO_LINE_NOT_FOUND, ISO_NO_PIPING, ISO_DISCONNECTED, ISO_SPOOL_NOT_FOUND, ISO_PARAM_INVALID, MAT_EXPORT_CONTROLLED. Save with llull export_isometric --save <dir>.',
+    'annotations: [{ sheetIndex, kind elevation | coordinate | slope | weld | spool | continuation | support | skew | skew_leg, text, at, sheet, ... }] (a skew annotation has lengthMm, legsMm, legAxes, angleDeg, plane), supports: [{ id, mark, type, at, sheetIndex }], comparison? (compareToIssue: { issueId, issuedRevision, purpose, unchanged, clouds, delta: { components, welds, dimensions, bom: { added, removed, changed }, bomChanges, total } }), tables: { <name>: { rows, columns, data } } (whole line), layout (first sheet), warnings, reviewRequired, issue? }. ' +
+    'Refusals (document unchanged): ISO_LINE_NOT_FOUND, ISO_NO_PIPING, ISO_DISCONNECTED, ISO_SPOOL_NOT_FOUND, ISO_PARAM_INVALID, ISO_ISSUE_NOT_FOUND, ISO_ISSUE_SNAPSHOT_MISSING (compareToIssue), MAT_EXPORT_CONTROLLED. Save with llull export_isometric --save <dir>.',
   params: z.object({
     lineId: z.string().min(1).describe('The line: routed line id, imported PCF line number or legacy pipe line number.'),
     style: z
@@ -70,6 +72,19 @@ export const exportIsometric = defineCommand({
       .min(1)
       .optional()
       .describe('A spool name from spool_list (e.g. L-101-SP02): draw only that spool (implies style spool).'),
+    compareToIssue: z
+      .boolean()
+      .optional()
+      .describe(
+        'Compare the line with its last issued revision (the issue_isometric stamp): components, welds, dimension strings and BOM rows that are new, removed or changed. Added and changed components and welds are circled by a revision cloud with a delta triangle on the sheet (layer ISO-REV; annotations kind revision); removed ones are counted in the legend and listed in data.comparison. Needs an issue with a stored snapshot.',
+      ),
+    revision: z
+      .string()
+      .trim()
+      .min(1)
+      .max(8)
+      .optional()
+      .describe('Label printed in the delta triangles of compareToIssue (the revision being drawn, e.g. "B"). Default "*".'),
     confirmExportControlled,
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -83,6 +98,15 @@ export const exportIsometric = defineCommand({
         'spoolId is for the spool style: omit style or pass style spool',
         [params.spoolId],
         ['spoolId', 'style'],
+      );
+    if (params.revision !== undefined && params.compareToIssue !== true)
+      return refuseIso(
+        doc,
+        'export_isometric',
+        'ISO_PARAM_INVALID',
+        'revision labels the compareToIssue clouds: pass compareToIssue true',
+        [],
+        ['revision'],
       );
     const analysis = analyseLine(doc, 'export_isometric', params.lineId);
     if (!isAnalysis(analysis)) return analysis;
@@ -132,6 +156,31 @@ export const exportIsometric = defineCommand({
       );
     const wanted = params.tables ?? (style === 'check' ? [] : TABLE_NAMES);
     const { latest, current } = issueState(analysis.fabrication, analysis.lineId, basisOf(analysis));
+    let comparison: { issueId: string; issuedRevision: string; purpose: string; unchanged: boolean; delta: IssueDelta } | undefined;
+    let revision: SheetOptions['revision'];
+    if (params.compareToIssue === true) {
+      const issued = latest === undefined ? undefined : analysis.fabrication.issueSnapshots?.[latest.id];
+      if (latest === undefined || issued === undefined)
+        return refuseIso(
+          doc,
+          'export_isometric',
+          latest === undefined ? 'ISO_ISSUE_NOT_FOUND' : 'ISO_ISSUE_SNAPSHOT_MISSING',
+          latest === undefined ? `line ${params.lineId} has no issue to compare with` : `issue ${latest.id} has no stored snapshot`,
+          latest === undefined ? [params.lineId] : [latest.id],
+          ['compareToIssue'],
+        );
+      const now = snapshotOf(analysis);
+      const delta = deltaOf(issued, now);
+      comparison = { issueId: latest.id, issuedRevision: latest.revision, purpose: latest.purpose, unchanged: delta.total === 0, delta };
+      if (delta.total > 0)
+        revision = {
+          label: params.revision ?? '*',
+          issuedRevision: latest.revision,
+          removed: delta.components.removed.length,
+          componentIds: new Set([...delta.components.added, ...delta.components.changed]),
+          welds: new Map([...delta.welds.added, ...delta.welds.changed].map((number) => [number, (now.welds[number] as { at: Vec3 }).at])),
+        };
+    }
     const scoped = style === 'spool' || plan.sheets.length > 1;
     const supports = lineSupports(doc, analysis.lineId, analysis.read.network);
     const built: Array<{ info: SheetInfo; sheet: IsoSheet; continuation: ReturnType<typeof continuationOf> }> = [];
@@ -143,6 +192,7 @@ export const exportIsometric = defineCommand({
         northArrow,
         tables: wanted,
         supports,
+        ...(revision === undefined ? {} : { revision }),
         project: doc.building?.project.name.trim() || 'llull',
         ...(current === undefined
           ? {}
@@ -211,6 +261,7 @@ export const exportIsometric = defineCommand({
       `export_isometric: line ${analysis.name}: ${built.length} sheet(s) ${paper} (${style}), ${graph.runs.length} run(s), ${built.reduce((sum, { sheet }) => sum + sheet.dimensions.length, 0)} dimension string(s) (${mismatches} mismatch), ` +
         `${built.reduce((sum, { sheet }) => sum + sheet.annotations.length, 0)} label(s), ${whole.length} table(s), ${files.map((file) => file.name).join(', ')}; ` +
         `${current === undefined ? 'NOT FOR CONSTRUCTION, review required' : `issued ${current.purpose.replace('_', ' ')} rev ${current.revision} by ${current.signer}`}` +
+        `${comparison === undefined ? '' : `; vs rev ${comparison.issuedRevision}: ${comparison.delta.total} difference(s)`}` +
         `${warnings.length === 0 ? '' : `; warnings: ${[...new Set(warnings.map((warning) => warning.code))].join(', ')}`}`,
       {
         lineId: analysis.name,
@@ -259,6 +310,17 @@ export const exportIsometric = defineCommand({
           passes: first.layout.passes,
           crossings: first.layout.crossings.length,
         },
+        ...(comparison === undefined
+          ? {}
+          : {
+              comparison: {
+                ...comparison,
+                clouds: built.reduce(
+                  (sum, { sheet }) => sum + sheet.annotations.filter((annotation) => annotation.kind === 'revision').length,
+                  0,
+                ),
+              },
+            }),
         warnings,
         reviewRequired: current === undefined,
         ...(current === undefined ? {} : { issue: current }),

@@ -264,8 +264,10 @@
         "check.status": "fail",
         "check.codes": [
           "DAT_REQUIRED_PROPERTY_MISSING",
-          "DAT_LINE_END_UNRESOLVED"
-        ]
+          "DAT_LINE_END_UNRESOLVED",
+          "DAT_INFERRED_NOZZLE"
+        ],
+        "check.findings": 3
       },
       "tolerance": "exact codes, ids, paths",
       "source": "plan",
