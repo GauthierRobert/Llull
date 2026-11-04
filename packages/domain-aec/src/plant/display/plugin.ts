@@ -9,10 +9,12 @@ import { plantEntityProperties } from './properties';
 import { applyServiceColourScheme, listServiceColourSchemes } from './serviceColour';
 import { renderStats } from './renderStats';
 import { pipeMarkers } from './pipeMarkers';
+import { addPipeMarkers } from './addPipeMarkers';
+import { checkPipeMarkers } from './checkPipeMarkers';
 
 export const plantDisplayPlugin: CadPlugin = {
   name: 'plant-display',
   toolset: 'review',
-  commands: commandCatalog(listServiceColourSchemes, applyServiceColourScheme, renderStats, pipeMarkers),
+  commands: commandCatalog(listServiceColourSchemes, applyServiceColourScheme, renderStats, pipeMarkers, addPipeMarkers, checkPipeMarkers),
   entityProperties: plantEntityProperties,
 };

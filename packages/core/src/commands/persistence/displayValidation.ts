@@ -92,11 +92,44 @@ function materialClassProblems(display: Record<string, unknown>): string[] {
   return problems;
 }
 
+const isVec3 = (value: unknown): boolean =>
+  Array.isArray(value) && value.length === 3 && value.every((n) => typeof n === 'number' && Number.isFinite(n));
+const REASONS = ['valve', 'flange', 'bend', 'interval'];
+
+function pipeMarkerProblems(display: Record<string, unknown>): string[] {
+  const markers = display['pipeMarkers'];
+  if (markers === undefined) return [];
+  if (!isRecord(markers)) return ['display.pipeMarkers must be a record'];
+  return Object.entries(markers).flatMap(([id, marker]) => {
+    const where = `display.pipeMarkers['${id}']`;
+    if (isReservedKey(id)) return [`display.pipeMarkers: id '${id}' is a reserved JavaScript property name`];
+    const ok =
+      isRecord(marker) &&
+      marker['id'] === id &&
+      typeof marker['pipeId'] === 'string' &&
+      isVec3(marker['positionMm']) &&
+      isVec3(marker['tangent']) &&
+      typeof marker['atMm'] === 'number' &&
+      REASONS.includes(marker['reason'] as string) &&
+      typeof marker['fieldLengthMm'] === 'number' &&
+      typeof marker['letterHeightMm'] === 'number' &&
+      typeof marker['bandInterpolated'] === 'boolean' &&
+      typeof marker['bidirectional'] === 'boolean' &&
+      (marker['letters'] === undefined || typeof marker['letters'] === 'string') &&
+      (marker['letterHex'] === undefined || typeof marker['letterHex'] === 'string');
+    return ok
+      ? []
+      : [
+          `${where} must be { id, pipeId, positionMm, tangent, atMm, reason, fieldLengthMm, letterHeightMm, bandInterpolated, bidirectional, letters?, letterHex? }`,
+        ];
+  });
+}
+
 /** Problems of the optional `display` field of a raw document (absent is valid). */
 export function displayProblems(value: unknown): string[] {
   if (value === undefined) return [];
   if (!isRecord(value) || !isRecord(value['colourProfiles']))
-    return ['display must be { colourProfiles, activeProfileId?, materialClasses?, materialClassOf? }'];
+    return ['display must be { colourProfiles, activeProfileId?, materialClasses?, materialClassOf?, pipeMarkers? }'];
   const profiles = value['colourProfiles'];
   const active = value['activeProfileId'];
   const problems = [
@@ -105,6 +138,7 @@ export function displayProblems(value: unknown): string[] {
       ? null
       : 'display.activeProfileId must name an existing profile',
     ...materialClassProblems(value),
+    ...pipeMarkerProblems(value),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }

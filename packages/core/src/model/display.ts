@@ -84,6 +84,31 @@ export interface MaterialClass {
   readonly roughness: number;
 }
 
+/** One stored pipe-content marker (`add_pipe_markers`, plant 09 VIS §5.7): where it sits on a pipe and the size of its legend. Absolute mm, document coordinates. */
+export interface PipeMarker {
+  /** `<pipe id>:<k>`, k from 1 along the pipe. */
+  readonly id: string;
+  /** Building pipe id or 02 RTE run id the marker sits on. */
+  readonly pipeId: string;
+  readonly positionMm: readonly [number, number, number];
+  /** Unit vector along the centreline (from end toward to end) at the marker. */
+  readonly tangent: readonly [number, number, number];
+  /** Arc length from the start of the pipe. */
+  readonly atMm: number;
+  /** Why it is there: a valve, flange or direction change within 600 mm, or the straight-run interval. */
+  readonly reason: 'valve' | 'flange' | 'bend' | 'interval';
+  /** Legend size of the A13.1 table row of the pipe (OD plus covering). */
+  readonly fieldLengthMm: number;
+  readonly letterHeightMm: number;
+  /** The OD lay between two table rows (next larger row taken): a reviewer confirms with the edition in force. */
+  readonly bandInterpolated: boolean;
+  /** Letters and colour from the profile rule the pipe's service selects, when the profile carries them. */
+  readonly letters?: string;
+  readonly letterHex?: string;
+  /** A both-ways flow arrow (the line is flagged bidirectional) instead of one along the tangent. */
+  readonly bidirectional: boolean;
+}
+
 export interface DisplayModel {
   colourProfiles: Record<string, ColourProfile>;
   activeProfileId?: string;
@@ -91,6 +116,8 @@ export interface DisplayModel {
   materialClasses?: Record<string, MaterialClass>;
   /** Entity id -> class id (assign_material_class); entries of deleted entities or classes are ignored. */
   materialClassOf?: Record<string, string>;
+  /** Stored A13.1 markers by id (add_pipe_markers); a marker whose pipe is gone is reported by check_pipe_markers and drawn by nothing. */
+  pipeMarkers?: Record<string, PipeMarker>;
 }
 
 export function createDisplayModel(): DisplayModel {
