@@ -31,7 +31,7 @@ export function decodedTransforms(array: InstanceArray): Float64Array | null {
 }
 
 /** Placement of member `index` of a decoded table. */
-export function memberPlacement(table: Float64Array, index: number): { readonly position: Vec3; readonly rotation: Vec3 } {
+function memberPlacement(table: Float64Array, index: number): { readonly position: Vec3; readonly rotation: Vec3 } {
   const at = index * INSTANCE_STRIDE;
   return {
     position: [table[at] ?? 0, table[at + 1] ?? 0, table[at + 2] ?? 0],
