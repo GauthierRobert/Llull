@@ -192,7 +192,7 @@ export const placeGratings = (
   building: BuildingModel,
   slots: readonly Slot[],
   base: PartBase,
-  fields: { topOffset: number; gratingType: string; bearingBarAngle: number },
+  fields: { topOffset: number; gratingType: string; bearingBarAngle: number; imposedLoadKPa?: number },
   panels: ReadonlyArray<PanelDef>,
 ): { building: BuildingModel; ids: string[] } =>
   place(
@@ -211,6 +211,7 @@ export const placeGratings = (
           topOffset: fields.topOffset,
           gratingType: fields.gratingType,
           bearingBarAngle: fields.bearingBarAngle,
+          ...(fields.imposedLoadKPa === undefined ? {} : { imposedLoadKPa: fields.imposedLoadKPa }),
           supportIds: panel.supportIds,
         }),
     ),

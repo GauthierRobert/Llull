@@ -9,6 +9,7 @@ import { planPoint } from '@lib/vec2';
 import { pointInPolygon, polygonArea, projectOntoSegment, type Point2 } from '@lib/polygon';
 import { elementsOf } from '../../building/model';
 import { GRAVITY, round } from '../../shared/numeric';
+import { findGratingType } from '../../plant/structures/grating/gratingTypes';
 import type { ModelUnits } from './steelMemberBars';
 import { depositArea, type BeamLoads } from './steelBeamLoads';
 
@@ -20,7 +21,11 @@ interface AreaLoadParams {
 }
 
 export interface FloorLoadReport {
+  /** Element id of the surface: a floor slab, or a grating panel (06 STA, `kind` "grating"). */
   readonly slabId: string;
+  readonly kind: 'slab' | 'grating';
+  /** Imposed load used on this surface, kN/m² (a grating panel: its own `imposedLoadKPa`, else the `imposedLoad` default). */
+  readonly imposedKnM2: number;
   readonly mark: string;
   readonly levelId: string;
   /** Net floor area (openings removed), m². */
@@ -45,6 +50,10 @@ type AreaLoadResult = { readonly floors: FloorLoadReport[]; readonly equipment: 
 
 interface Surface {
   readonly slabId: string;
+  readonly kind: 'slab' | 'grating';
+  /** kN/m² permanent and imposed on this surface. */
+  readonly deadKnM2: number;
+  readonly imposedKnM2: number;
   readonly mark: string;
   readonly levelId: string;
   readonly polygon: Point2[];
@@ -110,7 +119,7 @@ function rasterCells(surface: Surface): { centres: Point2[]; area: number } {
   return { centres, area: Math.max(0, net) / 1e6 };
 }
 
-function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>): Surface[] {
+function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>, params: AreaLoadParams): Surface[] {
   const { building, toMm, elevationMm } = units;
   const surfaces: Surface[] = [];
   for (const slab of elementsOf(building, 'slab')) {
@@ -118,12 +127,32 @@ function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>): Surface
     const top = elevationMm(slab.levelId) + toMm(slab.offset);
     surfaces.push({
       slabId: slab.id,
+      kind: 'slab',
+      deadKnM2: params.floorDeadLoad,
+      imposedKnM2: params.imposedLoad,
       mark: slab.mark,
       levelId: slab.levelId,
       polygon: slab.boundary.map((point) => toPoint2(point, toMm)),
       openings: (slab.openings ?? []).map((opening) => opening.map((point) => toPoint2(point, toMm))),
       top,
       beams: beamsUnder(beams, top - toMm(slab.thickness), top),
+    });
+  }
+  for (const grating of elementsOf(building, 'grating')) {
+    const type = findGratingType(grating.gratingType);
+    if (type === undefined) continue;
+    const top = elevationMm(grating.levelId) + toMm(grating.topOffset);
+    surfaces.push({
+      slabId: grating.id,
+      kind: 'grating',
+      deadKnM2: (type.massKgM2 * GRAVITY) / 1000,
+      imposedKnM2: grating.imposedLoadKPa ?? params.imposedLoad,
+      mark: grating.mark,
+      levelId: grating.levelId,
+      polygon: grating.boundary.map((point) => toPoint2(point, toMm)),
+      openings: [],
+      top,
+      beams: beamsUnder(beams, top - type.barDepthMm, top),
     });
   }
   return surfaces;
@@ -146,18 +175,19 @@ function footprintsOf(units: ModelUnits): Array<{ id: string; footprint: Footpri
   return footprints;
 }
 
-function applyFloors(
-  surfaces: ReadonlyArray<Surface>,
-  footprints: ReadonlyArray<Footprint>,
-  params: AreaLoadParams,
-  warnings: string[],
-): FloorLoadReport[] {
+function applyFloors(surfaces: ReadonlyArray<Surface>, footprints: ReadonlyArray<Footprint>, warnings: string[]): FloorLoadReport[] {
   return surfaces.map((surface): FloorLoadReport => {
     const { centres, area } = rasterCells(surface);
-    const report = { slabId: surface.slabId, mark: surface.mark, levelId: surface.levelId };
+    const report = {
+      slabId: surface.slabId,
+      kind: surface.kind,
+      imposedKnM2: surface.imposedKnM2,
+      mark: surface.mark,
+      levelId: surface.levelId,
+    };
     if (surface.beams.length === 0 || centres.length === 0) {
       warnings.push(
-        `floor slab ${surface.mark} (${surface.levelId}) has no steel beam at its level: its load is not carried by any member`,
+        `${surface.kind === 'grating' ? 'grating panel' : 'floor slab'} ${surface.mark} (${surface.levelId}) has no steel beam at its level: its load is not carried by any member`,
       );
       return { ...report, areaM2: area, deadKn: 0, imposedKn: 0, supportingBeams: 0 };
     }
@@ -167,8 +197,8 @@ function applyFloors(
     let imposedKn = 0;
     for (const centre of centres) {
       const occupied = standing.some((footprint) => insideFootprint(centre, footprint));
-      const dead = params.floorDeadLoad * cellArea;
-      const imposed = occupied ? 0 : params.imposedLoad * cellArea;
+      const dead = surface.deadKnM2 * cellArea;
+      const imposed = occupied ? 0 : surface.imposedKnM2 * cellArea;
       bear(centre, surface.beams, dead, imposed, true);
       deadKn += dead;
       imposedKn += imposed;
@@ -241,11 +271,10 @@ function applyEquipment(
  */
 export function applyAreaLoads(units: ModelUnits, beams: ReadonlyArray<BeamLoads>, params: AreaLoadParams): AreaLoadResult {
   const warnings: string[] = [];
-  const surfaces = surfacesOf(units, beams);
+  const surfaces = surfacesOf(units, beams, params);
   const floors = applyFloors(
     surfaces,
     footprintsOf(units).map((entry) => entry.footprint),
-    params,
     warnings,
   );
   const equipment = applyEquipment(units, surfaces, beams, warnings);

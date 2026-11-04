@@ -7,7 +7,10 @@ import type { CadDocument } from '@core/model/types';
 import { MM_PER_UNIT } from '@core/model/units';
 import type { AssemblyElement, BuildingModel } from '@aec/building/types';
 import { remediationOf, type StaCode } from '../codes';
+import { boxFootprint } from '../ladder/boxFootprint';
 import { obstacleOf } from '../ladder/ladderClearance';
+import type { OrientedBox } from '../../../industrial/clash/clashBoxes';
+import { pipeBoxes } from './obstructions';
 import { platformSpecSchema } from '../platform/platformSpec';
 import { ruleById, type RulesetName } from '../rules/ruleTable';
 import { breachFinding, type Finding } from './finding';
@@ -66,8 +69,14 @@ function widthMm(assembly: AssemblyElement, factor: number): number | null {
   return parsed.success ? minimumWidth(parsed.data.boundary.map(([x, y]) => [x * factor, y * factor])) : null;
 }
 
-/** Lowest underside above the deck within its plan, mm above the deck top: other surfaces, walls, columns, steel members and equipment; null when none is above. */
-function headroomMm(doc: CadDocument, building: BuildingModel, node: SurfaceNode, assembly: AssemblyElement): number | null {
+/** Lowest underside above the deck within its plan, mm above the deck top: other surfaces, walls, columns, steel members, equipment, pipes and trays (spec-driven runs with their insulation; the whole box, so a sloped pipe is a conservative lower bound); null when none is above. */
+function headroomMm(
+  doc: CadDocument,
+  building: BuildingModel,
+  node: SurfaceNode,
+  assembly: AssemblyElement,
+  pipes: ReadonlyArray<OrientedBox>,
+): number | null {
   const factor = MM_PER_UNIT[doc.units];
   let lowest: number | null = null;
   const consider = (undersideMm: number): void => {
@@ -82,6 +91,10 @@ function headroomMm(doc: CadDocument, building: BuildingModel, node: SurfaceNode
     if (obstacle === null) continue;
     if (obstacle.zMin * factor > node.topMm + 1 && overlaps(obstacle.ring.map(([x, y]) => [x * factor, y * factor])))
       consider(obstacle.zMin * factor);
+  }
+  for (const box of pipes) {
+    const { ring, zMin } = boxFootprint(box);
+    if (zMin * factor > node.topMm + 1 && overlaps(ring.map(([x, y]) => [x * factor, y * factor]))) consider(zMin * factor);
   }
   return lowest === null ? null : lowest - node.topMm;
 }
@@ -139,6 +152,7 @@ export function checkPlatforms(
           ),
         ];
   const tree = isRefusal(graph) ? null : routeTree(graph);
+  const pipes = pipeBoxes(doc, building);
   const reports: PlatformReport[] = [];
   const iso = rulesets.includes('iso_14122');
   for (const assembly of platforms) {
@@ -178,7 +192,7 @@ export function checkPlatforms(
           ),
         );
       else {
-        const steel = headroomMm(doc, building, node, assembly);
+        const steel = headroomMm(doc, building, node, assembly, pipes);
         const surface = surfaceHeadroomMm(graph, node);
         headroom = steel === null ? surface : surface === null ? steel : Math.min(steel, surface);
         if (headroom !== null && iso) {

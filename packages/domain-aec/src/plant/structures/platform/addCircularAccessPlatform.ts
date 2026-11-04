@@ -54,6 +54,13 @@ export const addCircularAccessPlatform = defineCommand({
     sweepDeg: z.number().positive().max(360).optional().describe('Angular extent, degrees, 0 < sweep <= 360. Default 360 (full ring).'),
     gap: z.number().min(0).optional().describe('Clear gap between the shell and the walkway, DOCUMENT UNITS. Default 50 mm.'),
     gratingType: z.string().optional().describe('Catalogue key from list_grating_types. Default "19-W-4 1-1/4x3/16".'),
+    imposedLoadKPa: z
+      .number()
+      .min(0)
+      .optional()
+      .describe(
+        'Imposed (live) load on the walking surface, kN/m² (kPa), fed to check_steel_members with the grating self-weight. Unset: check_steel_members uses its own imposedLoad default (5 kN/m²).',
+      ),
     bracketProfile: z.string().optional().describe('Steel catalogue name of the brackets (list_steel_profiles). Default UPN160.'),
     bracketSpacingMax: z
       .number()
@@ -91,6 +98,7 @@ export const addCircularAccessPlatform = defineCommand({
       gratingType: named(params.gratingType, DEFAULT_CIRCULAR_GRATING, `gratingType ${DEFAULT_CIRCULAR_GRATING}`),
       bracketProfile: named(params.bracketProfile, DEFAULT_BRACKET_PROFILE, `bracketProfile ${DEFAULT_BRACKET_PROFILE}`),
       ...(params.bracketSpacingMax === undefined ? {} : { bracketSpacingMax: params.bracketSpacingMax }),
+      ...(params.imposedLoadKPa === undefined ? {} : { imposedLoadKPa: params.imposedLoadKPa }),
       railing,
     };
     if (params.bracketSpacingMax === undefined)

@@ -224,7 +224,7 @@ export const checkClashes = defineCommand({
     'envelope of every valve whose catalogue row describes one (handwheel disc, gear box, actuator along the stem direction; id "<valve part>/wheel", "/gear", "/actuator"): a hit is a ' +
     'hard clash with the part id, e.g. "run-4/pipe-2"; the insulation of an insulated line (create_pipeline insulation, OD + 2 x thickness) is ' +
     'checked too and a hit that the bare pipe clears is kind "insulation"; a run is not checked against the runs attached to it or the equipment ' +
-    'its nozzles sit on. Returns element ids, kind ("hard", "insulation" or "clearance") and penetration depth (document units; summary in mm).',
+    'its nozzles sit on. Plant access elements (ladders, steel stairs, grating panels, railings) take part with their parts, named by element id; railing gates are not bodies and an element never clashes with what it stands on. Returns element ids, kind ("hard", "insulation" or "clearance") and penetration depth (document units; summary in mm).',
   params: z.object({
     levelId: z.string().optional().describe('Only this level. Default: the whole building.'),
     tolerance: z.number().optional().describe('Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.'),

@@ -65,6 +65,13 @@ export const addGrating = defineCommand({
       .describe(
         'Panel depth, DOCUMENT UNITS. Optional: it must equal the bar depth of the type (the catalogue decides); refused otherwise.',
       ),
+    imposedLoadKPa: z
+      .number()
+      .min(0)
+      .optional()
+      .describe(
+        'Imposed (live) load on the walking surface, kN/m² (kPa), fed to check_steel_members with the grating self-weight. Unset: check_steel_members uses its own imposedLoad default (5 kN/m²).',
+      ),
     levelId: levelIdParam,
   }),
   run: (doc, params): CommandResult => {
@@ -186,6 +193,7 @@ export const addGrating = defineCommand({
         topOffset,
         gratingType: type.name,
         bearingBarAngle: barAngle,
+        ...(params.imposedLoadKPa === undefined ? {} : { imposedLoadKPa: params.imposedLoadKPa }),
         supportIds: supportIdsOf(panel.supports),
       }),
     );
