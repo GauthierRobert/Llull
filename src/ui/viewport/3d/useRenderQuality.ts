@@ -27,6 +27,8 @@ export interface RenderQualitySettings {
   plantShadowMaxLod: -1 | 0 | 1 | 2;
   /** Feature edges (screen-space normal/depth pass) by default: High only; the Edges toggle overrides. */
   edgeLines: boolean;
+  /** Half-resolution GTAO ambient occlusion (a post-processing pass): High only. */
+  ambientOcclusion: boolean;
 }
 
 const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
@@ -39,6 +41,7 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     keyShadows: true,
     plantShadowMaxLod: 1,
     edgeLines: false,
+    ambientOcclusion: false,
   },
   medium: {
     tier: 'medium',
@@ -49,6 +52,7 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     keyShadows: true,
     plantShadowMaxLod: 1,
     edgeLines: false,
+    ambientOcclusion: false,
   },
   low: {
     tier: 'low',
@@ -59,13 +63,21 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     keyShadows: true,
     plantShadowMaxLod: 1,
     edgeLines: false,
+    ambientOcclusion: false,
   },
 };
 
 /** Realism tiers sit on top of the quality tier: Standard keeps it, Draft drops every shadow, High forces the richest set whatever the scene size. */
 const REALISM_SETTINGS: Record<Exclude<RealismTier, 'standard'>, RenderQualitySettings> = {
-  draft: { ...QUALITY_SETTINGS.low, keyShadows: false, plantShadowMaxLod: -1, edgeLines: false },
-  high: { ...QUALITY_SETTINGS.high, softShadowSamples: 24, shadowMapSize: 4096, plantShadowMaxLod: 2, edgeLines: true },
+  draft: { ...QUALITY_SETTINGS.low, keyShadows: false, plantShadowMaxLod: -1, edgeLines: false, ambientOcclusion: false },
+  high: {
+    ...QUALITY_SETTINGS.high,
+    softShadowSamples: 24,
+    shadowMapSize: 4096,
+    plantShadowMaxLod: 2,
+    edgeLines: true,
+    ambientOcclusion: true,
+  },
 };
 
 /** Final settings of a quality tier under a realism tier. Stable references (per tier pair). */

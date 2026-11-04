@@ -65,7 +65,7 @@ const EDGE_SHADER = {
       // The normal target is cleared to zero: no surface there, the depth edge already draws the silhouette.
       if (zc >= cameraFar && z0 >= cameraFar && z1 >= cameraFar && z2 >= cameraFar && z3 >= cameraFar) normalEdge = 0.0;
       float edge = max(depthEdge, normalEdge) * strength;
-      gl_FragColor = vec4(mix(base.rgb, lineColor, edge), base.a);
+      gl_FragColor = vec4(mix(base.rgb, lineColor, edge), max(base.a, edge));
     }
   `,
 };

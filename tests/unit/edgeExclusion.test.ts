@@ -16,6 +16,16 @@ describe('edge pass exclusion', () => {
     expect(isEdgeExcluded(solid())).toBe(false);
   });
 
+  it('excludes a mesh with only overlay materials (not drawn, or no depth test: the TransformControls gizmo), not one with a world material among them', () => {
+    const undrawn = new THREE.MeshBasicMaterial({ visible: false });
+    expect(isEdgeExcluded(new THREE.Mesh(new THREE.PlaneGeometry(), undrawn))).toBe(true);
+    expect(isEdgeExcluded(new THREE.Mesh(new THREE.PlaneGeometry(), [undrawn, undrawn]))).toBe(true);
+    const overlay = new THREE.MeshBasicMaterial({ depthTest: false });
+    expect(isEdgeExcluded(new THREE.Mesh(new THREE.BoxGeometry(), overlay))).toBe(true);
+    expect(isEdgeExcluded(new THREE.Mesh(new THREE.PlaneGeometry(), [undrawn, overlay]))).toBe(true);
+    expect(isEdgeExcluded(new THREE.Mesh(new THREE.PlaneGeometry(), [undrawn, new THREE.MeshBasicMaterial()]))).toBe(false);
+  });
+
   it('hides them for the normal render and restores exactly what it hid', () => {
     const scene = new THREE.Scene();
     const keep = solid();

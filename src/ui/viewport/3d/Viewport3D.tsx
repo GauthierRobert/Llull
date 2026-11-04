@@ -85,6 +85,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
   const quality = useRenderQuality();
   const edges = useEdgeLines();
+  const ambientOcclusion = quality.ambientOcclusion;
+  const effects = edges || ambientOcclusion;
   const palette = useViewportPalette();
 
   // Initial camera only: CameraReactor applies later changes imperatively.
@@ -192,9 +194,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* Last: its useFrame must run after every pose writer (see RenderRig). */}
       <RenderRig />
-      {edges && <HighQualityEffects edges={edges} />}
+      {effects && <HighQualityEffects edges={edges} ambientOcclusion={ambientOcclusion} />}
 
-      <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={edges ? 2 : 1}>
+      <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={effects ? 2 : 1}>
         <GizmoViewport axisColors={palette.axisColors} labelColor={palette.axisLabel} />
       </GizmoHelper>
     </>

@@ -74,6 +74,16 @@ describe('realism tiers', () => {
   });
 });
 
+describe('ambient occlusion', () => {
+  it('is on in High only, whatever the scene size', () => {
+    for (const tier of ['high', 'medium', 'low'] as const) {
+      expect(settingsFor(tier, 'high').ambientOcclusion).toBe(true);
+      expect(settingsFor(tier, 'standard').ambientOcclusion).toBe(false);
+      expect(settingsFor(tier, 'draft').ambientOcclusion).toBe(false);
+    }
+  });
+});
+
 describe('feature edges', () => {
   it('are on by default in High only', () => {
     for (const tier of ['high', 'medium', 'low'] as const) {
