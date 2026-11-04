@@ -7,9 +7,11 @@ import { addPump } from './commands/addPump';
 import { addStorageTank } from './commands/addStorageTank';
 import { addVessel } from './commands/addVessel';
 import { checkEquipment } from './commands/checkEquipment';
+import { equipmentCog } from './commands/equipmentCog';
 import { equipmentDatasheet } from './commands/equipmentDatasheet';
 import { equipmentWeights } from './commands/equipmentWeights';
 import { equipmentPortsQuery } from './commands/equipmentPortsQuery';
+import { nozzleReinforcement } from './commands/nozzleReinforcement';
 import { addNozzle, deleteNozzle, updateNozzle } from './commands/nozzles';
 import { tankShellThickness } from './commands/tankShellThickness';
 import { updateEquipmentParameters } from './commands/updateEquipmentParameters';
@@ -33,8 +35,10 @@ export const equipmentCatalog = commandCatalog(
   renameElementTag,
   vesselVolume,
   vesselThickness,
+  nozzleReinforcement,
   tankShellThickness,
   equipmentWeights,
+  equipmentCog,
   checkEquipment,
   equipmentDatasheet,
 );

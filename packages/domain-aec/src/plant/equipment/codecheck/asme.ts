@@ -244,18 +244,39 @@ function headPart(
   }
   if (shape.kind === 'torispherical') {
     const proportions = shape.knuckleRadius / shape.crownRadius;
-    if (Math.abs(proportions - FD_KNUCKLE_RATIO) > 1e-6 || shape.crownRadius > template.insideDiameter * (1 + TOLERANCE))
+    if (shape.crownRadius > template.insideDiameter * (1 + TOLERANCE))
       return notCovered(
-        `UG-32(e) is built for ASME flanged and dished proportions only (knuckle 6 % of the crown radius, crown radius <= D); this head has k/L ${proportions}`,
+        `UG-32(e) needs a crown radius not above the skirt diameter: L ${shape.crownRadius} > D ${template.insideDiameter}`,
       );
     const crown = shape.crownRadius * mm + grow;
     if (available / crown < 0.002)
       return notCovered(`UG-32(e) needs t/L >= 0.002 (App. 1-4(f) / UG-33 below it): t ${available} mm, L ${crown} mm`);
-    const formula = 't = 0.885 P L / (S E - 0.1 P); P = S E t / (0.885 L + 0.1 t)';
-    const required = (0.885 * p * crown) / (se - 0.1 * p);
+    if (Math.abs(proportions - FD_KNUCKLE_RATIO) <= 1e-6) {
+      const formula = 't = 0.885 P L / (S E - 0.1 P); P = S E t / (0.885 L + 0.1 t)';
+      const required = (0.885 * p * crown) / (se - 0.1 * p);
+      return {
+        key,
+        result: finish(basis, 'UG-32(e)', formula, required, (se * available) / (0.885 * crown + 0.1 * available), {
+          crownRadiusMm: crown,
+        }),
+      };
+    }
+    const knuckle = shape.knuckleRadius * mm + grow;
+    const skirtOutside = template.insideDiameter * mm + 2 * basis.nominal;
+    if (knuckle < 0.06 * skirtOutside || knuckle < 3 * basis.nominal)
+      return notCovered(
+        `UG-32(e) needs a knuckle radius of at least 6 % of the skirt outside diameter (${0.06 * skirtOutside} mm) and 3 t (${3 * basis.nominal} mm): r ${knuckle} mm`,
+      );
+    const m = (3 + Math.sqrt(crown / knuckle)) / 4;
+    const formula = 't = P L M / (2 S E - 0.2 P), M = (3 + sqrt(L / r)) / 4; P = 2 S E t / (L M + 0.2 t)';
+    const required = (p * crown * m) / (2 * se - 0.2 * p);
     return {
       key,
-      result: finish(basis, 'UG-32(e)', formula, required, (se * available) / (0.885 * crown + 0.1 * available), { crownRadiusMm: crown }),
+      result: finish(basis, 'UG-32(e)', formula, required, (2 * se * available) / (crown * m + 0.2 * available), {
+        crownRadiusMm: crown,
+        knuckleRadiusMm: knuckle,
+        M: m,
+      }),
     };
   }
   return notCovered(
