@@ -47,7 +47,10 @@ export interface ScenePart {
   readonly name: string;
   readonly entityId: string;
   readonly kind: Entity['kind'];
-  /** World-space triangles. A part that reuses the tessellation of an identical placed solid (gpu mode) holds that prototype's `localTris`: same length, never read as world geometry (it is drawn through a shared mesh). */
+  /**
+   * World-space triangles. A part that reuses the tessellation of an identical placed solid (gpu mode) holds that prototype's `localTris`:
+   * same length, never read as world geometry (it is drawn through a shared mesh).
+   */
   readonly tris: Triangle[];
   /** The same triangles in the part's own frame: texture UVs follow the part, as in the viewport. */
   readonly localTris: Triangle[];
@@ -155,7 +158,7 @@ function addToBuckets(
 
 /**
  * Parts of a placed solid in gpu mode: the first solid of each (shape, appearance) prototype is tessellated, later identical solids reuse its
- * local triangles (a part with face colours is always tessellated on its own).
+ * local triangles (a part with face colours is always tessellated on its own). Every part built here has a placement (a solid always does).
  */
 function placedParts(name: string, solid: Entity, doc: CadDocument, prototypes: Map<string, readonly ScenePart[]>): ScenePart[] {
   const appearance = appearanceOf(doc, solid);

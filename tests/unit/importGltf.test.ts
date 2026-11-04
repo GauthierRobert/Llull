@@ -219,6 +219,72 @@ describe('import_gltf: refusals (named codes, document unchanged)', () => {
     refused(triangleGltf({ nodes }), 'GLTF_LIMIT');
   });
 
+  it('refuses transforms that overflow the double range (finite inputs, infinite products): matrix, stacked scales, scale param', () => {
+    const big = 1e308;
+    refused(triangleGltf({ nodes: [{ mesh: 0, matrix: new Array(16).fill(big) }] }), 'GLTF_LIMIT');
+    refused(
+      triangleGltf({
+        nodes: [
+          { scale: [1e200, 1, 1], children: [1] },
+          { scale: [1e200, 1, 1], mesh: 0 },
+        ],
+      }),
+      'GLTF_LIMIT',
+    );
+    refused(triangleGltf({ nodes: [{ mesh: 0, scale: [10, 10, 10] }] }), 'GLTF_LIMIT', { scale: 1.7e308 });
+  });
+
+  it('refuses a mesh entry that is not an object (no unchecked cast on untrusted data)', () => {
+    refused(triangleGltf({ meshes: [5] }), 'GLTF_MALFORMED');
+    refused(triangleGltf({ meshes: [null] }), 'GLTF_MALFORMED');
+  });
+
+  it('reads text directly: a JSON string with characters a byte round trip would alter', () => {
+    const json = triangleGltf({ nodes: [{ name: 'caf\u00e9 \ud83d\ude00', mesh: 0 }] });
+    const result = importText(json);
+    expect(result.document.entities[result.affected[0] as string]?.name).toBe('caf\u00e9 \ud83d\ude00');
+  });
+
+  it('names a body after its mesh when the node has no name, and reads a material without pbr data as white', () => {
+    const json = triangleGltf({
+      nodes: [{ mesh: 0 }, { name: '', mesh: 1 }],
+      scenes: [{ nodes: [0, 1] }],
+      materials: [{}],
+      meshes: [
+        { name: 'plate', primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] },
+        { primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] },
+      ],
+    });
+    const result = importText(json);
+    expect(result.affected.map((id) => [result.document.entities[id]?.name, result.document.entities[id]?.color])).toEqual([
+      ['plate', '#ffffff'],
+      ['mesh 1', '#9aa5b1'],
+    ]);
+  });
+
+  it('refuses a material index out of range and a base colour that is not 4 numbers', () => {
+    refused(triangleGltf({ meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 2 }] }] }), 'GLTF_MALFORMED');
+    const bad = triangleGltf({
+      materials: [{ pbrMetallicRoughness: { baseColorFactor: [1, 0] } }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }],
+    });
+    refused(bad, 'GLTF_MALFORMED');
+  });
+
+  it('handles a mesh without primitives, an empty primitive and a non-object primitive', () => {
+    refused(triangleGltf({ meshes: [{}] }), 'GLTF_NO_GEOMETRY');
+    refused(triangleGltf({ meshes: [{ primitives: [7] }] }), 'GLTF_MALFORMED');
+    refused(triangleGltf({ meshes: [{ primitives: [{ attributes: 3 }] }] }), 'GLTF_MALFORMED');
+    refused(triangleGltf({ nodes: [{ mesh: 0, extensions: 5 }] }), 'GLTF_MALFORMED');
+  });
+
+  it('imports every root node when the file has no scenes, and honours an explicit scene index', () => {
+    const second = triangleGltf({ scenes: [{ nodes: [] }, { nodes: [0] }], scene: 1 });
+    expect(importText(second).affected).toHaveLength(1);
+    expect(importText(triangleGltf({ scenes: [{ name: 'empty' }] })).error?.code).toBe('GLTF_NO_GEOMETRY');
+    refused(triangleGltf({ scenes: [3] }), 'GLTF_MALFORMED');
+  });
+
   it('refuses a scene without triangles (GLTF_NO_GEOMETRY)', () => {
     refused(triangleGltf({ nodes: [{ name: 'empty' }] }), 'GLTF_NO_GEOMETRY');
     refused(triangleGltf({ meshes: [{ primitives: [{ attributes: { POSITION: 0 }, mode: 0 }] }] }), 'GLTF_NO_GEOMETRY');

@@ -252,6 +252,18 @@ describe('import_gltf: EXT_mesh_gpu_instancing details', () => {
     expect(sheared.data).toMatchObject({ instances: 0, meshEntities: 1 });
   });
 
+  it('refuses instance transforms whose product overflows (finite parent scale times finite instance scale)', () => {
+    const product = run({
+      ...instancedGltf([0, 0, 0], null, [1e30, 1, 1]),
+      nodes: [
+        { children: [1], scale: [1e300, 1, 1] },
+        { mesh: 0, ...instancedExt({ TRANSLATION: 2, SCALE: 3 }) },
+      ],
+    });
+    expect(product.error?.code).toBe('GLTF_LIMIT');
+    expect(product.affected).toEqual([]);
+  });
+
   it('skips a zero-scale instance and counts it', () => {
     const result = run(instancedGltf([0, 0, 0, 1, 1, 1], null, [1, 1, 1, 0, 1, 1]));
     expect(result.data).toMatchObject({ instances: 1, skippedInstances: 1 });

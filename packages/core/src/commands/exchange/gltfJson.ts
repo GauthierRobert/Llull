@@ -62,7 +62,9 @@ export function indexOf(value: unknown, bound: number, what: string): number {
 
 /** `length` finite numbers (a vector / matrix). */
 export function numbersOf(value: unknown, length: number, what: string): number[] {
-  if (!Array.isArray(value) || value.length !== length || !value.every((v) => typeof v === 'number' && Number.isFinite(v)))
-    throw new GltfError('GLTF_MALFORMED', `${what} must be ${length} finite numbers`);
-  return value as number[];
+  const numbers: number[] = [];
+  if (Array.isArray(value) && value.length === length)
+    for (const v of value satisfies readonly unknown[]) if (typeof v === 'number' && Number.isFinite(v)) numbers.push(v);
+  if (numbers.length !== length) throw new GltfError('GLTF_MALFORMED', `${what} must be ${length} finite numbers`);
+  return numbers;
 }

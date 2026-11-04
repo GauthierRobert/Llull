@@ -25,6 +25,11 @@ describe('instanceIdExtras', () => {
     expect(instanceIdExtras(['a0', 'a1', 'a2'])).toEqual({ llullIdRuns: [['a', 0, 2]] });
   });
 
+  it('keeps a non-numeric id between two runs as a plain entry', () => {
+    expect(instanceIdExtras(['a1', 'a2', 'a3', 'odd', 'b7', 'b8', 'b9'])).toEqual({ llullIdRuns: [['a', 1, 3], 'odd', ['b', 7, 9]] });
+    expect(instanceIdExtras(['x', 'a1', 'a2', 'a3', 'y'])).toEqual({ llullIdRuns: ['x', ['a', 1, 3], 'y'] });
+  });
+
   it('expanding the runs gives the ids back, in order', () => {
     const ids = ['p', 'e0', 'e1', 'e2', 'e3', 'e5', 'e6', 'e7', 'q-1', 'e99999999999999999999', 'e099', 'e100', 'e101'];
     expect(nodeInstanceIds(instanceIdExtras(ids))).toEqual(ids);

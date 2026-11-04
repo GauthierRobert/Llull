@@ -80,11 +80,11 @@ export function decompose(m: Mat4): Decomposed | 'degenerate' | 'mirrored' | 'sh
   const scale = columns.map((v) => Math.hypot(v[0], v[1], v[2]));
   if (scale.some((s) => !(s > 1e-12))) return 'degenerate';
   if (determinant3(m) < 0) return 'mirrored';
-  const [u0, u1, u2] = columns.map((v, c): Vec3 => [v[0] / (scale[c] ?? 1), v[1] / (scale[c] ?? 1), v[2] / (scale[c] ?? 1)]) as [
-    Vec3,
-    Vec3,
-    Vec3,
-  ];
+  const unit = (c: 0 | 1 | 2): Vec3 => {
+    const [v, length] = [columns[c], scale[c] ?? 1];
+    return [v[0] / length, v[1] / length, v[2] / length];
+  };
+  const [u0, u1, u2] = [unit(0), unit(1), unit(2)];
   const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   if ([dot(u0, u1), dot(u0, u2), dot(u1, u2)].some((v) => Math.abs(v) > SHEAR_TOLERANCE)) return 'sheared';
   // R = [u0 u1 u2] as columns; intrinsic Euler XYZ (R = Rx · Ry · Rz).

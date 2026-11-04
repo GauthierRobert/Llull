@@ -15,10 +15,10 @@ const CHUNK_BIN = 0x004e4942;
 /** The one extension the reader understands (a file may require it). */
 export const SUPPORTED_EXTENSION = 'EXT_mesh_gpu_instancing';
 
-function parseJson(bytes: Uint8Array): Json {
+function parseJson(source: Uint8Array | string): Json {
   let value: unknown;
   try {
-    value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    value = JSON.parse(typeof source === 'string' ? source : new TextDecoder('utf-8', { fatal: true }).decode(source));
   } catch {
     throw new GltfError('GLTF_MALFORMED', 'the content is neither a GLB container nor valid UTF-8 glTF JSON');
   }
@@ -64,7 +64,7 @@ function checkAsset(json: Json): void {
 export function readGltfFile(source: { readonly text: string } | { readonly bytes: Uint8Array }): GltfFile {
   const file =
     'text' in source
-      ? { json: parseJson(new TextEncoder().encode(source.text)), bin: null }
+      ? { json: parseJson(source.text), bin: null }
       : source.bytes.length >= 4 && new DataView(source.bytes.buffer, source.bytes.byteOffset, 4).getUint32(0, true) === GLB_MAGIC
         ? parseGlb(source.bytes)
         : { json: parseJson(source.bytes), bin: null };

@@ -114,6 +114,12 @@ function instanceMatrices(node: Json, accessors: GltfAccessors, where: string): 
   };
 }
 
+/** `m` when every element is finite, else the refusal: finite factors can still multiply past the double range. */
+function checkedMatrix(m: Mat4, where: string): Mat4 {
+  if (!m.every(Number.isFinite)) throw new GltfError('GLTF_LIMIT', `${where}: the composed transform overflows`);
+  return m;
+}
+
 /** Plans the import of `file`: `scale` multiplies every length (glTF is in metres). */
 export function planGltfScene(file: GltfFile, scale: number): ScenePlan {
   const { json } = file;
@@ -175,9 +181,15 @@ export function planGltfScene(file: GltfFile, scale: number): ScenePlan {
     const positions: number[] = [];
     for (let i = 0; i < primitive.positions.length; i += 3)
       positions.push(...transformPoint(m, primitive.positions[i] ?? 0, primitive.positions[i + 1] ?? 0, primitive.positions[i + 2] ?? 0));
+    if (!positions.every(Number.isFinite))
+      throw new GltfError('GLTF_LIMIT', `${name}: the transform overflows the coordinates of the mesh`);
     const indices = Array.from(primitive.indices);
     if (determinant3(m) < 0)
-      for (let i = 0; i < indices.length; i += 3) [indices[i + 1], indices[i + 2]] = [indices[i + 2] as number, indices[i + 1] as number];
+      for (let i = 0; i < indices.length; i += 3) {
+        const [b, c] = [indices[i + 1] ?? 0, indices[i + 2] ?? 0];
+        indices[i + 1] = c;
+        indices[i + 2] = b;
+      }
     return { name, color: primitive.color, positions, indices };
   };
 
@@ -216,10 +228,12 @@ export function planGltfScene(file: GltfFile, scale: number): ScenePlan {
     const where = `nodes[${nodeIndex}]`;
     const node = nodes[nodeIndex];
     if (!isRecord(node)) throw new GltfError('GLTF_MALFORMED', `${where} must be an object`);
-    const world = multiply(parent, localMatrix(node, where));
+    const world = checkedMatrix(multiply(parent, localMatrix(node, where)), where);
     if (node['mesh'] !== undefined) {
       const meshIndex = indexOf(node['mesh'], meshes.length, `${where}.mesh`);
-      const meshName = (meshes[meshIndex] as Json)['name'];
+      const mesh = meshes[meshIndex];
+      if (!isRecord(mesh)) throw new GltfError('GLTF_MALFORMED', `meshes[${meshIndex}] must be an object`);
+      const meshName = mesh['name'];
       const name =
         typeof node['name'] === 'string' && node['name'] !== ''
           ? node['name']
@@ -233,10 +247,13 @@ export function planGltfScene(file: GltfFile, scale: number): ScenePlan {
         for (let i = 0; component !== null && i < instances.count; i++) {
           if (placements.length >= MAX_GLTF_INSTANCES)
             throw new GltfError('GLTF_LIMIT', `more than ${MAX_GLTF_INSTANCES} placed instances / bodies`);
-          const placed = decompose(multiply(world, instances.matrix(i)));
+          const product = checkedMatrix(multiply(world, instances.matrix(i)), `${where} instance ${i}`);
+          const placed = decompose(product);
           if (placed === 'degenerate') skippedInstances++;
-          else if (typeof placed === 'string') placeBodies(name, meshIndex, multiply(world, instances.matrix(i)));
-          else placements.push({ kind: 'instance', component, ...placed });
+          else if (typeof placed === 'string') placeBodies(name, meshIndex, product);
+          else if ([...placed.position, ...placed.rotation, ...placed.scale].every(Number.isFinite))
+            placements.push({ kind: 'instance', component, ...placed });
+          else throw new GltfError('GLTF_LIMIT', `${where} instance ${i}: the transform overflows`);
         }
       }
     }
