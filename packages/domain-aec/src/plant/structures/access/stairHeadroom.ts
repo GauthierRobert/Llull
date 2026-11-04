@@ -8,19 +8,17 @@
  * @invariant pure; null headroom = nothing modelled above the stair (never a pass by a default height); an obstruction through the stair reads 0
  */
 
-import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
+import type { CadDocument, Vec2 } from '@core/model/types';
 import { fromMm, toMm } from '@core/model/units';
 import { pointInPolygon } from '@lib/polygon';
-import { dot3 } from '@lib/vec3';
 import type { BuildingModel, SteelStairElement } from '@aec/building/types';
 import { elementsOf } from '../../../building/model';
-import { boxExtent, elementBoxes, type OrientedBox } from '../../../industrial/clash/clashBoxes';
-import { externalBodies } from '../../../industrial/clash/clashSources';
 import { accessLinks } from '../clash/structuresClashBodies';
 import { ruleById, type AccessRule, type RulesetName } from '../rules/ruleTable';
 import { directionOf, layoutSteelStair } from '../stair/steelStairLayout';
 import { stairSizes } from '../stair/steelStairMeasure';
 import { breachFinding, type Finding } from './finding';
+import { allCandidates, verticalSpan } from './obstructions';
 
 /** Sample spacing along and across the stair, mm. */
 const SAMPLE_MM = 50;
@@ -35,48 +33,12 @@ export interface StairHeadroomReport {
   readonly obstructionId: string | null;
 }
 
-interface Candidate {
-  readonly id: string;
-  readonly box: OrientedBox;
-  readonly min: Vec3;
-  readonly max: Vec3;
-}
-
 interface SlabCandidate {
   readonly id: string;
   readonly ring: ReadonlyArray<Vec2>;
   readonly openings: ReadonlyArray<ReadonlyArray<Vec2>>;
   readonly bottom: number;
   readonly top: number;
-}
-
-/** The z range `[low, high]` of the vertical line through (x, y) inside the box; null when the line misses it. */
-function verticalSpan(box: OrientedBox, x: number, y: number): [number, number] | null {
-  let [low, high] = [-Infinity, Infinity];
-  const origin: Vec3 = [x - box.center[0], y - box.center[1], -box.center[2]];
-  for (let axis = 0; axis < 3; axis++) {
-    const direction = box.axes[axis] as Vec3;
-    const [offset, slope, half] = [dot3(origin, direction), direction[2], box.half[axis] as number];
-    if (Math.abs(slope) < 1e-12) {
-      if (Math.abs(offset) > half) return null;
-      continue;
-    }
-    const [a, b] = [(-half - offset) / slope, (half - offset) / slope];
-    low = Math.max(low, Math.min(a, b));
-    high = Math.min(high, Math.max(a, b));
-  }
-  return low <= high ? [low, high] : null;
-}
-
-function candidatesOf(doc: CadDocument, building: BuildingModel, exclude: ReadonlySet<string>): Candidate[] {
-  const found: Candidate[] = [];
-  const add = (id: string, box: OrientedBox): void => {
-    found.push({ id, box, ...boxExtent(box) });
-  };
-  for (const element of Object.values(building.elements))
-    if (!exclude.has(element.id)) for (const box of elementBoxes(doc, building, element)) add(element.id, box);
-  for (const body of externalBodies(doc)) if (!exclude.has(body.id) && !exclude.has(body.group)) add(body.id, body.box);
-  return found;
 }
 
 function slabsOf(building: BuildingModel, exclude: ReadonlySet<string>): SlabCandidate[] {
@@ -105,7 +67,7 @@ export function stairHeadroom(doc: CadDocument, building: BuildingModel, stair: 
   const level = building.levels[stair.levelId];
   if (level === undefined) return null;
   const exclude = new Set(accessLinks(doc, building, stair));
-  const candidates = candidatesOf(doc, building, exclude);
+  const candidates = allCandidates(doc, building, exclude);
   const slabs = slabsOf(building, exclude);
   const { stations, run } = layoutSteelStair(stair, stairSizes(doc, stair));
   const { forward, left } = directionOf(stair.angle);
