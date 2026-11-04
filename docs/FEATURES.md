@@ -74,7 +74,7 @@
 | `set_face_color` | Colour single faces of a mesh solid (kind "mesh": results of booleans, fillets, shells and other kernel operations, imported bodies). |  |
 | `set_modeling_tolerance` | Set the document modelling tolerances used by exact (B-rep) work. |  |
 | `set_parameter` | Create or update a named numeric parameter in the document. |  |
-| `set_selection` | Change which entities are selected (the selection that selection-based tools and the viewport highlight use). |  |
+| `set_selection` | Change which entities are selected (the selection that selection-based tools use). |  |
 | `set_units` | Set the document unit of length and/or the display precision (decimal places). |  |
 | `stack_on` | Translate movingId so that its bounding-box minimum face along axis exactly meets the bounding-box maximum face of baseId. |  |
 | `ungroup_entities` | Dissolve a group, removing it from the document. |  |

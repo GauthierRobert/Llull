@@ -32,4 +32,13 @@ describe('selection is session state routed through set_selection', () => {
     state().select([id]);
     expect(state().document.selection).toEqual([id]);
   });
+  it('a live snapshot carrying another selection (e.g. CLI set_selection) never overrides the local one', () => {
+    state().dispatch('add_box', { size: [1, 1, 1] });
+    state().dispatch('add_box', { size: [1, 1, 1] });
+    const [a, b] = state().document.order as [string, string];
+    state().select([a]);
+    const snapshot = { epoch: state().liveEpoch, seq: state().liveSeq + 1, document: { ...state().document, selection: [b] } };
+    state().hydrateLiveDocument(snapshot as Parameters<ReturnType<typeof state>['hydrateLiveDocument']>[0]);
+    expect(state().document.selection).toEqual([a]);
+  });
 });
