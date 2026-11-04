@@ -8,10 +8,11 @@ import { commandCatalog } from '@core/commands/schema';
 import { plantEntityProperties } from './properties';
 import { applyServiceColourScheme, listServiceColourSchemes } from './serviceColour';
 import { renderStats } from './renderStats';
+import { pipeMarkers } from './pipeMarkers';
 
 export const plantDisplayPlugin: CadPlugin = {
   name: 'plant-display',
   toolset: 'review',
-  commands: commandCatalog(listServiceColourSchemes, applyServiceColourScheme, renderStats),
+  commands: commandCatalog(listServiceColourSchemes, applyServiceColourScheme, renderStats, pipeMarkers),
   entityProperties: plantEntityProperties,
 };
