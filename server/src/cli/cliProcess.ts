@@ -33,6 +33,7 @@ async function prepareKernel(): Promise<void> {
     { installFontProvider },
     { installArtifactPort },
     { defaultFeArtifactStore },
+    { installPipingLibraryProvider },
   ] = await Promise.all([
     import('../geometryKernel'),
     import('../physicsEngine'),
@@ -45,6 +46,7 @@ async function prepareKernel(): Promise<void> {
     import('../fontProvider'),
     import('@implicit/index'),
     import('../fea/artifactStore'),
+    import('../libraries/pipingLibraryStore'),
   ]);
   installRasterPort();
   installGeometryQueryEngine();
@@ -53,6 +55,7 @@ async function prepareKernel(): Promise<void> {
   setMeshAssetPort(defaultMeshAssetStore());
   installArtifactPort(defaultFeArtifactStore());
   installFontProvider();
+  installPipingLibraryProvider();
   await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
 }
 

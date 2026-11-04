@@ -6,6 +6,7 @@ import { installGeometryKernel } from './geometryKernel';
 import { installPhysicsEngine } from './physicsEngine';
 import { installRasterPort } from './native/rasterPort';
 import { installFontProvider } from './fontProvider';
+import { installPipingLibraryProvider } from './libraries/pipingLibraryStore';
 import { setMeshAssetPort } from '@core/geometry/mesh/assets';
 import { installArtifactPort } from '@implicit/index';
 import { defaultFeArtifactStore } from './fea/artifactStore';
@@ -71,6 +72,7 @@ export async function startServer(app: Express, port: number, host: string): Pro
   if (refusal !== null) throw new Error(refusal);
   installRasterPort();
   installFontProvider();
+  installPipingLibraryProvider();
   installGeometryQueryEngine();
   installSpatialIndex();
   setMeshAssetPort(defaultMeshAssetStore());
