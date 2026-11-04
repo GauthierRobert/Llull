@@ -4,6 +4,8 @@
  * code in `NAMED_COLOUR_RAL`; maroon and purple are llull choices (RAL not confirmed by a source). Reports always say `approximate: true`.
  */
 
+import type { DisplayModel } from '@core/model/display';
+
 export const PALETTE_ID = 'llull-ral-approx-v1';
 
 const RAL_HEX: Readonly<Record<string, string>> = {
@@ -39,6 +41,18 @@ const NAMED_COLOUR_RAL: Readonly<Record<string, string>> = {
   maroon: '3007',
   purple: '4008',
 };
+
+/** Named colour -> display hex of one palette. */
+export type HexLookup = (name: string) => string | undefined;
+
+/** The lookup of palette `id`: the default palette, or an owner palette of `display` (define_palette); undefined when there is none of that id. */
+export function paletteLookup(display: DisplayModel | undefined, id: string): HexLookup | undefined {
+  if (id === PALETTE_ID) return paletteHex;
+  const palette = display?.palettes !== undefined && Object.hasOwn(display.palettes, id) ? display.palettes[id] : undefined;
+  return palette === undefined
+    ? undefined
+    : (name) => (Object.hasOwn(palette.colours, name.toLowerCase()) ? palette.colours[name.toLowerCase()] : undefined);
+}
 
 /** Display hex of a named colour in the default palette, or undefined for a name the palette lacks. */
 export function paletteHex(name: string): string | undefined {

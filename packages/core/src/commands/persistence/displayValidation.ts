@@ -57,6 +57,17 @@ function profileProblem(id: string, value: unknown): string | null {
   if (typeof value['name'] !== 'string' || typeof value['palette'] !== 'string' || typeof value['reviewRequired'] !== 'boolean')
     return `${where}: name and palette must be strings and reviewRequired a boolean`;
   if (typeof value['defaultColour'] !== 'string') return `${where}: defaultColour must be a string`;
+  const approval = value['approval'];
+  if (
+    approval !== undefined &&
+    !(
+      isRecord(approval) &&
+      typeof approval['signer'] === 'string' &&
+      typeof approval['signatureId'] === 'string' &&
+      typeof approval['profileSha256'] === 'string'
+    )
+  )
+    return `${where}: approval must be { signer, signatureId, profileSha256 }`;
   const rules = value['rules'];
   if (!Array.isArray(rules) || !rules.every(isRule))
     return `${where}: rules must be { id, legend, when (predicate), appearance { colour, transparency?, hidden? }, scheme?, marker? { letters, letterHex? } }`;
@@ -125,11 +136,29 @@ function pipeMarkerProblems(display: Record<string, unknown>): string[] {
   });
 }
 
+function paletteProblems(display: Record<string, unknown>): string[] {
+  const palettes = display['palettes'];
+  if (palettes === undefined) return [];
+  if (!isRecord(palettes)) return ['display.palettes must be a record'];
+  return Object.entries(palettes).flatMap(([id, palette]) => {
+    const where = `display.palettes['${id}']`;
+    if (isReservedKey(id)) return [`display.palettes: id '${id}' is a reserved JavaScript property name`];
+    if (!isRecord(palette) || palette['id'] !== id || typeof palette['name'] !== 'string' || !isRecord(palette['colours']))
+      return [`${where} must be { id: '${id}', name, colours }`];
+    const colours = palette['colours'];
+    return Object.entries(colours).flatMap(([name, hex]) =>
+      isReservedKey(name) || typeof hex !== 'string' || !COLOUR.test(hex)
+        ? [`${where}.colours['${name}'] must be a #rrggbb colour under a usable name`]
+        : [],
+    );
+  });
+}
+
 /** Problems of the optional `display` field of a raw document (absent is valid). */
 export function displayProblems(value: unknown): string[] {
   if (value === undefined) return [];
   if (!isRecord(value) || !isRecord(value['colourProfiles']))
-    return ['display must be { colourProfiles, activeProfileId?, materialClasses?, materialClassOf?, pipeMarkers? }'];
+    return ['display must be { colourProfiles, activeProfileId?, materialClasses?, materialClassOf?, pipeMarkers?, palettes? }'];
   const profiles = value['colourProfiles'];
   const active = value['activeProfileId'];
   const problems = [
@@ -139,6 +168,7 @@ export function displayProblems(value: unknown): string[] {
       : 'display.activeProfileId must name an existing profile',
     ...materialClassProblems(value),
     ...pipeMarkerProblems(value),
+    ...paletteProblems(value),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }

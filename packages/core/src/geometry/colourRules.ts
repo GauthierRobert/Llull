@@ -222,5 +222,5 @@ export function storeProfile(display: DisplayModel, profile: ColourProfile, acti
   const problem = profileProblems(profile)[0];
   if (problem !== undefined) return problem;
   const colourProfiles = { ...display.colourProfiles, [profile.id]: profile };
-  return activate ? { colourProfiles, activeProfileId: profile.id } : { ...display, colourProfiles };
+  return activate ? { ...display, colourProfiles, activeProfileId: profile.id } : { ...display, colourProfiles };
 }

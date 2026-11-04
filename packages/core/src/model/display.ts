@@ -58,6 +58,14 @@ export interface ColourRule {
   readonly marker?: RuleMarker;
 }
 
+/** The human act that cleared `reviewRequired` of a profile (approve_colour_profile): who signed, which signature, and the hash of the rules approved. */
+interface ProfileApproval {
+  readonly signer: string;
+  readonly signatureId: string;
+  /** sha256 of the canonical JSON of the profile's name, rules, default colour and palette at the moment it was approved. */
+  readonly profileSha256: string;
+}
+
 export interface ColourProfile {
   readonly id: string;
   readonly name: string;
@@ -69,6 +77,8 @@ export interface ColourProfile {
   readonly palette: string;
   /** True while the profile awaits approval by a qualified reviewer (set by the plugin that built it). */
   readonly reviewRequired: boolean;
+  /** Set by approve_colour_profile; a replaced profile carries none. */
+  readonly approval?: ProfileApproval;
 }
 
 /** A named display class (plant 09 VIS §5.6): appearance only; geometry and `doc.materials` are never touched. */
@@ -109,8 +119,17 @@ export interface PipeMarker {
   readonly bidirectional: boolean;
 }
 
+/** A palette the owner pinned (define_palette): named colour (lowercase) -> `#rrggbb`. Profiles built from it name its id in `palette`. */
+export interface DisplayPalette {
+  readonly id: string;
+  readonly name: string;
+  readonly colours: Readonly<Record<string, string>>;
+}
+
 export interface DisplayModel {
   colourProfiles: Record<string, ColourProfile>;
+  /** Owner palettes by id (define_palette); the default palette `llull-ral-approx-v1` is code, never stored. */
+  palettes?: Record<string, DisplayPalette>;
   activeProfileId?: string;
   /** Document classes: new ones and overrides of the named defaults (`DEFAULT_MATERIAL_CLASSES`); absent = defaults only. */
   materialClasses?: Record<string, MaterialClass>;

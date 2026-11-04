@@ -381,7 +381,7 @@ A missing property never matches. Cost is O(N · m) per profile change. The resu
 `scheme:<id>/<category>` resolves through `palette` to `displayHex` (`validation/data/llull_display_palette.json`).
 Reports always carry the category **name** and the `palette` id with `approximate: true`. Hazard-scheme profiles
 start with `reviewRequired: true`, cleared only by a human-signed `set_issue_status`-style act on the profile
-(`approve_colour_profile`, V1, human gate).
+(`approve_colour_profile`, built: §12.18, human gate).
 
 ### 5.2 Batching rule R-BATCH-v1 (TR-VIS-20)
 
@@ -728,7 +728,7 @@ Sibling dependencies:
    from a fetched source (search budget exhausted). Map them onto BCF `TopicStatus` on export only after a
    confirmed source.
 5. **Q5. Display hex.** Should the owner be able to pin a corporate palette (e.g. a paint-system RAL list)? This is
-   a `define_palette` command (V1) whose palette is named in every report.
+   a `define_palette` command (built: §12.18) whose palette is named in every report.
 6. **Q6. Determinism scope of `render_view` digests.** Per Node major version, or with an own sin / cos
    implementation for full portability? Only the reference renderer is concerned; the native renderer is non-hash
    (§2.A). **Decided at VIS-M9 (2026-10-19):** digests are pinned per `rendererVersion` (`llull-ts-raster/1`) on the
@@ -815,7 +815,7 @@ reference, CLI first; no viewport UI). Everything else in §3–§8 is still pro
 
 ### 12.5 Not built yet (remaining VIS work)
 
-The rest of VIS-M1 (profile cache, `approve_colour_profile`, `define_palette`, viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (the Review panel, redlines, section-box gizmo and clipping are §12.11; left there: switching a section box off, the BCF snapshot from the canvas), the rest of VIS-M4
+The rest of VIS-M1 (profile cache (still open, §12.18 O4); `approve_colour_profile` and `define_palette` are built (§12.18); viewport / `render_view` use of a profile; the model, commands and schemes are §12.6), the rest of VIS-M2 (the Review panel, redlines, section-box gizmo and clipping are §12.11; left there: switching a section box off, the BCF snapshot from the canvas), the rest of VIS-M4
 (shadow, ambient occlusion and Blinn-Phong review shading; the profile, section box, highlight, `visibleEntityIds` and budget are §12.10), the vendored XSDs for VC-VIS-15 (VIS-M5 itself is §12.9), VIS-M6 viewport tiers
 and walk / fly, VIS-M7, VIS-M8. VC-VIS-60 (a) belongs to RS-6 (`llull-bvh`).
 
@@ -844,7 +844,7 @@ Deviations from §2–§4 (law-driven or scoped to M1):
   grouped and can be `unmatched` (a box is not reported against a pipe-service profile). `groupBy` is `rule` (default), `entity` or `property` + `groupProperty` (SC-VIS-01 groups by `line`); the report knows no plant key.
 - **Not built:** (`delete_colour_profile` refuses a profile a viewpoint references since VIS-M2, `VIS_PROFILE_IN_USE`);
   the profile result cache (`(profile, entities)`) waits for the renderer
-  that needs it; `approve_colour_profile` and `define_palette` stay V1; BS 1710 / DIN 2403 stay documentation. Predicates nest one `any` level in
+  that needs it; `approve_colour_profile` and `define_palette` are built (§12.18); BS 1710 / DIN 2403 stay documentation. Predicates nest one `any` level in
   the tool schema (the stored model nests four). Added code `VIS_RULE_PROPERTY_UNKNOWN` (warn): a rule tests a property no entity has.
 - **Ids.** `execute` refuses reserved ids (`CMD_RESERVED_ID`) for any `*Id` / `id` param before the command runs; profile lookups are own-key only (`findProfile`) and `storeProfile` (`geometry/colourRules.ts`) is the single writer of profiles for `define_colour_profile` and `apply_service_colour_scheme` (empty / reserved id, bad rule or colour refused).
 - **Pipe markers (data, built 2026-11-04).** `ColourRule.marker { letters, letterHex? }` (core `model/display.ts`, validated by `profileProblems` and load validation); `apply_service_colour_scheme` `markerLetters: true` writes it (service in capitals; A13.1 letterColour in the default palette, ISO 14726 has none) and `scheme.names` stays named colours. `pipe_markers` (plant-display, review toolset, read-only) returns per building pipe and 02 RTE run (centrelines from the shared `plant/common/pipeCentrelines.ts`, also used by the stress model) `markers[{positionMm, tangent, atMm}]`: ceil(length/spacingMm) placements at the middles of equal parts (default 7620 mm, linear walk), tangent along the centreline order (from end to to end; not a verified flow direction), plus line, service and the rule the core evaluator selects from the active / given profile. Cap 5000 placements, checked before any placement is built (`VIS_MARKER_LIMIT`); `VIS_MARKER_NOT_FOUND`, `VIS_PROFILE_NOT_FOUND`. Valve / flange placement and bidirectional arrows are built by `add_pipe_markers` (§12.18); penetration placement is not (no data). The viewport drawing is the UI lane.
@@ -879,7 +879,7 @@ Decisions (owner delegated, quality first):
 - **Deleting an issue is always a human act.** An issue has no verified creator, so no deletion can be told from a deletion that makes an unclosable finding or a signed record vanish. An agent that wants a draft gone hands over; `delete_review_issue` needs a signature bound to the issue hash. Deleting a viewpoint or markup stays ungated (no signed record).
 - **Live peers.** `applyLiveCommand` replays commands without `ctx`, so a signed `set_issue_status` / `delete_review_issue` is refused on a peer; the state hash then differs and the peer resyncs from the server snapshot, as for every gated act (05 FEA, 08 MAT, 09 PLM). The host that holds the signing port executes and broadcasts.
 - **`apply_viewpoint` is approximate for orthographic viewpoints.** The document camera is a perspective orbit camera: view height and the roll of `up` are not kept; `data.warnings` carries `VIS_VIEWPOINT_APPROXIMATED` for an orthographic viewpoint.
-- **Approving a review is closing its issues.** There is no separate "review approval" record. `approve_colour_profile` stays V1 (§12.6) and will use the same `humanGate`.
+- **Approving a review is closing its issues.** There is no separate "review approval" record. `approve_colour_profile` is built (§12.18) on the same `humanGate`.
 - **`author` of markups and comments is a label**, not verified (default `agent`, the UI sends `human`). Only `history[].by` is a verified fact.
 - **No import of old bookmarks.** The one-time import of §2 and of the functional spec §6.3 is dropped: the owner rule is no backward-compatibility shims.
   Existing localStorage bookmarks (`llull-named-views`) are simply no longer read. The review model has no backward compatibility either: a document saved with
@@ -1234,6 +1234,20 @@ Tests: `tests/unit/plant/display/pipeMarkersPlacement.test.ts` (24: legend rows,
 Decisions: **N1** class colours = what `resolveEntityColour` gives (profile rule, then material class colour, then profile default) so the BCF and the viewport agree; no separate "class" colouring. **N2** The section box of a viewpoint is NOT applied to snapshots (the snapshot path has no cut); visibility is. **N3** The default (colours on) changes the bytes of an archive of a document that has a profile or class colours; a document without them exports the same bytes as before (test). Not built: per-component `IfcGuid` (needs the 08-DAT mapping), XSD validation of the 2.1 output (VC-DAT / VC-VIS-15 runs only with `xmllint` and the 3.0 schemas; the 2.1 schemas are not vendored: the layout follows the published 2.1 schema from memory of the format and is checked only by the in-repo reader).
 
 Tests: `tests/unit/review/bcfExportColours.test.ts` (9: 2.1 layout, round trip through `import_bcf`, determinism, Coloring in 3.0 and 2.1, snapshots with colours, class colour, deleted profile, purity, the 1000 boundary and the legend labels in 3.0 and 2.1); `reviewWalkthroughBcf.test.ts` (2.1 is no longer refused). Tool-schema snapshot and `docs/FEATURES.md` regenerated.
+
+**Item 5, `define_palette`, `approve_colour_profile`, activation fix (plant-display, review toolset; closes Q5 and the V1 mentions of §5.1 / §12.6 / §12.7).** Code `plant/display/{definePalette,approveColourProfile,palette,serviceColour}.ts`; core `model/display.ts` (`DisplayPalette`, `DisplayModel.palettes`, `ColourProfile.approval`), `displayValidation.ts`, `geometry/colourRules.ts`.
+
+| What | Behaviour |
+| ---- | --------- |
+| `define_palette { id, name?, colours, replace? }` | stores `display.palettes[id]`: colour names (trimmed, lowercase) -> `#rrggbb`; 1..64 colours, names up to 40 characters, no reserved names, no duplicates after lowercasing; the built-in id `llull-ral-approx-v1` is refused (`VIS_PALETTE_INVALID`); an existing id needs `replace` (`VIS_PALETTE_EXISTS`); the summary and `data.profilesUsing` name the profiles built from a replaced palette (they keep their colours until the scheme is re-applied). metaHistory. |
+| `apply_service_colour_scheme { palette? }` | the field / main colour (and, with `markerLetters`, the letter colour) of each mapped row is looked up in that palette; `ColourProfile.palette` holds its id, so reports (which already repeat `palette`) name it. Unknown id: `VIS_PALETTE_NOT_FOUND`; a colour name the palette lacks: `VIS_PALETTE_INCOMPLETE` (naming them). `list_service_colour_schemes` still lists the default palette. |
+| `approve_colour_profile { profileId, confirmation }` | human gate (`humanGate`, act `display:approve_colour_profile`, ids [profileId], details `withDocumentUid({ profileSha256 })`, profileSha256 = sha256 of the JCS of the profile's name, rules, default colour and palette): clears `reviewRequired` and stores `approval { signer, signatureId, profileSha256 }`. Order: profile exists (`VIS_PROFILE_NOT_FOUND`), profile awaits review (else a no-op, nothing is spent), then the gate (`VIS_HUMAN_GATE`). A signature made for another mapping, profile or document does not verify; it is spent once. Re-applying or redefining the profile creates a new object with no approval and `reviewRequired` as the new definition says. |
+
+Decisions: **O1** Both commands are plant-display plugin commands (toolset `review`) although the display model is core: the toolset assignment of core commands lives in `@protocol/toolsets` (CLI lane); the approval is generic and moves to core when that lane wants it. **O2** `approve_colour_profile` has no `review_act_payload`-style helper yet: a signing front end must rebuild the payload as `humanGatePayload` does (`@core/model/humanGate`); the signing UI is open. **O3** `define_colour_profile` can still define a profile with `reviewRequired: false` directly (an agent can write that flag; `approval` is what proves a human did): `check_display` does not yet warn about an unapproved `reviewRequired: false` hazard profile. **O4** The profile cache of §5.1 is NOT built: `evaluateProfile` is O(N m) per call and no consumer re-evaluates in a loop that a measurement flagged; build it when the viewport profile path is profiled (VIS-M7c measured the plan scene, not profiles).
+
+**Fixed on the way (pre-existing).** `storeProfile(display, profile, activate = true)` built `{ colourProfiles, activeProfileId }` and so dropped every other field of the display model (material classes, class assignments, and now palettes and pipe markers) whenever a profile was activated at definition (`apply_service_colour_scheme { activate: true }`). It now keeps them (`paletteApproval.test.ts` fails without it).
+
+Tests: `tests/unit/plant/display/paletteApproval.test.ts` (10: palette stored / used / refusals / replace / purity / hostile load, the activation fix, approval refusals for an agent / bare true / unsigned, a signature bound to mapping, profile and document, spend once, no-op for a profile not awaiting review, re-apply drops the approval, hostile approval on load). The signing port is the ledger test port of the 05 / 09 suites, not the real Ed25519 port. Tool-schema snapshot (two new tools, `apply_service_colour_scheme` gained `palette`) and `docs/FEATURES.md` regenerated.
 
 ## 13. References
 
