@@ -6,7 +6,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { humanGate, humanGatePayload } from '@core/model/humanGate';
-import { documentIdentity } from '@core/model/documentUid';
+import { withDocumentUid } from '@core/model/documentUid';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import { refusePlm } from './refusal';
@@ -30,15 +30,17 @@ export function actParts(
   return {
     act: `plm:${command}`,
     ids: [partNumber],
-    details: {
-      // The state hash alone verifies in any document whose PLM record is identical: the document uid (VIS-ID) pins the act to this document.
-      documentUid: documentIdentity(doc),
-      stateHash: sha256Hex(jcsJson(doc.plm ?? null)),
-      ...(BINDS_CONTENT.has(command) ? { contentHash: scopeOf(doc, ctx).sha256 } : {}),
-      // The signer must be able to see WHICH file they sign: its hash is a named detail, not buried in the params hash.
-      ...(command === 'import_qif_results' && typeof params['xml'] === 'string' ? { xmlSha256: sha256Hex(params['xml']) } : {}),
-      params: signed,
-    },
+    // The state hash alone verifies in any document whose PLM record is identical: the document uid (VIS-ID) pins the act to this document.
+    details: withDocumentUid(
+      {
+        stateHash: sha256Hex(jcsJson(doc.plm ?? null)),
+        ...(BINDS_CONTENT.has(command) ? { contentHash: scopeOf(doc, ctx).sha256 } : {}),
+        // The signer must be able to see WHICH file they sign: its hash is a named detail, not buried in the params hash.
+        ...(command === 'import_qif_results' && typeof params['xml'] === 'string' ? { xmlSha256: sha256Hex(params['xml']) } : {}),
+        params: signed,
+      },
+      doc,
+    ),
   };
 }
 

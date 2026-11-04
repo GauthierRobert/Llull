@@ -108,6 +108,14 @@ export const deleteReviewIssue = defineCommand({
     if (review.issues[id] === undefined)
       return reviewRejection(doc, 'delete_review_issue', 'VIS_ISSUE_NOT_FOUND', `no issue '${id}'`, [id]);
     const issue = review.issues[id];
+    if (doc.uid === undefined)
+      return reviewRejection(
+        doc,
+        'delete_review_issue',
+        'VIS_DOCUMENT_UNIDENTIFIED',
+        'the document has no uid, so a human signature cannot be bound to it',
+        [id],
+      );
     const outcome = humanGate(
       ctx?.humanSignature ?? null,
       DELETE_ACT,

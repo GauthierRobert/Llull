@@ -7,6 +7,7 @@
 import { jcsJson } from '../../lib/jcs';
 import { sha256Hex } from '../../lib/sha256';
 import { humanGatePayload } from '../../model/humanGate';
+import { withDocumentUid } from '../../model/documentUid';
 import type { IssueStatus, ReviewIssue } from '../../model/review';
 
 export const STATUS_ACT = 'review:set_issue_status';
@@ -18,22 +19,17 @@ export const isProtectedIssue = (issue: ReviewIssue): boolean =>
 
 export const issueSha256 = (issue: ReviewIssue): string => sha256Hex(jcsJson(issue));
 
-export const statusDetails = (issue: ReviewIssue, to: IssueStatus, reason: string, documentUid: string): Record<string, unknown> => ({
-  documentUid,
-  from: issue.status,
-  to,
-  reason: reason.trim(),
-  historyLength: issue.history.length,
-  issueSha256: issueSha256(issue),
-});
+export const statusDetails = (issue: ReviewIssue, to: IssueStatus, reason: string, documentUid: string): Record<string, unknown> =>
+  withDocumentUid(
+    { from: issue.status, to, reason: reason.trim(), historyLength: issue.history.length, issueSha256: issueSha256(issue) },
+    documentUid,
+  );
 
 export const statusPayload = (issue: ReviewIssue, to: IssueStatus, reason: string, nonce: string, documentUid: string): string =>
   humanGatePayload(STATUS_ACT, [issue.id], statusDetails(issue, to, reason, documentUid), nonce);
 
-export const deleteDetails = (issue: ReviewIssue, documentUid: string): Record<string, unknown> => ({
-  documentUid,
-  issueSha256: issueSha256(issue),
-});
+export const deleteDetails = (issue: ReviewIssue, documentUid: string): Record<string, unknown> =>
+  withDocumentUid({ issueSha256: issueSha256(issue) }, documentUid);
 
 export const deletePayload = (issue: ReviewIssue, nonce: string, documentUid: string): string =>
   humanGatePayload(DELETE_ACT, [issue.id], deleteDetails(issue, documentUid), nonce);

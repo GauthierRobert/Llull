@@ -23,6 +23,8 @@ export function describePlans(plans: Record<string, GoldenAction[]>): void {
         const outcome = runPlan(actions);
         const replayed = execute(outcome.document, 'replay_history', {});
         expect(normalizeGeometry(replayed.document)).toEqual(normalizeGeometry(outcome.document));
+        // The snapshots do not carry the uid (normalize strips it), so its stability under replay is asserted here.
+        expect(replayed.document.uid).toBe(outcome.document.uid);
       });
     });
   }

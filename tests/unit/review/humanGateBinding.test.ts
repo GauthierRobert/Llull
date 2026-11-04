@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { reviewProblems } from '@core/commands/persistence/reviewValidation';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
@@ -367,5 +368,41 @@ describe('a signature is bound to its document (VIS-ID)', () => {
     const a = closedIn(documentWith('t'));
     const bad = withIssue(a, { history: a.review!.issues['iss-2']!.history.map((entry) => ({ ...entry, documentUid: 7 as never })) });
     expect(reviewProblems(bad.review!)).toEqual(expect.arrayContaining([expect.stringContaining('documentUid')]));
+  });
+});
+
+describe('a gated act needs the document uid (VIS-ID)', () => {
+  const withoutUid = (doc: CadDocument): CadDocument => {
+    const { uid: _uid, ...rest } = doc;
+    void _uid;
+    return rest;
+  };
+
+  it('a document without a uid refuses the payload, the signed move and the signed delete with a named code', () => {
+    const bare = withoutUid(documentWith('t'));
+    const payload = execute(bare, 'review_act_payload', { ...close, nonce: 'n-1' });
+    expect(payload.error?.code).toBe('VIS_DOCUMENT_UNIDENTIFIED');
+    const params = { ...close, confirmation: { alg: 'Ed25519', keyId: 'grace', nonce: 'n-1', signature: 'x' } };
+    const refused = execute(bare, 'set_issue_status', params, humanCtx());
+    expect(refused.error?.code).toBe('VIS_DOCUMENT_UNIDENTIFIED');
+    expect(refused.document).toBe(bare);
+    expect(execute(bare, 'delete_review_issue', { id: 'iss-2' }, humanCtx()).error?.code).toBe('VIS_DOCUMENT_UNIDENTIFIED');
+  });
+
+  it('loading the file through load_document seals a uid, after which the human act succeeds and reads genuine', () => {
+    const bare = withoutUid(documentWith('t'));
+    const loaded = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(bare) }).document;
+    expect(loaded.uid).toMatch(/^[0-9a-f]{32}$/);
+    const closed = execute(loaded, 'set_issue_status', closeParams(loaded), humanCtx());
+    expect(closed.error).toBeUndefined();
+    expect(closed.document.uid).toBe(loaded.uid);
+    expect(rows(closed.document, humanCtx())).toMatchObject({ status: 'pass', issues: [] });
+  });
+
+  it('limit: the uid defends against copy-in, not against a file editor who sets the victim uid and pastes a genuinely signed issue', () => {
+    const victim = execute(documentWith('t'), 'set_issue_status', closeParams(documentWith('t')), humanCtx()).document;
+    const attacker = documentWith('t', 20);
+    const pasted = { ...attacker, uid: victim.uid!, review: victim.review! };
+    expect(rows(pasted, humanCtx())).toMatchObject({ status: 'pass', issues: [] });
   });
 });

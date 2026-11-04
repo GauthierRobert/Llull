@@ -79,6 +79,14 @@ export const setIssueStatus = defineCommand({
         ['status'],
       );
     const gated = isHumanTransition(issue.status, status);
+    if ((gated || confirmation !== undefined) && doc.uid === undefined)
+      return reviewRejection(
+        doc,
+        'set_issue_status',
+        'VIS_DOCUMENT_UNIDENTIFIED',
+        'the document has no uid, so a human signature cannot be bound to it',
+        [issueId],
+      );
     let entry: IssueHistoryEntry = { status, by: 'agent', reason: why };
     if (gated || confirmation !== undefined) {
       const proof = confirmation === undefined ? undefined : proofOf(confirmation);
@@ -144,6 +152,14 @@ export const reviewActPayload = defineCommand({
     const issue = reviewOf(doc).issues[issueId];
     if (issue === undefined)
       return reviewRejection(doc, 'review_act_payload', 'VIS_ISSUE_NOT_FOUND', `no issue '${issueId}'`, [issueId], ['issueId']);
+    if (doc.uid === undefined)
+      return reviewRejection(
+        doc,
+        'review_act_payload',
+        'VIS_DOCUMENT_UNIDENTIFIED',
+        'the document has no uid, so a signature over this payload could not be bound to it',
+        [issueId],
+      );
     if (act === 'delete_review_issue') {
       const payloadSha256 = deletePayload(issue, nonce, documentIdentity(doc));
       return report(doc, `Payload to sign for deleting ${issueId}: ${payloadSha256}.`, {

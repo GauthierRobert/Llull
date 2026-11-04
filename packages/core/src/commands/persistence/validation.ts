@@ -1,4 +1,5 @@
 import { type CadDocument, type Component, type JointKind, CONSTRAINT_KINDS } from '../../model/types';
+import { DOCUMENT_UID_PATTERN } from '../../model/documentUid';
 import { isStringArray } from '../../lib/isStringArray';
 import { findComponentCycle } from '../assembly/assemblies';
 import { isRecord } from '../../lib/isRecord';
@@ -199,6 +200,8 @@ function listedStaleIds(raw: Record<string, unknown>): ReadonlySet<string> {
  */
 export function validateDocumentValues(v: Record<string, unknown>): string[] {
   const errors: string[] = [];
+  if (v['uid'] !== undefined && !(typeof v['uid'] === 'string' && DOCUMENT_UID_PATTERN.test(v['uid'])))
+    errors.push('uid must be a 32-hex string');
   const entities = v['entities'] as Record<string, unknown>;
   const layers = v['layers'] as Record<string, unknown>;
   for (const [eid, entity] of Object.entries(entities)) {
