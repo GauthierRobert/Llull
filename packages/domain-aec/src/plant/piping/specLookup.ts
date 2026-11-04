@@ -168,7 +168,7 @@ function missOf(outcome: Extract<ResolveOutcome, { ok: false }>, notes: string):
 const SOCKET_GAP_MM = 1.6;
 
 /**
- * The built-in connection table (the PSC spec format has no connection rules yet), looked up in either order: butt weld, flange, socket weld (SW
+ * The built-in connection table (a spec overrides a pair with `connections`, the socket gap with `socketGapMm`), looked up in either order: butt weld, flange, socket weld (SW
  * socket on a plain-end pipe) and threaded (both ends screwed).
  */
 const CONNECTIONS: ReadonlyArray<readonly [EndType, EndType, ConnectionRule]> = [
@@ -177,6 +177,23 @@ const CONNECTIONS: ReadonlyArray<readonly [EndType, EndType, ConnectionRule]> = 
   ['SW', 'PL', { joint: 'socketWeld', gapMm: SOCKET_GAP_MM, requires: [] }],
   ['SC', 'SC', { joint: 'threaded', gapMm: 0, requires: [] }],
 ];
+
+const samePair = (x: EndType, y: EndType, a: EndType, b: EndType): boolean => (x === a && y === b) || (x === b && y === a);
+
+/** Requirements of a joint kind when the rule gives none (a flanged joint needs its gasket and bolt set). */
+const defaultRequires = (joint: ConnectionRule['joint']): readonly ComponentType[] =>
+  joint === 'flanged' ? ['gasketSpiralWound', 'boltSet'] : [];
+
+/** The connection rule of the end pair: the spec's own rule first, else the built-in table (its socket gap replaced by the spec's socketGapMm). */
+function connectionRule(spec: PipeSpec, a: EndType, b: EndType): ConnectionRule | null {
+  const own = spec.connections?.find((rule) => samePair(rule.end, rule.pipeEnd, a, b));
+  if (own !== undefined) {
+    const gap = own.gapMm ?? (own.joint === 'socketWeld' ? (spec.socketGapMm ?? SOCKET_GAP_MM) : 0);
+    return { joint: own.joint, gapMm: gap, requires: own.requires ?? defaultRequires(own.joint) };
+  }
+  const builtIn = CONNECTIONS.find(([x, y]) => samePair(x, y, a, b))?.[2] ?? null;
+  return builtIn?.joint === 'socketWeld' && spec.socketGapMm !== undefined ? { ...builtIn, gapMm: spec.socketGapMm } : builtIn;
+}
 
 function elbowRule(spec: PipeSpec): ElbowRule {
   if (spec.elbowAngles !== undefined) return { ...spec.elbowAngles, defaulted: false };
@@ -266,7 +283,7 @@ export function createSpecLookup(doc: Pick<CadDocument, 'plant'>, specId: string
     },
     insulation: (code, dn, tempC) => insulationOf(spec, code, dn, tempC),
     elbowAngles: () => elbowRule(spec),
-    connection: (a, b) => CONNECTIONS.find(([x, y]) => (x === a && y === b) || (x === b && y === a))?.[2] ?? null,
+    connection: (a, b) => connectionRule(spec, a, b),
   };
 }
 

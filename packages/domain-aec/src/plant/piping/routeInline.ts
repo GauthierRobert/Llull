@@ -17,6 +17,7 @@ import { operatorBodies, operatorKind } from './operator';
 import { flangeParts, mintSet, type FlangeSetIds } from './routeEnds';
 import { at, joinOf, partOf, type Env, type Mint, type Slot } from './routeEnv';
 import { inlineInOrder, isReducer, isValve, startDn } from './runSizes';
+import { isStraight, straightSlot } from './routeStraight';
 import { isMiss } from './specLookup';
 
 /** Catalogue types `insert_inline_component` accepts (strainers and the like are not modelled). */
@@ -29,6 +30,9 @@ export const INLINE_TYPES = [
   'valvePlug',
   'reducerConcentric',
   'reducerEccentric',
+  'swage',
+  'coupling',
+  'union',
 ] as const satisfies readonly ComponentType[];
 
 /** Unit stem direction used when none is given: perpendicular to the pipe, up (+Z), or +X on a vertical pipe. */
@@ -283,7 +287,13 @@ export function layoutInline(env: Env, legLengths: readonly number[], dirs: read
       dnOut: isReducer(comp) && comp.dn2 !== undefined ? comp.dn2 : dn,
       direction: dirs[comp.leg] as Vec3,
     };
-    const slot = isValve(comp) ? valveSlot(env, located, mint) : isReducer(comp) ? reducerSlot(env, located, mint) : null;
+    const slot = isValve(comp)
+      ? valveSlot(env, located, mint)
+      : isReducer(comp)
+        ? reducerSlot(env, located, mint)
+        : isStraight(comp)
+          ? straightSlot(env, comp, dn, mint)
+          : null;
     if (slot === null) return noComponent(`${comp.type} cannot be placed inline (${INLINE_TYPES.join(', ')})`, comp);
     if (isFailure(slot)) return slot;
     slots.push(slot);

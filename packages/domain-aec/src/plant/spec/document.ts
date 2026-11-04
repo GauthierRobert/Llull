@@ -2,7 +2,7 @@
 
 import { isRecord } from '@lib/isRecord';
 import { COMPONENT_TYPES } from '../catalog/types';
-import { SPEC_STATUSES } from './types';
+import { CONNECTION_ENDS, CONNECTION_JOINTS, SPEC_STATUSES } from './types';
 
 const isSize = (value: unknown): boolean =>
   isRecord(value) && (value['system'] === 'NPS' || value['system'] === 'DN') && typeof value['key'] === 'string';
@@ -15,6 +15,25 @@ function componentErrors(component: unknown, at: string): string[] {
   if (typeof component['catalogRef'] !== 'string') bad.push('catalogRef');
   if (!isSize(component['from']) || !isSize(component['to'])) bad.push('from / to sizes');
   return bad.length === 0 ? [] : [`${at} has an invalid ${bad.join(', ')}`];
+}
+
+const isRule = (rule: unknown): boolean =>
+  isRecord(rule) &&
+  CONNECTION_ENDS.includes(rule['end'] as (typeof CONNECTION_ENDS)[number]) &&
+  CONNECTION_ENDS.includes(rule['pipeEnd'] as (typeof CONNECTION_ENDS)[number]) &&
+  CONNECTION_JOINTS.includes(rule['joint'] as (typeof CONNECTION_JOINTS)[number]) &&
+  (rule['gapMm'] === undefined || (typeof rule['gapMm'] === 'number' && rule['gapMm'] >= 0 && rule['gapMm'] <= 50)) &&
+  (rule['requires'] === undefined || (Array.isArray(rule['requires']) && rule['requires'].every((type) => COMPONENT_TYPES.includes(type))));
+
+/** Errors of the connection members of a stored spec revision. */
+function connectionErrors(spec: Record<string, unknown>, at: string): string[] {
+  const gap = spec['socketGapMm'];
+  return [
+    ...(gap === undefined || (typeof gap === 'number' && gap >= 0 && gap <= 10) ? [] : [`${at}.socketGapMm must be a number from 0 to 10`]),
+    ...(spec['connections'] === undefined || (Array.isArray(spec['connections']) && spec['connections'].every(isRule))
+      ? []
+      : [`${at}.connections must be a list of { end, pipeEnd, joint, gapMm?, requires? }`]),
+  ];
 }
 
 function specErrors(id: string, revisions: unknown): string[] {
@@ -42,6 +61,7 @@ function specErrors(id: string, revisions: unknown): string[] {
       errors.push(`${at} must have components and catalogs arrays`);
     if (Array.isArray(spec['components']))
       errors.push(...spec['components'].flatMap((c: unknown, k) => componentErrors(c, `${at}.components.${k}`)));
+    errors.push(...connectionErrors(spec, at));
     if (!isRecord(range) || !isSize(range['from']) || !isSize(range['to']))
       errors.push(`${at}.sizeRange must be { from, to } nominal sizes`);
     return errors;

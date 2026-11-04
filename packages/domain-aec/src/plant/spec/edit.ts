@@ -60,7 +60,7 @@ export const editOpSchema = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('setHeader').describe('Set header members of the spec.'),
     fields: json.describe(
-      'Header members to set (a member set to null is removed, except the required ones): title, service, dimensionalStandard, rating, materials, corrosionAllowance { value, unit }, millTolerance, designLimits, catalogs, elbowAngles ({ anglesDeg, toleranceDeg, trimmedAllowed, bendRadiusD? }), provenance.',
+      'Header members to set (a member set to null is removed, except the required ones): title, service, dimensionalStandard, rating, materials, corrosionAllowance { value, unit }, millTolerance, designLimits, catalogs, elbowAngles ({ anglesDeg, toleranceDeg, trimmedAllowed, bendRadiusD? }), socketGapMm, connections ([{ end, pipeEnd, joint, gapMm?, requires? }]), provenance.',
     ),
   }),
 ]);
@@ -84,6 +84,8 @@ const HEADER_KEYS: ReadonlySet<string> = new Set([
   'designLimits',
   'catalogs',
   'elbowAngles',
+  'socketGapMm',
+  'connections',
   'provenance',
 ]);
 const REQUIRED_HEADER_KEYS: ReadonlySet<string> = new Set(['dimensionalStandard', 'rating', 'corrosionAllowance', 'catalogs']);

@@ -12,6 +12,7 @@ import { deriveRun } from '../routeParts';
 import { byRoute } from '../runSizes';
 import { createSpecLookup, isMiss } from '../specLookup';
 import { takeoffOf } from '../takeoff';
+import { branchFromRun, branchOnRun } from './routeBranchStart';
 import { buildInline, inlineAt, inlineFields, isResolved, legsInput, portOrPoint, resolveEndpoint, viaInput } from './routeInput';
 
 /**
@@ -19,7 +20,7 @@ import { buildInline, inlineAt, inlineFields, isResolved, legsInput, portOrPoint
  *   valves, reducers)
  * @invariant stored = the points of intersection and the inline components only; parts, cut lengths and joints are derived from the line's spec;
  *   a straight closing leg is appended when the target port is on its axis; consecutive collinear legs merge; weld gap default 0 (data.weldGap)
- * @failure unknown line / port, port in use, size / rating / facing / end-type mismatch, port direction, closing leg, zero leg, angle with no
+ * @failure from.onRun: the add_branch refusals (RTE_UNKNOWN_RUN, RTE_BRANCH_NO_TABLE_ROW, RTE_BRANCH_ON_FITTING, RTE_NO_FITTING_FOR_ANGLE ...); unknown line / port, port in use, size / rating / facing / end-type mismatch, port direction, closing leg, zero leg, angle with no
  *   spec elbow, leg too short, an inline component that does not fit, missing spec component -> RTE_* refusal, document unchanged
  */
 export const routePipe = defineCommand({
@@ -54,7 +55,11 @@ export const routePipe = defineCommand({
     'RTE_SPEC_AMBIGUOUS. Next: piping_takeoff for the cut list; check_piping; add_branch / insert_inline_component; delete_pipe_run to redo.',
   params: z.object({
     lineId: z.string().describe('Pipe line id (affected[0] of create_pipeline).'),
-    from: portOrPoint.describe('Start: { portId } or an open { point, direction? }.'),
+    from: z
+      .union([portOrPoint, z.object({ onRun: branchOnRun.describe('Branch off the run runId at the point or leg position `at`.') })])
+      .describe(
+        'Start: { portId }, an open { point, direction? }, or { onRun: { runId, at } } to BRANCH off an existing run in this one call (the tee / olet / stub-in of the header spec branch table is created as by add_branch; the new run is the branch run, at the line DN; the first leg must leave perpendicular to the header; inline and bendRadius are not available there).',
+      ),
     to: portOrPoint.optional().describe('End: { portId } (a closing leg is added) or an open { point }. Omit to end at the last leg.'),
     legs: legsInput,
     via: viaInput,
@@ -76,7 +81,7 @@ export const routePipe = defineCommand({
       .optional()
       .describe('Valves and concentric reducers placed while routing (see insert_inline_component for the rules).'),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     if (doc.units !== 'mm')
       return refuse(
         doc,
@@ -87,6 +92,7 @@ export const routePipe = defineCommand({
     const piping = getPiping(doc);
     const line = piping.lines[params.lineId];
     if (line === undefined) return refuse(doc, 'route_pipe', 'RTE_UNKNOWN_LINE', `no pipe line "${params.lineId}"`, [], ['lineId']);
+    if ('onRun' in params.from) return branchFromRun(doc, params, params.from.onRun, line.dn, ctx);
     const lookup = createSpecLookup(doc, line.spec);
     if (isMiss(lookup)) return refuse(doc, 'route_pipe', lookup.miss, lookup.detail, [line.id, ...lookup.ids], ['lineId']);
     const from = resolveEndpoint(doc, 'route_pipe', line, line.dn, params.from, 'from');

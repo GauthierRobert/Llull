@@ -170,7 +170,7 @@ export const AEC_READERS: readonly HostileReader[] = [
   },
   {
     name: 'plant: import_piping_library (execute, the library file text comes from the provider)',
-    covers: [],
+    covers: ['import_piping_library'],
     input: 'text',
     build: () => JSON.stringify({ ...(JSON.parse(jsonFile(CATALOG)) as object), id: 'hostile-library' }),
     skipLinear: 'a schema-validated JSON file: the sample is a fixed catalog, not a scalable record list',
