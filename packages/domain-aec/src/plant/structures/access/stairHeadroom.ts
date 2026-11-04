@@ -13,12 +13,13 @@ import { fromMm, toMm } from '@core/model/units';
 import { pointInPolygon } from '@lib/polygon';
 import type { BuildingModel, SteelStairElement } from '@aec/building/types';
 import { elementsOf } from '../../../building/model';
-import { accessLinks } from '../clash/structuresClashBodies';
+import { accessLinks, hostedRailings, type Hosted } from '../clash/structuresClashBodies';
+import { boxFootprint } from '../ladder/boxFootprint';
 import { ruleById, type AccessRule, type RulesetName } from '../rules/ruleTable';
 import { directionOf, layoutSteelStair } from '../stair/steelStairLayout';
 import { stairSizes } from '../stair/steelStairMeasure';
 import { breachFinding, type Finding } from './finding';
-import { allCandidates, verticalSpan } from './obstructions';
+import { allCandidates, verticalSpan, type Candidate } from './obstructions';
 
 /** Sample spacing along and across the stair, mm. */
 const SAMPLE_MM = 50;
@@ -33,7 +34,7 @@ export interface StairHeadroomReport {
   readonly obstructionId: string | null;
 }
 
-interface SlabCandidate {
+export interface SlabCandidate {
   readonly id: string;
   readonly ring: ReadonlyArray<Vec2>;
   readonly openings: ReadonlyArray<ReadonlyArray<Vec2>>;
@@ -41,10 +42,10 @@ interface SlabCandidate {
   readonly top: number;
 }
 
-function slabsOf(building: BuildingModel, exclude: ReadonlySet<string>): SlabCandidate[] {
+function slabsOf(building: BuildingModel): SlabCandidate[] {
   return elementsOf(building, 'slab').flatMap((slab) => {
     const level = building.levels[slab.levelId];
-    if (level === undefined || exclude.has(slab.id)) return [];
+    if (level === undefined) return [];
     const top = level.elevation + slab.offset;
     return [{ id: slab.id, ring: slab.boundary, openings: slab.openings ?? [], bottom: top - slab.thickness, top }];
   });
@@ -62,19 +63,67 @@ function pitchHeight(stair: SteelStairElement, stations: ReadonlyArray<number>, 
   return stair.riserCount * stair.riserHeight;
 }
 
+/** What every steel stair of one check_access shares: the obstruction boxes, the slabs and the hosted railings, computed once. */
+export interface HeadroomContext {
+  readonly candidates: readonly Candidate[];
+  readonly slabs: readonly SlabCandidate[];
+  readonly hosted: Hosted;
+}
+
+export function headroomContext(doc: CadDocument, building: BuildingModel): HeadroomContext {
+  return { candidates: allCandidates(doc, building), slabs: slabsOf(building), hosted: hostedRailings(building) };
+}
+
+/** Sorted distinct sample positions: the regular grid on 0..length plus every given edge, clamped, with a point just either side of each. */
+function positions(length: number, step: number, edges: ReadonlyArray<number>, inset: number): number[] {
+  const count = Math.max(1, Math.ceil(length / step));
+  const found = new Set<number>();
+  for (let index = 0; index <= count; index++) found.add(Math.min(length, (length * index) / count));
+  for (const edge of edges) {
+    const at = Math.min(length, Math.max(0, edge));
+    found.add(at);
+    found.add(Math.min(length, Math.max(0, at + inset)));
+    found.add(Math.min(length, Math.max(0, at - inset)));
+  }
+  return [...found].sort((p, q) => p - q);
+}
+
 /** The headroom of one steel stair, or null when its level is missing. */
-export function stairHeadroom(doc: CadDocument, building: BuildingModel, stair: SteelStairElement): StairHeadroomReport | null {
+export function stairHeadroom(
+  doc: CadDocument,
+  building: BuildingModel,
+  stair: SteelStairElement,
+  context: HeadroomContext = headroomContext(doc, building),
+): StairHeadroomReport | null {
   const level = building.levels[stair.levelId];
   if (level === undefined) return null;
-  const exclude = new Set(accessLinks(doc, building, stair));
-  const candidates = allCandidates(doc, building, exclude);
-  const slabs = slabsOf(building, exclude);
+  const exclude = new Set(accessLinks(doc, building, stair, context.hosted));
+  const candidates = context.candidates.filter((candidate) => !exclude.has(candidate.id) && !exclude.has(candidate.group));
+  const slabs = context.slabs.filter((slab) => !exclude.has(slab.id));
   const { stations, run } = layoutSteelStair(stair, stairSizes(doc, stair));
   const { forward, left } = directionOf(stair.angle);
   const base = level.elevation + stair.start[2];
   const [step, touch] = [fromMm(doc, SAMPLE_MM), fromMm(doc, TOUCH_MM)];
-  const alongCount = Math.max(1, Math.ceil(run / step));
-  const acrossCount = Math.max(1, Math.ceil(stair.width / step));
+  const at = (station: number, side: number): Vec2 => [
+    stair.start[0] + forward[0] * station + left[0] * side,
+    stair.start[1] + forward[1] * station + left[1] * side,
+  ];
+  // Obstructions whose plan extent meets the stair plan: their edges (in stair coordinates) join the sample positions, so a narrow one is never missed.
+  const corners = [at(0, -stair.width / 2), at(run, -stair.width / 2), at(run, stair.width / 2), at(0, stair.width / 2)];
+  const [minX, maxX] = [Math.min(...corners.map((c) => c[0])), Math.max(...corners.map((c) => c[0]))];
+  const [minY, maxY] = [Math.min(...corners.map((c) => c[1])), Math.max(...corners.map((c) => c[1]))];
+  const near = candidates.filter((c) => c.max[0] >= minX && c.min[0] <= maxX && c.max[1] >= minY && c.min[1] <= maxY);
+  const alongEdges: number[] = [];
+  const acrossEdges: number[] = [];
+  for (const candidate of near)
+    for (const [x, y] of boxFootprint(candidate.box).ring) {
+      const [dx, dy] = [x - stair.start[0], y - stair.start[1]];
+      alongEdges.push(dx * forward[0] + dy * forward[1]);
+      acrossEdges.push(dx * left[0] + dy * left[1] + stair.width / 2);
+    }
+  const inset = fromMm(doc, 0.01);
+  const alongs = positions(run, step, alongEdges, inset);
+  const acrosses = positions(stair.width, step, acrossEdges, inset);
   let least = Infinity;
   let obstruction: string | null = null;
   const consider = (id: string, pitch: number, low: number, high: number): void => {
@@ -82,14 +131,11 @@ export function stairHeadroom(doc: CadDocument, building: BuildingModel, stair: 
     const gap = Math.max(0, low - pitch);
     if (gap < least) [least, obstruction] = [gap, id];
   };
-  for (let along = 0; along <= alongCount; along++) {
-    const station = Math.min(run, along * step);
+  for (const station of alongs) {
     const pitch = base + pitchHeight(stair, stations, station);
-    for (let across = 0; across <= acrossCount; across++) {
-      const side = -stair.width / 2 + (stair.width * across) / acrossCount;
-      const x = stair.start[0] + forward[0] * station + left[0] * side;
-      const y = stair.start[1] + forward[1] * station + left[1] * side;
-      for (const candidate of candidates) {
+    for (const across of acrosses) {
+      const [x, y] = at(station, across - stair.width / 2);
+      for (const candidate of near) {
         if (x < candidate.min[0] || x > candidate.max[0] || y < candidate.min[1] || y > candidate.max[1]) continue;
         const span = verticalSpan(candidate.box, x, y);
         if (span !== null) consider(candidate.id, pitch, span[0], span[1]);
@@ -112,8 +158,9 @@ export function checkStairHeadroom(
   building: BuildingModel,
   stair: SteelStairElement,
   rulesets: readonly RulesetName[],
+  context?: HeadroomContext,
 ): { finding: Finding | null; report: StairHeadroomReport | null } {
-  const report = stairHeadroom(doc, building, stair);
+  const report = stairHeadroom(doc, building, stair, context);
   if (report === null || report.headroomMm === null || !rulesets.includes('iso_14122')) return { finding: null, report };
   const finding = breachFinding(ruleById('ISO-STR-HEADROOM'), 'STA_STAIR_HEADROOM', stair.id, report.headroomMm);
   const where = report.obstructionId === null ? {} : { location: `under ${report.obstructionId}` };

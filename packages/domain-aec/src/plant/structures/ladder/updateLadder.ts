@@ -136,7 +136,8 @@ export const updateLadder = defineCommand({
     let model = withElement(building, next);
     let gate: ReturnType<typeof cutRailingGate> = { building: model, status: 'none' };
     const arrival = walkingSurfaces(model).find((surface) => surface.id === ladder.arrivalSurfaceId);
-    if (next.exit === 'through' && (params.exit !== undefined || params.clearWidth !== undefined) && arrival !== undefined) {
+    const regate = next.exit === 'through' && (params.exit !== undefined || params.clearWidth !== undefined);
+    if (regate && arrival !== undefined) {
       gate = cutRailingGate(
         doc,
         model,
@@ -150,7 +151,14 @@ export const updateLadder = defineCommand({
         mm(GATE_REACH_MM),
       );
       model = gate.building;
-    }
+    } else if (regate)
+      gate = { building: model, status: 'skipped', reason: 'the ladder has no arrival surface, so no railing gap can be cut' };
+    else if (params.exit === 'side_step' && ladder.exit === 'through')
+      gate = {
+        building: model,
+        status: 'none',
+        reason: 'exit is now side_step: a gated gap cut earlier stays in its railing (update_railing openings removes it)',
+      };
     const names = Object.keys(changes).concat(
       params.rungPitchMax === undefined ? [] : ['rungPitchMax'],
       params.cage === undefined ? [] : ['cage'],

@@ -13,7 +13,7 @@ import { liveBackClearance } from '../ladder/ladderClearance';
 import { checkPlatforms, type PlatformReport } from './platformChecks';
 import { checkRailing, RAILING_RULES_NOT_EVALUATED, railingRules } from './railingChecks';
 import { checkStair, checkSteelStair, CONCRETE_STAIR_HEADROOM_NOT_EVALUATED, STAIR_RULES_NOT_EVALUATED, stairRules } from './stairChecks';
-import { checkStairHeadroom, stairHeadroomRules, type StairHeadroomReport } from './stairHeadroom';
+import { checkStairHeadroom, headroomContext, stairHeadroomRules, type StairHeadroomReport } from './stairHeadroom';
 
 type Verdict = 'pass' | 'warn' | 'fail';
 
@@ -139,7 +139,8 @@ export const checkAccess = defineCommand({
       ...(railings.length > 0 ? railingRules(params.rulesets) : []),
       ...(ladders.length > 0 ? ladderRules(ladders, params.rulesets) : []),
     ];
-    const headroom = steelStairs.map((stair) => checkStairHeadroom(doc, building, stair, params.rulesets));
+    const headroomShared = steelStairs.length > 0 ? headroomContext(doc, building) : undefined;
+    const headroom = steelStairs.map((stair) => checkStairHeadroom(doc, building, stair, params.rulesets, headroomShared));
     const breaches = [
       ...stairs.flatMap((stair) => checkStair(doc, stair, params.rulesets)),
       ...steelStairs.flatMap((stair) => checkSteelStair(doc, stair, params.rulesets)),

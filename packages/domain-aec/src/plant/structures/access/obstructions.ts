@@ -12,6 +12,8 @@ import { dot3 } from '@lib/vec3';
 
 export interface Candidate {
   readonly id: string;
+  /** Group of an access body (its assembly), else the id. */
+  readonly group: string;
   readonly box: OrientedBox;
   readonly min: Vec3;
   readonly max: Vec3;
@@ -35,14 +37,14 @@ export function verticalSpan(box: OrientedBox, x: number, y: number): [number, n
   return low <= high ? [low, high] : null;
 }
 
-const candidate = (id: string, box: OrientedBox): Candidate => ({ id, box, ...boxExtent(box) });
+const candidate = (id: string, box: OrientedBox, group = id): Candidate => ({ id, group, box, ...boxExtent(box) });
 
-/** Every building solid, spec-driven pipe run (insulation envelopes included) and access body, except the ids and groups in `exclude`. */
-export function allCandidates(doc: CadDocument, building: BuildingModel, exclude: ReadonlySet<string>): Candidate[] {
+/** Every building solid, spec-driven pipe run (insulation envelopes included) and access body. */
+export function allCandidates(doc: CadDocument, building: BuildingModel): Candidate[] {
   const found: Candidate[] = [];
   for (const element of Object.values(building.elements))
-    if (!exclude.has(element.id)) for (const box of elementBoxes(doc, building, element)) found.push(candidate(element.id, box));
-  for (const body of externalBodies(doc)) if (!exclude.has(body.id) && !exclude.has(body.group)) found.push(candidate(body.id, body.box));
+    for (const box of elementBoxes(doc, building, element)) found.push(candidate(element.id, box));
+  for (const body of externalBodies(doc)) found.push(candidate(body.id, body.box, body.group));
   return found;
 }
 
