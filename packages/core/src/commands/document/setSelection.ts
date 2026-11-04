@@ -14,7 +14,8 @@ export const setSelection = defineCommand({
   name: 'set_selection',
   annotations: { session: true, idempotent: true },
   description:
-    'Change which entities are selected (the selection that selection-based tools and the viewport highlight use). ' +
+    'Change which entities are selected (the selection that selection-based tools use). Per-client view state: it is never synced, ' +
+    'so against the open desktop app (--app) it does NOT highlight anything in the viewport; use the app UI to select. ' +
     'ids: entity ids; ids that do not exist are ignored. mode: "replace" (default) makes ids the whole selection (an empty list clears it), ' +
     '"add" appends them, "remove" removes them, "toggle" flips each one. Session command: not part of the feature history and not undoable.',
   params: z.object({
