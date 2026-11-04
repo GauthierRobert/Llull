@@ -303,7 +303,7 @@ As-built entities: `add_pipe_run` and `add_steel_member` gain an optional `asBui
 element (owned with 02 RTE / 06 STA). `check_clashes` and the line list then show "as-built". Persistence: `scan` is a new
 optional slice. The document version is bumped and the migration is a no-op (absent = no clouds). Validation goes in
 `scan/validate.ts` (plugin `DocumentExtension.validate`). The asset is never saved in the `.llull` file. **Pack and go**
-(`llull pack --with-scans`) zips the document with the assets it references (V1).
+(`llull pack --with-scans`) zips the document with the assets it references (built, §13.9).
 
 ### 3.1 Asset layout (MVP)
 
@@ -529,7 +529,7 @@ summary says so.
 | XYZ / PTS / CSV                                       | import MVP                          | Declared column order and unit; PTS first line = count (checked)                                                                                                                                                      |
 | RCP / RCS (ReCap), FLS (Faro), native Leica / Trimble | refused                             | `SCN_FORMAT_PROPRIETARY`                                                                                                                                                                                              |
 | PLY (binary / ascii)                                  | import (built, §13.8)               | Common from photogrammetry / CloudCompare                                                                                                                                                                             |
-| Document `.llull`                                     | `scan` slice (references + records) | Assets are never embedded; `pack --with-scans` (V1)                                                                                                                                                                   |
+| Document `.llull`                                     | `scan` slice (references + records) | Assets are never embedded; `pack --with-scans` (built, §13.9)                                                                                                                                                         |
 | IFC 4.3                                               | via 08 DAT                          | As-built pipes and members export like any element, with property `Pset_llullAsBuilt` (extractionId, fit RMS, source)                                                                                                 |
 
 ## 7. CLI / MCP / UI surfaces and error codes
@@ -588,6 +588,13 @@ summary says so.
 | `SCN_PLY_TRUNCATED`                | fail        | import            | The file holds fewer records than the header declares                                    | "The file is cut: re-export it"                                         |
 | `SCN_PLY_PARSE`                    | fail        | import            | ASCII PLY row not numeric / too short / too long                                         | "Re-export the PLY (binary if possible)"                                |
 | `SCN_PLY_DROPPED`                  | warn        | import            | Vertices with non-finite or out-of-range coordinates were dropped                        | "Check the export; the dropped count is in the manifest"                |
+| `SCN_PACK_DOCUMENT_UNREADABLE`     | fail        | pack              | The document file is missing or not a llull document                                     | "Pass --doc FILE (a saved .llull)"                                      |
+| `SCN_PACK_ASSET_MISSING`           | fail        | pack              | A referenced asset is not in this machine's store                                        | "Run `llull scan import <file>` for each, or pack without --with-scans" |
+| `SCN_PACK_ASSET_CORRUPT`           | fail        | pack              | A node block fails its CRC-32                                                            | "Re-import the source"                                                  |
+| `SCN_PACK_TOO_LARGE`               | fail        | pack / unpack     | Over --max-bytes (default 1 GiB)                                                         | "Pack without --with-scans or raise --max-bytes"                        |
+| `SCN_PACK_INVALID`                 | fail        | unpack            | Not a pack: bad zip, entry name, manifest or missing file                                | "Use an archive written by `llull pack`"                                |
+| `SCN_PACK_CHECKSUM`                | fail        | unpack            | A file does not match its sha256 / the asset does not read back                          | "The archive is damaged: copy it again"                                 |
+| `SCN_PACK_EXISTS`                  | fail        | unpack            | The target document exists                                                               | "Pass --force or --to another file"                                     |
 | `SCN_STEEL_NO_MATCH`               | warn        | steel fit         | Best score > 3σ                                                                          | "Non-catalogue or built-up section; model manually"                     |
 | `SCN_REG_TARGETS_INSUFFICIENT`     | fail        | registration      | < 3 target pairs                                                                         | "Add targets or use ICP with an initial transform"                      |
 | `SCN_REG_DEGENERATE`               | fail        | registration      | Collinear / coincident targets                                                           | "Use targets that span a plane"                                         |
@@ -741,7 +748,7 @@ Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_clo
     supports `device: "gpu"` only when built with `--features gpu` (else `SCN_GPU_FALLBACK`, CPU numbers unchanged).
 14. **Not built**: `$fromStep` plan binding (TR-SCN-03, a core prerequisite: plans stay DRAFT, agents run queries with `--json`),
     `fit_steel_member` (VC-SCN-23), `commit_slice_geometry`, COPC / E57 export, `llull scan gc`,
-    `server/tests/packReplay10scn.test.ts`. (`render_view` clouds: built, SCN-M3c.)
+    `server/tests/packReplay10scn.test.ts`; left: see §13.10. (`render_view` clouds: built, SCN-M3c.)
 
 ### 13.3 Validation status
 
@@ -879,6 +886,38 @@ Untrusted-input table (limits are named constants of `ply.rs`, every row has a c
 
 Host: `scan_import` runs the same `llull-compute cloud import` job (atomic store, timeout, no asset left on failure: `server/tests/scanImport.test.ts`); the document
 type `CloudFormat` (`@core/model/pointCloud`) gained `'ply'`. New codes (§7.2): `SCN_PLY_HEADER`, `SCN_PLY_TRUNCATED`, `SCN_PLY_PARSE` (fail), `SCN_PLY_DROPPED` (warn).
+
+### 13.9 Pack and go (SCN-V1c, 2026-11-04)
+
+`llull pack OUT.zip [--doc FILE] [--with-scans] [--store DIR] [--max-bytes N]` and `llull unpack ARCHIVE.zip [--to FILE] [--store DIR] [--force]`
+(`server/src/cli/pack.ts`, `server/src/scan/scanPack.ts`; file based: a document open in the desktop app is saved first, `--app` / `--server` are a usage error).
+Without `--with-scans` the archive carries the document and lists the asset keys it references; with it, the assets of the local store too.
+
+Archive: `pack.json` (canonical JSON: version 1, the document's sha256, the referenced keys, and per packed asset its source name, point count and every file with size and
+sha256), `document.llull` (the saved file byte for byte) and `scans/<assetKey>/{manifest.json, hierarchy.bin, nodes.bin[, source.sha256]}`. Entries are STORED with fixed
+timestamps, so the same document and assets give the same archive bytes (tested). Points are never copied into the document; the archive is only the transport.
+
+- **Pack refusals** (nothing is written): unreadable or non-llull document `SCN_PACK_DOCUMENT_UNREADABLE`; with scans, a referenced asset absent from the store or not
+  readable `SCN_PACK_ASSET_MISSING` (every key named, with "run `llull scan import`"); an asset whose node block fails its CRC-32 `SCN_PACK_ASSET_CORRUPT`; more than
+  `--max-bytes` (default 1 GiB: the zip is built in memory without ZIP64) `SCN_PACK_TOO_LARGE`.
+- **Unpack = untrusted archive.** The zip is read with a byte cap (and ratio 1: only STORED data is accepted), only the entry names `pack.json`, `document.llull` and
+  `scans/<64 hex>/<one of the four file names>` are accepted (anything else, including `..` and absolute paths, is `SCN_PACK_INVALID`), `pack.json` is validated field by
+  field and every listed path must belong to its own asset key, then every file is checked against its size and sha256 (`SCN_PACK_CHECKSUM`) and each new asset is staged in
+  a `.tmp-` folder of the store and must read back through `AssetReader` as that key before ANY rename (a failure installs nothing and writes no document). Assets
+  already in the store are kept (content addressed); an existing target document is `SCN_PACK_EXISTS` unless `--force`. Assets referenced but not packed are reported
+  (`notIncluded`) with the import hint.
+- Tests (`server/tests/scanPack.test.ts`): refusals, name traversal, malformed manifests, tampered document / file, byte cap, invalid asset content with a right hash, CLI
+  usage, byte-reproducible packing of two real clouds (CYL-A, CLH-A), unpack into an empty store with the files equal to the source store's, re-unpack ("already there"),
+  a bit flip inside the archive, a corrupted block at pack time.
+
+### 13.10 Left (V1 remainder, 2026-11-04)
+
+- **COPC export** (§6): not built. The `laz` crate encodes, but a COPC file needs a LAZ 1.4 writer with one variable-size chunk per octree node, the `copc` info VLR and a
+  hierarchy EVLR, and the only reader that would prove it valid (PDAL, copc-lib, QGIS) is not available offline; a writer checked only by our own reader could ship files
+  other tools reject. It stays a V1 item for a session with a reference reader. **E57 export**: not built (the `e57` crate has a writer, but there is no host surface yet:
+  an export tool, its CLI verb and a round trip through an independent reader are one task).
+- `fit_steel_member` (FR-SCN-15, VC-SCN-23), batch extraction (VC-SCN-22 / 23 in parallel over many seeds), global registration (several stations), `commit_slice_geometry`,
+  `llull scan gc`, `$fromStep` plan binding, ZIP64 / streamed archives for packs above 1 GiB.
 
 ## 12. References
 

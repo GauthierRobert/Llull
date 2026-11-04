@@ -3,7 +3,9 @@
 import { DEFAULT_DOCUMENT_PATH } from '@protocol/documentFiles';
 
 /** Flags that never take a value (`--json`, not `--json yes`). */
-const BOOLEAN_FLAGS: ReadonlySet<string> = new Set('json dry-run validate continue force help quiet progress app no-fit'.split(' '));
+const BOOLEAN_FLAGS: ReadonlySet<string> = new Set(
+  'json dry-run validate continue force help quiet progress app no-fit with-scans'.split(' '),
+);
 
 export interface ParsedArgv {
   readonly positionals: readonly string[]; // the subcommand first
