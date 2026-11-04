@@ -196,3 +196,20 @@ describe('InstancedRenderer — material args', () => {
     },
   );
 });
+
+describe('InstancedRenderer: material classes split batches (VIS-M8f)', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+  it('identical boxes with different class surfaces form separate batches, surface carried; no class = one batch', () => {
+    for (let i = 0; i < 4; i++) localDispatch('add_box', { size: [10, 10, 10] });
+    const entities = getVisibleEntities();
+    expect(groupEntitiesForInstancing(entities).size).toBe(1);
+    const shiny = { metalness: 0.9, roughness: 0.3 };
+    const batches = groupEntitiesForInstancing(entities, {}, (entity) => (entity.id === entities[0]!.id ? shiny : undefined));
+    expect(batches.size).toBe(2);
+    expect([...batches.values()].map((b) => b.entities.length).sort()).toEqual([1, 3]);
+    expect([...batches.values()].filter((b) => b.surface !== undefined)).toHaveLength(1);
+    expect(makeMaterialArgs('shaded', shiny)).toMatchObject({ roughness: 0.3, metalness: 0.55 });
+  });
+});

@@ -4,6 +4,7 @@
 import React from 'react';
 import { useStore } from '@ui/store';
 import { DisplaySection } from './DisplaySection';
+import { MaterialClassSection } from './MaterialClassSection';
 import { IssuesSection } from './IssuesSection';
 import { ViewpointsSection } from './ViewpointsSection';
 
@@ -14,6 +15,7 @@ export function ModelReview(): React.ReactElement {
       <IssuesSection review={document.review} />
       <ViewpointsSection review={document.review} />
       <DisplaySection document={document} />
+      <MaterialClassSection document={document} />
     </div>
   );
 }

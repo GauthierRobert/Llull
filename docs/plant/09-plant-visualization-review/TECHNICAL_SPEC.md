@@ -1095,9 +1095,17 @@ Decisions:
 - **Metalness and roughness are stored but not used by any render yet**: `render_view` / `render_walkthrough` use the colour only.
 - **Class assignment is by entity id, not by rule.** A plugin (e.g. the plant display plugin) can assign classes from its own data with `assign_material_class` in a later change; a rule-based assignment (`materialClassRules`) was not added to keep the model small.
 
-Left: the viewport reading of `display.materialClasses` (three.js `MeshStandardMaterial` colour / metalness / roughness per class, and the Display panel to define and assign classes) is a UI follow-up; Blinn-Phong with class metalness / roughness in the reference raster; plant-specific default assignments (grating, handrail, valve) from the plant plugins.
+Left: ~~the viewport reading of `display.materialClasses` and the panel~~ (built, VIS-M8f below); Blinn-Phong with class metalness / roughness in the reference raster; plant-specific default assignments (grating, handrail, valve) from the plant plugins.
 
 Validation: `tests/unit/display/materialClasses.test.ts`, `tests/unit/render/walkthroughPath.test.ts`.
+
+As built, VIS-M8f (viewport and panel, 2026-11-04; UI only, no core change):
+
+- **Colour** = `render_view`'s precedence, one pure function (`resolveTintColour`, `viewport/3d/review/materialClassAppearance.ts`): profile rule, then class colour, then profile default colour, then the entity colour. `profileTints` now also tints from classes without an active profile; it feeds the existing tint store, so per-entity meshes, the instanced batches and the plant batch colour buffers all read it. A profile default no longer tints 2D shapes (as `render_view`). Equality with core `applyReviewStyle` is tested on a table.
+- **Metalness / roughness** come from the assigned class only (`entityPbrMaterial`, over the `materialId` material, whose colour is kept), through the same `displayMetalness` cap as materials. Per-entity solids: the class surface travels in `pbrMaterial`; a tinted solid keeps its surface and takes the tint colour (before, a tint dropped the material surface). Instanced batches split by class surface (`grouping.ts` key suffix, `InstanceBatch.surface`). Plant buckets already split by class (the plan's `materialClass`): their material takes the class surface when the bucket's class is the assigned display class (a `materialId` equal to a class id is not mistaken for it). Instancing, LOD, picking, tints and section clipping are untouched. No assignment: the same keys, materials and colours as before.
+- **Panel**: Review tab, "Material classes" section (`MaterialClassSection.tsx`): the defaults and document classes with swatch, metalness / roughness and assigned count; Assign / Clear on the selection; Edit (prefills the form) and Save (`define_material_class`: id, name, colour or "keep entity colour", metalness, roughness); Delete only for a document class. Refusals (`VIS_MATERIAL_CLASS_INVALID`, `VIS_MATERIAL_CLASS_IN_USE`) show the command summary. All changes are `dispatch` of the existing commands.
+- **Left**: a class applied to the children of an `instance` entity (the per-entity path draws them with their own colours, as `render_view`); a GPU pixel check of the class surface in the desktop window.
+- Validation: `tests/component/{materialClassAppearance,MaterialClassSection,MaterialClassShell,InstancedRenderer}.test.ts(x)`.
 
 ### 12.15 As built — VIS-M8a glTF `EXT_mesh_gpu_instancing` export (TR-VIS-25), 2026-11-04
 

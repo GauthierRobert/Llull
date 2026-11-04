@@ -71,7 +71,8 @@ export function SolidMeshShell({
     color: tint ?? color,
     selected,
     ...surface,
-    pbrOverride: tint === undefined ? pbrMaterial : undefined,
+    // A tint (profile rule, class colour, overlay) replaces the colour only: the surface (material or material class) stays.
+    pbrOverride: pbrMaterial === undefined || tint === undefined ? pbrMaterial : { ...pbrMaterial, color: tint },
     ghosted,
   });
   const displayMode = useViewportStore((s) => s.displayMode);
