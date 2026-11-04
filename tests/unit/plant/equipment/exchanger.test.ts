@@ -487,15 +487,7 @@ describe('check_equipment on an exchanger', () => {
 
 describe('exchangers keep the generic equipment commands honest', () => {
   const doc = bemDocument();
-  it('update_equipment_parameters and update_equipment refuse a parametric exchanger with a coded reason', () => {
-    const result = expectRefusal(
-      doc,
-      'update_equipment_parameters',
-      { equipment: 'E-301', set: { name: 'x' } },
-      'EQP_NOT_PARAMETRIC',
-      'equipment',
-    );
-    expect(result.summary).toContain('parametric exchanger');
+  it('update_equipment refuses a parametric exchanger with a coded reason (update_equipment_parameters revises it)', () => {
     expectRefusal(doc, 'update_equipment', { currentMark: 'E-301', name: 'x' }, 'EQP_NOT_PARAMETRIC', 'elementId');
   });
 

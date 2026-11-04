@@ -843,7 +843,7 @@
 | `rename_element_tag` | Rename the tag (mark) of cable trays, pipe supports and steel members, so that assign_plant_object can classify them with a plant tag (plant data writes the ta… |  |
 | `rename_equipment_tag` | Rename the tag (mark) of equipment and keep every reference to it consistent: a legacy pipe from / to naming the tag or a port "<tag>:<nozzle>" and the from / … |  |
 | `tank_shell_thickness` | Query: API 650 one-foot-method shell thickness, course by course, of a vertical atmospheric storage tank. | read-only |
-| `update_equipment_parameters` | Revise a parametric vessel (from add_vessel / add_process_column) in place: set { name, location, planRotationDeg, insideDiameter, tangentLength, heads, shellT… |  |
+| `update_equipment_parameters` | Revise a parametric vessel, heat exchanger, storage tank or pump (from add_vessel / add_process_column / add_heat_exchanger / add_storage_tank / add_pump) in p… |  |
 | `update_nozzle` | Change a nozzle of an equipment in place, keeping its mark and port id "<tag>:<mark>": any of service, dn / nps, rating, facing, location (same forms as add_no… |  |
 | `vessel_thickness` | Query: ASME VIII-1 internal-pressure thickness of a parametric vessel (tag or id): required thickness, available thickness and MAWP of the shell (UG-27(c)(1) c… | read-only |
 | `vessel_volume` | Query: inside volume of a cylindrical vessel with two formed heads, and the liquid volume at given levels (closed forms of D. | read-only |
