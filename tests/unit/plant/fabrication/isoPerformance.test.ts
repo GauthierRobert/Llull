@@ -55,21 +55,27 @@ const best = <T>(runs: number, run: () => T): { value: T; ms: number } => {
   return { value: value as T, ms };
 };
 
-/** The whole chain on a line of `pairs` pipe + elbow pairs: import, number welds, define (50 pipes per sheet), final isometric. */
-function chain(pairs: number): number {
+/** A fixed pure-JS workload (sort, string building, a hash-like fold), independent of the code under test: how slow this machine is right now. */
+function workload(): number {
   const start = performance.now();
-  const imported = apply(createEmptyDocument(), 'import_pcf', { text: staircasePcf(pairs) });
-  const numbered = apply(imported, 'number_welds', { lineId: 'L-1000' });
-  const defined = apply(numbered, 'define_isometric', { lineId: 'L-1000', maxPipePiecesPerSheet: 50, style: 'final' });
-  data(defined, 'export_isometric', { lineId: 'L-1000', style: 'final' });
-  return performance.now() - start;
+  let seed = 12345;
+  const values: number[] = [];
+  for (let at = 0; at < 150_000; at++) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    values.push(seed);
+  }
+  values.sort((x, y) => x - y);
+  let fold = 0;
+  for (const value of values) fold = (fold * 31 + (value % 997)) % 1000003;
+  const text = values.slice(0, 20_000).join(',');
+  return fold >= 0 && text.length > 0 ? performance.now() - start : -1;
 }
 
-/** Bounds are the §8 budgets of a plain run; they scale by how much slower a fixed 40-pair reference chain (55 ms on the dev machine, 2026-11-04) runs here (coverage instrumentation, load). */
-const REFERENCE_MILLISECONDS = 60;
+/** Bounds are the §8 budgets of a plain run; they scale by how much slower the fixed workload runs than on the dev machine (45 ms, 2026-11-04; coverage instrumentation, load), at most x10. */
+const REFERENCE_MILLISECONDS = 45;
 const SLACK = ((): number => {
-  chain(40);
-  return Math.max(1, chain(40) / REFERENCE_MILLISECONDS);
+  workload();
+  return Math.min(10, Math.max(1, Math.min(workload(), workload()) / REFERENCE_MILLISECONDS));
 })();
 
 describe('VC-ISO-18: a 1000-component line stays inside the budgets of TECHNICAL_SPEC §8', () => {
@@ -87,7 +93,7 @@ describe('VC-ISO-18: a 1000-component line stays inside the budgets of TECHNICAL
     expect(best(3, () => execute(empty, 'import_pcf', { text, preview: true })).ms).toBeLessThan(100 * SLACK);
   });
 
-  it('export_pcf < 200 ms, output <= 200 kB (the 120 kB of the first draft is under one record of 120 bytes)', () => {
+  it('export_pcf < 200 ms, output <= 200 kB (a 120 kB bound could not hold: about 130 bytes per two-point record)', () => {
     const { value, ms } = best(3, () => data<{ files: Array<{ content: string }> }>(doc, 'export_pcf', { lineIds: ['L-1000'] }));
     expect(ms).toBeLessThan(200 * SLACK);
     expect(value.files[0]?.content.length).toBeLessThan(200_000);

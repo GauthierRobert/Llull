@@ -11,7 +11,7 @@ import type { LineAnalysis } from './analysis';
 import { bomRows } from './bom';
 import { mmText, runDimensions } from './iso/isoDimensions';
 import { buildIsoGraph } from './iso/isoGraph';
-import type { IssueSnapshot, NetworkComponent } from './model';
+import type { FabricationModel, IssuedIsometric, IssueSnapshot, NetworkComponent } from './model';
 
 const pointText = (point: readonly number[]): string => point.map(mmText).join(',');
 
@@ -26,7 +26,7 @@ export function snapshotOf(analysis: LineAnalysis): IssueSnapshot {
     const last = dimension.points[dimension.points.length - 1];
     if (first === undefined || last === undefined) continue;
     let key = `${dimension.axis}@${pointText(first)}`;
-    for (let copy = 2; key in dimensions; copy++) key = `${dimension.axis}@${pointText(first)}#${copy}`;
+    for (let copy = 2; Object.hasOwn(dimensions, key); copy++) key = `${dimension.axis}@${pointText(first)}#${copy}`;
     dimensions[key] = { overallMm: dimension.overall, to: pointText(last) };
   }
   return {
@@ -44,6 +44,16 @@ export function snapshotOf(analysis: LineAnalysis): IssueSnapshot {
       bomRows(network.components, () => true).rows.map((row) => [row.itemCode, { quantity: row.quantity, unit: row.unit }]),
     ),
   };
+}
+
+/** The snapshots after `issue` is stored: its own, and none of the earlier issues of the same line (compareToIssue only reads the latest). */
+export function withLatestSnapshot(
+  fabrication: FabricationModel,
+  issue: IssuedIsometric,
+  snapshot: IssueSnapshot,
+): Record<string, IssueSnapshot> {
+  const kept = Object.entries(fabrication.issueSnapshots ?? {}).filter(([id]) => fabrication.issues?.[id]?.lineId !== issue.lineId);
+  return { ...Object.fromEntries(kept), [issue.id]: snapshot };
 }
 
 export interface ChangeSet {
@@ -76,9 +86,9 @@ function diffRecords<T>(
 ): ChangeSet {
   const keys = (record: Readonly<Record<string, T>>): string[] => Object.keys(record).sort();
   return {
-    added: keys(current).filter((key) => !(key in issued)),
-    removed: keys(issued).filter((key) => !(key in current)),
-    changed: keys(current).filter((key) => key in issued && !same(issued[key] as T, current[key] as T)),
+    added: keys(current).filter((key) => !Object.hasOwn(issued, key)),
+    removed: keys(issued).filter((key) => !Object.hasOwn(current, key)),
+    changed: keys(current).filter((key) => Object.hasOwn(issued, key) && !same(issued[key] as T, current[key] as T)),
   };
 }
 

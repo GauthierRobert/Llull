@@ -45,7 +45,7 @@ export const deletePcfLine = defineCommand({
     const issueSnapshots =
       fabrication.issueSnapshots === undefined || issues === undefined
         ? undefined
-        : Object.fromEntries(Object.entries(fabrication.issueSnapshots).filter(([id]) => id in issues));
+        : Object.fromEntries(Object.entries(fabrication.issueSnapshots).filter(([id]) => Object.hasOwn(issues, id)));
     return {
       document: withFabrication(doc, {
         version: 1,

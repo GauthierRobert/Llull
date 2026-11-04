@@ -11,6 +11,7 @@ import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { deltaOf } from '@aec/plant/fabrication/compareIssue';
 import type { IssueSnapshot } from '@aec/plant/fabrication/model';
 import { fabricationErrors } from '@aec/plant/fabrication/validate';
+import { cs150Document } from '../piping/rteFixtures';
 import { loadedL101 } from './isoM2Fixtures';
 
 const port: HumanSignaturePort = { verify: () => ({ signer: 'alice', signatureId: 'sig-1' }) };
@@ -139,5 +140,67 @@ describe('deltaOf', () => {
 
   it('identical snapshots have no difference', () => {
     expect(deltaOf(base, base).total).toBe(0);
+  });
+});
+
+describe('compareToIssue: review follow-ups', () => {
+  it('keeps one snapshot per line: a second issue replaces the first', () => {
+    const renumbered = apply(edited, 'number_welds', { lineId: 'L-101' });
+    const second = execute(renumbered, 'issue_isometric', { ...issueParams, revision: 'B', confirmation: { nonce: 'n2' } }, ctx);
+    expect(second.error, second.summary).toBeUndefined();
+    const fabrication = second.document.plant?.fabrication;
+    expect(Object.keys(fabrication?.issues ?? {})).toHaveLength(2);
+    expect(Object.keys(fabrication?.issueSnapshots ?? {})).toEqual([second.affected[0]]);
+    expect(compare(second.document).comparison).toMatchObject({ issuedRevision: 'B', unchanged: true });
+  });
+
+  it('compareToIssue works after replay_history (the snapshot is recomputed with the issue)', () => {
+    const replayed = execute(edited, 'replay_history', {}).document;
+    expect(compare(replayed).comparison?.delta.welds.added).toEqual(compare(edited).comparison?.delta.welds.added);
+    expect(Object.keys(replayed.plant?.fabrication?.issueSnapshots ?? {})).toEqual(
+      Object.keys(issued.plant?.fabrication?.issueSnapshots ?? {}),
+    );
+  });
+
+  it('the legend counts removed components', () => {
+    const result = compare(edited);
+    expect(result.comparison?.delta.components.removed).toHaveLength(1);
+    expect(result.files[0]?.content).toContain('1 REMOVED');
+  });
+
+  it('load validation: a snapshot of no issue and a malformed fingerprint are reported', () => {
+    const fabrication = issued.plant?.fabrication;
+    const [id] = Object.keys(fabrication?.issueSnapshots ?? {});
+    const snapshot = fabrication?.issueSnapshots?.[id as string];
+    expect(fabricationErrors({ ...fabrication, issueSnapshots: { ...fabrication?.issueSnapshots, 'iso-issue-99.1': snapshot } })).toEqual([
+      'plant.fabrication.issueSnapshots.iso-issue-99.1: no issue with this id',
+    ]);
+    const first = Object.keys(snapshot?.components ?? {})[0] as string;
+    const bad = { ...snapshot, components: { ...snapshot?.components, [first]: { type: 'PIPE', fp: 'XYZ', at: [0, 0, 0] } } };
+    expect(fabricationErrors({ ...fabrication, issueSnapshots: { [id as string]: bad } }).length).toBeGreaterThan(0);
+  });
+
+  it('record keys named like Object.prototype members are plain keys', () => {
+    const origin = [0, 0, 0] as const;
+    const snapshot = (components: IssueSnapshot['components']): IssueSnapshot => ({ components, welds: {}, dimensions: {}, bom: {} });
+    const delta = deltaOf(snapshot({}), snapshot({ constructor: { type: 'PIPE', fp: '0123456789abcdef', at: origin } }));
+    expect(delta.components.added).toEqual(['constructor']);
+    expect(deltaOf(snapshot({ toString: { type: 'PIPE', fp: '0123456789abcdef', at: origin } }), snapshot({})).components.removed).toEqual([
+      'toString',
+    ]);
+    const grade = apply(cs150Document(), 'add_level', { name: 'Grade', elevation: 0 });
+    const points = [
+      [0, 0, 1000],
+      [3000, 0, 1000],
+    ];
+    expect(apply(grade, 'add_pipe_run', { points, dn: 100, line: 'constructor' })).not.toBe(grade);
+    const created = apply(cs150Document(), 'create_pipeline', {
+      service: 'P',
+      sequence: '1',
+      spec: 'CS150',
+      dn: 100,
+      lineNumber: 'constructor',
+    });
+    expect(created.plant?.piping?.lineOrder).toHaveLength(1);
   });
 });

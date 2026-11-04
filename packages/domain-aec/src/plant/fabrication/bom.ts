@@ -130,6 +130,7 @@ function studOf(row: (typeof FLANGES_B16_5)[number], gasketMm: number, gasketGiv
       gasketGiven
         ? `gasket ${gasketMm} mm given by the caller`
         : `gasket ${gasketMm} mm ASSUMED (B16.20 spiral wound, nominal): pass gasketThicknessMm`,
+      'the catalogue thickness is the minimum thickness without the raised face (dataset note); B16.5 minimum thickness for Class 150 / 300 may already include the 1.6 mm raised face: to confirm against B16.5 Table 8, in which case the stud is up to 3.2 mm long (one stocking step)',
       `nut height ${rule.nutHeightMm} mm = nominal bolt diameter (conservative)`,
       `thread projection ${rule.projectionMm.toFixed(2)} mm = 2 pitches of ${rule.pitchMm.toFixed(3)} mm`,
     ],

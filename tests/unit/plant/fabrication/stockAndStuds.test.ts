@@ -106,7 +106,7 @@ describe('piping_bom stud length', () => {
   const bolts = (extra: Record<string, unknown> = {}): Bom =>
     data<Bom>(doc, 'piping_bom', { scope: 'line', lineId: 'L-101', includeBolting: true, matingFlanges: 'assume_in_scope', ...extra });
 
-  it('class 150 NPS 4: 22.4 + 1.6 + 22.4 + 1.6 + 4.5 + 2 x 15.875 + 4 x 2.309 = 93.5 mm, stocked at 95.25 mm (3-3/4 in), derived, never verified', () => {
+  it('class 150 NPS 4 by the named rule on the bundled row (unverified, derived): hand sum 93.5 mm stocked at 95.25 mm', () => {
     const stud = bolts().bolting?.groups[0]?.stud;
     expect(stud).toMatchObject({ lengthMm: 95.25, lengthIn: '3-3/4', method: 'rule', verified: false });
     expect(stud?.assumptions.join(' ')).toContain('gasket 4.5 mm ASSUMED');
@@ -120,5 +120,18 @@ describe('piping_bom stud length', () => {
 
   it('no includeBolting, no stud', () => {
     expect(data<Bom>(doc, 'piping_bom', { scope: 'line', lineId: 'L-101' }).bolting).toBeUndefined();
+  });
+});
+
+describe('nestPieces: ties and duplicate stock lengths', () => {
+  it('equal cut lengths are placed by piece name, whatever the input order', () => {
+    const forward = nestPieces([piece('A', 3000), piece('B', 3000), piece('C', 3000)], [6000], 0);
+    const backward = nestPieces([piece('C', 3000), piece('B', 3000), piece('A', 3000)], [6000], 0);
+    expect(forward.groups[0]?.bars.map((bar) => bar.pieces)).toEqual([['A', 'B'], ['C']]);
+    expect(backward.groups[0]?.bars.map((bar) => bar.pieces)).toEqual([['A', 'B'], ['C']]);
+  });
+
+  it('a stock length given twice is one stock length', () => {
+    expect(nestPieces([piece('A', 1000)], [6000, 6000, 12000], 0).stockLengthsMm).toEqual([6000, 12000]);
   });
 });

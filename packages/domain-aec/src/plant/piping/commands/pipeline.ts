@@ -75,7 +75,7 @@ export const createPipeline = defineCommand({
         [clash],
         ['sequence'],
       );
-    if (lineNumber in getFabrication(doc).pcfLines)
+    if (Object.hasOwn(getFabrication(doc).pcfLines, lineNumber))
       return refuse(
         doc,
         'create_pipeline',

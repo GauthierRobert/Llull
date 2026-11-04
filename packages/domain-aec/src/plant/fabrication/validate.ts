@@ -92,7 +92,7 @@ const issued = z.object({
   payloadSha256: z.string().length(64),
 });
 const snapshot = z.object({
-  components: z.record(z.string(), z.object({ type: z.string(), fp: z.string(), at: vec3 })),
+  components: z.record(z.string(), z.object({ type: z.string(), fp: z.string().regex(/^[0-9a-f]{16}$/), at: vec3 })),
   welds: z.record(z.string(), z.object({ kind: z.enum(['shop', 'site', 'field_fit']), at: vec3 })),
   dimensions: z.record(z.string(), z.object({ overallMm: z.number(), to: z.string() })),
   bom: z.record(z.string(), z.object({ quantity: z.number(), unit: z.enum(['m', 'ea']) })),
@@ -160,11 +160,24 @@ function weldErrors(welds: unknown, fieldWelds: unknown, isometrics: unknown, is
   return errors;
 }
 
+/** Every snapshot belongs to an issue of the slice. */
+function snapshotErrors(snapshots: unknown, issues: unknown): string[] {
+  if (!isRecord(snapshots)) return [];
+  return Object.keys(snapshots)
+    .filter((key) => !isRecord(issues) || !Object.hasOwn(issues, key))
+    .map((key) => `${ROOT}.issueSnapshots.${key}: no issue with this id`);
+}
+
 /** Problems of a raw `plant.fabrication` (empty = valid or absent). */
 export function fabricationErrors(raw: unknown): string[] {
   if (raw === undefined) return [];
   const shape = sliceSchemaErrors(fabrication, raw, ROOT);
   return isRecord(raw)
-    ? [...shape, ...crossErrors(raw['pcfLines']), ...weldErrors(raw['welds'], raw['fieldWelds'], raw['isometrics'], raw['issues'])]
+    ? [
+        ...shape,
+        ...crossErrors(raw['pcfLines']),
+        ...weldErrors(raw['welds'], raw['fieldWelds'], raw['isometrics'], raw['issues']),
+        ...snapshotErrors(raw['issueSnapshots'], raw['issues']),
+      ]
     : shape;
 }

@@ -196,7 +196,7 @@ export const addPipeRun = defineCommand({
     if (pipeTwin) return noop(doc, duplicateSummary('add_pipe_run', pipeTwin, 'a pipe on this route'));
     const text = (value: string | undefined): string | undefined => value?.trim() || undefined;
     const [lineNumber, origin, destination] = [text(line), text(from), text(to)];
-    if (lineNumber !== undefined && lineNumber in getFabrication(doc).pcfLines)
+    if (lineNumber !== undefined && Object.hasOwn(getFabrication(doc).pcfLines, lineNumber))
       return refuseLine(
         doc,
         'add_pipe_run',
