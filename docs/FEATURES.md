@@ -491,7 +491,7 @@
 | `delete_section_box` | Delete a section box (sb-<n>). |  |
 | `delete_viewpoint` | Delete a saved viewpoint. |  |
 | `delete_walkthrough` | Delete a walkthrough (wt-<n>); its viewpoints stay. |  |
-| `export_bcf` | Export review issues (create_review_issue) as a BCF 3.0 archive for other BIM / review tools: one topic per issue (title, type, status, priority, labels, descr… | read-only |
+| `export_bcf` | Export review issues (create_review_issue) as a BCF 3.0 (default) or 2.1 archive for other BIM / review tools: one topic per issue (title, type, status, priori… | read-only |
 | `export_bcf_viewpoint` | Export one saved viewpoint (vp-<n>) as a BCF VisualizationInfo XML (*.bcfv: camera in metres, vertical field of view in degrees, the selected entities as Compo… | read-only |
 | `get_viewpoint` | Read one saved viewpoint (vp-<n>): data { id, guid, name, camera, sectionBoxId?, colourProfileId?, visibility?, selection?, markups[], warnings[] (none are emi… | read-only |
 | `import_bcf` | Import a BCF 2.1 or 3.0 archive (.bcfzip / .bcf) as review issues: one issue per topic (title, type, priority, labels, description, assignedTo, dueDate) with i… |  |

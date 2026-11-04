@@ -990,7 +990,7 @@ Decisions:
 - **Imported comments** keep the BCF Author as `importedAuthor` (unverified label, `author` stays `agent`; `export_bcf` writes it back); comments dedupe on author + text. One import creates at most 20 000 records (`VIS_BCF_LIMIT`) and an entry may inflate at most 200 times its size.
 - **VC-VIS-15 runs only when `xmllint` and `LLULL_BCF_XSD_DIR` are present**; elsewhere only the structural unit test covers it.
 
-Not built: BCF 2.1 export (`VIS_BCF_VERSION` still refuses it), `VIS_BCF_COLOURING_LARGE`, per-component `IfcGuid` mapping (needs the 08-DAT IFC export), import of
+Built later (§12.18): BCF 2.1 export, `VIS_BCF_COLOURING_LARGE`, viewpoint colouring. Not built: per-component `IfcGuid` mapping (needs the 08-DAT IFC export), import of
 snapshots, section boxes and markups from a BCF viewpoint (`Lines`, `ClippingPlanes` are ignored), the vendored XSDs for the server test, and the UI for any of it.
 
 ### 12.10 As built — VIS-M4b profile, section box, review highlight, visible entities, 2026-11-03
@@ -1222,6 +1222,18 @@ Validation: `tests/unit/render/surfaceShading.test.ts`, `tests/unit/plant/displa
 Decisions: **M1** `VIS_MARKER_NO_OD` refuses the whole call (no partial write) and lists the pipes; `VIS_MARKER_BAND_INTERPOLATED` is a summary + `interpolated` list, not a refusal. **M2** Penetrations are NOT planned and NOT checked: no model supplies them (02 RTE has no penetration entity); the summary says so. Placing the two markers per wall / floor crossing needs a penetration source first. **M3** `scheme` accepts only `asme_a13_1` (ISO 14726 has no legend size table). **M4** Params follow `pipe_markers` (`ids`, `lines`, `spacingMm`, `profileId`) rather than the §7 sketch (`lineIds | all`, `spacing`). **M5** The viewport overlay still draws the `pipe_markers` interval placement; drawing the stored `display.pipeMarkers` (with `bidirectional` arrows and the legend size) is UI work. Not verified: the markers against a real A13.1 edition (vendor tables, grade A / B as in the data file).
 
 Tests: `tests/unit/plant/display/pipeMarkersPlacement.test.ts` (24: legend rows, placement on drawn pipes and on SC-RTE-02 with a valve, replace on rerun, profile letters, covering, bidirectional, refusals, purity, replay, save / load, hostile `display.pipeMarkers`, check rows). Tool-schema snapshot (two new tools; `pipe_markers` description no longer says valves are not special-cased) and `docs/FEATURES.md` regenerated.
+
+**Item 4, `export_bcf` 2.1, viewpoint colouring, `VIS_BCF_COLOURING_LARGE` (closes the "Not built" of §12.9 for these three).** Code `core/commands/exchange/bcf/{bcfXml,bcfColouring,exportBcf}.ts`.
+
+| What | Behaviour |
+| ---- | --------- |
+| `version: '2.1'` | the 2.1 layout, written and read back by `import_bcf`: `bcf.version` with `DetailedVersion`, no `extensions.xml`, `Labels` and `Comment` elements directly in Topic / Markup (no wrappers), one `Viewpoints Guid` element per viewpoint, no `AspectRatio` in the camera, no `Components` wrapper in a Coloring `Color`. `VIS_BCF_VERSION` stays an import code only. Default stays 3.0. |
+| Colours | `colours` (default true): per viewpoint the style of `render_view` is resolved (viewpoint profile, else the active one; the viewpoint visibility) and applied to the scene the snapshot is drawn from (so the PNG shows the profile and the assigned material-class colours, as the viewport does); the entities whose colour changed are written as the viewpoint's `Coloring`, one `Color` (6 hex digits) per colour, members as llull components. `colours: false` = the previous behaviour byte for byte (test). A viewpoint naming a profile that no longer exists is refused with `VIS_PROFILE_NOT_FOUND` (as `render_view`). `data.coloured` counts the written components. |
+| `VIS_BCF_COLOURING_LARGE` | more than 1000 (`MAX_COLOURED_COMPONENTS`, [R7]) coloured components in ONE viewpoint: no `Coloring` for that viewpoint (the snapshot still shows the colours); the rules that painted something go out as topic labels `<legend> (#rrggbb)` (also in `extensions.xml` for 3.0); warning `{ code, ids: [viewpoint ids], counts }` in `data.warnings` and the summary. Exactly 1000 is still written. |
+
+Decisions: **N1** class colours = what `resolveEntityColour` gives (profile rule, then material class colour, then profile default) so the BCF and the viewport agree; no separate "class" colouring. **N2** The section box of a viewpoint is NOT applied to snapshots (the snapshot path has no cut); visibility is. **N3** The default (colours on) changes the bytes of an archive of a document that has a profile or class colours; a document without them exports the same bytes as before (test). Not built: per-component `IfcGuid` (needs the 08-DAT mapping), XSD validation of the 2.1 output (VC-DAT / VC-VIS-15 runs only with `xmllint` and the 3.0 schemas; the 2.1 schemas are not vendored: the layout follows the published 2.1 schema from memory of the format and is checked only by the in-repo reader).
+
+Tests: `tests/unit/review/bcfExportColours.test.ts` (9: 2.1 layout, round trip through `import_bcf`, determinism, Coloring in 3.0 and 2.1, snapshots with colours, class colour, deleted profile, purity, the 1000 boundary and the legend labels in 3.0 and 2.1); `reviewWalkthroughBcf.test.ts` (2.1 is no longer refused). Tool-schema snapshot and `docs/FEATURES.md` regenerated.
 
 ## 13. References
 

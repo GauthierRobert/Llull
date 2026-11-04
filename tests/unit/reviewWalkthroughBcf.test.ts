@@ -221,10 +221,11 @@ describe('export_bcf', () => {
     expect([...entries.values()].some((bytes) => bytes.toString().includes('2026-10-19T12:00:00Z'))).toBe(true);
   });
 
-  it('refuses 2.1, unknown or missing issues, bad dates and native snapshots without a port', () => {
+  it('refuses unknown or missing issues, bad dates and native snapshots without a port', () => {
     const doc = withIssues();
     const code = (params: Record<string, unknown>, d = doc): string | undefined => execute(d, 'export_bcf', params).error?.code;
-    expect(code({ version: '2.1' })).toBe('VIS_BCF_VERSION');
+    expect(code({ version: '2.1' })).toBeUndefined();
+    expect(code({ version: '2.0' })).toBe('CMD_INVALID_PARAMS');
     expect(code({ issueIds: ['iss-1'] })).toBe('VIS_ISSUE_NOT_FOUND');
     expect(code({}, reviewed())).toBe('VIS_ISSUE_NOT_FOUND');
     expect(code({ creationDate: 'yesterday' })).toBe('VIS_BCF_INVALID');
