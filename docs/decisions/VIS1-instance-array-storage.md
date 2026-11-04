@@ -100,3 +100,12 @@ graph before a single triangle exists, and 234 B of JSON per bolt that differs f
 3. Per-instance columns (class index, colour index) and `detach_array_instances`; plugin-derived arrays omitted on save.
 4. Streaming tiles (octree <= 50 000), prototype LOD by projected size, Hi-Z occlusion with one-frame latency, impostors, terrain / sky / sun.
 5. `export_gltf` / `check_clashes` / BOM over arrays (glTF `EXT_mesh_gpu_instancing` maps one array to one node directly).
+
+## Addendum (2026-11-04, from lane VIS-M8i): how planScene reads arrays
+
+VIS-M8i measured `planScene` at 10^6 SYN-RACK after TypeScript optimisation: ~1.0 - 1.2 s first call (was 2.1 - 2.9 s); the rest is building
+10^6 JS objects, and `JSON.stringify` of 10^6 entities alone is > 1 s, so marshalling the document to a Rust sidecar costs more than the
+TypeScript pass. Typed storage is the path under 500 ms: a struct-of-arrays `PlanScene` (Float64Array AABBs `6 x n`, Uint32 prototype and
+class columns, ids derived from `(arrayId, index)` on demand, no id string per instance) fed straight from the decoded transform table, with
+the prototype corner set computed once per array. VIS-M8j keeps the `PlanInstance[]` shape (arrays expand into objects) so the viewport,
+`render_stats` and the BVH packing do not change in this slice; the columnar scene is next step 1 and is what makes the typed table pay.
