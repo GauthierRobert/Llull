@@ -102,6 +102,18 @@ describe('a confirmation is bound to its act, its params and the document state'
     expect(runRaw(doc, 'release_item', signedNow).document.plm?.item.revisions['A']?.state).toBe('released');
   });
 
+  it('a signature is bound to the document uid: an identical PLM record and definition in another document refuses it (VIS-ID)', () => {
+    const doc = approveAll(reviewWithEco());
+    expect(doc.uid).toMatch(/^[0-9a-f]{32}$/);
+    const params = { changeOrder: 'ECO-0100', at: T, by: 'u-1' };
+    const signedNow = confirmed(doc, 'release_item', params, 'u-1');
+    const copy: CadDocument = { ...doc, uid: 'f'.repeat(32) };
+    const refused = runRaw(copy, 'release_item', signedNow);
+    expect(code(refused)).toBe('PLM_HUMAN_GATE');
+    expect(refused.document).toBe(copy);
+    expect(runRaw(doc, 'release_item', signedNow).document.plm?.item.revisions['A']?.state).toBe('released');
+  });
+
   it('a release signature binds the document definition: changing the model after signing invalidates it', () => {
     const doc = approveAll(reviewWithEco());
     const params = { changeOrder: 'ECO-0100', at: T, by: 'u-1' };

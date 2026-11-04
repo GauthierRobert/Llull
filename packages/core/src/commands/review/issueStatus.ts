@@ -13,6 +13,7 @@ import {
   type IssueStatus,
   type ReviewIssue,
 } from '../../model/review';
+import { documentIdentity } from '../../model/documentUid';
 import { DELETE_ACT, STATUS_ACT, deletePayload, statusDetails, statusPayload } from './reviewActs';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -82,7 +83,13 @@ export const setIssueStatus = defineCommand({
     if (gated || confirmation !== undefined) {
       const proof = confirmation === undefined ? undefined : proofOf(confirmation);
       if (typeof proof === 'string') return reviewRejection(doc, 'set_issue_status', 'VIS_HUMAN_GATE', proof, [issueId], ['confirmation']);
-      const outcome = humanGate(ctx?.humanSignature ?? null, STATUS_ACT, [issueId], confirmation, statusDetails(issue, status, why));
+      const outcome = humanGate(
+        ctx?.humanSignature ?? null,
+        STATUS_ACT,
+        [issueId],
+        confirmation,
+        statusDetails(issue, status, why, documentIdentity(doc)),
+      );
       if (!outcome.cleared)
         return reviewRejection(
           doc,
@@ -98,6 +105,7 @@ export const setIssueStatus = defineCommand({
         reason: why,
         signatureId: outcome.signatureId,
         signer: outcome.signer,
+        documentUid: documentIdentity(doc),
         ...(proof === undefined ? {} : { proof }),
       };
     }
@@ -119,8 +127,8 @@ export const reviewActPayload = defineCommand({
     'The SHA-256 a human signs to authorize a review act on an issue, with a nonce the signer chooses (the same nonce goes in `confirmation.nonce`). ' +
     'act "set_issue_status" (default): give status and reason; it is needed to close an issue or re-open a closed one, and a human may also sign any other move ' +
     '(then it is recorded as a human act and the signature is spent). act "delete_review_issue": deleting an issue is always a human act; give only the nonce. ' +
-    'The payload is bound to the whole issue (its hash: guid, title, entities, viewpoints, history), its current status and history length, so a signature ' +
-    'cannot be replayed on another issue or state. data { act, issueId, from, to, reason, nonce, payloadSha256 }. Read-only. Errors: VIS_ISSUE_NOT_FOUND, VIS_ISSUE_STATUS_INVALID.',
+    'The payload is bound to the whole issue (its hash: guid, title, entities, viewpoints, history), its current status and history length, and to this ' +
+    'document (its uid), so a signature cannot be replayed on another issue, state or document. data { act, issueId, from, to, reason, nonce, payloadSha256 }. Read-only. Errors: VIS_ISSUE_NOT_FOUND, VIS_ISSUE_STATUS_INVALID.',
   annotations: { readOnly: true },
   params: z.object({
     issueId: z.string().describe('Issue id, e.g. "iss-2".'),
@@ -137,7 +145,7 @@ export const reviewActPayload = defineCommand({
     if (issue === undefined)
       return reviewRejection(doc, 'review_act_payload', 'VIS_ISSUE_NOT_FOUND', `no issue '${issueId}'`, [issueId], ['issueId']);
     if (act === 'delete_review_issue') {
-      const payloadSha256 = deletePayload(issue, nonce);
+      const payloadSha256 = deletePayload(issue, nonce, documentIdentity(doc));
       return report(doc, `Payload to sign for deleting ${issueId}: ${payloadSha256}.`, {
         act: DELETE_ACT,
         issueId,
@@ -164,7 +172,7 @@ export const reviewActPayload = defineCommand({
         [issueId],
         ['status'],
       );
-    const payloadSha256 = statusPayload(issue, status, reason, nonce);
+    const payloadSha256 = statusPayload(issue, status, reason, nonce, documentIdentity(doc));
     return report(doc, `Payload to sign for ${issueId} ${issue.status} -> ${status}: ${payloadSha256}.`, {
       act: STATUS_ACT,
       issueId,

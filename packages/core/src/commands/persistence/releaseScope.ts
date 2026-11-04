@@ -17,12 +17,12 @@ const SCOPE_FORMAT_VERSION = 2;
 
 /**
  * Canonical JSON of the release scope: the saved definition (derived entities and private library values omitted) minus view state
- * (`selection`, `camera`) and the keys plugins declare outside the release scope (the PLM record).
+ * (`selection`, `camera`), the document identity (`uid`: who the document is, not what it defines) and the keys plugins declare outside the release scope (the PLM record).
  * @invariant a function of the definition alone: camera / selection / PLM edits and key order never change it
  */
 export function releaseScopeJson(doc: CadDocument): string {
-  const { selection: _selection, camera: _camera, ...scoped } = withoutPrivateValues(withoutDerivedEntities(doc));
-  void [_selection, _camera];
+  const { selection: _selection, camera: _camera, uid: _uid, ...scoped } = withoutPrivateValues(withoutDerivedEntities(doc));
+  void [_selection, _camera, _uid];
   const excluded = new Set(documentExtensions().flatMap((extension) => extension.outsideReleaseScope ?? []));
   const definition = Object.fromEntries(Object.entries(scoped).filter(([key]) => !excluded.has(key)));
   return jcsJson({ format: 'llull-document', version: SCOPE_FORMAT_VERSION, document: definition });

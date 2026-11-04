@@ -1,6 +1,7 @@
 /** check_review (plant 09 VIS §7, TR-VIS-16, AF-20): read-only status of the review data with stable VIS_* codes, ids, paths and remediation. */
 
 import { humanGatePayload } from '../../model/humanGate';
+import { documentIdentity } from '../../model/documentUid';
 import { ISSUE_STATUSES, type ReviewIssue } from '../../model/review';
 import type { HumanSignaturePort } from '../../model/analysis';
 import { STATUS_ACT, issueBefore, statusDetails } from './reviewActs';
@@ -22,13 +23,29 @@ interface CheckRow {
 
 const humanEntries = (issue: ReviewIssue): number[] => issue.history.flatMap((entry, index) => (entry.by === 'human' ? [index] : []));
 
-/** Whether the human entry `index` of the issue history verifies against the act rebuilt from the chain (pure: the signature is not spent). */
-function entryVerdict(port: HumanSignaturePort, issue: ReviewIssue, index: number): 'ok' | 'revoked' | 'invalid' {
+type Verdict = 'ok' | 'revoked' | 'invalid' | 'unbound' | 'foreign';
+
+/**
+ * Whether the human entry `index` of the issue history verifies against the act rebuilt from the chain, bound to the uid it records (pure: the
+ * signature is not spent). Without a verifier only the uid binding is judged.
+ * @invariant 'unbound' = no recorded document uid (signed before VIS-ID); 'foreign' = the recorded uid is not this document's, and the signature is
+ *   genuine for it (or no verifier is installed); a signature that does not verify for the recorded uid is 'invalid'
+ */
+function entryVerdict(port: HumanSignaturePort | null, issue: ReviewIssue, index: number, documentUid: string): Verdict {
   const entry = issue.history[index];
-  const nonce = entry?.proof?.['nonce'];
-  if (entry === undefined || entry.proof === undefined || typeof nonce !== 'string' || nonce === '') return 'invalid';
-  const payload = humanGatePayload(STATUS_ACT, [issue.id], statusDetails(issueBefore(issue, index), entry.status, entry.reason), nonce);
-  if (port.verify(entry.proof, payload) !== null) return 'ok';
+  if (entry === undefined) return 'invalid';
+  if (entry.documentUid === undefined) return 'unbound';
+  const mismatch = entry.documentUid !== documentUid;
+  if (port === null) return mismatch ? 'foreign' : 'ok';
+  const nonce = entry.proof?.['nonce'];
+  if (entry.proof === undefined || typeof nonce !== 'string' || nonce === '') return 'invalid';
+  const payload = humanGatePayload(
+    STATUS_ACT,
+    [issue.id],
+    statusDetails(issueBefore(issue, index), entry.status, entry.reason, entry.documentUid),
+    nonce,
+  );
+  if (port.verify(entry.proof, payload) !== null) return mismatch ? 'foreign' : 'ok';
   // Revoked only when the trust store holds a revoked record for exactly this key, the signature is genuine and that record's user is the recorded signer.
   return entry.signer !== undefined && port.revokedSignerOf?.(entry.proof, payload) === entry.signer ? 'revoked' : 'invalid';
 }
@@ -43,7 +60,7 @@ export const checkReview = defineCommand({
     'Check the model-review data: data { status "pass" | "warn" | "fail", issues[{ code, severity, ids, paths, message, remediation }], counts }. Codes: ' +
     'VIS_ISSUE_OPEN (info: issue open or in progress), VIS_ISSUE_AWAITING_APPROVAL (warn: resolved, waiting for a human to close it), VIS_ISSUE_ENTITY_MISSING ' +
     '(warn: an unclosed issue cites deleted entities), VIS_VIEWPOINT_STALE (warn: a viewpoint selects or lists deleted entities), VIS_HUMAN_GATE (error: a closed ' +
-    'issue has no human act in its history, or a human history entry whose signature does not verify when re-checked), VIS_SIGNATURE_UNVERIFIED (warn: human entries exist but this host has no signature verifier), VIS_SIGNER_REVOKED (warn: a genuine signature by a revoked key of the recorded signer). Read-only; run it before handing a review over.',
+    'issue has no human act in its history, or a human history entry whose signature does not verify when re-checked), VIS_SIGNATURE_UNVERIFIED (warn: human entries exist but this host has no signature verifier), VIS_SIGNER_REVOKED (warn: a genuine signature by a revoked key of the recorded signer), VIS_SIGNATURE_FOREIGN_DOCUMENT (error: a human signature made for another document uid, e.g. an issue copied in), VIS_SIGNATURE_UNBOUND (error: a human signature that records no document uid). Read-only; run it before handing a review over.',
   annotations: { readOnly: true },
   params: z.object({
     includeInfo: z.boolean().optional().describe('false: leave the info rows (VIS_ISSUE_OPEN) out of `issues`. Default true.'),
@@ -53,8 +70,10 @@ export const checkReview = defineCommand({
     const review = reviewOf(doc);
     const issues = review.issueOrder.map((id) => review.issues[id]).filter((issue) => issue !== undefined);
     const missing = (ids: readonly string[]): string[] => ids.filter((id) => doc.entities[id] === undefined);
-    const verdicts = (issue: ReviewIssue): string[] =>
-      port === null ? [] : humanEntries(issue).map((index) => entryVerdict(port, issue, index));
+    const documentUid = documentIdentity(doc);
+    const verdicts = (issue: ReviewIssue): Verdict[] => humanEntries(issue).map((index) => entryVerdict(port, issue, index, documentUid));
+    const withVerdict = (verdict: Verdict): string[] =>
+      issues.filter((issue) => verdicts(issue).includes(verdict)).map((issue) => issue.id);
     const candidates: CheckRow[] = [
       {
         code: 'VIS_ISSUE_OPEN',
@@ -102,6 +121,22 @@ export const checkReview = defineCommand({
         paths: ['review.issues[].history'],
         message: 'issues whose closing is not a human act, or whose recorded human signature is not genuine',
         remediation: 'a human re-opens and closes them with a signature (set_issue_status); the file was edited outside the commands',
+      },
+      {
+        code: 'VIS_SIGNATURE_FOREIGN_DOCUMENT',
+        severity: 'error',
+        ids: withVerdict('foreign'),
+        paths: ['review.issues[].history[].documentUid'],
+        message: 'issues with a human signature made for another document (copied in, or the document was cloned and re-identified)',
+        remediation: 'discard the copied issue; a human of THIS document re-confirms the move with a signature over this document uid',
+      },
+      {
+        code: 'VIS_SIGNATURE_UNBOUND',
+        severity: 'error',
+        ids: withVerdict('unbound'),
+        paths: ['review.issues[].history[].documentUid'],
+        message: 'issues with a human signature that records no document uid (signed before signatures were bound to their document)',
+        remediation: 'a human re-opens and re-closes the issue with a new signature (set_issue_status)',
       },
       {
         code: 'VIS_SIGNER_REVOKED',

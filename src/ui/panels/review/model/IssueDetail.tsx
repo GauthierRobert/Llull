@@ -17,6 +17,7 @@ interface Props {
 
 export function IssueDetail({ issue, review }: Props): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const documentUid = useStore((s) => s.document.uid ?? '');
   const redlineViewpoint = useRedlineStore((s) => s.viewpointId);
   const [comment, setComment] = useState('');
   const [target, setTarget] = useState<IssueStatus | ''>('');
@@ -52,7 +53,7 @@ export function IssueDetail({ issue, review }: Props): React.ReactElement {
         title: target === 'closed' ? `Close ${issue.id}` : `Re-open ${issue.id}`,
         summary: `Sign to move ${issue.id} "${issue.title}" from ${STATUS_LABEL[issue.status]} to ${STATUS_LABEL[target]}: ${params.reason}`,
         act: 'set_issue_status',
-        payload: (nonce) => statusPayload(issue, target, params.reason, nonce),
+        payload: (nonce) => statusPayload(issue, target, params.reason, nonce, documentUid),
         onSigned: (confirmation) => send('set_issue_status', { ...params, confirmation }),
       });
     }
@@ -65,7 +66,7 @@ export function IssueDetail({ issue, review }: Props): React.ReactElement {
       title: `Delete ${issue.id}`,
       summary: `Sign to delete issue ${issue.id} "${issue.title}" and its comments. Deleting an issue is a human act.`,
       act: 'delete_review_issue',
-      payload: (nonce) => deletePayload(issue, nonce),
+      payload: (nonce) => deletePayload(issue, nonce, documentUid),
       onSigned: (confirmation) => send('delete_review_issue', { id: issue.id, confirmation }),
     });
 

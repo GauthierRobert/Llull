@@ -115,6 +115,7 @@ function historyProblem(history: unknown, status: unknown): string | null {
       (typeof item['signatureId'] !== 'string' || typeof item['signer'] !== 'string' || !isRecord(item['proof']))
     )
       return 'a human history entry carries signatureId, signer and proof';
+    if (item['documentUid'] !== undefined && typeof item['documentUid'] !== 'string') return 'a history documentUid is a string';
     const proof = item['proof'];
     if (
       isRecord(proof) &&

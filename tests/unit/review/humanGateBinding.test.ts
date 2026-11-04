@@ -4,6 +4,7 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { reviewProblems } from '@core/commands/persistence/reviewValidation';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import type { ReviewIssue } from '@core/model/review';
 import { confirmationOver, deleteIssue, humanCtx, ledgerPort } from './humanActs';
 
@@ -96,6 +97,7 @@ describe('check_review re-verifies every human history entry', () => {
           reason: 'accept',
           signatureId: 'k:abc',
           signer: 'grace',
+          documentUid: doc.uid ?? '',
           proof: { nonce: 'n-1', signature: 'forged', keyId: 'grace' },
         },
       ],
@@ -107,7 +109,15 @@ describe('check_review re-verifies every human history entry', () => {
       status: 'closed',
       history: [
         ...history,
-        { status: 'closed', by: 'human', reason: 'accept', signatureId: 'k:abc', signer: 'grace', proof: { signature: 'x' } },
+        {
+          status: 'closed',
+          by: 'human',
+          reason: 'accept',
+          signatureId: 'k:abc',
+          signer: 'grace',
+          documentUid: doc.uid ?? '',
+          proof: { signature: 'x' },
+        },
       ],
     });
     expect(rows(noNonce, humanCtx()).status).toBe('fail');
@@ -242,6 +252,7 @@ describe('a revoked signer key and the stored proof', () => {
           reason: 'accept',
           signatureId: 'k:abc',
           signer: 'grace',
+          documentUid: doc.uid ?? '',
           proof: { keyId: 'grace', nonce: 'n-1', signature: 'forged' },
         },
       ],
@@ -278,5 +289,83 @@ describe('a revoked signer key and the stored proof', () => {
     const entry = base.issues['iss-2']!.history.at(-1)!;
     entry.proof['extra'] = 'x';
     expect(reviewProblems(base).join()).toContain('a history proof holds only');
+  });
+});
+
+describe('a signature is bound to its document (VIS-ID)', () => {
+  const closedIn = (doc: CadDocument): CadDocument => execute(doc, 'set_issue_status', closeParams(doc), humanCtx()).document;
+  /** The same issue content under another document uid: what copying a signed issue into another document produces. */
+  const reIdentified = (doc: CadDocument, uid = 'e'.repeat(32)): CadDocument => ({ ...doc, uid });
+
+  it('seals a stable uid at the first change and review commands keep it', () => {
+    const doc = documentWith('t');
+    expect(doc.uid).toMatch(/^[0-9a-f]{32}$/);
+    expect(closedIn(doc).uid).toBe(doc.uid);
+    expect(documentWith('other title').uid).toBe(doc.uid);
+    expect(documentWith('t', 20).uid).not.toBe(doc.uid);
+  });
+
+  it('a signature made in document A does not clear the same issue in document B', () => {
+    const a = documentWith('t');
+    const b = reIdentified(a);
+    const forA = closeParams(a);
+    const refused = execute(b, 'set_issue_status', forA, humanCtx());
+    expect(refused.error?.code).toBe('VIS_HUMAN_GATE');
+    expect(refused.document).toBe(b);
+    expect(execute(a, 'set_issue_status', forA, humanCtx()).error).toBeUndefined();
+    expect(deleteIssue(b, 'iss-2', humanCtx(), 'd-1').error).toBeUndefined();
+    const deleteForA = confirmationOver(a, { issueId: 'iss-2', act: 'delete_review_issue' }, 'grace', 'd-2');
+    expect(execute(b, 'delete_review_issue', { id: 'iss-2', confirmation: deleteForA }, humanCtx()).error?.code).toBe('VIS_HUMAN_GATE');
+    expect(execute(a, 'delete_review_issue', { id: 'iss-2', confirmation: deleteForA }, humanCtx()).error).toBeUndefined();
+  });
+
+  it('review_act_payload differs per document uid', () => {
+    const a = documentWith('t');
+    const payload = (doc: CadDocument): unknown =>
+      (execute(doc, 'review_act_payload', { ...close, nonce: 'n-1' }).data as { payloadSha256: string }).payloadSha256;
+    expect(payload(reIdentified(a))).not.toBe(payload(a));
+  });
+
+  it('check_review reports a signed issue copied into another document as VIS_SIGNATURE_FOREIGN_DOCUMENT, and the same document as clean', () => {
+    const a = closedIn(documentWith('t'));
+    expect(rows(a, humanCtx())).toMatchObject({ status: 'pass', issues: [] });
+    const copied = rows(reIdentified(a), humanCtx());
+    expect(copied.status).toBe('fail');
+    expect(copied.issues).toEqual([expect.objectContaining({ code: 'VIS_SIGNATURE_FOREIGN_DOCUMENT', ids: ['iss-2'] })]);
+    expect(rows(reIdentified(a)).issues.map((row) => row.code)).toContain('VIS_SIGNATURE_FOREIGN_DOCUMENT');
+  });
+
+  it('check_review: a recorded uid edited to the new document is not genuine (VIS_HUMAN_GATE), a missing uid is VIS_SIGNATURE_UNBOUND', () => {
+    const a = closedIn(documentWith('t'));
+    const b = reIdentified(a);
+    const history = b.review!.issues['iss-2']!.history;
+    const rewritten = withIssue(b, { history: history.map((entry) => (entry.by === 'human' ? { ...entry, documentUid: b.uid! } : entry)) });
+    expect(rows(rewritten, humanCtx()).issues.map((row) => row.code)).toEqual(['VIS_HUMAN_GATE']);
+    const legacy = withIssue(a, {
+      history: history.map((entry) => {
+        const { documentUid: _dropped, ...rest } = entry;
+        void _dropped;
+        return rest;
+      }),
+    });
+    const result = rows(legacy, humanCtx());
+    expect(result.status).toBe('fail');
+    expect(result.issues.map((row) => row.code)).toEqual(['VIS_SIGNATURE_UNBOUND']);
+  });
+
+  it('replay and regeneration keep the uid, so a signed issue still verifies', () => {
+    const a = closedIn(documentWith('t'));
+    const regenerated = execute(a, 'replay_history', {}, humanCtx()).document;
+    expect(regenerated.uid).toBe(a.uid);
+    expect(rows(regenerated, humanCtx())).toMatchObject({ status: 'pass', issues: [] });
+    const { uid: _uid, ...restored } = createEmptyDocument();
+    void _uid;
+    expect(withMonotonicStepCounter(restored, a).uid).toBe(a.uid);
+  });
+
+  it('a recorded documentUid must be a string at load', () => {
+    const a = closedIn(documentWith('t'));
+    const bad = withIssue(a, { history: a.review!.issues['iss-2']!.history.map((entry) => ({ ...entry, documentUid: 7 as never })) });
+    expect(reviewProblems(bad.review!)).toEqual(expect.arrayContaining([expect.stringContaining('documentUid')]));
   });
 });

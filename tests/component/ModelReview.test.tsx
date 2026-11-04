@@ -130,7 +130,9 @@ describe('Review panel: issues', () => {
     const issue = useStore.getState().document.review?.issues['iss-2'];
     expect(signed[0]).toMatchObject({ kind: 'payload', act: 'set_issue_status' });
     // The signed bytes are exactly the payload the command rebuilds from the issue, with the nonce that travels in the confirmation.
-    expect(signed[0]?.['payloadSha256']).toBe(statusPayload(issue as never, 'closed', 'tray moved', params.confirmation.nonce));
+    expect(signed[0]?.['payloadSha256']).toBe(
+      statusPayload(issue as never, 'closed', 'tray moved', params.confirmation.nonce, useStore.getState().document.uid ?? ''),
+    );
     vi.unstubAllGlobals();
   });
 
