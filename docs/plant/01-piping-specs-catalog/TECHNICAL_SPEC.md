@@ -608,7 +608,7 @@ Decided 2026-10-23 (owner delegated, plant README D4):
 | TR-PSC-11 | Dimensional-standard and joint compatibility rules                                    | FR-11        | AF-30               | VC-14             |
 | TR-PSC-12 | `PipeElement.spec`, `add_pipe_run` / `assign_pipe_spec`, consumers read `spec.wallMm` | FR-13        | AF-01               | VC-15             |
 | TR-PSC-13 | `check_piping_catalog` rules (§5.6)                                                   | FR-12        | AF-20, AF-30        | VC-05             |
-| TR-PSC-14 | Canonical JSON, sha256, round trip                        | FR-16, FR-17 | AF-05, AF-12, AF-13 | VC-17             |
+| TR-PSC-14 | Canonical JSON, sha256, round trip                                                    | FR-16, FR-17 | AF-05, AF-12, AF-13 | VC-17             |
 | TR-PSC-15 | Lifecycle, revisions, approval gate via signature                                     | FR-14, FR-15 | AF-32, AF-33, AF-34 | VC-16             |
 | TR-PSC-16 | Component shape recipes and ports (§5.8)                                              | FR-19        | AF-22               | VC-19             |
 
@@ -828,3 +828,11 @@ The "spec insulation table (V1)" of the §13.5 Left is built since RTE-M3 (02 §
 #### Shapes of caps, couplings, unions, swages and eccentric reducers
 
 `component_shape` (`catalog/shapes/fittings.ts`) now builds: `cap` (closed-end cylinder of the row `length`, one port; the dome profile is not tabulated, so the closed end is drawn flat and the note says so; hollow when a wall is known), `coupling` / `union` (solid body `bodyOd` x `length`, two ports; end type SW with a `socketDepth`, THD with a `threadLength`, else null; a row without `bodyOd` is refused, the body is not drawn at the pipe diameter), `swage` (a concentric reducer; end types not tabulated: null) and `reducerEccentric` (a ruled loft of two circles: the small end axis is shifted (D - d) / 2 toward +X, the flat side; volume within the 24-gon error of the oblique frustum pi L (R^2 + R r + r^2) / 3). Refusals stay coded (`PSC_CATALOG_ROW_MISSING` for a missing dimension). **No catalogue row is shipped for these types**: the pack's B16.9 file says caps have no second source (grade C, not used) and the rest has no free source, so the bundled catalogue answers `PSC_CATALOG_ROW_MISSING`; rows come from an imported catalogue (the tests use labelled declared inputs). Not built: B16.5 flange hub dimensions, ring-joint gasket shape, bolt sets. Tests: `fittingShapes.test.ts`.
+
+#### `assign_pipe_spec` sweep over a whole document
+
+`all: true` selects every building pipe element of the document (exactly one of `pipeId`, `line`, `all`); with no size each pipe keeps its binding size or its own dn, so one call also moves a whole document to the newest approved revision. All or nothing: the first pipe that cannot resolve (for example one with neither a binding nor a dn, `PSC_SIZE_UNKNOWN`) is named and nothing changes; a document without a pipe element is `PSC_PIPE_UNKNOWN`. 02 runs keep their spec on the line (`update_pipeline spec`), so no `assign_pipe_spec` for runs is needed. Test: `assignSweep.test.ts`.
+
+#### Left (after CAT-FU)
+
+Bundled sourced rows for caps, couplings, unions, swages and eccentric reducers (no free second source: import them; the shapes and inline parts exist); B16.5 flange hub dimensions; a host that installs the `PipingLibraryProvider` (the port and the commands exist; the Express server / desktop wiring that reads `~/.llull/...` library files is a host task in `server/`, like the material libraries); a cap as a run end (02 §13.13); the items of §13.8 that are not listed here (XLSX, confirmed Plant 3D schema, rating tables with sources, per-dimension provenance in the CSV sheet), PCF SKEY map (05), UI browser, guide section.
