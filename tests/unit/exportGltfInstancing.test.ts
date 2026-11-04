@@ -19,7 +19,7 @@ interface Accessor {
 interface GltfNode {
   name: string;
   mesh?: number;
-  extras?: { llullIds?: string[]; instanceCount?: number };
+  extras?: { llullIds?: string[]; instanceCount?: number; kind?: string };
   extensions?: { EXT_mesh_gpu_instancing: { attributes: Record<string, number> } };
 }
 interface Gltf {
@@ -182,6 +182,102 @@ describe('export_gltf instancing', () => {
     const { gltf } = exported(doc, { instancing: 'gpu' });
     expect(gltf.nodes.filter((n) => n.extensions !== undefined)).toHaveLength(2);
     expect(gltf.nodes.filter((n) => n.extensions === undefined)).toHaveLength(2);
+  });
+
+  it('keeps an instance with a zero or non-finite scale out of the buckets', () => {
+    const base = instanceDoc();
+    const componentId = Object.keys(base.components)[0] as string;
+    const withScale = (scale: Vec3): CadDocument => {
+      const added = applied(base, 'insert_instance', { componentId, position: [0, 0, 9] });
+      const id = added.order[added.order.length - 1] as string;
+      return { ...added, entities: { ...added.entities, [id]: { ...(added.entities[id] as InstanceEntity), scale } } };
+    };
+    for (const scale of [
+      [0, 1, 1],
+      [Number.NaN, 1, 1],
+      [Number.POSITIVE_INFINITY, 1, 1],
+    ] as Vec3[]) {
+      const doc = withScale(scale);
+      const id = doc.order[doc.order.length - 1] as string;
+      const { gltf } = exported(doc, { instancing: 'gpu' });
+      const bucketed = gltf.nodes.flatMap((n) => (n.extensions === undefined ? [] : (n.extras?.llullIds ?? [])));
+      expect(bucketed, String(scale)).not.toContain(id);
+      expect(bucketed).toHaveLength(8);
+    }
+  });
+
+  it('never mixes entity kinds in one instanced node (extras kind stays true)', () => {
+    let doc = createEmptyDocument();
+    doc = applied(doc, 'add_box', { size: [1, 2, 3], position: [0, 0, 0] });
+    const boxId = doc.order[0] as string;
+    const positions = solidTriangles(doc.entities[boxId]!).flatMap((tri) => tri.flat());
+    const indices = positions
+      .map((_, i) => i)
+      .filter((i) => i % 3 === 0)
+      .map((i) => i / 3);
+    const mesh = (id: string, x: number): CadDocument['entities'][string] =>
+      ({ ...doc.entities[boxId]!, id, kind: 'mesh', position: [x, 0, 0], mesh: { positions, indices } }) as CadDocument['entities'][string];
+    let entities = { ...doc.entities };
+    let order = [...doc.order];
+    for (const [id, x] of [
+      ['m1', 5],
+      ['m2', 10],
+    ] as const) {
+      entities = { ...entities, [id]: mesh(id, x) };
+      order = [...order, id];
+    }
+    doc = applied({ ...doc, entities, order }, 'add_box', { size: [1, 2, 3], position: [20, 0, 0] });
+    const { gltf } = exported(doc, { instancing: 'gpu' });
+    const kinds = gltf.nodes.filter((n) => n.extensions !== undefined).map((n) => [n.extras?.kind, n.extras?.instanceCount]);
+    expect(kinds).toEqual(
+      expect.arrayContaining([
+        ['box', 2],
+        ['mesh', 2],
+      ]),
+    );
+    expect(kinds).toHaveLength(2);
+  });
+
+  it('keeps float32 accuracy for plant-scale coordinates (1e5 - 1e6) with rotation and non-uniform scale', () => {
+    let doc = instanceDoc();
+    const componentId = Object.keys(doc.components)[0] as string;
+    doc = applied(doc, 'insert_instance', {
+      componentId,
+      position: [123456, -654321, 987654],
+      rotation: [1.1, -0.6, 2.3],
+      scale: [3, 0.25, 1.7],
+    });
+    doc = applied(doc, 'insert_instance', {
+      componentId,
+      position: [-1000000, 800000, 250000],
+      rotation: [-2.2, 0.9, 0.4],
+      scale: [0.5, 4, 2],
+    });
+    const out = exported(doc, { instancing: 'gpu' });
+    const instances = Object.values(doc.entities).filter((e): e is InstanceEntity => e.kind === 'instance');
+    const component = Object.values(doc.components)[0]!;
+    const tolerance = 0.2;
+    out.gltf.nodes.forEach((node, nodeIndex) => {
+      const attributes = node.extensions?.EXT_mesh_gpu_instancing.attributes ?? {};
+      const t = floats(out, attributes['TRANSLATION'] as number);
+      const r = floats(out, attributes['ROTATION'] as number);
+      const s = floats(out, attributes['SCALE'] as number);
+      const positions = floats(out, out.gltf.meshes[node.mesh as number]?.primitives[0]?.attributes['POSITION'] as number);
+      instances.forEach((instance, i) => {
+        const world = expandInstance(instance, component)[nodeIndex]!;
+        const cloud = solidTriangles(world).flat();
+        for (let p = 0; p < positions.length; p += 3) {
+          const scaled: Vec3 = [
+            (positions[p] as number) * (s[i * 3] as number),
+            (positions[p + 1] as number) * (s[i * 3 + 1] as number),
+            (positions[p + 2] as number) * (s[i * 3 + 2] as number),
+          ];
+          const placed = rotate(r.slice(i * 4, i * 4 + 4), scaled).map((c, k) => c + (t[i * 3 + k] as number));
+          const nearest = Math.min(...cloud.map((v) => Math.hypot(v[0] - placed[0]!, v[1] - placed[1]!, v[2] - placed[2]!)));
+          expect(nearest).toBeLessThan(tolerance);
+        }
+      });
+    });
   });
 
   it('turns identical placed solids into one instanced node and keeps a unique solid a plain node', () => {

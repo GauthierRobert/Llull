@@ -275,18 +275,24 @@ function instancedGroups(
   shareGroup: readonly (number | undefined)[],
   groupOf: GroupOf,
 ): ({ members: number[] } | undefined)[] {
-  const byKey = new Map<string, { members: number[] }>();
-  parts.forEach((part, p) => {
+  const keyOf = (p: number): string | undefined => {
+    const part = parts[p];
     const share = shareGroup[p];
-    if (share === undefined || part.placement === undefined) return;
-    const key = `${share}|${groupOf(part.entityId)?.id ?? ''}`;
+    return share === undefined || part === undefined || part.placement === undefined
+      ? undefined
+      : `${share}|${part.kind}|${groupOf(part.entityId)?.id ?? ''}`;
+  };
+  const byKey = new Map<string, { members: number[] }>();
+  parts.forEach((_, p) => {
+    const key = keyOf(p);
+    if (key === undefined) return;
     const bucket = byKey.get(key);
     if (bucket === undefined) byKey.set(key, { members: [p] });
     else bucket.members.push(p);
   });
   return parts.map((_, p) => {
-    const share = shareGroup[p];
-    const bucket = share === undefined ? undefined : byKey.get(`${share}|${groupOf(parts[p]?.entityId ?? '')?.id ?? ''}`);
+    const key = keyOf(p);
+    const bucket = key === undefined ? undefined : byKey.get(key);
     return bucket !== undefined && bucket.members.length >= 2 ? bucket : undefined;
   });
 }

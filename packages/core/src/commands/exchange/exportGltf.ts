@@ -141,7 +141,7 @@ export const exportGltf = defineCommand({
       .describe(
         'Repeated geometry layout. "expand" (default): one node per part, identical parts share one mesh (universal glTF 2.0). ' +
           '"gpu": one node per prototype with EXT_mesh_gpu_instancing (per-instance TRANSLATION / ROTATION / SCALE); a component instance ' +
-          'with a mirroring or zero scale, or a nested instance, is still expanded. Requires a consumer that reads the extension.',
+          'with a mirroring or zero scale is still expanded; a nested instance (an instance inside a component) exports nothing, as in "expand". Requires a consumer that reads the extension.',
       ),
   }),
   run: (doc, params, ctx): CommandResult => {
