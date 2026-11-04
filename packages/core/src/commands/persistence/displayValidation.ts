@@ -1,6 +1,6 @@
 /** Load-time validation of the optional `display` field (colour profiles, material classes; plant 09 VIS). Unknown keys are ignored. */
 
-import { profileProblems } from '../../geometry/colourRules';
+import { awaitsApproval, hasSchemeRules, profileProblems } from '../../geometry/colourRules';
 import type { ColourProfile } from '../../model/display';
 import { isRecord } from '../../lib/isRecord';
 import { isReservedKey } from '../../lib/reservedKey';
@@ -71,7 +71,10 @@ function profileProblem(id: string, value: unknown): string | null {
   const rules = value['rules'];
   if (!Array.isArray(rules) || !rules.every(isRule))
     return `${where}: rules must be { id, legend, when (predicate), appearance { colour, transparency?, hidden? }, scheme?, marker? { letters, letterHex? } }`;
-  const problem = profileProblems(value as unknown as ColourProfile)[0];
+  const typed = value as unknown as ColourProfile;
+  if (hasSchemeRules(typed) && !typed.reviewRequired && awaitsApproval(typed))
+    return `${where}: a scheme profile that is not reviewRequired must carry an approval whose profileSha256 matches its rules (approve_colour_profile)`;
+  const problem = profileProblems(typed)[0];
   return problem === undefined ? null : `${where}: ${problem.path}: ${problem.message}`;
 }
 
@@ -105,6 +108,7 @@ function materialClassProblems(display: Record<string, unknown>): string[] {
 
 const isVec3 = (value: unknown): boolean =>
   Array.isArray(value) && value.length === 3 && value.every((n) => typeof n === 'number' && Number.isFinite(n));
+const positive = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
 const REASONS = ['valve', 'flange', 'bend', 'interval'];
 
 function pipeMarkerProblems(display: Record<string, unknown>): string[] {
@@ -121,9 +125,10 @@ function pipeMarkerProblems(display: Record<string, unknown>): string[] {
       isVec3(marker['positionMm']) &&
       isVec3(marker['tangent']) &&
       typeof marker['atMm'] === 'number' &&
+      marker['atMm'] >= 0 &&
       REASONS.includes(marker['reason'] as string) &&
-      typeof marker['fieldLengthMm'] === 'number' &&
-      typeof marker['letterHeightMm'] === 'number' &&
+      positive(marker['fieldLengthMm']) &&
+      positive(marker['letterHeightMm']) &&
       typeof marker['bandInterpolated'] === 'boolean' &&
       typeof marker['bidirectional'] === 'boolean' &&
       (marker['letters'] === undefined || typeof marker['letters'] === 'string') &&

@@ -213,3 +213,71 @@ describe('approve_colour_profile', () => {
     expect(validateDocumentValues(bad).length).toBeGreaterThan(0);
   });
 });
+
+describe('an approval cannot be bypassed', () => {
+  const doc = apply(withPipe(), 'apply_service_colour_scheme', { ...SCHEME, activate: true });
+  const approvedDoc = (): CadDocument => {
+    const { ctx, confirmation } = signed(doc, 'svc');
+    return execute(doc, 'approve_colour_profile', { profileId: 'svc', confirmation }, ctx).document;
+  };
+  /** The document with the profile replaced by `change(profile)`, as a hand edit or a stray writer would leave it. */
+  const forged = (base: CadDocument, change: (p: ColourProfile) => ColourProfile): CadDocument =>
+    ({ ...base, display: { ...base.display, colourProfiles: { svc: change(profile(base) as ColourProfile) } } }) as CadDocument;
+  const codes = (d: CadDocument): string[] =>
+    data<{ issues: Array<{ code: string }> }>(d, 'check_display', {}).issues.map((issue) => issue.code);
+  const rule = (p: ColourProfile): ColourProfile => ({
+    ...p,
+    rules: p.rules.map((r) => ({ ...r, appearance: { ...r.appearance, colour: '#000001' } })),
+  });
+
+  it('define_colour_profile refuses to overwrite a scheme or approved profile unless the approval is cleared explicitly', () => {
+    const redefine = {
+      id: 'svc',
+      name: 'x',
+      rules: [{ id: 'r', when: { property: 'kind', equals: 'pipe' }, colour: '#112233', legend: 'x' }],
+      replace: true,
+    };
+    expectRefusal(doc, 'define_colour_profile', redefine, 'VIS_PROFILE_APPROVED', 'id');
+    const approved = approvedDoc();
+    expectRefusal(approved, 'define_colour_profile', { ...redefine, reviewRequired: false }, 'VIS_PROFILE_APPROVED', 'id');
+    const cleared = apply(approved, 'define_colour_profile', { ...redefine, clearApproval: true });
+    expect(profile(cleared)?.approval).toBeUndefined();
+    expect(profile(cleared)?.reviewRequired).toBe(false);
+    expect(profile(cleared)?.rules.some((r) => r.scheme !== undefined)).toBe(false);
+  });
+
+  it('check_display and colour_by_rule_report call a scheme profile with its flag cleared by hand, or with rules changed after the signature, unapproved', () => {
+    const approved = approvedDoc();
+    expect(codes(approved)).not.toContain('VIS_SCHEME_REVIEW_REQUIRED');
+    const flagCleared = forged(doc, (p) => ({ ...p, reviewRequired: false }));
+    const edited = forged(approved, rule);
+    for (const bad of [flagCleared, edited]) {
+      expect(codes(bad)).toContain('VIS_SCHEME_REVIEW_REQUIRED');
+      expect(data<{ reviewRequired: boolean }>(bad, 'colour_by_rule_report', {}).reviewRequired).toBe(true);
+    }
+    expect(data<{ reviewRequired: boolean }>(approved, 'colour_by_rule_report', {}).reviewRequired).toBe(false);
+  });
+
+  it('refuses a file with the flag cleared, a mismatched approval hash or an edited rule on load; an untouched approval loads', () => {
+    const approved = approvedDoc();
+    const raw = (d: CadDocument): Record<string, unknown> => JSON.parse(JSON.stringify(d)) as Record<string, unknown>;
+    expect(validateDocumentValues(raw(approved))).toEqual([]);
+    const problems = (d: CadDocument): string[] => validateDocumentValues(raw(d));
+    expect(problems(forged(doc, (p) => ({ ...p, reviewRequired: false }))).join()).toContain('approval');
+    const wrongHash = forged(approved, (p) => ({
+      ...p,
+      approval: { ...(p.approval as NonNullable<ColourProfile['approval']>), profileSha256: '0'.repeat(64) },
+    }));
+    expect(problems(wrongHash).join()).toContain('profileSha256');
+    expect(problems(forged(approved, rule)).join()).toContain('profileSha256');
+  });
+
+  it('a forged profile can be properly approved again by a human', () => {
+    const flagCleared = forged(doc, (p) => ({ ...p, reviewRequired: false }));
+    const { ctx, confirmation } = signed(flagCleared, 'svc');
+    const out = execute(flagCleared, 'approve_colour_profile', { profileId: 'svc', confirmation }, ctx);
+    expect(out.rejected, out.summary).toBeUndefined();
+    expect(codes(out.document)).not.toContain('VIS_SCHEME_REVIEW_REQUIRED');
+    expect(validateDocumentValues(JSON.parse(JSON.stringify(out.document)) as Record<string, unknown>)).toEqual([]);
+  });
+});

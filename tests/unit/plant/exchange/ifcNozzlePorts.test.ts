@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { readStep, stepReferences, stepString, type StepEntity } from '@lib/stepRead';
 import { apply, data } from '../../../helpers/commandAssertions';
-import { separatorDocument } from '../equipment/equipmentFixtures';
+import { separatorDocument, separatorNozzles, separatorParams } from '../equipment/equipmentFixtures';
 
 interface IfcData {
   ifc: string;
@@ -107,5 +107,77 @@ describe('nozzle rating read from the PSC rating table', () => {
     const odd = apply(doc, 'update_nozzle', { equipment: equipment?.id, mark: 'N1', rating: 'PN16' });
     const props = ofType(exportIfc(odd).ifc, 'IFCPROPERTYSINGLEVALUE').filter((prop) => stepString(prop.args[0]) === 'RatedPressure');
     expect(props.length).toBeLessThan(4);
+  });
+});
+
+describe('rated pressure of every class (ASME B16.5 group 1.1 at 38 degC)', () => {
+  it.each([
+    ['CL150', 19.6],
+    ['CL300', 51.1],
+    ['CL600', 102.1],
+    ['CL900', 153.2],
+    ['CL1500', 255.3],
+    ['CL2500', 425.5],
+  ])('%s -> %s bar, with its basis and verified flag', (rating, bar) => {
+    const base = scene('V-101:N1', 2);
+    const equipment = Object.values(base.building?.elements ?? {}).find((element) => element.category === 'equipment');
+    const doc = separatorNozzles
+      .map((nozzle) => nozzle.mark)
+      .reduce((acc, mark) => apply(acc, 'update_nozzle', { equipment: equipment?.id, mark, rating }), base);
+    const { ifc } = exportIfc(doc);
+    const pascals = [...ifc.matchAll(/'RatedPressure','[^']*',IFCPRESSUREMEASURE\(([^)]+)\)/g)].map((match) =>
+      Math.round(Number(match[1])),
+    );
+    expect(pascals).toHaveLength(separatorNozzles.length);
+    expect(new Set(pascals)).toEqual(new Set([Math.round(bar * 1e5)]));
+    expect(ifc).toContain(`class ${rating.slice(2)} at 38 degC (`);
+    expect(ifc).toMatch(/'RatedPressureVerified',\$,IFCBOOLEAN\(\.[TF]\.\)/);
+  });
+});
+
+describe('drawn line end near several nozzles', () => {
+  /** V-101 and V-102 0.4 mm apart (both within the 1 mm margin of each other's nozzles); a classified drawn line starts on the N1 face of V-102 and names `from`. */
+  function twins(from: string | null): { ifc: string } {
+    let doc = apply(separatorDocument(), 'add_vessel', { ...separatorParams, tag: 'V-102', location: [5000.4, 5000] });
+    for (const nozzle of separatorNozzles) doc = apply(doc, 'add_nozzle', { equipment: 'V-102', ...nozzle });
+    doc = apply(doc, 'define_plant_hierarchy', {
+      nodes: [
+        { code: 'S1', kind: 'site' },
+        { code: 'U10', kind: 'unit', parent: 'S1', properties: { areaNumber: '1' } },
+      ],
+    });
+    doc = apply(doc, 'load_plant_class_library', { library: 'llull-default-process' });
+    const at = data<PortList>(doc, 'equipment_ports', {}).ports['V-102:N1']?.position ?? [0, 0, 0];
+    doc = apply(doc, 'add_pipe_run', {
+      points: [at, [at[0] + 3000, at[1], at[2]]],
+      dn: 150,
+      line: 'L-1',
+      service: 'process',
+      ...(from === null ? {} : { from }),
+      to: 'BL-1',
+    });
+    const pipe = Object.keys(doc.building?.elements ?? {})
+      .filter((key) => key.startsWith('pipe'))
+      .at(-1);
+    doc = apply(doc, 'assign_plant_object', {
+      target: pipe,
+      className: 'ProcessLine',
+      hierarchy: 'U10',
+      tagFields: { nominalSize: 150, fluidCode: 'P', seq: 1, spec: 'CS150' },
+    });
+    return exportIfc(doc);
+  }
+  const relating = (ifc: string): string[] =>
+    connections(ifc).map((rel) => {
+      const port = readStep(ifc).entities.get(refOf(rel.args[4]));
+      return stepString(port?.args[3]) ?? '';
+    });
+
+  it('the nearest nozzle wins by proximity, not the first one in document order', () => {
+    expect(relating(twins(null).ifc).filter((text) => text.startsWith('V-10'))).toEqual([expect.stringContaining('V-102:N1')]);
+  });
+
+  it('a named owner is never second-guessed by proximity', () => {
+    expect(relating(twins('V-101:N1').ifc).filter((text) => text.startsWith('V-10'))).toEqual([expect.stringContaining('V-101:N1')]);
   });
 });

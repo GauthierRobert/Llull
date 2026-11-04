@@ -12,7 +12,7 @@ import { toMetres } from '../../../model/units';
 
 export type BcfVersion = '3.0' | '2.1';
 
-/** Components of a viewpoint painted one colour (`colour` is 6 hex digits, no #). */
+/** Components of a viewpoint painted one colour (`colour` is 8 hex digits ARGB, no #). */
 export interface ViewpointColouring {
   readonly colour: string;
   readonly ids: readonly string[];

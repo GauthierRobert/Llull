@@ -27,14 +27,15 @@ export interface ViewpointStyle {
 
 export type ViewpointStyleResult = ViewpointStyle | { readonly code: string; readonly message: string; readonly paths: readonly string[] };
 
-const hex6 = (colour: string): string | null => {
+/** `FFRRGGBB`: the 8-digit ARGB of an opaque colour, as BCF writes it. */
+const argb = (colour: string): string | null => {
   const rgb = hexRgb(colour);
   return rgb === null
     ? null
-    : rgb
+    : `FF${rgb
         .map((channel) => channel.toString(16).padStart(2, '0'))
         .join('')
-        .toUpperCase();
+        .toUpperCase()}`;
 };
 
 /** The style of one viewpoint; `enabled` false = the document as it is (no colouring, no visibility). */
@@ -53,8 +54,8 @@ export function styleViewpoint(
   for (const id of styled.scene.order) {
     const before = doc.entities[id];
     const after = styled.scene.entities[id];
-    const colour = after === undefined ? null : hex6(after.color);
-    if (before === undefined || after === undefined || colour === null || hex6(before.color) === colour) continue;
+    const colour = after === undefined ? null : argb(after.color);
+    if (before === undefined || after === undefined || colour === null || argb(before.color) === colour) continue;
     groups.set(colour, [...(groups.get(colour) ?? []), id]);
     coloured += 1;
   }

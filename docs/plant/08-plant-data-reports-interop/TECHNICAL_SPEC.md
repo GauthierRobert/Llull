@@ -959,3 +959,5 @@ Decisions: **J1** an unnamed end of a line with a pipe is reported as `DAT_OPEN_
 | J4 | Not built: the pipe spec's flange class of the connected line is NOT compared with the nozzle rating (that is 02 RTE / 03 EQP \`check\` territory); no rating at the design temperature. | scope |
 
 Tests: \`tests/unit/plant/exchange/ifcNozzlePorts.test.ts\` (name match, geometry match and a 50 mm miss, determinism, rated pressure 18-20 bar for CL150, an unknown label adds nothing; 3 of the 5 fail without the change).
+
+**Review follow-up (item 2).** A drawn line end connects to the nozzle its `from` / `to` names; only when it names no equipment does geometry apply: among free nozzles within 1 mm the nearest wins, ties by element id and mark; a used or already connected nozzle is skipped while searching. `RatedPressure` is pinned for every class (CL150 19.6, CL300 51.1, CL600 102.1, CL900 153.2, CL1500 255.3, CL2500 425.5 bar). SC-DAT-03 `expected_results.json` / validation README now say 3 findings (the info `DAT_INFERRED_NOZZLE`).

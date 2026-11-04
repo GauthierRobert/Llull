@@ -121,7 +121,7 @@ describe('export_bcf viewpoint colouring', () => {
     for (const view of named(v3.files, '.bcfv')) {
       const coloring = xmlChildren(xmlChildren(parsed(view), 'Components')[0] as XmlElement, 'Coloring')[0] as XmlElement;
       const color = xmlChildren(coloring, 'Color')[0] as XmlElement;
-      expect(xmlAttr(color, 'Color')).toBe('336699');
+      expect(xmlAttr(color, 'Color')).toBe('FF336699');
       const members = xmlChildren(xmlChildren(color, 'Components')[0] as XmlElement, 'Component');
       expect(members).toHaveLength(2);
       expect(view).toContain(`<AuthoringToolId>${boxes[0]}</AuthoringToolId>`);
@@ -152,7 +152,7 @@ describe('export_bcf viewpoint colouring', () => {
     doc = run(doc, 'assign_material_class', { classId: 'painted', entityIds: [doc.order[2] ?? ''] });
     const out = exportBcf(doc);
     expect(out.data.coloured).toBe(2);
-    expect(named(out.files, '.bcfv')[0]).toContain('<Color Color="FFCC00">');
+    expect(named(out.files, '.bcfv')[0]).toContain('<Color Color="FFFFCC00">');
   });
 
   it('refuses a viewpoint whose profile no longer exists with VIS_PROFILE_NOT_FOUND', () => {

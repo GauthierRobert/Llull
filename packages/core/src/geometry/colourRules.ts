@@ -3,6 +3,8 @@
  * selects. Pure; no document access, no geometry.
  */
 
+import { jcsJson } from '../lib/jcs';
+import { sha256Hex } from '../lib/sha256';
 import {
   MAX_MARKER_LETTERS,
   type ColourProfile,
@@ -24,6 +26,20 @@ export interface ProfileProblem {
   readonly path: string;
   readonly message: string;
 }
+
+/** sha256 of the canonical JSON of what a profile paints (name, rules, default colour, palette): the mapping a reviewer approves. */
+export const profileSha256 = (profile: ColourProfile): string =>
+  sha256Hex(jcsJson({ name: profile.name, rules: profile.rules, defaultColour: profile.defaultColour, palette: profile.palette }));
+
+/** A profile built from a hazard / service scheme (some rule names its scheme row). */
+export const hasSchemeRules = (profile: ColourProfile): boolean => profile.rules.some((rule) => rule.scheme !== undefined);
+
+/**
+ * True when the profile does not carry a valid approval it needs: flagged `reviewRequired`, or a scheme profile whose `reviewRequired` is false without an approval
+ * whose hash is that of the rules as they are now (a flag cleared by hand, or rules edited after the signature).
+ */
+export const awaitsApproval = (profile: ColourProfile): boolean =>
+  profile.reviewRequired || (hasSchemeRules(profile) && profile.approval?.profileSha256 !== profileSha256(profile));
 
 /**
  * True when a group is itself repeated (+, *, {n,}) and its body (nested groups included) holds a quantifier or an alternation: the

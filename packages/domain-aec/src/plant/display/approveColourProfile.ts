@@ -9,8 +9,7 @@ import { changed, tableRejection } from '@core/commands/noop';
 import { findProfile, type ColourProfile } from '@core/model/display';
 import { humanGate } from '@core/model/humanGate';
 import { withDocumentUid } from '@core/model/documentUid';
-import { jcsJson } from '@lib/jcs';
-import { sha256Hex } from '@lib/sha256';
+import { awaitsApproval, profileSha256 as hashOf } from '@core/geometry/colourRules';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_PROFILE_NOT_FOUND: 'list the profiles with check_display or colour_by_rule_report; apply_service_colour_scheme builds one',
@@ -18,10 +17,6 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'approving a colour mapping is a human act: ask the qualified reviewer to sign in the desktop app and pass the signature object (with a nonce) as confirmation',
 };
 const reject = tableRejection(REMEDIATION);
-
-/** The mapping a reviewer approves: what the profile paints, not its approval record. */
-const profileHash = (profile: ColourProfile): string =>
-  sha256Hex(jcsJson({ name: profile.name, rules: profile.rules, defaultColour: profile.defaultColour, palette: profile.palette }));
 
 /**
  * @affects sets reviewRequired false and the approval record of doc.display.colourProfiles[profileId] (affected: []); metaHistory
@@ -50,9 +45,9 @@ export const approveColourProfile = defineCommand({
     const profile = doc.display === undefined ? undefined : findProfile(doc.display, profileId);
     if (doc.display === undefined || profile === undefined)
       return reject(doc, 'approve_colour_profile', 'VIS_PROFILE_NOT_FOUND', `no colour profile '${profileId}'`, [], ['profileId']);
-    if (!profile.reviewRequired)
+    if (!awaitsApproval(profile))
       return { document: doc, summary: `Colour profile '${profileId}' is not awaiting review; nothing approved.`, affected: [] };
-    const profileSha256 = profileHash(profile);
+    const profileSha256 = hashOf(profile);
     const outcome = humanGate(
       ctx?.humanSignature ?? null,
       'display:approve_colour_profile',

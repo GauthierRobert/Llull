@@ -243,6 +243,9 @@ describe('hostile display.pipeMarkers on load', () => {
     ['a wrong key', { other: first }],
     ['a bad reason', { [first.id]: { ...first, reason: 'x' } }],
     ['a bad position', { [first.id]: { ...first, positionMm: [1, 2] } }],
+    ['a zero field length', { [first.id]: { ...first, fieldLengthMm: 0 } }],
+    ['a negative letter height', { [first.id]: { ...first, letterHeightMm: -1 } }],
+    ['a negative arc length', { [first.id]: { ...first, atMm: -5 } }],
     ['a missing flag', { [first.id]: { ...first, bidirectional: 'no' } }],
   ])('refuses %s', (_name, markers) => {
     expect(validateDocumentValues(JSON.parse(JSON.stringify(withMarkers(markers))) as Record<string, unknown>).length).toBeGreaterThan(0);

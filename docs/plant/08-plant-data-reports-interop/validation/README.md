@@ -76,7 +76,7 @@ numbers.
 | VC-DAT-09 | Excel round trip: export equals fixture; preview = 1 change + `DAT_IMPORT_READONLY_COLUMN` + `DAT_IMPORT_TYPE`, document unchanged; apply = 1 change | xlsx fixtures [S5] | exact | A | `roundTrip.test.ts` |
 | VC-DAT-10 | IDS minimum handover: 0 failures on SC-DAT-01/02 exports; the check discriminates (24/24 failures on the bSI plumbing sample) | `plant-handover.ids`, `ids_results.json` [S4] | exact | A | `ids.test.ts` |
 | VC-DAT-11 | Determinism: same plan twice → byte-identical IFC, CSV and tags; replay of the feature history re-mints the same tags | — | byte-identical | A (AF-13) | golden `plant-data-sc-dat-01` |
-| VC-DAT-12 | SC-DAT-03 error codes: `DAT_TAG_FORMAT`, `DAT_TAG_DUPLICATE`, `DAT_REQUIRED_PROPERTY_MISSING`, `DAT_LINE_END_UNRESOLVED` with ids and paths | plan | exact | closed form | `check.test.ts` |
+| VC-DAT-12 | SC-DAT-03 error codes: `DAT_TAG_FORMAT`, `DAT_TAG_DUPLICATE`, `DAT_REQUIRED_PROPERTY_MISSING`, `DAT_LINE_END_UNRESOLVED` with ids and paths, plus the info `DAT_INFERRED_NOZZLE` of the nozzle-less pump (3 findings since DAT-FU2) | plan | exact | closed form | `check.test.ts` |
 | VC-DAT-13 | `ifc_summary` of the two bSI samples: schema, counts, system members, ports | `bsi_sample_stats.json` [S1, S3] | exact | A | `ifcSummary.test.ts` |
 | VC-DAT-14 | Data Manager edits are atomic commands: an invalid batch applies nothing (`DAT_PROPERTY_TYPE`), a valid batch is one feature step, undo restores a deep-equal document, `is pure` | L1 / L3 | exact | A | `properties.test.ts` |
 | VC-DAT-15 | Deliverable status: an agent can issue for review but not for construction (`DAT_HUMAN_GATE`), the result carries `reviewRequired` | AF-34, 09 PLM | exact | A | `deliverables.test.ts` |
