@@ -13,7 +13,7 @@ import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportParts, exportSummary, withFullResolution } from '../../geometry/entityTriangles';
 import type { CadDocument } from '../../model/types';
 import { entityIdsField } from './exportFormats';
-import { type GroupOf, buildGltfScene, collectDecalParts, collectSceneParts } from './gltfScene';
+import { type GroupOf, type InstanceBucket, type ScenePart, buildGltfScene, collectDecalParts, collectSceneParts } from './gltfScene';
 
 /** Align a byte length to a 4-byte boundary (glTF chunk requirement). */
 function align4(n: number): number {
@@ -21,6 +21,20 @@ function align4(n: number): number {
 }
 
 type GltfScene = ReturnType<typeof buildGltfScene>;
+
+/** Nodes of a glTF JSON that carry EXT_mesh_gpu_instancing. */
+function instancedNodes(json: Record<string, unknown>): number {
+  const nodes = (json['nodes'] ?? []) as Array<{ extensions?: unknown }>;
+  return nodes.filter((node) => node.extensions !== undefined).length;
+}
+
+/** Triangles of a gpu-instancing scene counted per instance, without building the world-space triangles of every copy. */
+function gpuTriangleCount(parts: readonly ScenePart[], { buckets }: { readonly buckets: readonly InstanceBucket[] }): number {
+  return (
+    parts.reduce((sum, part) => sum + part.tris.length, 0) +
+    buckets.reduce((sum, { part, entityIds }) => sum + part.tris.length * entityIds.length, 0)
+  );
+}
 
 /** First group (document order) containing each entity id. */
 function groupIndex(doc: CadDocument): GroupOf {
@@ -86,7 +100,7 @@ export const exportGltf = defineCommand({
   description:
     'Export the document (or a subset of entities) to glTF 2.0 format. ' +
     'Produces a triangle tessellation in world space for every exportable 3D solid entity. ' +
-    '2D shape entities are silently skipped. Revolution and instance entities are fully expanded. ' +
+    '2D shape entities are silently skipped. Revolution entities are tessellated; instance entities are expanded unless instancing is "gpu". ' +
     'Returns the UNCHANGED document, affected:[], and a data object with: ' +
     '  format ("gltf" or "glb"), triangleCount, nodeCount, materialCount, ' +
     '  text (glTF 2.0 JSON string — when binary=false, default),   base64 (GLB binary blob base64-encoded — when binary=true). ' +
@@ -102,7 +116,13 @@ export const exportGltf = defineCommand({
     'alpha-blended textured meshes. The BIN buffer is inlined as a data: URI in JSON mode. ' +
     'In GLB mode the 12-byte header + JSON chunk + BIN chunk are packed per the glTF 2.0 spec. ' +
     'entityIds: omit to export all 3D entities; provide an array to export a subset. ' +
-    'binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.',
+    'binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. ' +
+    'instancing: "expand" (default) writes one node per part (parts with identical geometry share a mesh); "gpu" writes one node per ' +
+    'prototype with the EXT_mesh_gpu_instancing extension (TRANSLATION / ROTATION / SCALE accessors, listed in extensionsUsed): identical ' +
+    'placed parts and component instances become ONE node, so a plant of 10^5 - 10^6 copies stays small. Use "gpu" for large repeated ' +
+    'scenes when the consumer supports the extension (three.js, Babylon, Blender 4+); "expand" for the widest compatibility. ' +
+    'In gpu mode node extras carry llullIds (instance entity ids in instance order) and instanceCount; data adds instancedNodeCount and ' +
+    'instanceCount. Does NOT modify the document.',
   params: z.object({
     entityIds: entityIdsField,
     confirmExportControlled,
@@ -115,9 +135,17 @@ export const exportGltf = defineCommand({
           '(12-byte header + JSON chunk + BIN chunk per glTF 2.0 spec). ' +
           'Most web viewers accept JSON glTF; most desktop importers accept GLB.',
       ),
+    instancing: z
+      .enum(['expand', 'gpu'])
+      .optional()
+      .describe(
+        'Repeated geometry layout. "expand" (default): one node per part, identical parts share one mesh (universal glTF 2.0). ' +
+          '"gpu": one node per prototype with EXT_mesh_gpu_instancing (per-instance TRANSLATION / ROTATION / SCALE); a component instance ' +
+          'with a mirroring or zero scale is still expanded; a nested instance (an instance inside a component) exports nothing, as in "expand". Requires a consumer that reads the extension.',
+      ),
   }),
   run: (doc, params, ctx): CommandResult => {
-    const { entityIds, binary = false } = params;
+    const { entityIds, binary = false, instancing = 'expand' } = params;
     const refused = exportRefusal(doc, 'export_gltf', 'gltf', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
     const collected = collectExportParts(doc, entityIds, (ctx ?? currentContext()).meshAssets);
@@ -125,9 +153,17 @@ export const exportGltf = defineCommand({
     if (unreadable !== null) return unreadable;
     const ids = collected.parts.map((part) => part.id);
     const sceneDoc = withFullResolution(doc, ids, (ctx ?? currentContext()).meshAssets);
-    const scene = buildGltfScene(collectSceneParts(sceneDoc, ids), collectDecalParts(sceneDoc, ids), groupIndex(sceneDoc));
-    const tris = collected.parts.flatMap((part) => part.tris);
-    const counts = { triangleCount: tris.length, nodeCount: scene.nodeCount, materialCount: scene.materialCount };
+    const groupOf = groupIndex(sceneDoc);
+    const sink = instancing === 'gpu' ? { buckets: [] as InstanceBucket[], groupOf } : undefined;
+    const sceneParts = collectSceneParts(sceneDoc, ids, sink);
+    const scene = buildGltfScene(sceneParts, collectDecalParts(sceneDoc, ids), groupOf, sink);
+    const tris = { length: sink === undefined ? collected.parts.flatMap((part) => part.tris).length : gpuTriangleCount(sceneParts, sink) };
+    const counts = {
+      triangleCount: tris.length,
+      nodeCount: scene.nodeCount,
+      materialCount: scene.materialCount,
+      ...(sink === undefined ? {} : { instanceCount: scene.instanceCount, instancedNodeCount: instancedNodes(scene.json) }),
+    };
     const summary =
       exportSummary('export_gltf', binary ? 'glb' : 'gltf', { ...collected, tris }) +
       ` ${scene.nodeCount} node(s), ${scene.materialCount} material(s).`;

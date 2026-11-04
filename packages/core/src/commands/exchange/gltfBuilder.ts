@@ -5,6 +5,7 @@
  */
 
 import { tupleExtent } from '../../lib/extent';
+import { GPU_INSTANCING_EXTENSION, type PackedInstances } from './gltfInstancing';
 
 /** Component-wise min/max of a flat array of `components`-tuples (all-zero when empty). */
 function bounds(data: Float32Array, components: number): { min: number[]; max: number[] } {
@@ -53,6 +54,18 @@ export class GltfBuilder {
       count: data.length / components,
       type: components === 2 ? 'VEC2' : 'VEC3',
       ...(withBounds ? bounds(data, components) : {}),
+    });
+    return this.accessors.length - 1;
+  }
+
+  /** FLOAT accessor of per-instance `components`-vectors (EXT_mesh_gpu_instancing attribute: no vertex-buffer target, no bounds). */
+  instanceData(data: Float32Array, components: 3 | 4): number {
+    const view = this.view(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+    this.accessors.push({
+      bufferView: view,
+      componentType: 5126,
+      count: data.length / components,
+      type: components === 3 ? 'VEC3' : 'VEC4',
     });
     return this.accessors.length - 1;
   }
@@ -112,6 +125,15 @@ export class GltfBuilder {
   /** A node showing `mesh` (under `parent`, else a scene root), placed by a column-major `matrix` when given. */
   meshNode(name: string, mesh: number, extras: Record<string, unknown>, parent?: number, matrix?: readonly number[] | null): void {
     this.attach({ name, mesh, ...(matrix ? { matrix } : {}), extras }, parent);
+  }
+
+  /** A node drawing `mesh` once per instance of `packed` through EXT_mesh_gpu_instancing (marks the extension as used). */
+  instancedNode(name: string, mesh: number, extras: Record<string, unknown>, packed: PackedInstances, parent?: number): void {
+    const attributes: Record<string, number> = { TRANSLATION: this.instanceData(packed.TRANSLATION, 3) };
+    if (packed.ROTATION !== undefined) attributes['ROTATION'] = this.instanceData(packed.ROTATION, 4);
+    if (packed.SCALE !== undefined) attributes['SCALE'] = this.instanceData(packed.SCALE, 3);
+    this.useExtension(GPU_INSTANCING_EXTENSION);
+    this.attach({ name, mesh, extensions: { [GPU_INSTANCING_EXTENSION]: { attributes } }, extras }, parent);
   }
 
   /** One triangle mesh and its node (under `parent`, else a scene root). */
