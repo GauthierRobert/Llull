@@ -195,8 +195,11 @@ function buildFamily(family: FileFamily, sizes: ComponentSize[]): ComponentFamil
 
 const zodPath = (path: readonly PropertyKey[]): string => path.map(String).join('.');
 
-/** Parses a catalogue file object: the stored catalogue, or every problem found (first = the refusal code). */
-export function parseCatalogFile(raw: unknown): { readonly catalog: PipingCatalog } | { readonly issues: readonly CatalogIssue[] } {
+/** Parses a catalogue file object: the stored catalogue, or every problem found (first = the refusal code). `allowLicensed`: a private library file (never embedded in the document) may be licensed-no-redistribution. */
+export function parseCatalogFile(
+  raw: unknown,
+  allowLicensed = false,
+): { readonly catalog: PipingCatalog } | { readonly issues: readonly CatalogIssue[] } {
   const file = fileSchema.safeParse(raw);
   if (!file.success)
     return {
@@ -209,7 +212,7 @@ export function parseCatalogFile(raw: unknown): { readonly catalog: PipingCatalo
       ),
     };
   const issues: CatalogIssue[] = [];
-  if (file.data.licence === 'licensed-no-redistribution')
+  if (file.data.licence === 'licensed-no-redistribution' && !allowLicensed)
     return {
       issues: [
         {

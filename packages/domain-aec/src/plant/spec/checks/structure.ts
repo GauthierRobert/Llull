@@ -94,18 +94,33 @@ export function overlapFindings({ spec }: CheckContext): SpecFinding[] {
 }
 
 /** Catalogues the spec names that do not exist (fail), components whose rows are missing (warn PSC_CATALOG_ROW_MISSING). */
-export function referenceFindings({ spec, missingCatalogs }: CheckContext, rows: readonly ComponentRows[]): SpecFinding[] {
-  const unknown = missingCatalogs.map((reference) =>
-    finding(
-      spec.id,
-      'references',
-      'PSC_CATALOG_UNKNOWN',
-      'fail',
-      [reference],
-      ['catalogs'],
-      `spec ${spec.id} searches catalogue "${reference}", which is neither bundled nor imported`,
-    ),
-  );
+export function referenceFindings(
+  { spec, missingCatalogs, unresolvedLibraries }: CheckContext,
+  rows: readonly ComponentRows[],
+): SpecFinding[] {
+  const unknown = missingCatalogs.map((reference) => {
+    const reason =
+      unresolvedLibraries !== undefined && Object.hasOwn(unresolvedLibraries, reference) ? unresolvedLibraries[reference] : undefined;
+    return reason === undefined
+      ? finding(
+          spec.id,
+          'references',
+          'PSC_CATALOG_UNKNOWN',
+          'fail',
+          [reference],
+          ['catalogs'],
+          `spec ${spec.id} searches catalogue "${reference}", which is neither bundled nor imported`,
+        )
+      : finding(
+          spec.id,
+          'references',
+          'PSC_LIBRARY_UNRESOLVED',
+          'fail',
+          [reference],
+          ['catalogs'],
+          `spec ${spec.id} searches private library "${reference}": ${reason}`,
+        );
+  });
   const missing = rows.flatMap((entry) =>
     entry.missing.length === 0
       ? []

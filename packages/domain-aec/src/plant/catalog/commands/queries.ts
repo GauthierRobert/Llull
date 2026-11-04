@@ -8,7 +8,7 @@ import { allRatingTables } from '../ptRating';
 import { refuse } from '../codes';
 import { FAMILY_SCHEMAS } from '../familySchemas';
 import { flatKeys, resolveCatalogRow, type ResolvedRow } from '../lookup';
-import { allCatalogs, findCatalog } from '../store';
+import { allCatalogs, findCatalog, getCatalogModel, libraryUnresolvedReason } from '../store';
 import { BEND_RADII, COMPONENT_TYPES, END_TYPES, FACINGS, type ComponentFamily, type PipingCatalog } from '../types';
 
 const nominalParam = z.union([z.number(), z.string()]);
@@ -34,17 +34,17 @@ function familySummary(family: ComponentFamily): Record<string, unknown> {
   };
 }
 
-const catalogSummary = (catalog: PipingCatalog, families: readonly ComponentFamily[]): Record<string, unknown> => ({
+const catalogSummary = (catalog: PipingCatalog, families: readonly ComponentFamily[], library: boolean): Record<string, unknown> => ({
   id: catalog.id,
   version: catalog.version,
   title: catalog.title ?? null,
   licence: catalog.licence,
-  origin: catalog.id === BUNDLED_CATALOG_ID ? 'bundled' : 'document',
+  origin: catalog.id === BUNDLED_CATALOG_ID ? 'bundled' : library ? 'library' : 'document',
   families: families.map(familySummary),
 });
 
 /**
- * @affects none; data = { catalogs: [{ id, version, licence, origin, families: [{ id, type, standard, sizeKeys, schedules?, classes, rows, verifiedValues, totalValues }] }], ratingTables, importOnly }
+ * @affects none; data = { catalogs: [{ id, version, licence, origin (bundled | document | library), families: [{ id, type, standard, sizeKeys, schedules?, classes, rows, verifiedValues, totalValues }] }], ratingTables, importOnly, unresolvedLibraries: [{ libraryId, version, reason }] }
  * @invariant read-only; the bundled catalogue `llull-open-piping` is always listed first
  * @failure unknown catalogId -> PSC_CATALOG_UNKNOWN
  */
@@ -82,6 +82,7 @@ export const listPipingCatalogs = defineCommand({
         ['catalogId'],
       );
     const wanted = standard?.toLowerCase();
+    const libraries = getCatalogModel(doc).libraries ?? {};
     const summaries = catalogs.map((catalog) =>
       catalogSummary(
         catalog,
@@ -89,8 +90,13 @@ export const listPipingCatalogs = defineCommand({
           (family) =>
             (type === undefined || family.type === type) && (wanted === undefined || family.standard.toLowerCase().includes(wanted)),
         ),
+        Object.hasOwn(libraries, catalog.id),
       ),
     );
+    const unresolvedLibraries = Object.values(libraries).flatMap((library) => {
+      const reason = libraryUnresolvedReason(doc, library.libraryId);
+      return reason === undefined ? [] : [{ libraryId: library.libraryId, version: library.version, reason }];
+    });
     const familyCount = summaries.reduce((count, entry) => count + (entry['families'] as unknown[]).length, 0);
     return report(
       doc,
@@ -105,6 +111,7 @@ export const listPipingCatalogs = defineCommand({
           imported: rating.id !== BUNDLED_RATING_TABLE_ID,
         })),
         importOnly: IMPORT_ONLY_STANDARDS,
+        unresolvedLibraries,
         familySchemas: FAMILY_SCHEMAS.map((schema) => ({
           id: schema.id,
           standard: schema.standardName,

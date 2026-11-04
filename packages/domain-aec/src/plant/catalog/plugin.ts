@@ -8,6 +8,7 @@ import type { CadPlugin } from '@core/plugins/plugin';
 import { commandCatalog } from '@core/commands/schema';
 import { checkPipingCatalog } from './commands/check';
 import { pipeSectionProperties, ptRating } from './commands/engineering';
+import { importPipingLibrary } from './commands/library';
 import { importPipingCatalogSheet } from './commands/importSheet';
 import { exportRatingTable, importRatingTable } from './commands/ratingTables';
 import { pipeWallCheck } from './commands/wall';
@@ -53,6 +54,7 @@ export const pipingCatalogPlugin: CadPlugin = {
     importRatingTable,
     exportRatingTable,
     importPipingCatalogSheet,
+    importPipingLibrary,
     importPipeSpecSheet,
   ),
   document: pipingCatalogDocument,

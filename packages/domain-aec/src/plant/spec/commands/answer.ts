@@ -7,6 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import type { PipingCatalog } from '../../catalog/types';
 import type { ResolvedComponent } from '../resolve';
 import { sizeLabel } from '../size';
+import { libraryUnresolvedReason } from '../../catalog/store';
 import { findSpec, getSpecModel, specCatalogs } from '../store';
 import type { PipeSpec } from '../types';
 
@@ -36,7 +37,17 @@ export function loadSpec(
     );
   }
   const found = specCatalogs(doc, spec);
-  if (requireCatalogs && found.missing.length > 0)
+  if (requireCatalogs && found.missing.length > 0) {
+    const unresolved = found.missing.flatMap((reference) => libraryUnresolvedReason(doc, reference) ?? []);
+    if (unresolved.length > 0)
+      return refuse(
+        doc,
+        command,
+        'PSC_LIBRARY_UNRESOLVED',
+        `spec ${spec.id} searches a private library that does not resolve: ${unresolved.join('; ')}`,
+        [...found.missing],
+        ['catalogs'],
+      );
     return refuse(
       doc,
       command,
@@ -45,6 +56,7 @@ export function loadSpec(
       [...found.missing],
       ['catalogs'],
     );
+  }
   return { spec, catalogs: found.catalogs };
 }
 

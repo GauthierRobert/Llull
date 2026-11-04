@@ -48,6 +48,7 @@ export {
 export { pipingPlugin } from './plant/piping/plugin';
 export { pipingFabricationPlugin } from './plant/fabrication/plugin';
 export { pipingCatalogPlugin } from './plant/catalog/plugin';
+export { setPipingLibraryProvider, type PipingLibraryProvider } from './plant/catalog/libraryPort';
 export { structuresPlugin } from './plant/structures/plugin';
 export { pipeStressPlugin } from './plant/stress/plugin';
 export { plantEquipmentPlugin } from './plant/equipment/plugin';

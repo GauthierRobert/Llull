@@ -59,6 +59,8 @@ export interface CheckContext {
   readonly spec: PipeSpec;
   readonly catalogs: readonly PipingCatalog[];
   readonly missingCatalogs: readonly string[];
+  /** Reason per missing reference that names a private library of the document (PSC_LIBRARY_UNRESOLVED instead of PSC_CATALOG_UNKNOWN). */
+  readonly unresolvedLibraries?: Readonly<Record<string, string>>;
   readonly sizes: readonly NominalSize[];
 }
 

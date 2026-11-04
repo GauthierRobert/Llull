@@ -804,3 +804,15 @@ Commands (toolset `piping`): `import_pipe_spec_sheet` (M), `import_piping_catalo
 #### Left
 
 XLSX spec / catalogue sheets; a confirmed Plant 3D schema (and `.pspc` / `.pspx`); PCF SKEY map (05 ISO); further rating tables with sources (B16.5 groups other than 1.1 above 50 degC for class >= 300, B16.34, EN 1092-1 PN) - supply them with `import_rating_table`; per-dimension provenance in the CSV catalogue sheet; the earlier open items of §13.7.
+
+### 13.9 As built (CAT-FU, 2026-11-04: follow-ups of M2 to M5)
+
+Branch `feat/plant-cat-fu`. One block per item; "Left" at the end of the section lists what stays open.
+
+#### Private libraries (`PipingLibraryProvider`)
+
+- **Port.** `catalog/libraryPort.ts`: `PipingLibraryProvider { get(libraryId, version): string | null }` returns the library file text (`llull-piping-catalog` JSON); the host installs it with `setPipingLibraryProvider` (exported from `@aec/index`, like the core `setMaterialLibraryProvider`). It is a module-level port of the plugin, not a field of the core `CommandContext` (a plugin cannot extend core types, L10). Parsed files are cached by (id, sha256).
+- **`import_piping_library { libraryId, version, sha256?, replace? }`** records `{ libraryId, version, sha256 }` in `plant.catalog.libraries[libraryId]` and nothing of the file's values. `sha256` pins the exact text (default: the hash found now). The library id is the catalogue id specs name in `catalogs[]`; the ids of the bundled and imported catalogues are refused (`PSC_CATALOG_CONFLICT`). A `licensed-no-redistribution` file is accepted here only (the importers still refuse it, `PSC_LICENCE_EMBED_FORBIDDEN`).
+- **`PSC_LIBRARY_UNRESOLVED` is raised** by `import_piping_library` (no provider, file absent, hash differs from the recorded one, not JSON, not a valid catalogue, file id differs), by every spec read that needs the catalogues (`loadSpec`: resolve / shape / assign / wall ...) when a spec names a library of the document that does not resolve (instead of `PSC_CATALOG_UNKNOWN`), and by `check_pipe_spec` as a `fail` finding. `list_piping_catalogs` lists resolvable libraries (`origin: library`) and `data.unresolvedLibraries[] { libraryId, version, reason }`. A document with an unresolved reference still loads; load validation checks the reference shape (`libraryId` = key, `version`, 64-hex `sha256`) and that the id does not clash with an imported catalogue.
+- **Licence.** `export_piping_catalog` of a licensed library is refused (`PSC_LICENCE_EMBED_FORBIDDEN`). Values read from a library reach the document only as derived numbers a command stores (a pipe's `SpecBinding` od / wall, as for any spec); the file is never embedded.
+- Tests: `tests/unit/plant/piping/pipingLibrary.test.ts`; the hostile-input harness covers `import_piping_library` with a hostile file text.
