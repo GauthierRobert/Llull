@@ -59,6 +59,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'Ask the reviewer to issue the isometric in the desktop app: confirmation is a signature object over the act, produced there.',
   ISO_CHECK_FAILED: 'Fix the errors check_isometric lists for the line (style final), then issue again.',
   ISO_REVIEW_REQUIRED: 'An unissued isometric is for review only (NOT FOR CONSTRUCTION): a human issues it.',
+  ISO_ISSUE_NOT_FOUND:
+    'The line has no issue stamp to compare with: a human issues it first (issue_isometric), then compareToIssue draws the changes.',
+  ISO_ISSUE_SNAPSHOT_MISSING:
+    'The issue predates snapshots: issue the line anew (issue_isometric) to store the content it is compared with.',
   ISO_GA_OVERFLOW: 'Use a smaller scale (a larger number) or a larger paper, or draw fewer lines (lineIds).',
   ISO_ROUTE_UNSUPPORTED:
     'Import the line as pcf_line (as omitted), or edit the PCF: route mode rebuilds a line from its centreline with the spec, so it takes pipes, elbows, bends, tees, olets, reducers, valves, end flanges, field welds and supports only.',

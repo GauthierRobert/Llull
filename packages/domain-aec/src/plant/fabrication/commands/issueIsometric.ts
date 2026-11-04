@@ -7,6 +7,7 @@ import { isoUtc } from '../../../shared/isoUtc';
 import { analyseLine, isAnalysis } from '../analysis';
 import { checkLine } from '../check';
 import { refuseIso } from '../codes';
+import { snapshotOf } from '../compareIssue';
 import { basisOf } from '../issues';
 import type { IssueApproval, IssuedIsometric } from '../model';
 import { getFabrication, withFabrication } from '../state';
@@ -99,6 +100,7 @@ export const issueIsometric = defineCommand({
       document: withFabrication(doc, {
         ...fabrication,
         issues: { ...fabrication.issues, [issue.id]: issue },
+        issueSnapshots: { ...fabrication.issueSnapshots, [issue.id]: snapshotOf(analysis) },
         ...(recorded === undefined ? { issueLedger: [...(fabrication.issueLedger ?? []), approval] } : {}),
       }),
       summary: `issue_isometric: line ${analysis.name} issued ${params.purpose.replace('_', ' ')} at revision ${issue.revision} by ${issue.signer} (${issue.id}, signature ${issue.signatureId})`,

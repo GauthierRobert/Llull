@@ -91,6 +91,12 @@ const issued = z.object({
   at: isoUtc,
   payloadSha256: z.string().length(64),
 });
+const snapshot = z.object({
+  components: z.record(z.string(), z.object({ type: z.string(), fp: z.string(), at: vec3 })),
+  welds: z.record(z.string(), z.object({ kind: z.enum(['shop', 'site', 'field_fit']), at: vec3 })),
+  dimensions: z.record(z.string(), z.object({ overallMm: z.number(), to: z.string() })),
+  bom: z.record(z.string(), z.object({ quantity: z.number(), unit: z.enum(['m', 'ea']) })),
+});
 const approval = issued.omit({ id: true });
 
 const fabrication = z.object({
@@ -103,6 +109,7 @@ const fabrication = z.object({
   spoolBreaks: z.record(z.string(), z.array(z.enum(['field_welds', 'flanged_joints', 'line_ends']))).optional(),
   isometrics: z.record(z.string(), isometric).optional(),
   issues: z.record(z.string(), issued).optional(),
+  issueSnapshots: z.record(z.string(), snapshot).optional(),
   issueLedger: z.array(approval).optional(),
 });
 
