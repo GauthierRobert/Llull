@@ -5,6 +5,10 @@ import { type PlanInstance, type PlanScene, prototypeKeyOf } from '@core/geometr
 import { applyEulerXYZ, isZeroRotation } from '@lib/eulerRotation';
 import { type CadDocument, type Entity, is3D } from '@core/model/types';
 
+/**
+ * NOT frozen: this oracle imports the live `prototypeKeyOf`, `entityBoundsInDoc`, `entityBounds`, `entityToTriangles` and material-class helpers.
+ * A later edit to any of them must first copy the VIS-M8i behaviour into this file, or the oracle stops guarding it.
+ */
 const diagonalOf = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
 
 /** The closed-form rotated cylinder / cone / sphere / torus box exactly as `bounds.ts` wrote it before VIS-M8i (no memo, no inlining). */

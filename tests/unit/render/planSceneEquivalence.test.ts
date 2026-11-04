@@ -141,4 +141,49 @@ describe('planScene equals the pre-VIS-M8i reference', () => {
     expect(scene.instances[0]?.aabb).not.toEqual(scene.instances[1]?.aabb);
     expect(scene).toEqual(referencePlanScene(doc));
   });
+
+  it('hostile entities: undefined params, signed zeros, NaN, reordered keys, 2D / curve / sheet, corrupt scale', () => {
+    const base = { layerId: DEFAULT_LAYER_ID, color: '#fff' };
+    const hostile = (entity: Record<string, unknown>): Entity => ({ ...base, ...entity }) as unknown as Entity;
+    const entities: Entity[] = [
+      hostile({ id: 'a', kind: 'cylinder', position: [0, 0, 0], rotation: [0, 0, 0], radius: 5, height: 9, extra: undefined }),
+      hostile({ id: 'b', kind: 'cylinder', position: [0, 0, 0], rotation: [0, 0, 0], radius: 5, height: 9 }),
+      hostile({ id: 'c', kind: 'cylinder', position: [0, 0, 0], rotation: [0, 0, 0], height: 9, radius: 5 }),
+      hostile({ id: 'd', kind: 'cylinder', position: [0, 0, 0], rotation: [0, 0, 0], radius: -0, height: 9 }),
+      hostile({ id: 'e', kind: 'cylinder', position: [0, 0, 0], rotation: [0, 0, 0], radius: 0, height: 9 }),
+      hostile({ id: 'f', kind: 'cylinder', position: [1, 2, 3], rotation: [0, 0, 0], radius: NaN, height: 9 }),
+      hostile({ id: 'g', kind: 'cylinder', position: [1, 2, 3], rotation: [0, 0, 0], radius: NaN, height: 9 }),
+      hostile({ id: 'h', kind: 'cylinder', position: [0, 0, 0], rotation: [NaN, -0, 0], radius: 5, height: 9 }),
+      hostile({ id: 'i', kind: 'cylinder', position: [0, 0, 0], rotation: [NaN, -0, 0], radius: 5, height: 9 }),
+      hostile({ id: 'j', kind: 'box', position: [0, 0, 0], rotation: [0, -0, NaN], size: [1, 2, 3] }),
+      hostile({ id: 'k', kind: 'line', position: [0, 0, 0], rotation: [0, 0, 0], start: [0, 0], end: [1, 1] }),
+      hostile({ id: 'l', kind: 'nurbs_curve', position: [0, 0, 0], rotation: [0, 0, 0], curve: { degree: 1, poles: [], knots: [] } }),
+      hostile({ id: 'm', kind: 'nurbs_surface', position: [0, 0, 0], rotation: [0, 0, 0], surface: {} }),
+      hostile({ id: 'n', kind: 'instance', position: [0, 0, 0], rotation: [0, 0, 0], componentId: 'comp', scale: 'abc' }),
+      hostile({ id: 'o', kind: 'instance', position: [0, 0, 0], rotation: [0, 0, 0], componentId: 'comp', scale: new Set([2, 1, 1]) }),
+      hostile({ id: 'p', kind: 'instance', position: [0, 0, 0], rotation: [0, 0, 0], componentId: 'comp', scale: [1, 'x', 1] }),
+    ];
+    const source = randomDocument(11, 5);
+    const doc: CadDocument = { ...source, entities: Object.fromEntries(entities.map((e) => [e.id, e])), order: entities.map((e) => e.id) };
+    expect(planScene(doc)).toEqual(referencePlanScene(doc));
+  });
+
+  it('past the trie node cap (continuously varying parameters) keys and boxes still equal the reference', () => {
+    const entities: Entity[] = Array.from({ length: 40_000 }, (_, index) => ({
+      id: `v${index}`,
+      kind: 'cylinder',
+      position: [index, 0, 0],
+      rotation: [0, 0.2, 0],
+      layerId: DEFAULT_LAYER_ID,
+      color: '#fff',
+      radius: 10 + index * 0.001234,
+      height: 5 + (index % 97) * 0.37,
+    }));
+    const doc: CadDocument = {
+      ...createEmptyDocument(),
+      entities: Object.fromEntries(entities.map((e) => [e.id, e])),
+      order: entities.map((e) => e.id),
+    };
+    expect(planScene(doc)).toEqual(referencePlanScene(doc));
+  });
 });

@@ -131,32 +131,40 @@ export function prototypeKeyOf(entity: Entity): string {
 }
 
 interface KeyTrieNode {
-  readonly children: Map<unknown, KeyTrieNode>;
+  /** Created on the first step below the node: leaves carry none. */
+  children: Map<unknown, KeyTrieNode> | undefined;
   key: string | undefined;
 }
 
 const ARRAY_OPEN = Symbol('array-open');
 const ARRAY_CLOSE = Symbol('array-close');
 const ABSENT = Symbol('absent');
+/** Trie nodes after which the keyer stops walking and caching (parameters that vary continuously would grow the trie by a path per entity). */
+const KEY_TRIE_NODE_CAP = 100_000;
 
 /**
  * `prototypeKeyOf` with a per-call memo: the RAW (unrounded) shape parameters walk a trie, so entities with identical parameters (the usual
  * case, 10^6 instances of a few prototypes) skip the canonical 6-significant-figure formatting and any string building. Entities holding
- * nested data (or meshes) take the reference path.
+ * nested data (or meshes), a scale that is not a number array, or arriving after the trie reached its node cap (the rest of the call) take the reference path.
  * @invariant returns exactly `prototypeKeyOf(entity)`: the token path (kind, then key / value pairs; number arrays bracketed) determines every
  *   value the canonical form reads, and Map keys keep number, string and boolean tokens apart
  */
 function createPrototypeKeyer(): (entity: Entity) => string {
-  const root: KeyTrieNode = { children: new Map(), key: undefined };
-  const step = (node: KeyTrieNode, token: unknown): KeyTrieNode => {
-    let next = node.children.get(token);
+  const root: KeyTrieNode = { children: undefined, key: undefined };
+  let nodeCount = 0;
+  const step = (node: KeyTrieNode | undefined, token: unknown): KeyTrieNode | undefined => {
+    if (node === undefined) return undefined;
+    const children = (node.children ??= new Map());
+    let next = children.get(token);
     if (next === undefined) {
-      next = { children: new Map(), key: undefined };
-      node.children.set(token, next);
+      nodeCount++;
+      next = { children: undefined, key: undefined };
+      children.set(token, next);
     }
     return next;
   };
-  const numbers = (node: KeyTrieNode, values: readonly unknown[]): KeyTrieNode | undefined => {
+  const numbers = (node: KeyTrieNode | undefined, values: unknown): KeyTrieNode | undefined => {
+    if (!Array.isArray(values)) return undefined;
     let at = step(node, ARRAY_OPEN);
     for (const item of values) {
       if (typeof item !== 'number') return undefined;
@@ -177,16 +185,13 @@ function createPrototypeKeyer(): (entity: Entity) => string {
       const at = step(node, key);
       if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') node = step(at, value);
       else if (value === undefined) node = step(at, ABSENT);
-      else if (Array.isArray(value)) {
-        const inner = numbers(at, value);
-        if (inner === undefined) return undefined;
-        node = inner;
-      } else return undefined;
+      else node = numbers(at, value);
+      if (node === undefined) return undefined;
     }
     return node;
   };
   return (entity) => {
-    if (entity.kind === 'mesh') return prototypeKeyOf(entity);
+    if (entity.kind === 'mesh' || nodeCount >= KEY_TRIE_NODE_CAP) return prototypeKeyOf(entity);
     const leaf = walk(entity);
     if (leaf === undefined) return prototypeKeyOf(entity);
     leaf.key ??= prototypeKeyOf(entity);
