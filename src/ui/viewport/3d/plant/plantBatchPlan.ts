@@ -51,6 +51,8 @@ export interface DrawBucket {
   readonly lod: 0 | 1 | 2;
   /** Entity id per instance: the index is the `instanceId` of a pick. */
   readonly ids: readonly EntityId[];
+  /** Scene instance index per instance, ascending (the key of the instance BVH). */
+  readonly members: readonly number[];
   /** Prototype key per instance (a LOD2 box bucket mixes prototypes). */
   readonly prototypes: readonly string[];
 }
@@ -65,14 +67,17 @@ export function drawBuckets(scene: PlanScene, plan: RenderPlan, covered: Readonl
   const result: DrawBucket[] = [];
   const push = (prototypeKey: string, materialClass: string, lod: 0 | 1 | 2, members: readonly number[]): void => {
     const ids: EntityId[] = [];
+    const kept: number[] = [];
     const prototypes: string[] = [];
     for (const index of members) {
       const instance = scene.instances[index];
       if (instance === undefined || !covered.has(instance.id)) continue;
       ids.push(instance.id);
+      kept.push(index);
       prototypes.push(scene.prototypeKeys[instance.prototype] ?? '');
     }
-    if (ids.length > 0) result.push({ key: `${prototypeKey}|${materialClass}|${lod}`, prototypeKey, materialClass, lod, ids, prototypes });
+    if (ids.length > 0)
+      result.push({ key: `${prototypeKey}|${materialClass}|${lod}`, prototypeKey, materialClass, lod, ids, members: kept, prototypes });
   };
   for (const bucket of plan.buckets) push(bucket.prototypeKey, bucket.materialClass, bucket.lod, bucket.members);
   for (const batch of plan.uniqueBatches) {

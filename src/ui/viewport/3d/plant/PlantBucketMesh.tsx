@@ -1,6 +1,6 @@
 // One InstancedMesh of a draw bucket: matrices, colours, x-ray opacity and picking (`instanceId` -> entity id).
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import type * as THREE from 'three';
 import type { Entity, EntityId } from '@core/model/types';
@@ -14,6 +14,7 @@ import type { LodGeometryCache } from './LodGeometryCache';
 import { type DrawBucket, entityIdAt } from './plantBatchPlan';
 import { writeBucketColours } from './plantInstanceColours';
 import { bucketMatrices, type LocalBox } from './plantMatrices';
+import { bucketRaycast, type CandidateSource } from './plantPick';
 
 export interface PlantBucketMeshProps {
   bucket: DrawBucket;
@@ -24,6 +25,8 @@ export interface PlantBucketMeshProps {
   displayMode: DisplayMode;
   selectionSet: ReadonlySet<EntityId>;
   onSelect: (id: EntityId, additive: boolean) => void;
+  /** BVH ray candidates of the scene the bucket belongs to. */
+  candidates: CandidateSource;
 }
 
 export function PlantBucketMesh({
@@ -35,6 +38,7 @@ export function PlantBucketMesh({
   displayMode,
   selectionSet,
   onSelect,
+  candidates,
 }: PlantBucketMeshProps): React.ReactElement | null {
   // Tints rewrite the colour buffer only (no plan, no matrix rewrite); read here so small documents never render this component.
   const tints = useTintStore((s) => s.tints);
@@ -70,6 +74,8 @@ export function PlantBucketMesh({
     material.needsUpdate = true;
   }, [displayMode, bucket, selectionSet, material]);
 
+  const raycast = useMemo(() => bucketRaycast(bucket, candidates), [bucket, candidates]);
+
   if (geometry === undefined || count === 0) return null;
 
   function handleClick(event: ThreeEvent<MouseEvent>): void {
@@ -84,6 +90,7 @@ export function PlantBucketMesh({
       args={[geometry, material, capacity]}
       count={count}
       onClick={handleClick}
+      raycast={raycast}
       castShadow={bucket.lod <= plantShadowMaxLod}
       receiveShadow={keyShadows}
     />
