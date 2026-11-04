@@ -2,15 +2,16 @@
 // pixel culled, hysteresis) comes from `usePlantPlan`; this component only draws `covered` entities of buckets that belong to the same
 // scene as the plan. Entities in `covered` are NOT drawn by the per-entity path (Entities.tsx excludes them).
 
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import type { Entity, EntityId, Material } from '@core/model/types';
+import type { Entity, EntityId, Material, Vec3 } from '@core/model/types';
 import { type DisplayMode, useViewportStore } from '@ui/store';
 import { useDisposable } from '../../useDisposable';
 import { makeMaterialArgs } from '../InstancedRenderer';
 import { LodGeometryCache } from './LodGeometryCache';
 import { PlantBucketMesh } from './PlantBucketMesh';
 import { drawBuckets } from './plantBatchPlan';
+import { prepareRayIndex, rayCandidates } from './plantRayIndex';
 import type { PlantPlan } from './usePlantPlan';
 
 interface PlantBatchRendererProps {
@@ -66,6 +67,9 @@ export function PlantBatchRenderer({
   // Prototypes that left the scene free their geometries.
   const { scene } = plan;
   useEffect(() => cache.retain(new Set(scene.prototypeKeys)), [cache, scene]);
+  // Picking: the instance BVH of this scene, built in a later task, and the ray query every bucket of one pick shares.
+  useEffect(() => prepareRayIndex(scene), [scene]);
+  const candidates = useCallback((origin: Vec3, direction: Vec3) => rayCandidates(scene, origin, direction), [scene]);
 
   return (
     <group name="plant-batches">
@@ -82,6 +86,7 @@ export function PlantBatchRenderer({
           displayMode={displayMode}
           selectionSet={selectionSet}
           onSelect={onSelect}
+          candidates={candidates}
         />
       ))}
     </group>
