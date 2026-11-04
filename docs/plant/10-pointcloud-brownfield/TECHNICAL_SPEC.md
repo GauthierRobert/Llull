@@ -2,7 +2,7 @@
 
 Companion of [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md). Laws: `.claude/rules/architecture.md` (L1–L10). Operator model:
 `docs/aerospace/AGENT_FIRST.md`. Validation: [validation/README.md](validation/README.md). Status: RS-3 / RS-4 built 2026-10-19
-(M1, M2, M4, M5, M6, M7; M3 viewport built 2026-11-03, `render_view` and the V1 items not built): see §13 "As built". §1–§12 are the specification as written.
+(M1, M2, M4, M5, M6, M7; M3 viewport built 2026-11-03, `render_view` clouds built SCN-M3c, the V1 items not built): see §13 "As built". §1–§12 are the specification as written.
 
 ## 1. Current state in llull (2026-10-18)
 
@@ -693,7 +693,7 @@ Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_clo
    port does in TypeScript (`describe_point_cloud`, `query_cloud_points`, `nearest_cloud_point`, `measure_cloud`) work on any asset
    already in the store. VC-SCN-60 (a) "native vs WASM" becomes "native reproducibility": identical asset bytes, fits, ICP
    transforms and deviation sums for any thread count (`tests/octree.rs`, `fits.rs`, `registration.rs`, `compare.rs`).
-2. **M3 (viewport) built in the desktop viewport (§13.6)**; `render_view` still does not draw clouds (the `budget` param of §7 is not built).
+2. **M3 (viewport) built in the desktop viewport (§13.6)**; `render_view` draws clouds (`clouds` param, SCN-M3c).
 3. **Asset key** (decision 1): `sha256("<sourceSha256>\n<importerVersion>\n<canonicalJson(importOptions with defaults)>")`,
    `importerVersion = "llull-cloud@<crate version>/asset-1"`. Options in the key: `format`, `sourceUnit`, `columns`,
    `applyStationPoses`, `checksum`, `maxPointsPerNode`.
@@ -736,7 +736,7 @@ Commands: mutating `attach_point_cloud`, `update_point_cloud`, `detach_point_clo
     supports `device: "gpu"` only when built with `--features gpu` (else `SCN_GPU_FALLBACK`, CPU numbers unchanged).
 14. **Not built**: `$fromStep` plan binding (TR-SCN-03, a core prerequisite: plans stay DRAFT, agents run queries with `--json`),
     `trace_pipe_centreline` (VC-SCN-22), `fit_steel_member` (VC-SCN-23), `commit_slice_geometry`, COPC / E57 export, `llull scan gc`,
-    `server/tests/packReplay10scn.test.ts`, `render_view` clouds.
+    `server/tests/packReplay10scn.test.ts`. (`render_view` clouds: built, SCN-M3c.)
 
 ### 13.3 Validation status
 
@@ -789,7 +789,9 @@ scaled to 0–65535 at import, `classification` = ASPRS code); absent ones are l
 only the TypeScript `AssetReader` dropped them (it read positions and record indices). `cloudClient.parseTileAnswer` already reads these keys. Budgets / caps unchanged; rgb adds
 about 4 bytes per point to the JSON. **(2)** the answer is JSON (≈ 1 MB per 30 k points), adequate for
 ≤ 3 M resident points; a binary route is the follow-up if the 150 ms p95 fetch of §8 is missed. **(3)** a refined tile replaces its coarser answer (no
-shared parents), so the budget counts the finest answer per tile. **(4)** EDL shading, `render_view` clouds and the section-box (VIS) clip are not built.
+shared parents), so the budget counts the finest answer per tile. **(4)** EDL shading and the shader section-box clip are not built; **`render_view` clouds — closed (SCN-M3c)**, below.
+
+**`render_view` clouds (SCN-M3c).** Usage: `overlay: 'clouds', overlayOptions: { clouds: { maxPoints?, colour?: elevation | rgb | intensity | classification, pointSizePx? } }` (budget 100–200 000, default 20 000, about 0.3 MB of SVG at 20 k and 2.8 MB at 200 k; size 1–8 px, default 2). Core knows no cloud: `RenderOverlay.paramsSchema` (zod, per kind) validates the kind's entry of the generic `overlayOptions` at run time (unknown kind, a kind without options, an unrequested kind or invalid options: `CMD_INVALID_PARAMS` with path `overlayOptions.<kind>.<field>`); the tool schema stays static, so per-kind options are documented in the plugin tool docs (`query_cloud_points`). The drawing is the scan plugin overlay `clouds` (`packages/domain-aec/src/scan/cloudOverlay.ts`); core hands the overlay narrow `ports.pointClouds` (from `ctx`), its validated `options`, `cutKeep` (section box and `cut` without `entityIds`), `dim` (review shading with a selection) and `size`. Each visible attached cloud is read with `lod: budget` (share = maxPoints / clouds; 4× when a crop or cut applies, so a region keeping under 25 % is under-sampled), moved by its transform exactly as `query_cloud_points` does, cropped by `set_scan_crop` boxes (per cloud) and the cut, thinned to the share by evenly spaced picks in canonical order (deterministic), projected with the solids' projector and drawn as zero-length round-capped SVG paths, one per quantised colour (viridis 32 steps, grey intensity, ASPRS classes, rgb at 4 bits per channel). A cloud without the requested column falls back to elevation (named in the summary). Same overlay layer for `raster` and `vector` modes (SVG over the PNG). Dimmed (opacity 0.3) under `shading: 'review'` with a selection. With `isolate` a cloud is drawn only when the isolate list names its cloud id. The report is `data.overlays.clouds.detail` = `{ maxPoints, colour, pointSizePx, drawn, clouds: [{ cloudId, colour, queried, cropped, sampled, offscreen, drawn, truncated, note? }], skipped?, note }`, and `note` is appended to the summary. Without a port, with no cloud attached, all hidden or an unreadable asset: nothing is drawn and the note says why (kernel-optional). Limits: orthographic views only (perspective and turntable say so), marks are drawn over the picture (not occluded by solids), and the view is framed by the document entities, not by the clouds.
 
 ## 12. References
 

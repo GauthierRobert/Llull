@@ -26,6 +26,7 @@ import { reviewData } from './reviewData';
 import { MAX_RENDER_SAMPLES, renderSamples } from './viewVisibility';
 import type { CadDocument } from '../../model/types';
 import type { RenderViewData } from './types';
+import { cutKeep, overlayOptionsParams, resolveOverlayOptions } from './overlayOptions';
 import { clamp } from '../../lib/clamp';
 import { withExplodedPositions } from '../../geometry/explodedOffsets';
 
@@ -71,6 +72,7 @@ export const renderView = defineCommand({
     'Enrichments: turntable (multi-frame strip), isolate (highlight entities), section (cut-plane view), ' +
     'showDimensions (bbox labels), showAxes (world triad, default on), showGrid (ground grid, default on), ' +
     'showLabels (entity id/name labels + key-point markers, default off), overlay ("cage": the cage edges and vertices of subdivision solids, "net": the control net of nurbs_surface sheets and the control polygon of nurbs_curve entities, drawn over the picture, not occluded; one kind or an array of both; with `isolate` only the isolated entities; orthographic views only). The active exploded view (set_active_exploded_view) is drawn like the viewport: parts at their exploded positions. ' +
+    'Plugin overlay kinds take their options in `overlayOptions` ({ <kind>: options }; per-kind options: see the plugin tool docs); what a kind drew is in data.overlays.<kind>.detail. ' +
     'Does NOT modify the document; `affected` is always [].',
   params: z.object({
     view: z
@@ -205,6 +207,7 @@ export const renderView = defineCommand({
           'orange=point, cyan=2D curve, purple=3D solid, yellow=annotation. ' +
           'A legend appears in the top-right corner. Default: false (opt in to avoid clutter).',
       ),
+    ...overlayOptionsParams,
     ...viewParams,
     ...reviewParams,
   }),
@@ -214,6 +217,9 @@ export const renderView = defineCommand({
     const resolved = resolveRenderOptions(unstyled, params);
     if ('error' in resolved) return { document: doc, summary: `render_view rejected: ${resolved.error}.`, affected: [] };
     const { options } = resolved;
+    const requestedKinds = params.overlay === undefined ? [] : typeof params.overlay === 'string' ? [params.overlay] : params.overlay;
+    const overlayOptions = resolveOverlayOptions(doc, params.overlayOptions, requestedKinds);
+    if (!('options' in overlayOptions)) return overlayOptions;
     const view: ViewName = options.direction || params.viewpointId !== undefined ? 'custom' : (params.view ?? 'iso');
     const width = clampPixels(params.width, 800);
     const height = clampPixels(params.height, 600);
@@ -279,15 +285,23 @@ export const renderView = defineCommand({
       showGrid: !perspective && params.showGrid !== false,
       showLabels: !perspective && params.showLabels === true,
     });
-    const kinds = params.overlay === undefined ? [] : typeof params.overlay === 'string' ? [params.overlay] : params.overlay;
+    const kinds = requestedKinds;
     let overlays: RenderViewData['overlays'];
     if (kinds.length > 0 && perspective) summary += ` Overlay ${kinds.join(' + ')} not drawn: it needs an orthographic view.`;
     else if (kinds.length > 0) {
       const isolated = params.isolate === undefined ? undefined : typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
-      const drawn = appendCageNetOverlays(svg, doc, base, orderedEntities(scene), kinds, isolated);
+      const keep = cutKeep(options.cut);
+      const drawn = appendCageNetOverlays(svg, doc, base, orderedEntities(scene), kinds, isolated, {
+        ports: { pointClouds: ctx?.pointClouds ?? null },
+        options: overlayOptions.options,
+        ...(keep === undefined ? {} : { cutKeep: keep }),
+        ...(style.highlight === null ? {} : { dim: true }),
+      });
       svg = drawn.svg;
       overlays = drawn.stats;
       for (const kind of kinds) {
+        const note = drawn.stats[kind]?.detail?.['note'];
+        if (typeof note === 'string') summary += ` Overlay ${kind}: ${note}`;
         const failed = drawn.stats[kind]?.detail?.['failed'];
         if (failed !== undefined) summary += ` Overlay ${kind} failed: ${String(failed)}.`;
       }

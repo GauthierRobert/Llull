@@ -5,6 +5,7 @@ import { execute } from '@core/commands/registry';
 import { installPlugin, pluginRenderOverlays } from '@core/plugins/host';
 import type { CadPlugin } from '@core/plugins/plugin';
 import type { RenderOverlay } from '@core/model/renderOverlay';
+import { z } from 'zod';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 
@@ -107,5 +108,41 @@ describe('CadPlugin.renderOverlays', () => {
     render(second.document, { overlay: 'test_overlay', isolate: b });
     expect(calls.at(-1)?.entityIds).toEqual([b]);
     expect(calls.at(-1)?.only).toEqual([b]);
+  });
+
+  it('paramsSchema: the overlayOptions entry of the kind is validated (defaults applied) and handed to draw as view.options; invalid, unknown or unrequested entries are CMD_INVALID_PARAMS with a path', () => {
+    const seen: unknown[] = [];
+    const withOptions: CadPlugin = {
+      name: 'test-overlay-options',
+      toolset: 'test',
+      commands: [],
+      renderOverlays: [
+        {
+          kind: 'test_options',
+          paramsSchema: z.object({ level: z.number().int().default(3) }),
+          draw: (_doc, view) => {
+            seen.push(view.options);
+            return { svg: [], stats: { entities: [], lines: 0, points: 0, detail: { note: 'drawn with options' } } };
+          },
+        },
+      ],
+    };
+    installPlugin(withOptions);
+    const ok = render(doc, { overlay: 'test_options', overlayOptions: { test_options: {} } });
+    expect(ok.error, ok.summary).toBeUndefined();
+    expect(seen.at(-1)).toEqual({ level: 3 });
+    expect(ok.summary).toContain('Overlay test_options: drawn with options');
+    render(doc, { overlay: 'test_options' });
+    expect(seen.at(-1)).toBeUndefined();
+    const bad = render(doc, { overlay: 'test_options', overlayOptions: { test_options: { level: 'x' } } });
+    expect(bad.error?.code).toBe('CMD_INVALID_PARAMS');
+    expect(bad.error?.paths).toEqual(['overlayOptions.test_options.level']);
+    expectNoOp(bad, doc);
+    expect(render(doc, { overlay: 'test_options', overlayOptions: { nope: {} } }).error?.paths).toEqual(['overlayOptions.nope']);
+    expect(render(doc, { overlayOptions: { test_options: {} } }).error?.paths).toEqual(['overlayOptions.test_options']);
+    installPlugin(plugin('test-overlay-ok', 'test_overlay'));
+    expect(render(doc, { overlay: 'test_overlay', overlayOptions: { test_overlay: {} } }).error?.paths).toEqual([
+      'overlayOptions.test_overlay',
+    ]);
   });
 });
