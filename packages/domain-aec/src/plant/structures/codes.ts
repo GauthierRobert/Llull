@@ -28,22 +28,18 @@ const REMEDIATION = {
     'Give climbHeight so that base + climbHeight reaches the top of a slab or grating within 50 mm and within 600 mm in plan of the ladder, or attachTo = the id of that surface.',
   STA_LADDER_PITCH_INFEASIBLE:
     'No uniform pitch satisfies every requested ruleset for this height: change climbHeight (or attachTo), pass rulesets with one ruleset, or give rungPitch and accept the finding.',
-  STA_LADDER_PITCH_OUT_OF_RANGE:
-    'delete_building_element the ladder and add_ladder again with rungPitchMax (or no rungPitch) so the pitch is uniform within the range.',
-  STA_LADDER_WIDTH: 'delete_building_element the ladder and add_ladder again with a larger clearWidth.',
+  STA_LADDER_PITCH_OUT_OF_RANGE: 'update_ladder { rungPitchMax } re-spaces the rungs so the pitch is uniform within the range.',
+  STA_LADDER_WIDTH: 'update_ladder { clearWidth } to at least the limit.',
   STA_LADDER_BACK_CLEARANCE:
     'Move the ladder away from the object behind it (delete_building_element, add_ladder with another base), or move the object.',
-  STA_LADDER_RAIL_EXTENSION: 'delete_building_element the ladder and add_ladder again with a larger railExtension.',
-  STA_LADDER_FALL_PROTECTION_MISSING:
-    'delete_building_element the ladder and add_ladder again with fallProtection cage, ladder_safety_system or pfas as the rulesets allow (leave it unset to take the default).',
-  STA_LADDER_CAGE_NOT_PRIMARY: 'delete_building_element the ladder and add_ladder again with fallProtection ladder_safety_system or pfas.',
+  STA_LADDER_RAIL_EXTENSION: 'update_ladder { railExtension } to at least the limit.',
+  STA_LADDER_FALL_PROTECTION_MISSING: 'update_ladder { fallProtection } cage, ladder_safety_system or pfas as the rulesets allow.',
+  STA_LADDER_CAGE_NOT_PRIMARY: 'update_ladder { fallProtection: "ladder_safety_system" } (or "pfas").',
   STA_LADDER_CAGE_RETROFIT:
     'Plan the retrofit of the existing cage before 2036-11-18 (the date is under a proposed repeal); a reviewer decides, nothing to change in the model.',
-  STA_LADDER_CAGE_START: 'delete_building_element the ladder and add_ladder again with cage.startHeight inside the allowed band.',
-  STA_LADDER_CAGE_GEOMETRY:
-    'delete_building_element the ladder and add_ladder again with cage.hoopSpacing / cage.diameter inside the limits.',
-  STA_LADDER_LANDING_INTERVAL:
-    'delete_building_element the ladder and add_ladder again with landings (leave landings unset to take the generated ones).',
+  STA_LADDER_CAGE_START: 'update_ladder { cage: { startHeight } } inside the allowed band.',
+  STA_LADDER_CAGE_GEOMETRY: 'update_ladder { cage: { hoopSpacing, diameter } } inside the limits.',
+  STA_LADDER_LANDING_INTERVAL: 'update_ladder { landings } so no stretch between landings is longer than the limit.',
   STA_EQUIPMENT_NOT_VESSEL:
     'Pass the id of a vertical vessel (add_equipment shape vertical_vessel, or a plant vertical vessel); for any other deck use add_access_platform.',
   STA_OUTSIDE_SHELL: 'Give an elevation above the vessel base (level-relative) and not above its top: 0 < elevation <= the vessel height.',
@@ -60,11 +56,13 @@ const REMEDIATION = {
   STA_RACK_STALE:
     'The pipe rack no longer matches the parameters it was derived from (a part was changed outside the generator): update_pipe_rack { assemblyId } re-derives it (ids kept); the reason is in the finding.',
   STA_STAIR_BLONDEL:
-    'Change riserCount or treadDepth of the stair (a steel stair: delete it and add_steel_stair again with another riserMax / going) so that 2 x riser + going is within the ISO range.',
+    'Change riserCount or treadDepth of the stair (a steel stair: update_steel_stair { riserMax, going }) so that 2 x riser + going is within the ISO range.',
   STA_STAIR_RISER: 'Increase riserCount (steel stair: lower riserMax) so the riser height drops under the limit.',
   STA_STAIR_TREAD: 'Increase treadDepth (steel stair: going) to at least the limit.',
   STA_STAIR_ANGLE: 'Change riserCount or treadDepth (steel stair: riserMax / going) so the pitch angle is within the limit.',
-  STA_STAIR_WIDTH: 'Increase the stair width to at least the limit (steel stair: delete it and add_steel_stair again with a larger width).',
+  STA_STAIR_WIDTH: 'Increase the stair width to at least the limit (steel stair: update_steel_stair { width }).',
+  STA_STAIR_HEADROOM:
+    'Raise the obstruction named in the finding location above the stair, or lower the stair (delete it and add_steel_stair again with another start or toSurfaceId): the free height over the pitch line must reach the limit.',
   STA_STAIR_FLIGHT_RISE:
     'Add an intermediate landing (add_stair landingAt, add_steel_stair landingEvery) so no flight rises more than the limit.',
   STA_EDGE_UNPROTECTED:

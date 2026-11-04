@@ -18,14 +18,14 @@ interface LadderMeasures {
   readonly section: number;
 }
 
-const measuresOf = (doc: CadDocument, ladder: LadderElement): LadderMeasures => {
+const measuresOf = (doc: CadDocument, ladder: LadderElement, backClearance: number): LadderMeasures => {
   const heights = [0, ...ladder.landings, ladder.climbHeight];
   const section = Math.max(...heights.slice(1).map((height, index) => height - (heights[index] as number)));
   return {
     height: toMm(doc, ladder.climbHeight),
     pitch: toMm(doc, ladder.rungPitch),
     clearWidth: toMm(doc, ladder.clearWidth),
-    backClearance: toMm(doc, ladder.backClearance),
+    backClearance: toMm(doc, backClearance),
     railExtension: toMm(doc, ladder.railExtension),
     section: toMm(doc, section),
   };
@@ -66,10 +66,6 @@ export function ladderRules(ladders: readonly LadderElement[], rulesets: readonl
 /** Rows of the ladder rules that no check reads, listed in `notEvaluated`. */
 export const LADDER_RULES_NOT_EVALUATED: ReadonlyArray<{ readonly ruleId: string; readonly reason: string }> = [
   { ruleId: 'ISO-LAD-FLIGHT', reason: 'grade C row: not loaded; the sources disagree on the flight height' },
-  {
-    ruleId: 'ladder-back-clearance',
-    reason: 'measured once when the ladder was added (rays from the rung centre); a moved obstacle is not re-measured',
-  },
 ];
 
 function fallProtectionFindings(ladder: LadderElement, measures: LadderMeasures, rulesets: readonly RulesetName[]): Finding[] {
@@ -145,8 +141,14 @@ function cageFindings(ladder: LadderElement, doc: CadDocument, rulesets: readonl
   });
 }
 
-export function checkLadder(doc: CadDocument, ladder: LadderElement, rulesets: readonly RulesetName[]): Finding[] {
-  const measures = measuresOf(doc, ladder);
+/** `backClearance` = the back clearance measured against the model now (document units); the stored value when omitted. */
+export function checkLadder(
+  doc: CadDocument,
+  ladder: LadderElement,
+  rulesets: readonly RulesetName[],
+  backClearance: number = ladder.backClearance,
+): Finding[] {
+  const measures = measuresOf(doc, ladder, backClearance);
   const found: Finding[] = RANGE_CHECKS.flatMap((check) => {
     const rule = ruleById(check.ruleId);
     const finding = rulesets.includes(rule.ruleset) ? breachFinding(rule, check.code, ladder.id, check.measure(measures)) : null;

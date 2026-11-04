@@ -9,7 +9,7 @@ import type { Vec2 } from '@core/model/vectors';
 import { DxfWriter, assembleDxf } from '@lib/dxfWriter';
 import { escapeXml } from '@lib/escapeXml';
 
-export type IsoLayer = 'ISO-PIPE' | 'ISO-SYMB' | 'ISO-DIM' | 'ISO-TEXT' | 'ISO-TABLE' | 'ISO-FRAME';
+export type IsoLayer = 'ISO-PIPE' | 'ISO-SYMB' | 'ISO-DIM' | 'ISO-TEXT' | 'ISO-TABLE' | 'ISO-FRAME' | 'ISO-REV';
 
 export type IsoPrimitive =
   | { readonly t: 'line'; readonly layer: IsoLayer; readonly a: Vec2; readonly b: Vec2; readonly gap?: true }
@@ -32,12 +32,13 @@ const CLASS: Readonly<Record<IsoLayer, string>> = {
   'ISO-TEXT': 'iso-text',
   'ISO-TABLE': 'iso-table',
   'ISO-FRAME': 'iso-frame',
+  'ISO-REV': 'iso-rev',
 };
 
 const STYLE =
   '.iso-pipe{fill:none;stroke:#000;stroke-width:0.5}.iso-symb{fill:none;stroke:#000;stroke-width:0.3}.iso-dim{fill:none;stroke:#000;stroke-width:0.13}' +
   '.iso-table{fill:none;stroke:#000;stroke-width:0.15}.iso-frame{fill:none;stroke:#000;stroke-width:0.4}.iso-gap{stroke:#fff;stroke-width:1.6}' +
-  '.iso-fill{fill:#000}text{fill:#000}';
+  '.iso-rev{fill:none;stroke:#d00;stroke-width:0.35}.iso-fill{fill:#000}text{fill:#000}';
 
 /** SVG document of a sheet of `width` x `height` mm. */
 export function svgOf(primitives: readonly IsoPrimitive[], width: number, height: number, title: string): string {
@@ -80,6 +81,7 @@ const LAYER_COLORS: Readonly<Record<string, number>> = {
   'ISO-TEXT': 7,
   'ISO-TABLE': 8,
   'ISO-FRAME': 7,
+  'ISO-REV': 1,
 };
 
 const ANCHOR = { start: 'left', middle: 'center', end: 'right' } as const;

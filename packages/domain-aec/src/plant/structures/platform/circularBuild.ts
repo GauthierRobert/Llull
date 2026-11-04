@@ -128,7 +128,12 @@ export function buildCircularPlatform(
       building,
       slots.grating.slice(index, index + 1),
       partBase,
-      { topOffset: spec.elevation, gratingType: type.name, bearingBarAngle: segment.barAngle },
+      {
+        topOffset: spec.elevation,
+        gratingType: type.name,
+        bearingBarAngle: segment.barAngle,
+        ...(spec.imposedLoadKPa === undefined ? {} : { imposedLoadKPa: spec.imposedLoadKPa }),
+      },
       [segment],
     );
     building = placed.building;

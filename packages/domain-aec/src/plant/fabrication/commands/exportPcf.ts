@@ -6,6 +6,7 @@ import { buildGraph, selectRuns } from '../../piping/graph';
 import { getPiping, refuse } from '../../piping/model';
 import { isoIssue, refuseIso } from '../codes';
 import { splitComponents } from '../fieldWelds';
+import { networkOpenEnds } from '../joints';
 import { legacyLines, legacyNetwork } from '../legacyNetwork';
 import { fieldWeldsOf } from '../lineNetwork';
 import type { IsoIssue, PcfLineData, PcfUnit, PcfUnits, PipingNetwork } from '../model';
@@ -80,7 +81,7 @@ export const exportPcf = defineCommand({
     '(elbow butt weld ELBW / socket weld ELSW, tee TEBW, weld neck flange FLWN, eccentric reducer REBW); other components are written without one and listed in data.files[].missingSkey - add the key ' +
     'in your isometric tool, or pass strictSkey to refuse instead. A stub-in has no PCF component (listed in skipped). Field welds added with add_field_weld are written as WELD records (SKEY WS / WF, ERECTION-ITEM) between the two pipe pieces. With includeSupports the pipe supports of a routed or legacy line (add_pipe_support) are written as SUPPORT records after the pipe they lie on: CO-ORDS on the centreline, UNIQUE-COMPONENT-IDENTIFIER the support id, SUPPORT-NAME the mark and SUPPORT-TYPE SHOE / GUIDE / ANCHOR / HANGER (these two attributes are not in the confirmed PCF subset; no SKEY is invented); an imported line always writes the SUPPORT records it holds. ' +
     'Give lineIds (a routed line id, a PCF line number or a legacy line number), or omit for every line. units mm (default) or inch. ' +
-    'Returns data = { files: [{ name, content, sha256, componentCount, countsByType, source, skipped, missingSkey, bolts, openEnds, supports: [{ id, mark, type, coordsMm }], units, warnings }], count, reviewRequired }; save it with llull export_pcf --save <dir> (one file per line). ' +
+    'Returns data = { files: [{ name, content, sha256, componentCount, countsByType, source, skipped, missingSkey, bolts, openEnds: [{ partId, position, dn }] (free connection points: ports connected to nothing on a routed line, points no other component meets on an imported or legacy line; dn = bore in mm), supports: [{ id, mark, type, coordsMm }], units, warnings }], count, reviewRequired }; save it with llull export_pcf --save <dir> (one file per line). ' +
     'Refusals: ISO_LINE_NOT_FOUND, ISO_NO_PIPING, ISO_SKEY_MISSING (strictSkey), the RTE_* code of a run that no longer derives (fix it first), MAT_EXPORT_CONTROLLED. Does not modify the document. Next: check_piping before handing the file over; import_pcf reads it back.',
   params: z.object({
     lineIds: z
@@ -272,9 +273,12 @@ export const exportPcf = defineCommand({
             : [],
         ),
         bolts: source.route?.bolts ?? [],
-        openEnds: graph.openEnds
-          .filter((end) => piping.lines[end.lineId]?.lineNumber === source.data.lineId)
-          .map((end) => ({ partId: end.partId, position: end.position, dn: end.dn })),
+        openEnds:
+          source.network.source === 'route'
+            ? graph.openEnds
+                .filter((end) => piping.lines[end.lineId]?.lineNumber === source.data.lineId)
+                .map((end) => ({ partId: end.partId, position: end.position, dn: end.dn }))
+            : networkOpenEnds(source.network),
         units: effective[index],
         warnings,
       };
