@@ -21,8 +21,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PST_COMPONENT_UNSUPPORTED: 'Move the valve, flange or reducer onto straight pipe between two nodes (not across a bend).',
   PST_COMPONENT_NOT_FOUND:
     'Name an inline valve or reducer of an RTE run of the model (piping_takeoff lists them), or a declared record id.',
-  PST_RESTRAINT_OBLIQUE:
-    'A lateral guide needs a pipe along a horizontal global axis or a vertical one; add a translational restraint on an axis instead.',
+  PST_DISPLACEMENT_NOT_ANCHORED:
+    'An imposed displacement moves an anchor: add an anchor at that node (add_stress_restraint kind anchor) or place it on an existing anchor.',
+  PST_SIF_NOT_FOUND: 'Pass the id returned by set_sif_override (data.overrideId).',
   PST_UNSTABLE: 'Add an anchor or a guide at the listed node (add_pipe_support type anchor, or add_stress_restraint).',
   PST_MODEL_TOO_LARGE: 'Analyse fewer pipes at once or raise maxElementLengthMm.',
   PST_NONLINEAR_NOT_CONVERGED: 'Remove the gap or one-way action at the listed restraints, or make them two-way, then re-run.',
@@ -43,6 +44,12 @@ const FINDING_REMEDIATION: Readonly<Record<string, string>> = {
   PST_SUSTAINED_OVERSTRESS: 'Add supports near the node (shorter span) or reduce the weight.',
   PST_EXPANSION_OVERSTRESS: 'Add flexibility (loop or offset), or move guides and line stops.',
   PST_OCCASIONAL_OVERSTRESS: 'Add guides or restraints for the occasional direction.',
+  PST_HYDROTEST_OVERSTRESS:
+    'Support the line for the water-filled weight (temporary supports) or lower the test pressure; check the stated hydrotest allowable.',
+  PST_SIF_OVERRIDE:
+    'A user SIF replaces the code value at that node: keep its source note current and have a qualified engineer confirm it.',
+  PST_SIF_PLANE_UNKNOWN:
+    'Place the override on a bend or a tee (where the plane is known) or give equal in-plane and out-of-plane factors.',
   PST_SUPPORT_LIFTOFF: 'Move or add a support, or use a hanger or spring.',
   PST_DISPLACEMENT_LIMIT: 'Check clearances at the listed nodes.',
   PST_CASE_INCOMPLETE: 'Add a sustained (SUS) and an expansion (EXP) load case; preset b31.3-default does it.',

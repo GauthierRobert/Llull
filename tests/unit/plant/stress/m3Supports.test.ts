@@ -132,7 +132,7 @@ describe('pipe supports map to restraints', () => {
     expect(Math.abs(guide?.forceN[2] as number)).toBeLessThan(1e-6);
   });
 
-  it('a guide on a pipe oblique in plan is PST_RESTRAINT_OBLIQUE (rotated restraints arrive with M5)', () => {
+  it('a guide on a pipe oblique in plan is an oblique restraint (M5a): it reacts horizontally, perpendicular to the pipe', () => {
     const s = supported(
       [
         { type: 'anchor', at: [0, 0, 3000] },
@@ -144,8 +144,10 @@ describe('pipe supports map to restraints', () => {
       ],
     );
     const d = cases(s.doc, s.id, [{ name: 'W', type: 'SUS', basic: ['W'] }]);
-    const refusal = expectRefusal(d, 'analyze_pipe_stress', { modelId: s.id }, 'PST_RESTRAINT_OBLIQUE');
-    expect(refusal.error?.ids).toEqual([s.supportIds[1]]);
+    const guide = run(d, s.id).details?.reactions?.find((load) => load.supportIds.includes(s.supportIds[1] as string));
+    // weight only: the lateral guide carries nothing; its (oblique) reaction is zero and the vertical rest takes the load
+    expect(Math.hypot(guide?.forceN[0] as number, guide?.forceN[1] as number)).toBeLessThan(1e-6);
+    expect(guide?.forceN[2] as number).toBeGreaterThan(0);
   });
 });
 
@@ -207,7 +209,7 @@ describe('extra restraints', () => {
     expect(analyzed(d, id).findings.map((finding) => finding.code)).toContain('PST_RESTRAINT_OVERRIDDEN');
   });
 
-  it('a guide restraint on an oblique pipe is refused like a guide support', () => {
+  it('a guide restraint on an oblique pipe analyses (oblique contact, two-way) and carries no load under weight alone', () => {
     const { doc: pipes, id: pipeId } = withPipe(
       baseDoc(),
       [
@@ -219,12 +221,9 @@ describe('extra restraints', () => {
     const { doc, id } = withModel(pipes, [pipeId]);
     let d = anchorAt(conditioned(doc, id), id, pipeId, 0);
     d = apply(d, 'add_stress_restraint', { modelId: id, at: { pipeId, atMm: 4000 }, kind: 'guide' });
-    expectRefusal(
-      cases(d, id, [{ name: 'W', type: 'SUS', basic: ['W'] }]),
-      'analyze_pipe_stress',
-      { modelId: id },
-      'PST_RESTRAINT_OBLIQUE',
-    );
+    const result = analyzed(cases(d, id, [{ name: 'W', type: 'SUS', basic: ['W'] }]), id);
+    expect(result.status).toBeDefined();
+    expect(result.findings.map((finding) => finding.code)).not.toContain('PST_NONLINEAR_NOT_CONVERGED');
   });
 
   it('stored restraints and forces that no longer fit the model are coded refusals at analysis, not silent', () => {

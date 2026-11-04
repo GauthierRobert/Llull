@@ -7,8 +7,9 @@ import type { SourceComponent } from './components';
 import type { JunctionFitting } from './junctions';
 import { buildLayout, type LayoutComponent } from './layout';
 import type { Attachment, Layout, LayoutFailure } from './layoutTypes';
+import { applySifOverrides } from './sifOverrides';
 import { mapRestraints, type RestraintSet } from './restraints';
-import type { StressComponent, StressModel } from './schema';
+import type { StressComponent, StressModel, StressRestraint } from './schema';
 import { arcOf, meanSection, pointAtArc, sectionAt, type SectionStep } from './sections';
 import { resolveSources, type SourcePipe, type Sources } from './sources';
 
@@ -24,6 +25,8 @@ export interface BuiltModel {
     readonly force: readonly [number, number, number];
     readonly moment: readonly [number, number, number];
   }[];
+  /** Imposed displacements of anchor nodes: 6 values (mm, rad). */
+  readonly displacements: readonly { readonly name: string; readonly node: number; readonly values: readonly number[] }[];
   /** Stated weights of tees / olets (kg) at their junction node. */
   readonly pointWeights: readonly { readonly node: number; readonly kg: number }[];
   readonly warnings: readonly { readonly code: string; readonly message: string; readonly ids: readonly string[] }[];
@@ -128,6 +131,7 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
   const walls = new Map<string, number>();
   const steps = new Map<string, SectionStep[]>();
   const corrosion = model.conditions?.corrosionAllowanceMm ?? 0;
+  const millFactor = 1 - (model.conditions?.millTolerancePct ?? 0) / 100;
   const checkWall = (pipe: SourcePipe, wall: number | null, odMm: number): LayoutFailure | null => {
     if (wall === null || !(wall > 0) || 2 * wall >= odMm)
       return failure(
@@ -138,10 +142,10 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
         [pipe.id],
         ['conditions.wallMm'],
       );
-    if (!(wall - corrosion > MIN_CORRODED_WALL_MM))
+    if (!(wall * millFactor - corrosion > MIN_CORRODED_WALL_MM))
       return failure(
         'PST_CORROSION_EXCEEDS_WALL',
-        `pipe ${pipe.id}: corrosion allowance ${corrosion} mm leaves ${(wall - corrosion).toFixed(3)} mm of the ${wall} mm wall (needs more than ${MIN_CORRODED_WALL_MM} mm)`,
+        `pipe ${pipe.id}: corrosion allowance ${corrosion} mm leaves ${(wall * millFactor - corrosion).toFixed(3)} mm of the ${wall} mm wall (mill tolerance ${model.conditions?.millTolerancePct ?? 0} %) (needs more than ${MIN_CORRODED_WALL_MM} mm)`,
         [pipe.id],
         ['conditions.corrosionAllowanceMm'],
       );
@@ -203,6 +207,29 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
       );
     attachments.push({ key: `force:${index}`, pipeId: pipe.id, point });
   }
+  const locate = (at: StressRestraint['at'], key: string, label: string): Attachment | LayoutFailure => {
+    if ('supportId' in at) {
+      const support = sources.supports.find((candidate) => candidate.id === at.supportId);
+      return support === undefined
+        ? failure('PST_SUPPORT_NOT_FOUND', `${label}: no support ${at.supportId} on the model pipes`, [label])
+        : { key, pipeId: support.pipeId, point: support.point };
+    }
+    const pipe = lookup(at.pipeId);
+    const point = pipe === undefined ? null : pointAtArc(pipe.points, at.atMm);
+    return pipe === undefined || point === null
+      ? failure('PST_POINT_OFF_PIPE', `${label}: pipe ${at.pipeId} is not in the model`, [label], ['at'])
+      : { key, pipeId: pipe.id, point };
+  };
+  for (const [index, moved] of model.displacements.entries()) {
+    const placed = locate(moved.at, `displacement:${index}`, `displacement ${moved.name}`);
+    if ('ok' in placed) return placed;
+    attachments.push(placed);
+  }
+  for (const override of model.sifOverrides) {
+    const placed = locate(override.at, `sif:${override.id}`, `SIF override ${override.id}`);
+    if ('ok' in placed) return placed;
+    attachments.push(placed);
+  }
   const set = ruleSetOf(model.rule);
   const components = layoutComponents(model, sources, steps);
   if ('ok' in components) return components;
@@ -216,23 +243,50 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
     fittingOf: (branchPipeId) => fittingChoice(model, sources, branchPipeId),
   });
   if ('ok' in layout) return layout;
-  const restraints = mapRestraints(model, sources.supports, layout);
+  const overridden = applySifOverrides(
+    layout.elements,
+    model.sifOverrides.map((override) => ({
+      id: override.id,
+      node: (layout.attached.get(`sif:${override.id}`) as { node: number }).node,
+      ii: override.sifInPlane,
+      io: override.sifOutOfPlane,
+      flexibility: override.flexibility,
+      source: override.source,
+    })),
+  );
+  if ('ok' in overridden) return overridden;
+  const finished: Layout = { ...layout, elements: overridden.elements };
+  const restraints = mapRestraints(model, sources.supports, finished);
   if ('ok' in restraints) return restraints;
+  const displacements: BuiltModel['displacements'][number][] = [];
+  for (const [index, moved] of model.displacements.entries()) {
+    const node = (finished.attached.get(`displacement:${index}`) as { node: number }).node;
+    if (!restraints.anchors.some((anchor) => anchor.node === node))
+      return failure(
+        'PST_DISPLACEMENT_NOT_ANCHORED',
+        `imposed displacement ${moved.name} acts at node N${node + 1}, which is not an anchor`,
+        [moved.name],
+        [`displacements.${index}`],
+      );
+    const rotation = moved.rotationDeg ?? [0, 0, 0];
+    displacements.push({ name: moved.name, node, values: [...moved.translationMm, ...rotation.map((deg) => (deg * Math.PI) / 180)] });
+  }
   const forces = model.forces.map((force, index) => ({
     name: force.name,
-    node: (layout.attached.get(`force:${index}`) as { node: number }).node,
+    node: (finished.attached.get(`force:${index}`) as { node: number }).node,
     force: force.forceN,
     moment: force.momentNmm ?? ([0, 0, 0] as const),
   }));
-  const pointWeights = layout.junctions.flatMap((junction) => {
+  const pointWeights = finished.junctions.flatMap((junction) => {
     const stored = model.components.find((entry) => 'branchPipeId' in entry.target && entry.target.branchPipeId === junction.branchPipeId);
     return stored?.weightKg === undefined || stored.weightKg === 0 ? [] : [{ node: junction.node, kg: stored.weightKg }];
   });
-  const assumed = layout.junctions.filter((junction) => fittingChoice(model, sources, junction.branchPipeId).origin === 'assumed');
+  const assumed = finished.junctions.filter((junction) => fittingChoice(model, sources, junction.branchPipeId).origin === 'assumed');
   const unweighed = components.list.filter((component) => component.kind !== 'reducer' && component.weightKg === null);
   const reducers = components.list.filter((component) => component.kind === 'reducer');
   const warnings = [
     ...restraints.warnings,
+    ...overridden.warnings,
     ...assumed.map((junction) => ({
       code: 'PST_TEE_FITTING_ASSUMED',
       message: `branch ${junction.branchPipeId} on ${junction.headerPipeId} is modelled as an unreinforced fabricated tee (set_stress_component fitting to change it)`,
@@ -256,7 +310,7 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
             ids: reducers.map((component) => component.key),
           },
         ]),
-    ...layout.sharpCorners.map((id) => ({
+    ...finished.sharpCorners.map((id) => ({
       code: 'PST_SHARP_CORNERS',
       message: `pipe ${id}: corners kept sharp (elbowRadiusFactor 0): k = 1 and i = 1`,
       ids: [id],
@@ -271,5 +325,5 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
         ]
       : []),
   ];
-  return { sources, layout, restraints, walls, set, forces, pointWeights, warnings };
+  return { sources, layout: finished, restraints, walls, set, forces, displacements, pointWeights, warnings };
 }

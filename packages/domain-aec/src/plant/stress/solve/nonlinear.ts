@@ -5,7 +5,7 @@
  */
 
 import { analyzeFrame } from '@lib/frame3d/solve';
-import type { FrameCaseResult, FrameLoadCase, FrameModel, FrameRestraint } from '@lib/frame3d/types';
+import type { FrameCaseResult, FrameElement, FrameLoadCase, FrameModel, FramePoint, FrameRestraint } from '@lib/frame3d/types';
 import type { Contact } from '../model/restraints';
 
 /** Stick stiffness of a friction spring: 1e9 N/m = 1e6 N/mm (named, 07 PST §5.5). */
@@ -14,6 +14,10 @@ const MAX_ITERATIONS = 50;
 const FORCE_TOLERANCE = 1e-6;
 const DISPLACEMENT_TOLERANCE = 1e-9;
 const SLIP_MARGIN = 1e-9;
+/** Oblique contact: an axial bar of 1e9 N/mm (about 1e4 times the pipe lateral stiffness) to a fixed ground node 100 mm away along the direction. */
+const OBLIQUE_STIFFNESS = 1e9;
+const OBLIQUE_LENGTH = 100;
+const BAR_NEGLIGIBLE = 1e-9;
 
 export type ContactStatus = 'active' | 'lifted' | 'gap-open' | 'sliding';
 
@@ -53,7 +57,10 @@ const tangentialDofs = (dof: number): number[] => [0, 1, 2].filter((candidate) =
  */
 export function solveWithContacts(
   base: Pick<FrameModel, 'nodes' | 'elements'>,
-  anchors: readonly { readonly node: number }[],
+  anchors: readonly {
+    readonly node: number;
+    /** Imposed displacement per DOF (6), default 0. */ readonly values?: readonly number[] | undefined;
+  }[],
   contacts: readonly Contact[],
   loadCase: FrameLoadCase,
   maxIterations = MAX_ITERATIONS,
@@ -67,11 +74,42 @@ export function solveWithContacts(
   let singleMode = false;
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     const restraints = new Map<number, FrameRestraint>();
-    for (const anchor of anchors) for (let dof = 0; dof < 6; dof++) restraints.set(anchor.node * 6 + dof, { node: anchor.node, dof });
+    for (const anchor of anchors)
+      for (let dof = 0; dof < 6; dof++) restraints.set(anchor.node * 6 + dof, { node: anchor.node, dof, value: anchor.values?.[dof] ?? 0 });
     contacts.forEach((contact, index) => {
+      if (contact.direction !== undefined) return;
       const key = contact.node * 6 + contact.dof;
       if (active[index] && !restraints.has(key))
         restraints.set(key, { node: contact.node, dof: contact.dof, value: -contact.normal * contact.gapMm });
+    });
+    const auxNodes: FramePoint[] = [];
+    const auxElements: FrameElement[] = [];
+    const auxOf = new Map<number, number>();
+    contacts.forEach((contact, index) => {
+      const d = contact.direction;
+      if (d === undefined || !active[index]) return;
+      const at = base.nodes[contact.node] as FramePoint;
+      const auxNode = base.nodes.length + auxNodes.length;
+      auxNodes.push([at[0] + d[0] * OBLIQUE_LENGTH, at[1] + d[1] * OBLIQUE_LENGTH, at[2] + d[2] * OBLIQUE_LENGTH]);
+      auxOf.set(index, base.elements.length + auxElements.length);
+      auxElements.push({
+        a: contact.node,
+        b: auxNode,
+        properties: {
+          youngs: OBLIQUE_STIFFNESS * OBLIQUE_LENGTH,
+          shear: 1e5,
+          area: 1,
+          inertia: BAR_NEGLIGIBLE,
+          torsion: BAR_NEGLIGIBLE,
+          shearArea: 0,
+        },
+      });
+      for (let dof = 0; dof < 6; dof++)
+        restraints.set(auxNode * 6 + dof, {
+          node: auxNode,
+          dof,
+          value: dof < 3 ? -contact.normal * contact.gapMm * (d[dof] as number) : 0,
+        });
     });
     const rigid = new Set(restraints.keys());
     const frictionLoads: NonNullable<FrameLoadCase['nodal']>[number][] = [];
@@ -88,9 +126,10 @@ export function solveWithContacts(
       });
       if (state.mode === 'slip') frictionLoads.push({ node: contact.node, force });
     });
-    const analysis = analyzeFrame({ ...base, restraints: [...restraints.values()] }, [
-      frictionLoads.length === 0 ? loadCase : { ...loadCase, nodal: [...(loadCase.nodal ?? []), ...frictionLoads] },
-    ]);
+    const analysis = analyzeFrame(
+      { nodes: [...base.nodes, ...auxNodes], elements: [...base.elements, ...auxElements], restraints: [...restraints.values()] },
+      [frictionLoads.length === 0 ? loadCase : { ...loadCase, nodal: [...(loadCase.nodal ?? []), ...frictionLoads] }],
+    );
     if (!analysis.ok) {
       const code =
         analysis.code === 'FRAME_UNSTABLE'
@@ -100,17 +139,32 @@ export function solveWithContacts(
             : 'PST_ANALYSIS_FAILED';
       return { ok: false, code, message: analysis.message, nodes: analysis.dofs.map((dof) => dof.node), dofs: analysis.dofs, sources: [] };
     }
-    const result = analysis.cases[0] as FrameCaseResult;
-    if (contacts.length === 0) return { ok: true, result, iterations: 1, contacts: [] };
+    const full = analysis.cases[0] as FrameCaseResult;
+    if (contacts.length === 0) return { ok: true, result: full, iterations: 1, contacts: [] };
+    const result: FrameCaseResult = {
+      ...full,
+      displacements: full.displacements.slice(0, base.nodes.length * 6),
+      reactions: full.reactions.slice(0, base.nodes.length * 6),
+      elementForces: full.elementForces.slice(0, base.elements.length * 12),
+    };
     const forceTolerance = FORCE_TOLERANCE + 1e-9 * result.reactions.reduce((largest, value) => Math.max(largest, Math.abs(value)), 0);
-    const normalForce = contacts.map((contact) => contact.normal * (result.reactions[contact.node * 6 + contact.dof] as number));
+    const normalForce = contacts.map((contact, index) => {
+      if (contact.direction === undefined) return contact.normal * (result.reactions[contact.node * 6 + contact.dof] as number);
+      const bar = auxOf.get(index);
+      return bar === undefined ? 0 : -contact.normal * (full.elementForces[bar * 12] as number);
+    });
+    const along = (contact: Contact): number => {
+      const d = contact.direction;
+      if (d === undefined) return result.displacements[contact.node * 6 + contact.dof] as number;
+      return [0, 1, 2].reduce((sum, i) => sum + (d[i] as number) * (result.displacements[contact.node * 6 + i] as number), 0);
+    };
     const violations: { index: number; size: number; release: boolean }[] = [];
     contacts.forEach((contact, index) => {
       if (active[index]) {
         if ((normalForce[index] as number) < -forceTolerance)
           violations.push({ index, size: -(normalForce[index] as number), release: true });
       } else {
-        const penetration = -contact.gapMm - contact.normal * (result.displacements[contact.node * 6 + contact.dof] as number);
+        const penetration = -contact.gapMm - contact.normal * along(contact);
         if (penetration > DISPLACEMENT_TOLERANCE) violations.push({ index, size: penetration * 1e9, release: false });
       }
     });
@@ -160,6 +214,13 @@ export function solveWithContacts(
       }));
       // a slipping shoe is a constant applied force in the solve; as a support it is the reaction the shoe gives
       const reactions = Float64Array.from(result.reactions);
+      contacts.forEach((contact, index) => {
+        const d = contact.direction;
+        if (d === undefined || !active[index]) return;
+        for (let i = 0; i < 3; i++)
+          reactions[contact.node * 6 + i] =
+            (reactions[contact.node * 6 + i] as number) + (normalForce[index] as number) * contact.normal * (d[i] as number);
+      });
       for (const load of frictionLoads)
         for (let i = 0; i < 3; i++) reactions[load.node * 6 + i] = (reactions[load.node * 6 + i] as number) + (load.force?.[i] ?? 0);
       return { ok: true, result: { ...result, reactions }, iterations: iteration, contacts: outcome };

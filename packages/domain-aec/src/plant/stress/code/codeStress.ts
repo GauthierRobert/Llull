@@ -14,7 +14,7 @@ import { computeAllowables } from './allowables';
 
 export interface StressRow {
   readonly case: string;
-  readonly caseType: 'OPE' | 'SUS' | 'EXP' | 'OCC';
+  readonly caseType: 'OPE' | 'SUS' | 'EXP' | 'OCC' | 'HYD';
   readonly element: string;
   readonly pipeId: string;
   /** Node id (`N3`) at an element end, null at an interior station. */
@@ -104,6 +104,7 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
     localAxes(built.layout.nodes[element.a] as FramePoint, built.layout.nodes[element.b] as FramePoint),
   );
   const b311 = set.code === 'B31.1';
+  const millFactor = 1 - (conditions.millTolerancePct ?? 0) / 100;
   const rows: StressRow[] = [];
   const sustainedAtNode = new Map<string, number>();
 
@@ -127,7 +128,10 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
               (r) => (R[r * 3] as number) * normal[0] + (R[r * 3 + 1] as number) * normal[1] + (R[r * 3 + 2] as number) * normal[2],
             );
       const bendNormal = toLocal(element.bend?.normal);
-      const wall = expansion ? element.wallMm : element.wallMm - conditions.corrosionAllowanceMm;
+      // wall of the stress section: nominal for the displacement range; less the mill under-tolerance (when chosen) and the corrosion allowance for sustained and occasional; hydrotest: the new pipe, less the mill tolerance only
+      const wallOf = (nominal: number): number =>
+        expansion ? nominal : nominal * millFactor - (state.type === 'HYD' ? 0 : conditions.corrosionAllowanceMm);
+      const wall = wallOf(element.wallMm);
       const od = element.odMm;
       const inner = od - 2 * wall;
       const area = (Math.PI / 4) * (od ** 2 - inner ** 2);
@@ -142,11 +146,7 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
         const nLocal = endSif === undefined ? bendNormal : toLocal(endSif.normal);
         // the branch end of a tee: effective section modulus Z_e = pi r2^2 T_e, T_e the lesser of the header wall and i_i x branch wall (B31.3 319.4.4)
         const Z =
-          endSif?.headerWallMm === undefined
-            ? pipeZ
-            : Math.PI *
-              ((od - wall) / 2) ** 2 *
-              Math.min(endSif.headerWallMm - (expansion ? 0 : conditions.corrosionAllowanceMm), ii * wall);
+          endSif?.headerWallMm === undefined ? pipeZ : Math.PI * ((od - wall) / 2) ** 2 * Math.min(wallOf(endSif.headerWallMm), ii * wall);
         const bending = Math.hypot(s.my, s.mz);
         const inPlane = nLocal === null ? bending : Math.abs(s.my * (nLocal[1] as number) + s.mz * (nLocal[2] as number));
         const outPlane = nLocal === null ? 0 : Math.sqrt(Math.max(0, bending ** 2 - inPlane ** 2));
@@ -187,8 +187,22 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
             stress = Math.sqrt((Math.abs(axial) + Sb) ** 2 + (2 * (s.torsion / (2 * Z))) ** 2);
             equation = 'S_L = sqrt((|S_a| + S_b)^2 + (2 S_t)^2)';
           }
-          limit = state.type === 'OCC' ? base.occasionalMPa : material.ShMPa;
-          rule = state.type === 'OCC' ? (b311 ? 'B311-OCC' : 'B313-OCC') : 'B313-SA-1A';
+          limit =
+            state.type === 'OCC'
+              ? base.occasionalMPa
+              : state.type === 'HYD'
+                ? (conditions.hydro?.allowableMPa ?? Number.NaN)
+                : material.ShMPa;
+          rule =
+            state.type === 'OCC'
+              ? b311
+                ? 'B311-OCC'
+                : 'B313-OCC'
+              : state.type === 'HYD'
+                ? b311
+                  ? 'B311-HYD'
+                  : 'B313-HYD'
+                : 'B313-SA-1A';
           if (state.type === 'SUS' && node !== null) sustainedAtNode.set(node, Math.max(sustainedAtNode.get(node) ?? 0, stress));
         }
         out.push({
@@ -211,7 +225,8 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
   };
 
   // OPE reports displacements and loads; the code limits apply to the sustained, occasional and expansion states
-  for (const state of states) if (state.type === 'SUS' || state.type === 'OCC') rows.push(...evaluate(state, false));
+  for (const state of states)
+    if (state.type === 'SUS' || state.type === 'OCC' || state.type === 'HYD') rows.push(...evaluate(state, false));
   for (const state of states) if (state.type === 'EXP') rows.push(...evaluate(state, true));
   return {
     rows,

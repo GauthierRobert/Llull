@@ -13,7 +13,7 @@ export const SOLVER_VERSION = 'frame3d-1 contacts-1';
 
 export interface CaseState {
   readonly name: string;
-  readonly type: 'OPE' | 'SUS' | 'EXP' | 'OCC';
+  readonly type: 'OPE' | 'SUS' | 'EXP' | 'OCC' | 'HYD';
   /** 6 per node, global. */
   readonly displacements: Float64Array;
   readonly reactions: Float64Array;
@@ -83,8 +83,15 @@ export function solveModel(
   built: BuiltModel,
   conditions: OperatingConditions,
 ): SolveSuccess | SolveFailure {
-  const problems = loadCaseProblems(model.loadCases, model.forces);
+  const problems = loadCaseProblems(model.loadCases, model.forces, model.displacements);
   if (model.loadCases.length === 0) problems.push(['loadCases', 'no load cases: set_stress_load_cases']);
+  model.loadCases.forEach((loadCase, index) => {
+    if (
+      conditions.hydro === undefined &&
+      (loadCase.type === 'HYD' || (loadCase.basic ?? []).some((name) => name === 'WW' || name === 'HP'))
+    )
+      problems.push([`cases.${index}`, `case ${loadCase.name} needs the hydrotest conditions (set_pipe_operating_conditions hydrotest)`]);
+  });
   if (problems.length > 0)
     return {
       ok: false,
@@ -94,7 +101,6 @@ export function solveModel(
       paths: problems.map(([path]) => path),
     };
   const frame: Pick<FrameModel, 'nodes' | 'elements'> = { nodes: built.layout.nodes, elements: frameElements(built, conditions) };
-  const anchors = built.restraints.anchors;
   const warnings: { code: string; message: string; ids: string[] }[] = [...built.warnings.map((w) => ({ ...w, ids: [...w.ids] }))];
   const parts = componentCount(frame.nodes.length, frame.elements);
   if (parts > 1)
@@ -114,6 +120,7 @@ export function solveModel(
         message: `case ${loadCase.name}: ${[...new Set(loads.unverified)].join('; ')}`,
         ids: [],
       });
+    const anchors = built.restraints.anchors.map((anchor) => ({ node: anchor.node, values: loads.prescribed.get(anchor.node) }));
     const solved = solveWithContacts(frame, anchors, built.restraints.contacts, loads.load);
     if (!solved.ok) {
       const named = solved.dofs.map((dof) => `${nodeId(dof.node)} ${DOF_NAMES[dof.dof]}`);

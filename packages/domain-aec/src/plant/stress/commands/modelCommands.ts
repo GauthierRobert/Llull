@@ -132,6 +132,8 @@ export const createStressModel = defineCommand({
       loadCases: [],
       forces: [],
       restraints: [],
+      displacements: [],
+      sifOverrides: [],
       components: [],
     };
     return {

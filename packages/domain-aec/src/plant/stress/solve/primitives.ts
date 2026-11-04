@@ -26,6 +26,8 @@ export interface CaseLoads {
   readonly pressureBar: number;
   /** Largest metal temperature of the thermal primitives, degC (null when none). */
   readonly maxTempC: number | null;
+  /** Imposed displacements of anchor nodes (D primitives): 6 values per node (mm, rad), summed per node. */
+  readonly prescribed: ReadonlyMap<number, readonly number[]>;
   /** Reasons the thermal strain source is not verified (PST_MATERIAL_UNVERIFIED). */
   readonly unverified: readonly string[];
 }
@@ -104,15 +106,23 @@ export function caseLoads(
   let pressureBar = 0;
   let maxTempC: number | null = null;
   const unverified: string[] = [];
+  const prescribed = new Map<number, readonly number[]>();
   const E = conditions.material.youngsModulusMPa;
   for (const primitive of basic) {
-    if (primitive === 'W') {
+    if (primitive === 'W' || primitive === 'WW') {
+      const contents = primitive === 'WW' ? (conditions.hydro?.fluidDensityKgM3 ?? 0) : conditions.fluidDensityKgM3;
+      const insulation = conditions.insulation;
       elements.forEach((element, index) => {
         const inner = element.odMm - 2 * element.wallMm;
         const stated = element.component?.weightKg !== undefined && element.component.weightKg !== null;
         const steel = stated ? 0 : (Math.PI / 4) * (element.odMm ** 2 - inner ** 2);
         const fluid = (Math.PI / 4) * inner ** 2;
-        const q = GRAVITY * 1e-9 * (conditions.material.densityKgM3 * steel + conditions.fluidDensityKgM3 * fluid);
+        const outer = element.odMm + 2 * (insulation?.thicknessMm ?? 0);
+        const insulated =
+          stated || insulation === undefined
+            ? 0
+            : insulation.densityKgM3 * (Math.PI / 4) * (outer ** 2 - element.odMm ** 2) + insulation.claddingKgM2 * 1e3 * Math.PI * outer;
+        const q = GRAVITY * 1e-9 * (conditions.material.densityKgM3 * steel + contents * fluid + insulated);
         elemental.push({ element: index, uniform: [0, 0, -q] });
         uniform[index * 3 + 2] = (uniform[index * 3 + 2] as number) - q;
         if (element.component !== undefined && element.component.weightKg !== null) {
@@ -151,6 +161,29 @@ export function caseLoads(
           const hoop = (entry.gaugeBar * BAR_TO_MPA * element.odMm) / (2 * element.wallMm);
           elemental.push({ element: index, freeStrain: (-conditions.material.poisson * hoop) / E });
         });
+    } else if (primitive === 'HP') {
+      if (conditions.hydro === undefined)
+        return {
+          ok: false,
+          code: 'PST_LOADCASE_INVALID',
+          message: `case ${name}: HP needs the hydrotest conditions (set_pipe_operating_conditions hydrotest)`,
+          path: 'loadCases',
+        };
+      pressureBar = Math.max(pressureBar, conditions.hydro.testPressureBar);
+    } else if (primitive.startsWith('D')) {
+      const moved = built.displacements.find((entry) => entry.name === primitive);
+      if (moved === undefined)
+        return {
+          ok: false,
+          code: 'PST_LOADCASE_INVALID',
+          message: `case ${name}: no imposed displacement ${primitive} (set_stress_load_cases displacements)`,
+          path: 'loadCases',
+        };
+      const sum = prescribed.get(moved.node) ?? [0, 0, 0, 0, 0, 0];
+      prescribed.set(
+        moved.node,
+        sum.map((value, dof) => value + (moved.values[dof] as number)),
+      );
     } else if (primitive.startsWith('F')) {
       const loads = built.forces.filter((force) => force.name === primitive);
       if (loads.length === 0)
@@ -163,5 +196,5 @@ export function caseLoads(
       for (const force of loads) nodal.push({ node: force.node, force: force.force, moment: force.moment });
     }
   }
-  return { load: { name, nodal, elemental }, uniform, pressureBar, maxTempC, unverified };
+  return { load: { name, nodal, elemental }, uniform, pressureBar, maxTempC, prescribed, unverified };
 }
