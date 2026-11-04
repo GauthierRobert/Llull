@@ -58,6 +58,14 @@ export interface ColourRule {
   readonly marker?: RuleMarker;
 }
 
+/** The human act that cleared `reviewRequired` of a profile (approve_colour_profile): who signed, which signature, and the hash of the rules approved. */
+interface ProfileApproval {
+  readonly signer: string;
+  readonly signatureId: string;
+  /** sha256 of the canonical JSON of the profile's name, rules, default colour and palette at the moment it was approved. */
+  readonly profileSha256: string;
+}
+
 export interface ColourProfile {
   readonly id: string;
   readonly name: string;
@@ -69,6 +77,8 @@ export interface ColourProfile {
   readonly palette: string;
   /** True while the profile awaits approval by a qualified reviewer (set by the plugin that built it). */
   readonly reviewRequired: boolean;
+  /** Set by approve_colour_profile; a replaced profile carries none. */
+  readonly approval?: ProfileApproval;
 }
 
 /** A named display class (plant 09 VIS §5.6): appearance only; geometry and `doc.materials` are never touched. */
@@ -84,13 +94,49 @@ export interface MaterialClass {
   readonly roughness: number;
 }
 
+/** One stored pipe-content marker (`add_pipe_markers`, plant 09 VIS §5.7): where it sits on a pipe and the size of its legend. Absolute mm, document coordinates. */
+export interface PipeMarker {
+  /** `<pipe id>:<k>`, k from 1 along the pipe. */
+  readonly id: string;
+  /** Building pipe id or 02 RTE run id the marker sits on. */
+  readonly pipeId: string;
+  readonly positionMm: readonly [number, number, number];
+  /** Unit vector along the centreline (from end toward to end) at the marker. */
+  readonly tangent: readonly [number, number, number];
+  /** Arc length from the start of the pipe. */
+  readonly atMm: number;
+  /** Why it is there: a valve, flange or direction change within 600 mm, or the straight-run interval. */
+  readonly reason: 'valve' | 'flange' | 'bend' | 'interval';
+  /** Legend size of the A13.1 table row of the pipe (OD plus covering). */
+  readonly fieldLengthMm: number;
+  readonly letterHeightMm: number;
+  /** The OD lay between two table rows (next larger row taken): a reviewer confirms with the edition in force. */
+  readonly bandInterpolated: boolean;
+  /** Letters and colour from the profile rule the pipe's service selects, when the profile carries them. */
+  readonly letters?: string;
+  readonly letterHex?: string;
+  /** A both-ways flow arrow (the line is flagged bidirectional) instead of one along the tangent. */
+  readonly bidirectional: boolean;
+}
+
+/** A palette the owner pinned (define_palette): named colour (lowercase) -> `#rrggbb`. Profiles built from it name its id in `palette`. */
+export interface DisplayPalette {
+  readonly id: string;
+  readonly name: string;
+  readonly colours: Readonly<Record<string, string>>;
+}
+
 export interface DisplayModel {
   colourProfiles: Record<string, ColourProfile>;
+  /** Owner palettes by id (define_palette); the default palette `llull-ral-approx-v1` is code, never stored. */
+  palettes?: Record<string, DisplayPalette>;
   activeProfileId?: string;
   /** Document classes: new ones and overrides of the named defaults (`DEFAULT_MATERIAL_CLASSES`); absent = defaults only. */
   materialClasses?: Record<string, MaterialClass>;
   /** Entity id -> class id (assign_material_class); entries of deleted entities or classes are ignored. */
   materialClassOf?: Record<string, string>;
+  /** Stored A13.1 markers by id (add_pipe_markers); a marker whose pipe is gone is reported by check_pipe_markers and drawn by nothing. */
+  pipeMarkers?: Record<string, PipeMarker>;
 }
 
 export function createDisplayModel(): DisplayModel {

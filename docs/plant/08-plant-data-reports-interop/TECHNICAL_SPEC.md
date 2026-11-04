@@ -745,7 +745,7 @@ The registry is the union of the plant objects (per tag scope) and these model t
 
 ### 13.5 Check rules built
 
-`DAT_OUTSIDE_HIERARCHY`, `DAT_TAG_FORMAT`, `DAT_TAG_DUPLICATE` (one finding per tag, all holder ids), `DAT_TAG_CASE_COLLISION`, `DAT_REQUIRED_PROPERTY_MISSING`, `DAT_LINE_END_UNRESOLVED`, `DAT_LINE_SIZE_MISMATCH`, `DAT_TAG_MODEL_MISMATCH`, `DAT_OBJECT_ORPHAN`, `DAT_UNCLASSIFIED_ELEMENT` (equipment, legacy pipes, routed lines; only without a hierarchy / classes filter), `DAT_VALUE_UNVERIFIED`, `DAT_RESERVED_TAG_UNMODELLED`. Not yet: `DAT_OPEN_PORT`, `DAT_INFERRED_NOZZLE` (need the M2 nozzle schedule and the M3 ports).
+`DAT_OUTSIDE_HIERARCHY`, `DAT_TAG_FORMAT`, `DAT_TAG_DUPLICATE` (one finding per tag, all holder ids), `DAT_TAG_CASE_COLLISION`, `DAT_REQUIRED_PROPERTY_MISSING`, `DAT_LINE_END_UNRESOLVED`, `DAT_LINE_SIZE_MISMATCH`, `DAT_TAG_MODEL_MISMATCH`, `DAT_OBJECT_ORPHAN`, `DAT_UNCLASSIFIED_ELEMENT` (equipment, legacy pipes, routed lines; only without a hierarchy / classes filter), `DAT_VALUE_UNVERIFIED`, `DAT_RESERVED_TAG_UNMODELLED`. Built later (DAT-FU2, §13.14): `DAT_OPEN_PORT`, `DAT_INFERRED_NOZZLE`.
 
 ### 13.6 Tests and validation
 
@@ -939,3 +939,25 @@ No new command; the providers and four report kinds are new. Code in `packages/d
 **Tests.** `tests/unit/plant/data/deliverables.test.ts` (29: machine, hash, refusals, prototype keys, scope fixed at creation, dropped scope, gate with a ledger port that accepts only the exact payload and spends once, check before spend and scope, supersession, IFC, save / load, corrupt-file cases, REPLAY, REGENERATE), `handover.test.ts` (19: unverified marks, headers, mapping, byte determinism, `is pure`, registers, document register, export gate, `externalIds`), `deliverablesRelease.test.ts` (2), `tests/unit/hostParams.test.ts` (the `at` stamp). Tool-schema snapshot and `docs/FEATURES.md` regenerated.
 
 **Not verified.** The CFIHOS-like names and class ids against an IOGP release (Q9); the signer, signature id and payload hash of a stored signed step are self-asserted on load (a hand-edited file can carry any; the key store and its consumed-signature ledger are the proof, not this record); no human-signed status was exercised through the real Ed25519 port (a ledger test port stands in, as in the 05 / 09 suites).
+
+### 13.14 DAT-FU2 (2026-11-04): follow-ups
+
+**Item 1, port rules of `check_plant_data` (closes H5, E8, F10, G12 and the check part of I7).** `data/openPort.ts`, `data/check.ts`, `codes.ts`.
+
+| Rule | Severity | Behaviour |
+| ---- | -------- | --------- |
+| `DAT_OPEN_PORT` | warn | An end (`from` / `to`) of a process line that names nothing AND is attached to nothing. A drawn (legacy) pipe has no attachments, so an unnamed end is open; a routed run end is attached when it carries a `ref` (nozzle, tie-in, run end, branch). A named end (tag, nozzle, battery limit) is never open; an unresolved name stays `DAT_LINE_END_UNRESOLVED` (fail). Path `<line tag>.<from|to>`, ids = line object + model element. |
+| `DAT_INFERRED_NOZZLE` | info | One per nozzle `inferredNozzles()` derives (same function as the nozzle schedule and the IFC ports): equipment without 03 EQP nozzles whose line end lies in its footprint. Path `<equipment mark>/N<k>`, ids = equipment element + line object; scoped by the line object. Info only, so `status` stays `pass`. |
+
+Decisions: **J1** an unnamed end of a line with a pipe is reported as `DAT_OPEN_PORT` and no longer as the `DAT_LINE_END_UNRESOLVED` warn "has no from / to" (one finding per fact); a line with no pipe still gets the old warn (nothing to be open); an unnamed end of a routed run that is attached keeps the old warn (the data is missing, the pipe is not open). **J2** the geometric test (an end lying on a nozzle without naming it) is not applied: attachment is the `ref` of the run. Tests: `tests/unit/plant/data/checkPorts.test.ts` (fail without the rules); `check.test.ts` `check` helper hides the info finding of the fixtures' nozzle-less pump; SC-DAT-03 expects 3 findings (the plan row says why).
+
+**Item 2, real nozzles as IFC ports (closes the build part of H6).** The 03 EQP nozzle ports (IfcDistributionPort + IfcRelNests + the connection of routed run ends) existed since EQP-M5 (\`ifcEquipmentExport.ts\`, \`ifcPipingExport.ts\`); H6 was out of date on that point. Built now: \`building/exchange/ifcNozzleConnections.ts\` connects the end of a DRAWN (legacy) process line to the real nozzle port: by the nozzle name of its \`from\` / \`to\` (\`<tag>:<mark>\`), else by geometry (nozzle face within 1 mm of the pipe end); SOURCE is the RelatingPort (the nozzle for a \`from\` end), one connection per port; \`building/exchange/ifcNozzleRating.ts\` adds \`RatedPressure\` (Pa gauge), \`RatedPressureBasis\` and \`RatedPressureVerified\` to \`Pset_llullNozzle\`, read from the 01 PSC rating table (\`asme-b16.5-group-1.1\`, class from the label \`CL<n>\`, at 38 degC = 100 degF).
+
+| # | Decision | Why |
+| - | -------- | --- |
+| J3 | The rating is the nozzle's class label looked up in the PSC table at the reference temperature; the nozzle still STORES its label (no new stored field). A label that is not \`CL<n>\` (\`PN16\`) or a class the table lacks adds no property. The table is the bundled B16.5 group 1.1: the nozzle carries no material group, so the figure is a carbon-steel reference, said in the basis. | the PSC table needs a standard, group and temperature; the nozzle has none of them |
+| J4 | Not built: the pipe spec's flange class of the connected line is NOT compared with the nozzle rating (that is 02 RTE / 03 EQP \`check\` territory); no rating at the design temperature. | scope |
+
+Tests: \`tests/unit/plant/exchange/ifcNozzlePorts.test.ts\` (name match, geometry match and a 50 mm miss, determinism, rated pressure 18-20 bar for CL150, an unknown label adds nothing; 3 of the 5 fail without the change).
+
+**Review follow-up (item 2).** A drawn line end connects to the nozzle its `from` / `to` names; only when it names no equipment does geometry apply: among free nozzles within 1 mm the nearest wins, ties by element id and mark; a used or already connected nozzle is skipped while searching. `RatedPressure` is pinned for every class (CL150 19.6, CL300 51.1, CL600 102.1, CL900 153.2, CL1500 255.3, CL2500 425.5 bar). SC-DAT-03 `expected_results.json` / validation README now say 3 findings (the info `DAT_INFERRED_NOZZLE`).

@@ -8,13 +8,15 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed, report, tableRejection } from '@core/commands/noop';
 import { storeProfile } from '@core/geometry/colourRules';
 import { createDisplayModel, type ColourProfile, type ColourRule, type RuleMarker } from '@core/model/display';
-import { PALETTE_ID, paletteHex } from './palette';
+import { PALETTE_ID, paletteHex, paletteLookup, type HexLookup } from './palette';
 import { SCHEME_IDS, SCHEME_STANDARDS, findRow, legendOf, rowsOf, type SchemeId, type SchemeRow } from './serviceSchemes';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_SCHEME_UNKNOWN: `use one of ${SCHEME_IDS.join(', ')}; list_service_colour_schemes shows the tables`,
   VIS_SCHEME_CATEGORY_UNKNOWN: 'list_service_colour_schemes shows the categories of the scheme',
   VIS_RULE_INVALID: 'give a non-empty serviceMap of distinct service texts (case-insensitive) and a property name',
+  VIS_PALETTE_NOT_FOUND: 'define_palette creates an owner palette; omit palette for the built-in default',
+  VIS_PALETTE_INCOMPLETE: 'add the named colours to the palette (define_palette with replace), or omit palette for the built-in default',
 };
 
 const reject = tableRejection(REMEDIATION);
@@ -24,11 +26,12 @@ const isSchemeId = (value: string): value is SchemeId => (SCHEME_IDS as readonly
 /** Neutral grey for a colour name the palette lacks (a test asserts every table row resolves, so this is a guard only). */
 const NO_PALETTE_COLOUR = '#808080';
 
-const displayHex = (row: SchemeRow): string => paletteHex(row.names['fieldColour'] ?? row.names['mainColour'] ?? '') ?? NO_PALETTE_COLOUR;
+const displayHex = (row: SchemeRow, lookup: HexLookup): string =>
+  lookup(row.names['fieldColour'] ?? row.names['mainColour'] ?? '') ?? NO_PALETTE_COLOUR;
 
 /** Marker of a rule: the service in capitals and the row's letter colour (ASME A13.1); ISO 14726 names none. */
-const markerOf = (service: string, row: SchemeRow): RuleMarker => {
-  const letterHex = paletteHex(row.names['letterColour'] ?? '');
+const markerOf = (service: string, row: SchemeRow, lookup: HexLookup): RuleMarker => {
+  const letterHex = lookup(row.names['letterColour'] ?? '');
   return { letters: service.toUpperCase(), ...(letterHex === undefined ? {} : { letterHex }) };
 };
 
@@ -51,7 +54,7 @@ export const listServiceColourSchemes = defineCommand({
       standard: SCHEME_STANDARDS[id],
       palette: PALETTE_ID,
       approximate: true,
-      rows: rowsOf(id).map((row) => ({ ...row, displayHex: displayHex(row) })),
+      rows: rowsOf(id).map((row) => ({ ...row, displayHex: displayHex(row, paletteHex) })),
     }));
     return report(
       doc,
@@ -73,8 +76,8 @@ export const applyServiceColourScheme = defineCommand({
     '(e.g. "cooling water") to a category of the scheme (e.g. "water"; ISO: the medium, e.g. "sea water"; see list_service_colour_schemes). YOU decide the mapping: llull never guesses a hazard class from text. ' +
     'One rule per mapped service, in map order, first match wins; the pipe is tinted with the row field / main colour from the default palette (approximate display hex). ' +
     'data { profileId, mapped, unmapped[] (services in the model absent from the map: they keep their own colour), reviewRequired: true }. The profile is flagged reviewRequired: ' +
-    'a qualified reviewer must approve the mapping before the colours are used on a deliverable. markerLetters: true adds the marker letters (service in capitals) and letter colour to each rule for pipe_markers. Follow with colour_by_rule_report and check_display. Re-running with the same profileId replaces it. ' +
-    'Errors: VIS_SCHEME_UNKNOWN, VIS_SCHEME_CATEGORY_UNKNOWN. Does not change geometry or add a feature step.',
+    'a qualified reviewer must approve the mapping before the colours are used on a deliverable (approve_colour_profile, a human act). palette names an owner palette from define_palette instead of the default; a colour name it lacks is refused (VIS_PALETTE_INCOMPLETE). markerLetters: true adds the marker letters (service in capitals) and letter colour to each rule for pipe_markers. Follow with colour_by_rule_report and check_display. Re-running with the same profileId replaces it. ' +
+    'Errors: VIS_SCHEME_UNKNOWN, VIS_SCHEME_CATEGORY_UNKNOWN, VIS_PALETTE_NOT_FOUND, VIS_PALETTE_INCOMPLETE. Does not change geometry or add a feature step.',
   annotations: { metaHistory: true },
   params: z.object({
     scheme: z.string().describe('"asme_a13_1" or "iso_14726".'),
@@ -86,6 +89,12 @@ export const applyServiceColourScheme = defineCommand({
       ),
     property: z.string().optional().describe('Entity property holding the service text. Default "service".'),
     activate: z.boolean().optional().describe('true: also make the profile the active display profile.'),
+    palette: z
+      .string()
+      .optional()
+      .describe(
+        `Id of an owner palette (define_palette) that supplies the display hex of the named colours. Default: the built-in ${PALETTE_ID} (approximate).`,
+      ),
     markerLetters: z
       .boolean()
       .optional()
@@ -93,7 +102,11 @@ export const applyServiceColourScheme = defineCommand({
         'true: each rule also carries the marker legend text (the service in capitals, e.g. "COOLING WATER") and the letter colour hex (scheme letterColour, default palette), read by pipe_markers for the viewport markers. Default false.',
       ),
   }),
-  run: (doc, { scheme, profileId, serviceMap, property = 'service', activate, markerLetters }, ctx): CommandResult => {
+  run: (
+    doc,
+    { scheme, profileId, serviceMap, property = 'service', activate, markerLetters, palette = PALETTE_ID },
+    ctx,
+  ): CommandResult => {
     const fail = (code: string, message: string, ids: string[] = [], paths: string[] = []): CommandResult =>
       reject(doc, 'apply_service_colour_scheme', code, message, ids, paths);
     if (!isSchemeId(scheme)) return fail('VIS_SCHEME_UNKNOWN', `no scheme '${scheme}'`, [], ['scheme']);
@@ -113,6 +126,21 @@ export const applyServiceColourScheme = defineCommand({
         [],
         unknown.map((entry) => `serviceMap.${entry.service}`),
       );
+    const lookup = paletteLookup(doc.display, palette);
+    if (lookup === undefined) return fail('VIS_PALETTE_NOT_FOUND', `no palette '${palette}'`, [], ['palette']);
+    const lacking = [
+      ...new Set(
+        rows.flatMap(({ row }) =>
+          row === undefined
+            ? []
+            : [row.names['fieldColour'] ?? row.names['mainColour'], ...(markerLetters === true ? [row.names['letterColour']] : [])].filter(
+                (name): name is string => name !== undefined && lookup(name) === undefined,
+              ),
+        ),
+      ),
+    ];
+    if (palette !== PALETTE_ID && lacking.length > 0)
+      return fail('VIS_PALETTE_INCOMPLETE', `palette '${palette}' has no colour for ${lacking.join(', ')}`, [], ['palette']);
     const rules: ColourRule[] = rows.flatMap(({ service, row }) =>
       row === undefined
         ? []
@@ -120,10 +148,10 @@ export const applyServiceColourScheme = defineCommand({
             {
               id: `${row.id}:${service}`,
               when: { property, equals: service },
-              appearance: { colour: displayHex(row) },
+              appearance: { colour: displayHex(row, lookup) },
               legend: `${service}: ${legendOf(row)}`,
               scheme: { id: scheme, rowId: row.id, category: row.category, names: row.names },
-              ...(markerLetters === true ? { marker: markerOf(service, row) } : {}),
+              ...(markerLetters === true ? { marker: markerOf(service, row, lookup) } : {}),
             },
           ],
     );
@@ -132,7 +160,7 @@ export const applyServiceColourScheme = defineCommand({
       name: `${scheme} service colours`,
       rules,
       defaultColour: 'entity',
-      palette: PALETTE_ID,
+      palette,
       reviewRequired: true,
     };
     const stored = storeProfile(doc.display ?? createDisplayModel(), profile, activate === true);

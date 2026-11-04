@@ -4,19 +4,15 @@
  * Centrelines come from the stress-model source resolver (one reader for building pipes and routed runs).
  */
 
-import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report, tableRejection } from '@core/commands/noop';
-import { findProfile, type ColourRule } from '@core/model/display';
-import { compileProfile, profileProblems, type CompiledProfile } from '@core/geometry/colourRules';
-import { getBuilding } from '../../building/model';
-import { getPiping } from '../piping/model';
-import { pipeCentreline, type SourcePipe } from '../common/pipeCentrelines';
+import { findProfile } from '@core/model/display';
+import { compileProfile, profileProblems } from '@core/geometry/colourRules';
+import { allPipeIds, entryOf, ruleOf } from './markerEntries';
+import { DEFAULT_SPACING_MM } from './markerPlan';
 
-/** Straight-run interval of the spec (§5.7): 25 ft, grade B named default. */
-const DEFAULT_SPACING_MM = 7620;
 /** Most placements one call returns; a smaller spacing over a larger plant is refused, never truncated. */
 const MAX_MARKERS = 5000;
 
@@ -27,14 +23,6 @@ const REMEDIATION: Readonly<Record<string, string>> = {
 };
 const reject = tableRejection(REMEDIATION);
 
-interface Entry {
-  readonly id: string;
-  readonly kind: 'pipe' | 'run';
-  readonly line: string | null;
-  readonly service: string | null;
-  readonly source: SourcePipe;
-}
-
 interface Mark {
   readonly positionMm: Vec3;
   readonly tangent: Vec3;
@@ -44,31 +32,6 @@ interface Mark {
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const norm = (v: Vec3): number => Math.hypot(v[0], v[1], v[2]);
 const round3 = (n: number): number => Math.round(n * 1000) / 1000;
-
-function entryOf(doc: CadDocument, id: string): Entry | null {
-  const building = getBuilding(doc);
-  const element = Object.hasOwn(building.elements, id) ? building.elements[id] : undefined;
-  if (element?.category === 'pipe') {
-    const source = pipeCentreline(doc, 'pipes', id);
-    return typeof source === 'string' ? null : { id, kind: 'pipe', line: element.line ?? null, service: element.service, source };
-  }
-  const piping = getPiping(doc);
-  const run = Object.hasOwn(piping.runs, id) ? piping.runs[id] : undefined;
-  if (run === undefined) return null;
-  const source = pipeCentreline(doc, 'runs', id);
-  const line = piping.lines[run.lineId];
-  return typeof source === 'string' ? null : { id, kind: 'run', line: line?.lineNumber ?? null, service: line?.service ?? null, source };
-}
-
-/** The first rule of the profile the pipe's service / line selects (the core evaluator, so every predicate form works). */
-const ruleOf = (compiled: CompiledProfile | undefined, entry: Entry): ColourRule | null =>
-  compiled === undefined
-    ? null
-    : compiled.select({
-        ...(entry.service === null ? {} : { service: entry.service }),
-        ...(entry.line === null ? {} : { line: entry.line }),
-        category: 'pipe',
-      });
 
 const legsOf = (points: readonly Vec3[]): { a: Vec3; b: Vec3; length: number }[] =>
   points.slice(1).map((end, i) => ({ a: points[i] as Vec3, b: end, length: norm(sub(end, points[i] as Vec3)) }));
@@ -111,7 +74,7 @@ export const pipeMarkers = defineCommand({
     '{ positionMm [x,y,z] absolute mm, tangent [dx,dy,dz] unit vector along the pipe at the marker, in the order of its centreline points (the from end towards the to end), atMm arc length from the start }. Placements are spread evenly: ' +
     'ceil(length / spacingMm) markers at the middles of equal parts (so at most spacingMm apart, at least one per pipe). With a colour profile (profileId, default the active one) built by ' +
     'apply_service_colour_scheme, each pipe also gets rule { ruleId, category, fieldHex, legend, markerLetters, letterHex } (any rule predicate works; null when no rule matches; markerLetters and letterHex are null unless the profile was built with markerLetters: true). ' +
-    'Without a profile the geometry is still returned. Read-only; the viewport draws from this. Valves, flanges and penetrations are not special-cased (use spacingMm). ' +
+    'Without a profile the geometry is still returned. Read-only; the viewport draws from this. Valves, flanges and direction changes are not special-cased here: add_pipe_markers stores the rule-based placement (valve, flange, bend, interval). ' +
     'Errors: VIS_MARKER_NOT_FOUND, VIS_PROFILE_NOT_FOUND, VIS_MARKER_LIMIT.',
   annotations: { readOnly: true },
   params: z.object({
@@ -128,12 +91,7 @@ export const pipeMarkers = defineCommand({
     const profile = wantedProfile === undefined || doc.display === undefined ? undefined : findProfile(doc.display, wantedProfile);
     if (profileId !== undefined && profile === undefined)
       return reject(doc, 'pipe_markers', 'VIS_PROFILE_NOT_FOUND', `no colour profile '${profileId}'`, [], ['profileId']);
-    const wanted = ids ?? [
-      ...Object.values(getBuilding(doc).elements)
-        .filter((element) => element.category === 'pipe')
-        .map((element) => element.id),
-      ...getPiping(doc).runOrder,
-    ];
+    const wanted = ids ?? allPipeIds(doc);
     const found = wanted.map((id) => ({ id, entry: entryOf(doc, id) }));
     const missing = found.filter((item) => item.entry === null).map((item) => item.id);
     if (missing.length > 0)

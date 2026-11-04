@@ -26,6 +26,7 @@ import { pressureToMpa } from '../../plant/equipment/codecheck/units';
 import { evaluateParametricEquipment } from '../../plant/equipment/evaluate/evaluateEquipment';
 import { equipmentPorts } from '../../plant/equipment/geometry/ports';
 import { addNamedPset, type PlantIfcRun } from './ifcPlant';
+import { ratedPressureProperties } from './ifcNozzleRating';
 import { addPort, nest, type Flow, type Port, type PortState } from './ifcPorts';
 import { type Context, direction, ifcReal, ifcString, point3, rectangleProfile } from './ifcStep';
 
@@ -232,7 +233,7 @@ export function nozzleFlow(mark: string, service: string | undefined): Flow {
 export function exportEquipmentPorts(
   context: Context,
   state: PortState,
-  doc: Parameters<typeof getBuilding>[0],
+  doc: CadDocument,
   element: EquipmentElement,
   level: BuildingLevel,
   storeyPlacement: string,
@@ -259,6 +260,7 @@ export function exportEquipmentPorts(
       `IFCPROPERTYSINGLEVALUE('PortId',$,IFCLABEL(${ifcString(port.id)}),$)`,
       `IFCPROPERTYSINGLEVALUE('Rating',$,IFCLABEL(${ifcString(port.rating)}),$)`,
       `IFCPROPERTYSINGLEVALUE('Facing',$,IFCLABEL(${ifcString(port.facing)}),$)`,
+      ...ratedPressureProperties(doc, port.rating),
       ...(port.service === undefined ? [] : [`IFCPROPERTYSINGLEVALUE('Service',$,IFCLABEL(${ifcString(port.service)}),$)`]),
     ]);
     written.set(port.mark, nozzlePort);

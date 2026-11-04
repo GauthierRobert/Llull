@@ -1,7 +1,7 @@
 /** check_display (plant 09 VIS §4, TR-VIS-16): consistency of the colour profiles against the document; read-only. */
 
 import { findProfile } from '../../model/display';
-import { referencedProperties } from '../../geometry/colourRules';
+import { awaitsApproval, referencedProperties } from '../../geometry/colourRules';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
@@ -77,14 +77,16 @@ export const checkDisplay = defineCommand({
           message: `${unmatched.length} entit${unmatched.length === 1 ? 'y' : 'ies'} matched no rule of profile '${active.id}'`,
           remediation: 'extend the profile rules, or accept the default colour',
         });
-      if (active.reviewRequired)
+      if (awaitsApproval(active))
         issues.push({
           code: 'VIS_SCHEME_REVIEW_REQUIRED',
           severity: 'warn',
           ids: [],
           paths: [`display.colourProfiles.${active.id}`],
-          message: `profile '${active.id}' is flagged reviewRequired and not approved`,
-          remediation: 'a qualified reviewer approves the profile before the colours are used on a deliverable',
+          message: active.reviewRequired
+            ? `profile '${active.id}' is flagged reviewRequired and not approved`
+            : `profile '${active.id}' is a scheme profile without a valid approval (reviewRequired was cleared without a signature, or its rules changed after it)`,
+          remediation: 'a qualified reviewer approves the profile (approve_colour_profile) before the colours are used on a deliverable',
         });
     }
     const status = issues.some((issue) => issue.severity === 'error') ? 'fail' : issues.length > 0 ? 'warn' : 'pass';

@@ -76,16 +76,16 @@ describe('load validation of malformed display data never throws', () => {
     appearance: { colour: '#ffffff' },
     ...patch,
   });
-  const load = (rules: unknown[]): string[] =>
+  const load = (rules: unknown[], reviewRequired = false): string[] =>
     validateDocumentValues({
       ...JSON.parse(JSON.stringify(createEmptyDocument())),
-      display: { colourProfiles: { p: { id: 'p', name: 'P', palette: 'x', reviewRequired: false, defaultColour: 'entity', rules } } },
+      display: { colourProfiles: { p: { id: 'p', name: 'P', palette: 'x', reviewRequired, defaultColour: 'entity', rules } } },
     });
 
   it('accepts a well-formed rule', () => {
     expect(load([rule({})])).toEqual([]);
     const scheme = { id: 's', rowId: 'r', category: 'c', names: { a: 'b' } };
-    expect(load([rule({ scheme, when: { any: [{ property: 'a', in: [1, 'x'] }] } })])).toEqual([]);
+    expect(load([rule({ scheme, when: { any: [{ property: 'a', in: [1, 'x'] }] } })], true)).toEqual([]);
   });
 
   const deep = JSON.parse('{"any":['.repeat(8) + '{"property":"a","equals":1}' + ']}'.repeat(8)) as unknown;

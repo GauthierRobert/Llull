@@ -1,6 +1,6 @@
 /** Load-time validation of the optional `display` field (colour profiles, material classes; plant 09 VIS). Unknown keys are ignored. */
 
-import { profileProblems } from '../../geometry/colourRules';
+import { awaitsApproval, hasSchemeRules, profileProblems } from '../../geometry/colourRules';
 import type { ColourProfile } from '../../model/display';
 import { isRecord } from '../../lib/isRecord';
 import { isReservedKey } from '../../lib/reservedKey';
@@ -57,10 +57,24 @@ function profileProblem(id: string, value: unknown): string | null {
   if (typeof value['name'] !== 'string' || typeof value['palette'] !== 'string' || typeof value['reviewRequired'] !== 'boolean')
     return `${where}: name and palette must be strings and reviewRequired a boolean`;
   if (typeof value['defaultColour'] !== 'string') return `${where}: defaultColour must be a string`;
+  const approval = value['approval'];
+  if (
+    approval !== undefined &&
+    !(
+      isRecord(approval) &&
+      typeof approval['signer'] === 'string' &&
+      typeof approval['signatureId'] === 'string' &&
+      typeof approval['profileSha256'] === 'string'
+    )
+  )
+    return `${where}: approval must be { signer, signatureId, profileSha256 }`;
   const rules = value['rules'];
   if (!Array.isArray(rules) || !rules.every(isRule))
     return `${where}: rules must be { id, legend, when (predicate), appearance { colour, transparency?, hidden? }, scheme?, marker? { letters, letterHex? } }`;
-  const problem = profileProblems(value as unknown as ColourProfile)[0];
+  const typed = value as unknown as ColourProfile;
+  if (hasSchemeRules(typed) && !typed.reviewRequired && awaitsApproval(typed))
+    return `${where}: a scheme profile that is not reviewRequired must carry an approval whose profileSha256 matches its rules (approve_colour_profile)`;
+  const problem = profileProblems(typed)[0];
   return problem === undefined ? null : `${where}: ${problem.path}: ${problem.message}`;
 }
 
@@ -92,11 +106,64 @@ function materialClassProblems(display: Record<string, unknown>): string[] {
   return problems;
 }
 
+const isVec3 = (value: unknown): boolean =>
+  Array.isArray(value) && value.length === 3 && value.every((n) => typeof n === 'number' && Number.isFinite(n));
+const positive = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
+const REASONS = ['valve', 'flange', 'bend', 'interval'];
+
+function pipeMarkerProblems(display: Record<string, unknown>): string[] {
+  const markers = display['pipeMarkers'];
+  if (markers === undefined) return [];
+  if (!isRecord(markers)) return ['display.pipeMarkers must be a record'];
+  return Object.entries(markers).flatMap(([id, marker]) => {
+    const where = `display.pipeMarkers['${id}']`;
+    if (isReservedKey(id)) return [`display.pipeMarkers: id '${id}' is a reserved JavaScript property name`];
+    const ok =
+      isRecord(marker) &&
+      marker['id'] === id &&
+      typeof marker['pipeId'] === 'string' &&
+      isVec3(marker['positionMm']) &&
+      isVec3(marker['tangent']) &&
+      typeof marker['atMm'] === 'number' &&
+      marker['atMm'] >= 0 &&
+      REASONS.includes(marker['reason'] as string) &&
+      positive(marker['fieldLengthMm']) &&
+      positive(marker['letterHeightMm']) &&
+      typeof marker['bandInterpolated'] === 'boolean' &&
+      typeof marker['bidirectional'] === 'boolean' &&
+      (marker['letters'] === undefined || typeof marker['letters'] === 'string') &&
+      (marker['letterHex'] === undefined || typeof marker['letterHex'] === 'string');
+    return ok
+      ? []
+      : [
+          `${where} must be { id, pipeId, positionMm, tangent, atMm, reason, fieldLengthMm, letterHeightMm, bandInterpolated, bidirectional, letters?, letterHex? }`,
+        ];
+  });
+}
+
+function paletteProblems(display: Record<string, unknown>): string[] {
+  const palettes = display['palettes'];
+  if (palettes === undefined) return [];
+  if (!isRecord(palettes)) return ['display.palettes must be a record'];
+  return Object.entries(palettes).flatMap(([id, palette]) => {
+    const where = `display.palettes['${id}']`;
+    if (isReservedKey(id)) return [`display.palettes: id '${id}' is a reserved JavaScript property name`];
+    if (!isRecord(palette) || palette['id'] !== id || typeof palette['name'] !== 'string' || !isRecord(palette['colours']))
+      return [`${where} must be { id: '${id}', name, colours }`];
+    const colours = palette['colours'];
+    return Object.entries(colours).flatMap(([name, hex]) =>
+      isReservedKey(name) || typeof hex !== 'string' || !COLOUR.test(hex)
+        ? [`${where}.colours['${name}'] must be a #rrggbb colour under a usable name`]
+        : [],
+    );
+  });
+}
+
 /** Problems of the optional `display` field of a raw document (absent is valid). */
 export function displayProblems(value: unknown): string[] {
   if (value === undefined) return [];
   if (!isRecord(value) || !isRecord(value['colourProfiles']))
-    return ['display must be { colourProfiles, activeProfileId?, materialClasses?, materialClassOf? }'];
+    return ['display must be { colourProfiles, activeProfileId?, materialClasses?, materialClassOf?, pipeMarkers?, palettes? }'];
   const profiles = value['colourProfiles'];
   const active = value['activeProfileId'];
   const problems = [
@@ -105,6 +172,8 @@ export function displayProblems(value: unknown): string[] {
       ? null
       : 'display.activeProfileId must name an existing profile',
     ...materialClassProblems(value),
+    ...pipeMarkerProblems(value),
+    ...paletteProblems(value),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }
