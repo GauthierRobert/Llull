@@ -11,6 +11,7 @@ import { z } from '../schema';
 import { orderedEntities } from '../entity/entityOps';
 import { dot3 } from '../../lib/vec3';
 import type { ExecutionContext } from '../types';
+import { materialClassColour, recolouredEntity } from '../../geometry/materialClasses';
 import { evaluateProfile } from '../display/displayModel';
 import { hexRgb } from './frames';
 import type { CutSpec } from './types';
@@ -185,14 +186,10 @@ function dimmed(colour: string, background: readonly number[]): string {
     .join('')}`;
 }
 
-function recoloured(entity: Entity, colour: string): Entity {
-  const { materialId: _material, ...rest } = entity;
-  return { ...rest, color: colour } as Entity;
-}
-
 /**
  * `scene` with viewpoint visibility and hidden rules applied, the profile colours set and (review shading) the non-selected entities dimmed.
- * @invariant instance children keep their own colours (the profile colours the instance entity only); a profile default colour applies to 3D entities only
+ * @invariant instance children keep their own colours (the profile colours the instance entity only); a profile default colour applies to 3D entities only;
+ *   precedence: a matching rule, then the assigned material class colour, then the profile default colour, then the entity colour
  */
 export function applyReviewStyle(
   scene: CadDocument,
@@ -214,15 +211,18 @@ export function applyReviewStyle(
   for (const id of shown) {
     let entity = scene.entities[id] as Entity;
     const rule = rules.get(id) ?? null;
+    const classColour = materialClassColour(scene, entity);
     if (rule?.appearance.hidden === true) {
       hidden.add(id);
       continue;
     }
     if (rule !== null) {
       counts.set(rule.id, (counts.get(rule.id) ?? 0) + 1);
-      entity = recoloured(entity, rule.appearance.colour);
-    } else if (profile !== null && profile.defaultColour !== 'entity' && !is2D(entity)) entity = recoloured(entity, profile.defaultColour);
-    if (highlight !== null && !highlight.has(id)) entity = recoloured(entity, dimmed(entity.color, backgroundRgb));
+      entity = recolouredEntity(entity, rule.appearance.colour);
+    } else if (classColour !== null) entity = recolouredEntity(entity, classColour);
+    else if (profile !== null && profile.defaultColour !== 'entity' && !is2D(entity))
+      entity = recolouredEntity(entity, profile.defaultColour);
+    if (highlight !== null && !highlight.has(id)) entity = recolouredEntity(entity, dimmed(entity.color, backgroundRgb));
     entities[id] = entity;
     order.push(id);
   }

@@ -75,6 +75,35 @@ export function interpolateViewpointCamera(a: ViewpointCamera, b: ViewpointCamer
   return { projection: 'orthographic', eye, direction, up, viewHeight: heightOf(a) + (heightOf(b) - heightOf(a)) * t };
 }
 
+/** Uniform Catmull-Rom point of the segment p1 -> p2 at `t` ∈ [0, 1] (passes through p1 at 0 and p2 at 1). */
+function catmullRom3(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number): Vec3 {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const axis = (i: 0 | 1 | 2): number =>
+    0.5 *
+    (2 * p1[i] + (p2[i] - p0[i]) * t + (2 * p0[i] - 5 * p1[i] + 4 * p2[i] - p3[i]) * t2 + (3 * p1[i] - p0[i] - 3 * p2[i] + p3[i]) * t3);
+  return [axis(0), axis(1), axis(2)];
+}
+
+/**
+ * Camera at `t` ∈ [0, 1] on the segment `a` -> `b` of a smooth path: the eye follows the Catmull-Rom spline through the key eyes
+ * (`before` / `after` are the neighbouring keys, absent at the path ends where the end tangent is mirrored); direction, up and fov / view
+ * height interpolate exactly as `interpolateViewpointCamera`.
+ * @invariant t = 0 gives the eye of `a`, t = 1 the eye of `b`; with collinear, evenly spaced keys it equals the linear glide
+ */
+export function interpolateViewpointCameraSmooth(
+  before: ViewpointCamera | undefined,
+  a: ViewpointCamera,
+  b: ViewpointCamera,
+  after: ViewpointCamera | undefined,
+  t: number,
+): ViewpointCamera {
+  const linear = interpolateViewpointCamera(a, b, t);
+  const p0 = before?.eye ?? sub3(scale3(a.eye, 2), b.eye);
+  const p3 = after?.eye ?? sub3(scale3(b.eye, 2), a.eye);
+  return { ...linear, eye: catmullRom3(p0, a.eye, b.eye, p3, t) };
+}
+
 /**
  * The document orbit camera (`set_camera` convention) that looks the way `camera` does (inverse of `documentCameraViewpoint`): target = eye +
  * direction · r, where r is the distance along the view axis to `sceneCentre` when that lies ahead of the eye, else `fallbackDistance`.

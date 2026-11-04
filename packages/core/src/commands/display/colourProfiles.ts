@@ -128,8 +128,8 @@ export const setActiveColourProfile = defineCommand({
     const display = displayOf(doc);
     if (profileId !== null && findProfile(display, profileId) === undefined)
       return displayRejection(doc, 'set_active_colour_profile', 'VIS_PROFILE_NOT_FOUND', `no profile '${profileId}'`, [profileId]);
-    const { colourProfiles } = display;
-    const next: DisplayModel = profileId === null ? { colourProfiles } : { colourProfiles, activeProfileId: profileId };
+    const { activeProfileId: _previous, ...kept } = display;
+    const next: DisplayModel = profileId === null ? kept : { ...kept, activeProfileId: profileId };
     const summary = profileId === null ? 'Deactivated the colour profile.' : `Activated colour profile '${profileId}'.`;
     return { ...changed({ ...doc, display: next }, summary, []), data: { active: profileId } };
   },
@@ -162,9 +162,12 @@ export const deleteColourProfile = defineCommand({
         users,
       );
     const colourProfiles = Object.fromEntries(Object.entries(display.colourProfiles).filter(([id]) => id !== profileId));
-    const { activeProfileId } = display;
-    const keepActive = activeProfileId !== undefined && activeProfileId !== profileId;
-    const next: DisplayModel = keepActive ? { colourProfiles, activeProfileId } : { colourProfiles };
+    const { activeProfileId, ...kept } = display;
+    const next: DisplayModel = {
+      ...kept,
+      colourProfiles,
+      ...(activeProfileId !== undefined && activeProfileId !== profileId ? { activeProfileId } : {}),
+    };
     return changed({ ...doc, display: next }, `Deleted colour profile '${profileId}'.`, []);
   },
 });

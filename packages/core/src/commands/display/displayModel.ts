@@ -14,6 +14,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_PROFILE_EXISTS: 'pass replace: true to overwrite the profile, or choose another id',
   VIS_RULE_INVALID:
     'fix the rule at the reported path: every rule needs a unique id and a predicate with a clause (regex <= 200 chars, range low <= high)',
+  VIS_MATERIAL_CLASS_NOT_FOUND: 'list the classes with list_material_classes, or create one with define_material_class',
+  VIS_MATERIAL_CLASS_IN_USE: 'clear the assignment first: assign_material_class with classId null on the listed entities',
+  VIS_MATERIAL_CLASS_INVALID:
+    'use a snake_case id, colour #rrggbb or null, metalness and roughness in 0..1, and at least one existing entity id',
   VIS_COLOUR_INVALID: 'use #rrggbb',
   VIS_GROUP_PROPERTY_MISSING: 'pass groupProperty, e.g. "layerName", or use groupBy "rule" / "entity"',
 };

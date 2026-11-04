@@ -1,7 +1,7 @@
 /**
  * Display model of a document (`CadDocument.display`, plant 09 VIS §3.1): ordered first-match colour profiles keyed on entity properties.
  * Domain-free: schemes (colour schemes) are produced by plugins as ordinary profiles. Display only: a profile never changes
- * geometry. Material classes arrive with the renderer milestones (VIS-M4/M6).
+ * geometry. Material classes (`MaterialClass`) are named appearance classes assigned per entity.
  */
 
 /** One property value; a key may hold several (see `PropertyBag`). */
@@ -71,9 +71,26 @@ export interface ColourProfile {
   readonly reviewRequired: boolean;
 }
 
+/** A named display class (plant 09 VIS §5.6): appearance only; geometry and `doc.materials` are never touched. */
+export interface MaterialClass {
+  /** snake_case id, unique; a document class with a default's id overrides the default. */
+  readonly id: string;
+  readonly name: string;
+  /** `#rrggbb`, or null to keep the entity's own colour (and its profile's). */
+  readonly colour: string | null;
+  /** 0..1. */
+  readonly metalness: number;
+  /** 0..1. */
+  readonly roughness: number;
+}
+
 export interface DisplayModel {
   colourProfiles: Record<string, ColourProfile>;
   activeProfileId?: string;
+  /** Document classes: new ones and overrides of the named defaults (`DEFAULT_MATERIAL_CLASSES`); absent = defaults only. */
+  materialClasses?: Record<string, MaterialClass>;
+  /** Entity id -> class id (assign_material_class); entries of deleted entities or classes are ignored. */
+  materialClassOf?: Record<string, string>;
 }
 
 export function createDisplayModel(): DisplayModel {

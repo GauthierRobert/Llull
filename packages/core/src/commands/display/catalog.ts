@@ -3,6 +3,7 @@
 import { commandCatalog } from '../schema';
 import { checkDisplay } from './checkDisplay';
 import { colourByRuleReport } from './colourReport';
+import { assignMaterialClass, defineMaterialClass, deleteMaterialClass, listMaterialClasses } from './materialClasses';
 import { defineColourProfile, deleteColourProfile, setActiveColourProfile } from './colourProfiles';
 
 export const displayCommands = commandCatalog(
@@ -11,4 +12,8 @@ export const displayCommands = commandCatalog(
   deleteColourProfile,
   colourByRuleReport,
   checkDisplay,
+  defineMaterialClass,
+  deleteMaterialClass,
+  assignMaterialClass,
+  listMaterialClasses,
 );

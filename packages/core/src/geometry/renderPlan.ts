@@ -11,6 +11,7 @@ import { sha256Hex } from '../lib/sha256';
 import { dot3 } from '../lib/vec3';
 import type { Bounds } from './bounds';
 import { entityBounds, entityBoundsInDoc } from './bounds';
+import { assignedMaterialClass } from './materialClasses';
 import { entityToTriangles } from './entityTriangles';
 import { type FrustumPlane, type PlanCamera, frustumPlanes, planCameraProblem } from './renderPlanCamera';
 
@@ -129,8 +130,9 @@ export function prototypeKeyOf(entity: Entity): string {
   return `${entity.kind}|${params.map(([key, value]) => `${key}=${canonical(value)}`).join(';')}`;
 }
 
-/** Material class of an entity until the material-class model lands (VIS-M4/M6): its `materialId`, else `unassigned`. */
-const defaultMaterialClassOf = (entity: Entity): string => entity.materialId ?? 'unassigned';
+/** Material class of an entity by default: its assigned display class (assign_material_class), else its `materialId`, else `unassigned`. */
+const defaultMaterialClassOf = (doc: CadDocument, entity: Entity): string =>
+  assignedMaterialClass(doc, entity.id)?.id ?? entity.materialId ?? 'unassigned';
 
 const diagonalOf = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
 
@@ -139,7 +141,10 @@ const diagonalOf = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0],
  * @invariant document order; entities on hidden layers and 2D / curve / sheet entities are skipped; an `instance` entity is one instance
  *   (children are not expanded into the plan)
  */
-export function planScene(doc: CadDocument, materialClassOf: (entity: Entity) => string = defaultMaterialClassOf): PlanScene {
+export function planScene(
+  doc: CadDocument,
+  materialClassOf: (entity: Entity) => string = (entity) => defaultMaterialClassOf(doc, entity),
+): PlanScene {
   const prototypeIndex = new Map<string, number>();
   const classIndex = new Map<string, number>();
   const prototypeTriangles: number[] = [];
