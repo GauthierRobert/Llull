@@ -43,12 +43,15 @@ export const conditionsSchema = z.object({
   corrosionAllowanceMm: nonNegative,
   cycles: finite.refine((value) => value >= 1, 'must be >= 1'),
   wallMm: positive.optional(),
+  insulation: z.object({ thicknessMm: positive, densityKgM3: positive, claddingKgM2: nonNegative }).optional(),
+  millTolerancePct: finite.refine((value) => value >= 0 && value < 50, 'must be in [0, 50)').optional(),
+  hydro: z.object({ testPressureBar: positive, allowableMPa: positive, fluidDensityKgM3: positive }).optional(),
   poissonPressure: z.boolean(),
   material: materialSchema,
   defaulted: z.array(z.string()),
 });
 
-export const LOAD_CASE_TYPES = ['OPE', 'SUS', 'EXP', 'OCC'] as const;
+export const LOAD_CASE_TYPES = ['OPE', 'SUS', 'EXP', 'OCC', 'HYD'] as const;
 
 export const loadCaseSchema = z.object({
   name: z
@@ -57,10 +60,12 @@ export const loadCaseSchema = z.object({
     .describe('Case name, e.g. L1 (letters, digits, underscore; up to 16).'),
   type: z
     .enum(LOAD_CASE_TYPES)
-    .describe('SUS sustained, OPE operating, OCC occasional state, EXP displacement range (combination of cases).'),
+    .describe('SUS sustained, OPE operating, OCC occasional state, HYD hydrotest, EXP displacement range (combination of cases).'),
   basic: z
-    .array(z.string().regex(/^(W|[TPF][1-9])$/))
-    .describe('OPE / SUS / OCC: primitive loads solved together: W, T1..T9, P1..P9, F1..F9.')
+    .array(z.string().regex(/^(W|WW|HP|[TPFD][1-9])$/))
+    .describe(
+      'OPE / SUS / OCC / HYD: primitive loads solved together: W (weight), WW (weight with the hydrotest water), HP (hydrotest pressure), T1..T9, P1..P9, F1..F9, D1..D9.',
+    )
     .optional(),
   combine: z
     .array(
@@ -81,6 +86,30 @@ export const forceSchema = z.object({
   momentNmm: vec3.describe('Moment [x, y, z] in N.mm, global axes. Default none.').optional(),
 });
 
+export const displacementSchema = z.object({
+  name: indexedName('D').describe('D1 .. D9: the name load cases use in basic.'),
+  at: z
+    .union([
+      z.object({ supportId: z.string().min(1).describe('Id of an anchor pipe support.') }),
+      z.object({
+        pipeId: z.string().min(1).describe('Pipe or run id in the model.'),
+        atMm: nonNegative.describe('Arc length from the pipe start, mm.'),
+      }),
+    ])
+    .describe('The anchor that moves: {supportId} or {pipeId, atMm} (an anchor must sit there).'),
+  translationMm: vec3.describe('Imposed translation [x, y, z] of the anchor, mm, global axes.'),
+  rotationDeg: vec3.describe('Imposed rotation [x, y, z] of the anchor, degrees, global axes. Default none.').optional(),
+});
+
+export const sifOverrideSchema = z.object({
+  id: z.string().min(1),
+  at: z.union([z.object({ supportId: z.string().min(1) }), z.object({ pipeId: z.string().min(1), atMm: nonNegative })]),
+  sifInPlane: finite.refine((value) => value >= 1, 'must be >= 1'),
+  sifOutOfPlane: finite.refine((value) => value >= 1, 'must be >= 1'),
+  flexibility: finite.refine((value) => value >= 1, 'must be >= 1').optional(),
+  source: z.string().min(3),
+});
+
 export const RESTRAINT_KINDS = ['anchor', 'rest', 'guide', 'translational'] as const;
 
 export const restraintSchema = z.object({
@@ -88,9 +117,31 @@ export const restraintSchema = z.object({
   at: z.union([z.object({ supportId: z.string().min(1) }), z.object({ pipeId: z.string().min(1), atMm: nonNegative })]),
   kind: z.enum(RESTRAINT_KINDS),
   axis: z.enum(['x', 'y', 'z']).optional(),
+  direction: vec3.optional(),
   oneWay: z.enum(['+', '-']).optional(),
   gapMm: nonNegative.optional(),
   frictionCoefficient: nonNegative.optional(),
+});
+
+export const COMPONENT_KINDS = ['valve', 'flange', 'rigid'] as const;
+export const TEE_FITTINGS = ['welding_tee', 'unreinforced_tee', 'reinforced_tee', 'weldolet'] as const;
+
+/**
+ * Data of a pipe component the stress model reads (07 PST M5a): an 02 RTE inline valve or reducer (`componentId`), the tee / olet at the start of a
+ * branch pipe (`branchPipeId`), or a component declared on a pipe (`pipeId` + `atMm` + `lengthMm`: a flange pair, a valve or any rigid body of a building pipe).
+ */
+export const componentSchema = z.object({
+  id: z.string().min(1),
+  target: z.union([
+    z.object({ componentId: z.string().min(1) }),
+    z.object({ branchPipeId: z.string().min(1) }),
+    z.object({ pipeId: z.string().min(1), atMm: nonNegative, lengthMm: positive, kind: z.enum(COMPONENT_KINDS) }),
+  ]),
+  weightKg: nonNegative.optional(),
+  rigid: z.boolean().optional(),
+  stiffnessFactor: positive.optional(),
+  fitting: z.enum(TEE_FITTINGS).optional(),
+  padMm: positive.optional(),
 });
 
 const recordedSchema = z.object({
@@ -128,6 +179,9 @@ export const stressModelSchema = z.object({
   loadCases: z.array(loadCaseSchema),
   forces: z.array(forceSchema),
   restraints: z.array(restraintSchema),
+  displacements: z.array(displacementSchema),
+  sifOverrides: z.array(sifOverrideSchema),
+  components: z.array(componentSchema),
   recorded: recordedSchema.optional(),
   approval: approvalSchema.optional(),
 });
@@ -139,5 +193,8 @@ export type StressSlice = z.infer<typeof stressSliceSchema>;
 export type OperatingConditions = z.infer<typeof conditionsSchema>;
 export type LoadCaseDef = z.infer<typeof loadCaseSchema>;
 export type StressRestraint = z.infer<typeof restraintSchema>;
+export type StressComponent = z.infer<typeof componentSchema>;
+export type StressDisplacement = z.infer<typeof displacementSchema>;
+export type SifOverride = z.infer<typeof sifOverrideSchema>;
 export type StressForce = z.infer<typeof forceSchema>;
 export type RecordedResults = z.infer<typeof recordedSchema>;

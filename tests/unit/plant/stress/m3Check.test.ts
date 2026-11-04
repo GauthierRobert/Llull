@@ -279,7 +279,7 @@ describe('bends from an RTE run carry the SIFs of pipe_sif', () => {
     );
   });
 
-  it('a branch (a pipe ending on another pipe) and a reducer-bearing run are refused with their codes', () => {
+  it('a pipe ending on the interior of another is a tee node (M5a), not a refusal: the unrestrained system is PST_UNSTABLE at its first node', () => {
     const a = withPipe(
       baseDoc(),
       [
@@ -298,7 +298,7 @@ describe('bends from an RTE run carry the SIFs of pipe_sif', () => {
     );
     const { doc, id } = withModel(b.doc, [a.id, b.id]);
     const ready = cases(conditioned(doc, id), id, [{ name: 'S', type: 'SUS', basic: ['W'] }]);
-    expectRefusal(ready, 'analyze_pipe_stress', { modelId: id }, 'PST_BRANCH_UNSUPPORTED');
+    expectRefusal(ready, 'analyze_pipe_stress', { modelId: id }, 'PST_UNSTABLE');
   });
 });
 
