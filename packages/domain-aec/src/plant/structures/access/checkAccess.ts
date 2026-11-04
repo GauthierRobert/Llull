@@ -9,6 +9,7 @@ import { RULESET_NAMES, RULE_TABLE_VERSION, type AccessRule } from '../rules/rul
 import { checkEdges, edgeRuleUnsetFinding, type EdgeReport } from './edgeChecks';
 import { unverifiedFindings, type Finding } from './finding';
 import { LADDER_RULES_NOT_EVALUATED, checkLadder, ladderRules } from './ladderChecks';
+import { liveBackClearance } from '../ladder/ladderClearance';
 import { checkPlatforms, type PlatformReport } from './platformChecks';
 import { checkRailing, RAILING_RULES_NOT_EVALUATED, railingRules } from './railingChecks';
 import { checkStair, checkSteelStair, CONCRETE_STAIR_HEADROOM_NOT_EVALUATED, STAIR_RULES_NOT_EVALUATED, stairRules } from './stairChecks';
@@ -144,7 +145,7 @@ export const checkAccess = defineCommand({
       ...steelStairs.flatMap((stair) => checkSteelStair(doc, stair, params.rulesets)),
       ...headroom.flatMap((judged) => (judged.finding === null ? [] : [judged.finding])),
       ...railings.flatMap((railing) => checkRailing(doc, railing, params.rulesets)),
-      ...ladders.flatMap((ladder) => checkLadder(doc, ladder, params.rulesets)),
+      ...ladders.flatMap((ladder) => checkLadder(doc, ladder, params.rulesets, liveBackClearance(doc, building, ladder))),
     ];
     const findings: Finding[] = [...breaches, ...unverifiedFindings(breaches, rules)];
     // A generated platform or pipe rack that no longer matches what it is derived from is never green (update_access_platform / update_pipe_rack re-derive it).
