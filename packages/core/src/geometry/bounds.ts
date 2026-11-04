@@ -274,18 +274,30 @@ const MAX_NESTING = 8;
  * Falls back to a point at the instance position when the component is empty or missing.
  */
 export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument, depth = 0): Bounds {
-  const component = doc.components[instance.componentId];
-  // Past MAX_NESTING a reference cycle is assumed: the instance counts as a point at its position.
-  if (!component || component.order.length === 0 || depth >= MAX_NESTING) return { min: instance.position, max: instance.position };
-  const { scale = [1, 1, 1], rotation, position } = instance;
-  const toWorld = instanceToWorld(scale, rotation, position);
-  const worldPoints: Vec3[] = [];
+  const corners = instanceLocalCorners(doc, instance.componentId, depth);
+  return boundsOfPlacedCorners(corners, instance.scale ?? [1, 1, 1], instance.rotation, instance.position);
+}
+
+/**
+ * The component-space corners of the AABBs of a component's children (empty: component missing or empty, or nesting past `MAX_NESTING`).
+ * Shared by every placement of the component: an instance array computes them once.
+ */
+export function instanceLocalCorners(doc: CadDocument, componentId: string, depth = 0): Vec3[] {
+  const component = doc.components[componentId];
+  if (!component || component.order.length === 0 || depth >= MAX_NESTING) return [];
+  const corners: Vec3[] = [];
   for (const cid of component.order) {
     const child = component.entities[cid];
-    if (!child) continue;
-    for (const c of boundsCorners(entityBoundsInDoc(doc, child, depth + 1))) worldPoints.push(toWorld(c));
+    if (child) corners.push(...boundsCorners(entityBoundsInDoc(doc, child, depth + 1)));
   }
-  return worldPoints.length > 0 ? boundsOfPoints(worldPoints) : bounds(position, position);
+  return corners;
+}
+
+/** World AABB of `corners` placed by scale, rotation and position (a point at `position` when there are none). */
+export function boundsOfPlacedCorners(corners: readonly Vec3[], scale: Vec3, rotation: Vec3, position: Vec3): Bounds {
+  if (corners.length === 0) return { min: position, max: position };
+  const toWorld = instanceToWorld(scale, rotation, position);
+  return boundsOfPoints(corners.map(toWorld));
 }
 
 /**

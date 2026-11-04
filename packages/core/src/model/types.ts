@@ -664,6 +664,8 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   review?: ReviewModel;
   /** Absent until the first display command (`define_colour_profile`, `apply_service_colour_scheme`; plant 09 VIS). */
   display?: DisplayModel;
+  /** Absent until the first `add_instance_array`: packed placements of a Component, no Entity per instance (plant 09 VIS-M8j, VIS1). */
+  instanceArrays?: Record<string, import('./instanceArray').InstanceArray>;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */

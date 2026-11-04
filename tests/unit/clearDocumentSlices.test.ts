@@ -17,6 +17,7 @@ const SLICE_PROBES: Record<Exclude<OptionalKey, KeptKey>, unknown> = {
   prototype: {},
   review: {},
   display: {},
+  instanceArrays: { a: {} },
   blobs: { a: {} },
   fonts: { a: {} },
   exchange: {},

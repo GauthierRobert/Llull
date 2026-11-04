@@ -29,6 +29,7 @@ import { drawingsCommands } from './drawings/catalog';
 import { pmiCommands } from './pmi/catalog';
 import { reviewCommands } from './review/catalog';
 import { displayCommands } from './display/catalog';
+import { instanceArrayCommands } from './instanceArray/catalog';
 import { materialLabCommands } from './materiallab/catalog';
 import { materialCommands } from './materials/catalog';
 import { surfaceCommands } from './surface/catalog';
@@ -58,6 +59,7 @@ registerCommands('core', [
   ...pmiCommands,
   ...reviewCommands,
   ...displayCommands,
+  ...instanceArrayCommands,
   ...materialLabCommands,
   ...materialCommands,
   ...surfaceCommands,

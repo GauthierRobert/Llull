@@ -13,6 +13,8 @@ import type { Bounds } from './bounds';
 import { entityBounds, entityBoundsInDoc } from './bounds';
 import { assignedMaterialClass, materialClassPlanKey } from './materialClasses';
 import { entityToTriangles } from './entityTriangles';
+import { decodedTransforms, memberAsInstance, memberBounds } from './instanceArrays';
+import { instanceMemberId } from '../model/instanceArray';
 import { type FrustumPlane, type PlanCamera, frustumPlanes, planCameraProblem } from './renderPlanCamera';
 
 const PLAN_VERSION = 'R-BATCH-v1';
@@ -144,7 +146,8 @@ const diagonalOf = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0],
 /**
  * Every visible 3D entity of the document as a batchable instance.
  * @invariant document order; entities on hidden layers and 2D / curve / sheet entities are skipped; an `instance` entity is one instance
- *   (children are not expanded into the plan)
+ *   (children are not expanded into the plan); the members of every instance array (VIS1) follow, array by array, in table order, with
+ *   the same prototype key, AABB and diagonal as the equivalent `instance` entity and the id `<arrayId>#<index>`
  */
 export function planScene(
   doc: CadDocument,
@@ -156,6 +159,24 @@ export function planScene(
   const prototypeCounts: number[] = [];
   const instances: PlanInstance[] = [];
   let hiddenCount = 0;
+  const prototypeOf = (key: string, triangles: () => number): number => {
+    let slot = prototypeIndex.get(key);
+    if (slot === undefined) {
+      slot = prototypeIndex.size;
+      prototypeIndex.set(key, slot);
+      prototypeTriangles.push(triangles());
+      prototypeCounts.push(0);
+    }
+    return slot;
+  };
+  const classOf = (name: string): number => {
+    let slot = classIndex.get(name);
+    if (slot === undefined) {
+      slot = classIndex.size;
+      classIndex.set(name, slot);
+    }
+    return slot;
+  };
   for (const id of doc.order) {
     const entity = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
     if (entity === undefined || !is3D(entity)) continue;
@@ -163,24 +184,27 @@ export function planScene(
       hiddenCount++;
       continue;
     }
-    const key = prototypeKeyOf(entity);
-    let prototype = prototypeIndex.get(key);
-    if (prototype === undefined) {
-      prototype = prototypeIndex.size;
-      prototypeIndex.set(key, prototype);
-      prototypeTriangles.push(entityToTriangles(entity, doc).length);
-      prototypeCounts.push(0);
-    }
+    const prototype = prototypeOf(prototypeKeyOf(entity), () => entityToTriangles(entity, doc).length);
     prototypeCounts[prototype] = (prototypeCounts[prototype] ?? 0) + 1;
-    const className = materialClassOf(entity);
-    let materialClass = classIndex.get(className);
-    if (materialClass === undefined) {
-      materialClass = classIndex.size;
-      classIndex.set(className, materialClass);
-    }
+    const materialClass = classOf(materialClassOf(entity));
     const aabb = entityBoundsInDoc(doc, entity);
     const diagonal = entity.kind === 'instance' ? diagonalOf(aabb) : diagonalOf(entityBounds(entity));
     instances.push({ id, prototype, materialClass, aabb, diagonal });
+  }
+  for (const array of Object.values(doc.instanceArrays ?? {})) {
+    if (doc.layers[array.layerId]?.visible === false) {
+      hiddenCount += array.count;
+      continue;
+    }
+    const table = decodedTransforms(array);
+    const first = memberAsInstance(array, 0);
+    if (table === null || first === null) continue;
+    const prototype = prototypeOf(prototypeKeyOf(first), () => entityToTriangles(first, doc).length);
+    prototypeCounts[prototype] = (prototypeCounts[prototype] ?? 0) + array.count;
+    const materialClass = classOf(array.materialId ?? 'unassigned');
+    let index = 0;
+    for (const aabb of memberBounds(doc, array, table))
+      instances.push({ id: instanceMemberId(array.id, index++), prototype, materialClass, aabb, diagonal: diagonalOf(aabb) });
   }
   return {
     instances,

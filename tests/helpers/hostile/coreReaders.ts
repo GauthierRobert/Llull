@@ -73,6 +73,17 @@ const documentBuild = (records: number): string => {
   return serializeDocument(doc);
 };
 
+/** A saved document holding one instance array (VIS1), with `tamper` applied to its parsed record: the hostile variants of the packed table. */
+const arrayDocument = (tamper: (record: Record<string, unknown>) => void): string => {
+  let doc = createEmptyDocument();
+  doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+  doc = execute(doc, 'create_component', { name: 'C', entityIds: doc.order, componentId: 'c' }).document;
+  doc = execute(doc, 'add_instance_array', { componentId: 'c', counts: [2, 2, 1], step: [5, 5, 5] }).document;
+  const saved = JSON.parse(serializeDocument(doc)) as { document: { instanceArrays: Record<string, Record<string, unknown>> } };
+  for (const record of Object.values(saved.document.instanceArrays)) tamper(record);
+  return JSON.stringify(saved);
+};
+
 const png1x1 = (): Uint8Array =>
   Uint8Array.from(
     Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64'),
@@ -224,6 +235,19 @@ export const CORE_READERS: readonly HostileReader[] = [
     read: (input) => execute(createEmptyDocument(), 'load_document', { json: asText(input) }),
     accepts: (result) => (result as { affected: string[] }).affected.length > 0,
     maxRecords: 4000,
+    extra: [
+      { name: 'instance array: count far beyond the table', input: () => arrayDocument((record) => (record['count'] = 2 ** 31)) },
+      {
+        name: 'instance array: table of 4 MB of base64 for a count of 4',
+        input: () => arrayDocument((record) => (record['transforms'] = 'A'.repeat(4_000_000))),
+      },
+      {
+        name: 'instance array: every double NaN',
+        input: () => arrayDocument((record) => (record['transforms'] = '/n8AAAAAAAA='.repeat(12).replace(/=/g, ''))),
+      },
+      { name: 'instance array: table as a nested array', input: () => arrayDocument((record) => (record['transforms'] = [[[1]]])) },
+      { name: 'instance array: component id __proto__', input: () => arrayDocument((record) => (record['componentId'] = '__proto__')) },
+    ],
   },
   {
     name: 'core: thread designations and colours',
