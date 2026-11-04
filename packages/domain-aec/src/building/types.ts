@@ -384,6 +384,8 @@ export interface GratingElement extends LevelElementBase {
   bearingBarAngle: number;
   /** The members the bars bear on, one list per side in order along the bar direction (end-to-end members share a side). */
   supportIds: [string[], string[]];
+  /** Imposed load on the panel, kN/m² (06 STA FR-STA-15); absent = the `imposedLoad` of check_steel_members. */
+  imposedLoadKPa?: number;
   /** The platform assembly that generated this panel (06 STA M6). */
   assemblyId?: string;
 }

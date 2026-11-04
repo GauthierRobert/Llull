@@ -21,6 +21,7 @@ export const platformSpecSchema = z.object({
   topOffset: z.number(),
   gratingType: z.string(),
   bearingBarDirection: point,
+  imposedLoadKPa: z.number().min(0).optional(),
   framing: z.union([
     z.object({ kind: z.literal('existing') }),
     z.object({ kind: z.literal('generated'), profile: z.string(), maxSpacing: z.number().positive() }),
@@ -37,6 +38,7 @@ export const circularSpecSchema = z.object({
   gap: z.number().min(0),
   width: z.number().positive(),
   gratingType: z.string(),
+  imposedLoadKPa: z.number().min(0).optional(),
   bracketProfile: z.string(),
   bracketSpacingMax: z.number().positive().optional(),
   railing: z.union([z.null(), z.object({ edges: z.array(z.enum(['outer', 'inner', 'ends'])), ...railingFields })]),

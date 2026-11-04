@@ -821,7 +821,7 @@
 | `list_access_rules` | List the access-structure rules check_access evaluates: id, ruleset, clause, quantity, limits in mm / N / degrees (with the imperial original), grade and sourc… | read-only |
 | `list_grating_types` | List the steel bar grating catalogue (NAAMM MBG 531 basis: welded W type, plain bearing bars, 4 in cross bars) used by add_grating and check_grating. | read-only |
 | `update_access_platform` | Change a generated platform (add_access_platform / add_circular_access_platform `assemblyId`) and regenerate its members, grating panels and railings; part ids… |  |
-| `update_grating` | Change the grating type of existing panels (the `elementIds` of add_grating): use a deeper bar after check_grating reported STA_GRATING_OVERSTRESS or STA_GRATI… |  |
+| `update_grating` | Change the grating type and / or the imposed load of existing panels (the `elementIds` of add_grating): use a deeper bar after check_grating reported STA_GRATI… |  |
 | `update_ladder` | Change fields of an existing fixed ladder (add_ladder id) in place: the id, mark, position and arrival surface stay (to move it, delete it and add a new one). |  |
 | `update_pipe_rack` | Change a generated pipe rack (add_pipe_rack `assemblyId`) and regenerate its members; member ids and marks are kept (extra members get new ids, surplus ones ar… |  |
 | `update_railing` | Change fields of an existing railing (add_railing id): height, kneeRails, toePlate, postProfile, railProfile, postSpacingMax (lengths in DOCUMENT UNITS), openi… |  |
