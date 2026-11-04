@@ -11,7 +11,7 @@ export interface PipeMarker {
   readonly colour: string;
 }
 
-export interface PipeMarkerLabel {
+interface PipeMarkerLabel {
   readonly runId: string;
   readonly positionMm: Vec3;
   readonly letters: string;
