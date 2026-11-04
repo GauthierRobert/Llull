@@ -260,7 +260,10 @@ export function planRender(scene: PlanScene, camera: PlanCamera, options: PlanOp
   const { instances } = scene;
   const levels = new Uint8Array(instances.length).fill(LEVEL_OUTSIDE);
   const query = options.query ?? bruteForceQuery(instances);
-  const inside = [...new Set(query(frustumPlanes(camera)))].sort((a, b) => a - b);
+  const found = query(frustumPlanes(camera));
+  const inside = found.every((value, position) => position === 0 || value > (found[position - 1] as number))
+    ? found
+    : [...new Set(found)].sort((a, b) => a - b);
   const classCount = Math.max(scene.materialClasses.length, 1);
   const bucketMembers = new Map<number, number[]>();
   const uniqueMembers = new Map<number, number[]>();
