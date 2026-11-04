@@ -18,7 +18,7 @@ const ROW_PATTERN = /^(.+):(max|min)$/;
  * @affects doc.analysis.cases[analysisId].thermal.dispositions[rowId] (records decision, justification, resultsHash, signer, signatureId and the verified signature, so readers can re-verify it)
  * @invariant only with a signature verified by `ctx.humanSignature` over the payload sha256 of (documentUid, analysisId, rowId, decision, justification,
  *   resultsHash); the disposition binds to the current results hash and to this document (its uid, recorded with it and re-verified by check_temperature_limits)
- * @failure a document without a uid -> THM_DOCUMENT_UNIDENTIFIED; no port or a signature that does not verify -> THM_HUMAN_GATE; unknown row -> THM_LIMIT_NOT_FOUND; stale results -> FEA_RESULTS_STALE;
+ * @failure no port or a signature that does not verify -> THM_HUMAN_GATE; a document without a uid (checked after the port) -> THM_DOCUMENT_UNIDENTIFIED; unknown row -> THM_LIMIT_NOT_FOUND; stale results -> FEA_RESULTS_STALE;
  *   no results -> FEA_RESULTS_MISSING; empty justification -> THM_LIMIT_INVALID (all refusals, unchanged doc)
  */
 export const disposeThermalLimit = defineCommand({
@@ -52,13 +52,13 @@ export const disposeThermalLimit = defineCommand({
       return fail('THM_LIMIT_NOT_FOUND', `no limit row '${rowId}' in '${analysisId}'`, [analysisId, rowId], ['rowId']);
     if (justification.trim() === '')
       return fail('THM_LIMIT_INVALID', 'a disposition needs a justification', [analysisId, rowId], ['justification']);
-    if (doc.uid === undefined) return fail('THM_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [analysisId]);
     const port = ctx?.humanSignature ?? null;
     if (port === null)
       return fail(
         'THM_HUMAN_GATE',
         'dispositions need a human-held signature and no signing port is available: hand over to the qualified reviewer',
       );
+    if (doc.uid === undefined) return fail('THM_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [analysisId]);
     const record = found.analysisCase.results;
     const artifacts = resultArtifacts(doc, found, ctx?.feaArtifacts);
     if (

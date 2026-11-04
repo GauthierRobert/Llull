@@ -48,3 +48,23 @@ export function expectBoundToDocument(
   expect(refused.error?.code, refused.summary).toBe(gateCode);
   expect(refused.document).toBe(copied);
 }
+
+/**
+ * A gate that re-verifies stored signatures refuses a document that has no uid (the signature would bind to nothing), but only after the signing port
+ * and the signature: a caller without a port still gets the gate's own code.
+ */
+export function expectRefusesWithoutUid(
+  doc: CadDocument,
+  attempt: (document: CadDocument, confirmation: Record<string, unknown>, ctx: ExecutionContext) => CommandResult,
+  unidentifiedCode: string,
+  gateCode: string,
+): void {
+  const { uid, ...bare } = doc;
+  void uid;
+  const confirmation = { nonce: 'n1', payload: 'any' };
+  const refused = attempt(bare, confirmation, { ...defaultContext(), humanSignature: pinnedPort() });
+  expect(refused.error?.code, refused.summary).toBe(unidentifiedCode);
+  expect(refused.document).toBe(bare);
+  const agent = attempt(bare, confirmation, { ...defaultContext(), humanSignature: null });
+  expect(agent.error?.code, agent.summary).toBe(gateCode);
+}

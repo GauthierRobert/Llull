@@ -46,7 +46,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_DISPOSITION_UNVERIFIED:
     'the stored disposition does not verify (no signing port, or no / a wrong signature): the qualified reviewer records it again with dispose_thermal_limit',
   THM_DOCUMENT_UNIDENTIFIED:
-    'the document has no uid yet: make any recorded change (or load it with load_document), then sign; the signature is bound to the uid',
+    'the document has no uid yet: make any recorded change (or load it with load_document, or run it as its own command, not inside a build_project plan), then sign; the signature is bound to the uid',
   THM_DISPOSITION_FOREIGN_DOCUMENT:
     'discard the copied disposition; a qualified reviewer of THIS document dispositions the row again (dispose_thermal_limit signs the document uid)',
   THM_DISPOSITION_UNBOUND:

@@ -11,6 +11,7 @@ import { analysisInputHash } from '@cae/hash/inputHash';
 import { isProblem, thermalCaseOf } from '@cae/thermal/access';
 import { limitRows } from '@cae/thermal/limitRows';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
+import { expectRefusesWithoutUid } from '../../../helpers/documentBinding';
 import { caseOf, machineContext, must } from './fixtures';
 import { HOT_T, solvedWall, type SolvedWall } from './solved';
 
@@ -324,6 +325,17 @@ describe('dispose_thermal_limit: the signature is bound to the document (GATE-UI
     expect(items).toContainEqual(expect.objectContaining({ code: 'THM_DISPOSITION_FOREIGN_DOCUMENT', severity: 'error' }));
     expect((checked.data as Data).rows.find((entry) => entry.rowId === rowId)?.disposition).toBe('pending_human');
     expect(items.map((item) => item.code)).toContain('THM_DISPOSITION_PENDING');
+  });
+
+  it('every re-verified gate refuses a uid-less document after the port check (shared helper)', () => {
+    const { wall, doc, params } = setup();
+    expectRefusesWithoutUid(
+      doc,
+      (document, signature, ctx) =>
+        run(document, 'dispose_thermal_limit', { ...params, signature }, withPorts(wall, ctx.humanSignature ?? undefined)),
+      'THM_DOCUMENT_UNIDENTIFIED',
+      'THM_HUMAN_GATE',
+    );
   });
 
   it('a disposition that records no document uid does not count: THM_DISPOSITION_UNBOUND', () => {

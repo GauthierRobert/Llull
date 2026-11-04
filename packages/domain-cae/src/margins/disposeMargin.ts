@@ -20,7 +20,7 @@ import { refuseMarginsAs } from './refusal';
  *   resultsHash, documentUid): the decision binds to the row as computed now, to the current results hash and to this document (its uid, recorded with
  *   the disposition and re-verified by compute_margins), and ends when the case is solved again
  * @failure no signing port, no signature or a signature that does not verify -> FEA_HUMAN_GATE (an agent caller always lands here); unknown analysis
- *   -> FEA_ANALYSIS_NOT_FOUND; a document without a uid -> FEA_DOCUMENT_UNIDENTIFIED; empty justification -> FEA_PARAM_INVALID; stale / missing results -> FEA_RESULTS_STALE / FEA_RESULTS_MISSING; unknown
+ *   -> FEA_ANALYSIS_NOT_FOUND; a document without a uid (checked after the port and signature) -> FEA_DOCUMENT_UNIDENTIFIED; empty justification -> FEA_PARAM_INVALID; stale / missing results -> FEA_RESULTS_STALE / FEA_RESULTS_MISSING; unknown
  *   rowId -> FEA_MARGIN_ROW_NOT_FOUND; a PASS row -> FEA_MARGIN_PARAM_INVALID (all refusals, unchanged doc)
  */
 export const disposeMargin = defineCommand({
@@ -44,10 +44,10 @@ export const disposeMargin = defineCommand({
     const fail = (code: string, message: string, ids: readonly string[] = [analysisId, rowId]): CommandResult =>
       refuseMarginsAs(doc, 'dispose_margin', code, message, ids);
     if (caseOf(doc, analysisId) === undefined) return fail('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId]);
-    if (doc.uid === undefined) return fail('FEA_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [analysisId]);
     const port = ctx?.humanSignature ?? null;
     if (port === null || signature === undefined)
       return fail('FEA_HUMAN_GATE', 'dispositions need a human-held signature: hand over to the qualified reviewer, do not retry');
+    if (doc.uid === undefined) return fail('FEA_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [analysisId]);
     if (justification.trim() === '') return fail('FEA_PARAM_INVALID', 'a disposition needs a justification');
     const table = marginTable(doc, analysisId, query, ctx);
     if ('code' in table) return fail(table.code, table.message, table.ids);

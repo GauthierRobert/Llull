@@ -9,6 +9,7 @@ import { isRecord } from '@lib/isRecord';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { marginDispositionPayload } from '@cae/margins/disposition';
 import { withCase } from '@cae/shared/access';
+import { expectRefusesWithoutUid } from '../../helpers/documentBinding';
 import { caseIn } from './helpers';
 import { mustRun } from './deckFixtures';
 import { marginBar, type MarginBar } from './marginsFixtures';
@@ -314,6 +315,16 @@ describe('dispose_margin: the signature is bound to the document (GATE-UID)', ()
       expect(result.error?.code, name).toBe('FEA_DOCUMENT_UNIDENTIFIED');
       expect(result.document).toBe(unidentified);
     }
+  });
+
+  it('every re-verified gate refuses a uid-less document after the port check (shared helper)', () => {
+    expectRefusesWithoutUid(
+      bar.recorded,
+      (document, signature, ctx) =>
+        execute(document, 'dispose_margin', { ...params, signature }, { ...bar.ctx, humanSignature: ctx.humanSignature ?? null }),
+      'FEA_DOCUMENT_UNIDENTIFIED',
+      'FEA_HUMAN_GATE',
+    );
   });
 
   it('a signature made in this document is refused in a copy of it: FEA_HUMAN_GATE', () => {

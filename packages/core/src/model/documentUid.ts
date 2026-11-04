@@ -17,7 +17,7 @@ export function sealDocumentUid(before: CadDocument, result: CadDocument, seed: 
 /** What a stored `uid` must look like (checked at load). */
 export const DOCUMENT_UID_PATTERN = /^[0-9a-f]{32}$/;
 
-/** The identity a human signature binds to: the document uid, or '' while the document has none (gated acts refuse such a document first). */
+/** The identity a human signature binds to: the document uid, or '' while the document has none (re-verified acts refuse a uid-less document; the others bind ''; sealing makes that unreachable after the first command). */
 export const documentIdentity = (doc: CadDocument): string => doc.uid ?? '';
 
 /**

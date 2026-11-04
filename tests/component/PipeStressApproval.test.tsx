@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { useStore } from '@ui/store';
 import { PipeStressPanel } from '@ui/panels/pipeStress/PipeStressPanel';
 import { resetStore } from '../helpers/componentEntities';
@@ -87,7 +88,7 @@ describe('PipeStressPanel approval signature', () => {
       humanGatePayload(
         'plant:approve_pipe_stress',
         [modelId],
-        { inputHash: recorded?.inputHash, resultHash: recorded?.resultHash },
+        withDocumentUid({ inputHash: recorded?.inputHash, resultHash: recorded?.resultHash }, useStore.getState().document),
         nonce as string,
       ),
     );
