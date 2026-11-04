@@ -87,3 +87,16 @@ describe('render_walkthrough path', () => {
     expectPure(doc, () => execute(doc, 'render_walkthrough', { id: 'wt-4', path: 'smooth', width: 64, height: 48 }));
   });
 });
+
+describe('render_walkthrough material class shading (VIS-M8h)', () => {
+  it('draws the Blinn-Phong highlight of an assigned class on the reference raster (a class with no colour still changes the frames)', () => {
+    const doc = routed();
+    const shiny = apply(
+      apply(doc, 'define_material_class', { id: 'sheen', colour: null, metalness: 1, roughness: 1 }),
+      'assign_material_class',
+      { entityIds: [doc.order[0] as string], classId: 'sheen' },
+    );
+    expect(render(shiny).frameSha256).not.toEqual(render(doc).frameSha256);
+    expect(render(shiny).frameSha256).toEqual(render(shiny).frameSha256);
+  });
+});

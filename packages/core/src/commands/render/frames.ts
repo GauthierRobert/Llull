@@ -12,7 +12,7 @@ import { ORIGIN } from '../../lib/vec3';
 import type { ViewpointCamera } from '../../model/review';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { rasterScenePixels } from './raster';
-import type { PixelStage } from './types';
+import type { PixelStage, SurfaceShading } from './types';
 import { renderDocument } from './scene';
 import { viewpointView } from './viewSetup';
 
@@ -41,6 +41,7 @@ export function renderCameraPng(
   background: readonly [number, number, number],
   center: Vec3,
   pixels: PixelStage = rasterScenePixels,
+  shading?: ReadonlyMap<string, SurfaceShading>,
 ): Uint8Array {
   let drawn: Uint8Array | null = null;
   const capture: PixelStage = (scene) => {
@@ -52,6 +53,7 @@ export function renderCameraPng(
     caption: false,
     background: null,
     pixels: capture,
+    ...(shading === undefined ? {} : { shading }),
   });
   const source: Uint8Array = drawn ?? new Uint8Array(width * height * 4);
   const out = new Uint8Array(width * height * 4);

@@ -1,6 +1,7 @@
 /**
  * Entity property bag (plant 09 VIS §3.3/§3.4): the flat, read-only facts colour rules and reports match on. Core knows its own keys
- * (kind, layer, tags, material, name, component); a plugin adds domain keys through `CadPlugin.entityProperties`.
+ * (kind, layer, tags, material, name, component); a plugin adds domain keys through `CadPlugin.entityProperties`. The key `defaultMaterialClass`
+ * (a class id) is the render's shading class for an entity with no assignment (`commands/render/surfaceShading.ts`).
  */
 
 import type { PropertyValue } from './display';
