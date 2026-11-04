@@ -13,6 +13,7 @@ import { stepIdSource } from '../lib/id';
 import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
+import { sealDocumentUid } from '../model/documentUid';
 import { runCommand } from './runCommand';
 
 const blobsGiven = new WeakMap<GeometryKernel, Set<string>>();
@@ -61,7 +62,12 @@ function executeGuarded(doc: CadDocument, commandName: string, params: unknown, 
     );
   feedBlobs(doc, ctx.kernel);
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true && annotations?.session !== true;
-  if (!recordsStep) return runInContext(ctx, () => runCommand(def, doc, params, ctx)); // queries, history meta-commands, session commands
+  if (!recordsStep) {
+    // queries, history meta-commands, session commands; a meta-history change (review data) also seals the document identity
+    const ran = runInContext(ctx, () => runCommand(def, doc, params, ctx));
+    if (annotations?.metaHistory !== true) return ran;
+    return { ...ran, document: sealDocumentUid(doc, ran.document, { name: commandName, params: withoutConfirmations(params) }) };
+  }
   // An execute nested inside a running step appends no step of its own but is reconciled like any mutating result.
   if (ctx.stepKey !== undefined)
     return applyReconcile(
@@ -95,7 +101,7 @@ function executeGuarded(doc: CadDocument, commandName: string, params: unknown, 
     affected: result.affected,
   };
   const recorded: CadDocument = {
-    ...result.document,
+    ...sealDocumentUid(doc, result.document, { name: commandName, params: recordedParams }),
     featureHistory: [...result.document.featureHistory, step],
     nextStepNumber: Math.max(result.document.nextStepNumber ?? 1, stepNumber + 1),
   };

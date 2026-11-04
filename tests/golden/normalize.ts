@@ -70,8 +70,11 @@ function normalizeJson(parsed: unknown): unknown {
   return walk(parsed);
 }
 
+/** The document uid is a generated identity (a hash of the first step), not definition data: the snapshots do not carry it (its tests are in tests/unit/review). */
 export function normalize(doc: CadDocument): unknown {
-  return normalizeJson(JSON.parse(serializeDocument(doc, { includeDerived: true })));
+  const { uid: _uid, ...definition } = doc;
+  void _uid;
+  return normalizeJson(JSON.parse(serializeDocument(definition, { includeDerived: true })));
 }
 
 /** Everything replay regenerates (carry.ts): entities, order, materials, components, constraints — what a history edit must reproduce. */

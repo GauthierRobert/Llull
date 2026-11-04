@@ -29,6 +29,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   VIS_ISSUE_STATUS_INVALID:
     'follow the workflow open <-> in_progress <-> resolved -> closed (closing and re-opening a closed issue are human acts)',
   VIS_COMMENT_INVALID: 'give a non-empty text',
+  VIS_DOCUMENT_UNIDENTIFIED:
+    'the document has no uid yet (a file not loaded through load_document and never changed): make any recorded change, or load it with load_document, then sign: the signature is bound to the uid',
   VIS_HUMAN_GATE:
     'a human signs the act in the desktop app (review_act_payload gives the bytes) and the signature goes in confirmation; an agent prepares the act and hands over',
   VIS_RENDER_BUDGET: 'lower width / height / fps or the frame count',

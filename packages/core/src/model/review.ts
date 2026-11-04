@@ -109,6 +109,8 @@ export interface IssueHistoryEntry {
   readonly reason: string;
   readonly signatureId?: string;
   readonly signer?: string;
+  /** The uid of the document the signature was made for (check_review: another uid than the document's is a transplanted record). */
+  readonly documentUid?: string;
   /** The signature a human made ({ alg, keyId, publicKey, signature, nonce } only); check_review re-verifies it against the rebuilt act. */
   readonly proof?: Readonly<Record<string, string>>;
 }

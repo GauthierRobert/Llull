@@ -252,6 +252,7 @@ describe('set_issue_status and the human gate (VC-VIS-14, TR-VIS-15)', () => {
       reason: 'accept',
       signatureId: 'fake:grace',
       signer: 'grace',
+      documentUid: doc.uid,
       proof: confirmationFor(doc, 'closed', 'accept'),
     });
     expect(closed.summary).toContain('by human (grace)');

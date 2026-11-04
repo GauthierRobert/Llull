@@ -1,9 +1,10 @@
 /** Attack tests of the human gate (AF-34, TR-PLM-16): a human-only act needs a signature over THAT act; no label, flag or param clears it. */
 
 import { describe, expect, it } from 'vitest';
-import type { CadDocument } from '@core/model/types';
+import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { ExecutionContext } from '@core/commands/types';
 import { actPayload } from '@plm/gate';
+import { serializeDocument } from '@core/commands/persistence/serialization';
 import { APPROVALS, T, approveAll, inReview, inWork, released, reviewWithEco } from './fixtures';
 import { agentContext, confirmed, humanContext, loadSample, run, runRaw } from './scenarioRunner';
 
@@ -100,6 +101,32 @@ describe('a confirmation is bound to its act, its params and the document state'
     const later = run(doc, 'set_item_marking', { regime: 'none', decidedBy: 'u-3' }).document;
     expect(code(runRaw(later, 'release_item', signedNow))).toBe('PLM_HUMAN_GATE');
     expect(runRaw(doc, 'release_item', signedNow).document.plm?.item.revisions['A']?.state).toBe('released');
+  });
+
+  it('a signature is bound to the document uid: an identical PLM record and definition in another document refuses it (VIS-ID)', () => {
+    const doc = approveAll(reviewWithEco());
+    expect(doc.uid).toMatch(/^[0-9a-f]{32}$/);
+    const params = { changeOrder: 'ECO-0100', at: T, by: 'u-1' };
+    const signedNow = confirmed(doc, 'release_item', params, 'u-1');
+    const copy: CadDocument = { ...doc, uid: 'f'.repeat(32) };
+    const refused = runRaw(copy, 'release_item', signedNow);
+    expect(code(refused)).toBe('PLM_HUMAN_GATE');
+    expect(refused.document).toBe(copy);
+    expect(runRaw(doc, 'release_item', signedNow).document.plm?.item.revisions['A']?.state).toBe('released');
+  });
+
+  it('a document without a uid (a fresh one) still takes its first human act, which seals the uid; load_document seals a loaded file', () => {
+    const fresh = createEmptyDocument();
+    expect(fresh.uid).toBeUndefined();
+    const params = { partNumber: 'LL-1', name: 'n', itemType: 'part', policy: { humanSignatureRequired: false } };
+    const first = runRaw(fresh, 'set_item_identity', { ...params, ...confirmed(fresh, 'set_item_identity', params, 'u-1') });
+    expect(first.error).toBeUndefined();
+    expect(first.document.uid).toMatch(/^[0-9a-f]{32}$/);
+    const { uid: _uid, ...bare } = first.document;
+    void _uid;
+    const loaded = run(loadSample(), 'load_document', { json: serializeDocument(bare as CadDocument) }).document;
+    expect(loaded.uid).toMatch(/^[0-9a-f]{32}$/);
+    expect(run(loadSample(), 'load_document', { json: serializeDocument(bare as CadDocument) }).document.uid).toBe(loaded.uid);
   });
 
   it('a release signature binds the document definition: changing the model after signing invalidates it', () => {
