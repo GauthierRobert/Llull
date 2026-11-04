@@ -6,7 +6,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import type { StressModel, StressRestraint } from './schema';
-import type { Layout, LayoutFailure } from './layout';
+import type { Layout, LayoutFailure } from './layoutTypes';
 import type { SourceSupport } from './sources';
 
 export interface Contact {

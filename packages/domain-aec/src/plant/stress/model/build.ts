@@ -1,10 +1,15 @@
 /** The finite element model of a stress model, rebuilt from the current document on every analysis (07 PST §5.1). */
 
 import type { CadDocument } from '@core/model/types';
+import type { Vec3 } from '@core/model/vectors';
 import { ruleSetOf, type RuleSet } from '../code/ruleSets';
-import { buildLayout, pointAtArc, type Attachment, type Layout, type LayoutFailure } from './layout';
+import type { SourceComponent } from './components';
+import type { JunctionFitting } from './junctions';
+import { buildLayout, type LayoutComponent } from './layout';
+import type { Attachment, Layout, LayoutFailure } from './layoutTypes';
 import { mapRestraints, type RestraintSet } from './restraints';
-import type { StressModel } from './schema';
+import type { StressComponent, StressModel } from './schema';
+import { arcOf, meanSection, pointAtArc, sectionAt, type SectionStep } from './sections';
 import { resolveSources, type SourcePipe, type Sources } from './sources';
 
 export interface BuiltModel {
@@ -19,6 +24,8 @@ export interface BuiltModel {
     readonly force: readonly [number, number, number];
     readonly moment: readonly [number, number, number];
   }[];
+  /** Stated weights of tees / olets (kg) at their junction node. */
+  readonly pointWeights: readonly { readonly node: number; readonly kg: number }[];
   readonly warnings: readonly { readonly code: string; readonly message: string; readonly ids: readonly string[] }[];
 }
 
@@ -32,12 +39,81 @@ const failure = (code: string, message: string, ids: readonly string[] = [], pat
 
 /** Thinnest corroded wall the section formulas are used with (mm): below it the section is not a pipe. */
 const MIN_CORRODED_WALL_MM = 0.1;
+const MIN_COMPONENT_MM = 2;
 
 export const isBuildFailure = (value: BuiltModel | LayoutFailure): value is LayoutFailure => 'ok' in value;
 
+/** The fitting a branch pipe's tee is modelled with: the stored choice, else what the 02 RTE derivation says, else a fabricated tee (assumed). */
+function fittingChoice(
+  model: Pick<StressModel, 'components'>,
+  sources: Sources,
+  branchPipeId: string,
+): JunctionFitting & { readonly origin: 'stored' | 'rte' | 'assumed' } {
+  const stored = model.components.find((entry) => 'branchPipeId' in entry.target && entry.target.branchPipeId === branchPipeId);
+  const derived = sources.branches.find((branch) => branch.branchPipeId === branchPipeId);
+  const padMm = stored?.padMm;
+  if (stored?.fitting !== undefined) return { fitting: stored.fitting, padMm, origin: 'stored' };
+  if (derived !== undefined)
+    return {
+      fitting: derived.kind === 'tee' ? 'welding_tee' : derived.kind === 'olet' ? 'weldolet' : 'unreinforced_tee',
+      padMm,
+      origin: 'rte',
+    };
+  return { fitting: 'unreinforced_tee', padMm, origin: 'assumed' };
+}
+
+const distance = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+/** The components of the model as layout input: RTE valves / reducers and the declared ones, each with its stored data. */
+function layoutComponents(
+  model: StressModel,
+  sources: Sources,
+  steps: ReadonlyMap<string, readonly SectionStep[]>,
+): { readonly list: LayoutComponent[] } | LayoutFailure {
+  const list: LayoutComponent[] = [];
+  const push = (component: SourceComponent, data: StressComponent | undefined): void => {
+    const own = steps.get(component.pipeId) as readonly SectionStep[];
+    const arc = arcOf(sources.pipes.find((pipe) => pipe.id === component.pipeId)?.points ?? [], component.faces[0]);
+    const section =
+      component.kind === 'reducer' && component.downstream !== undefined
+        ? meanSection(sectionAt(own, arc - 1), sectionAt(own, arc + component.lengthMm))
+        : undefined;
+    list.push({
+      key: component.key,
+      pipeId: component.pipeId,
+      kind: component.kind,
+      faces: component.faces,
+      rigid: data?.rigid ?? component.kind !== 'reducer',
+      stiffnessFactor: data?.stiffnessFactor ?? 1,
+      weightKg: data?.weightKg ?? null,
+      ...(section === undefined ? {} : { section }),
+    });
+  };
+  for (const component of sources.components)
+    push(
+      component,
+      model.components.find((entry) => 'componentId' in entry.target && entry.target.componentId === component.key),
+    );
+  for (const entry of model.components) {
+    if (!('pipeId' in entry.target)) continue;
+    const target = entry.target;
+    const pipe = sources.pipes.find((candidate) => candidate.id === target.pipeId);
+    const first = pipe === undefined ? null : pointAtArc(pipe.points, Math.max(0, target.atMm - target.lengthMm / 2));
+    const second = pipe === undefined ? null : pointAtArc(pipe.points, target.atMm + target.lengthMm / 2);
+    if (pipe === undefined || first === null || second === null || distance(first, second) < MIN_COMPONENT_MM)
+      return failure(
+        'PST_POINT_OFF_PIPE',
+        `component ${entry.id}: no length of at least ${MIN_COMPONENT_MM} mm on pipe ${target.pipeId} at ${target.atMm} mm`,
+        [entry.id, target.pipeId],
+      );
+    push({ key: entry.id, pipeId: pipe.id, kind: target.kind, faces: [first, second], lengthMm: target.lengthMm }, entry);
+  }
+  return { list };
+}
+
 /**
- * @failure document not in mm -> PST_PARAM_INVALID; missing pipe / run -> PST_PIPE_NOT_FOUND; run branches / reducers -> PST_COMPONENT_UNSUPPORTED;
- *   no wall -> PST_WALL_UNKNOWN; geometry failures of `buildLayout`, `mapRestraints`
+ * @failure document not in mm -> PST_PARAM_INVALID; missing pipe / run -> PST_PIPE_NOT_FOUND; no wall -> PST_WALL_UNKNOWN; corrosion allowance eating the wall
+ *   -> PST_CORROSION_EXCEEDS_WALL; geometry failures of `buildLayout`, `mapRestraints`
  */
 export function buildStressModel(doc: CadDocument, model: StressModel): BuiltModel | LayoutFailure {
   if (doc.units !== 'mm') return failure('PST_PARAM_INVALID', `plant lengths are mm; this document is in ${doc.units}`, [], ['units']);
@@ -49,27 +125,19 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
       sources.missing.map(([id]) => id),
       ['scope'],
     );
-  const unsupported = sources.pipes.flatMap((pipe) => pipe.unsupported.map((what) => `${pipe.id}: ${what}`));
-  if (unsupported.length > 0)
-    return failure(
-      'PST_COMPONENT_UNSUPPORTED',
-      `components the M3 model cannot represent (tees, branches and reducers arrive with M5): ${unsupported.join('; ')}`,
-      sources.pipes.filter((pipe) => pipe.unsupported.length > 0).map((pipe) => pipe.id),
-      ['scope'],
-    );
   const walls = new Map<string, number>();
-  for (const pipe of sources.pipes) {
-    const wall = model.conditions?.wallMm ?? pipe.wallMm;
-    if (wall === null || !(wall > 0) || 2 * wall >= pipe.odMm)
+  const steps = new Map<string, SectionStep[]>();
+  const corrosion = model.conditions?.corrosionAllowanceMm ?? 0;
+  const checkWall = (pipe: SourcePipe, wall: number | null, odMm: number): LayoutFailure | null => {
+    if (wall === null || !(wall > 0) || 2 * wall >= odMm)
       return failure(
         'PST_WALL_UNKNOWN',
         wall === null
           ? `pipe ${pipe.id} has no wall thickness (no spec binding)`
-          : `pipe ${pipe.id}: wall ${wall} mm is not a physical wall for OD ${pipe.odMm} mm`,
+          : `pipe ${pipe.id}: wall ${wall} mm is not a physical wall for OD ${odMm} mm`,
         [pipe.id],
         ['conditions.wallMm'],
       );
-    const corrosion = model.conditions?.corrosionAllowanceMm ?? 0;
     if (!(wall - corrosion > MIN_CORRODED_WALL_MM))
       return failure(
         'PST_CORROSION_EXCEEDS_WALL',
@@ -77,7 +145,25 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
         [pipe.id],
         ['conditions.corrosionAllowanceMm'],
       );
-    walls.set(pipe.id, wall);
+    return null;
+  };
+  for (const pipe of sources.pipes) {
+    const wall = model.conditions?.wallMm ?? pipe.wallMm;
+    const bad = checkWall(pipe, wall, pipe.odMm);
+    if (bad !== null) return bad;
+    walls.set(pipe.id, wall as number);
+    const own: SectionStep[] = [{ fromArcMm: 0, section: { odMm: pipe.odMm, wallMm: wall as number } }];
+    for (const component of sources.components) {
+      if (component.pipeId !== pipe.id || component.kind !== 'reducer' || component.downstream === undefined) continue;
+      const downstream = { odMm: component.downstream.odMm, wallMm: model.conditions?.wallMm ?? component.downstream.wallMm };
+      const worse = checkWall(pipe, downstream.wallMm, downstream.odMm);
+      if (worse !== null) return worse;
+      own.push({ fromArcMm: arcOf(pipe.points, component.faces[0]) + component.lengthMm / 2, section: downstream });
+    }
+    steps.set(
+      pipe.id,
+      own.sort((a, b) => a.fromArcMm - b.fromArcMm),
+    );
   }
   const attachments: Attachment[] = [];
   for (const support of sources.supports) attachments.push({ key: `support:${support.id}`, pipeId: support.pipeId, point: support.point });
@@ -118,7 +204,17 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
     attachments.push({ key: `force:${index}`, pipeId: pipe.id, point });
   }
   const set = ruleSetOf(model.rule);
-  const layout = buildLayout(sources.pipes, walls, set, model, attachments);
+  const components = layoutComponents(model, sources, steps);
+  if ('ok' in components) return components;
+  const layout = buildLayout({
+    pipes: sources.pipes,
+    sections: steps,
+    set,
+    options: model,
+    attachments,
+    components: components.list,
+    fittingOf: (branchPipeId) => fittingChoice(model, sources, branchPipeId),
+  });
   if ('ok' in layout) return layout;
   const restraints = mapRestraints(model, sources.supports, layout);
   if ('ok' in restraints) return restraints;
@@ -128,15 +224,38 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
     force: force.forceN,
     moment: force.momentNmm ?? ([0, 0, 0] as const),
   }));
+  const pointWeights = layout.junctions.flatMap((junction) => {
+    const stored = model.components.find((entry) => 'branchPipeId' in entry.target && entry.target.branchPipeId === junction.branchPipeId);
+    return stored?.weightKg === undefined || stored.weightKg === 0 ? [] : [{ node: junction.node, kg: stored.weightKg }];
+  });
+  const assumed = layout.junctions.filter((junction) => fittingChoice(model, sources, junction.branchPipeId).origin === 'assumed');
+  const unweighed = components.list.filter((component) => component.kind !== 'reducer' && component.weightKg === null);
+  const reducers = components.list.filter((component) => component.kind === 'reducer');
   const warnings = [
     ...restraints.warnings,
-    ...sources.pipes.flatMap((pipe) =>
-      pipe.asPipe.map((what) => ({
-        code: 'PST_COMPONENT_AS_PIPE',
-        message: `${pipe.id}: ${what} is modelled as plain pipe`,
-        ids: [pipe.id],
-      })),
-    ),
+    ...assumed.map((junction) => ({
+      code: 'PST_TEE_FITTING_ASSUMED',
+      message: `branch ${junction.branchPipeId} on ${junction.headerPipeId} is modelled as an unreinforced fabricated tee (set_stress_component fitting to change it)`,
+      ids: [junction.branchPipeId],
+    })),
+    ...(unweighed.length === 0
+      ? []
+      : [
+          {
+            code: 'PST_COMPONENT_WEIGHT_MISSING',
+            message: `${unweighed.map((component) => component.key).join(', ')}: no weight stated, the body carries only the pipe weight (set_stress_component weightKg)`,
+            ids: unweighed.map((component) => component.key),
+          },
+        ]),
+    ...(reducers.length === 0
+      ? []
+      : [
+          {
+            code: 'PST_REDUCER_SIF',
+            message: `${reducers.map((component) => component.key).join(', ')}: reducer stress intensification is 1.0 (no factor in a read source); a manufacturer or B31J value should replace it`,
+            ids: reducers.map((component) => component.key),
+          },
+        ]),
     ...layout.sharpCorners.map((id) => ({
       code: 'PST_SHARP_CORNERS',
       message: `pipe ${id}: corners kept sharp (elbowRadiusFactor 0): k = 1 and i = 1`,
@@ -152,5 +271,5 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
         ]
       : []),
   ];
-  return { sources, layout, restraints, walls, set, forces, warnings };
+  return { sources, layout, restraints, walls, set, forces, pointWeights, warnings };
 }

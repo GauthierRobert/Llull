@@ -17,8 +17,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PST_WALL_UNKNOWN: 'Bind the pipe to a spec (assign_pipe_spec) or give wallMm in set_pipe_operating_conditions.',
   PST_BEND_TOO_TIGHT: 'Lengthen the leg, reduce elbowRadiusFactor, or lower the bend radius of the run.',
   PST_BRANCH_UNSUPPORTED:
-    'Tees and branches arrive with M5: model each header or branch as its own stress model, or end the pipes at the junction.',
-  PST_COMPONENT_UNSUPPORTED: 'Reducers and branches arrive with M5: analyse the straight reducer-free runs separately.',
+    'Only 90 degree tees on straight header pipe are modelled: move the branch off the bend or the pipe end, or model the Y / cross junction as separate models.',
+  PST_COMPONENT_UNSUPPORTED: 'Move the valve, flange or reducer onto straight pipe between two nodes (not across a bend).',
+  PST_COMPONENT_NOT_FOUND:
+    'Name an inline valve or reducer of an RTE run of the model (piping_takeoff lists them), or a declared record id.',
   PST_RESTRAINT_OBLIQUE:
     'A lateral guide needs a pipe along a horizontal global axis or a vertical one; add a translational restraint on an axis instead.',
   PST_UNSTABLE: 'Add an anchor or a guide at the listed node (add_pipe_support type anchor, or add_stress_restraint).',
@@ -47,7 +49,11 @@ const FINDING_REMEDIATION: Readonly<Record<string, string>> = {
   PST_SIF_EDITION: 'Give the B31J values (a later milestone) or have a qualified engineer confirm.',
   PST_MATERIAL_UNVERIFIED: 'Use a sourced thermal strain model (a signed material record).',
   PST_DISCONNECTED: 'Connect the runs or analyse the systems separately; each needs its own restraints.',
-  PST_COMPONENT_AS_PIPE: 'Valve weight and stiffness are not modelled: a later milestone.',
+  PST_TEE_FITTING_ASSUMED:
+    'set_stress_component with branchPipeId and the fitting (welding_tee, weldolet, reinforced_tee, unreinforced_tee).',
+  PST_COMPONENT_WEIGHT_MISSING: 'set_stress_component with weightKg (catalogue weight of the valve or flange).',
+  PST_REDUCER_SIF:
+    'A reducer has no code factor in a read source: take the manufacturer or B31J value and confirm with a qualified engineer.',
   PST_SHARP_CORNERS: 'Give elbowRadiusFactor 1.5 (long radius) for bends with SIFs.',
   PST_RESTRAINT_OVERRIDDEN: 'Two restraints act on the same degree of freedom; the later one is used.',
   PST_INSTALL_TEMP_DEFAULTED: 'Set installTempC explicitly.',

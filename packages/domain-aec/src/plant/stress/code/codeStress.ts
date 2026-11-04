@@ -111,7 +111,7 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
     const out: StressRow[] = [];
     built.layout.elements.forEach((element, index) => {
       const axes = elementAxes[index];
-      if (axes === null || axes === undefined) return;
+      if (axes === null || axes === undefined || element.component?.rigid === true) return;
       const R = axes.rotation;
       const q = [state.uniform[index * 3] as number, state.uniform[index * 3 + 1] as number, state.uniform[index * 3 + 2] as number];
       const local = [0, 1, 2].map(
@@ -120,22 +120,33 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
           (R[r * 3 + 1] as number) * (q[1] as number) +
           (R[r * 3 + 2] as number) * (q[2] as number),
       );
-      const normal = element.bend?.normal;
-      const nLocal =
+      const toLocal = (normal: readonly [number, number, number] | undefined): number[] | null =>
         normal === undefined
           ? null
           : [0, 1, 2].map(
               (r) => (R[r * 3] as number) * normal[0] + (R[r * 3 + 1] as number) * normal[1] + (R[r * 3 + 2] as number) * normal[2],
             );
-      const ii = element.bend?.ii ?? 1;
-      const io = element.bend?.io ?? 1;
+      const bendNormal = toLocal(element.bend?.normal);
       const wall = expansion ? element.wallMm : element.wallMm - conditions.corrosionAllowanceMm;
       const od = element.odMm;
       const inner = od - 2 * wall;
       const area = (Math.PI / 4) * (od ** 2 - inner ** 2);
-      const Z = (Math.PI / 32) * ((od ** 4 - inner ** 4) / od);
+      const pipeZ = (Math.PI / 32) * ((od ** 4 - inner ** 4) / od);
       const pressure = state.pressureBar * BAR_TO_MPA;
       for (const s of stations(state.elementForces, index * 12, axes.length, local as [number, number, number])) {
+        const node = s.end === null ? null : nodeId(s.end === 'a' ? element.a : element.b);
+        const endSif =
+          s.end === null ? undefined : element.endSifs?.find((entry) => entry.node === (s.end === 'a' ? element.a : element.b));
+        const ii = endSif?.ii ?? element.bend?.ii ?? 1;
+        const io = endSif?.io ?? element.bend?.io ?? 1;
+        const nLocal = endSif === undefined ? bendNormal : toLocal(endSif.normal);
+        // the branch end of a tee: effective section modulus Z_e = pi r2^2 T_e, T_e the lesser of the header wall and i_i x branch wall (B31.3 319.4.4)
+        const Z =
+          endSif?.headerWallMm === undefined
+            ? pipeZ
+            : Math.PI *
+              ((od - wall) / 2) ** 2 *
+              Math.min(endSif.headerWallMm - (expansion ? 0 : conditions.corrosionAllowanceMm), ii * wall);
         const bending = Math.hypot(s.my, s.mz);
         const inPlane = nLocal === null ? bending : Math.abs(s.my * (nLocal[1] as number) + s.mz * (nLocal[2] as number));
         const outPlane = nLocal === null ? 0 : Math.sqrt(Math.max(0, bending ** 2 - inPlane ** 2));
@@ -143,7 +154,6 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
         let limit: number;
         let equation: string;
         let rule: string;
-        const node = s.end === null ? null : nodeId(s.end === 'a' ? element.a : element.b);
         if (expansion) {
           if (b311) {
             stress = (ii * Math.hypot(bending, s.torsion)) / Z;

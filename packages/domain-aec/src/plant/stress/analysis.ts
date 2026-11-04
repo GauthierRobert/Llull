@@ -91,6 +91,8 @@ export function inputHashOf(doc: CadDocument, model: StressModel, built: BuiltMo
       model: stored,
       pipes: built?.sources.pipes ?? null,
       supports: built?.sources.supports ?? null,
+      components: built?.sources.components ?? null,
+      branches: built?.sources.branches ?? null,
       material,
     }),
   );

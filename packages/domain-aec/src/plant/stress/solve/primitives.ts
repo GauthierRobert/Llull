@@ -109,12 +109,19 @@ export function caseLoads(
     if (primitive === 'W') {
       elements.forEach((element, index) => {
         const inner = element.odMm - 2 * element.wallMm;
-        const steel = (Math.PI / 4) * (element.odMm ** 2 - inner ** 2);
+        const stated = element.component?.weightKg !== undefined && element.component.weightKg !== null;
+        const steel = stated ? 0 : (Math.PI / 4) * (element.odMm ** 2 - inner ** 2);
         const fluid = (Math.PI / 4) * inner ** 2;
         const q = GRAVITY * 1e-9 * (conditions.material.densityKgM3 * steel + conditions.fluidDensityKgM3 * fluid);
         elemental.push({ element: index, uniform: [0, 0, -q] });
         uniform[index * 3 + 2] = (uniform[index * 3 + 2] as number) - q;
+        if (element.component !== undefined && element.component.weightKg !== null) {
+          // the stated weight of a valve / flange acts at its end nodes, shared over the elements it is split into
+          const half = (element.component.weightKg * GRAVITY) / element.component.elements / 2;
+          nodal.push({ node: element.a, force: [0, 0, -half] }, { node: element.b, force: [0, 0, -half] });
+        }
       });
+      for (const point of built.pointWeights) nodal.push({ node: point.node, force: [0, 0, -point.kg * GRAVITY] });
     } else if (primitive.startsWith('T')) {
       const entry = conditions.temperatures.find((candidate) => candidate.name === primitive);
       if (entry === undefined)

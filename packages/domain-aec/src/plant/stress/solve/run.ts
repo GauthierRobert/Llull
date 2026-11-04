@@ -44,12 +44,21 @@ export interface SolveSuccess {
 
 const DOF_NAMES = ['ux', 'uy', 'uz', 'rx', 'ry', 'rz'] as const;
 
-/** The frame3d elements of the built model (nominal section at the stated Young's modulus). */
+/** Stiffness multiplier of a rigid body (valve, flange): 1e4 times the pipe, so its own deformation is 1e-4 of a pipe piece of the same length. */
+const RIGID_FACTOR = 1e4;
+
+/** The frame3d elements of the built model (nominal section at the stated Young's modulus; rigid components stiffened, elastic ones scaled by their stated factor). */
 export function frameElements(built: BuiltModel, conditions: OperatingConditions): FrameElement[] {
   return built.layout.elements.map((element) => ({
     a: element.a,
     b: element.b,
-    properties: pipeProperties(element.odMm, element.wallMm, conditions.material.youngsModulusMPa, conditions.material.poisson),
+    properties: pipeProperties(
+      element.odMm,
+      element.wallMm,
+      conditions.material.youngsModulusMPa *
+        (element.component === undefined ? 1 : element.component.rigid ? RIGID_FACTOR : element.component.stiffnessFactor),
+      conditions.material.poisson,
+    ),
     ...(element.bend === undefined ? {} : { flexibility: element.bend.k }),
   }));
 }

@@ -22,6 +22,17 @@ export interface GeometryElement {
   readonly odMm: number;
   readonly wallMm: number;
   readonly bendRadiusMm: number | null;
+  /** Key of the valve / flange / reducer the element belongs to, or null. */
+  readonly componentKey: string | null;
+}
+export interface GeometryJunction {
+  readonly nodeId: string;
+  readonly headerPipeId: string;
+  readonly branchPipeId: string;
+  readonly fitting: string;
+  readonly h: number | null;
+  readonly ii: number;
+  readonly io: number;
 }
 export interface GeometryPipe {
   readonly id: string;
@@ -34,6 +45,8 @@ export interface ModelGeometry {
   readonly nodes: readonly GeometryNode[];
   readonly elements: readonly GeometryElement[];
   readonly pipes: readonly GeometryPipe[];
+  /** Tee / olet nodes with the SIFs that act there. */
+  readonly junctions: readonly GeometryJunction[];
 }
 
 export function modelGeometry(built: BuiltModel): ModelGeometry {
@@ -50,6 +63,7 @@ export function modelGeometry(built: BuiltModel): ModelGeometry {
       odMm: element.odMm,
       wallMm: element.wallMm,
       bendRadiusMm: element.bend?.radiusMm ?? null,
+      componentKey: element.component?.key ?? null,
     })),
     pipes: built.sources.pipes.map((pipe) => ({
       id: pipe.id,
@@ -57,5 +71,6 @@ export function modelGeometry(built: BuiltModel): ModelGeometry {
       pointsMm: pipe.points.map((p) => [p[0], p[1], p[2]] as const),
       elementIds: elements.filter((element) => element.pipeId === pipe.id).map((element) => element.id),
     })),
+    junctions: built.layout.junctions.map((junction) => ({ ...junction, nodeId: `N${junction.node + 1}` })),
   };
 }
