@@ -63,6 +63,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'The line has no issue stamp to compare with: a human issues it first (issue_isometric), then compareToIssue draws the changes.',
   ISO_ISSUE_SNAPSHOT_MISSING:
     'The issue predates snapshots: issue the line anew (issue_isometric) to store the content it is compared with.',
+  ISO_STOCK_TOO_SHORT: 'Add a longer stock length (stockLengthsMm), or add a weld so that no cut piece is longer than the longest bar.',
   ISO_GA_OVERFLOW: 'Use a smaller scale (a larger number) or a larger paper, or draw fewer lines (lineIds).',
   ISO_ROUTE_UNSUPPORTED:
     'Import the line as pcf_line (as omitted), or edit the PCF: route mode rebuilds a line from its centreline with the spec, so it takes pipes, elbows, bends, tees, olets, reducers, valves, end flanges, field welds and supports only.',
