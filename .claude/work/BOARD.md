@@ -13,6 +13,11 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-11-04 (later) — merged: DESK-TSC (server tests typechecked by `npm run typecheck` now), VIS-M8b (native `llull_bvh::instance`,
+  bit-identical to the TS tree, 2.4x at 10⁶, not wired: plan in 09 §12.13), VIS-M8c (material classes + `render_walkthrough path: smooth`,
+  09 §12.14), VIS-M8a (`export_gltf instancing: gpu`, 09 §12.15). Each after cad-reviewer (M8a, M8c) + review fixes. Next: VIS-M8d
+  (placed-solid prototype grouping before tessellation, `import_gltf`), VIS-M8e (native BVH wiring: `llull-compute bvh` + `ctx.spatialIndex`),
+  VIS-M8f (material classes in the viewport + Display panel), VIS-HUMAN (owner). Streaming / Hi-Z / impostors wait for the 08-DAT storage decision.
 - 2026-11-04 — plant run (owner: until the weekly token budget is at 80 %; budget not observable from the session). Since 2026-11-03 merged + pushed:
   EQP-M5-UI, PST-GATE/HARDEN, BLD-UID + FUZZ-EQP, PID-M5b/c, PST-M4 + M4c, SCN-M3 + M3b/c/d, VIS-M3a/b, VIS-M4b, VIS-M5b, VIS-UI, VIS-TINT,
   VIS-CLIP, VIS-M6, VIS-M7 core + picking + BVH transfer + VIS-M7c (worker BVH, pipe markers drawn), pipe markers data, CHK-CSS, SEL-CLI, VIS-DESKTOP fixes. Gates: each merge after
@@ -219,9 +224,13 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - Built since (reconciled 2026-11-02 from git, as built in each spec §13): DAT-M1b, M2–M5; ISO-M2–M4; STA-M4, M5; PID-M2–M4, M5 (no 2D
   viewport branch), M7 (5 of 8 `P3D_*` codes); EQP-R1; VIS-M9. Built 2026-11-02: EQP-M3..M5, PSC-M3..M5, PST-M1..M3, STA-M6..M8, DAT-M6, ISO-M5, PID-M6, PID-M7b. Remaining plant milestones (one line each, spec §10 of the pack):
 - `[BLOCKED]` **ISO-M6** 05 performance VC-ISO-18, ISOGEN conformance (OQ-ISO-01, needs a licensed tool), CSV weld map, revision clouds.
-- `[TODO]` **VIS-M8** 10⁶ streaming; glTF instancing (`EXT_mesh_gpu_instancing` in core `export_gltf`); native `llull-bvh` parity (VC-VIS-60 native side, RS-6); render_stats < 500 ms at 10⁶ only on repeat calls (first call 4-5 s, `planScene`). VIS-M6 merged 2026-11-04 (Clip off, walk / fly, Draft / Standard / High tiers, 09 §12.12); left: material classes, `render_walkthrough`, CSM, GTAO (no postprocessing dep), solid edge lines, walk floor following / collision.
+- `[DONE]` **VIS-M8a/b/c** 2026-11-04: glTF `EXT_mesh_gpu_instancing` (09 §12.15), native instance BVH parity VC-VIS-60 (§12.13), material classes + smooth walkthrough paths (§12.14).
+- `[TODO]` **VIS-M8** rest: 10⁶ streaming, Hi-Z, impostors, terrain / sky (needs the 08-DAT storage decision); render_stats first call 4-5 s at 10⁶ (`planScene`); CSM, GTAO (no postprocessing dep), solid edge lines, walk floor following / collision.
+- `[TODO]` **VIS-M8d** `export_gltf gpu`: group placed solids by `prototypeKeyOf` before tessellating (10⁵ placed solids need a multi-GB heap today); `import_gltf` reading the extension; compact `llullIds` (09 §12.15 Left).
+- `[TODO]` **VIS-M8e** native BVH wiring: `llull-compute bvh` job + server transport (`NATIVE_TOOL_MISSING` → TS), injected `ctx.spatialIndex` for `planSceneOf` / `check_clashes` (09 §12.13 wiring plan (a)+(b)).
+- `[TODO]` **VIS-M8f** material classes in the viewport (three.js colour / metalness / roughness per class) + Display panel define / assign; Blinn-Phong in the reference raster; plant default assignments (09 §12.14 Left).
 - `[TODO]` **VIS-HUMAN** owner hands-on (no mouse / keyboard input from an agent session, VIS-DESKTOP 2026-11-04): orbit popping on a plant batch, section-box grip drag + pick through clipped geometry, Review panel flows + signing, PST panel overlay, P&ID sheet picker + glyph pick, EQP data-sheet panel, walk / fly, High tier, Scan panel with a bundled `llull-compute` (dev desktop runs return NATIVE_TOOL_MISSING), EDL + kd-tree snap. Verified by screenshot: batch render + profile tint, section-box clip (axes gizmo fix 9b0c8179f), EQP port glyphs.
-- `[TODO]` **DESK-TSC** `npm --prefix desktop run build` fails at the server typecheck on pre-existing type errors in `server/tests/nativeBlend*.test.ts` / `nativeFilletKink.test.ts` (DES-6c tests, not plant).
+- `[DONE]` **DESK-TSC** (807bc7e46, 2026-11-04; `typecheck:server` in the gate) `npm --prefix desktop run build` failed at the server typecheck on pre-existing type errors in `server/tests/nativeBlend*.test.ts` / `nativeFilletKink.test.ts` (DES-6c tests, not plant).
 - SCN-M3d merged 2026-11-04 (EDL, worker kd-tree snap = linear scan results, CPU benchmark; GPU frame time / 150 ms tile fetch not measurable headless, 10 §13.6).
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
