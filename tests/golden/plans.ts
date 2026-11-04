@@ -1020,6 +1020,11 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'equipment_ports', params: { equipment: 'V-101' } },
     { command: 'update_equipment_parameters', params: { equipment: 'V-101', set: { insideDiameter: 1800 } } },
   ],
+  // VIS1 / VIS-M8j: one packed instance array of a component (no Entity per member)
+  instance_array_grid: [
+    ...CUBE_COMPONENT,
+    { command: 'add_instance_array', params: { componentId: 'comp-cube', counts: [3, 2, 2], step: [2, 2, 3], rotation: [0, 0, 0.5] } },
+  ],
 };
 
 /** Plans needing the Manifold geometry kernel (booleans). */
