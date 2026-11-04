@@ -1013,6 +1013,7 @@ name = "llull-bvh"
 version = "0.1.0"
 dependencies = [
  "llull-jsmath",
+ "serde_json",
 ]
 
 [[package]]
