@@ -10,6 +10,7 @@ import type { DisplayModel, MaterialClass } from '../../model/display';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, report } from '../noop';
+import { is3D } from '../../model/types';
 import { displayOf, displayRejection } from './displayModel';
 
 const ID_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
@@ -26,7 +27,7 @@ export const defineMaterialClass = defineCommand({
   description:
     'Define a display material class, or override a named default (list_material_classes shows them: structural_steel_painted, galvanized_steel, ' +
     'carbon_steel_pipe_painted, stainless_steel, insulation_cladding_aluminium, concrete, grating, cast_steel_valve, alloy_bolting, frp). A class gives ' +
-    'a display colour, metalness and roughness; entities take it with assign_material_class and render_view / render_walkthrough then draw them in the ' +
+    'a display colour, metalness and roughness (metalness and roughness are stored but not used by renders yet); entities take it with assign_material_class and render_view / render_walkthrough then draw them in the ' +
     'class colour (a matching colour-profile rule still wins). Display only: geometry and create_material materials are untouched. Re-defining an ' +
     'id replaces it. Error: VIS_MATERIAL_CLASS_INVALID. Does not add a feature step.',
   annotations: { metaHistory: true },
@@ -113,9 +114,9 @@ export const assignMaterialClass = defineCommand({
   name: 'assign_material_class',
   description:
     'Assign a display material class (list_material_classes) to entities, or pass classId null to clear it. Unknown entity ids are skipped and ' +
-    'named in the summary. The class colour is then drawn by render_view and render_walkthrough, the class id is the entity property "materialClass" ' +
+    'named in the summary; 2D shapes and curves are refused (VIS_MATERIAL_CLASS_INVALID: a class is drawn on 3D solids, meshes and instances only). The class colour is then drawn by render_view and render_walkthrough, the class id is the entity property "materialClass" ' +
     '(colour-profile rules can test it) and it is the material class of the render plan. Display only: geometry, create_material materials and ' +
-    'assign_material are untouched. Errors: VIS_MATERIAL_CLASS_NOT_FOUND, VIS_MATERIAL_CLASS_INVALID (no entity id exists). Does not add a feature step.',
+    'assign_material are untouched. The assignment is keyed by entity id: deleting the entity drops it, copies and duplicates do not carry it. Metalness and roughness are stored but not used by any render yet (only the colour is). Errors: VIS_MATERIAL_CLASS_NOT_FOUND, VIS_MATERIAL_CLASS_INVALID (no entity id exists). Does not add a feature step.',
   annotations: { metaHistory: true },
   params: z.object({
     classId: z.string().nullable().describe('Class id (define_material_class / a named default), or null to clear the assignment.'),
@@ -133,8 +134,22 @@ export const assignMaterialClass = defineCommand({
         ['classId'],
       );
     const unique = [...new Set(entityIds)];
-    const known = unique.filter((id) => Object.hasOwn(doc.entities, id));
-    const skipped = unique.filter((id) => !Object.hasOwn(doc.entities, id));
+    const exists = (id: string): boolean => Object.hasOwn(doc.entities, id);
+    const flat = unique.filter((id) => {
+      const entity = exists(id) ? doc.entities[id] : undefined;
+      return entity !== undefined && !is3D(entity);
+    });
+    if (classId !== null && flat.length > 0)
+      return displayRejection(
+        doc,
+        'assign_material_class',
+        'VIS_MATERIAL_CLASS_INVALID',
+        `2D shapes and curves are never drawn in a class colour: ${flat.slice(0, 5).join(', ')}`,
+        flat,
+        ['entityIds'],
+      );
+    const known = unique.filter(exists);
+    const skipped = unique.filter((id) => !exists(id));
     if (known.length === 0)
       return displayRejection(doc, 'assign_material_class', 'VIS_MATERIAL_CLASS_INVALID', 'no entity id exists', skipped, ['entityIds']);
     const current = { ...display.materialClassOf };

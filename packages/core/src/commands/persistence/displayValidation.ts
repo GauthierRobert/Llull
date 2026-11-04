@@ -83,8 +83,12 @@ function materialClassProblems(display: Record<string, unknown>): string[] {
       else if (!unit(entry['metalness']) || !unit(entry['roughness'])) problems.push(`${where}: metalness and roughness must be in [0, 1]`);
     }
   }
-  if (assigned !== undefined && (!isRecord(assigned) || !Object.values(assigned).every((id) => typeof id === 'string')))
-    problems.push('display.materialClassOf must map entity ids to class ids');
+  if (assigned !== undefined) {
+    if (!isRecord(assigned) || !Object.values(assigned).every((id) => typeof id === 'string'))
+      problems.push('display.materialClassOf must map entity ids to class ids');
+    else if (Object.keys(assigned).some(isReservedKey))
+      problems.push('display.materialClassOf: an entity id is a reserved JavaScript property name');
+  }
   return problems;
 }
 

@@ -224,3 +224,57 @@ describe('load validation of display material classes', () => {
     expect(problems({ colourProfiles: {}, materialClassOf: { [A]: 3 } }).join()).toContain('materialClassOf');
   });
 });
+
+describe('hostile display material class data', () => {
+  const problems = (display: unknown): string[] => validateDocumentValues({ ...JSON.parse(JSON.stringify(scene())), display });
+
+  it('rejects a reserved entity id key and a non-string class id', () => {
+    const hostile = JSON.parse('{"colourProfiles":{},"materialClassOf":{"__proto__":"concrete"}}') as unknown;
+    expect(problems(hostile).join()).toContain('reserved JavaScript property name');
+    expect(problems({ colourProfiles: {}, materialClassOf: { [A]: { id: 'concrete' } } }).join()).toContain('materialClassOf');
+    expect(problems({ colourProfiles: {}, materialClassOf: [] }).join()).toContain('materialClassOf');
+  });
+});
+
+describe('assignments follow their entity', () => {
+  it('deleting an assigned entity drops its assignment: counts, delete_material_class and the picture follow', () => {
+    let doc = apply(scene(), 'define_material_class', { id: 'mine', colour: '#ff0000', metalness: 0, roughness: 0.5 });
+    const before = top(doc);
+    doc = apply(doc, 'assign_material_class', { classId: 'mine', entityIds: [A] });
+    const deleted = apply(doc, 'delete_entities', { ids: [A] });
+    expect(deleted.display?.materialClassOf).toBeUndefined();
+    expect(data<Listed>(deleted, 'list_material_classes', {}).classes.find((c) => c.id === 'mine')?.assigned).toBe(0);
+    expect(ok(deleted, 'delete_material_class', { id: 'mine' }).rejected).toBeUndefined();
+    const onlyB = apply(scene(), 'delete_entities', { ids: [A] });
+    expect(top(deleted)).toBe(top(onlyB));
+    expect(before).not.toBe(top(doc));
+  });
+
+  it('keeps the assignments of the entities that stay', () => {
+    const doc = apply(scene(), 'assign_material_class', { classId: 'frp', entityIds: [A, B] });
+    expect(apply(doc, 'delete_entities', { ids: [A] }).display?.materialClassOf).toEqual({ [B]: 'frp' });
+  });
+
+  it('deleting an override of a default while entities use it restores the default for them', () => {
+    let doc = apply(scene(), 'define_material_class', { id: 'concrete', colour: '#101010', metalness: 0, roughness: 1 });
+    doc = apply(doc, 'assign_material_class', { classId: 'concrete', entityIds: [A] });
+    expect(withMaterialClassColours(doc).entities[A]?.color).toBe('#101010');
+    const restored = ok(doc, 'delete_material_class', { id: 'concrete' }).document;
+    expect(restored.display?.materialClassOf).toEqual({ [A]: 'concrete' });
+    expect(withMaterialClassColours(restored).entities[A]?.color).toBe('#9a9a96');
+  });
+
+  it('refuses 2D shapes and curves (never drawn in a class colour) but lets a clear through', () => {
+    const doc = apply(scene(), 'draw_rectangle', { width: 10, height: 10 });
+    const line = doc.order.at(-1) as string;
+    const refused = expectRefusal(
+      doc,
+      'assign_material_class',
+      { classId: 'frp', entityIds: [A, line] },
+      'VIS_MATERIAL_CLASS_INVALID',
+      'entityIds',
+    );
+    expect(refused.error?.ids).toEqual([line]);
+    expect(ok(doc, 'assign_material_class', { classId: null, entityIds: [line] }).affected).toEqual([line]);
+  });
+});
