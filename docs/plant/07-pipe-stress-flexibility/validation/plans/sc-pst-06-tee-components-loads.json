@@ -1,0 +1,137 @@
+{
+  "id": "SC-PST-06",
+  "validates": ["VC-PST-20", "VC-PST-21", "VC-PST-22", "VC-PST-23"],
+  "description": "PST-M5a: a DN100 T (header 6 m fixed at both ends, 2 m branch) with a welding tee through set_stress_component (and a refused component on an unknown pipe) and a force at the branch tip; then an NPS 6 fixed-fixed beam with a 50 mm anchor movement (imposed displacement). Closed forms derived in tests/unit/plant/stress/m5aComponents.test.ts and m5aLoads.test.ts.",
+  "actions": [
+    { "command": "add_level", "params": { "name": "Rack", "elevation": 0 } },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [0, 0, 3000],
+          [6000, 0, 3000]
+        ],
+        "diameter": 114.3
+      },
+      "as": "header"
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [3000, 0, 3000],
+          [3000, 2000, 3000]
+        ],
+        "diameter": 114.3
+      },
+      "as": "branch"
+    },
+    {
+      "command": "create_stress_model",
+      "params": {
+        "name": "T-branch",
+        "pipeIds": ["$header", "$branch"],
+        "rule": "B31.3-2018",
+        "elbowRadiusFactor": 0,
+        "maxElementLengthMm": 100000
+      },
+      "as": "stress"
+    },
+    {
+      "command": "set_pipe_operating_conditions",
+      "params": {
+        "modelId": "$stress",
+        "temperatures": [{ "name": "T1", "tempC": 100 }],
+        "wallMm": 6.02,
+        "material": { "youngsModulusMPa": 200000, "ShMPa": 138, "ScMPa": 138, "thermal": { "table": "carbon-steel-c1" } }
+      }
+    },
+    { "command": "add_stress_restraint", "params": { "modelId": "$stress", "at": { "pipeId": "$header", "atMm": 0 }, "kind": "anchor" } },
+    {
+      "command": "add_stress_restraint",
+      "params": { "modelId": "$stress", "at": { "pipeId": "$header", "atMm": 6000 }, "kind": "anchor" }
+    },
+    { "command": "set_stress_component", "params": { "modelId": "$stress", "branchPipeId": "$branch", "fitting": "welding_tee" } },
+    { "command": "set_stress_component", "params": { "modelId": "$stress", "branchPipeId": "nope", "weightKg": 1 } },
+    {
+      "command": "set_stress_load_cases",
+      "params": {
+        "modelId": "$stress",
+        "cases": [{ "name": "F", "type": "SUS", "basic": ["F1"] }],
+        "forces": [{ "name": "F1", "pipeId": "$branch", "atMm": 2000, "forceN": [0, 0, 1000] }]
+      }
+    },
+    {
+      "command": "analyze_pipe_stress",
+      "params": { "modelId": "$stress", "include": ["displacements", "stresses"], "nodes": ["N2", "N4"] }
+    },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [0, 5000, 3000],
+          [6000, 5000, 3000]
+        ],
+        "diameter": 168.3
+      },
+      "as": "beam"
+    },
+    {
+      "command": "create_stress_model",
+      "params": { "name": "settlement", "pipeIds": ["$beam"], "rule": "B31.3-2018", "maxElementLengthMm": 100000 },
+      "as": "settle"
+    },
+    {
+      "command": "set_pipe_operating_conditions",
+      "params": {
+        "modelId": "$settle",
+        "temperatures": [{ "name": "T1", "tempC": 100 }],
+        "wallMm": 7.11,
+        "material": { "youngsModulusMPa": 200000, "ShMPa": 138, "ScMPa": 138, "thermal": { "table": "carbon-steel-c1" } }
+      }
+    },
+    { "command": "add_stress_restraint", "params": { "modelId": "$settle", "at": { "pipeId": "$beam", "atMm": 0 }, "kind": "anchor" } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$settle", "at": { "pipeId": "$beam", "atMm": 6000 }, "kind": "anchor" } },
+    {
+      "command": "set_stress_load_cases",
+      "params": {
+        "modelId": "$settle",
+        "cases": [{ "name": "D", "type": "OPE", "basic": ["D1"] }],
+        "displacements": [{ "name": "D1", "at": { "pipeId": "$beam", "atMm": 6000 }, "translationMm": [0, 50, 0] }]
+      }
+    },
+    { "command": "analyze_pipe_stress", "params": { "modelId": "$settle", "include": ["reactions"], "nodes": ["N2"] } }
+  ],
+  "refusals": [{ "step": 8, "code": "PST_PIPE_NOT_FOUND" }],
+  "expected": [
+    {
+      "step": 10,
+      "path": "data.details.displacements[case=F,node=N4].uMm.2",
+      "value": 19.2964,
+      "rel": 1e-5,
+      "source": "F a^3 / 24EI + F b^2 a / 2GJ + F b^3 / 3EI + Timoshenko shear terms (m5aComponents.test.ts)"
+    },
+    {
+      "step": 10,
+      "path": "data.details.stresses[case=F,node=N2,element=E3].stressMPa",
+      "value": 49.536,
+      "rel": 1e-5,
+      "source": "0.75 io M / Z_e, welding tee h = 3.1 T / r2 (ASME B31.3 App. D, grade B)"
+    },
+    {
+      "step": 10,
+      "path": "data.details.stresses[case=F,node=N2,element=E3].sif.io",
+      "value": 1.830695,
+      "rel": 1e-5,
+      "source": "0.9 / h^(2/3), h = 0.344699"
+    },
+    { "step": 10, "path": "data.reviewRequired", "value": true, "source": "AF-33" },
+    {
+      "step": 17,
+      "path": "data.details.reactions[case=D,nodeId=N2].forceN.1",
+      "value": 6472.51,
+      "rel": 1e-5,
+      "source": "12 E I d / L^3 = 6509.017 N (Euler-Bernoulli, lbend_guided_cantilever.json) less the Timoshenko shear term 1 / (1 + phi), phi = 0.00564"
+    }
+  ]
+}

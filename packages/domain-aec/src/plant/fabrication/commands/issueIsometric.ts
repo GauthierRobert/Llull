@@ -1,6 +1,7 @@
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { humanGate, humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { isRecord } from '@lib/isRecord';
 import { nextId } from '@lib/id';
 import { isoUtc } from '../../../shared/isoUtc';
@@ -70,7 +71,7 @@ export const issueIsometric = defineCommand({
               entry.basisSha256 === basis,
           )
         : undefined;
-    const details = { revision: params.revision, purpose: params.purpose, basisSha256: basis, at: params.at };
+    const details = withDocumentUid({ revision: params.revision, purpose: params.purpose, basisSha256: basis, at: params.at }, doc);
     const outcome =
       recorded !== undefined
         ? ({ cleared: true, signer: recorded.signer, signatureId: recorded.signatureId } as const)

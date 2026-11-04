@@ -4,6 +4,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { humanGate } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { isRecord } from '@lib/isRecord';
 import { analyzeStressModel } from '../analysis';
 import { refuse } from '../codes';
@@ -142,10 +143,13 @@ export const approvePipeStress = defineCommand({
         inputHash: recorded.inputHash,
         resultHash: recorded.resultHash,
       });
-    const gate = humanGate(ctx?.humanSignature ?? null, 'plant:approve_pipe_stress', [modelId], confirmation, {
-      inputHash: recorded.inputHash,
-      resultHash: recorded.resultHash,
-    });
+    const gate = humanGate(
+      ctx?.humanSignature ?? null,
+      'plant:approve_pipe_stress',
+      [modelId],
+      confirmation,
+      withDocumentUid({ inputHash: recorded.inputHash, resultHash: recorded.resultHash }, doc),
+    );
     if (!gate.cleared) return fail('PST_HUMAN_GATE', `approve_pipe_stress is a human act: ${gate.reason}`);
     const approval = {
       signer: gate.signer,

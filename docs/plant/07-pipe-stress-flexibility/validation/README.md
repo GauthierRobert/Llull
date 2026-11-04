@@ -35,7 +35,7 @@ never used; their VCs are `TBD — measure with <tool>`.
 | `data/scripts/frame3d.py` | independent 3D Timoshenko pipe-frame solver (direct stiffness, thermal and distributed loads) | — |
 | `data/scripts/closed_forms.py`, `lbend_flexibility.py`, `psi_benchmarks.py` | derivations of every computed expectation | — |
 | `expected_results.json` | index of every VC | — |
-| `plans/sc-pst-0*.json` | CLI scenarios (`build_project` actions + `expected` rows) | — |
+| `plans/sc-pst-0*.json` | CLI scenarios (`build_project` actions + `expected` rows); SC-PST-06 (tee, components, imposed displacement) runs since PST-M5a | — |
 
 ## Real use cases
 
@@ -71,6 +71,10 @@ never used; their VCs are `TBD — measure with <tool>`.
 | VC-PST-17 | NUREG/CR-1677 Problem 1 modal frequencies (f1 ≈ 28.5 Hz per one extract) | S26 | TBD — measure when the report is obtained | C | FR-21; TR-15 |
 | VC-PST-18 | Agent-first: refusals carry codes (§7 TECHNICAL); `reviewRequired: true` on every analysis; defaulted cycles / edition / friction listed; unsigned material ⇒ `PST_MATERIAL_UNVERIFIED`; edit after record ⇒ `PST_RESULTS_STALE`; agent approval ⇒ `PST_HUMAN_GATE` | AGENT_FIRST AF-11, 31–34 | exact codes | A (spec) | FR-02, 10, 11, 17, 18; TR-11, 12 |
 | VC-PST-19 | B31J SIFs for B31.3 ≥ 2020 | licensed B31J copy | TBD — measure with a licensed B31J table or CAESAR II B31J option | C | FR-08, 22; TR-07 |
+| VC-PST-20 | PST-M5a tee: DN100 T, header 6 m fixed at both ends, branch 2 m, F = 1000 N out of plane: tip uz 19.2964 mm (F a^3/24EI + F b^2 a/2GJ + F b^3/3EI + Timoshenko shear); branch root S_L = 0.75 io M / Z_e = 105.317 / 49.536 / 47.514 MPa (unreinforced / welding tee / weldolet), in plane 85.752 MPa; NPS 3 io 3.4795 / 1.6366 / 1.5698 | beam theory; App. D formulas [S3, S5]; PSI `test_sifs.py` | 1e-5 (deflection 1e-6, published 1e-4) | A (frame), B (SIF) | FR-08, 12; TR-01, 02, 07 |
+| VC-PST-21 | PST-M5a valves, reducers: cantilever with a 500 mm rigid valve of 100 kg: Fz = w (L - 500) + 100 g, My exact statics; tip deflection with the rigid length; DN150 x DN100 reducer run tip deflection = stepped-section beam (mean section in the reducer) | statics; beam theory | 1e-7 (statics), 1e-3 (rigid, E x 1e4), 1e-6 (stepped) | A | FR-08, 12; TR-02, 04 |
+| VC-PST-22 | PST-M5a oblique restraints and anchor movement: guide at mid-length of a 45 degree pipe = 2.5 F = the axis-aligned propped cantilever (1e-6); oblique one-way contact R = 0.8 w (L^4/8EI + L^2/2GAs) / (L^3/3EI + L/GAs), lift-off when reversed; NPS 6 fixed-fixed beam, anchor moved 50 mm: F = 12 E I d / (L^3 (1 + phi)) = 6472.51 N (Euler-Bernoulli VC-PST-06: 6509.017 N), M = 6 E I d / (L^2 (1 + phi)); end rotation M = (4 + phi) E I theta / ((1 + phi) L) | beam theory (Timoshenko) | 1e-6 | A | FR-04, 09; TR-04, 05 |
+| VC-PST-23 | PST-M5a loads and SIF override: insulation + cladding weight, hydrotest water weight and S_L = P Di^2/(Do^2 - Di^2) + M/Z on the wall less the 12.5 % mill tolerance, sustained wall less mill and corrosion; user SIF at a tee (0.75 io M / Z_e = 67.64 MPa), a bend (S_L with the chord torsion) and a plain node | statics; section formulas | 1e-6 | A | FR-04, 08; TR-04, 06, 07 |
 
 ### Derivations used as expectations
 

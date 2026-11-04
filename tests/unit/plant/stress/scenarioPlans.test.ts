@@ -80,6 +80,8 @@ describe('toolset pipestress', () => {
       'approve_pipe_stress',
       'check_pipe_stress',
       'create_stress_model',
+      'delete_sif_override',
+      'delete_stress_component',
       'delete_stress_model',
       'delete_stress_restraint',
       'guided_cantilever',
@@ -88,6 +90,8 @@ describe('toolset pipestress', () => {
       'pipe_stress_report',
       'record_pipe_stress_results',
       'set_pipe_operating_conditions',
+      'set_sif_override',
+      'set_stress_component',
       'set_stress_load_cases',
       'thermal_growth',
       'update_stress_model',
@@ -120,36 +124,38 @@ interface ScenarioPlan extends Plan {
   refusals?: Array<{ step: number; code: string }>;
 }
 
-describe.each(['sc-pst-01-lbend-two-anchors.json', 'sc-pst-02-psi-3d-benchmark.json', 'sc-pst-04-supports-guardrails.json'])(
-  '%s',
-  (file) => {
-    const plan = JSON.parse(readFileSync(path.join(PLANS, file), 'utf8')) as ScenarioPlan;
-    const report = (execute(createEmptyDocument(), 'build_project', { actions: plan.actions, onError: 'continue' }).data as Report).steps;
-    const refused = new Set((plan.refusals ?? []).map((row) => row.step));
+describe.each([
+  'sc-pst-01-lbend-two-anchors.json',
+  'sc-pst-02-psi-3d-benchmark.json',
+  'sc-pst-04-supports-guardrails.json',
+  'sc-pst-06-tee-components-loads.json',
+])('%s', (file) => {
+  const plan = JSON.parse(readFileSync(path.join(PLANS, file), 'utf8')) as ScenarioPlan;
+  const report = (execute(createEmptyDocument(), 'build_project', { actions: plan.actions, onError: 'continue' }).data as Report).steps;
+  const refused = new Set((plan.refusals ?? []).map((row) => row.step));
 
-    it('runs every step except the declared refusals, which carry their stable code', () => {
-      expect(report.filter((step, index) => !step.ok && !refused.has(index)).map((step) => step.summary)).toEqual([]);
-      for (const row of plan.refusals ?? []) {
-        expect(report[row.step]?.ok).toBe(false);
-        expect(report[row.step]?.summary).toContain(row.code);
-      }
-    });
+  it('runs every step except the declared refusals, which carry their stable code', () => {
+    expect(report.filter((step, index) => !step.ok && !refused.has(index)).map((step) => step.summary)).toEqual([]);
+    for (const row of plan.refusals ?? []) {
+      expect(report[row.step]?.ok).toBe(false);
+      expect(report[row.step]?.summary).toContain(row.code);
+    }
+  });
 
-    it('meets every expected row at its stated tolerance', () => {
-      expect(plan.expected.length).toBeGreaterThan(3);
-      for (const row of plan.expected) {
-        const actual = resolvePath(report[row.step], row.path);
-        const label = `step ${row.step} ${row.path}: ${String(actual)} vs ${String(row.value)}`;
-        if (typeof row.value === 'number') {
-          expect(typeof actual, label).toBe('number');
-          expect(Math.abs((actual as number) - row.value), label).toBeLessThanOrEqual(row.abs ?? Math.abs(row.value) * (row.rel ?? 0));
-        } else expect(actual, label).toBe(row.value);
-      }
-    });
+  it('meets every expected row at its stated tolerance', () => {
+    expect(plan.expected.length).toBeGreaterThan(3);
+    for (const row of plan.expected) {
+      const actual = resolvePath(report[row.step], row.path);
+      const label = `step ${row.step} ${row.path}: ${String(actual)} vs ${String(row.value)}`;
+      if (typeof row.value === 'number') {
+        expect(typeof actual, label).toBe('number');
+        expect(Math.abs((actual as number) - row.value), label).toBeLessThanOrEqual(row.abs ?? Math.abs(row.value) * (row.rel ?? 0));
+      } else expect(actual, label).toBe(row.value);
+    }
+  });
 
-    it('is deterministic: a second run gives byte-identical step data (AF-13)', () => {
-      const again = (execute(createEmptyDocument(), 'build_project', { actions: plan.actions, onError: 'continue' }).data as Report).steps;
-      expect(JSON.stringify(again)).toBe(JSON.stringify(report));
-    });
-  },
-);
+  it('is deterministic: a second run gives byte-identical step data (AF-13)', () => {
+    const again = (execute(createEmptyDocument(), 'build_project', { actions: plan.actions, onError: 'continue' }).data as Report).steps;
+    expect(JSON.stringify(again)).toBe(JSON.stringify(report));
+  });
+});

@@ -418,6 +418,8 @@ export interface Disposition {
   readonly signatureId: string;
   /** The signature object the signing port verified; readers re-verify it against the payload (a record without it is unverified). */
   readonly signature?: unknown;
+  /** Uid of the document signed for (VIS-ID); absent or another document's: never counts. */
+  readonly documentUid?: string;
 }
 
 export interface ThermalSetup {
@@ -481,14 +483,9 @@ export interface ThermoMechSetup {
   readonly loadCaseName: string;
 }
 
-interface FitDisposition {
-  readonly decision: Decision;
-  readonly justification: string;
+/** A fit disposition: the margin disposition fields (the signature is kept so a reader can re-verify it) with the hash of the fit inputs. */
+interface FitDisposition extends Pick<Disposition, 'decision' | 'justification' | 'signer' | 'signatureId' | 'signature'> {
   readonly inputsHash: string;
-  readonly signer: string;
-  readonly signatureId: string;
-  /** The signature object the signing port verified; readers re-verify it against the payload. */
-  readonly signature?: unknown;
 }
 export type FitDispositions = Readonly<Record<string, FitDisposition>>;
 

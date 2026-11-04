@@ -5,6 +5,7 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { sha256Hex } from '@lib/sha256';
 import { canonicalSpecText } from '@aec/plant/spec/file';
 import { latestSpec } from '@aec/plant/spec/store';
@@ -47,7 +48,7 @@ function twoRevisions(ops: unknown[]): CadDocument {
   const payload = humanGatePayload(
     'plant:approve_pipe_spec',
     ['CS150-A1'],
-    { revision: 1, contentSha256: sha256Hex(canonicalSpecText(spec)) },
+    withDocumentUid({ revision: 1, contentSha256: sha256Hex(canonicalSpecText(spec)) }, doc),
     'n1',
   );
   const approved = execute(

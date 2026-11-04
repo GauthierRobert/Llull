@@ -31,6 +31,7 @@ describe('margin_disposition_payload', () => {
       'accepted',
       'tested to 1.8 x limit',
       caseIn(bar.recorded, bar.analysisId).results?.resultsHash ?? '',
+      bar.recorded.uid ?? '',
     );
     expect(result.data).toMatchObject({ payloadSha256: expected, rowKey: failRow.rowKey, status: failRow.status });
     expect(result.affected).toEqual([]);

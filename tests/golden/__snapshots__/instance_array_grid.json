@@ -1,0 +1,100 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "instance",
+        "componentId": "#2",
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#3",
+        "color": "#c8553d"
+      }
+    },
+    "order": [
+      "#1"
+    ],
+    "layers": {
+      "#3": {
+        "id": "#3",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#3"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#4",
+        "name": "add_box",
+        "params": {"size":[1,1,1]},
+        "suppressed": false,
+        "affected": ["#5"]
+      },
+      {
+        "id": "#6",
+        "name": "create_component",
+        "params": {"name":"Cube","entityIds":["#5"],"componentId":"#2"},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#7",
+        "name": "add_instance_array",
+        "params": {"componentId":"#2","counts":[3,2,2],"step":[2,2,3],"rotation":[0,0,0.5]},
+        "suppressed": false,
+        "affected": []
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {
+      "#2": {
+        "id": "#2",
+        "name": "Cube",
+        "entities": {"#5":{"id":"#5","kind":"box","size":[1,1,1],"position":[0,0,0],"rotation":[0,0,0],"layerId":"#3","color":"#6b8f9c"}},
+        "order": ["#5"]
+      }
+    },
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 4,
+    "instanceArrays": {
+      "#8": {
+        "id": "#8",
+        "name": "comp-cube_array",
+        "componentId": "#2",
+        "layerId": "#3",
+        "color": "#c8553d",
+        "count": 12,
+        "encoding": "f64le-base64",
+        "transforms": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAEEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAAEAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAEEAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAAEAAAAAAAAAAAAAAAAAAAAhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAEEAAAAAAAAAAAAAAAAAAAAhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAAAAAAAAAAAAAQAAAAAAAAAhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAAEAAAAAAAAAAQAAAAAAAAAhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/AAAAAAAAEEAAAAAAAAAAQAAAAAAAAAhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/"
+      }
+    }
+  }
+}

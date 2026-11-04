@@ -1,6 +1,8 @@
 /** Pipe stress commands (07 PST): the `pipeStressPlugin` catalog. M1 quick checks, M3 model, analysis, record and approval, M4 report. */
 
 import { commandCatalog } from '@core/commands/schema';
+import { deleteSifOverride, setSifOverride } from './commands/sifOverrides';
+import { deleteStressComponent, setStressComponent } from './commands/components';
 import { analyzePipeStress, checkPipeStress } from './commands/analyze';
 import { setPipeOperatingConditions, setStressLoadCases } from './commands/conditions';
 import { guidedCantilever } from './commands/guidedCantilever';
@@ -24,6 +26,10 @@ export const pipeStressCommands = commandCatalog(
   setStressLoadCases,
   addStressRestraint,
   deleteStressRestraint,
+  setStressComponent,
+  deleteStressComponent,
+  setSifOverride,
+  deleteSifOverride,
   analyzePipeStress,
   checkPipeStress,
   recordPipeStressResults,

@@ -8,6 +8,7 @@ import { caseOf, withCase } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
 import { analysisInputHash } from '../hash/inputHash';
 import { verifyAndSpend } from '@core/model/humanGate';
+import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/documentUid';
 import { marginDispositionPayload } from './disposition';
 import { marginQueryShape, marginTable } from './computeMargins';
 import { refuseMarginsAs } from './refusal';
@@ -16,9 +17,10 @@ import { refuseMarginsAs } from './refusal';
  * @affects doc.analysis.cases[analysisId].dispositions[rowKey] (records decision, justification, resultsHash, signer, signatureId and the verified
  *   signature; affected: [rowKey]); never changes a row's status or the results
  * @invariant recorded only with a signature verified by `ctx.humanSignature` over sha256 of (analysisId, rowKey, status, ms, decision, justification,
- *   resultsHash): the decision binds to the row as computed now and to the current results hash, and ends when the case is solved again
+ *   resultsHash, documentUid): the decision binds to the row as computed now, to the current results hash and to this document (its uid, recorded with
+ *   the disposition and re-verified by compute_margins), and ends when the case is solved again
  * @failure no signing port, no signature or a signature that does not verify -> FEA_HUMAN_GATE (an agent caller always lands here); unknown analysis
- *   -> FEA_ANALYSIS_NOT_FOUND; empty justification -> FEA_PARAM_INVALID; stale / missing results -> FEA_RESULTS_STALE / FEA_RESULTS_MISSING; unknown
+ *   -> FEA_ANALYSIS_NOT_FOUND; a document without a uid (checked after the port and signature) -> FEA_DOCUMENT_UNIDENTIFIED; empty justification -> FEA_PARAM_INVALID; stale / missing results -> FEA_RESULTS_STALE / FEA_RESULTS_MISSING; unknown
  *   rowId -> FEA_MARGIN_ROW_NOT_FOUND; a PASS row -> FEA_MARGIN_PARAM_INVALID (all refusals, unchanged doc)
  */
 export const disposeMargin = defineCommand({
@@ -45,6 +47,7 @@ export const disposeMargin = defineCommand({
     const port = ctx?.humanSignature ?? null;
     if (port === null || signature === undefined)
       return fail('FEA_HUMAN_GATE', 'dispositions need a human-held signature: hand over to the qualified reviewer, do not retry');
+    if (doc.uid === undefined) return fail('FEA_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [analysisId]);
     if (justification.trim() === '') return fail('FEA_PARAM_INVALID', 'a disposition needs a justification');
     const table = marginTable(doc, analysisId, query, ctx);
     if ('code' in table) return fail(table.code, table.message, table.ids);
@@ -64,6 +67,7 @@ export const disposeMargin = defineCommand({
         decision,
         justification,
         resultsHash,
+        documentIdentity(doc),
       ),
     );
     if (signed === null)
@@ -75,6 +79,7 @@ export const disposeMargin = defineCommand({
       signer: signed.signer,
       signatureId: signed.signatureId,
       signature,
+      documentUid: documentIdentity(doc),
     };
     const next = { ...table.analysis, dispositions: { ...table.analysis.dispositions, [rowKey]: disposition } };
     return changed(

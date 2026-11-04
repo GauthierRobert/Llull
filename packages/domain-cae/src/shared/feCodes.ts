@@ -53,6 +53,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_COMPOSITE_MARGINS_UNSUPPORTED:
     'a composite shell got no ply-failure rows (the laminate lacks Xt, Xc, Yt, Yc, S, the shell is not planar, or the results lack STRESS_TOP / STRESS_BOT): complete the lamina data (create_lamina_material) or assess the plies with the 06 CMP laminate analysis',
   FEA_MARGINAL_BAND_UNSET: 'ask the owner / company rule for a marginal band and pass marginalBand to compute_margins',
+  FEA_DOCUMENT_UNIDENTIFIED:
+    'the document has no uid yet: make any recorded change (or load it with load_document, or run it as its own command, not inside a build_project plan), then sign; the signature is bound to the uid',
+  FEA_DISPOSITION_FOREIGN_DOCUMENT:
+    'discard the copied disposition; a qualified reviewer of THIS document dispositions the row again (dispose_margin signs the document uid)',
+  FEA_DISPOSITION_UNBOUND:
+    'the disposition was signed before signatures were bound to their document: the qualified reviewer dispositions the row again (dispose_margin)',
   FEA_DISPOSITION_PENDING:
     'hand the FAIL / MARGINAL rows to the qualified reviewer, who dispositions them with dispose_margin in the desktop app',
   FEA_UNDERCONSTRAINED:

@@ -10,6 +10,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { pluginRenderOverlays } from '@core/plugins/host';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import type { CadDocument } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { analyzeStressModel } from '@aec/plant/stress/analysis';
@@ -45,7 +46,7 @@ function approved(doc: CadDocument, id: string): CadDocument {
   const payload = humanGatePayload(
     'plant:approve_pipe_stress',
     [id],
-    { inputHash: results.inputHash, resultHash: results.resultHash },
+    withDocumentUid({ inputHash: results.inputHash, resultHash: results.resultHash }, doc),
     'n1',
   );
   const signature = { payload, nonce: 'n1' };

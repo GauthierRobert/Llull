@@ -6,6 +6,7 @@
 
 import type { AnalysisCase, FeMeshArtifact, HumanSignaturePort } from '@core/model/analysis';
 import type { LaminaMaterial } from '@core/model/composites';
+import { documentIdentity } from '@core/model/documentUid';
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { toMetres } from '@core/model/units';
@@ -169,6 +170,7 @@ export function plyMarginRows(input: PlyMarginInput): PlyOutcome {
       { rowKey, status, ms, inputHash: analysisInputHash(doc, analysis.id, 'full') },
       input.port,
       analysis.results?.resultsHash ?? '',
+      documentIdentity(doc),
     );
     const thermal =
       analysis.type === 'static'
@@ -234,6 +236,7 @@ export function plyMarginRows(input: PlyMarginInput): PlyOutcome {
         statusLabel: decided.statusLabel,
         ...(decided.record !== undefined ? { dispositionRecord: decided.record } : {}),
         ...(decided.note !== undefined ? { dispositionNote: decided.note } : {}),
+        ...(decided.code !== undefined ? { dispositionCode: decided.code } : {}),
       },
     ];
   });
