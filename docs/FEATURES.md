@@ -7,12 +7,12 @@
 
 | Toolset | Commands |
 | ------- | -------- |
-| [core](#core) | 37 |
+| [core](#core) | 36 |
 | [2d](#2d) | 33 |
 | [3d](#3d) | 96 |
 | [measure](#measure) | 8 |
 | [parametric](#parametric) | 15 |
-| [assembly](#assembly) | 36 |
+| [assembly](#assembly) | 37 |
 | [materials](#materials) | 23 |
 | [material-lab](#material-lab) | 3 |
 | [analysis](#analysis) | 129 |
@@ -43,7 +43,6 @@
 
 | Command | Description | Flags |
 | ------- | ----------- | ----- |
-| `add_instance_array` | Place a Component (create_component) on a 3-D grid as one instance array: nx x ny x nz members at origin + i*step, each with the same rotation and scale, store… |  |
 | `add_layer` | Create a new layer with the given name and append it to the layer order. |  |
 | `align` | Move every entity in targetIds so that its bounding-box edge (or center) along the specified axis matches the reference entity's. |  |
 | `array_linear` | Duplicate an entity into a linear pattern. |  |
@@ -261,6 +260,7 @@
 | `add_cylinder_pressure` | Gas pressure on a piston, for simulate_motion: force = (p - ambient) x bore area pushes the piston toward the crank, applied as the generalised force of the pr… |  |
 | `add_drive_relation` | Couple two kinematic joints (add_joint; poses only, no inertia): driven_value = driver_value * ratio + offset. |  |
 | `add_gear_coupling` | Couple two physics joints (add_body_joint) rigidly, like meshing gears, a belt or a chain: speed(driven) = ratio × speed(driver), enforced by the physics engin… |  |
+| `add_instance_array` | Place a Component (create_component) on a 3-D grid as one instance array: nx x ny x nz members at origin + i*step, each with the same rotation and scale, store… |  |
 | `add_joint` | Add a kinematic joint between two InstanceEntity frames to model a mechanism (poses only, no forces; for rigid-body physics with masses and forces use add_body… |  |
 | `add_motor` | Drive a joint for simulate_motion. |  |
 | `add_propeller` | Load a revolute joint with a propeller's aerodynamics for simulate_motion (static / take-off condition by default). |  |
