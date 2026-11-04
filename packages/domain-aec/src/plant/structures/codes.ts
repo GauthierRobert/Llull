@@ -65,6 +65,8 @@ const REMEDIATION = {
   STA_STAIR_TREAD: 'Increase treadDepth (steel stair: going) to at least the limit.',
   STA_STAIR_ANGLE: 'Change riserCount or treadDepth (steel stair: riserMax / going) so the pitch angle is within the limit.',
   STA_STAIR_WIDTH: 'Increase the stair width to at least the limit (steel stair: delete it and add_steel_stair again with a larger width).',
+  STA_STAIR_HEADROOM:
+    'Raise the obstruction named in the finding location above the stair, or lower it (delete it and add_steel_stair again with another start or toSurfaceId): the free height over the pitch line must reach the limit.',
   STA_STAIR_FLIGHT_RISE:
     'Add an intermediate landing (add_stair landingAt, add_steel_stair landingEvery) so no flight rises more than the limit.',
   STA_EDGE_UNPROTECTED:

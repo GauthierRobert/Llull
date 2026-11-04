@@ -134,11 +134,35 @@ function footLinks(doc: CadDocument, building: BuildingModel, hosted: Hosted, le
   return found === undefined ? [] : linksOf(building, hosted, found.id);
 }
 
-export function structuresClashBodies(doc: CadDocument): ExternalBody[] {
-  const building = getBuilding(doc);
+/** Hosted railings of every host id (a stair carries its hand-rails). */
+function hostedRailings(building: BuildingModel): Hosted {
   const hosted = new Map<string, string[]>();
   for (const railing of elementsOf(building, 'railing'))
     if (railing.host !== undefined) hosted.set(railing.host.hostId, [...(hosted.get(railing.host.hostId) ?? []), railing.id]);
+  return hosted;
+}
+
+/**
+ * Ids a ladder or steel stair stands on and reaches by design: itself with its hosted hand-rails, the surface it arrives on and the one it leaves from
+ * (each with its assembly, panel supports and hosted railings). Bodies of these never clash with it and never obstruct its headroom.
+ */
+export function accessLinks(doc: CadDocument, building: BuildingModel, element: LadderElement | SteelStairElement): string[] {
+  const hosted = hostedRailings(building);
+  const level = building.levels[element.levelId];
+  const foot = element.category === 'ladder' ? element.base : element.start;
+  const extra = element.category === 'ladder' ? element.clearWidth : element.width;
+  return [
+    ...new Set([
+      ...linksOf(building, hosted, element.id),
+      ...(element.arrivalSurfaceId === undefined ? [] : linksOf(building, hosted, element.arrivalSurfaceId)),
+      ...(level === undefined ? [] : footLinks(doc, building, hosted, level, foot, extra)),
+    ]),
+  ];
+}
+
+export function structuresClashBodies(doc: CadDocument): ExternalBody[] {
+  const building = getBuilding(doc);
+  const hosted = hostedRailings(building);
   const bodies: ExternalBody[] = [];
   const collect =
     (element: BuildingElement, connectedTo: readonly string[]): Emit =>
@@ -156,20 +180,12 @@ export function structuresClashBodies(doc: CadDocument): ExternalBody[] {
   for (const ladder of elementsOf(building, 'ladder')) {
     const level = building.levels[ladder.levelId];
     if (level === undefined) continue;
-    const links = [
-      ...(ladder.arrivalSurfaceId === undefined ? [] : linksOf(building, hosted, ladder.arrivalSurfaceId)),
-      ...footLinks(doc, building, hosted, level, ladder.base, ladder.clearWidth),
-    ];
-    ladderBoxes(doc, ladder, level, collect(ladder, links));
+    ladderBoxes(doc, ladder, level, collect(ladder, accessLinks(doc, building, ladder)));
   }
   for (const stair of elementsOf(building, 'steelStair')) {
     const level = building.levels[stair.levelId];
     if (level === undefined) continue;
-    const links = [
-      ...(stair.arrivalSurfaceId === undefined ? [] : linksOf(building, hosted, stair.arrivalSurfaceId)),
-      ...footLinks(doc, building, hosted, level, stair.start, stair.width),
-    ];
-    stairBoxes(doc, stair, level, collect(stair, links));
+    stairBoxes(doc, stair, level, collect(stair, accessLinks(doc, building, stair)));
   }
   for (const grating of elementsOf(building, 'grating')) {
     const level = building.levels[grating.levelId];
