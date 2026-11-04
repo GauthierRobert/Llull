@@ -90,8 +90,9 @@ function InstanceBatchMesh({ batch, selectionSet, displayMode, onSelect }: Insta
   const geometry = useDisposable(() => makeGeometry(geometryBatch), [geometryBatch]);
 
   const material = useDisposable(
-    () => new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, batch.pbrMaterial)),
-    [displayMode, batch.pbrMaterial],
+    () => new THREE.MeshStandardMaterial(makeMaterialArgs(displayMode, geometryBatch.surface ?? batch.pbrMaterial)),
+    // The class surface is part of the batch key: `geometryBatch` keeps one object per key, unlike the batch rebuilt every pass.
+    [displayMode, batch.pbrMaterial, geometryBatch.surface],
   );
 
   // `args` changing (display mode → material, geometry, count) makes r3f construct a NEW InstancedMesh with identity

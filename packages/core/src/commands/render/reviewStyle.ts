@@ -4,14 +4,14 @@
  * @invariant the scene given is never modified; styling returns a copy whose recoloured entities carry no material override
  */
 
-import { is2D, type CadDocument, type Entity, type Vec3 } from '../../model/types';
+import { type CadDocument, type Entity, type Vec3 } from '../../model/types';
 import type { ColourProfile } from '../../model/display';
 import type { SectionBox, ViewpointVisibility } from '../../model/review';
 import { z } from '../schema';
 import { orderedEntities } from '../entity/entityOps';
 import { dot3 } from '../../lib/vec3';
 import type { ExecutionContext } from '../types';
-import { materialClassColour, recolouredEntity } from '../../geometry/materialClasses';
+import { recolouredEntity, resolveEntityColour } from '../../geometry/materialClasses';
 import { evaluateProfile } from '../display/displayModel';
 import { hexRgb } from './frames';
 import type { CutSpec } from './types';
@@ -211,17 +211,13 @@ export function applyReviewStyle(
   for (const id of shown) {
     let entity = scene.entities[id] as Entity;
     const rule = rules.get(id) ?? null;
-    const classColour = materialClassColour(scene, entity);
     if (rule?.appearance.hidden === true) {
       hidden.add(id);
       continue;
     }
-    if (rule !== null) {
-      counts.set(rule.id, (counts.get(rule.id) ?? 0) + 1);
-      entity = recolouredEntity(entity, rule.appearance.colour);
-    } else if (classColour !== null) entity = recolouredEntity(entity, classColour);
-    else if (profile !== null && profile.defaultColour !== 'entity' && !is2D(entity))
-      entity = recolouredEntity(entity, profile.defaultColour);
+    if (rule !== null) counts.set(rule.id, (counts.get(rule.id) ?? 0) + 1);
+    const colour = resolveEntityColour(scene.display, entity, rule === null ? null : rule.appearance.colour, profile?.defaultColour);
+    if (colour !== null) entity = recolouredEntity(entity, colour);
     if (highlight !== null && !highlight.has(id)) entity = recolouredEntity(entity, dimmed(entity.color, backgroundRgb));
     entities[id] = entity;
     order.push(id);

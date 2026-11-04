@@ -5,7 +5,7 @@
  */
 
 import type { DisplayModel, MaterialClass } from '../model/display';
-import { is3D, type CadDocument, type Entity } from '../model/types';
+import { is2D, is3D, type CadDocument, type Entity } from '../model/types';
 
 const defaults = (rows: ReadonlyArray<readonly [string, string, string | null, number, number]>): ReadonlyArray<MaterialClass> =>
   rows.map(([id, name, colour, metalness, roughness]) => ({ id, name, colour, metalness, roughness }));
@@ -40,11 +40,44 @@ export function findMaterialClass(display: DisplayModel | undefined, id: string)
 }
 
 /** The class assigned to the entity (assign_material_class) when it still exists, else undefined. */
-export function assignedMaterialClass(doc: CadDocument, entityId: string): MaterialClass | undefined {
-  const assigned = doc.display?.materialClassOf;
+export function assignedMaterialClassIn(display: DisplayModel | undefined, entityId: string): MaterialClass | undefined {
+  const assigned = display?.materialClassOf;
   if (assigned === undefined || !Object.hasOwn(assigned, entityId)) return undefined;
   const id = assigned[entityId];
-  return id === undefined ? undefined : findMaterialClass(doc.display, id);
+  return id === undefined ? undefined : findMaterialClass(display, id);
+}
+
+/** `assignedMaterialClassIn` of a document. */
+export function assignedMaterialClass(doc: CadDocument, entityId: string): MaterialClass | undefined {
+  return assignedMaterialClassIn(doc.display, entityId);
+}
+
+const PLAN_KEY_PREFIX = 'matclass:';
+
+/** Render-plan material class key of an assigned display class: namespaced, so a `materialId` equal to a class id is a different key. */
+export function materialClassPlanKey(classId: string): string {
+  return PLAN_KEY_PREFIX + classId;
+}
+
+/** The display class id of a render-plan material class key, or undefined when the key is a `materialId` / `unassigned`. */
+export function materialClassIdOfPlanKey(key: string): string | undefined {
+  return key.startsWith(PLAN_KEY_PREFIX) ? key.slice(PLAN_KEY_PREFIX.length) : undefined;
+}
+
+/**
+ * The display colour of an entity, the ONE precedence chain of `render_view`, `render_walkthrough` and the viewport: a matching profile rule's
+ * colour (`ruleColour`), else the assigned class colour (3D only), else the profile default colour (not 2D; 'entity' or undefined = none), else null.
+ */
+export function resolveEntityColour(
+  display: DisplayModel | undefined,
+  entity: Entity,
+  ruleColour: string | null,
+  profileDefault: string | undefined,
+): string | null {
+  if (ruleColour !== null) return ruleColour;
+  const classColour = is3D(entity) ? (assignedMaterialClassIn(display, entity.id)?.colour ?? null) : null;
+  if (classColour !== null) return classColour;
+  return !is2D(entity) && profileDefault !== undefined && profileDefault !== 'entity' ? profileDefault : null;
 }
 
 /** `entity` drawn in `colour` (a colour replaces the material override, like a profile rule). */
@@ -54,7 +87,7 @@ export function recolouredEntity(entity: Entity, colour: string): Entity {
 }
 
 /** Colour of the class assigned to a 3D `entity`, or null (no assignment, a class without a colour, a 2D shape or a curve). */
-export function materialClassColour(doc: CadDocument, entity: Entity): string | null {
+function materialClassColour(doc: CadDocument, entity: Entity): string | null {
   return is3D(entity) ? (assignedMaterialClass(doc, entity.id)?.colour ?? null) : null;
 }
 

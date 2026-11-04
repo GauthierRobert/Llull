@@ -15,6 +15,13 @@ export interface InstanceBatch {
   entities: Entity[];
   /** Base roughness/metalness + shaded instance colors (materialId is part of the key). */
   pbrMaterial?: PbrMaterial;
+  /** Metalness / roughness of the assigned material class (wins over the material's); the class is part of the key. */
+  surface?: Surface;
+}
+
+export interface Surface {
+  readonly metalness: number;
+  readonly roughness: number;
 }
 
 /** e.g. `"box|10|20|30|#c8553d|layer-default"` (+ `|mat:<id>`); null when not batchable. */
@@ -42,19 +49,31 @@ export function isBatchable(entity: Entity): boolean {
 }
 
 /** Non-batchable entities are omitted (rendered per entity by the caller). */
-export function groupEntitiesForInstancing(entities: Entity[], materials: Record<string, Material> = {}): Map<string, InstanceBatch> {
+export function groupEntitiesForInstancing(
+  entities: Entity[],
+  materials: Record<string, Material> = {},
+  surfaceOf: (entity: Entity) => Surface | undefined = () => undefined,
+): Map<string, InstanceBatch> {
   const map = new Map<string, InstanceBatch>();
 
   for (const entity of entities) {
-    const key = entityRenderKey(entity);
-    if (key === null) continue;
+    const base = entityRenderKey(entity);
+    if (base === null) continue;
+    const surface = surfaceOf(entity);
+    const key = surface === undefined ? base : `${base}|surf:${surface.metalness}|${surface.roughness}`;
 
     const existing = map.get(key);
     if (existing) {
       existing.entities.push(entity);
     } else {
       const mat = entity.materialId ? materials[entity.materialId] : undefined;
-      map.set(key, { key, kind: entity.kind as BatchableKind, entities: [entity], ...(mat && { pbrMaterial: mat }) });
+      map.set(key, {
+        key,
+        kind: entity.kind as BatchableKind,
+        entities: [entity],
+        ...(mat && { pbrMaterial: mat }),
+        ...(surface && { surface }),
+      });
     }
   }
 

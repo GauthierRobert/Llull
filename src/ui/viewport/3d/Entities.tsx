@@ -26,6 +26,8 @@ import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 import { activeExplodeOffsets } from '@core/geometry/explodedOffsets';
 import type { PbrMaterial } from './useMaterialProps';
+import { assignedMaterialClassIn } from '@core/geometry/materialClasses';
+import { entityPbrMaterial } from './review/materialClassAppearance';
 import { useTransitioningIds } from '@ui/store/transitioningIds';
 import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
 import { type GhostRenderer, LiveFxLayer } from '../liveFx/LiveFxLayer';
@@ -129,7 +131,7 @@ const renderPreviewEntity: RenderPreviewEntity = (entity) => (
 
 export function Entities(): React.ReactElement {
   const document = useStore((s) => s.document);
-  const { order, entities, layers, materials, animations, groups, dynamics } = document;
+  const { order, entities, layers, materials, animations, groups, dynamics, display } = document;
   const selectionSet = useSelectionSet();
 
   const select = useStore((s) => s.select);
@@ -222,8 +224,12 @@ export function Entities(): React.ReactElement {
             !tints.has(entity.id),
         ),
         materials,
+        (entity) => {
+          const cls = assignedMaterialClassIn(display, entity.id);
+          return cls === undefined ? undefined : { metalness: cls.metalness, roughness: cls.roughness };
+        },
       ),
-    [perEntityCandidates, animatedIds, materials, hasFinish, transitions, ghosted, tints],
+    [perEntityCandidates, animatedIds, materials, display, hasFinish, transitions, ghosted, tints],
   );
   const nonBatchableEntities = useMemo(
     () =>
@@ -240,6 +246,12 @@ export function Entities(): React.ReactElement {
     [perEntityCandidates, animatedIds, layers, hasFinish, transitions, ghosted, tints],
   );
 
+  // Memoized so a class-assigned entity keeps one PBR object (the memoized renderer does not re-render on a selection change).
+  const pbrById = useMemo(
+    () => new Map(nonBatchableEntities.map((entity) => [entity.id, entityPbrMaterial({ display, materials }, entity)] as const)),
+    [nonBatchableEntities, display, materials],
+  );
+
   return (
     <group name="entities">
       <GridAnnotations3D document={document} />
@@ -252,6 +264,7 @@ export function Entities(): React.ReactElement {
           covered={plantCovered}
           entities={entities}
           materials={materials}
+          display={display}
           selectionSet={selectionSet}
           onSelect={handleSelect}
         />
@@ -265,7 +278,7 @@ export function Entities(): React.ReactElement {
             selected={selectionSet.has(entity.id)}
             onSelect={handleSelect}
             components={entity.kind === 'instance' ? document.components : undefined}
-            pbrMaterial={entity.materialId ? materials[entity.materialId] : undefined}
+            pbrMaterial={pbrById.get(entity.id)}
           />
         </LiveTransitionGroup>
       ))}

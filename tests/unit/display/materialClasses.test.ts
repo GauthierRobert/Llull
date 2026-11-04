@@ -2,7 +2,14 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { DEFAULT_MATERIAL_CLASSES, effectiveMaterialClasses, withMaterialClassColours } from '@core/geometry/materialClasses';
+import {
+  DEFAULT_MATERIAL_CLASSES,
+  effectiveMaterialClasses,
+  materialClassIdOfPlanKey,
+  materialClassPlanKey,
+  resolveEntityColour,
+  withMaterialClassColours,
+} from '@core/geometry/materialClasses';
 import { coreEntityProperties } from '@core/geometry/entityProperties';
 import { planScene } from '@core/geometry/renderPlan';
 import { validateDocumentValues } from '@core/commands/persistence/validation';
@@ -181,7 +188,7 @@ describe('the class in the picture and in the properties', () => {
     const doc = classed();
     expect(coreEntityProperties(doc, A).materialClass).toBe('signal_red');
     expect(coreEntityProperties(doc, B).materialClass).toBeUndefined();
-    expect(planScene(doc).materialClasses).toEqual(['signal_red', 'unassigned']);
+    expect(planScene(doc).materialClasses).toEqual(['matclass:signal_red', 'unassigned']);
     const rule = { id: 'sr', when: { property: 'materialClass', equals: 'signal_red' }, colour: '#00ff00', legend: 'sr' };
     const profiled = apply(doc, 'define_colour_profile', { id: 'p', name: 'P', rules: [rule] });
     const shown = execute(profiled, 'render_view', { view: 'top', mode: 'vector', width: 200, height: 100, colourProfileId: 'p' });
@@ -276,5 +283,58 @@ describe('assignments follow their entity', () => {
     );
     expect(refused.error?.ids).toEqual([line]);
     expect(ok(doc, 'assign_material_class', { classId: null, entityIds: [line] }).affected).toEqual([line]);
+  });
+});
+
+describe('shared colour chain and plan key (VIS-M8f follow-up)', () => {
+  const polyline = (): CadDocument =>
+    apply(scene(), 'draw_polyline', {
+      points: [
+        [0, 0],
+        [1, 1],
+      ],
+    });
+  const withClass = (doc: CadDocument, id: string, classId: string): CadDocument =>
+    apply(doc, 'assign_material_class', { classId, entityIds: [id] });
+
+  it('resolveEntityColour: rule, then class colour, then profile default (not 2D), then null', () => {
+    const doc = withClass(polyline(), A, 'stainless_steel');
+    const [, , line] = doc.order as [string, string, string];
+    const box = doc.entities[A]!;
+    const plain = doc.entities[B]!;
+    expect(resolveEntityColour(doc.display, box, '#ff0000', '#00ff00')).toBe('#ff0000');
+    expect(resolveEntityColour(doc.display, box, null, '#00ff00')).toBe('#c0c4c8');
+    expect(resolveEntityColour(doc.display, plain, null, '#00ff00')).toBe('#00ff00');
+    expect(resolveEntityColour(doc.display, plain, null, 'entity')).toBeNull();
+    expect(resolveEntityColour(doc.display, plain, null, undefined)).toBeNull();
+    expect(resolveEntityColour(doc.display, doc.entities[line]!, null, '#00ff00')).toBeNull();
+    const painted = withClass(doc, B, 'structural_steel_painted');
+    expect(resolveEntityColour(painted.display, painted.entities[B]!, null, '#00ff00')).toBe('#00ff00');
+  });
+
+  it('render_view applies the same chain: a class colour beats the profile default, an unclassed box takes the default', () => {
+    const profile = (defaultColour: string): Record<string, unknown> => ({
+      id: 'p',
+      name: 'P',
+      rules: [{ id: 'r', when: { property: 'kind', equals: 'sphere' }, colour: '#ff0000', legend: 'none' }],
+      defaultColour,
+    });
+    const both = withClass(withClass(scene(), A, 'stainless_steel'), B, 'stainless_steel');
+    const green = top(apply(both, 'define_colour_profile', profile('#00ff00')), { colourProfileId: 'p' });
+    const entity = top(apply(both, 'define_colour_profile', profile('entity')), { colourProfileId: 'p' });
+    expect(green).toBe(entity);
+    const one = withClass(scene(), A, 'stainless_steel');
+    expect(top(apply(one, 'define_colour_profile', profile('#00ff00')), { colourProfileId: 'p' })).not.toBe(
+      top(apply(one, 'define_colour_profile', profile('entity')), { colourProfileId: 'p' }),
+    );
+  });
+
+  it('namespaces the plan key: a materialId equal to a class id is a different bucket', () => {
+    expect(materialClassPlanKey('concrete')).toBe('matclass:concrete');
+    expect(materialClassIdOfPlanKey('matclass:concrete')).toBe('concrete');
+    expect(materialClassIdOfPlanKey('concrete')).toBeUndefined();
+    const base = withClass(scene(), A, 'concrete');
+    const doc = { ...base, entities: { ...base.entities, [B]: { ...base.entities[B]!, materialId: 'concrete' } } } as CadDocument;
+    expect(planScene(doc).materialClasses).toEqual(['matclass:concrete', 'concrete']);
   });
 });
