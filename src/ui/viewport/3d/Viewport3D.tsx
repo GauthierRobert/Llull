@@ -24,7 +24,8 @@ import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { DynamicsPlayer } from './DynamicsPlayer';
-import { useRenderQuality } from './useRenderQuality';
+import { useEdgeLines, useRenderQuality } from './useRenderQuality';
+import { HighQualityEffects } from './effects/HighQualityEffects';
 import { NavigationController, WALKABLE_GROUP_NAME } from './navigation/NavigationController';
 import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
@@ -83,6 +84,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   const orbiting = useNavigationStore((s) => s.mode === 'orbit');
 
   const quality = useRenderQuality();
+  const edges = useEdgeLines();
   const palette = useViewportPalette();
 
   // Initial camera only: CameraReactor applies later changes imperatively.
@@ -149,6 +151,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         fadeStrength={1.5}
         position={[0, 0, 0]}
         rotation={GROUND_PLANE_ROTATION}
+        userData={{ noEdges: true }}
         infiniteGrid
       />
 
@@ -189,8 +192,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* Last: its useFrame must run after every pose writer (see RenderRig). */}
       <RenderRig />
+      {edges && <HighQualityEffects edges={edges} />}
 
-      <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
+      <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={edges ? 2 : 1}>
         <GizmoViewport axisColors={palette.axisColors} labelColor={palette.axisLabel} />
       </GizmoHelper>
     </>

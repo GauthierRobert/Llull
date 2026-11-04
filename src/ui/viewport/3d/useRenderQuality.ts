@@ -2,7 +2,7 @@
 // Budget: ≤ 16 ms median frame at 500 entities on a mid-range laptop GPU, which Low reaches by dropping PCSS + contact shadows.
 
 import { type QualityTier, type QualityOverride, useStore, useViewportStore } from '@ui/store';
-import { type RealismTier, useRealismStore } from '@ui/store/realismStore';
+import { type EdgePreference, type RealismTier, useRealismStore } from '@ui/store/realismStore';
 
 export function deriveQualityTier(entityCount: number): QualityTier {
   return entityCount <= 50 ? 'high' : entityCount <= 200 ? 'medium' : 'low';
@@ -25,6 +25,8 @@ export interface RenderQualitySettings {
   keyShadows: boolean;
   /** Plant batch buckets of LOD <= this cast shadows (-1 = none); 0 is the nearest LOD. */
   plantShadowMaxLod: -1 | 0 | 1 | 2;
+  /** Feature edges (screen-space normal/depth pass) by default: High only; the Edges toggle overrides. */
+  edgeLines: boolean;
 }
 
 const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
@@ -36,6 +38,7 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     environmentEnabled: true,
     keyShadows: true,
     plantShadowMaxLod: 1,
+    edgeLines: false,
   },
   medium: {
     tier: 'medium',
@@ -45,6 +48,7 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     environmentEnabled: true,
     keyShadows: true,
     plantShadowMaxLod: 1,
+    edgeLines: false,
   },
   low: {
     tier: 'low',
@@ -54,13 +58,14 @@ const QUALITY_SETTINGS: Record<QualityTier, RenderQualitySettings> = {
     environmentEnabled: true,
     keyShadows: true,
     plantShadowMaxLod: 1,
+    edgeLines: false,
   },
 };
 
 /** Realism tiers sit on top of the quality tier: Standard keeps it, Draft drops every shadow, High forces the richest set whatever the scene size. */
 const REALISM_SETTINGS: Record<Exclude<RealismTier, 'standard'>, RenderQualitySettings> = {
-  draft: { ...QUALITY_SETTINGS.low, keyShadows: false, plantShadowMaxLod: -1 },
-  high: { ...QUALITY_SETTINGS.high, softShadowSamples: 24, shadowMapSize: 4096, plantShadowMaxLod: 2 },
+  draft: { ...QUALITY_SETTINGS.low, keyShadows: false, plantShadowMaxLod: -1, edgeLines: false },
+  high: { ...QUALITY_SETTINGS.high, softShadowSamples: 24, shadowMapSize: 4096, plantShadowMaxLod: 2, edgeLines: true },
 };
 
 /** Final settings of a quality tier under a realism tier. Stable references (per tier pair). */
@@ -74,4 +79,15 @@ export function useRenderQuality(): RenderQualitySettings {
   const qualityOverride = useViewportStore((s) => s.qualityOverride);
   const realism = useRealismStore((s) => s.realism);
   return settingsFor(resolveQualityTier(qualityOverride, entityCount), realism);
+}
+
+/** The tier's edge default under the user's override. */
+export function resolveEdgeLines(settings: RenderQualitySettings, preference: EdgePreference): boolean {
+  return preference === 'auto' ? settings.edgeLines : preference === 'on';
+}
+
+export function useEdgeLines(): boolean {
+  const settings = useRenderQuality();
+  const preference = useRealismStore((s) => s.edges);
+  return resolveEdgeLines(settings, preference);
 }
