@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { isEvaluationFailure } from '@cae/fatigue/evaluate';
 import { fatigueFieldInput } from '@cae/fatigue/feField';
+import { instanceBvhCases } from '../../helpers/instanceBvhFixture';
 import { fatigueFieldReference } from '../../helpers/fatigueFieldOracle';
 import { maxPrincipal, signedVonMises } from '@cae/fatigue/feStress';
 import { countCycles, type CountingMethod, type ResidueRule } from '@cae/fatigue/rainflow';
@@ -209,4 +210,6 @@ describe('native reference fixtures (TS = oracle)', () => {
     fixture('llull-post/tests/fixtures/fatigue_jobs.json', fatigueJobCases()),
   );
   it('mesh mappings for llull-post (VC-TMC-10 at crate level)', () => fixture('llull-post/tests/fixtures/map.json', mapCases()));
+  it('instance BVH trees and query results for llull-bvh (VC-VIS-60 native side)', () =>
+    fixture('llull-bvh/tests/fixtures/instance_bvh.json', instanceBvhCases()));
 });

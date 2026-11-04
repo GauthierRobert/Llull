@@ -6,6 +6,7 @@
 //! arithmetic (`llull_jsmath::hypot`) = the same leaf for every query, so native results match the TypeScript reference bit for bit.
 
 pub mod geometry;
+pub mod instance;
 
 use llull_jsmath::hypot;
 
