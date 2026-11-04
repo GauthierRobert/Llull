@@ -28,10 +28,32 @@ import { arrivalSurface, distanceToRing, namedSurfaces, nearestSurface, walkingS
 const ARRIVAL_Z_MM = 50;
 const ARRIVAL_REACH_MM = 600;
 /** More rungs than this is a unit mistake (a pitch in metres), not a ladder. */
-const MAX_RUNGS = 500;
+export const MAX_RUNGS = 500;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const isIsoDate = (text: string): boolean => ISO_DATE.test(text) && !Number.isNaN(Date.parse(`${text}T00:00:00Z`));
+export const isIsoDate = (text: string): boolean => ISO_DATE.test(text) && !Number.isNaN(Date.parse(`${text}T00:00:00Z`));
+
+export const ladderCageParam = z
+  .object({
+    startHeight: z
+      .number()
+      .positive()
+      .optional()
+      .describe('First hoop above the base, DOCUMENT UNITS. Default 2200 mm (ISO-LAD-CAGE-START minimum).'),
+    hoopSpacing: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Largest distance between hoops, DOCUMENT UNITS. Default 1500 mm (ISO-LAD-CAGE-HOOP, grade B).'),
+    diameter: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Inside cage diameter, DOCUMENT UNITS. Default 650 mm (ISO-LAD-CAGE-DIAM, grade B).'),
+    bars: z.number().int().min(2).max(12).optional().describe('Vertical bars across the cage arc. Default 5.'),
+  })
+  .optional()
+  .describe('Cage dimensions; only with fallProtection "cage".');
 
 /**
  * @affects creates 1 ladder element (stiles, rungs, cage hoops / bars and landing plates as entities on layer S-LADR) and, for a through exit, a gap with a gate in the railing in front of it
@@ -90,27 +112,7 @@ export const addLadder = defineCommand({
       .enum(['none', 'cage', 'ladder_safety_system', 'pfas'])
       .optional()
       .describe('Fall protection. Default from the rulesets and the height (see the description).'),
-    cage: z
-      .object({
-        startHeight: z
-          .number()
-          .positive()
-          .optional()
-          .describe('First hoop above the base, DOCUMENT UNITS. Default 2200 mm (ISO-LAD-CAGE-START minimum).'),
-        hoopSpacing: z
-          .number()
-          .positive()
-          .optional()
-          .describe('Largest distance between hoops, DOCUMENT UNITS. Default 1500 mm (ISO-LAD-CAGE-HOOP, grade B).'),
-        diameter: z
-          .number()
-          .positive()
-          .optional()
-          .describe('Inside cage diameter, DOCUMENT UNITS. Default 650 mm (ISO-LAD-CAGE-DIAM, grade B).'),
-        bars: z.number().int().min(2).max(12).optional().describe('Vertical bars across the cage arc. Default 5.'),
-      })
-      .optional()
-      .describe('Cage dimensions; only with fallProtection "cage".'),
+    cage: ladderCageParam,
     landings: z
       .array(z.number().positive())
       .optional()
