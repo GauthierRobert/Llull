@@ -5,6 +5,7 @@ import type { PipeLine } from '@aec/plant/types';
 import { nextId } from '@lib/id';
 import { envelopeDiameter, resolveInsulation } from '../insulation';
 import { lineNumberTemplate, parseLineNumber, renderLineNumber } from '../lineNumber';
+import { getFabrication } from '../../fabrication/state';
 import { getPiping, refuse, withPiping } from '../model';
 import { createSpecLookup, isMiss } from '../specLookup';
 import { insulationInput, lineSlopeInput, slopeProblem } from './lineInput';
@@ -14,6 +15,7 @@ import { insulationInput, lineSlopeInput, slopeProblem } from './lineInput';
  * @invariant lineNumber = explicit or the document's template (`set_piping_settings`, default DN-service-sequence-spec[-insulation]); unique
  * @invariant the spec is resolved now (newest revision, its catalogues loaded); every later derivation re-reads it; insulation "fromSpec" is read from
  *   the spec table once and stored with the row that gave it
+ * @invariant the line number is never the number of an imported PCF line (one PIPELINE-REFERENCE per file)
  * @failure spec not loaded -> RTE_SPEC_UNKNOWN; DN without a pipe row, or no insulation table row -> RTE_SPEC_NO_COMPONENT; line number used ->
  *   RTE_DUPLICATE_LINE_NUMBER; unusable slope -> RTE_SLOPE_INVALID
  */
@@ -29,7 +31,7 @@ export const createPipeline = defineCommand({
     'without drain / vent (RTE_POCKET). Returns the line id (affected[0]); data = { lineId, lineNumber, template { value, defaulted, applied }, ' +
     'lineNumberParse (explicit number only: how the template reads it, differences are reported, never corrected), spec: { id, revision, status }, ' +
     'pipe: { outsideDiameterMm, wallMm }, insulation, envelopeDiameterMm, slope, unverified }. Refusals: RTE_SPEC_UNKNOWN (spec or a catalogue it ' +
-    'names not loaded), RTE_SPEC_NO_COMPONENT (no pipe row for the DN, no insulation row), RTE_DUPLICATE_LINE_NUMBER, RTE_SLOPE_INVALID. ' +
+    'names not loaded), RTE_SPEC_NO_COMPONENT (no pipe row for the DN, no insulation row), RTE_DUPLICATE_LINE_NUMBER (also an imported PCF line number), RTE_SLOPE_INVALID. ' +
     'Next: add_tie_in_point (or add_nozzle on equipment), then route_pipe (compass legs) or auto_route_pipe.',
   params: z.object({
     service: z.string().min(1).describe("Service code, e.g. 'P' (process), 'CW', 'HO'."),
@@ -72,6 +74,15 @@ export const createPipeline = defineCommand({
         `line number ${lineNumber} is used by ${clash}`,
         [clash],
         ['sequence'],
+      );
+    if (Object.hasOwn(getFabrication(doc).pcfLines, lineNumber))
+      return refuse(
+        doc,
+        'create_pipeline',
+        'RTE_DUPLICATE_LINE_NUMBER',
+        `line number ${lineNumber} is the number of an imported PCF line (delete_pcf_line first, or choose another number)`,
+        [lineNumber],
+        [params.lineNumber === undefined ? 'sequence' : 'lineNumber'],
       );
     const id = nextId('line');
     const line: PipeLine = {

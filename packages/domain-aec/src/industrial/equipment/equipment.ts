@@ -13,6 +13,8 @@ import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from '../piping/pipeSizes
 import { hasRepeatedPoint, routeLength, routeOrFailure } from '../piping/routeSupport';
 import { levelIdParam } from '../../building/levelParams';
 import { refuse } from '../../plant/catalog/codes';
+import { getFabrication } from '../../plant/fabrication/state';
+import { refuse as refuseLine } from '../../plant/piping/model';
 import { bindPipe, isBound, type Bound } from '../../plant/spec/binding';
 
 /**
@@ -93,6 +95,7 @@ export const addEquipment = defineCommand({
 /**
  * @affects creates 1 pipe run (segments + bends on layer P-PIPE) carrying its line-list data
  * @invariant diameter from the spec pipe (`spec` + `nps` | `dn`; binding stored on the pipe, data carries outsideDiameterMm / schedule / wallMm), else `diameter`, else the DN outside-diameter table, else 114.3 mm (DN100)
+ * @invariant `line` is never the number of an imported PCF line (one PIPELINE-REFERENCE per file)
  * @failure < 2 points / repeated point / diameter <= 0 / invalid or unknown DN without diameter -> no-op; spec without a size, unknown spec or size, `diameter` differing from the spec OD -> coded refusal (PSC_*)
  */
 export const addPipeRun = defineCommand({
@@ -105,7 +108,7 @@ export const addPipeRun = defineCommand({
     'check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. Refused if a pipe of the same ' +
     'diameter already follows the same route (either direction) on the level. With `spec` (a piping spec id, see list_pipe_specs) and a size `nps` (or `dn`) ' +
     'the outside diameter, wall and schedule come from the spec pipe at that size (e.g. CS150-A1 NPS 2-1/2: 73.0 mm Sch 40, not the legacy table 76.1 mm), the pipe stores the spec binding, and data gains ' +
-    'outsideDiameterMm, schedule and wallMm; the newest approved revision is used (the newest draft with a PSC_SPEC_NOT_APPROVED warning). Without `spec` the legacy DN table applies unchanged.',
+    'outsideDiameterMm, schedule and wallMm; the newest approved revision is used (the newest draft with a PSC_SPEC_NOT_APPROVED warning). Without `spec` the legacy DN table applies unchanged. `line` must not be the number of an imported PCF line (import_pcf): RTE_DUPLICATE_LINE_NUMBER.',
   params: z.object({
     points: z.array(z.array(z.number())).describe('Pipe centreline [[x, y, z], …], 2 to 1000 points.'),
     diameter: z.number().optional().describe('Outside diameter in document units. Default: from `dn` when given, else 114.3 mm (DN100).'),
@@ -193,6 +196,15 @@ export const addPipeRun = defineCommand({
     if (pipeTwin) return noop(doc, duplicateSummary('add_pipe_run', pipeTwin, 'a pipe on this route'));
     const text = (value: string | undefined): string | undefined => value?.trim() || undefined;
     const [lineNumber, origin, destination] = [text(line), text(from), text(to)];
+    if (lineNumber !== undefined && Object.hasOwn(getFabrication(doc).pcfLines, lineNumber))
+      return refuseLine(
+        doc,
+        'add_pipe_run',
+        'RTE_DUPLICATE_LINE_NUMBER',
+        `line ${lineNumber} is an imported PCF line: choose another line number, or delete_pcf_line first`,
+        [lineNumber],
+        ['line'],
+      );
     const pipe: PipeElement = {
       id: nextElementId(resolution.building, 'pipe'),
       category: 'pipe',

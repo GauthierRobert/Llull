@@ -42,6 +42,10 @@ export const deletePcfLine = defineCommand({
     const spoolBreaks = without(fabrication.spoolBreaks);
     const isometrics = without(fabrication.isometrics);
     const issues = ofOtherLines(fabrication.issues);
+    const issueSnapshots =
+      fabrication.issueSnapshots === undefined || issues === undefined
+        ? undefined
+        : Object.fromEntries(Object.entries(fabrication.issueSnapshots).filter(([id]) => Object.hasOwn(issues, id)));
     return {
       document: withFabrication(doc, {
         version: 1,
@@ -53,6 +57,7 @@ export const deletePcfLine = defineCommand({
         ...(spoolBreaks === undefined ? {} : { spoolBreaks }),
         ...(isometrics === undefined ? {} : { isometrics }),
         ...(issues === undefined ? {} : { issues }),
+        ...(issueSnapshots === undefined ? {} : { issueSnapshots }),
       }),
       summary: `delete_pcf_line: removed line ${params.lineId} (${line.components.length} component(s))`,
       affected: [params.lineId],
