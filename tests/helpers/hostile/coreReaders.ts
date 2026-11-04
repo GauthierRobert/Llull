@@ -6,6 +6,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { evaluateExpression } from '@lib/expression';
 import { compileExpression } from '@lib/expressionProgram';
+import { float64ToBase64 } from '@lib/float64Base64';
 import { parseFont, validateGlyphs } from '@lib/font/font';
 import { parseHexRgb } from '@lib/isHexColor';
 import { parseImageDataUrl } from '@lib/imageDataUrl';
@@ -71,6 +72,17 @@ const documentBuild = (records: number): string => {
   const ids = Array.from({ length: records }, (_, k) => `box-${k}`);
   const doc: CadDocument = { ...base, entities: Object.fromEntries(ids.map((id) => [id, { ...(boxEntity as Entity), id }])), order: ids };
   return serializeDocument(doc);
+};
+
+/** A saved document holding one instance array (VIS1), with `tamper` applied to its parsed record: the hostile variants of the packed table. */
+const arrayDocument = (tamper: (record: Record<string, unknown>) => void): string => {
+  let doc = createEmptyDocument();
+  doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
+  doc = execute(doc, 'create_component', { name: 'C', entityIds: doc.order, componentId: 'c' }).document;
+  doc = execute(doc, 'add_instance_array', { componentId: 'c', counts: [2, 2, 1], step: [5, 5, 5] }).document;
+  const saved = JSON.parse(serializeDocument(doc)) as { document: { instanceArrays: Record<string, Record<string, unknown>> } };
+  for (const record of Object.values(saved.document.instanceArrays)) tamper(record);
+  return JSON.stringify(saved);
 };
 
 const png1x1 = (): Uint8Array =>
@@ -224,6 +236,19 @@ export const CORE_READERS: readonly HostileReader[] = [
     read: (input) => execute(createEmptyDocument(), 'load_document', { json: asText(input) }),
     accepts: (result) => (result as { affected: string[] }).affected.length > 0,
     maxRecords: 4000,
+    extra: [
+      { name: 'instance array: count far beyond the table', input: () => arrayDocument((record) => (record['count'] = 2 ** 31)) },
+      {
+        name: 'instance array: table of 4 MB of base64 for a count of 4',
+        input: () => arrayDocument((record) => (record['transforms'] = 'A'.repeat(4_000_000))),
+      },
+      {
+        name: 'instance array: every double NaN',
+        input: () => arrayDocument((record) => (record['transforms'] = float64ToBase64(new Float64Array(24).fill(Number.NaN)))),
+      },
+      { name: 'instance array: table as a nested array', input: () => arrayDocument((record) => (record['transforms'] = [[[1]]])) },
+      { name: 'instance array: component id __proto__', input: () => arrayDocument((record) => (record['componentId'] = '__proto__')) },
+    ],
   },
   {
     name: 'core: thread designations and colours',

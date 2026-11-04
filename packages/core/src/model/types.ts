@@ -19,6 +19,7 @@ import type { AnalysisModel } from './analysis';
 import type { DrawingsModel } from './sheet';
 import type { PmiModel } from './pmi';
 import type { DynamicsModel } from './dynamics';
+import type { InstanceArray } from './instanceArray';
 import type { PrototypeModel } from './prototype';
 import type { ReviewModel } from './review';
 import type { DisplayModel } from './display';
@@ -670,6 +671,8 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   review?: ReviewModel;
   /** Absent until the first display command (`define_colour_profile`, `apply_service_colour_scheme`; plant 09 VIS). */
   display?: DisplayModel;
+  /** Absent until the first `add_instance_array`: packed placements of a Component, no Entity per instance (plant 09 VIS-M8j, VIS1). */
+  instanceArrays?: Record<string, InstanceArray>;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */

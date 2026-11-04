@@ -210,6 +210,7 @@ describe('dispose_margin on a singular row', () => {
       'accepted',
       'peak at a point support',
       resultsHash,
+      bar.recorded.uid ?? '',
     );
     const done = execute(
       bar.recorded,

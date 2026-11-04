@@ -1,6 +1,7 @@
 /** compute_margins (05 §5.8, AF-31..36): margins of safety from the TRUSTED results artifact of a static / thermo_static analysis. */
 
 import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, HumanSignaturePort, LoadCategory } from '@core/model/analysis';
+import { documentIdentity } from '@core/model/documentUid';
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { defineCommand, z } from '@core/commands/schema';
@@ -109,6 +110,13 @@ export interface MarginRow {
   readonly status: MarginStatus;
   readonly disposition: string;
   readonly [key: string]: unknown;
+}
+
+/** One warning per rejected stored disposition: a record made for another document, or one that records no uid (never counted). */
+function dispositionWarnings(rows: readonly MarginRow[]): string[] {
+  return rows.flatMap((row) =>
+    typeof row['dispositionCode'] === 'string' ? [`${row['dispositionCode']}: ${row.rowId}: ${String(row['dispositionNote'])}`] : [],
+  );
 }
 
 const suffix = (name: string): string => `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
@@ -251,6 +259,7 @@ function buildRows(
             { rowKey, status, ms, inputHash: analysisInputHash(context.doc, analysis.id, 'full') },
             context.port,
             analysis.results?.resultsHash ?? '',
+            documentIdentity(context.doc),
           );
           (singular ? singularRows : rows).push({
             rowId: '',
@@ -293,6 +302,7 @@ function buildRows(
             statusLabel: decided.statusLabel,
             ...(decided.record !== undefined ? { dispositionRecord: decided.record } : {}),
             ...(decided.note !== undefined ? { dispositionNote: decided.note } : {}),
+            ...(decided.code !== undefined ? { dispositionCode: decided.code } : {}),
           });
         }
       }
@@ -451,6 +461,7 @@ export function marginTable(
     warnings: [
       ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
       ...composite,
+      ...dispositionWarnings(rows),
       ...exclusionWarnings(trust.meshArtifact, screen.excluded),
       ...orphanSingularKeys(rows).map(
         (key) => `FEA_MS_ALL_SINGULAR: group ${key} lies entirely in a singular zone: it has only a singular row and no margin`,

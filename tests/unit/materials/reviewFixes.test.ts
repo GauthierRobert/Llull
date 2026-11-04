@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { parseMaterialLibrary } from '@core/commands/materials/libraryFormat';
+import { withDocumentUid } from '@core/model/documentUid';
 import type { MaterialLibrary } from '@core/model/materialLibrary';
 import type { CadDocument } from '@core/model/types';
 import { defaultContext } from '@core/commands/context';
@@ -132,12 +133,8 @@ describe('review fix 3 / 6: replace-import never lowers a marking without a huma
 
   it('a verified signature bound to the from / to markings lets it through; the stored step carries no signature', () => {
     const seen: string[] = [];
-    const result = call(
-      imported(),
-      'import_material_library',
-      { ...next({ regime: 'none' }), confirmation: SIGNATURE },
-      signingContext(seen),
-    );
+    const before = imported();
+    const result = call(before, 'import_material_library', { ...next({ regime: 'none' }), confirmation: SIGNATURE }, signingContext(seen));
     expect(result.rejected).toBeUndefined();
     expect(result.document.materialLibraries?.['synthetic-lib']?.exportMarking).toEqual({ regime: 'none' });
     const lowered = [
@@ -145,7 +142,9 @@ describe('review fix 3 / 6: replace-import never lowers a marking without a huma
       { id: 'aa7075_t6', from: itar, to: { regime: 'none' } },
     ];
     const ids = ['aa7075_t6', 'synthetic-lib'];
-    expect(seen).toEqual([sha256Hex(canonicalJson({ act: 'lowering an export marking', ids, details: { lowered }, nonce: 'n-1' }))]);
+    expect(seen).toEqual([
+      sha256Hex(canonicalJson({ act: 'lowering an export marking', ids, details: withDocumentUid({ lowered }, before), nonce: 'n-1' })),
+    ]);
     expect(JSON.stringify(result.document.featureHistory.at(-1)?.params)).not.toContain('"signature"');
     expect(result.document.featureHistory.at(-1)?.params).toMatchObject({ confirmation: { verified: true } });
   });
@@ -163,7 +162,7 @@ describe('review fix 3 / 6: replace-import never lowers a marking without a huma
     const lower = { material: 'secret', marking: { regime: 'none' }, confirmation: SIGNATURE };
     const applied = call(doc, 'set_export_marking', lower, signingContext(seen));
     expect(applied.rejected).toBeUndefined();
-    const details = { lowered: [{ id: 'secret', from: itar, to: { regime: 'none' } }] };
+    const details = withDocumentUid({ lowered: [{ id: 'secret', from: itar, to: { regime: 'none' } }] }, doc);
     expect(seen).toEqual([sha256Hex(canonicalJson({ act: 'lowering an export marking', ids: ['secret'], details, nonce: 'n-1' }))]);
     expect(JSON.stringify(applied.document.featureHistory)).not.toContain('"signature"');
     const noNonce = call(doc, 'set_export_marking', { ...lower, confirmation: { signature: 'x' } }, signingContext());

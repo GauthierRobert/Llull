@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { CadDocument } from '@core/model/types';
 import { MM_PER_UNIT } from '@core/model/units';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { classNames } from '@ui/classNames';
 import { SignActDialog, type SignActRequest } from '@ui/components/SignActDialog';
 import { useFocusItem } from '@ui/hooks/useFocusItem';
@@ -116,6 +117,7 @@ function StationRow({ document, view, row }: { document: CadDocument; view: Stre
 
 function ApprovalSection({ model, outcome }: { model: StressModel; outcome: StressOutcome }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
+  const documentUid = useStore((s) => s.document.uid ?? '');
   const [signing, setSigning] = useState<SignActRequest | null>(null);
   const status = approvalStatus(model, outcome);
   const recorded = model.recorded;
@@ -130,7 +132,7 @@ function ApprovalSection({ model, outcome }: { model: StressModel; outcome: Stre
         humanGatePayload(
           'plant:approve_pipe_stress',
           [model.id],
-          { inputHash: recorded.inputHash, resultHash: recorded.resultHash },
+          withDocumentUid({ inputHash: recorded.inputHash, resultHash: recorded.resultHash }, documentUid),
           nonce,
         ),
       onSigned: (confirmation) => dispatch('approve_pipe_stress', { modelId: model.id, confirmation, at: new Date().toISOString() }),

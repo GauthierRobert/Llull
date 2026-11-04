@@ -5,6 +5,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, codedRejection, failer } from '../noop';
 import { humanGate } from '../../model/humanGate';
+import { withDocumentUid } from '../../model/documentUid';
 import { isFindingKey } from '../persistence/prototypeValidation';
 import { prototypeOf } from './intents';
 
@@ -58,10 +59,13 @@ export const setReviewDisposition = defineCommand({
     const fail = failer(doc, NAME);
     const gate =
       status === 'accepted'
-        ? humanGate(ctx?.humanSignature ?? null, 'accept a prototype review finding', [findingKey], confirmation, {
-            inputsHash,
-            comment: comment.trim(),
-          })
+        ? humanGate(
+            ctx?.humanSignature ?? null,
+            'accept a prototype review finding',
+            [findingKey],
+            confirmation,
+            withDocumentUid({ inputsHash, comment: comment.trim() }, doc),
+          )
         : null;
     if (gate !== null && !gate.cleared)
       return codedRejection(

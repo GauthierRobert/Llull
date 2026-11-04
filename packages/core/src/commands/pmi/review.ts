@@ -1,4 +1,5 @@
 import { humanGate, humanGatePayload } from '../../model/humanGate';
+import { withDocumentUid } from '../../model/documentUid';
 import { jcsJson } from '../../lib/jcs';
 import { sha256Hex } from '../../lib/sha256';
 import type { CadDocument } from '../../model/types';
@@ -10,12 +11,12 @@ import { findPmi, pmiOf, refuse, withItem } from './pmiOps';
 
 const PMI_REVIEW_ACT = 'PMI review';
 
-/** The details a PMI review signature binds: the decision, the comment and a hash of the reviewed items (their content, without the review state). */
+/** The details a PMI review signature binds: the decision, the comment and a hash of the reviewed items (their content, without the review state) and the document uid (VIS-ID). */
 function pmiReviewDetails(doc: CadDocument, pmiIds: readonly string[], decision: string, comment: string): Record<string, unknown> {
   const items = [...pmiIds].sort().map((id) => {
     return Object.fromEntries(Object.entries(findPmi(doc, id) as PmiItem).filter(([key]) => key !== 'review'));
   });
-  return { decision, comment: comment.trim(), itemsHash: sha256Hex(jcsJson(items)) };
+  return withDocumentUid({ decision, comment: comment.trim(), itemsHash: sha256Hex(jcsJson(items)) }, doc);
 }
 
 /** The SHA-256 a human signs to accept / reject PMI items on this document (shared with the signing endpoint, which computes it server-side). */

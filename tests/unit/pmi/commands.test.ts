@@ -6,6 +6,7 @@ import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { plateKernel } from '../../helpers/pmiPlateKernel';
+import { expectBoundToDocument } from '../../helpers/documentBinding';
 
 const FRONT = [60, 0, 6] as const;
 const BOTTOM = [30, 10, 0] as const;
@@ -717,6 +718,21 @@ describe('accept_pmi_review: the human gate (VC-GDT-57)', () => {
         ),
       ),
     ).toBe('GDT_REVIEW_HUMAN_ONLY');
+  });
+
+  it('a signature made for one document does not verify in a copy of it (GATE-UID)', () => {
+    const run = add(plate(), 'add_datum_feature', { facesNear: [BOTTOM] });
+    expectBoundToDocument(
+      run.document,
+      (document, confirmation, ctx) =>
+        execute(
+          document,
+          'accept_pmi_review',
+          { pmiIds: [idOf(run)], decision: 'accept', comment: 'ok', at: '2026-10-20', confirmation },
+          ctx,
+        ),
+      'GDT_REVIEW_HUMAN_ONLY',
+    );
   });
 
   it('accepts and rejects with a verified human signature', () => {

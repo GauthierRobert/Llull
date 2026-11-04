@@ -3,12 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
+import { withDocumentUid } from '@core/model/documentUid';
+import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import { G6, H7, SPEC_20C, explicitCte } from '../../physics/thermomech/thermomechFixtures';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
 import { thermoFixture } from './fixtures';
+import { expectBoundToDocument } from '../../../helpers/documentBinding';
 
 const params = {
   rowKey: 'hole 20 degC | shaft 20 degC',
@@ -17,15 +20,14 @@ const params = {
   inputsHash: 'h1',
   signature: 'good',
 };
-const payload = (): string =>
+const payload = (doc: CadDocument): string =>
   sha256Hex(
-    canonicalJson({
-      act: 'dispose_fit_result',
-      rowKey: params.rowKey,
-      decision: 'accepted',
-      justification: 'checked by hand',
-      inputsHash: 'h1',
-    }),
+    canonicalJson(
+      withDocumentUid(
+        { act: 'dispose_fit_result', rowKey: params.rowKey, decision: 'accepted', justification: 'checked by hand', inputsHash: 'h1' },
+        doc,
+      ),
+    ),
   );
 
 const port = (seen: string[] = []): HumanSignaturePort => ({
@@ -47,6 +49,14 @@ describe('dispose_fit_result (human gate)', () => {
     expect(JSON.stringify(result.document)).toBe(JSON.stringify(doc));
   });
 
+  it('a signature made for one document does not verify in a copy of it (GATE-UID)', () => {
+    expectBoundToDocument(
+      doc,
+      (document, signature, ctx) => execute(document, 'dispose_fit_result', { ...params, signature }, ctx),
+      'TMC_HUMAN_GATE',
+    );
+  });
+
   it('refuses a signature that does not verify', () => {
     const result = execute(doc, 'dispose_fit_result', { ...params, signature: 'forged' }, withPort());
     expectNoOp(result, doc);
@@ -56,7 +66,7 @@ describe('dispose_fit_result (human gate)', () => {
   it('records the disposition with the verified signer over the payload hash', () => {
     const seen: string[] = [];
     const result = execute(doc, 'dispose_fit_result', params, withPort(seen));
-    expect(seen).toEqual([payload()]);
+    expect(seen).toEqual([payload(doc)]);
     expect(result.affected).toEqual([params.rowKey]);
     expect(result.document.analysis?.fitDispositions).toEqual({
       [params.rowKey]: {

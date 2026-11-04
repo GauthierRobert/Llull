@@ -220,6 +220,16 @@ export interface IssuedIsometric {
   readonly payloadSha256: string;
 }
 
+/** Compact image of what an issue was signed for (`compareToIssue`): fingerprint and position per component, numbered welds, dimension strings, BOM rows. */
+export interface IssueSnapshot {
+  readonly components: Readonly<
+    Record<string, { readonly type: string; readonly fp: string; readonly at: readonly [number, number, number] }>
+  >;
+  readonly welds: Readonly<Record<string, { readonly kind: WeldKind; readonly at: readonly [number, number, number] }>>;
+  readonly dimensions: Readonly<Record<string, { readonly overallMm: number; readonly to: string }>>;
+  readonly bom: Readonly<Record<string, { readonly quantity: number; readonly unit: 'm' | 'ea' }>>;
+}
+
 /** What a verified human issue leaves for replay: the issue minus its step-scoped id. A recorded `issue_isometric` step re-applies only an entry of the exact line, revision, purpose and content hash. */
 export type IssueApproval = Omit<IssuedIsometric, 'id'>;
 
@@ -241,6 +251,8 @@ export interface FabricationModel {
   readonly isometrics?: Readonly<Record<string, IsoDefinition>>;
   /** Issue stamps by id (ISO-M4); the latest per line is the current one. */
   readonly issues?: Readonly<Record<string, IssuedIsometric>>;
+  /** Snapshot of the content of each issue by issue id (derived from the line at issue time; removed with the issue). */
+  readonly issueSnapshots?: Readonly<Record<string, IssueSnapshot>>;
   /** Ledger of verified issue acts, kept across replay (`replaySeed`) so a recorded issue_isometric step re-applies its real approval; inert for undo. */
   readonly issueLedger?: readonly IssueApproval[];
 }

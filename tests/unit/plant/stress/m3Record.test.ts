@@ -10,10 +10,12 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import type { CadDocument } from '@core/model/types';
 import { pipeStressDocument } from '@aec/plant/stress/model/document';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
+import { expectBoundToDocument } from '../../../helpers/documentBinding';
 import { baseDoc, cases, conditioned, DN100, recordedModel, withModel, withPipe } from './m3Fixtures';
 
 const AT = '2026-11-02T09:30:00Z';
@@ -35,7 +37,12 @@ function sign(doc: CadDocument, id: string, nonce = 'n1'): { payload: string; no
   const results = doc.plant?.stress?.models[id]?.recorded;
   if (results === undefined) throw new Error('not recorded');
   return {
-    payload: humanGatePayload('plant:approve_pipe_stress', [id], { inputHash: results.inputHash, resultHash: results.resultHash }, nonce),
+    payload: humanGatePayload(
+      'plant:approve_pipe_stress',
+      [id],
+      withDocumentUid({ inputHash: results.inputHash, resultHash: results.resultHash }, doc),
+      nonce,
+    ),
     nonce,
   };
 }
@@ -139,6 +146,15 @@ describe('staleness: a design edit makes recorded results stale, never a silent 
 });
 
 describe('approve_pipe_stress (VC-PST-18): a human act', () => {
+  it('a signature made for one document does not verify in a copy of it (GATE-UID)', () => {
+    const { doc, id } = recorded();
+    expectBoundToDocument(
+      doc,
+      (document, confirmation, ctx) => execute(document, 'approve_pipe_stress', { modelId: id, confirmation, at: AT }, ctx),
+      'PST_HUMAN_GATE',
+    );
+  });
+
   it('a valid signature over { act, model, inputHash, resultHash } approves, stores signer, signature id, host time and hashes', () => {
     const { doc, id } = recorded();
     const port = portFor();
