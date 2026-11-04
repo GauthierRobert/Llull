@@ -5,6 +5,7 @@
  */
 
 import type { Vec2 } from '@core/model/vectors';
+import type { Shape } from './symbols/shapes';
 
 export const PID_CONVENTIONS = ['ISA-5.1', 'ISO-10628-2'] as const;
 export type PidConvention = (typeof PID_CONVENTIONS)[number];
@@ -217,6 +218,14 @@ export interface PidAcceptance {
   readonly payloadSha256?: string;
 }
 
+/** A project's own graphics for a library class (`define_pid_symbol`): shapes fitted into the box of the built-in class, for the conventions named. */
+export interface PidProjectSymbol {
+  readonly class: string;
+  readonly name: string;
+  readonly conventions: readonly PidConvention[];
+  readonly shapes: readonly Shape[];
+}
+
 export interface PidTagFormat {
   /** Regular expression source a tag of the kind must match. */
   readonly pattern: string;
@@ -235,6 +244,8 @@ export interface PidModel {
   readonly sheetOrder: readonly string[];
   readonly items: Readonly<Record<string, PidItem>>;
   readonly itemOrder: readonly string[];
+  /** Library class -> the project's symbol for it (`define_pid_symbol`). */
+  readonly symbols?: Readonly<Record<string, PidProjectSymbol>>;
   /** findingKey -> acceptance. */
   readonly acceptances?: Readonly<Record<string, PidAcceptance>>;
   readonly imports?: readonly PidImportRecord[];

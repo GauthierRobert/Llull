@@ -32,6 +32,7 @@ const PID_COMMANDS = [
   'set_pid_conventions',
   'accept_pid_finding',
   'issue_pid_sheet',
+  'define_pid_symbol',
 ];
 
 describe('pid plugin', () => {

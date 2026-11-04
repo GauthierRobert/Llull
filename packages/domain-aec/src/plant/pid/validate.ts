@@ -7,6 +7,8 @@ import { isRecord } from '@lib/isRecord';
 import { isReservedKey } from '@lib/reservedKey';
 import { PID_CONVENTIONS, PID_IMPORT_FORMATS, PID_PAPERS, PID_SHEET_STATUSES, PID_TAG_FORMAT_KINDS } from './model';
 import { tagPatternErrors } from './patternSafety';
+import { fitsBox, shapeProblems, SYMBOL_LIMITS, symbolFamilyOf, targetBox } from './symbols/projectSymbol';
+import type { Shape } from './symbols/shapes';
 import { itemErrors } from './validateItems';
 
 const nonEmpty = (value: unknown): boolean => typeof value === 'string' && value !== '';
@@ -91,8 +93,37 @@ function linkErrors(raw: Record<string, unknown>): string[] {
   return errors;
 }
 
-function recordErrors(raw: Record<string, unknown>): string[] {
+/** `symbols`: library class -> project symbol, every shape validated as untrusted data and inside the box of the built-in class. */
+function symbolErrors(raw: Record<string, unknown>): string[] {
+  const symbols = raw['symbols'];
+  if (symbols === undefined) return [];
+  if (!isRecord(symbols)) return ['plant.pid.symbols must be an object'];
   const errors: string[] = [];
+  for (const [key, value] of Object.entries(symbols)) {
+    const path = `plant.pid.symbols.${key}`;
+    if (isReservedKey(key) || symbolFamilyOf(key) === null) {
+      errors.push(`${path}: the key must be an equipment or piping class of the library`);
+      continue;
+    }
+    if (!isRecord(value) || value['class'] !== key) {
+      errors.push(`${path} must be an object whose class equals its key`);
+      continue;
+    }
+    if (!nonEmpty(value['name']) || String(value['name']).length > SYMBOL_LIMITS.name)
+      errors.push(`${path}.name must be 1 to ${SYMBOL_LIMITS.name} characters`);
+    const conventions = value['conventions'];
+    if (!Array.isArray(conventions) || conventions.length === 0 || !conventions.every((entry) => isOneOf(PID_CONVENTIONS, entry)))
+      errors.push(`${path}.conventions must list ${PID_CONVENTIONS.join(' and / or ')}`);
+    const problems = shapeProblems(value['shapes'], `${path}.shapes`);
+    errors.push(...problems);
+    if (problems.length === 0 && !fitsBox(value['shapes'] as Shape[], targetBox(key)))
+      errors.push(`${path}.shapes lie outside the box of the built-in ${key} symbol`);
+  }
+  return errors;
+}
+
+function recordErrors(raw: Record<string, unknown>): string[] {
+  const errors: string[] = symbolErrors(raw);
   const acceptances = raw['acceptances'];
   if (acceptances !== undefined) {
     if (!isRecord(acceptances)) errors.push('plant.pid.acceptances must be an object');

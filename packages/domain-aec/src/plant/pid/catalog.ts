@@ -13,6 +13,7 @@ import { checkPid3d } from './commands/checkPid3d';
 import { issuePidSheet } from './commands/issuePidSheet';
 import { linkPidItem } from './commands/linkPidItem';
 import { createPidSheet } from './commands/createPidSheet';
+import { definePidSymbol } from './commands/definePidSymbol';
 import { deletePidItem } from './commands/deletePidItem';
 import { exportDexpi } from './commands/exportDexpi';
 import { listPidSymbols } from './commands/listPidSymbols';
@@ -52,4 +53,5 @@ export const pidCatalog = commandCatalog(
   setPidConventions,
   acceptPidFinding,
   issuePidSheet,
+  definePidSymbol,
 );

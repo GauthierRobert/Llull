@@ -42,6 +42,9 @@ export const DEXPI_REMEDIATION: Readonly<Record<string, string>> = {
     'Fix the errors check_pid reports for the sheet (remediation per finding), or have a human accept each with accept_pid_finding, then issue again.',
   PID_STATUS_TRANSITION:
     'A sheet moves one step forward at a time (draft, issued_for_review, issued_for_hazop, issued_for_construction) or back to draft; give the next status.',
+  PID_SYMBOL_INVALID:
+    'Fix the graphics the message names: at most 64 shapes, 200 points per line, coordinates within +/-1000 mm, finite numbers, text of 1 to 24 plain characters, entities of kind polyline / rectangle / circle / arc / text drawn in the XY plane.',
+  PID_SYMBOL_NOT_FOUND: 'The class has no project symbol: list_pid_symbols shows the symbols with source "project".',
   PID_SHEET_NOT_FOUND: 'List the sheets with pid_report kind=counts or import a P&ID with import_dexpi first.',
 };
 
