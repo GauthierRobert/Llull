@@ -13,6 +13,9 @@ export const SCAN_REMEDIATION: Readonly<Record<string, string>> = {
   SCN_QUERY_LIMIT: 'Narrow the region or lower maxPoints and page.',
   SCN_FIT_TOO_FEW_POINTS: 'Enlarge the region (it must hold at least 30 points for a cylinder, 10 for a plane / sphere / circle).',
   SCN_FIT_NO_MODEL: 'Tighten the region around one object.',
+  SCN_TRACE_SKEW: 'Possible offset or two-plane bend: seed the trace again on the next straight and trace it separately.',
+  SCN_TRACE_BEND_RADIUS_UNMEASURED:
+    'The bend has too few scanned surface points (or its radius sits on the search bound): field-measure the bend radius.',
   SCN_REG_TARGETS_INSUFFICIENT: 'Add targets (at least 3 non-collinear pairs) or use ICP with an initial transform.',
   SCN_REG_DEGENERATE: 'Use targets that span a plane (not collinear, not coincident).',
   SCN_REG_TARGET_NOT_FOUND: 'Move the seed onto the target (a sphere within 2 radii of the seed).',

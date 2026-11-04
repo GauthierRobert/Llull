@@ -2,10 +2,14 @@
 //! on the orthogonal residual (Lukács, Martin & Marshall 1998) with two passes of inlier re-selection, the covariance σ̂²(JᵀJ)⁻¹ and the
 //! CRLB at σ (Kay 1993, ch. 3).
 
+pub mod bend;
 pub mod circle;
 pub mod cylinder;
 pub mod plane;
 pub mod sphere;
+pub mod trace;
+mod trace_next;
+pub mod trace_result;
 
 use crate::cloud::Vec3;
 use crate::error::CloudError;

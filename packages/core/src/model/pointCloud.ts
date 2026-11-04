@@ -6,7 +6,7 @@
 
 import type { Vec3 } from './vectors';
 
-type CloudFormat = 'e57' | 'las' | 'laz' | 'xyz' | 'pts' | 'csv';
+type CloudFormat = 'e57' | 'las' | 'laz' | 'ply' | 'xyz' | 'pts' | 'csv';
 type CloudAttribute = 'intensity' | 'rgb' | 'classification' | 'returnNumber' | 'numberOfReturns' | 'gpsTime' | 'normal';
 
 /** Row-major 4 × 4 rigid transform (16 numbers), translation in metres (column 3). */

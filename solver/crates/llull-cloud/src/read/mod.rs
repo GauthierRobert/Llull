@@ -1,8 +1,9 @@
-//! Readers (TECHNICAL_SPEC §5.1, §5.2, §6): format detection by signature then extension, proprietary refusal, one entry point.
+//! Readers (TECHNICAL_SPEC §5.1, §5.2, §6, §13.8): format detection by signature (E57, LAS, PLY) then extension, proprietary refusal, one entry point.
 
 pub mod ascii;
 pub mod e57;
 pub mod las;
+pub mod ply;
 
 use crate::cloud::{Format, RawCloud};
 use crate::error::{CloudError, CloudResult};
@@ -87,6 +88,9 @@ pub fn detect(path: &Path, forced: Option<Format>) -> CloudResult<Format> {
     if read >= 4 && &signature[..4] == b"LASF" {
         return Ok(if ext == "laz" { Format::Laz } else { Format::Las });
     }
+    if read >= 4 && (&signature[..4] == b"ply\n" || &signature[..4] == b"ply\r") {
+        return Ok(Format::Ply);
+    }
     if let Some(format @ (Format::Xyz | Format::Pts | Format::Csv)) = forced {
         return Ok(format);
     }
@@ -94,7 +98,7 @@ pub fn detect(path: &Path, forced: Option<Format>) -> CloudResult<Format> {
         "xyz" | "txt" | "asc" => Ok(Format::Xyz),
         "pts" => Ok(Format::Pts),
         "csv" => Ok(Format::Csv),
-        "e57" | "las" | "laz" => {
+        "e57" | "las" | "laz" | "ply" => {
             Err(CloudError::new("SCN_FORMAT_UNSUPPORTED", format!("the .{ext} file does not carry its format signature")))
         }
         _ => Err(CloudError::new("SCN_FORMAT_UNSUPPORTED", format!("unknown point-cloud format '.{ext}': convert to E57, LAS or LAZ"))),
@@ -108,6 +112,7 @@ pub fn read(path: &Path, options: &ImportOptions) -> CloudResult<RawCloud> {
     let cloud = match format {
         Format::E57 => e57::read(path, options)?,
         Format::Las | Format::Laz => las::read(path, ascii::unit_scale(&options.source_unit)?)?,
+        Format::Ply => ply::read(path, &options.source_unit)?,
         Format::Xyz | Format::Pts | Format::Csv => ascii::read(path, format, &options.columns, &options.source_unit)?,
     };
     if cloud.is_empty() {

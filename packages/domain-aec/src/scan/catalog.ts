@@ -8,6 +8,7 @@ import { acceptRegistration, applyRegistration, markRegistrationSupplied } from 
 import { computeRegistration } from './registrationQuery';
 import { extractPipes, fitPrimitive } from './fitCommands';
 import { sliceCloud } from './sliceCommand';
+import { tracePipeCentreline } from './traceCommand';
 import { acceptAsbuiltExtraction, commitAsbuiltExtraction } from './extractionCommands';
 import { checkAsbuiltClash, cloudToModelDeviation } from './compareCommands';
 import { checkPointClouds } from './checkCommand';
@@ -29,6 +30,7 @@ export const scanCommands = commandCatalog(
   sliceCloud,
   fitPrimitive,
   extractPipes,
+  tracePipeCentreline,
   commitAsbuiltExtraction,
   acceptAsbuiltExtraction,
   cloudToModelDeviation,

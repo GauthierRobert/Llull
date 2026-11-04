@@ -27,9 +27,39 @@ pub fn pca_normals(tree: &KdTree, k: usize, viewpoint: &Vec3) -> Vec<(Vec3, f64)
         .collect()
 }
 
+/// Normals from the neighbours within `radius` (None below `min_neighbours`), oriented toward `viewpoint`: the scale follows the object
+/// (a pipe), not the point density.
+pub fn pca_normals_within(tree: &KdTree, radius: f64, min_neighbours: usize, viewpoint: &Vec3) -> Vec<Option<Vec3>> {
+    (0..tree.len())
+        .collect::<Vec<usize>>()
+        .par_chunks(1024)
+        .flat_map_iter(|chunk| {
+            chunk.iter().map(|&i| {
+                let neighbours: Vec<Vec3> = tree.within(tree.point(i), radius).into_iter().map(|j| *tree.point(j)).collect();
+                if neighbours.len() < min_neighbours {
+                    return None;
+                }
+                let (_, vectors) = jacobi_eigen(scatter(&neighbours, &mean(&neighbours)));
+                let n = column(&vectors, 0);
+                Some(if dot(&n, &sub(viewpoint, tree.point(i))) < 0.0 { [-n[0], -n[1], -n[2]] } else { n })
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn radius_normals_ignore_sparse_neighbourhoods() {
+        let points: Vec<Vec3> = (0..400).map(|i| [f64::from(i % 20) * 0.01, f64::from(i / 20) * 0.01, 0.0]).collect();
+        let tree = KdTree::build(&points);
+        let normals = pca_normals_within(&tree, 0.03, 12, &[0.1, 0.1, 5.0]);
+        assert!(normals.iter().flatten().all(|n| (n[2] - 1.0).abs() < 1e-9));
+        assert!(normals.iter().flatten().count() > 300);
+        assert!(pca_normals_within(&tree, 0.005, 12, &[0.1, 0.1, 5.0]).iter().all(Option::is_none));
+    }
 
     #[test]
     fn a_plane_has_vertical_normals_toward_the_viewpoint() {

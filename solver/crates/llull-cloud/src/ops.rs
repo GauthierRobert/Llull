@@ -8,11 +8,12 @@
 //!
 //! Every coordinate is metres in the DOCUMENT frame: each cloud's points are mapped by its `toDocument` affine transform before the op,
 //! so results need only a unit conversion. `result.json` holds the op's fields plus `device` and `deterministic`. Kinds: `register_targets`
-//! (clouds = [fixed, moving]), `icp` ([fixed, moving]), `fit`, `slice`, `extract_pipes` ([cloud]), `deviation`, `clash` ([cloud]).
+//! (clouds = [fixed, moving]), `icp` ([fixed, moving]), `fit`, `slice`, `extract_pipes` ([cloud]), `trace` ([cloud]; seedPoint + optional region, §5.6), `deviation`, `clash` ([cloud]).
 //! Errors: `SCN_*` codes of the op, `SCN_ASSET_MISSING`, `SCN_QUERY_LIMIT` (a region above `maxPoints`), `NATIVE_JOB_INPUT`.
 
 use crate::cloud::Vec3;
 use crate::error::{CloudError, CloudResult};
+use crate::fit::trace::{trace, TraceSettings};
 use crate::fit::{self, FitSettings};
 use crate::job::read_json;
 use crate::kdtree::KdTree;
@@ -149,6 +150,17 @@ pub fn optional<T: for<'de> Deserialize<'de>>(params: &Value, name: &str, defaul
     }
 }
 
+fn fit_settings(p: &Value) -> CloudResult<FitSettings> {
+    Ok(FitSettings {
+        noise_sigma: optional(p, "noiseSigma", None)?,
+        distance_threshold: optional(p, "distanceThreshold", None)?,
+        normal_threshold_deg: optional(p, "normalThresholdDeg", 20.0)?,
+        seed: optional(p, "seed", 1)?,
+        min_radius: optional(p, "minRadius", FitSettings::default().min_radius)?,
+        max_radius: optional(p, "maxRadius", FitSettings::default().max_radius)?,
+    })
+}
+
 fn run_kind(job: &OpJob, warnings: &mut Vec<(String, String)>) -> CloudResult<Value> {
     let p = &job.params;
     let max_points: usize = optional(p, "maxLoadPoints", DEFAULT_OP_MAX_POINTS)?;
@@ -183,14 +195,7 @@ fn run_kind(job: &OpJob, warnings: &mut Vec<(String, String)>) -> CloudResult<Va
             let clouds = open(&job.clouds, 1)?;
             let region: Region = optional(p, "region", Region::All)?;
             let points = clouds[0].points(&region, max_points)?;
-            let settings = FitSettings {
-                noise_sigma: optional(p, "noiseSigma", None)?,
-                distance_threshold: optional(p, "distanceThreshold", None)?,
-                normal_threshold_deg: optional(p, "normalThresholdDeg", 20.0)?,
-                seed: optional(p, "seed", 1)?,
-                min_radius: optional(p, "minRadius", FitSettings::default().min_radius)?,
-                max_radius: optional(p, "maxRadius", FitSettings::default().max_radius)?,
-            };
+            let settings = fit_settings(p)?;
             if job.kind == "extract_pipes" {
                 return extract_pipes(&points, &settings);
             }
@@ -206,6 +211,24 @@ fn run_kind(job: &OpJob, warnings: &mut Vec<(String, String)>) -> CloudResult<Va
                 map.insert("kind".into(), json!(kind));
             }
             Ok(value)
+        }
+        "trace" => {
+            let clouds = open(&job.clouds, 1)?;
+            let seed: Vec3 = param(p, "seedPoint")?;
+            let defaults = TraceSettings::default();
+            let settings = TraceSettings {
+                fit: fit_settings(p)?,
+                step_length: optional(p, "stepLength", None)?,
+                bend_detection_deg: optional(p, "bendDetectionDeg", defaults.bend_detection_deg)?,
+                max_length: optional(p, "maxLength", defaults.max_length)?,
+                seed_radius: optional(p, "seedRadius", defaults.seed_radius)?,
+                skew_tolerance: optional(p, "skewTolerance", None)?,
+                max_legs: optional(p, "maxLegs", defaults.max_legs)?,
+                max_bend_radius_factor: optional(p, "maxBendRadiusFactor", defaults.max_bend_radius_factor)?,
+            };
+            let default_region = Region::Seed { point: seed, radius: settings.max_length };
+            let points = clouds[0].points(&optional(p, "region", default_region)?, max_points)?;
+            Ok(serde_json::to_value(trace(&points, &seed, &settings)?).unwrap_or(Value::Null))
         }
         "slice" => {
             let clouds = open(&job.clouds, 1)?;

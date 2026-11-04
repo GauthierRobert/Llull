@@ -11,6 +11,7 @@ pub enum Format {
     E57,
     Las,
     Laz,
+    Ply,
     Xyz,
     Pts,
     Csv,

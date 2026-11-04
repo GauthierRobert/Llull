@@ -27,6 +27,7 @@ import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
 import { PlmUsage, confirmedParams, runPlmCli } from './plm';
 import { runVault } from './vault';
+import { runPackCli } from './pack';
 import { crashesCli } from './crashes';
 import { fuzzCli, fuzzOneCli, FuzzUsageError } from './fuzz';
 import { skillsCli, SkillsUsageError } from './skills';
@@ -476,6 +477,9 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
         return await runPlmCli(args, io, () => backendOf(args, io));
       case 'scan':
         return await runExec(parseArgv(scanArgv(argv)), io);
+      case 'pack':
+      case 'unpack':
+        return runPackCli(args, io);
       case 'mesh':
         return await runExec(parseArgv(meshArgv(argv)), io);
       case 'crashes':
