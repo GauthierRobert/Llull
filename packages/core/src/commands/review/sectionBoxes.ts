@@ -79,7 +79,7 @@ export const setActiveSectionBox = defineCommand({
   params: z.object({ id: z.string().nullable().describe('Section box id, e.g. "sb-1", or null to deactivate.') }),
   run: (doc, { id }): CommandResult => {
     const review = reviewOf(doc);
-    if (id !== null && review.sectionBoxes[id] === undefined)
+    if (id !== null && !Object.hasOwn(review.sectionBoxes, id))
       return reviewRejection(doc, 'set_active_section_box', 'VIS_SECTION_BOX_NOT_FOUND', `no section box '${id}'`, [id], ['id']);
     const { activeSectionBoxId, ...rest } = review;
     const next = id === null ? rest : { ...rest, activeSectionBoxId: id };

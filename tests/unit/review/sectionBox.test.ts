@@ -89,6 +89,8 @@ describe('set_section_box / delete_section_box', () => {
     const refused = execute(doc, 'set_active_section_box', { id: 'sb-9' });
     expect(refused.error?.code).toBe('VIS_SECTION_BOX_NOT_FOUND');
     expect(refused.document).toBe(doc);
+    for (const key of ['constructor', 'toString', '__proto__'])
+      expect(execute(doc, 'set_active_section_box', { id: key }).document.review?.activeSectionBoxId).not.toBe(key);
     const before = JSON.stringify(doc);
     execute(doc, 'set_active_section_box', { id: null });
     expect(JSON.stringify(doc)).toBe(before);
