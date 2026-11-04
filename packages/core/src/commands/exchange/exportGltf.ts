@@ -121,7 +121,7 @@ export const exportGltf = defineCommand({
     'prototype with the EXT_mesh_gpu_instancing extension (TRANSLATION / ROTATION / SCALE accessors, listed in extensionsUsed): identical ' +
     'placed parts and component instances become ONE node, so a plant of 10^5 - 10^6 copies stays small. Use "gpu" for large repeated ' +
     'scenes when the consumer supports the extension (three.js, Babylon, Blender 4+); "expand" for the widest compatibility. ' +
-    'In gpu mode node extras carry llullIds (instance entity ids in instance order) and instanceCount; data adds instancedNodeCount and ' +
+    'In gpu mode node extras carry the instance entity ids in instance order (llullIds: a list; or llullIdRuns when ids are numbered consecutively: each entry is an id string or [prefix, first, last] = prefix+n for n=first..last) and instanceCount; data adds instancedNodeCount and ' +
     'instanceCount. Does NOT modify the document.',
   params: z.object({
     entityIds: entityIdsField,

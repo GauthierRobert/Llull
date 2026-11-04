@@ -87,7 +87,7 @@ export interface RenderPlan {
   readonly levels: Uint8Array;
 }
 
-const NON_GEOMETRY_KEYS = new Set([
+export const NON_GEOMETRY_KEYS: ReadonlySet<string> = new Set([
   'id',
   'kind',
   'position',

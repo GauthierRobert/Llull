@@ -84,6 +84,7 @@ function contentHash(data: Float32Array): number {
 }
 
 function sameContent(a: Float32Array, b: Float32Array): boolean {
+  if (a === b) return true;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
@@ -109,10 +110,18 @@ interface ShareCandidate {
  */
 export function sharedGeometryGroups(items: readonly ShareCandidate[]): (number | undefined)[] {
   const buckets = new Map<string, { content: Float32Array; members: number[] }[]>();
+  /** Parts built from one tessellation hold the same `localTris` array: its content and hash are computed once. */
+  const memo = new WeakMap<readonly Triangle[], { content: Float32Array; hash: number }>();
   items.forEach((item, index) => {
     if (!item.placed || item.localTris.length === 0) return;
-    const content = cornerPositions(item.localTris);
-    const bucketKey = `${item.key}#${content.length}#${contentHash(content)}`;
+    let seen = memo.get(item.localTris);
+    if (seen === undefined) {
+      const fresh = cornerPositions(item.localTris);
+      seen = { content: fresh, hash: contentHash(fresh) };
+      memo.set(item.localTris, seen);
+    }
+    const { content, hash } = seen;
+    const bucketKey = `${item.key}#${content.length}#${hash}`;
     const candidates = buckets.get(bucketKey) ?? [];
     const match = candidates.find((candidate) => sameContent(candidate.content, content));
     if (match !== undefined) match.members.push(index);

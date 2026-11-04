@@ -23,6 +23,8 @@ import { toRadians } from '../../lib/angle';
 import { faceColorTriangles } from '../../geometry/faceColors';
 import { InstanceTransforms } from './gltfInstancing';
 import { indexedMesh, placementMatrix, positionKey, sharedGeometryGroups } from './gltfMeshData';
+import { exactShapeKeyOf } from './gltfPrototypes';
+import { instanceIdExtras } from './gltfIds';
 
 /** Metalness / roughness of a solid without an assigned material (matches the viewport). */
 export const DEFAULT_METALNESS = 0.08;
@@ -45,6 +47,10 @@ export interface ScenePart {
   readonly name: string;
   readonly entityId: string;
   readonly kind: Entity['kind'];
+  /**
+   * World-space triangles. A part that reuses the tessellation of an identical placed solid (gpu mode) holds that prototype's `localTris`:
+   * same length, never read as world geometry (it is drawn through a shared mesh).
+   */
   readonly tris: Triangle[];
   /** The same triangles in the part's own frame: texture UVs follow the part, as in the viewport. */
   readonly localTris: Triangle[];
@@ -151,18 +157,42 @@ function addToBuckets(
 }
 
 /**
+ * Parts of a placed solid in gpu mode: the first solid of each (shape, appearance) prototype is tessellated, later identical solids reuse its
+ * local triangles (a part with face colours is always tessellated on its own). Every part built here has a placement (a solid always does).
+ */
+function placedParts(name: string, solid: Entity, doc: CadDocument, prototypes: Map<string, readonly ScenePart[]>): ScenePart[] {
+  const appearance = appearanceOf(doc, solid);
+  if (solid.kind === 'mesh' && solid.faceColors !== undefined && solid.faceColors.length > 0)
+    return partsOfSolid(name, solid.id, solid, appearance);
+  const key = `${exactShapeKeyOf(solid)}|${JSON.stringify(appearance)}`;
+  const prototype = prototypes.get(key);
+  if (prototype === undefined) {
+    const parts = partsOfSolid(name, solid.id, solid, appearance);
+    prototypes.set(key, parts);
+    return parts;
+  }
+  const placement = { position: solid.position, rotation: solid.rotation };
+  return prototype.map((part) => ({ ...part, name, entityId: solid.id, tris: part.localTris, placement }));
+}
+
+/**
  * Exported parts of the entities named by `ids` (instances expand into one part per child; 2D and empty parts are dropped). With `sink`,
  * instances that can be drawn as buckets go there instead of expanding; the others still expand.
  */
 export function collectSceneParts(doc: CadDocument, ids: readonly string[], sink?: InstancingSink): ScenePart[] {
   const parts: ScenePart[] = [];
   const prototypes = new Map<string, InstanceBucket[]>();
+  const solidPrototypes = new Map<string, readonly ScenePart[]>();
   for (const id of ids) {
     const entity = doc.entities[id];
     if (entity === undefined) continue;
     const label = entity.name ?? entity.id;
     if (entity.kind !== 'instance') {
-      parts.push(...partsOfSolid(label, id, entity, appearanceOf(doc, entity)));
+      parts.push(
+        ...(sink === undefined
+          ? partsOfSolid(label, id, entity, appearanceOf(doc, entity))
+          : placedParts(label, entity, doc, solidPrototypes)),
+      );
       continue;
     }
     const component = doc.components[entity.componentId];
@@ -386,7 +416,7 @@ export function buildGltfScene(
       builder.instancedNode(
         part.name,
         partMesh(part, part.localTris, material),
-        { llullIds: ids, kind: part.kind, instanceCount: ids.length },
+        { ...instanceIdExtras(ids), kind: part.kind, instanceCount: ids.length },
         transforms.packed(),
         parentOf(part.entityId),
       );
@@ -406,7 +436,7 @@ export function buildGltfScene(
     builder.instancedNode(
       part.name,
       partMesh(part, part.tris, material),
-      { llullIds: entityIds, kind: part.kind, instanceCount: entityIds.length },
+      { ...instanceIdExtras(entityIds), kind: part.kind, instanceCount: entityIds.length },
       transforms.packed(),
       parentOf(part.entityId),
     );

@@ -49,6 +49,7 @@ const FILE_PARAMS: Readonly<Record<string, FileTarget>> = {
   import_step_exact: { key: 'stepBase64', encoding: 'base64' },
   import_iges: { key: 'igesBase64', encoding: 'base64' },
   import_mesh_file: { key: 'fileKey', encoding: 'meshFile' },
+  import_gltf: { key: 'dataBase64', encoding: 'base64' },
   import_font: { key: 'base64', encoding: 'base64', alias: 'path' },
   verify_exchange_file: { key: 'stepBase64', encoding: 'base64' },
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
