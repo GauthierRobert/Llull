@@ -263,6 +263,12 @@ export function buildInstanceBvh(boxes: PackedBoxes): InstanceBvh {
   }
 
   /** Depth-first walk: `prune(node)` 0 = skip, 1 = test the leaves, 2 = take the whole subtree. */
+  return bvhOver({ count, nodeCount: nodes, boxes, order, nodeBox, nodeStart, nodeEnd, nodeChild });
+}
+
+/** Query object over flat BVH state (shared by the build and the import). */
+function bvhOver(state: BvhState): InstanceBvh {
+  const { count, boxes, order, nodeBox, nodeStart, nodeEnd, nodeChild } = state;
   const walk = (prune: (node: number) => 0 | 1 | 2, leafHit: (box: number) => boolean): number[] => {
     if (count === 0) return [];
     let found = new Uint32Array(64);
@@ -295,7 +301,7 @@ export function buildInstanceBvh(boxes: PackedBoxes): InstanceBvh {
     return Array.from(found.subarray(0, size).sort());
   };
 
-  return {
+  const bvh: InstanceBvh = {
     count,
     frustumQuery: (planes) =>
       walk(
@@ -315,4 +321,97 @@ export function buildInstanceBvh(boxes: PackedBoxes): InstanceBvh {
         (id) => boxOverlapsBox(boxes, id * 6, min, max),
       ),
   };
+  states.set(bvh, state);
+  return bvh;
+}
+
+interface BvhState {
+  readonly count: number;
+  readonly nodeCount: number;
+  readonly boxes: PackedBoxes;
+  readonly order: Uint32Array;
+  readonly nodeBox: Float64Array;
+  readonly nodeStart: Uint32Array;
+  readonly nodeEnd: Uint32Array;
+  readonly nodeChild: Int32Array;
+}
+
+const states = new WeakMap<InstanceBvh, BvhState>();
+
+/** Plain, structured-cloneable form of an `InstanceBvh`: typed arrays only, sized exactly (`nodeCount` nodes, `count` boxes). */
+export interface InstanceBvhBuffers {
+  readonly count: number;
+  readonly nodeCount: number;
+  /** Input boxes, 6 numbers per box. */
+  readonly boxes: Float64Array;
+  /** Box indices in leaf order (a permutation of 0..count-1). */
+  readonly order: Uint32Array;
+  /** Node bounds, 6 numbers per node. */
+  readonly nodeBox: Float64Array;
+  /** Node range `[nodeStart, nodeEnd)` into `order`. */
+  readonly nodeStart: Uint32Array;
+  readonly nodeEnd: Uint32Array;
+  /** First child (the second is the next node), -1 for a leaf. */
+  readonly nodeChild: Int32Array;
+  /** The ArrayBuffers to pass as the `transfer` list of `postMessage` (all owned by this object, none shared with the source BVH). */
+  readonly transfer: ArrayBuffer[];
+}
+
+/**
+ * Copies `bvh` into transferable buffers (the source BVH stays usable after a transfer). A BVH not made by `buildInstanceBvh` /
+ * `importInstanceBvh` throws.
+ */
+export function exportInstanceBvh(bvh: InstanceBvh): InstanceBvhBuffers {
+  const state = states.get(bvh);
+  if (state === undefined) throw new Error('exportInstanceBvh: not an InstanceBvh built by this module');
+  const { count, nodeCount } = state;
+  const boxes = state.boxes.slice(0, count * 6);
+  const order = state.order.slice(0, count);
+  const nodeBox = state.nodeBox.slice(0, nodeCount * 6);
+  const nodeStart = state.nodeStart.slice(0, nodeCount);
+  const nodeEnd = state.nodeEnd.slice(0, nodeCount);
+  const nodeChild = state.nodeChild.slice(0, nodeCount);
+  const transfer = [boxes, order, nodeBox, nodeStart, nodeEnd, nodeChild].map((array) => array.buffer as ArrayBuffer);
+  return { count, nodeCount, boxes, order, nodeBox, nodeStart, nodeEnd, nodeChild, transfer };
+}
+
+const fail = (reason: string): never => {
+  throw new Error(`importInstanceBvh: ${reason}`);
+};
+
+const allFinite = (array: Float64Array): boolean => {
+  for (let i = 0; i < array.length; i++) if (!Number.isFinite(array[i])) return false;
+  return true;
+};
+
+/**
+ * Rebuilds an `InstanceBvh` from `exportInstanceBvh` output (any structured-clone / transfer of it). O(count) validation: counts, array
+ * types and lengths, finite coordinates, `order` a permutation, node ranges inside `order`, child links in range. Throws `Error` on mismatch.
+ * Takes ownership of the arrays (no copy). Queries then equal those of the exported BVH.
+ */
+export function importInstanceBvh(buffers: InstanceBvhBuffers): InstanceBvh {
+  const { count, nodeCount, boxes, order, nodeBox, nodeStart, nodeEnd, nodeChild } = buffers as Partial<InstanceBvhBuffers>;
+  if (!Number.isInteger(count) || (count as number) < 0) return fail('count must be a non-negative integer');
+  if (!Number.isInteger(nodeCount) || (nodeCount as number) < 0) return fail('nodeCount must be a non-negative integer');
+  const [n, nodes] = [count as number, nodeCount as number];
+  if (!(boxes instanceof Float64Array) || boxes.length !== n * 6) return fail('boxes must be a Float64Array of 6 * count');
+  if (!(order instanceof Uint32Array) || order.length !== n) return fail('order must be a Uint32Array of count');
+  if (!(nodeBox instanceof Float64Array) || nodeBox.length !== nodes * 6) return fail('nodeBox must be a Float64Array of 6 * nodeCount');
+  if (!(nodeStart instanceof Uint32Array) || nodeStart.length !== nodes) return fail('nodeStart must be a Uint32Array of nodeCount');
+  if (!(nodeEnd instanceof Uint32Array) || nodeEnd.length !== nodes) return fail('nodeEnd must be a Uint32Array of nodeCount');
+  if (!(nodeChild instanceof Int32Array) || nodeChild.length !== nodes) return fail('nodeChild must be an Int32Array of nodeCount');
+  if ((n === 0) !== (nodes === 0) || nodes > 2 * n) return fail('nodeCount inconsistent with count');
+  if (!allFinite(boxes) || !allFinite(nodeBox)) return fail('boxes and node bounds must be finite');
+  const seen = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const id = order[i] as number;
+    if (id >= n || seen[id] === 1) return fail('order must be a permutation of 0..count-1');
+    seen[id] = 1;
+  }
+  for (let node = 0; node < nodes; node++) {
+    const [start, end, child] = [nodeStart[node] as number, nodeEnd[node] as number, nodeChild[node] as number];
+    if (start > end || end > n) return fail(`node ${node} range outside order`);
+    if (child !== -1 && (child <= node || child + 1 >= nodes)) return fail(`node ${node} child link out of range`);
+  }
+  return bvhOver({ count: n, nodeCount: nodes, boxes, order, nodeBox, nodeStart, nodeEnd, nodeChild });
 }
