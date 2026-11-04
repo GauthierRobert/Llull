@@ -1167,7 +1167,7 @@ Decisions:
 - **Which pictures change.** Only renders whose scene has a plant object (the categories above) or an assigned class: their `svgSha256` changes with the `rendererVersion` bump. No committed digest exists to update: the pinned digests of VC-VIS-30 / SC-VIS-05 are still "TBD - measure per rendererVersion" (`validation/README.md`, `expected_results.json`) and `server/tests/visNativeParity.test.ts` compares native to reference on documents without classes. Tests pin the bumped version, determinism and one face colour.
 - **Narrow highlights.** A smooth class (roughness 0.3: `s` = 20) shows a highlight only when a face is close to the half-vector; broad ones (concrete, FRP: `s` = 1 - 2) lift whole faces by a few levels. That is the model, not a bug.
 
-Left: the plant default colour (above) and a viewport read of the derived default surface (the viewport uses assigned classes only, §12.14 VIS-M8f); `render_motion`, the `isolate` / `section` sub-views of `render_view` and BCF snapshots draw without the highlight (BCF does not apply class colours either); sun shadow, ambient occlusion, edges and sky / ground of §5.6 are still not built.
+Left: the plant default colour (above) and a viewport read of the derived default surface (the viewport uses assigned classes only, §12.14 VIS-M8f); BCF snapshots get the highlight but not the class colours (`render_motion`, BCF and the `render_view` turntable / isolate / section sub-views all use `surfaceShadingOf`); sun shadow, ambient occlusion, edges and sky / ground of §5.6 are still not built.
 
 Validation: `tests/unit/render/surfaceShading.test.ts`, `tests/unit/plant/display/defaultMaterialClass.test.ts`, `tests/unit/render/walkthroughPath.test.ts`.
 
