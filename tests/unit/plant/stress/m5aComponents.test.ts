@@ -432,7 +432,9 @@ describe('RTE valves and reducers', () => {
     const sizes = elements.map((element) => [element.odMm, element.wallMm]);
     expect(sizes[0]).toEqual([168.3, 7.11]);
     expect(sizes.at(-1)).toEqual([114.3, 6.02]);
-    expect(reducerElements[0]?.odMm).toBeCloseTo((168.3 + 114.3) / 2, 9);
+    // hand values: (168.3 + 114.3) / 2 = 141.3 and (7.11 + 6.02) / 2 = 6.565
+    expect(reducerElements[0]?.odMm).toBeCloseTo(141.3, 9);
+    expect(reducerElements[0]?.wallMm).toBeCloseTo(6.565, 9);
     expect(reducerElements[0]?.wallMm).toBeCloseTo((7.11 + 6.02) / 2, 9);
     expect(data.findings.map((finding) => finding.code)).toContain('PST_REDUCER_SIF');
     // closed form on the model's own element sections: delta = sum over elements of the exact cantilever tip contribution

@@ -14,7 +14,7 @@ const MAX_ITERATIONS = 50;
 const FORCE_TOLERANCE = 1e-6;
 const DISPLACEMENT_TOLERANCE = 1e-9;
 const SLIP_MARGIN = 1e-9;
-/** Oblique contact: an axial bar of 1e9 N/mm (about 1e4 times the pipe lateral stiffness) to a fixed ground node 100 mm away along the direction. */
+/** Oblique contact: an axial bar of 1e9 N/mm to a fixed ground node 100 mm away along the direction; at least 1e4, typically 1e6 to 1e7, times the pipe lateral stiffness. */
 const OBLIQUE_STIFFNESS = 1e9;
 const OBLIQUE_LENGTH = 100;
 const BAR_NEGLIGIBLE = 1e-9;

@@ -474,3 +474,26 @@ describe('set_sif_override', () => {
     expectRefusal(withLoad, 'analyze_pipe_stress', { modelId: sc.id }, 'PST_PARAM_INVALID');
   });
 });
+
+describe('conditioning: rigid body (E x 1e4) with an oblique contact on a short span', () => {
+  it('the reactions at the anchor and the oblique contact equilibrate the applied force to 1e-6', () => {
+    const sc = pipeScene([1200, 0, 3000]);
+    let doc = apply(sc.doc, 'set_stress_component', {
+      modelId: sc.id,
+      declare: { pipeId: sc.pipe, atMm: 600, lengthMm: 300, kind: 'valve' },
+      weightKg: 0,
+    });
+    doc = apply(doc, 'add_stress_restraint', {
+      modelId: sc.id,
+      at: { pipeId: sc.pipe, atMm: 1200 },
+      kind: 'translational',
+      direction: [0, 0.6, 0.8],
+    });
+    const load = [300, -700, -1000];
+    doc = cases(doc, sc.id, [{ name: 'F', type: 'SUS', basic: ['F1'] }], [{ name: 'F1', pipeId: sc.pipe, atMm: 700, forceN: load }]);
+    const data = run(doc, sc.id);
+    const sum = [0, 1, 2].map((i) => (data.details?.reactions ?? []).reduce((total, entry) => total + (entry.forceN[i] as number), 0));
+    for (const i of [0, 1, 2]) expect(Math.abs((sum[i] as number) + (load[i] as number)), `component ${i}`).toBeLessThan(1e-6 * 1200);
+    expect(data.solver.maxResidual).toBeLessThan(1e-6);
+  });
+});
