@@ -24,6 +24,8 @@ export interface Inline3d extends Labelled {
   readonly type: string;
   readonly runId: string;
   readonly lineId: string;
+  /** DN of the 3D line at the component (the run size, after the reducers upstream of it in the run); undefined when no size is known. */
+  readonly dn: number | undefined;
 }
 
 /** One 3D line: the legacy pipe runs sharing a line number and / or the 02 RTE routed line of that number, with what the comparisons read. */

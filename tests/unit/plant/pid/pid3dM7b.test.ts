@@ -21,7 +21,7 @@ interface Answer {
   items: Item[];
   skipped: Skip[];
   countsByCode: Record<string, number>;
-  matched: { equipment: string[]; lines: string[]; inline: string[] };
+  matched: { equipment: string[]; lines: string[]; inline: string[]; nozzles: string[] };
   unmatchedPid: Array<{ label: string; reason: string }>;
   unmatched3d: Array<{ label: string; category: string; reason: string }>;
 }
@@ -60,8 +60,13 @@ describe('02 RTE routed lines on the 3D side', () => {
 
   it('flags a routed line whose nozzle port differs from the P&ID nozzle sub-tag', () => {
     const answer = check(clean({ pumpNozzle: 'N5' }));
-    expect(pairs(answer)).toEqual([['P3D_CONNECTIVITY_MISMATCH', scene.lineNumber]]);
-    expect(answer.items[0]?.values['modelEnds']).toContain('P-101/N2');
+    // the renamed P&ID nozzle is also P3D_UNPLACED and the 3D nozzle N2 (a line ends on it) P3D_NOT_IN_PID (PID-FU-5)
+    expect(pairs(answer)).toEqual([
+      ['P3D_UNPLACED', 'P-101/N5'],
+      ['P3D_NOT_IN_PID', 'P-101/N2'],
+      ['P3D_CONNECTIVITY_MISMATCH', scene.lineNumber],
+    ]);
+    expect(answer.items.find((f) => f.code === 'P3D_CONNECTIVITY_MISMATCH')?.values['modelEnds']).toContain('P-101/N2');
   });
 
   it('a routed line absent from the P&ID is P3D_NOT_IN_PID (pipe category)', () => {

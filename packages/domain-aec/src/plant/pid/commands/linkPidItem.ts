@@ -4,9 +4,25 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { fail, findAny, isFail, refuse } from '../authoring/refs';
 import { dropLinks } from '../link3d/links';
+import { getPiping } from '@aec/plant/piping/model';
+import type { PipingModel } from '@aec/plant/types';
 import { getPid, withPid } from '../state';
 
 const WANTED = { equipment: 'equipment', line: 'pipe' } as const;
+
+interface Target {
+  readonly id: string;
+  readonly category: string;
+  readonly mark: string;
+}
+
+/** A 02 RTE routed line by its id or its line number, as a link target (category pipe). */
+function routedLineOf(piping: PipingModel, ref: string): Target | undefined {
+  const line = Object.hasOwn(piping.lines, ref)
+    ? piping.lines[ref]
+    : piping.lineOrder.flatMap((id) => piping.lines[id] ?? []).find((candidate) => candidate.lineNumber?.trim() === ref.trim());
+  return line === undefined ? undefined : { id: line.id, category: 'pipe', mark: line.lineNumber ?? line.id };
+}
 
 /**
  * @affects plant.pid.links (one pair pid item -> building element id, replaced or cleared)
@@ -17,7 +33,7 @@ export const linkPidItem = defineCommand({
   name: 'link_pid_item',
   description:
     'Pair a P&ID item with a 3D object explicitly, or clear the pair (element null). check_pid_3d uses these pairs before it matches tags, so use it when the tag or line number differs between the drawing and the 3D model, ' +
-    'or to resolve P3D_TAG_AMBIGUOUS. A P&ID equipment links to a building equipment element (add_equipment), a P&ID line to a pipe run (add_pipe_run); other kinds are refused. Linking an item that already has another link replaces it. ' +
+    'or to resolve P3D_TAG_AMBIGUOUS. A P&ID equipment links to a building equipment element (add_equipment), a P&ID line to a pipe run (add_pipe_run) or to a 02 RTE routed line (its id or its line number: the pair is stored with the routed line id); other kinds are refused. Linking an item that already has another link replaces it. ' +
     'Returns affected = [P&ID item id]; data = { pidItem, element, previous? }. Refusals (document unchanged): PID_ITEM_NOT_FOUND, PID_ITEM_KIND, PID_LINK_DUPLICATE, PID_LINK_NOT_FOUND. Next: check_pid_3d.',
   params: z.object({
     pidItem: z.string().min(1).describe('P&ID equipment (tag or id) or line (line number or id) to link.'),
@@ -26,7 +42,7 @@ export const linkPidItem = defineCommand({
       .min(1)
       .nullable()
       .describe(
-        'Building element id (e.g. "equipment-1", "pipe-2") or its mark of the matching category: equipment for equipment, pipe for a line. null removes the existing link of the item.',
+        'Building element id (e.g. "equipment-1", "pipe-2") or its mark of the matching category: equipment for equipment, pipe for a line; for a line also the id or line number of a routed line (02 RTE). null removes the existing link of the item.',
       ),
   }),
   run: (doc, params): CommandResult => {
@@ -57,9 +73,19 @@ export const linkPidItem = defineCommand({
     const wanted = WANTED[item.kind];
     const ref = params.element;
     const byId: BuildingElement | undefined = Object.hasOwn(building.elements, ref) ? building.elements[ref] : undefined;
-    const element = byId ?? elementsOf(building, wanted).find((e) => e.mark === ref);
+    const routed = item.kind === 'line' && byId === undefined ? routedLineOf(getPiping(doc), ref) : undefined;
+    const element: Target | undefined =
+      routed ?? byId ?? (elementsOf(building, wanted).find((e) => e.mark === ref) as BuildingElement | undefined);
     if (element === undefined)
-      return refuse(doc, name, fail('PID_ITEM_NOT_FOUND', `no building element with id or mark "${ref}"`, ['element']));
+      return refuse(
+        doc,
+        name,
+        fail(
+          'PID_ITEM_NOT_FOUND',
+          `no building element${item.kind === 'line' ? ' or routed line' : ''} with id, mark or line number "${ref}"`,
+          ['element'],
+        ),
+      );
     if (element.category !== wanted)
       return refuse(
         doc,

@@ -8,23 +8,34 @@ import { text, type Inline3d, type Norm, type Run } from './common';
 const byRoute = (a: InlineComponent, b: InlineComponent): number => a.leg - b.leg || a.centreDistance - b.centreDistance;
 const isBranchRun = (run: PipeRun): boolean => run.start.ref?.kind === 'branch';
 
-const inlineOf = (run: PipeRun, component: InlineComponent): Inline3d | undefined =>
-  text(component.tag) === undefined
-    ? undefined
-    : {
+/** The tagged components of `run` in route order, each with the DN of the line at it: the run size, changed by the outlet of every reducer upstream of it. */
+function taggedOf(run: PipeRun, lineDn: number | undefined): Inline3d[] {
+  let dn = run.dn ?? lineDn;
+  const out: Inline3d[] = [];
+  for (const component of [...(run.inline ?? [])].sort(byRoute)) {
+    if (text(component.tag) !== undefined)
+      out.push({
         ids: [component.id],
         label: (component.tag ?? '').trim(),
         componentId: component.id,
         type: component.type,
         runId: run.id,
         lineId: run.lineId,
-      };
+        dn,
+      });
+    if (component.type.startsWith('reducer') && component.dn2 !== undefined) dn = component.dn2;
+  }
+  return out;
+}
+
+const lineDnOf = (piping: PipingModel, run: PipeRun): number | undefined =>
+  Object.hasOwn(piping.lines, run.lineId) ? piping.lines[run.lineId]?.dn : undefined;
 
 /** Every tagged inline component of the routed runs, in route order (the objects `check_pid_3d` pairs with P&ID inline tags). */
 export function inlineObjects(piping: PipingModel): Inline3d[] {
   return piping.runOrder.flatMap((id) => {
     const run = Object.hasOwn(piping.runs, id) ? piping.runs[id] : undefined;
-    return run === undefined ? [] : [...(run.inline ?? [])].sort(byRoute).flatMap((c) => inlineOf(run, c) ?? []);
+    return run === undefined ? [] : taggedOf(run, lineDnOf(piping, run));
   });
 }
 
@@ -77,7 +88,7 @@ function finalise(draft: Draft, piping: PipingModel, building: BuildingModel, ru
     specs,
     from: legacyFrom ?? routedEnd(piping, building, main[0], 'start', first?.line.from),
     to: legacyTo ?? routedEnd(piping, building, main[main.length - 1], 'end', last?.line.to),
-    sequence: main.flatMap((run) => [...(run.inline ?? [])].sort(byRoute).flatMap((c) => inlineOf(run, c) ?? [])),
+    sequence: main.flatMap((run) => taggedOf(run, lineDnOf(piping, run))),
   };
 }
 

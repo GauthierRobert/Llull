@@ -52,7 +52,16 @@ export interface Finding3d {
 /** A comparison that could not be made, coded so it is never read as a pass. */
 export interface Skip3d {
   readonly code: P3dRule;
-  readonly reason: 'no_pid_class' | 'no_3d_spec' | 'class_not_mapped' | 'no_3d_class' | 'sequence_too_long';
+  readonly reason:
+    | 'no_pid_class'
+    | 'no_3d_spec'
+    | 'class_not_mapped'
+    | 'no_3d_class'
+    | 'sequence_too_long'
+    | 'no_3d_nozzles'
+    | 'no_pid_dn'
+    | 'no_3d_dn'
+    | 'reducer';
   readonly item: string;
   readonly pidIds: readonly string[];
   readonly elementIds: readonly string[];
