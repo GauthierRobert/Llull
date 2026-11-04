@@ -91,6 +91,8 @@ export function inputHashOf(doc: CadDocument, model: StressModel, built: BuiltMo
       model: stored,
       pipes: built?.sources.pipes ?? null,
       supports: built?.sources.supports ?? null,
+      components: built?.sources.components ?? null,
+      branches: built?.sources.branches ?? null,
       material,
     }),
   );
@@ -125,6 +127,7 @@ function findingsOf(
     ['PST_SUSTAINED_OVERSTRESS', 'SUS', 'sustained stress S_L above the allowable S_h'],
     ['PST_EXPANSION_OVERSTRESS', 'EXP', 'displacement stress range S_E above the allowable S_A'],
     ['PST_OCCASIONAL_OVERSTRESS', 'OCC', 'occasional stress above its allowable'],
+    ['PST_HYDROTEST_OVERSTRESS', 'HYD', 'hydrotest stress S_L above the stated hydrotest allowable'],
   ];
   for (const [code, type, text] of overstress) {
     const over = lines(rows, type, 1);
