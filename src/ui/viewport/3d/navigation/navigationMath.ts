@@ -92,35 +92,146 @@ export const NAVIGATION_KEY_CODES: ReadonlySet<string> = new Set([
   'ShiftRight',
 ]);
 
-export interface StepOptions {
-  readonly mode: 'walk' | 'fly';
-  /** Units per second before the boost. */
-  readonly speed: number;
-  /** Walk: the eye's world Z (floor + eye height). Ignored in fly. */
-  readonly eyeZ: number;
-}
-
-/** Eye position after `dt` seconds. Walk stays level at `eyeZ`; fly moves along the view for forward/back and along world Z for rise. */
-export function stepNavigation(
-  position: Vec3,
-  angles: LookAngles,
-  input: MoveInput,
-  dt: number,
-  options: StepOptions,
-): [number, number, number] {
+/** Wish direction (length at most 1): walk stays level, fly follows the view and rises along world Z. */
+function wishVector(angles: LookAngles, input: MoveInput, mode: 'walk' | 'fly'): [number, number, number] {
   const sinYaw = Math.sin(angles.yaw);
   const cosYaw = Math.cos(angles.yaw);
-  const forward: Vec3 = options.mode === 'fly' ? lookDirection(angles) : [sinYaw, cosYaw, 0];
-  const rise = options.mode === 'fly' ? input.rise : 0;
+  const forward: Vec3 = mode === 'fly' ? lookDirection(angles) : [sinYaw, cosYaw, 0];
+  const rise = mode === 'fly' ? input.rise : 0;
   const wish: [number, number, number] = [
     forward[0] * input.forward + cosYaw * input.strafe,
     forward[1] * input.forward - sinYaw * input.strafe,
     forward[2] * input.forward + rise,
   ];
   const length = Math.hypot(...wish);
-  const distance = options.speed * (input.boost ? BOOST_FACTOR : 1) * Math.max(dt, 0);
-  const scale = length > 1 ? distance / length : distance;
-  const next: [number, number, number] = [position[0] + wish[0] * scale, position[1] + wish[1] * scale, position[2] + wish[2] * scale];
-  if (options.mode === 'walk') next[2] = options.eyeZ;
-  return next;
+  if (length > 1) return [wish[0] / length, wish[1] / length, wish[2] / length];
+  return wish;
+}
+
+function travelDistance(speed: number, input: MoveInput, dt: number): number {
+  return speed * (input.boost ? BOOST_FACTOR : 1) * Math.max(dt, 0);
+}
+
+/** Fly eye position after `dt` seconds: along the view for forward/back, along world Z for rise (walk is `stepWalk`). */
+export function stepNavigation(position: Vec3, angles: LookAngles, input: MoveInput, dt: number, speed: number): [number, number, number] {
+  const wish = wishVector(angles, input, 'fly');
+  const distance = travelDistance(speed, input, dt);
+  return [position[0] + wish[0] * distance, position[1] + wish[1] * distance, position[2] + wish[2] * distance];
+}
+
+export interface WallHit {
+  readonly distance: number;
+  /** Horizontal unit normal of the surface, facing the ray origin. */
+  readonly normal: readonly [number, number];
+}
+
+/** What the walker can touch (the scene probe; the maths never sees three.js). Document units, WORLD space, +Z up. */
+export interface WalkWorld {
+  /** Highest walkable surface at or below `fromZ` under (x, y); null when there is none. */
+  floorBelow(x: number, y: number, fromZ: number): number | null;
+  /** Nearest blocking surface along the horizontal ray within `maxDistance`. */
+  wallAhead(origin: Vec3, dirX: number, dirY: number, maxDistance: number): WallHit | null;
+}
+
+export interface WalkBody {
+  /** Soles of the feet; the eye is `feet[2] + eyeHeight`. */
+  readonly feet: Vec3;
+  readonly velocityZ: number;
+  readonly grounded: boolean;
+}
+
+export interface WalkOptions {
+  readonly speed: number;
+  readonly eyeHeight: number;
+  /** Horizontal capsule radius. */
+  readonly radius: number;
+  /** Highest riser walked onto (stairs); a taller surface is a wall. */
+  readonly stepHeight: number;
+  /** Units per second squared, positive. */
+  readonly gravity: number;
+  /** Fall speed cap, units per second. */
+  readonly terminalSpeed: number;
+  /** Floor when the scene has nothing below the feet (the ground plane). */
+  readonly baseFloor: number;
+}
+
+/** Wall probes cross at most this fraction of the radius per sub-step, so a boosted frame cannot jump a thin wall. */
+const SUBSTEP_RADIUS_FRACTION = 0.75;
+const MAX_SUBSTEPS = 48;
+const FAN_ANGLES: readonly number[] = [0, Math.PI / 5, -Math.PI / 5];
+const SKIN = 1e-6;
+/** Probe height above the step height: risers up to the step height are not walls. */
+const KNEE_MARGIN = 0.05;
+
+function blockedBy(world: WalkWorld, feet: Vec3, move: readonly [number, number], options: WalkOptions): WallHit | null {
+  const length = Math.hypot(move[0], move[1]);
+  if (length === 0) return null;
+  const baseAngle = Math.atan2(move[1], move[0]);
+  const heights = [options.stepHeight + KNEE_MARGIN, options.eyeHeight * 0.6];
+  let nearest: WallHit | null = null;
+  for (const height of heights) {
+    const origin: Vec3 = [feet[0], feet[1], feet[2] + height];
+    for (const offset of FAN_ANGLES) {
+      const dirX = Math.cos(baseAngle + offset);
+      const dirY = Math.sin(baseAngle + offset);
+      const hit = world.wallAhead(origin, dirX, dirY, options.radius + length);
+      if (hit === null) continue;
+      const advance = move[0] * dirX + move[1] * dirY;
+      if (advance <= Math.max(hit.distance - options.radius, 0) + SKIN) continue;
+      if (nearest === null || hit.distance < nearest.distance) nearest = hit;
+    }
+  }
+  return nearest;
+}
+
+/** One horizontal sub-move: slides along the first wall hit, re-probes the slid move and stops when it is still blocked. */
+function slideMove(world: WalkWorld, feet: Vec3, wish: readonly [number, number], options: WalkOptions): [number, number] {
+  let move: [number, number] = [wish[0], wish[1]];
+  for (let pass = 0; pass < 2; pass += 1) {
+    const hit = blockedBy(world, feet, move, options);
+    if (hit === null) return move;
+    const into = move[0] * hit.normal[0] + move[1] * hit.normal[1];
+    if (into >= 0) return move;
+    move = [move[0] - hit.normal[0] * into, move[1] - hit.normal[1] * into];
+  }
+  return blockedBy(world, feet, move, options) === null ? move : [0, 0];
+}
+
+function settleVertically(world: WalkWorld, body: WalkBody, feet: Vec3, dt: number, options: WalkOptions): WalkBody {
+  const found = world.floorBelow(feet[0], feet[1], feet[2] + options.stepHeight);
+  const floor = found ?? options.baseFloor;
+  if (body.grounded && feet[2] - floor <= options.stepHeight) return { feet: [feet[0], feet[1], floor], velocityZ: 0, grounded: true };
+  const velocityZ = Math.max(body.velocityZ - options.gravity * dt, -options.terminalSpeed);
+  const z = feet[2] + velocityZ * dt;
+  if (z <= floor) return { feet: [feet[0], feet[1], floor], velocityZ: 0, grounded: true };
+  return { feet: [feet[0], feet[1], z], velocityZ, grounded: false };
+}
+
+/** Walk step: floor following (up to `stepHeight`, snaps down stairs), gravity when no floor is within reach, a ray fan against walls with
+ *  sliding. Fixed sub-steps keep the wall test from tunnelling at boost speed. */
+export function stepWalk(
+  body: WalkBody,
+  angles: LookAngles,
+  input: MoveInput,
+  dt: number,
+  options: WalkOptions,
+  world: WalkWorld,
+): WalkBody {
+  const wish = wishVector(angles, input, 'walk');
+  const distance = travelDistance(options.speed, input, dt);
+  const substeps = Math.min(MAX_SUBSTEPS, Math.max(1, Math.ceil(distance / (options.radius * SUBSTEP_RADIUS_FRACTION))));
+  const each = distance / substeps;
+  let current = body;
+  for (let index = 0; index < substeps; index += 1) {
+    const move = slideMove(world, current.feet, [wish[0] * each, wish[1] * each], options);
+    const feet: Vec3 = [current.feet[0] + move[0], current.feet[1] + move[1], current.feet[2]];
+    current = settleVertically(world, current, feet, Math.max(dt, 0) / substeps, options);
+  }
+  return current;
+}
+
+/** A walker put down at the eye position: on the floor found below it (or the base floor). */
+export function dropOntoFloor(eye: Vec3, world: WalkWorld, baseFloor: number): WalkBody {
+  const found = world.floorBelow(eye[0], eye[1], eye[2]);
+  return { feet: [eye[0], eye[1], found ?? baseFloor], velocityZ: 0, grounded: true };
 }

@@ -11,15 +11,21 @@ import { useNavigationStore } from '@ui/store/navigationStore';
 import { mergedEntityBounds } from '../fitBounds';
 import {
   EYE_HEIGHT_MM,
+  type WalkBody,
+  type WalkOptions,
+  type WalkWorld,
   type LookAngles,
   NAVIGATION_KEY_CODES,
   anglesOfDirection,
   applyMouseLook,
   inputFromKeys,
   lookDirection,
+  dropOntoFloor,
   navigationSpeed,
   stepNavigation,
+  stepWalk,
 } from './navigationMath';
+import { createSceneWalkWorld } from './sceneWalkWorld';
 
 /** Walking pace of an empty document, in millimetres per second. */
 const FALLBACK_SPEED_MM = 1400;
@@ -27,7 +33,17 @@ const FALLBACK_SPEED_MM = 1400;
 const TARGET_LEAD_SECONDS = 2;
 /** A frame after an idle spell must not teleport the eye. */
 const MAX_FRAME_SECONDS = 0.1;
+/** The ground plane the walker falls to when the scene has nothing below the feet. */
 const FLOOR_Z = 0;
+const RADIUS_MM = 250;
+/** Highest riser walked onto (stairs); taller is a wall. */
+const STEP_HEIGHT_MM = 400;
+const GRAVITY_MM = 9810;
+const TERMINAL_SPEED_MM = 50000;
+/** Name of the group the walker probes (Viewport3D wraps the entities in it). */
+export const WALKABLE_GROUP_NAME = 'walkable-scene';
+
+const OPEN_WORLD: WalkWorld = { floorBelow: () => null, wallAhead: () => null };
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -45,11 +61,13 @@ function modelSpeed(): number {
 export function NavigationController(): null {
   const mode = useNavigationStore((s) => s.mode);
   const setMode = useNavigationStore((s) => s.setMode);
-  const { camera, controls, gl, invalidate } = useThree();
+  const { camera, controls, gl, invalidate, scene } = useThree();
   const angles = useRef<LookAngles>({ yaw: 0, pitch: 0 });
   const held = useRef(new Set<string>());
   const speed = useRef(1);
-  const eyeHeight = useRef(1.6);
+  const walkOptions = useRef<WalkOptions | null>(null);
+  const walkWorld = useRef<WalkWorld>(OPEN_WORLD);
+  const body = useRef<WalkBody | null>(null);
 
   useEffect(() => {
     if (mode === 'orbit') return;
@@ -57,7 +75,27 @@ export function NavigationController(): null {
     const direction = camera.getWorldDirection(camera.position.clone());
     angles.current = anglesOfDirection([direction.x, direction.y, direction.z]);
     speed.current = modelSpeed();
-    eyeHeight.current = fromMm(useStore.getState().document, EYE_HEIGHT_MM);
+    const doc = useStore.getState().document;
+    walkOptions.current = {
+      speed: speed.current,
+      eyeHeight: fromMm(doc, EYE_HEIGHT_MM),
+      radius: fromMm(doc, RADIUS_MM),
+      stepHeight: fromMm(doc, STEP_HEIGHT_MM),
+      gravity: fromMm(doc, GRAVITY_MM),
+      terminalSpeed: fromMm(doc, TERMINAL_SPEED_MM),
+      baseFloor: FLOOR_Z,
+    };
+    const walkable = scene.getObjectByName(WALKABLE_GROUP_NAME);
+    walkWorld.current = walkable ? createSceneWalkWorld(walkable, () => useStore.getState().renderOrigin) : OPEN_WORLD;
+    const origin = useStore.getState().renderOrigin;
+    body.current =
+      mode === 'walk'
+        ? dropOntoFloor(
+            [camera.position.x + origin[0], camera.position.y + origin[1], camera.position.z + origin[2]],
+            walkWorld.current,
+            FLOOR_Z,
+          )
+        : null;
     held.current.clear();
     camera.up.set(0, 0, 1);
     let locked = false;
@@ -112,19 +150,30 @@ export function NavigationController(): null {
       (controls as OrbitControlsImpl | null)?.update();
       invalidate();
     };
-  }, [mode, camera, controls, gl, invalidate, setMode]);
+  }, [mode, camera, controls, gl, invalidate, setMode, scene]);
 
   useFrame((state, delta) => {
     if (mode === 'orbit') return;
     const orbit = controls as OrbitControlsImpl | null;
     const origin = useStore.getState().renderOrigin;
-    const eye = stepNavigation(
-      [camera.position.x + origin[0], camera.position.y + origin[1], camera.position.z + origin[2]],
-      angles.current,
-      inputFromKeys(held.current),
-      Math.min(delta, MAX_FRAME_SECONDS),
-      { mode, speed: speed.current, eyeZ: FLOOR_Z + eyeHeight.current },
-    );
+    const input = inputFromKeys(held.current);
+    const dt = Math.min(delta, MAX_FRAME_SECONDS);
+    const options = walkOptions.current;
+    let eye: [number, number, number];
+    if (mode === 'walk') {
+      if (options === null || body.current === null) return;
+      body.current = stepWalk(body.current, angles.current, input, dt, { ...options, speed: speed.current }, walkWorld.current);
+      const [x, y, z] = body.current.feet;
+      eye = [x, y, z + options.eyeHeight];
+    } else {
+      eye = stepNavigation(
+        [camera.position.x + origin[0], camera.position.y + origin[1], camera.position.z + origin[2]],
+        angles.current,
+        input,
+        dt,
+        speed.current,
+      );
+    }
     const forward = lookDirection(angles.current);
     const lead = speed.current * TARGET_LEAD_SECONDS;
     camera.position.set(eye[0] - origin[0], eye[1] - origin[1], eye[2] - origin[2]);

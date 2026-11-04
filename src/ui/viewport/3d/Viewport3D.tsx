@@ -25,7 +25,7 @@ import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { DynamicsPlayer } from './DynamicsPlayer';
 import { useRenderQuality } from './useRenderQuality';
-import { NavigationController } from './navigation/NavigationController';
+import { NavigationController, WALKABLE_GROUP_NAME } from './navigation/NavigationController';
 import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
@@ -153,9 +153,11 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       />
 
       <group position={groupOffset}>
-        <PlantCameraProvider>
-          <Entities />
-        </PlantCameraProvider>
+        <group name={WALKABLE_GROUP_NAME}>
+          <PlantCameraProvider>
+            <Entities />
+          </PlantCameraProvider>
+        </group>
         <PointClouds />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <FeatureSessionLayer />
