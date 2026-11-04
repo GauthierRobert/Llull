@@ -72,8 +72,9 @@ export function ScanPanel({ className }: { className?: string }): React.ReactEle
   const pointBudget = useScanViewStore((s) => s.pointBudget);
   const applyCrops = useScanViewStore((s) => s.applyCrops);
   const snapToScan = useScanViewStore((s) => s.snapToScan);
+  const edl = useScanViewStore((s) => s.edl);
   const streams = useScanViewStore((s) => s.streams);
-  const { setColourChoice, setPointBudget, toggleApplyCrops, toggleSnapToScan } = useScanViewStore.getState();
+  const { setColourChoice, setPointBudget, toggleApplyCrops, toggleSnapToScan, toggleEdl } = useScanViewStore.getState();
 
   const clouds = (scan?.cloudOrder ?? []).flatMap((id) => {
     const cloud = scan?.clouds[id];
@@ -138,6 +139,10 @@ export function ScanPanel({ className }: { className?: string }): React.ReactEle
               <label className="loads-check scan__toggle">
                 <input type="checkbox" checked={snapToScan} onChange={toggleSnapToScan} data-testid="scan-snap" />
                 Snap to scan points
+              </label>
+              <label className="loads-check scan__toggle">
+                <input type="checkbox" checked={edl} onChange={toggleEdl} data-testid="scan-edl" />
+                Eye-dome lighting (depth shading)
               </label>
             </div>
           </PanelSection>
