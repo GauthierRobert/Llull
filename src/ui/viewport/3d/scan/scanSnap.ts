@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type { Vec3 } from '@core/model/vectors';
 import { nearestScreenPoint, projectToScreen, type SnapView } from './pointSnap';
+import { treeFor } from './kdTreeCache';
 import { allSnapTiles } from './snapRegistry';
 
 /** Snap radius in px (a handle within a thumb-width of a scan point locks onto it). */
@@ -37,5 +38,5 @@ export function scanSnapFor(
   const view = snapViewOf(camera, size, renderOrigin);
   const pointer = projectToScreen(view, target[0], target[1], target[2]);
   if (pointer === null) return null;
-  return nearestScreenPoint(tiles, view, pointer, SCAN_SNAP_TOLERANCE_PX)?.position ?? null;
+  return nearestScreenPoint(tiles, view, pointer, SCAN_SNAP_TOLERANCE_PX, treeFor)?.position ?? null;
 }

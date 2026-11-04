@@ -93,11 +93,14 @@ describe('ScanPanel', () => {
     fireEvent.change(screen.getByTestId('scan-budget'), { target: { value: '3000000' } });
     fireEvent.click(screen.getByTestId('scan-crops'));
     fireEvent.click(screen.getByTestId('scan-snap'));
+    expect(useScanViewStore.getState().edl).toBe(true);
+    fireEvent.click(screen.getByTestId('scan-edl'));
     expect(useScanViewStore.getState()).toMatchObject({
       colourChoice: 'single',
       pointBudget: 3_000_000,
       applyCrops: false,
       snapToScan: false,
+      edl: false,
     });
     expect(useStore.getState().document).toBe(before);
   });
