@@ -81,6 +81,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EQP_HEAD_UNDER_THICKNESS: 'Increase headThickness (update_equipment_parameters).',
   EQP_MAWP_BELOW_DESIGN: 'Increase the governing thickness so that the MAWP reaches the design pressure, or lower the design pressure.',
   EQP_NOZZLE_OVERLAP: 'Move one of the two nozzles (update_nozzle) so that their reinforcement zones do not intersect.',
+  EQP_NOZZLE_REINFORCEMENT_INSUFFICIENT:
+    'Thicken the shell or the neck, or add a reinforcing pad (not modelled here): the UG-37 area replacement fails; have an engineer review the pad.',
   EQP_NOZZLE_IN_KNUCKLE: 'Move the head nozzle toward the head centre (update_nozzle radialOffset).',
   EQP_NOZZLE_IN_SUPPORT: 'Move the nozzle clear of the saddle / skirt (update_nozzle), or provide an opening in the support.',
   EQP_TABLE_UNVERIFIED: 'Confirm the value from the licensed standard or a vendor; it comes from a table row below grade A.',

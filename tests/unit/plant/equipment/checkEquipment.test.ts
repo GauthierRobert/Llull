@@ -153,13 +153,13 @@ describe('check_equipment: warnings for what the formulas do not cover', () => {
     expect(codes(check(noPressure)).sort()).toEqual(['EQP_DESIGN_DATA_MISSING', 'EQP_VALUE_UNSOURCED']);
   });
 
-  it('a head from a grade B proportion table is flagged EQP_TABLE_UNVERIFIED (and not covered by the formulas)', () => {
+  it('a head from a grade B proportion table is flagged EQP_TABLE_UNVERIFIED (the UG-32(e) M-factor formula now covers its proportions)', () => {
     const grade = { type: 'torispherical', standard: 'asme_80_10' };
     const doc = apply(mmDocument(), 'add_vessel', { ...separatorParams, heads: { top: grade, bottom: grade }, support: { type: 'none' } });
     const result = check(doc);
     expect(codes(result)).toContain('EQP_TABLE_UNVERIFIED');
     expect(result.issues.find((issue) => issue.code === 'EQP_TABLE_UNVERIFIED')?.paths).toEqual(['heads']);
-    expect(codes(result)).toContain('EQP_HEAD_NOT_COVERED');
+    expect(codes(result)).not.toContain('EQP_HEAD_NOT_COVERED');
   });
 });
 

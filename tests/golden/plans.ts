@@ -1020,6 +1020,67 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'equipment_ports', params: { equipment: 'V-101' } },
     { command: 'update_equipment_parameters', params: { equipment: 'V-101', set: { insideDiameter: 1800 } } },
   ],
+  // 03 EQP-FU: an exchanger, a tank and a pump revised in place (ids, tags and nozzle marks kept)
+  plant_equipment_revise_exchanger_tank_pump: [
+    { command: 'set_units', params: { units: 'mm' } },
+    {
+      command: 'add_heat_exchanger',
+      params: {
+        tag: 'E-301',
+        temaType: 'BEM',
+        location: [0, 8000],
+        shellInsideDiameter: 600,
+        shellThickness: 8,
+        tubes: { outsideDiameter: 19.05, wallThickness: 1.651, count: 300, length: 4877, passes: 2, pitch: 23.8125, layoutAngleDeg: 30 },
+        tubesheetThickness: 50,
+        frontChannel: { length: 300 },
+        rearChannel: { length: 300 },
+        support: { type: 'saddles', stations: [800, 4077], width: 200, axisElevation: 1000 },
+      },
+    },
+    {
+      command: 'add_nozzle',
+      params: {
+        equipment: 'E-301',
+        mark: 'S1',
+        dn: 150,
+        rating: 'CL150',
+        facing: 'RF',
+        location: { on: 'shell', station: 400, orientationDeg: 0 },
+        projection: 600,
+      },
+    },
+    {
+      command: 'update_equipment_parameters',
+      params: { equipment: 'E-301', exchanger: { tubes: { length: 5877 }, shellInsideDiameter: 700 } },
+    },
+    {
+      command: 'add_storage_tank',
+      params: {
+        tag: 'T-401',
+        location: [30000, 0],
+        diameter: 20000,
+        shellHeight: 12000,
+        courses: [2000, 2000, 2000, 2000, 2000, 2000],
+        roof: { type: 'cone', slopeRatio: '1:12' },
+        design: { specificGravity: 1, designLiquidLevel: 12000, material: 'A36M', corrosionAllowance: 1.5 },
+      },
+    },
+    { command: 'update_equipment_parameters', params: { equipment: 'T-401', tank: { diameter: 24000 } } },
+    {
+      command: 'add_pump',
+      params: {
+        tag: 'P-101',
+        location: [2000, 3000],
+        standard: 'iso_2858',
+        size: '65-40-250',
+        driver: { length: 600, width: 400, height: 400 },
+        weightKg: 310,
+      },
+    },
+    { command: 'update_equipment_parameters', params: { equipment: 'P-101', pump: { driver: { length: 1000 } } } },
+    { command: 'equipment_ports', params: {} },
+  ],
   // VIS1 / VIS-M8j: one packed instance array of a component (no Entity per member)
   instance_array_grid: [
     ...CUBE_COMPONENT,

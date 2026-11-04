@@ -37,6 +37,16 @@ export interface VesselDesignData {
   readonly materialDensityKgM3?: number | undefined;
   /** Level counts from the bottom tangent line (vertical) or the shell bottom (horizontal). */
   readonly operatingLiquid?: { readonly specificGravity: number; readonly levelAboveBottomTangent: number } | undefined;
+  /** Insulation on the shell and the heads (not on the support): added to every weight state. */
+  readonly insulation?: { readonly thickness: number; readonly densityKgM3: number } | undefined;
+  /** Internals (trays, packing, demister ...) as lumped masses; `position` = distance along the axis from the bottom tangent line (vertical) / left tangent line (horizontal). */
+  readonly internals?: readonly VesselInternal[] | undefined;
+}
+
+export interface VesselInternal {
+  readonly label: string;
+  readonly kg: number;
+  readonly position?: number | undefined;
 }
 
 /** Resolved support: every default is filled in and reported by the command that created it. */

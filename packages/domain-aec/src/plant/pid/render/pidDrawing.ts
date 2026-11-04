@@ -8,6 +8,7 @@ import type { Vec2 } from '@core/model/vectors';
 import type { PidConvention, PidItem, PidModel, PidSegment, PidSheet } from '../model';
 import { equipmentSymbol } from '../symbols/equipment';
 import { BUBBLE_R, INLINE_HALF, actuatorSymbol, connectorSymbol, flowArrowSymbol, instrumentSymbol, pipingSymbol } from '../symbols/piping';
+import { withProjectSymbol } from '../symbols/projectSymbol';
 import { label, placeSymbol } from './placeSymbol';
 
 export const LAYERS = { equipment: 'PID-EQPT', pipe: 'PID-PIPE', instrument: 'PID-INST', signal: 'PID-SIGN', text: 'PID-TEXT' } as const;
@@ -70,7 +71,7 @@ function itemGlyph(pid: PidModel, item: PidItem, convention: PidConvention): Pid
   const base = { id: item.id, kind: item.kind, ...(item.tag === undefined ? {} : { tag: item.tag }) };
   switch (item.kind) {
     case 'equipment': {
-      const symbol = equipmentSymbol(item.dexpiClass, convention);
+      const symbol = withProjectSymbol(pid, equipmentSymbol(item.dexpiClass, convention), convention);
       const below: Vec2 = [item.at[0], item.at[1] - symbol.halfHeight - 4];
       return {
         ...base,
@@ -114,7 +115,7 @@ function itemGlyph(pid: PidModel, item: PidItem, convention: PidConvention): Pid
     case 'segment':
       return segmentGlyph(item);
     case 'inline': {
-      const symbol = pipingSymbol(item.dexpiClass);
+      const symbol = withProjectSymbol(pid, pipingSymbol(item.dexpiClass), convention);
       const turned = inlineAngle(item.ports, item.rotationDeg);
       return {
         ...base,

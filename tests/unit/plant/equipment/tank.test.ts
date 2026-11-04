@@ -407,16 +407,8 @@ describe('check_equipment on a tank', () => {
 });
 
 describe('tanks and the generic equipment commands', () => {
-  it('update_equipment_parameters refuses a tank with a coded reason; the plant record survives a save / load round trip', async () => {
+  it('the plant record survives a save / load round trip', async () => {
     const doc = tankDocument();
-    const result = expectRefusal(
-      doc,
-      'update_equipment_parameters',
-      { equipment: 'T-401', set: { name: 'x' } },
-      'EQP_NOT_PARAMETRIC',
-      'equipment',
-    );
-    expect(result.summary).toContain('parametric tank');
     const { deserializeDocument, serializeDocument } = await import('@core/commands/persistence/serialization');
     const loaded = deserializeDocument(serializeDocument(doc));
     expect(equipmentOf(loaded).plant).toEqual(equipmentOf(doc).plant);

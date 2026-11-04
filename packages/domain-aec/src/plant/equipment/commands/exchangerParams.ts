@@ -11,7 +11,7 @@ import { tubeWallRow, TUBE_WALL_SOURCE } from '../data/temaTables';
 import type { ExchangerChannel, ExchangerSideDesign, ExchangerTemplate, TubeBundle } from '../plantData';
 import { designInputSchema, isVesselIssue, resolveSupport, supportInputSchema, type VesselIssue } from './vesselParams';
 
-const channelSchema = z.object({
+export const channelSchema = z.object({
   length: z
     .number()
     .positive()
@@ -25,7 +25,7 @@ const channelSchema = z.object({
     ),
 });
 
-const sideSchema = designInputSchema
+export const sideSchema = designInputSchema
   .omit({ operatingLiquid: true, materialDensityKgM3: true })
   .extend({
     specificGravity: z

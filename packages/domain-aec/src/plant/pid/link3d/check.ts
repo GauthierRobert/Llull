@@ -3,7 +3,7 @@
 import { elementsOf } from '@aec/building/model';
 import type { BuildingModel } from '@aec/building/types';
 import type { PipingModel } from '@aec/plant/types';
-import type { PidEquipment, PidInline, PidItem, PidLine, PidModel } from '../model';
+import type { PidEquipment, PidInline, PidItem, PidLine, PidModel, PidNozzle } from '../model';
 import { naturalCompare } from '../lists/sort';
 import { compareEquipmentClass, compareInlineClass, type ClassOutcome } from './classCompare';
 import { equipmentOf } from './classMap';
@@ -12,6 +12,7 @@ import { makeFinding3d, compareFindings3d, type Finding3d, type Skip3d } from '.
 import { compareLine } from './lineCompare';
 import { collectRuns, inlineObjects } from './lines3d';
 import { compareOrder } from './orderCompare';
+import { compareInlineSize, compareNozzles } from './nozzleCompare';
 import { pairUp, type Pairing } from './pairing';
 
 export type Scope3d = 'all' | 'equipment' | 'lines' | 'inline';
@@ -24,7 +25,7 @@ export interface UnmatchedPid {
 }
 export interface Unmatched3d {
   readonly ids: readonly string[];
-  readonly category: 'equipment' | 'pipe' | 'inline';
+  readonly category: 'equipment' | 'pipe' | 'inline' | 'nozzle';
   readonly label: string;
   readonly reason: 'not_in_pid' | 'ambiguous';
 }
@@ -32,7 +33,7 @@ export interface Check3dResult {
   readonly findings: readonly Finding3d[];
   /** Comparisons that could not be made (coded; never a pass). */
   readonly skipped: readonly Skip3d[];
-  readonly matched: { readonly equipment: string[]; readonly lines: string[]; readonly inline: string[] };
+  readonly matched: { readonly equipment: string[]; readonly lines: string[]; readonly inline: string[]; readonly nozzles: string[] };
   readonly unmatchedPid: readonly UnmatchedPid[];
   readonly unmatched3d: readonly Unmatched3d[];
 }
@@ -124,10 +125,24 @@ export function check3d(
   const norm = normaliser(normaliseTags);
   const links = pid.links ?? {};
   const sink: Collector = { findings: [], skipped: [], unmatchedPid: [], unmatched3d: [] };
-  const matched = { equipment: [] as string[], lines: [] as string[], inline: [] as string[] };
+  const matched = { equipment: [] as string[], lines: [] as string[], inline: [] as string[], nozzles: [] as string[] };
   const items = pid.itemOrder.flatMap((id) => itemAt(pid, id) ?? []);
 
+  const runs = collectRuns(building, piping, norm);
   if (scope === 'all' || scope === 'equipment') {
+    const nozzlesOf = new Map<string, PidNozzle[]>();
+    for (const item of items) {
+      if (item.kind !== 'nozzle') continue;
+      const list = nozzlesOf.get(item.equipmentId);
+      if (list === undefined) nozzlesOf.set(item.equipmentId, [item]);
+      else list.push(item);
+    }
+    const connected = new Set<string>();
+    for (const run of runs)
+      for (const end of [run.from, run.to]) {
+        const cut = end === undefined ? -1 : end.indexOf(':');
+        if (end !== undefined && cut > 0) connected.add(`${norm(end.slice(0, cut))}:${norm(end.slice(cut + 1))}`);
+      }
     const equipment = items.filter((i): i is PidEquipment => i.kind === 'equipment' && i.parentId === undefined);
     const objects = elementsOf(building, 'equipment').map((e): Labelled => ({ ids: [e.id], label: e.mark }));
     const pairing = pairUp(
@@ -142,11 +157,21 @@ export function check3d(
       matched.equipment.push(item.tag ?? item.id);
       const element = equipmentOf(building, object.ids[0] ?? '');
       if (element !== undefined) outcome(sink, compareEquipmentClass(item, element));
+      const placed = Object.hasOwn(building.elements, object.ids[0] ?? '') ? building.elements[object.ids[0] as string] : undefined;
+      if (placed?.category === 'equipment') {
+        const compared = compareNozzles(item.tag ?? item.id, placed, nozzlesOf.get(item.id) ?? [], connected, norm);
+        sink.findings.push(...compared.findings);
+        sink.skipped.push(...compared.skips);
+        matched.nozzles.push(...compared.matched);
+        for (const entry of compared.unplaced)
+          sink.unmatchedPid.push({ id: entry.nozzle.id, kind: 'nozzle', label: entry.label, reason: 'unplaced' });
+        for (const entry of compared.notInPid)
+          sink.unmatched3d.push({ ids: entry.ids, category: 'nozzle', label: entry.label, reason: 'not_in_pid' });
+      }
     }
   }
 
   if (scope !== 'equipment') {
-    const runs = collectRuns(building, piping, norm);
     const lines = items.filter((i): i is PidLine => i.kind === 'line');
     const lineKey = (line: PidLine): string | undefined => (text(line.lineNumber) === undefined ? undefined : norm(line.lineNumber ?? ''));
     const pairing = pairUp(lines, runs, lineKey, (run) => run.key, links);
@@ -177,6 +202,11 @@ export function check3d(
       for (const [item, component] of inlinePairing.pairs) {
         matched.inline.push(item.tag ?? item.id);
         outcome(sink, compareInlineClass(item, component));
+        const size = compareInlineSize(item, component);
+        if (size !== undefined) {
+          if ('findingKey' in size) sink.findings.push(size);
+          else sink.skipped.push(size);
+        }
       }
     }
   }
@@ -184,6 +214,7 @@ export function check3d(
   sortLabels(matched.equipment);
   sortLabels(matched.lines);
   sortLabels(matched.inline);
+  sortLabels(matched.nozzles);
   return {
     findings: sink.findings.sort(compareFindings3d),
     skipped: sink.skipped.sort(

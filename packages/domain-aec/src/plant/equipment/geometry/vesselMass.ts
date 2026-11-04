@@ -55,9 +55,39 @@ function supportParts(template: VesselTemplate, geometry: VesselGeometry, cubic:
   return [];
 }
 
+/** Insulation layer on the shell (annulus) and on both heads (exact offset solid of the head, minus the head itself), one part each. */
+function insulationParts(
+  geometry: VesselGeometry,
+  design: VesselDesignData | undefined,
+  cubic: number,
+  names: readonly [string, string],
+): MassPart[] {
+  const insulation = design?.insulation;
+  if (insulation === undefined) return [];
+  const { radius, length, first, second, headThickness } = geometry;
+  const shellOuter = radius + geometry.shellThickness;
+  const kg = (volume: number): number => volume * cubic * insulation.densityKgM3;
+  const layer = (shape: typeof first): number =>
+    headMetalVolume(shape, radius, headThickness + insulation.thickness) - headMetalVolume(shape, radius, headThickness);
+  const method = 'exact offset layer (t + insulation minus t) x insulation density; supports are not insulated';
+  return [
+    {
+      part: 'insulation shell',
+      kg: kg(annulus(shellOuter + insulation.thickness, shellOuter) * length),
+      method: 'annulus x tangent length x insulation density',
+    },
+    { part: `insulation ${names[0]}`, kg: kg(layer(first)), method },
+    { part: `insulation ${names[1]}`, kg: kg(layer(second)), method },
+  ];
+}
+
+/** Internals the user gave as lumped masses. */
+const internalParts = (design: VesselDesignData | undefined): MassPart[] =>
+  (design?.internals ?? []).map((item) => ({ part: `internals: ${item.label}`, kg: item.kg, method: 'vendor mass (input)' }));
+
 /**
  * @param scale metres per document unit
- * @invariant empty = shell + both heads + skirt / ring / legs (saddle plates and nozzles are not included); test = empty + full inside volume
+ * @invariant empty = shell + both heads + skirt / ring / legs + insulation + internals (saddle plates and nozzles are not included); test = empty + full inside volume
  *   x 1000 kg/m3 (nozzle bores not subtracted); density default and operating-liquid absence are the caller's to report
  */
 export function vesselMass(
@@ -86,6 +116,8 @@ export function vesselMass(
       method: headMethod,
     },
     ...supportParts(template, geometry, cubic, density),
+    ...insulationParts(geometry, design, cubic, vertical ? ['headBottom', 'headTop'] : ['headLeft', 'headRight']),
+    ...internalParts(design),
   ];
   const emptyKg = parts.reduce((sum, part) => sum + part.kg, 0);
   const liquid = design?.operatingLiquid;

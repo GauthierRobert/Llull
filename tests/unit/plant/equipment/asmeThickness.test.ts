@@ -153,7 +153,7 @@ describe('VC-EQP-06: UG-32 heads', () => {
     expect(rel(required, (200 * 20.1) / (2 * 20000 - 0.2 * 200) + 0.1)).toBeLessThan(1e-12);
   });
 
-  it('an uncovered head is refused per part: conical, DIN 28011 (k/L 0.1) and a 3:1 ellipse -> EQP_HEAD_NOT_COVERED with the head path', () => {
+  it('an uncovered head is refused per part: conical, a 3:1 ellipse and a knuckle below 6 % of the skirt diameter (80-6) -> EQP_HEAD_NOT_COVERED with the head path', () => {
     const inputs = { P_psi: 100, S_psi: 20000 };
     const conical = { type: 'conical', halfAngleDeg: 45 };
     expectRefusal(
@@ -163,14 +163,15 @@ describe('VC-EQP-06: UG-32 heads', () => {
       'EQP_HEAD_NOT_COVERED',
       'heads.first',
     );
-    const din = { type: 'torispherical', standard: 'din_28011' };
-    expectRefusal(
-      inchVessel(inputs, { D_in: 40, heads: din }),
+    const shallow = { type: 'torispherical', crownRadius: 40, knuckleRadius: 2.2 };
+    const refused = expectRefusal(
+      inchVessel(inputs, { D_in: 40, head: 1, heads: shallow }),
       'vessel_thickness',
       { equipment: 'V-1' },
       'EQP_HEAD_NOT_COVERED',
       'heads.first',
     );
+    expect(refused.summary).toContain('6 % of the skirt outside diameter');
     const three = { type: 'ellipsoidal', ratio: 3 };
     expectRefusal(
       inchVessel(inputs, { D_in: 40, heads: three }),
@@ -179,6 +180,32 @@ describe('VC-EQP-06: UG-32 heads', () => {
       'EQP_HEAD_NOT_COVERED',
       'heads.first',
     );
+  });
+});
+
+describe('UG-32(e) general torispherical heads (knuckle factor M)', () => {
+  const kloepper = (P_psi: number, head = 1): CadDocument =>
+    inchVessel({ P_psi, S_psi: 20000 }, { D_in: 40, head, heads: { type: 'torispherical', standard: 'din_28011' } });
+
+  it('DIN 28011 (L = D = 40 in, r = 0.1 D = 4 in): M = (3 + sqrt(40 / 4)) / 4 = 1.5405694 and t = P L M / (2 S E - 0.2 P) = 0.1541339 in at 100 psi', () => {
+    const m = (3 + Math.sqrt(10)) / 4;
+    expect(m).toBeCloseTo(1.5405694, 7);
+    const expected = (100 * 40 * m) / (2 * 20000 - 0.2 * 100);
+    expect(expected).toBeCloseTo(0.1541339, 6);
+    const head = thickness(kloepper(100)).components.headTop as Component & { formula: string; inputs: Record<string, number> };
+    expect(rel(head.requiredThicknessMm / MM_PER_INCH, expected)).toBeLessThan(1e-12);
+    expect(head.formula).toContain('M = (3 + sqrt(L / r)) / 4');
+    expect(rel(head.inputs['M'] as number, m)).toBeLessThan(1e-12);
+  });
+
+  it('the MAWP round-trips the thickness (P = 2 S E t / (L M + 0.2 t)); the ASME F&D head keeps the printed 0.885 form', () => {
+    const m = (3 + Math.sqrt(10)) / 4;
+    const result = thickness(kloepper(100));
+    expect(rel((result.components.headTop as Component).mawpMPa, ((2 * 20000 * 1) / (40 * m + 0.2 * 1)) * 0.00689475729)).toBeLessThan(
+      1e-6,
+    );
+    const fd = inchVessel({ P_psi: 100, S_psi: 20000 }, { D_in: 40, head: 1, heads: { type: 'torispherical', standard: 'asme_fd' } });
+    expect((thickness(fd).components.headTop as Component).formula).toContain('0.885');
   });
 });
 

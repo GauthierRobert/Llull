@@ -25,11 +25,11 @@ export const equipmentWeights = defineCommand({
   description:
     'Query: empty, operating and hydrotest weights of a parametric vessel, exchanger, tank or pump (tag or id; exchangers: shell, channels, bonnets, tubesheets, tubes, both sides full ' +
     'at their specific gravity; tanks: courses, bottom, roof plate, liquid at the design level; pumps: the vendor weightKg, EQP_DESIGN_DATA_MISSING without it). Vessels:  body = shell annulus + both formed heads (exact solid between ' +
-    'the inside profile and its outward offset by the head thickness) + skirt / base ring / legs, at the metal density of design.materialDensityKgM3 ' +
+    'the inside profile and its outward offset by the head thickness) + skirt / base ring / legs + insulation + internals, at the metal density of design.materialDensityKgM3 ' +
     '(default 7850 kg/m3, listed in `defaulted`). operatingKg = empty + liquid volume of design.operatingLiquid x specific gravity x 1000 (null when no ' +
     'operating liquid is set, with a warning); testKg = empty + the full inside volume x 1000 kg/m3 of water. include: "body" (default) and/or ' +
     '"nozzles" (neck beyond the outside wall + weld-neck flange per nozzle, flange rows from the piping catalogue; placeholders are listed in ' +
-    '`defaulted`); saddle plates, trays, insulation and internals are not modelled. Returns body{emptyKg, operatingKg, testKg}, nozzles{kg} ' +
+    '`defaulted`); insulation (design.insulation: shell annulus + exact head layers) and internals (design.internals: vendor lumped masses) are part of every state; saddle plates and welds are not modelled. Returns body{emptyKg, operatingKg, testKg}, nozzles{kg} ' +
     '(when included), total{emptyKg, operatingKg, testKg} (body + requested parts), breakdown[{part, kg, method}], defaulted[], warnings[], ' +
     'unverified. Refusals: EQP_NOT_FOUND, EQP_NOT_PARAMETRIC, EQP_HEAD_INVALID. Does not modify the document.',
   annotations: { readOnly: true, idempotent: true },
@@ -100,7 +100,7 @@ export const equipmentWeights = defineCommand({
       defaulted,
       warnings,
       unverified,
-      notIncluded: ['saddle plates', 'trays and other internals', 'insulation', 'lifting lugs, platform clips'],
+      notIncluded: ['saddle plates', 'internals not listed in design.internals', 'lifting lugs, platform clips'],
     };
     return report(
       doc,

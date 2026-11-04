@@ -2,7 +2,9 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { PID_CONVENTIONS } from '../model';
+import { getPid } from '../state';
 import { allSymbols } from '../symbols/library';
+import { withProjectSymbol } from '../symbols/projectSymbol';
 
 const FAMILIES = ['equipment', 'piping', 'instrument', 'actuator', 'connector', 'annotation'] as const;
 
@@ -15,9 +17,9 @@ export const listPidSymbols = defineCommand({
   name: 'list_pid_symbols',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'List the built-in P&ID symbols that export_pid_svg draws (read-only): equipment classes (Tank, CentrifugalPump, PlateHeatExchanger ...), piping components (BallValve, PipeTee, PipeReducer ...), ' +
+    'List the P&ID symbols that export_pid_svg draws (read-only): the built-in library with the project symbols of define_pid_symbol in place of their classes: equipment classes (Tank, CentrifugalPump, PlateHeatExchanger ...), piping components (BallValve, PipeTee, PipeReducer ...), ' +
     'off-page connectors, instrument bubbles (location x display), actuators and the flow arrow. add_pid_equipment / add_pid_inline accept exactly the equipment and piping classes listed here. ' +
-    'Returns data = { rows: [{ class, name, family, convention, source: "builtin", halfWidth, halfHeight, ports: [[x, y], ...], shapes (number of drawing shapes) }] , count }; sizes and ports are in sheet millimetres in the symbol frame (+y up, origin at the centre). ' +
+    'Returns data = { rows: [{ class, name, family, convention, source: "builtin" or "project" (define_pid_symbol), halfWidth, halfHeight, ports: [[x, y], ...], shapes (number of drawing shapes) }] , count }; sizes and ports are in sheet millimetres in the symbol frame (+y up, origin at the centre). ' +
     'ISA-5.1 draws equipment as outlines with the class initial, ISO-10628-2 adds the internals; components, bubbles and actuators are the same in both. Refusals: none.',
   params: z.object({
     convention: z.enum(PID_CONVENTIONS).optional().describe('Only the symbols of this convention. Default: both.'),
@@ -26,19 +28,25 @@ export const listPidSymbols = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const wanted = params.class?.toLowerCase();
+    const pid = getPid(doc);
     const rows = allSymbols()
+      .map(({ convention, symbol }) => ({
+        convention,
+        symbol: withProjectSymbol(pid, symbol, convention),
+        project: withProjectSymbol(pid, symbol, convention) !== symbol,
+      }))
       .filter(
         ({ convention, symbol }) =>
           (params.convention === undefined || convention === params.convention) &&
           (wanted === undefined || symbol.class.toLowerCase() === wanted) &&
           (params.family === undefined || symbol.family === params.family),
       )
-      .map(({ convention, symbol }) => ({
+      .map(({ convention, symbol, project }) => ({
         class: symbol.class,
         name: symbol.name,
         family: symbol.family,
         convention,
-        source: 'builtin',
+        source: project ? 'project' : 'builtin',
         halfWidth: symbol.halfWidth,
         halfHeight: symbol.halfHeight,
         ports: symbol.ports,

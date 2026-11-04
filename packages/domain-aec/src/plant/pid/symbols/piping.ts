@@ -7,7 +7,9 @@ import { circle, ellipse, line, poly, rect, text, type PidSymbol, type Shape } f
 /** Half length of an inline symbol along the flow axis (the ports sit at +/- this, `add_pid_inline`). */
 export const INLINE_HALF = 5;
 const H = INLINE_HALF;
-const W = 3.2;
+/** Half height of an inline symbol across the flow axis, mm. */
+export const INLINE_HALF_HEIGHT = 3.2;
+const W = INLINE_HALF_HEIGHT;
 
 const bowTie: Shape[] = [
   poly([

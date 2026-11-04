@@ -5,6 +5,7 @@
  */
 
 import type { Vec2 } from '@core/model/vectors';
+import type { Shape } from './symbols/shapes';
 
 export const PID_CONVENTIONS = ['ISA-5.1', 'ISO-10628-2'] as const;
 export type PidConvention = (typeof PID_CONVENTIONS)[number];
@@ -27,6 +28,15 @@ export type PidItemKind = (typeof PID_ITEM_KINDS)[number];
 export const PID_PAPERS = ['A0', 'A1', 'A2', 'A3', 'A4'] as const;
 export const PID_SHEET_STATUSES = ['draft', 'issued_for_review', 'issued_for_hazop', 'issued_for_construction'] as const;
 
+/** The human stamp of an issued sheet: signer, time, the signature id and the payload hash that was signed, and the hash of the sheet content at that moment. */
+export interface PidSheetIssue {
+  readonly signer: string;
+  readonly at: string;
+  readonly signatureId?: string;
+  readonly payloadSha256?: string;
+  readonly contentSha256?: string;
+}
+
 export interface PidSheet {
   readonly id: string;
   /** Unique, e.g. `PID-001`. */
@@ -36,7 +46,7 @@ export interface PidSheet {
   readonly revision: string;
   readonly status: (typeof PID_SHEET_STATUSES)[number];
   /** Set only by a human-gated issue (AF-34). */
-  readonly issuedBy?: { readonly signer: string; readonly at: string };
+  readonly issuedBy?: PidSheetIssue;
 }
 
 /** An attribute value; `defaulted` / `unverified` flag a value that was not given by the user or not confirmed (AF-31, AF-32). */
@@ -200,6 +210,20 @@ export interface PidAcceptance {
   readonly reason: string;
   readonly by: string;
   readonly at: string;
+  /** Rule code and severity of the finding when it was accepted. */
+  readonly code?: string;
+  readonly severity?: 'error' | 'warning' | 'info';
+  /** Only for a human-signed acceptance (an error-severity finding): the signature id and the payload hash that was signed. */
+  readonly signatureId?: string;
+  readonly payloadSha256?: string;
+}
+
+/** A project's own graphics for a library class (`define_pid_symbol`): shapes fitted into the box of the built-in class, for the conventions named. */
+export interface PidProjectSymbol {
+  readonly class: string;
+  readonly name: string;
+  readonly conventions: readonly PidConvention[];
+  readonly shapes: readonly Shape[];
 }
 
 export interface PidTagFormat {
@@ -220,6 +244,8 @@ export interface PidModel {
   readonly sheetOrder: readonly string[];
   readonly items: Readonly<Record<string, PidItem>>;
   readonly itemOrder: readonly string[];
+  /** Library class -> the project's symbol for it (`define_pid_symbol`). */
+  readonly symbols?: Readonly<Record<string, PidProjectSymbol>>;
   /** findingKey -> acceptance. */
   readonly acceptances?: Readonly<Record<string, PidAcceptance>>;
   readonly imports?: readonly PidImportRecord[];

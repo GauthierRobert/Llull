@@ -56,7 +56,17 @@ export function runChecks(
   for (const runner of RUNNERS)
     if (runner.codes.some((code) => wanted.has(code))) found.push(...runner.run(ctx, options.sheetId).filter((f) => wanted.has(f.code)));
   const acceptances = pid.acceptances ?? {};
-  const visible = options.includeAccepted ? found : found.filter((f) => !Object.hasOwn(acceptances, f.findingKey));
+  /** An acceptance hides a finding only when it still describes it: same severity, and a signature for an error (a record without one is not proof). */
+  const accepted = (f: Finding): boolean => {
+    if (!Object.hasOwn(acceptances, f.findingKey)) return false;
+    const record = acceptances[f.findingKey];
+    return (
+      record !== undefined &&
+      (record.severity === undefined || record.severity === f.severity) &&
+      (f.severity !== 'error' || record.signatureId !== undefined)
+    );
+  };
+  const visible = options.includeAccepted ? found : found.filter((f) => !accepted(f));
   return {
     findings: visible.sort(compareFindings),
     rulesRun: PID_RULES.filter((code) => wanted.has(code)),

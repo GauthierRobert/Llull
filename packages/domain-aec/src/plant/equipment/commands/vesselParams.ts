@@ -109,6 +109,34 @@ export const designInputSchema = z
       })
       .optional()
       .describe('Operating liquid, added to the operating weight and reported by vessel_volume.'),
+    insulation: z
+      .object({
+        thickness: z.number().positive().describe('Insulation thickness on the shell and the heads, document units.'),
+        densityKgM3: z.number().positive().describe('Insulation density, kg/m3 (never defaulted: it is a product property).'),
+      })
+      .optional()
+      .describe(
+        'Insulation layer around the shell and heads; its mass joins the empty, operating and test weights and the centre of gravity.',
+      ),
+    internals: z
+      .array(
+        z.object({
+          label: z.string().min(1).describe('What it is, e.g. "trays 1-20".'),
+          kg: z.number().positive().describe('Mass of the item (or group), kg, from the vendor.'),
+          position: z
+            .number()
+            .min(0)
+            .optional()
+            .describe(
+              'Distance of its centre along the axis from the bottom tangent line (vertical) or the left tangent line (horizontal). Omitted: the middle of the shell (reported in defaulted).',
+            ),
+        }),
+      )
+      .max(200)
+      .optional()
+      .describe(
+        'Internals as lumped masses (trays, packing, demister ...); their mass joins every weight state and the centre of gravity.',
+      ),
   })
   .describe('Design data of the vessel (pressure, temperature, material, allowables, efficiencies, operating liquid).');
 

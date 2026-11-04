@@ -82,7 +82,13 @@ describe('VC-EQP-16: the error table of the specification', () => {
         'size',
       ],
       ['EQP_PUMP_SIZE_UNKNOWN', mmDocument(), 'add_pump', { tag: 'P-1', location: [0, 0], standard: 'asme_b73_1' }, 'size'],
-      ['EQP_NOT_PARAMETRIC', pumpDocument(), 'update_equipment_parameters', { equipment: 'P-101', set: { name: 'x' } }, 'equipment'],
+      [
+        'EQP_PARAM_INVALID',
+        pumpDocument(),
+        'update_equipment_parameters',
+        { equipment: 'P-101', set: { shellThickness: 5 } },
+        'set.shellThickness',
+      ],
       ['EQP_DESIGN_DATA_MISSING', unsized, 'equipment_weights', { equipment: 'P-1' }, 'weightKg'],
     ];
     for (const [code, doc, command, params, at] of refusals) {

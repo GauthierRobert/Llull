@@ -28,6 +28,21 @@ describe('fillHostParams', () => {
     ).toEqual({ deliverable: 'mto', revision: 'A', status: 'in_work', at: FILLED.at });
   });
 
+  it('stamps the time of accept_pid_finding and issue_pid_sheet (P&ID human gates), overriding a caller-supplied one', () => {
+    expect(fillHostParams('accept_pid_finding', { findingKey: 'k', reason: 'r', at: '2001-01-01T00:00:00Z' }, host)).toEqual({
+      findingKey: 'k',
+      reason: 'r',
+      at: FILLED.at,
+      by: FILLED.by, // the host user names who accepts a warning when the caller gave no `by`
+    });
+    expect(fillHostParams('issue_pid_sheet', { sheet: 'PID-001', status: 'issued_for_review', revision: 'A' }, host)).toEqual({
+      sheet: 'PID-001',
+      status: 'issued_for_review',
+      revision: 'A',
+      at: FILLED.at,
+    });
+  });
+
   it('leaves other commands, unknown names and commands without at/by alone', () => {
     expect(fillHostParams('add_box', { size: [1, 1, 1] }, host)).toEqual({ size: [1, 1, 1] });
     expect(fillHostParams('add_door', { wallId: 'w' }, host)).toEqual({ wallId: 'w' });

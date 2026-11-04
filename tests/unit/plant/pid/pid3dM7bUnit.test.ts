@@ -48,7 +48,15 @@ const runOf = (tags: readonly string[]): Run => ({
   specs: [],
   from: undefined,
   to: undefined,
-  sequence: tags.map((tag, k) => ({ ids: [`c${k}`], label: tag, componentId: `c${k}`, type: 'valveGate', runId: 'r1', lineId: 'ln' })),
+  sequence: tags.map((tag, k) => ({
+    ids: [`c${k}`],
+    label: tag,
+    componentId: `c${k}`,
+    type: 'valveGate',
+    runId: 'r1',
+    lineId: 'ln',
+    dn: undefined,
+  })),
 });
 
 describe('longestCommonSubsequence and its bound', () => {

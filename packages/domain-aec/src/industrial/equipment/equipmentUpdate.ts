@@ -10,7 +10,7 @@ import { SHAPE_PARAM_TEXT, describeEquipmentShape, equipmentShapeSchema, normali
 /**
  * @affects regenerates 1 equipment (same element id, mark kept unless renamed)
  * @invariant element id, GlobalId seed and schedule row identity survive the edit
- * @failure unknown element / tag, not equipment, parametric plant vessel (use update_equipment_parameters), ambiguous tag, duplicate mark, invalid values, unknown level -> no-op
+ * @failure unknown element / tag, not equipment, parametric plant equipment (vessel, exchanger, tank, pump: use update_equipment_parameters), ambiguous tag, duplicate mark, invalid values, unknown level -> no-op
  */
 export const updateEquipment = defineCommand({
   name: 'update_equipment',
@@ -64,8 +64,8 @@ export const updateEquipment = defineCommand({
         doc,
         'update_equipment',
         'EQP_NOT_PARAMETRIC',
-        `${equipment.mark} is parametric ${equipment.plant.template.kind} equipment: its size, shape and weight are derived, so update_equipment does not edit it (vessels: update_equipment_parameters; other parametric equipment: recreate it)`,
-        'update_equipment edits plain blocks; revise a parametric vessel with update_equipment_parameters, recreate other parametric equipment.',
+        `${equipment.mark} is parametric ${equipment.plant.template.kind} equipment: its size, shape and weight are derived, so update_equipment does not edit it (revise it with update_equipment_parameters)`,
+        'update_equipment edits plain blocks; revise parametric equipment (vessel, exchanger, tank, pump) with update_equipment_parameters.',
         [equipment.id],
         ['elementId'],
       );

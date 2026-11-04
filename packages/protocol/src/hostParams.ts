@@ -21,6 +21,8 @@ const HOST_STAMPED: ReadonlySet<string> = new Set([
   'approve_pipe_stress',
   'set_deliverable_status',
   'issue_isometric',
+  'accept_pid_finding',
+  'issue_pid_sheet',
 ]);
 
 /** ISO-8601 UTC without milliseconds, e.g. 2026-11-02T09:30:00Z. */

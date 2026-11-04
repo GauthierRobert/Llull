@@ -289,9 +289,8 @@ describe('pump weights and checks', () => {
     expect(report.checked[0]?.notChecked.join(' ')).toContain('NPSH');
   });
 
-  it('update_equipment_parameters refuses a pump; the plant record survives a save / load round trip', async () => {
+  it('the plant record survives a save / load round trip', async () => {
     const doc = pumpDocument();
-    expectRefusal(doc, 'update_equipment_parameters', { equipment: 'P-101', set: { name: 'x' } }, 'EQP_NOT_PARAMETRIC', 'equipment');
     const { deserializeDocument, serializeDocument } = await import('@core/commands/persistence/serialization');
     const loaded = deserializeDocument(serializeDocument(doc));
     expect(equipmentOf(loaded).plant).toEqual(equipmentOf(doc).plant);

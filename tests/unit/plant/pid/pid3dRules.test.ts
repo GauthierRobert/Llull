@@ -76,7 +76,7 @@ describe('consistent models', () => {
     const answer = check(build([]));
     expect(answer.status).toBe('pass');
     expect(answer.items).toEqual([]);
-    expect(answer.matched).toEqual({ equipment: ['P-101', 'T-101'], lines: [DISCHARGE, SUCTION], inline: [] });
+    expect(answer.matched).toEqual({ equipment: ['P-101', 'T-101'], lines: [DISCHARGE, SUCTION], inline: [], nozzles: [] });
     expect(answer.unmatchedPid).toEqual([]);
     expect(Object.values(answer.countsByCode).every((n) => n === 0)).toBe(true);
   });
