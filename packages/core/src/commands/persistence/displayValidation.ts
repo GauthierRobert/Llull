@@ -32,12 +32,17 @@ const isScheme = (value: unknown): boolean =>
     isRecord(value['names']) &&
     Object.values(value['names']).every((name) => typeof name === 'string'));
 
+const isMarker = (value: unknown): boolean =>
+  value === undefined ||
+  (isRecord(value) && typeof value['letters'] === 'string' && (value['letterHex'] === undefined || typeof value['letterHex'] === 'string'));
+
 const isRule = (rule: unknown): boolean => {
   if (!isRecord(rule) || typeof rule['id'] !== 'string' || typeof rule['legend'] !== 'string') return false;
   const appearance = rule['appearance'];
   return (
     isPredicateShape(rule['when']) &&
     isScheme(rule['scheme']) &&
+    isMarker(rule['marker']) &&
     isRecord(appearance) &&
     typeof appearance['colour'] === 'string' &&
     (appearance['transparency'] === undefined || typeof appearance['transparency'] === 'number') &&
@@ -54,7 +59,7 @@ function profileProblem(id: string, value: unknown): string | null {
   if (typeof value['defaultColour'] !== 'string') return `${where}: defaultColour must be a string`;
   const rules = value['rules'];
   if (!Array.isArray(rules) || !rules.every(isRule))
-    return `${where}: rules must be { id, legend, when (predicate), appearance { colour, transparency?, hidden? }, scheme? }`;
+    return `${where}: rules must be { id, legend, when (predicate), appearance { colour, transparency?, hidden? }, scheme?, marker? { letters, letterHex? } }`;
   const problem = profileProblems(value as unknown as ColourProfile)[0];
   return problem === undefined ? null : `${where}: ${problem.path}: ${problem.message}`;
 }

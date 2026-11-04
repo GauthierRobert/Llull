@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report, tableRejection } from '@core/commands/noop';
 import { storeProfile } from '@core/geometry/colourRules';
-import { createDisplayModel, type ColourProfile, type ColourRule } from '@core/model/display';
+import { createDisplayModel, type ColourProfile, type ColourRule, type RuleMarker } from '@core/model/display';
 import { PALETTE_ID, paletteHex } from './palette';
 import { SCHEME_IDS, SCHEME_STANDARDS, findRow, legendOf, rowsOf, type SchemeId, type SchemeRow } from './serviceSchemes';
 
@@ -25,6 +25,12 @@ const isSchemeId = (value: string): value is SchemeId => (SCHEME_IDS as readonly
 const NO_PALETTE_COLOUR = '#808080';
 
 const displayHex = (row: SchemeRow): string => paletteHex(row.names['fieldColour'] ?? row.names['mainColour'] ?? '') ?? NO_PALETTE_COLOUR;
+
+/** Marker of a rule: the service in capitals and the row's letter colour (ASME A13.1); ISO 14726 names none. */
+const markerOf = (service: string, row: SchemeRow): RuleMarker => {
+  const letterHex = paletteHex(row.names['letterColour'] ?? '');
+  return { letters: service.toUpperCase(), ...(letterHex === undefined ? {} : { letterHex }) };
+};
 
 /** @affects nothing — read-only; data.schemes [{ scheme, standard, palette, approximate, rows[] }] */
 export const listServiceColourSchemes = defineCommand({
@@ -67,7 +73,7 @@ export const applyServiceColourScheme = defineCommand({
     '(e.g. "cooling water") to a category of the scheme (e.g. "water"; ISO: the medium, e.g. "sea water"; see list_service_colour_schemes). YOU decide the mapping: llull never guesses a hazard class from text. ' +
     'One rule per mapped service, in map order, first match wins; the pipe is tinted with the row field / main colour from the default palette (approximate display hex). ' +
     'data { profileId, mapped, unmapped[] (services in the model absent from the map: they keep their own colour), reviewRequired: true }. The profile is flagged reviewRequired: ' +
-    'a qualified reviewer must approve the mapping before the colours are used on a deliverable. Follow with colour_by_rule_report and check_display. Re-running with the same profileId replaces it. ' +
+    'a qualified reviewer must approve the mapping before the colours are used on a deliverable. markerLetters: true adds the marker letters (service in capitals) and letter colour to each rule for pipe_markers. Follow with colour_by_rule_report and check_display. Re-running with the same profileId replaces it. ' +
     'Errors: VIS_SCHEME_UNKNOWN, VIS_SCHEME_CATEGORY_UNKNOWN. Does not change geometry or add a feature step.',
   annotations: { metaHistory: true },
   params: z.object({
@@ -80,8 +86,14 @@ export const applyServiceColourScheme = defineCommand({
       ),
     property: z.string().optional().describe('Entity property holding the service text. Default "service".'),
     activate: z.boolean().optional().describe('true: also make the profile the active display profile.'),
+    markerLetters: z
+      .boolean()
+      .optional()
+      .describe(
+        'true: each rule also carries the marker legend text (the service in capitals, e.g. "COOLING WATER") and the letter colour hex (scheme letterColour, default palette), read by pipe_markers for the viewport markers. Default false.',
+      ),
   }),
-  run: (doc, { scheme, profileId, serviceMap, property = 'service', activate }, ctx): CommandResult => {
+  run: (doc, { scheme, profileId, serviceMap, property = 'service', activate, markerLetters }, ctx): CommandResult => {
     const fail = (code: string, message: string, ids: string[] = [], paths: string[] = []): CommandResult =>
       reject(doc, 'apply_service_colour_scheme', code, message, ids, paths);
     if (!isSchemeId(scheme)) return fail('VIS_SCHEME_UNKNOWN', `no scheme '${scheme}'`, [], ['scheme']);
@@ -111,6 +123,7 @@ export const applyServiceColourScheme = defineCommand({
               appearance: { colour: displayHex(row) },
               legend: `${service}: ${legendOf(row)}`,
               scheme: { id: scheme, rowId: row.id, category: row.category, names: row.names },
+              ...(markerLetters === true ? { marker: markerOf(service, row) } : {}),
             },
           ],
     );

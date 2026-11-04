@@ -3,7 +3,14 @@
  * selects. Pure; no document access, no geometry.
  */
 
-import type { ColourProfile, ColourRule, DisplayModel, PropertyValue, RulePredicate } from '../model/display';
+import {
+  MAX_MARKER_LETTERS,
+  type ColourProfile,
+  type ColourRule,
+  type DisplayModel,
+  type PropertyValue,
+  type RulePredicate,
+} from '../model/display';
 import type { PropertyBag } from '../model/entityProperties';
 import { isHexColor } from '../lib/isHexColor';
 import { isReservedKey } from '../lib/reservedKey';
@@ -96,6 +103,19 @@ function ruleProblems(rule: ColourRule, index: number): ProfileProblem[] {
       code: 'VIS_RULE_INVALID',
       path: `${path}.appearance.transparency`,
       message: `rule '${rule.id}': transparency must be in [0, 1]`,
+    });
+  const marker = rule.marker;
+  if (marker !== undefined && (marker.letters.length === 0 || marker.letters.length > MAX_MARKER_LETTERS))
+    problems.push({
+      code: 'VIS_RULE_INVALID',
+      path: `${path}.marker.letters`,
+      message: `rule '${rule.id}': marker letters must be 1..${MAX_MARKER_LETTERS} characters`,
+    });
+  if (marker?.letterHex !== undefined && !isHexColor(marker.letterHex))
+    problems.push({
+      code: 'VIS_COLOUR_INVALID',
+      path: `${path}.marker.letterHex`,
+      message: `rule '${rule.id}': '${marker.letterHex}' is not #rrggbb`,
     });
   return problems;
 }

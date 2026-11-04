@@ -38,6 +38,16 @@ interface RuleScheme {
   readonly names: Readonly<Record<string, string>>;
 }
 
+/** Marker legend of a rule (pipe markers, plant 09 VIS-M7): the text drawn on the marker and its colour. */
+export interface RuleMarker {
+  /** 1..MAX_MARKER_LETTERS characters. */
+  readonly letters: string;
+  /** `#rrggbb` of the letters; absent when the scheme names no letter colour. */
+  readonly letterHex?: string;
+}
+
+export const MAX_MARKER_LETTERS = 80;
+
 export interface ColourRule {
   /** Unique within the profile. */
   readonly id: string;
@@ -45,6 +55,7 @@ export interface ColourRule {
   readonly appearance: RuleAppearance;
   readonly legend: string;
   readonly scheme?: RuleScheme;
+  readonly marker?: RuleMarker;
 }
 
 export interface ColourProfile {
