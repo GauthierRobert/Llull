@@ -13,6 +13,7 @@ import type { IsolatedKernel } from '../src/isolatedKernel';
 interface Face {
   readonly name?: string;
   readonly surface: string;
+  readonly axis?: { readonly span?: readonly [number, number] };
 }
 interface Row {
   readonly kind: string;

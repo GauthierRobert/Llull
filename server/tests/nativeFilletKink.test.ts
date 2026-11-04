@@ -63,13 +63,13 @@ describeNative('two circular fillet steps: a second blend larger than the round 
           [edge.start, edge.end].every((p) => Math.abs((p[1] as number) - 0) < 1e-9 && Math.abs((p[2] as number) - 20) < 1e-9),
       )?.index ?? -1;
     expect(top).toBeGreaterThanOrEqual(0);
-    const built = kernel.evaluate({ ...(recipe as object), edges: [top] } as Parameters<typeof kernel.evaluate>[0]);
+    const built = kernel.evaluate({ ...(recipe as object), edges: [top] } as never as Parameters<typeof kernel.evaluate>[0]);
     expect(built).not.toBeNull();
     const shape = built as NonNullable<typeof built>;
     const query = kernel.faceQuery as NonNullable<typeof kernel.faceQuery>;
     const graph = query.faceGraph(shape) as NonNullable<ReturnType<typeof query.faceGraph>>;
     const names = kernel.topology(shape)?.faces.map((face) => face.name) ?? [];
-    const spline = names.findIndex((name) => name.startsWith('blend(e(blend('));
+    const spline = names.findIndex((name) => name?.startsWith('blend(e(blend('));
     expect(spline).toBeGreaterThanOrEqual(0);
     const kinked = graph.edgeFaces.findIndex(
       (faces, edge) =>

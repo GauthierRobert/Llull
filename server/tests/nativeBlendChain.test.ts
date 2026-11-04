@@ -62,7 +62,7 @@ describeNative('fillet_faces: one size law over a tangent chain of edges (native
   };
 
   /** Arc length from the end `from` of the chain (the far end of the line along y = cy, or of the line along x = cx) to a point of the chain; the chain is symmetric about the corner. */
-  const arcLength = (point: number[], cx: number, cy: number, fromX: boolean): number => {
+  const arcLength = (point: readonly number[], cx: number, cy: number, fromX: boolean): number => {
     const [sx, sy] = [cx === 0 ? 1 : -1, cy === 0 ? 1 : -1];
     const alongX = Math.abs((point[1] as number) - cy) < 1e-6 && (point[0] as number) * sx >= cx * sx + 4 - 1e-6;
     const alongY = Math.abs((point[0] as number) - cx) < 1e-6 && (point[1] as number) * sy >= cy * sy + 4 - 1e-6;
@@ -98,7 +98,7 @@ describeNative('fillet_faces: one size law over a tangent chain of edges (native
       // the end curves of the blend on the far walls are not contact lines of the chain
       if (!onWall || !isNewBlend || names.some((name) => far.some((tag) => name.endsWith(':' + tag)))) return;
       for (const sample of query.edgeSamples(shape, index, 9) ?? []) {
-        const p = sample.point as number[];
+        const p: readonly number[] = sample.point;
         if ((p[2] as number) > 9.999) continue;
         out.push([arcLength(p, cx, cy, fromX), 10 - (p[2] as number)]);
       }
@@ -290,7 +290,7 @@ describeNative('fillet_faces: one size law over a tangent chain of edges (native
       axis: 'x' | 'y' | 'arc',
     ): { size: number; sizeEnd: number; interpolation: string; axis: string } => {
       // the law of the chain from (20, 0) at the own start and own end of the edge
-      const sOf = (p: number[]): number => arcLength(p, 0, 0, true);
+      const sOf = (p: readonly number[]): number => arcLength(p, 0, 0, true);
       const value = (p: number[]): number => 1 + (2 * sOf(p)) / S;
       return { size: value(edge.start), sizeEnd: value(edge.end), interpolation: 'linear', axis };
     };
