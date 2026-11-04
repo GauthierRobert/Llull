@@ -66,7 +66,7 @@ export const setTagFormat = defineCommand({
                 .map((change) => `${change.from} -> ${change.to}`)
                 .join(', ')}${retagged.changes.length > 5 ? ', ...' : ''})`
         }.`,
-        [cls.name, ...retagged.changes.map((change) => change.id)],
+        [cls.name, ...new Set([...retagged.changes.map((change) => change.id), ...retagged.rewritten])],
       ),
       data: { className: cls.name, tagFormat, changedTags: retagged.changes, divergent: 0 },
     };

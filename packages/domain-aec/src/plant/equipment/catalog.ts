@@ -13,6 +13,7 @@ import { equipmentPortsQuery } from './commands/equipmentPortsQuery';
 import { addNozzle, deleteNozzle, updateNozzle } from './commands/nozzles';
 import { tankShellThickness } from './commands/tankShellThickness';
 import { updateEquipmentParameters } from './commands/updateEquipmentParameters';
+import { renameElementTag } from './commands/renameElementTag';
 import { renameEquipmentTag } from './commands/renameEquipmentTag';
 import { vesselThickness } from './commands/vesselThickness';
 import { vesselVolume } from './commands/vesselVolume';
@@ -29,6 +30,7 @@ export const equipmentCatalog = commandCatalog(
   equipmentPortsQuery,
   updateEquipmentParameters,
   renameEquipmentTag,
+  renameElementTag,
   vesselVolume,
   vesselThickness,
   tankShellThickness,
