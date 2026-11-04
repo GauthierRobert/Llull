@@ -39,6 +39,9 @@ function powInt(base: number, exponent: number): number {
   return result;
 }
 
+/** Highlight tint of one channel: white for a dielectric (metalness 0), the albedo for a metal (metalness 1). */
+const tint = (metalness: number, albedo: number): number => 1 - metalness + (metalness * albedo) / 255;
+
 /**
  * Blinn-Phong highlight of a face for a material class (spec 5.6): k_s (n.h)^s with k_s = 0.04 + 0.5 * metalness and
  * s = round(2 / roughness^2 - 2) clamped to [1, 256]. Square root and basic arithmetic only, so the number is identical on every platform.
@@ -191,8 +194,7 @@ export function prepareRasterScene(
       const spec = highlight(facing, [-view[0], -view[1], -view[2]], polygon.shading);
       const metal = unit(polygon.shading.metalness);
       const albedo = [r, g, b];
-      for (let k = 0; k < 3; k += 1)
-        colour[k] = Math.min(255, (colour[k] ?? 0) + 255 * spec * (1 - metal + (metal * (albedo[k] ?? 0)) / 255));
+      for (let k = 0; k < 3; k += 1) colour[k] = Math.min(255, (colour[k] ?? 0) + 255 * spec * tint(metal, albedo[k] ?? 0));
     }
     addFill([projection.loop(polygon.verts)], colour, facing, owner, 0);
   }

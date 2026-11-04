@@ -13,7 +13,7 @@ import { apply } from '../../helpers/commandAssertions';
 import { expectPure } from '../../helpers/expectNoOp';
 
 const topCamera: Camera = { position: [0, 0, 10], target: [0, 0, 0], up: [0, 1, 0] };
-const face = (shading?: SurfaceShading, normal: [number, number, number] = [0, 0, 1]): Polygon3D => ({
+const face = (shading?: SurfaceShading, normal: readonly number[] = [0, 0, 1]): Polygon3D => ({
   verts: [
     [-1, -1, 0],
     [1, -1, 0],
@@ -21,7 +21,7 @@ const face = (shading?: SurfaceShading, normal: [number, number, number] = [0, 0
     [-1, 1, 0],
   ],
   color: '#406080',
-  normal,
+  normal: normal as [number, number, number],
   stroke: false,
   depth: 0,
   ...(shading === undefined ? {} : { shading }),
@@ -155,5 +155,64 @@ describe('render_view with material classes', () => {
   it('is deterministic and leaves a document without any class unchanged by the default rule', () => {
     expect(image(twoBoxes()).svgSha256).toBe(image(twoBoxes()).svgSha256);
     expect(image(twoBoxes(), withDefaults({})).svgSha256).toBe(image(twoBoxes()).svgSha256);
+  });
+});
+
+describe('prepareRasterScene highlight values', () => {
+  const light = ((): [number, number, number] => {
+    const length = Math.hypot(0.6, -0.8, 1);
+    return [0.6 / length, -0.8 / length, 1 / length];
+  })();
+  const albedo = [0x40, 0x60, 0x80];
+  const half = ((): [number, number, number] => {
+    const sum: [number, number, number] = [light[0], light[1], light[2] + 1];
+    const length = Math.sqrt(sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2]);
+    return [sum[0] / length, sum[1] / length, sum[2] / length];
+  })();
+  const lambert = (normal: readonly [number, number, number]): number[] => {
+    const diffuse = Math.max(0, normal[0] * light[0] + normal[1] * light[1] + normal[2] * light[2]);
+    return albedo.map((c) => c * (0.35 + 0.65 * diffuse));
+  };
+
+  it('a face whose normal is the half vector gets colour + 255 * k_s (white for a dielectric)', () => {
+    const colour = faceColour(face({ metalness: 0, roughness: 1 }, half));
+    lambert(half).forEach((base, k) => expect(colour[k]).toBeCloseTo(Math.min(255, base + 255 * 0.04), 9));
+  });
+
+  it('a metal tints the highlight by the albedo: k_s = 0.54 times the channel', () => {
+    const colour = faceColour(face({ metalness: 1, roughness: 1 }, half));
+    lambert(half).forEach((base, k) => expect(colour[k]).toBeCloseTo(Math.min(255, base + 255 * 0.54 * ((albedo[k] ?? 0) / 255)), 9));
+  });
+
+  it('clamps the sum at 255', () => {
+    const bright: Polygon3D = { ...face({ metalness: 1, roughness: 1 }, half), color: '#ffffff' };
+    for (const channel of faceColour(bright)) expect(channel).toBeLessThanOrEqual(255);
+    expect(faceColour(bright)[0]).toBe(255);
+  });
+
+  it('a rough class off the half vector stays at the Lambert colour', () => {
+    const colour = faceColour(face({ metalness: 0, roughness: 0.1 }));
+    lambert([0, 0, 1]).forEach((base, k) => expect(colour[k]).toBeCloseTo(base, 5));
+  });
+
+  it('in perspective two faces with the same normal get different view vectors, in orthographic the same colour', () => {
+    const at = (x: number): Polygon3D => ({
+      ...face({ metalness: 0, roughness: 1 }),
+      verts: [
+        [x - 1, -1, 0],
+        [x + 1, -1, 0],
+        [x + 1, 1, 0],
+        [x - 1, 1, 0],
+      ],
+    });
+    const colours = (camera: Camera): number[][] => {
+      const scene = prepareRasterScene([at(-6), at(6)], camera, 8, 40, 40, 8);
+      const faces = Array.from(scene?.faces ?? []);
+      return [faces.slice(0, 3), faces.slice(8, 11)];
+    };
+    const [left, right] = colours({ ...topCamera, fovDeg: 60 });
+    expect(left?.[0]).not.toBeCloseTo(right?.[0] ?? 0, 3);
+    const [orthoLeft, orthoRight] = colours(topCamera);
+    expect(orthoLeft).toEqual(orthoRight);
   });
 });

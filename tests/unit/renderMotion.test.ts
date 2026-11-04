@@ -5,6 +5,8 @@ import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { documentAtPose, eulerDegOf, matFromQuaternion } from '@core/geometry/bodyPose';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { sliderCrank } from './sliderCrankFixture';
+import { defaultContext } from '@core/commands/context';
+import type { ExecutionContext } from '@core/commands/types';
 
 beforeAll(async () => setPhysicsEngine(await createMujocoPhysics()));
 afterAll(() => setPhysicsEngine(null));
@@ -132,5 +134,23 @@ describe('bodyPose', () => {
     expect(documentAtPose(doc, { ghost: { start: [0, 0, 0], position: [1, 1, 1], orientation: [1, 0, 0, 0] } }).entities).toEqual(
       doc.entities,
     );
+  });
+});
+
+describe('render_motion material class shading (VIS-M8h)', () => {
+  beforeAll(async () => setPhysicsEngine(await createMujocoPhysics()));
+  it('draws the highlight of a class default on every frame, like render_view', () => {
+    const doc = pendulum();
+    const params = { frames: 2, duration: 0.2, view: 'front', width: 120, height: 100 };
+    const ctx = (table: boolean): ExecutionContext => ({
+      ...defaultContext(),
+      properties: () => (table ? { defaultMaterialClass: 'concrete' } : {}),
+    });
+    const first = execute(doc, 'render_motion', params, ctx(false));
+    expect(first.summary).toMatch(/^render_motion: 2/);
+    const plain = (first.data as Frames).svg;
+    const shaded = (execute(doc, 'render_motion', params, ctx(true)).data as Frames).svg;
+    expect(shaded).not.toBe(plain);
+    expect((execute(doc, 'render_motion', params, ctx(true)).data as Frames).svg).toBe(shaded);
   });
 });

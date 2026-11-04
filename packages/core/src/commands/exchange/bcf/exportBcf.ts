@@ -14,6 +14,7 @@ import type { CommandResult } from '../../types';
 import { confirmExportControlled, defineCommand, z } from '../../schema';
 import { exportRefusal, report } from '../../noop';
 import { reviewOf, reviewRejection } from '../../review/reviewModel';
+import { surfaceShadingOf } from '../../render/surfaceShading';
 import { FRAME_BACKGROUND, hexRgb, renderCameraPng, sceneCenter } from '../../render/frames';
 import { nativeRun } from '../../render/rendererProvenance';
 import { rasterScenePixels } from '../../render/raster';
@@ -95,7 +96,16 @@ export const exportBcf = defineCommand({
         }
         const png =
           snapshotCache.get(viewpointId) ??
-          renderCameraPng(doc, viewpoint.camera, width, height, background, center, run?.pixels ?? rasterScenePixels);
+          renderCameraPng(
+            doc,
+            viewpoint.camera,
+            width,
+            height,
+            background,
+            center,
+            run?.pixels ?? rasterScenePixels,
+            surfaceShadingOf(doc, ctx),
+          );
         snapshotCache.set(viewpointId, png);
         entries.push({ name: `${issue.guid}/${guid}.png`, data: png });
         markupViews.push({ guid, file: `${guid}.bcfv`, snapshot: `${guid}.png` });
