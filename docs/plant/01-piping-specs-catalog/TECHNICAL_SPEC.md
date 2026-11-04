@@ -608,7 +608,7 @@ Decided 2026-10-23 (owner delegated, plant README D4):
 | TR-PSC-11 | Dimensional-standard and joint compatibility rules                                    | FR-11        | AF-30               | VC-14             |
 | TR-PSC-12 | `PipeElement.spec`, `add_pipe_run` / `assign_pipe_spec`, consumers read `spec.wallMm` | FR-13        | AF-01               | VC-15             |
 | TR-PSC-13 | `check_piping_catalog` rules (§5.6)                                                   | FR-12        | AF-20, AF-30        | VC-05             |
-| TR-PSC-14 | Canonical JSON, sha256, `--param-file` CLI feature, round trip                        | FR-16, FR-17 | AF-05, AF-12, AF-13 | VC-17             |
+| TR-PSC-14 | Canonical JSON, sha256, round trip                        | FR-16, FR-17 | AF-05, AF-12, AF-13 | VC-17             |
 | TR-PSC-15 | Lifecycle, revisions, approval gate via signature                                     | FR-14, FR-15 | AF-32, AF-33, AF-34 | VC-16             |
 | TR-PSC-16 | Component shape recipes and ports (§5.8)                                              | FR-19        | AF-22               | VC-19             |
 
@@ -662,7 +662,7 @@ failure at `families.0.sizes.0.centreToEnd`), 06 (all 24 bolt patterns), 07, 12,
 M2 (specs, resolution, branch table, `check_pipe_spec`, `PSC_DIM_STANDARD_MIXED`), M3 (`add_pipe_run` / `assign_pipe_spec`, consumers read
 `spec.wallMm`, `approve_pipe_spec`; the interim `plant/piping/sizes.ts` and `industrial/piping/pipeSizes.ts` stay until then), M4 (`pipe_wall_check`,
 `resolve_joint`, `component_shape`, bolt sets, B16.11 and olet schemas), rating-table import, EN 10220 walls (the pack has ODs only),
-`PipingLibraryProvider` private libraries (`PSC_LIBRARY_UNRESOLVED` is defined, not yet raised), `--param-file` CLI feature, UI browser, guide
+`PipingLibraryProvider` private libraries (`PSC_LIBRARY_UNRESOLVED` is defined, not yet raised), UI browser, guide
 section, VC-PSC-08 to 11, 14 (spec check), 15, 16, 19. Open for the owner: Q1 (bundling policy, licence flag), Q3 to Q7 unchanged.
 
 ### 13.5 As built (M2, 2026-10-23)

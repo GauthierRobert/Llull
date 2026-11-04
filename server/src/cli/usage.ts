@@ -16,7 +16,9 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   exec <command> [params]     run one command; params are key=value pairs (values parsed as
                               JSON unless the param is a string: size=[1,2,3] name=123),
                               one JSON object,
-                              @params.json or - (stdin); a value @img:scan.png is
+                              @params.json or - (stdin); --param-file FILE (or -) takes the
+                              params from a JSON object file, key=value pairs override its keys;
+                              a value @img:scan.png is
                               read as an image data URL (add_image_underlay dataUrl=…)
   <command> [params]          shorthand for exec
                               exchange tools too (export_step, import_step, import_dwg,
