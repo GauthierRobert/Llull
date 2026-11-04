@@ -12,7 +12,8 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import type { PipingModel } from '../types';
-import { renamedReference } from '../equipment/commands/renameEquipmentTag';
+import { isRenameable } from '../equipment/commands/renameElementTag';
+import { renamedReference } from '../equipment/tagReferences';
 import { getPiping } from '../piping/model';
 import { inlineInfoOf } from './inlineInfo';
 import { copyObject, getPlantData, withPlantData } from './model';
@@ -20,11 +21,14 @@ import { registerPlantObjectProvider, type PlantObjectProvider, type ProviderEle
 import type { PlantValueInput } from './properties';
 import { nozzleProvider, pidInstrumentProvider } from './providersSibling';
 
-const TAGGED_CATEGORIES = ['equipment', 'pipe'] as const;
+const TAGGED_CATEGORIES = ['equipment', 'pipe', 'tray', 'pipeSupport', 'member'] as const;
 type TaggedCategory = (typeof TAGGED_CATEGORIES)[number];
 
 const isTagged = (element: BuildingElement): element is Extract<BuildingElement, { category: TaggedCategory }> =>
   (TAGGED_CATEGORIES as readonly string[]).includes(element.category);
+
+const isMarkTagged = (element: BuildingElement | undefined): boolean =>
+  element !== undefined && element.category !== 'pipe' && isTagged(element);
 
 function describeElement(element: Extract<BuildingElement, { category: TaggedCategory }>): ProviderElement {
   const named = element.category === 'equipment' ? ` "${element.name}"` : '';
@@ -37,7 +41,7 @@ function describeElement(element: Extract<BuildingElement, { category: TaggedCat
         ? {}
         : { tag: element.line }
       : { tag: element.mark }),
-    tagUnique: element.category === 'equipment',
+    tagUnique: element.category !== 'pipe',
     needsClass: element.category === 'equipment' || element.category === 'pipe',
   };
 }
@@ -73,7 +77,16 @@ function writeBuildingTags(
     .filter((entry) => elements[entry.id]?.category === 'equipment')
     .map((entry) => ({ equipment: entry.id, tag: entry.tag }));
   const pipes = tags.filter((entry) => elements[entry.id]?.category === 'pipe').map((entry) => ({ pipeId: entry.id, line: entry.tag }));
+  const marked = tags.filter((entry) => {
+    const element = elements[entry.id];
+    return element !== undefined && isRenameable(element);
+  });
   let current = doc;
+  if (marked.length > 0) {
+    const result = execute(current, 'rename_element_tag', { renames: marked.map((entry) => ({ element: entry.id, tag: entry.tag })) }, ctx);
+    if (result.rejected === true) return result.summary;
+    current = result.document;
+  }
   if (renames.length > 0) {
     const result = execute(current, 'rename_equipment_tag', { renames }, ctx);
     if (result.rejected === true) return result.summary;
@@ -116,8 +129,8 @@ const buildingElementProvider: PlantObjectProvider = {
     return listed;
   },
   tagProblem: (doc, id, tag) =>
-    getBuilding(doc).elements[id]?.category === 'equipment' && /[:\s]/.test(tag)
-      ? "an equipment tag must not contain whitespace or ':' (the port id is <tag>:<mark>): change the tag format of the class"
+    isMarkTagged(getBuilding(doc).elements[id]) && /[:\s]/.test(tag)
+      ? "a tag written into an element mark must not contain whitespace or ':' (the port id is <tag>:<mark>): change the tag format of the class"
       : null,
   ends: (doc, id) => {
     const element = getBuilding(doc).elements[id];

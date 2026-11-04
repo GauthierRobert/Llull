@@ -9,7 +9,7 @@ import type { CadDocument } from '@core/model/types';
 import { copyObject, getPlantData } from '@aec/plant/data/model';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { addTie, routedPumpToVessel, valveScene } from '../piping/rteFixtures';
-import { addEquipment, addPipe, assignPump, libraryDocument, withData } from './dataFixtures';
+import { addEquipment, addPipe, assignPump, libraryDocument, markEquipmentByHand, withData } from './dataFixtures';
 
 interface Finding {
   code: string;
@@ -179,7 +179,7 @@ describe('check_plant_data', () => {
 
   it('DAT_OBJECT_ORPHAN: the model element was deleted; DAT_TAG_MODEL_MISMATCH: it was renamed', () => {
     const scene = pumpAndLine('BL-1');
-    const renamed = apply(scene.doc, 'update_equipment', { elementId: scene.pump.id, mark: 'ZZ-1' });
+    const renamed = markEquipmentByHand(scene.doc, scene.pump.id, 'ZZ-1');
     expect(check(renamed).findings).toEqual([
       expect.objectContaining({ code: 'DAT_TAG_MODEL_MISMATCH', severity: 'warn', ids: [scene.pumpObject, scene.pump.id] }),
     ]);

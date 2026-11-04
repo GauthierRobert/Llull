@@ -6,19 +6,11 @@ import { commitBuilding } from '../../../building/evaluate/evaluateElements';
 import { elementsOf, getBuilding } from '../../../building/model';
 import { getPiping } from '../../piping/model';
 import { refuse } from '../model';
+import { followableRenames, followMarkInColourRules, renamedReference } from '../tagReferences';
 import { equipmentRefParam, findEquipment } from './equipmentRef';
 
-/** A port id `<tag>:<mark>` or a bare tag, with the equipment tag replaced; undefined when it does not name a renamed equipment. */
-export function renamedReference(reference: string | undefined, renames: ReadonlyMap<string, string>): string | undefined {
-  if (reference === undefined) return undefined;
-  const colon = reference.indexOf(':');
-  const base = colon < 0 ? reference : reference.slice(0, colon);
-  const next = renames.get(base);
-  return next === undefined ? undefined : `${next}${colon < 0 ? '' : reference.slice(colon)}`;
-}
-
 /**
- * @affects changes the tag (mark) of equipment, parametric vessels included, and every reference to it: legacy pipe from / to (`<tag>` and `<tag>:<nozzle>`), routed line from / to text (through update_pipeline)
+ * @affects changes the tag (mark) of equipment, parametric vessels included, and every reference to it: legacy pipe from / to (`<tag>` and `<tag>:<nozzle>`), routed line from / to text (through update_pipeline); the `mark` clauses (equals / in) of colour rules (09 VIS) follow the new mark unless another element still carries the old one; the plant objects of 08 DAT are NOT touched (the plant-data guard refuses a direct rename of classified equipment)
  * @invariant the tag grammar of add_vessel (no whitespace, no ':'), equipment tags unique after the whole batch (a swap is valid); element ids, nozzle marks, geometry and routed ports (by element id) are untouched
  * @failure unknown equipment, bad or duplicate tag -> EQP_* refusal, document unchanged
  */
@@ -29,7 +21,9 @@ export const renameEquipmentTag = defineCommand({
     'text of routed lines follow. This is the ONLY command that renames a parametric vessel (update_equipment refuses those because size, shape and weight are derived; ' +
     'the tag carries no geometry). The tag must not be empty nor contain whitespace or ":" (the port id is <tag>:<mark>) and must be unique among equipment after the ' +
     'whole batch (swapping two tags in one call is valid). renames: [{ equipment (tag or element id), tag }]. Returns data = { renamed [{ id, from, to }], pipes, lines } ' +
-    'with the ids of the pipes and lines whose references were rewritten. Refusals: EQP_NOT_FOUND, EQP_PARAM_INVALID, EQP_TAG_DUPLICATE. Used by assign_plant_object (plant data) to write a tag back.',
+    'with the ids of the pipes and lines whose references were rewritten; display colour rules with a mark clause (equals / in) on the old tag are rewritten to the new one (data.colourRules; ' +
+    'a mark regular expression cannot be rewritten: data.patternRules). Equipment already classified with assign_plant_object is renamed through plant data (assign_plant_object / set_plant_properties / ' +
+    'set_tag_format retag), a direct rename is refused with DAT_DIRECT_RENAME; unassign_plant_object first to rename it freely. Refusals: EQP_NOT_FOUND, EQP_PARAM_INVALID, EQP_TAG_DUPLICATE. Used by assign_plant_object (plant data) to write a tag back.',
   params: z.object({
     renames: z
       .array(z.object({ equipment: equipmentRefParam, tag: z.string().describe('New tag, e.g. "P-101": no whitespace, no ":".') }))
@@ -126,14 +120,20 @@ export const renameEquipmentTag = defineCommand({
       current = updated.document;
       lines.push(lineId);
     }
+    const rules = followMarkInColourRules(
+      current,
+      followableRenames(building.elements, new Set(renamed.map((change) => change.id)), renames),
+    );
     return {
-      document: current,
+      document: rules.document,
       summary: `rename_equipment_tag: ${renamed.length} equipment renamed (${renamed
         .slice(0, 4)
         .map((change) => `${change.from} -> ${change.to}`)
-        .join(', ')}${renamed.length > 4 ? ', ...' : ''}); ${pipes.length} pipe and ${lines.length} line reference(s) followed.`,
+        .join(', ')}${renamed.length > 4 ? ', ...' : ''}); ${pipes.length} pipe and ${lines.length} line reference(s) followed${
+        rules.followed.length === 0 ? '' : `, ${rules.followed.length} colour rule(s) (${rules.followed.join(', ')})`
+      }${rules.patterned.length === 0 ? '' : `; colour rule(s) ${rules.patterned.join(', ')} match the old mark by pattern and were not rewritten`}.`,
       affected: [...renamed.map((change) => change.id), ...pipes, ...lines],
-      data: { renamed, pipes, lines },
+      data: { renamed, pipes, lines, colourRules: rules.followed, patternRules: rules.patterned },
     };
   },
 });

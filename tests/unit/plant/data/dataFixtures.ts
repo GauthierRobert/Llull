@@ -145,3 +145,11 @@ export function scDat02Document(): CadDocument {
   }
   return doc;
 }
+
+/** Sets the mark of an equipment straight in the building slice (a file edited by hand: the commands refuse a rename behind a plant object). */
+export function markEquipmentByHand(doc: CadDocument, id: string, mark: string): CadDocument {
+  const building = doc.building;
+  const element = building?.elements[id];
+  if (building === undefined || element?.category !== 'equipment') throw new Error(`no equipment ${id}`);
+  return { ...doc, building: { ...building, elements: { ...building.elements, [id]: { ...element, mark } } } };
+}

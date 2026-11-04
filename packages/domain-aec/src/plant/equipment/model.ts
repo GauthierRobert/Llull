@@ -50,7 +50,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'This head type has no closed-form partial volume yet (horizontal torispherical, V1): give a level at 0 or the full diameter.',
   EQP_LEVEL_OUT_OF_RANGE: 'Give levels inside 0..totalHeight, measured from the lowest inside point (head apex or shell bottom).',
   EQP_NOT_FOUND: 'List the tags with equipment_ports or building_schedule kind equipment, and pass a tag (e.g. "V-101") or an element id.',
-  EQP_TAG_DUPLICATE: 'Choose another tag; equipment tags are unique in the document.',
+  EQP_TAG_DUPLICATE: 'Choose another tag; equipment tags are unique in the document, trays / supports / members within their category.',
+  EQP_ELEMENT_READONLY: 'Edit the assembly that generated it (update_access_platform, update_pipe_rack).',
   EQP_NOT_PARAMETRIC:
     'Recreate it with add_vessel, or keep it as a block and add nozzles with location { on: "free", position, direction }.',
   EQP_SUPPORT_INVALID:

@@ -111,7 +111,7 @@ export const renumberTags = defineCommand({
                 .map((entry) => `${entry.from} -> ${entry.to}`)
                 .join(', ')}${mapping.length > 3 ? ', ...' : ''})`
         }.`,
-        [...new Set([...selected.map((object) => object.id), ...mapping.map((entry) => entry.id)])],
+        [...new Set([...selected.map((object) => object.id), ...mapping.map((entry) => entry.id), ...retagged.rewritten])],
       ),
       data: { mapping, count: mapping.length, unchanged: selected.length - mapping.length },
     };

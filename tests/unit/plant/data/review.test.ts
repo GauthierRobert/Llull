@@ -11,7 +11,7 @@ import { parseTagFormat } from '@aec/plant/data/tagFormat';
 import { getProvider } from '@aec/plant/data/providers';
 import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { routedPumpToVessel } from '../piping/rteFixtures';
-import { addEquipment, addPipe, libraryDocument } from './dataFixtures';
+import { addEquipment, addPipe, libraryDocument, markEquipmentByHand } from './dataFixtures';
 
 interface Check {
   status: string;
@@ -209,7 +209,7 @@ describe('round 2 review', () => {
       tagFields: { seq: 1 },
       properties: { DesignPressure: 1 },
     });
-    const renamed = apply(tagged, 'rename_equipment_tag', { renames: [{ equipment: 'V-101', tag: 'P-102' }] });
+    const renamed = markEquipmentByHand(tagged, s.vessel, 'P-102');
     const clash = expectRefusal(
       renamed,
       'assign_plant_object',
