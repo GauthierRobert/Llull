@@ -34,6 +34,31 @@ describe('head centroids', () => {
     expect(half.centroid).toBeLessThan(250);
   });
 
+  it('a conical head (45 degrees, R 500, t 10): the metal between two similar cones has its centroid at (1/4) (Ro^4 - Ri^4) / (Ro^3 - Ri^3), Ro = 500 + 10 / cos 45', () => {
+    const outer = 500 + 10 / Math.cos(Math.PI / 4);
+    const expected = (1 / 4) * ((outer ** 4 - 500 ** 4) / (outer ** 3 - 500 ** 3));
+    expect(headMetalCentroid({ kind: 'conical', depth: 500 }, 500, 10)).toBeCloseTo(expected, 8);
+  });
+
+  it('a torispherical head (ASME F&D, D 1000): the metal centroid lies between the tangent plane and the apex; so does the cavity centroid (below the 3/8 of a hemisphere)', () => {
+    const alpha = Math.asin((500 - 60) / (1000 - 60));
+    const shape: HeadShape = {
+      kind: 'torispherical',
+      depth: 1000 * (1 - Math.cos(alpha)) + 60 * Math.cos(alpha),
+      crownRadius: 1000,
+      knuckleRadius: 60,
+      alpha,
+      crownDepth: 1000 * (1 - Math.cos(alpha)),
+      knuckleDepth: 60 * Math.cos(alpha),
+    };
+    const metal = headMetalCentroid(shape, 500, 10);
+    expect(metal).toBeGreaterThan(0);
+    expect(metal).toBeLessThan(shape.depth + 10);
+    const cavity = headFillCentroid(shape, 500, shape.depth).centroid;
+    expect(cavity).toBeGreaterThan(0);
+    expect(cavity).toBeLessThan(shape.depth / 2);
+  });
+
   it('a flat head is a plate of thickness t beyond the tangent plane (t / 2) and holds no liquid', () => {
     expect(headMetalCentroid({ kind: 'flat', depth: 0 }, 500, 12)).toBe(6);
     expect(headFillCentroid({ kind: 'flat', depth: 0 }, 500, 0)).toEqual({ volume: 0, centroid: 0 });

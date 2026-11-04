@@ -165,3 +165,74 @@ describe('nozzle_reinforcement: refusals', () => {
     expectRefusal(doc, 'nozzle_reinforcement', params, code, path);
   });
 });
+
+describe('nozzle_reinforcement: other heads, corroded-away necks, missing design pressure', () => {
+  const custom = (top: object, extra: object = {}, design: object = {}): CadDocument =>
+    apply(
+      apply(mmDocument(), 'add_vessel', {
+        tag: 'V-1',
+        orientation: 'vertical',
+        location: [0, 0],
+        insideDiameter: 1000,
+        tangentLength: 3000,
+        heads: { top, bottom: { type: 'ellipsoidal', ratio: 2 } },
+        shellThickness: 12,
+        headThickness: 12,
+        corrosionAllowance: 3,
+        support: { type: 'none' },
+        design: {
+          pressure: { value: 1.5, unit: 'MPa' },
+          allowableStress: { value: 138, unit: 'MPa', source: 'hand example' },
+          jointEfficiency: { shell: 1, heads: 1 },
+          ...design,
+        },
+        ...extra,
+      }),
+      'add_nozzle',
+      nozzle('H1', 200, { on: 'head', head: 'top', radialOffset: 0, orientationDeg: 0 }, 700),
+    );
+  const headRow = (doc: CadDocument): Report => query(doc, { mark: 'H1' });
+
+  it('a hemispherical head is a sphere of the inside radius: t_r = P R / (2 S - 0.2 P) = 1.5 x 503 / 275.7 = 2.73667 mm (UG-27(d))', () => {
+    const n = row(headRow(custom({ type: 'hemispherical' })), 'H1');
+    expect(n.requiredShellThicknessMm).toBeCloseTo((1.5 * 503) / (2 * 138 - 0.2 * 1.5), 9);
+    expect(n.requiredShellThicknessMm).toBeCloseTo(2.73667, 5);
+    expect(n.status).toBe('pass_with_review');
+  });
+
+  it('a torispherical crown opening uses the crown radius: t_r = P L / (2 S - 0.2 P) with L = 1000 + 3 = 1003 -> 1.5 x 1003 / 275.7 = 5.45702 mm', () => {
+    const n = row(headRow(custom({ type: 'torispherical', standard: 'asme_fd' })), 'H1');
+    expect(n.requiredShellThicknessMm).toBeCloseTo((1.5 * 1003) / (2 * 138 - 0.2 * 1.5), 9);
+    expect(n.requiredShellThicknessMm).toBeCloseTo(5.45702, 5);
+  });
+
+  it('is not covered, and says why: an opening that reaches the F&D knuckle (offset 460 + d/2 > 468), a 3:1 ellipse, a conical head', () => {
+    const knuckle = apply(custom({ type: 'torispherical', standard: 'asme_fd' }), 'update_nozzle', {
+      equipment: 'V-1',
+      mark: 'H1',
+      location: { on: 'head', head: 'top', radialOffset: 460, orientationDeg: 0 },
+    });
+    const refused = query(knuckle);
+    expect(refused.notCovered).toEqual([expect.objectContaining({ mark: 'H1', code: 'EQP_HEAD_NOT_COVERED' })]);
+    for (const head of [
+      { type: 'ellipsoidal', ratio: 3 },
+      { type: 'conical', halfAngleDeg: 45 },
+    ])
+      expect(query(custom(head)).notCovered.map((entry) => entry.code)).toEqual(['EQP_HEAD_NOT_COVERED']);
+    const message = execute(custom({ type: 'conical', halfAngleDeg: 45 }), 'nozzle_reinforcement', { equipment: 'V-1', mark: 'H1' });
+    expect(message.error?.code).toBe('EQP_HEAD_NOT_COVERED');
+    expect(message.document).toBeDefined();
+  });
+
+  it('a neck whose wall is corroded away is refused for that nozzle (EQP_PARAM_INVALID at neckWall); no design pressure is EQP_DESIGN_DATA_MISSING', () => {
+    const thin = custom({ type: 'hemispherical' }, { shellThickness: 20, corrosionAllowance: 9, headThickness: 20 });
+    expect(query(thin).notCovered).toEqual([expect.objectContaining({ mark: 'H1', code: 'EQP_PARAM_INVALID' })]);
+    expectRefusal(
+      custom({ type: 'hemispherical' }, {}, { pressure: undefined }),
+      'nozzle_reinforcement',
+      { equipment: 'V-1' },
+      'EQP_DESIGN_DATA_MISSING',
+      'design.pressure',
+    );
+  });
+});
