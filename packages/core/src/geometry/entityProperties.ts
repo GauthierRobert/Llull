@@ -2,10 +2,11 @@
 
 import type { PropertyValue } from '../model/display';
 import type { EntityPropertyProvider, PropertyBag } from '../model/entityProperties';
+import { assignedMaterialClass } from './materialClasses';
 import { is2D, type CadDocument } from '../model/types';
 
 /**
- * Core keys: `id`, `kind`, `is2D`, `layerId`, `layerName`, `name`, `materialId`, `componentId`, and `tag` (all tags, multi-valued).
+ * Core keys: `id`, `kind`, `is2D`, `layerId`, `layerName`, `name`, `materialId`, `componentId`, `tag` (all tags, multi-valued) and `materialClass` (the assigned display class id).
  * @invariant {} for an unknown id; keys with no value are absent
  */
 export function coreEntityProperties(doc: CadDocument, entityId: string): PropertyBag {
@@ -18,6 +19,8 @@ export function coreEntityProperties(doc: CadDocument, entityId: string): Proper
   if (entity.name !== undefined) bag['name'] = entity.name;
   if (entity.tags !== undefined && entity.tags.length > 0) bag['tag'] = entity.tags;
   if (entity.materialId !== undefined) bag['materialId'] = entity.materialId;
+  const displayClass = assignedMaterialClass(doc, entityId);
+  if (displayClass !== undefined) bag['materialClass'] = displayClass.id;
   if ('componentId' in entity && typeof entity.componentId === 'string') bag['componentId'] = entity.componentId;
   return bag;
 }

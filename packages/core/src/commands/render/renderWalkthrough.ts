@@ -1,11 +1,12 @@
 /**
  * render_walkthrough (plant 09 VIS §4, VIS-M9): the frames of a walkthrough as PNG files, the camera gliding between its viewpoints
- * (eye linear, direction / up spherical, fov or view height linear). Reference frames carry a sha256 each (deterministic per
+ * (eye linear or on a Catmull-Rom spline through the keys, direction / up spherical, fov or view height linear). Reference frames carry a sha256 each (deterministic per
  * rendererVersion); native frames (`renderer: 'native'`, `ctx.raster`) are pictures without digests.
  */
 
 import type { ViewpointCamera } from '../../model/review';
-import { interpolateViewpointCamera } from '../../geometry/viewpointCamera';
+import { interpolateViewpointCamera, interpolateViewpointCameraSmooth } from '../../geometry/viewpointCamera';
+import { withMaterialClassColours } from '../../geometry/materialClasses';
 import { sha256Hex } from '../../lib/sha256';
 import { uint8ArrayToBase64 } from '../../lib/base64';
 import { clamp } from '../../lib/clamp';
@@ -21,15 +22,21 @@ const MAX_FRAMES = 600;
 /** Named guard: frames × width × height above this is refused (VIS_RENDER_BUDGET). */
 const MAX_TOTAL_PIXELS = 100_000_000;
 
-/** Camera at time `t` (seconds) of a walkthrough whose key k lasts `seconds[k]`. */
-function cameraAt(cameras: readonly ViewpointCamera[], seconds: readonly number[], t: number): ViewpointCamera {
+type CameraPath = 'linear' | 'smooth';
+
+/** Camera at time `t` (seconds) of a walkthrough whose key k lasts `seconds[k]`; `smooth` bends the eye path through the keys. */
+function cameraAt(cameras: readonly ViewpointCamera[], seconds: readonly number[], t: number, path: CameraPath): ViewpointCamera {
   let start = 0;
   for (let k = 0; k + 1 < cameras.length; k += 1) {
     const span = seconds[k] ?? 0;
     const a = cameras[k];
     const b = cameras[k + 1];
-    if (a !== undefined && b !== undefined && (t <= start + span || k + 2 === cameras.length))
-      return interpolateViewpointCamera(a, b, clamp((t - start) / span, 0, 1));
+    if (a !== undefined && b !== undefined && (t <= start + span || k + 2 === cameras.length)) {
+      const u = clamp((t - start) / span, 0, 1);
+      return path === 'smooth'
+        ? interpolateViewpointCameraSmooth(cameras[k - 1], a, b, cameras[k + 2], u)
+        : interpolateViewpointCamera(a, b, u);
+    }
     start += span;
   }
   return cameras[0] as ViewpointCamera;
@@ -45,7 +52,7 @@ export const renderWalkthrough = defineCommand({
   name: 'render_walkthrough',
   description:
     'Render a walkthrough (create_walkthrough) to PNG frames: the camera glides between the saved viewpoints (eye linear, direction ' +
-    'spherical) at `fps` frames per second; frames = floor(duration × fps) + 1. Solids and sketches only (no grid / axes). data: { frames, ' +
+    'spherical; path "smooth" bends the eye along a Catmull-Rom spline through the key eyes) at `fps` frames per second; frames = floor(duration × fps) + 1. Solids and sketches only (no grid / axes); solids take the colour of their assigned material class (assign_material_class). data: { frames, ' +
     'fps, durationS, width, height, files: [{ fileName: "frame-0001.png", base64 }] } — save them with `--save dir/`. renderer "reference" ' +
     '(default) adds frameSha256[] (deterministic per rendererVersion); "native" draws each frame on the GPU with llull-compute (CLI / ' +
     'desktop only): GPU frames without digests, data.deterministic false. Errors: VIS_WALKTHROUGH_NOT_FOUND, VIS_WALKTHROUGH_INVALID (more ' +
@@ -58,6 +65,12 @@ export const renderWalkthrough = defineCommand({
     height: z.number().optional().describe('Frame height in pixels, clamped to [64, 2000]. Default 360.'),
     maxFrames: z.number().int().optional().describe('Refuse when the walkthrough needs more frames than this (1..600). Default 600.'),
     background: z.string().optional().describe('Frame background "#rrggbb". Default "#1a1a2e".'),
+    path: z
+      .enum(['linear', 'smooth'])
+      .optional()
+      .describe(
+        'Camera path between keys: "linear" (default; eye straight from key to key) or "smooth" (eye on a Catmull-Rom spline through the key eyes).',
+      ),
     renderer: z.enum(['reference', 'native']).optional().describe('"reference" (default, digests) or "native" (GPU frames, no digests).'),
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -85,17 +98,18 @@ export const renderWalkthrough = defineCommand({
     const native = params.renderer === 'native' ? (ctx?.raster ?? null) : undefined;
     if (native === null) return fail('NATIVE_TOOL_MISSING', 'no native raster (llull-compute) is installed in this host', ['renderer']);
     const run = native === undefined ? null : nativeRun(native, 'gpu');
-    const center = sceneCenter(doc);
+    const scene = withMaterialClassColours(doc);
+    const center = sceneCenter(scene);
     const keyCameras = cameras as ViewpointCamera[];
     const files: { fileName: string; base64: string }[] = [];
     const digests: string[] = [];
     for (let i = 0; i < frames; i += 1) {
-      const camera = cameraAt(keyCameras, seconds, i / fps);
-      const png = renderCameraPng(doc, camera, width, height, background, center, run?.pixels ?? rasterScenePixels);
+      const camera = cameraAt(keyCameras, seconds, i / fps, params.path ?? 'linear');
+      const png = renderCameraPng(scene, camera, width, height, background, center, run?.pixels ?? rasterScenePixels);
       files.push({ fileName: `frame-${String(i + 1).padStart(4, '0')}.png`, base64: uint8ArrayToBase64(png) });
       if (run === null) digests.push(sha256Hex(png));
     }
-    const base = { id: params.id, frames, fps, durationS, width, height, files };
+    const base = { id: params.id, frames, fps, durationS, width, height, path: params.path ?? 'linear', files };
     const summary = `Rendered walkthrough ${params.id} "${walkthrough.name}": ${frames} frame(s) at ${fps} fps, ${width}×${height}`;
     if (run === null)
       return report(doc, `${summary} (reference raster). Save the frames with --save <dir>/.`, {

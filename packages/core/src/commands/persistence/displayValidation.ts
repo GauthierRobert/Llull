@@ -1,4 +1,4 @@
-/** Load-time validation of the optional `display` field (colour profiles; plant 09 VIS). Unknown keys are ignored. */
+/** Load-time validation of the optional `display` field (colour profiles, material classes; plant 09 VIS). Unknown keys are ignored. */
 
 import { profileProblems } from '../../geometry/colourRules';
 import type { ColourProfile } from '../../model/display';
@@ -64,10 +64,39 @@ function profileProblem(id: string, value: unknown): string | null {
   return problem === undefined ? null : `${where}: ${problem.path}: ${problem.message}`;
 }
 
+const COLOUR = /^#[0-9a-fA-F]{6}$/;
+const unit = (value: unknown): boolean => typeof value === 'number' && value >= 0 && value <= 1;
+
+function materialClassProblems(display: Record<string, unknown>): string[] {
+  const classes = display['materialClasses'];
+  const assigned = display['materialClassOf'];
+  const problems: string[] = [];
+  if (classes !== undefined) {
+    if (!isRecord(classes)) return ['display.materialClasses must be a record'];
+    for (const [id, entry] of Object.entries(classes)) {
+      const where = `display.materialClasses['${id}']`;
+      if (isReservedKey(id)) problems.push(`display.materialClasses: id '${id}' is a reserved JavaScript property name`);
+      else if (!isRecord(entry) || entry['id'] !== id || typeof entry['name'] !== 'string')
+        problems.push(`${where} must be { id: '${id}', name, colour, metalness, roughness }`);
+      else if (entry['colour'] !== null && !(typeof entry['colour'] === 'string' && COLOUR.test(entry['colour'])))
+        problems.push(`${where}.colour must be #rrggbb or null`);
+      else if (!unit(entry['metalness']) || !unit(entry['roughness'])) problems.push(`${where}: metalness and roughness must be in [0, 1]`);
+    }
+  }
+  if (assigned !== undefined) {
+    if (!isRecord(assigned) || !Object.values(assigned).every((id) => typeof id === 'string'))
+      problems.push('display.materialClassOf must map entity ids to class ids');
+    else if (Object.keys(assigned).some(isReservedKey))
+      problems.push('display.materialClassOf: an entity id is a reserved JavaScript property name');
+  }
+  return problems;
+}
+
 /** Problems of the optional `display` field of a raw document (absent is valid). */
 export function displayProblems(value: unknown): string[] {
   if (value === undefined) return [];
-  if (!isRecord(value) || !isRecord(value['colourProfiles'])) return ['display must be { colourProfiles, activeProfileId? }'];
+  if (!isRecord(value) || !isRecord(value['colourProfiles']))
+    return ['display must be { colourProfiles, activeProfileId?, materialClasses?, materialClassOf? }'];
   const profiles = value['colourProfiles'];
   const active = value['activeProfileId'];
   const problems = [
@@ -75,6 +104,7 @@ export function displayProblems(value: unknown): string[] {
     active === undefined || (typeof active === 'string' && Object.hasOwn(profiles, active))
       ? null
       : 'display.activeProfileId must name an existing profile',
+    ...materialClassProblems(value),
   ];
   return problems.filter((problem): problem is string => problem !== null);
 }

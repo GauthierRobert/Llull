@@ -1,3 +1,4 @@
+import type { DisplayModel } from '../../model/display';
 import type { CadDocument, Entity, EntityGroup } from '../../model/types';
 
 /** Entities in drawing order (`doc.order`), skipping ids with no stored entity. */
@@ -108,6 +109,16 @@ function pruneAnimations(
   return { animations: withoutKeys(doc.animations, dropped), dropped: dropped.size };
 }
 
+/** The `display` patch that drops the material class assignments of `removed` entities (a reused id must not inherit a class). */
+function withoutClassAssignments(doc: CadDocument, removed: ReadonlySet<string>): { display?: DisplayModel } {
+  const display = doc.display;
+  const assigned = display?.materialClassOf;
+  if (display === undefined || assigned === undefined || !Object.keys(assigned).some((id) => removed.has(id))) return {};
+  const kept = Object.fromEntries(Object.entries(assigned).filter(([id]) => !removed.has(id)));
+  const { materialClassOf: _previous, ...others } = display;
+  return { display: Object.keys(kept).length === 0 ? others : { ...others, materialClassOf: kept } };
+}
+
 /**
  * `doc` without `removed` entities: entities/order/selection, group memberships (groups left with fewer than 2 members are dissolved and
  * listed), and every constraint / joint / drive relation / animation that referenced a removed entity (counted in `prunedReferences`).
@@ -139,6 +150,7 @@ export function withoutEntities(
     ...(dropped === 0 ? {} : { animations }),
     ...references,
     // import provenance describes imported bodies: it leaves with them
+    ...withoutClassAssignments(doc, removed),
     ...(provenance === undefined || stale.length === 0 ? {} : { exchange: { provenance: withoutKeys(provenance, new Set(stale)) } }),
   };
   return { document, dissolvedGroups, prunedReferences };
