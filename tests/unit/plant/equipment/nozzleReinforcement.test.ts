@@ -236,3 +236,41 @@ describe('nozzle_reinforcement: other heads, corroded-away necks, missing design
     );
   });
 });
+
+describe('nozzle_reinforcement: UG-36(c)(3) boundary and flat heads', () => {
+  const dn80 = (shell: number): CadDocument =>
+    apply(vessel(shell), 'add_nozzle', nozzle('N80', 80, { on: 'shell', elevation: 800, orientationDeg: 90 }, 700));
+
+  it('the unreinforced-opening limit is 89 mm up to a 9.525 mm (3/8 in) wall and 60 mm above: DN80 (d = 88.9 - 10.98 + 6 = 83.92 mm) is exempt on a 9.5 mm shell and fails on a 9.6 mm shell', () => {
+    const thin = row(query(dn80(9.5), { mark: 'N80' }), 'N80');
+    expect(thin.inputs['openingDiameterMm']).toBeCloseTo(83.92, 9);
+    expect(thin.availableAreaMm2).toBeLessThan(thin.requiredAreaMm2);
+    expect(thin.exempt).toBe(true);
+    expect(thin.status).toBe('exempt');
+    const thick = row(query(dn80(9.6), { mark: 'N80' }), 'N80');
+    expect(thick.availableAreaMm2).toBeLessThan(thick.requiredAreaMm2);
+    expect(thick.exempt).toBe(false);
+    expect(thick.status).toBe('fail');
+  });
+
+  it('a nozzle on a flat head has no reinforcement rule here: it is listed under notCovered with EQP_HEAD_NOT_COVERED', () => {
+    const doc = apply(
+      apply(mmDocument(), 'add_vessel', {
+        tag: 'V-1',
+        orientation: 'vertical',
+        location: [0, 0],
+        insideDiameter: 1000,
+        tangentLength: 3000,
+        heads: { top: { type: 'flat' }, bottom: { type: 'ellipsoidal', ratio: 2 } },
+        shellThickness: 12,
+        headThickness: 12,
+        corrosionAllowance: 3,
+        support: { type: 'none' },
+        design: { pressure: { value: 1.5, unit: 'MPa' }, allowableStress: { value: 138, unit: 'MPa', source: 'x' } },
+      }),
+      'add_nozzle',
+      nozzle('H1', 100, { on: 'head', head: 'top', radialOffset: 0, orientationDeg: 0 }, 400),
+    );
+    expect(query(doc).notCovered).toEqual([expect.objectContaining({ mark: 'H1', code: 'EQP_HEAD_NOT_COVERED' })]);
+  });
+});

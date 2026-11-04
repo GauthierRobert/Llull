@@ -87,6 +87,13 @@ export const addAccessPlatform = defineCommand({
       .optional()
       .describe('Rectangular region [[xmin, ymin], [xmax, ymax]], document units. Give boundary or bounds, not both.'),
     topOffset: z.number().optional().describe('Walking-surface height relative to the level elevation, DOCUMENT UNITS. Default 0.'),
+    imposedLoadKPa: z
+      .number()
+      .min(0)
+      .optional()
+      .describe(
+        'Imposed (live) load on the walking surface, kN/m² (kPa), fed to check_steel_members with the grating self-weight. Unset: check_steel_members uses its own imposedLoad default (5 kN/m²).',
+      ),
     framing: framingParam.optional(),
     railing: deckRailingParam.optional(),
     levelId: levelIdParam,
@@ -135,6 +142,7 @@ export const addAccessPlatform = defineCommand({
       topOffset: params.topOffset ?? 0,
       gratingType: params.gratingType,
       bearingBarDirection: params.bearingBarDirection,
+      ...(params.imposedLoadKPa === undefined ? {} : { imposedLoadKPa: params.imposedLoadKPa }),
       framing,
       railing,
     };

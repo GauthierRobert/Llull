@@ -9,7 +9,8 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { getPid } from '@aec/plant/pid/state';
+import { pidPlugin } from '@aec/index';
+import { getPid, withPid } from '@aec/plant/pid/state';
 import { pidErrors } from '@aec/plant/pid/validate';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { expectBoundToDocument } from '../../../helpers/documentBinding';
@@ -307,5 +308,55 @@ describe('load validation of the stamps', () => {
     (raw['acceptances'] as Record<string, Record<string, unknown>>)[key]!['severity'] = 'warning';
     (raw['acceptances'] as Record<string, Record<string, unknown>>)[key]!['signatureId'] = '';
     expect(pidErrors(raw)).toEqual([expect.stringContaining('signatureId must be a non-empty string')]);
+  });
+});
+
+describe('acceptances are only as good as the finding they describe', () => {
+  const doc = feedPump();
+  const error = errorOf(doc);
+  const record = { reason: 'forged', by: 'mallory', at: AT, code: error.code, severity: 'error' as const };
+  const withRecord = (extra: object): CadDocument => {
+    const pid = getPid(doc);
+    return withPid(doc, { ...pid, acceptances: { [error.findingKey]: { ...record, ...extra } } });
+  };
+
+  it('an error acceptance without a signature (a hand-edited file) does not hide the finding; a signed one does; a wrong severity does not', () => {
+    expect(check(withRecord({})).items.map((item) => item.findingKey)).toContain(error.findingKey);
+    expect(check(withRecord({ signatureId: 's', payloadSha256: 'a'.repeat(64) })).items.map((item) => item.findingKey)).not.toContain(
+      error.findingKey,
+    );
+    expect(check(withRecord({ signatureId: 's', severity: 'warning' })).items.map((item) => item.findingKey)).toContain(error.findingKey);
+  });
+
+  it('carry keeps only acceptances of findings that still exist: a fixed finding drops its acceptance, so a re-created one is not pre-accepted', () => {
+    const signed = withRecord({ signatureId: 's', payloadSha256: 'a'.repeat(64) });
+    const carry = pidPlugin.document?.carry;
+    expect(Object.keys(getPid(carry?.(signed, signed) ?? signed).acceptances ?? {})).toEqual([error.findingKey]);
+    const fixed = carry?.(signed, cleanSheet()) as CadDocument;
+    expect(getPid(fixed).acceptances).toBeUndefined();
+  });
+
+  it('the issue stamp content hash covers the project symbols and the acceptances', () => {
+    const hashOf = (document: CadDocument): string =>
+      data<{ contentSha256: string }>(document, 'issue_pid_sheet', { sheet: 'PID-001', status: 'issued_for_review', revision: 'A', at: AT })
+        .contentSha256;
+    const before = hashOf(doc);
+    const symbol = apply(doc, 'define_pid_symbol', {
+      class: 'Tank',
+      shapes: [
+        {
+          t: 'line',
+          closed: true,
+          pts: [
+            [0, 0],
+            [10, 0],
+            [10, 10],
+          ],
+        },
+      ],
+    });
+    expect(hashOf(symbol)).not.toBe(before);
+    const accepted = apply(doc, 'accept_pid_finding', { findingKey: warningOf(doc).findingKey, reason: 'x', by: 'a', at: AT });
+    expect(hashOf(accepted)).not.toBe(before);
   });
 });

@@ -13,6 +13,8 @@ import type { CodeFinding } from './asme';
 
 /** UG-37(a): K1 of a 2:1 semi-ellipsoidal head (the equivalent spherical radius is K1 D). */
 const K1_TWO_TO_ONE = 0.9;
+/** UG-36(c)(3): a vessel wall of at most 3/8 in (9.525 mm) allows an unreinforced opening up to 89 mm (3.5 in), above it up to 60 mm (2.375 in). */
+const UG36_THIN_WALL_MM = 9.525;
 /** UG-36(b)(1): the opening must lie within the central 80 % of the head diameter for the spherical-radius rule. */
 const CENTRAL_FRACTION = 0.8;
 
@@ -130,8 +132,8 @@ function headWall(
 
 /**
  * UG-37 area replacement of one nozzle of a vessel.
- * @invariant F = 1, E1 = 1 (opening not through a weld seam); f_r1 = f_r2 = min(1, S_n / S_v); d and the walls are corroded by the vessel allowance;
- *   A41 = A5 = 0 (no weld metal or pad is modelled); small openings (UG-36(c)(3): d <= 89 mm for t <= 10 mm, d <= 60 mm above) are exempt
+ * @invariant F = 1, E1 = 1 (opening not through a weld seam); f_r1 = f_r2 = min(1, S_n / S_v), which is the set-in (inserted) nozzle of Fig. UG-37.1: an abutting (set-on) nozzle has f_r1 = 1 and different A1 limits and is NOT modelled; d and the walls are corroded by the vessel allowance;
+ *   A41 = A5 = 0 (no weld metal or pad is modelled); small openings (UG-36(c)(3): d <= 89 mm for a nominal wall of 9.525 mm (3/8 in) or less, d <= 60 mm above) are exempt
  */
 function nozzleReinforcement(
   plant: PlantEquipmentData,
@@ -170,7 +172,7 @@ function nozzleReinforcement(
   const a1 = Math.max(d * excess - 2 * wallN * excess * (1 - f), 2 * (t + wallN) * excess - 2 * wallN * excess * (1 - f));
   const a2 = Math.max(0, Math.min(5 * (wallN - trn) * f * t, 5 * (wallN - trn) * f * wallN));
   const available = Math.max(0, a1) + a2;
-  const exempt = d <= (t + allowance <= 10 ? 89 : 60);
+  const exempt = d <= (t + allowance <= UG36_THIN_WALL_MM ? 89 : 60);
   const status = available >= required * (1 - 1e-9) ? 'pass_with_review' : exempt ? 'exempt' : 'fail';
   return {
     mark: nozzle.mark,

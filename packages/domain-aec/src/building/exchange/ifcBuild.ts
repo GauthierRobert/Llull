@@ -36,6 +36,7 @@ import {
 } from './ifcPlant';
 import { type PlantSpatial, containerOf, writePlantNodes } from './ifcPlantHierarchy';
 import { equipmentProperties, exportEquipmentPorts, parametricBody } from './ifcEquipmentExport';
+import { connectRealNozzles } from './ifcNozzleConnections';
 import { type PortState, exportPipeProducts, finishNozzles, newPortState } from './ifcPorts';
 
 type LevelElement = Extract<BuildingElement, { levelId: string }>;
@@ -306,7 +307,10 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
       `IFCRELCONTAINEDINSPATIALSTRUCTURE('${context.guid(`rel:contains:plant:${container}`)}',$,$,$,(${refs.join(',')}),${container})`,
     );
   }
-  if (run.x3 && options.ports) finishNozzles(context, doc, ports);
+  if (run.x3 && options.ports) {
+    finishNozzles(context, doc, ports);
+    connectRealNozzles(context, doc, ports);
+  }
   if (run.x3 && options.systems === 'line') writeSystems(context, run);
   const piping = exportPipingProducts(context, doc, buildingPlacement, ports);
   if (piping.products.length > 0) {

@@ -67,10 +67,15 @@ const STAIR_CHECKS: readonly StairCheck[] = [
 
 /** Rows that need data the stair checks do not have, reported as not evaluated rather than silently passed. */
 export const STAIR_RULES_NOT_EVALUATED: ReadonlyArray<{ readonly ruleId: string; readonly reason: string }> = [
-  { ruleId: 'ISO-STR-HEADROOM', reason: 'headroom over the pitch line is not evaluated (use check_model for stair/slab headroom)' },
   { ruleId: 'OSHA-STR-LANDING', reason: 'landing depth and width are not evaluated' },
   { ruleId: 'OSHA-STR-UNIFORM', reason: 'a stair has equal risers and treads by construction' },
 ];
+
+/** Headroom row of a concrete stair: its slab headroom is a clash check, the pitch-line check is for steel stairs. */
+export const CONCRETE_STAIR_HEADROOM_NOT_EVALUATED = {
+  ruleId: 'ISO-STR-HEADROOM',
+  reason: 'a concrete stair is not judged over its pitch line: check_clashes reports the slab above its 2 m headroom',
+} as const;
 
 /** Rows evaluated for the requested rulesets. */
 export const stairRules = (rulesets: readonly RulesetName[]): AccessRule[] =>

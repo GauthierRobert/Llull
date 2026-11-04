@@ -15,6 +15,7 @@ import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
 import { sealDocumentUid } from '../model/documentUid';
 import { runCommand } from './runCommand';
+import { withOmittedArraysNotice } from './instanceArray/omittedNotice';
 
 const blobsGiven = new WeakMap<GeometryKernel, Set<string>>();
 /** Blob tables (immutable objects) already scanned per kernel: an unchanged table is not re-walked on every execute. */
@@ -47,7 +48,11 @@ function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
  * @failure nextStepNumber not a safe integer >= 1 (a mutating command would re-mint ids), unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
  */
 export function execute(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext = currentContext()): CommandResult {
-  return withKernelMeshGuard(() => executeGuarded(doc, commandName, params, guardedContext(ctx)));
+  return withOmittedArraysNotice(
+    doc,
+    commandName,
+    withKernelMeshGuard(() => executeGuarded(doc, commandName, params, guardedContext(ctx))),
+  );
 }
 
 function executeGuarded(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext): CommandResult {

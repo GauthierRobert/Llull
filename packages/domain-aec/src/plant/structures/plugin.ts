@@ -9,6 +9,8 @@ import { registerAssemblyHandler } from '../../building/assemblyHandlers';
 import { assemblyGuard } from './assembly/assemblyGuard';
 import { platformHandler } from './platform/platformHandler';
 import { rackHandler } from './rack/rackHandler';
+import { registerClashSource } from '../../industrial/clash/clashSources';
+import { structuresClashBodies } from './clash/structuresClashBodies';
 
 export const structuresPlugin: CadPlugin = {
   name: 'plantStructures',
@@ -18,5 +20,6 @@ export const structuresPlugin: CadPlugin = {
   onInstall: () => {
     registerAssemblyHandler(platformHandler);
     registerAssemblyHandler(rackHandler);
+    registerClashSource(structuresClashBodies);
   },
 };

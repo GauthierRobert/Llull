@@ -18,8 +18,8 @@ export const checkPlantData = defineCommand({
     'Check the plant data and report findings, each with a stable code, severity (fail, warn, info), the object ids, the paths ("<tag>.<field>") and the one-line ' +
     'remediation. Rules: DAT_TAG_FORMAT (a tag that does not match its class format), DAT_TAG_DUPLICATE, DAT_TAG_CASE_COLLISION, DAT_REQUIRED_PROPERTY_MISSING, ' +
     'DAT_LINE_END_UNRESOLVED (a line from / to that is neither a tag nor a battery limit; the default battery-limit pattern ^(BL|TI)- is returned in data.defaults), ' +
-    'DAT_LINE_SIZE_MISMATCH, DAT_TAG_MODEL_MISMATCH (the model object carries another tag), DAT_OBJECT_ORPHAN, DAT_UNCLASSIFIED_ELEMENT (equipment, pipes and ' +
-    'routed lines without a plant object; only when no hierarchy / classes filter is given), DAT_OUTSIDE_HIERARCHY, DAT_VALUE_UNVERIFIED, ' +
+    'DAT_OPEN_PORT (warn: a line end that names nothing and is attached to nothing; a routed run end is attached by a nozzle, tie-in or run), DAT_LINE_SIZE_MISMATCH, DAT_TAG_MODEL_MISMATCH (the model object carries another tag), DAT_OBJECT_ORPHAN, DAT_UNCLASSIFIED_ELEMENT (equipment, pipes and ' +
+    'routed lines without a plant object; only when no hierarchy / classes filter is given), DAT_OUTSIDE_HIERARCHY, DAT_INFERRED_NOZZLE (info: a nozzle only inferred from a line end, the equipment has no 03 EQP nozzle), DAT_VALUE_UNVERIFIED, ' +
     'DAT_RESERVED_TAG_UNMODELLED. hierarchy / classes restrict the objects checked (node code, path or id; class names with their subclasses). severity: ' +
     'report only findings at or above it (default info = all); status is always computed from all findings. Returns data = { status: pass | warn | fail, ' +
     'findings [{ code, severity, ids, paths, message, remediation }], counts { fail, warn, info }, checked (objects), defaults { batteryLimitPattern } }.',

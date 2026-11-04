@@ -9,8 +9,7 @@ import { headMetalVolume } from './headOffset';
 import { integrate } from './gaussLegendre';
 
 /** First moment about the tangent plane of the solid enclosed by `shape` (rim radius `radius`) and the tangent plane. */
-const momentOf = (shape: HeadShape, radius: number): number =>
-  shape.kind === 'flat' ? 0 : integrate((x) => headFilledVolume(shape, radius, x), 0, shape.depth);
+const momentOf = (shape: HeadShape, radius: number): number => integrate((x) => headFilledVolume(shape, radius, x), 0, shape.depth);
 
 /** Moment about the tangent plane of the volume under the ellipse quadrant (semi-axes radius, depth) offset outward by t (the parametrisation of `headOffset`). */
 function ellipsoidalOffsetMoment(radius: number, depth: number, t: number): number {

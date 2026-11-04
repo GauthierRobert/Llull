@@ -233,8 +233,8 @@
     {
       "step": 12,
       "path": "findings.length",
-      "value": 2,
-      "source": "plan"
+      "value": 3,
+      "source": "the two data errors plus the info DAT_INFERRED_NOZZLE of the pump P-101 (no 03 EQP nozzle: its end of line 50-CWS-0007-B2 infers N1)"
     }
   ]
 }

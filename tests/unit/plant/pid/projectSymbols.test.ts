@@ -314,3 +314,39 @@ describe('load validation of stored symbols', () => {
     expect(pidErrors(state).join('\n')).toMatch(pattern);
   });
 });
+
+describe('define_pid_symbol: what is accepted always loads (the fitted shapes are re-validated)', () => {
+  const base = feedPump();
+  const drawing = (extent: number): object[] => [
+    {
+      t: 'line',
+      closed: true,
+      pts: [
+        [0, 0],
+        [extent, 0],
+        [extent, extent],
+        [0, extent],
+      ],
+    },
+    { t: 'text', at: [extent / 2, extent / 2], h: 2, s: 'T' },
+  ];
+
+  it('a tiny drawing whose text would scale beyond 100 mm is refused with PID_SYMBOL_INVALID, not stored', () => {
+    expectRefusal(base, 'define_pid_symbol', { class: 'Tank', shapes: drawing(0.01) }, 'PID_SYMBOL_INVALID', 'shapes');
+  });
+
+  it('property: over extents from 0.001 to 1000 mm every accepted definition survives serialize / deserialize and the load validation', () => {
+    let accepted = 0;
+    for (const extent of [0.001, 0.01, 0.1, 1, 10, 50, 100, 500, 1000]) {
+      const result = execute(base, 'define_pid_symbol', { class: 'Tank', shapes: drawing(extent) });
+      if (result.rejected !== undefined) {
+        expect(result.error?.code, `extent ${extent}`).toBe('PID_SYMBOL_INVALID');
+        continue;
+      }
+      accepted += 1;
+      expect(pidErrors(getPid(result.document)), `extent ${extent}`).toEqual([]);
+      expect(getPid(deserializeDocument(serializeDocument(result.document))).symbols).toEqual(getPid(result.document).symbols);
+    }
+    expect(accepted).toBeGreaterThan(3);
+  });
+});

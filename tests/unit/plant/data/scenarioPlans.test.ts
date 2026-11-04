@@ -141,7 +141,11 @@ describe('SC-DAT-03 (VC-DAT-12)', () => {
     expect(outcomes[6]?.error?.code).toBe('DAT_TAG_FORMAT');
     expect(outcomes[8]?.error?.code).toBe('DAT_TAG_DUPLICATE');
     const findings = (outcomes[12]?.['findings'] ?? []) as Array<{ code: string }>;
-    expect(findings.map((finding) => finding.code).sort()).toEqual(['DAT_LINE_END_UNRESOLVED', 'DAT_REQUIRED_PROPERTY_MISSING']);
+    expect(findings.map((finding) => finding.code).sort()).toEqual([
+      'DAT_INFERRED_NOZZLE',
+      'DAT_LINE_END_UNRESOLVED',
+      'DAT_REQUIRED_PROPERTY_MISSING',
+    ]);
   });
 });
 

@@ -152,6 +152,13 @@ export const definePidSymbol = defineCommand({
     const fitted = normalise(raw, box);
     if (typeof fitted === 'string')
       return fail('PID_SYMBOL_INVALID', fitted, [params.fromEntities === undefined ? 'shapes' : 'fromEntities']);
+    const refit = shapeProblems(fitted, 'fitted');
+    if (refit.length > 0)
+      return fail(
+        'PID_SYMBOL_INVALID',
+        `after fitting into the ${box[0] * 2} x ${box[1] * 2} mm box the symbol breaks a limit (a text grew too tall or an extent is too small for its text): ${refit.slice(0, 3).join('; ')}`,
+        [params.fromEntities === undefined ? 'shapes' : 'fromEntities'],
+      );
     const conventions: PidConvention[] = [...new Set(params.conventions ?? PID_CONVENTIONS)];
     const symbol: PidProjectSymbol = { class: params.class, name: params.name ?? params.class, conventions, shapes: fitted };
     return {

@@ -38,7 +38,7 @@ export const acceptPidFinding = defineCommand({
       .max(120)
       .optional()
       .describe(
-        'Who accepts a warning or info (self-asserted, stored as given). Not used for an error: the verified signer is recorded instead.',
+        'Who accepts a warning or info (stored as given; the host fills the host user when omitted). Not used for an error: the verified signer is recorded instead.',
       ),
     at: isoUtc.describe(
       'When the acceptance happened: ISO-8601 UTC, e.g. 2026-11-02T09:30:00Z. The host (UI / llull CLI) fills it and it is part of the signed payload; commands never read a clock.',

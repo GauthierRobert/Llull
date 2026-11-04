@@ -59,6 +59,11 @@ describe('head centroids', () => {
     expect(cavity).toBeLessThan(shape.depth / 2);
   });
 
+  it('a head without metal (t = 0) has no centroid: 0, for every head kind', () => {
+    for (const shape of [hemisphere(500), { kind: 'ellipsoidal', depth: 250 } as HeadShape, { kind: 'conical', depth: 500 } as HeadShape])
+      expect(headMetalCentroid(shape, 500, 0)).toBe(0);
+  });
+
   it('a flat head is a plate of thickness t beyond the tangent plane (t / 2) and holds no liquid', () => {
     expect(headMetalCentroid({ kind: 'flat', depth: 0 }, 500, 12)).toBe(6);
     expect(headFillCentroid({ kind: 'flat', depth: 0 }, 500, 0)).toEqual({ volume: 0, centroid: 0 });

@@ -12,18 +12,28 @@ import { getPid, withPid } from '../state';
 
 const ACT = 'pid:issue_pid_sheet';
 
-/** SHA-256 of what a sheet shows: its identity fields and every item drawn on it, in item order (status, revision and the issue stamp are not part of it). */
+/** SHA-256 of what a sheet shows: its identity fields, every item drawn on it in item order, the project symbols and the acceptances (status, revision and the issue stamp are not part of it). */
 export function sheetContentSha256(pid: PidModel, sheet: PidSheet): string {
   const items = pid.itemOrder.flatMap((id) => {
     const item = pid.items[id];
     return item !== undefined && item.sheetId === sheet.id ? [item] : [];
   });
-  return sha256Hex(jcsJson({ id: sheet.id, number: sheet.number, title: sheet.title, paper: sheet.paper, items }));
+  return sha256Hex(
+    jcsJson({
+      id: sheet.id,
+      number: sheet.number,
+      title: sheet.title,
+      paper: sheet.paper,
+      items,
+      symbols: pid.symbols ?? null,
+      acceptances: pid.acceptances ?? null,
+    }),
+  );
 }
 
 /**
  * @affects plant.pid.sheets[sheet] (status, revision; issued_for_construction also the issue stamp: signer, time, signature id, signed payload hash, content hash); a metaHistory command: no feature step, sheet status and stamps are carried across a history replay
- * @invariant issued_for_construction is a human act: needs no unaccepted error finding on the sheet (checked first, so a signature is not spent on a refusal), then a signature verified AND spent by ctx.humanSignature over { act, sheet, revision, from, status, content hash, accepted errors, at, documentUid }; the other statuses are set by anyone and keep reviewRequired true; going back to draft clears the stamp; the stamp records the content hash, so an edit afterwards is visible as a changed hash
+ * @invariant issued_for_construction is a human act: needs no unaccepted error finding on the sheet (checked first, so a signature is not spent on a refusal), then a signature verified AND spent by ctx.humanSignature over { act, sheet, revision, from, status, content hash, accepted errors, at, documentUid }; the other statuses are set by anyone and keep reviewRequired true; going back to draft clears the stamp; the stamp records the content hash (sheet, its items, project symbols, acceptances), so an edit afterwards is visible as a changed hash; a loaded file's issuedBy is validated for shape only and is NOT proof of a signature (the signature itself is never stored)
  * @failure unknown sheet -> PID_SHEET_NOT_FOUND; not a forward step nor draft -> PID_STATUS_TRANSITION; unaccepted errors -> PID_CHECK_FAILED; no valid human signature for issued_for_construction -> PID_HUMAN_GATE; document unchanged
  */
 export const issuePidSheet = defineCommand({
@@ -72,7 +82,10 @@ export const issuePidSheet = defineCommand({
     const gated = params.status === 'issued_for_construction';
     const run = gated ? runChecks(pid, { sheetId: sheet.id, includeAccepted: true }) : null;
     const errors = run?.findings.filter((finding) => finding.severity === 'error') ?? [];
-    const open = errors.filter((finding) => !Object.hasOwn(pid.acceptances ?? {}, finding.findingKey));
+    const openKeys = new Set(
+      (gated ? runChecks(pid, { sheetId: sheet.id, includeAccepted: false }).findings : []).map((finding) => finding.findingKey),
+    );
+    const open = errors.filter((finding) => openKeys.has(finding.findingKey));
     if (open.length > 0)
       return fail(
         'PID_CHECK_FAILED',
@@ -80,7 +93,10 @@ export const issuePidSheet = defineCommand({
         ['sheet'],
         open.flatMap((finding) => finding.ids),
       );
-    const acceptedErrors = errors.map((finding) => finding.findingKey).sort();
+    const acceptedErrors = errors
+      .filter((finding) => !openKeys.has(finding.findingKey))
+      .map((finding) => finding.findingKey)
+      .sort();
     let signed: { readonly signer: string; readonly signatureId: string; readonly payloadSha256: string } | null = null;
     if (gated) {
       const details = withDocumentUid(

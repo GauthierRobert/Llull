@@ -24,8 +24,8 @@ export const nozzleReinforcement = defineCommand({
     'Query: ASME VIII-1 UG-37 opening reinforcement (area replacement) of the shell and head nozzles of a parametric vessel (tag or id). Per nozzle: ' +
     'required area A = d t_r F + 2 t_n t_r F (1 - f_r1) (d = finished opening diameter, corroded; t_r = required thickness of a seamless shell, or of a ' +
     'seamless sphere of radius K1 D = 0.9 D for a 2:1 head, the radius of a hemispherical head or the crown radius of a torispherical head), available area ' +
-    'A1 (excess vessel wall) + A2 (excess neck wall), margin, and status fail | pass_with_review | exempt (UG-36(c)(3): d <= 89 mm for t <= 10 mm, ' +
-    '60 mm above). No pad and no weld metal is modelled (A41 = A5 = 0), so a fail means "add a pad or thicken, reviewed by an engineer". The neck comes from ' +
+    'A1 (excess vessel wall) + A2 (excess neck wall), margin, and status fail | pass_with_review | exempt (UG-36(c)(3): d <= 89 mm for a wall of 9.525 mm or less, ' +
+    '60 mm above; boundary 9.525 mm = 3/8 in nominal wall). The nozzle is taken as set-in (inserted through the wall); an abutting nozzle is not modelled. No pad and no weld metal is modelled (A41 = A5 = 0), so a fail means "add a pad or thicken, reviewed by an engineer". The neck comes from ' +
     'the nozzle record (OD and wall); neck and vessel are taken as the same material unless nozzleAllowableStress is given. Uses design.pressure ' +
     '(or `pressure`), design.allowableStress; never defaulted. mark restricts to one nozzle. Returns nozzles[{ mark, on, clause, requiredAreaMm2, a1Mm2, ' +
     'a2Mm2, availableAreaMm2, marginMm2, requiredShellThicknessMm, requiredNeckThicknessMm, exempt, status, inputs, notChecked }], notCovered[{ mark, code, ' +

@@ -110,7 +110,15 @@ describe('VC-ISO-09: bolting', () => {
     const result = bom(doc, { scope: 'line', lineId: 'L-101', includeBolting: true, matingFlanges: 'assume_in_scope' });
     expect(result.bolting).toMatchObject({ joints: 3, gaskets: 3, studBolts: 24, diameter: '5/8', unresolved: [] });
     expect(result.bolting?.groups).toEqual([
-      { dn: 100, pressureClass: 150, boltsPerSet: 8, boltDiameterIn: '5/8', sets: 3, unverified: false },
+      {
+        dn: 100,
+        pressureClass: 150,
+        boltsPerSet: 8,
+        boltDiameterIn: '5/8',
+        sets: 3,
+        unverified: false,
+        stud: expect.objectContaining({ lengthMm: 95.25, method: 'rule', verified: false }),
+      },
     ]);
   });
 

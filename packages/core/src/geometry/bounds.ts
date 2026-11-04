@@ -202,21 +202,44 @@ function localEntityCorners(e: Entity): Vec3[] {
   return e.kind === 'cone' || e.kind === 'pyramid' ? [...corners.slice(0, 4), [0, 0, local.max[2]]] : corners;
 }
 
+let lastAxisRotation: Vec3 | undefined;
+let lastAxis: Vec3 = [0, 0, 1];
+
+/**
+ * World direction of the local +Z axis under `rotation`. One-entry memo on the rotation VALUES (`Object.is`, so signed zeros stay distinct):
+ * runs of entities sharing an orientation (a rack of pipes) pay the trigonometry once.
+ * @invariant equals `applyEulerXYZ([0, 0, 1], ORIGIN, rotation)` bit for bit
+ */
+function rotatedZAxis(rotation: Vec3): Vec3 {
+  const last = lastAxisRotation;
+  if (last !== undefined && Object.is(last[0], rotation[0]) && Object.is(last[1], rotation[1]) && Object.is(last[2], rotation[2]))
+    return lastAxis;
+  lastAxisRotation = [rotation[0], rotation[1], rotation[2]];
+  lastAxis = applyEulerXYZ([0, 0, 1], ORIGIN, rotation);
+  return lastAxis;
+}
+
 /**
  * Tight world AABB of a rotated cylinder / cone / sphere / torus from closed-form extents: a circle of radius r whose axis has world
  * component n_i on axis i spans r·sqrt(1-n_i²) there. Undefined for other kinds (they use the rotated local-corner hull).
  */
 function analyticOrientedBounds(e: Entity): Bounds | undefined {
   if (e.kind !== 'cylinder' && e.kind !== 'cone' && e.kind !== 'sphere' && e.kind !== 'torus') return undefined;
-  const axis = applyEulerXYZ([0, 0, 1], ORIGIN, e.rotation);
+  const axis = rotatedZAxis(e.rotation);
+  if (e.kind === 'cylinder') {
+    // Same expressions as `extent` below would give, inlined (the rack-scale hot path allocates no closure or pair arrays).
+    const halfAxis = e.height / 2;
+    const [nx, ny, nz] = axis;
+    const hx = halfAxis * Math.abs(nx) + e.radius * Math.sqrt(Math.max(0, 1 - nx * nx));
+    const hy = halfAxis * Math.abs(ny) + e.radius * Math.sqrt(Math.max(0, 1 - ny * ny));
+    const hz = halfAxis * Math.abs(nz) + e.radius * Math.sqrt(Math.max(0, 1 - nz * nz));
+    const [px, py, pz] = e.position;
+    return { min: [px + -hx, py + -hy, pz + -hz], max: [px + hx, py + hy, pz + hz], oriented: true };
+  }
   const extent = (i: 0 | 1 | 2): [number, number] => {
     const n = axis[i];
     const spread = Math.sqrt(Math.max(0, 1 - n * n));
     switch (e.kind) {
-      case 'cylinder': {
-        const half = (e.height / 2) * Math.abs(n) + e.radius * spread;
-        return [-half, half];
-      }
       case 'cone': {
         const rim = e.radius * spread;
         return [Math.min(-rim, e.height * n), Math.max(rim, e.height * n)];
@@ -274,18 +297,30 @@ const MAX_NESTING = 8;
  * Falls back to a point at the instance position when the component is empty or missing.
  */
 export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument, depth = 0): Bounds {
-  const component = doc.components[instance.componentId];
-  // Past MAX_NESTING a reference cycle is assumed: the instance counts as a point at its position.
-  if (!component || component.order.length === 0 || depth >= MAX_NESTING) return { min: instance.position, max: instance.position };
-  const { scale = [1, 1, 1], rotation, position } = instance;
-  const toWorld = instanceToWorld(scale, rotation, position);
-  const worldPoints: Vec3[] = [];
+  const corners = instanceLocalCorners(doc, instance.componentId, depth);
+  return boundsOfPlacedCorners(corners, instance.scale ?? [1, 1, 1], instance.rotation, instance.position);
+}
+
+/**
+ * The component-space corners of the AABBs of a component's children (empty: component missing or empty, or nesting past `MAX_NESTING`).
+ * Shared by every placement of the component: an instance array computes them once.
+ */
+export function instanceLocalCorners(doc: CadDocument, componentId: string, depth = 0): Vec3[] {
+  const component = doc.components[componentId];
+  if (!component || component.order.length === 0 || depth >= MAX_NESTING) return [];
+  const corners: Vec3[] = [];
   for (const cid of component.order) {
     const child = component.entities[cid];
-    if (!child) continue;
-    for (const c of boundsCorners(entityBoundsInDoc(doc, child, depth + 1))) worldPoints.push(toWorld(c));
+    if (child) corners.push(...boundsCorners(entityBoundsInDoc(doc, child, depth + 1)));
   }
-  return worldPoints.length > 0 ? boundsOfPoints(worldPoints) : bounds(position, position);
+  return corners;
+}
+
+/** World AABB of `corners` placed by scale, rotation and position (a point at `position` when there are none). */
+export function boundsOfPlacedCorners(corners: readonly Vec3[], scale: Vec3, rotation: Vec3, position: Vec3): Bounds {
+  if (corners.length === 0) return { min: position, max: position };
+  const toWorld = instanceToWorld(scale, rotation, position);
+  return boundsOfPoints(corners.map(toWorld));
 }
 
 /**

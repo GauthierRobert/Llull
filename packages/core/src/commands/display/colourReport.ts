@@ -1,6 +1,7 @@
 /** colour_by_rule_report (plant 09 VIS §4): which rule colours which entity, grouped; read-only. */
 
 import { findProfile, type ColourProfile } from '../../model/display';
+import { awaitsApproval } from '../../geometry/colourRules';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
@@ -127,7 +128,7 @@ export const colourByRuleReport = defineCommand({
       profileId: profile.id,
       palette: profile.palette,
       approximate: true,
-      reviewRequired: profile.reviewRequired,
+      reviewRequired: awaitsApproval(profile),
       groupBy,
       groupCount: ordered.length,
       groups: Object.fromEntries(shown.map((group) => [group.key, groupFields(group, profile)])),
@@ -139,7 +140,7 @@ export const colourByRuleReport = defineCommand({
     };
     const summary =
       `Profile '${profile.id}' (palette ${profile.palette}, approximate): ${scoped.length} entit${scoped.length === 1 ? 'y' : 'ies'} in ${ordered.length} group(s) by ${groupBy}, ` +
-      `${unmatched.length} unmatched, ${rows.length - scoped.length} out of scope${profile.reviewRequired ? '; review required (not approved)' : ''}.`;
+      `${unmatched.length} unmatched, ${rows.length - scoped.length} out of scope${awaitsApproval(profile) ? '; review required (not approved)' : ''}.`;
     return report(doc, summary, data);
   },
 });

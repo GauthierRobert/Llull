@@ -1,12 +1,44 @@
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
+import { toCsv } from '@lib/csv';
+import { sha256Hex } from '@lib/sha256';
 import { analyseLine, isAnalysis } from '../analysis';
 import { isoIssue, refuseIso } from '../codes';
+
+const WELD_MAP_COLUMNS = ['WELD', 'KIND', 'FIELD', 'NUMBERED', 'SPOOL', 'BORE_MM', 'END_TYPE', 'X_MM', 'Y_MM', 'Z_MM', 'COMPONENTS'];
+
+/** The weld map of the listed welds as an RFC 4180 file. */
+function weldMapFile(
+  lineName: string,
+  welds: ReadonlyArray<Record<string, unknown>>,
+): { name: string; format: 'csv'; content: string; sha256: string } {
+  const content = toCsv(
+    WELD_MAP_COLUMNS,
+    welds.map((weld) => {
+      const at = weld['at'] as readonly number[];
+      return [
+        String(weld['number']),
+        String(weld['kind']),
+        weld['field'] === true,
+        weld['numbered'] === true,
+        (weld['spool'] as string | null) ?? null,
+        Number(weld['boreMm']),
+        String(weld['endType']),
+        at[0] ?? null,
+        at[1] ?? null,
+        at[2] ?? null,
+        (weld['componentIds'] as readonly string[]).join(' '),
+      ];
+    }),
+  );
+  return { name: `${lineName.replace(/[^A-Za-z0-9._-]/g, '_')}_weld_map.csv`, format: 'csv', content, sha256: sha256Hex(content) };
+}
 
 /**
  * @affects none (query: returns the same document)
  * @invariant welds are listed in numbering order; an unnumbered joint shows the number number_welds would give it (numbered false); orphaned numbers are listed apart
+ * @invariant format csv adds the weld map as one RFC 4180 file in data.files (one row per listed weld, same order and values as data.welds; deterministic bytes)
  * @failure unknown line -> ISO_LINE_NOT_FOUND; unknown spoolId -> ISO_SPOOL_NOT_FOUND; unnumbered joints -> warning ISO_WELDS_UNNUMBERED in data.warnings (not a refusal)
  */
 export const weldList = defineCommand({
@@ -18,9 +50,10 @@ export const weldList = defineCommand({
     '(SKEY WS site / WF field-fit) or a weld added with add_field_weld sets the kind; set_weld_type overrides it. Bolted flange pairs are not welds (flangedTerminals counts the flanged line ends). ' +
     'Numbers come from number_welds; a joint not yet numbered shows the number it would get (numbered false) and data.warnings has ISO_WELDS_UNNUMBERED. Spools use the breaks of split_spools (all breaks by default). ' +
     'Returns data = { lineId, welds: [{ weldId (null until numbered), number, numbered, kind, field, at: [x, y, z] mm, componentIds, boreMm, endType, spool, spools }], orphaned: [{ weldId, number, at }], ' +
-    'counts: { total, shop, site, fieldFit, unnumbered }, highest, flangedTerminals, warnings }. Refusals: ISO_LINE_NOT_FOUND, ISO_SPOOL_NOT_FOUND.',
+    'counts: { total, shop, site, fieldFit, unnumbered }, highest, flangedTerminals, warnings }. With format csv data.files = [{ name, format csv, content, sha256 }] carries the weld map (columns WELD, KIND, FIELD, NUMBERED, SPOOL, BORE_MM, END_TYPE, X_MM, Y_MM, Z_MM, COMPONENTS; one row per weld, components joined by a space; save with --save). Refusals: ISO_LINE_NOT_FOUND, ISO_SPOOL_NOT_FOUND.',
   params: z.object({
     lineId: z.string().min(1).describe('The line: routed line id, imported PCF line number or legacy pipe line number.'),
+    format: z.enum(['json', 'csv']).optional().describe('json (default): data only. csv: also the weld map as a CSV file in data.files.'),
     spoolId: z.string().min(1).optional().describe('Only the welds that touch this spool (a name from spool_list, e.g. L-101-SP02).'),
   }),
   run: (doc, params): CommandResult => {
@@ -96,6 +129,7 @@ export const weldList = defineCommand({
           unnumbered: unnumbered.length,
         },
         highest: analysis.numbering.highest,
+        ...(params.format === 'csv' ? { files: [weldMapFile(analysis.name, welds)] } : {}),
         flangedTerminals: terminals,
         warnings,
       },
