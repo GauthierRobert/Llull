@@ -8,6 +8,7 @@ import { type CadDocument, DOCUMENT_UNITS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, noop } from '../noop';
+import { sha256Hex } from '../../lib/sha256';
 import { errorMessage } from '../../lib/errorMessage';
 import { isRecord } from '../../lib/isRecord';
 import { derivedEntityIds, documentExtensions } from '../../plugins/host';
@@ -223,7 +224,9 @@ export const loadDocument = defineCommand({
   run: (doc, { json }): CommandResult => {
     let parsed: CadDocument;
     try {
-      parsed = deserializeDocument(json);
+      const read = deserializeDocument(json);
+      // A file without an identity (saved before VIS-ID, or built outside the commands) gets one from its own bytes, so signing on it works.
+      parsed = read.uid === undefined ? { ...read, uid: sha256Hex(json).slice(0, 32) } : read;
     } catch (err) {
       return noop(doc, errorMessage(err));
     }

@@ -13,7 +13,9 @@ import { stepIdSource } from '../lib/id';
 import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
+import { sealDocumentUid } from '../model/documentUid';
 import { runCommand } from './runCommand';
+import { withOmittedArraysNotice } from './instanceArray/omittedNotice';
 
 const blobsGiven = new WeakMap<GeometryKernel, Set<string>>();
 /** Blob tables (immutable objects) already scanned per kernel: an unchanged table is not re-walked on every execute. */
@@ -46,7 +48,11 @@ function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
  * @failure nextStepNumber not a safe integer >= 1 (a mutating command would re-mint ids), unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
  */
 export function execute(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext = currentContext()): CommandResult {
-  return withKernelMeshGuard(() => executeGuarded(doc, commandName, params, guardedContext(ctx)));
+  return withOmittedArraysNotice(
+    doc,
+    commandName,
+    withKernelMeshGuard(() => executeGuarded(doc, commandName, params, guardedContext(ctx))),
+  );
 }
 
 function executeGuarded(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext): CommandResult {
@@ -61,7 +67,12 @@ function executeGuarded(doc: CadDocument, commandName: string, params: unknown, 
     );
   feedBlobs(doc, ctx.kernel);
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true && annotations?.session !== true;
-  if (!recordsStep) return runInContext(ctx, () => runCommand(def, doc, params, ctx)); // queries, history meta-commands, session commands
+  if (!recordsStep) {
+    // queries, history meta-commands, session commands; a meta-history change (review data) also seals the document identity
+    const ran = runInContext(ctx, () => runCommand(def, doc, params, ctx));
+    if (annotations?.metaHistory !== true) return ran;
+    return { ...ran, document: sealDocumentUid(doc, ran.document, { name: commandName, params: withoutConfirmations(params) }) };
+  }
   // An execute nested inside a running step appends no step of its own but is reconciled like any mutating result.
   if (ctx.stepKey !== undefined)
     return applyReconcile(
@@ -95,7 +106,7 @@ function executeGuarded(doc: CadDocument, commandName: string, params: unknown, 
     affected: result.affected,
   };
   const recorded: CadDocument = {
-    ...result.document,
+    ...sealDocumentUid(doc, result.document, { name: commandName, params: recordedParams }),
     featureHistory: [...result.document.featureHistory, step],
     nextStepNumber: Math.max(result.document.nextStepNumber ?? 1, stepNumber + 1),
   };

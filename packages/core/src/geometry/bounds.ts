@@ -202,21 +202,44 @@ function localEntityCorners(e: Entity): Vec3[] {
   return e.kind === 'cone' || e.kind === 'pyramid' ? [...corners.slice(0, 4), [0, 0, local.max[2]]] : corners;
 }
 
+let lastAxisRotation: Vec3 | undefined;
+let lastAxis: Vec3 = [0, 0, 1];
+
+/**
+ * World direction of the local +Z axis under `rotation`. One-entry memo on the rotation VALUES (`Object.is`, so signed zeros stay distinct):
+ * runs of entities sharing an orientation (a rack of pipes) pay the trigonometry once.
+ * @invariant equals `applyEulerXYZ([0, 0, 1], ORIGIN, rotation)` bit for bit
+ */
+function rotatedZAxis(rotation: Vec3): Vec3 {
+  const last = lastAxisRotation;
+  if (last !== undefined && Object.is(last[0], rotation[0]) && Object.is(last[1], rotation[1]) && Object.is(last[2], rotation[2]))
+    return lastAxis;
+  lastAxisRotation = [rotation[0], rotation[1], rotation[2]];
+  lastAxis = applyEulerXYZ([0, 0, 1], ORIGIN, rotation);
+  return lastAxis;
+}
+
 /**
  * Tight world AABB of a rotated cylinder / cone / sphere / torus from closed-form extents: a circle of radius r whose axis has world
  * component n_i on axis i spans r·sqrt(1-n_i²) there. Undefined for other kinds (they use the rotated local-corner hull).
  */
 function analyticOrientedBounds(e: Entity): Bounds | undefined {
   if (e.kind !== 'cylinder' && e.kind !== 'cone' && e.kind !== 'sphere' && e.kind !== 'torus') return undefined;
-  const axis = applyEulerXYZ([0, 0, 1], ORIGIN, e.rotation);
+  const axis = rotatedZAxis(e.rotation);
+  if (e.kind === 'cylinder') {
+    // Same expressions as `extent` below would give, inlined (the rack-scale hot path allocates no closure or pair arrays).
+    const halfAxis = e.height / 2;
+    const [nx, ny, nz] = axis;
+    const hx = halfAxis * Math.abs(nx) + e.radius * Math.sqrt(Math.max(0, 1 - nx * nx));
+    const hy = halfAxis * Math.abs(ny) + e.radius * Math.sqrt(Math.max(0, 1 - ny * ny));
+    const hz = halfAxis * Math.abs(nz) + e.radius * Math.sqrt(Math.max(0, 1 - nz * nz));
+    const [px, py, pz] = e.position;
+    return { min: [px + -hx, py + -hy, pz + -hz], max: [px + hx, py + hy, pz + hz], oriented: true };
+  }
   const extent = (i: 0 | 1 | 2): [number, number] => {
     const n = axis[i];
     const spread = Math.sqrt(Math.max(0, 1 - n * n));
     switch (e.kind) {
-      case 'cylinder': {
-        const half = (e.height / 2) * Math.abs(n) + e.radius * spread;
-        return [-half, half];
-      }
       case 'cone': {
         const rim = e.radius * spread;
         return [Math.min(-rim, e.height * n), Math.max(rim, e.height * n)];

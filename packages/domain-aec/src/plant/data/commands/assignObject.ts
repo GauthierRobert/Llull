@@ -11,6 +11,7 @@ import { resolveNode, scopeKey } from '../hierarchy';
 import { isProcessLine } from '../lines';
 import {
   getPlantData,
+  rewrittenObjectIds,
   withPlantData,
   type PlantDataModel,
   type PlantObject,
@@ -349,6 +350,14 @@ export function assignObject(
   if (typeof written === 'string') return failure('DAT_TARGET_TAG_READONLY', `${element.label}: ${written}`, ['target']);
   return {
     ok: true,
-    assigned: { document: written, object, scope: scope.key, seeded: values.seeded, tagWritten: true, rebound, affected: [id, element.id] },
+    assigned: {
+      document: written,
+      object,
+      scope: scope.key,
+      seeded: values.seeded,
+      tagWritten: true,
+      rebound,
+      affected: [id, element.id, ...rewrittenObjectIds(nextData, getPlantData(written))],
+    },
   };
 }

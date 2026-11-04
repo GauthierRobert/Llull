@@ -21,7 +21,11 @@ export function defaultLoadCases(conditions: OperatingConditions): LoadCaseDef[]
 }
 
 /** Problems of a set of load cases against the forces of the model: [path, message]; empty when valid. */
-export function loadCaseProblems(cases: readonly LoadCaseDef[], forces: StressModel['forces']): [string, string][] {
+export function loadCaseProblems(
+  cases: readonly LoadCaseDef[],
+  forces: StressModel['forces'],
+  displacements: StressModel['displacements'] = [],
+): [string, string][] {
   const problems: [string, string][] = [];
   const names = new Set<string>();
   cases.forEach((loadCase, index) => {
@@ -41,6 +45,8 @@ export function loadCaseProblems(cases: readonly LoadCaseDef[], forces: StressMo
       for (const primitive of loadCase.basic ?? [])
         if (primitive.startsWith('F') && !forces.some((force) => force.name === primitive))
           problems.push([`${path}.basic`, `case ${loadCase.name}: no force ${primitive} (pass it in forces)`]);
+        else if (primitive.startsWith('D') && !displacements.some((moved) => moved.name === primitive))
+          problems.push([`${path}.basic`, `case ${loadCase.name}: no imposed displacement ${primitive} (pass it in displacements)`]);
     }
   });
   cases.forEach((loadCase, index) => {

@@ -4,6 +4,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { SignActDialog, type SignActRequest } from '@ui/components/SignActDialog';
 import { getCommand } from '@core/commands/registry';
 import { classNames } from '@ui/classNames';
@@ -92,6 +93,7 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
   const markersShown = useReviewStore((s) => s.markersShown);
   const entities = useStore((s) => s.document.entities);
   const dynamics = useStore((s) => s.document.dynamics);
+  const documentUid = useStore((s) => s.document.uid ?? '');
   const dispatch = useStore((s) => s.dispatch);
   const run = useRunChecks();
   const checkCommand = reviewCheckCommand();
@@ -112,7 +114,7 @@ export function ReviewPanel({ className }: { className?: string }): React.ReactE
         humanGatePayload(
           'accept a prototype review finding',
           [change.findingKey],
-          { inputsHash: change.inputsHash, comment: change.comment.trim() },
+          withDocumentUid({ inputsHash: change.inputsHash, comment: change.comment.trim() }, documentUid),
           nonce,
         ),
       onSigned: (confirmation) => dispatch(DISPOSITION_COMMAND, { ...change, confirmation }),

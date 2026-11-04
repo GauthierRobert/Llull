@@ -6,7 +6,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { ExecutionContext } from '@core/commands/types';
-import { copyObject, providerIdOf, withPlantData, type PlantDataModel, type PlantObject } from '../model';
+import { copyObject, getPlantData, providerIdOf, rewrittenObjectIds, withPlantData, type PlantDataModel, type PlantObject } from '../model';
 import { expectedTag } from '../objectTag';
 import { elementOf, foreignTagHolders, getProvider } from '../providers';
 import { collidingHolders, objectRegistry, type ScopeInfo } from '../registry';
@@ -24,7 +24,7 @@ export function retagObjects(
   data: PlantDataModel,
   ids: readonly string[],
   ctx: ExecutionContext | undefined,
-): Outcome<{ readonly document: CadDocument; readonly changes: readonly TagChange[] }> {
+): Outcome<{ readonly document: CadDocument; readonly changes: readonly TagChange[]; readonly rewritten: readonly string[] }> {
   const changes: TagChange[] = [];
   for (const id of ids) {
     const object = data.objects[id];
@@ -33,7 +33,7 @@ export function retagObjects(
     if (!generated.ok) return failure(generated.code, `${object.tag} (${id}): ${generated.message}`, [`objects.${id}`], [id]);
     if (generated.tag !== object.tag) changes.push({ id, from: object.tag, to: generated.tag });
   }
-  if (changes.length === 0) return { ok: true, document: withPlantData(doc, data), changes };
+  if (changes.length === 0) return { ok: true, document: withPlantData(doc, data), changes, rewritten: [] };
   const objects = { ...data.objects };
   for (const change of changes) objects[change.id] = copyObject(objects[change.id] as PlantObject, { tag: change.to });
   const next: PlantDataModel = { ...data, objects };
@@ -79,5 +79,5 @@ export function retagObjects(
       );
     document = written;
   }
-  return { ok: true, document, changes };
+  return { ok: true, document, changes, rewritten: rewrittenObjectIds(next, getPlantData(document)) };
 }

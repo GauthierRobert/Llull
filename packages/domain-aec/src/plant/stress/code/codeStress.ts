@@ -14,7 +14,7 @@ import { computeAllowables } from './allowables';
 
 export interface StressRow {
   readonly case: string;
-  readonly caseType: 'OPE' | 'SUS' | 'EXP' | 'OCC';
+  readonly caseType: 'OPE' | 'SUS' | 'EXP' | 'OCC' | 'HYD';
   readonly element: string;
   readonly pipeId: string;
   /** Node id (`N3`) at an element end, null at an interior station. */
@@ -104,6 +104,7 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
     localAxes(built.layout.nodes[element.a] as FramePoint, built.layout.nodes[element.b] as FramePoint),
   );
   const b311 = set.code === 'B31.1';
+  const millFactor = 1 - (conditions.millTolerancePct ?? 0) / 100;
   const rows: StressRow[] = [];
   const sustainedAtNode = new Map<string, number>();
 
@@ -111,7 +112,7 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
     const out: StressRow[] = [];
     built.layout.elements.forEach((element, index) => {
       const axes = elementAxes[index];
-      if (axes === null || axes === undefined) return;
+      if (axes === null || axes === undefined || element.component?.rigid === true) return;
       const R = axes.rotation;
       const q = [state.uniform[index * 3] as number, state.uniform[index * 3 + 1] as number, state.uniform[index * 3 + 2] as number];
       const local = [0, 1, 2].map(
@@ -120,22 +121,32 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
           (R[r * 3 + 1] as number) * (q[1] as number) +
           (R[r * 3 + 2] as number) * (q[2] as number),
       );
-      const normal = element.bend?.normal;
-      const nLocal =
+      const toLocal = (normal: readonly [number, number, number] | undefined): number[] | null =>
         normal === undefined
           ? null
           : [0, 1, 2].map(
               (r) => (R[r * 3] as number) * normal[0] + (R[r * 3 + 1] as number) * normal[1] + (R[r * 3 + 2] as number) * normal[2],
             );
-      const ii = element.bend?.ii ?? 1;
-      const io = element.bend?.io ?? 1;
-      const wall = expansion ? element.wallMm : element.wallMm - conditions.corrosionAllowanceMm;
+      const bendNormal = toLocal(element.bend?.normal);
+      // wall of the stress section: nominal for the displacement range; less the mill under-tolerance (when chosen) and the corrosion allowance for sustained and occasional; hydrotest: the new pipe, less the mill tolerance only
+      const wallOf = (nominal: number): number =>
+        expansion ? nominal : nominal * millFactor - (state.type === 'HYD' ? 0 : conditions.corrosionAllowanceMm);
+      const wall = wallOf(element.wallMm);
       const od = element.odMm;
       const inner = od - 2 * wall;
       const area = (Math.PI / 4) * (od ** 2 - inner ** 2);
-      const Z = (Math.PI / 32) * ((od ** 4 - inner ** 4) / od);
+      const pipeZ = (Math.PI / 32) * ((od ** 4 - inner ** 4) / od);
       const pressure = state.pressureBar * BAR_TO_MPA;
       for (const s of stations(state.elementForces, index * 12, axes.length, local as [number, number, number])) {
+        const node = s.end === null ? null : nodeId(s.end === 'a' ? element.a : element.b);
+        const endSif =
+          s.end === null ? undefined : element.endSifs?.find((entry) => entry.node === (s.end === 'a' ? element.a : element.b));
+        const ii = endSif?.ii ?? element.bend?.ii ?? 1;
+        const io = endSif?.io ?? element.bend?.io ?? 1;
+        const nLocal = endSif === undefined ? bendNormal : toLocal(endSif.normal);
+        // the branch end of a tee: effective section modulus Z_e = pi r2^2 T_e, T_e the lesser of the header wall and i_i x branch wall (B31.3 319.4.4)
+        const Z =
+          endSif?.headerWallMm === undefined ? pipeZ : Math.PI * ((od - wall) / 2) ** 2 * Math.min(wallOf(endSif.headerWallMm), ii * wall);
         const bending = Math.hypot(s.my, s.mz);
         const inPlane = nLocal === null ? bending : Math.abs(s.my * (nLocal[1] as number) + s.mz * (nLocal[2] as number));
         const outPlane = nLocal === null ? 0 : Math.sqrt(Math.max(0, bending ** 2 - inPlane ** 2));
@@ -143,7 +154,6 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
         let limit: number;
         let equation: string;
         let rule: string;
-        const node = s.end === null ? null : nodeId(s.end === 'a' ? element.a : element.b);
         if (expansion) {
           if (b311) {
             stress = (ii * Math.hypot(bending, s.torsion)) / Z;
@@ -177,8 +187,22 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
             stress = Math.sqrt((Math.abs(axial) + Sb) ** 2 + (2 * (s.torsion / (2 * Z))) ** 2);
             equation = 'S_L = sqrt((|S_a| + S_b)^2 + (2 S_t)^2)';
           }
-          limit = state.type === 'OCC' ? base.occasionalMPa : material.ShMPa;
-          rule = state.type === 'OCC' ? (b311 ? 'B311-OCC' : 'B313-OCC') : 'B313-SA-1A';
+          limit =
+            state.type === 'OCC'
+              ? base.occasionalMPa
+              : state.type === 'HYD'
+                ? (conditions.hydro?.allowableMPa ?? Number.NaN)
+                : material.ShMPa;
+          rule =
+            state.type === 'OCC'
+              ? b311
+                ? 'B311-OCC'
+                : 'B313-OCC'
+              : state.type === 'HYD'
+                ? b311
+                  ? 'B311-HYD'
+                  : 'B313-HYD'
+                : 'B313-SA-1A';
           if (state.type === 'SUS' && node !== null) sustainedAtNode.set(node, Math.max(sustainedAtNode.get(node) ?? 0, stress));
         }
         out.push({
@@ -201,7 +225,8 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
   };
 
   // OPE reports displacements and loads; the code limits apply to the sustained, occasional and expansion states
-  for (const state of states) if (state.type === 'SUS' || state.type === 'OCC') rows.push(...evaluate(state, false));
+  for (const state of states)
+    if (state.type === 'SUS' || state.type === 'OCC' || state.type === 'HYD') rows.push(...evaluate(state, false));
   for (const state of states) if (state.type === 'EXP') rows.push(...evaluate(state, true));
   return {
     rows,

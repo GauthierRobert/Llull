@@ -1,5 +1,5 @@
 /**
- * Prepare stage of the render_view raster: polygons -> the screen-space `RasterScene` (supersampled pixels, flat Lambert colour per face,
+ * Prepare stage of the render_view raster: polygons -> the screen-space `RasterScene` (supersampled pixels, flat Lambert colour per face plus the Blinn-Phong highlight of its material class,
  * outline normals and owners, 2D strokes as segments). The per-pixel stage (`raster.ts` `rasterScenePixels`, or a host's `ctx.raster`)
  * only fills, depth-tests, outlines and resolves. Orthographic scenes keep the historical projector arithmetic (bit-identical renders);
  * perspective scenes are clipped at a near plane in camera space and carry z = −1/depth, which is affine in screen space.
@@ -9,7 +9,7 @@
 import type { Vec3 } from '../../model/types';
 import type { RasterScene } from '../../model/raster';
 import { type Camera, cameraBasis, makeProjector, projectPoint } from './camera';
-import type { Polygon3D } from './types';
+import type { Polygon3D, SurfaceShading } from './types';
 
 const SUPERSAMPLE = 2;
 /** Above this many output pixels the render is not supersampled (memory and time stay bounded at 2000 × 2000). */
@@ -23,6 +23,40 @@ const LIGHT: Vec3 = (() => {
   return [v[0] / length, v[1] / length, v[2] / length];
 })();
 const AMBIENT = 0.35;
+const SPECULAR_BASE = 0.04;
+const SPECULAR_METAL = 0.5;
+const SHININESS_MAX = 256;
+const unit = (x: number): number => (x > 0 ? Math.min(1, x) : 0);
+
+/** `base` to the integer power `exponent` (square and multiply: a fixed operation order, so the result is bit-stable). */
+function powInt(base: number, exponent: number): number {
+  let result = 1;
+  let square = base;
+  for (let e = exponent; e > 0; e = Math.floor(e / 2)) {
+    if (e % 2 === 1) result *= square;
+    square *= square;
+  }
+  return result;
+}
+
+/** Highlight tint of one channel: white for a dielectric (metalness 0), the albedo for a metal (metalness 1). */
+const tint = (metalness: number, albedo: number): number => 1 - metalness + (metalness * albedo) / 255;
+
+/**
+ * Blinn-Phong highlight of a face for a material class (spec 5.6): k_s (n.h)^s with k_s = 0.04 + 0.5 * metalness and
+ * s = round(2 / roughness^2 - 2) clamped to [1, 256]. Square root and basic arithmetic only, so the number is identical on every platform.
+ */
+function highlight(facing: Vec3, toEye: Vec3, shading: SurfaceShading): number {
+  const hx = LIGHT[0] + toEye[0];
+  const hy = LIGHT[1] + toEye[1];
+  const hz = LIGHT[2] + toEye[2];
+  const length = Math.sqrt(hx * hx + hy * hy + hz * hz);
+  if (!(length > 1e-12)) return 0;
+  const nh = Math.max(0, (facing[0] * hx + facing[1] * hy + facing[2] * hz) / length);
+  const roughness = unit(shading.roughness);
+  const shininess = Math.min(SHININESS_MAX, Math.max(1, Math.round(2 / (roughness * roughness) - 2)));
+  return (SPECULAR_BASE + SPECULAR_METAL * unit(shading.metalness)) * powInt(nh, shininess);
+}
 /** cos of the normal change that draws an outline (≈ 25°). */
 const CREASE_COS = Math.cos((25 * Math.PI) / 180);
 const FLAG_HATCH = 1;
@@ -155,7 +189,14 @@ export function prepareRasterScene(
     const facing: Vec3 = facingAway ? [-nx, -ny, -nz] : polygon.normal;
     const diffuse = Math.max(0, facing[0] * LIGHT[0] + facing[1] * LIGHT[1] + facing[2] * LIGHT[2]);
     const factor = AMBIENT + (1 - AMBIENT) * diffuse;
-    addFill([projection.loop(polygon.verts)], [r * factor, g * factor, b * factor], facing, owner, 0);
+    const colour = [r * factor, g * factor, b * factor];
+    if (polygon.shading !== undefined) {
+      const spec = highlight(facing, [-view[0], -view[1], -view[2]], polygon.shading);
+      const metal = unit(polygon.shading.metalness);
+      const albedo = [r, g, b];
+      for (let k = 0; k < 3; k += 1) colour[k] = Math.min(255, (colour[k] ?? 0) + 255 * spec * tint(metal, albedo[k] ?? 0));
+    }
+    addFill([projection.loop(polygon.verts)], colour, facing, owner, 0);
   }
   const bias = sceneRadius * 0.002;
   for (const stroke of polygons.filter((p) => p.stroke)) {

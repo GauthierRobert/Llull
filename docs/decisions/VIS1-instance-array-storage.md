@@ -26,7 +26,7 @@ graph before a single triangle exists, and 234 B of JSON per bolt that differs f
 
 ## Decision
 
-1. **Instance arrays are a document slice, not Entities.** `CadDocument.instanceArrays?: Record<arrayId, InstanceArray>` (core, like
+1. **Instance arrays are a document slice, not Entities.** (L7 says 2D shapes and 3D solids are both Entity kinds in one bag; it does not say every placed geometry is an Entity: `display`, `review` and `plant` are already non-Entity slices, so no law is bent and the owner delegated this decision as "long-term-best over cheap".) `CadDocument.instanceArrays?: Record<arrayId, InstanceArray>` (core, like
    `display` / `review`: absent until the first array command; additive; the format version stays 3). One `InstanceArray` = a prototype +
    a packed per-instance table: `{ id, name, componentId, layerId, color, materialId?, scale?, count, encoding, transforms }`,
    `transforms` = base64 of `count x 6` little-endian float64 `[x, y, z, rx, ry, rz]` (document units; rotation = the Euler XYZ of
@@ -74,6 +74,12 @@ graph before a single triangle exists, and 234 B of JSON per bolt that differs f
    the explicit table anyway; one storage form beats two. A generator stays the command's input.
    (d) A new "prototype table" beside components: duplicates `Component` and every consumer of it.
 
+## Consequences of "not every placed geometry is an Entity"
+
+- **Selection and edits.** A member has no Entity, so `doc.selection`, `delete_entities`, `move` / `rotate` and every command taking an entity id refuse a member id as an unknown entity (an id with `#` is never a valid Entity id: load refuses it, `validateDocumentValues`). The only edit is replacing the array (re-run the step) until `detach_array_instances`. Selecting and picking members is next step 2.
+- **Surfaces that do not read arrays yet** say so instead of silently omitting them: the choke point `execute` appends "N instance arrays (M members) not included" to the summary of `export_gltf`, `export_obj`, `export_stl`, `export_3mf`, `export_step_ap242`, `export_iges`, `export_code`, `check_clashes`, `bill_of_materials`, `fit_view`, `render_view`, `render_walkthrough` and `explode_instance` (`commands/instanceArray/omittedNotice.ts`; remove a name when the command supports arrays). Aware today: `planScene`, `render_stats`, save / load / replay.
+- **Not covered by that list (host and UI, also unaware):** the host `export_step` (Python bridge, built from the feature program), viewport drawing, picking and zoom-extents, copy / paste, the section / measure / clearance tools that iterate `doc.entities`. Each is a next step below.
+
 ## Interaction table
 
 | Concern     | Rule                                                                                                                                                   |
@@ -99,7 +105,7 @@ graph before a single triangle exists, and 234 B of JSON per bolt that differs f
 2. Viewport: draw array members from the packed table (`InstancedMesh` matrices straight from the decoded columns), picking by member id, array selection.
 3. Per-instance columns (class index, colour index) and `detach_array_instances`; plugin-derived arrays omitted on save.
 4. Streaming tiles (octree <= 50 000), prototype LOD by projected size, Hi-Z occlusion with one-frame latency, impostors, terrain / sky / sun.
-5. `export_gltf` / `check_clashes` / BOM over arrays (glTF `EXT_mesh_gpu_instancing` maps one array to one node directly).
+5. `export_gltf` / `check_clashes` / BOM over arrays (glTF `EXT_mesh_gpu_instancing` maps one array to one node directly), then the other surfaces of the notice list, the host `export_step`, copy / paste and the measure / section tools; each removes its name from `omittedNotice.ts`.
 
 ## Addendum (2026-11-04, from lane VIS-M8i): how planScene reads arrays
 

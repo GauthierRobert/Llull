@@ -229,3 +229,21 @@ describe('load_document: prototype keys and layerOrder', () => {
     expect(deserializeDocument(json).layerOrder).toHaveLength(1);
   });
 });
+
+describe('load_document: document uid (VIS-ID)', () => {
+  it.each([[{ a: 1 }], [7], [''], ['zz'], ['A'.repeat(32)], ['a'.repeat(31)], ['a'.repeat(33)], [null]])('refuses uid %j', (uid) => {
+    expectRejected(
+      tampered((raw) => {
+        raw['uid'] = uid;
+      }),
+      'uid must be a 32-hex string',
+    );
+  });
+
+  it('keeps a valid uid through save and load, and loads a document without one', () => {
+    const doc = built();
+    expect(doc.uid).toMatch(/^[0-9a-f]{32}$/);
+    expect(deserializeDocument(serializeDocument(doc)).uid).toBe(doc.uid);
+    expect(deserializeDocument(tampered((raw) => void delete raw['uid'])).uid).toBeUndefined();
+  });
+});

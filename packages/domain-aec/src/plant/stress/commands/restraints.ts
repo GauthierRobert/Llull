@@ -12,15 +12,15 @@ import { isRefusal, modelOr } from './common';
 
 /**
  * @affects plant.stress.models[modelId].restraints: one restraint appended; the approval is dropped
- * @invariant restraints add to the mapped pipe supports; on the same degree of freedom and side the later one wins (PST_RESTRAINT_OVERRIDDEN in the analysis); directions are global axes
+ * @invariant restraints add to the mapped pipe supports; on the same degree of freedom and side the later one wins (PST_RESTRAINT_OVERRIDDEN in the analysis); directions are global axes unless `direction` is given
  * @failure unknown model -> PST_MODEL_NOT_FOUND; pipe outside the model -> PST_POINT_OFF_PIPE; unknown support -> PST_SUPPORT_NOT_FOUND; translational without axis, axis on another kind, oneWay / gap on an anchor -> PST_PARAM_INVALID
  */
 export const addStressRestraint = defineCommand({
   name: 'add_stress_restraint',
   description:
     'Add a restraint to a stress model on top of the pipe supports it maps (anchor, shoe, guide, hanger). Place it with at = {supportId} (the node of an existing pipe support) or {pipeId, atMm} (arc length along the pipe centreline, mm). ' +
-    'Kinds: anchor (all six degrees of freedom), rest (vertical, reacts upward only, friction on the horizontal plane), guide (horizontal lateral restraint, two-way, gap on each side; needs a pipe along a global horizontal axis or vertical), ' +
-    'translational (one global axis x / y / z; oneWay "+" reacts along +axis only, "-" along -axis only, absent = two-way). gapMm is the free travel before contact (default 0); frictionCoefficient on a rest or translational restraint overrides the model friction. ' +
+    'Kinds: anchor (all six degrees of freedom), rest (vertical, reacts upward only, friction on the horizontal plane), guide (horizontal lateral restraint perpendicular to the pipe, two-way, gap on each side; a pipe oblique in plan gets an oblique guide, a vertical pipe two), ' +
+    'translational (one global axis x / y / z, or an oblique `direction` vector in global axes for a restraint at any angle; oneWay "+" reacts along +axis only, "-" along -axis only, absent = two-way). gapMm is the free travel before contact (default 0); frictionCoefficient on a rest or translational restraint overrides the model friction. ' +
     'One-way, gap and friction behaviour is solved per load case (bounded iterations; PST_NONLINEAR_NOT_CONVERGED when it does not settle). Returns data { modelId, restraintId }.',
   params: z.object({
     modelId: z.string().min(1).describe('Id of the stress model.'),
@@ -34,7 +34,13 @@ export const addStressRestraint = defineCommand({
       ])
       .describe('Where: {supportId} or {pipeId, atMm}.'),
     kind: z.enum(RESTRAINT_KINDS).describe('anchor | rest | guide | translational.'),
-    axis: z.enum(['x', 'y', 'z']).describe('Translational only: the global axis restrained.').optional(),
+    axis: z.enum(['x', 'y', 'z']).describe('Translational only: the global axis restrained (or give direction).').optional(),
+    direction: z
+      .tuple([z.number(), z.number(), z.number()])
+      .describe(
+        'Translational only, instead of axis: an oblique direction [x, y, z] in global axes (any non-zero vector; normalised). The restraint blocks translation along it; oneWay and gapMm apply along it; no friction on an oblique direction.',
+      )
+      .optional(),
     oneWay: z
       .enum(['+', '-'])
       .describe('Translational only: "+" reacts along +axis only (blocks motion toward -axis, like a rest on +z); omit for two-way.')
@@ -53,10 +59,14 @@ export const addStressRestraint = defineCommand({
     if (isRefusal(model)) return model;
     const fail = (code: string, message: string, ids: readonly string[], paths: readonly string[]): CommandResult =>
       refuse(doc, 'add_stress_restraint', code, message, ids, paths);
-    if (params.kind === 'translational' && params.axis === undefined)
-      return fail('PST_PARAM_INVALID', 'a translational restraint needs axis', [model.id], ['axis']);
-    if (params.kind !== 'translational' && (params.axis !== undefined || params.oneWay !== undefined))
-      return fail('PST_PARAM_INVALID', 'axis and oneWay apply to translational restraints only', [model.id], ['axis']);
+    if (params.kind === 'translational' && (params.axis === undefined) === (params.direction === undefined))
+      return fail('PST_PARAM_INVALID', 'a translational restraint needs exactly one of axis and direction', [model.id], ['axis']);
+    if (params.kind !== 'translational' && (params.axis !== undefined || params.direction !== undefined || params.oneWay !== undefined))
+      return fail('PST_PARAM_INVALID', 'axis, direction and oneWay apply to translational restraints only', [model.id], ['axis']);
+    if (params.direction !== undefined && !(Math.hypot(...params.direction) > 1e-9))
+      return fail('PST_PARAM_INVALID', 'direction must be a non-zero vector', [model.id], ['direction']);
+    if (params.direction !== undefined && (params.frictionCoefficient ?? 0) > 0)
+      return fail('PST_PARAM_INVALID', 'friction is modelled on axis-aligned restraints only', [model.id], ['frictionCoefficient']);
     if (params.kind === 'anchor' && (params.gapMm !== undefined || params.frictionCoefficient !== undefined))
       return fail('PST_PARAM_INVALID', 'an anchor has no gap or friction', [model.id], ['gapMm']);
     if ('supportId' in params.at) {
@@ -76,6 +86,7 @@ export const addStressRestraint = defineCommand({
       at: params.at,
       kind: params.kind,
       ...(params.axis === undefined ? {} : { axis: params.axis }),
+      ...(params.direction === undefined ? {} : { direction: params.direction }),
       ...(params.oneWay === undefined ? {} : { oneWay: params.oneWay }),
       ...(params.gapMm === undefined ? {} : { gapMm: params.gapMm }),
       ...(params.frictionCoefficient === undefined ? {} : { frictionCoefficient: params.frictionCoefficient }),

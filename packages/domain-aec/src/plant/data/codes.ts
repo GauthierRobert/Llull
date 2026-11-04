@@ -44,6 +44,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DAT_TAG_CASE_COLLISION: 'Rename one of the tags: tags are compared case-sensitively but a case-only difference is almost always a typo.',
   DAT_TAG_MODEL_MISMATCH:
     'The model object still carries another tag (renamed after tagging): re-run set_plant_properties on a tag-driving property, or rename the model object back.',
+  DAT_DIRECT_RENAME:
+    'Change the tag through plant data (set_plant_properties on a tag-driving property, set_tag_format with retag), or unassign_plant_object first to rename the equipment freely.',
   DAT_TARGET_UNKNOWN: 'Pass an element id (building_schedule), a routed line id (piping_takeoff), { provider, id } or "reserved".',
   DAT_TARGET_ALREADY_TAGGED: 'Call unassign_plant_object on the existing object first.',
   DAT_TARGET_TAG_READONLY:

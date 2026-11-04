@@ -65,7 +65,7 @@ export const createStressModel = defineCommand({
     'Scope: pipeIds (building pipes from add_pipe_run, or 02 RTE run ids from route_pipe) or lineId (all runs of a plant pipeline). Units: mm, N, MPa, degC, bar g; Z is up; the document must be in mm. ' +
     '`rule` names the code and edition (B31.3-2016 .. 2024, B31.1-2016 .. 2022); there is no default edition. Named defaults, listed in the result and in every analysis: maxElementLengthMm 3000, elbowRadiusFactor 1.5 (long radius bends of R = 1.5 x nominal size at corners that carry no RTE bend radius; 0 keeps sharp corners with k = 1 and i = 1), frictionCoefficient 0.3 (steel on steel). ' +
     'Next: set_pipe_operating_conditions, set_stress_load_cases (preset b31.3-default), pipe supports (add_pipe_support: anchor, shoe, guide, hanger map to restraints) or add_stress_restraint, then analyze_pipe_stress and check_pipe_stress. ' +
-    'Run bends come from the RTE derivation; tees, branches and reducers are not modelled yet (PST_BRANCH_UNSUPPORTED / PST_COMPONENT_UNSUPPORTED at analysis). Returns data { modelId, scope, rule, defaulted }.',
+    'Run bends come from the RTE derivation; a pipe end on another pipe is a tee with its code SIF, RTE valves are rigid bodies and reducers elastic elements (weights and fittings: set_stress_component). Returns data { modelId, scope, rule, defaulted }.',
   params: z.object({
     name: z.string().min(1).describe('Model name, e.g. "P-101 hot line".'),
     pipeIds: pipeIdsParam.optional(),
@@ -132,6 +132,9 @@ export const createStressModel = defineCommand({
       loadCases: [],
       forces: [],
       restraints: [],
+      displacements: [],
+      sifOverrides: [],
+      components: [],
     };
     return {
       ...changed(

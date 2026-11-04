@@ -17,6 +17,7 @@ import type { ViewName } from './camera';
 import { makeProjector } from './camera';
 import { renderDocument } from './scene';
 import { resolveRenderOptions } from './options';
+import { surfaceShadingOf } from './surfaceShading';
 import { extractSvgInner, r2, svgDocument } from './svg';
 
 /** The part of simulate_motion's `data` (detail 'poses') this command reads. */
@@ -168,7 +169,14 @@ export const renderMotion = defineCommand({
     const layers: string[] = [];
     const frames = indices.map((index, k) => {
       const frameDoc = frameDocs[k] ?? doc;
-      const data = renderDocument(frameDoc, view, width, height, { ...resolved.options, frame, background: null, caption: false });
+      const shading = surfaceShadingOf(frameDoc, ctx);
+      const data = renderDocument(frameDoc, view, width, height, {
+        ...resolved.options,
+        frame,
+        background: null,
+        caption: false,
+        ...(shading === undefined ? {} : { shading }),
+      });
       const x = (k % columns) * width;
       const y = Math.floor(k / columns) * cellHeight;
       const time = poses.times[index] ?? 0;

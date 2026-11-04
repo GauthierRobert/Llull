@@ -17,10 +17,13 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PST_WALL_UNKNOWN: 'Bind the pipe to a spec (assign_pipe_spec) or give wallMm in set_pipe_operating_conditions.',
   PST_BEND_TOO_TIGHT: 'Lengthen the leg, reduce elbowRadiusFactor, or lower the bend radius of the run.',
   PST_BRANCH_UNSUPPORTED:
-    'Tees and branches arrive with M5: model each header or branch as its own stress model, or end the pipes at the junction.',
-  PST_COMPONENT_UNSUPPORTED: 'Reducers and branches arrive with M5: analyse the straight reducer-free runs separately.',
-  PST_RESTRAINT_OBLIQUE:
-    'A lateral guide needs a pipe along a horizontal global axis or a vertical one; add a translational restraint on an axis instead.',
+    'Only 90 degree tees on straight header pipe are modelled: move the branch off the bend or the pipe end, or model the Y / cross junction as separate models.',
+  PST_COMPONENT_UNSUPPORTED: 'Move the valve, flange or reducer onto straight pipe between two nodes (not across a bend).',
+  PST_COMPONENT_NOT_FOUND:
+    'Name an inline valve or reducer of an RTE run of the model (piping_takeoff lists them), or a declared record id.',
+  PST_DISPLACEMENT_NOT_ANCHORED:
+    'An imposed displacement moves an anchor: add an anchor at that node (add_stress_restraint kind anchor) or place it on an existing anchor.',
+  PST_SIF_NOT_FOUND: 'Pass the id returned by set_sif_override (data.overrideId).',
   PST_UNSTABLE: 'Add an anchor or a guide at the listed node (add_pipe_support type anchor, or add_stress_restraint).',
   PST_MODEL_TOO_LARGE: 'Analyse fewer pipes at once or raise maxElementLengthMm.',
   PST_NONLINEAR_NOT_CONVERGED: 'Remove the gap or one-way action at the listed restraints, or make them two-way, then re-run.',
@@ -41,13 +44,23 @@ const FINDING_REMEDIATION: Readonly<Record<string, string>> = {
   PST_SUSTAINED_OVERSTRESS: 'Add supports near the node (shorter span) or reduce the weight.',
   PST_EXPANSION_OVERSTRESS: 'Add flexibility (loop or offset), or move guides and line stops.',
   PST_OCCASIONAL_OVERSTRESS: 'Add guides or restraints for the occasional direction.',
+  PST_HYDROTEST_OVERSTRESS:
+    'Support the line for the water-filled weight (temporary supports) or lower the test pressure; check the stated hydrotest allowable.',
+  PST_SIF_OVERRIDE:
+    'A user SIF replaces the code value at that node: keep its source note current and have a qualified engineer confirm it.',
+  PST_SIF_PLANE_UNKNOWN:
+    'Place the override on a bend or a tee (where the plane is known) or give equal in-plane and out-of-plane factors.',
   PST_SUPPORT_LIFTOFF: 'Move or add a support, or use a hanger or spring.',
   PST_DISPLACEMENT_LIMIT: 'Check clearances at the listed nodes.',
   PST_CASE_INCOMPLETE: 'Add a sustained (SUS) and an expansion (EXP) load case; preset b31.3-default does it.',
   PST_SIF_EDITION: 'Give the B31J values (a later milestone) or have a qualified engineer confirm.',
   PST_MATERIAL_UNVERIFIED: 'Use a sourced thermal strain model (a signed material record).',
   PST_DISCONNECTED: 'Connect the runs or analyse the systems separately; each needs its own restraints.',
-  PST_COMPONENT_AS_PIPE: 'Valve weight and stiffness are not modelled: a later milestone.',
+  PST_TEE_FITTING_ASSUMED:
+    'set_stress_component with branchPipeId and the fitting (welding_tee, weldolet, reinforced_tee, unreinforced_tee).',
+  PST_COMPONENT_WEIGHT_MISSING: 'set_stress_component with weightKg (catalogue weight of the valve or flange).',
+  PST_REDUCER_SIF:
+    'A reducer has no code factor in a read source: take the manufacturer or B31J value and confirm with a qualified engineer.',
   PST_SHARP_CORNERS: 'Give elbowRadiusFactor 1.5 (long radius) for bends with SIFs.',
   PST_RESTRAINT_OVERRIDDEN: 'Two restraints act on the same degree of freedom; the later one is used.',
   PST_INSTALL_TEMP_DEFAULTED: 'Set installTempC explicitly.',

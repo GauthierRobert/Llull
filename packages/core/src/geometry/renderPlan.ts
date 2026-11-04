@@ -13,7 +13,7 @@ import type { Bounds } from './bounds';
 import { entityBounds, entityBoundsInDoc } from './bounds';
 import { assignedMaterialClass, materialClassPlanKey } from './materialClasses';
 import { entityToTriangles } from './entityTriangles';
-import { decodedTransforms, memberAsInstance, memberBounds } from './instanceArrays';
+import { decodedTransforms, eachMemberBounds, memberAsInstance } from './instanceArrays';
 import { instanceMemberId } from '../model/instanceArray';
 import { type FrustumPlane, type PlanCamera, frustumPlanes, planCameraProblem } from './renderPlanCamera';
 
@@ -89,7 +89,7 @@ export interface RenderPlan {
   readonly levels: Uint8Array;
 }
 
-const NON_GEOMETRY_KEYS = new Set([
+export const NON_GEOMETRY_KEYS: ReadonlySet<string> = new Set([
   'id',
   'kind',
   'position',
@@ -132,6 +132,75 @@ export function prototypeKeyOf(entity: Entity): string {
   return `${entity.kind}|${params.map(([key, value]) => `${key}=${canonical(value)}`).join(';')}`;
 }
 
+interface KeyTrieNode {
+  /** Created on the first step below the node: leaves carry none. */
+  children: Map<unknown, KeyTrieNode> | undefined;
+  key: string | undefined;
+}
+
+const ARRAY_OPEN = Symbol('array-open');
+const ARRAY_CLOSE = Symbol('array-close');
+const ABSENT = Symbol('absent');
+/** Trie nodes after which the keyer stops walking and caching (parameters that vary continuously would grow the trie by a path per entity). */
+const KEY_TRIE_NODE_CAP = 100_000;
+
+/**
+ * `prototypeKeyOf` with a per-call memo: the RAW (unrounded) shape parameters walk a trie, so entities with identical parameters (the usual
+ * case, 10^6 instances of a few prototypes) skip the canonical 6-significant-figure formatting and any string building. Entities holding
+ * nested data (or meshes), a scale that is not a number array, or arriving after the trie reached its node cap (the rest of the call) take the reference path.
+ * @invariant returns exactly `prototypeKeyOf(entity)`: the token path (kind, then key / value pairs; number arrays bracketed) determines every
+ *   value the canonical form reads, and Map keys keep number, string and boolean tokens apart
+ */
+function createPrototypeKeyer(): (entity: Entity) => string {
+  const root: KeyTrieNode = { children: undefined, key: undefined };
+  let nodeCount = 0;
+  const step = (node: KeyTrieNode | undefined, token: unknown): KeyTrieNode | undefined => {
+    if (node === undefined) return undefined;
+    const children = (node.children ??= new Map());
+    let next = children.get(token);
+    if (next === undefined) {
+      nodeCount++;
+      next = { children: undefined, key: undefined };
+      children.set(token, next);
+    }
+    return next;
+  };
+  const numbers = (node: KeyTrieNode | undefined, values: unknown): KeyTrieNode | undefined => {
+    if (!Array.isArray(values)) return undefined;
+    let at = step(node, ARRAY_OPEN);
+    for (const item of values) {
+      if (typeof item !== 'number') return undefined;
+      at = step(at, item);
+    }
+    return step(at, ARRAY_CLOSE);
+  };
+  const walk = (entity: Entity): KeyTrieNode | undefined => {
+    let node = step(root, entity.kind);
+    if (entity.kind === 'instance') {
+      node = step(node, entity.componentId);
+      return entity.scale === undefined ? step(node, ABSENT) : numbers(node, entity.scale);
+    }
+    const record = entity as unknown as Record<string, unknown>;
+    for (const key in record) {
+      if (NON_GEOMETRY_KEYS.has(key)) continue;
+      const value = record[key];
+      const at = step(node, key);
+      if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') node = step(at, value);
+      else if (value === undefined) node = step(at, ABSENT);
+      else node = numbers(at, value);
+      if (node === undefined) return undefined;
+    }
+    return node;
+  };
+  return (entity) => {
+    if (entity.kind === 'mesh' || nodeCount >= KEY_TRIE_NODE_CAP) return prototypeKeyOf(entity);
+    const leaf = walk(entity);
+    if (leaf === undefined) return prototypeKeyOf(entity);
+    leaf.key ??= prototypeKeyOf(entity);
+    return leaf.key;
+  };
+}
+
 /**
  * Material class of an entity by default: its assigned display class as `matclass:<id>` (assign_material_class), else its `materialId`, else
  * `unassigned`. The prefix keeps a `materialId` equal to a class id in its own bucket.
@@ -141,7 +210,30 @@ const defaultMaterialClassOf = (doc: CadDocument, entity: Entity): string => {
   return assigned === undefined ? (entity.materialId ?? 'unassigned') : materialClassPlanKey(assigned.id);
 };
 
+/** The default material class of `doc`; a document with no class assignment skips the per-entity assignment lookup. */
+const defaultMaterialClassFn = (doc: CadDocument): ((entity: Entity) => string) =>
+  doc.display?.materialClassOf === undefined
+    ? (entity) => entity.materialId ?? 'unassigned'
+    : (entity) => defaultMaterialClassOf(doc, entity);
+
 const diagonalOf = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+
+/**
+ * Diagonal of the unrotated world box of a 3D entity (`entityBounds`), straight from the shape parameters for box and cylinder (same
+ * operations as `entityBounds`, no boxes allocated); every other kind goes through `entityBounds`.
+ */
+function unrotatedDiagonal(entity: Entity): number {
+  const [px, py, pz] = entity.position;
+  if (entity.kind === 'box') {
+    const [x, y, z] = [entity.size[0] / 2, entity.size[1] / 2, entity.size[2] / 2];
+    return Math.hypot(px + x - (px + -x), py + y - (py + -y), pz + z - (pz + -z));
+  }
+  if (entity.kind === 'cylinder') {
+    const [r, z] = [entity.radius, entity.height / 2];
+    return Math.hypot(px + r - (px + -r), py + r - (py + -r), pz + z - (pz + -z));
+  }
+  return diagonalOf(entityBounds(entity));
+}
 
 /**
  * Every visible 3D entity of the document as a batchable instance.
@@ -149,10 +241,7 @@ const diagonalOf = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0],
  *   (children are not expanded into the plan); the members of every instance array (VIS1) follow, array by array, in table order, with
  *   the same prototype key, AABB and diagonal as the equivalent `instance` entity and the id `<arrayId>#<index>`
  */
-export function planScene(
-  doc: CadDocument,
-  materialClassOf: (entity: Entity) => string = (entity) => defaultMaterialClassOf(doc, entity),
-): PlanScene {
+export function planScene(doc: CadDocument, materialClassOf: (entity: Entity) => string = defaultMaterialClassFn(doc)): PlanScene {
   const prototypeIndex = new Map<string, number>();
   const classIndex = new Map<string, number>();
   const prototypeTriangles: number[] = [];
@@ -177,18 +266,26 @@ export function planScene(
     }
     return slot;
   };
+  const keyOf = createPrototypeKeyer();
+  const kindIs3D = new Map<string, boolean>();
   for (const id of doc.order) {
     const entity = Object.hasOwn(doc.entities, id) ? doc.entities[id] : undefined;
-    if (entity === undefined || !is3D(entity)) continue;
+    if (entity === undefined) continue;
+    let solid = kindIs3D.get(entity.kind);
+    if (solid === undefined) {
+      solid = is3D(entity);
+      kindIs3D.set(entity.kind, solid);
+    }
+    if (!solid) continue;
     if (doc.layers[entity.layerId]?.visible === false) {
       hiddenCount++;
       continue;
     }
-    const prototype = prototypeOf(prototypeKeyOf(entity), () => entityToTriangles(entity, doc).length);
+    const prototype = prototypeOf(keyOf(entity), () => entityToTriangles(entity, doc).length);
     prototypeCounts[prototype] = (prototypeCounts[prototype] ?? 0) + 1;
     const materialClass = classOf(materialClassOf(entity));
     const aabb = entityBoundsInDoc(doc, entity);
-    const diagonal = entity.kind === 'instance' ? diagonalOf(aabb) : diagonalOf(entityBounds(entity));
+    const diagonal = entity.kind === 'instance' ? diagonalOf(aabb) : unrotatedDiagonal(entity);
     instances.push({ id, prototype, materialClass, aabb, diagonal });
   }
   for (const array of Object.values(doc.instanceArrays ?? {})) {
@@ -199,12 +296,12 @@ export function planScene(
     const table = decodedTransforms(array);
     const first = memberAsInstance(array, 0);
     if (table === null || first === null) continue;
-    const prototype = prototypeOf(prototypeKeyOf(first), () => entityToTriangles(first, doc).length);
+    const prototype = prototypeOf(keyOf(first), () => entityToTriangles(first, doc).length);
     prototypeCounts[prototype] = (prototypeCounts[prototype] ?? 0) + array.count;
     const materialClass = classOf(array.materialId ?? 'unassigned');
-    let index = 0;
-    for (const aabb of memberBounds(doc, array, table))
-      instances.push({ id: instanceMemberId(array.id, index++), prototype, materialClass, aabb, diagonal: diagonalOf(aabb) });
+    eachMemberBounds(doc, array, table, (index, aabb) =>
+      instances.push({ id: instanceMemberId(array.id, index), prototype, materialClass, aabb, diagonal: diagonalOf(aabb) }),
+    );
   }
   return {
     instances,

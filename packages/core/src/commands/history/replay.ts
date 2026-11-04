@@ -130,6 +130,7 @@ export function replayHistory(
     layerOrder: base.layerOrder,
     featureHistory: history,
     ...(base.nextStepNumber !== undefined ? { nextStepNumber: base.nextStepNumber } : {}),
+    ...(base.uid !== undefined ? { uid: base.uid } : {}),
     // Recipes must survive replay so that a recorded `instantiate_recipe` step can
     // re-expand its recipe when this history is replayed again (e.g. via replay_history).
     recipes: base.recipes,

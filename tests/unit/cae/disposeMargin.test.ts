@@ -9,6 +9,7 @@ import { isRecord } from '@lib/isRecord';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { marginDispositionPayload } from '@cae/margins/disposition';
 import { withCase } from '@cae/shared/access';
+import { expectRefusesWithoutUid } from '../../helpers/documentBinding';
 import { caseIn } from './helpers';
 import { mustRun } from './deckFixtures';
 import { marginBar, type MarginBar } from './marginsFixtures';
@@ -47,6 +48,7 @@ function signatureFor(b: MarginBar, row: Row, decision: string, justification: s
       decision,
       justification,
       resultsHash,
+      b.recorded.uid ?? '',
     ),
   };
 }
@@ -242,6 +244,7 @@ describe('the signed payload names the model set-up', () => {
       'accepted',
       justification,
       resultsHash,
+      bar.recorded.uid ?? '',
     );
     const result = execute(
       bar.recorded,
@@ -251,5 +254,88 @@ describe('the signed payload names the model set-up', () => {
     );
     expect(result.summary).toContain('FEA_HUMAN_GATE');
     expect(result.document).toBe(bar.recorded);
+  });
+});
+
+describe('dispose_margin: the signature is bound to the document (GATE-UID)', () => {
+  const failRow = rowsOf(computed(bar.recorded, bar.ctx))[0] as Row;
+  const justification = 'static test to 1.8 x limit load, report XYZ-12';
+  const params = { analysisId: bar.analysisId, rowId: failRow.rowId, decision: 'accepted', justification };
+  const accepted = execute(
+    bar.recorded,
+    'dispose_margin',
+    { ...params, signature: signatureFor(bar, failRow, 'accepted', justification) },
+    humanContext(),
+  );
+  const withStored = (patch: Partial<Disposition>, uid: string | undefined = accepted.document.uid): CadDocument => {
+    const analysis = caseIn(accepted.document, bar.analysisId);
+    const stored = analysis.dispositions[failRow.rowKey] as Disposition;
+    const { documentUid, ...rest } = stored;
+    void documentUid;
+    const document = withCase(accepted.document, { ...analysis, dispositions: { [failRow.rowKey]: { ...rest, ...patch } } });
+    return uid === undefined ? document : { ...document, uid };
+  };
+  const codes = (doc: CadDocument): string[] =>
+    (execute(doc, 'check_analysis', { analysisId: bar.analysisId }, humanContext()).data as { items: { code: string }[] }).items.map(
+      (entry) => entry.code,
+    );
+
+  it('records the uid of the document it was signed in, and counts there', () => {
+    expect(bar.recorded.uid).toMatch(/^[0-9a-f]{32}$/);
+    expect(caseIn(accepted.document, bar.analysisId).dispositions[failRow.rowKey]?.documentUid).toBe(bar.recorded.uid);
+    expect(rowsOf(computed(accepted.document, humanContext()))[0]).toMatchObject({ disposition: 'accepted' });
+  });
+
+  it('a disposition copied into another document does not count: the row is pending with FEA_DISPOSITION_FOREIGN_DOCUMENT (rows, warnings, check_analysis)', () => {
+    const copied = { ...accepted.document, uid: 'f'.repeat(32) };
+    const margins = computed(copied, humanContext());
+    const row = rowsOf(margins)[0] as Row & { dispositionCode?: string };
+    expect(row).toMatchObject({ disposition: 'pending_human', dispositionCode: 'FEA_DISPOSITION_FOREIGN_DOCUMENT' });
+    expect(row.dispositionNote).toContain('another document');
+    expect((margins.data as { warnings: string[] }).warnings.some((text) => text.startsWith('FEA_DISPOSITION_FOREIGN_DOCUMENT: '))).toBe(
+      true,
+    );
+    expect(codes(copied)).toContain('FEA_DISPOSITION_FOREIGN_DOCUMENT');
+    expect(codes(accepted.document)).not.toContain('FEA_DISPOSITION_FOREIGN_DOCUMENT');
+  });
+
+  it('a disposition that records no document uid does not count: FEA_DISPOSITION_UNBOUND', () => {
+    const unbound = withStored({});
+    const row = rowsOf(computed(unbound, humanContext()))[0] as Row & { dispositionCode?: string };
+    expect(row).toMatchObject({ disposition: 'pending_human', dispositionCode: 'FEA_DISPOSITION_UNBOUND' });
+    expect(codes(unbound)).toContain('FEA_DISPOSITION_UNBOUND');
+  });
+
+  it('a document without a uid refuses to sign (dispose_margin and its payload query): FEA_DOCUMENT_UNIDENTIFIED, unchanged', () => {
+    const { uid, ...unidentified } = bar.recorded;
+    void uid;
+    for (const name of ['dispose_margin', 'margin_disposition_payload']) {
+      const extra = name === 'dispose_margin' ? { signature: { payload: 'x' } } : {};
+      const result = execute(unidentified, name, { ...params, ...extra }, humanContext());
+      expect(result.error?.code, name).toBe('FEA_DOCUMENT_UNIDENTIFIED');
+      expect(result.document).toBe(unidentified);
+    }
+  });
+
+  it('every re-verified gate refuses a uid-less document after the port check (shared helper)', () => {
+    expectRefusesWithoutUid(
+      bar.recorded,
+      (document, signature, ctx) =>
+        execute(document, 'dispose_margin', { ...params, signature }, { ...bar.ctx, humanSignature: ctx.humanSignature ?? null }),
+      'FEA_DOCUMENT_UNIDENTIFIED',
+      'FEA_HUMAN_GATE',
+    );
+  });
+
+  it('a signature made in this document is refused in a copy of it: FEA_HUMAN_GATE', () => {
+    const copy = { ...bar.recorded, uid: 'f'.repeat(32) };
+    const result = execute(
+      copy,
+      'dispose_margin',
+      { ...params, signature: signatureFor(bar, failRow, 'accepted', justification) },
+      humanContext(),
+    );
+    expect(result.error?.code).toBe('FEA_HUMAN_GATE');
+    expect(result.document).toBe(copy);
   });
 });

@@ -8,6 +8,7 @@ import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
 import { plantDataCatalog } from './catalog';
 import { getPlantData, own, withPlantData } from './model';
+import { directRenameGuard } from './directRenameGuard';
 import { registerBuiltinProviders } from './providersBuiltin';
 import { plantDataErrors } from './validate';
 
@@ -37,6 +38,7 @@ export const plantDataPlugin: CadPlugin = {
   name: 'plant-data',
   toolset: 'plant_data',
   commands: plantDataCatalog,
+  guards: [directRenameGuard],
   onInstall: registerBuiltinProviders,
   document: plantDataDocument,
 };

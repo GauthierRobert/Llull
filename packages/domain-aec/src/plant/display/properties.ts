@@ -1,7 +1,7 @@
 /**
  * Entity property provider of the plant display plugin (plant 09 VIS §3.3): resolves a derived entity to its owning element and returns the
  * domain facts colour rules match on. Building elements: `category`, `mark`; pipes add `service`, `line`, `dn`, `odMm`, `material`, `from`, `to`;
- * equipment adds `equipmentShape`. Plant piping part entities (02 RTE) add `service`, `line`, `dn`, `spec`, `partKind`, `odMm` (pipe pieces and elbows only), `insulationMm`, `from`, `to`.
+ * equipment adds `equipmentShape`. Both add `defaultMaterialClass` (the class shading uses when none is assigned, `defaultMaterialClass.ts`). Plant piping part entities (02 RTE) add `service`, `line`, `dn`, `spec`, `partKind`, `odMm` (pipe pieces and elbows only), `insulationMm`, `from`, `to`.
  */
 
 import type { PropertyValue } from '@core/model/display';
@@ -11,6 +11,7 @@ import { buildingElementOf } from '../../building/evaluate/integrity';
 import type { BuildingElement } from '../../building/types';
 import { getPiping } from '../piping/model';
 import { pipeOutsideDiameter } from '../piping/specLookup';
+import { defaultClassOfElement, defaultClassOfRunPart } from './defaultMaterialClass';
 
 type Bag = Record<string, PropertyValue>;
 
@@ -20,6 +21,7 @@ const set = (bag: Bag, key: string, value: PropertyValue | undefined): void => {
 
 function elementProperties(element: BuildingElement): PropertyBag {
   const bag: Bag = { category: element.category, mark: element.mark };
+  set(bag, 'defaultMaterialClass', defaultClassOfElement(element));
   if (element.category === 'pipe') {
     bag['service'] = element.service;
     bag['material'] = element.material;
@@ -44,6 +46,7 @@ function runProperties(doc: CadDocument, entityId: string): PropertyBag {
   const bag: Bag = { category: 'pipe', service: line.service, line: line.lineNumber, dn: line.dn, spec: line.spec };
   const kind = entityId.split('/')[1]?.replace(/-\d+$/, '');
   set(bag, 'partKind', kind);
+  bag['defaultMaterialClass'] = defaultClassOfRunPart(kind);
   // The outside diameter is that of the pipe itself: pipe pieces and elbows only, not flanges or gaskets.
   if (kind === 'pipe' || kind === 'elbow') set(bag, 'odMm', pipeOutsideDiameter(doc, line.spec, line.dn) ?? undefined);
   set(bag, 'insulationMm', line.insulation?.thicknessMm);

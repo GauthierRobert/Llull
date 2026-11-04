@@ -59,6 +59,16 @@
       "expected": { "codes": ["PST_EDITION_DEFAULTED", "PST_CYCLES_DEFAULTED", "PST_INSTALL_TEMP_DEFAULTED", "PST_MATERIAL_UNVERIFIED", "PST_SUPPORT_LIFTOFF", "PST_RESULTS_STALE", "PST_HUMAN_GATE"], "reviewRequired": true },
       "plan": "plans/sc-pst-04-supports-guardrails.json", "test": "tests/integration/pipeStressGuardrails.test.ts" },
     { "id": "VC-PST-19", "command": "pipe_sif (B31.3-2020+)", "grade": "C",
-      "expected": "TBD — measure with a licensed ASME B31J table or the CAESAR II B31J option; until then PST_SIF_EDITION is raised" }
+      "expected": "TBD — measure with a licensed ASME B31J table or the CAESAR II B31J option; until then PST_SIF_EDITION is raised" },
+    { "id": "VC-PST-20", "command": "set_stress_component, analyze_pipe_stress", "grade": "A (frame) / B (SIF)",
+      "expected": { "tipUzMm": 19.2964, "rootStressOutOfPlaneMPa": { "unreinforced": 105.317, "weldingTee": 49.536, "weldolet": 47.514 }, "inPlaneUnreinforcedMPa": 85.752, "nps3Io": { "unreinforced": 3.4795, "weldingTee": 1.6366, "weldolet": 1.5698 } },
+      "tolerance": "1e-5 (published 1e-4)", "plan": "plans/sc-pst-06-tee-components-loads.json", "test": "tests/unit/plant/stress/m5aComponents.test.ts" },
+    { "id": "VC-PST-21", "command": "set_stress_component, analyze_pipe_stress", "grade": "A",
+      "expected": "exact statics of a stated valve weight, rigid-length deflection (1e-3), stepped reducer beam (1e-6)", "test": "tests/unit/plant/stress/m5aComponents.test.ts" },
+    { "id": "VC-PST-22", "command": "add_stress_restraint (direction), set_stress_load_cases (displacements)", "grade": "A",
+      "expected": { "obliqueGuideReactionOverF": 2.5, "guidedCantileverForceN": 6472.51, "eulerBernoulliForceN": 6509.017 },
+      "tolerance": "1e-6", "plan": "plans/sc-pst-06-tee-components-loads.json", "test": "tests/unit/plant/stress/m5aLoads.test.ts" },
+    { "id": "VC-PST-23", "command": "set_pipe_operating_conditions (insulation, millTolerancePct, hydrotest), set_sif_override", "grade": "A",
+      "expected": "weights and section stresses of the reduced walls, override SIF stresses", "tolerance": "1e-6", "test": "tests/unit/plant/stress/m5aLoads.test.ts" }
   ]
 }

@@ -19,6 +19,7 @@ import type { AnalysisModel } from './analysis';
 import type { DrawingsModel } from './sheet';
 import type { PmiModel } from './pmi';
 import type { DynamicsModel } from './dynamics';
+import type { InstanceArray } from './instanceArray';
 import type { PrototypeModel } from './prototype';
 import type { ReviewModel } from './review';
 import type { DisplayModel } from './display';
@@ -636,6 +637,12 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   featureHistory: FeatureStep[];
   /** Next `step-<n>`; never reused so step-scoped entity ids stay unique. Absent = 1. */
   nextStepNumber?: number;
+  /**
+   * Document identity (VIS-ID): sha256 prefix of the first document-changing command (step number, name, params), sealed by `execute`, so a replay of
+   * the same plan re-mints it. Signatures of human acts bind to it, so a signed record copied into another document does not verify there.
+   * Absent until the first change.
+   */
+  uid?: string;
   /** Design table: variants of parameter expressions. */
   configurations: Record<string, Configuration>;
   /** Keyed by material name; referenced by `BaseEntity.materialId`. */
@@ -665,7 +672,7 @@ export interface CadDocument extends AssemblyPresentationFields, SketchPlaneFiel
   /** Absent until the first display command (`define_colour_profile`, `apply_service_colour_scheme`; plant 09 VIS). */
   display?: DisplayModel;
   /** Absent until the first `add_instance_array`: packed placements of a Component, no Entity per instance (plant 09 VIS-M8j, VIS1). */
-  instanceArrays?: Record<string, import('./instanceArray').InstanceArray>;
+  instanceArrays?: Record<string, InstanceArray>;
   /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
   kernelSettings?: DocumentKernelSettings;
   /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */

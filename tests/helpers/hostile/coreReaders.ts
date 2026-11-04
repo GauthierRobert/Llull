@@ -6,6 +6,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { evaluateExpression } from '@lib/expression';
 import { compileExpression } from '@lib/expressionProgram';
+import { float64ToBase64 } from '@lib/float64Base64';
 import { parseFont, validateGlyphs } from '@lib/font/font';
 import { parseHexRgb } from '@lib/isHexColor';
 import { parseImageDataUrl } from '@lib/imageDataUrl';
@@ -243,7 +244,7 @@ export const CORE_READERS: readonly HostileReader[] = [
       },
       {
         name: 'instance array: every double NaN',
-        input: () => arrayDocument((record) => (record['transforms'] = '/n8AAAAAAAA='.repeat(12).replace(/=/g, ''))),
+        input: () => arrayDocument((record) => (record['transforms'] = float64ToBase64(new Float64Array(24).fill(Number.NaN)))),
       },
       { name: 'instance array: table as a nested array', input: () => arrayDocument((record) => (record['transforms'] = [[[1]]])) },
       { name: 'instance array: component id __proto__', input: () => arrayDocument((record) => (record['componentId'] = '__proto__')) },

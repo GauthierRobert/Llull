@@ -151,7 +151,7 @@ export const setPlantProperties = defineCommand({
                 .map((change) => `${change.from} -> ${change.to}`)
                 .join(', ')})`
         }.`,
-        [...touchedIds, ...retagged.changes.map((change) => change.id).filter((id) => !touchedIds.includes(id))],
+        [...new Set([...touchedIds, ...retagged.changes.map((change) => change.id), ...retagged.rewritten])],
       ),
       data: { changed: values, objects: touchedIds, retagged: retagged.changes },
     };

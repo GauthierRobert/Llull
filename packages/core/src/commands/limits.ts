@@ -27,3 +27,7 @@ export const MAX_REVOLVE_SEGMENTS = 1_024;
 export const MAX_IMAGE_DATA_URL_LENGTH = 8_000_000;
 /** Largest raster side in pixels: the common WebGL texture size limit. */
 export const MAX_IMAGE_PIXEL_SIDE = 16_384;
+/** import_gltf: node expansions of the scene walk (a node reached through two parents counts twice), placed instances, and node-tree depth. */
+export const MAX_GLTF_NODES = 200_000;
+export const MAX_GLTF_INSTANCES = 1_000_000;
+export const MAX_GLTF_DEPTH = 64;

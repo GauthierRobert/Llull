@@ -4,6 +4,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
+import { documentIdentity } from '@core/model/documentUid';
 import { analysisIdSchema } from '../shared/schemas';
 import { verifyDisposition } from './dispositionGate';
 import { isProblem, thermalCaseOf, type ThermalCase } from './access';
@@ -16,7 +17,7 @@ import { unverifiedInputs } from './unverified';
 interface RowDisposition {
   readonly disposition: unknown;
   /** The recorded disposition that did not re-verify: the row stays pending_human and says why. */
-  readonly unverifiedDisposition?: { readonly decision: string; readonly signer: string; readonly reason: string };
+  readonly unverifiedDisposition?: { readonly decision: string; readonly signer: string; readonly reason: string; readonly code?: string };
 }
 
 /**
@@ -28,22 +29,29 @@ function dispositionOf(
   row: LimitRow,
   resultsHash: string,
   port: HumanSignaturePort | null | undefined,
+  documentUid: string,
 ): RowDisposition {
   if (row.status === 'PASS') return { disposition: 'not_required' };
   const recorded = Object.hasOwn(found.thermal.dispositions, row.rowId) ? found.thermal.dispositions[row.rowId] : undefined;
   if (recorded === undefined || recorded.resultsHash !== resultsHash) return { disposition: 'pending_human' };
-  const check = verifyDisposition(port, found.analysisCase.id, row.rowId, recorded);
+  const check = verifyDisposition(port, found.analysisCase.id, row.rowId, recorded, documentUid);
   if (check.valid) return { disposition: recorded };
   return {
     disposition: 'pending_human',
-    unverifiedDisposition: { decision: recorded.decision, signer: recorded.signer, reason: check.reason },
+    unverifiedDisposition: {
+      decision: recorded.decision,
+      signer: recorded.signer,
+      reason: check.reason,
+      ...(check.code === undefined ? {} : { code: check.code }),
+    },
   };
 }
 
 /**
  * @invariant read-only; every row carries reviewRequired: true and a reason; no limit and no marginal band is ever defaulted; FAIL / MARGINAL
  *   rows are `pending_human` until dispose_thermal_limit records a signed disposition on the same results; a disposition counts only if its
- *   signature re-verifies through `ctx.humanSignature` against the payload, else it is listed as THM_DISPOSITION_UNVERIFIED and the row stays pending
+ *   signature re-verifies through `ctx.humanSignature` against the payload of THIS document (its uid), else it is listed as THM_DISPOSITION_UNVERIFIED and the
+ *   row stays pending; a disposition signed for another document (copied in) is the error THM_DISPOSITION_FOREIGN_DOCUMENT, one recording no uid THM_DISPOSITION_UNBOUND
  * @failure unknown analysis / other case type; stale results -> FEA_RESULTS_STALE; no results or artifacts -> FEA_RESULTS_MISSING (refusals)
  */
 export const checkTemperatureLimits = defineCommand({
@@ -54,7 +62,7 @@ export const checkTemperatureLimits = defineCommand({
     'reviewRequired: true, reviewReason, disposition }], items, summary }. marginK = limit - T for max (T - limit for min), in K; negative = ' +
     'exceeded (FAIL, THM_LIMIT_EXCEEDED). MARGINAL only when marginalBandK is given (never defaulted: ask the owner or the company rule). ' +
     'FAIL / MARGINAL rows are "pending_human": only a qualified reviewer accepts them (dispose_thermal_limit); a stored disposition counts only ' +
-    'when its signature re-verifies against the signing port (otherwise THM_DISPOSITION_UNVERIFIED and the row stays pending). Refused with FEA_RESULTS_STALE ' +
+    'when its signature re-verifies against the signing port for this document (otherwise THM_DISPOSITION_UNVERIFIED and the row stays pending; THM_DISPOSITION_FOREIGN_DOCUMENT / THM_DISPOSITION_UNBOUND, errors, for a disposition signed for another document or recording no document uid). Refused with FEA_RESULTS_STALE ' +
     'after any change since the solve, FEA_RESULTS_MISSING without results. Report the numbers and "computed by llull, not approved".',
   annotations: { readOnly: true },
   params: z.object({
@@ -94,7 +102,7 @@ export const checkTemperatureLimits = defineCommand({
       unverified: inputs.unverified,
       reviewRequired: true,
       reviewReason: REVIEW_REASON,
-      ...dispositionOf(found, row, artifacts.resultsHash, ctx?.humanSignature),
+      ...dispositionOf(found, row, artifacts.resultsHash, ctx?.humanSignature, documentIdentity(doc)),
     }));
     if (marginalBandK === undefined)
       items.push(item('THM_MARGINAL_BAND_UNSET', 'warning', 'no marginalBandK given: no row can be MARGINAL', [analysisId]));
@@ -102,8 +110,8 @@ export const checkTemperatureLimits = defineCommand({
       if (row.unverifiedDisposition !== undefined)
         items.push(
           item(
-            'THM_DISPOSITION_UNVERIFIED',
-            'warning',
+            row.unverifiedDisposition.code ?? 'THM_DISPOSITION_UNVERIFIED',
+            row.unverifiedDisposition.code === undefined ? 'warning' : 'error',
             `${row.rowId}: the recorded '${row.unverifiedDisposition.decision}' by ${row.unverifiedDisposition.signer} is not counted: ${row.unverifiedDisposition.reason}`,
             [row.rowId],
           ),

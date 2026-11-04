@@ -5,8 +5,12 @@ import { defaultContext } from '@core/commands/context';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { ExchangeWriteRequest } from '@core/geometry/kernelExchange';
+import { exportDocumentHash } from '@core/model/exportGate';
+import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { summarizeStep21 } from '@lib/step21/summary';
+import { expectBoundToDocument } from '../../helpers/documentBinding';
 import { fakeExactKernel } from '../../helpers/fakeExactKernel';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { TETRA } from '../../helpers/fakeKernel';
@@ -309,6 +313,27 @@ describe('export_step_ap242: unverified imported bodies (TR-XCH-26)', () => {
       { ...ctx, humanSignature: { verify: () => null, spend: () => true } },
     );
     expect(rejectedSignature.error?.code).toBe('XCH_HUMAN_GATE');
+  });
+
+  it('the signed payload names the document uid and a signature does not verify in a copy of the document (GATE-UID)', () => {
+    const { doc: unidentified, id } = flagged();
+    const doc = { ...unidentified, uid: 'a'.repeat(32) };
+    const seen: string[] = [];
+    const port = { verify: (_signature: unknown, payload: string) => (seen.push(payload), null), spend: () => true };
+    execute(doc, 'export_step_ap242', { acceptUnverified: { nonce: 'n1' } }, { ...ctxOf(fakeXdeKernel().kernel), humanSignature: port });
+    const details = withDocumentUid({ command: 'export_step_ap242', documentHash: exportDocumentHash(doc) }, doc);
+    expect(seen).toEqual([humanGatePayload('export of unverified bodies', [id], details, 'n1')]);
+    expectBoundToDocument(
+      doc,
+      (document, acceptUnverified, ctx) =>
+        execute(
+          document,
+          'export_step_ap242',
+          { acceptUnverified },
+          { ...ctxOf(fakeXdeKernel().kernel), humanSignature: ctx.humanSignature ?? null },
+        ),
+      'XCH_HUMAN_GATE',
+    );
   });
 });
 

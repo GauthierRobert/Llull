@@ -9,6 +9,8 @@ import { planSceneOf } from '@core/geometry/planSceneCache';
 import { base64ToFloat64, float64ToBase64 } from '@lib/float64Base64';
 import { instanceMemberId, parseInstanceMemberId, MAX_ARRAY_INSTANCES, type InstanceArray } from '@core/model/instanceArray';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { ARRAY_UNAWARE_COMMANDS, withOmittedArraysNotice } from '@core/commands/instanceArray/omittedNotice';
+import { getCommand } from '@core/commands/registry';
 import { apply, ok } from '../helpers/commandAssertions';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 
@@ -263,5 +265,93 @@ describe('float64 base64 codec', () => {
   it('refuses a wrong count and bad text', () => {
     expect(base64ToFloat64(float64ToBase64(Float64Array.of(1, 2)), 3)).toBeNull();
     expect(base64ToFloat64('AAAAAAAA8D8*', 1)).toBeNull();
+  });
+});
+
+describe('surfaces that do not read instance arrays say so', () => {
+  const withArray = (): CadDocument => apply(withBolt(), 'add_instance_array', GRID);
+  const SURFACES: readonly (readonly [string, Record<string, unknown>])[] = [
+    ['export_gltf', {}],
+    ['export_obj', {}],
+    ['export_stl', {}],
+    ['export_3mf', {}],
+    ['export_code', { language: 'cadquery' }],
+    ['check_clashes', {}],
+    ['bill_of_materials', {}],
+    ['fit_view', {}],
+    ['render_view', { view: 'top', mode: 'vector', width: 100, height: 100 }],
+    ['explode_instance', { id: 'nothing' }],
+  ];
+
+  it.each(SURFACES)('%s names the 12 omitted members', (name, params) => {
+    const result = execute(withArray(), name, params);
+    expect(result.rejected, result.summary).toBeUndefined();
+    expect(result.summary).toContain('1 instance array (12 members) not included');
+  });
+
+  it.each(SURFACES)('%s adds nothing without arrays', (name, params) => {
+    expect(execute(withBolt(), name, params).summary).not.toContain('instance array');
+  });
+
+  it('every listed command is annotated by the wrapper, a refusal and a document without arrays are not', () => {
+    const doc = withArray();
+    const done = { document: doc, summary: 'done.', affected: [] };
+    for (const name of ARRAY_UNAWARE_COMMANDS)
+      expect(withOmittedArraysNotice(doc, name, done).summary).toContain('(12 members) not included');
+    expect(withOmittedArraysNotice(doc, 'export_gltf', { ...done, rejected: true }).summary).toBe('done.');
+    expect(withOmittedArraysNotice(doc, 'render_stats', done).summary).toBe('done.');
+    expect(withOmittedArraysNotice(withBolt(), 'export_gltf', done).summary).toBe('done.');
+    expect([...ARRAY_UNAWARE_COMMANDS].every((name) => getCommand(name) !== undefined)).toBe(true);
+  });
+
+  it('render_stats, which reads arrays, is not annotated', () => {
+    expect(execute(withArray(), 'render_stats', { width: 100, height: 100 }).summary).not.toContain('not included');
+  });
+});
+
+describe('add_instance_array overflow and property', () => {
+  it.each([
+    ['position overflow', { ...GRID, counts: [4000, 1, 1], step: [1e308, 0, 0] }, 'not finite'],
+    ['bounds overflow', { ...GRID, counts: [1, 1, 1], scale: [1e308, 1e308, 1e308] }, 'not finite'],
+  ])('refuses %s with the document unchanged', (_label, params, text) => {
+    const doc = withBolt();
+    expectNoOp(execute(doc, 'add_instance_array', params), doc, text);
+  });
+
+  it('every document it accepts passes load validation (seeded sweep including extreme numbers)', () => {
+    let seed = 12345;
+    const next = (): number => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+    const pick = (): number => [0, 1, -3.5, 1e-9, 1e6, 1e154, 1e200, 1e308, -1e308][Math.floor(next() * 9)]!;
+    const base = withBolt();
+    let accepted = 0;
+    for (let k = 0; k < 120; k++) {
+      const params = {
+        componentId: 'bolt',
+        counts: [1 + Math.floor(next() * 40), 1 + Math.floor(next() * 40), 1 + Math.floor(next() * 3)],
+        step: [pick(), pick(), pick()],
+        origin: [pick(), pick(), pick()],
+        rotation: [next() * 7, next() * 7, next() * 7],
+        scale: [pick(), pick(), pick()],
+      };
+      const result = execute(base, 'add_instance_array', params);
+      if (result.document === base) continue;
+      accepted++;
+      const raw = JSON.parse(serializeDocument(result.document)).document as Record<string, unknown>;
+      expect(validateDocumentValues(raw), JSON.stringify(params)).toEqual([]);
+    }
+    expect(accepted).toBeGreaterThan(10);
+  });
+});
+
+describe('entity ids and member ids', () => {
+  it('a loaded document with an entity id containing # is refused', () => {
+    const doc = apply(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
+    const id = doc.order[0]!;
+    const raw = JSON.parse(serializeDocument(doc)).document as Record<string, unknown>;
+    const entities = raw['entities'] as Record<string, Record<string, unknown>>;
+    entities['e#1'] = { ...entities[id]!, id: 'e#1' };
+    delete entities[id];
+    raw['order'] = ['e#1'];
+    expect(validateDocumentValues(raw).join('\n')).toContain("contains '#'");
   });
 });

@@ -2,7 +2,7 @@
  * add_instance_array (plant 09 VIS-M8j, VIS1): place a Component on a 3-D grid as ONE packed instance array, no Entity per placement.
  * @affects doc.instanceArrays[arrayId] (affected: [], the array is not an entity); a feature step (params are the small grid spec)
  * @invariant deterministic: the same params give the same bytes (replay); the table is row-major, x fastest, then y, then z
- * @failure unknown component / empty component / unknown layer / bad colour / count > MAX_ARRAY_INSTANCES -> rejected, unchanged document
+ * @failure unknown component / empty component / unknown layer / bad colour / count > MAX_ARRAY_INSTANCES / non-finite position or bounds -> rejected, unchanged document
  */
 
 import { DEFAULT_LAYER_ID } from '../../model/types';
@@ -55,9 +55,17 @@ export const addInstanceArray = defineCommand({
     for (let k = 0; k < nz; k++)
       for (let j = 0; j < ny; j++)
         for (let i = 0; i < nx; i++) {
-          table.set([ox + i * dx, oy + j * dy, oz + k * dz, rx, ry, rz], at);
+          table[at] = ox + i * dx;
+          table[at + 1] = oy + j * dy;
+          table[at + 2] = oz + k * dz;
+          table[at + 3] = rx;
+          table[at + 4] = ry;
+          table[at + 5] = rz;
           at += INSTANCE_STRIDE;
         }
+    // an overflowing step (1e308 x 4000) would store Infinity: the file would be refused on load
+    if (!table.every(Number.isFinite))
+      return reject('a member position is not finite (origin + index x step overflows); reduce the step or the counts');
     const id = nextId('arr');
     const array: InstanceArray = {
       id,
@@ -79,6 +87,8 @@ export const addInstanceArray = defineCommand({
     const axes = [0, 1, 2] as const;
     const lo = axes.map((axis) => (base.min[axis] ?? 0) + (origin[axis] ?? 0) + Math.min(0, reach[axis] ?? 0));
     const hi = axes.map((axis) => (base.max[axis] ?? 0) + (origin[axis] ?? 0) + Math.max(0, reach[axis] ?? 0));
+    if (![...lo, ...hi].every(Number.isFinite))
+      return reject('the bounds of the array are not finite (scale or component extent overflows)');
     return {
       ...report(next, `Added instance array '${id}': ${count} x '${params.componentId}' (${nx} x ${ny} x ${nz}).`, {
         arrayId: id,

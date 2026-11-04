@@ -7,6 +7,7 @@ import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { isoDateProblem } from '../../lib/isoDate';
 import { humanGate } from '../../model/humanGate';
+import { documentIdentity } from '../../model/documentUid';
 import { DELETE_ACT, deleteDetails } from './reviewActs';
 import { mintReviewId, reviewOf, reviewRejection } from './reviewModel';
 
@@ -107,7 +108,21 @@ export const deleteReviewIssue = defineCommand({
     if (review.issues[id] === undefined)
       return reviewRejection(doc, 'delete_review_issue', 'VIS_ISSUE_NOT_FOUND', `no issue '${id}'`, [id]);
     const issue = review.issues[id];
-    const outcome = humanGate(ctx?.humanSignature ?? null, DELETE_ACT, [id], confirmation, issue === undefined ? {} : deleteDetails(issue));
+    if (doc.uid === undefined)
+      return reviewRejection(
+        doc,
+        'delete_review_issue',
+        'VIS_DOCUMENT_UNIDENTIFIED',
+        'the document has no uid, so a human signature cannot be bound to it',
+        [id],
+      );
+    const outcome = humanGate(
+      ctx?.humanSignature ?? null,
+      DELETE_ACT,
+      [id],
+      confirmation,
+      issue === undefined ? {} : deleteDetails(issue, documentIdentity(doc)),
+    );
     if (!outcome.cleared)
       return reviewRejection(
         doc,

@@ -270,3 +270,9 @@ export const targetKey = (target: PlantObjectTarget): string | null =>
 /** `record[key]` for an agent-chosen key: only an own entry (`constructor`, `__proto__`, `toString` are not entries). */
 export const own = <T>(record: Readonly<Record<string, T>> | undefined, key: string): T | undefined =>
   record !== undefined && Object.hasOwn(record, key) ? record[key] : undefined;
+
+/** Ids of the objects of `before` that `after` holds as another record (a rewritten `from` / `to` after an equipment rename, a new tag). */
+export function rewrittenObjectIds(before: PlantDataModel, after: PlantDataModel): string[] {
+  if (before.objects === after.objects) return [];
+  return before.objectOrder.filter((id) => after.objects[id] !== before.objects[id]);
+}
