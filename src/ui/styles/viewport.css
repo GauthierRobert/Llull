@@ -973,6 +973,7 @@ button.lens-pill:hover .lens-pill__label {
   border: 1px solid currentcolor;
   border-radius: 4px;
   outline: none;
+}
 
 /* ---- P&ID 2D HUD: sheet picker + read-only item inspector (PidSheetHud) ------ */
 
