@@ -5,7 +5,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
@@ -88,6 +88,86 @@ describe('scan extraction on llull-compute', () => {
     );
     const circle = (result.data as { circles: { radius: number }[] }).circles[0];
     expect(Math.abs((circle?.radius ?? 0) - 0.10955)).toBeLessThanOrEqual(0.0016);
+  });
+});
+
+describe('scan centreline trace on llull-compute', () => {
+  native(
+    'traces ELB-A: 2 straights + 1 bend within the pack tolerances, then commits ONE as-built run through the PI (VC-SCN-22)',
+    async () => {
+      const truth = TRUTH['ELB-A'] as {
+        file: string;
+        radius_m: number;
+        bendRadius_m: number;
+        intersectionPoint_m: number[];
+        noiseSigma_m: number;
+        tolerance: { radius_m: number; bendRadius_m: number; bendAngle_deg: number; intersectionPoint_m: number };
+      };
+      const { doc, cloudId } = await attach(metres(), truth.file);
+      const traced = execute(doc, 'trace_pipe_centreline', { cloudId, seed: [0.5, 0, 1], noiseSigma: truth.noiseSigma_m }, ctx);
+      expect(traced.rejected, traced.summary).toBeUndefined();
+      const data = traced.data as {
+        straights: { radius: number }[];
+        bends: { radius: number; angleDeg: number; intersectionPoint: number[] }[];
+        snapped: { dn: number };
+        centreline: number[][];
+        extractions: { extraction: unknown }[];
+        warnings: unknown[];
+      };
+      expect(data.straights).toHaveLength(2);
+      expect(data.bends).toHaveLength(1);
+      const bend = data.bends[0];
+      expect(Math.abs((bend?.radius ?? 0) - truth.bendRadius_m)).toBeLessThanOrEqual(truth.tolerance.bendRadius_m);
+      expect(Math.abs((bend?.angleDeg ?? 0) - 90)).toBeLessThanOrEqual(truth.tolerance.bendAngle_deg);
+      expect(Math.hypot(...truth.intersectionPoint_m.map((v, i) => v - (bend?.intersectionPoint[i] ?? 0)))).toBeLessThanOrEqual(
+        truth.tolerance.intersectionPoint_m,
+      );
+      for (const straight of data.straights)
+        expect(Math.abs(straight.radius - truth.radius_m)).toBeLessThanOrEqual(truth.tolerance.radius_m);
+      expect(data.snapped.dn).toBe(100);
+      expect(data.warnings).toEqual([]);
+      const committed = execute(doc, 'commit_asbuilt_extraction', { extraction: data.extractions[0]?.extraction, line: 'L-22' }, ctx);
+      expect(committed.rejected, committed.summary).toBeUndefined();
+      const pipe = committed.document.building?.elements[committed.affected[1] ?? ''] as unknown as { points: number[][]; dn: number };
+      expect(pipe.dn).toBe(100);
+      expect(pipe.points).toHaveLength(3);
+      expect(Math.abs((pipe.points[1]?.[0] ?? 0) - 1.6524)).toBeLessThanOrEqual(truth.tolerance.intersectionPoint_m);
+      const replayed = execute(committed.document, 'replay_history', {});
+      expect(JSON.stringify(replayed.document.building)).toBe(JSON.stringify(committed.document.building));
+    },
+  );
+
+  native(
+    'a seed off the pipe is SCN_FIT_NO_MODEL and a region above the load cap is SCN_QUERY_LIMIT, both leave the document unchanged',
+    async () => {
+      const { doc, cloudId } = await attach(metres(), 'synthetic/elb-a.csv');
+      const beside = execute(doc, 'trace_pipe_centreline', { cloudId, seed: [0.5, 0.3, 1] }, ctx);
+      expect(beside.error?.code).toBe('SCN_FIT_NO_MODEL');
+      expect(beside.document).toBe(doc);
+      const capped = createPointCloudPort({ store, env: { ...process.env }, binary: BINARY });
+      const loadCapped = {
+        ...ctx,
+        pointClouds: {
+          ...capped,
+          compute: (op: Parameters<typeof capped.compute>[0]) => capped.compute({ ...op, params: { ...op.params, maxLoadPoints: 100 } }),
+        },
+      };
+      const limit = execute(doc, 'trace_pipe_centreline', { cloudId, seed: [0.5, 0, 1] }, loadCapped);
+      expect(limit.error?.code).toBe('SCN_QUERY_LIMIT');
+      expect(limit.document).toBe(doc);
+    },
+  );
+
+  native('a trace that outlives the host timeout kills its child, commits nothing and leaves no job folder', async () => {
+    const { doc, cloudId } = await attach(metres(), 'synthetic/elb-a.csv');
+    const folders = (): string[] => readdirSync(tmpdir()).filter((name) => name.startsWith('llull-compute-'));
+    const before = new Set(folders());
+    const impatient = createPointCloudPort({ store, env: { ...process.env, LLULL_SCAN_OP_TIMEOUT_S: '0.001' }, binary: BINARY });
+    const result = execute(doc, 'trace_pipe_centreline', { cloudId, seed: [0.5, 0, 1] }, { ...ctx, pointClouds: impatient });
+    expect(result.error?.code).toBe('NATIVE_TIMEOUT');
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+    expect(folders().filter((name) => !before.has(name))).toEqual([]);
   });
 });
 

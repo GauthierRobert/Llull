@@ -60,7 +60,7 @@ const vec = (value: unknown): number[] | null =>
 
 /**
  * @affects 1 extraction record + the pipe run add_pipe_run creates (affected: [extractionId, pipeId]), the run flagged asBuilt
- * @invariant the extraction hash matches its content, else refused; unverified = the record's reasons + the cloud's registration status now
+ * @invariant a traced extraction (fit.centreline from trace_pipe_centreline) routes ONE run through every PI; else start -> end. The extraction hash matches its content, else refused; unverified = the record's reasons + the cloud's registration status now
  * @failure hash mismatch -> SCN_EXTRACTION_TAMPERED; unknown cloud -> SCN_CLOUD_NOT_FOUND; already committed -> SCN_EXTRACTION_DUPLICATE;
  *   a fit without start / end / radius -> SCN_PARAM_INVALID; add_pipe_run refusals are passed on
  */
@@ -113,7 +113,8 @@ export const commitAsbuiltExtraction = defineCommand({
     if (twin !== undefined)
       return refuseScan(doc, command, 'SCN_EXTRACTION_DUPLICATE', `already committed as ${twin.id}`, [twin.id], ['extraction']);
     const [start, end, radius] = [vec(extraction.fit['start']), vec(extraction.fit['end']), extraction.fit['radius']];
-    if (start === null || end === null || typeof radius !== 'number')
+    const traced = Array.isArray(extraction.fit['centreline']) ? extraction.fit['centreline'].map(vec) : null;
+    if (start === null || end === null || typeof radius !== 'number' || (traced !== null && (traced.length < 2 || traced.includes(null))))
       return refuseScan(
         doc,
         command,
@@ -133,7 +134,7 @@ export const commitAsbuiltExtraction = defineCommand({
       doc,
       'add_pipe_run',
       {
-        points: [at(start), at(end)],
+        points: traced !== null ? traced.map((p) => at(p ?? start)) : [at(start), at(end)],
         diameter,
         ...(extraction.snapped?.dn != null ? { dn: extraction.snapped.dn } : {}),
         ...(line !== undefined ? { line } : {}),

@@ -52,6 +52,13 @@ export function extractionHash(extraction: Omit<PendingExtraction, 'extractionHa
   );
 }
 
+const UNVERIFIED_CODES: ReadonlySet<string> = new Set([
+  'SCN_FIT_LOW_COVERAGE',
+  'SCN_FIT_HIGH_RMS',
+  'SCN_TRACE_SKEW',
+  'SCN_TRACE_BEND_RADIUS_UNMEASURED',
+]);
+
 /** Why scan-derived numbers of `cloud` are unverified (registration status, fit quality warnings). */
 export function unverifiedReasons(scan: ScanModel, cloud: CloudReference, fitWarnings: readonly string[]): string[] {
   const registration =
@@ -60,7 +67,7 @@ export function unverifiedReasons(scan: ScanModel, cloud: CloudReference, fitWar
       : undefined;
   return [
     ...(registration?.status === 'unverified' ? [`registration ${registration.id} is unverified (${registration.method})`] : []),
-    ...fitWarnings.filter((code) => code === 'SCN_FIT_LOW_COVERAGE' || code === 'SCN_FIT_HIGH_RMS').map((code) => `fit quality: ${code}`),
+    ...fitWarnings.filter((code) => UNVERIFIED_CODES.has(code)).map((code) => `fit quality: ${code}`),
   ];
 }
 
