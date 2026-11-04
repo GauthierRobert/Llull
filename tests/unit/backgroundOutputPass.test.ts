@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { OutputShader } from 'three/examples/jsm/shaders/OutputShader.js';
-import { backgroundOutputFragment, srgb } from '@ui/viewport/3d/effects/BackgroundOutputPass';
+import { backgroundOutputFragment, pickBackground, srgb } from '@ui/viewport/3d/effects/BackgroundOutputPass';
 
 describe('background output pass', () => {
   const fragment = backgroundOutputFragment();
@@ -18,5 +18,12 @@ describe('background output pass', () => {
     expect(r).toBeCloseTo(0xec / 255, 2);
     expect(g).toBeCloseTo(0xee / 255, 2);
     expect(b).toBeCloseTo(0xf2 / 255, 2);
+  });
+  it('uses the scene background colour, else the renderer clear colour, never a fixed white', () => {
+    const clear = new THREE.Color('#102030');
+    const background = new THREE.Color('#eceef2');
+    expect(pickBackground(background, clear)).toBe(background);
+    expect(pickBackground(null, clear)).toBe(clear);
+    expect(pickBackground(new THREE.Texture(), clear)).toBe(clear);
   });
 });

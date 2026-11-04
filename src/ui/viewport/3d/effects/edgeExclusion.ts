@@ -3,13 +3,15 @@
 
 import type * as THREE from 'three';
 
-/** True when the object has materials and none is world geometry: not drawn (`visible = false`) or an overlay (`depthTest = false`, as the
- *  TransformControls gizmo and its pick plane). An override material would draw them as ordinary surfaces. */
+/** True when the object has materials and none is world geometry: not drawn (`visible = false`) an overlay (`depthTest = false`, as the
+ *  TransformControls gizmo and its pick plane) or fully transparent (the live-FX pulse rings, opacity 0 between pulses). An override material would draw them as ordinary surfaces. */
 function isOverlayOnly(object: THREE.Object3D): boolean {
   const material = (object as { material?: THREE.Material | THREE.Material[] }).material;
   if (material === undefined) return false;
   const materials = Array.isArray(material) ? material : [material];
-  return materials.length > 0 && materials.every((entry) => !entry.visible || !entry.depthTest);
+  return (
+    materials.length > 0 && materials.every((entry) => !entry.visible || !entry.depthTest || (entry.transparent && entry.opacity <= 0.01))
+  );
 }
 
 export function isEdgeExcluded(object: THREE.Object3D): boolean {

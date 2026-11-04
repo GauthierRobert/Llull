@@ -37,16 +37,30 @@ export interface DepthRange {
   readonly far: number;
 }
 
-/** Slack around the scene sphere so its surfaces never touch the clip planes. */
+/** Slack around the scene's depth extent so its surfaces never touch the clip planes. */
 const RANGE_SLACK = 1.05;
+/** Near is never below far x this (the AO and edge passes then miss surfaces closer than that to the eye). */
+const MIN_NEAR_OF_FAR = 1e-4;
 
-/** Near/far hugging the scene's bounding sphere as seen from the camera. The view camera's range (adaptive, ~1:4e6) leaves a 24-bit depth
- *  buffer ~1e-4 of the distance per step, which GTAO turns into banding on flat faces; the AO pass renders with this tighter range instead.
- *  Falls back to the camera's own range when the camera is inside the sphere or the sphere is degenerate. */
-export function tightDepthRange(distanceToCentre: number, radius: number, cameraNear: number, cameraFar: number): DepthRange {
-  const near = distanceToCentre - radius * RANGE_SLACK;
-  const far = distanceToCentre + radius * RANGE_SLACK;
-  if (!(radius > 0) || !Number.isFinite(near) || !Number.isFinite(far) || near <= cameraNear || far <= near)
-    return { near: cameraNear, far: cameraFar };
-  return { near, far: Math.min(far, cameraFar) };
+type Vector = readonly [number, number, number];
+
+/** Near/far hugging the scene's bounding box along the view direction (depth of its 8 corners), so it also works from inside the scene (the
+ *  walk case), where near falls back to far x 1e-4 instead of the view camera's near. Falls back to the camera's own range when the box is
+ *  entirely behind the camera or degenerate. */
+export function viewDepthRange(eye: Vector, forward: Vector, min: Vector, max: Vector, cameraNear: number, cameraFar: number): DepthRange {
+  let nearest = Number.POSITIVE_INFINITY;
+  let farthest = Number.NEGATIVE_INFINITY;
+  for (const x of [min[0], max[0]]) {
+    for (const y of [min[1], max[1]]) {
+      for (const z of [min[2], max[2]]) {
+        const depth = (x - eye[0]) * forward[0] + (y - eye[1]) * forward[1] + (z - eye[2]) * forward[2];
+        nearest = Math.min(nearest, depth);
+        farthest = Math.max(farthest, depth);
+      }
+    }
+  }
+  if (!Number.isFinite(nearest) || !Number.isFinite(farthest) || farthest <= 0) return { near: cameraNear, far: cameraFar };
+  const far = Math.min(farthest * RANGE_SLACK, cameraFar);
+  const near = Math.max(cameraNear, nearest > 0 ? nearest / RANGE_SLACK : 0, far * MIN_NEAR_OF_FAR);
+  return near < far ? { near, far } : { near: cameraNear, far: cameraFar };
 }

@@ -22,9 +22,16 @@ export function backgroundOutputFragment(source: string = OutputShader.fragmentS
 }
 
 const scratch = new THREE.Color();
+const clearScratch = new THREE.Color();
+
+/** The colour behind the image: the scene background when it is a plain colour, else the renderer's own clear colour (never a made-up white). */
+export function pickBackground(background: unknown, clearColour: THREE.Color): THREE.Color {
+  return background instanceof THREE.Color ? background : clearColour;
+}
 
 export class BackgroundOutputPass extends OutputPass {
-  constructor(private readonly background: () => THREE.Color | null) {
+  /** `background` is the scene's background as it was before the composer cleared it (any type). */
+  constructor(private readonly background: () => unknown) {
     super();
     this.material.fragmentShader = backgroundOutputFragment();
     this.uniforms['backgroundColor'] = { value: new THREE.Color(1, 1, 1) };
@@ -37,8 +44,8 @@ export class BackgroundOutputPass extends OutputPass {
     deltaTime: number,
     maskActive: boolean,
   ): void {
-    const colour = this.background();
-    if (colour !== null) (this.uniforms['backgroundColor']?.value as THREE.Color).setRGB(...srgb(colour));
+    const colour = pickBackground(this.background(), renderer.getClearColor(clearScratch));
+    (this.uniforms['backgroundColor']?.value as THREE.Color).setRGB(...srgb(colour));
     super.render(renderer, writeBuffer, readBuffer, deltaTime, maskActive);
   }
 }

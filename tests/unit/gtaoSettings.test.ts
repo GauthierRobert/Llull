@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GTAO_MAX_RADIUS_MM, gtaoParameters, gtaoRadius, gtaoSize, tightDepthRange } from '@ui/viewport/3d/effects/gtaoSettings';
+import { GTAO_MAX_RADIUS_MM, gtaoParameters, gtaoRadius, gtaoSize, viewDepthRange } from '@ui/viewport/3d/effects/gtaoSettings';
 
 describe('gtao settings', () => {
   it('halves the frame, rounding up and never below one pixel', () => {
@@ -23,17 +23,22 @@ describe('gtao settings', () => {
   });
 });
 
-describe('tight depth range', () => {
-  it('hugs the scene sphere with a little slack, inside the camera range', () => {
-    const range = tightDepthRange(10, 2, 0.005, 20000);
-    expect(range.near).toBeCloseTo(10 - 2 * 1.05);
-    expect(range.far).toBeCloseTo(10 + 2 * 1.05);
+describe('view depth range', () => {
+  const forward = [0, 1, 0] as const;
+  it('hugs the scene box along the view with a little slack, inside the camera range', () => {
+    const range = viewDepthRange([0, -10, 0], forward, [-1, 0, -1], [1, 4, 1], 0.005, 20000);
+    expect(range.near).toBeCloseTo(10 / 1.05);
+    expect(range.far).toBeCloseTo(14 * 1.05);
   });
-  it('never exceeds the camera range and falls back to it when the camera is inside the sphere or the sphere is degenerate', () => {
-    expect(tightDepthRange(10, 2, 9, 11).near).toBe(9);
-    expect(tightDepthRange(10, 2, 0.005, 11).far).toBe(11);
-    expect(tightDepthRange(1, 2, 0.01, 500)).toEqual({ near: 0.01, far: 500 });
-    expect(tightDepthRange(10, 0, 0.01, 500)).toEqual({ near: 0.01, far: 500 });
-    expect(tightDepthRange(Number.NaN, 2, 0.01, 500)).toEqual({ near: 0.01, far: 500 });
+  it('from inside the box (the walk case) keeps near at far x 1e-4, not the view camera near', () => {
+    const range = viewDepthRange([0, 1, 0], forward, [-5, 0, -5], [5, 50, 5], 0.001, 20000);
+    expect(range.far).toBeCloseTo(49 * 1.05);
+    expect(range.near).toBeCloseTo(49 * 1.05 * 1e-4);
+    expect(range.near).toBeGreaterThan(0.001);
+  });
+  it('never exceeds the camera range and falls back to it when the box is behind the eye or degenerate', () => {
+    expect(viewDepthRange([0, -10, 0], forward, [-1, 0, -1], [1, 4, 1], 12, 13)).toEqual({ near: 12, far: 13 });
+    expect(viewDepthRange([0, 100, 0], forward, [-1, 0, -1], [1, 4, 1], 0.01, 500)).toEqual({ near: 0.01, far: 500 });
+    expect(viewDepthRange([0, 0, 0], forward, [Number.NaN, 0, 0], [1, 1, 1], 0.01, 500)).toEqual({ near: 0.01, far: 500 });
   });
 });

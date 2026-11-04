@@ -1,27 +1,24 @@
 // three's GTAOPass at half resolution: the composer hands every pass the full frame size, this one shrinks it (its normal / AO / denoise
 // targets are all allocated from that size), so the pass costs about a quarter of a full-resolution one.
 
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { hideEdgeExcluded } from './edgeExclusion';
-import { type DepthRange, type GtaoParameters, gtaoSize } from './gtaoSettings';
+import type { DepthRangeCamera } from './depthRangeCamera';
+import { type GtaoParameters, gtaoSize } from './gtaoSettings';
 
 export class HalfResGtaoPass extends GTAOPass {
-  private readonly viewCamera: THREE.PerspectiveCamera;
-  private readonly aoCamera = new THREE.PerspectiveCamera();
-
-  /** `depthRange` gives the near/far the AO renders with (see tightDepthRange); null keeps the view camera's own. */
+  /** `depthCamera` gives the camera (tight near/far, see viewDepthRange) the normals and depth are rendered with. */
   constructor(
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     width: number,
     height: number,
     parameters: GtaoParameters,
-    private readonly depthRange: (camera: THREE.PerspectiveCamera) => DepthRange | null,
+    private readonly depthCamera: DepthRangeCamera,
   ) {
     const half = gtaoSize(width, height);
     super(scene, camera, half.width, half.height);
-    this.viewCamera = camera;
     this.updateGtaoMaterial(parameters);
   }
 
@@ -35,14 +32,7 @@ export class HalfResGtaoPass extends GTAOPass {
     deltaTime: number,
     maskActive: boolean,
   ): void {
-    const range = this.depthRange(this.viewCamera);
-    if (range !== null) {
-      this.aoCamera.copy(this.viewCamera);
-      this.aoCamera.near = range.near;
-      this.aoCamera.far = range.far;
-      this.aoCamera.updateProjectionMatrix();
-      this.camera = this.aoCamera;
-    } else this.camera = this.viewCamera;
+    this.camera = this.depthCamera.current();
     const restore = hideEdgeExcluded(this.scene);
     try {
       super.render(renderer, writeBuffer, readBuffer, deltaTime, maskActive);

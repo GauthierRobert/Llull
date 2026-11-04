@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { FullScreenQuad, Pass } from 'three/examples/jsm/postprocessing/Pass.js';
+import type { DepthRangeCamera } from './depthRangeCamera';
 import { hideEdgeExcluded } from './edgeExclusion';
 
 const EDGE_SHADER = {
@@ -79,7 +80,7 @@ export class EdgeOverlayPass extends Pass {
 
   constructor(
     private readonly scene: THREE.Scene,
-    private readonly camera: THREE.Camera,
+    private readonly depthCamera: DepthRangeCamera,
     width: number,
     height: number,
   ) {
@@ -108,26 +109,26 @@ export class EdgeOverlayPass extends Pass {
     const previousBackground = this.scene.background;
     renderer.getClearColor(this.clearColor);
 
+    const camera = this.depthCamera.current();
     const restoreVisibility = hideEdgeExcluded(this.scene);
     this.scene.overrideMaterial = this.normalMaterial;
     this.scene.background = null;
     renderer.setRenderTarget(this.target);
     renderer.setClearColor(0x808080, 0);
     renderer.autoClear = true;
-    renderer.render(this.scene, this.camera);
+    renderer.render(this.scene, camera);
     this.scene.overrideMaterial = null;
     this.scene.background = previousBackground;
     restoreVisibility();
     renderer.setClearColor(this.clearColor, previousAlpha);
     renderer.autoClear = previousAutoClear;
 
-    const perspective = this.camera as THREE.PerspectiveCamera;
     const uniforms = this.material.uniforms as Record<string, THREE.IUniform>;
     uniforms['tDiffuse']!.value = readBuffer.texture;
     uniforms['tNormal']!.value = this.target.texture;
     uniforms['tDepth']!.value = this.target.depthTexture;
-    uniforms['cameraNear']!.value = perspective.near;
-    uniforms['cameraFar']!.value = perspective.far;
+    uniforms['cameraNear']!.value = camera.near;
+    uniforms['cameraFar']!.value = camera.far;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     this.quad.render(renderer);
     renderer.setRenderTarget(previousTarget);

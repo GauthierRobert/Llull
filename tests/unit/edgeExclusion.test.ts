@@ -20,6 +20,11 @@ describe('edge pass exclusion', () => {
     const undrawn = new THREE.MeshBasicMaterial({ visible: false });
     expect(isEdgeExcluded(new THREE.Mesh(new THREE.PlaneGeometry(), undrawn))).toBe(true);
     expect(isEdgeExcluded(new THREE.Mesh(new THREE.PlaneGeometry(), [undrawn, undrawn]))).toBe(true);
+    const pulse = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+    expect(isEdgeExcluded(new THREE.Mesh(new THREE.RingGeometry(), pulse))).toBe(true);
+    expect(isEdgeExcluded(new THREE.Mesh(new THREE.RingGeometry(), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.5 })))).toBe(
+      false,
+    );
     const overlay = new THREE.MeshBasicMaterial({ depthTest: false });
     expect(isEdgeExcluded(new THREE.Mesh(new THREE.BoxGeometry(), overlay))).toBe(true);
     expect(isEdgeExcluded(new THREE.Mesh(new THREE.PlaneGeometry(), [undrawn, overlay]))).toBe(true);
