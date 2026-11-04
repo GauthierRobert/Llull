@@ -362,3 +362,48 @@ describe('display colour rules follow a rename', () => {
     expect(plain.document.display).toBeUndefined();
   });
 });
+
+describe('the direct-rename guard covers trays, supports and members', () => {
+  it('rename_element_tag on a classified tray / support / member is refused (DAT_DIRECT_RENAME), the document unchanged', () => {
+    const s = structureDocument();
+    let doc = s.doc;
+    for (const [index, target] of [s.tray, s.support, s.beam].entries())
+      doc = apply(doc, 'assign_plant_object', vesselParams(target, index + 4));
+    for (const target of [s.tray, s.support, s.beam]) {
+      const refused = expectRefusal(doc, 'rename_element_tag', { renames: [{ element: target, tag: 'FREE-1' }] }, 'DAT_DIRECT_RENAME');
+      expect(refused.error?.ids).toContain(target);
+    }
+    expect(execute(doc, 'rename_element_tag', { renames: [{ element: s.column, tag: 'FREE-1' }] }).rejected).toBeUndefined();
+  });
+
+  it('a retag through plant data still renames a classified tray; unassigned, it renames freely', () => {
+    const s = structureDocument();
+    const tagged = apply(s.doc, 'assign_plant_object', vesselParams(s.tray, 4));
+    const retagged = execute(tagged, 'renumber_tags', { className: 'PressureVessel', startSequence: 7 });
+    expect(retagged.rejected, retagged.summary).toBeUndefined();
+    expect(markOf(retagged.document, s.tray)).toBe('V-107');
+    const objectId = getPlantData(tagged).objectOrder[0] as string;
+    const free = apply(tagged, 'unassign_plant_object', { objects: [objectId] });
+    expect(execute(free, 'rename_element_tag', { renames: [{ element: s.tray, tag: 'FREE-1' }] }).rejected).toBeUndefined();
+  });
+
+  it('is cheap on a large unclassified building: no scan when the elements record is unchanged, no registry for an unclassified rename', () => {
+    const s = structureDocument();
+    const tagged = apply(s.doc, 'assign_plant_object', vesselParams(s.tray, 4));
+    const building = tagged.building as NonNullable<CadDocument['building']>;
+    const template = building.elements[s.column] as BuildingElement;
+    const elements: Record<string, BuildingElement> = { ...building.elements };
+    const order = [...building.elementOrder];
+    for (let index = 0; index < 20000; index++) {
+      elements[`member-big-${index}`] = { ...template, id: `member-big-${index}`, mark: `B${index}` } as BuildingElement;
+      order.push(`member-big-${index}`);
+    }
+    const big: CadDocument = { ...tagged, building: { ...building, elements, elementOrder: order } };
+    const started = performance.now();
+    const same = execute(big, 'update_equipment', { elementId: 'none' });
+    const renamed = execute(big, 'rename_element_tag', { renames: [{ element: 'member-big-5', tag: 'B-FREE' }] });
+    expect(renamed.rejected, renamed.summary).toBeUndefined();
+    expect(same.document).toBe(big);
+    expect(performance.now() - started).toBeLessThan(1500);
+  });
+});
