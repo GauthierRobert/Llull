@@ -99,7 +99,8 @@ describe('set_section_box / delete_section_box', () => {
   it('render_view stops clipping once the box is deactivated', () => {
     const doc = execute(scene(), 'set_section_box', { ...BOX, activate: true }).document;
     const count = (d: CadDocument): number =>
-      (execute(d, 'render_view', { view: 'top', mode: 'vector', width: 400, height: 300 }).data as { visibleEntityCount: number }).visibleEntityCount;
+      (execute(d, 'render_view', { view: 'top', mode: 'vector', width: 400, height: 300 }).data as { visibleEntityCount: number })
+        .visibleEntityCount;
     expect(count(doc)).toBe(2);
     expect(count(execute(doc, 'set_active_section_box', { id: null }).document)).toBe(3);
   });

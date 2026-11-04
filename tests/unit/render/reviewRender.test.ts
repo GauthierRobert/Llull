@@ -238,7 +238,8 @@ describe('visibleEntityIds of render_view and visible_entity_ids', () => {
     let doc = apply(scene(), 'set_section_box', { name: 'left', min: [-1000, -1000, 0], max: [3500, 1000, 2000], activate: true });
     doc = apply(doc, 'save_viewpoint', { name: 'v', camera });
     const [a, b, c] = doc.order as [string, string, string];
-    const ids = (d: CadDocument): unknown => data<Record<string, unknown>>(d, 'visible_entity_ids', { viewpointId: 'vp-2' })['visibleEntityIds'];
+    const ids = (d: CadDocument): unknown =>
+      data<Record<string, unknown>>(d, 'visible_entity_ids', { viewpointId: 'vp-2' })['visibleEntityIds'];
     expect(ids(doc)).toEqual([a, b]);
     expect(ids(apply(doc, 'set_active_section_box', { id: null }))).toEqual([a, b, c]);
   });
