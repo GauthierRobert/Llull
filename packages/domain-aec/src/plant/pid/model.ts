@@ -27,6 +27,15 @@ export type PidItemKind = (typeof PID_ITEM_KINDS)[number];
 export const PID_PAPERS = ['A0', 'A1', 'A2', 'A3', 'A4'] as const;
 export const PID_SHEET_STATUSES = ['draft', 'issued_for_review', 'issued_for_hazop', 'issued_for_construction'] as const;
 
+/** The human stamp of an issued sheet: signer, time, the signature id and the payload hash that was signed, and the hash of the sheet content at that moment. */
+export interface PidSheetIssue {
+  readonly signer: string;
+  readonly at: string;
+  readonly signatureId?: string;
+  readonly payloadSha256?: string;
+  readonly contentSha256?: string;
+}
+
 export interface PidSheet {
   readonly id: string;
   /** Unique, e.g. `PID-001`. */
@@ -36,7 +45,7 @@ export interface PidSheet {
   readonly revision: string;
   readonly status: (typeof PID_SHEET_STATUSES)[number];
   /** Set only by a human-gated issue (AF-34). */
-  readonly issuedBy?: { readonly signer: string; readonly at: string };
+  readonly issuedBy?: PidSheetIssue;
 }
 
 /** An attribute value; `defaulted` / `unverified` flag a value that was not given by the user or not confirmed (AF-31, AF-32). */
@@ -200,6 +209,12 @@ export interface PidAcceptance {
   readonly reason: string;
   readonly by: string;
   readonly at: string;
+  /** Rule code and severity of the finding when it was accepted. */
+  readonly code?: string;
+  readonly severity?: 'error' | 'warning' | 'info';
+  /** Only for a human-signed acceptance (an error-severity finding): the signature id and the payload hash that was signed. */
+  readonly signatureId?: string;
+  readonly payloadSha256?: string;
 }
 
 export interface PidTagFormat {

@@ -30,6 +30,8 @@ const PID_COMMANDS = [
   'reverse_pid_flow',
   'renumber_pid_lines',
   'set_pid_conventions',
+  'accept_pid_finding',
+  'issue_pid_sheet',
 ];
 
 describe('pid plugin', () => {

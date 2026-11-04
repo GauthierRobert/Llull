@@ -62,6 +62,9 @@ function sheetErrors(raw: Record<string, unknown>): string[] {
     const issued = sheet['issuedBy'];
     if (issued !== undefined && !(isRecord(issued) && nonEmpty(issued['signer']) && nonEmpty(issued['at'])))
       errors.push(`${path}.issuedBy must be { signer, at }`);
+    else if (isRecord(issued))
+      for (const field of ['signatureId', 'payloadSha256', 'contentSha256'])
+        if (issued[field] !== undefined && !nonEmpty(issued[field])) errors.push(`${path}.issuedBy.${field} must be a non-empty string`);
     if (sheet['status'] === 'issued_for_construction' && issued === undefined)
       errors.push(`${path}: an issued-for-construction sheet needs issuedBy`);
   }
@@ -98,6 +101,13 @@ function recordErrors(raw: Record<string, unknown>): string[] {
         if (isReservedKey(key)) errors.push(`plant.pid.acceptances.${key}: the name is reserved`);
         if (!(isRecord(value) && nonEmpty(value['reason']) && nonEmpty(value['by']) && nonEmpty(value['at'])))
           errors.push(`plant.pid.acceptances.${key} must be { reason, by, at } (non-empty strings)`);
+        else {
+          for (const field of ['code', 'signatureId', 'payloadSha256'])
+            if (value[field] !== undefined && !nonEmpty(value[field]))
+              errors.push(`plant.pid.acceptances.${key}.${field} must be a non-empty string`);
+          if (value['severity'] !== undefined && !['error', 'warning', 'info'].includes(String(value['severity'])))
+            errors.push(`plant.pid.acceptances.${key}.severity must be error, warning or info`);
+        }
       }
   }
   const imports = raw['imports'];

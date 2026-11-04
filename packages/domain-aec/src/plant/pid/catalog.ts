@@ -1,4 +1,5 @@
 import { commandCatalog } from '@core/commands/schema';
+import { acceptPidFinding } from './commands/acceptPidFinding';
 import { addPidActuatingSystem } from './commands/addPidActuatingSystem';
 import { addPidEquipment } from './commands/addPidEquipment';
 import { addPidInline } from './commands/addPidInline';
@@ -9,6 +10,7 @@ import { addPidOffPageConnector } from './commands/addPidOffPageConnector';
 import { addPidSignalLine } from './commands/addPidSignalLine';
 import { checkPid } from './commands/checkPid';
 import { checkPid3d } from './commands/checkPid3d';
+import { issuePidSheet } from './commands/issuePidSheet';
 import { linkPidItem } from './commands/linkPidItem';
 import { createPidSheet } from './commands/createPidSheet';
 import { deletePidItem } from './commands/deletePidItem';
@@ -48,4 +50,6 @@ export const pidCatalog = commandCatalog(
   reversePidFlow,
   renumberPidLines,
   setPidConventions,
+  acceptPidFinding,
+  issuePidSheet,
 );

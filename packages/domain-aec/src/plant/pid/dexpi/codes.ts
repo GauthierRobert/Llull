@@ -35,6 +35,13 @@ export const DEXPI_REMEDIATION: Readonly<Record<string, string>> = {
     'The pair already exists, or the 3D element is linked to another P&ID item: link_pid_item that item with element null first.',
   PID_LINK_NOT_FOUND: 'Nothing to clear: the P&ID item has no explicit link (check_pid_3d lists what is matched).',
   PID_SHEET_DUPLICATE: 'Choose another sheet number (omit `sheet` to take the next free PID-nnn).',
+  PID_HUMAN_GATE:
+    'Ask the owner or reviewer to confirm in the desktop app: a signature over this act, produced there (with a nonce field), is the only thing that clears it.',
+  PID_FINDING_NOT_FOUND: 'Run check_pid with includeAccepted and pass the findingKey of one of its findings, exactly as printed.',
+  PID_CHECK_FAILED:
+    'Fix the errors check_pid reports for the sheet (remediation per finding), or have a human accept each with accept_pid_finding, then issue again.',
+  PID_STATUS_TRANSITION:
+    'A sheet moves one step forward at a time (draft, issued_for_review, issued_for_hazop, issued_for_construction) or back to draft; give the next status.',
   PID_SHEET_NOT_FOUND: 'List the sheets with pid_report kind=counts or import a P&ID with import_dexpi first.',
 };
 
