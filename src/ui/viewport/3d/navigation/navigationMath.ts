@@ -7,7 +7,7 @@ export type Vec3 = readonly [number, number, number];
 /** Looking straight up/down would flip the horizon: the pitch stops just short of the poles. */
 export const MAX_PITCH = Math.PI / 2 - 0.02;
 /** Radians of turn per pixel of pointer movement. */
-export const LOOK_SENSITIVITY = 0.0022;
+const LOOK_SENSITIVITY = 0.0022;
 /** Walk eye height above the floor, in millimetres. */
 export const EYE_HEIGHT_MM = 1600;
 /** Holding Shift multiplies the speed. */
