@@ -3,10 +3,12 @@
 // scene, or while the camera is unplannable (zero-size canvas). It subscribes to camera bumps only while a scene is active.
 
 import { useMemo, useRef } from 'react';
+import type { FrustumPlane } from '@core/geometry/renderPlanCamera';
 import { type PlanScene, type RenderPlan, planRender } from '@core/geometry/renderPlan';
 import { useStore } from '@ui/store';
 import { usePlantCameraView } from './PlantCameraProvider';
 import { motionCamera, planCameraOf } from './plantPlanCamera';
+import { usePlantBvh } from './usePlantBvh';
 
 export interface PlantPlan {
   readonly scene: PlanScene;
@@ -17,6 +19,7 @@ export interface PlantPlan {
 
 export function usePlantPlan(scene: PlanScene | null): PlantPlan | null {
   const view = usePlantCameraView(scene !== null);
+  const bvh = usePlantBvh(scene);
   const previous = useRef<{ scene: PlanScene; levels: Uint8Array } | null>(null);
   return useMemo(() => {
     if (scene === null || view === null) return null;
@@ -26,9 +29,10 @@ export function usePlantPlan(scene: PlanScene | null): PlantPlan | null {
     const plan = planRender(scene, view.moving ? motionCamera(base) : base, {
       multiDraw: true,
       quality: 'medium',
+      ...(bvh !== null && { query: (planes: readonly FrustumPlane[]) => bvh.frustumQuery(planes) }),
       ...(previousLevels && { previousLevels }),
     });
     previous.current = { scene, levels: plan.levels };
     return { scene, plan, moving: view.moving };
-  }, [scene, view]);
+  }, [scene, view, bvh]);
 }

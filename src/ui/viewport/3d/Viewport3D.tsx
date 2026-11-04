@@ -37,6 +37,7 @@ import { StructuralOverlay } from './structural/StructuralOverlay';
 import { PointClouds } from './PointClouds';
 import { FindingsOverlay } from './findings/FindingsOverlay';
 import { PortGlyphOverlay } from './ports/PortGlyphOverlay';
+import { PipeMarkerOverlay } from './pipeMarkers/PipeMarkerOverlay';
 import { PipeStressOverlay } from './pipeStress/PipeStressOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
@@ -170,6 +171,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <StructuralOverlay />
         <FindingsOverlay />
         <PortGlyphOverlay />
+        <PipeMarkerOverlay />
         <PipeStressOverlay />
         <DimensionLens />
         <PmiLayer />

@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import type { CadDocument } from '@core/model/types';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { useStore } from '@ui/store';
+import { usePipeMarkerStore } from '@ui/store/pipeMarkerStore';
 import { sectionBoxAround } from './issueModel';
 
 const MARGIN_FRACTION = 0.05;
@@ -12,6 +13,8 @@ const MARGIN_FRACTION = 0.05;
 export function DisplaySection({ document }: { document: CadDocument }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [status, setStatus] = useState('');
+  const markersShown = usePipeMarkerStore((s) => s.shown);
+  const setMarkersShown = usePipeMarkerStore((s) => s.setShown);
   const review = document.review;
   const boxes = Object.values(review?.sectionBoxes ?? {});
   const profiles = Object.values(document.display?.colourProfiles ?? {});
@@ -91,6 +94,15 @@ export function DisplaySection({ document }: { document: CadDocument }): React.R
             </option>
           ))}
         </select>
+      </label>
+      <label className="datasheet__toggle">
+        <input
+          type="checkbox"
+          checked={markersShown}
+          onChange={(event) => setMarkersShown(event.target.checked)}
+          data-testid="pipe-markers-shown"
+        />
+        Show pipe content markers
       </label>
       {activeProfileRules.length > 0 && (
         <ul className="panel__list" aria-label="Colour legend" data-testid="colour-legend">
