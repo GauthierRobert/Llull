@@ -7,6 +7,7 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import type { CloudQuery } from '@core/model/pointCloud';
 import type { OverlayLayer, OverlayView, RenderOverlay } from '@core/model/renderOverlay';
+import { z } from 'zod';
 import { clamp } from '@lib/clamp';
 import { classColour, grey, rgbColour, viridis } from './cloudColour';
 import { applyPoint } from './mat4';
@@ -56,13 +57,13 @@ function sampleCloud(
   share: number,
   crops: readonly CropBox[],
 ): CloudSamples | string {
-  const port = view.pointClouds;
+  const port = view.ports?.pointClouds;
   const manifest = port?.manifest(cloud.assetKey) ?? null;
   if (port === null || port === undefined || manifest === null) return `${cloud.id}: its asset is not in this machine's store`;
   const column = columnOf[wanted];
   const present = column !== null && manifest.attributes.includes(column);
   const colour: Colour = column === null || present ? wanted : 'elevation';
-  const filtering = view.keep !== undefined || crops.length > 0;
+  const filtering = view.cutKeep !== undefined || crops.length > 0;
   const budget = share * (filtering ? 4 : 1);
   const query: CloudQuery = { lod: { budget }, maxPoints: budget, ...(present ? { attributes: [column] } : {}) };
   const read = port.query(cloud.assetKey, query);
@@ -77,7 +78,7 @@ function sampleCloud(
       applyPoint(cloud.transform, [read.positions[3 * i] ?? 0, read.positions[3 * i + 1] ?? 0, read.positions[3 * i + 2] ?? 0]),
     );
     const hidden =
-      (view.keep !== undefined && !view.keep(p)) ||
+      (view.cutKeep !== undefined && !view.cutKeep(p)) ||
       crops.some((crop) => (insideBox(crop, p) ? crop.keep === 'outside' : crop.keep === 'inside'));
     if (hidden) {
       cropped++;
@@ -118,7 +119,28 @@ const range = (values: readonly number[]): [number, number] =>
 
 const fixed = (v: number): string => String(Math.round(v * 10) / 10);
 
+/** Options of render_view `overlayOptions.clouds`. */
+const cloudOptions = z.object({
+  maxPoints: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Total point budget over all attached clouds, clamped to [100, 200000]. Default 20000. The SVG grows with it: about 2.8 MB at 200000 points, 0.3 MB at 20000. ' +
+        'Under a cut / section box / crop that keeps less than 25% of a cloud the sample is thinner than the budget (the query is 4x the share).',
+    ),
+  colour: z
+    .enum(['elevation', 'rgb', 'intensity', 'classification'])
+    .optional()
+    .describe(
+      'Point colour: "elevation" (default, viridis over the drawn height range) or the stored "rgb", "intensity" (grey) or "classification" (ASPRS palette); a cloud without that column falls back to elevation (named in the summary).',
+    ),
+  pointSizePx: z.number().positive().optional().describe('Mark diameter in pixels, clamped to [1, 8]. Default 2.'),
+});
+
 /**
+ * @invariant with `only` (isolate) a cloud is drawn only when the list names its cloud id
  * @invariant a pure query: the same document, port, request and view give the same marks (canonical node order, evenly spaced thinning, colours bucketed in sorted order)
  * @invariant no port, no attached (visible) cloud or an unreadable asset: nothing is drawn and detail.note says why (kernel-optional)
  * @invariant total drawn points never exceed maxPoints (clamped to [100, 200000]); each cloud gets maxPoints / clouds
@@ -126,18 +148,23 @@ const fixed = (v: number): string => String(Math.round(v * 10) / 10);
  */
 export const cloudOverlay: RenderOverlay = {
   kind: 'clouds',
+  paramsSchema: cloudOptions,
   draw(doc, view): OverlayLayer {
-    const maxPoints = clamp(Math.round(view.clouds?.maxPoints ?? 20_000), 100, 200_000);
-    const wanted: Colour = view.clouds?.colour ?? 'elevation';
-    const size = clamp(view.clouds?.pointSizePx ?? 2, 1, 8);
-    if (view.pointClouds === undefined || view.pointClouds === null)
+    const request = cloudOptions.parse(view.options ?? {});
+    const maxPoints = clamp(request.maxPoints ?? 20_000, 100, 200_000);
+    const wanted: Colour = request.colour ?? 'elevation';
+    const size = clamp(request.pointSizePx ?? 2, 1, 8);
+    if (view.ports?.pointClouds === undefined || view.ports?.pointClouds === null)
       return empty('none drawn: no point-cloud port is installed in this host.', { maxPoints });
     const attached = cloudsOf(doc);
-    const shown = attached.filter((cloud) => cloud.display.visible);
+    const shown = attached.filter((cloud) => cloud.display.visible && (view.only === undefined || view.only.includes(cloud.id)));
     if (shown.length === 0)
-      return empty(attached.length === 0 ? 'none drawn: no cloud is attached.' : 'none drawn: every attached cloud is hidden.', {
-        maxPoints,
-      });
+      return empty(
+        attached.length === 0
+          ? 'none drawn: no cloud is attached.'
+          : 'none drawn: every attached cloud is hidden or outside the isolate list.',
+        { maxPoints },
+      );
     const share = Math.max(1, Math.floor(maxPoints / shown.length));
     const crops = Object.values(scanOf(doc).crops);
     const skipped: string[] = [];

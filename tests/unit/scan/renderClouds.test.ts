@@ -6,10 +6,17 @@ import type { Vec3 } from '@core/model/vectors';
 import { expectPure } from '../../helpers/expectNoOp';
 import { fixturePort, KEY_A, KEY_B, withPort, type FixtureCloud } from './fixturePort';
 
+interface Detail {
+  drawn: number;
+  maxPoints: number;
+  colour: string;
+  note: string;
+  clouds: Record<string, unknown>[];
+}
 interface CloudsData {
+  clouds?: Detail | undefined;
   svg: string;
-  clouds?: { drawn: number; maxPoints: number; colour: string; note: string; clouds: Record<string, unknown>[] };
-  overlays?: Record<string, { entities: string[]; points: number }>;
+  overlays?: Record<string, { entities: string[]; points: number; detail?: Detail }>;
 }
 
 /** 10 × 10 grid on a 0.9 m square (mm document: 0-900), z rising with x. */
@@ -41,14 +48,22 @@ function scene(clouds: FixtureCloud[], extra: (doc: CadDocument) => CadDocument 
   return { doc: extra(doc), ids };
 }
 
-const render = (doc: CadDocument, clouds: FixtureCloud[] | null, params: object = {}): { data: CloudsData; summary: string } => {
-  const result = execute(
+/** `clouds` in `params` is shorthand for overlay 'clouds' + overlayOptions.clouds. */
+const run = (doc: CadDocument, clouds: FixtureCloud[] | null, params: Record<string, unknown>): ReturnType<typeof execute> => {
+  const { clouds: options, ...rest } = params;
+  const request = options === undefined ? {} : { overlay: 'clouds', overlayOptions: { clouds: options } };
+  return execute(
     doc,
     'render_view',
-    { view: 'top', showAxes: false, showGrid: false, ...params } as Record<string, unknown>,
+    { view: 'top', showAxes: false, showGrid: false, ...request, ...rest },
     clouds === null ? undefined : ctxFor(clouds),
   );
-  return { data: result.data as CloudsData, summary: result.summary };
+};
+
+const render = (doc: CadDocument, clouds: FixtureCloud[] | null, params: object = {}): { data: CloudsData; summary: string } => {
+  const result = run(doc, clouds, params as Record<string, unknown>);
+  const data = result.data as CloudsData;
+  return { data: { ...data, clouds: data.overlays?.['clouds']?.detail }, summary: result.summary };
 };
 
 const marks = (svg: string, cloudId?: string): number => {
@@ -65,7 +80,7 @@ describe('render_view clouds', () => {
     expect(data.clouds).toMatchObject({ drawn: 100, maxPoints: 20000, colour: 'elevation' });
     expect(data.clouds?.clouds[0]).toMatchObject({ cloudId: ids[0], queried: 100, sampled: 100, drawn: 100, cropped: 0 });
     expect(data.overlays?.['clouds']).toMatchObject({ entities: ids, points: 100 });
-    expect(summary).toContain('Clouds: 100 point(s) of 1 cloud(s) drawn');
+    expect(summary).toContain('Overlay clouds: 100 point(s) of 1 cloud(s) drawn');
     expect(strokes(data.svg).length).toBeGreaterThan(1);
   });
 
@@ -142,7 +157,40 @@ describe('render_view clouds', () => {
   it('is opt-in, notes a turntable, is pure', () => {
     const { doc } = scene([full]);
     expect(marks(render(doc, [full]).data.svg)).toBe(0);
-    expect(render(doc, [full], { clouds: {}, turntable: { frames: 2 } }).summary).toContain('not drawn on a turntable strip');
+    expect(render(doc, [full], { clouds: {}, turntable: { frames: 2 } }).summary).toContain('Overlay not drawn on a turntable strip');
     expectPure(doc, () => render(doc, [full], { clouds: {} }));
+  });
+
+  it('with isolate draws only the clouds the list names by id', () => {
+    const { doc, ids } = scene([full, bare]);
+    const named = render(doc, [full, bare], { clouds: {}, isolate: [ids[1] ?? ''] });
+    expect(marks(named.data.svg, ids[0])).toBe(0);
+    expect(marks(named.data.svg, ids[1])).toBe(100);
+    const other = render(doc, [full, bare], { clouds: {}, isolate: Object.keys(doc.entities) });
+    expect(marks(other.data.svg)).toBe(0);
+    expect(other.summary).toContain('outside the isolate list');
+  });
+
+  it('refuses invalid overlayOptions, an unknown kind, a kind without options and options for an unrequested kind (CMD_INVALID_PARAMS with a path)', () => {
+    const { doc } = scene([full]);
+    const bad = run(doc, [full], { overlay: 'clouds', overlayOptions: { clouds: { colour: 'pink', maxPoints: -1 } } });
+    expect(bad.error?.code).toBe('CMD_INVALID_PARAMS');
+    expect(bad.error?.paths).toEqual(expect.arrayContaining(['overlayOptions.clouds.colour', 'overlayOptions.clouds.maxPoints']));
+    expect(bad.document).toBe(doc);
+    const unknown = run(doc, [full], { overlay: 'clouds', overlayOptions: { nope: {} } });
+    expect(unknown.error).toMatchObject({ code: 'CMD_INVALID_PARAMS', paths: ['overlayOptions.nope'] });
+    const noOptions = run(doc, [full], { overlay: 'cage', overlayOptions: { cage: {} } });
+    expect(noOptions.error).toMatchObject({ code: 'CMD_INVALID_PARAMS', paths: ['overlayOptions.cage'] });
+    const unrequested = run(doc, [full], { overlayOptions: { clouds: {} } });
+    expect(unrequested.error).toMatchObject({ code: 'CMD_INVALID_PARAMS', paths: ['overlayOptions.clouds'] });
+  });
+
+  it('skips a cloud whose read fails and says so', () => {
+    const { doc } = scene([full]);
+    const port = fixturePort([full]);
+    const failing = withPort({ ...port, query: () => null });
+    const result = execute(doc, 'render_view', { view: 'top', overlay: 'clouds' }, failing);
+    expect(result.summary).toContain('its asset could not be read');
+    expect(marks((result.data as CloudsData).svg)).toBe(0);
   });
 });

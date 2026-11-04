@@ -99,7 +99,9 @@ export const queryCloudPoints = defineCommand({
     'one column per requested attribute the cloud has, one entry per returned point and in the same order: rgb = 3 × uint8 per point ' +
     '[r, g, b, …] (0-255), intensity = uint16 as stored (LAS raw; E57 and ASCII scaled to 0-65535 at import), classification = ASPRS class code. Attributes the cloud lacks ' +
     'are listed in data.missingAttributes (see describe_point_cloud attributes). The payload is JSON: ~1 MB per 30 k points for positions, ' +
-    'plus ~12 bytes per point for rgb, ~6 for intensity, ~3 for classification.',
+    'plus ~12 bytes per point for rgb, ~6 for intensity, ~3 for classification. ' +
+    'To SEE the clouds, render_view takes overlay "clouds" with overlayOptions { clouds: { maxPoints (100-200000, default 20000; ~2.8 MB of SVG at 200000), colour (elevation | rgb | intensity | classification), pointSizePx (1-8) } }: ' +
+    'budgeted marks over an orthographic picture, cropped by set_scan_crop boxes, the section box and cut, listed per cloud in data.overlays.clouds.detail; with isolate only the clouds named by id are drawn.',
   annotations: { readOnly: true },
   params: z.object({
     cloudId: cloudIdParam,

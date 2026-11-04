@@ -1,6 +1,7 @@
 /** Overlay kinds of render_view `overlay`, what an overlay drew, and the port a plugin registers a kind through (model-level port: render/overlayCage.ts, render/types.ts and plugins use it). */
 
 import type { CadDocument, Entity, Vec3 } from './types';
+import type { z } from 'zod';
 import type { PointCloudPort } from './pointCloud';
 
 /** World point to SVG pixels of an orthographic render (y down). */
@@ -22,13 +23,6 @@ export interface OverlayStats {
   readonly detail?: Readonly<Record<string, unknown>>;
 }
 
-/** The `clouds` request of render_view as the `clouds` overlay of the scan plugin reads it. */
-export interface CloudDrawOptions {
-  readonly maxPoints?: number | undefined;
-  readonly colour?: 'elevation' | 'rgb' | 'intensity' | 'classification' | undefined;
-  readonly pointSizePx?: number | undefined;
-}
-
 /** What `RenderOverlay.draw` gets: the orthographic projector of the picture and the entities to cover. */
 export interface OverlayView {
   readonly project: OverlayProjector;
@@ -38,13 +32,13 @@ export interface OverlayView {
   readonly only?: ReadonlyArray<string>;
   /** Image size in pixels (marks outside it are not drawn). */
   readonly size?: { readonly width: number; readonly height: number };
-  /** The installed point-cloud port (kernel-optional pattern: null / absent = nothing to read). */
-  readonly pointClouds?: PointCloudPort | null;
-  /** The render_view `clouds` request, when given. */
-  readonly clouds?: CloudDrawOptions;
+  /** Host ports from the execution context, narrow (a missing or null port = nothing to read: draw nothing and say so in `detail.note`). */
+  readonly ports?: { readonly pointClouds?: PointCloudPort | null };
+  /** This kind's `overlayOptions` entry, already validated against `RenderOverlay.paramsSchema`; undefined when none was given. */
+  readonly options?: unknown;
   /** World-point predicate of the cutaway / section box: false = the point is cut away. Absent = no cut. */
-  readonly keep?: (p: Vec3) => boolean;
-  /** True under review shading with a selection: non-selected content is drawn dimmed. */
+  readonly cutKeep?: (p: Vec3) => boolean;
+  /** True under review shading with a selection: content that is not selected is drawn dimmed. */
   readonly dim?: boolean;
 }
 
@@ -61,5 +55,7 @@ export interface OverlayLayer {
 export interface RenderOverlay {
   /** snake_case overlay name accepted by render_view `overlay`; must not equal a built-in kind or another plugin's kind. */
   readonly kind: string;
+  /** Schema of this kind's entry in render_view `overlayOptions` (checked when the command runs; invalid options are CMD_INVALID_PARAMS). Absent = the kind takes no options. */
+  readonly paramsSchema?: z.ZodType;
   draw(doc: CadDocument, view: OverlayView): OverlayLayer;
 }
