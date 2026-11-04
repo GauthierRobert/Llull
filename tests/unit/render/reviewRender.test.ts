@@ -233,6 +233,17 @@ describe('visibleEntityIds of render_view and visible_entity_ids', () => {
     expect(rendered['visibleEntityIds']).toEqual([a, c]);
   });
 
+  it('stops box-filtering once the active section box is deactivated', () => {
+    const camera = { projection: 'orthographic', eye: [3000, 0, 10000], direction: [0, 0, -1], up: [0, 1, 0], viewHeight: 20000 };
+    let doc = apply(scene(), 'set_section_box', { name: 'left', min: [-1000, -1000, 0], max: [3500, 1000, 2000], activate: true });
+    doc = apply(doc, 'save_viewpoint', { name: 'v', camera });
+    const [a, b, c] = doc.order as [string, string, string];
+    const ids = (d: CadDocument): unknown =>
+      data<Record<string, unknown>>(d, 'visible_entity_ids', { viewpointId: 'vp-2' })['visibleEntityIds'];
+    expect(ids(doc)).toEqual([a, b]);
+    expect(ids(apply(doc, 'set_active_section_box', { id: null }))).toEqual([a, b, c]);
+  });
+
   it('culls entities outside the view frustum', () => {
     const doc = ok(scene(), 'save_viewpoint', {
       name: 'narrow',

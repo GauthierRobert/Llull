@@ -10,7 +10,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { isRecord } from '@lib/isRecord';
 import { computeVersionSync, readOutputSync, runComputeSync, withJobFolderSync } from '../native/computeJob';
 import { nativeBinaryPath, nativeInstallHint } from '../native/nativeBinary';
-import { AssetReader, boxDistance, boxesMeet } from './assetReader';
+import { AssetReader, boxDistance, boxesMeet, type NodePoints } from './assetReader';
 import { assetDir, isAssetKey, scanCacheDir } from './scanStore';
 
 const DEFAULT_OP_TIMEOUT_S = 600;
@@ -25,7 +25,7 @@ export interface PointCloudPortOptions {
 }
 
 /** Points of node `i` inside `query`'s box / sphere. */
-function* pointsIn(reader: AssetReader, i: number, query: CloudQuery): Generator<{ p: Vec3; index: number }> {
+function* pointsIn(reader: AssetReader, i: number, query: CloudQuery): Generator<{ p: Vec3; index: number; node: NodePoints; k: number }> {
   const node = reader.readNode(i);
   if (node === null) return;
   for (let k = 0; k < node.indices.length; k++) {
@@ -41,7 +41,7 @@ function* pointsIn(reader: AssetReader, i: number, query: CloudQuery): Generator
       Math.hypot(p[0] - query.sphere.centre[0], p[1] - query.sphere.centre[1], p[2] - query.sphere.centre[2]) > query.sphere.radius
     )
       continue;
-    yield { p, index: node.indices[k] ?? 0 };
+    yield { p, index: node.indices[k] ?? 0, node, k };
   }
 }
 
@@ -75,7 +75,8 @@ function budgetNodes(reader: AssetReader, centre: Vec3, budget: number, query: C
   return selected.sort((a, b) => a - b);
 }
 
-function runQuery(reader: AssetReader, query: CloudQuery): CloudPoints {
+/** Null when a block to read is unreadable (CRC, size or manifest mismatch): the command refuses with SCN_ASSET_MISSING. */
+function runQuery(reader: AssetReader, query: CloudQuery): CloudPoints | null {
   const centre: Vec3 =
     query.sphere?.centre ??
     (query.box !== undefined
@@ -87,20 +88,40 @@ function runQuery(reader: AssetReader, query: CloudQuery): CloudPoints {
       : budgetNodes(reader, centre, query.lod.budget, query);
   const positions: number[] = [];
   const indices: number[] = [];
+  if (nodes.some((i) => reader.readNode(i) === null)) return null;
+  const wanted = (query.attributes ?? []).filter((name) => reader.manifest.attributes.includes(name));
+  const columns = { intensity: [] as number[], rgb: [] as number[], classification: [] as number[] };
   let truncated = false;
   let deepest = 0;
   outer: for (const i of nodes) {
-    for (const { p, index } of pointsIn(reader, i, query)) {
+    for (const { p, index, node, k } of pointsIn(reader, i, query)) {
       if (indices.length >= query.maxPoints) {
         truncated = true;
         break outer;
       }
       positions.push(p[0], p[1], p[2]);
       indices.push(index);
+      if (wanted.includes('intensity')) columns.intensity.push(node.intensity?.[k] ?? 0);
+      if (wanted.includes('rgb')) columns.rgb.push(node.rgb?.[3 * k] ?? 0, node.rgb?.[3 * k + 1] ?? 0, node.rgb?.[3 * k + 2] ?? 0);
+      if (wanted.includes('classification')) columns.classification.push(node.classification?.[k] ?? 0);
       deepest = Math.max(deepest, reader.nodes[i]?.level ?? 0);
     }
   }
-  return { positions: Float64Array.from(positions), indices: Uint32Array.from(indices), truncated, spacing: reader.spacing(deepest) };
+  return {
+    positions: Float64Array.from(positions),
+    indices: Uint32Array.from(indices),
+    ...(wanted.length > 0
+      ? {
+          attributes: {
+            ...(wanted.includes('intensity') ? { intensity: Uint16Array.from(columns.intensity) } : {}),
+            ...(wanted.includes('rgb') ? { rgb: Uint8Array.from(columns.rgb) } : {}),
+            ...(wanted.includes('classification') ? { classification: Uint8Array.from(columns.classification) } : {}),
+          },
+        }
+      : {}),
+    truncated,
+    spacing: reader.spacing(deepest),
+  };
 }
 
 function runNearest(reader: AssetReader, point: Vec3, maxDistance: number): CloudNearest | null {

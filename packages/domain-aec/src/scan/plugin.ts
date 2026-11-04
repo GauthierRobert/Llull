@@ -6,5 +6,12 @@
 import type { CadPlugin } from '@core/plugins/plugin';
 import { scanCommands } from './catalog';
 import { scanDocument } from './document';
+import { cloudOverlay } from './cloudOverlay';
 
-export const scanPlugin: CadPlugin = { name: 'scan', toolset: 'scan', commands: scanCommands, document: scanDocument };
+export const scanPlugin: CadPlugin = {
+  name: 'scan',
+  toolset: 'scan',
+  commands: scanCommands,
+  document: scanDocument,
+  renderOverlays: [cloudOverlay],
+};

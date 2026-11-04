@@ -116,6 +116,78 @@ describe('instanceBvh', () => {
       expect(bvh.boxQuery(min, max)).toEqual(brute(bvh.count, (o) => boxOverlapsBox(boxes, o, min, max)));
   });
 
+  it('equals brute force on degenerate, point, touching and exact-boundary boxes and a grazing ray', () => {
+    const list: { min: Vec3; max: Vec3 }[] = [
+      { min: [0, 0, 0], max: [0, 0, 0] },
+      { min: [1, 1, 1], max: [1, 1, 1] },
+      { min: [0, 0, 0], max: [1, 0, 1] },
+      { min: [1, 0, 0], max: [2, 1, 1] },
+      { min: [2, 0, 0], max: [3, 1, 1] },
+      { min: [-1, -1, -1], max: [-1, 5, -1] },
+      { min: [4, 4, 4], max: [4, 4, 5] },
+      ...Array.from({ length: 20 }, (_, i) => ({ min: [i, i, 0] as Vec3, max: [i + 1, i + 1, 0] as Vec3 })),
+    ];
+    const packed = packBoxes(list);
+    const tree = buildInstanceBvh(packed);
+    const queries: [Vec3, Vec3][] = [
+      [
+        [1, 0, 0],
+        [2, 1, 1],
+      ],
+      [
+        [1, 1, 1],
+        [1, 1, 1],
+      ],
+      [
+        [3, 0, 0],
+        [4, 4, 4],
+      ],
+      [
+        [-1, -1, -1],
+        [0, 0, 0],
+      ],
+      [
+        [0.5, 0.5, 0.5],
+        [0.5, 0.5, 0.5],
+      ],
+    ];
+    for (const [min, max] of queries)
+      expect(tree.boxQuery(min, max)).toEqual(brute(tree.count, (o) => boxOverlapsBox(packed, o, min, max)));
+    const rays: [Vec3, Vec3][] = [
+      [
+        [-5, 1, 1],
+        [1, 0, 0],
+      ],
+      [
+        [0, 0, 0],
+        [1, 1, 0],
+      ],
+      [
+        [1, 2, 0.5],
+        [0, -1, 0],
+      ],
+      [
+        [1, -3, 1],
+        [0, 1, 0],
+      ],
+      [
+        [-2, 1, 0],
+        [1, 0, 0],
+      ],
+      [
+        [2, 1.0000000000000002, 0.5],
+        [1, 0, 0],
+      ],
+    ];
+    let hits = 0;
+    for (const [origin, direction] of rays) {
+      const result = tree.rayQuery(origin, direction);
+      expect(result).toEqual(brute(tree.count, (o) => rayHitsBox(packed, o, origin, direction)));
+      hits += result.length;
+    }
+    expect(hits).toBeGreaterThan(5);
+  });
+
   it('is deterministic', () => {
     const again = buildInstanceBvh(boxes);
     const planes = frustumPlanes(camera());

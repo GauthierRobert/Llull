@@ -11,7 +11,7 @@ import { type OrientedBox, boxExtent } from './clashBoxes';
 
 const EXTENT_MARGIN = 1e-6;
 
-/** Solids from which the BVH replaces the all-pairs scan (measured at VIS-M7, 09 spec §12.11). */
+/** Solids from which the BVH replaces the all-pairs scan (measured at VIS-M7, 09 spec §12.13). */
 export const CLASH_BVH_THRESHOLD = 64;
 
 export interface SolidIndex {
@@ -25,19 +25,17 @@ const inflate = (value: Vec3, sign: 1 | -1): Vec3 => [
   value[2] + sign * EXTENT_MARGIN,
 ];
 
-export function solidIndex(boxes: readonly OrientedBox[]): SolidIndex {
-  const bvh = buildInstanceBvh(
-    packBoxes(
-      boxes.map((box) => {
-        const { min, max } = boxExtent(box);
-        return { min: inflate(min, -1), max: inflate(max, 1) };
-      }),
-    ),
-  );
+/**
+ * @invariant null (caller scans every solid) when any extent is not finite; otherwise `nearBox` never misses a touching solid
+ */
+export function solidIndex(boxes: readonly OrientedBox[]): SolidIndex | null {
+  const extents = boxes.map((box) => boxExtent(box));
+  if (!extents.every(({ min, max }) => min.every(Number.isFinite) && max.every(Number.isFinite))) return null;
+  const bvh = buildInstanceBvh(packBoxes(extents.map(({ min, max }) => ({ min: inflate(min, -1), max: inflate(max, 1) }))));
   return {
     nearBox: (box) => {
       const { min, max } = boxExtent(box);
-      return bvh.boxQuery(min, max);
+      return min.every(Number.isFinite) && max.every(Number.isFinite) ? bvh.boxQuery(min, max) : Array.from(boxes.keys());
     },
   };
 }

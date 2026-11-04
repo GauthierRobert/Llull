@@ -5,9 +5,11 @@ import type { ThreeEvent } from '@react-three/fiber';
 import type * as THREE from 'three';
 import type { Entity, EntityId } from '@core/model/types';
 import type { DisplayMode } from '@ui/store';
+import { useTintStore } from '@ui/store/tintStore';
 import { isAdditiveSelect } from '../../selectClick';
 import { XRAY_OPACITY } from '../../viewportPalette';
 import { useBatchCapacity } from '../InstancedRenderer';
+import { useRenderQuality } from '../useRenderQuality';
 import type { LodGeometryCache } from './LodGeometryCache';
 import { type DrawBucket, entityIdAt } from './plantBatchPlan';
 import { writeBucketColours } from './plantInstanceColours';
@@ -34,6 +36,9 @@ export function PlantBucketMesh({
   selectionSet,
   onSelect,
 }: PlantBucketMeshProps): React.ReactElement | null {
+  // Tints rewrite the colour buffer only (no plan, no matrix rewrite); read here so small documents never render this component.
+  const tints = useTintStore((s) => s.tints);
+  const { keyShadows, plantShadowMaxLod } = useRenderQuality();
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = bucket.ids.length;
   const capacity = useBatchCapacity(count);
@@ -55,8 +60,8 @@ export function PlantBucketMesh({
 
   useEffect(() => {
     const mesh = meshRef.current;
-    if (mesh) writeBucketColours(mesh, bucket.ids, entities, materialColour, selectionSet);
-  }, [bucket, entities, materialColour, selectionSet, geometry, material, capacity]);
+    if (mesh) writeBucketColours(mesh, bucket.ids, entities, materialColour, selectionSet, tints);
+  }, [bucket, entities, materialColour, selectionSet, tints, geometry, material, capacity]);
 
   // No per-instance opacity: in x-ray, any selected entity raises the whole bucket's opacity (as InstancedRenderer).
   useEffect(() => {
@@ -79,8 +84,8 @@ export function PlantBucketMesh({
       args={[geometry, material, capacity]}
       count={count}
       onClick={handleClick}
-      castShadow={bucket.lod < 2}
-      receiveShadow
+      castShadow={bucket.lod <= plantShadowMaxLod}
+      receiveShadow={keyShadows}
     />
   );
 }

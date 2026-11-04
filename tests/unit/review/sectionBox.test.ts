@@ -77,6 +77,34 @@ describe('set_section_box / delete_section_box', () => {
     expect(refused.document).toBe(used);
   });
 
+  it('set_active_section_box switches the active box, null clears it, unknown id is refused', () => {
+    const doc = execute(scene(), 'set_section_box', { ...BOX, activate: true }).document;
+    const off = execute(doc, 'set_active_section_box', { id: null });
+    expect(off.data).toEqual({ active: null });
+    expect(off.affected).toEqual([]);
+    expect(off.document.review?.activeSectionBoxId).toBeUndefined();
+    expect(off.document.review?.sectionBoxes['sb-1']).toBeDefined();
+    expect(execute(off.document, 'set_active_section_box', { id: null }).document.review?.activeSectionBoxId).toBeUndefined();
+    expect(execute(off.document, 'set_active_section_box', { id: 'sb-1' }).document.review?.activeSectionBoxId).toBe('sb-1');
+    const refused = execute(doc, 'set_active_section_box', { id: 'sb-9' });
+    expect(refused.error?.code).toBe('VIS_SECTION_BOX_NOT_FOUND');
+    expect(refused.document).toBe(doc);
+    for (const key of ['constructor', 'toString', '__proto__'])
+      expect(execute(doc, 'set_active_section_box', { id: key }).document.review?.activeSectionBoxId).not.toBe(key);
+    const before = JSON.stringify(doc);
+    execute(doc, 'set_active_section_box', { id: null });
+    expect(JSON.stringify(doc)).toBe(before);
+  });
+
+  it('render_view stops clipping once the box is deactivated', () => {
+    const doc = execute(scene(), 'set_section_box', { ...BOX, activate: true }).document;
+    const count = (d: CadDocument): number =>
+      (execute(d, 'render_view', { view: 'top', mode: 'vector', width: 400, height: 300 }).data as { visibleEntityCount: number })
+        .visibleEntityCount;
+    expect(count(doc)).toBe(2);
+    expect(count(execute(doc, 'set_active_section_box', { id: null }).document)).toBe(3);
+  });
+
   it('is pure', () => {
     const doc = execute(scene(), 'set_section_box', BOX).document;
     const before = JSON.stringify(doc);

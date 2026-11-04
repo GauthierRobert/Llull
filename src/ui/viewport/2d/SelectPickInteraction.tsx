@@ -7,6 +7,8 @@ import { useFocusStore } from '@ui/store/focusStore';
 import { pickEntityId } from './modifyHelpers';
 import { pickContext } from './pickContext';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
+import { usePidViewStore } from '@ui/store/pidViewStore';
+import { pidGlyphAt } from './pidSheetItems';
 import { isAdditiveSelect } from '../selectClick';
 
 /** Pointer travel (px) above which a press is a pan, not a click. */
@@ -28,16 +30,31 @@ export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): Rea
         const { document, tolerance, accepts } = pickContext(zoom);
         const id = pickEntityId(document, toDocumentPoint(e.point), tolerance, accepts);
         const additive = isAdditiveSelect(e);
+        const pidView = usePidViewStore.getState();
         if (id === null) {
-          if (!additive) {
+          // P&ID items are not entities: the sheet drawn is hit-tested when no entity is under the pointer.
+          const { layers } = document;
+          const glyph = pidGlyphAt(
+            document.plant?.pid,
+            pidView.activeSheetId,
+            toDocumentPoint(e.point),
+            tolerance,
+            (layer) => layers[`layer-${layer}`]?.visible !== false,
+          );
+          if (glyph !== null) {
             state.clearSelection();
             useFocusStore.getState().setFocus(null);
+            pidView.setPicked({ id: glyph.id, kind: glyph.kind });
+          } else if (!additive) {
+            state.clearSelection();
+            useFocusStore.getState().setFocus(null);
+            pidView.setPicked(null);
           }
-        } else if (additive) {
-          state.toggleSelection(id);
-        } else {
-          state.select([id]);
+          return;
         }
+        pidView.setPicked(null);
+        if (additive) state.toggleSelection(id);
+        else state.select([id]);
       }}
     />
   );

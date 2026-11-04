@@ -6,7 +6,7 @@ import type { Entity } from '@core/model/types';
 import { LodGeometryCache } from '@ui/viewport/3d/plant/LodGeometryCache';
 import { drawBuckets, entityIdAt, isPlantBatchable, plantCoveredIds } from '@ui/viewport/3d/plant/plantBatchPlan';
 import { bucketMatrices } from '@ui/viewport/3d/plant/plantMatrices';
-import { writeBucketColours } from '@ui/viewport/3d/plant/plantInstanceColours';
+import { instanceBaseColour, writeBucketColours } from '@ui/viewport/3d/plant/plantInstanceColours';
 import { motionCamera } from '@ui/viewport/3d/plant/plantPlanCamera';
 import { frustumPlanes } from '@core/geometry/renderPlanCamera';
 import { synRackDocument } from '../helpers/synRack';
@@ -109,6 +109,32 @@ describe('plant batch: hidden layers, motion, tint', () => {
     writeBucketColours(mesh, ids, doc.entities, '#00ff00', new Set());
     mesh.getColorAt(0, plain);
     expect(plain.getHexString()).toBe('00ff00');
+  });
+});
+
+describe('plant instance colour precedence', () => {
+  it('tint beats material colour beats entity colour', () => {
+    const entity = { color: '#111111' } as Entity;
+    const tints = new Map([['a', '#ff0000']]);
+    expect(instanceBaseColour('a', entity, '#00ff00', tints)).toBe('#ff0000');
+    expect(instanceBaseColour('b', entity, '#00ff00', tints)).toBe('#00ff00');
+    expect(instanceBaseColour('b', entity, undefined, tints)).toBe('#111111');
+    expect(instanceBaseColour('b', undefined, undefined, tints)).toBe('#cccccc');
+  });
+
+  it('writes the tint into the colour buffer, selection still lerps over it', () => {
+    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial(), 2);
+    const ids = drawBuckets(scene, plan, everything)[0]?.ids.slice(0, 2) as string[];
+    const tints = new Map([[ids[0] as string, '#ff0000']]);
+    writeBucketColours(mesh, ids, doc.entities, '#00ff00', new Set(), tints);
+    const c = new THREE.Color();
+    mesh.getColorAt(0, c);
+    expect(c.getHexString()).toBe('ff0000');
+    mesh.getColorAt(1, c);
+    expect(c.getHexString()).toBe('00ff00');
+    writeBucketColours(mesh, ids, doc.entities, '#00ff00', new Set([ids[0] as string]), tints);
+    mesh.getColorAt(0, c);
+    expect(c.getHexString()).not.toBe('ff0000');
   });
 });
 

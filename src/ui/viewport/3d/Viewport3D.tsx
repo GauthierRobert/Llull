@@ -25,6 +25,8 @@ import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { DynamicsPlayer } from './DynamicsPlayer';
 import { useRenderQuality } from './useRenderQuality';
+import { NavigationController } from './navigation/NavigationController';
+import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { CANVAS_DPR_RANGE, RenderRig } from './RenderRig';
@@ -61,6 +63,8 @@ import { NurbsNetBar } from './nurbsNet/NurbsNetBar';
 import { RemotePreviewLayer } from './preview/RemotePreviewLayer';
 import { FootprintPreviewLayer } from './preview/FootprintPreviewLayer';
 import { CageEditBar } from './cage/CageEditBar';
+import { ReviewViewportLayer } from './review/ReviewViewportLayer';
+import { MarkupOverlay } from './review/MarkupOverlay';
 import { SpaceMouseControl } from '@ui/input/SpaceMouseControl';
 
 // Idempotent, StrictMode-safe.
@@ -75,6 +79,7 @@ interface SceneContentsProps {
 
 function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
+  const orbiting = useNavigationStore((s) => s.mode === 'orbit');
 
   const quality = useRenderQuality();
   const palette = useViewportPalette();
@@ -106,8 +111,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         enableDamping
         dampingFactor={0.06}
         screenSpacePanning={false}
-        enabled={orbitEnabled}
+        enabled={orbitEnabled && orbiting}
       />
+      <NavigationController />
 
       <CameraReactor />
 
@@ -174,6 +180,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <WrapOverlay />
         <BlendOverlay />
         <FocusOverlay />
+        <ReviewViewportLayer />
       </group>
 
       {/* Last: its useFrame must run after every pose writer (see RenderRig). */}
@@ -220,6 +227,7 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
+      <MarkupOverlay />
       <div className="feature-chips">
         <FeatureStartBar />
         <CageEditBar />

@@ -454,3 +454,79 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+
+/* Model review (09 VIS): issues, viewpoints, redlines, section box. */
+
+.model-review {
+  display: flex;
+  flex-direction: column;
+}
+
+.issue-form,
+.issue-detail__form,
+.bcf-actions,
+.redline-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.issue-form .field__input,
+.issue-detail__form .field__input {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.issue-row .building-row-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.issue-detail {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent, var(--fg-subtle));
+  border-radius: var(--radius-sm, 4px);
+}
+
+.issue-detail__text {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.issue-detail__views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.issue-detail__comments {
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.issue-detail__comment + .issue-detail__comment {
+  margin-top: var(--space-1);
+}
+
+.redline-tools__colour {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+}
+
+.issue-detail__notice {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}

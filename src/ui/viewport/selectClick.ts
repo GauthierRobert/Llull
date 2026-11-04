@@ -1,4 +1,5 @@
 import type { ThreeEvent } from '@react-three/fiber';
+import { isClippedAway } from './3d/review/activeClipPlanes';
 
 /** Shift / Ctrl / Cmd held ⇒ the click toggles into the selection instead of replacing it. */
 export function isAdditiveSelect(event: Pick<MouseEvent, 'shiftKey' | 'ctrlKey' | 'metaKey'>): boolean {
@@ -11,6 +12,8 @@ export function selectOnClick(
   onSelect: (id: string, additive: boolean) => void,
 ): (event: ThreeEvent<MouseEvent>) => void {
   return (event) => {
+    // A hit on the clipped-away part is not a hit: the click falls through to what is visible behind it.
+    if (isClippedAway(event.point)) return;
     event.stopPropagation();
     onSelect(entityId, isAdditiveSelect(event.nativeEvent));
   };

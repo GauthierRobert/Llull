@@ -95,7 +95,13 @@ export const queryCloudPoints = defineCommand({
     `Read-only: points of a cloud in a region, in document units and frame, as a flat [x, y, z, …] array in canonical order (deterministic). ` +
     `lod "full" (default) returns every point in the region up to maxPoints (≤ ${MAX_QUERY_POINTS}); lod "budget" returns a level-of-detail ` +
     'subset of at most `budget` points (whole octree levels, coarse first). data.truncated says when maxPoints cut the answer (SCN_QUERY_LIMIT ' +
-    'warning): narrow the region. indices are the source record numbers.',
+    'warning): narrow the region. indices are the source record numbers. attributes (optional, subset of rgb / intensity / classification) adds ' +
+    'one column per requested attribute the cloud has, one entry per returned point and in the same order: rgb = 3 × uint8 per point ' +
+    '[r, g, b, …] (0-255), intensity = uint16 as stored (LAS raw; E57 and ASCII scaled to 0-65535 at import), classification = ASPRS class code. Attributes the cloud lacks ' +
+    'are listed in data.missingAttributes (see describe_point_cloud attributes). The payload is JSON: ~1 MB per 30 k points for positions, ' +
+    'plus ~12 bytes per point for rgb, ~6 for intensity, ~3 for classification. ' +
+    'To SEE the clouds, render_view takes overlay "clouds" with overlayOptions { clouds: { maxPoints (100-200000, default 20000; ~2.8 MB of SVG at 200000), colour (elevation | rgb | intensity | classification), pointSizePx (1-8) } }: ' +
+    'budgeted marks over an orthographic picture, cropped by set_scan_crop boxes, the section box and cut, listed per cloud in data.overlays.clouds.detail; with isolate only the clouds named by id are drawn.',
   annotations: { readOnly: true },
   params: z.object({
     cloudId: cloudIdParam,
@@ -103,8 +109,16 @@ export const queryCloudPoints = defineCommand({
     lod: z.enum(['full', 'budget']).optional().describe('full (default) or budget.'),
     budget: z.number().int().positive().optional().describe('Point budget for lod "budget" (default 20000).'),
     maxPoints: z.number().int().positive().optional().describe(`Hard cap on returned points (default 10000, at most ${MAX_QUERY_POINTS}).`),
+    attributes: z
+      .array(z.enum(['rgb', 'intensity', 'classification']))
+      .optional()
+      .describe('Per-point columns to return: any of rgb, intensity, classification. Default none.'),
   }),
-  run: (doc, { cloudId, region = { kind: 'all' as const }, lod = 'full', budget = 20_000, maxPoints = 10_000 }, ctx): CommandResult => {
+  run: (
+    doc,
+    { cloudId, region = { kind: 'all' as const }, lod = 'full', budget = 20_000, maxPoints = 10_000, attributes = [] },
+    ctx,
+  ): CommandResult => {
     const access = cloudAccess(doc, 'query_cloud_points', cloudId, ctx);
     if (!isAccess(access)) return access;
     const resolved = resolveRegion(doc, region);
@@ -112,8 +126,11 @@ export const queryCloudPoints = defineCommand({
     const cap = Math.min(maxPoints, MAX_QUERY_POINTS);
     const { cloud, port, manifest } = access;
     const box = assetBox(cloud, resolved.region);
+    const wanted = [...new Set(attributes)];
+    const present = wanted.filter((name) => manifest.attributes.includes(name));
     const read = port.query(cloud.assetKey, {
       ...(box !== undefined ? { box } : {}),
+      ...(present.length > 0 ? { attributes: present } : {}),
       lod: lod === 'full' ? 'full' : { budget },
       maxPoints: Number.MAX_SAFE_INTEGER,
     });
@@ -121,6 +138,17 @@ export const queryCloudPoints = defineCommand({
       return refuseScan(doc, 'query_cloud_points', 'SCN_ASSET_MISSING', `asset ${cloud.assetKey} could not be read`, [cloudId]);
     const points: number[] = [];
     const indices: number[] = [];
+    const width = { intensity: 1, rgb: 3, classification: 1 } as const;
+    const short = Object.entries(read.attributes ?? {}).some(
+      ([name, column]) => column.length !== read.indices.length * width[name as keyof typeof width],
+    );
+    if (short)
+      return refuseScan(doc, 'query_cloud_points', 'SCN_ASSET_MISSING', 'the attribute columns do not match the returned points', [
+        cloudId,
+      ]);
+    const missingAttributes = wanted.filter((name) => read.attributes?.[name] === undefined);
+    const columns = { intensity: [] as number[], rgb: [] as number[], classification: [] as number[] };
+    const source = read.attributes;
     let truncated = false;
     for (let i = 0; i < read.indices.length; i++) {
       const p = applyPoint(cloud.transform, [read.positions[3 * i] ?? 0, read.positions[3 * i + 1] ?? 0, read.positions[3 * i + 2] ?? 0]);
@@ -131,6 +159,9 @@ export const queryCloudPoints = defineCommand({
       }
       points.push(...vecFromM(doc, p));
       indices.push(read.indices[i] ?? 0);
+      if (source?.intensity !== undefined) columns.intensity.push(source.intensity[i] ?? 0);
+      if (source?.rgb !== undefined) columns.rgb.push(source.rgb[3 * i] ?? 0, source.rgb[3 * i + 1] ?? 0, source.rgb[3 * i + 2] ?? 0);
+      if (source?.classification !== undefined) columns.classification.push(source.classification[i] ?? 0);
     }
     const data = {
       cloudId,
@@ -138,6 +169,10 @@ export const queryCloudPoints = defineCommand({
       count: indices.length,
       points,
       indices,
+      ...(source?.rgb !== undefined ? { rgb: columns.rgb } : {}),
+      ...(source?.intensity !== undefined ? { intensity: columns.intensity } : {}),
+      ...(source?.classification !== undefined ? { classification: columns.classification } : {}),
+      ...(wanted.length > 0 ? { missingAttributes } : {}),
       truncated,
       spacing: fromM(doc, read.spacing),
       totalPoints: manifest.pointCount,

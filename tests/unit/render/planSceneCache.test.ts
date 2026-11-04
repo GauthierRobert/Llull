@@ -27,6 +27,20 @@ describe('planSceneOf (VIS-M7)', () => {
     expect(planSceneOf(small).query).toBeUndefined();
   });
 
+  it('a document exactly at the threshold gets no query on call 1 and a query on call 2; a newer BVH evicts the older one', () => {
+    const count = planScene(doc).instances.length;
+    const first = { ...doc };
+    expect(planSceneOf(first, count).query).toBeUndefined();
+    expect(planSceneOf(first, count).query).toBeTypeOf('function');
+    expect(planSceneOf({ ...doc }, count + 1).query).toBeUndefined();
+    const second = { ...doc };
+    planSceneOf(second, count);
+    expect(planSceneOf(second, count).query).toBeTypeOf('function');
+    expect(planSceneOf(first, count).query).toBeTypeOf('function');
+    const frustum = planSceneOf(first, count).query;
+    expect(frustum).toBeDefined();
+  });
+
   it('plans identically through the BVH query and the brute-force scan (all cameras)', () => {
     const fresh = { ...doc };
     planSceneOf(fresh, 0);

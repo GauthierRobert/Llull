@@ -103,7 +103,7 @@ interface BuildScratch {
 }
 
 /**
- * Splits `order[start, end)` at the lowest binned-SAH cost over the three axes. Returns the split position (start < position < end), or -1 when
+ * Splits `order[start, end)` at the lowest binned-SAH cost over the axis with the widest centroid extent (16 bins). Returns the split position (start < position < end), or -1 when
  * every centroid coincides.
  */
 function sahSplit(
@@ -133,6 +133,7 @@ function sahSplit(
     0,
   );
   for (const axis of [widest]) {
+    // one axis only: three axes built ~1.5x slower for no measurable query gain (09 spec §12.13)
     const low = lowC[axis] as number;
     const extent = (highC[axis] as number) - low;
     if (!(extent > 0)) continue;
@@ -206,6 +207,7 @@ function sahSplit(
 
 /**
  * Builds the BVH of `boxes` (6 numbers per box).
+ * @invariant queries equal the brute-force scan with the same predicate, ascending, no duplicates (boxes finite)
  * @invariant deterministic: the same boxes give the same tree; leaves hold <= 4 boxes except identical-centroid runs, which are halved by index
  */
 export function buildInstanceBvh(boxes: PackedBoxes): InstanceBvh {

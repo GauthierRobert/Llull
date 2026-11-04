@@ -66,6 +66,29 @@ export const setSectionBox = defineCommand({
 });
 
 /**
+ * @affects sets or clears doc.review.activeSectionBoxId (affected: []); metaHistory
+ * @failure unknown id -> VIS_SECTION_BOX_NOT_FOUND
+ */
+export const setActiveSectionBox = defineCommand({
+  name: 'set_active_section_box',
+  description:
+    'Make a section box (sb-<n>) the active one (the viewport, render_view and visible_entity_ids clip with it), or pass id null to switch section clipping off ' +
+    'without deleting the box. A section box given to render_view or saved in a viewpoint still wins over the active one. data { active }. ' +
+    'Error: VIS_SECTION_BOX_NOT_FOUND. Does not add a feature step.',
+  annotations: { metaHistory: true },
+  params: z.object({ id: z.string().nullable().describe('Section box id, e.g. "sb-1", or null to deactivate.') }),
+  run: (doc, { id }): CommandResult => {
+    const review = reviewOf(doc);
+    if (id !== null && !Object.hasOwn(review.sectionBoxes, id))
+      return reviewRejection(doc, 'set_active_section_box', 'VIS_SECTION_BOX_NOT_FOUND', `no section box '${id}'`, [id], ['id']);
+    const { activeSectionBoxId, ...rest } = review;
+    const next = id === null ? rest : { ...rest, activeSectionBoxId: id };
+    const summary = id === null ? 'Deactivated the section box.' : `Activated section box ${id}.`;
+    return { ...changed({ ...doc, review: next }, summary, []), data: { active: id } };
+  },
+});
+
+/**
  * @affects removes doc.review.sectionBoxes[id] (affected: [id]); metaHistory
  * @failure unknown id -> VIS_SECTION_BOX_NOT_FOUND; referenced by a viewpoint -> VIS_SECTION_BOX_IN_USE
  */
