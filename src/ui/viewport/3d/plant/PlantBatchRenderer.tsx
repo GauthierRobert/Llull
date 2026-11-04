@@ -12,7 +12,8 @@ import { makeMaterialArgs } from '../InstancedRenderer';
 import { LodGeometryCache } from './LodGeometryCache';
 import { PlantBucketMesh } from './PlantBucketMesh';
 import { type DrawBucket, drawBuckets } from './plantBatchPlan';
-import { assignedClassOf } from '../review/materialClassAppearance';
+import { useStableByKey } from '../../useStableByKey';
+import { bucketSurface, classSurfacesKey, planClassSurfaces, type PlantSurface } from './plantClassSurfaces';
 import { prepareRayIndex, rayCandidates } from './plantRayIndex';
 import type { PlantPlan } from './usePlantPlan';
 
@@ -33,12 +34,12 @@ class PlantMaterials {
   constructor(
     private readonly displayMode: DisplayMode,
     private readonly materials: Readonly<Record<string, Material>>,
-    private readonly display: DisplayModel | undefined,
+    private readonly classes: ReadonlyMap<string, PlantSurface>,
   ) {}
   get(bucket: DrawBucket): THREE.MeshStandardMaterial {
     let material = this.byBucket.get(bucket.key);
     if (material === undefined) {
-      const pbr = bucketSurface(bucket, this.materials, this.display);
+      const pbr = bucketSurface(bucket.materialClass, this.materials, this.classes);
       // Pushed back like SolidMeshShell, so lines drawn on the surface stay visible.
       material = new THREE.MeshStandardMaterial({
         ...makeMaterialArgs(this.displayMode, pbr),
@@ -56,17 +57,6 @@ class PlantMaterials {
   }
 }
 
-/** The bucket's `materialClass` is an assigned display class id (its surface) or a document material id (its PBR, colour too). */
-function bucketSurface(
-  bucket: DrawBucket,
-  materials: Readonly<Record<string, Material>>,
-  display: DisplayModel | undefined,
-): { roughness: number; metalness: number; color?: string } | undefined {
-  const cls = assignedClassOf(display, bucket.ids[0] ?? '');
-  if (cls !== undefined && cls.id === bucket.materialClass) return cls;
-  return Object.hasOwn(materials, bucket.materialClass) ? materials[bucket.materialClass] : undefined;
-}
-
 export function PlantBatchRenderer({
   plan,
   covered,
@@ -78,8 +68,11 @@ export function PlantBatchRenderer({
 }: PlantBatchRendererProps): React.ReactElement {
   const displayMode = useViewportStore((s) => s.displayMode);
   const cache = useDisposable(() => new LodGeometryCache(), []);
-  const plantMaterials = useDisposable(() => new PlantMaterials(displayMode, materials, display), [displayMode, materials, display]);
   const buckets = useMemo(() => drawBuckets(plan.scene, plan.plan, covered, plan.moving), [plan, covered]);
+  // Only the surfaces of the classes the plan uses: an unrelated display change (a profile, another class) keeps every bucket material.
+  const usedClasses = useMemo(() => planClassSurfaces(plan.scene.materialClasses, display), [plan.scene.materialClasses, display]);
+  const classes = useStableByKey(usedClasses, classSurfacesKey(usedClasses));
+  const plantMaterials = useDisposable(() => new PlantMaterials(displayMode, materials, classes), [displayMode, materials, classes]);
 
   // Prototypes that left the scene free their geometries.
   const { scene } = plan;
@@ -97,7 +90,7 @@ export function PlantBatchRenderer({
           entities={entities}
           cache={cache}
           material={plantMaterials.get(bucket)}
-          materialColour={displayMode === 'shaded' ? bucketSurface(bucket, materials, display)?.color : undefined}
+          materialColour={displayMode === 'shaded' ? bucketSurface(bucket.materialClass, materials, classes)?.color : undefined}
           displayMode={displayMode}
           selectionSet={selectionSet}
           onSelect={onSelect}

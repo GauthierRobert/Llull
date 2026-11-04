@@ -11,7 +11,7 @@ import { sha256Hex } from '../lib/sha256';
 import { dot3 } from '../lib/vec3';
 import type { Bounds } from './bounds';
 import { entityBounds, entityBoundsInDoc } from './bounds';
-import { assignedMaterialClass } from './materialClasses';
+import { assignedMaterialClass, materialClassPlanKey } from './materialClasses';
 import { entityToTriangles } from './entityTriangles';
 import { type FrustumPlane, type PlanCamera, frustumPlanes, planCameraProblem } from './renderPlanCamera';
 
@@ -130,9 +130,14 @@ export function prototypeKeyOf(entity: Entity): string {
   return `${entity.kind}|${params.map(([key, value]) => `${key}=${canonical(value)}`).join(';')}`;
 }
 
-/** Material class of an entity by default: its assigned display class (assign_material_class), else its `materialId`, else `unassigned`. */
-const defaultMaterialClassOf = (doc: CadDocument, entity: Entity): string =>
-  assignedMaterialClass(doc, entity.id)?.id ?? entity.materialId ?? 'unassigned';
+/**
+ * Material class of an entity by default: its assigned display class as `matclass:<id>` (assign_material_class), else its `materialId`, else
+ * `unassigned`. The prefix keeps a `materialId` equal to a class id in its own bucket.
+ */
+const defaultMaterialClassOf = (doc: CadDocument, entity: Entity): string => {
+  const assigned = assignedMaterialClass(doc, entity.id);
+  return assigned === undefined ? (entity.materialId ?? 'unassigned') : materialClassPlanKey(assigned.id);
+};
 
 const diagonalOf = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
 

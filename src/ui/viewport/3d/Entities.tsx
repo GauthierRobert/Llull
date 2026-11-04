@@ -26,7 +26,8 @@ import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 import { activeExplodeOffsets } from '@core/geometry/explodedOffsets';
 import type { PbrMaterial } from './useMaterialProps';
-import { assignedClassOf, entityPbrMaterial } from './review/materialClassAppearance';
+import { assignedMaterialClassIn } from '@core/geometry/materialClasses';
+import { entityPbrMaterial } from './review/materialClassAppearance';
 import { useTransitioningIds } from '@ui/store/transitioningIds';
 import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
 import { type GhostRenderer, LiveFxLayer } from '../liveFx/LiveFxLayer';
@@ -224,7 +225,7 @@ export function Entities(): React.ReactElement {
         ),
         materials,
         (entity) => {
-          const cls = assignedClassOf(display, entity.id);
+          const cls = assignedMaterialClassIn(display, entity.id);
           return cls === undefined ? undefined : { metalness: cls.metalness, roughness: cls.roughness };
         },
       ),

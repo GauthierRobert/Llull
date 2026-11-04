@@ -4,10 +4,10 @@
 
 import { compileProfile, profileProblems } from '@core/geometry/colourRules';
 import { entityPropertyBag } from '@core/geometry/entityProperties';
+import { resolveEntityColour } from '@core/geometry/materialClasses';
 import { findProfile } from '@core/model/display';
 import type { EntityPropertyProvider } from '@core/model/entityProperties';
 import type { CadDocument } from '@core/model/types';
-import { resolveTintColour } from './materialClassAppearance';
 
 const NONE: ReadonlyMap<string, string> = new Map();
 
@@ -27,7 +27,7 @@ export function profileTints(doc: CadDocument, providers: readonly EntityPropert
     const entity = doc.entities[id];
     if (entity === undefined) continue;
     const rule = compiled?.select(entityPropertyBag(doc, id, providers)) ?? null;
-    const colour = resolveTintColour(display, entity, rule === null ? null : rule.appearance.colour, profile?.defaultColour);
+    const colour = resolveEntityColour(display, entity, rule === null ? null : rule.appearance.colour, profile?.defaultColour);
     if (colour !== null && colour !== 'entity') tints.set(id, colour);
   }
   return tints.size === 0 ? NONE : tints;
