@@ -745,7 +745,7 @@ The registry is the union of the plant objects (per tag scope) and these model t
 
 ### 13.5 Check rules built
 
-`DAT_OUTSIDE_HIERARCHY`, `DAT_TAG_FORMAT`, `DAT_TAG_DUPLICATE` (one finding per tag, all holder ids), `DAT_TAG_CASE_COLLISION`, `DAT_REQUIRED_PROPERTY_MISSING`, `DAT_LINE_END_UNRESOLVED`, `DAT_LINE_SIZE_MISMATCH`, `DAT_TAG_MODEL_MISMATCH`, `DAT_OBJECT_ORPHAN`, `DAT_UNCLASSIFIED_ELEMENT` (equipment, legacy pipes, routed lines; only without a hierarchy / classes filter), `DAT_VALUE_UNVERIFIED`, `DAT_RESERVED_TAG_UNMODELLED`. Not yet: `DAT_OPEN_PORT`, `DAT_INFERRED_NOZZLE` (need the M2 nozzle schedule and the M3 ports).
+`DAT_OUTSIDE_HIERARCHY`, `DAT_TAG_FORMAT`, `DAT_TAG_DUPLICATE` (one finding per tag, all holder ids), `DAT_TAG_CASE_COLLISION`, `DAT_REQUIRED_PROPERTY_MISSING`, `DAT_LINE_END_UNRESOLVED`, `DAT_LINE_SIZE_MISMATCH`, `DAT_TAG_MODEL_MISMATCH`, `DAT_OBJECT_ORPHAN`, `DAT_UNCLASSIFIED_ELEMENT` (equipment, legacy pipes, routed lines; only without a hierarchy / classes filter), `DAT_VALUE_UNVERIFIED`, `DAT_RESERVED_TAG_UNMODELLED`. Built later (DAT-FU2, §13.14): `DAT_OPEN_PORT`, `DAT_INFERRED_NOZZLE`.
 
 ### 13.6 Tests and validation
 
@@ -939,3 +939,14 @@ No new command; the providers and four report kinds are new. Code in `packages/d
 **Tests.** `tests/unit/plant/data/deliverables.test.ts` (29: machine, hash, refusals, prototype keys, scope fixed at creation, dropped scope, gate with a ledger port that accepts only the exact payload and spends once, check before spend and scope, supersession, IFC, save / load, corrupt-file cases, REPLAY, REGENERATE), `handover.test.ts` (19: unverified marks, headers, mapping, byte determinism, `is pure`, registers, document register, export gate, `externalIds`), `deliverablesRelease.test.ts` (2), `tests/unit/hostParams.test.ts` (the `at` stamp). Tool-schema snapshot and `docs/FEATURES.md` regenerated.
 
 **Not verified.** The CFIHOS-like names and class ids against an IOGP release (Q9); the signer, signature id and payload hash of a stored signed step are self-asserted on load (a hand-edited file can carry any; the key store and its consumed-signature ledger are the proof, not this record); no human-signed status was exercised through the real Ed25519 port (a ledger test port stands in, as in the 05 / 09 suites).
+
+### 13.14 DAT-FU2 (2026-11-04): follow-ups
+
+**Item 1, port rules of `check_plant_data` (closes H5, E8, F10, G12 and the check part of I7).** `data/openPort.ts`, `data/check.ts`, `codes.ts`.
+
+| Rule | Severity | Behaviour |
+| ---- | -------- | --------- |
+| `DAT_OPEN_PORT` | warn | An end (`from` / `to`) of a process line that names nothing AND is attached to nothing. A drawn (legacy) pipe has no attachments, so an unnamed end is open; a routed run end is attached when it carries a `ref` (nozzle, tie-in, run end, branch). A named end (tag, nozzle, battery limit) is never open; an unresolved name stays `DAT_LINE_END_UNRESOLVED` (fail). Path `<line tag>.<from|to>`, ids = line object + model element. |
+| `DAT_INFERRED_NOZZLE` | info | One per nozzle `inferredNozzles()` derives (same function as the nozzle schedule and the IFC ports): equipment without 03 EQP nozzles whose line end lies in its footprint. Path `<equipment mark>/N<k>`, ids = equipment element + line object; scoped by the line object. Info only, so `status` stays `pass`. |
+
+Decisions: **J1** an unnamed end of a line with a pipe is reported as `DAT_OPEN_PORT` and no longer as the `DAT_LINE_END_UNRESOLVED` warn "has no from / to" (one finding per fact); a line with no pipe still gets the old warn (nothing to be open); an unnamed end of a routed run that is attached keeps the old warn (the data is missing, the pipe is not open). **J2** the geometric test (an end lying on a nozzle without naming it) is not applied: attachment is the `ref` of the run. Tests: `tests/unit/plant/data/checkPorts.test.ts` (fail without the rules); `check.test.ts` `check` helper hides the info finding of the fixtures' nozzle-less pump; SC-DAT-03 expects 3 findings (the plan row says why).
