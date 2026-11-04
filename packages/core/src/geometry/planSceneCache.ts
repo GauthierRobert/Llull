@@ -43,6 +43,7 @@ export function planSceneOf(
   entry.calls++;
   const { scene } = entry;
   if (scene.instances.length < threshold || (bvhSlot?.entry !== entry && entry.calls < 2)) return { scene, query: undefined };
+  // @invariant the slot is keyed on the document only: every SpatialIndexPort builds the bit-identical tree (VC-VIS-60).
   if (bvhSlot?.entry !== entry)
     bvhSlot = { entry, bvh: resolveSpatialIndex(spatialIndex).build(packBoxes(scene.instances.map((instance) => instance.aabb))) };
   const { bvh } = bvhSlot;
