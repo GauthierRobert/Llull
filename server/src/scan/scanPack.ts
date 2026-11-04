@@ -21,16 +21,16 @@ import { packZipProblem } from './scanPackZip';
 import { assetDir, hasAsset, isAssetKey } from './scanStore';
 
 /** Layout version of `pack.json`. */
-export const PACK_VERSION = 1;
+const PACK_VERSION = 1;
 /** Files of an asset, in archive order (`source.sha256` is optional). */
 const ASSET_FILES = ['manifest.json', 'hierarchy.bin', 'nodes.bin', 'source.sha256'] as const;
 const REQUIRED_FILES = 3;
 /** Default cap on the bytes of one archive (the zip is built and read in memory, without ZIP64). */
-export const DEFAULT_PACK_MAX_BYTES = 1 << 30;
+const DEFAULT_PACK_MAX_BYTES = 1 << 30;
 const DOCUMENT_ENTRY = 'document.llull';
 const MANIFEST_ENTRY = 'pack.json';
 
-export type PackFailureCode =
+type PackFailureCode =
   | 'SCN_PACK_DOCUMENT_UNREADABLE'
   | 'SCN_PACK_ASSET_MISSING'
   | 'SCN_PACK_ASSET_CORRUPT'
@@ -39,7 +39,7 @@ export type PackFailureCode =
   | 'SCN_PACK_CHECKSUM'
   | 'SCN_PACK_EXISTS';
 
-export type PackFailure = { readonly ok: false; readonly code: PackFailureCode; readonly message: string };
+type PackFailure = { readonly ok: false; readonly code: PackFailureCode; readonly message: string };
 
 interface PackedFile {
   readonly path: string;

@@ -7,13 +7,13 @@ import type { HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 
-export const OTHER_UID = 'f'.repeat(32);
+const OTHER_UID = 'f'.repeat(32);
 
 /** `doc` as it would be if the same content lived in another document (same entities, same state, another uid). */
-export const inAnotherDocument = (doc: CadDocument): CadDocument => ({ ...doc, uid: OTHER_UID });
+const inAnotherDocument = (doc: CadDocument): CadDocument => ({ ...doc, uid: OTHER_UID });
 
 /** A confirmation is accepted only when its `payload` is exactly the payload the command asks the port to verify; every payload is recorded. */
-export function pinnedPort(seen: string[] = []): HumanSignaturePort {
+function pinnedPort(seen: string[] = []): HumanSignaturePort {
   return {
     verify: (confirmation, payload) => {
       seen.push(payload);
