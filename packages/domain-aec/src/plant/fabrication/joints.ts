@@ -142,5 +142,14 @@ export function buildLineGraph(network: PipingNetwork): LineGraph {
   return { joints, terminals, members, byKey };
 }
 
+/** Free connection points of an imported or legacy line (a terminal of the line graph: a point no other component meets), in graph order; `dn` is the bore in mm. */
+export function networkOpenEnds(network: PipingNetwork): Array<{ partId: string; position: Vec3; dn: number }> {
+  return buildLineGraph(network).terminals.map((terminal) => ({
+    partId: network.components[terminal.componentIndex]?.id ?? '',
+    position: terminal.xyz,
+    dn: terminal.boreMm,
+  }));
+}
+
 /** A joint that is a weld (shop, site or field-fit), not a bolted pair. */
 export const isWeldJoint = (joint: JointClass): joint is WeldKind => joint === 'shop' || joint === 'site' || joint === 'field_fit';

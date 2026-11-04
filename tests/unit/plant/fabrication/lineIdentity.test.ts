@@ -29,10 +29,15 @@ const legacyPipe = (base: CadDocument, line: string): CadDocument =>
     service: 'water',
   }).document;
 
+/** A document loaded from a file can hold an imported line next to a routed or legacy one with the same number (the commands refuse to create that). */
+const withImportedL100 = (base: CadDocument): CadDocument => {
+  const imported = apply(cs150Document(), 'import_pcf', { text: fixturePcf().replace('L-101', 'L-100') });
+  return { ...base, plant: { ...base.plant, fabrication: imported.plant?.fabrication } };
+};
+
 describe('export_pcf: one file per PIPELINE-REFERENCE', () => {
   it('an imported line and a routed line with the same number are refused, both owners named', () => {
-    const imported = apply(cs150Document(), 'import_pcf', { text: fixturePcf().replace('L-101', 'L-100') });
-    const both = routedLine('L-100', imported);
+    const both = withImportedL100(routedLine('L-100'));
     const result = expectRefusal(both, 'export_pcf', {}, 'ISO_LINE_DUPLICATE', 'lineIds');
     expect(result.summary).toContain('routed line');
     expect(result.summary).toContain('imported line L-100');
@@ -40,8 +45,7 @@ describe('export_pcf: one file per PIPELINE-REFERENCE', () => {
   });
 
   it('an imported line and a legacy pipe line with the same number are refused instead of dropping the pipe', () => {
-    const imported = apply(cs150Document(), 'import_pcf', { text: fixturePcf().replace('L-101', 'L-100') });
-    const both = legacyPipe(imported, 'L-100');
+    const both = withImportedL100(legacyPipe(cs150Document(), 'L-100'));
     const result = expectRefusal(both, 'export_pcf', {}, 'ISO_LINE_DUPLICATE');
     expect(result.summary).toContain('legacy pipe line L-100');
     expectRefusal(both, 'export_pcf', { lineIds: ['L-100'] }, 'ISO_LINE_DUPLICATE');
