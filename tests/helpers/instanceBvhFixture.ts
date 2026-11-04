@@ -18,6 +18,14 @@ function randomBoxes(count: number, seed: number, zeroSize: number, identical: n
   return boxes;
 }
 
+/** Unit cubes on an nx x ny lattice with the given pitch: symmetric splits, so two bin boundaries cost exactly the same (SAH tie). */
+function lattice(nx: number, ny: number, pitch: number): Box[] {
+  const boxes: Box[] = [];
+  for (let i = 0; i < nx; i++)
+    for (let j = 0; j < ny; j++) boxes.push({ min: [i * pitch, j * pitch, 0], max: [i * pitch + 1, j * pitch + 1, 1] });
+  return boxes;
+}
+
 function queriesFor(next: () => number): { frustum: FrustumPlane[][]; rays: [Vec3, Vec3][]; boxes: [Vec3, Vec3][] } {
   const frustum: FrustumPlane[][] = [];
   for (let q = 0; q < 14; q++) {
@@ -63,6 +71,9 @@ export function instanceBvhCases(): Record<string, unknown>[] {
     ['all-identical-37', randomBoxes(37, 13, 0, 37)],
     ['all-zero-size-60', randomBoxes(60, 14, 60, 0)],
     ['single-leaf-3', randomBoxes(3, 15, 0, 0)],
+    ['lattice-tie-10x1', lattice(10, 1, 2)],
+    ['lattice-tie-6x6', lattice(6, 6, 1)],
+    ['lattice-tie-5x5', lattice(5, 5, 3)],
     ['empty', []],
   ];
   return sets.map(([name, boxes], index) => {
