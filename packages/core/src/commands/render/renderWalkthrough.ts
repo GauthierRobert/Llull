@@ -15,6 +15,7 @@ import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { reviewOf, reviewRejection } from '../review/reviewModel';
 import { FRAME_BACKGROUND, hexRgb, renderCameraPng, sceneCenter } from './frames';
+import { surfaceShadingOf } from './surfaceShading';
 import { nativeRun, REFERENCE_RENDERER_VERSION } from './rendererProvenance';
 import { rasterScenePixels } from './raster';
 
@@ -100,12 +101,13 @@ export const renderWalkthrough = defineCommand({
     const run = native === undefined ? null : nativeRun(native, 'gpu');
     const scene = withMaterialClassColours(doc);
     const center = sceneCenter(scene);
+    const shading = surfaceShadingOf(scene, ctx);
     const keyCameras = cameras as ViewpointCamera[];
     const files: { fileName: string; base64: string }[] = [];
     const digests: string[] = [];
     for (let i = 0; i < frames; i += 1) {
       const camera = cameraAt(keyCameras, seconds, i / fps, params.path ?? 'linear');
-      const png = renderCameraPng(scene, camera, width, height, background, center, run?.pixels ?? rasterScenePixels);
+      const png = renderCameraPng(scene, camera, width, height, background, center, run?.pixels ?? rasterScenePixels, shading);
       files.push({ fileName: `frame-${String(i + 1).padStart(4, '0')}.png`, base64: uint8ArrayToBase64(png) });
       if (run === null) digests.push(sha256Hex(png));
     }

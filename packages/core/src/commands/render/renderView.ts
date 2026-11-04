@@ -16,6 +16,7 @@ import { appendCageNetOverlays, overlayKinds } from './overlayCage';
 import { orderedEntities } from '../entity/entityOps';
 import { appendBeforeClose } from './svg';
 import { renderNotes, resolveRenderOptions } from './options';
+import { surfaceShadingOf } from './surfaceShading';
 import { buildTurntableSvg, buildIsolateSvg, buildSectionSvg } from './multiPass';
 import { is2D } from '../../model/types';
 import { reviewRejection } from '../review/reviewModel';
@@ -234,6 +235,8 @@ export const renderView = defineCommand({
     const { style } = reviewed;
     const styled = applyReviewStyle(unstyled, style, ctx, options.background ?? undefined);
     const scene = styled.scene;
+    const shading = surfaceShadingOf(scene, ctx);
+    if (shading !== undefined) options.shading = shading;
     if (style.box !== null) options.cut = sectionBoxCut(style.box);
     if (styled.hiddenIds.length > 0) options.frame = computeSceneSnapshot(unstyled).bounds;
     const setup = prepareView(unstyled, params, options, width, height, ctx);

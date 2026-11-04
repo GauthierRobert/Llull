@@ -322,3 +322,19 @@ describe('review fixes (cad-reviewer)', () => {
     expect(JSON.stringify(doc)).toBe(before);
   });
 });
+
+describe('export_bcf snapshots with a material class (VIS-M8h)', () => {
+  const withClass = (table: Record<string, string>): ReturnType<typeof defaultContext> => ({
+    ...defaultContext(),
+    properties: (_doc, id) => (Object.hasOwn(table, id) ? { defaultMaterialClass: table[id] ?? '' } : {}),
+  });
+  it('shades the snapshot like render_view: the archive differs when the box has a default class', () => {
+    const doc = withIssues();
+    const box = doc.order[0] ?? '';
+    const params = { snapshotWidth: 120, snapshotHeight: 90, author: 'reviewer@example.com' };
+    const plain = (execute(doc, 'export_bcf', params, withClass({})).data as Bcf).sha256;
+    const shaded = (execute(doc, 'export_bcf', params, withClass({ [box]: 'concrete' })).data as Bcf).sha256;
+    expect(shaded).not.toBe(plain);
+    expect((execute(doc, 'export_bcf', params, withClass({ [box]: 'concrete' })).data as Bcf).sha256).toBe(shaded);
+  });
+});

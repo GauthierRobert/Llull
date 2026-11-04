@@ -72,7 +72,8 @@ export function renderDocument(
       polygons = result.polygons;
       if (result.cut) cutEntityIds.push(id);
     }
-    items.push({ id, polygons: polygons.map((polygon) => ({ ...polygon, owner: id })) });
+    const shading = options.shading?.get(id);
+    items.push({ id, polygons: polygons.map((polygon) => ({ ...polygon, owner: id, ...(shading === undefined ? {} : { shading }) })) });
   }
   const raster = options.mode !== 'vector';
   // Rasterising costs per pixel, not per face: the budget only guards against pathological meshes there.

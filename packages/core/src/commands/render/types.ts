@@ -85,6 +85,14 @@ export interface RenderOptions {
   view?: { readonly camera: Camera; readonly orthoHalf: number };
   /** Replaces the reference per-pixel stage of raster mode (a host's native raster, `ctx.raster`). */
   pixels?: PixelStage;
+  /** Entity id -> material class surface (metalness, roughness): the entity's faces get the Blinn-Phong highlight in raster mode. */
+  shading?: ReadonlyMap<string, SurfaceShading>;
+}
+
+/** Surface response of a material class, both in [0, 1]. */
+export interface SurfaceShading {
+  readonly metalness: number;
+  readonly roughness: number;
 }
 
 /** Replaces the reference per-pixel stage (a host's native raster); returns the logical RGBA image. */
@@ -107,6 +115,8 @@ export interface PreDepthPolygon {
   seamless?: boolean;
   /** Id of the entity the face belongs to (depth splitting only splits faces another entity can overlap). */
   owner?: string;
+  /** Surface response of the owner's material class (raster mode adds a Blinn-Phong highlight to the face colour). */
+  shading?: SurfaceShading;
 }
 
 /** A flat polygon of world-space 3D points, with associated color, normal, and camera depth. */
