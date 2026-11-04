@@ -14,7 +14,9 @@ export function materialsInUse(doc: CadDocument, entityIds?: readonly string[]):
   const users = new Map<string, string[]>();
   for (const entity of entities) {
     if (entity.materialId === undefined) continue;
-    users.set(entity.materialId, [...(users.get(entity.materialId) ?? []), entity.id]);
+    const list = users.get(entity.materialId);
+    if (list === undefined) users.set(entity.materialId, [entity.id]);
+    else list.push(entity.id);
   }
   return users;
 }

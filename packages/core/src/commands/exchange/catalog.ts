@@ -10,6 +10,7 @@ import { exportGltf } from './exportGltf';
 import { exportCode } from './exportCode';
 import { applyCodeTrace } from './codeTrace';
 import { importMesh } from './importMesh';
+import { importGltf } from './importGltf';
 import { importDxf } from './importDxf';
 import { importStepExact } from './importStepExact';
 import { exportStepAp242 } from './exportStepAp242';
@@ -30,6 +31,7 @@ export const exchangeCommands = commandCatalog(
   exportCode,
   applyCodeTrace,
   importMesh,
+  importGltf,
   importDxf,
   importStepExact,
   exportStepAp242,
