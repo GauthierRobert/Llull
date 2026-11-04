@@ -57,7 +57,15 @@ function SceneContactShadows({ opacity, bounds }: { opacity: number; bounds: Sce
 }
 
 /** Shadow-casting key light that follows the scene's extent (see keyLightRig.ts). */
-function SceneKeyLight({ shadowMapSize, bounds }: { shadowMapSize: number; bounds: SceneBounds }): React.ReactElement {
+function SceneKeyLight({
+  shadowMapSize,
+  castShadow,
+  bounds,
+}: {
+  shadowMapSize: number;
+  castShadow: boolean;
+  bounds: SceneBounds;
+}): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
   const invalidate = useThree((s) => s.invalidate);
   const lightRef = useRef<THREE.DirectionalLight>(null);
@@ -83,7 +91,7 @@ function SceneKeyLight({ shadowMapSize, bounds }: { shadowMapSize: number; bound
     target.updateMatrixWorld();
     markShadowsDirty();
     invalidate();
-  }, [rig, shadowMapSize, invalidate]);
+  }, [rig, shadowMapSize, castShadow, invalidate]);
 
   return (
     <>
@@ -92,7 +100,7 @@ function SceneKeyLight({ shadowMapSize, bounds }: { shadowMapSize: number; bound
         ref={lightRef}
         position={rig.position}
         intensity={1.8}
-        castShadow
+        castShadow={castShadow}
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.0004}
       />
@@ -103,17 +111,19 @@ function SceneKeyLight({ shadowMapSize, bounds }: { shadowMapSize: number; bound
 /** Only this subscribes to the document, so edits never re-render the Environment (its cube map would re-bake). */
 function SceneShadowRig({
   shadowMapSize,
+  keyShadows,
   contactShadows,
   contactShadowOpacity,
 }: {
   shadowMapSize: number;
+  keyShadows: boolean;
   contactShadows: boolean;
   contactShadowOpacity: number;
 }): React.ReactElement {
   const bounds = useSceneBounds();
   return (
     <>
-      <SceneKeyLight shadowMapSize={shadowMapSize} bounds={bounds} />
+      <SceneKeyLight shadowMapSize={shadowMapSize} castShadow={keyShadows} bounds={bounds} />
       {contactShadows && <SceneContactShadows opacity={contactShadowOpacity} bounds={bounds} />}
     </>
   );
@@ -151,6 +161,7 @@ export function SceneLighting({
 
       <SceneShadowRig
         shadowMapSize={quality.shadowMapSize}
+        keyShadows={quality.keyShadows}
         contactShadows={quality.contactShadowsEnabled}
         contactShadowOpacity={contactShadowOpacity}
       />

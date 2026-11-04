@@ -196,6 +196,22 @@ describe('Review panel: viewpoints, redlines, section box, colour', () => {
     expect(params.max[0]).toBeGreaterThan(1);
   });
 
+  it('switches section clipping off through set_active_section_box, only while a box is active', () => {
+    const { unmount } = render(<ReviewPanel />);
+    expect(screen.queryByText('Clip off')).toBeNull();
+    unmount();
+    const doc = execute(useStore.getState().document, 'set_section_box', {
+      name: 'Box',
+      min: [0, 0, 0],
+      max: [1, 1, 1],
+      activate: true,
+    }).document;
+    useStore.setState({ document: doc });
+    render(<ReviewPanel />);
+    fireEvent.click(screen.getByText('Clip off'));
+    expect(dispatch).toHaveBeenCalledWith('set_active_section_box', { id: null });
+  });
+
   it('switches the colour profile through set_active_colour_profile', () => {
     const doc = execute(useStore.getState().document, 'define_colour_profile', {
       id: 'p1',

@@ -25,6 +25,8 @@ import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { DynamicsPlayer } from './DynamicsPlayer';
 import { useRenderQuality } from './useRenderQuality';
+import { NavigationController } from './navigation/NavigationController';
+import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { CANVAS_DPR_RANGE, RenderRig } from './RenderRig';
@@ -77,6 +79,7 @@ interface SceneContentsProps {
 
 function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
+  const orbiting = useNavigationStore((s) => s.mode === 'orbit');
 
   const quality = useRenderQuality();
   const palette = useViewportPalette();
@@ -108,8 +111,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         enableDamping
         dampingFactor={0.06}
         screenSpacePanning={false}
-        enabled={orbitEnabled}
+        enabled={orbitEnabled && orbiting}
       />
+      <NavigationController />
 
       <CameraReactor />
 

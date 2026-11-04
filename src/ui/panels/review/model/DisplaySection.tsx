@@ -34,6 +34,18 @@ export function DisplaySection({ document }: { document: CadDocument }): React.R
         </button>
       </div>
       {status !== '' && <p className="panel__row-meta">{status}</p>}
+      {review?.activeSectionBoxId !== undefined && (
+        <div className="issue-form">
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
+            title="Stop clipping; the boxes stay"
+            onClick={() => dispatch('set_active_section_box', { id: null })}
+          >
+            Clip off
+          </button>
+        </div>
+      )}
       <ul className="panel__list" aria-label="Section boxes">
         {boxes.map((box) => {
           const active = review?.activeSectionBoxId === box.id;
