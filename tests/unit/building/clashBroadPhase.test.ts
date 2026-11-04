@@ -66,7 +66,8 @@ function equipmentDoc(items: { x: number; y: number; clearance: number; size?: [
 }
 
 describe('check_clashes broad phase edge cases', () => {
-  const far = (count: number) => Array.from({ length: count }, (_, i) => ({ x: 50_000 + i * 5000, y: 50_000, clearance: 0 }));
+  const far = (count: number): { x: number; y: number; clearance: number }[] =>
+    Array.from({ length: count }, (_, i) => ({ x: 50_000 + i * 5000, y: 50_000, clearance: 0 }));
 
   it('reports clearance-only clashes through the BVH exactly as the full scan does', () => {
     const doc = equipmentDoc([{ x: 0, y: 0, clearance: 600 }, { x: 1900, y: 0, clearance: 0 }, ...far(70)]);
