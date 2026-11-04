@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report, tableRejection } from '@core/commands/noop';
 import { storeProfile } from '@core/geometry/colourRules';
-import { createDisplayModel, type ColourProfile, type ColourRule } from '@core/model/display';
+import { createDisplayModel, type ColourProfile, type ColourRule, type RuleMarker } from '@core/model/display';
 import { PALETTE_ID, paletteHex } from './palette';
 import { SCHEME_IDS, SCHEME_STANDARDS, findRow, legendOf, rowsOf, type SchemeId, type SchemeRow } from './serviceSchemes';
 
@@ -26,10 +26,10 @@ const NO_PALETTE_COLOUR = '#808080';
 
 const displayHex = (row: SchemeRow): string => paletteHex(row.names['fieldColour'] ?? row.names['mainColour'] ?? '') ?? NO_PALETTE_COLOUR;
 
-/** Marker legend text and letter colour of a rule (extra keys of the rule's `scheme.names`): ASME letters are drawn in the row's letterColour; ISO 14726 has none. */
-const markerNames = (service: string, row: SchemeRow): Record<string, string> => {
+/** Marker of a rule: the service in capitals and the row's letter colour (ASME A13.1); ISO 14726 names none. */
+const markerOf = (service: string, row: SchemeRow): RuleMarker => {
   const letterHex = paletteHex(row.names['letterColour'] ?? '');
-  return { markerLetters: service.toUpperCase(), ...(letterHex === undefined ? {} : { letterHex }) };
+  return { letters: service.toUpperCase(), ...(letterHex === undefined ? {} : { letterHex }) };
 };
 
 /** @affects nothing — read-only; data.schemes [{ scheme, standard, palette, approximate, rows[] }] */
@@ -122,7 +122,8 @@ export const applyServiceColourScheme = defineCommand({
               when: { property, equals: service },
               appearance: { colour: displayHex(row) },
               legend: `${service}: ${legendOf(row)}`,
-              scheme: { id: scheme, rowId: row.id, category: row.category, names: markerLetters === true ? { ...row.names, ...markerNames(service, row) } : row.names },
+              scheme: { id: scheme, rowId: row.id, category: row.category, names: row.names },
+              ...(markerLetters === true ? { marker: markerOf(service, row) } : {}),
             },
           ],
     );
