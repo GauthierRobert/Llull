@@ -129,6 +129,49 @@ describe('PointCloudPort over a real asset', () => {
     expect(all['count']).toBe(7680);
   });
 
+  native('imports a binary PLY with colour, intensity and normals and refuses damaged ones without leaving an asset', async () => {
+    const header = (count: number): string =>
+      `ply\nformat binary_little_endian 1.0\ncomment photogrammetry export\nelement vertex ${count}\n` +
+      'property float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\n' +
+      'property ushort intensity\nproperty float nx\nproperty float ny\nproperty float nz\nend_header\n';
+    const record = (i: number): Buffer => {
+      const row = Buffer.alloc(12 + 3 + 2 + 12);
+      [i * 0.5, 0.25, 2].forEach((v, k) => row.writeFloatLE(v, 4 * k));
+      row.set([i, 100, 200], 12);
+      row.writeUInt16LE(1000 * i, 15);
+      [0, 0, 1].forEach((v, k) => row.writeFloatLE(v, 17 + 4 * k));
+      return row;
+    };
+    const rows = [0, 1, 2, 3, 4].map(record);
+    const file = path.join(work, 'photo.ply');
+    writeFileSync(file, Buffer.concat([Buffer.from(header(5)), ...rows]));
+    const imported = await runScanImport({ path: file, options }, deps());
+    if (!imported.ok) throw new Error(imported.message);
+    expect(imported.manifest).toMatchObject({ format: 'ply', pointCount: 5, attributes: ['intensity', 'rgb', 'normal'] });
+    const ctx = { ...defaultContext(), pointClouds: createPointCloudPort({ store, env: process.env, binary: BINARY }) };
+    const attached = execute({ ...createEmptyDocument(), units: 'm' as const }, 'attach_point_cloud', { assetKey: imported.assetKey }, ctx);
+    const cloudId = attached.affected[0];
+    const all = execute(attached.document, 'query_cloud_points', { cloudId, maxPoints: 100, attributes: ['rgb', 'intensity'] }, ctx)
+      .data as Record<string, unknown>;
+    expect(all['count']).toBe(5);
+    expect(all['missingAttributes']).toEqual([]);
+    const before = listAssets(store);
+    const truncated = path.join(work, 'cut.ply');
+    writeFileSync(truncated, Buffer.concat([Buffer.from(header(5)), ...rows.slice(0, 3), rows[3]?.subarray(0, 10) ?? Buffer.alloc(0)]));
+    expect(await runScanImport({ path: truncated, options }, deps())).toMatchObject({ ok: false, code: 'SCN_PLY_TRUNCATED' });
+    const bomb = path.join(work, 'bomb.ply');
+    writeFileSync(bomb, header(4_000_000_000));
+    expect(await runScanImport({ path: bomb, options }, deps())).toMatchObject({ ok: false, code: 'SCN_PLY_TRUNCATED' });
+    const text = path.join(work, 'text.ply');
+    writeFileSync(
+      text,
+      'ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nend_header\n1 two 3\n',
+    );
+    expect(await runScanImport({ path: text, options }, deps())).toMatchObject({ ok: false, code: 'SCN_PLY_PARSE' });
+    expect(listAssets(store)).toEqual(before);
+    noTempLeft();
+  });
+
   native('keeps LAS coordinates exact (VC-SCN-09) and honours the LOD budget (VC-SCN-10)', async () => {
     const big = await runScanImport({ path: path.join(DATA, 'las/test1_4.las'), options }, deps());
     if (!big.ok) throw new Error(big.message);

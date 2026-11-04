@@ -165,7 +165,7 @@ laspy and `reference_check.py`; their tolerances do not change.
 
 ```ts
 // packages/core/src/model/pointCloud.ts  (core: interface + document slice types only)
-export type CloudFormat = 'e57' | 'las' | 'laz' | 'xyz' | 'pts' | 'copc';
+export type CloudFormat = 'e57' | 'las' | 'laz' | 'ply' | 'xyz' | 'pts' | 'csv' | 'copc';
 export type CloudAttribute =
   | 'intensity'
   | 'rgb'
@@ -528,7 +528,7 @@ summary says so.
 | COPC 1.0                                              | import / export V1                  | LAZ 1.4 PDRF 6/7/8 + `info` and `hierarchy` VLRs [R6]; written by `llull-compute cloud` with the `laz` encoder; readable by PDAL, QGIS and potree-core. Not the cache format (Q2)                                     |
 | XYZ / PTS / CSV                                       | import MVP                          | Declared column order and unit; PTS first line = count (checked)                                                                                                                                                      |
 | RCP / RCS (ReCap), FLS (Faro), native Leica / Trimble | refused                             | `SCN_FORMAT_PROPRIETARY`                                                                                                                                                                                              |
-| PLY (binary / ascii)                                  | import V1                           | Common from photogrammetry / CloudCompare                                                                                                                                                                             |
+| PLY (binary / ascii)                                  | import (built, §13.8)               | Common from photogrammetry / CloudCompare                                                                                                                                                                             |
 | Document `.llull`                                     | `scan` slice (references + records) | Assets are never embedded; `pack --with-scans` (V1)                                                                                                                                                                   |
 | IFC 4.3                                               | via 08 DAT                          | As-built pipes and members export like any element, with property `Pset_llullAsBuilt` (extractionId, fit RMS, source)                                                                                                 |
 
@@ -584,6 +584,10 @@ summary says so.
 | `SCN_FIT_NO_STANDARD_SIZE`         | warn        | extract           | No size-table OD within tolerance                                                        | "Kept the measured OD; check insulation thickness or the table"         |
 | `SCN_TRACE_SKEW`                   | warn        | trace             | Straights do not meet within 1 mm                                                        | "Possible offset or 2-plane bend; split the trace"                      |
 | `SCN_TRACE_BEND_RADIUS_UNMEASURED` | warn        | trace             | A bend radius sits on the search bound or has < 20 arc points                            | "Field-measure the bend radius"                                         |
+| `SCN_PLY_HEADER`                   | fail        | import            | PLY header unreadable, over a limit or without x y z                                     | "Re-export the PLY with x y z vertex properties"                        |
+| `SCN_PLY_TRUNCATED`                | fail        | import            | The file holds fewer records than the header declares                                    | "The file is cut: re-export it"                                         |
+| `SCN_PLY_PARSE`                    | fail        | import            | ASCII PLY row not numeric / too short / too long                                         | "Re-export the PLY (binary if possible)"                                |
+| `SCN_PLY_DROPPED`                  | warn        | import            | Vertices with non-finite or out-of-range coordinates were dropped                        | "Check the export; the dropped count is in the manifest"                |
 | `SCN_STEEL_NO_MATCH`               | warn        | steel fit         | Best score > 3σ                                                                          | "Non-catalogue or built-up section; model manually"                     |
 | `SCN_REG_TARGETS_INSUFFICIENT`     | fail        | registration      | < 3 target pairs                                                                         | "Add targets or use ICP with an initial transform"                      |
 | `SCN_REG_DEGENERATE`               | fail        | registration      | Collinear / coincident targets                                                           | "Use targets that span a plane"                                         |
@@ -849,6 +853,32 @@ a vertical-to-horizontal elbow traced from the middle of the pipe (R 0.2 m +-20 
 a parallel pipe plus uniform clutter, a skewed second leg (`SCN_TRACE_SKEW`, the trace stops), the failure codes, bit-identical results for any thread count, and the op job
 (including `SCN_QUERY_LIMIT` and `NATIVE_JOB_INPUT`). Limits: the next straight needs at least 15 % of the points around the end to belong to it (heavy clutter: seed the
 trace again on the next straight); legs shorter than 2 steps are not found; a 3D bend where the two straights are not coplanar with the arc stops with `SCN_TRACE_SKEW`.
+
+### 13.8 PLY import (SCN-V1b, 2026-11-04)
+
+`llull-cloud/src/read/ply.rs`: `ascii`, `binary_little_endian` and `binary_big_endian` PLY 1.0, detected by the `ply\n` signature (any extension; a `.ply` without the
+signature is `SCN_FORMAT_UNSUPPORTED`). `llull scan import FILE.ply [sourceUnit=mm]` (PLY carries no unit: `sourceUnit` as for XYZ, default m). Vertex properties:
+`x y z` of any numeric type (char / uchar / short / ushort / int / uint / float / double and the int8 … float64 spellings), optional colour (`red green blue`, else
+`r g b`, else `diffuse_*`: uchar as is, ushort / 257, float 0..1, other integers clamped to 0..255), `intensity` (or `scalar_intensity`; uchar x 257, ushort as is, others
+scaled from the observed range to 16 bits as the ASCII reader does) and `nx ny nz` (stored as float32 normals). Every other property (`alpha`, `confidence`, vendor
+fields) and every other element (faces, edges) is skipped, in elements declared before the vertices too (rows with lists are walked one by one). `record_index` is the
+vertex index. A list property inside the vertex element is refused. Throughput (release, parse only): 20 Mpoints/s binary, 4.3 Mpoints/s ascii (2 M points, xyz + rgb).
+
+Untrusted-input table (limits are named constants of `ply.rs`, every row has a case in `tests/ply.rs`; each refusal is a stable code, never a panic, under 2 s):
+
+| Input                                                                                                                                                                       | Behaviour                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header above 64 KiB, a line above 4 KiB, more than 1 024 header lines                                                                                                       | `SCN_PLY_HEADER`; the header is read through a bounded reader, never whole                                                                                 |
+| More than 64 elements, more than 64 properties in one element                                                                                                               | `SCN_PLY_HEADER`                                                                                                                                           |
+| Unknown format / version / property type, a count that is not an unsigned integer, a property before an element, garbage line, no `end_header`, no vertex element, no x y z | `SCN_PLY_HEADER`                                                                                                                                           |
+| A vertex count that the file cannot hold (4 billion in 100 bytes)                                                                                                           | `SCN_PLY_TRUNCATED` before anything is allocated: binary compares count x row size with the bytes left, ASCII needs one byte per row; reserves cap at 2^20 |
+| A vertex count above 2^32 (the record index is u32)                                                                                                                         | `SCN_IMPORT_TOO_LARGE`                                                                                                                                     |
+| A list whose count claims billions of items, a file cut inside a record                                                                                                     | `SCN_PLY_TRUNCATED` (every skip is checked against the bytes left)                                                                                         |
+| ASCII row above 64 KiB, a token that is not a number, fewer values than declared                                                                                            | `SCN_PLY_PARSE`                                                                                                                                            |
+| NaN, infinite or beyond 1e7 m (after the unit scale) coordinates                                                                                                            | the vertex is dropped and counted (`dropped`, warning `SCN_PLY_DROPPED`); all dropped: `SCN_CLOUD_EMPTY`                                                   |
+
+Host: `scan_import` runs the same `llull-compute cloud import` job (atomic store, timeout, no asset left on failure: `server/tests/scanImport.test.ts`); the document
+type `CloudFormat` (`@core/model/pointCloud`) gained `'ply'`. New codes (§7.2): `SCN_PLY_HEADER`, `SCN_PLY_TRUNCATED`, `SCN_PLY_PARSE` (fail), `SCN_PLY_DROPPED` (warn).
 
 ## 12. References
 
