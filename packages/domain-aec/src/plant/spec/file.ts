@@ -8,7 +8,16 @@ import { z } from '@core/commands/schema';
 import { canonicalJson } from '@lib/canonicalJson';
 import { BEND_RADII, COMPONENT_TYPES, END_TYPES, FACINGS, type NominalSize } from '../catalog/types';
 import { parseSize, sizeOrdinal } from './size';
-import { BRANCH_FITTINGS, SPEC_STATUSES, type BranchTable, type ExtraValue, type PipeSpec, type SpecComponent } from './types';
+import {
+  BRANCH_FITTINGS,
+  CONNECTION_ENDS,
+  CONNECTION_JOINTS,
+  SPEC_STATUSES,
+  type BranchTable,
+  type ExtraValue,
+  type PipeSpec,
+  type SpecComponent,
+} from './types';
 
 export const SPEC_FORMAT = 'llull-pipe-spec';
 export const SPEC_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
@@ -135,6 +144,31 @@ export const headerShape = {
     })
     .strict()
     .describe('Elbow angle rules consumed by routing (02 RTE).')
+    .optional(),
+  socketGapMm: z
+    .number()
+    .min(0)
+    .max(10)
+    .describe('Socket gap of socket-weld joints in mm (ASME B31.3 328.5.2 asks for about 1.6 mm). Absent = the named default 1.6 mm.')
+    .optional(),
+  connections: z
+    .array(
+      z
+        .object({
+          end: z.enum(CONNECTION_ENDS).describe('Fitting end type: BW, FL, SW, SC, PL, WAF or LUG.'),
+          pipeEnd: z.enum(CONNECTION_ENDS).describe('End type of the pipe (or the mating part) facing it.'),
+          joint: z.enum(CONNECTION_JOINTS).describe('buttWeld, socketWeld, threaded or flanged.'),
+          gapMm: z
+            .number()
+            .min(0)
+            .max(50)
+            .describe('Weld root gap or socket gap in mm. Absent = built-in (0 / the spec socketGapMm).')
+            .optional(),
+          requires: z.array(z.enum(COMPONENT_TYPES)).describe('Component types the joint needs besides its two ends.').optional(),
+        })
+        .strict(),
+    )
+    .describe('Connection rules of the spec; a rule overrides the built-in rule of the same pair of end types (either order).')
     .optional(),
   provenance: provenance.describe('Where the spec comes from: { author, citation, accessed }.').optional(),
 };
@@ -304,6 +338,12 @@ export function parseSpecFile(raw: unknown): { readonly spec: PipeSpec } | { rea
     if (seen.has(component.id)) issues.push(invalid(`components.${index}.id`, `component id ${component.id} is used twice`));
     seen.add(component.id);
   });
+  const pairs = new Set<string>();
+  data.connections?.forEach((rule, index) => {
+    const pair = [rule.end, rule.pipeEnd].sort().join('-');
+    if (pairs.has(pair)) issues.push(invalid(`connections.${index}`, `connections.${index}: the end pair ${pair} has two rules`));
+    pairs.add(pair);
+  });
   const table =
     data.branchTable === undefined || range === null ? undefined : parseBranchTable(data.branchTable, range.from.system, issues);
   if (issues.length > 0 || range === null || components.some((component) => component === null)) return { issues };
@@ -329,6 +369,8 @@ export function parseSpecFile(raw: unknown): { readonly spec: PipeSpec } | { rea
       ...(table === undefined || table === null ? {} : { branchTable: table }),
       ...(data.insulation === undefined ? {} : { insulation: data.insulation }),
       ...(data.elbowAngles === undefined ? {} : { elbowAngles: data.elbowAngles }),
+      ...(data.socketGapMm === undefined ? {} : { socketGapMm: data.socketGapMm }),
+      ...(data.connections === undefined ? {} : { connections: data.connections }),
       status: data.status ?? 'draft',
       ...(data.approval === undefined ? {} : { approval: data.approval }),
       ...(author === undefined
@@ -388,6 +430,8 @@ export function specToFile(spec: PipeSpec): Record<string, unknown> {
     ...(spec.branchTable === undefined ? {} : { branchTable: spec.branchTable }),
     ...(spec.insulation === undefined ? {} : { insulation: spec.insulation }),
     ...(spec.elbowAngles === undefined ? {} : { elbowAngles: spec.elbowAngles }),
+    ...(spec.socketGapMm === undefined ? {} : { socketGapMm: spec.socketGapMm }),
+    ...(spec.connections === undefined ? {} : { connections: spec.connections }),
     status: spec.status,
     ...(spec.approval === undefined ? {} : { approval: spec.approval }),
     ...(spec.provenance === undefined ? {} : { provenance: spec.provenance }),

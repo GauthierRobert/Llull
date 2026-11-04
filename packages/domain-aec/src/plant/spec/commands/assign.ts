@@ -15,13 +15,13 @@ const PIPE_ID_PATTERN = /^[\w.-]+$/;
 /**
  * @affects building.elements[pipe].spec / .diameter / .dn for each selected pipe element (the pipe is regenerated at the spec outside diameter)
  * @invariant all or nothing: every selected pipe resolves or none changes; the spec decides OD, wall and schedule (a given schedule is only an assertion); size defaults to the pipe's current binding, else its dn; without revision the newest approved revision is used (the newest draft when none is approved, with a PSC_SPEC_NOT_APPROVED warning)
- * @failure neither or both of pipeId / line, unknown pipe or line -> PSC_PIPE_UNKNOWN; unknown spec -> PSC_SPEC_UNKNOWN; no size -> PSC_SIZE_UNKNOWN; size not in the spec -> PSC_SIZE_OUT_OF_RANGE / PSC_NO_COMPONENT; schedule differs -> PSC_SCHEDULE_UNKNOWN
+ * @failure not exactly one of pipeId / line / all (the document sweep: every pipe element, none in the document -> PSC_PIPE_UNKNOWN), unknown pipe or line -> PSC_PIPE_UNKNOWN; unknown spec -> PSC_SPEC_UNKNOWN; no size -> PSC_SIZE_UNKNOWN; size not in the spec -> PSC_SIZE_OUT_OF_RANGE / PSC_NO_COMPONENT; schedule differs -> PSC_SCHEDULE_UNKNOWN
  */
 export const assignPipeSpec = defineCommand({
   name: 'assign_pipe_spec',
   description:
     'Bind pipe element(s) made by add_pipe_run to a piping spec: the pipe gets the spec revision, the nominal size, the outside diameter, wall and schedule that the spec selects ' +
-    '(a pipe component of the spec at that size, via its catalogue), and the pipe is redrawn at that outside diameter. Select either one pipe (`pipeId`) or every pipe of a line number (`line`). ' +
+    '(a pipe component of the spec at that size, via its catalogue), and the pipe is redrawn at that outside diameter. Select either one pipe (`pipeId`), every pipe of a line number (`line`) or EVERY pipe element of the document (`all: true`, the document sweep: with no size each pipe keeps its binding size or its own dn, so it also moves a whole document to the newest approved revision). ' +
     'Size: give `nps` (inch designation, e.g. "2-1/2" or 2.5) or `dn`; when omitted, each pipe keeps the size of its current binding (so re-running the command moves pipes to the newest approved revision, ' +
     'the sweep that clears PSC_SPEC_REVISION_STALE) or falls back to its own dn. `revision` defaults to the newest approved revision of the spec (the newest draft when none is approved; ' +
     'data.warnings then lists PSC_SPEC_NOT_APPROVED). `schedule` is only an assertion: the spec decides, a different schedule is refused (PSC_SCHEDULE_UNKNOWN). All pipes resolve or none changes. ' +
@@ -29,6 +29,12 @@ export const assignPipeSpec = defineCommand({
   params: z.object({
     pipeId: z.string().regex(PIPE_ID_PATTERN).describe('Id of one pipe element (e.g. "pipe-1"). Give this or line.').optional(),
     line: z.string().min(1).describe('Line number: every pipe element with this line number is assigned. Give this or pipeId.').optional(),
+    all: z
+      .boolean()
+      .describe(
+        'true: every building pipe element of the document is assigned (the document sweep), all or nothing; the first pipe that cannot resolve is named and nothing changes. Give exactly one of pipeId, line, all.',
+      )
+      .optional(),
     specId: z.string().min(1).describe('Spec id (list_pipe_specs).'),
     revision: z.number().int().positive().describe('Spec revision. Default: the newest approved revision.').optional(),
     nps: z
@@ -38,23 +44,30 @@ export const assignPipeSpec = defineCommand({
     dn: z.union([z.string(), z.number()]).describe('Nominal diameter DN, e.g. 100. Give this or nps.').optional(),
     schedule: z.string().describe('Expected schedule, e.g. "40": refused when the spec selects another one at this size.').optional(),
   }),
-  run: (doc, { pipeId, line, specId, revision, nps, dn, schedule }): CommandResult => {
+  run: (doc, { pipeId, line, all, specId, revision, nps, dn, schedule }): CommandResult => {
     const fail = (code: string, message: string, ids: readonly string[], paths: readonly string[]): CommandResult =>
       refuse(doc, 'assign_pipe_spec', code, message, ids, paths);
-    if ((pipeId === undefined) === (line === undefined))
-      return fail('PSC_PIPE_UNKNOWN', 'give exactly one of pipeId or line', [], ['pipeId']);
+    if ([pipeId !== undefined, line !== undefined, all === true].filter(Boolean).length !== 1)
+      return fail('PSC_PIPE_UNKNOWN', 'give exactly one of pipeId, line or all: true', [], ['pipeId']);
     if (nps !== undefined && dn !== undefined) return fail('PSC_SIZE_UNKNOWN', 'give nps or dn, not both', [], ['nps']);
     const building = getBuilding(doc);
+    const everyPipe = elementsOf(building, 'pipe');
     const pipes: PipeElement[] =
-      pipeId !== undefined
-        ? elementsOf(building, 'pipe').filter((pipe) => pipe.id === pipeId)
-        : elementsOf(building, 'pipe').filter((pipe) => pipe.line === line);
+      all === true
+        ? everyPipe
+        : pipeId !== undefined
+          ? everyPipe.filter((pipe) => pipe.id === pipeId)
+          : everyPipe.filter((pipe) => pipe.line === line);
     if (pipes.length === 0)
       return fail(
         'PSC_PIPE_UNKNOWN',
-        pipeId !== undefined ? `no pipe element "${pipeId}"` : `no pipe element with line number "${line}"`,
+        all === true
+          ? 'the document has no pipe element to sweep'
+          : pipeId !== undefined
+            ? `no pipe element "${pipeId}"`
+            : `no pipe element with line number "${line}"`,
         [],
-        [pipeId !== undefined ? 'pipeId' : 'line'],
+        [all === true ? 'all' : pipeId !== undefined ? 'pipeId' : 'line'],
       );
     const bound: Array<{ pipe: PipeElement; bound: Bound }> = [];
     for (const pipe of pipes) {

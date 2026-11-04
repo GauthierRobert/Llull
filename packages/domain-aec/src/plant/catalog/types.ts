@@ -151,10 +151,20 @@ export interface SpecBinding {
   readonly verified: boolean;
 }
 
+/** What the document keeps of a private library (`import_piping_library`). */
+export interface PipingLibraryReference {
+  readonly libraryId: string;
+  readonly version: string;
+  /** SHA-256 of the library file text (`llull-piping-catalog` JSON). */
+  readonly sha256: string;
+}
+
 /** `doc.plant.catalog`: user-imported catalogues (the bundled `llull-open-piping` lives in code, not in the document). */
 export interface CatalogModel {
   readonly catalogs: Readonly<Record<string, PipingCatalog>>;
   readonly catalogOrder: readonly string[];
   /** Imported rating tables by id (M5); absent until the first `import_rating_table`. */
   readonly ratingTables?: Readonly<Record<string, RatingTable>>;
+  /** Private libraries by library id (= catalogue id): the document keeps the reference, the values stay in the provider's file (`import_piping_library`). */
+  readonly libraries?: Readonly<Record<string, PipingLibraryReference>>;
 }

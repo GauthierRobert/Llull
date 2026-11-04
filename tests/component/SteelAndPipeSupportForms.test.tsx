@@ -107,12 +107,36 @@ describe('pipe support form', () => {
     submit();
     expect(dispatch).toHaveBeenLastCalledWith('add_pipe_support', { line: 'L-1', type: 'shoe', spacing: 3000 });
   });
+  it('dispatches add_pipe_support with runId for a plant run (points, then spacing)', () => {
+    const dispatch = spyDispatch();
+    render(<BuildingPanel />);
+    pickTool('pipeSupport');
+    setField('runId', 'run-7.1');
+    setField('points', '3000,0,3000');
+    submit();
+    expect(dispatch).toHaveBeenLastCalledWith('add_pipe_support', { runId: 'run-7.1', type: 'shoe', at: xyz(3000, 0, 3000) });
+    setField('points', '');
+    setField('spacing', '3000');
+    submit();
+    expect(dispatch).toHaveBeenLastCalledWith('add_pipe_support', { runId: 'run-7.1', type: 'shoe', spacing: 3000 });
+  });
+  it('refuses a plant run id together with a picked pipe, and sends nothing', () => {
+    const dispatch = spyDispatch();
+    render(<BuildingPanel />);
+    pickTool('pipeSupport');
+    setField('pipe', 'line:L-1');
+    setField('runId', 'run-7.1');
+    setField('spacing', '3000');
+    submit();
+    expect(screen.getByRole('alert')).toHaveTextContent('either a pipe / line or a plant run id');
+    expect(dispatch).not.toHaveBeenCalled();
+  });
   it('refuses no pipe, neither points nor spacing, or both', () => {
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
     pickTool('pipeSupport');
     submit();
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose the pipe');
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose the pipe or line to support, or give a plant run id');
     setField('pipe', 'line:L-1');
     submit();
     expect(screen.getByRole('alert')).toHaveTextContent('either the support points or');

@@ -80,6 +80,10 @@ function pieces(part: RoutedPart): Piece[] {
         : [{ from: first.position, to: second.position, half: (part.dims['bodyDiameter'] ?? od) / 2, insulated: false }];
     case 'flange':
       return flangePieces(part);
+    case 'inline':
+      return od === undefined
+        ? []
+        : [{ from: first.position, to: second.position, half: Math.max(part.dims['bodyOd'] ?? od, od) / 2, insulated: false }];
     case 'reducer': {
       const out = part.dims['outsideDiameterOut'];
       return od === undefined || out === undefined

@@ -7,6 +7,7 @@ import type { CheckStatus } from '@core/model/checkResult';
 import { worstStatus } from '@core/model/checkResult';
 import type { CadDocument } from '@core/model/types';
 import { sizesInRange } from '../size';
+import { libraryUnresolvedReason } from '../../catalog/store';
 import { specCatalogs } from '../store';
 import type { PipeSpec } from '../types';
 import { branchFindings, coverageFindings, overlapFindings, referenceFindings, statusFindings, trustFindings } from './structure';
@@ -25,7 +26,19 @@ export interface SpecCheck {
 /** Findings of the spec passes (plus the design pass when `design` is given). */
 export function checkSpec(doc: CadDocument, spec: PipeSpec, design: DesignConditions | undefined): SpecCheck {
   const { catalogs, missing } = specCatalogs(doc, spec);
-  const context: CheckContext = { spec, catalogs, missingCatalogs: missing, sizes: sizesInRange(spec.sizeRange.from, spec.sizeRange.to) };
+  const unresolvedLibraries = Object.fromEntries(
+    missing.flatMap((reference) => {
+      const reason = libraryUnresolvedReason(doc, reference);
+      return reason === undefined ? [] : [[reference, reason] as const];
+    }),
+  );
+  const context: CheckContext = {
+    spec,
+    catalogs,
+    missingCatalogs: missing,
+    unresolvedLibraries,
+    sizes: sizesInRange(spec.sizeRange.from, spec.sizeRange.to),
+  };
   const rows = componentRows(context);
   const designOutcome = design === undefined ? undefined : designFindings(doc, context, design);
   const findings = sortFindings([

@@ -160,9 +160,25 @@ function stringParamKeys(name: string): ReadonlySet<string> {
 }
 
 /** Params of `name`, with `@img:<path>` values loaded as image data URLs and `@text:<path>` values as file text. */
-async function paramsOf(name: string, tokens: readonly string[], io: CliIo): Promise<unknown> {
-  const params = await rawParamsOf(name, tokens, io);
+async function paramsOf(name: string, tokens: readonly string[], io: CliIo, paramFile?: string): Promise<unknown> {
+  const params = paramFile === undefined ? await rawParamsOf(name, tokens, io) : await paramFileParams(name, tokens, io, paramFile);
   return asUsage(() => resolveFileRefs(params, (source) => asUsage(() => fs.readFileSync(source), `cannot read ${source}: `)));
+}
+
+/**
+ * `--param-file FILE` (or `-`, stdin): the params of the command are the JSON object of the file; `key=value` pairs after the command name are applied on
+ * top of it (a pair replaces the file's top-level key). A JSON literal, `@file` or `-` positional together with the flag is ambiguous and refused.
+ * @failure unreadable file / not JSON / not an object / a non-pair positional -> UsageError (exit 2)
+ */
+async function paramFileParams(name: string, tokens: readonly string[], io: CliIo, paramFile: string): Promise<unknown> {
+  const source = asUsage(() => paramsSource(tokens, stringParamKeys(name)));
+  if (source.kind !== 'pairs')
+    throw new UsageError(
+      '--param-file takes the params from the file: pass only key=value overrides after the command, not a JSON literal, @file or -.',
+    );
+  const base = parseJson(await readSource(paramFile, io), paramFile);
+  if (!isRecord(base)) throw new UsageError(`${paramFile} must hold one JSON object (the params of ${name}).`);
+  return { ...base, ...source.params };
 }
 
 async function rawParamsOf(name: string, tokens: readonly string[], io: CliIo): Promise<unknown> {
@@ -224,7 +240,7 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   if (name === undefined) throw new UsageError('exec needs a command name: llull exec <command> [params]');
   const isExchange = exchangeTool(name) !== undefined;
   if (getCommand(name) === undefined && !isExchange) unknownCommand(name);
-  const raw = await paramsOf(name, rest, io);
+  const raw = await paramsOf(name, rest, io, stringFlag(args, 'param-file'));
   const params = asUsage(() => withSaveDefaults(name, takesFileParam(name) ? withFileContent(name, raw) : raw, stringFlag(args, 'save')));
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);

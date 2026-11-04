@@ -165,7 +165,7 @@ describe('buildShape: flanges, gaskets, valves, the rest', () => {
     refusal(buildShape(source('valveBall', { faceToFace: 229 })), 'PSC_SHAPE_UNSUPPORTED');
     const valve = built(buildShape(source('valveBall', { faceToFace: 229, flangeOutsideDiameter: 230 }, { pipeOdMm: undefined })));
     expect(valve.bounds.max[0]).toBe(115);
-    for (const type of ['cap', 'coupling', 'union', 'swage', 'boltSet', 'reducerEccentric'] as const)
+    for (const type of ['boltSet', 'gasketRing'] as const)
       refusal(buildShape(source(type, { length: 50, centreToEnd: 50 })), 'PSC_SHAPE_UNSUPPORTED');
   });
 });

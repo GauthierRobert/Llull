@@ -1,13 +1,14 @@
 /**
  * A plant run seen as the pipe a support rests on (02 RTE V1 part 2): the run centreline (the legs of `piping_takeoff`, else the stored points of
  * intersection when the run does not derive) and its outside diameter, in the shape of a building `PipeElement` so every support consumer reads
- * both pipe kinds through the one carrier lookup (`industrial/piping/pipeCarrier.ts`). Points are document units (mm in plant documents), z relative
- * to the level `levelId` like the points of a building pipe.
+ * both pipe kinds through the one carrier lookup (`industrial/piping/pipeCarrier.ts`). A run is stored in millimetres whatever the document unit; the pipe is
+ * given in DOCUMENT units (points z-relative to the level `levelId`, and the diameter), like a building pipe, so a document in m or ft reads a run correctly.
  * @invariant pure; the derivation is memoised per run object and document slices (derivationMemo.ts), so repeated lookups are cheap
  */
 
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
+import { fromMm } from '@core/model/units';
 import type { PipeElement } from '@aec/building/types';
 import { runPoints, getPiping } from './model';
 import { deriveRun } from './routeParts';
@@ -38,7 +39,7 @@ export function runCarrierPipe(doc: CarrierDoc, runId: string, levelId?: string)
   const centreline: Vec3[] = derivation.ok
     ? [(derivation.legs[0] ?? { start: run.start.point }).start, ...derivation.legs.map((leg) => leg.end)]
     : runPoints(run);
-  const frame = levelId ?? levelOfElevation(doc.building, Math.min(...centreline.map((point) => point[2])));
+  const frame = levelId ?? levelOfElevation(doc.building, fromMm(doc, Math.min(...centreline.map((point) => point[2]))));
   const elevation = doc.building?.levels[frame]?.elevation ?? 0;
   return {
     id: run.id,
@@ -46,8 +47,8 @@ export function runCarrierPipe(doc: CarrierDoc, runId: string, levelId?: string)
     mark: run.id,
     entityIds: [],
     levelId: frame,
-    points: centreline.map((point): Vec3 => [point[0], point[1], point[2] - elevation]),
-    diameter: derivation.ok ? derivation.pipe.outsideDiameterMm : (run.dn ?? line.dn),
+    points: centreline.map((point): Vec3 => [fromMm(doc, point[0]), fromMm(doc, point[1]), fromMm(doc, point[2]) - elevation]),
+    diameter: fromMm(doc, derivation.ok ? derivation.pipe.outsideDiameterMm : (run.dn ?? line.dn)),
     service: line.service,
     material: line.spec,
     line: line.lineNumber,

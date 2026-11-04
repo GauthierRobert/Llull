@@ -6,6 +6,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { readStep } from '@lib/stepRead';
 import { parseDn, parseNps } from '@aec/plant/catalog/nominal';
 import { parseCatalogFile } from '@aec/plant/catalog/file';
+import { setPipingLibraryProvider } from '@aec/plant/catalog/libraryPort';
 import { parseTagFormat } from '@aec/plant/data/tagFormat';
 import { readPcf } from '@aec/plant/fabrication/pcf/pcfRead';
 import { readDexpi } from '@aec/plant/pid/dexpi/proteusRead';
@@ -166,6 +167,23 @@ export const AEC_READERS: readonly HostileReader[] = [
     skipLinear: 'a schema-validated JSON file: the sample is a fixed catalog, not a scalable record list',
     read: (input) => execute(createEmptyDocument(), 'import_piping_catalog', { catalog: recordOf(parsedJson(asText(input))) }),
     accepts: imported,
+  },
+  {
+    name: 'plant: import_piping_library (execute, the library file text comes from the provider)',
+    covers: ['import_piping_library'],
+    input: 'text',
+    build: () => JSON.stringify({ ...(JSON.parse(jsonFile(CATALOG)) as object), id: 'hostile-library' }),
+    skipLinear: 'a schema-validated JSON file: the sample is a fixed catalog, not a scalable record list',
+    read: (input) => {
+      const text = asText(input);
+      setPipingLibraryProvider({ get: () => text });
+      try {
+        return execute(createEmptyDocument(), 'import_piping_library', { libraryId: 'hostile-library', version: '1' });
+      } finally {
+        setPipingLibraryProvider(null);
+      }
+    },
+    accepts: (result) => (result as { summary: string }).summary.startsWith('Referenced'),
   },
   {
     name: 'plant: parseSpecFile (llull-pipe-spec JSON)',

@@ -105,7 +105,7 @@ function catalogCsv(catalog: PipingCatalog): string {
 /**
  * @affects none; data = { catalogId, format, text, sha256, bytes, families, rows }
  * @invariant read-only; json is the canonical file (sorted keys, millimetres, stable row order) and re-importing it reproduces the catalogue; sha256 is of the text
- * @failure unknown catalogue or family -> PSC_CATALOG_UNKNOWN; export-controlled content in the document without a human signature -> MAT_EXPORT_CONTROLLED / MAT_HUMAN_GATE
+ * @failure unknown catalogue or family -> PSC_CATALOG_UNKNOWN; licensed-no-redistribution library -> PSC_LICENCE_EMBED_FORBIDDEN; export-controlled content in the document without a human signature -> MAT_EXPORT_CONTROLLED / MAT_HUMAN_GATE
  */
 export const exportPipingCatalog = defineCommand({
   name: 'export_piping_catalog',
@@ -133,6 +133,15 @@ export const exportPipingCatalog = defineCommand({
           .map((c) => c.id)
           .join(', ')})`,
         [catalogId],
+        ['catalogId'],
+      );
+    if (found.licence === 'licensed-no-redistribution')
+      return refuse(
+        doc,
+        'export_piping_catalog',
+        'PSC_LICENCE_EMBED_FORBIDDEN',
+        `catalogue ${found.id} is a licensed private library: its values are not exported`,
+        [found.id],
         ['catalogId'],
       );
     const families = familyId === undefined ? found.families : found.families.filter((family) => family.id === familyId);

@@ -121,16 +121,16 @@ function flangeOd(catalogs: readonly PipingCatalog[], origin: Origin): number | 
 /**
  * @affects none; data = { type, recipe, bounds: { min, max, size }, ports: [{ id, position, direction, outsideDiameterMm, endType }], hollow, notes, frame, stats, source, verified }
  * @invariant read-only; the recipe is analytic (revolution solids and booleans) in the component's local frame, bounds are exact for it, ports are outward unit directions; a missing dimension is a refusal, an omitted detail is named in notes
- * @failure unknown spec / catalogue -> PSC_SPEC_UNKNOWN / PSC_CATALOG_UNKNOWN; no component or row -> PSC_NO_COMPONENT / PSC_CATALOG_ROW_MISSING; type without a recipe (cap, coupling, eccentric reducer, ring gasket ...) -> PSC_SHAPE_UNSUPPORTED; inconsistent row (bend shorter than its tangent) -> PSC_CATALOG_DIM_MISMATCH
+ * @failure unknown spec / catalogue -> PSC_SPEC_UNKNOWN / PSC_CATALOG_UNKNOWN; no component or row -> PSC_NO_COMPONENT / PSC_CATALOG_ROW_MISSING; type without a recipe (bolt set, ring-joint gasket ...) -> PSC_SHAPE_UNSUPPORTED; inconsistent row (bend shorter than its tangent) -> PSC_CATALOG_DIM_MISMATCH
  */
 export const componentShape = defineCommand({
   name: 'component_shape',
   description:
     'Shape of one piping component for the 3D builders and routers: an analytic shape recipe (revolution solids and booleans, millimetres, local frame), its exact bounds and its connection ports (position, outward direction, outside diameter, end type). ' +
     'Pick the component from a spec (specId + componentId or type, at nps / dn; branchNps for reducing tees, olets, reducers) or from a catalogue (catalogId, default llull-open-piping, with type, nps / dn and the row keys schedule, class, facing, radius). ' +
-    'Supported: pipe (lengthMm), elbow90 / elbow45 (torus segment, bend radius from the row, straight ends when the tabulated centre-to-end exceeds R tan(theta/2); extent of a 90 degree LR NPS 6 elbow: 312.75 x 312.75 x 168.3 mm), tee, reducingTee, reducerConcentric, ' +
+    'Supported: pipe (lengthMm), elbow90 / elbow45 (torus segment, bend radius from the row, straight ends when the tabulated centre-to-end exceeds R tan(theta/2); extent of a 90 degree LR NPS 6 elbow: 312.75 x 312.75 x 168.3 mm), tee, reducingTee, reducerConcentric, swage (as a concentric reducer; needs length), reducerEccentric (oblique frustum, ruled loft; flat side +X, small end axis shifted (D - d) / 2), cap (closed end drawn flat; needs length), coupling / union (body bodyOd x length, drawn solid), ' +
     'flanges (disc, raised face, optional hub, bolt holes straddling the axes), gaskets (annulus), valves (envelope box face-to-face by flange diameter), weldolet / sockolet / threadolet (branch body). The wall (spec pipe wall, or wallMm) makes tubes hollow; otherwise the shape is solid and says so. ' +
-    'Refuses types without a recipe (caps, couplings, eccentric reducers, ring-joint gaskets: PSC_SHAPE_UNSUPPORTED) and rows missing a needed dimension (PSC_CATALOG_ROW_MISSING). The solid is built by the caller through the geometry kernel. Next: resolve_joint for the parts of a joint, the routing commands insert these shapes.',
+    'Refuses types without a recipe (bolt sets, ring-joint gaskets: PSC_SHAPE_UNSUPPORTED) and rows missing a needed dimension (PSC_CATALOG_ROW_MISSING; caps, couplings, unions and swages exist only in imported catalogues: the bundled one has no sourced rows for them). The solid is built by the caller through the geometry kernel. Next: resolve_joint for the parts of a joint, the routing commands insert these shapes.',
   params: z.object({
     specId: z.string().describe('Spec id: pick the component from this spec (list_pipe_specs). Omit to pick from a catalogue.').optional(),
     revision: z.number().int().positive().describe('Spec revision. Default: the newest.').optional(),

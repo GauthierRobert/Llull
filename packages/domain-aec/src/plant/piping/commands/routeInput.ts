@@ -11,6 +11,7 @@ import { refuse } from '../model';
 import { portOccupant, resolvePortId } from '../ports';
 import { resolveFlat } from '../eccentric';
 import { defaultStem, INLINE_TYPES } from '../routeInline';
+import { isStraight } from '../routeStraight';
 import { isValve } from '../runSizes';
 
 export const portOrPoint = z.union([
@@ -71,7 +72,7 @@ export const inlineFields = {
   type: z
     .enum(INLINE_TYPES)
     .describe(
-      'Catalogue type: a valve (valveGate, valveGlobe, valveCheck, valveBall, valveButterfly, valvePlug), reducerConcentric or reducerEccentric (needs flat or flatDirection).',
+      'Catalogue type: a valve (valveGate, valveGlobe, valveCheck, valveBall, valveButterfly, valvePlug), reducerConcentric, reducerEccentric (needs flat or flatDirection), swage (a swage nipple, placed like a concentric reducer; needs dn2), coupling or union (one straight part of the row length; no dn2). Coupling, union and swage need a catalogue row of that type (imported: the bundled catalogue has none).',
     ),
   tag: z.string().min(1).optional().describe('Instrument / equipment tag, e.g. "XV-1001".'),
   dn2: z
@@ -79,7 +80,9 @@ export const inlineFields = {
     .int()
     .positive()
     .optional()
-    .describe('Reducers only: the outlet size DN the run continues at (the inlet is the run size at that point). Valves: omit.'),
+    .describe(
+      'Reducers and swages only: the outlet size DN the run continues at (the inlet is the run size at that point). Valves, couplings, unions: omit.',
+    ),
   stemDirection: vec3(
     'Valves: direction from the valve centre toward the handwheel [dx, dy, dz]; normalised. Default: up (+Z), or +X on a vertical pipe.',
   ).optional(),
@@ -122,9 +125,10 @@ export function buildInline(
   path: string,
 ): InlineComponent | CommandResult {
   const valve = isValve(fields);
-  if (valve && fields.dn2 !== undefined)
+  const oneSize = valve || isStraight(fields);
+  if (oneSize && fields.dn2 !== undefined)
     return refuse(doc, command, 'RTE_SIZE_MISMATCH', `${fields.type} has one size: dn2 is for reducers`, [], [`${path}.dn2`]);
-  if (!valve && fields.dn2 === undefined)
+  if (!oneSize && fields.dn2 === undefined)
     return refuse(doc, command, 'RTE_SIZE_MISMATCH', `a reducer needs dn2, the size the run continues at`, [], [`${path}.dn2`]);
   if (fields.stemDirection !== undefined && !(Math.hypot(...fields.stemDirection) > 1e-12))
     return refuse(doc, command, 'RTE_INVALID_PORT', 'the stem direction is zero', [], [`${path}.stemDirection`]);
@@ -142,7 +146,7 @@ export function buildInline(
   const flat = eccentric ? resolveFlat(fields.flat, fields.flatDirection, legDirection) : undefined;
   if (typeof flat === 'string') return refuse(doc, command, 'RTE_ECCENTRIC_INVALID', flat, [], [`${path}.flat`]);
   return {
-    id: nextId(valve ? 'valve' : 'reducer'),
+    id: nextId(valve ? 'valve' : isStraight(fields) ? 'fitting' : 'reducer'),
     type: fields.type,
     ...(fields.tag === undefined ? {} : { tag: fields.tag }),
     leg: at.leg,

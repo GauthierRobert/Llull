@@ -6,8 +6,9 @@
 
 import type { InlineComponent, PipeRun } from '@aec/plant/types';
 
-/** A reducer changes the run size (concentric reducer; eccentric ones are V1). */
-export const isReducer = (component: Pick<InlineComponent, 'type'>): boolean => component.type.startsWith('reducer');
+/** A reducer changes the run size: concentric and eccentric reducers and swages. */
+export const isReducer = (component: Pick<InlineComponent, 'type'>): boolean =>
+  component.type.startsWith('reducer') || component.type === 'swage';
 
 export const isValve = (component: Pick<InlineComponent, 'type'>): boolean => component.type.startsWith('valve');
 

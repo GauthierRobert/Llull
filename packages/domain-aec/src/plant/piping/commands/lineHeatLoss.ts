@@ -22,7 +22,7 @@ export const lineHeatLoss = defineCommand({
     'conductivity (W/mK); the inside film is neglected when insideFilmWm2K is omitted; the insulation conductivity is read from the spec insulation table row when omitted. Returns data = ' +
     '{ heatLossWPerM (positive = the line loses heat), surfaceTempC (outer surface), steelOuterTempC, resistances (K m/W), diametersMm, lengthM and totalHeatLossW over the routed runs of the line ' +
     'that derive, tracing (when set_heat_tracing recorded a maintain temperature: the heat loss at that temperature, i.e. the heat the tracing must supply), defaults (each input that was not given and what was assumed), ' +
-    'provenance, reviewRequired: true }. No radiation and no temperature-dependent conductivity: a screening figure, not a thermal design. Refusals: RTE_UNKNOWN_LINE, RTE_SPEC_NO_COMPONENT, ' +
+    'provenance, reviewRequired: true }. Optional refinements: outsideEmissivity adds radiation to the ambient (outsideFilmWm2K is then the CONVECTION coefficient only; h_r = eps sigma (Ts + Ta)(Ts^2 + Ta^2) in kelvin at the solved surface temperature, data.outsideFilm gives both parts), and insulationConductivitySlopeWmK2 with insulationConductivityRefTempC makes the insulation conductivity linear in temperature, k(T) = k + slope (T - ref), evaluated at the mean temperature of the insulation (exact for a linear k; data.insulationConductivityMeanWmK); both are solved by iteration. Without them the closed form is unchanged. A screening figure, not a thermal design. Refusals: RTE_UNKNOWN_LINE, RTE_SPEC_NO_COMPONENT, ' +
     'RTE_HEAT_LOSS_INPUT. Does not modify the document. Next: set_heat_tracing, piping_takeoff.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
@@ -43,6 +43,24 @@ export const lineHeatLoss = defineCommand({
       .describe(
         'Insulation conductivity at its mean temperature, W/mK, > 0. Omit to read the conductivity column of the spec insulation table row.',
       ),
+    outsideEmissivity: z
+      .number()
+      .optional()
+      .describe(
+        'Surface emissivity of the outer surface (insulation cladding or bare steel), in (0, 1]: adds radiation to the ambient (black-body surroundings at the ambient temperature). When given, outsideFilmWm2K is the convection coefficient only. Omit for no radiation term (outsideFilmWm2K lumped).',
+      ),
+    insulationConductivitySlopeWmK2: z
+      .number()
+      .optional()
+      .describe(
+        'dk/dT of the insulation, W/(m K^2) (positive for mineral wool: conductivity rises with temperature). Needs insulationConductivityRefTempC; k(T) = k + slope (T - ref) with k = insulationConductivityWmK or the spec row value. Omit for a constant conductivity.',
+      ),
+    insulationConductivityRefTempC: z
+      .number()
+      .optional()
+      .describe(
+        'Temperature (degC) at which the insulation conductivity (given or from the spec row) holds. Required with insulationConductivitySlopeWmK2.',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const piping = getPiping(doc);
@@ -56,6 +74,15 @@ export const lineHeatLoss = defineCommand({
       ['insulationConductivityWmK', params.insulationConductivityWmK],
     ] as const)
       if (value !== undefined && !(value > 0)) return bad(path, `${path} must be > 0 (got ${value})`);
+    if (params.outsideEmissivity !== undefined && !(params.outsideEmissivity > 0 && params.outsideEmissivity <= 1))
+      return bad('outsideEmissivity', `outsideEmissivity must be in (0, 1] (got ${params.outsideEmissivity})`);
+    if (params.insulationConductivitySlopeWmK2 !== undefined && !Number.isFinite(params.insulationConductivitySlopeWmK2))
+      return bad('insulationConductivitySlopeWmK2', 'insulationConductivitySlopeWmK2 must be a finite number');
+    if ((params.insulationConductivitySlopeWmK2 === undefined) !== (params.insulationConductivityRefTempC === undefined))
+      return bad(
+        'insulationConductivityRefTempC',
+        'insulationConductivitySlopeWmK2 and insulationConductivityRefTempC go together (the temperature at which the conductivity holds)',
+      );
     const lookup = createSpecLookup(doc, line.spec);
     if (isMiss(lookup)) return refuse(doc, 'line_heat_loss', lookup.miss, lookup.detail, [...lookup.ids, line.id], ['lineId']);
     const pipe = lookup.pipe(line.dn);
@@ -97,8 +124,25 @@ export const lineHeatLoss = defineCommand({
       insulationConductivityWmK: insulationK,
       outsideFilmWm2K: params.outsideFilmWm2K,
       insideFilmWm2K: params.insideFilmWm2K ?? null,
+      ...(params.outsideEmissivity === undefined ? {} : { emissivity: params.outsideEmissivity }),
+      ...(params.insulationConductivitySlopeWmK2 === undefined || insulation === undefined
+        ? {}
+        : {
+            conductivitySlopeWmK2: params.insulationConductivitySlopeWmK2,
+            conductivityRefTempC: params.insulationConductivityRefTempC as number,
+          }),
     };
+    if (params.insulationConductivitySlopeWmK2 !== undefined && insulation === undefined)
+      defaults.push({ input: 'insulationConductivitySlopeWmK2', assumed: 'ignored: the line has no insulation' });
     const result = heatLossPerMetre({ ...base, fluidTempC: params.fluidTempC });
+    if (
+      !Number.isFinite(result.heatLossWPerM) ||
+      (result.insulationConductivityMeanWmK !== undefined && !(result.insulationConductivityMeanWmK > 0))
+    )
+      return bad(
+        'insulationConductivitySlopeWmK2',
+        `the insulation conductivity k + slope (T - ref) is not positive at its mean temperature (${result.insulationConductivityMeanWmK ?? 'n/a'} W/mK): check the slope and the reference temperature`,
+      );
     let lengthMm = 0;
     const skipped: string[] = [];
     for (const runId of piping.runOrder) {
@@ -139,7 +183,7 @@ export const lineHeatLoss = defineCommand({
             'ISO 12241 calculation rules for insulation of equipment and pipework',
           ],
           pipeRow: pipe.key,
-          model: 'steady state, one dimension radial, constant conductivities, no radiation term',
+          model: `steady state, one dimension radial, ${params.insulationConductivitySlopeWmK2 === undefined ? 'constant conductivities' : 'linear k(T) of the insulation at its mean temperature'}, ${params.outsideEmissivity === undefined ? 'no radiation term (the outside film is lumped)' : 'radiation to the ambient linearised at the surface temperature (Stefan-Boltzmann 5.670374419e-8)'}`,
         },
         reviewRequired: true,
       },

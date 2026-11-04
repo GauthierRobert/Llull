@@ -608,7 +608,7 @@ Decided 2026-10-23 (owner delegated, plant README D4):
 | TR-PSC-11 | Dimensional-standard and joint compatibility rules                                    | FR-11        | AF-30               | VC-14             |
 | TR-PSC-12 | `PipeElement.spec`, `add_pipe_run` / `assign_pipe_spec`, consumers read `spec.wallMm` | FR-13        | AF-01               | VC-15             |
 | TR-PSC-13 | `check_piping_catalog` rules (§5.6)                                                   | FR-12        | AF-20, AF-30        | VC-05             |
-| TR-PSC-14 | Canonical JSON, sha256, `--param-file` CLI feature, round trip                        | FR-16, FR-17 | AF-05, AF-12, AF-13 | VC-17             |
+| TR-PSC-14 | Canonical JSON, sha256, round trip                                                    | FR-16, FR-17 | AF-05, AF-12, AF-13 | VC-17             |
 | TR-PSC-15 | Lifecycle, revisions, approval gate via signature                                     | FR-14, FR-15 | AF-32, AF-33, AF-34 | VC-16             |
 | TR-PSC-16 | Component shape recipes and ports (§5.8)                                              | FR-19        | AF-22               | VC-19             |
 
@@ -662,7 +662,7 @@ failure at `families.0.sizes.0.centreToEnd`), 06 (all 24 bolt patterns), 07, 12,
 M2 (specs, resolution, branch table, `check_pipe_spec`, `PSC_DIM_STANDARD_MIXED`), M3 (`add_pipe_run` / `assign_pipe_spec`, consumers read
 `spec.wallMm`, `approve_pipe_spec`; the interim `plant/piping/sizes.ts` and `industrial/piping/pipeSizes.ts` stay until then), M4 (`pipe_wall_check`,
 `resolve_joint`, `component_shape`, bolt sets, B16.11 and olet schemas), rating-table import, EN 10220 walls (the pack has ODs only),
-`PipingLibraryProvider` private libraries (`PSC_LIBRARY_UNRESOLVED` is defined, not yet raised), `--param-file` CLI feature, UI browser, guide
+`PipingLibraryProvider` private libraries (`PSC_LIBRARY_UNRESOLVED` is defined, not yet raised), UI browser, guide
 section, VC-PSC-08 to 11, 14 (spec check), 15, 16, 19. Open for the owner: Q1 (bundling policy, licence flag), Q3 to Q7 unchanged.
 
 ### 13.5 As built (M2, 2026-10-23)
@@ -804,3 +804,35 @@ Commands (toolset `piping`): `import_pipe_spec_sheet` (M), `import_piping_catalo
 #### Left
 
 XLSX spec / catalogue sheets; a confirmed Plant 3D schema (and `.pspc` / `.pspx`); PCF SKEY map (05 ISO); further rating tables with sources (B16.5 groups other than 1.1 above 50 degC for class >= 300, B16.34, EN 1092-1 PN) - supply them with `import_rating_table`; per-dimension provenance in the CSV catalogue sheet; the earlier open items of §13.7.
+
+### 13.9 As built (CAT-FU, 2026-11-04: follow-ups of M2 to M5)
+
+Branch `feat/plant-cat-fu`. One block per item; "Left" at the end of the section lists what stays open.
+
+#### Private libraries (`PipingLibraryProvider`)
+
+- **Port.** `catalog/libraryPort.ts`: `PipingLibraryProvider { get(libraryId, version): string | null }` returns the library file text (`llull-piping-catalog` JSON); the host installs it with `setPipingLibraryProvider` (exported from `@aec/index`, like the core `setMaterialLibraryProvider`). It is a module-level port of the plugin, not a field of the core `CommandContext` (a plugin cannot extend core types, L10). Parsed files are cached by (id, sha256).
+- **`import_piping_library { libraryId, version, sha256?, replace? }`** records `{ libraryId, version, sha256 }` in `plant.catalog.libraries[libraryId]` and nothing of the file's values. `sha256` pins the exact text (default: the hash found now). The library id is the catalogue id specs name in `catalogs[]`; the ids of the bundled and imported catalogues are refused (`PSC_CATALOG_CONFLICT`). A `licensed-no-redistribution` file is accepted here only (the importers still refuse it, `PSC_LICENCE_EMBED_FORBIDDEN`).
+- **`PSC_LIBRARY_UNRESOLVED` is raised** by `import_piping_library` (no provider, file absent, hash differs from the recorded one, not JSON, not a valid catalogue, file id differs), by every spec read that needs the catalogues (`loadSpec`: resolve / shape / assign / wall ...) when a spec names a library of the document that does not resolve (instead of `PSC_CATALOG_UNKNOWN`), and by `check_pipe_spec` as a `fail` finding. `list_piping_catalogs` lists resolvable libraries (`origin: library`) and `data.unresolvedLibraries[] { libraryId, version, reason }`. A document with an unresolved reference still loads; load validation checks the reference shape (`libraryId` = key, `version`, 64-hex `sha256`) and that the id does not clash with an imported catalogue.
+- **Licence.** `export_piping_catalog` of a licensed library is refused (`PSC_LICENCE_EMBED_FORBIDDEN`). Values read from a library reach the document only as derived numbers a command stores (a pipe's `SpecBinding` od / wall, as for any spec); the file is never embedded.
+- Tests: `tests/unit/plant/piping/pipingLibrary.test.ts`; the hostile-input harness covers `import_piping_library` with a hostile file text.
+
+#### Spec insulation table: verified as already built (no change)
+
+The "spec insulation table (V1)" of the §13.5 Left is built since RTE-M3 (02 §13.8): `PipeSpec.insulation[] { code, dnMax, tempMaxC, thicknessMm, material, conductivityWmK? }` (file, canonical export, `diff_pipe_spec` rows, `edit_pipe_spec` ops `setInsulationRow` / `removeInsulationRow`), read by `SpecLookup.insulation(code, dn, tempC)` (tightest row: smallest `dnMax`, then `tempMaxC`), consumed by `create_pipeline` / `set_line_insulation` / `update_pipeline` (`thickness: 'fromSpec'`), the insulation envelope of `check_clashes` and `line_heat_loss` (conductivity from the row). The key is the line-number insulation code (it stands for the service class), the size (DN) and the design temperature; no change was needed.
+
+#### Connection rules and the socket gap in the PSC spec format
+
+`PipeSpec.socketGapMm` (0 to 10 mm; absent = the named default 1.6 mm, B31.3 328.5.2) and `PipeSpec.connections[] { end, pipeEnd, joint, gapMm?, requires? }` (`end` / `pipeEnd` in BW, FL, SW, SC, PL, WAF, LUG; `joint` buttWeld, socketWeld, threaded, flanged). A rule overrides the built-in rule of the same unordered pair of ends (BW-BW, FL-FL, SW-PL, SC-SC) in `SpecLookup.connection`; `gapMm` absent = 0 (or `socketGapMm` for a socket weld); `requires` absent = by joint (flanged: spiral-wound gasket and bolt set). Two rules for one pair are refused at import (`PSC_SPEC_INVALID`, path `connections.<i>`), load validation checks the members, `setHeader` edits them, `diff_pipe_spec` reports them as header changes. A rule cannot supply what a row lacks: a threaded rule on a row without `threadEngagement`, or a socket gap not smaller than the row's `socketDepth`, is refused when routing (`RTE_SPEC_NO_COMPONENT`). Tests: `connectionRules.test.ts`.
+
+#### Shapes of caps, couplings, unions, swages and eccentric reducers
+
+`component_shape` (`catalog/shapes/fittings.ts`) now builds: `cap` (closed-end cylinder of the row `length`, one port; the dome profile is not tabulated, so the closed end is drawn flat and the note says so; hollow when a wall is known), `coupling` / `union` (solid body `bodyOd` x `length`, two ports; end type SW with a `socketDepth`, THD with a `threadLength`, else null; a row without `bodyOd` is refused, the body is not drawn at the pipe diameter), `swage` (a concentric reducer; end types not tabulated: null) and `reducerEccentric` (a ruled loft of two circles: the small end axis is shifted (D - d) / 2 toward +X, the flat side; volume within the 24-gon error of the oblique frustum pi L (R^2 + R r + r^2) / 3). Refusals stay coded (`PSC_CATALOG_ROW_MISSING` for a missing dimension). **No catalogue row is shipped for these types**: the pack's B16.9 file says caps have no second source (grade C, not used) and the rest has no free source, so the bundled catalogue answers `PSC_CATALOG_ROW_MISSING`; rows come from an imported catalogue (the tests use labelled declared inputs). Not built: B16.5 flange hub dimensions, ring-joint gasket shape, bolt sets. Tests: `fittingShapes.test.ts`.
+
+#### `assign_pipe_spec` sweep over a whole document
+
+`all: true` selects every building pipe element of the document (exactly one of `pipeId`, `line`, `all`); with no size each pipe keeps its binding size or its own dn, so one call also moves a whole document to the newest approved revision. All or nothing: the first pipe that cannot resolve (for example one with neither a binding nor a dn, `PSC_SIZE_UNKNOWN`) is named and nothing changes; a document without a pipe element is `PSC_PIPE_UNKNOWN`. 02 runs keep their spec on the line (`update_pipeline spec`), so no `assign_pipe_spec` for runs is needed. Test: `assignSweep.test.ts`.
+
+#### Left (after CAT-FU)
+
+Bundled sourced rows for caps, couplings, unions, swages and eccentric reducers (no free second source: import them; the shapes and inline parts exist); B16.5 flange hub dimensions; a host that installs the `PipingLibraryProvider` (the port and the commands exist; the Express server / desktop wiring that reads `~/.llull/...` library files is a host task in `server/`, like the material libraries); a cap as a run end (02 §13.13); the items of §13.8 that are not listed here (XLSX, confirmed Plant 3D schema, rating tables with sources, per-dimension provenance in the CSV sheet), PCF SKEY map (05), UI browser, guide section.

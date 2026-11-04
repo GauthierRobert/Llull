@@ -61,6 +61,7 @@ const VALUE_FLAGS = [
   'confirm-key',
   'passphrase-env',
   'manifest-sha256',
+  'param-file',
 ] as const;
 
 export function missingValueFlag(parsed: ParsedArgv): string | undefined {

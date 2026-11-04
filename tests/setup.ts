@@ -8,6 +8,7 @@ import { setFieldEngine } from '@core/geometry/field/engine';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { setMaterialLibraryProvider } from '@core/commands/libraryPort';
 import { setFontProvider } from '@core/commands/fontPort';
+import { setPipingLibraryProvider } from '@aec/plant/catalog/libraryPort';
 
 installDefaultPlugins();
 // The `node` project shares modules across files: start every file from the same process defaults as a fresh import.
@@ -19,3 +20,4 @@ setMeshProcessingEngine(null);
 setFieldEngine(null);
 setMaterialLibraryProvider(null);
 setFontProvider(null);
+setPipingLibraryProvider(null);

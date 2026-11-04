@@ -93,6 +93,21 @@ export interface ElbowAngles {
   readonly bendRadiusD?: number | undefined;
 }
 
+/** End types a connection rule names (routing end types: BW butt weld, FL flanged, SW socket weld, SC screwed, PL plain end, WAF wafer, LUG lug). */
+export const CONNECTION_ENDS = ['BW', 'FL', 'SW', 'SC', 'PL', 'WAF', 'LUG'] as const;
+export const CONNECTION_JOINTS = ['buttWeld', 'socketWeld', 'threaded', 'flanged'] as const;
+
+/** One connection rule of the spec: how a fitting end `end` meets a pipe whose end is `pipeEnd` (either order). Overrides the built-in table for that pair. */
+export interface SpecConnectionRule {
+  readonly end: (typeof CONNECTION_ENDS)[number];
+  readonly pipeEnd: (typeof CONNECTION_ENDS)[number];
+  readonly joint: (typeof CONNECTION_JOINTS)[number];
+  /** Weld root gap (butt weld) or socket gap (socket weld), mm; absent = the built-in value (0, or the spec's socketGapMm for a socket weld). */
+  readonly gapMm?: number | undefined;
+  /** Component types the joint needs besides its two ends; absent = by joint (flanged: spiral-wound gasket and bolt set). */
+  readonly requires?: readonly ComponentType[] | undefined;
+}
+
 export interface SpecApproval {
   readonly signer: string;
   readonly signatureId: string;
@@ -122,6 +137,10 @@ export interface PipeSpec {
   /** Insulation thickness table: a line asks for its thickness by code, size and design temperature (`create_pipeline` insulation "fromSpec"). */
   readonly insulation?: readonly InsulationRow[];
   readonly elbowAngles?: ElbowAngles;
+  /** Socket gap of a socket-weld joint, mm (B31.3 328.5.2); absent = the named default 1.6 mm. */
+  readonly socketGapMm?: number;
+  /** Connection rules that override the built-in table (BW-BW, FL-FL, SW-PL, SC-SC) for their pair of ends. */
+  readonly connections?: readonly SpecConnectionRule[];
   readonly status: SpecStatus;
   readonly approval?: SpecApproval;
   readonly provenance?: Provenance & { readonly author?: string };

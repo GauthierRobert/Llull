@@ -11,6 +11,7 @@ import type { ShapeRecipe } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { MM_PER_INCH } from '../bolting';
 import type { BendRadius, EndType } from '../types';
+import { capShape, eccentricReducerShape, straightFittingShape } from './fittings';
 import { flangeShape, gasketShape, valveShape } from './flanged';
 import {
   CUT_OVERSHOOT_MM,
@@ -178,8 +179,7 @@ function teeShape(source: ShapeSource): ShapeOutcome {
 }
 
 function reducerShape(source: ShapeSource): ShapeOutcome {
-  if (source.type === 'reducerEccentric')
-    return refusal('PSC_SHAPE_UNSUPPORTED', 'eccentric reducers need an off-axis loft: not modelled (use reducerConcentric)');
+  if (source.type === 'reducerEccentric') return eccentricReducerShape(source);
   const lacking = need(source, 'length');
   if (lacking !== null) return lacking;
   const length = dim(source, 'length');
@@ -187,6 +187,7 @@ function reducerShape(source: ShapeSource): ShapeOutcome {
   const small = source.smallPipeOdMm ?? source.dims['smallOutsideDiameter'];
   if (od === undefined || small === undefined)
     return refusal('PSC_SHAPE_UNSUPPORTED', 'a reducer shape needs the large and small end outside diameters');
+  const end: EndType | null = source.type === 'swage' ? null : 'BW';
   const wall = source.wallMm;
   const hollow = wall !== undefined && wall > 0 && wall < small / 2;
   const profile: Section = hollow
@@ -206,11 +207,14 @@ function reducerShape(source: ShapeSource): ShapeOutcome {
     recipe: revolved('reducer', profile),
     discs: profileDiscs(profile),
     ports: [
-      { id: 'A', position: [0, 0, 0], direction: [0, 0, -1], outsideDiameterMm: od, endType: 'BW' },
-      { id: 'B', position: [0, 0, length], direction: [0, 0, 1], outsideDiameterMm: small, endType: 'BW' },
+      { id: 'A', position: [0, 0, 0], direction: [0, 0, -1], outsideDiameterMm: od, endType: end },
+      { id: 'B', position: [0, 0, length], direction: [0, 0, 1], outsideDiameterMm: small, endType: end },
     ],
     hollow,
-    notes: hollow ? ['same wall at both ends assumed'] : ['no wall: drawn solid'],
+    notes: [
+      ...(source.type === 'swage' ? ['swage drawn as a concentric reducer; its end types are not tabulated'] : []),
+      ...(hollow ? ['same wall at both ends assumed'] : ['no wall: drawn solid']),
+    ],
     frame: 'axis +Z, large end at z = 0, small end at z = length',
   });
 }
@@ -259,7 +263,13 @@ export function buildShape(source: ShapeSource): ShapeOutcome {
       return teeShape(source);
     case 'reducerConcentric':
     case 'reducerEccentric':
+    case 'swage':
       return reducerShape(source);
+    case 'cap':
+      return capShape(source);
+    case 'coupling':
+    case 'union':
+      return straightFittingShape(source);
     case 'flangeWeldNeck':
     case 'flangeSlipOn':
     case 'flangeBlind':
@@ -283,9 +293,6 @@ export function buildShape(source: ShapeSource): ShapeOutcome {
     case 'threadolet':
       return oletShape(source);
     default:
-      return refusal(
-        'PSC_SHAPE_UNSUPPORTED',
-        `${source.type} has no shape recipe (caps, couplings, unions, swages and bolt sets are not modelled)`,
-      );
+      return refusal('PSC_SHAPE_UNSUPPORTED', `${source.type} has no shape recipe (bolt sets are not modelled)`);
   }
 }

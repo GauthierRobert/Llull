@@ -61,6 +61,26 @@ function ratingTableErrors(raw: unknown): string[] {
   });
 }
 
+const isLibraryReference = (id: string, value: unknown): boolean =>
+  isRecord(value) &&
+  value['libraryId'] === id &&
+  /^[A-Za-z0-9._-]{1,64}$/.test(id) &&
+  typeof value['version'] === 'string' &&
+  typeof value['sha256'] === 'string' &&
+  /^[0-9a-f]{64}$/.test(value['sha256']);
+
+/** Errors of a raw `plant.catalog.libraries` value (absent is valid). */
+function libraryErrors(raw: unknown, catalogIds: readonly string[]): string[] {
+  if (raw === undefined) return [];
+  if (!isRecord(raw)) return ['plant.catalog.libraries must be an object'];
+  return Object.entries(raw).flatMap(([id, value]) => [
+    ...(isLibraryReference(id, value) ? [] : [`plant.catalog.libraries.${id} must be { libraryId: "${id}", version, sha256 (64 hex) }`]),
+    ...(id === BUNDLED_CATALOG_ID || catalogIds.includes(id)
+      ? [`plant.catalog.libraries.${id}: the id is already a bundled or imported catalogue`]
+      : []),
+  ]);
+}
+
 /** Errors of a raw `plant.catalog` value (empty when valid). */
 export function pipingCatalogErrors(raw: unknown): string[] {
   if (!isRecord(raw) || !isRecord(raw['catalogs']) || !Array.isArray(raw['catalogOrder']))
@@ -74,6 +94,7 @@ export function pipingCatalogErrors(raw: unknown): string[] {
   return [
     ...orderErrors,
     ...ratingTableErrors(raw['ratingTables']),
+    ...libraryErrors(raw['libraries'], ids),
     ...ids.flatMap((id) => catalogErrors(id, (raw['catalogs'] as Record<string, unknown>)[id])),
   ];
 }
