@@ -9,12 +9,13 @@ import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import { execute } from '@core/commands/registry';
 import { verifyAndSpend } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { analysisOf } from '../shared/access';
 import { refuseTmc } from './refusal';
 
 /**
  * @affects doc.analysis.fitDispositions[rowKey] (affected: [rowKey]); stores the verified signature next to the decision so a reader can re-verify it
- * @invariant the signature is verified over sha256 of canonical JSON { act, rowKey, decision, justification, inputsHash }; with `fitParams` the command
+ * @invariant the signature is verified over sha256 of canonical JSON { act, documentUid, rowKey, decision, justification, inputsHash } (nothing re-verifies a stored fit disposition, so it records no uid); with `fitParams` the command
  *   re-runs fit_at_temperature itself and the row must hash to `inputsHash` (a client-given `currentInputsHash` is only a hint)
  * @failure no signing port or signature rejected -> TMC_HUMAN_GATE; currentInputsHash != inputsHash -> TMC_FIT_INPUTS_CHANGED; empty
  *   justification -> FEA_PARAM_INVALID (refusals, document unchanged)
@@ -55,7 +56,7 @@ export const disposeFitResult = defineCommand({
     const signer = verifyAndSpend(
       port,
       signature,
-      sha256Hex(canonicalJson({ act: 'dispose_fit_result', rowKey, decision, justification, inputsHash })),
+      sha256Hex(canonicalJson(withDocumentUid({ act: 'dispose_fit_result', rowKey, decision, justification, inputsHash }, doc))),
     );
     if (signer === null) return fail('TMC_HUMAN_GATE', 'the signature did not verify for this disposition');
     if (justification.trim() === '') return fail('FEA_PARAM_INVALID', 'justification must not be empty');

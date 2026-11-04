@@ -4,6 +4,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { humanGate } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { isRecord } from '@lib/isRecord';
 import { sha256Hex } from '@lib/sha256';
 import { elementsOf, getBuilding } from '../../../building/model';
@@ -100,10 +101,13 @@ export const approvePipeSpec = defineCommand({
       recorded !== undefined
         ? { cleared: true, signer: recorded.signer, signatureId: recorded.signatureId, at: recorded.at }
         : (() => {
-            const gate = humanGate(ctx?.humanSignature ?? null, 'plant:approve_pipe_spec', [specId], confirmation, {
-              revision: spec.revision,
-              contentSha256,
-            });
+            const gate = humanGate(
+              ctx?.humanSignature ?? null,
+              'plant:approve_pipe_spec',
+              [specId],
+              confirmation,
+              withDocumentUid({ revision: spec.revision, contentSha256 }, doc),
+            );
             return gate.cleared ? { ...gate, at } : gate;
           })();
     if (!outcome.cleared)

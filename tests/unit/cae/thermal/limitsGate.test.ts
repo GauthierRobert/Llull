@@ -175,6 +175,7 @@ const payload = (wall: SolvedWall, rowId: string, decision: string, justificatio
   sha256Hex(
     canonicalJson({
       kind: 'thermal_limit_disposition',
+      documentUid: wall.doc.uid ?? '',
       analysisId: wall.analysisId,
       rowId,
       decision,
@@ -222,6 +223,7 @@ describe('dispose_thermal_limit (human gate)', () => {
       signer: 'alice',
       signatureId: 'sig-7',
       signature: 'good',
+      documentUid: doc.uid,
     });
     expectPure(doc, () => run(doc, 'dispose_thermal_limit', params, withPorts(wall, signer())));
     const after = run(result.document, 'check_temperature_limits', { analysisId: wall.analysisId }, withPorts(wall, signer()));
@@ -288,5 +290,67 @@ describe('dispose_thermal_limit (human gate)', () => {
     });
     const unsolved = run(none.document, 'dispose_thermal_limit', { ...base, rowId: `${none.affected[0]}:max` }, ctx);
     expect(unsolved.error?.code).toBe('FEA_RESULTS_MISSING');
+  });
+});
+
+describe('dispose_thermal_limit: the signature is bound to the document (GATE-UID)', () => {
+  const justification = 'accepted for the qualification test, margin covered by the 5 K thermostat';
+  const pinned = (): HumanSignaturePort => ({
+    verify: (signature, hash) =>
+      (signature as { payload?: string } | null)?.payload === hash ? { signer: 'alice', signatureId: 'sig-7' } : null,
+  });
+  const setup = (): { wall: SolvedWall; doc: CadDocument; rowId: string; params: Record<string, unknown>; disposed: CommandResult } => {
+    const { wall, doc, limitId } = limited();
+    const rowId = `${limitId}:max`;
+    const signature = { payload: payload(wall, rowId, 'accepted', justification) };
+    const params = { analysisId: wall.analysisId, rowId, decision: 'accepted', justification, signature };
+    return { wall, doc, rowId, params, disposed: run(doc, 'dispose_thermal_limit', params, withPorts(wall, pinned())) };
+  };
+  const codes = (wall: SolvedWall, doc: CadDocument): Record<string, unknown>[] =>
+    (run(doc, 'check_temperature_limits', { analysisId: wall.analysisId }, withPorts(wall, pinned())).data as Data).items;
+
+  it('records the uid of the document it was signed in, and counts there', () => {
+    const { wall, doc, rowId, disposed } = setup();
+    expect(disposed.error, disposed.summary).toBeUndefined();
+    expect(caseOf(disposed.document, wall.analysisId).thermal?.dispositions[rowId]?.documentUid).toBe(doc.uid);
+    expect(codes(wall, disposed.document).map((item) => item.code)).not.toContain('THM_DISPOSITION_PENDING');
+  });
+
+  it('a disposition copied into another document does not count: THM_DISPOSITION_FOREIGN_DOCUMENT (error), the row pending', () => {
+    const { wall, rowId, disposed } = setup();
+    const copied = { ...disposed.document, uid: 'f'.repeat(32) };
+    const checked = run(copied, 'check_temperature_limits', { analysisId: wall.analysisId }, withPorts(wall, pinned()));
+    const items = (checked.data as Data).items;
+    expect(items).toContainEqual(expect.objectContaining({ code: 'THM_DISPOSITION_FOREIGN_DOCUMENT', severity: 'error' }));
+    expect((checked.data as Data).rows.find((entry) => entry.rowId === rowId)?.disposition).toBe('pending_human');
+    expect(items.map((item) => item.code)).toContain('THM_DISPOSITION_PENDING');
+  });
+
+  it('a disposition that records no document uid does not count: THM_DISPOSITION_UNBOUND', () => {
+    const { wall, rowId, disposed } = setup();
+    const analysis = caseOf(disposed.document, wall.analysisId);
+    const { documentUid, ...stored } = analysis.thermal!.dispositions[rowId]!;
+    void documentUid;
+    const unbound = {
+      ...disposed.document,
+      analysis: {
+        ...disposed.document.analysis!,
+        cases: { [wall.analysisId]: { ...analysis, thermal: { ...analysis.thermal!, dispositions: { [rowId]: stored } } } },
+      },
+    };
+    expect(codes(wall, unbound)).toContainEqual(expect.objectContaining({ code: 'THM_DISPOSITION_UNBOUND', severity: 'error' }));
+  });
+
+  it('a signature made in this document is refused in a copy of it (THM_HUMAN_GATE); a document without a uid refuses to sign (THM_DOCUMENT_UNIDENTIFIED)', () => {
+    const { wall, doc, params } = setup();
+    const copy = { ...doc, uid: 'f'.repeat(32) };
+    const refused = run(copy, 'dispose_thermal_limit', params, withPorts(wall, pinned()));
+    expect(refused.error?.code).toBe('THM_HUMAN_GATE');
+    expect(refused.document).toBe(copy);
+    const { uid, ...unidentified } = doc;
+    void uid;
+    const noUid = run(unidentified, 'dispose_thermal_limit', params, withPorts(wall, pinned()));
+    expect(noUid.error?.code).toBe('THM_DOCUMENT_UNIDENTIFIED');
+    expect(noUid.document).toBe(unidentified);
   });
 });

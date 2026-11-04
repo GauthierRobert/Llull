@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { exportDocumentHash, exportGate } from '@core/model/exportGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import type { ExecutionContext } from '@core/commands/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { HumanSignaturePort } from '@core/model/analysis';
@@ -119,7 +120,7 @@ describe('VC-MAT-15 / VC-MAT-25: exports of controlled content', () => {
     const result = call(doc, 'export_stl', { confirmExportControlled: { signature: 'x', nonce: 'n1' } }, contextWith(port));
     expect(result.rejected).toBeUndefined();
     expect(dataOf(result)['format']).toBe('ascii');
-    const details = { command: 'export_stl', documentHash: exportDocumentHash(doc) };
+    const details = withDocumentUid({ command: 'export_stl', documentHash: exportDocumentHash(doc) }, doc);
     expect(seen).toEqual([sha256Hex(canonicalJson({ act: 'export of ITAR-controlled content', ids: ['secret'], details, nonce: 'n1' }))]);
   });
 

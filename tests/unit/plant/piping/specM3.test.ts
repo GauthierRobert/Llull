@@ -7,6 +7,7 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { humanGatePayload } from '@core/model/humanGate';
+import { withDocumentUid } from '@core/model/documentUid';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { sha256Hex } from '@lib/sha256';
 import { pipeWallMm, pipeWeightPerMetre } from '@aec/industrial/piping/pipeWeight';
@@ -16,6 +17,7 @@ import { canonicalSpecText } from '@aec/plant/spec/file';
 import { latestSpec } from '@aec/plant/spec/store';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
+import { expectBoundToDocument } from '../../../helpers/documentBinding';
 import { importedDoc, mixSpec, smallSpec, type Json } from './specFixture';
 
 const AT = '2026-11-02T09:30:00Z';
@@ -50,7 +52,8 @@ function signApproval(doc: CadDocument, specId: string, nonce = 'n1'): { payload
   const spec = latestSpec(doc, specId);
   if (spec === undefined) throw new Error('no spec');
   const contentSha256 = sha256Hex(canonicalSpecText(spec));
-  return { payload: humanGatePayload('plant:approve_pipe_spec', [specId], { revision: spec.revision, contentSha256 }, nonce), nonce };
+  const details = withDocumentUid({ revision: spec.revision, contentSha256 }, doc);
+  return { payload: humanGatePayload('plant:approve_pipe_spec', [specId], details, nonce), nonce };
 }
 
 const approve = (doc: CadDocument, specId = 'CS150-A1'): CadDocument =>
@@ -129,6 +132,14 @@ describe('add_pipe_run with a spec (VC-PSC-15)', () => {
 describe('approve_pipe_spec human gate (VC-PSC-16)', () => {
   const doc = base();
   const params = { specId: 'CS150-A1', at: AT };
+
+  it('a signature made for one document does not verify in a copy of it (GATE-UID)', () => {
+    expectBoundToDocument(
+      doc,
+      (document, confirmation, ctx) => execute(document, 'approve_pipe_spec', { ...params, confirmation }, ctx),
+      'PSC_HUMAN_GATE',
+    );
+  });
 
   it('an agent (no confirmation, true, no port, a signature that does not verify, no nonce) gets PSC_HUMAN_GATE and the spec stays draft', () => {
     for (const [confirmation, ctx] of [

@@ -1,6 +1,7 @@
 /** import_material_library / delete_material_library (08 MAT M3): material libraries with licence, export marking and content hash. */
 
 import { humanGate } from '../../model/humanGate';
+import { withDocumentUid } from '../../model/documentUid';
 import { markingRank, type ExportMarking, type MaterialLibraryEntry } from '../../model/materialLibrary';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -123,7 +124,7 @@ export const importMaterialLibrary = defineCommand({
         'lowering an export marking',
         lowered.map((entry) => entry.id),
         params.confirmation,
-        { lowered },
+        withDocumentUid({ lowered }, doc),
       );
       if (!gate.cleared)
         return refuse(

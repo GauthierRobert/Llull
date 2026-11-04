@@ -7,6 +7,7 @@ import type { CadDocument } from '../../model/types';
 import type { CommandResult, ExecutionContext } from '../types';
 import { exportDocumentHash } from '../../model/exportGate';
 import { humanGate } from '../../model/humanGate';
+import { withDocumentUid } from '../../model/documentUid';
 import { commandError, rejection } from '../noop';
 import { importedBodyStatus } from '../inspect/massReport';
 
@@ -38,7 +39,7 @@ export function unverifiedIds(doc: CadDocument, ids: readonly string[]): string[
 
 /**
  * The refusal for the export of `input` unless a human cleared `confirmation`; null when nothing needs the gate or it is cleared.
- * @invariant the signature is verified AND spent through the signing port over { command, documentHash } and the sorted ids; a port without a
+ * @invariant the signature is verified AND spent through the signing port over { documentUid, command, documentHash } and the sorted ids; a port without a
  *   single-use ledger never clears it
  */
 export function unverifiedGate(
@@ -75,7 +76,13 @@ export function unverifiedGate(
       remediation: 'install the 09 PLM signing port',
       ids,
     };
-  const outcome = humanGate(port, 'export of unverified bodies', ids, confirmation, { command, documentHash: exportDocumentHash(doc) });
+  const outcome = humanGate(
+    port,
+    'export of unverified bodies',
+    ids,
+    confirmation,
+    withDocumentUid({ command, documentHash: exportDocumentHash(doc) }, doc),
+  );
   return outcome.cleared
     ? null
     : {
