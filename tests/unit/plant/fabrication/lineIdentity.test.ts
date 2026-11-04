@@ -32,7 +32,10 @@ const legacyPipe = (base: CadDocument, line: string): CadDocument =>
 /** A document loaded from a file can hold an imported line next to a routed or legacy one with the same number (the commands refuse to create that). */
 const withImportedL100 = (base: CadDocument): CadDocument => {
   const imported = apply(cs150Document(), 'import_pcf', { text: fixturePcf().replace('L-101', 'L-100') });
-  return { ...base, plant: { ...base.plant, fabrication: imported.plant?.fabrication } };
+  return {
+    ...base,
+    plant: { ...base.plant, ...(imported.plant?.fabrication === undefined ? {} : { fabrication: imported.plant.fabrication }) },
+  };
 };
 
 describe('export_pcf: one file per PIPELINE-REFERENCE', () => {
