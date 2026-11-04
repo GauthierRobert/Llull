@@ -24,8 +24,9 @@ import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
 import { DynamicsPlayer } from './DynamicsPlayer';
-import { useRenderQuality } from './useRenderQuality';
-import { NavigationController } from './navigation/NavigationController';
+import { useEdgeLines, useRenderQuality } from './useRenderQuality';
+import { HighQualityEffects } from './effects/HighQualityEffects';
+import { NavigationController, WALKABLE_GROUP_NAME } from './navigation/NavigationController';
 import { useNavigationStore } from '@ui/store/navigationStore';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
@@ -83,6 +84,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   const orbiting = useNavigationStore((s) => s.mode === 'orbit');
 
   const quality = useRenderQuality();
+  const edges = useEdgeLines();
+  const ambientOcclusion = quality.ambientOcclusion;
+  const effects = edges || ambientOcclusion;
   const palette = useViewportPalette();
 
   // Initial camera only: CameraReactor applies later changes imperatively.
@@ -149,13 +153,16 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         fadeStrength={1.5}
         position={[0, 0, 0]}
         rotation={GROUND_PLANE_ROTATION}
+        userData={{ noEdges: true }}
         infiniteGrid
       />
 
       <group position={groupOffset}>
-        <PlantCameraProvider>
-          <Entities />
-        </PlantCameraProvider>
+        <group name={WALKABLE_GROUP_NAME}>
+          <PlantCameraProvider>
+            <Entities />
+          </PlantCameraProvider>
+        </group>
         <PointClouds />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <FeatureSessionLayer />
@@ -187,8 +194,9 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 
       {/* Last: its useFrame must run after every pose writer (see RenderRig). */}
       <RenderRig />
+      {effects && <HighQualityEffects edges={edges} ambientOcclusion={ambientOcclusion} />}
 
-      <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
+      <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={effects ? 2 : 1}>
         <GizmoViewport axisColors={palette.axisColors} labelColor={palette.axisLabel} />
       </GizmoHelper>
     </>

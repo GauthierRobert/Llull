@@ -46,6 +46,7 @@ function SceneContactShadows({ opacity, bounds }: { opacity: number; bounds: Sce
       key={bakeKey}
       position={plane.position}
       rotation={GROUND_PLANE_ROTATION}
+      userData={{ noEdges: true }}
       opacity={opacity}
       scale={plane.scale}
       blur={2.5}

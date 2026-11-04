@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { NavigationModeControl } from '@ui/viewport/3d/navigation/NavigationModeControl';
 import { RealismControl } from '@ui/viewport/3d/RealismControl';
-import { settingsFor } from '@ui/viewport/3d/useRenderQuality';
+import { resolveEdgeLines, settingsFor } from '@ui/viewport/3d/useRenderQuality';
 import { useNavigationStore } from '@ui/store/navigationStore';
-import { REALISM_STORAGE_KEY, sanitizeRealism, useRealismStore } from '@ui/store/realismStore';
+import { EDGES_STORAGE_KEY, REALISM_STORAGE_KEY, sanitizeEdgePreference, sanitizeRealism, useRealismStore } from '@ui/store/realismStore';
 
 beforeEach(() => {
   useNavigationStore.setState({ mode: 'orbit' });
-  useRealismStore.setState({ realism: 'standard' });
+  useRealismStore.setState({ realism: 'standard', edges: 'auto' });
   localStorage.clear();
 });
 
@@ -71,5 +71,50 @@ describe('realism tiers', () => {
     fireEvent.change(screen.getByLabelText('Realism'), { target: { value: 'high' } });
     expect(useRealismStore.getState().realism).toBe('high');
     expect(localStorage.getItem(REALISM_STORAGE_KEY)).toBe('"high"');
+  });
+});
+
+describe('ambient occlusion', () => {
+  it('is on in High only, whatever the scene size', () => {
+    for (const tier of ['high', 'medium', 'low'] as const) {
+      expect(settingsFor(tier, 'high').ambientOcclusion).toBe(true);
+      expect(settingsFor(tier, 'standard').ambientOcclusion).toBe(false);
+      expect(settingsFor(tier, 'draft').ambientOcclusion).toBe(false);
+    }
+  });
+});
+
+describe('feature edges', () => {
+  it('are on by default in High only', () => {
+    for (const tier of ['high', 'medium', 'low'] as const) {
+      expect(settingsFor(tier, 'high').edgeLines).toBe(true);
+      expect(settingsFor(tier, 'standard').edgeLines).toBe(false);
+      expect(settingsFor(tier, 'draft').edgeLines).toBe(false);
+    }
+  });
+  it('the preference overrides the tier default either way', () => {
+    expect(resolveEdgeLines(settingsFor('low', 'standard'), 'auto')).toBe(false);
+    expect(resolveEdgeLines(settingsFor('low', 'standard'), 'on')).toBe(true);
+    expect(resolveEdgeLines(settingsFor('low', 'high'), 'auto')).toBe(true);
+    expect(resolveEdgeLines(settingsFor('low', 'high'), 'off')).toBe(false);
+  });
+  it('sanitises a stored preference', () => {
+    expect(sanitizeEdgePreference('off')).toBe('off');
+    expect(sanitizeEdgePreference('sometimes')).toBe('auto');
+  });
+  it('the Edges toggle follows the tier, overrides it and persists the override', () => {
+    render(<RealismControl />);
+    const toggle = screen.getByLabelText('Edges');
+    expect(toggle).not.toBeChecked();
+    fireEvent.change(screen.getByLabelText('Realism'), { target: { value: 'high' } });
+    expect(toggle).toBeChecked();
+    fireEvent.click(toggle);
+    expect(useRealismStore.getState().edges).toBe('off');
+    expect(localStorage.getItem(EDGES_STORAGE_KEY)).toBe('"off"');
+    expect(toggle).not.toBeChecked();
+    fireEvent.change(screen.getByLabelText('Realism'), { target: { value: 'standard' } });
+    fireEvent.click(toggle);
+    expect(useRealismStore.getState().edges).toBe('on');
+    expect(toggle).toBeChecked();
   });
 });
