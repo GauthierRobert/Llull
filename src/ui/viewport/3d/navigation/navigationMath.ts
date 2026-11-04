@@ -108,8 +108,14 @@ function wishVector(angles: LookAngles, input: MoveInput, mode: 'walk' | 'fly'):
   return wish;
 }
 
+/** A frame time that is not a finite number of seconds moves nothing. */
+function safeDt(dt: number): number {
+  return Number.isFinite(dt) ? Math.max(dt, 0) : 0;
+}
+
 function travelDistance(speed: number, input: MoveInput, dt: number): number {
-  return speed * (input.boost ? BOOST_FACTOR : 1) * Math.max(dt, 0);
+  const distance = speed * (input.boost ? BOOST_FACTOR : 1) * safeDt(dt);
+  return Number.isFinite(distance) ? distance : 0;
 }
 
 /** Fly eye position after `dt` seconds: along the view for forward/back, along world Z for rise (walk is `stepWalk`). */
@@ -131,6 +137,8 @@ export interface WalkWorld {
   floorBelow(x: number, y: number, fromZ: number): number | null;
   /** Nearest blocking surface along the horizontal ray within `maxDistance`. */
   wallAhead(origin: Vec3, dirX: number, dirY: number, maxDistance: number): WallHit | null;
+  /** Lowest surface above `fromZ` under (x, y) within `maxDistance` (a ceiling, seen from below); its z, or null. */
+  ceilingAbove(x: number, y: number, fromZ: number, maxDistance: number): number | null;
 }
 
 export interface WalkBody {
@@ -151,17 +159,18 @@ export interface WalkOptions {
   readonly gravity: number;
   /** Fall speed cap, units per second. */
   readonly terminalSpeed: number;
-  /** Floor when the scene has nothing below the feet (the ground plane). */
+  /** Lowest floor the walker can reach when the scene has nothing below the feet: the ground plane z = 0, or the scene's lowest point when
+   *  that is lower. A missing hit never raises the feet above where they are. */
   readonly baseFloor: number;
 }
 
 /** Wall probes cross at most this fraction of the radius per sub-step, so a boosted frame cannot jump a thin wall. */
 const SUBSTEP_RADIUS_FRACTION = 0.75;
-const MAX_SUBSTEPS = 48;
+const MAX_SUBSTEPS = 16;
 const FAN_ANGLES: readonly number[] = [0, Math.PI / 5, -Math.PI / 5];
 const SKIN = 1e-6;
-/** Probe height above the step height: risers up to the step height are not walls. */
-const KNEE_MARGIN = 0.05;
+/** Probe height above the step height: risers up to the step height are not walls, anything taller is (no blind band above it). */
+const KNEE_MARGIN = 1e-3;
 
 function blockedBy(world: WalkWorld, feet: Vec3, move: readonly [number, number], options: WalkOptions): WallHit | null {
   const length = Math.hypot(move[0], move[1]);
@@ -199,7 +208,7 @@ function slideMove(world: WalkWorld, feet: Vec3, wish: readonly [number, number]
 
 function settleVertically(world: WalkWorld, body: WalkBody, feet: Vec3, dt: number, options: WalkOptions): WalkBody {
   const found = world.floorBelow(feet[0], feet[1], feet[2] + options.stepHeight);
-  const floor = found ?? options.baseFloor;
+  const floor = found ?? Math.min(options.baseFloor, feet[2]);
   if (body.grounded && feet[2] - floor <= options.stepHeight) return { feet: [feet[0], feet[1], floor], velocityZ: 0, grounded: true };
   const velocityZ = Math.max(body.velocityZ - options.gravity * dt, -options.terminalSpeed);
   const z = feet[2] + velocityZ * dt;
@@ -209,6 +218,12 @@ function settleVertically(world: WalkWorld, body: WalkBody, feet: Vec3, dt: numb
 
 /** Walk step: floor following (up to `stepHeight`, snaps down stairs), gravity when no floor is within reach, a ray fan against walls with
  *  sliding. Fixed sub-steps keep the wall test from tunnelling at boost speed. */
+/** Free height above `floorZ` at (x, y): the distance to the ceiling, or Infinity when none is within the walker's height. */
+function headroom(world: WalkWorld, x: number, y: number, floorZ: number, options: WalkOptions): number {
+  const ceiling = world.ceilingAbove(x, y, floorZ + options.stepHeight, options.eyeHeight - options.stepHeight + options.radius);
+  return ceiling === null ? Number.POSITIVE_INFINITY : ceiling - floorZ;
+}
+
 export function stepWalk(
   body: WalkBody,
   angles: LookAngles,
@@ -225,7 +240,11 @@ export function stepWalk(
   for (let index = 0; index < substeps; index += 1) {
     const move = slideMove(world, current.feet, [wish[0] * each, wish[1] * each], options);
     const feet: Vec3 = [current.feet[0] + move[0], current.feet[1] + move[1], current.feet[2]];
-    current = settleVertically(world, current, feet, Math.max(dt, 0) / substeps, options);
+    const next = settleVertically(world, current, feet, safeDt(dt) / substeps, options);
+    // Refuse a move (or a step up) that leaves less than the walker's height under a ceiling, unless it is no worse than where they stand.
+    const room = headroom(world, next.feet[0], next.feet[1], next.feet[2], options);
+    const blocked = room < options.eyeHeight && room < headroom(world, current.feet[0], current.feet[1], current.feet[2], options);
+    current = blocked ? settleVertically(world, current, current.feet, safeDt(dt) / substeps, options) : next;
   }
   return current;
 }
@@ -233,5 +252,16 @@ export function stepWalk(
 /** A walker put down at the eye position: on the floor found below it (or the base floor). */
 export function dropOntoFloor(eye: Vec3, world: WalkWorld, baseFloor: number): WalkBody {
   const found = world.floorBelow(eye[0], eye[1], eye[2]);
-  return { feet: [eye[0], eye[1], found ?? baseFloor], velocityZ: 0, grounded: true };
+  return { feet: [eye[0], eye[1], found ?? Math.min(baseFloor, eye[2])], velocityZ: 0, grounded: true };
+}
+
+/** True when the camera is not where the walk last put it (a goto, view preset or fit moved it): the walker must be re-seeded there. */
+export function cameraMovedExternally(lastWritten: Vec3 | null, current: Vec3, epsilon: number): boolean {
+  if (lastWritten === null) return true;
+  return Math.hypot(current[0] - lastWritten[0], current[1] - lastWritten[1], current[2] - lastWritten[2]) > epsilon;
+}
+
+/** The scene's lowest point: the walker's floor when nothing is below, so a scene entirely below z = 0 is not walked UP to z = 0. */
+export function walkBaseFloor(sceneMinZ: number | null): number {
+  return sceneMinZ === null || !Number.isFinite(sceneMinZ) ? 0 : Math.min(0, sceneMinZ);
 }

@@ -9,7 +9,8 @@ import type { WalkWorld, WallHit } from './navigationMath';
 
 /** A hit whose surface is flatter than this (normal Z) is a floor or ceiling, not a wall. */
 const WALL_MAX_NORMAL_Z = 0.7;
-const FLOOR_PROBE_RANGE = 1e7;
+/** Floor ray length when the scene's lowest z is unknown. */
+const FALLBACK_FLOOR_RANGE = 1e5;
 
 const scratchNormal = new THREE.Vector3();
 const scratchMatrix = new THREE.Matrix4();
@@ -36,7 +37,8 @@ function worldNormal(hit: THREE.Intersection): THREE.Vector3 | null {
   return scratchNormal.copy(hit.face.normal).applyNormalMatrix(scratchNormalMatrix.getNormalMatrix(scratchMatrix)).normalize();
 }
 
-export function createSceneWalkWorld(root: THREE.Object3D, renderOrigin: () => Vec3): WalkWorld {
+/** `lowestZ` is the scene's lowest world z (null = unknown): the floor ray only reaches that far down. */
+export function createSceneWalkWorld(root: THREE.Object3D, renderOrigin: () => Vec3, lowestZ: () => number | null = () => null): WalkWorld {
   const raycaster = new THREE.Raycaster();
   const hits: THREE.Intersection[] = [];
   const probe = (origin: THREE.Vector3, direction: THREE.Vector3, far: number): THREE.Intersection[] => {
@@ -49,11 +51,19 @@ export function createSceneWalkWorld(root: THREE.Object3D, renderOrigin: () => V
   };
   const origin = new THREE.Vector3();
   const down = new THREE.Vector3(0, 0, -1);
+  const up = new THREE.Vector3(0, 0, 1);
   const along = new THREE.Vector3();
   return {
     floorBelow(x, y, fromZ): number | null {
       const [ox, oy, oz] = renderOrigin();
-      const found = probe(origin.set(x - ox, y - oy, fromZ - oz), down, FLOOR_PROBE_RANGE).find(isSolidHit);
+      const lowest = lowestZ();
+      const range = lowest === null ? FALLBACK_FLOOR_RANGE : Math.max(fromZ - lowest, 0) + 1;
+      const found = probe(origin.set(x - ox, y - oy, fromZ - oz), down, range).find(isSolidHit);
+      return found === undefined ? null : found.point.z + oz;
+    },
+    ceilingAbove(x, y, fromZ, maxDistance): number | null {
+      const [ox, oy, oz] = renderOrigin();
+      const found = probe(origin.set(x - ox, y - oy, fromZ - oz), up, maxDistance).find(isSolidHit);
       return found === undefined ? null : found.point.z + oz;
     },
     wallAhead(from, dirX, dirY, maxDistance): WallHit | null {

@@ -9,7 +9,9 @@ import {
   inputFromKeys,
   lookDirection,
   navigationSpeed,
+  cameraMovedExternally,
   dropOntoFloor,
+  walkBaseFloor,
   stepNavigation,
   stepWalk,
   type WallHit,
@@ -89,8 +91,16 @@ describe('walk: floor following, gravity, collision', () => {
   const feetAt = (x: number, y: number, z: number, grounded = true): WalkBody => ({ feet: [x, y, z], velocityZ: 0, grounded });
 
   /** Analytic scene: `floor(x)` is the surface height (null = none) and `walls` are infinite planes x = X over [zMin, zMax]. */
-  function world(floor: (x: number) => number | null, walls: readonly { x: number; zMin: number; zMax: number }[] = []): WalkWorld {
+  function world(
+    floor: (x: number) => number | null,
+    walls: readonly { x: number; zMin: number; zMax: number }[] = [],
+    ceilings: readonly { fromX: number; z: number }[] = [],
+  ): WalkWorld {
     return {
+      ceilingAbove: (x, _y, fromZ, maxDistance) => {
+        const hit = ceilings.filter((c) => x >= c.fromX && c.z >= fromZ && c.z - fromZ <= maxDistance).map((c) => c.z);
+        return hit.length === 0 ? null : Math.min(...hit);
+      },
       floorBelow: (x, _y, fromZ) => {
         const height = floor(x);
         return height !== null && height <= fromZ ? height : null;
@@ -202,5 +212,62 @@ describe('walk: floor following, gravity, collision', () => {
         -1,
       ).feet[2],
     ).toBe(-1);
+  });
+
+  it('does not teleport up to z = 0 when the whole scene is below it (floor at -5, stepping off its edge)', () => {
+    const scene = world((x) => (x > 1 ? null : -5));
+    const end = run(feetAt(0, 0, -5), scene, 120);
+    expect(end.feet[0]).toBeGreaterThan(1.5);
+    expect(end.feet[2]).toBeLessThanOrEqual(-5);
+    expect(
+      dropOntoFloor(
+        [0, 0, -3],
+        world(() => null),
+        0,
+      ).feet[2],
+    ).toBe(-3);
+  });
+
+  it('takes the scene lowest point below z = 0 as the base floor', () => {
+    expect(walkBaseFloor(-5)).toBe(-5);
+    expect(walkBaseFloor(3)).toBe(0);
+    expect(walkBaseFloor(null)).toBe(0);
+    expect(walkBaseFloor(Number.NaN)).toBe(0);
+  });
+
+  it('refuses to walk (or step up) where less than the walker height of headroom is left', () => {
+    const lowBeam = world(() => 0, [], [{ fromX: 1, z: 1.2 }]);
+    const end = run(feetAt(0, 0, 0), lowBeam, 120);
+    expect(end.feet[0]).toBeLessThan(1 + 1e-6);
+    const stepUnderBeam = world((x) => (x > 1 ? 0.3 : 0), [{ x: 1, zMin: 0, zMax: 0.3 }], [{ fromX: 1, z: 1.7 }]);
+    expect(run(feetAt(0, 0, 0), stepUnderBeam, 120).feet[0]).toBeLessThan(1 + 1e-6);
+    const tallEnough = world(() => 0, [], [{ fromX: 1, z: 2.5 }]);
+    expect(run(feetAt(0, 0, 0), tallEnough, 120).feet[0]).toBeGreaterThan(2);
+  });
+
+  it('is blocked by a 0.42 m riser (no blind band just above the step height)', () => {
+    const scene = world((x) => (x > 1 ? 0.42 : 0), [{ x: 1, zMin: 0, zMax: 0.42 }]);
+    const end = run(feetAt(0, 0, 0), scene, 120);
+    expect(end.feet[0]).toBeLessThanOrEqual(1 - options.radius + 1e-6);
+    expect(end.feet[2]).toBe(0);
+  });
+
+  it('moves nothing and stays finite on a NaN or infinite frame time or speed', () => {
+    const scene = world(() => 0);
+    for (const dt of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      const end = stepWalk(feetAt(1, 2, 0), forwardX, ahead, dt, options, scene);
+      expect(end.feet).toEqual([1, 2, 0]);
+    }
+    const airborne = stepWalk(feetAt(1, 2, 5, false), forwardX, ahead, Number.NaN, options, scene);
+    expect(Number.isFinite(airborne.feet[2])).toBe(true);
+    expect(Number.isFinite(airborne.velocityZ)).toBe(true);
+    const noSpeed = stepWalk(feetAt(1, 2, 0), forwardX, ahead, 0.1, { ...options, speed: Number.NaN }, scene);
+    expect(noSpeed.feet).toEqual([1, 2, 0]);
+  });
+
+  it('notices a camera moved by something else (goto, view preset), not the pose the walk wrote', () => {
+    expect(cameraMovedExternally(null, [0, 0, 0], 1)).toBe(true);
+    expect(cameraMovedExternally([1, 2, 3], [1, 2, 3.0005], 0.01)).toBe(false);
+    expect(cameraMovedExternally([1, 2, 3], [9, 2, 3], 0.01)).toBe(true);
   });
 });

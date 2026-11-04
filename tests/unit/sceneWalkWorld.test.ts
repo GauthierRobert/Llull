@@ -23,6 +23,27 @@ describe('scene walk world', () => {
     expect(world.floorBelow(0, 0, 0.5)).toBeNull();
   });
 
+  it('finds a ceiling above the probe within range, and limits the floor ray to the scene lowest point', () => {
+    const { root } = scene();
+    const world = createSceneWalkWorld(
+      root,
+      () => [0, 0, 0],
+      () => 0,
+    );
+    expect(world.ceilingAbove(0, 0, -3, 5)).toBeCloseTo(0);
+    expect(world.ceilingAbove(0, 0, -3, 1)).toBeNull();
+    expect(world.ceilingAbove(5, 0, -3, 5)).toBeNull();
+    // from z = 5 the block top (z = 1) is 4 away: a ray reaching only (5 - lowest 0) + 1 = 6 finds it; a scene "lowest" of 4.5 stops short.
+    expect(world.floorBelow(0, 0, 5)).toBeCloseTo(1);
+    expect(
+      createSceneWalkWorld(
+        root,
+        () => [0, 0, 0],
+        () => 4.5,
+      ).floorBelow(0, 0, 5),
+    ).toBeNull();
+  });
+
   it('reports the horizontal normal and distance of a wall, facing the walker', () => {
     const { root } = scene();
     const world = createSceneWalkWorld(root, () => [0, 0, 0]);
