@@ -163,7 +163,9 @@ describe('check-in / check-out and externalized snapshots (M3)', () => {
     expect(readRefs(vault, 'LL-2001')?.revisions['A']).toMatchObject({ state: 'released', contentHash: frozen?.contentHash });
     expect(existsSync(path.join(root, 'items', 'LL-2001', 'A', 'manifest.json'))).toBe(true);
     const ctx = { ...defaultContext(), objects: vault.objects };
-    expect(execute(done.document, 'verify_release', { revision: 'A' }, ctx).summary).toContain('verified');
+    const verifiedA = execute(done.document, 'verify_release', { revision: 'A' }, ctx);
+    expect(verifiedA.summary.startsWith('partial:')).toBe(true);
+    expect(verifiedA.data).toMatchObject({ state: 'partial', geometryVerified: false, contentHashMatches: true });
     expect(execute(done.document, 'view_revision', { revision: 'A' }, ctx).rejected).toBeUndefined();
     expect(execute(done.document, 'plm_status', {}, ctx).data).toMatchObject({ integrity: { A: 'ok' } });
     const lost = execute(done.document, 'verify_release', { revision: 'A' }, defaultContext());

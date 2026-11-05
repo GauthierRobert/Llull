@@ -233,3 +233,37 @@ describe('S2 lifecycle guards (VC-PLM-02, 03, 08, 09, 25)', () => {
     expect(loadSample().plm).toBeUndefined();
   });
 });
+
+describe('verify_release title block (INT-15)', () => {
+  const releasedWith = (sheet: Record<string, unknown>): CadDocument => {
+    const drawn = run(inWork(), 'create_sheet', { name: 'S1', views: ['front'], ...sheet }).document;
+    const review = run(drawn, 'submit_for_review', { at: T, by: 'u-1' }).document;
+    return run(review, 'release_item', {
+      approvals: [
+        { role: 'design-authority', userId: 'u-1' },
+        { role: 'checker', userId: 'u-2' },
+      ],
+      at: T,
+      by: 'u-1',
+    }).document;
+  };
+
+  it('a consistent title block still verifies as partial (geometry unchecked)', () => {
+    const clean = run(releasedWith({}), 'verify_release', { revision: 'A' });
+    expect(clean.data).toMatchObject({ titleBlockConsistent: true, liveDefinitionMatches: true, state: 'partial' });
+  });
+
+  it('a title block out of step with the managed identity while hash and live definition agree is a failure, not "verified except geometry"', () => {
+    const done = releasedWith({ partNumber: 'OTHER' });
+    const result = run(done, 'verify_release', { revision: 'A' });
+    expect(result.data).toMatchObject({
+      contentHashMatches: true,
+      liveDefinitionMatches: true,
+      titleBlockConsistent: false,
+      state: 'fail',
+    });
+    expect(result.summary).toContain('FAILED verification');
+    expect(result.summary.startsWith('partial:')).toBe(false);
+    expect(result.summary).toContain('title block');
+  });
+});

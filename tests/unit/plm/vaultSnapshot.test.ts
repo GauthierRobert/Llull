@@ -94,7 +94,9 @@ describe('an externalized snapshot in the document', () => {
 
   it('reads, verifies and views the revision through the port, and reports PLM_VAULT_OBJECT_MISSING without it', () => {
     const { out, ctx } = externalized();
-    expect(run(out, 'verify_release', { revision: 'A' }, ctx).summary).toContain('verified');
+    const verified = run(out, 'verify_release', { revision: 'A' }, ctx);
+    expect(verified.summary.startsWith('partial:')).toBe(true);
+    expect(verified.data).toMatchObject({ state: 'partial', geometryVerified: false, contentHashMatches: true });
     expect(run(out, 'view_revision', { revision: 'A' }, ctx).rejected).toBeUndefined();
     expect(run(out, 'plm_diff', { from: 'A', to: 'A' }, ctx).rejected).toBeUndefined();
     expect(run(out, 'verify_release', { revision: 'A' }, agentContext()).error?.code).toBe('PLM_VAULT_OBJECT_MISSING');

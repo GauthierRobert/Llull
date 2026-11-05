@@ -83,6 +83,7 @@ function signatureStatus(plm: PlmModel, revision: Revision, ctx: ExecutionContex
 /**
  * @affects nothing (read-only)
  * @invariant recomputes every hash and signature on demand; released, superseded and obsolete revisions all verify
+ * @invariant a sheet title block out of step with the managed identity (current revision) fails the verification, like a hash or signature mismatch
  * @invariant never a clean pass over geometry: data.geometryVerified is false, data.unchecked lists the skipped scopes and data.state is 'partial' (summary starts 'partial:') when everything checked verifies, 'fail' when anything does not
  */
 export const verifyRelease = defineCommand({
@@ -121,7 +122,7 @@ export const verifyRelease = defineCommand({
         : 'n/a (not the current released revision)';
     const signaturesValid = signatureStatus(plm, revision, ctx);
     const titleBlockConsistent = label === plm.item.currentRevision ? titleBlockMismatches(doc, plm).length === 0 : 'n/a';
-    const ok = contentHashMatches && live !== false && signaturesValid !== false;
+    const ok = contentHashMatches && live !== false && signaturesValid !== false && titleBlockConsistent !== false;
     const unchecked: Array<{ scope: string; reason: string }> = [{ scope: 'geometry', reason: 'regeneration not implemented' }];
     if (typeof signaturesValid === 'string' && signaturesValid.startsWith('unverified')) {
       unchecked.push({ scope: 'signatures', reason: 'no verifier port' });
@@ -129,7 +130,7 @@ export const verifyRelease = defineCommand({
     const state = ok ? 'partial' : 'fail';
     return report(
       doc,
-      `${ok ? 'partial: ' : ''}${revisionText(plm, label)} ${ok ? 'verified except geometry (not regenerated)' : 'FAILED verification'}: content hash ${contentHashMatches ? 'matches' : 'MISMATCH'}, live definition ${String(live)}, signatures ${String(signaturesValid)}.`,
+      `${ok ? 'partial: ' : ''}${revisionText(plm, label)} ${ok ? 'verified except geometry (not regenerated)' : 'FAILED verification'}: content hash ${contentHashMatches ? 'matches' : 'MISMATCH'}, live definition ${String(live)}, signatures ${String(signaturesValid)}, title blocks ${titleBlockConsistent === false ? 'INCONSISTENT with the managed identity' : String(titleBlockConsistent)}.`,
       {
         contentHashMatches,
         liveDefinitionMatches: live,
