@@ -1,7 +1,7 @@
 /** The engine: the single choke point every surface calls (architecture L1, L5, L8). */
 
 import type { CadDocument, FeatureStep } from '../model/types';
-import type { CommandResult, ExecutionContext } from './types';
+import type { CommandResult, ExecutionContext, ProvenanceScope } from './types';
 import { currentContext, runInContext } from './context';
 import { getCommand } from './commandTable';
 import { kernelUnavailable } from './kernelRefusal';
@@ -14,7 +14,7 @@ import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
 import { sealDocumentUid } from '../model/documentUid';
-import { withProvenance } from './provenance';
+import { isDegraded, withProvenance } from './provenance';
 import { runCommand } from './runCommand';
 import { withOmittedArraysNotice } from './instanceArray/omittedNotice';
 
@@ -58,9 +58,13 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
 }
 
 function executeGuarded(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext): CommandResult {
-  const result = executeCommand(doc, commandName, params, ctx);
+  const scope: ProvenanceScope = { degraded: null };
+  const result = executeCommand(doc, commandName, params, { ...ctx, provenanceScope: scope });
   const def = getCommand(commandName);
-  return def === undefined || result.rejected === true ? result : withProvenance(def, ctx, result);
+  const stamped = def === undefined || result.rejected === true ? result : withProvenance(def, ctx, result, scope.degraded);
+  if (ctx.provenanceScope !== undefined && ctx.provenanceScope.degraded === null && isDegraded(stamped.provenance))
+    ctx.provenanceScope.degraded = stamped.provenance;
+  return stamped;
 }
 
 function executeCommand(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext): CommandResult {

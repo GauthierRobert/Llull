@@ -154,8 +154,10 @@ export function runProject(doc: CadDocument, { actions, onError = 'abort', valid
     const expanded = steps.length === actions.length ? '' : ` (${steps.length} commands executed)`;
     summary = `Plan complete: ${okCount}/${actions.length} plan step(s) ok${expanded}, ${affected.length} entit${affected.length === 1 ? 'y' : 'ies'} affected.`;
   }
-  const degradedSteps = steps.flatMap((step, position) => (isDegraded(step.provenance) ? [position] : []));
-  const degraded = steps[degradedSteps[0] ?? -1]?.provenance;
+  const degradedSteps = [...new Set(steps.filter((step) => isDegraded(step.provenance)).map((step) => step.index))];
+  const degraded = steps.find((step) => isDegraded(step.provenance))?.provenance;
+  if (degradedSteps.length > 0)
+    summary += ` Answered by the mesh kernel at step${degradedSteps.length > 1 ? 's' : ''} ${degradedSteps.join(', ')} (exact kernel requested).`;
   return {
     document: finalDoc,
     summary,

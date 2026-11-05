@@ -254,7 +254,14 @@ export interface ExportFilePort {
   open(fileName: string): ExportFileWriter | null;
 }
 
+/** Run state of one `execute` call (host state, never document state): the worst degraded provenance its nested executes reported. */
+export interface ProvenanceScope {
+  degraded: ResultProvenance | null;
+}
+
 export interface ExecutionContext {
+  /** Set by `execute`: where the executes this call makes (nested) report a degraded kernel, so an unannotated composing command still carries it. */
+  readonly provenanceScope?: ProvenanceScope;
   /** Set by `runCommand` while a command runs: a command it executes in turn is nested (a query then refuses an unreadable mesh asset instead of degrading). */
   readonly nested?: boolean;
   /** Set by `runCommand`: the command about to run is itself checked by the locked-layer guard, so the executes it makes are judged by its guard on the final result. */

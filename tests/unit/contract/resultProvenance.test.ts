@@ -66,4 +66,20 @@ describe('result provenance (FR-INT-07, TR-INT-09)', () => {
     expect((exact.data as { degradedSteps?: number[] }).degradedSteps).toBeUndefined();
     expect(exact.provenance).toBeUndefined();
   });
+
+  it('degradedSteps counts plan steps (top-level actions, as stepCount and failedAt do), not the flattened commands of a repeat', () => {
+    const plan = {
+      actions: [
+        { command: 'add_box', params: { size: [1, 1, 1] } },
+        { repeat: { count: 3 }, step: { command: 'mass_properties', params: { entityId: 'box-1.1' } } },
+        { command: 'add_box', params: { size: [1, 1, 1], position: [5, 0, 0] } },
+      ],
+    };
+    const result = execute(createEmptyDocument(), 'build_project', plan, withKernel(degradedKernel));
+    const data = result.data as { stepCount: number; steps: { index: number }[]; degradedSteps?: number[] };
+    expect(data.stepCount).toBe(3);
+    expect(data.steps.map((step) => step.index)).toEqual([0, 1, 1, 1, 2]);
+    expect(data.degradedSteps).toEqual([1]);
+    expect(result.summary).toContain('mesh kernel at step 1');
+  });
 });

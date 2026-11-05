@@ -20,10 +20,19 @@ export function isDegraded(provenance: ResultProvenance | undefined): provenance
   return provenance !== undefined && provenance.exactRequested && provenance.kernel !== 'occt-native';
 }
 
-/** `result` with its provenance when `def` uses the kernel (`requiresKernel` / `kernelOptional`) and the result does not carry one already. */
-export function withProvenance(def: CommandDefinition<unknown>, ctx: ExecutionContext, result: CommandResult): CommandResult {
+/**
+ * `result` with its provenance: its own when `def` uses the kernel (`requiresKernel` / `kernelOptional`) and the result carries none, else the one it
+ * already has; the degraded one of the executes nested in the run (`nested`) wins over a non-degraded own, so a command composing others reports the worst.
+ */
+export function withProvenance(
+  def: CommandDefinition<unknown>,
+  ctx: ExecutionContext,
+  result: CommandResult,
+  nested: ResultProvenance | null,
+): CommandResult {
   const annotations = def.annotations;
-  if (annotations?.requiresKernel !== true && annotations?.kernelOptional !== true) return result;
-  if (result.provenance !== undefined) return result;
-  return { ...result, provenance: kernelProvenance(ctx) };
+  const usesKernel = annotations?.requiresKernel === true || annotations?.kernelOptional === true;
+  const own = result.provenance ?? (usesKernel ? kernelProvenance(ctx) : undefined);
+  const provenance = isDegraded(own) ? own : (nested ?? own);
+  return provenance === undefined || provenance === result.provenance ? result : { ...result, provenance };
 }

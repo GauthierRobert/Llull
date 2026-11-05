@@ -72,7 +72,10 @@ export interface BuildProjectData {
   aliases?: Record<string, string[]>;
   /** Validation issues (validate mode only). */
   issues?: string[];
-  /** Indices (into `steps`) of the steps the mesh kernel answered while the exact kernel was requested (FR-INT-07). */
+  /**
+   * Plan steps (top-level `actions` indices: the unit of `stepCount`, `failedAt` and "step N" in summaries, not positions in `steps`, which lists every
+   * command a repeat / for_each expands to) in which the mesh kernel answered while the exact kernel was requested (FR-INT-07). Ascending, no duplicates.
+   */
   degradedSteps?: number[];
   /** Final document snapshot (omitted in validate mode — nothing changed). */
   scene?: SceneSnapshot;
