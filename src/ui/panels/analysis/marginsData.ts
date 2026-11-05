@@ -112,7 +112,7 @@ export function dispositionText(disposition: string): string {
   return disposition === 'pending_human' ? 'pending human review' : disposition.replace(/_/g, ' ');
 }
 
-/** Panel tone of a margin status: FAIL bad, MARGINAL warn, PASS ok. */
+/** Panel tone of a margin status: FAIL bad, MARGINAL and NOT_ASSESSED (inadequate mesh) warn, PASS ok. */
 export function statusToneOf(status: string): 'ok' | 'warn' | 'bad' {
-  return status === 'FAIL' ? 'bad' : status === 'MARGINAL' ? 'warn' : 'ok';
+  return status === 'FAIL' ? 'bad' : status === 'MARGINAL' || status === 'NOT_ASSESSED' ? 'warn' : 'ok';
 }

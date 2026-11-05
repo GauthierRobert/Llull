@@ -213,7 +213,6 @@ describe('check_analysis margin items (VC-FEA-62)', () => {
     expect([...new Set(data.items.map((entry) => entry.code))].sort()).toEqual([
       'FEA_DISPOSITION_PENDING',
       'FEA_MARGINAL_BAND_UNSET',
-      'FEA_MESH_ADEQUACY',
       'FEA_MS_NEGATIVE',
     ]);
     expect(data.items.find((entry) => entry.code === 'FEA_MS_NEGATIVE')).toMatchObject({ severity: 'error' });
@@ -223,13 +222,10 @@ describe('check_analysis margin items (VC-FEA-62)', () => {
   it('positive margins only draw the unset-band warning; no strengths means no margin items', () => {
     const strong = marginBar({ ftu: 900, fty: 800 });
     const warned = execute(strong.recorded, 'check_analysis', { analysisId: strong.analysisId }, strong.ctx);
-    expect((warned.data as { items: { code: string }[] }).items.map((entry) => entry.code)).toEqual([
-      'FEA_MESH_ADEQUACY',
-      'FEA_MARGINAL_BAND_UNSET',
-    ]);
+    expect((warned.data as { items: { code: string }[] }).items.map((entry) => entry.code)).toEqual(['FEA_MARGINAL_BAND_UNSET']);
     const bare = marginBar({ ftu: null, fty: null });
     const silent = execute(bare.recorded, 'check_analysis', { analysisId: bare.analysisId }, bare.ctx);
-    expect((silent.data as { items: { code: string }[] }).items.map((entry) => entry.code)).toEqual(['FEA_MESH_ADEQUACY']);
+    expect((silent.data as { items: { code: string }[] }).items.map((entry) => entry.code)).toEqual([]);
   });
 });
 

@@ -38,6 +38,7 @@ export { readOp2, type Op2Result, type Op2Tables } from './results/op2Reader';
 export { op2ToResults, type Op2Import } from './results/op2Results';
 export { writeVtu, type VtuEncoding } from './results/vtuWriter';
 export { meshSummary, resultsSummary } from './results/summary';
+export { meshAdequacy, inadequacyReasons } from './results/adequacy';
 export { bindingOf, frdBoundHashes, mismatchMessage, UNBOUND_WARNING } from './results/inputBinding';
 export { fieldPlotLayout } from './results/fieldPlotSvg';
 export { finishRaster, prepareRaster, rasterPixels, type PreparedRaster, type RasterPixels } from './results/fieldRaster';

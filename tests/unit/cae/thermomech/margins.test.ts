@@ -9,7 +9,7 @@ import { analysisInputHash } from '@cae/hash/inputHash';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { expectCase } from '../../physics/benchmarkCases';
 import { PACK } from '../../physics/thermomech/thermomechFixtures';
-import { strengthModel } from '../marginsFixtures';
+import { ADEQUATE, strengthModel } from '../marginsFixtures';
 import { mustRun } from '../deckFixtures';
 import { hashOf, portOf, thermoFixture, withThermalSource, type ThermalSource } from './fixtures';
 
@@ -51,6 +51,7 @@ function solvedChain(): Chain {
     inputHash: analysisInputHash(source.fixture.doc, analysisId, 'full'),
     solver: 'ccx',
     solverVersion: '2.21',
+    adequacy: ADEQUATE,
     steps: [
       {
         step: 1,

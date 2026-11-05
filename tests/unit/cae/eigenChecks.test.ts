@@ -8,7 +8,7 @@ import { writeInp } from '@cae/decks/inpWriter';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { parseDat } from '@cae/results/datReader';
 import { eigenNote, eigenReport } from '@cae/results/eigenReport';
-import { partAdequacy } from '@cae/results/adequacy';
+import { meshAdequacy } from '@cae/results/adequacy';
 import { partRestraints } from '@cae/results/restraint';
 import { buildDeckContext, type DeckContext } from '@cae/decks/context';
 import { bucklingDat, eigenCase, modalDat } from './eigenFixtures';
@@ -321,27 +321,28 @@ describe('supports and mesh adequacy from the mesh artifact', () => {
     ]);
   });
 
-  it('mesh adequacy: a fine bar has 2+ edges across its thinnest side, the 6-tet bar does not', () => {
+  it('mesh adequacy: the fine bar (4 cells through its thickness) is adequate; the 6-tet bar is inadequate and check_analysis raises it as an error', () => {
     const fine = eigenCase({ type: 'modal', fine: true });
-    expect(partAdequacy(fine.mesh)[0]?.elementsAcross).toBeGreaterThan(2);
+    expect(meshAdequacy(fine.mesh).verdict).toBe('adequate');
     const coarse = eigenCase({ type: 'modal' });
-    const [part] = partAdequacy(coarse.mesh);
-    expect(part?.elementsAcross).toBeLessThan(1);
-    expect(part?.thinnestExtent).toBe(1);
-    const warned = execute(coarse.recorded, 'check_analysis', { analysisId: coarse.bar.analysisId }, coarse.ctx);
-    expect((warned.data as Check).items.find((entry) => entry.code === 'FEA_MESH_ADEQUACY')?.message).toContain(
-      'element edge(s) across its thinnest',
-    );
+    const [part] = meshAdequacy(coarse.mesh).parts;
+    expect(part).toMatchObject({ order: 'linear', required: 4, verdict: 'inadequate' });
+    expect(part?.elementsThrough).toBeLessThan(4);
+    const flagged = execute(coarse.recorded, 'check_analysis', { analysisId: coarse.bar.analysisId }, coarse.ctx);
+    const found = (flagged.data as Check).items.find((entry) => entry.code === 'FEA_MESH_INADEQUATE');
+    expect(found).toMatchObject({ severity: 'error', ids: [coarse.bar.boxId] });
+    expect(found?.message).toContain('element layer(s) through its wall');
+    expect((flagged.data as Check).status).toBe('fail');
   });
 
-  it('adequacy skips tets that reference a missing node and parts without elements', () => {
+  it('adequacy leaves tets that reference a missing node and parts without elements out of the count', () => {
     const fine = eigenCase({ type: 'modal', fine: true });
-    expect(partAdequacy({ ...fine.mesh, blocks: [] })).toEqual([]);
+    expect(meshAdequacy({ ...fine.mesh, blocks: [] }).parts).toEqual([]);
     const broken = {
       ...fine.mesh,
       blocks: [{ ...(fine.mesh.blocks[0] as never as { type: 'C3D4'; entityId: string }), elements: [[1, 1, 2, 3, 99999]] }],
     };
-    expect(partAdequacy(broken)).toEqual([]);
+    expect(meshAdequacy(broken).parts).toEqual([]);
   });
 });
 

@@ -7,6 +7,7 @@
 
 import type { Vec3 } from './vectors';
 import type { Quantity } from './quantity';
+import type { FeMeshAdequacy } from './meshAdequacy';
 import type { DurabilityModel } from './durability';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
@@ -595,6 +596,8 @@ export interface FeResultsArtifact {
   readonly convergence?: readonly FeConvergenceRow[];
   /** random_response only: nodal rms field of the PHY-09 post-processing (native `llull-compute post random` or the TS reference). */
   readonly nodalRms?: NodalRmsField;
+  /** Mesh adequacy measured when the solve ran (absent: imported results; readers re-measure from the mesh). */
+  readonly adequacy?: FeMeshAdequacy;
 }
 
 /** Temperature table (PHY-04 TR-TMC-14): rows `[x, y, z, T]` in the units the `table` field source declares; written by `fea_import_field`. */

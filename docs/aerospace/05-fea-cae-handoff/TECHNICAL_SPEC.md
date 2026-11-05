@@ -525,7 +525,8 @@ Check items from `check_analysis` use the same codes with a severity.
 | `FEA_TOOL_MISSING` | error | `llull-mesh` missing or its Netgen / OCCT libraries do not load, or ccx not found | tool name | install hint (desktop bundle / `LLULL_MESH_BIN` / `LLULL_CCX`) (AF-41) |
 | `FEA_FACE_MAP_AMBIGUOUS` | error | llull face → mesher face not unique | face indices | heal geometry and re-mesh |
 | `FEA_MESH_INVERTED` | error | any element with scaled Jacobian ≤ 0 | element ids | refine, or change `order`/`optimize` |
-| `FEA_MESH_ADEQUACY` | warning | < 2 elements through a thickness or span | part id | reduce `globalSize` or add a refinement |
+| `FEA_MESH_INADEQUATE` | error | 5th percentile of the tetrahedra crossed by rays through a wall below the budget (C3D4 4, C3D10 2; 10-result-integrity TR-INT-07, pending VNV-M3) | part id | reduce `globalSize` or add a refinement |
+| `FEA_MESH_MARGINAL` | warning | 5th percentile meets the budget, the thinnest sampled spot does not | part id | refine the thin wall |
 | `FEA_MESH_STALE` | error | mesh `inputHash` ≠ current | analysis id | `fea_mesh` |
 | `FEA_RESULTS_MISSING` | error | no results, or artifact absent on this machine | analysis id | `fea_solve` |
 | `FEA_RESULTS_STALE` | error | results `inputHash` ≠ current | analysis id, changed inputs | `fea_mesh` then `fea_solve` |
@@ -702,8 +703,8 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
   `FEA_BUCKLING_NEGATIVE_FACTOR` and `FEA_BUCKLING_BELOW_APPLIED` (factor < 1: the applied load exceeds the linear buckling load; warnings). Linear buckling is an upper bound
   (no imperfections): the summary says so and `reviewRequired` is always true.
 - **`check_analysis` additions.** `FEA_UNDERCONSTRAINED` from the mesh artifact: the restrained (node, dof) rows of every support are projected on the six rigid-body motions of each part
-  (rank by Gram-Schmidt: a fixed face 6, a fixed point 3, a fixed edge 5; parts that share mesh nodes under conformal bonding form one group); `FEA_MESH_ADEQUACY` when fewer than 2 element edges fit across the thinnest bounding-box side of a
-  part (bounding box over the mean tet edge: a heuristic, VC-FEA-09); margin items for a solved static / thermo_static case with allowables: `FEA_MS_NEGATIVE` (error, also after
+  (rank by Gram-Schmidt: a fixed face 6, a fixed point 3, a fixed edge 5; parts that share mesh nodes under conformal bonding form one group); `FEA_MESH_INADEQUATE` / `FEA_MESH_MARGINAL` from the element layers through the wall of a
+  part (rays cast through the tet mesh, VC-FEA-09, TR-INT-07); margin items for a solved static / thermo_static case with allowables: `FEA_MS_NEGATIVE` (error, also after
   a disposition: a FAIL never becomes a pass), `FEA_MARGINAL_BAND_UNSET` (warning, VC-FEA-62) and `FEA_DISPOSITION_PENDING` (the check runs the default query without a band, so
   `FEA_MS_MARGINAL` stays a code of `compute_margins` rows). Because of the last two a solved
   case with allowables reads `warn` at best until a band is stated.

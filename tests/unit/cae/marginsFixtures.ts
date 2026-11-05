@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { execute } from '@core/commands/registry';
 import type { FactorSet, FeResultsArtifact } from '@core/model/analysis';
+import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import type { CadDocument } from '@core/model/types';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { parseFrd } from '@cae/results/frdReader';
@@ -11,6 +12,9 @@ import { barDocument, barMesh, facesOn, hashOf, mustRun, portOf, X0_NODES, X2_NO
 import type { FeArtifactPort } from '@core/model/analysis';
 import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
+
+/** The adequacy a fine-enough solve records: the 6-tet fixture bar only stands in for the real mesh whose stresses the .frd holds. */
+export const ADEQUATE: FeMeshAdequacy = { verdict: 'adequate', parts: [], unmeasuredParts: [] };
 
 const SOURCE = { citation: 'synthetic test fixture', locator: 'tests/unit/cae/margins' };
 
@@ -38,6 +42,8 @@ export interface MarginBarOptions {
   readonly globalSize?: number;
   /** The point supports (nodes 1 and 3) are singular sources (no face in the mesh artifact). Default: false. */
   readonly pointSupportsSingular?: boolean;
+  /** Adequacy recorded on the results (default: an adequate mesh, so the stress arithmetic is what the tests see); 'measured' records none, so the 6-tet bar is measured (inadequate). */
+  readonly adequacy?: FeMeshAdequacy | 'measured';
 }
 
 export interface MarginBar extends SolvedBar {
@@ -98,6 +104,7 @@ export function marginBar(options: MarginBarOptions = {}): MarginBar {
     solver: 'CalculiX',
     solverVersion: '2.21',
     steps: parseFrd(readFileSync('tests/unit/cae/fixtures/static.frd', 'utf8')),
+    ...(options.adequacy === 'measured' ? {} : { adequacy: options.adequacy ?? ADEQUATE }),
   };
   const resultsHash = hashOf(results);
   const port: FeArtifactPort = portOf(mesh, results);

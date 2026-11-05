@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { buildDeckContext } from '@cae/decks/context';
-import { partAdequacy } from '@cae/results/adequacy';
+import { meshAdequacy } from '@cae/results/adequacy';
 import { partRestraints } from '@cae/results/restraint';
 import { quadMetrics, tetMetrics, triMetrics } from '@cae/results/verdict';
 import { withCase } from '@cae/shared/access';
@@ -53,7 +53,7 @@ describe('verdict metrics on degenerate elements', () => {
   });
 });
 
-describe('partAdequacy on odd meshes', () => {
+describe('meshAdequacy on odd meshes', () => {
   const bar = barDocument();
   const base = barMesh(bar.doc, bar.analysisId, bar.boxId, {});
 
@@ -72,12 +72,13 @@ describe('partAdequacy on odd meshes', () => {
         },
       ],
     };
-    expect(partAdequacy(broken).map((part) => part.entityId)).toEqual([bar.boxId]);
+    expect(meshAdequacy(broken).parts.map((part) => part.entityId)).toEqual([bar.boxId]);
+    expect(meshAdequacy(broken).unmeasuredParts).toEqual(['ghost']);
   });
 
-  it('coincident corner nodes give a zero mean edge and an unbounded element count', () => {
+  it('coincident corner nodes leave no castable face: the part is unmeasured, never inadequate', () => {
     const squashed: FeMeshArtifact = { ...base, nodes: base.nodes.map((node) => [node[0], 0, 0, 0] as const) };
-    expect(partAdequacy(squashed)[0]).toMatchObject({ meanEdge: 0, thinnestExtent: 0, elementsAcross: Number.MAX_SAFE_INTEGER });
+    expect(meshAdequacy(squashed)).toMatchObject({ verdict: 'adequate', parts: [], unmeasuredParts: [bar.boxId] });
   });
 });
 
