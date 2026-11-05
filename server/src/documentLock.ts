@@ -8,6 +8,7 @@
 
 import fs from 'fs';
 import os from 'os';
+import { randomBytes } from 'crypto';
 import path from 'path';
 import { isRecord } from '@lib/isRecord';
 
@@ -119,10 +120,15 @@ type Created = 'created' | 'exists' | 'unavailable';
 
 const codeOf = (error: unknown): string | undefined => (error as NodeJS.ErrnoException).code;
 const UNWRITABLE = new Set(['EACCES', 'EROFS', 'EPERM']);
+const OPEN_RETRIES = 3;
+const OPEN_RETRY_MS = 50;
+const sleepSync = (ms: number): void => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /**
  * Create the lock file only if it does not exist: a hard link of a private temp (atomic and exclusive on POSIX and NTFS); on volumes that cannot
- * link (FAT / exFAT, some SMB shares: EPERM, ENOTSUP, EINVAL, EXDEV) an exclusive 'wx' create. 'unavailable': the folder takes no file at all.
+ * link (FAT / exFAT, some SMB shares: EPERM, ENOTSUP, EINVAL, EXDEV) an exclusive 'wx' create. 'unavailable': the folder takes no file at all,
+ * which only the writability probe itself (the staged temp write) can say, and only when no lock file is there: a refused create next to a lock
+ * file, or after a staged write that worked, is contention (a delete-pending lock, an antivirus share violation), never an unwritable folder.
  */
 function createExclusive(lockPath: string, info: LockInfo): Created {
   const text = JSON.stringify(info);
@@ -130,7 +136,7 @@ function createExclusive(lockPath: string, info: LockInfo): Created {
   try {
     fs.writeFileSync(staged, text, 'utf8');
   } catch (error) {
-    if (UNWRITABLE.has(codeOf(error) ?? '')) return 'unavailable';
+    if (UNWRITABLE.has(codeOf(error) ?? '')) return fs.existsSync(lockPath) ? 'exists' : 'unavailable';
     throw error;
   }
   try {
@@ -144,19 +150,24 @@ function createExclusive(lockPath: string, info: LockInfo): Created {
   }
 }
 
+/** 'exists' also covers a create that stays refused (EACCES / EPERM / EROFS) after the staged write worked: that is contention, so the caller says DSF_DOC_LOCKED. */
 function createByOpen(lockPath: string, text: string): Created {
-  try {
-    const fd = fs.openSync(lockPath, 'wx');
+  for (let attempt = 0; ; attempt += 1) {
     try {
-      fs.writeSync(fd, text);
-    } finally {
-      fs.closeSync(fd);
+      const fd = fs.openSync(lockPath, 'wx');
+      try {
+        fs.writeSync(fd, text);
+      } finally {
+        fs.closeSync(fd);
+      }
+      return 'created';
+    } catch (error) {
+      if (codeOf(error) === 'EEXIST') return 'exists';
+      if (!UNWRITABLE.has(codeOf(error) ?? '')) throw error;
+      if (fs.existsSync(lockPath)) return 'exists';
+      if (attempt >= OPEN_RETRIES) return 'exists'; // a delete-pending lock that never clears: refuse rather than open unlocked
+      sleepSync(OPEN_RETRY_MS);
     }
-    return 'created';
-  } catch (error) {
-    if (codeOf(error) === 'EEXIST') return 'exists';
-    if (UNWRITABLE.has(codeOf(error) ?? '')) return 'unavailable';
-    throw error;
   }
 }
 
@@ -219,7 +230,10 @@ function takeMutex(mutexPath: string): boolean {
       if (codeOf(error) !== 'EEXIST') return false;
       try {
         if (Date.now() - fs.statSync(mutexPath).mtimeMs < TAKEOVER_STALE_MS) return false;
-        fs.rmSync(mutexPath, { force: true });
+        // Rename first: removing by name could delete a fresh mutex another taker created between the stat and the remove.
+        const aside = `${mutexPath}.${process.pid}.${randomBytes(4).toString('hex')}.stale`;
+        fs.renameSync(mutexPath, aside);
+        fs.rmSync(aside, { force: true });
       } catch {
         return false;
       }

@@ -172,6 +172,7 @@ describe('llull --doc', () => {
 
 describe('lock creation on volumes without hard links, and in folders that take no lock (review 3)', () => {
   const errno = (code: string): Error => Object.assign(new Error(code), { code });
+  const realOpen = fs.openSync.bind(fs);
 
   it.each(['EPERM', 'ENOTSUP', 'EINVAL', 'EXDEV'])('falls back to an exclusive create when link() fails with %s', (code) => {
     vi.spyOn(fs, 'linkSync').mockImplementation(() => {
@@ -217,6 +218,69 @@ describe('lock creation on volumes without hard links, and in folders that take 
     }
   });
 
+  it('EPERM from the exclusive create while a lock file exists is contention (DSF_DOC_LOCKED), never an unlocked open', async () => {
+    writeLock({ pid: await liveOtherProcess(), app: 'desktop' });
+    vi.spyOn(fs, 'linkSync').mockImplementation(() => {
+      throw errno('EPERM');
+    });
+    vi.spyOn(fs, 'openSync').mockImplementation(((target: fs.PathLike, ...rest: unknown[]) => {
+      if (String(target).endsWith('.llull-lock')) throw errno('EPERM');
+      return (realOpen as (...args: unknown[]) => number)(target, ...rest);
+    }) as typeof fs.openSync);
+    try {
+      expect(() => acquireDocumentLock(file, 'cli')).toThrow(DocumentLockedError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('a delete-pending lock (EPERM, then the create works) is retried and taken', () => {
+    let failures = 2;
+    vi.spyOn(fs, 'linkSync').mockImplementation(() => {
+      throw errno('EPERM');
+    });
+    vi.spyOn(fs, 'openSync').mockImplementation(((target: fs.PathLike, ...rest: unknown[]) => {
+      if (String(target).endsWith('.llull-lock') && failures-- > 0) throw errno('EPERM');
+      return (realOpen as (...args: unknown[]) => number)(target, ...rest);
+    }) as typeof fs.openSync);
+    try {
+      const lock = acquireDocumentLock(file, 'desktop');
+      expect(lock.warning).toBeNull();
+      expect(fs.existsSync(lockPathOf(file))).toBe(true);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('an EPERM that never clears and shows no lock is still DSF_DOC_LOCKED, not an unlocked open', () => {
+    vi.spyOn(fs, 'linkSync').mockImplementation(() => {
+      throw errno('EPERM');
+    });
+    vi.spyOn(fs, 'openSync').mockImplementation(((target: fs.PathLike, ...rest: unknown[]) => {
+      if (String(target).endsWith('.llull-lock')) throw errno('EPERM');
+      return (realOpen as (...args: unknown[]) => number)(target, ...rest);
+    }) as typeof fs.openSync);
+    try {
+      expect(() => acquireDocumentLock(file, 'desktop')).toThrow(DocumentLockedError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('a probe write that fails (EROFS / EPERM) while a lock file exists is contention, not an unwritable folder', async () => {
+    writeLock({ pid: await liveOtherProcess(), app: 'desktop' });
+    const real = fs.writeFileSync.bind(fs);
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((target: fs.PathOrFileDescriptor, data: string, ...rest: unknown[]) => {
+      if (String(target).endsWith('.tmp')) throw errno('EPERM');
+      return (real as (...args: unknown[]) => void)(target, data, ...rest);
+    }) as typeof fs.writeFileSync);
+    try {
+      expect(() => acquireDocumentLock(file, 'cli')).toThrow(DocumentLockedError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it('the CLI reports DSF_LOCK_UNAVAILABLE next to a successful write', async () => {
     const real = fs.writeFileSync.bind(fs);
     vi.spyOn(fs, 'writeFileSync').mockImplementation(((target: fs.PathOrFileDescriptor, data: string, ...rest: unknown[]) => {
@@ -251,6 +315,28 @@ describe('takeover race, unreadable-lock message, leftover temporaries (review 6
     fs.utimesSync(mutex, old, old);
     expect(acquireDocumentLock(file, 'cli').tookOver).not.toBeNull();
     expect(fs.existsSync(mutex)).toBe(false);
+  });
+
+  it('a stale takeover mutex is renamed to a unique name before it is deleted (no remove-by-name race)', async () => {
+    writeLock({ pid: await deadPid() });
+    const mutex = `${lockPathOf(file)}.takeover`;
+    fs.writeFileSync(mutex, '');
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(mutex, old, old);
+    const renamed: string[] = [];
+    const realRename = fs.renameSync.bind(fs);
+    vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (String(from) === mutex) renamed.push(String(to));
+      realRename(from, to);
+    });
+    try {
+      expect(acquireDocumentLock(file, 'cli').tookOver).not.toBeNull();
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(renamed).toHaveLength(1);
+    expect(renamed[0]).toMatch(/\.takeover\.\d+\.[0-9a-f]{8}\.stale$/);
+    expect(fs.readdirSync(dir).filter((name) => name.endsWith('.stale'))).toEqual([]);
   });
 
   it('a fresh lock that appears between the check and the rename is put back, never taken (both would hold otherwise)', async () => {
