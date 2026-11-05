@@ -267,6 +267,8 @@ with pack 03 PRF when checkpoint times exceed their budget (§8); owner question
 | `DSF_LOCK_STALE` | warn | open | a lock from another host older than `LOCK_STALE_MS`; break only on request |
 | `DSF_LOCK_BROKEN` | info | open | a dead same-host lock was removed (audit) |
 | `DSF_AUTOSAVE_FAILED` | error | recovery writer | journal or checkpoint write failed; status bar stays red until a write succeeds |
+| `DSF_HOLD_EXPIRED` | warn | recovery session | a document replacement never finished; the changes made meanwhile were written into the current slot (as built) |
+| `DSF_LOCK_UNAVAILABLE` | warn | open / CLI `--doc` | the folder takes no lock file (probe write refused and no lock present); the document opens without a lock (as built) |
 | `DSF_RECOVERY_AVAILABLE` | info | launch | one or more slots to recover |
 | `DSF_RECOVERY_PARTIAL` | warn | recovery | replay stopped at line k (CRC / hash / truncation); state = last verified |
 | `DSF_HASH_MISMATCH` | warn | verify / load | integrity hash differs (edited outside llull or damaged) |
@@ -342,6 +344,31 @@ Cross-pack: pack 03 PRF (checkpoint cost on large documents), pack 06 E2E (deskt
 5. **Q5 Undo memory budget**: a fixed size or a share of physical RAM; decide after VC-DSF-04 measures it.
 6. **Q6 Native durable rename** helper (napi-rs addon) or accept the residual power-loss risk?
 7. **Q7 `--doc` on a document open in the app**: refuse with a hint (proposed) or route automatically to `--app`?
+
+## 13. As built, 2026-11-05 (branch fix/dsf-recovery)
+
+Differences and additions to the design above; the code is the reference.
+
+- **Slots** live in `LLULL_RECOVERY_DIR` (the desktop sets `<userData>/recovery`; default `server/.recovery`): `<id>.json` + `<id>.meta.json` + `active.json`
+  (the slot a supervised restart resumes with `LLULL_RECOVERY_RESUME=1`). Slot id: `doc-<sha1(path)[0..16]>`, `untitled-<hex>`, `offline-<time>-<hex>`.
+- **Slot meta**: `{ id, path, kind: 'document' | 'offline', label, changedAt, changeCount, baseSha256, baseSize }`. `baseSha256` / `baseSize` are the
+  content hash and size of the document file as opened or last saved (null: untitled). A restore keeps the slot's path only when the file on disk
+  still hashes to `baseSha256`; otherwise the document is untitled (Save As), so a restore never overwrites a file that moved on.
+- **Routes** (`server/src/recoveryRoutes.ts`): `GET /recovery`, `GET /recovery/:id`, `POST /recovery/{hold, release, bind, saved, adopt, discard, offline}`.
+  Replacing the live document is `hold` -> `load_document` -> `bind` (new file / untitled) or `adopt` (restored slot), or `release` when the load failed.
+  `bind` and `saved` carry the optional `baseSha256` + `baseSize`; `saved` removes the slot only if `stateHash` still equals the live document.
+- **Hold**: while held, changes stay in memory and out of the previous slot. Every ending path ends the hold: `bind`, `adopt` (also an unknown slot,
+  which answers 404 after releasing), `release`, and a TTL (30 s, `holdTtlMs`): on expiry the held change is written into the current binding and
+  status `DSF_HOLD_EXPIRED` is emitted until the next change. `flush()` and `stop()` write a held change into the current binding too.
+  The desktop retries a failing `bind` / `adopt` once, then releases and reports through `onWarning` (error box); the renderer-only restore path releases when its adopt fails.
+- **SSE**: `status` ({ epoch, autosave: { ok } | { ok: false, code, message } }, also sent to a subscriber that joins while failing) and `document`
+  ({ epoch, path }, the path of the open document, also sent on join). `GET /health` mirrors the autosave status.
+- **Locks**: the lock is created by hard link of a private temp file, falling back to an exclusive create where links are not supported.
+  `DSF_LOCK_UNAVAILABLE` only when the temp-file write itself is refused (EACCES / EROFS / EPERM) and no lock file exists; a refused create next to a
+  lock file, or after a good temp write, is contention and ends as `DSF_DOC_LOCKED` (3 short retries first for a delete-pending lock). Stale takeover is
+  serialized by `<lock>.takeover`; a stale mutex is renamed to a unique name before it is deleted.
+- **Save conflict**: `DSF_SAVE_CONFLICT` compares the file with the stamp (mtime, size, sha256) of what was opened or last saved. The stamp after a save
+  is the hash of the bytes just written; an unchanged size and time stamp are not hashed again (a time stamp younger than 2 s is, for FAT).
 
 ## 12. References
 
