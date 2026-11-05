@@ -52,10 +52,11 @@ const dynamicsParams = z.object({
  * @invariant returns the SAME document, affected []; deterministic; a simulation-based item is never 'pass' when the simulation did not run
  * @failure no rigid bodies -> status not_run with FPR_NO_MOTION; no physics engine, refused model or open loop -> static items + not_run
  *   simulation items; invalid params -> rejected by execute
+ * @invariant kernel-optional: static checks read body mass properties through the kernel when present
  */
 export const checkDynamics = defineCommand({
   name: NAME,
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Review check of the physics model (rigid bodies, joints, motors, propellers): are the inputs realistic and are the simulation numbers ' +
     'trustworthy? Returns the review envelope in data (status = worst item; not_run is never a pass; reviewRequired). Static items need no ' +

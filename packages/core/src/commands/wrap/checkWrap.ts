@@ -93,6 +93,7 @@ const isWrapResult = (doc: CadDocument, entity: Entity): boolean =>
  * @affects none (read-only)
  * @invariant fails only on a number against a limit (the named default maxLengthStrain 0.02 is reported as defaulted, never silently); `unverified` is true when a font behind a result is not pinned
  * @failure unknown id -> WRP_ENTITY_NOT_FOUND refusal
+ * @invariant kernel-optional: the exact volume change of an emboss is read through the kernel when present
  */
 export const checkWrap = defineCommand({
   name: 'check_wrap',
@@ -124,7 +125,7 @@ export const checkWrap = defineCommand({
         'Smallest stroke width the process can make, document units. No default: the stroke check runs only when you name the process limit.',
       ),
   }),
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   run: (doc, params, ctx): CommandResult => {
     const targets = params.ids ?? doc.order.filter((id) => doc.entities[id] !== undefined && isWrapResult(doc, doc.entities[id] as Entity));
     for (const [index, id] of targets.entries()) {

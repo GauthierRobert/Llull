@@ -12,6 +12,7 @@ import { prepareCase } from './prepare';
  * @affects none; data = the §5.1 report (checks[], surface, smallFeatures[], domain, frontalAreaM2, blockageRatio, grid, estimate, geometryHash, caseHash, defaults, warnings)
  * @invariant deterministic for a given document, kernel and params; the hash `geometryHash` is that of the oriented welded flow surface
  * @failure unknown case -> CFD_CASE_NOT_FOUND; every geometry problem is a check row (status fail / warn), not a refusal
+ * @invariant kernel-optional: the flow surface of B-rep leaves is built through the kernel (buildSurface) when present, from meshes otherwise
  */
 export const cfdPrepare = defineCommand({
   name: 'prepare_cfd_case',
@@ -22,7 +23,7 @@ export const cfdPrepare = defineCommand({
     'defaults) and the blockage, estimates cells, device memory and run time, and picks the solver from the Mach number. `data.checks` is a ' +
     'pass / warn / fail / not_run list with stable CFD_* codes; `data.status` is the worst of them. Nothing is changed or solved. Pass ' +
     '`deviceMemoryBytes` to also check the memory against a device.',
-  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true, idempotent: true },
   params: z.object({
     caseId: z.string().describe('Id of the case (create_cfd_case).'),
     quality: z

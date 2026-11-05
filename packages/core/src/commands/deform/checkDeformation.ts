@@ -175,10 +175,11 @@ function findingsOf(id: string, entity: Entity, analysis: DeformAnalysis, unit: 
  * @invariant status is "fail" when any finding fails, "warn" when only warnings remain, else "pass"; the notes about the check itself
  *   (DEF_CHECK_TOLERANCE_DEFAULTED, DEF_CHECK_INPUT_UNVERIFIED) are listed but never change the status; purpose "release" on a mesh result sets reviewRequired
  * @failure unknown id -> DEF_ENTITY_NOT_FOUND; no deform node -> DEF_NOT_DEFORMED; source not rebuildable -> DEF_SOURCE_UNAVAILABLE
+ * @invariant kernel-optional: the exact deformation path needs the kernel; the mesh path answers without one
  */
 export const checkDeformation = defineCommand({
   name: 'check_deformation',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Pass / warn / fail verdict for deformed bodies, with coded findings an agent can act on. Checked: fold-over (min det J <= 1e-6, DEF_CHECK_FOLDOVER), ' +
     'self-intersection and open edges of the result (DEF_CHECK_SELF_INTERSECTION, DEF_CHECK_NOT_CLOSED), chordal deviation above the tolerance ' +

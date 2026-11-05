@@ -119,10 +119,11 @@ export function gvpOfEntity(doc: CadDocument, entity: Entity, ctx: MassContext):
  * @invariant data = { unit, items[{id,name,kind,volume,area,centroid,bbox,method}], assemblies[{id,name,solids,volume,area,centroid}] }; lengths in
  *   document units; volume / area are unit-density values (the same ones export_step_ap242 writes as GVP)
  * @failure unknown id, 2D entity, entity without volume -> listed in skipped; no 3D solid at all -> no-op
+ * @invariant kernel-optional: exact volume / area / centroid through the kernel when present, mesh integration otherwise
  */
 export const geometricValidationProperties = defineCommand({
   name: 'geometric_validation_properties',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Compute the CAx-IF geometric validation properties of 3D solids: volume, surface area, centre of volume (centroid) and bounding box, in document ' +
     'units (volume in units^3, area in units^2). These are the values export_step_ap242 embeds in a STEP file and verify_exchange_file compares with what ' +

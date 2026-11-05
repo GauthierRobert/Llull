@@ -29,6 +29,7 @@ const warning = (code: string, message: string): Warning => ({ code, message, re
  * @invariant numbers shown are the recorded summary only when it equals the one recomputed from the stored bundle (`trusted`); a stale result
  *   is reported with the warning CFD_RESULT_STALE, never hidden
  * @failure unknown case -> CFD_CASE_NOT_FOUND; no recorded result -> CFD_NO_RESULT
+ * @invariant kernel-optional: result staleness re-prepares the case through the kernel when present
  */
 export const cfdReport = defineCommand({
   name: 'cfd_report',
@@ -38,7 +39,7 @@ export const cfdReport = defineCommand({
     'time, what is not modelled, named defaults). `stale: true` with the warning CFD_RESULT_STALE when the case or the geometry changed since the ' +
     'solve; `trusted: false` when the recorded summary cannot be re-verified against the stored bundle on this machine. `include` picks the ' +
     'sections (default all). Refused with CFD_NO_RESULT before any cfd_solve.',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { kernelOptional: true, readOnly: true, idempotent: true },
   params: z.object({
     caseId: z.string().describe('Id of the case.'),
     include: z.array(z.enum(SECTIONS)).optional().describe('Sections to include (default every one).'),

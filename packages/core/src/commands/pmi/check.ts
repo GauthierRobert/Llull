@@ -86,10 +86,11 @@ function dataFindings(items: readonly PmiItem[], byId: Readonly<Record<string, P
  * @affects nothing — read-only
  * @invariant deterministic order: item creation order, then the document-level findings; every finding { code, severity, pmiIds, message, remediation, paths }
  * @failure none: no PMI gives zero counts; a kernel without exact topology reports resolution 'not_run' instead of failing
+ * @invariant kernel-optional: face lookups of the PMI resolve through the kernel (createSolidLookup) when present
  */
 export const checkPmi = defineCommand({
   name: 'check_pmi',
-  annotations: { readsMeshTriangles: true, readOnly: true, idempotent: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true, idempotent: true },
   description:
     'Check the PMI of the document (read-only). Re-resolves every feature on the CURRENT B-rep (so it catches PMI broken by a model edit: ' +
     'GDT_FEATURE_UNRESOLVED, GDT_SURFACE_TYPE_CHANGED) when an OCC kernel is present, else reports resolution "not_run". Built-in logical ' +

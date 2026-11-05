@@ -23,6 +23,7 @@ const FILE_EXTENSIONS: Readonly<Record<CodeLanguage, string>> = { cadquery: 'py'
  * @invariant data.text regenerates the document's 3D solids; data.source tells whether it came from the feature history ('history',
  *   parametric) or the current geometry ('snapshot')
  * @failure unknown language -> no-op with summary, affected:[]
+ * @invariant kernel-optional: exact recipes are lowered with the kernel (buildFeatureProgram) when present, as meshes otherwise
  */
 export const exportCode = defineCommand({
   name: 'export_code',
@@ -40,7 +41,7 @@ export const exportCode = defineCommand({
     name: z.string().optional().describe('Base file name without extension (sanitized). Default "model".'),
     confirmExportControlled,
   }),
-  annotations: { readsMeshTriangles: true, readOnly: true, writesArtifact: true, idempotent: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true, writesArtifact: true, idempotent: true },
   run: (doc, params, ctx): CommandResult => {
     const { language, name } = params;
     const refused = exportRefusal(doc, 'export_code', 'code', params.confirmExportControlled, ctx);

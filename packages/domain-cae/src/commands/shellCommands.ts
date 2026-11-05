@@ -15,6 +15,7 @@ import { isMidsurfaceRefusal } from '../shell/types';
  * @invariant read-only; faces are planar polygons in document units (world frame), `normal` points to the top of the wall
  * @failure missing / 2D entity -> FEA_PART_INVALID; face pairing without maxThickness -> FEA_PARAM_INVALID; no exact kernel for a solid that is
  *   neither a box nor a sheet-metal part -> FEA_KERNEL_OCC_REQUIRED; no pair -> FEA_MIDSURFACE_NO_PAIRS
+ * @invariant kernel-optional: face-paired mid-surfaces of solids need the exact kernel (named refusal without)
  */
 export const extractMidsurface = defineCommand({
   name: 'extract_midsurface',
@@ -23,7 +24,7 @@ export const extractMidsurface = defineCommand({
     'normal, area, outer, holes }], thicknesses, coverage (paired area fraction, shells need >= 0.98 by default), unpairedFaces (kernel face ' +
     'indices), warnings }. Sheet-metal parts and box plates come straight from their recipe; other solids pair planar faces <= maxThickness ' +
     'apart on the exact OCC kernel (cylindrical walls, extension and sewing of the mid faces are not built). Lengths in document units.',
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   params: z.object({
     entityId: z.string().describe('Id of the 3D solid.'),
     maxThickness: z.number().positive().optional().describe('Thickest wall that pairs (document units); needed for face pairing.'),

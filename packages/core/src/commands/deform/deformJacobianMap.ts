@@ -134,10 +134,11 @@ function build(doc: CadDocument, node: DeformNode, kernel: GeometryKernel | null
  * @invariant a mirror (orientation-reversing affine node, det J < 0) reads as folded: det J <= floor on every triangle it reaches, and the sign multiplies through a chain (mirror then taper = minus the taper); the inward nudge follows the orientation flips of the nodes from each stage outward
  * @invariant scope composed (default): the determinant of every node of the chain is read at the rest point of the triangle in that node's input space (carried through every refinement, barycentric for new vertices) and multiplied: the volume ratio against the ORIGINAL body; scope outermost: the outermost node alone
  * @failure unknown id -> DEF_ENTITY_NOT_FOUND; no deform node -> DEF_NOT_DEFORMED; degenerate frame -> DEF_FRAME_DEGENERATE; source not rebuildable -> DEF_SOURCE_UNAVAILABLE; refinement still over the budget after coarsening, or refused -> the warp's code (DEF_BUDGET_EXCEEDED, DEF_APPROX_TOLERANCE)
+ * @invariant kernel-optional: the source mesh is rebuilt through the exact kernel when present, the stored mesh otherwise
  */
 export const deformJacobianMap = defineCommand({
   name: 'deform_jacobian_map',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Jacobian determinant of a deformed body, per triangle, for a colour map drawn on the body (document units, world coordinates): by default COMPOSED along the chain of deformations (the volume ratio against the original body), or `scope: "outermost"` for the last node alone. ' +
     'data: positions (flat [x, y, z, ...] of the deformed body), indices (triangles), determinant (det J at the rest centroid of each triangle: 1 = volume kept, > 1 stretched, < 1 compressed, <= floor folded), ' +

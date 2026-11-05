@@ -20,9 +20,11 @@ const STRUCTURAL_2D: ReadonlySet<string> = new Set(['static', 'modal', 'buckling
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; missing / 2D entity, or shell / plane_stress in another case type -> FEA_PART_INVALID;
  *   plane_stress without thickness / sourceFacesNear -> FEA_PARAM_INVALID; midsurface / laminate / plane refusals (FEA_MIDSURFACE_*,
  *   FEA_KERNEL_OCC_REQUIRED, FEA_COMPOSITE_*, FEA_PLANE_STRESS_NOT_XY)
+ * @invariant kernel-optional: face-paired mid-surfaces of solids need the exact kernel (named refusal without); sheet-metal parts and box plates need none
  */
 export const setPartIdealization = defineCommand({
   name: 'set_part_idealization',
+  annotations: { kernelOptional: true },
   description:
     'Add a 3D solid to an analysis as a meshed part. idealization "solid" (default): 3D tetrahedra. "shell": shell elements on the midsurface ' +
     '(sheet-metal parts and box plates need no kernel; other solids are face-paired on the exact OCC kernel: planar walls <= maxThickness), ' +

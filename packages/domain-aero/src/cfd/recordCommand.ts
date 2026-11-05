@@ -56,9 +56,11 @@ const dot = (a: readonly number[], b: readonly number[]): number =>
  *   `verified: false` only when it is a complete `CfdResultSummary` for this case and hash
  * @failure unknown case -> CFD_CASE_NOT_FOUND; artifact absent and no complete summary -> CFD_RESULT_MISSING; hash, case id or summary differ ->
  *   CFD_RESULT_HASH_MISMATCH; artifact built for another case hash or flow surface -> CFD_INPUT_STALE (all refusals, unchanged doc)
+ * @invariant kernel-optional: result staleness re-prepares the case through the kernel when present
  */
 export const recordCfdResults = defineCommand({
   name: TOOL,
+  annotations: { kernelOptional: true },
   description:
     'Record the result of a flow solve run by the host (cfd_solve transport) on a case. Not for hand use: the summary is re-derived from the ' +
     'stored result bundle (forces, peaks, provenance; the coefficients from the forces and the case reference), so numbers cannot be invented. ' +

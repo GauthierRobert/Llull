@@ -53,10 +53,11 @@ interface MeasureBoundingBoxData {
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { min: Vec3, max: Vec3, size: Vec3 }
  * @failure missing entity id, empty document -> no-op, affected:[], no data
+ * @invariant kernel-optional: a kernel result keeps exact bounds from the kernel when present, mesh bounds otherwise
  */
 export const measureBoundingBox = defineCommand({
   name: 'measure_bounding_box',
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   description:
     'Compute the world-space axis-aligned bounding box (AABB) only; use mass_properties for mass, centroid and inertia. Three modes: (a) entityId — AABB of one entity; ' +
     '(b) useSelection:true — combined AABB of the current document selection; ' +

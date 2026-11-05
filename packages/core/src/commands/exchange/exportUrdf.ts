@@ -82,10 +82,11 @@ function jointXml(doc: CadDocument, joint: UrdfJoint, parentOrigin: Vec3, travel
  * @invariant data = { format:'urdf', source, robot, files[{ name, content }] (the .urdf first, then meshes/<link>.stl), linkCount, jointCount,
  *   notes[] }; lengths in metres, link frames aligned with the world axes and located at their joint anchor
  * @failure no bodies / joints to export, or an unknown source -> no-op, no data
+ * @invariant kernel-optional: link inertia through bodyMassProperties: exact with a kernel, mesh integration otherwise
  */
 export const exportUrdf = defineCommand({
   name: 'export_urdf',
-  annotations: { readsMeshTriangles: true, readOnly: true, writesArtifact: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true, writesArtifact: true },
   description:
     'Export the kinematic model as a URDF robot description (ROS, Gazebo, MuJoCo, PyBullet) with one STL mesh per link. ' +
     'source "dynamics" uses the rigid bodies and body joints (add_rigid_body, add_body_joint); "assembly" uses component instances connected ' +

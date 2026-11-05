@@ -90,10 +90,11 @@ function faceFrame(
 /**
  * @affects adds 1 sketch plane (doc.sketchPlanes); no entity
  * @failure both or neither of plane / face, face not planar or not found (REF_LOST when its recorded name is gone), no kernel for a face -> no-op
+ * @invariant kernel-optional: a plane on a planar face needs the kernel (named refusal without); a world plane needs none
  */
 export const createSketchPlane = defineCommand({
   name: 'create_sketch_plane',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Create a named sketch plane: a world plane (plane: "xy" | "xz" | "yz") or a planar FACE of a solid (face: { id, faceIndex | faceNear | faceName }), ' +
     'moved offset along its normal and turned spin degrees about it. Place 2D entities on it with place_on_sketch_plane, project solid edges into ' +

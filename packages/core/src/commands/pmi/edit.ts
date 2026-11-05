@@ -73,10 +73,11 @@ const setFacesNear = (item: PmiItem, points: readonly (readonly [number, number,
  * @affects replaces 1 PMI item (id and kind never change); a renamed datum label also rewrites the frames that reference it
  * @invariant the edited item is review-required again; derived data (faceIndices, measured size, count) is re-resolved when the kernel can
  * @failure unknown id, field invalid for the kind, rule of check_pmi violated, label taken, facesNear that resolve to nothing, same values -> no-op
+ * @invariant kernel-optional: face lookups of the PMI resolve through the kernel (createSolidLookup) when present
  */
 export const updatePmi = defineCommand({
   name: 'update_pmi',
-  annotations: { readsMeshTriangles: true, idempotent: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, idempotent: true },
   description:
     'Edit one PMI item by id. Each kind takes only its own fields: datum_feature (label, facesNear), datum_target (targetNumber, areaSize, ' +
     'facesNear), size_dimension (tolerance, sizeModifiers, facesNear), location_dimension (tolerance), geometric_tolerance (zone, ' +

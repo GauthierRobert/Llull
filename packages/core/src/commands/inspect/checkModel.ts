@@ -207,10 +207,11 @@ export function runModelChecks(doc: CadDocument, farThreshold: number, kernel: G
  * @affects nothing — read-only; document returned as the SAME reference, affected:[]
  * @invariant data satisfies CheckResult; document === input doc (same reference)
  * @failure never throws; always returns a valid CheckResult in data
+ * @invariant kernel-optional: feature-reference checks read the exact topology through the kernel when present; the others need none
  */
 export const checkModel = defineCommand({
   name: 'check_model',
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   description:
     'Scan the document for geometry defects, structural issues, and parameter errors. ' +
     'Returns a structured issue list in `data` ({ ok: boolean, issues: Issue[] }) — ' +

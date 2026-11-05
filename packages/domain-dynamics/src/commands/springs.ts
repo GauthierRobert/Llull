@@ -37,10 +37,11 @@ function worldPoint(
  *            pointA / pointB are stored as world points whatever pointFrame was given
  * @failure unknown body, same body twice, both ends fixed / ground, coincident points, freeLengthMm with preloadN, preload that needs a
  *          negative free length, non-positive stiffness, taken id -> no-op
+ * @invariant kernel-optional: the body frame comes from bodyMassProperties: exact with a kernel, mesh integration otherwise
  */
 export const addSpring = defineCommand({
   name: 'add_spring',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Add a spring-damper force element (physics, for simulate_motion; NOT the add_coil solid geometry) between a point on one rigid body and a point on another body or the ground, for simulate_motion ' +
     '(a coil spring, a gas strut, a bungee, an engine-valve spring). Force along the line joining the two points: ' +
