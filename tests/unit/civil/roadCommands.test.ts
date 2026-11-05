@@ -327,8 +327,12 @@ describe('alignment_report', () => {
     expect(result.summary).toContain('failure(s)');
     const gentle = execute(profile.document, 'alignment_report', { alignmentId: id, designSpeedKmh: 20 });
     expect((gentle.data as { checks: { horizontal: Array<{ ok: boolean }> } }).checks.horizontal[0]?.ok).toBe(true);
-    const fast = execute(profile.document, 'alignment_report', { alignmentId: id, designSpeedKmh: 200 });
-    expect(fast.summary).toContain('200 km/h');
+    const fast = execute(profile.document, 'alignment_report', { alignmentId: id, designSpeedKmh: 130 });
+    expect(fast.summary).toContain('CIV_SPEED_OUT_OF_TABLE');
+    expect(fast.summary).toContain('[20, 120]');
+    expect(fast.data).toBeUndefined();
+    expect(fast.document).toBe(profile.document);
+    expect(fast.affected).toEqual([]);
     const ok = designed(101);
     expect(execute(ok.doc, 'alignment_report', { alignmentId: ok.id, designSpeedKmh: 50 }).summary).toContain('all checks pass');
   });
@@ -340,6 +344,30 @@ describe('alignment_report', () => {
     expect(checks.horizontal[0]?.minRadiusM).toBeCloseTo(3600 / (127 * 0.24), 1);
     expect(checks.warnings).toEqual([]);
     expect(result.summary).not.toContain('WARNING');
+  });
+  it('checks an intermediate design speed with the next higher table row and names it (VC-INT-11)', () => {
+    const { doc, id } = withAlignment(surveyedDocument(flat(100), 21, 20), { points: xy(50, 100, 250, 100, 250, 300), radii: [100] });
+    const banked = execute(doc, 'set_superelevation', { alignmentId: id, maxRate: 0.06 }).document;
+    const result = execute(banked, 'alignment_report', { alignmentId: id, designSpeedKmh: 65 });
+    const checks = (result.data as { checks: { tableSpeedKmh: number; assumptions: string; horizontal: Array<{ minRadiusM: number }> } })
+      .checks;
+    expect(checks.tableSpeedKmh).toBe(70);
+    expect(checks.horizontal[0]?.minRadiusM).toBeCloseTo(158.4, 1);
+    expect(checks.assumptions).toContain('design speed 65 km/h is checked with the 70 km/h row');
+    expect(result.summary).toContain('Design speed 65 km/h (checked with the 70 km/h row)');
+    const exact = execute(banked, 'alignment_report', { alignmentId: id, designSpeedKmh: 70 });
+    expect(exact.summary).not.toContain('checked with the');
+    expect((exact.data as { checks: { tableSpeedKmh: number } }).checks.tableSpeedKmh).toBe(70);
+  });
+  it('refuses design speeds outside the 20..120 km/h table (VC-INT-10)', () => {
+    const { doc, id } = designed(101);
+    for (const speed of [130, 121, 19.9]) {
+      const result = execute(doc, 'alignment_report', { alignmentId: id, designSpeedKmh: speed });
+      expect(result.summary).toContain('CIV_SPEED_OUT_OF_TABLE');
+      expect(result.summary).toContain('[20, 120]');
+      expect(result.data).toBeUndefined();
+      expect(result.document).toBe(doc);
+    }
   });
   it('refuses unknown alignments, bad intervals, bad speeds', () => {
     const { doc, id } = designed(101);
