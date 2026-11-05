@@ -14,7 +14,7 @@ import { _resetHistory, applyCommand, canUndo, undo } from '../src/commandBus';
 import type { Response } from 'express';
 
 const TOKEN = 'secret-token';
-const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
+const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST', 'LLULL_ALLOWED_ORIGINS'];
 
 beforeEach(() => {
   _resetLiveDoc();
@@ -42,6 +42,7 @@ describe('guardRead', () => {
   });
 
   it('with a token: the local UI (allowed Origin, loopback) still reads', async () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     process.env['LLULL_AUTH_TOKEN'] = TOKEN;
     const res = await request(app).get('/live/snapshot').set('Origin', 'http://localhost:5173');
     expect(res.status).toBe(200);
@@ -50,6 +51,7 @@ describe('guardRead', () => {
   });
 
   it('with a token: a proxied request (X-Forwarded-For / Forwarded) is not trusted as loopback', async () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     process.env['LLULL_AUTH_TOKEN'] = TOKEN;
     const origin = 'http://localhost:5173';
     const xff = await request(app).get('/live/snapshot').set('Origin', origin).set('X-Forwarded-For', '203.0.113.9');

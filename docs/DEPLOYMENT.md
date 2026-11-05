@@ -7,8 +7,8 @@ seats, audit trail or admin routes: one local backend per machine, started by th
 | Piece           | What it is                                                                                     |
 | --------------- | ---------------------------------------------------------------------------------------------- |
 | Desktop app     | Electron shell (`desktop/`): starts the local backend on loopback and shows the React UI in it |
-| Local backend   | `server/` bundle: the live document, autosave, exchange (STEP / DWG / CadQuery), exports        |
-| `llull` CLI     | `server/src/cli`: the agent path (Claude Code, scripts, CI), on a file or on the open app       |
+| Local backend   | `server/` bundle: the live document, autosave, exchange (STEP / DWG / CadQuery), exports       |
+| `llull` CLI     | `server/src/cli`: the agent path (Claude Code, scripts, CI), on a file or on the open app      |
 | Native binaries | `solver/` (`llull-compute`, `llull-kernel`), bundled with the app when built                   |
 
 ## 1. Install
@@ -38,7 +38,10 @@ file. Procedure: the `llull-cli` skill; reference: `node server/bin/llull.cjs he
   writes it, owner-only, to `~/.llull/desktop.json` for the CLI. Every REST call needs it as
   `Authorization: Bearer <token>`; the SSE stream takes a single-use 30 s `?ticket=` minted by
   `POST /live/ticket`. Other local processes and websites cannot reach the document.
-- The only allowed browser origin is the app's own; Host headers other than loopback names are refused
+- A backend with no token refuses every mutating route (`401 SEC_TOKEN_REQUIRED`) unless started with
+  `--insecure-no-token` (`LLULL_INSECURE_NO_TOKEN=1`: logged, `insecure: true` in `/health`); a standalone launch
+  without either generates a per-launch token and prints it. There is no default allowed browser origin
+  (`LLULL_ALLOWED_ORIGINS` names one explicitly); Host headers other than loopback names are refused
   (DNS rebinding).
 
 Every server variable (rate limits, timeouts, Python bridge, kernel) is listed in
