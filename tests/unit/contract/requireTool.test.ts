@@ -7,8 +7,11 @@ import { parseRequired, summarize } from '../../requireToolTeardown';
 const run = `unit-${process.pid}-${Date.now()}`;
 const directory = join(skipRoot(), run);
 
+const outerRun = process.env[SKIP_RUN_ENV];
+
 afterEach(() => {
-  delete process.env[SKIP_RUN_ENV];
+  if (outerRun === undefined) delete process.env[SKIP_RUN_ENV];
+  else process.env[SKIP_RUN_ENV] = outerRun;
   rmSync(directory, { recursive: true, force: true });
 });
 
