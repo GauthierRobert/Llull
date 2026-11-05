@@ -8,7 +8,7 @@ import { defineCommand, vec3, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { ACCEPT_INADEQUATE_MESH } from '../margins/adequacyGate';
-import { adequacyOf, inadequacyReasons } from '../results/adequacy';
+import { adequacyOf, blocksAssessment, inadequacyReasons } from '../results/adequacy';
 import { caseOf } from '../shared/access';
 import { analysisLengthMetres } from '../shared/defaults';
 import { analysisIdSchema } from '../shared/schemas';
@@ -204,7 +204,7 @@ function measure(
     .concat(pointRows.map((row) => `${row.name} |u| ${row.magnitude.toPrecision(6)} ${unit}`))
     .join('; ');
   const adequacy = adequacyOf(results, mesh);
-  const inadequate = adequacy.verdict === 'inadequate';
+  const inadequate = blocksAssessment(adequacy);
   const gated = inadequate && !accept;
   const rows = gated
     ? faceRows.map((row) => (row.tolerance === undefined ? row : { ...row, withinTolerance: null, code: 'FEA_MESH_INADEQUATE' }))

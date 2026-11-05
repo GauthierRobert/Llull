@@ -67,19 +67,19 @@ checked with the 70 km/h row"). Every table found by the inventory (TR-INT-14) m
 ## 3. FE mesh adequacy gates results (FR-INT-06) · Lane 1
 
 **TR-INT-07 Measure.** Replace the bounding-box heuristic in `packages/domain-cae/src/results/adequacy.ts`:
-- for each part, compute local thickness at a sample of boundary faces (≥ 200 per part or all faces if fewer): cast a ray along
-  the inward face normal through the tet mesh and record the hit distance t and the tets crossed, and the local element size h (mean edge length of the crossed tets over 1.26, the mean edge of a Kuhn-split cell, so a structured hex-equivalent layer is 1); the element layers are n = t / h (not the count of tets crossed: one layer is about 3 tets);
-- `elementsThrough = p5(n)` over the samples (5th percentile, so thin walls govern), separately per element order;
+- for each part, compute local thickness at sampled boundary faces (every face up to 2,000 boundary faces, else 3 faces per position x area-class bucket, deterministic by a hash of the face nodes): cast a ray along
+  the inward face normal through the tet mesh and record the hit distance t and the tets crossed, and the local element size h = (6 x mean volume of the crossed tets)^(1/3) (a Kuhn cell of side s holds 6 tets of volume s^3 / 6, so h = s exactly and a structured hex-equivalent layer is 1; an unstructured mesh has about 6 to 6.5 tets per node, a bias of a few percent; the earlier mean-edge / 1.26 rule was calibrated on Kuhn meshes only and reads 12 % more layers than this rule on regular tets (edge a: 0.79 a against 0.89 a)); the element layers are n = t / h (not the count of tets crossed: one layer is about 3 tets);
+- `elementsThrough = p5(n)` over the samples (area-weighted 5th percentile, so thin walls govern; the thinnest dimension of a slender section governs by design), separately per element order;
 - thresholds: linear tets (C3D4) need ≥ 4 layers in bending regions, quadratic (C3D10) ≥ 2. These budgets come from the
   convergence studies of VC-INT-12 (target grade until VNV-M3 replaces them with measured convergence);
-- verdict `adequate` | `marginal` | `inadequate`, stored on the FE result artefact (`results.adequacy`).
+- verdict `adequate` | `marginal` | `inadequate`: `inadequate` when p5 is below the budget OR the thinnest sampled spot is below 0.5 x the budget (hard floor, so a thin rib on a fine mesh is not averaged away); `marginal` (a warning, `FEA_MESH_MARGINAL`, never gated) when the thinnest spot is between 0.5 x and 0.75 x the budget; stored on the FE result artefact (`results.adequacy`) as a display record only: every gate re-measures the mesh artifact (memoized by mesh object and verified mesh hash), a forged or stale record gates nothing, and results without a mesh artifact are `unmeasured`, which gates like `inadequate`.
 
 **TR-INT-08 Gate.**
 - `compute_margins`: rows sourced from an `inadequate` result get `state: 'not_assessed'`, code `FEA_MESH_INADEQUATE`, and the
   overall verdict is never `pass`;
-- `check_analysis` raises it as an error (not a warning);
+- `check_analysis` raises it as an error (not a warning); `compute_fatigue` / `check_fatigue` (FE hot spots), `thermal_distortion_report` (flatness verdict), `dispose_margin` and `margin_disposition_payload` follow the same gate; `compute_margins` and `compute_fatigue` add `FEA_MESH_MARGINAL` to their warnings and summary for a marginal mesh;
 - `fea_solve` reports the verdict in its summary;
-- `acceptInadequateMesh: true` (boolean param on `compute_margins`) restores numeric states and records
+- `acceptInadequateMesh: true` (boolean param on `compute_margins`, `compute_fatigue`, `check_fatigue`, `check_analysis` margin items, `thermal_distortion_report`) restores numeric states and records
   `data.overrides: ['acceptInadequateMesh']`.
 
 ## 4. Result provenance: which kernel answered (FR-INT-07) · Lanes 1 + 4 + 2

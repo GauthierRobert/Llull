@@ -9,6 +9,7 @@ import type { FeArtifactPort } from '@core/model/analysis';
 import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import type { CadDocument } from '@core/model/types';
 import { ACCEPT_INADEQUATE_MESH } from '../margins/adequacyGate';
+import { blocksAssessment } from '../results/adequacy';
 import { inadequacyReasons } from '../results/adequacy';
 import { nodeCoordinates, nodeEntities } from '../results/fields';
 import { evaluateCycles, isEvaluationFailure, type Evaluation, type Failure } from './evaluate';
@@ -119,7 +120,7 @@ export function evaluateFeCase(
         [fatigueCase.id],
       ),
     );
-  const inadequate = input.adequacy.verdict === 'inadequate';
+  const inadequate = blocksAssessment(input.adequacy);
   const gated = inadequate && !acceptInadequateMesh;
   if (inadequate)
     items.push(
@@ -128,6 +129,16 @@ export function evaluateFeCase(
         gated ? 'error' : 'warning',
         `the mesh of analysis '${fatigueCase.analysisId ?? ''}' is inadequate (${inadequacyReasons(input.adequacy).join('; ')}): ${gated ? 'the hot spots are not assessed' : 'hot spots computed anyway on acceptInadequateMesh'}`,
         'refine the mesh (fea_mesh, fea_solve) until the wall has the required element layers, or accept it with acceptInadequateMesh: true on the explicit decision of the engineer',
+        [fatigueCase.analysisId ?? fatigueCase.id],
+      ),
+    );
+  if (input.adequacy.verdict === 'marginal')
+    items.push(
+      item(
+        'FEA_MESH_MARGINAL',
+        'warning',
+        `the mesh of analysis '${fatigueCase.analysisId ?? ''}' is marginal, a thin region is under-resolved but not gated (${inadequacyReasons(input.adequacy).join('; ')})`,
+        'refine the mesh on the thin region (fea_mesh, fea_solve)',
         [fatigueCase.analysisId ?? fatigueCase.id],
       ),
     );

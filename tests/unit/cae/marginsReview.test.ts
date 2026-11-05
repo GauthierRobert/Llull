@@ -6,7 +6,7 @@ import { appliedOverFibres } from '@cae/margins/fibreStress';
 import { compositeWarnings, exclusionWarnings, isCompositeEntity, orphanSingularKeys } from '@cae/margins/screenWarnings';
 import { screenSingularities } from '@cae/margins/singularity';
 import { vonMises } from '@cae/results/fields';
-import { marginBar } from './marginsFixtures';
+import { marginBar, STAND_IN_MESH } from './marginsFixtures';
 
 const items = (result: ReturnType<typeof execute>): { code: string; severity: string; ids: string[] }[] =>
   (result.data as { items: { code: string; severity: string; ids: string[] }[] }).items;
@@ -75,7 +75,7 @@ describe('what the margin table leaves out', () => {
 describe('check_analysis singular findings', () => {
   it('warns about a failing singular row instead of dropping it', () => {
     const weak = marginBar({ pointSupportsSingular: true, ftu: 20, fty: 10 });
-    const found = items(execute(weak.recorded, 'check_analysis', { analysisId: weak.analysisId }, weak.ctx));
+    const found = items(execute(weak.recorded, 'check_analysis', { analysisId: weak.analysisId, ...STAND_IN_MESH }, weak.ctx));
     const singular = found.find((item) => item.code === 'FEA_MS_SINGULAR_FAIL');
     expect(singular?.severity).toBe('warning');
     expect(singular?.ids.length).toBeGreaterThan(1);
@@ -84,7 +84,7 @@ describe('check_analysis singular findings', () => {
 
   it('errors when the default radius swallows the whole part, and warns about the large exclusion', () => {
     const coarse = marginBar({ pointSupportsSingular: true, globalSize: 10 });
-    const found = items(execute(coarse.recorded, 'check_analysis', { analysisId: coarse.analysisId }, coarse.ctx));
+    const found = items(execute(coarse.recorded, 'check_analysis', { analysisId: coarse.analysisId, ...STAND_IN_MESH }, coarse.ctx));
     expect(found.find((item) => item.code === 'FEA_MS_ALL_SINGULAR')?.severity).toBe('error');
     expect(found.find((item) => item.code === 'FEA_SINGULAR_EXCLUSION_LARGE')?.severity).toBe('warning');
   });

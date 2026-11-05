@@ -8,11 +8,10 @@ import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { withCase } from '@cae/shared/access';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
-import { ADEQUATE } from '../marginsFixtures';
 import { hashOf, portOf, thermoFixture, type Fixture } from './fixtures';
 
 /** Plate z = 0 (nodes 1-5, centre node 5) and an apex node 6 above it; the centre lifts by 0.2 mm. Mesh and results are recorded for real. */
-function solved(options: { units?: CadDocument['units']; steps?: FeResultsArtifact['steps']; measured?: boolean } = {}): {
+function solved(options: { units?: CadDocument['units']; steps?: FeResultsArtifact['steps'] } = {}): {
   fixture: Fixture;
   port: ReturnType<typeof portOf>;
   mesh: FeMeshArtifact;
@@ -50,7 +49,6 @@ function solved(options: { units?: CadDocument['units']; steps?: FeResultsArtifa
     inputHash: analysisInputHash(base.doc, base.analysisId, 'full'),
     solver: 'ccx',
     solverVersion: '2',
-    ...(options.measured === true ? {} : { adequacy: ADEQUATE }),
     steps: options.steps ?? [{ step: 1, time: 1, fields: { DISP: { components: ['D1', 'D2', 'D3'], values: displacement } } }],
   };
   const resultsHash = hashOf(results);
@@ -95,6 +93,7 @@ describe('thermal_distortion_report', () => {
         { name: 'by plane', onPlane: { entityId: fixture.boxId, point: [0, 0, 0], normal: [0, 0, 5], distance: 0.01 }, tolerance: 0.25 },
       ],
       points: [{ name: 'centre', point: [5, 5, 0.1] }],
+      acceptInadequateMesh: true,
     });
     const data = result.data as {
       unit: string;
@@ -119,7 +118,7 @@ describe('thermal_distortion_report', () => {
   });
 
   it('FR-INT-06: on an inadequate mesh the flatness tolerance verdict is not assessed unless acceptInadequateMesh', () => {
-    const { fixture, port } = solved({ measured: true });
+    const { fixture, port } = solved();
     const faces = [{ name: 'by set', targetKey: 'C_fc-1.1', tolerance: 0.1 }];
     const gated = report(fixture, port, { faces });
     const data = gated.data as { faces: (FaceRow & { code?: string })[]; meshAdequacy: { verdict: string }; overrides?: string[] };

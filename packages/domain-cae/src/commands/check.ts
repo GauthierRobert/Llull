@@ -170,8 +170,16 @@ export const checkAnalysis = defineCommand({
     'Modal / buckling: supports, rigid-body modes, buckling-factor guards; any structural case: supports that remove all six rigid-body motions (FEA_UNDERCONSTRAINED) and through-thickness mesh adequacy (FEA_MESH_INADEQUATE error, FEA_MESH_MARGINAL warning); solved static / thermo_static cases with allowables: the margin rows (FEA_MS_NEGATIVE, FEA_MARGINAL_BAND_UNSET, FEA_DISPOSITION_PENDING, FEA_DISPOSITION_FOREIGN_DOCUMENT / FEA_DISPOSITION_UNBOUND for a recorded disposition signed for another document or recording no document uid). ' +
     'It is not a certification: reviewRequired is always true and a qualified person must review the model, mesh and results.',
   annotations: { readOnly: true },
-  params: z.object({ analysisId: analysisIdSchema }),
-  run: (doc, { analysisId }, ctx): CommandResult => {
+  params: z.object({
+    analysisId: analysisIdSchema,
+    acceptInadequateMesh: z
+      .boolean()
+      .optional()
+      .describe(
+        'Default false: on an inadequate mesh the margin rows are not assessed, so no FEA_MS_* margin item is listed (FEA_MESH_INADEQUATE is the error). true: the margin items are computed on the numeric rows anyway (the FEA_MESH_INADEQUATE error stays); only on the explicit decision of the engineer.',
+      ),
+  }),
+  run: (doc, { analysisId, acceptInadequateMesh }, ctx): CommandResult => {
     const analysis = caseOf(doc, analysisId);
     if (analysis === undefined)
       return refuseFe(doc, 'check_analysis', 'FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId]);
@@ -189,7 +197,7 @@ export const checkAnalysis = defineCommand({
       ...disciplines,
       ...structureItems(doc, analysis, trust),
       ...(trust.state === 'solved' && (analysis.type === 'static' || analysis.type === 'thermo_static')
-        ? marginItems(doc, analysisId, ctx)
+        ? marginItems(doc, analysisId, ctx, acceptInadequateMesh === true)
         : []),
       ...artifactItems(doc, analysis, trust),
     ];

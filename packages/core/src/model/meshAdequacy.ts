@@ -1,7 +1,11 @@
-/** Through-thickness mesh adequacy of the solid tetrahedra (TR-INT-07): measured on the actual mesh by `meshAdequacy` (@cae), recorded by fea_solve. */
+/**
+ * Through-thickness mesh adequacy of the solid tetrahedra (TR-INT-07): measured on the actual mesh by `meshAdequacy` (@cae). Gating always re-measures
+ * from the mesh; the verdict recorded on the results by fea_solve is display only.
+ */
 export interface FeMeshAdequacy {
-  readonly verdict: 'adequate' | 'marginal' | 'inadequate';
-  /** One entry per part and element order: the 5th percentile of the element layers (hit distance / local element size) of rays cast through the wall, and the budget. */
+  /** Worst part verdict; `unmeasured` when the mesh artifact was not available to measure (gates like `inadequate`). */
+  readonly verdict: 'adequate' | 'marginal' | 'inadequate' | 'unmeasured';
+  /** One entry per part and element order: the area-weighted 5th percentile of the element layers (hit distance / local element size) of rays cast through the wall, and the budget. */
   readonly parts: readonly {
     readonly entityId: string;
     readonly order: 'linear' | 'quadratic';

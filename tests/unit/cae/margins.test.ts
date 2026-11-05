@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { withCase } from '@cae/shared/access';
 import { mustRun, portOf } from './deckFixtures';
-import { marginBar, type MarginBar } from './marginsFixtures';
+import { marginBar, STAND_IN_MESH, type MarginBar } from './marginsFixtures';
 
 interface Row {
   rowId: string;
@@ -41,7 +41,7 @@ interface Margins {
 }
 
 const margins = (bar: MarginBar, params: Record<string, unknown> = {}, doc = bar.recorded): ReturnType<typeof execute> =>
-  execute(doc, 'compute_margins', { analysisId: bar.analysisId, ...params }, bar.ctx);
+  execute(doc, 'compute_margins', { analysisId: bar.analysisId, ...STAND_IN_MESH, ...params }, bar.ctx);
 
 const dataOf = (result: ReturnType<typeof execute>): Margins => result.data as Margins;
 
@@ -112,7 +112,7 @@ describe('compute_margins', () => {
     expect(data.rows.map((row) => row.status)).toEqual(['PASS', 'MARGINAL']);
     expect(data.rows[1]?.code).toBe('FEA_MS_MARGINAL');
     expect(data.rows[1]?.disposition).toBe('pending_human');
-    expect(data.warnings).toEqual([]);
+    expect(data.warnings.filter((text) => !text.startsWith('FEA_MESH_INADEQUATE accepted'))).toEqual([]);
     expect(dataOf(margins(bar)).rows.map((row) => row.status)).toEqual(['PASS', 'PASS']);
   });
 

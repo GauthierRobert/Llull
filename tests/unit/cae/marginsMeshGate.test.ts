@@ -1,8 +1,10 @@
-/** compute_margins and check_analysis on a mesh with too few layers through the wall (FR-INT-06, TR-INT-08, VC-INT-14). */
+/** compute_margins and check_analysis on a mesh with too few layers through the wall (FR-INT-06, TR-INT-08, VC-INT-14). The mesh is always measured. */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import type { FeMeshArtifact } from '@core/model/analysis';
 import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
-import { marginBar } from './marginsFixtures';
+import { blockMesh, unionMesh } from './adequacyFixtures';
+import { marginBar, STAND_IN_MESH, type MarginBar } from './marginsFixtures';
 
 interface Row {
   rowId: string;
@@ -19,24 +21,31 @@ interface Table {
   meshAdequacy: FeMeshAdequacy;
   warnings: string[];
 }
-const PART: FeMeshAdequacy['parts'][number] = {
-  entityId: 'p',
-  order: 'linear',
-  elementsThrough: 2,
-  minimumLayers: 1,
-  tetsCrossed: 3,
-  required: 4,
-  samples: 400,
-  verdict: 'inadequate',
-};
-const INADEQUATE: FeMeshAdequacy = { verdict: 'inadequate', parts: [PART], unmeasuredParts: [] };
+const tableOf = (result: { data?: unknown }): Table => result.data as unknown as Table;
+
+/** The 2 x 1 x 1 bar on a real lattice of cells of 1 / `perDepth` mm (so `perDepth` layers through its 1 mm depth), measured, no stamp. */
+const lattice =
+  (perDepth: number) =>
+  (boxId: string): FeMeshArtifact =>
+    blockMesh([2 * perDepth, perDepth, perDepth], [2, 1, 1], { entityId: boxId });
+
+/** 4 layers over the bar plus a cube of the same part on under 5 % of the surface: 2 cells (2 layers, marginal) or 1 cell (1 layer, below the half-budget floor). */
+const withCube =
+  (cells: number, side: number) =>
+  (boxId: string): FeMeshArtifact =>
+    unionMesh(
+      blockMesh([8, 4, 4], [2, 1, 1], { entityId: boxId }),
+      blockMesh([cells, cells, cells], [side, side, side], { entityId: boxId }),
+    );
+
+const margins = (bar: MarginBar, params: Record<string, unknown> = {}): ReturnType<typeof execute> =>
+  execute(bar.recorded, 'compute_margins', { analysisId: bar.analysisId, ...params }, bar.ctx);
 
 describe('compute_margins on an inadequate mesh', () => {
   it('VC-INT-14: every row is not_assessed with FEA_MESH_INADEQUATE and the overall verdict is not pass', () => {
-    const bar = marginBar({ adequacy: 'measured' });
-    const result = execute(bar.recorded, 'compute_margins', { analysisId: bar.analysisId }, bar.ctx);
+    const result = margins(marginBar());
     expect(result.rejected).not.toBe(true);
-    const table = result.data as unknown as Table;
+    const table = tableOf(result);
     expect(table.rows.length).toBeGreaterThan(0);
     for (const row of table.rows)
       expect(row).toMatchObject({
@@ -56,9 +65,8 @@ describe('compute_margins on an inadequate mesh', () => {
   });
 
   it('acceptInadequateMesh: true restores the numeric states and records the override', () => {
-    const bar = marginBar({ adequacy: 'measured' });
-    const result = execute(bar.recorded, 'compute_margins', { analysisId: bar.analysisId, acceptInadequateMesh: true }, bar.ctx);
-    const table = result.data as unknown as Table;
+    const result = margins(marginBar(), STAND_IN_MESH);
+    const table = tableOf(result);
     expect(table.rows.map((row) => row.status)).toEqual(['FAIL', 'PASS']);
     expect(table.rows[0]?.ms).toBeCloseTo(-0.047619, 5);
     expect(table.overall).toBe('fail');
@@ -67,21 +75,17 @@ describe('compute_margins on an inadequate mesh', () => {
     expect(result.summary).toContain('min MS');
   });
 
-  it('the verdict recorded on the results governs; an adequate mesh needs no override and records none', () => {
-    const recordedBad = marginBar({ adequacy: INADEQUATE });
-    const gated = execute(recordedBad.recorded, 'compute_margins', { analysisId: recordedBad.analysisId }, recordedBad.ctx);
-    expect((gated.data as unknown as Table).rows.every((row) => row.status === 'NOT_ASSESSED')).toBe(true);
-    const good = marginBar();
-    const open = execute(good.recorded, 'compute_margins', { analysisId: good.analysisId, acceptInadequateMesh: true }, good.ctx);
-    expect((open.data as unknown as Table).overrides).toBeUndefined();
-    expect((open.data as unknown as Table).overall).toBe('fail');
-    const marginal = marginBar({ adequacy: { ...INADEQUATE, verdict: 'marginal' }, ftu: 900, fty: 800 });
-    const passed = execute(marginal.recorded, 'compute_margins', { analysisId: marginal.analysisId }, marginal.ctx);
-    expect((passed.data as unknown as Table).overall).toBe('pass');
+  it('a forged adequate verdict (or an empty {}) recorded on the results gates nothing: the mesh is measured', () => {
+    for (const recordedAdequacy of [{ verdict: 'adequate', parts: [], unmeasuredParts: [] }, {}]) {
+      const table = tableOf(margins(marginBar({ recordedAdequacy })));
+      expect(table.rows.every((row) => row.status === 'NOT_ASSESSED')).toBe(true);
+      expect(table.overall).toBe('not_assessed');
+      expect(table.meshAdequacy.verdict).toBe('inadequate');
+    }
   });
 
   it('a not_assessed row cannot be dispositioned', () => {
-    const bar = marginBar({ adequacy: 'measured' });
+    const bar = marginBar();
     const refused = execute(
       bar.recorded,
       'dispose_margin',
@@ -99,26 +103,66 @@ describe('compute_margins on an inadequate mesh', () => {
     expect(payload.error?.code).toBe('FEA_MESH_INADEQUATE');
   });
 
-  it('check_analysis raises FEA_MESH_INADEQUATE as an error and does not list the unassessed margins', () => {
-    const bar = marginBar({ adequacy: 'measured' });
-    const check = execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId }, bar.ctx).data as {
-      status: string;
-      items: { code: string; severity: string }[];
-    };
+  it('check_analysis raises FEA_MESH_INADEQUATE as an error and does not list the unassessed margins unless the mesh is accepted', () => {
+    const bar = marginBar();
+    type Check = { status: string; items: { code: string; severity: string }[] };
+    const check = execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId }, bar.ctx).data as Check;
     expect(check.status).toBe('fail');
     expect(check.items.find((entry) => entry.code === 'FEA_MESH_INADEQUATE')?.severity).toBe('error');
     expect(check.items.some((entry) => entry.code === 'FEA_MS_NEGATIVE')).toBe(false);
+    const accepted = execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId, ...STAND_IN_MESH }, bar.ctx).data as Check;
+    expect(accepted.items.some((entry) => entry.code === 'FEA_MS_NEGATIVE')).toBe(true);
+    expect(accepted.items.find((entry) => entry.code === 'FEA_MESH_INADEQUATE')?.severity).toBe('error');
+  });
+});
+
+describe('compute_margins on a MEASURED mesh (no stamp, no opt-in): the bar on a lattice of cells', () => {
+  it('4 layers through the depth: adequate, numeric rows, no override, no mesh warning', () => {
+    const result = margins(marginBar({ lattice: lattice(4) }));
+    const table = tableOf(result);
+    expect(table.meshAdequacy.verdict).toBe('adequate');
+    expect(table.meshAdequacy.parts[0]?.elementsThrough).toBeCloseTo(4, 6);
+    expect(table.overrides).toBeUndefined();
+    expect(table.rows.map((row) => row.status)).toEqual(['FAIL', 'PASS']);
+    expect(table.rows[0]?.ms).toBeCloseTo(300 / (210 * 1.5) - 1, 6);
+    expect(table.rows[1]?.ms).toBeCloseTo(250 / 210 - 1, 6);
+    expect(table.overall).toBe('fail');
+    expect(table.warnings.some((text) => text.startsWith('FEA_MESH'))).toBe(false);
+    expect(result.summary).toContain('min MS');
   });
 
-  it('check_analysis warns FEA_MESH_MARGINAL when only a thin spot is short of the budget', () => {
-    const bar = marginBar({
-      adequacy: { ...INADEQUATE, verdict: 'marginal', parts: [{ ...PART, verdict: 'marginal', elementsThrough: 5 }] },
-    });
-    const items = (
-      execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId }, bar.ctx).data as {
-        items: { code: string; severity: string }[];
-      }
-    ).items;
-    expect(items.find((entry) => entry.code === 'FEA_MESH_MARGINAL')?.severity).toBe('warning');
+  it('3 layers through the depth: inadequate, every row not assessed', () => {
+    const table = tableOf(margins(marginBar({ lattice: lattice(3) })));
+    expect(table.meshAdequacy.verdict).toBe('inadequate');
+    expect(table.rows.every((row) => row.status === 'NOT_ASSESSED')).toBe(true);
+  });
+
+  it('a 2-layer spot on under 5 % of the surface is marginal: numeric rows, FEA_MESH_MARGINAL in the warnings, summary and check_analysis, never gated', () => {
+    const bar = marginBar({ lattice: withCube(2, 0.25), ftu: 900, fty: 800 });
+    const result = margins(bar);
+    const table = tableOf(result);
+    expect(table.meshAdequacy.verdict).toBe('marginal');
+    expect(table.rows.map((row) => row.status)).toEqual(['PASS', 'PASS']);
+    expect(table.overall).toBe('pass');
+    expect(table.warnings.some((text) => text.startsWith('FEA_MESH_MARGINAL'))).toBe(true);
+    expect(result.summary).toContain('FEA_MESH_MARGINAL');
+    const check = execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId }, bar.ctx).data as {
+      items: { code: string; severity: string }[];
+    };
+    expect(check.items.find((entry) => entry.code === 'FEA_MESH_MARGINAL')?.severity).toBe('warning');
+  });
+
+  it('hard floor: a 1-layer rib on under 5 % of the surface is inadequate although the 5th percentile reads 4 layers', () => {
+    const table = tableOf(margins(marginBar({ lattice: withCube(1, 0.125) })));
+    expect(table.meshAdequacy.verdict).toBe('inadequate');
+    expect(table.meshAdequacy.parts[0]?.elementsThrough).toBeCloseTo(4, 6);
+    expect(table.rows.every((row) => row.status === 'NOT_ASSESSED')).toBe(true);
+  });
+
+  it('no artifact store is a refusal, never a pass', () => {
+    const bar = marginBar({ lattice: lattice(4) });
+    const result = execute(bar.recorded, 'compute_margins', { analysisId: bar.analysisId }, { ...bar.ctx, feaArtifacts: null });
+    expect(result.rejected).toBe(true);
+    expect(result.error?.code).toBe('FEA_RESULTS_MISSING');
   });
 });

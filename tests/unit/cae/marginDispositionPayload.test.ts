@@ -4,7 +4,7 @@ import { execute } from '@core/commands/registry';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { marginDispositionPayload } from '@cae/margins/disposition';
 import { caseIn } from './helpers';
-import { marginBar } from './marginsFixtures';
+import { marginBar, STAND_IN_MESH } from './marginsFixtures';
 
 const bar = marginBar();
 interface Row {
@@ -13,8 +13,16 @@ interface Row {
   status: string;
   ms: number | null;
 }
-const failRow = (execute(bar.recorded, 'compute_margins', { analysisId: bar.analysisId }, bar.ctx).data as { rows: Row[] }).rows[0] as Row;
-const params = { analysisId: bar.analysisId, rowId: failRow.rowId, decision: 'accepted', justification: 'tested to 1.8 x limit' };
+const failRow = (
+  execute(bar.recorded, 'compute_margins', { analysisId: bar.analysisId, ...STAND_IN_MESH }, bar.ctx).data as { rows: Row[] }
+).rows[0] as Row;
+const params = {
+  analysisId: bar.analysisId,
+  ...STAND_IN_MESH,
+  rowId: failRow.rowId,
+  decision: 'accepted',
+  justification: 'tested to 1.8 x limit',
+};
 
 describe('margin_disposition_payload', () => {
   it('returns the hash dispose_margin verifies, without touching the document', () => {

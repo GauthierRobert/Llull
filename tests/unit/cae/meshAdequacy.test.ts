@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { FeMeshArtifact } from '@core/model/analysis';
-import { LINEAR_LAYERS_REQUIRED, adequacyOf, inadequacyReasons, meshAdequacy } from '@cae/results/adequacy';
-import { blockMesh, singleLayerTubeMesh, tubeMesh } from './adequacyFixtures';
+import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
+import { LINEAR_LAYERS_REQUIRED, adequacyOf, blocksAssessment, inadequacyReasons, meshAdequacy } from '@cae/results/adequacy';
+import { blockMesh, jitteredBlockMesh, singleLayerTubeMesh, tetVolumes, tubeMesh, unionMesh as union } from './adequacyFixtures';
 
 /** The bounding-box heuristic that FR-INT-06 replaces (thinnest AABB side over the mean tet edge), kept here to show what it read. */
 function legacyElementsAcross(mesh: FeMeshArtifact): number {
@@ -24,22 +25,6 @@ function legacyElementsAcross(mesh: FeMeshArtifact): number {
     });
   }
   return Math.min(...hi.map((high, axis) => high - (lo[axis] ?? 0))) / (total / edges);
-}
-/** Two meshes as one (the second's node ids shifted), both blocks of the same part. */
-/**  and  as one mesh (b's node ids shifted), both blocks of the same part. */
-function union(a: FeMeshArtifact, b: FeMeshArtifact): FeMeshArtifact {
-  const shift = 100000;
-  return {
-    ...a,
-    nodes: [...a.nodes, ...b.nodes.map((node) => [node[0] + shift, node[1], node[2], node[3]] as const)],
-    blocks: [
-      ...a.blocks,
-      ...b.blocks.map((block) => ({
-        ...block,
-        elements: block.elements.map((element, index) => [index + 100001, ...element.slice(1).map((id) => id + shift)]),
-      })),
-    ],
-  };
 }
 
 /** A block whose thickness is `layers` hex-equivalent cells of side 5 mm (6 Kuhn tets per cell); the in-plane cells have the same side. */
@@ -94,13 +79,26 @@ describe('meshAdequacy: layers through the wall of the actual tet mesh (FR-INT-0
     expect(meshAdequacy(tubeMesh(40, 8, 20, { wallLayers: 6, around: 48, along: 10 })).verdict).toBe('adequate');
   });
 
-  it('a thin spot under 5 % of the surface leaves the 5th percentile adequate but the verdict marginal', () => {
-    const sliver = blockMesh([1, 1, 1], [3, 3, 1]);
+  it('a thin spot of 2 layers on under 5 % of the surface leaves the 5th percentile adequate but the verdict marginal (a warning, not a gate)', () => {
+    const sliver = blockMesh([2, 2, 2], [5, 5, 5]);
     const result = meshAdequacy(union(blockMesh([20, 20, 4], [100, 100, 20]), sliver));
     expect(result.parts[0]).toMatchObject({ verdict: 'marginal' });
     expect(result.parts[0]?.elementsThrough).toBeCloseTo(4, 6);
     expect(result.parts[0]?.minimumLayers).toBeLessThan(0.75 * LINEAR_LAYERS_REQUIRED);
+    expect(result.parts[0]?.minimumLayers).toBeGreaterThanOrEqual(0.5 * LINEAR_LAYERS_REQUIRED);
     expect(result.verdict).toBe('marginal');
+  });
+
+  it('hard floor: a 1-layer rib on under 5 % of the faces of a fine block is inadequate although the 5th percentile reads 4 layers', () => {
+    const block = blockMesh([20, 20, 4], [100, 100, 20]);
+    const mesh = union(block, blockMesh([1, 1, 1], [3, 3, 1]));
+    const ribFaces = 12;
+    expect(ribFaces / (meshAdequacy(block).parts[0]?.samples ?? 1)).toBeLessThan(0.05);
+    const result = meshAdequacy(mesh);
+    expect(result.parts[0]?.minimumLayers).toBeLessThan(0.5 * LINEAR_LAYERS_REQUIRED);
+    expect(result.parts[0]?.elementsThrough).toBeCloseTo(4, 6);
+    expect(result.parts[0]?.verdict).toBe('inadequate');
+    expect(result.verdict).toBe('inadequate');
   });
 
   it('quadratic tetrahedra need 2 layers: a single thin C3D10 is inadequate, a grid of cells is adequate; orders are reported separately', () => {
@@ -119,11 +117,13 @@ describe('meshAdequacy: layers through the wall of the actual tet mesh (FR-INT-0
     expect(meshAdequacy(both).verdict).toBe('inadequate');
   });
 
-  it('is deterministic and samples at most 400 faces of a large mesh', () => {
+  it('is deterministic; a boundary of up to 2,000 faces is measured on every face, a larger one on 3 faces per position x area bucket', () => {
+    const small = blockMesh([10, 10, 6], [50, 50, 30]);
+    expect(meshAdequacy(small).parts[0]?.samples).toBe(2 * (10 * 10 + 10 * 6 + 10 * 6) * 2);
     const mesh = blockMesh([20, 20, 6], [100, 100, 30]);
     const first = meshAdequacy(mesh);
-    expect(meshAdequacy(mesh)).toEqual(first);
-    expect(first.parts[0]?.samples).toBeLessThanOrEqual(400);
+    expect(meshAdequacy({ ...mesh })).toEqual(first);
+    expect(first.parts[0]?.samples).toBeLessThan(2 * (20 * 20 + 20 * 6 + 20 * 6) * 2);
     expect(first.parts[0]?.samples).toBeGreaterThanOrEqual(200);
   });
 
@@ -202,11 +202,90 @@ describe('meshAdequacy: layers through the wall of the actual tet mesh (FR-INT-0
     expect(reasons[0]).toContain('C3D10 needs 2');
   });
 
-  it('adequacyOf prefers the verdict recorded on the results, else measures the mesh', () => {
-    const mesh = blockMesh([12, 12, 1], [60, 60, 5]);
-    const recorded = { verdict: 'adequate' as const, parts: [], unmeasuredParts: [] };
+  it('the recorded verdict is display only: adequacyOf always measures the mesh (a forged adequate, an empty {} or no mesh gate as not adequate)', () => {
+    const mesh = blockMesh([12, 12, 2], [60, 60, 10]);
     const results = { kind: 'fe_results' as const, meshHash: '', inputHash: '', solver: 's', solverVersion: '1', steps: [] };
-    expect(adequacyOf({ ...results, adequacy: recorded }, mesh)).toBe(recorded);
+    const forged = { verdict: 'adequate' as const, parts: [], unmeasuredParts: [] };
+    expect(adequacyOf({ ...results, adequacy: forged }, mesh).verdict).toBe('inadequate');
+    expect(adequacyOf({ ...results, adequacy: {} as unknown as typeof forged }, mesh).verdict).toBe('inadequate');
     expect(adequacyOf(results, mesh).verdict).toBe('inadequate');
+    const none = adequacyOf({ ...results, adequacy: forged }, null);
+    expect(none.verdict).toBe('unmeasured');
+    expect(blocksAssessment(none)).toBe(true);
+    expect(blocksAssessment(adequacyOf(results, mesh))).toBe(true);
+    expect(blocksAssessment(adequacyOf(results, blockMesh([12, 12, 5], [60, 60, 25])))).toBe(false);
+    expect(inadequacyReasons(none)[0]).toContain('not available');
+  });
+
+  it('memoizes the measure by the mesh object and by the verified mesh hash: a second call does not measure again', () => {
+    const results = { kind: 'fe_results' as const, meshHash: 'abc123', inputHash: '', solver: 's', solverVersion: '1', steps: [] };
+    const mesh = blockMesh([12, 12, 3], [60, 60, 15]);
+    const first = adequacyOf(results, mesh);
+    expect(adequacyOf(results, mesh)).toBe(first);
+    expect(meshAdequacy(mesh)).toBe(first);
+    expect(adequacyOf(results, { ...mesh })).toBe(first);
+    expect(adequacyOf({ ...results, meshHash: 'other' }, { ...mesh })).not.toBe(first);
+    const again: FeMeshAdequacy = meshAdequacy({ ...mesh });
+    expect(again).not.toBe(first);
+    expect(again).toEqual(first);
+  });
+});
+
+describe('meshAdequacy: calibration on unstructured meshes and documented conservatism', () => {
+  it('jittered lattices (interior nodes displaced by up to 0.25 cell sides, no inverted tet) read within 15 % of the structured value and never cross the budget', () => {
+    for (const layers of [2, 3, 4, 5]) {
+      const jittered = jitteredBlockMesh([8, 8, layers], [40, 40, 5 * layers], 0.25);
+      const structured = blockMesh([8, 8, layers], [40, 40, 5 * layers]);
+      const reference = tetVolumes(structured);
+      expect(tetVolumes(jittered).every((volume, index) => volume * (reference[index] as number) > 0)).toBe(true);
+      expect(jittered.nodes).not.toEqual(structured.nodes);
+      const read = meshAdequacy(jittered).parts[0];
+      const base = meshAdequacy(structured).parts[0];
+      process.stdout.write(
+        `jittered ${layers} layers: p5 ${read?.elementsThrough.toFixed(3)} thinnest ${read?.minimumLayers.toFixed(3)} (structured ${base?.elementsThrough.toFixed(3)}, bias ${(((read?.elementsThrough ?? 0) / (base?.elementsThrough ?? 1) - 1) * 100).toFixed(1)} %)\n`,
+      );
+      expect(read?.elementsThrough).toBeGreaterThan((base?.elementsThrough ?? 0) * 0.85);
+      expect(read?.elementsThrough).toBeLessThan((base?.elementsThrough ?? 0) * 1.15);
+      if (layers === 2) expect(read?.elementsThrough).toBeLessThan(LINEAR_LAYERS_REQUIRED);
+      if (layers === 5) expect(read?.elementsThrough).toBeGreaterThanOrEqual(LINEAR_LAYERS_REQUIRED);
+    }
+  });
+
+  it('a slender section is governed by its thinnest dimension (conservative by design): a 10 x 40 beam with 3 layers through the 10 reads 3 although 40 mm carries 12', () => {
+    const coarse = meshAdequacy(blockMesh([60, 12, 3], [200, 40, 10])).parts[0];
+    expect(coarse?.elementsThrough).toBeGreaterThan(3 * 0.85);
+    expect(coarse?.elementsThrough).toBeLessThan(3 * 1.15);
+    expect(coarse?.verdict).toBe('inadequate');
+    const fine = meshAdequacy(blockMesh([80, 16, 4], [200, 40, 10])).parts[0];
+    expect(fine?.elementsThrough).toBeGreaterThan(4 * 0.85);
+    expect(fine?.verdict).toBe('adequate');
+  });
+
+  it('rays lying in the Kuhn plane y = z cross the cell diagonal at a node / edge: they read the wall, never more and never zero (conservative early stop pinned)', () => {
+    const cell = meshAdequacy(blockMesh([1, 1, 1], [1, 1, 1])).parts[0];
+    expect(cell).toMatchObject({ samples: 12, tetsCrossed: 3 });
+    expect(cell?.minimumLayers).toBeGreaterThan(0);
+    expect(cell?.minimumLayers).toBeCloseTo(1, 9);
+    expect(cell?.elementsThrough).toBeLessThanOrEqual(1 + 1e-9);
+    const row = meshAdequacy(blockMesh([6, 1, 1], [6, 1, 1])).parts[0];
+    expect(row?.minimumLayers).toBeCloseTo(1, 9);
+    expect(row?.elementsThrough).toBeLessThanOrEqual(1 + 1e-9);
+  });
+
+  it('measures a 200,000-element mesh in seconds with typed arrays (single run, generous bound; reports time and heap)', () => {
+    const mesh = blockMesh([60, 60, 9], [60, 60, 9]);
+    const elements = mesh.blocks[0]?.elements.length ?? 0;
+    expect(elements).toBeGreaterThanOrEqual(190000);
+    const before = process.memoryUsage().heapUsed;
+    const start = performance.now();
+    const result = meshAdequacy(mesh);
+    const elapsedMs = performance.now() - start;
+    const heapMb = (process.memoryUsage().heapUsed - before) / 2 ** 20;
+    process.stdout.write(
+      `meshAdequacy ${elements} elements: ${elapsedMs.toFixed(0)} ms, heap +${heapMb.toFixed(0)} MB, rss ${(process.memoryUsage().rss / 2 ** 20).toFixed(0)} MB\n`,
+    );
+    expect(result.verdict).toBe('adequate');
+    expect(result.parts[0]?.elementsThrough).toBeCloseTo(9, 1);
+    expect(elapsedMs).toBeLessThan(10000);
   });
 });

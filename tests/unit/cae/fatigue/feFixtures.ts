@@ -10,10 +10,8 @@ import type { FeArtifactPort, FeMeshArtifact, FeResultsArtifact } from '@core/mo
 import type { CadDocument } from '@core/model/types';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
-import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import { barDocument, hashOf, mustRun } from '../deckFixtures';
-import { ADEQUATE } from '../marginsFixtures';
-import { gridMesh, seeded } from '../gridMesh';
+import { gridMesh, seeded, type GridMesh } from '../gridMesh';
 
 const SOURCE = { citation: 'synthetic test fixture', locator: 'tests/unit/cae/fatigue/feFixtures' };
 
@@ -45,11 +43,14 @@ const model = (id: string, body: Record<string, unknown>): Record<string, unknow
 });
 
 export interface FeFatigueOptions {
+  /** Cells of the 2 x 1 x 1 bar (default 8 x 4 x 4: 4 cells through the 1 mm depth, which measures adequate for C3D4). */
   readonly cells?: readonly [number, number, number];
+  /** A mesh to use instead of the structured grid (node ids and tet node lists). */
+  readonly grid?: GridMesh;
   readonly steps?: number;
   readonly seed?: number;
-  /** The adequacy recorded on the results (default: adequate, the seeded 2-layer grid only stands in for a fine mesh); 'measured' records none, so it is measured on the mesh. */
-  readonly adequacy?: FeMeshAdequacy | 'measured';
+  /** A verdict to record on the results (display only: the gate always measures the mesh; used to prove a forged record gates nothing). */
+  readonly recordedAdequacy?: unknown;
   /** Extra create_fatigue_case params (override the defaults). */
   readonly caseParams?: Record<string, unknown>;
 }
@@ -67,7 +68,7 @@ export interface FeFatigue {
 
 /** Solved static analysis with load cases LC1 / LC2 and FE fatigue case `caseId` (stress_life, sn1, Goodman, scatter 3). */
 export function feFatigue(options: FeFatigueOptions = {}): FeFatigue {
-  const { cells = [4, 2, 2], steps = 40, seed = 7 } = options;
+  const { cells = [8, 4, 4], steps = 40, seed = 7 } = options;
   const bar = barDocument();
   let doc = bar.doc;
   doc = mustRun(doc, 'set_material_property', {
@@ -153,7 +154,7 @@ export function feFatigue(options: FeFatigueOptions = {}): FeFatigue {
       vector: loadCase === 'LC1' ? [100, 0, 0] : [0, 100, 0],
       target: { entityId: bar.boxId, facesNear: [[2, 0.5, 0.5]] },
     });
-  const grid = gridMesh({ cells, size: [2, 1, 1] });
+  const grid = options.grid ?? gridMesh({ cells, size: [2, 1, 1] });
   const mesh: FeMeshArtifact = {
     kind: 'fe_mesh',
     unitSystem: 'N-mm-t-s',
@@ -178,7 +179,7 @@ export function feFatigue(options: FeFatigueOptions = {}): FeFatigue {
     inputHash: analysisInputHash(doc, bar.analysisId, 'full'),
     solver: 'test',
     solverVersion: '1',
-    ...(options.adequacy === 'measured' ? {} : { adequacy: options.adequacy ?? ADEQUATE }),
+    ...(options.recordedAdequacy === undefined ? {} : ({ adequacy: options.recordedAdequacy } as Partial<FeResultsArtifact>)),
     steps: [1, 2].map((step) => ({
       step,
       time: step,

@@ -84,8 +84,8 @@ describe('fatigue field (TR-FAT-41)', () => {
 
   it('builds the native job of every node from the trusted results, keyed by the case input hash', () => {
     const input = inputOf(fixture);
-    expect(input.job).toMatchObject({ task: 'fatigue', nodeCount: 45, loadCases: 2, steps: 40, measure: { kind: 'signed_von_mises' } });
-    expect(input.tensors).toHaveLength(45 * 2 * 6);
+    expect(input.job).toMatchObject({ task: 'fatigue', nodeCount: 225, loadCases: 2, steps: 40, measure: { kind: 'signed_von_mises' } });
+    expect(input.tensors).toHaveLength(225 * 2 * 6);
     expect(input.job.damage).toMatchObject({
       method: 'stress_life',
       curve: { kind: 'sn_basquin', sigmaF: 1160 },
@@ -108,7 +108,7 @@ describe('fatigue field (TR-FAT-41)', () => {
     expect(JSON.stringify(fixture.doc)).toBe(before);
     expect(result.document).toBe(fixture.doc);
     const out = data(result);
-    expect(out).toMatchObject({ selection: 'all_nodes', nodesEvaluated: 45, fatigueInputHash: input.key, reviewRequired: true });
+    expect(out).toMatchObject({ selection: 'all_nodes', nodesEvaluated: 225, fatigueInputHash: input.key, reviewRequired: true });
     const rows = out['rows'] as Json[];
     expect(rows.map((row) => row['rowKey'])).toEqual(['h1', 'h2', 'h3']);
     const width = FIELD_COMPONENTS.length;
@@ -120,7 +120,7 @@ describe('fatigue field (TR-FAT-41)', () => {
       status: expect.stringMatching(/PASS|MARGINAL|FAIL/),
       selection: 'all_nodes',
     });
-    expect(result.summary).toContain('ranked by damage over all 45 nodes');
+    expect(result.summary).toContain('ranked by damage over all 225 nodes');
     const check = data(execute(fixture.doc, 'check_fatigue', { caseId: fixture.caseId }, fixture.ctx));
     expect((check['items'] as Json[]).map((entry) => entry['code'])).not.toContain('FAT_RESULTS_MISSING');
   });
@@ -249,7 +249,7 @@ describe('fatigue field (TR-FAT-41)', () => {
       },
     ];
     for (const caseParams of variants) {
-      const local = feFatigue({ seed: 5, cells: [2, 1, 1], caseParams });
+      const local = feFatigue({ seed: 5, caseParams });
       const input = inputOf(local);
       const reference = fatigueFieldReference(input);
       expect(reference.every((value) => Number.isFinite(value))).toBe(true);
@@ -261,7 +261,7 @@ describe('fatigue field (TR-FAT-41)', () => {
   });
 
   it('ranks static failures first and reports no margin for them', () => {
-    const local = feFatigue({ seed: 9, cells: [2, 1, 1] });
+    const local = feFatigue({ seed: 9 });
     const scaled = execute(local.doc, 'update_fatigue_case', {
       caseId: local.caseId,
       mapping: [

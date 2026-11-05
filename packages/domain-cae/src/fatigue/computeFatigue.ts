@@ -5,6 +5,7 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { FatigueCase } from '@core/model/durability';
 import type { CadDocument } from '@core/model/types';
+import { marginalWarnings } from '../margins/adequacyGate';
 import { inadequacyReasons } from '../results/adequacy';
 import { refuseFatigue } from './codes';
 import { evaluateCase, isEvaluationFailure, type Evaluation } from './evaluate';
@@ -101,7 +102,7 @@ function computeFe(
     doc,
     gated
       ? `compute_fatigue ${fatigueCase.id}: ${rows.length} hot spot(s) over all ${evaluation.nodesEvaluated} nodes (fatigue field ${evaluation.fatigueInputHash.slice(0, 12)}); NOT_ASSESSED.${meshNote} ${REVIEW_NOTE}`
-      : `compute_fatigue ${fatigueCase.id}: ${rows.length} hot spot(s) ranked by damage over all ${evaluation.nodesEvaluated} nodes (fatigue field ${evaluation.fatigueInputHash.slice(0, 12)})${life}, min margin ${marginText(evaluation.minMargin)} with scatter factor ${fatigueCase.factors.scatter?.value} (${fatigueCase.factors.scatter?.source}); ${evaluation.status}${evaluation.overrides.length > 0 ? ' (inadequate mesh accepted by acceptInadequateMesh)' : ''}. ${REVIEW_NOTE}`,
+      : `compute_fatigue ${fatigueCase.id}: ${rows.length} hot spot(s) ranked by damage over all ${evaluation.nodesEvaluated} nodes (fatigue field ${evaluation.fatigueInputHash.slice(0, 12)})${life}, min margin ${marginText(evaluation.minMargin)} with scatter factor ${fatigueCase.factors.scatter?.value} (${fatigueCase.factors.scatter?.source}); ${evaluation.status}${evaluation.overrides.length > 0 ? ' (inadequate mesh accepted by acceptInadequateMesh)' : ''}${evaluation.adequacy.verdict === 'marginal' ? '; FEA_MESH_MARGINAL: a thin region of the mesh is under-resolved (not gated), see data.warnings' : ''}. ${REVIEW_NOTE}`,
     {
       caseId: fatigueCase.id,
       method: fatigueCase.method,
@@ -113,6 +114,7 @@ function computeFe(
       minMargin: evaluation.minMargin,
       status: evaluation.status,
       meshAdequacy: evaluation.adequacy,
+      warnings: [...marginalWarnings(evaluation.adequacy)],
       ...(evaluation.overrides.length > 0 ? { overrides: evaluation.overrides } : {}),
       factors: factorsOf(fatigueCase),
       rows,

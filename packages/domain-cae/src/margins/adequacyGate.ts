@@ -1,7 +1,7 @@
 /** Mesh-adequacy gate of compute_margins (FR-INT-06, TR-INT-08): rows of an inadequate result are not assessed unless the caller accepts the mesh. */
 
 import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
-import { inadequacyReasons } from '../results/adequacy';
+import { blocksAssessment, inadequacyReasons } from '../results/adequacy';
 
 export const ACCEPT_INADEQUATE_MESH = 'acceptInadequateMesh';
 
@@ -23,11 +23,11 @@ export interface GatedRows<R extends GateRow> {
 
 /**
  * `FEA_MESH_INADEQUATE` rows for an `inadequate` result: no margin, status `NOT_ASSESSED`, state `not_assessed`, no disposition to ask for.
- * @invariant adequate / marginal results pass through untouched; `accept` restores the numeric rows and is recorded in `overrides`
+ * @invariant adequate / marginal results pass through untouched (marginal is a warning: `adequacyWarnings`); `unmeasured` gates like `inadequate`; `accept` restores the numeric rows and is recorded in `overrides`
  */
 export function gateRows<R extends GateRow>(rows: readonly R[], adequacy: FeMeshAdequacy, accept: boolean): GatedRows<R> {
-  if (adequacy.verdict !== 'inadequate') return { rows, gated: false, overrides: [], reasons: [] };
   const reasons = inadequacyReasons(adequacy);
+  if (!blocksAssessment(adequacy)) return { rows, gated: false, overrides: [], reasons: [] };
   if (accept) return { rows, gated: false, overrides: [ACCEPT_INADEQUATE_MESH], reasons };
   return {
     rows: rows.map(
@@ -47,6 +47,25 @@ export function gateRows<R extends GateRow>(rows: readonly R[], adequacy: FeMesh
     overrides: [],
     reasons,
   };
+}
+
+/** The headline of a NOT ASSESSED result (compute_margins summary). */
+export const notAssessedText = (reasons: readonly string[]): string =>
+  `NOT ASSESSED (FEA_MESH_INADEQUATE: ${reasons.join('; ')}; refine the mesh, or pass acceptInadequateMesh: true on the engineer's decision)`;
+
+/** `FEA_MESH_MARGINAL: ...` when the mesh is marginal (a thin region under 75 % of the layer budget; not gated), else empty. */
+export const marginalWarnings = (adequacy: FeMeshAdequacy): string[] =>
+  adequacy.verdict === 'marginal'
+    ? [`FEA_MESH_MARGINAL: ${inadequacyReasons(adequacy).join('; ')}; the result is not gated, refine the thin region`]
+    : [];
+
+/** `data.warnings` entries of the gate: the refusal, the acceptance override, and FEA_MESH_MARGINAL. */
+export function adequacyWarnings(gate: GatedRows<GateRow>, adequacy: FeMeshAdequacy): string[] {
+  return [
+    ...(gate.gated ? [`FEA_MESH_INADEQUATE: ${gate.reasons.join('; ')}`] : []),
+    ...(gate.overrides.length > 0 ? [`FEA_MESH_INADEQUATE accepted by acceptInadequateMesh: ${gate.reasons.join('; ')}`] : []),
+    ...marginalWarnings(adequacy),
+  ];
 }
 
 /** `not_assessed` when a row is not assessed, else `fail` / `marginal` / `pass` by the worst regular (non-singular) row. */

@@ -6,9 +6,9 @@
 
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
-import type { Vec3 } from '@core/model/vectors';
+import { CORNERS, buildAdjacency, castRay, faceGeometry, faceHash, type Corner, type Ray } from './adequacyRay';
 
-type Verdict = FeMeshAdequacy['verdict'];
+type Verdict = FeMeshAdequacy['parts'][number]['verdict'];
 type PartEntry = FeMeshAdequacy['parts'][number];
 
 /**
@@ -18,227 +18,211 @@ type PartEntry = FeMeshAdequacy['parts'][number];
 export const LINEAR_LAYERS_REQUIRED = 4;
 /** Element layers required through the wall of a quadratic tetrahedron (C3D10). Target value of TR-INT-07, pending the VNV-M3 convergence study. */
 export const QUADRATIC_LAYERS_REQUIRED = 2;
-/** Boundary faces measured per part and order: all of them up to this many, else this many chosen by a deterministic hash of the face nodes. */
-const SAMPLE_FACES = 400;
-/** Fraction of the samples allowed to read thinner (the 5th percentile governs, so a thin wall is not averaged away). */
+/** A part with at most this many boundary faces is measured on every face. */
+const ALL_FACES = 2000;
+/** Above it: boundary faces are bucketed by position (a GRID^3 grid over the boundary) and area class, and this many (smallest hash) are taken per bucket. */
+const PER_BUCKET = 3;
+const GRID = 8;
+const AREA_CLASSES = 6;
+/** Fraction of the surface area allowed to read thinner (the 5th percentile governs, so a thin wall is not averaged away). */
 const PERCENTILE = 0.05;
-/**
- * Mean edge length of a Kuhn-split cell (6 tets: edges 1, 1, 1, sqrt 2, sqrt 2, sqrt 3 of the cell side) over the cell side: the local element size
- * h of a ray is the mean edge length of the tets it crosses divided by this, so a structured mesh of cubic cells of side s reads h = s and one
- * layer of hex-equivalent cells reads 1 layer. A mesher's near-regular tets (layer height 0.82 of the edge) read about the same.
- */
-const MEAN_EDGE_OVER_CELL = (3 + 2 * Math.SQRT2 + Math.sqrt(3)) / 6;
 /** Relative slack on the budget comparison, so a structured mesh exactly at the budget (4.0000000001 or 3.9999999999 layers) is not decided by rounding. */
 const BUDGET_TOLERANCE = 1e-6;
-/** A thinnest spot under this fraction of the budget makes a result that meets it `marginal` (a thin region smaller than 5 % of the surface). */
+/** A thinnest sampled spot under this fraction of the budget makes the part inadequate whatever the percentile says (a thin rib on a fine mesh is not averaged away). */
+const FLOOR_FRACTION = 0.5;
+/** A thinnest spot between FLOOR_FRACTION and this fraction of the budget makes a result that meets it `marginal` (a warning, not a gate). */
 const MARGINAL_FRACTION = 0.75;
-/** A direction counts as leaving a tetrahedron face only when its cosine with the outward normal exceeds this. */
-const EXIT_COSINE = 1e-9;
-type Corner = 0 | 1 | 2 | 3;
-const CORNERS: readonly Corner[] = [0, 1, 2, 3];
-/** Faces of a tetrahedron by the corner each one is opposite to. */
-const FACE_OF: Readonly<Record<Corner, readonly [Corner, Corner, Corner]>> = { 0: [1, 2, 3], 1: [0, 2, 3], 2: [0, 1, 3], 3: [0, 1, 2] };
-/** The six edges of a tetrahedron as corner pairs. */
-const EDGES: readonly (readonly [Corner, Corner])[] = [
-  [0, 1],
-  [0, 2],
-  [0, 3],
-  [1, 2],
-  [1, 3],
-  [2, 3],
-];
+/** Verified mesh hashes remembered at once (a hash hit saves re-measuring a mesh reloaded from the artifact store). */
+const HASH_CACHE = 8;
 
-const WORST: Readonly<Record<Verdict, number>> = { adequate: 0, marginal: 1, inadequate: 2 };
+const WORST: Readonly<Record<FeMeshAdequacy['verdict'], number>> = { adequate: 0, marginal: 1, inadequate: 2, unmeasured: 3 };
 
 /**
- * Verdict of a measured layer count: `inadequate` when the 5th percentile is below the budget; `marginal` when it meets the budget but the
- * thinnest sampled spot is under 75 % of it (a thin region smaller than 5 % of the surface); `adequate` otherwise.
+ * Verdict of a measured layer count: `inadequate` when the 5th percentile is below the budget or the thinnest sampled spot is under half of it;
+ * `marginal` when the thinnest spot is under 75 % of it; `adequate` otherwise.
  */
 function verdictOf(typical: number, thinnest: number, required: number): Verdict {
-  if (typical < required * (1 - BUDGET_TOLERANCE)) return 'inadequate';
+  if (typical < required * (1 - BUDGET_TOLERANCE) || thinnest < required * FLOOR_FRACTION) return 'inadequate';
   return thinnest < required * MARGINAL_FRACTION ? 'marginal' : 'adequate';
 }
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-
-type Corners = readonly [Vec3, Vec3, Vec3, Vec3];
-interface Tet {
-  readonly ids: readonly [number, number, number, number];
-  readonly corners: Corners;
+interface BoundaryFace {
+  readonly tet: number;
+  readonly corner: Corner;
+  readonly hash: number;
+  readonly area: number;
+  readonly bucket: number;
 }
 
-/** Sorted node ids of the face of `tet` opposite `corner`. */
-const faceIds = (tet: Tet, corner: Corner): [number, number, number] => {
-  const [a, b, c] = FACE_OF[corner];
-  return [tet.ids[a], tet.ids[b], tet.ids[c]].sort((x, y) => x - y) as [number, number, number];
-};
-
-/** Unit outward normal of the face of `tet` opposite corner `opposite` and one of its vertices; null for a zero-area face. */
-function outwardFace(tet: Tet, opposite: Corner): { readonly normal: Vec3; readonly vertex: Vec3 } | null {
-  const [a, b, c] = FACE_OF[opposite];
-  const [pa, pb, pc] = [tet.corners[a], tet.corners[b], tet.corners[c]];
-  const raw = cross(sub(pb, pa), sub(pc, pa));
-  const length = Math.hypot(raw[0], raw[1], raw[2]);
-  if (!(length > 0) || !Number.isFinite(length)) return null;
-  const sign = dot(raw, sub(tet.corners[opposite], pa)) > 0 ? -1 : 1;
-  return { normal: [(sign * raw[0]) / length, (sign * raw[1]) / length, (sign * raw[2]) / length], vertex: pa };
+/** The faces to cast from, each with the surface area it stands for: every face of a small boundary, else the `PER_BUCKET` smallest-hash faces of each (position, area class) bucket. */
+function sampleFaces(faces: BoundaryFace[]): { readonly face: BoundaryFace; readonly weight: number }[] {
+  if (faces.length <= ALL_FACES) return faces.map((face) => ({ face, weight: face.area }));
+  const buckets = new Map<number, BoundaryFace[]>();
+  for (const face of faces) {
+    const members = buckets.get(face.bucket);
+    if (members === undefined) buckets.set(face.bucket, [face]);
+    else members.push(face);
+  }
+  return [...buckets.entries()]
+    .sort(([left], [right]) => left - right)
+    .flatMap(([, members]) => {
+      const chosen = members.sort((left, right) => left.hash - right.hash).slice(0, PER_BUCKET);
+      const weight = members.reduce((sum, face) => sum + face.area, 0) / chosen.length;
+      return chosen.map((face) => ({ face, weight }));
+    });
 }
 
-/** `neighbours[4 * tet + corner]` is the tetrahedron across the face opposite `corner`, -1 on the boundary. */
-function adjacency(tets: readonly Tet[]): Int32Array {
-  const neighbours = new Int32Array(tets.length * 4).fill(-1);
-  const seen = new Map<string, number>();
-  tets.forEach((tet, index) => {
-    for (const corner of CORNERS) {
-      const key = faceIds(tet, corner).join(',');
-      const other = seen.get(key);
-      if (other === undefined) seen.set(key, index * 4 + corner);
-      else if (neighbours[other] === -1) {
-        neighbours[other] = index;
-        neighbours[index * 4 + corner] = Math.floor(other / 4);
-      }
-    }
+/** The boundary faces of the tetrahedra with their position / area bucket. */
+function boundaryFaces(xyz: Float64Array, nodes: Int32Array, neighbours: Int32Array): BoundaryFace[] {
+  const raw: { tet: number; corner: Corner; area: number; centroid: readonly number[] }[] = [];
+  for (let tet = 0; tet < nodes.length / 4; tet += 1)
+    for (const corner of CORNERS)
+      if (neighbours[tet * 4 + corner] === -1) raw.push({ tet, corner, ...faceGeometry(xyz, nodes, tet, corner) });
+  const lo = [Infinity, Infinity, Infinity];
+  const hi = [-Infinity, -Infinity, -Infinity];
+  let smallest = Infinity;
+  for (const face of raw) {
+    face.centroid.forEach((value, axis) => {
+      lo[axis] = Math.min(lo[axis] as number, value);
+      hi[axis] = Math.max(hi[axis] as number, value);
+    });
+    if (face.area > 0) smallest = Math.min(smallest, face.area);
+  }
+  const cell = (value: number, axis: number): number => {
+    const extent = (hi[axis] as number) - (lo[axis] as number);
+    return extent > 0 ? Math.min(GRID - 1, Math.floor((GRID * (value - (lo[axis] as number))) / extent)) : 0;
+  };
+  return raw.map((face) => {
+    const [cx, cy, cz] = face.centroid.map(cell) as [number, number, number];
+    const areaClass = face.area > 0 ? Math.min(AREA_CLASSES - 1, Math.floor(Math.log2(face.area / smallest))) : 0;
+    return {
+      tet: face.tet,
+      corner: face.corner,
+      area: face.area,
+      hash: faceHash(nodes, face.tet, face.corner),
+      bucket: ((cx * GRID + cy) * GRID + cz) * AREA_CLASSES + areaClass,
+    };
   });
-  return neighbours;
-}
-
-/** Deterministic pseudo-random order of a boundary face (hash of its sorted node ids): samples spread over the part without aliasing the mesh pattern. */
-function faceHash(tet: Tet, corner: Corner): number {
-  const [a, b, c] = faceIds(tet, corner);
-  return (Math.imul(a, 73856093) ^ Math.imul(b, 19349663) ^ Math.imul(c, 83492791)) >>> 0;
-}
-
-/** Mean of the 6 corner-to-corner edge lengths of `tet`. */
-function meanEdge(tet: Tet): number {
-  let total = 0;
-  for (const [from, to] of EDGES) {
-    const [a, b] = [tet.corners[from], tet.corners[to]];
-    total += Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-  }
-  return total / 6;
-}
-
-interface Ray {
-  /** Element layers: hit distance over the local element size. */
-  readonly layers: number;
-  readonly tets: number;
-}
-
-/**
- * The ray from the centroid of a boundary face along the inward normal until it leaves the part: its hit distance t over the local element size
- * h (mean edge length of the crossed tets over MEAN_EDGE_OVER_CELL); null for a degenerate face or a ray that crosses nothing measurable. A ray
- * stops where it makes no progress (a degenerate tet, or overlapping tets whose faces point at each other), so it always terminates.
- */
-function layersThrough(tets: readonly Tet[], neighbours: Int32Array, start: number, corner: Corner): Ray | null {
-  const first = tets[start] as Tet;
-  const face = outwardFace(first, corner);
-  if (face === null) return null;
-  const [a, b, c] = FACE_OF[corner].map((vertex) => first.corners[vertex]) as [Vec3, Vec3, Vec3];
-  const origin: Vec3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
-  const direction: Vec3 = [-face.normal[0], -face.normal[1], -face.normal[2]];
-  let current = start;
-  let crossed = 0;
-  let edges = 0;
-  let travelled = 0;
-  for (;;) {
-    const tet = tets[current] as Tet;
-    let exitCorner: Corner | null = null;
-    let exitAt = Infinity;
-    for (const opposite of CORNERS) {
-      const candidate = outwardFace(tet, opposite);
-      if (candidate === null) continue;
-      const cosine = dot(direction, candidate.normal);
-      if (cosine <= EXIT_COSINE) continue;
-      const at = dot(sub(candidate.vertex, origin), candidate.normal) / cosine;
-      if (at < exitAt) {
-        exitAt = at;
-        exitCorner = opposite;
-      }
-    }
-    if (exitCorner === null || !(exitAt > travelled)) break;
-    crossed += 1;
-    edges += meanEdge(tet);
-    travelled = exitAt;
-    const next = neighbours[current * 4 + exitCorner] as number;
-    if (next < 0) break;
-    current = next;
-  }
-  const size = edges / crossed / MEAN_EDGE_OVER_CELL;
-  return crossed > 0 && size > 0 ? { layers: travelled / size, tets: crossed } : null;
 }
 
 /** The measured entry of one part and order, or null when no boundary face could be cast. */
-function measure(entityId: string, order: PartEntry['order'], tets: readonly Tet[]): PartEntry | null {
-  const neighbours = adjacency(tets);
-  const boundary: { readonly tet: number; readonly corner: Corner; readonly hash: number }[] = [];
-  tets.forEach((tet, index) => {
-    for (const corner of CORNERS)
-      if (neighbours[index * 4 + corner] === -1) boundary.push({ tet: index, corner, hash: faceHash(tet, corner) });
-  });
-  const chosen =
-    boundary.length <= SAMPLE_FACES ? boundary : [...boundary].sort((left, right) => left.hash - right.hash).slice(0, SAMPLE_FACES);
-  const rays = chosen
-    .map((face) => layersThrough(tets, neighbours, face.tet, face.corner))
-    .filter((ray): ray is Ray => ray !== null)
-    .sort((left, right) => left.layers - right.layers || left.tets - right.tets);
-  const governing = rays[Math.max(0, Math.ceil(PERCENTILE * rays.length) - 1)];
-  const thinnest = rays[0];
-  if (governing === undefined || thinnest === undefined) return null;
-  const elementsThrough = governing.layers;
+function measure(entityId: string, order: PartEntry['order'], xyz: Float64Array, nodes: Int32Array): PartEntry | null {
+  const neighbours = buildAdjacency(nodes);
+  const rays = sampleFaces(boundaryFaces(xyz, nodes, neighbours))
+    .flatMap(({ face, weight }) => {
+      const ray = castRay(xyz, nodes, neighbours, face.tet, face.corner);
+      return ray === null ? [] : [{ ray, weight }];
+    })
+    .sort((left, right) => left.ray.layers - right.ray.layers || left.ray.tets - right.ray.tets);
+  const thinnest = rays[0]?.ray;
+  if (thinnest === undefined) return null;
+  const target = PERCENTILE * rays.reduce((sum, entry) => sum + entry.weight, 0) * (1 - 1e-12);
+  let cumulative = 0;
+  let governing: Ray = thinnest;
+  for (const entry of rays) {
+    governing = entry.ray;
+    cumulative += entry.weight;
+    if (cumulative >= target) break;
+  }
   const required = order === 'linear' ? LINEAR_LAYERS_REQUIRED : QUADRATIC_LAYERS_REQUIRED;
-  const minimumLayers = thinnest.layers;
   return {
     entityId,
     order,
-    elementsThrough,
-    minimumLayers,
+    elementsThrough: governing.layers,
+    minimumLayers: thinnest.layers,
     tetsCrossed: governing.tets,
     required,
     samples: rays.length,
-    verdict: verdictOf(elementsThrough, minimumLayers, required),
+    verdict: verdictOf(governing.layers, thinnest.layers, required),
   };
 }
 
-/**
- * Through-thickness adequacy of every solid part of the mesh, per element order.
- * @invariant deterministic (no randomness; samples chosen by a hash of the face nodes; ties keep the element order); cost O(E) to index the
- *   elements plus O(S x L) for S <= 400 sampled boundary faces per part and order and L the layers a ray crosses; `elementsThrough` is the 5th
- *   percentile of the element layers (hit distance over the mean tet edge of the crossed tets, calibrated to hex-equivalent cells; a thin wall governs); the verdict is the worst over parts; parts without tetrahedra, or with tetrahedra
- *   referencing a missing node left out of the count, are listed in `unmeasuredParts` and never counted as inadequate
- */
-export function meshAdequacy(mesh: FeMeshArtifact): FeMeshAdequacy {
-  const coordinates = new Map<number, Vec3>(mesh.nodes.map((node) => [node[0], [node[1], node[2], node[3]]]));
-  const groups = new Map<string, { entityId: string; order: PartEntry['order']; tets: Tet[] }>();
+function measureMesh(mesh: FeMeshArtifact): FeMeshAdequacy {
+  const index = new Map<number, number>();
+  const xyz = new Float64Array(mesh.nodes.length * 3);
+  mesh.nodes.forEach((node, at) => {
+    index.set(node[0], at);
+    xyz.set([node[1], node[2], node[3]], at * 3);
+  });
+  const groups = new Map<string, { entityId: string; order: PartEntry['order']; nodes: number[] }>();
   const entities = new Set<string>();
   for (const block of mesh.blocks) {
     entities.add(block.entityId);
     if (block.type !== 'C3D4' && block.type !== 'C3D10') continue;
     const order: PartEntry['order'] = block.type === 'C3D4' ? 'linear' : 'quadratic';
     const key = `${block.entityId}|${order}`;
-    const group = groups.get(key) ?? { entityId: block.entityId, order, tets: [] };
+    const group = groups.get(key) ?? { entityId: block.entityId, order, nodes: [] };
     for (const element of block.elements) {
-      const ids = element.slice(1, 5);
-      const corners = ids.map((id) => coordinates.get(id));
-      if (ids.length < 4 || corners.some((corner) => corner === undefined)) continue;
-      group.tets.push({ ids: ids as unknown as Tet['ids'], corners: corners as unknown as Corners });
+      const corners = [1, 2, 3, 4].map((at) => index.get(element[at] as number));
+      if (element.length < 5 || corners.some((corner) => corner === undefined)) continue;
+      for (const corner of corners) group.nodes.push(corner as number);
     }
     groups.set(key, group);
   }
   const parts = [...groups.values()]
     .sort((left, right) => (`${left.entityId}|${left.order}` < `${right.entityId}|${right.order}` ? -1 : 1))
-    .flatMap((group) => measure(group.entityId, group.order, group.tets) ?? []);
+    .flatMap((group) => measure(group.entityId, group.order, xyz, Int32Array.from(group.nodes)) ?? []);
   const measured = new Set(parts.map((part) => part.entityId));
-  const verdict = parts.reduce<Verdict>((worst, part) => (WORST[part.verdict] > WORST[worst] ? part.verdict : worst), 'adequate');
+  const verdict = parts.reduce<FeMeshAdequacy['verdict']>(
+    (worst, part) => (WORST[part.verdict] > WORST[worst] ? part.verdict : worst),
+    'adequate',
+  );
   return { verdict, parts, unmeasuredParts: [...entities].filter((entityId) => !measured.has(entityId)).sort() };
 }
 
-/** The adequacy recorded on the results artifact when the solve ran, else measured on `mesh` (imported results carry none). */
-export const adequacyOf = (results: FeResultsArtifact, mesh: FeMeshArtifact): FeMeshAdequacy => results.adequacy ?? meshAdequacy(mesh);
+const byObject = new WeakMap<FeMeshArtifact, FeMeshAdequacy>();
+const byHash = new Map<string, FeMeshAdequacy>();
+
+/**
+ * Through-thickness adequacy of every solid part of the mesh, per element order.
+ * @invariant deterministic (no randomness; samples chosen by a hash of the face nodes; ties keep the element order); memoized by the mesh object;
+ *   cost O(E) to index the elements and the face adjacency (typed arrays, no per-face strings) plus O(S x L) for S sampled boundary faces and L the
+ *   layers a ray crosses (all faces of a boundary up to 2,000 faces, else 3 per position x area bucket); `elementsThrough` is the area-weighted 5th
+ *   percentile of the element layers (hit distance over h = (6 x mean volume of the crossed tets)^(1/3): a Kuhn cell of side s reads s; a thin wall
+ *   governs, and the thinnest dimension of a slender section governs by design); a part is `inadequate` below the budget at the 5th percentile or when
+ *   the thinnest sampled spot is under half of it, `marginal` under 75 % of it; the verdict is the worst over parts; parts without tetrahedra, or with
+ *   tetrahedra referencing a missing node left out of the count, are listed in `unmeasuredParts` and never counted as inadequate
+ */
+export function meshAdequacy(mesh: FeMeshArtifact): FeMeshAdequacy {
+  const known = byObject.get(mesh);
+  if (known !== undefined) return known;
+  const measured = measureMesh(mesh);
+  byObject.set(mesh, measured);
+  return measured;
+}
+
+/** True when results on this adequacy must not be assessed without `acceptInadequateMesh` (inadequate, or not measurable). */
+export const blocksAssessment = (adequacy: FeMeshAdequacy): boolean =>
+  adequacy.verdict === 'inadequate' || adequacy.verdict === 'unmeasured';
+
+/**
+ * The adequacy that gates the results assessed on `mesh`: ALWAYS measured on the mesh, never read from `results.adequacy` (that record is display
+ * only: a forged or stale verdict gates nothing). No mesh artifact (imported results) is `unmeasured`, which gates like `inadequate`.
+ * @invariant memoized by the mesh object, and by the verified mesh hash `results.meshHash` (with the node and element counts) over the last 8 meshes
+ */
+export function adequacyOf(results: FeResultsArtifact, mesh: FeMeshArtifact | null): FeMeshAdequacy {
+  if (mesh === null) return { verdict: 'unmeasured', parts: [], unmeasuredParts: [] };
+  const known = byObject.get(mesh);
+  if (known !== undefined) return known;
+  const elements = mesh.blocks.reduce((sum, block) => sum + block.elements.length, 0);
+  const key = results.meshHash === '' ? '' : `${results.meshHash}|${mesh.nodes.length}|${elements}`;
+  const cached = key === '' ? undefined : byHash.get(key);
+  if (cached !== undefined) {
+    byObject.set(mesh, cached);
+    return cached;
+  }
+  const measured = meshAdequacy(mesh);
+  if (key !== '') {
+    byHash.set(key, measured);
+    if (byHash.size > HASH_CACHE) byHash.delete(byHash.keys().next().value as string);
+  }
+  return measured;
+}
 
 /** One account per part that is not adequate, e.g. `part 'bx-1': 2 element layer(s) through the wall ... (C3D4 needs 4)`; empty when adequate. */
 export function inadequacyReasons(adequacy: FeMeshAdequacy): string[] {
+  if (adequacy.verdict === 'unmeasured')
+    return ['the mesh artifact is not available, so the element layers through the walls could not be measured'];
   return adequacy.parts
     .filter((part) => part.verdict !== 'adequate')
     .map(
