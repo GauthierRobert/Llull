@@ -45,16 +45,24 @@ describe('record_signature (VC-PLM-17, 26)', () => {
     expect(signed.plm?.item.revisions['A']?.signatures).toHaveLength(1);
     const ok = run(signed, 'verify_release', { revision: 'A' }, humanContext({ humanSignature: fakePort(true) })).data as {
       signaturesValid: unknown;
+      state: string;
     };
     expect(ok.signaturesValid).toBe(true);
     const bad = run(signed, 'verify_release', { revision: 'A' }, humanContext({ humanSignature: fakePort(false) })).data as {
       signaturesValid: unknown;
+      state: string;
     };
     expect(bad.signaturesValid).toBe(false);
     const noPort = run(signed, 'verify_release', { revision: 'A' }, humanContext({ humanSignature: null })).data as {
       signaturesValid: unknown;
+      unchecked: Array<{ scope: string }>;
+      state: string;
     };
     expect(noPort.signaturesValid).toBe('unverified (no verifier port)');
+    expect(noPort.unchecked.map((entry) => entry.scope)).toEqual(['geometry', 'signatures']);
+    expect(noPort.state).toBe('partial');
+    expect(bad.state).toBe('fail');
+    expect(ok.state).toBe('partial');
   });
 
   it('refuses a bad signature, an untrusted or test key, malformed hex and a missing port', () => {

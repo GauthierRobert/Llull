@@ -114,6 +114,10 @@ describe('S2 lifecycle guards (VC-PLM-02, 03, 08, 09, 25)', () => {
       liveDefinitionMatches: boolean;
     };
     expect(verify).toMatchObject({ contentHashMatches: true, liveDefinitionMatches: false });
+    const failed = run(loaded.document, 'verify_release', { revision: 'A' });
+    expect(failed.data).toMatchObject({ state: 'fail', geometryVerified: false });
+    expect(failed.summary).toContain('FAILED verification');
+    expect(failed.summary.startsWith('partial:')).toBe(false);
     const restored = run(loaded.document, 'restore_revision_snapshot', { revision: 'A' });
     expect(restored.rejected, restored.summary).toBeUndefined();
     expect((run(restored.document, 'plm_status', {}).data as { integrity: Record<string, string> }).integrity['A']).toBe('ok');
@@ -139,6 +143,14 @@ describe('S2 lifecycle guards (VC-PLM-02, 03, 08, 09, 25)', () => {
       signaturesValid: 'n/a (none attached)',
     });
     expect(verified.document).toBe(doc);
+    expect(verified.data).toMatchObject({
+      geometryVerified: false,
+      state: 'partial',
+      unchecked: [{ scope: 'geometry', reason: 'regeneration not implemented' }],
+    });
+    expect((verified.data as { unchecked: Array<{ scope: string }> }).unchecked[0]?.scope).toBe('geometry');
+    expect(verified.summary.startsWith('partial:')).toBe(true);
+    expect(verified.summary).toContain('verified');
     expect(code(inWork(), 'verify_release', { revision: 'A' })).toBe('PLM_NOT_RELEASED');
     expect(code(doc, 'verify_release', { revision: 'Q' })).toBe('PLM_REVISION_UNKNOWN');
   });
