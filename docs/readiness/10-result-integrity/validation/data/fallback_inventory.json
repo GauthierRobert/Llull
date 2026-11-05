@@ -94,7 +94,45 @@
       "kind": "default",
       "input": "crane wheel base left out (3000 mm)",
       "policy": "pending",
-      "reason": "documented default in the wheelBase param description but not yet listed in the result data.defaulted of check_crane_runways / check_portal_frames."
+      "reason": "documented default in the wheelBase param description but not yet listed in the result data.defaulted of check_crane_runways / check_portal_frames.",
+      "match": "const wheelBase = model.wheelBase ?? 3000;"
+    },
+    {
+      "id": "INT-FB-011",
+      "file": "packages/domain-aec/src/plant/fabrication/check.ts",
+      "symbol": "checkFabrication (ISO_CUT_LENGTH_SHORT)",
+      "kind": "default",
+      "input": "minimum cut piece rule left out of the project rule set (no minimum: only pieces of 0 mm or less are flagged)",
+      "policy": "pending",
+      "reason": "an absent optional rule disables the minimum-cut-length check without being reported in the result; it should add an info finding naming the unset rule. Planned with the fabrication rule-set work.",
+      "match": "rules.minCutPieceMm?.value ?? 0"
+    },
+    {
+      "id": "INT-FB-012",
+      "file": "packages/domain-aec/src/industrial/frames/frameLoadParams.ts",
+      "symbol": "resolveFrameLoads",
+      "kind": "default",
+      "input": "frame loads left out (deadLoad 0.5, snowLoad 0.8, windPressure 0 kN/m2): echoed in the summary but not listed in data.defaulted",
+      "policy": "pending",
+      "reason": "check_portal_frames / design_portal_frames / check_foundations print the loads used in the summary; listing them in data.defaulted like boltClass needs the shared load shape and its tests reworked. Planned under INT-14."
+    },
+    {
+      "id": "INT-FB-013",
+      "file": "tests/unit/contract/fallbackInventory.test.ts",
+      "symbol": "fallback_scan_baseline.json",
+      "kind": "default",
+      "input": "numeric ?? / || defaults and destructuring defaults in the domain-* files outside the check / design / analysis name tier (recorded as a per-file hit count)",
+      "policy": "pending",
+      "reason": "the scan was extended to every non-test source file of packages/domain-*: these hits are ratcheted per file (a new one fails the scan) but were not individually reviewed. Only the grade fallbacks (S355 and any grade parser) were reviewed; review the rest and promote engineering inputs to refuse / default-and-report entries."
+    },
+    {
+      "id": "INT-FB-014",
+      "file": "packages/domain-aec/src/plant/structures/assembly/assemblyParts.ts",
+      "symbol": "placeMemberRuns",
+      "kind": "default",
+      "input": "steel grade of generated rack / platform members (was: the unparseable text \"steel\", checked as S355)",
+      "policy": "pending",
+      "reason": "generated members now store the explicit grade S355 (visible in the model, checked like any stored grade) but add_pipe_rack / add_access_platform have no grade parameter and derived members cannot be edited; add a steelGrade field to the rack and platform specs."
     }
   ]
 }
