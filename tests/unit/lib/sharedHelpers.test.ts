@@ -82,8 +82,8 @@ describe('step21 encode', () => {
     expect(unescapeStep(encodeStepString('é😀x'))).toBe('é😀x');
   });
   it('groups a non-ASCII run into one X2 of UTF-16 units when asked', () => {
-    expect(encodeStepString('éa😀', true)).toBe('\\X2\\00E9\\X0\\a\\X2\\D83DDE00\\X0\\');
-    expect(encodeStepString("a'b", true)).toBe("a''b");
+    expect(encodeStepString('éa😀', 'utf16-run')).toBe('\\X2\\00E9\\X0\\a\\X2\\D83DDE00\\X0\\');
+    expect(encodeStepString("a'b", 'utf16-run')).toBe("a''b");
   });
   it('writes REALs with a decimal point and rejects or zeroes non-finite values', () => {
     expect(stepReal(5)).toBe('5.');

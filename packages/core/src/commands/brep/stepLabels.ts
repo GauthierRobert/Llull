@@ -29,7 +29,7 @@ export const REPRESENTATION_PATTERN =
 
 /** STEP string literal body: quotes and backslashes doubled, non-ASCII as \X2\…\X0\, no control characters. */
 export function stepString(text: string): string {
-  return encodeStepString(text.replace(/[\p{Cc}\u2028\u2029]+/gu, ' '), true);
+  return encodeStepString(text.replace(/[\p{Cc}\u2028\u2029]+/gu, ' '), 'utf16-run');
 }
 
 export function rgbOf(hex: string | undefined): [number, number, number] | null {

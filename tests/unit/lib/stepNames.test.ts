@@ -1,25 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { restoreStepNames, step21String, withAsciiStepNames } from '@lib/stepNames';
+import { restoreStepNames, withAsciiStepNames } from '@lib/stepNames';
+import { encodeStepString } from '@lib/step21/encode';
 
-describe('step21String (ISO 10303-21 string encoding)', () => {
+describe('encodeStepString run mode (ISO 10303-21 string encoding of names)', () => {
   it('keeps printable ASCII as is', () => {
-    expect(step21String('Welle 20 mm (A-1)')).toBe('Welle 20 mm (A-1)');
+    expect(encodeStepString('Welle 20 mm (A-1)', 'run')).toBe('Welle 20 mm (A-1)');
   });
   it('encodes Latin-1 letters as \\X2\\ UTF-16 hex runs', () => {
-    expect(step21String('Ø20 Welle')).toBe('\\X2\\00D8\\X0\\20 Welle');
-    expect(step21String('café')).toBe('caf\\X2\\00E9\\X0\\');
+    expect(encodeStepString('Ø20 Welle', 'run')).toBe('\\X2\\00D8\\X0\\20 Welle');
+    expect(encodeStepString('café', 'run')).toBe('caf\\X2\\00E9\\X0\\');
   });
   it('encodes a run of CJK characters as one \\X2\\ run', () => {
-    expect(step21String('轴 A')).toBe('\\X2\\8F74\\X0\\ A');
-    expect(step21String('部品軸')).toBe('\\X2\\90E854C18EF8\\X0\\');
+    expect(encodeStepString('轴 A', 'run')).toBe('\\X2\\8F74\\X0\\ A');
+    expect(encodeStepString('部品軸', 'run')).toBe('\\X2\\90E854C18EF8\\X0\\');
   });
   it('encodes an astral code point as \\X4\\ (eight hex digits), never as two \\X2\\ surrogate units', () => {
-    expect(step21String('a😀b')).toBe('a\\X4\\0001F600\\X0\\b');
-    expect(step21String('é😀')).toBe('\\X2\\00E9\\X0\\\\X4\\0001F600\\X0\\');
+    expect(encodeStepString('a😀b', 'run')).toBe('a\\X4\\0001F600\\X0\\b');
+    expect(encodeStepString('é😀', 'run')).toBe('\\X2\\00E9\\X0\\\\X4\\0001F600\\X0\\');
   });
   it('doubles apostrophes and reverse solidi, and escapes control characters', () => {
-    expect(step21String("O'Brien \\ 5")).toBe("O''Brien \\\\ 5");
-    expect(step21String('a\nb')).toBe('a\\X2\\000A\\X0\\b');
+    expect(encodeStepString("O'Brien \\ 5", 'run')).toBe("O''Brien \\\\ 5");
+    expect(encodeStepString('a\nb', 'run')).toBe('a\\X2\\000A\\X0\\b');
   });
 });
 

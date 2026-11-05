@@ -4,37 +4,7 @@
  * it returns gets the real names back, encoded as ISO 10303-21 strings (`restoreStepNames`).
  */
 
-/**
- * A Part 21 string literal body for `text` (ISO 10303-21:2002, 6.4.3 "String"): printable ASCII (U+0020..U+007E) stands for itself, except that an
- * apostrophe is written twice and a reverse solidus twice; everything else is a hexadecimal escape: `\X2\` + four hex digits per UTF-16 code unit of
- * the Basic Multilingual Plane + `\X0\`, and `\X4\` + eight hex digits per code point for characters above U+FFFF (a surrogate pair is not a
- * UCS-2 character, so an astral code point is never written as two `\X2\` units). Control characters are escaped too: a raw one is not a Part 21 character.
- */
-export function step21String(text: string): string {
-  let out = '';
-  let run = '';
-  let runKind: 'X2' | 'X4' | null = null;
-  const flush = (): void => {
-    if (runKind !== null) out += `\\${runKind}\\${run}\\X0\\`;
-    run = '';
-    runKind = null;
-  };
-  const escape = (kind: 'X2' | 'X4', hex: string): void => {
-    if (runKind !== kind) flush();
-    runKind = kind;
-    run += hex;
-  };
-  for (const char of text) {
-    const code = char.codePointAt(0) ?? 0;
-    if (code >= 0x20 && code <= 0x7e) {
-      flush();
-      out += char === "'" ? "''" : char === '\\' ? '\\\\' : char;
-    } else if (code > 0xffff) escape('X4', code.toString(16).toUpperCase().padStart(8, '0'));
-    else escape('X2', code.toString(16).toUpperCase().padStart(4, '0'));
-  }
-  flush();
-  return out;
-}
+import { encodeStepString } from './step21/encode';
 
 /** Placeholder map of one generated script: placeholder text -> the real name. */
 export interface StepNamePlaceholders {
@@ -77,14 +47,25 @@ export function withAsciiStepNames(source: string): { source: string; placeholde
   return { source: replaced, placeholders: { prefix, names } };
 }
 
-/** `stepText` with every placeholder inside a STEP string literal replaced by the Part 21 encoding of its name. */
+/** A line break the STEP writer put inside a string literal, with the indentation that follows it. */
+const LINE_FOLD = /\r?\n[ \t]*/g;
+
+/**
+ * `stepText` with every placeholder inside a STEP string literal replaced by the Part 21 encoding of its name. A literal the writer wrapped over lines
+ * (a line break + indentation inside the quotes, e.g. a name longer than the 72-character line) is unfolded first, but only when that reveals a
+ * placeholder: a raw line break is not a Part 21 string character (ours are escaped as \\X2\\000A\\X0\\), so no real name is altered.
+ */
 export function restoreStepNames(stepText: string, placeholders: StepNamePlaceholders): string {
   if (placeholders.names.size === 0) return stepText;
   const placeholder = new RegExp(`${placeholders.prefix}\\d{${PLACEHOLDER_DIGITS}}`, 'g');
-  return stepText.replace(/'(?:[^']|'')*'/g, (literal) =>
-    literal.replace(placeholder, (found) => {
+  return stepText.replace(/'(?:[^']|'')*'/g, (literal) => {
+    const unfolded = LINE_FOLD.test(literal) ? literal.replace(LINE_FOLD, '') : literal;
+    LINE_FOLD.lastIndex = 0;
+    if (!placeholder.test(unfolded)) return literal;
+    placeholder.lastIndex = 0;
+    return unfolded.replace(placeholder, (found) => {
       const name = placeholders.names.get(found);
-      return name === undefined ? found : step21String(name);
-    }),
-  );
+      return name === undefined ? found : encodeStepString(name, 'run');
+    });
+  });
 }
