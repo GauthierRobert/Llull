@@ -27,10 +27,11 @@ import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main
 import { feFatigue } from '../../tests/unit/cae/fatigue/feFixtures';
 import { gridMesh } from '../../tests/unit/cae/gridMesh';
 import { thermoFixture, withThermalSource } from '../../tests/unit/cae/thermomech/fixtures';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('nativeTransports: llull-compute not built (cargo build --release in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 let dir = '';
 let store: FeArtifactCache;

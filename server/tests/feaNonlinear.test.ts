@@ -18,7 +18,7 @@ import { isRecord } from '@lib/isRecord';
 import { extractCurves } from '@cae/nonlinear/curves';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { FEA_TOOL_ENV, feaToolsMissing } from './feaTestSupport';
 
 const AREA = 100; // mm^2
 const LENGTH = 40; // mm
@@ -245,7 +245,7 @@ afterAll(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('nonlinear static pipeline (netgen + ccx)', () => {
+describe.skipIf(feaToolsMissing())('nonlinear static pipeline (netgen + ccx)', () => {
   it('pulls a perfectly plastic bar through yield and back: elastic stiffness, plastic plateau, permanent set, convergence', async () => {
     const { results, solve, summary } = await solvePlan(PULL_PLAN, 'pull');
     expect(results.convergence?.length).toBeGreaterThan(2);

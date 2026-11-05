@@ -5,6 +5,8 @@ import path from 'node:path';
 import { installDefaultPlugins } from '@app/plugins';
 import { configureHostForTests } from '../src/plm/hostConfig';
 
+// Most suites drive the app token-less through supertest: the explicit switch of the token-less mode (securityTokenless.test.ts removes it).
+process.env['LLULL_INSECURE_NO_TOKEN'] ??= '1';
 process.env['LLULL_DATA_DIR'] ??= mkdtempSync(path.join(tmpdir(), 'llull-server-test-data-'));
 
 installDefaultPlugins();

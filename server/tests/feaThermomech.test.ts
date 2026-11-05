@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { EXIT_COMMAND_ERROR } from '../src/cli/main';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { isRecord } from '@lib/isRecord';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
@@ -26,7 +26,7 @@ afterAll(() => {
   workspace.dispose();
 });
 
-describe.skipIf(!READY)(
+describe.skipIf(feaToolsMissing(true))(
   'VC-TMC-01 fully restrained bodies, uniform 100 K rise (sigma = -E alpha dT, divided by the Poisson factors)',
   () => {
     it.each([
@@ -47,7 +47,7 @@ describe.skipIf(!READY)(
   },
 );
 
-describe.skipIf(!READY)('VC-TMC-02 NAFEMS LE11', () => {
+describe.skipIf(feaToolsMissing(true))('VC-TMC-02 NAFEMS LE11', () => {
   it('sigma_zz at A of the revolved LE11 section under T = sqrt(x^2 + y^2) + z (Tref 0 degC), tet10', async () => {
     const session = workspace.open('le11');
     const analysisId = await session.idOf(planPath('tmc_nafems_le11'), 'an');
@@ -57,7 +57,7 @@ describe.skipIf(!READY)('VC-TMC-02 NAFEMS LE11', () => {
   }, 120_000);
 });
 
-describe.skipIf(!READY)('VC-TMC-05 thick cylinder, heat_steady then thermo_static on the same mesh', () => {
+describe.skipIf(feaToolsMissing(true))('VC-TMC-05 thick cylinder, heat_steady then thermo_static on the same mesh', () => {
   it('hoop stress at the bore and the outer surface, axial stress at the bore (free ends)', async () => {
     const session = workspace.open('cylinder');
     const aliases = await session.run(planPath('tmc_thick_cylinder_sequential'));

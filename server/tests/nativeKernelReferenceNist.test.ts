@@ -28,6 +28,7 @@ import {
   relative,
   WorstDeviations,
 } from './nativeReferenceSupport';
+import { requireTool } from '../../tests/requireTool';
 
 /** Whole-file row of nist_occt_reference.json (measure_step_brep.py): the healed OneShape, loose shells / wires / points included. */
 interface FileReference {
@@ -107,91 +108,94 @@ function inertiaDeviation(native: readonly number[], matrix: readonly (readonly 
 
 const brepFiles = reference.files.filter((row) => row.error === undefined);
 
-describe.skipIf(!runnable)('VC-KRN-25: native kernel vs the OCP 7.9.3 NIST STEP reference (nist_occt_reference.json)', () => {
-  it('reads the pinned corpus: 27 B-rep files and one tessellated-only file, every sha256 as measured', () => {
-    expect(reference.ocp).toBe('7.9.3.1');
-    expect(brepFiles).toHaveLength(27);
-    for (const { file, sha256 } of brepFiles) expect(sha256Hex(readFileSync(path.join(CORPUS, file), 'utf8')), file).toBe(sha256);
-  });
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null) || missing.length > 0)(
+  'VC-KRN-25: native kernel vs the OCP 7.9.3 NIST STEP reference (nist_occt_reference.json)',
+  () => {
+    it('reads the pinned corpus: 27 B-rep files and one tessellated-only file, every sha256 as measured', () => {
+      expect(reference.ocp).toBe('7.9.3.1');
+      expect(brepFiles).toHaveLength(27);
+      for (const { file, sha256 } of brepFiles) expect(sha256Hex(readFileSync(path.join(CORPUS, file), 'utf8')), file).toBe(sha256);
+    });
 
-  it.each(brepFiles.map((row) => [row.file, row] as const))(
-    '%s',
-    async (file, whole) => {
-      const ref = solidReference.files.find((row) => row.file === file)!.solid!;
-      const text = readFileSync(path.join(CORPUS, file), 'utf8');
-      const imported = (await harness.call('importShapes', ['step', text, OPTIONS])) as ImportedShapes;
-      expect('solids' in imported, `${file} imported`).toBe(true);
-      // Whole file (the census is taken on the transferred shape, before healing; ShapeFix changes no count on this corpus).
-      expect([imported.census.solids, imported.census.shells, imported.census.faces], `${file} census`).toEqual([
-        whole.solids,
-        whole.shells,
-        whole.faces,
-      ]);
-      expect(imported.solids, `${file} solids`).toHaveLength(whole.solids);
-      const solid = imported.solids[0]!;
-      expect([solid.validAsRead, solid.validAfterHeal], `${file} validity`).toEqual([whole.validAsRead, ref.validAfterShapeFix]);
-      expect(solid.faces, `${file} faces`).toBe(ref.faces);
-      expect(solid.maxToleranceMm > TOLERANCE_WARNING_MM, `${file} tolerance class (${solid.maxToleranceMm} mm)`).toBe(
-        ref.maxToleranceMm > TOLERANCE_WARNING_MM,
-      );
-      expect(worst.record('max sub-shape tolerance (mm)', Math.abs(solid.maxToleranceMm - ref.maxToleranceMm), file)).toBeLessThan(1e-12);
-
-      const blob = sha256Hex(solid.brep);
-      await harness.call('loadBlob', [blob, solid.brep]);
-      const recipe: ShapeRecipe = { op: 'brep', blob, format: 'occt-brep-v1' };
-      const topology = (await harness.on('topology', recipe)) as ShapeTopology;
-      const counts = [topology.solids, topology.faces.length, topology.edges.length, topology.vertices];
-      expect(counts, `${file} solids / faces / edges / vertices`).toEqual([1, ref.faces, ref.edges, ref.vertices]);
-      const analysis = (await harness.on('analyze', recipe)) as { valid: boolean; lumps: readonly { volume: number; area: number }[] };
-      expect(analysis.lumps, `${file} one lump`).toHaveLength(1);
-      // The import report says valid; the B-rep text blob read back may not be (known issue, ratcheted: it fails if it starts to pass).
-      expect(analysis.valid, `${file} blob valid`).toBe(
-        BLOB_LOSES_VALIDITY.includes(file) ? !ref.validAfterShapeFix : ref.validAfterShapeFix,
-      );
-      // Like for like: `analyze` integrates with BRepGProp's default (Gauss) rule, as the reference did.
-      expect(worst.record('volume (raw BRepGProp)', relative(analysis.lumps[0]!.volume, ref.volumeMm3), file)).toBeLessThan(1e-9);
-      expect(worst.record('area (raw BRepGProp)', relative(analysis.lumps[0]!.area, ref.areaMm2), file)).toBeLessThan(1e-9);
-      const mass = (await harness.on('massProperties', recipe)) as ExactMassProperties;
-      const faces = (await harness.on('faceQuery.faceDetails', recipe, { samples: 1 })) as readonly FaceDetail[];
-      expect(worst.record('volume', relative(mass.volume, ref.volumeMm3), file)).toBeLessThan(1e-9);
-      expect(worst.record('area', relative(mass.area, ref.areaMm2), file)).toBeLessThan(1e-9);
-      const centroid = Math.max(...ref.centroidMm.map((value, k) => Math.abs(mass.centroid[k]! - value)));
-      expect(worst.record('centroid (mm)', centroid, file)).toBeLessThan(1e-6);
-      expect(worst.record('inertia', inertiaDeviation(mass.inertiaAtCentroid, ref.inertiaRho1Mm5), file)).toBeLessThan(1e-9);
-      // The native bounds (BRepBndLib::Add, control-polygon based) enclose the reference's optimal box; they are not equal to it.
-      const bounds = [...mass.bounds.min, ...mass.bounds.max];
-      ref.bboxMm.forEach((value, k) =>
-        expect(k < 3 ? bounds[k]! - value : value - bounds[k]!, `${file} bounds enclose`).toBeLessThan(1e-6),
-      );
-      worst.record(
-        'bounding box excess over the optimal box (mm)',
-        Math.max(...ref.bboxMm.map((value, k) => Math.abs(bounds[k]! - value))),
-        file,
-      );
-      // VC-KRN-10 cross-build mode: same faces in the same order, each area / centroid within the VC-KRN-01 tolerances of the
-      // reference's 6-decimal values (+ 5e-7 for that rounding). The sha256 signature is reported, not required: values within
-      // 1e-15 of zero print as -0.000000 or 0.000000 depending on the build, and a value near a 6th-decimal boundary rounds either way.
-      const expected = faceReference.files.find((row) => row.file === file)!.faces;
-      expect(faces, `${file} faces`).toHaveLength(expected.length);
-      let faceDeviation = 0;
-      faces.forEach(({ area, centroid }, index) => {
-        const [refArea, ...refCentroid] = expected[index]!;
-        const deviation = Math.max(
-          (Math.abs(area - refArea!) - 5e-7) / Math.max(1, refArea!) / 1e-9,
-          ...centroid.map((value, k) => (Math.abs(value - refCentroid[k]!) - 5e-7) / 1e-6),
+    it.each(brepFiles.map((row) => [row.file, row] as const))(
+      '%s',
+      async (file, whole) => {
+        const ref = solidReference.files.find((row) => row.file === file)!.solid!;
+        const text = readFileSync(path.join(CORPUS, file), 'utf8');
+        const imported = (await harness.call('importShapes', ['step', text, OPTIONS])) as ImportedShapes;
+        expect('solids' in imported, `${file} imported`).toBe(true);
+        // Whole file (the census is taken on the transferred shape, before healing; ShapeFix changes no count on this corpus).
+        expect([imported.census.solids, imported.census.shells, imported.census.faces], `${file} census`).toEqual([
+          whole.solids,
+          whole.shells,
+          whole.faces,
+        ]);
+        expect(imported.solids, `${file} solids`).toHaveLength(whole.solids);
+        const solid = imported.solids[0]!;
+        expect([solid.validAsRead, solid.validAfterHeal], `${file} validity`).toEqual([whole.validAsRead, ref.validAfterShapeFix]);
+        expect(solid.faces, `${file} faces`).toBe(ref.faces);
+        expect(solid.maxToleranceMm > TOLERANCE_WARNING_MM, `${file} tolerance class (${solid.maxToleranceMm} mm)`).toBe(
+          ref.maxToleranceMm > TOLERANCE_WARNING_MM,
         );
-        faceDeviation = Math.max(faceDeviation, deviation);
-      });
-      expect(faceDeviation, `${file} per-face area / centroid (1 = at tolerance)`).toBeLessThanOrEqual(1);
-      if (faceSignature(faces, 6) === ref.signature) sameSignature.push(file);
-    },
-    120_000,
-  );
+        expect(worst.record('max sub-shape tolerance (mm)', Math.abs(solid.maxToleranceMm - ref.maxToleranceMm), file)).toBeLessThan(1e-12);
 
-  it('nist_ftc_08_asme1_ap242-e4-tg.stp (tessellated only, no B-rep): refused as tessellated_only, never an empty import', async () => {
-    const tessellated = reference.files.find(({ error }) => error !== undefined)!;
-    expect(tessellated.file).toBe('nist_ftc_08_asme1_ap242-e4-tg.stp');
-    const text = readFileSync(path.join(CORPUS, tessellated.file), 'utf8');
-    expect(await harness.call('importShapes', ['step', text, OPTIONS])).toMatchObject({ error: 'tessellated_only' });
-  });
-});
+        const blob = sha256Hex(solid.brep);
+        await harness.call('loadBlob', [blob, solid.brep]);
+        const recipe: ShapeRecipe = { op: 'brep', blob, format: 'occt-brep-v1' };
+        const topology = (await harness.on('topology', recipe)) as ShapeTopology;
+        const counts = [topology.solids, topology.faces.length, topology.edges.length, topology.vertices];
+        expect(counts, `${file} solids / faces / edges / vertices`).toEqual([1, ref.faces, ref.edges, ref.vertices]);
+        const analysis = (await harness.on('analyze', recipe)) as { valid: boolean; lumps: readonly { volume: number; area: number }[] };
+        expect(analysis.lumps, `${file} one lump`).toHaveLength(1);
+        // The import report says valid; the B-rep text blob read back may not be (known issue, ratcheted: it fails if it starts to pass).
+        expect(analysis.valid, `${file} blob valid`).toBe(
+          BLOB_LOSES_VALIDITY.includes(file) ? !ref.validAfterShapeFix : ref.validAfterShapeFix,
+        );
+        // Like for like: `analyze` integrates with BRepGProp's default (Gauss) rule, as the reference did.
+        expect(worst.record('volume (raw BRepGProp)', relative(analysis.lumps[0]!.volume, ref.volumeMm3), file)).toBeLessThan(1e-9);
+        expect(worst.record('area (raw BRepGProp)', relative(analysis.lumps[0]!.area, ref.areaMm2), file)).toBeLessThan(1e-9);
+        const mass = (await harness.on('massProperties', recipe)) as ExactMassProperties;
+        const faces = (await harness.on('faceQuery.faceDetails', recipe, { samples: 1 })) as readonly FaceDetail[];
+        expect(worst.record('volume', relative(mass.volume, ref.volumeMm3), file)).toBeLessThan(1e-9);
+        expect(worst.record('area', relative(mass.area, ref.areaMm2), file)).toBeLessThan(1e-9);
+        const centroid = Math.max(...ref.centroidMm.map((value, k) => Math.abs(mass.centroid[k]! - value)));
+        expect(worst.record('centroid (mm)', centroid, file)).toBeLessThan(1e-6);
+        expect(worst.record('inertia', inertiaDeviation(mass.inertiaAtCentroid, ref.inertiaRho1Mm5), file)).toBeLessThan(1e-9);
+        // The native bounds (BRepBndLib::Add, control-polygon based) enclose the reference's optimal box; they are not equal to it.
+        const bounds = [...mass.bounds.min, ...mass.bounds.max];
+        ref.bboxMm.forEach((value, k) =>
+          expect(k < 3 ? bounds[k]! - value : value - bounds[k]!, `${file} bounds enclose`).toBeLessThan(1e-6),
+        );
+        worst.record(
+          'bounding box excess over the optimal box (mm)',
+          Math.max(...ref.bboxMm.map((value, k) => Math.abs(bounds[k]! - value))),
+          file,
+        );
+        // VC-KRN-10 cross-build mode: same faces in the same order, each area / centroid within the VC-KRN-01 tolerances of the
+        // reference's 6-decimal values (+ 5e-7 for that rounding). The sha256 signature is reported, not required: values within
+        // 1e-15 of zero print as -0.000000 or 0.000000 depending on the build, and a value near a 6th-decimal boundary rounds either way.
+        const expected = faceReference.files.find((row) => row.file === file)!.faces;
+        expect(faces, `${file} faces`).toHaveLength(expected.length);
+        let faceDeviation = 0;
+        faces.forEach(({ area, centroid }, index) => {
+          const [refArea, ...refCentroid] = expected[index]!;
+          const deviation = Math.max(
+            (Math.abs(area - refArea!) - 5e-7) / Math.max(1, refArea!) / 1e-9,
+            ...centroid.map((value, k) => (Math.abs(value - refCentroid[k]!) - 5e-7) / 1e-6),
+          );
+          faceDeviation = Math.max(faceDeviation, deviation);
+        });
+        expect(faceDeviation, `${file} per-face area / centroid (1 = at tolerance)`).toBeLessThanOrEqual(1);
+        if (faceSignature(faces, 6) === ref.signature) sameSignature.push(file);
+      },
+      120_000,
+    );
+
+    it('nist_ftc_08_asme1_ap242-e4-tg.stp (tessellated only, no B-rep): refused as tessellated_only, never an empty import', async () => {
+      const tessellated = reference.files.find(({ error }) => error !== undefined)!;
+      expect(tessellated.file).toBe('nist_ftc_08_asme1_ap242-e4-tg.stp');
+      const text = readFileSync(path.join(CORPUS, tessellated.file), 'utf8');
+      expect(await harness.call('importShapes', ['step', text, OPTIONS])).toMatchObject({ error: 'tessellated_only' });
+    });
+  },
+);

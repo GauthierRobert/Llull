@@ -11,6 +11,7 @@ import { cardLines, intField, realField, roundingError } from '@cae/decks/bdf/fi
 import { withCase } from '@cae/shared/access';
 import { BAR_NODES, X0_NODES, X2_NODES, barDocument, barMesh, facesOn, mustRun } from './deckFixtures';
 import { caseIn } from './helpers';
+import { requireTool } from '../../requireTool';
 
 const textOf = (result: ReturnType<typeof writeBdf>): string => ('text' in result ? result.text : JSON.stringify(result));
 const normalised = (text: string): string =>
@@ -417,7 +418,7 @@ describe('pyNastran read_bdf round trip (TR-FEA-41)', () => {
   const status = pyNastranStatus();
   if ('reason' in status) console.warn(`pyNastran check skipped: ${status.reason}`);
 
-  it.skipIf('reason' in status)('reads the written deck back with xref and finds every entry', () => {
+  it.skipIf(requireTool('python', !('reason' in status)))('reads the written deck back with xref and finds every entry', () => {
     if ('reason' in status) return;
     const bar = barDocument();
     const mesh = barMesh(bar.doc, bar.analysisId, bar.boxId, {

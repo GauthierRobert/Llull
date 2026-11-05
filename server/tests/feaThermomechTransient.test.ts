@@ -10,7 +10,7 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
 const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
@@ -36,7 +36,7 @@ afterAll(() => {
 
 const LENGTH = 50;
 
-describe.skipIf(!READY)('VC-TMC-04 bimetal cantilever as FE (two materials, conformal mesh)', () => {
+describe.skipIf(feaToolsMissing(true))('VC-TMC-04 bimetal cantilever as FE (two materials, conformal mesh)', () => {
   it('tip deflection and curvature of the heated strip (E 200 / 100 GPa, alpha 12 / 19 ppm per K, dT 100 K)', async () => {
     const session = workspace.open('bimetal');
     const analysisId = await session.idOf(planPath('tmc_bimetal_cantilever'), 'an');
@@ -50,7 +50,7 @@ describe.skipIf(!READY)('VC-TMC-04 bimetal cantilever as FE (two materials, conf
   }, 600_000);
 });
 
-describe.skipIf(!TRANSIENT_READY)('transient coupled step on the restrained bar (TR-TMC-22, M4b)', () => {
+describe.skipIf(feaToolsMissing())('transient coupled step on the restrained bar (TR-TMC-22, M4b)', () => {
   it('writes the transient step, and the stress history ends at the steady restrained value with its peak at the end', async () => {
     const session = workspace.open('coupled-transient');
     const analysisId = await session.idOf(planPath('tmc_coupled_bar'), 'an');

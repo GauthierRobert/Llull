@@ -17,10 +17,11 @@ import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { createEmptyDocument } from '@core/model/types';
 import { newEntity } from '@core/commands/entity/newEntity';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshEngineRouting: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 beforeAll(async () => {
   await installGeometryKernel({ env: { ...process.env, LLULL_KERNEL: 'manifold' } });

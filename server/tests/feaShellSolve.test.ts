@@ -21,7 +21,7 @@ import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { FEA_TOOL_ENV, feaToolsMissing } from './feaTestSupport';
 
 type Step = Record<string, unknown>;
 
@@ -152,7 +152,7 @@ function valueAt(mesh: FeMeshArtifact, results: FeResultsArtifact, field: string
 
 const EI = (70000 * WIDTH * 2 ** 3) / 12;
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('shell solves (netgen + ccx 2.21)', () => {
+describe.skipIf(feaToolsMissing())('shell solves (netgen + ccx 2.21)', () => {
   it('maps the expanded .frd back to the 2D nodes: plate cantilever deflection and fibre signs, *HEADING binding in the .frd', async () => {
     const shell = new ShellCase('iso-tip');
     const { mesh, results, jobDirectory } = await shell.solve(isotropicPlate(2, [tipForce(2, -10)]));

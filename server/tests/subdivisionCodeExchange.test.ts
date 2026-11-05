@@ -17,6 +17,7 @@ import { SUBDIVISION_PY } from '@core/codegen/pythonSubdivision';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { createPythonExchangePort } from '../src/pythonExchange';
 import { BRIDGE_SCRIPT, CADQUERY_PYTHON, findPlainPython, probePython } from './exchangeTestSupport';
+import { requireTool, requireTools } from '../../tests/requireTool';
 
 const PYTHON = findPlainPython();
 const hasCadQuery = probePython(CADQUERY_PYTHON).cadquery !== null;
@@ -28,7 +29,7 @@ function creasedCage(): Pick<SubdivisionEntity, 'vertices' | 'faces' | 'creases'
   return { ...cage, vertices: cage.vertices.map(([x, y, z]) => [x + 0.3 * z, y, z]), creases: rim };
 }
 
-describe.skipIf(PYTHON === null)('python subdivision port', () => {
+describe.skipIf(requireTool('python', PYTHON !== null))('python subdivision port', () => {
   it('reproduces the TypeScript Bézier patches', () => {
     const cage = creasedCage();
     const driver = [
@@ -48,7 +49,7 @@ describe.skipIf(PYTHON === null)('python subdivision port', () => {
   });
 });
 
-describe.skipIf(PYTHON === null)('exported subdivision code', () => {
+describe.skipIf(requireTool('python', PYTHON !== null))('exported subdivision code', () => {
   const cage = creasedCage();
   const doc = execute(createEmptyDocument(), 'add_subdivision_solid', { ...cage, levels: 2, position: [5, 0, 0], name: 'grip' }).document;
 
@@ -67,7 +68,12 @@ describe.skipIf(PYTHON === null)('exported subdivision code', () => {
   });
 });
 
-describe.skipIf(!hasCadQuery || nativeKernelBinary === null)('subdivision solids through CadQuery', () => {
+describe.skipIf(
+  requireTools([
+    ['python', hasCadQuery],
+    ['native:llull-kernel', nativeKernelBinary !== null],
+  ]),
+)('subdivision solids through CadQuery', () => {
   const port = createPythonExchangePort({
     python: CADQUERY_PYTHON,
     build123dPython: CADQUERY_PYTHON,

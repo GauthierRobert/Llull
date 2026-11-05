@@ -10,7 +10,22 @@ import rateLimit from 'express-rate-limit';
 import { positiveInteger } from './env';
 import { consumeTicket } from './tickets';
 
-const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173'];
+/** No browser host exists (LC1): nothing is allowed by default; `LLULL_ALLOWED_ORIGINS` must name an origin explicitly. */
+const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [];
+
+/** Stable code of the 401 a mutating route answers when the backend runs with no token and without the explicit insecure switch. */
+const TOKEN_REQUIRED_CODE = 'SEC_TOKEN_REQUIRED';
+
+const TOKEN_REQUIRED_BODY = {
+  error:
+    'This llull backend runs without an auth token: mutating routes are refused. Start it with LLULL_AUTH_TOKEN, or with --insecure-no-token (LLULL_INSECURE_NO_TOKEN=1) on a single-user machine.',
+  code: TOKEN_REQUIRED_CODE,
+};
+
+/** The one switch for token-less operation (`--insecure-no-token` on the server sets it); headless scripting on a single-user machine only. */
+export function isInsecureNoToken(): boolean {
+  return process.env['LLULL_INSECURE_NO_TOKEN'] === '1';
+}
 
 /** JSON body of every 401. */
 const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
@@ -82,17 +97,21 @@ function hostWithoutPort(hostHeader: string): string {
 }
 
 /** Host-header allowlist (DNS rebinding): localhost, 127.0.0.1, [::1], any port. */
+export function isLoopbackHost(header: string | undefined): boolean {
+  const bare = typeof header === 'string' ? hostWithoutPort(header) : undefined;
+  return bare !== undefined && ['localhost', '127.0.0.1', '[::1]'].includes(bare);
+}
+
 export function hostAllowlist(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const header = req.headers['host'];
-    const bare = typeof header === 'string' ? hostWithoutPort(header) : undefined;
-    if (bare !== undefined && ['localhost', '127.0.0.1', '[::1]'].includes(bare)) next();
+    if (isLoopbackHost(req.headers['host'])) next();
     else res.status(403).json({ error: 'Host header is not allowed.' });
   };
 }
 
 /**
- * Guard for /command, /undo, /redo, /exchange, /import. The Origin allowlist is CSRF protection ONLY, never authentication:
+ * Guard for /command, /undo, /redo, /exchange, /import, /preview, /signing/sign, /live/ticket. The Origin allowlist is CSRF protection ONLY, never authentication:
+ *   0. no token and no `LLULL_INSECURE_NO_TOKEN=1` (mutating routes) -> 401 SEC_TOKEN_REQUIRED
  *   1. valid `Authorization: Bearer <LLULL_AUTH_TOKEN>`              -> allow
  *   2. `LLULL_REQUIRE_TOKEN_FOR_REST=true` and a token is set       -> 401
  *   3. token set and peer is NOT loopback (or came via a proxy)     -> 401 (Origin is not trusted)
@@ -129,6 +148,10 @@ export function guardTicketIssue(): RequestHandler {
 function buildGuard(isRead: boolean): RequestHandler {
   return (req, res, next) => {
     const token = process.env['LLULL_AUTH_TOKEN'];
+    if (!token && !isRead && !isInsecureNoToken()) {
+      res.status(401).json(TOKEN_REQUIRED_BODY);
+      return;
+    }
     if (!token && isRead) {
       const refusal = crossSiteRefusal(req);
       if (refusal === null) next();

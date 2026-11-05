@@ -10,6 +10,7 @@ import { execute } from '@core/commands/registry';
 import { expectCase } from '../../physics/benchmarkCases';
 import { PACK, strainModel, withModel } from '../../physics/thermomech/thermomechFixtures';
 import { barDocument, barMesh } from '../deckFixtures';
+import { requireTool } from '../../../requireTool';
 
 const SOLVER = 'ccx';
 const ccxAvailable = spawnSync(SOLVER, ['-v']).error === undefined;
@@ -52,17 +53,20 @@ describe('thermo_static deck through ccx', () => {
     expect(text).toContain('S, E, THE');
   });
 
-  it.skipIf(!ccxAvailable)('VC-TMC-01.a: fully restrained bar, uniform delta T = 100 K -> sigma_xx = -252 MPa', () => {
-    const { text } = restrainedBar();
-    const dir = mkdtempSync(join(tmpdir(), 'llull-tmc-'));
-    writeFileSync(join(dir, 'job.inp'), text);
-    const run = spawnSync(SOLVER, ['-i', 'job'], { cwd: dir, encoding: 'utf8' });
-    expect(run.status, run.stdout + run.stderr).toBe(0);
-    const steps = parseFrd(readFileSync(join(dir, 'job.frd'), 'utf8'));
-    const stress = steps[steps.length - 1]?.fields['STRESS'];
-    expect(stress).toBeDefined();
-    const sxx = Object.values(stress?.values ?? {}).map((components) => components[0] ?? Number.NaN);
-    expect(sxx).toHaveLength(8);
-    for (const value of sxx) expectCase(PACK, 'VC-TMC-01.a', value);
-  });
+  it.skipIf(requireTool('calculix', ccxAvailable))(
+    'VC-TMC-01.a: fully restrained bar, uniform delta T = 100 K -> sigma_xx = -252 MPa',
+    () => {
+      const { text } = restrainedBar();
+      const dir = mkdtempSync(join(tmpdir(), 'llull-tmc-'));
+      writeFileSync(join(dir, 'job.inp'), text);
+      const run = spawnSync(SOLVER, ['-i', 'job'], { cwd: dir, encoding: 'utf8' });
+      expect(run.status, run.stdout + run.stderr).toBe(0);
+      const steps = parseFrd(readFileSync(join(dir, 'job.frd'), 'utf8'));
+      const stress = steps[steps.length - 1]?.fields['STRESS'];
+      expect(stress).toBeDefined();
+      const sxx = Object.values(stress?.values ?? {}).map((components) => components[0] ?? Number.NaN);
+      expect(sxx).toHaveLength(8);
+      for (const value of sxx) expectCase(PACK, 'VC-TMC-01.a', value);
+    },
+  );
 });

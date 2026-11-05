@@ -14,11 +14,12 @@ import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { isNativeTool, runNativeTool } from '../src/native/tools';
 import { buildNativeToolDefinitions } from '@protocol/nativeTools';
 import { runVortexLatticeSolve } from '../src/native/vortexLattice';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn('aeroPanelNative: llull-compute not built (cargo build --release -p llull-compute in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 const doc = createEmptyDocument();
 const host: FeaHost = {

@@ -12,6 +12,7 @@ import { caseOf, withCase } from '@cae/shared/access';
 import { parseFrd } from '@cae/results/frdReader';
 import { GPa, MPa, NL1_VALIDITY, ONE, T293, addModel, defineSet } from '../physics/materials/materialFixtures';
 import { X0_NODES, X2_NODES, barDocument, barMesh, mustRun } from './deckFixtures';
+import { requireTool } from '../../requireTool';
 
 const J2 = (yieldStress: number): Record<string, unknown> => ({
   kind: 'j2_plasticity',
@@ -193,7 +194,7 @@ describe('constitutive sets in the CalculiX deck (MaterialCardWriter hook)', () 
 const CCX = process.env['LLULL_CCX'] ?? 'ccx';
 const hasCcx = spawnSync(CCX, ['-v']).error === undefined;
 
-describe.skipIf(!hasCcx)('CalculiX single-element read of the constitutive deck', () => {
+describe.skipIf(requireTool('calculix', hasCcx))('CalculiX single-element read of the constitutive deck', () => {
   it('perfect plasticity (yield 100 MPa) caps the uniaxial stress of a pulled bar at the yield', () => {
     const bar = plasticBar();
     const pull = execute(bar.doc, 'add_fea_constraint', {

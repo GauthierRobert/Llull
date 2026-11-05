@@ -23,6 +23,7 @@ import {
   type PackCase,
   type Session,
 } from './packCli';
+import { requireTool } from '../../tests/requireTool';
 
 afterAll(() => {
   setGeometryKernel(null);
@@ -76,7 +77,7 @@ const COVERS = [
 
 describe('pack 07 — expected_results.json replayed through llull --json', () => {
   // The cases replay plans that name `--kernel occt` (the exact kernel): they need the native binary.
-  const itNative = it.skipIf(nativeKernelBinary === null);
+  const itNative = it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null));
   itNative.each(plain.map((c) => [`${c.vc} ${c.case}`, c] as const))(
     '%s',
     async (label, packCase) => {
@@ -149,7 +150,7 @@ describe('VC-FTR-44 — discoverable commands, units stated, data units echoed',
     expect(missing).toEqual([]);
   });
 
-  it.skipIf(nativeKernelBinary === null)('a calc result echoes lengthUnit and angleUnit', async () => {
+  it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('a calc result echoes lengthUnit and angleUnit', async () => {
     const sub = subs.find((s) => s.id === 'echo') as PackCase;
     await replayCase(sub, 'VC-FTR-44 echo');
   });
@@ -159,28 +160,34 @@ describe('VC-FTR-45 — plan --validate, broken plan, --dry-run, render_view --s
   const subs = pack.cases.find((c) => c.vc === 'VC-FTR-45')?.subcases ?? [];
   const sub = (id: string): PackCase => subs.find((s) => s.id === id) as PackCase;
 
-  it.skipIf(nativeKernelBinary === null)('validate ok: the bracket plan validates without touching the document', async () => {
-    const session = newSession();
-    const [line] = sub('validate ok').cli ?? [];
-    const words = (line ?? '').split(' ').slice(1);
-    const call = await cliCall(session, [words[0] as string, path.resolve(REPO_ROOT, words[1] as string), words[2] as string]);
-    for (const assertion of sub('validate ok').assert ?? []) checkAssertion(session, assertion, 'VC-FTR-45 validate ok');
-    expect(call.code).toBe(0);
-    expect(existsSync(session.doc)).toBe(false);
-  });
+  it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
+    'validate ok: the bracket plan validates without touching the document',
+    async () => {
+      const session = newSession();
+      const [line] = sub('validate ok').cli ?? [];
+      const words = (line ?? '').split(' ').slice(1);
+      const call = await cliCall(session, [words[0] as string, path.resolve(REPO_ROOT, words[1] as string), words[2] as string]);
+      for (const assertion of sub('validate ok').assert ?? []) checkAssertion(session, assertion, 'VC-FTR-45 validate ok');
+      expect(call.code).toBe(0);
+      expect(existsSync(session.doc)).toBe(false);
+    },
+  );
 
-  it.skipIf(nativeKernelBinary === null)('a broken plan names step 0 and the offending parameter', async () => {
-    const broken = sub('validate names step and param');
-    const session = newSession();
-    await runPlan(session, broken);
-    expect(session.last?.code).toBe(1);
-    const summary = (session.last?.json as { summary: string }).summary;
-    expect(summary).toContain('step 0');
-    expect(summary).toContain('thickness');
-    for (const assertion of broken.assert ?? []) checkAssertion(session, assertion, 'VC-FTR-45 broken plan');
-  });
+  it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
+    'a broken plan names step 0 and the offending parameter',
+    async () => {
+      const broken = sub('validate names step and param');
+      const session = newSession();
+      await runPlan(session, broken);
+      expect(session.last?.code).toBe(1);
+      const summary = (session.last?.json as { summary: string }).summary;
+      expect(summary).toContain('step 0');
+      expect(summary).toContain('thickness');
+      for (const assertion of broken.assert ?? []) checkAssertion(session, assertion, 'VC-FTR-45 broken plan');
+    },
+  );
 
-  it.skipIf(nativeKernelBinary === null)(
+  it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
     '--dry-run leaves the document file byte-identical',
     async () => {
       const dry = sub('dry run leaves the file unchanged');
@@ -198,7 +205,7 @@ describe('VC-FTR-45 — plan --validate, broken plan, --dry-run, render_view --s
     SLOW,
   );
 
-  it.skipIf(nativeKernelBinary === null)(
+  it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
     'render_view --save writes a PNG next to the document',
     async () => {
       const render = sub('render');

@@ -30,6 +30,7 @@ afterEach(() => {
 
 describe('CORS', () => {
   it('echoes an allowed origin', async () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     const res = await request(app).get('/health').set('Origin', 'http://localhost:5173');
     expect(res.headers['access-control-allow-origin']).toBe('http://localhost:5173');
   });
@@ -81,6 +82,7 @@ describe('JSON error handling', () => {
   });
 
   it('body-parser errors still carry CORS headers for an allowed origin', async () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     const malformed = await request(app)
       .post('/command')
       .set('Origin', 'http://localhost:5173')
@@ -108,11 +110,13 @@ describe('mutation guard (/command, /undo, /redo)', () => {
   });
 
   it('allows an allowed Origin and no-Origin when no token is configured', async () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(200);
     expect((await request(app).post('/command').send(body)).status).toBe(200);
   });
 
   it('with a token: allowed Origin passes, bare client gets 401, bearer passes', async () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     process.env['LLULL_AUTH_TOKEN'] = 's3cret';
     expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(200);
     expect((await request(app).post('/command').send(body)).status).toBe(401);

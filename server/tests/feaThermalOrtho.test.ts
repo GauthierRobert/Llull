@@ -6,7 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeCase, editStep, loadPlan, openCase, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing } from './feaTestSupport';
 
 const SIDE_M = 0.1;
 const CONDUCTIVITY = [10, 20, 30];
@@ -14,7 +14,7 @@ const DELTA_T = 100;
 /** Centre of the low / high face along axis i. */
 const face = (axis: number, high: boolean): number[] => [0, 1, 2].map((i) => (i === axis ? (high ? SIDE_M : 0) : SIDE_M / 2));
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('orthotropic conductivity (netgen + ccx)', () => {
+describe.skipIf(feaToolsMissing())('orthotropic conductivity (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('ortho');

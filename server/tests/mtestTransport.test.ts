@@ -13,6 +13,7 @@ import type { ProcessResult } from '../src/processRunner';
 import { MAX_RESULT_ROWS, parseMtestResult } from '../src/mfront/mtestResult';
 import { runMtestTool } from '../src/mfront/mtestTool';
 import { runNativeTool } from '../src/native/tools';
+import { requireTool } from '../../tests/requireTool';
 
 const FOUND = { mtest: '/opt/tfel/bin/mtest', mfront: '/opt/tfel/bin/mfront', reason: null } as const;
 const ALLOWED = { LLULL_ALLOW_CODE_EXECUTION: '1' } as NodeJS.ProcessEnv;
@@ -222,7 +223,7 @@ describe('mtest_run', () => {
 describe('a real MTest install (skipped when absent)', () => {
   const tools = mfrontTools();
   if (tools.mtest === null) console.warn(`mtest_run real-run test skipped: ${tools.reason ?? 'mtest not found'}`);
-  it.skipIf(tools.mtest === null)('starts the detected mtest and reads its version banner', async () => {
+  it.skipIf(requireTool('oracle:mtest', tools.mtest !== null))('starts the detected mtest and reads its version banner', async () => {
     const result = await spawnRunner.run(tools.mtest ?? '', ['--version'], process.cwd(), 30_000, toolEnvironment());
     expect(result.startError).toBeUndefined();
     expect(result.timedOut).toBe(false);

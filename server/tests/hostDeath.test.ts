@@ -9,10 +9,11 @@ import { describe, expect, it } from 'vitest';
 import { isAlive, jobPidOf, waitFor } from '../../tests/helpers/processList';
 import { longMeshJobFolder } from '../../tests/helpers/longMeshJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('hostDeath: llull-compute not built (cargo build --release in solver/): skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const serverDir = path.resolve(__dirname, '..');
 
 describe('the host dies', () => {

@@ -16,6 +16,7 @@ import {
   type ProcessRunner,
 } from '../../../production/oracle/ifcRules';
 import { referenceIfc, scDat01, stamp } from './ifcFixtures';
+import { requireTool } from '../../../requireTool';
 
 const answer = (status: number | null, stdout = '', failedToStart = false): ProcessAnswer => ({
   status,
@@ -72,22 +73,25 @@ const probe = findValidator(localRunner, tmpdir());
 const available = 'interpreter' in probe;
 const reason = 'reason' in probe ? probe.reason : '';
 
-describe.skipIf(!available)(`IfcOpenShell schema and rule validation${available ? '' : ` (skipped: ${reason})`}`, () => {
-  it('finds no error in the IFC4X3_ADD2 export of SC-DAT-01 (VC-DAT-06)', () => {
-    const exported = execute(scDat01(), 'export_ifc', { timestamp: stamp, schema: 'IFC4X3_ADD2' }).data as { ifc: string };
-    const result = validateIfcRules(exported.ifc);
-    expect(result).toMatchObject({ status: 'ran' });
-    expect(result.status === 'ran' && result.errors).toEqual([]);
-  });
+describe.skipIf(requireTool('oracle:ifcopenshell', available))(
+  `IfcOpenShell schema and rule validation${available ? '' : ` (skipped: ${reason})`}`,
+  () => {
+    it('finds no error in the IFC4X3_ADD2 export of SC-DAT-01 (VC-DAT-06)', () => {
+      const exported = execute(scDat01(), 'export_ifc', { timestamp: stamp, schema: 'IFC4X3_ADD2' }).data as { ifc: string };
+      const result = validateIfcRules(exported.ifc);
+      expect(result).toMatchObject({ status: 'ran' });
+      expect(result.status === 'ran' && result.errors).toEqual([]);
+    });
 
-  it('finds the two seeded rule violations of the pack negative file (VC-DAT-08)', () => {
-    const result = validateIfcRules(referenceIfc('sc-dat-02-negative.ifc'));
-    expect(result.status === 'ran' && [...result.errors].sort()).toEqual([
-      'IfcRelConnectsPorts.NoSelfReference',
-      'IfcValve.CorrectPredefinedType',
-    ]);
-  });
-});
+    it('finds the two seeded rule violations of the pack negative file (VC-DAT-08)', () => {
+      const result = validateIfcRules(referenceIfc('sc-dat-02-negative.ifc'));
+      expect(result.status === 'ran' && [...result.errors].sort()).toEqual([
+        'IfcRelConnectsPorts.NoSelfReference',
+        'IfcValve.CorrectPredefinedType',
+      ]);
+    });
+  },
+);
 
 describe('IfcOpenShell availability on this machine', () => {
   it('is reported, not required', () => {

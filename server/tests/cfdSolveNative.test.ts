@@ -20,11 +20,12 @@ import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifact
 import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { LBM_BYTES_PER_CELL } from '@aero/cfd/memoryEstimate';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn('cfdSolveNative: llull-compute not built (cargo build --profile compute -p llull-compute in solver/): skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 let dir = '';
 let store: FeArtifactCache;

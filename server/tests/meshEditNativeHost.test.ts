@@ -24,12 +24,13 @@ import { defaultMeshAssetStore } from '../src/meshAssets/store';
 import { _clearResultCache, _runningJobCount } from '../src/native/deferredRun';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { requireTool } from '../../tests/requireTool';
 
 process.env['LLULL_MESH_CACHE'] = path.join(mkdtempSync(path.join(tmpdir(), 'llull-mesh-edit-')), 'cache');
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshEditNativeHost: llull-compute not built (cargo build --release in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const NDJSON = 'application/x-ndjson';
 /** Icosphere level 7: 327 680 triangles, above the 200 000 of the TypeScript engine and the 100 000 kept inline. */
 const SOURCE_TRIANGLES = 327_680;

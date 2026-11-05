@@ -90,6 +90,8 @@ jobs:
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'
+          # This job builds exactly llull-kernel and llull-mesh (cargo build above): a skipped suite for either fails the job (TR-INT-13).
+          LLULL_REQUIRE_TOOLS: native:llull-kernel,native:llull-mesh
       # The desktop bundle as shipped: llull-compute (gpu), llull-kernel resolving OCCT via $ORIGIN/occt/lib only, llull-mesh resolving
       # Netgen via $ORIGIN/netgen/lib (and Netgen OCCT via ../../occt/lib), licence notices.
       - run: node desktop/scripts/prepare-native.mjs
@@ -152,6 +154,8 @@ jobs:
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'
+          # This job builds llull-kernel + llull-mesh (the five files above need nothing else): a skipped native suite fails the job (TR-INT-13).
+          LLULL_REQUIRE_TOOLS: native:llull-kernel,native:llull-mesh
           LLULL_NATIVE_DIR: ${{ github.workspace }}/desktop/build/native
 
   check:
@@ -169,6 +173,12 @@ jobs:
             desktop/package-lock.json
       - run: npm ci
       - run: npm --prefix server ci
+      # A python with OCP + cadquery + build123d for the chamfer codegen oracle (tests/unit/chamferCodegenOracle.test.ts), which used to fail
+      # when CI was set and no OCP was importable.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install cadquery build123d
       # Electron's binary is not needed: the desktop suite runs the real backend without it.
       - run: npm --prefix desktop ci
         env:
@@ -181,7 +191,11 @@ jobs:
           restore-keys: static-gates-${{ hashFiles('package-lock.json', 'tsconfig*.json', '.oxlintrc.json', '.prettierrc*') }}-
       # typecheck + arch + deadcode + lint + format:check, concurrently (each prints its own block).
       - run: node scripts/runParallel.mjs typecheck arch deadcode lint format:check
+      # LLULL_REQUIRE_TOOLS (TR-INT-13): this job provisions only the OCP python above (no CalculiX, no native binaries, no pyNastran), so
+      # only python:ocp is required: its skip fails the run, as the old CI-only guard of the chamfer oracle did.
       - run: npm run test:coverage
+        env:
+          LLULL_REQUIRE_TOOLS: python:ocp
       - run: npm --prefix server run typecheck
       - run: npm --prefix server test
       - run: npm --prefix desktop run typecheck

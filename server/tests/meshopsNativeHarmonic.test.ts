@@ -12,10 +12,11 @@ import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { gridMesh, icosphere } from '../../tests/helpers/meshFixtures';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshopsNativeHarmonic: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const engine = BINARY === null ? null : createNativeMeshEngine({ binary: BINARY });
 const nativeEngine = (): NonNullable<typeof engine> => engine as NonNullable<typeof engine>;
 

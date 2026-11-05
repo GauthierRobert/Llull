@@ -17,10 +17,11 @@ import { _resetLiveDoc, getLiveDoc } from '../src/liveDocument';
 import { _clearResultCache, _runningJobCount } from '../src/native/deferredRun';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshJobsNative: llull-compute not built (cargo build --release in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const NDJSON = 'application/x-ndjson';
 /** Icosphere level 6 (81 920 triangles) asked for 5 000 quads: about two seconds of QuadriFlow. */
 const SPHERE_LEVEL = 6;

@@ -11,6 +11,7 @@ import { readXml } from '@lib/xmlRead';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { C01, PID_PACK, countsOf, dexpiText, importFile } from './dexpiFixtures';
 import { fingerprint } from './dexpiFingerprint';
+import { requireTool } from '../../../requireTool';
 
 const FILES = readdirSync(path.join(PID_PACK, 'data/dexpi13')).filter((name) => name.endsWith('.xml'));
 const REFERENCE = readFileSync(path.join(PID_PACK, 'data/dexpi20/reference_pid.xml'), 'utf8');
@@ -184,7 +185,7 @@ describe('export_dexpi version 2.0: authored sheet (SC-PID-02)', () => {
 });
 
 const xmllint = spawnSync('xmllint', ['--version']);
-describe.skipIf(xmllint.error !== undefined)('DEXPI_XML_Schema.xsd with xmllint (installed here)', () => {
+describe.skipIf(requireTool('oracle:xmllint', xmllint.error === undefined))('DEXPI_XML_Schema.xsd with xmllint (installed here)', () => {
   it('validates the reference file and every 2.0 export of the pack', () => {
     const folder = mkdtempSync(path.join(tmpdir(), 'dexpi20-'));
     try {

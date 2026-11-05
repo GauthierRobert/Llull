@@ -15,6 +15,7 @@ import { sha256Hex } from '@lib/sha256';
 import { box, leaf, nativeKernelBinary } from './kernelTestSupport';
 import { BOOLEANS, CLOSED_FORM, entity, handleOf, relative } from './nativeKernelCorpus';
 import { nativeReferenceHarness } from './nativeReferenceSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const harness = nativeReferenceHarness();
 const PACK = path.resolve(__dirname, '../../docs/aerospace/07-sheet-metal-machined-features/validation/data');
@@ -29,7 +30,7 @@ async function blobMass(brep: string): Promise<ExactMassProperties> {
   return (await harness.on('massProperties', { op: 'brep', blob: sha256, format: 'occt-brep-v1' })) as ExactMassProperties;
 }
 
-describe.skipIf(nativeKernelBinary === null)('native STEP assembly export', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('native STEP assembly export', () => {
   it('writes the product structure: shared parts once, one occurrence per use, nested parts composed', async () => {
     const bolt = { shapes: [leaf(entity('cylinder', { radius: 0.5, height: 4 }))] };
     const bracket = {
@@ -73,7 +74,7 @@ const FILES: readonly [string, number | null][] = [
   ['nist_ctc_01_asme1_ap242.stp', null],
 ];
 
-describe.skipIf(nativeKernelBinary === null)('native STEP import + healing', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('native STEP import + healing', () => {
   it.each(FILES)(
     '%s: one health-checked solid per body, every ADVANCED_FACE, the analytic volume, a blob that rebuilds it',
     async (file, volume) => {
@@ -126,7 +127,7 @@ describe.skipIf(nativeKernelBinary === null)('native STEP import + healing', () 
   });
 });
 
-describe.skipIf(nativeKernelBinary === null)('native B-rep blobs', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('native B-rep blobs', () => {
   it('evaluates brep leaves (also under booleans) once the blob is loaded, refusing a mismatched hash', async () => {
     // A blob no other test loaded: the healed import of the export of a one-off solid.
     const one = leaf(entity('cylinder', { radius: 7.25, height: 3.5 }, [1, 2, 3]));

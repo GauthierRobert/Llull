@@ -19,6 +19,7 @@ import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { booleanRecipe, box, common, createNativeTestKernel, leaf, nativeKernelBinary, volume } from './kernelTestSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const entity = (kind: string, fields: Record<string, unknown>, position: Vec3 = [0, 0, 0], rotation: Vec3 = [0, 0, 0]): Entity =>
   ({ id: kind, kind, position, rotation, ...common, ...fields }) as Entity;
@@ -342,7 +343,7 @@ const LUMPS: Readonly<Record<string, number>> = {
   'plate minus tube': 2, // the hollow tube (radius 0.5, bore 0.3) leaves its core as a lump of its own
 };
 
-describe.skipIf(nativeKernelBinary === null)('native recipe nodes (VC-KRN-25, second slice)', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('native recipe nodes (VC-KRN-25, second slice)', () => {
   let kernel: GeometryKernel;
   beforeAll(() => {
     kernel = createNativeTestKernel();

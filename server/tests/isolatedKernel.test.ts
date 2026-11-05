@@ -12,6 +12,7 @@ import { createIsolatedKernel, type IsolatedKernel } from '../src/isolatedKernel
 import { createNativeKernel } from '../src/nativeKernel';
 import { handleOf } from '@core/geometry/shapeKernel';
 import { booleanMesh, leaf, meshOf, nativeKernelBinary } from './kernelTestSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const box = (size: number): Entity =>
   ({
@@ -33,7 +34,7 @@ const make = (callTimeoutMs?: number): IsolatedKernel => {
 
 afterAll(() => kernels.forEach((kernel) => kernel.dispose()));
 
-describe.skipIf(nativeKernelBinary === null)('isolated native kernel (real binary)', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('isolated native kernel (real binary)', () => {
   it('tessellates and runs booleans through the worker', () => {
     const kernel = make();
     expect(meshOf(kernel, box(2))?.indices).toHaveLength(36);

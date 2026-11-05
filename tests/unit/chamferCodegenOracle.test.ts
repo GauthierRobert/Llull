@@ -2,7 +2,7 @@
  * DES-6c oracle (VC-BLD-26 style): the exported CadQuery / build123d program is RUN with real OCP and its volume compared with the exact removed volume of a
  * right-angle chamfer, 1/2 integral d1(s) d2(s) ds, which is what llull's native kernel is held to (06 BLD 13.14), and its vertices are placed absolutely:
  * the leg of the kernel's edge start sits at the kernel's start end, whichever way the target solid runs the edge. Needs a python importing OCP + cadquery +
- * build123d (LLULL_PYTHON; docs/QUALITY_GATES.md): skipped loudly without one, and a FAILURE when CI is set.
+ * build123d (LLULL_PYTHON; docs/QUALITY_GATES.md): skipped (counted by requireTool) without one; a run with LLULL_REQUIRE_TOOLS=python:ocp (or python) fails instead.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,14 +13,12 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { pythonRuntime, type PythonBackend } from '@core/codegen/pythonRuntime';
+import { requireTool } from '../requireTool';
 import { edgeOf, scriptedKernel, TOPOLOGY } from '../helpers/blendKernel';
 
 const PYTHON = process.env['LLULL_PYTHON'] ?? 'python3';
 const probe = spawnSync(PYTHON, ['-I', '-c', 'import OCP'], { encoding: 'utf8', timeout: 60_000 });
 const available = probe.status === 0;
-const inCi = process.env['CI'] !== undefined && process.env['CI'] !== '';
-if (!available && !inCi)
-  console.warn(`chamferCodegenOracle skipped: ${PYTHON} cannot import OCP (set LLULL_PYTHON to a python with OCP + cadquery + build123d)`);
 
 const directory = mkdtempSync(join(tmpdir(), 'llull-chamfer-'));
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
@@ -103,13 +101,7 @@ function legVertices(forward: boolean, firstOnSide: boolean): { present: Vertex[
   };
 }
 
-describe.skipIf(available || !inCi)('chamfer oracle prerequisites', () => {
-  it('a python with OCP, cadquery and build123d is available (CI must run this oracle)', () => {
-    expect(available, 'set LLULL_PYTHON to a python that imports OCP + cadquery + build123d (docs/QUALITY_GATES.md)').toBe(true);
-  });
-});
-
-describe.skipIf(!available)('exported variable chamfers, run with OCP', () => {
+describe.skipIf(requireTool('python:ocp', available))('exported variable chamfers, run with OCP', () => {
   /** Export a chamfer whose kernel edge 0 is x = 10, z = 2.5 and starts at y = startY(forward). */
   const exported = (params: Record<string, unknown>, language: PythonBackend, forward = true): string => {
     const edge = edgeOf(0, { start: [10, startY(forward), 2.5], end: [10, -startY(forward), 2.5], mid: [10, 0, 2.5], length: 10 });

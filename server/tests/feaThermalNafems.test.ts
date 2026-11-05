@@ -6,9 +6,9 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeCase, expectCase, loadPlan, openCase, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing } from './feaTestSupport';
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('NAFEMS thermal benchmarks (netgen + ccx)', () => {
+describe.skipIf(feaToolsMissing())('NAFEMS thermal benchmarks (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('nafems');

@@ -11,10 +11,11 @@ import type { CadDocument } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { createNativeFieldEngine } from '../src/native/fieldEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('latticeHomogenizeNative: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const engine = BINARY === null ? null : createNativeFieldEngine({ binary: BINARY });
 const ctx = (): ReturnType<typeof defaultContext> => ({ ...defaultContext(), ...(engine === null ? {} : { fieldEngine: engine }) });
 

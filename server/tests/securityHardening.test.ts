@@ -14,7 +14,7 @@ import { guardMutation, hasValidBearer, isLoopbackAddress, isLocalPeer, checkBin
 import { createAutosaver } from '../src/autosave';
 import { createEmptyDocument } from '@core/model/types';
 
-const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST'];
+const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_REQUIRE_TOKEN_FOR_REST', 'LLULL_ALLOWED_ORIGINS'];
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
 });
@@ -86,6 +86,7 @@ describe('guardMutation vs remote peers', () => {
   });
 
   it('still allows a loopback browser with an allowed Origin', () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     process.env['LLULL_AUTH_TOKEN'] = 'secret';
     const result = runGuard(fakeReq({ origin: 'http://localhost:5173' }, '::ffff:127.0.0.1'));
     expect(result.nextCalled).toBe(true);

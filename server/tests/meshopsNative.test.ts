@@ -16,10 +16,11 @@ import { createNativeMeshEngine, deviationFrom } from '../src/native/meshProcess
 import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
 import { box, grid, hashOf, icosphere, noisy, withHoles } from './meshopsNativeSupport';
 import { soupOf } from './meshopsRepairSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshopsNative: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const engine = BINARY === null ? null : createNativeMeshEngine({ binary: BINARY });
 
 /** The native engine's answer, after the host awaited the job (TECHNICAL_SPEC 13.8). */

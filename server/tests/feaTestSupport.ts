@@ -4,6 +4,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { requireTools, type ToolId } from '../../tests/requireTool';
 
 const CCX = process.env['LLULL_CCX'] ?? 'ccx';
 
@@ -12,6 +13,16 @@ export const MESH_BIN = nativeBinaryPath('llull-mesh');
 /** llull-mesh is built and runs (its Netgen / OCCT libraries load). */
 export const HAS_MESHER = MESH_BIN !== null && /\(Netgen /.test(spawnSync(MESH_BIN, ['--version'], { encoding: 'utf8' }).stdout ?? '');
 export const HAS_CCX = spawnSync(CCX, ['-v'], { stdio: 'ignore' }).error === undefined;
+
+/** True (and recorded per missing tool) when the FE suites cannot run: llull-mesh, CalculiX and, with `kernel`, the native llull-kernel. */
+export function feaToolsMissing(kernel = false): boolean {
+  const tools: Array<readonly [ToolId, boolean]> = [
+    ['native:llull-mesh', HAS_MESHER],
+    ['calculix', HAS_CCX],
+  ];
+  if (kernel) tools.push(['native:llull-kernel', nativeBinaryPath('llull-kernel') !== null]);
+  return requireTools(tools);
+}
 
 /**
  * The CLI `env` of the FE suites: the run uses the same mesher and solver the probes above found (not a bare `ccx`), and the

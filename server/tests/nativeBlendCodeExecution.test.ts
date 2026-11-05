@@ -15,6 +15,7 @@ import { createEmptyDocument, type CadDocument, type MeshSolidEntity } from '@co
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { CADQUERY_PYTHON, probePython } from './exchangeTestSupport';
 import type { IsolatedKernel } from '../src/isolatedKernel';
+import { requireTools } from '../../tests/requireTool';
 
 vi.setConfig({ testTimeout: 300_000 });
 
@@ -45,7 +46,12 @@ solids = [solid.shape for solid in namespace["LLULL_LIVE"].values()]
 print(json.dumps({"volumes": [shape.Volume() for shape in solids], "adaptive": [abs(adaptive(shape)) for shape in solids]}))
 `;
 
-describe.skipIf(skipReason !== null)('VC-BLD-26: exported radius-law fillets run under CPython + OCP', () => {
+describe.skipIf(
+  requireTools([
+    ['native:llull-kernel', nativeKernelBinary !== null],
+    ['python', pythonHasCadQuery],
+  ]),
+)('VC-BLD-26: exported radius-law fillets run under CPython + OCP', () => {
   let kernel: IsolatedKernel;
   let dir: string;
   beforeAll(() => {

@@ -27,11 +27,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
-import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { createNativeTestKernel } from './kernelTestSupport';
+import { feaToolsMissing } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace, type Session } from './feaThermomechSupport';
 
-const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
 let workspace: Workspace;
 let occtReady = false;
 
@@ -167,7 +166,7 @@ async function solveT1(name: string, thickness: number): Promise<Measurement> {
 /** The exterior field of the inclusion is sigma_theta = 50 (a/r)^2 (finite plate: + 0.5 MPa of free-edge correction): move a reading to radius `to`. */
 const transported = (value: number, from: number, to: number): number => (value * from * from) / (to * to);
 
-describe.skipIf(!READY)('VC-TMC-03 NAFEMS T1: hot disc bonded in a plate (two materials, conformal mesh)', () => {
+describe.skipIf(feaToolsMissing(true))('VC-TMC-03 NAFEMS T1: hot disc bonded in a plate (two materials, conformal mesh)', () => {
   it.each([0.04, 0.02])(
     'judges the stress inside the disc and just outside it at thickness = ring size %f',
     async (thickness) => {

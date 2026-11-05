@@ -12,8 +12,9 @@ import type { FeMeshArtifact } from '@core/model/analysis';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { callNativeMesher } from '../src/fea/nativeMesher';
 import { partGeometry } from '../src/fea/feaGeometry';
-import { HAS_MESHER, MESH_BIN } from './feaTestSupport';
+import { MESH_BIN, HAS_MESHER } from './feaTestSupport';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
+import { requireTool } from '../../tests/requireTool';
 
 interface MeshReply {
   ok: boolean;
@@ -81,7 +82,7 @@ function expectFacesOnSet(reply: MeshReply, key: string): void {
   }
 }
 
-describe.skipIf(!HAS_MESHER)('llull-mesh — STL geometry (Manifold)', () => {
+describe.skipIf(requireTool('native:llull-mesh', HAS_MESHER))('llull-mesh — STL geometry (Manifold)', () => {
   it.each([1, 2] as const)('meshes a box with tet order %i and resolves faces and points', async (order) => {
     const reply = await mesh(request(manifold, order));
     expect(reply.ok, reply.error).toBe(true);
@@ -155,7 +156,7 @@ describe.skipIf(!HAS_MESHER)('llull-mesh — STL geometry (Manifold)', () => {
   });
 });
 
-describe.skipIf(!HAS_MESHER)('llull-mesh — exact STEP geometry (OCC)', () => {
+describe.skipIf(requireTool('native:llull-mesh', HAS_MESHER))('llull-mesh — exact STEP geometry (OCC)', () => {
   it('meshes the STEP of a box with the same target resolution', async (context) => {
     if (occt === null) context.skip();
     const reply = await mesh(request(occt as GeometryKernel, 2));
@@ -168,7 +169,7 @@ describe.skipIf(!HAS_MESHER)('llull-mesh — exact STEP geometry (OCC)', () => {
   });
 });
 
-describe.skipIf(!HAS_MESHER)('llull-mesh — facesNear on trimmed faces (coplanar disjoint faces)', () => {
+describe.skipIf(requireTool('native:llull-mesh', HAS_MESHER))('llull-mesh — facesNear on trimmed faces (coplanar disjoint faces)', () => {
   it('resolves a point on each of two equal-height boss tops to that boss face only', async (context) => {
     if (occt === null) context.skip();
     const kernel = occt as GeometryKernel;
@@ -226,7 +227,7 @@ describe.skipIf(!HAS_MESHER)('llull-mesh — facesNear on trimmed faces (coplana
   });
 });
 
-describe.skipIf(!HAS_MESHER)('llull-mesh — conformal bonding of touching parts', () => {
+describe.skipIf(requireTool('native:llull-mesh', HAS_MESHER))('llull-mesh — conformal bonding of touching parts', () => {
   let touching: CadDocument;
   const pair: string[] = [];
 

@@ -191,6 +191,7 @@ function readPackage(bytes: Uint8Array, limits: Required<XlsxReadLimits>): XlsxR
   try {
     parts = unzip(bytes, {
       maxBytes: limits.maxInflatedBytes,
+      maxRatio: MAX_RATIO,
       select: (name) => {
         if (++entries > limits.maxEntries) throw new XlsxFailure('XLSX_TOO_LARGE', `more than ${limits.maxEntries} archive entries`);
         if (unsafeName(name))

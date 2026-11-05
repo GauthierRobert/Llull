@@ -21,11 +21,12 @@ import { clashStressDocument } from '../../tests/helpers/clashStress';
 import { SYN_RACK_BAYS, synRackDocument } from '../../tests/helpers/synRack';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { NATIVE_MIN_BOXES, createNativeSpatialIndex, installSpatialIndex } from '../src/native/spatialIndexPort';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn('spatialIndexNative: llull-compute not built (cargo build -p llull-compute --release in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const KEEP = { ...process.env, LLULL_NATIVE_KEEP: '1' };
 const MISSING = path.join(tmpdir(), 'no-such-llull-compute.exe');
 

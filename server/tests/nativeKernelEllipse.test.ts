@@ -13,6 +13,7 @@ import { encodeChain } from '../src/native/kernelLeaves';
 import { leaf } from './kernelTestSupport';
 import { entity } from './nativeKernelCorpus';
 import { nativeKernelBinary, nativeReferenceHarness, relative } from './nativeReferenceSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const harness = nativeReferenceHarness();
 
@@ -41,7 +42,7 @@ const head = (diameter: number): CurveSegment<Vec2>[] => [
   },
 ];
 
-describe.skipIf(nativeKernelBinary === null)('native kernel: exact ellipse segment', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('native kernel: exact ellipse segment', () => {
   it.each([1, 3.2, 1000])('a revolved 2:1 head of diameter %f has the closed-form volume pi D^3 / 24', async (diameter) => {
     const curves = head(diameter);
     const solid = entity('revolution', { profile: sampleProfile(curves), curves, axis: [0, 1, 0], angle: 2 * Math.PI, segments: 32 });
