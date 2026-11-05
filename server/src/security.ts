@@ -97,11 +97,14 @@ function hostWithoutPort(hostHeader: string): string {
 }
 
 /** Host-header allowlist (DNS rebinding): localhost, 127.0.0.1, [::1], any port. */
+export function isLoopbackHost(header: string | undefined): boolean {
+  const bare = typeof header === 'string' ? hostWithoutPort(header) : undefined;
+  return bare !== undefined && ['localhost', '127.0.0.1', '[::1]'].includes(bare);
+}
+
 export function hostAllowlist(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const header = req.headers['host'];
-    const bare = typeof header === 'string' ? hostWithoutPort(header) : undefined;
-    if (bare !== undefined && ['localhost', '127.0.0.1', '[::1]'].includes(bare)) next();
+    if (isLoopbackHost(req.headers['host'])) next();
     else res.status(403).json({ error: 'Host header is not allowed.' });
   };
 }

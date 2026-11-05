@@ -32,6 +32,7 @@ import {
   getAllowedOrigins,
   hostAllowlist,
   isInsecureNoToken,
+  isLoopbackHost,
   buildRestRateLimiter,
   jsonErrorHandler,
   securityHeaders,
@@ -67,6 +68,11 @@ app.get(
         ? createHmac('sha256', token).update(challenge).digest('hex')
         : undefined;
     const insecure = isInsecureNoToken() && (token === undefined || token === '');
+    // A challenge probe from a foreign Host learns nothing but liveness and the proof.
+    if (!isLoopbackHost(req.headers['host'])) {
+      res.json({ status: 'ok', ...(proof !== undefined ? { proof } : {}) });
+      return;
+    }
     res.json({
       status: 'ok',
       kernel: getActiveKernelName(),

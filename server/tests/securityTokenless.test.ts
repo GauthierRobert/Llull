@@ -12,6 +12,36 @@ const KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_INSECURE_NO_TOKEN', 'LLULL_ALLOWED_ORIG
 const saved = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
 const body = { name: 'add_box', params: { size: [1, 1, 1], position: [0, 0, 0] } };
 
+type Method = 'post' | 'put' | 'patch' | 'delete';
+interface RouterLayer {
+  readonly route?: { readonly path: string; readonly methods: Record<string, boolean | undefined> };
+  readonly handle: { readonly stack?: readonly RouterLayer[] };
+  readonly path?: string;
+  match(path: string): boolean;
+}
+/** Prefixes a sub-router may be mounted under besides '/'. A router mounted anywhere else fails the walk below, so it is added here on purpose. */
+const KNOWN_MOUNTS = ['/export', '/import'];
+
+/** Every non-GET route of the Express app, found by walking the router stack and its mounted routers. */
+function mutatingRoutes(): Array<{ method: Method; path: string }> {
+  const found: Array<{ method: Method; path: string }> = [];
+  const visit = (stack: readonly RouterLayer[], prefix: string): void => {
+    for (const layer of stack) {
+      if (layer.route !== undefined) {
+        for (const method of ['post', 'put', 'patch', 'delete'] as const) {
+          if (layer.route.methods[method] === true) found.push({ method, path: (prefix + layer.route.path).replace(/:[A-Za-z]+/g, 'x') });
+        }
+      } else if (layer.handle.stack !== undefined) {
+        const mount = layer.match('/zz-probe') ? '' : KNOWN_MOUNTS.find((candidate) => layer.match(`${candidate}/x`));
+        if (mount === undefined) throw new Error('a router is mounted under a prefix the walk does not know: add it to KNOWN_MOUNTS');
+        visit(layer.handle.stack, prefix + mount);
+      }
+    }
+  };
+  visit((app as unknown as { router: { stack: readonly RouterLayer[] } }).router.stack, '');
+  return found;
+}
+
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
@@ -42,6 +72,16 @@ describe('server started without a token', () => {
       expect(bare.body, route).toMatchObject({ code: 'SEC_TOKEN_REQUIRED' });
       const withOrigin = await request(app).post(route).set('Origin', 'http://localhost:5173').send(payload);
       expect(withOrigin.status, route).toBe(401);
+    }
+  });
+
+  it('refuses EVERY mutating route of the app (router stack walk, no hand-written list)', async () => {
+    const routes = mutatingRoutes();
+    expect(routes.length).toBeGreaterThanOrEqual(8);
+    for (const { method, path } of routes) {
+      const res = await request(app)[method](path).send({});
+      expect(res.status, `${method.toUpperCase()} ${path}`).toBe(401);
+      expect(res.body, `${method.toUpperCase()} ${path}`).toMatchObject({ code: 'SEC_TOKEN_REQUIRED' });
     }
   });
 
@@ -95,6 +135,18 @@ describe('/health behind the Host allowlist', () => {
     const res = await request(app).get('/health').set('Host', 'evil.test').query({ challenge: 'abcd' });
     expect(res.status).toBe(200);
     expect(res.body.proof).toBe(createHmac('sha256', 's3cret').update('abcd').digest('hex'));
+  });
+
+  it('gives a foreign Host nothing but the status and the proof (no kernel, no insecure flag)', async () => {
+    process.env['LLULL_AUTH_TOKEN'] = 's3cret';
+    const proven = await request(app).get('/health').set('Host', 'evil.test').query({ challenge: 'abcd' });
+    expect(proven.body).toEqual({ status: 'ok', proof: createHmac('sha256', 's3cret').update('abcd').digest('hex') });
+    delete process.env['LLULL_AUTH_TOKEN'];
+    process.env['LLULL_INSECURE_NO_TOKEN'] = '1';
+    const bare = await request(app).get('/health').set('Host', 'evil.test').query({ challenge: 'abcd' });
+    expect(bare.body).toEqual({ status: 'ok' });
+    expect((await request(app).get('/health').query({ challenge: 'abcd' })).body).toHaveProperty('kernel');
+    expect((await request(app).get('/health').query({ challenge: 'abcd' })).body).toMatchObject({ insecure: true });
   });
 });
 
