@@ -4,7 +4,7 @@
  * deflection 7.634 mm within 2 % and records an `adequate` mesh; one linear element through the width records `inadequate` and the
  * fea_solve summary says so. Skipped without llull-mesh or `ccx`.
  *
- * Expected element layers (hit distance / local element size, size = mean tet edge / 1.26, the Kuhn cell calibration of the measure): the load acts
+ * Expected element layers (hit distance / local element size, size = (6 x mean volume of the crossed tets)^(1/3), a Kuhn cell of side s reads s; a regular tet of edge a reads 0.89 a): the load acts
  * along z, so the bending depth is DEPTH = 50 mm (y, the width b = 20 mm, is the thin direction of the section and governs the 5th percentile).
  *   C3D10, globalSize 6: edges about 5-6 mm, size about 4-5 mm: about 4-5 layers through b, about 10-12 through DEPTH; budget 2 (adequate, >= 2x margin).
  *   C3D4, globalSize 40: no edge is below the section scale (the 20 mm width), so size >= about 16 mm: at most about 1.3 layers through b and about 3

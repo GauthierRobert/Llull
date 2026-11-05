@@ -86,10 +86,12 @@ describe('fea_solve records and reports the mesh adequacy (FR-INT-06)', () => {
   it('stores the verdict on the results artifact and names the inadequate part in the summary', async () => {
     const result = await solve();
     expect(result.isError).toBe(false);
-    expect(result.summary).toContain("Mesh adequacy: INADEQUATE - part 'plate': 1 element layer(s) through the wall");
+    expect(result.summary).toContain("Mesh adequacy: INADEQUATE - part 'plate':");
+    expect(result.summary).toContain('element layer(s) through the wall');
     expect(result.summary).toContain('compute_margins reports not_assessed rows until the mesh is refined');
     const results = store.get(String((result.data as { resultsHash: string }).resultsHash)) as FeResultsArtifact;
-    expect(results.adequacy).toMatchObject({ verdict: 'inadequate', parts: [{ entityId: 'plate', order: 'linear', elementsThrough: 1 }] });
+    expect(results.adequacy).toMatchObject({ verdict: 'inadequate', parts: [{ entityId: 'plate', order: 'linear' }] });
+    expect(results.adequacy?.parts[0]?.elementsThrough).toBeLessThan(1);
   });
 });
 
@@ -98,6 +100,32 @@ describe('a failed native mapping step is reported (FR-INT-13, VC-INT-24)', () =
     const result = await solve({ beforeDeck: () => Promise.reject(new Error('llull-compute exited 3')) });
     expect(result.isError).toBe(false);
     expect(result.summary).toContain('native mapping failed (llull-compute exited 3); mapped in TypeScript.');
+    expect(result.data).toMatchObject({ mappingFallback: { step: 'native-mapping', reason: 'llull-compute exited 3' } });
+  });
+
+  it('data carries no mappingFallback when the native step succeeded or there is none', async () => {
+    expect((await solve({ beforeDeck: () => Promise.resolve('mapped natively in 3 ms') })).data).not.toHaveProperty('mappingFallback');
+    expect((await solve()).data).not.toHaveProperty('mappingFallback');
+  });
+
+  it('when the TypeScript mapper fails after the native failure, the solve fails with the mapper code, names both, and keeps the fallback', async () => {
+    const hooks: CaeHooks = {
+      ...caeHooks,
+      analysisInputHash: () => 'h',
+      writeInp: () => ({ code: 'FEA_MAPPING_FAILED', message: 'no node of the mesh carries the field' }),
+    };
+    const result = await solve({ hooks, beforeDeck: () => Promise.reject(new Error('llull-compute exited 3')) });
+    expect(result.isError).toBe(true);
+    expect(result.summary).toContain('FEA_MAPPING_FAILED: no node of the mesh carries the field');
+    expect(result.summary).toContain('the native mapping step had failed first: llull-compute exited 3');
+    expect(result.data).toMatchObject({
+      code: 'FEA_MAPPING_FAILED',
+      mappingFallback: { step: 'native-mapping', reason: 'llull-compute exited 3' },
+    });
+    const alone = await solve({ hooks });
+    expect(alone.isError).toBe(true);
+    expect(alone.data).toEqual({ code: 'FEA_MAPPING_FAILED' });
+    expect(alone.summary).not.toContain('native mapping');
   });
 
   it('a non-Error rejection is named too, and a successful step note is kept verbatim', async () => {
