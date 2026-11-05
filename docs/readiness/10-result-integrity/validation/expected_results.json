@@ -1,0 +1,475 @@
+{
+  "pack": "10-result-integrity",
+  "gap": "INT",
+  "baselineDate": "2026-11-05",
+  "machineProfile": "ref-win11",
+  "readinessLevel": 2,
+  "baselineCommit": "00d5326f5",
+  "cases": [
+    {
+      "id": "VC-INT-01",
+      "proves": [
+        "FR-INT-01",
+        "TR-INT-01"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "parsedParamsReachRun",
+      "expected": "run receives { a: 'x', b: 7 } for { a: '  x ' }",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "tests/unit/contract/parsedParams.test.ts",
+      "level": 1
+    },
+    {
+      "id": "VC-INT-02",
+      "proves": [
+        "FR-INT-01",
+        "TR-INT-03"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "everyCommandSeesParsedValue",
+      "expected": "value seen by run deep-equals paramsValidator.parse(input) for every registered command",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "tests/unit/contract/parsedParams.test.ts",
+      "level": 1
+    },
+    {
+      "id": "VC-INT-03",
+      "proves": [
+        "FR-INT-02",
+        "TR-INT-04"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "unknownGradeRefused",
+      "expected": "A36, 1.0570, Fe360, empty -> STL_GRADE_UNKNOWN per row; overall verdict not pass",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "STL_GRADE_UNKNOWN",
+      "test": "tests/unit/industrial/steelStrength.test.ts"
+    },
+    {
+      "id": "VC-INT-04",
+      "proves": [
+        "FR-INT-03",
+        "TR-INT-04"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "fyS235Thin",
+      "expected": 235,
+      "tolerance": "exact",
+      "source": "S1",
+      "grade": "A",
+      "gating": true,
+      "test": "tests/unit/industrial/steelStrength.test.ts"
+    },
+    {
+      "id": "VC-INT-05",
+      "proves": [
+        "FR-INT-03",
+        "TR-INT-04"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "fyS355Thickness",
+      "expected": "t=50 mm -> 335 N/mm2 (value grade B); t=90 mm -> STL_THICKNESS_OUT_OF_RANGE",
+      "tolerance": "exact",
+      "source": "S2",
+      "grade": "B",
+      "gating": false,
+      "errorCode": "STL_THICKNESS_OUT_OF_RANGE",
+      "test": "tests/unit/industrial/steelStrength.test.ts"
+    },
+    {
+      "id": "VC-INT-27",
+      "proves": [
+        "FR-INT-03",
+        "TR-INT-04"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "thicknessOutOfRangeRefused",
+      "expected": "t=90 mm -> STL_THICKNESS_OUT_OF_RANGE",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "STL_THICKNESS_OUT_OF_RANGE",
+      "test": "tests/unit/industrial/steelStrength.test.ts"
+    },
+    {
+      "id": "VC-INT-06",
+      "proves": [
+        "FR-INT-04",
+        "TR-INT-05"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "boltM20Class109",
+      "expected": {
+        "shearN": 98000,
+        "tensionN": 176400
+      },
+      "tolerance": "1e-9 relative",
+      "source": "S2, S3",
+      "grade": "B",
+      "gating": false,
+      "test": "tests/unit/industrial/boltResistance.test.ts"
+    },
+    {
+      "id": "VC-INT-07",
+      "proves": [
+        "FR-INT-04",
+        "TR-INT-05"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "boltM18Class88",
+      "expected": {
+        "stressAreaMm2": 192,
+        "shearN": 73728
+      },
+      "tolerance": "1e-9 relative",
+      "source": "S3 (area, A); S2 (resistance, B)",
+      "grade": "A",
+      "gating": true,
+      "test": "tests/unit/industrial/boltResistance.test.ts"
+    },
+    {
+      "id": "VC-INT-08",
+      "proves": [
+        "FR-INT-04",
+        "TR-INT-05"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "boltNonStandardRefused",
+      "expected": "M19 -> STL_BOLT_SIZE_NONSTANDARD (M18, M20); class 12.9 -> STL_BOLT_CLASS_UNKNOWN",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "STL_BOLT_SIZE_NONSTANDARD",
+      "test": "tests/unit/industrial/boltResistance.test.ts"
+    },
+    {
+      "id": "VC-INT-09",
+      "proves": [
+        "FR-INT-02",
+        "FR-INT-04"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "boltClassDefaultedReported",
+      "expected": "data.defaulted contains { input: 'boltClass', value: '8.8' }; summary names it",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "tests/unit/industrial/boltResistance.test.ts"
+    },
+    {
+      "id": "VC-INT-10",
+      "proves": [
+        "FR-INT-05",
+        "TR-INT-06"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "roadSpeedOutOfTable",
+      "expected": "130 km/h -> CIV_SPEED_OUT_OF_TABLE, domain [20, 120]",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "CIV_SPEED_OUT_OF_TABLE",
+      "test": "tests/unit/civil/roadChecks.test.ts"
+    },
+    {
+      "id": "VC-INT-11",
+      "proves": [
+        "FR-INT-05",
+        "TR-INT-06"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "roadIntermediateSpeedRow",
+      "expected": {
+        "rowKmh": 70,
+        "rminM": 158.4
+      },
+      "tolerance": "0.1 m",
+      "source": "S4 formula; row rule spec budget",
+      "grade": "A",
+      "gating": true,
+      "test": "tests/unit/civil/roadChecks.test.ts"
+    },
+    {
+      "id": "VC-INT-12",
+      "proves": [
+        "FR-INT-06",
+        "TR-INT-07"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "cantileverAdequacy",
+      "expected": {
+        "c3d10TipMm": 7.634,
+        "c3d10Verdict": "adequate",
+        "c3d4OneLayerVerdict": "inadequate"
+      },
+      "tolerance": "2 %",
+      "source": "S5",
+      "grade": "A",
+      "gating": true,
+      "test": "server/tests/feaAdequacy.test.ts"
+    },
+    {
+      "id": "VC-INT-13",
+      "proves": [
+        "FR-INT-06",
+        "TR-INT-07"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "thinTubeOneLayerInadequate",
+      "expected": "inadequate",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "server/tests/feaAdequacy.test.ts"
+    },
+    {
+      "id": "VC-INT-14",
+      "proves": [
+        "FR-INT-06",
+        "TR-INT-08"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "marginsNotAssessedOnInadequateMesh",
+      "expected": "rows not_assessed, FEA_MESH_INADEQUATE, overall != pass; acceptInadequateMesh -> numeric + data.overrides",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "FEA_MESH_INADEQUATE",
+      "test": "tests/unit/cae/marginsAdequacy.test.ts"
+    },
+    {
+      "id": "VC-INT-15",
+      "proves": [
+        "FR-INT-07",
+        "TR-INT-09"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "degradedKernelProvenance",
+      "expected": "provenance.kernel = manifold with fallbackReason on each kernel result; 1 stderr warning per degraded result; /health requested != active; meta.approximate = true",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "server/tests/kernelProvenance.test.ts",
+      "level": 1
+    },
+    {
+      "id": "VC-INT-16",
+      "proves": [
+        "FR-INT-07",
+        "TR-INT-09"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "statusBarDegradedChip",
+      "expected": "Mesh kernel (degraded) + reason tooltip",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "tests/component/StatusBarKernel.test.tsx",
+      "level": 1
+    },
+    {
+      "id": "VC-INT-17",
+      "proves": [
+        "FR-INT-07",
+        "TR-INT-09"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "planValidateKernelWarnings",
+      "expected": 3,
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "server/tests/planKernelWarning.test.ts",
+      "level": 1
+    },
+    {
+      "id": "VC-INT-18",
+      "proves": [
+        "FR-INT-08",
+        "TR-INT-10"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "lockedLayerRefusedEveryCommand",
+      "expected": "100 % of mutating commands refused LAYER_LOCKED, document unchanged; unlock then succeed; replay succeeds",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "LAYER_LOCKED",
+      "test": "tests/unit/contract/layerLock.test.ts"
+    },
+    {
+      "id": "VC-INT-19",
+      "proves": [
+        "FR-INT-08",
+        "TR-INT-10"
+      ],
+      "priority": "MUST",
+      "driver": "perf",
+      "metric": "lockGuardOverheadP95Ms",
+      "expected": {
+        "op": "<=",
+        "value": 1
+      },
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "tests/unit/contract/layerLock.test.ts"
+    },
+    {
+      "id": "VC-INT-20",
+      "proves": [
+        "FR-INT-09",
+        "TR-INT-11"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "tokenRequiredAndOrigins",
+      "expected": "401 SEC_TOKEN_REQUIRED; insecure flag 200 + /health.insecure; localhost:5173 403; Host evil.test /health 403",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "SEC_TOKEN_REQUIRED",
+      "test": "server/tests/securityTokenless.test.ts",
+      "level": 1
+    },
+    {
+      "id": "VC-INT-21",
+      "proves": [
+        "FR-INT-10",
+        "TR-INT-12"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "hostileArchiveAndXmlCaps",
+      "expected": "limit codes; RSS growth <= 300 MB; no crash",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "ZIP_LIMIT_EXCEEDED",
+      "test": "tests/unit/lib/untrustedCaps.test.ts"
+    },
+    {
+      "id": "VC-INT-22",
+      "proves": [
+        "FR-INT-11",
+        "TR-INT-13"
+      ],
+      "priority": "MUST",
+      "driver": "cli",
+      "metric": "requiredToolSkipFails",
+      "expected": "LLULL_REQUIRE_TOOLS=calculix without CalculiX -> non-zero TST_REQUIRED_TOOL_SKIPPED; without env -> green + skip count printed",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "errorCode": "TST_REQUIRED_TOOL_SKIPPED",
+      "test": "tests/unit/contract/requireTool.test.ts",
+      "level": 1
+    },
+    {
+      "id": "VC-INT-23",
+      "proves": [
+        "FR-INT-12",
+        "TR-INT-15"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "verifyReleasePartial",
+      "expected": "state partial, geometryVerified false, unchecked[0].scope geometry, summary starts 'partial:'",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "tests/unit/plm/verifyRelease.test.ts"
+    },
+    {
+      "id": "VC-INT-24",
+      "proves": [
+        "FR-INT-13",
+        "TR-INT-16"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "feaMappingFailureReported",
+      "expected": "summary contains native mapping failed (boom); mapped in TypeScript",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "server/tests/feaSolveMapping.test.ts"
+    },
+    {
+      "id": "VC-INT-25",
+      "proves": [
+        "FR-INT-13",
+        "TR-INT-16"
+      ],
+      "priority": "SHOULD",
+      "driver": "unit",
+      "metric": "liveResyncOutOfSync",
+      "expected": "liveStatus out_of_sync after 3 failed resyncs, banner with Reload",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "tests/component/liveOutOfSync.test.tsx"
+    },
+    {
+      "id": "VC-INT-26",
+      "proves": [
+        "FR-INT-14",
+        "TR-INT-14"
+      ],
+      "priority": "MUST",
+      "driver": "unit",
+      "metric": "fallbackInventoryComplete",
+      "expected": "every inventory entry has a test; fixture fy ?? 355 reported as unlisted",
+      "tolerance": "exact",
+      "source": "spec budget",
+      "grade": "target",
+      "gating": true,
+      "test": "tests/unit/contract/fallbackInventory.test.ts"
+    }
+  ]
+}

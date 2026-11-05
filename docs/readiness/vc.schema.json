@@ -7,7 +7,7 @@
   "additionalProperties": true,
   "properties": {
     "pack": { "type": "string", "pattern": "^0[1-9]-[a-z0-9-]+$" },
-    "gap": { "enum": ["PIL", "UXD", "PRF", "DSF", "INS", "E2E", "VNV", "XCH", "COM"] },
+    "gap": { "enum": ["PIL", "UXD", "PRF", "DSF", "INS", "E2E", "VNV", "XCH", "COM", "INT"] },
     "baselineDate": { "type": "string", "format": "date" },
     "machineProfile": { "type": "string", "description": "id of a profile in ../readiness_gate.json machineProfiles; default ref-win11" },
     "cases": {
@@ -18,7 +18,7 @@
         "required": ["id", "proves", "priority", "driver", "metric", "grade", "gating"],
         "additionalProperties": true,
         "properties": {
-          "id": { "type": "string", "pattern": "^VC-(PIL|UXD|PRF|DSF|INS|E2E|VNV|XCH|COM)-[0-9]{2,3}$" },
+          "id": { "type": "string", "pattern": "^VC-(PIL|UXD|PRF|DSF|INS|E2E|VNV|XCH|COM|INT)-[0-9]{2,3}$" },
           "proves": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^(FR|TR)-[A-Z0-9]{3}-[0-9]{2,3}$" } },
           "priority": { "enum": ["MUST", "SHOULD", "COULD"] },
           "driver": {

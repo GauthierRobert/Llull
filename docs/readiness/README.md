@@ -27,6 +27,11 @@ product around them:
 | 7 | Engineering checks not verified and validated | VNV | checks tested against hand calcs, never against published worked examples as a V&V record; output must be signed by an engineer | [07-engineering-vnv](07-engineering-vnv/) |
 | 8 | Exchange fidelity for daily files | XCH | DWG only through an external converter; STEP imports as meshes; drawings are SVG (PDF by printing) | [08-exchange-fidelity](08-exchange-fidelity/) |
 | 9 | Commercial and support readiness (local-only) | COM | licence, accounts and audit removed with the cloud host (LC1); no release / support / help / localisation policy | [09-commercial-support](09-commercial-support/) |
+| 10 | Results that can be silently wrong (added 2026-11-05) | INT | zod-parsed params discarded before `run`; unknown steel grade → S355; bolts always 8.8 with size snapping; road speed clamp; FE margins trusted on any mesh; silent mesh-kernel answers; CLI edits locked layers; tool-less test runs green | [10-result-integrity](10-result-integrity/) |
+
+Audit of 2026-11-05 (main 00d5326f5): [`AUDIT-2026-11-05.md`](AUDIT-2026-11-05.md) — the full flaw register with
+priorities P0–P3, and corrections to packs 02–09. The "nothing built" status below is partly stale: see audit §4 (D1 licence is decided:
+GPL-3.0-or-later + commercial, `docs/decisions/LIC1-license.md`).
 
 ## What the packs found and specify (2026-10-28)
 
