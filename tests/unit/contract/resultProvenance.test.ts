@@ -103,10 +103,7 @@ describe('result provenance (FR-INT-07, TR-INT-09)', () => {
 
     it('a kernel without info() reads as the in-process mesh kernel, exact not requested (never degraded): hosts that fall back must describe themselves', () => {
       const { info: _info, ...bare } = fakeKernel();
-      expect(kernelProvenance(withKernel({ ...bare, info: undefined } as GeometryKernel))).toEqual({
-        kernel: 'manifold',
-        exactRequested: false,
-      });
+      expect(kernelProvenance(withKernel(bare as GeometryKernel))).toEqual({ kernel: 'manifold', exactRequested: false });
       expect(isDegraded(kernelProvenance(withKernel(bare as GeometryKernel)))).toBe(false);
     });
 
