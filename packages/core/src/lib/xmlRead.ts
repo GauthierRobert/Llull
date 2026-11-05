@@ -21,6 +21,7 @@ type XmlErrorCode =
   | 'XML_TOO_DEEP'
   | 'XML_TOO_MANY_ELEMENTS'
   | 'XML_TOO_MANY_ATTRIBUTES'
+  | 'XML_ATTRIBUTE_TOO_LARGE'
   | 'XML_TOO_MANY_NAMESPACES'
   | 'XML_SYNTAX'
   | 'XML_DTD_FORBIDDEN'
@@ -89,6 +90,8 @@ export interface XmlReadLimits {
   readonly maxElements?: number;
   /** Attributes on one element (default 1024). */
   readonly maxAttributes?: number;
+  /** Length of one attribute value in UTF-16 units (default 1 MiB). */
+  readonly maxAttributeChars?: number;
   /** Namespace declarations (xmlns, xmlns:p) in the whole document (default 100 000). */
   readonly maxNamespaceDeclarations?: number;
 }
@@ -98,6 +101,7 @@ const XML_DEFAULT_LIMITS = {
   maxDepth: 256,
   maxElements: 5_000_000,
   maxAttributes: 1024,
+  maxAttributeChars: 1 << 20,
   maxNamespaceDeclarations: 100_000,
 } as const;
 
@@ -183,6 +187,7 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
   const maxDepth = limits.maxDepth ?? XML_DEFAULT_LIMITS.maxDepth;
   const maxElements = limits.maxElements ?? XML_DEFAULT_LIMITS.maxElements;
   const maxAttributes = limits.maxAttributes ?? XML_DEFAULT_LIMITS.maxAttributes;
+  const maxAttributeChars = limits.maxAttributeChars ?? XML_DEFAULT_LIMITS.maxAttributeChars;
   const maxNamespaceDeclarations = limits.maxNamespaceDeclarations ?? XML_DEFAULT_LIMITS.maxNamespaceDeclarations;
   const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
   const length = text.length;
@@ -377,6 +382,12 @@ export function readXml(source: string, limits: XmlReadLimits = {}): XmlReadResu
         const close = text.indexOf(quote === 0x22 ? '"' : "'", quoteAt + 1);
         if (close < 0) fail('XML_UNCLOSED', `the value of attribute ${attrName} is not closed`, quoteAt);
         const rawValue = text.slice(quoteAt + 1, close);
+        if (rawValue.length > maxAttributeChars)
+          fail(
+            'XML_ATTRIBUTE_TOO_LARGE',
+            `attribute ${attrName} is ${rawValue.length} characters, over the limit of ${maxAttributeChars}`,
+            quoteAt + 1,
+          );
         if (rawValue.includes('<')) fail('XML_SYNTAX', `attribute ${attrName} contains <`, quoteAt + 1 + rawValue.indexOf('<'));
         checkChars(rawValue, quoteAt + 1, `attribute ${attrName}`);
         if (raw.length >= maxAttributes) fail('XML_TOO_MANY_ATTRIBUTES', `more than ${maxAttributes} attributes on <${name}>`, afterSpace);

@@ -1,5 +1,7 @@
 /** Raw DEFLATE decoder (RFC 1951): the reader side of `deflate.ts`, for ZIP-based formats (3MF). */
 
+import { LimitError } from './limitError';
+
 const LENGTH_BASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
 const LENGTH_EXTRA = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
 const DIST_BASE = [
@@ -99,6 +101,8 @@ function dynamicTables(reader: Reader): [Huffman, Huffman] {
   return [huffman(lengths.slice(0, literalCount)), huffman(lengths.slice(literalCount))];
 }
 
+const DEFAULT_INFLATE_BYTES = 256 * 2 ** 20;
+
 /** Growable output buffer with a hard cap (a hostile stream cannot allocate beyond it). */
 class Sink {
   private bytes = new Uint8Array(1 << 12);
@@ -107,7 +111,8 @@ class Sink {
 
   private reserve(extra: number): void {
     const needed = this.length + extra;
-    if (needed > this.limit) throw new Error('deflate output exceeds the size limit');
+    if (needed > this.limit)
+      throw new LimitError('INFLATE_LIMIT_EXCEEDED', `deflate output exceeds the size limit of ${this.limit} bytes`, this.limit, needed);
     if (needed <= this.bytes.length) return;
     const grown = new Uint8Array(Math.min(Math.max(needed, this.bytes.length * 2), this.limit));
     grown.set(this.bytes.subarray(0, this.length));
@@ -138,9 +143,9 @@ class Sink {
 /**
  * Inflate a raw DEFLATE stream.
  * @failure truncated or corrupt data (bad block type, stored LEN / NLEN mismatch, bad code or symbol, distance before the start), or output
- *   beyond `maxBytes` -> Error
+ *   beyond `maxBytes` (default 256 MiB) -> Error; the cap is a `LimitError` INFLATE_LIMIT_EXCEEDED with the limit and the size it would have reached
  */
-export function inflateRaw(data: Uint8Array, maxBytes = 1 << 30): Uint8Array {
+export function inflateRaw(data: Uint8Array, maxBytes = DEFAULT_INFLATE_BYTES): Uint8Array {
   const reader = new Reader(data);
   const out = new Sink(maxBytes);
   let last = 0;
