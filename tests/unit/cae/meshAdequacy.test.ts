@@ -42,14 +42,45 @@ function union(a: FeMeshArtifact, b: FeMeshArtifact): FeMeshArtifact {
   };
 }
 
+/** A block whose thickness is `layers` hex-equivalent cells of side 5 mm (6 Kuhn tets per cell); the in-plane cells have the same side. */
+const layered = (layers: number, quadratic = false): FeMeshArtifact => blockMesh([8, 8, layers], [40, 40, 5 * layers], { quadratic });
+
+describe('meshAdequacy: element layers = hit distance / local element size (FR-INT-06)', () => {
+  it.each([
+    [1, 'inadequate'],
+    [2, 'inadequate'],
+    [4, 'adequate'],
+    [6, 'adequate'],
+  ] as const)('C3D4 block of %i hex-equivalent layers reads about its layer count and is %s', (layers, verdict) => {
+    const part = meshAdequacy(layered(layers)).parts[0];
+    expect(part?.elementsThrough).toBeGreaterThan(layers * 0.85);
+    expect(part?.elementsThrough).toBeLessThan(layers * 1.15);
+    expect(part?.verdict).toBe(verdict);
+    expect(part?.tetsCrossed).toBe(3 * layers);
+  });
+
+  it('the tets-crossed rule that this replaces passed the 2-layer C3D4 block (6 tets crossed >= 4); the layer measure refuses it', () => {
+    const part = meshAdequacy(layered(2)).parts[0];
+    expect(part?.tetsCrossed).toBeGreaterThanOrEqual(LINEAR_LAYERS_REQUIRED);
+    expect(part?.verdict).toBe('inadequate');
+  });
+
+  it('C3D10 needs 2 layers: 2 hex-equivalent layers are adequate, 1 is inadequate', () => {
+    expect(meshAdequacy(layered(2, true)).parts[0]).toMatchObject({ order: 'quadratic', required: 2, verdict: 'adequate' });
+    expect(meshAdequacy(layered(1, true)).parts[0]).toMatchObject({ order: 'quadratic', verdict: 'inadequate' });
+  });
+});
+
 describe('meshAdequacy: layers through the wall of the actual tet mesh (FR-INT-06, VC-INT-12/13)', () => {
-  it('a block with 2 cell layers through its thickness is adequate for C3D4; one layer (3 tets crossed) is inadequate', () => {
-    const fine = meshAdequacy(blockMesh([12, 12, 2], [60, 60, 10]));
+  it('a block with 4 cell layers through its thickness is adequate for C3D4; one layer (3 tets crossed) is inadequate', () => {
+    const fine = meshAdequacy(blockMesh([12, 12, 4], [60, 60, 20]));
     expect(fine.verdict).toBe('adequate');
-    expect(fine.parts[0]).toMatchObject({ entityId: 'block', order: 'linear', required: LINEAR_LAYERS_REQUIRED, elementsThrough: 6 });
+    expect(fine.parts[0]).toMatchObject({ entityId: 'block', order: 'linear', required: LINEAR_LAYERS_REQUIRED, tetsCrossed: 12 });
+    expect(fine.parts[0]?.elementsThrough).toBeCloseTo(4, 6);
     const coarse = meshAdequacy(blockMesh([12, 12, 1], [60, 60, 5]));
     expect(coarse.verdict).toBe('inadequate');
-    expect(coarse.parts[0]).toMatchObject({ elementsThrough: 3, minimumLayers: 3 });
+    expect(coarse.parts[0]).toMatchObject({ tetsCrossed: 3 });
+    expect(coarse.parts[0]?.elementsThrough).toBeCloseTo(1, 6);
   });
 
   it('VC-INT-13: a tube OD 100, wall 2, L 500 with one element through the wall is inadequate where the bounding-box heuristic read adequate', () => {
@@ -60,13 +91,15 @@ describe('meshAdequacy: layers through the wall of the actual tet mesh (FR-INT-0
       expect(result.parts[0]?.elementsThrough).toBeLessThan(LINEAR_LAYERS_REQUIRED);
       expect(inadequacyReasons(result)[0]).toContain("part 'tube'");
     }
-    expect(meshAdequacy(tubeMesh(100, 4, 500, { wallLayers: 2, around: 24, along: 20 })).verdict).toBe('adequate');
+    expect(meshAdequacy(tubeMesh(40, 8, 20, { wallLayers: 6, around: 48, along: 10 })).verdict).toBe('adequate');
   });
 
   it('a thin spot under 5 % of the surface leaves the 5th percentile adequate but the verdict marginal', () => {
     const sliver = blockMesh([1, 1, 1], [3, 3, 1]);
-    const result = meshAdequacy(union(blockMesh([20, 20, 2], [100, 100, 10]), sliver));
-    expect(result.parts[0]).toMatchObject({ verdict: 'marginal', elementsThrough: 6, minimumLayers: 3 });
+    const result = meshAdequacy(union(blockMesh([20, 20, 4], [100, 100, 20]), sliver));
+    expect(result.parts[0]).toMatchObject({ verdict: 'marginal' });
+    expect(result.parts[0]?.elementsThrough).toBeCloseTo(4, 6);
+    expect(result.parts[0]?.minimumLayers).toBeLessThan(0.75 * LINEAR_LAYERS_REQUIRED);
     expect(result.verdict).toBe('marginal');
   });
 
@@ -76,8 +109,8 @@ describe('meshAdequacy: layers through the wall of the actual tet mesh (FR-INT-0
       ...single,
       blocks: [{ ...(single.blocks[0] as FeMeshArtifact['blocks'][number]), elements: (single.blocks[0]?.elements ?? []).slice(0, 1) }],
     };
-    expect(meshAdequacy(thin)).toMatchObject({ verdict: 'inadequate', parts: [{ order: 'quadratic', required: 2, elementsThrough: 1 }] });
-    expect(meshAdequacy(blockMesh([6, 6, 1], [30, 30, 10], { quadratic: true })).verdict).toBe('adequate');
+    expect(meshAdequacy(thin)).toMatchObject({ verdict: 'inadequate', parts: [{ order: 'quadratic', required: 2 }] });
+    expect(meshAdequacy(blockMesh([6, 6, 2], [30, 30, 10], { quadratic: true })).verdict).toBe('adequate');
     const both = union(blockMesh([6, 6, 4], [30, 30, 20]), thin);
     expect(meshAdequacy(both).parts.map((part) => [part.order, part.verdict])).toEqual([
       ['linear', 'adequate'],
@@ -110,7 +143,14 @@ describe('meshAdequacy: layers through the wall of the actual tet mesh (FR-INT-0
     const broken: FeMeshArtifact = {
       ...base,
       blocks: [
-        { type: 'C3D4', entityId: 'ghost', elements: [[1, 1, 2, 3, 99999]] },
+        {
+          type: 'C3D4',
+          entityId: 'ghost',
+          elements: [
+            [1, 1, 2, 3, 99999],
+            [2, 1, 2],
+          ],
+        },
         { type: 'S3', entityId: 'shell', elements: [[2, 1, 2, 3]] },
         ...base.blocks,
       ],
@@ -119,6 +159,47 @@ describe('meshAdequacy: layers through the wall of the actual tet mesh (FR-INT-0
     expect(meshAdequacy({ ...base, blocks: [] })).toEqual({ verdict: 'adequate', parts: [], unmeasuredParts: [] });
     const squashed: FeMeshArtifact = { ...base, nodes: base.nodes.map((node) => [node[0], 0, 0, 0] as const) };
     expect(meshAdequacy(squashed)).toMatchObject({ parts: [], unmeasuredParts: ['block'] });
+  });
+
+  /** A flat pyramid S (apex 5) on the base 1-2-3 of a degenerate tetrahedron D (node 4 coincides with node 3, so two faces have no area). */
+  const pyramidOnFlat = (flat: readonly number[]): FeMeshArtifact => ({
+    ...blockMesh([1, 1, 1], [1, 1, 1]),
+    nodes: [
+      [1, 0, 0, 0],
+      [2, 1, 0, 0],
+      [3, 0, 1, 0],
+      [4, 0, 1, 0],
+      [5, 0.3, 0.3, 0.1],
+    ],
+    blocks: [
+      {
+        type: 'C3D4',
+        entityId: 'flat',
+        elements: [
+          [1, 1, 2, 3, 5],
+          [2, ...flat],
+        ],
+      },
+    ],
+  });
+
+  it('a ray stops at a degenerate tetrahedron: no exit face leaves in its direction, or the exit makes no progress', () => {
+    for (const flat of [
+      [1, 2, 3, 4],
+      [1, 3, 2, 4],
+    ]) {
+      const result = meshAdequacy(pyramidOnFlat(flat));
+      expect(result.parts).toHaveLength(1);
+      expect(result.parts[0]?.samples).toBe(3);
+      expect(result.parts[0]?.tetsCrossed).toBe(1);
+      expect(Number.isFinite(result.parts[0]?.elementsThrough)).toBe(true);
+    }
+  });
+
+  it('quadratic reasons name C3D10 and its budget', () => {
+    const thin = blockMesh([1, 1, 1], [40, 40, 1], { quadratic: true });
+    const reasons = inadequacyReasons(meshAdequacy(thin));
+    expect(reasons[0]).toContain('C3D10 needs 2');
   });
 
   it('adequacyOf prefers the verdict recorded on the results, else measures the mesh', () => {

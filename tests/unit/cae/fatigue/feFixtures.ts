@@ -10,7 +10,9 @@ import type { FeArtifactPort, FeMeshArtifact, FeResultsArtifact } from '@core/mo
 import type { CadDocument } from '@core/model/types';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
+import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import { barDocument, hashOf, mustRun } from '../deckFixtures';
+import { ADEQUATE } from '../marginsFixtures';
 import { gridMesh, seeded } from '../gridMesh';
 
 const SOURCE = { citation: 'synthetic test fixture', locator: 'tests/unit/cae/fatigue/feFixtures' };
@@ -46,6 +48,8 @@ export interface FeFatigueOptions {
   readonly cells?: readonly [number, number, number];
   readonly steps?: number;
   readonly seed?: number;
+  /** The adequacy recorded on the results (default: adequate, the seeded 2-layer grid only stands in for a fine mesh); 'measured' records none, so it is measured on the mesh. */
+  readonly adequacy?: FeMeshAdequacy | 'measured';
   /** Extra create_fatigue_case params (override the defaults). */
   readonly caseParams?: Record<string, unknown>;
 }
@@ -174,6 +178,7 @@ export function feFatigue(options: FeFatigueOptions = {}): FeFatigue {
     inputHash: analysisInputHash(doc, bar.analysisId, 'full'),
     solver: 'test',
     solverVersion: '1',
+    ...(options.adequacy === 'measured' ? {} : { adequacy: options.adequacy ?? ADEQUATE }),
     steps: [1, 2].map((step) => ({
       step,
       time: step,

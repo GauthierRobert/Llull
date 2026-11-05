@@ -24,6 +24,7 @@ const PART: FeMeshAdequacy['parts'][number] = {
   order: 'linear',
   elementsThrough: 2,
   minimumLayers: 1,
+  tetsCrossed: 3,
   required: 4,
   samples: 400,
   verdict: 'inadequate',

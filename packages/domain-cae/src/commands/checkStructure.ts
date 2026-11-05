@@ -144,7 +144,7 @@ function meshItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): Stru
         item(
           part.verdict === 'inadequate' ? 'FEA_MESH_INADEQUATE' : 'FEA_MESH_MARGINAL',
           part.verdict === 'inadequate' ? 'error' : 'warning',
-          `part '${part.entityId}': ${part.elementsThrough} ${part.order} element layer(s) through its wall at the 5th percentile of ${part.samples} sampled boundary faces, ${part.minimumLayers} at the thinnest spot (${part.required} needed); ` +
+          `part '${part.entityId}': ${Number(part.elementsThrough.toFixed(2))} ${part.order} element layer(s) through its wall at the 5th percentile of ${part.samples} sampled boundary faces, ${Number(part.minimumLayers.toFixed(2))} at the thinnest spot (${part.required} needed); ` +
             (heat ? 'the temperature gradient across the wall is under-resolved' : 'bending is under-resolved') +
             (part.verdict === 'inadequate' && !heat ? '; compute_margins reports not_assessed rows for these results' : ''),
           [part.entityId],

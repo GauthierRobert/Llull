@@ -6,11 +6,13 @@
 
 import type { FatigueCase } from '@core/model/durability';
 import type { FeArtifactPort, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
+import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { loadCasesOf } from '../decks/context';
 import { stressPerMpa } from '../decks/units';
+import { adequacyOf } from '../results/adequacy';
 import { stepOfLoadCase } from '../results/fields';
 import { caseOf } from '../shared/access';
 import { trustedRecord } from '../shared/trust';
@@ -49,6 +51,8 @@ export interface FatigueFieldInput {
   readonly resultsHash: string;
   readonly meshHash: string;
   readonly mesh: FeMeshArtifact;
+  /** Through-thickness adequacy of the results the field is computed from (FR-INT-06). */
+  readonly adequacy: FeMeshAdequacy;
   readonly damage: DamageSetup;
   /** Mesh nodes without a finite stress tensor in every mapped load case (left out of the field). */
   readonly skippedNodes: number;
@@ -219,6 +223,7 @@ export function fatigueFieldInput(
     resultsHash,
     meshHash: results.meshHash,
     mesh,
+    adequacy: adequacyOf(results, mesh),
     damage,
     skippedNodes: mesh.nodes.length - nodeIds.length,
   };
