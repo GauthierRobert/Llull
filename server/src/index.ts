@@ -21,6 +21,7 @@ import { buildExchangeRouter } from './exchangeRoutes';
 import { getActiveKernelName } from './geometryKernel';
 import { getAutosaveStatus } from './liveDocument';
 import { buildLiveRouter } from './liveRoutes';
+import { buildRecoveryRouter } from './recoveryRoutes';
 import { buildPreviewRouter } from './previewRoutes';
 import { buildSigningRouter } from './plm/signingRoutes';
 import { buildCrashRouter } from './crashRoutes';
@@ -69,6 +70,7 @@ const restLimiter = buildRestRateLimiter();
 const exchange = exchangeOptionsWithDwg();
 
 app.use(buildLiveRouter(restLimiter));
+app.use(buildRecoveryRouter(restLimiter));
 app.use(buildPreviewRouter(restLimiter));
 app.use(buildSigningRouter(restLimiter));
 app.use(buildCrashRouter(restLimiter));

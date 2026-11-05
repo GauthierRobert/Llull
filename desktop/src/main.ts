@@ -309,7 +309,7 @@ async function showCrashReports(): Promise<void> {
 function onMainProcessError(error: unknown): void {
   const report = writeDesktopCrashReport(error, {
     directory: crashDirectory,
-    autosavePath: path.join(app.getPath('userData'), 'autosave.json'),
+    recoveryDir: path.join(app.getPath('userData'), 'recovery'),
     appVersion: app.getVersion(),
   });
   console.error('[llull-desktop] unexpected error:', error);

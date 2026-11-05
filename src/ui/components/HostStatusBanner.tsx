@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useHostStatusStore } from '@ui/store/hostStatusStore';
+import { useRecoveryStore } from '@ui/store/recoveryStore';
 
 const AUTOSAVE_TEXT: Record<string, string> = {
   DSF_SAVE_DISK_FULL: 'The disk is full',
@@ -12,7 +13,8 @@ const AUTOSAVE_TEXT: Record<string, string> = {
 export function HostStatusBanner(): React.ReactElement | null {
   const autosave = useHostStatusStore((s) => s.autosave);
   const outOfSync = useHostStatusStore((s) => s.outOfSync);
-  if (autosave.ok && !outOfSync) return null;
+  const offlineEditsKept = useRecoveryStore((s) => s.offlineEditsKept);
+  if (autosave.ok && !outOfSync && !offlineEditsKept) return null;
   return (
     <div className="restored-banner host-status-banner" role="alert">
       {!autosave.ok && (
@@ -20,6 +22,14 @@ export function HostStatusBanner(): React.ReactElement | null {
           Autosave is failing ({autosave.code}): {AUTOSAVE_TEXT[autosave.code] ?? autosave.message}. Save your work to a file; llull keeps
           retrying.
         </span>
+      )}
+      {offlineEditsKept && (
+        <>
+          <span>The edits you made while the backend was offline were kept as a recoverable copy next to the backend&apos;s document.</span>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => useRecoveryStore.getState().setOpen(true)}>
+            Review
+          </button>
+        </>
       )}
       {outOfSync && (
         <>

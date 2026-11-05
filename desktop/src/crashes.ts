@@ -4,12 +4,13 @@
  * the user may open.
  */
 import fs from 'fs';
+import { createRecoveryStore } from '@server/recovery';
 import { issueDraftUrl, listCrashReports, readCrashReport, writeCrashReport } from '@server/crashReports';
 
 interface DesktopCrashOptions {
   readonly directory: string;
-  /** The backend's autosave (the last state of the document the window showed); copied as the report's document. */
-  readonly autosavePath: string;
+  /** The backend's recovery folder; the open document's slot (the last state the window showed) is copied as the report's document. */
+  readonly recoveryDir: string;
   readonly appVersion: string;
 }
 
@@ -17,9 +18,11 @@ interface DesktopCrashOptions {
 export function writeDesktopCrashReport(error: unknown, options: DesktopCrashOptions): string | null {
   let documentJson: string | undefined;
   try {
-    documentJson = fs.readFileSync(options.autosavePath, 'utf8');
+    const store = createRecoveryStore(options.recoveryDir);
+    const active = store.readActive();
+    documentJson = active === null ? undefined : fs.readFileSync(store.docFile(active.id), 'utf8');
   } catch {
-    documentJson = undefined; // no autosave yet
+    documentJson = undefined; // no recovery slot yet
   }
   return writeCrashReport(
     {

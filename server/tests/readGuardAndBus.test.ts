@@ -106,13 +106,26 @@ describe('idempotency cache', () => {
   });
 });
 
-describe('unreadable autosave', () => {
-  it('is renamed aside before starting empty', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-autosave-'));
-    const file = path.join(dir, 'auto.json');
+describe('unreadable recovery slot', () => {
+  it('is renamed aside on a supervised restart before starting empty', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-recovery-'));
+    const file = path.join(dir, 'untitled-ab12.json');
     fs.writeFileSync(file, '{ not json');
+    fs.writeFileSync(
+      path.join(dir, 'untitled-ab12.meta.json'),
+      JSON.stringify({
+        id: 'untitled-ab12',
+        path: null,
+        kind: 'document',
+        label: 'Untitled document',
+        changedAt: '2026-01-01T00:00:00.000Z',
+        changeCount: 1,
+      }),
+    );
+    fs.writeFileSync(path.join(dir, 'active.json'), JSON.stringify({ id: 'untitled-ab12', path: null }));
     vi.resetModules();
-    vi.stubEnv('LLULL_AUTOSAVE_PATH', file);
+    vi.stubEnv('LLULL_RECOVERY_DIR', dir);
+    vi.stubEnv('LLULL_RECOVERY_RESUME', '1');
     vi.stubEnv('VITEST', '');
     vi.stubEnv('TEST', '');
     vi.stubEnv('LLULL_AUTOSAVE_DISABLED', '');
@@ -121,9 +134,9 @@ describe('unreadable autosave', () => {
       const live = await import('../src/liveDocument');
       expect(live.getLiveDoc().order).toEqual([]);
       const names = fs.readdirSync(dir);
-      expect(names.some((name) => name.startsWith('auto.json.unreadable-'))).toBe(true);
+      expect(names.some((name) => name.startsWith('untitled-ab12.json.unreadable-'))).toBe(true);
       expect(fs.existsSync(file)).toBe(false);
-      expect(String(warn.mock.calls[0]?.[0])).toContain('unreadable-');
+      expect(String(warn.mock.calls[0]?.[0])).toContain('moved aside');
     } finally {
       warn.mockRestore();
       vi.unstubAllEnvs();

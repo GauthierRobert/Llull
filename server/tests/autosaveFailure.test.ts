@@ -100,7 +100,7 @@ describe('live host exposes the autosave status', () => {
     const blocker = path.join(dir, 'blocker');
     fs.writeFileSync(blocker, 'x');
     vi.resetModules();
-    vi.stubEnv('LLULL_AUTOSAVE_PATH', path.join(blocker, 'auto.json'));
+    vi.stubEnv('LLULL_RECOVERY_DIR', path.join(blocker, 'recovery'));
     vi.stubEnv('VITEST', '');
     vi.stubEnv('TEST', '');
     vi.stubEnv('LLULL_AUTOSAVE_DISABLED', '');

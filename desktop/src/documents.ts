@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { CadDocument } from '@core/model/types';
+import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { outcomeIsFailure } from '@protocol/commandOutcome';
 import { parseCommandResponse } from '@protocol/restProtocol';
@@ -58,24 +59,46 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       throw new Error(outcome.summary !== '' ? outcome.summary : `${name} failed (HTTP ${status})`);
   };
 
+  /**
+   * The backend's recovery slots (A-08). Best effort: a failure here must never stop a document operation, and the backend's own slot
+   * only gets more conservative when a call is missed (a slot stays longer).
+   */
+  const recovery = async (action: 'bind' | 'saved', body: unknown): Promise<void> => {
+    try {
+      await requestJson(`${options.url}/recovery/${action}`, { body, token: options.token, fetchImpl: options.fetchImpl });
+    } catch (error) {
+      console.warn(`[documents] recovery ${action} failed: ${errorMessage(error)}`);
+    }
+  };
+  /** Called BEFORE another document is loaded: its autosaves go to that document's own slot, the previous slot is the user's call (confirmed discard). */
+  const bindRecovery = (documentPath: string | null): Promise<void> => recovery('bind', { path: documentPath, dropPrevious: true });
+  /** The live document equals a file: its recovery slot is no longer needed. */
+  const markRecoverySaved = (stateHash: string): Promise<void> => recovery('saved', { stateHash });
+
   return {
     currentPath: () => currentPath,
     async open(filePath) {
       const absolute = path.resolve(filePath);
-      await command('load_document', { json: fs.readFileSync(absolute, 'utf8') });
+      const json = fs.readFileSync(absolute, 'utf8');
+      await bindRecovery(absolute);
+      await command('load_document', { json });
       currentPath = absolute;
       savedHash = (await snapshot()).stateHash;
+      await markRecoverySaved(savedHash);
     },
     async save(filePath) {
       const target = filePath !== undefined ? path.resolve(filePath) : currentPath;
       if (target === null) throw new Error('no file chosen for this document (use Save As)');
       const current = await snapshot();
       writeDocumentFile(target, current.document);
+      if (target !== currentPath) await bindRecovery(target);
       currentPath = target;
       savedHash = current.stateHash;
+      await markRecoverySaved(savedHash);
       return target;
     },
     async newDocument() {
+      await bindRecovery(null);
       await command('clear_document', {}, true);
       currentPath = null;
       savedHash = (await snapshot()).stateHash;
@@ -84,9 +107,11 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       return (await snapshot()).document;
     },
     async loadDocument(json) {
+      await bindRecovery(null);
       await command('load_document', { json });
       currentPath = null;
       savedHash = (await snapshot()).stateHash;
+      await markRecoverySaved(savedHash);
     },
     async hasUnsavedChanges() {
       const current = await snapshot();

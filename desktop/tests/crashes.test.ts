@@ -1,6 +1,6 @@
 /** SC-D3 in the desktop app: the main process's crash report (with the autosave as its document) and Help > Crash Reports. */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { crashReportsView, writeDesktopCrashReport } from '../src/crashes';
@@ -23,9 +23,11 @@ describe('desktop crash reports', () => {
   });
 
   it('a main-process crash keeps the autosave as the document; the view drafts an issue for the newest report', () => {
-    const autosavePath = path.join(dir, 'autosave.json');
-    writeFileSync(autosavePath, '{"format":"llull-document","version":3,"document":{}}');
-    const report = writeDesktopCrashReport(new TypeError('menu handler broke'), { directory: crashes, autosavePath, appVersion: '9.9.9' });
+    const recoveryDir = path.join(dir, 'recovery');
+    mkdirSync(recoveryDir);
+    writeFileSync(path.join(recoveryDir, 'untitled-ab12.json'), '{"format":"llull-document","version":3,"document":{}}');
+    writeFileSync(path.join(recoveryDir, 'active.json'), JSON.stringify({ id: 'untitled-ab12', path: null }));
+    const report = writeDesktopCrashReport(new TypeError('menu handler broke'), { directory: crashes, recoveryDir, appVersion: '9.9.9' });
     if (report === null) throw new Error('no report');
     expect(readdirSync(report).sort()).toEqual(['commands.json', 'document.llull.json', 'error.txt', 'meta.json']);
     expect(readFileSync(path.join(report, 'document.llull.json'), 'utf8')).toContain('llull-document');
@@ -40,7 +42,7 @@ describe('desktop crash reports', () => {
   it('without an autosave the report has the error only', () => {
     const report = writeDesktopCrashReport('plain failure', {
       directory: crashes,
-      autosavePath: path.join(dir, 'missing.json'),
+      recoveryDir: path.join(dir, 'missing'),
       appVersion: '1',
     });
     expect(readdirSync(report ?? '').sort()).toEqual(['error.txt', 'meta.json']);

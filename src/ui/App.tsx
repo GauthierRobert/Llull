@@ -31,6 +31,7 @@ import { useSheetViewStore } from '@ui/viewport/sheet/sheetViewStore';
 import { LiveActivityFeed } from '@ui/components/LiveActivityFeed';
 import { RestoredBanner } from '@ui/components/RestoredBanner';
 import { HostStatusBanner } from '@ui/components/HostStatusBanner';
+import { RecoveryDialog } from '@ui/components/RecoveryDialog';
 
 export function App(): React.ReactElement {
   const theme = useThemeStore((s) => s.theme);
@@ -85,6 +86,7 @@ export function App(): React.ReactElement {
       <ShortcutsDialog />
       <ReportIssueDialog />
       <CommandPalette />
+      <RecoveryDialog />
     </div>
   );
 }
