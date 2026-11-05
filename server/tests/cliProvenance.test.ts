@@ -1,7 +1,7 @@
 /** Through the `llull` CLI: a result the mesh kernel answered while the exact kernel was requested prints one stderr warning and carries `provenance` (FR-INT-07). */
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
@@ -56,5 +56,16 @@ describe('CLI result provenance', () => {
     const exact = capture();
     await runCli(['exec', 'mass_properties', JSON.stringify({ entityId: 'box-1.1' }), '--doc', doc], exact.io);
     expect(exact.err).toEqual([]);
+  });
+
+  it('prints exactly one warning line for a plan with two degraded steps (not one per step)', async () => {
+    setGeometryKernel(await kernelWith({ active: 'manifold', fallbackReason: 'llull-kernel binary not found' }));
+    const planPath = path.join(mkdtempSync(path.join(tmpdir(), 'llull-cli-plan-')), 'plan.json');
+    const measure = { command: 'mass_properties', params: { entityId: 'box-1.1' } };
+    writeFileSync(planPath, JSON.stringify({ actions: [{ command: 'add_box', params: { size: [1, 1, 1] } }, measure, measure] }));
+    const { io, out, err } = capture();
+    expect(await runCli(['run', planPath, '--doc', docPath()], io)).toBe(EXIT_OK);
+    expect(err).toEqual(['warning: answered by the mesh kernel (llull-kernel binary not found); exact kernel unavailable']);
+    expect(out.join('')).toContain('mesh kernel at steps 1, 2');
   });
 });
