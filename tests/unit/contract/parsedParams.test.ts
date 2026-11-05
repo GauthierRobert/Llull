@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { guardCommand } from '@core/commands/guard';
-import { listCommands } from '@core/commands/registry';
-import { defineCommand, z } from '@core/commands/schema';
+import { execute, listCommands } from '@core/commands/registry';
+import { defineCommand, tolerant, z } from '@core/commands/schema';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult, ParamItemSpec } from '@core/commands/types';
 import { noop } from '@core/commands/noop';
@@ -50,6 +50,30 @@ describe('parsed params reach run (FR-INT-01)', () => {
     });
     guardCommand(probe as never).run(createEmptyDocument(), { a: '  x ' });
     expect(seen).toEqual({ a: 'x', b: 7 });
+  });
+
+  it('a tolerant param reaches run with its raw invalid value, not undefined', () => {
+    let seen: unknown;
+    const probe = defineCommand({
+      name: 'tolerant_params_probe',
+      description: 'Test-only probe that records a tolerant param.',
+      params: z.object({ family: tolerant(z.enum(['HEA']).optional().describe('A family.')) }),
+      run: (doc: CadDocument, params): CommandResult => {
+        seen = params.family;
+        return noop(doc, 'probe');
+      },
+    });
+    const guarded = guardCommand(probe as never);
+    guarded.run(createEmptyDocument(), { family: 'hea' });
+    expect(seen).toBe('hea');
+    guarded.run(createEmptyDocument(), { family: 3 });
+    expect(seen).toBe(3);
+  });
+
+  it('a nested own __proto__ key is refused before validation drops it', () => {
+    const result = execute(createEmptyDocument(), 'list_steel_profiles', JSON.parse('{"family":"HEA","extra":{"__proto__":"x"}}'));
+    expect(result.error?.code).toBe('CMD_RESERVED_ID');
+    expect(result.error?.paths).toEqual(['extra']);
   });
 
   it('VC-INT-02: for every registered command whose minimal input validates, run sees exactly the parsed value', () => {

@@ -32,6 +32,20 @@ function hasMalformedPosition(entity: unknown): boolean {
   return position !== undefined && (!Array.isArray(position) || position.length !== 3);
 }
 
+/**
+ * Dotted path of the object that owns a `__proto__` key (JSON.parse creates it as an own key), or null. zod drops such a key
+ * from the parsed output, so the command would never see it: refuse it before validation instead.
+ */
+function ownProtoKeyPath(value: unknown, path = '', depth = 0): string | null {
+  if (typeof value !== 'object' || value === null || depth > 8) return null;
+  if (!Array.isArray(value) && Object.prototype.hasOwnProperty.call(value, '__proto__')) return path;
+  for (const [key, child] of Object.entries(value)) {
+    const found = ownProtoKeyPath(child, path === '' ? key : `${path}.${key}`, depth + 1);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 /** Param keys whose string values are looked up as keys in document records (ids). */
 const ID_LIKE_KEY = /^id$|Ids?$|^ids$/;
 
@@ -123,6 +137,13 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
       doc,
       `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
       commandError('CMD_RESERVED_ID', 'Use an id that is not a JavaScript property name (constructor, __proto__, toString, …).'),
+    );
+  const protoPath = ownProtoKeyPath(safeParams);
+  if (protoPath !== null)
+    return rejection(
+      doc,
+      `${def.name} rejected: params carry a "__proto__" key at ${protoPath || '(params)'}; validation would drop it silently. Use a different key.`,
+      commandError('CMD_RESERVED_ID', 'Remove the "__proto__" key from the params.', [], [protoPath || '(params)']),
     );
   const unknownKeys = unknownParamsRejection(def, doc, safeParams);
   if (unknownKeys !== null) return unknownKeys;
