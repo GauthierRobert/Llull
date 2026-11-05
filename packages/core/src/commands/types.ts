@@ -240,6 +240,10 @@ export interface ExportFilePort {
 export interface ExecutionContext {
   /** Set by `runCommand` while a command runs: a command it executes in turn is nested (a query then refuses an unreadable mesh asset instead of degrading). */
   readonly nested?: boolean;
+  /** Set by `runCommand`: the command about to run is itself checked by the locked-layer guard, so the executes it makes are judged by its guard on the final result. */
+  readonly judgesNestedLocks?: boolean;
+  /** Set by `runCommand`: this call is nested in a command that judges locked layers on its final result, so its own guard defers to it (layerLock.ts). */
+  readonly lockJudgedByCaller?: boolean;
   /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
   readonly kernel: GeometryKernel | null;
   /** Rigid-body physics engine for `simulate_motion`; null/absent while none is installed. */

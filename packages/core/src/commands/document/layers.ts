@@ -114,6 +114,8 @@ export const setEntityLayer = defineCommand({
         `Entity ${entityId} is on locked layer ${entity.layerId} ("${sourceLayer.name}"). ` +
           `Unlock the source layer before reassigning its entities.`,
       );
+    if (targetLayer.locked && layerId !== entity.layerId)
+      return noop(doc, `Layer ${layerId} ("${targetLayer.name}") is locked: unlock it before moving ${entityId} onto it.`);
     return changed(
       replaceEntity(doc, { ...entity, layerId }),
       `Entity ${entityId}: moved from layer ${entity.layerId} to ${layerId} ("${targetLayer.name}").`,

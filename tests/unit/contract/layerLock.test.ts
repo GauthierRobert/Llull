@@ -168,7 +168,24 @@ describe('locked layers are enforced for every caller (FR-INT-08)', () => {
     expect(plan.document.entities[scene.box]?.position[0]).toBe(1);
   });
 
-  it('every mutating command refuses an entity edit on a locked layer or is annotated layerManagement', () => {
+  it('edit_step_params on a step whose entity sits on a locked layer: a changing edit is refused LAYER_LOCKED', () => {
+    const scene = lockedScene();
+    const step = scene.doc.featureHistory.find((s) => s.affected?.includes(scene.box));
+    expect(step?.name).toBe('add_box');
+    const result = execute(scene.doc, 'edit_step_params', { stepId: step?.id ?? '', params: { size: [3, 3, 3] } });
+    expect(result.error?.code, result.summary).toBe('LAYER_LOCKED');
+    expect(result.document).toBe(scene.doc);
+  });
+
+  it('edit_step_params that regenerates an equal entity on a locked layer succeeds', () => {
+    const scene = lockedScene();
+    const step = scene.doc.featureHistory.find((s) => s.affected?.includes(scene.box));
+    const result = execute(scene.doc, 'edit_step_params', { stepId: step?.id ?? '', params: { size: [2, 2, 2] } });
+    expect(result.rejected, result.summary).toBeUndefined();
+    expect(result.document.entities[scene.box]).toEqual(scene.doc.entities[scene.box]);
+  });
+
+  it('the commands exempt from the lock guard are exactly the layer-management ones (annotation list is pinned)', () => {
     const exempt = listCommands()
       .filter((command) => command.annotations?.layerManagement === true)
       .map((command) => command.name);

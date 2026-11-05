@@ -32,15 +32,30 @@ function hasMalformedPosition(entity: unknown): boolean {
   return position !== undefined && (!Array.isArray(position) || position.length !== 3);
 }
 
+const MAX_PARAM_DEPTH = 64;
+const TOO_DEEP = Symbol('params nested too deeply');
+
 /**
- * Dotted path of the object that owns a `__proto__` key (JSON.parse creates it as an own key), or null. zod drops such a key
- * from the parsed output, so the command would never see it: refuse it before validation instead.
+ * Dotted path of the object that owns a `__proto__` key (JSON.parse creates it as an own key), TOO_DEEP when nesting exceeds MAX_PARAM_DEPTH, or null.
+ * zod drops such a key from the parsed output, so the command would never see it: refuse it before validation instead. Arrays are walked by
+ * index and primitive elements are skipped (a mesh payload holds millions of numbers).
  */
-function ownProtoKeyPath(value: unknown, path = '', depth = 0): string | null {
-  if (typeof value !== 'object' || value === null || depth > 8) return null;
-  if (!Array.isArray(value) && Object.prototype.hasOwnProperty.call(value, '__proto__')) return path;
-  for (const [key, child] of Object.entries(value)) {
-    const found = ownProtoKeyPath(child, path === '' ? key : `${path}.${key}`, depth + 1);
+function ownProtoKeyPath(value: unknown, path = '', depth = 0): string | typeof TOO_DEEP | null {
+  if (typeof value !== 'object' || value === null) return null;
+  if (depth > MAX_PARAM_DEPTH) return TOO_DEEP;
+  const child = (key: string): string => (path === '' ? key : `${path}.${key}`);
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const element: unknown = value[index];
+      if (typeof element !== 'object' || element === null) continue;
+      const found = ownProtoKeyPath(element, child(String(index)), depth + 1);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, '__proto__')) return path;
+  for (const key of Object.keys(value)) {
+    const found = ownProtoKeyPath((value as Record<string, unknown>)[key], child(key), depth + 1);
     if (found !== null) return found;
   }
   return null;
@@ -139,6 +154,12 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
       commandError('CMD_RESERVED_ID', 'Use an id that is not a JavaScript property name (constructor, __proto__, toString, …).'),
     );
   const protoPath = ownProtoKeyPath(safeParams);
+  if (protoPath === TOO_DEEP)
+    return rejection(
+      doc,
+      `${def.name} rejected: params nested too deeply (more than ${MAX_PARAM_DEPTH} levels). Document unchanged.`,
+      commandError('CMD_INVALID_PARAMS', 'Flatten the params: no object or array may nest more than 64 levels deep.'),
+    );
   if (protoPath !== null)
     return rejection(
       doc,

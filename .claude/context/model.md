@@ -104,7 +104,7 @@ interface FeatureStep {
   affected?: readonly EntityId[];
 }
 
-interface Layer { readonly id: string; name: string; visible: boolean; locked: boolean; color?: string }  // locked: `execute` refuses any command that adds, changes or removes an entity on it (LAYER_LOCKED, commands/layerLock.ts)
+interface Layer { readonly id: string; name: string; visible: boolean; locked: boolean; color?: string }  // locked: `execute` refuses any command that adds, changes or removes an entity on it, or moves one onto/off it (LAYER_LOCKED, commands/layerLock.ts); plugin-derived entities are exempt by design (the lock binds user-authored entities: editing a wall whose derived mesh sits on a locked layer is allowed); a nested execute is judged by the enclosing command on its final result
 interface CameraState { target: Vec3; azimuth: number; polar: number; distance: number } // spherical orbit
 const DEFAULT_LAYER_ID = 'layer-default';
 createEmptyDocument(): CadDocument   // one default layer 'Layer 0', every table empty
