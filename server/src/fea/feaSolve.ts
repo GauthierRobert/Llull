@@ -7,11 +7,13 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { FeConvergenceRow, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
+import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import type { CadDocument } from '@core/model/types';
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 import type { CcxRunner } from './ccxProcess';
+import { errorMessage } from '@lib/errorMessage';
 import { currentMesh, feaFailure, INSTALL_HINT, isFailure } from './feaCommon';
 import type { RandomPostStep } from '../native/randomField';
 
@@ -54,6 +56,24 @@ function convergenceNote(rows: readonly FeConvergenceRow[]): string {
   return `${totals.increments} increment(s), ${totals.cutbacks} cutback(s), ${totals.iterations} iteration(s), total time reached ${totals.lastTotalTime}`;
 }
 
+/** A native pre-step that threw: the TypeScript mapper still maps, so the results stay right; the failure is reported in the summary (FR-INT-13). */
+/** The native mapping pre-step failed; the TypeScript mapper takes over (machine-readable twin of the summary note). */
+interface MappingFallback {
+  readonly step: 'native-mapping';
+  readonly reason: string;
+}
+
+const nativeMappingFailure = (error: unknown): { readonly note: string; readonly fallback: MappingFallback } => ({
+  note: `native mapping failed (${errorMessage(error)}); mapped in TypeScript`,
+  fallback: { step: 'native-mapping', reason: errorMessage(error) },
+});
+
+/** Summary sentence of the mesh adequacy verdict (FR-INT-06); names the parts and the budget when it is not adequate. */
+function adequacyNote(adequacy: FeMeshAdequacy, hooks: CaeHooks): string {
+  if (adequacy.verdict === 'adequate') return `Mesh adequacy: adequate (${adequacy.parts.length} part measurement(s)).`;
+  return `Mesh adequacy: ${adequacy.verdict.toUpperCase()} - ${hooks.inadequacyReasons(adequacy).join('; ')}${adequacy.verdict === 'inadequate' ? '; compute_margins reports not_assessed rows until the mesh is refined' : ''}.`;
+}
+
 const readOptional = (file: string): Promise<string> => readFile(file, 'utf8').catch(() => '');
 
 /**
@@ -74,10 +94,29 @@ export async function runFeaSolve(
   const random = doc.analysis?.cases[analysisId]?.type === 'random_response';
   const tooLarge = random ? (deps.randomPost?.precheck(doc, analysisId, current.mesh) ?? null) : null;
   if (tooLarge !== null) return feaFailure('fea_solve', tooLarge.code, tooLarge.message, [analysisId]);
-  const prepared = deps.beforeDeck === undefined ? null : await deps.beforeDeck(doc, analysisId, current.mesh).catch(() => null);
+  const mapping =
+    deps.beforeDeck === undefined
+      ? null
+      : await deps.beforeDeck(doc, analysisId, current.mesh).then(
+          (note) => ({ note, fallback: null }),
+          (error: unknown) => nativeMappingFailure(error),
+        );
+  const prepared = mapping?.note ?? null;
+  const fallback = mapping?.fallback ?? null;
   const deck = deps.hooks.writeInp(doc, analysisId, current.mesh, deps.store);
-  if ('code' in deck) return feaFailure('fea_solve', deck.code, deck.message, [analysisId]);
+  if ('code' in deck) {
+    return {
+      ...feaFailure(
+        'fea_solve',
+        deck.code,
+        fallback === null ? deck.message : `${deck.message} (the native mapping step had failed first: ${fallback.reason})`,
+        [analysisId],
+      ),
+      data: { code: deck.code, ...(fallback === null ? {} : { mappingFallback: fallback }) },
+    };
+  }
 
+  const adequacy = deps.hooks.meshAdequacy(current.mesh);
   const directory = await mkdtemp(path.join(tmpdir(), 'llull-ccx-'));
   try {
     await writeFile(path.join(directory, `${JOB}.inp`), deck.text);
@@ -152,6 +191,7 @@ export async function runFeaSolve(
       steps,
       ...(dat !== undefined ? { dat } : {}),
       ...(nonlinear && convergence.length > 0 ? { convergence } : {}),
+      adequacy,
     };
     const post = random && deps.randomPost !== undefined ? await deps.randomPost.run(doc, analysisId, current.mesh, solved) : null;
     if (post !== null && !('results' in post)) return feaFailure('fea_solve', post.code, post.message, [analysisId]);
@@ -172,12 +212,13 @@ export async function runFeaSolve(
     });
     const increments = nonlinear ? ` ${convergenceNote(convergence)}.` : '';
     return {
-      summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${prepared === null ? '' : ` ${prepared}.`}${post === null ? '' : ` ${post.note}.`} ${recorded.summary}`,
+      summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${prepared === null ? '' : ` ${prepared}.`} ${adequacyNote(adequacy, deps.hooks)}${post === null ? '' : ` ${post.note}.`} ${recorded.summary}`,
       affected: recorded.affected,
       isError: recorded.isError,
       data: {
         resultsHash,
         steps: steps.length,
+        ...(fallback === null ? {} : { mappingFallback: fallback }),
         ...(nonlinear ? { convergence: convergenceTotals(convergence) } : {}),
         ...(post !== null ? { nodalField: { engine: post.engine, elapsedMs: post.elapsedMs, deterministic: true } } : {}),
         ...(deps.keepJobs === true ? { jobDirectory: directory } : {}),

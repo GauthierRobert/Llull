@@ -12,7 +12,7 @@ import { withCase } from '@cae/shared/access';
 import { expectRefusesWithoutUid } from '../../helpers/documentBinding';
 import { caseIn } from './helpers';
 import { mustRun } from './deckFixtures';
-import { marginBar, type MarginBar } from './marginsFixtures';
+import { marginBar, STAND_IN_MESH, type MarginBar } from './marginsFixtures';
 
 /** A signing port whose signature is the payload it signs (a stand-in for the 09 PLM key holder). */
 const SIGNER = 'Dr. Reviewer';
@@ -36,7 +36,7 @@ const rowsOf = (result: ReturnType<typeof execute>): Row[] => (result.data as { 
 const bar = marginBar();
 const humanContext = (): ExecutionContext => ({ ...bar.ctx, humanSignature: signingPort() });
 const computed = (doc: CadDocument, ctx: ExecutionContext, params: Record<string, unknown> = {}): ReturnType<typeof execute> =>
-  execute(doc, 'compute_margins', { analysisId: bar.analysisId, ...params }, ctx);
+  execute(doc, 'compute_margins', { analysisId: bar.analysisId, ...STAND_IN_MESH, ...params }, ctx);
 
 /** What a reviewer signs for `row` (the same payload the command verifies). */
 function signatureFor(b: MarginBar, row: Row, decision: string, justification: string): { payload: string } {
@@ -59,7 +59,14 @@ describe('dispose_margin: the human gate (VC-FEA-63)', () => {
     execute(
       bar.recorded,
       'dispose_margin',
-      { analysisId: bar.analysisId, rowId: failRow.rowId, decision: 'accepted', justification: 'tested to 1.8 x limit', ...extra },
+      {
+        analysisId: bar.analysisId,
+        ...STAND_IN_MESH,
+        rowId: failRow.rowId,
+        decision: 'accepted',
+        justification: 'tested to 1.8 x limit',
+        ...extra,
+      },
       ctx,
     );
 
@@ -95,6 +102,7 @@ describe('dispose_margin: a valid human signature', () => {
     'dispose_margin',
     {
       analysisId: bar.analysisId,
+      ...STAND_IN_MESH,
       rowId: failRow.rowId,
       decision: 'accepted',
       justification,
@@ -126,7 +134,7 @@ describe('dispose_margin: a valid human signature', () => {
   });
 
   it('check_analysis keeps FEA_MS_NEGATIVE (fail) but no longer lists the row as pending', () => {
-    const check = execute(accepted.document, 'check_analysis', { analysisId: bar.analysisId }, humanContext());
+    const check = execute(accepted.document, 'check_analysis', { analysisId: bar.analysisId, ...STAND_IN_MESH }, humanContext());
     const codes = (check.data as { items: { code: string }[] }).items.map((entry) => entry.code);
     expect((check.data as { status: string }).status).toBe('fail');
     expect(codes).toContain('FEA_MS_NEGATIVE');
@@ -156,7 +164,7 @@ describe('dispose_margin: a valid human signature', () => {
 
 describe('dispose_margin: refusals and row selection', () => {
   const human = humanContext();
-  const base = { analysisId: bar.analysisId, decision: 'redesign', justification: 'thicken the web', signature: {} };
+  const base = { analysisId: bar.analysisId, ...STAND_IN_MESH, decision: 'redesign', justification: 'thicken the web', signature: {} };
   const refusal = (params: Record<string, unknown>, doc = bar.recorded): string | undefined =>
     execute(doc, 'dispose_margin', { ...base, ...params }, human).error?.code;
 
@@ -189,6 +197,7 @@ describe('dispose_margin: refusals and row selection', () => {
       'dispose_margin',
       {
         analysisId: bar.analysisId,
+        ...STAND_IN_MESH,
         rowId: marginal.rowId,
         decision: 'accepted',
         justification: 'band agreed with the owner',
@@ -207,13 +216,14 @@ describe('dispose_margin: refusals and row selection', () => {
 
 describe('check_analysis margin items (VC-FEA-62)', () => {
   it('a negative margin without a band and without a disposition: fail with FEA_MS_NEGATIVE, FEA_MARGINAL_BAND_UNSET, FEA_DISPOSITION_PENDING', () => {
-    const check = execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId }, bar.ctx);
+    const check = execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId, ...STAND_IN_MESH }, bar.ctx);
     const data = check.data as { status: string; items: { code: string; severity: string; ids: string[]; remediation: string }[] };
     expect(data.status).toBe('fail');
+    // the 8-node stand-in bar is also reported as an inadequate mesh (the error stays; the opt-in only computes the margin items)
     expect([...new Set(data.items.map((entry) => entry.code))].sort()).toEqual([
       'FEA_DISPOSITION_PENDING',
       'FEA_MARGINAL_BAND_UNSET',
-      'FEA_MESH_ADEQUACY',
+      'FEA_MESH_INADEQUATE',
       'FEA_MS_NEGATIVE',
     ]);
     expect(data.items.find((entry) => entry.code === 'FEA_MS_NEGATIVE')).toMatchObject({ severity: 'error' });
@@ -222,14 +232,14 @@ describe('check_analysis margin items (VC-FEA-62)', () => {
 
   it('positive margins only draw the unset-band warning; no strengths means no margin items', () => {
     const strong = marginBar({ ftu: 900, fty: 800 });
-    const warned = execute(strong.recorded, 'check_analysis', { analysisId: strong.analysisId }, strong.ctx);
+    const warned = execute(strong.recorded, 'check_analysis', { analysisId: strong.analysisId, ...STAND_IN_MESH }, strong.ctx);
     expect((warned.data as { items: { code: string }[] }).items.map((entry) => entry.code)).toEqual([
-      'FEA_MESH_ADEQUACY',
+      'FEA_MESH_INADEQUATE',
       'FEA_MARGINAL_BAND_UNSET',
     ]);
     const bare = marginBar({ ftu: null, fty: null });
-    const silent = execute(bare.recorded, 'check_analysis', { analysisId: bare.analysisId }, bare.ctx);
-    expect((silent.data as { items: { code: string }[] }).items.map((entry) => entry.code)).toEqual(['FEA_MESH_ADEQUACY']);
+    const silent = execute(bare.recorded, 'check_analysis', { analysisId: bare.analysisId, ...STAND_IN_MESH }, bare.ctx);
+    expect((silent.data as { items: { code: string }[] }).items.map((entry) => entry.code)).toEqual(['FEA_MESH_INADEQUATE']);
   });
 });
 
@@ -249,7 +259,14 @@ describe('the signed payload names the model set-up', () => {
     const result = execute(
       bar.recorded,
       'dispose_margin',
-      { analysisId: bar.analysisId, rowId: failRow.rowId, decision: 'accepted', justification, signature: { payload: foreign } },
+      {
+        analysisId: bar.analysisId,
+        ...STAND_IN_MESH,
+        rowId: failRow.rowId,
+        decision: 'accepted',
+        justification,
+        signature: { payload: foreign },
+      },
       humanContext(),
     );
     expect(result.summary).toContain('FEA_HUMAN_GATE');
@@ -260,7 +277,7 @@ describe('the signed payload names the model set-up', () => {
 describe('dispose_margin: the signature is bound to the document (GATE-UID)', () => {
   const failRow = rowsOf(computed(bar.recorded, bar.ctx))[0] as Row;
   const justification = 'static test to 1.8 x limit load, report XYZ-12';
-  const params = { analysisId: bar.analysisId, rowId: failRow.rowId, decision: 'accepted', justification };
+  const params = { analysisId: bar.analysisId, ...STAND_IN_MESH, rowId: failRow.rowId, decision: 'accepted', justification };
   const accepted = execute(
     bar.recorded,
     'dispose_margin',
@@ -276,9 +293,9 @@ describe('dispose_margin: the signature is bound to the document (GATE-UID)', ()
     return uid === undefined ? document : { ...document, uid };
   };
   const codes = (doc: CadDocument): string[] =>
-    (execute(doc, 'check_analysis', { analysisId: bar.analysisId }, humanContext()).data as { items: { code: string }[] }).items.map(
-      (entry) => entry.code,
-    );
+    (
+      execute(doc, 'check_analysis', { analysisId: bar.analysisId, ...STAND_IN_MESH }, humanContext()).data as { items: { code: string }[] }
+    ).items.map((entry) => entry.code);
 
   it('records the uid of the document it was signed in, and counts there', () => {
     expect(bar.recorded.uid).toMatch(/^[0-9a-f]{32}$/);

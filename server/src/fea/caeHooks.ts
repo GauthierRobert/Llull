@@ -8,6 +8,7 @@ import type {
   MeshSummary,
   ResultsSummary,
 } from '@core/model/analysis';
+import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import type { CadDocument } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import {
@@ -35,6 +36,8 @@ import {
   type VtuEncoding,
   meshSummary,
   resultsSummary,
+  meshAdequacy,
+  inadequacyReasons,
   parseFieldTable,
   type TableImport,
 } from '@cae/index';
@@ -88,6 +91,10 @@ export interface CaeHooks {
   classifyNonlinearStop(log: string): NonlinearStopCode | null;
   /** CSV `x,y,z,T` -> the `fe_table` artifact of a temperature field (PHY-04 TR-TMC-14). */
   parseFieldTable(csv: string, coordinatesUnit: string, temperatureUnit: string): TableImport;
+  /** Through-thickness adequacy of the solid tetrahedra (TR-INT-07), recorded on the results artifact. */
+  meshAdequacy(mesh: FeMeshArtifact): FeMeshAdequacy;
+  /** Why each non-adequate part is non-adequate (empty when adequate). */
+  inadequacyReasons(adequacy: FeMeshAdequacy): string[];
   meshSummary(mesh: FeMeshArtifact, meshHash: string): MeshSummary;
   resultsSummary(
     doc: CadDocument,
@@ -116,4 +123,6 @@ export const caeHooks: CaeHooks = {
   parseFieldTable,
   meshSummary,
   resultsSummary,
+  meshAdequacy,
+  inadequacyReasons,
 };

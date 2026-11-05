@@ -33,6 +33,8 @@ import { analysisInputHash } from '../hash/inputHash';
 import { dispositionOf } from './disposition';
 import { refuseMargins } from './refusal';
 import { screenSingularities } from './singularity';
+import { adequacyOf } from '../results/adequacy';
+import { adequacyWarnings, gateRows, notAssessedText, overallOf } from './adequacyGate';
 
 const CRITERIA = ['von_mises', 's_xx', 's_yy', 's_zz'] as const;
 type Criterion = (typeof CRITERIA)[number];
@@ -107,7 +109,7 @@ function appliedOver(
 export interface MarginRow {
   readonly rowId: string;
   readonly ms: number | null;
-  readonly status: MarginStatus;
+  readonly status: MarginStatus | 'NOT_ASSESSED';
   readonly disposition: string;
   readonly [key: string]: unknown;
 }
@@ -339,6 +341,12 @@ export const marginQueryShape = {
     .string()
     .optional()
     .describe('Mandatory (non-empty) engineering justification when singularityRadius is given; echoed in the result data.'),
+  acceptInadequateMesh: z
+    .boolean()
+    .optional()
+    .describe(
+      "Default false: when the mesh of the results is inadequate (too few element layers through a wall, data.meshAdequacy) every row is not_assessed with FEA_MESH_INADEQUATE and the overall verdict is never pass. true: numeric margins are computed anyway and data.overrides records acceptInadequateMesh. Set it only on the engineer's explicit decision; the better fix is a finer mesh.",
+    ),
 };
 
 export type MarginQuery = z.output<z.ZodObject<typeof marginQueryShape>>;
@@ -426,7 +434,10 @@ export function marginTable(
   };
   const built = buildRows(context);
   if ('code' in built) return refuse(built.code, built.message);
-  const { rows, skipped } = built;
+  const { skipped } = built;
+  const adequacy = adequacyOf(trust.resultsArtifact, trust.meshArtifact);
+  const gate = gateRows(built.rows, adequacy, query.acceptInadequateMesh === true);
+  const rows = gate.rows;
   const withRows = new Set(rows.map((row) => String(row['part'])));
   const composite = compositeWarnings(analysis, new Map([...skipped].filter(([entityId]) => !withRows.has(entityId))));
   if (rows.length === 0 && composite.length > 0)
@@ -442,7 +453,9 @@ export function marginTable(
   const finite = rows.filter((row) => row.ms !== null && row['singular'] !== true);
   const lowest = finite.reduce<MarginRow | null>((best, row) => (best === null || (row.ms ?? 0) < (best.ms ?? 0) ? row : best), null);
   const pending = rows.filter((row) => row.disposition === 'pending_human').length;
-  const decided = rows.filter((row) => row.status !== 'PASS' && row.disposition !== 'pending_human').length;
+  const decided = rows.filter(
+    (row) => row.status !== 'PASS' && row.status !== 'NOT_ASSESSED' && row.disposition !== 'pending_human',
+  ).length;
   const unverified = rows.filter((row) => row['unverified'] === true).length;
   const singularCount = rows.filter((row) => row['singular'] === true).length;
   const factors = factorReport(analysis);
@@ -458,7 +471,11 @@ export function marginTable(
     factors,
     rows,
     singularScreening: screen.data,
+    overall: overallOf(rows),
+    meshAdequacy: adequacy,
+    ...(gate.overrides.length > 0 ? { overrides: gate.overrides } : {}),
     warnings: [
+      ...adequacyWarnings(gate, adequacy),
       ...(marginalBand === undefined ? ['FEA_MARGINAL_BAND_UNSET: no marginalBand given, so no row is MARGINAL'] : []),
       ...composite,
       ...dispositionWarnings(rows),
@@ -470,11 +487,12 @@ export function marginTable(
     ],
     reviewRequired: true,
   };
-  const worst =
-    lowest === null
+  const worst = gate.gated
+    ? notAssessedText(gate.reasons)
+    : lowest === null
       ? 'no finite margin'
       : `min MS ${significantNumber(lowest.ms ?? 0, 4)} (${String(lowest['statusLabel'])}, ${lowest.rowId} ${String(lowest['loadCase'])}, part ${String(lowest['part'])})`;
-  const summary = `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}; ${pending} pending a human disposition${decided > 0 ? `, ${decided} dispositioned by a human (status unchanged)` : ''}, ${unverified} unverified${singularCount > 0 ? `, ${singularCount} singular row(s) excluded from min MS` : ''}; factors ultimate ${factors.ultimate.value} (${factors.ultimate.defaulted ? 'DEFAULT 14 CFR 25.303, not set by the user' : 'set via create_analysis'}), yield ${factors.yield.value} (${factors.yield.defaulted ? 'DEFAULT, not set by the user' : 'set via create_analysis'}). Computed by llull, not approved: needs a qualified engineer.`;
+  const summary = `compute_margins: '${analysisId}' ${rows.length} row(s), ${worst}${adequacy.verdict === 'marginal' ? '; FEA_MESH_MARGINAL: a thin region of the mesh is under-resolved (not gated, see data.warnings)' : ''}; ${pending} pending a human disposition${decided > 0 ? `, ${decided} dispositioned by a human (status unchanged)` : ''}, ${unverified} unverified${singularCount > 0 ? `, ${singularCount} singular row(s) excluded from min MS` : ''}; factors ultimate ${factors.ultimate.value} (${factors.ultimate.defaulted ? 'DEFAULT 14 CFR 25.303, not set by the user' : 'set via create_analysis'}), yield ${factors.yield.value} (${factors.yield.defaulted ? 'DEFAULT, not set by the user' : 'set via create_analysis'}). Computed by llull, not approved: needs a qualified engineer.`;
   return { analysis, rows, summary, data };
 }
 
@@ -484,7 +502,9 @@ export function marginTable(
  *   FAIL / MARGINAL rows are disposition pending_human until dispose_margin records a human decision whose signature still verifies (the status
  *   never changes: statusLabel reads `FAIL (accepted)`); every row has a stable rowKey; nodes within the singularity radius of a point / edge load or support are excluded from the
  *   part / target rows and reported in separate singular rows (singular: true, rowKey suffix |singular, after the regular rows) that never count
- *   towards minMs; re-entrant edges are NOT screened
+ *   towards minMs; re-entrant edges are NOT screened; the mesh adequacy (always measured on the mesh artifact; the verdict recorded on the results is display only; unmeasured gates like inadequate; marginal is a warning) gates every
+ *   row: an inadequate result gives rows status NOT_ASSESSED / state not_assessed / code FEA_MESH_INADEQUATE, ms null, data.overall never pass, unless
+ *   acceptInadequateMesh: true, which restores the numeric rows and records data.overrides
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not static / thermo_static -> FEA_ANALYSIS_TYPE_UNSUPPORTED; stale results ->
  *   FEA_RESULTS_STALE; no verified results -> FEA_RESULTS_MISSING; recorded summary differs from its artifact -> FEA_SUMMARY_MISMATCH;
  *   no allowable -> FEA_MATERIAL_NO_ALLOWABLE; bad load case / band / yield on ultimate-only cases / singularityRadius < 0 or without a
@@ -511,7 +531,7 @@ export const computeMargins = defineCommand({
     '(document length units, 0 = exclude nothing) overrides it and REQUIRES singularityNote (engineer justification, echoed in data), else ' +
     'FEA_MARGIN_PARAM_INVALID. Re-entrant corners / sharp edges are NOT screened (needs geometry, deferred): judge them yourself. Refused with ' +
     'FEA_RESULTS_STALE when inputs changed since the solve (run fea_mesh and fea_solve), FEA_RESULTS_MISSING without a verified results ' +
-    'artifact, FEA_MATERIAL_NO_ALLOWABLE when a part has no Ftu / Fty for the check and no explicit allowable. Values are in the analysis ' +
+    'artifact, FEA_MATERIAL_NO_ALLOWABLE when a part has no Ftu / Fty for the check and no explicit allowable. MESH ADEQUACY: the through-thickness verdict is ALWAYS measured on the mesh artifact (data.meshAdequacy: adequate | marginal | inadequate, element layers through the wall per part and order; a verdict recorded on the results is display only; an unavailable mesh is unmeasured and gates like inadequate; a thin spot under half the budget is inadequate, under 75 % marginal = warning FEA_MESH_MARGINAL, not gated); on an inadequate mesh every row is not_assessed (status NOT_ASSESSED, code FEA_MESH_INADEQUATE, ms null) and data.overall is never pass: refine the mesh (fea_mesh) or pass acceptInadequateMesh: true on the explicit decision of the engineer (recorded in data.overrides). data.overall is pass | marginal | fail | not_assessed. Values are in the analysis ' +
     'unit system (N-mm-t-s: MPa, mm) and field names carry the unit.',
   annotations: { readOnly: true },
   params: z.object({ analysisId: analysisIdSchema, ...marginQueryShape }),

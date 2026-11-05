@@ -63,8 +63,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'hand the FAIL / MARGINAL rows to the qualified reviewer, who dispositions them with dispose_margin in the desktop app',
   FEA_UNDERCONSTRAINED:
     'add supports that remove all six rigid-body motions (a fixed face, or three non-collinear points holding six dofs); modal analyses of a free model report rigid-body modes at 0 Hz',
-  FEA_MESH_ADEQUACY:
-    'reduce the global mesh size or add a refinement so that at least 2 (better 3-4) elements span the thinnest dimension, then run fea_mesh',
+  FEA_MESH_INADEQUATE:
+    'refine the mesh (smaller globalSize, a refinement on the thin wall, or quadratic C3D10 elements) until the wall has the required element layers, then run fea_mesh and fea_solve; compute_margins reports not_assessed rows until then (acceptInadequateMesh: true only on the explicit decision of the engineer)',
+  FEA_MESH_MARGINAL:
+    'the wall meets the layer budget at the 5th percentile but a thin spot (under 5 % of the surface) does not: refine the mesh there before relying on stresses or deflections at it',
   FEA_LOADS_IGNORED: 'delete the loads, or use a static analysis for the response to them; a modal analysis only needs supports and mass',
   FEA_BUCKLING_LOAD_CASE_IGNORED:
     'keep one load case in a buckling analysis (the first one is the reference) or create one buckling analysis per case',

@@ -39,7 +39,8 @@ describe('check_analysis FEA_FACETED_GEOMETRY', () => {
     expect(item?.message).toContain('off by several % (either sign)');
     expect(item?.ids).toContain('box-1.1');
     expect(item?.remediation).toContain('OCC kernel');
-    expect(data.items.filter((entry) => entry.severity === 'error')).toEqual([]);
+    // the 6-tet fixture mesh is itself too coarse through its wall: that is the only error
+    expect(data.items.filter((entry) => entry.severity === 'error').map((entry) => entry.code)).toEqual(['FEA_MESH_INADEQUATE']);
   });
 
   it('is silent for a mesh without faceted parts (a box, or an exact STEP mesh), and the recorded summary still verifies', () => {

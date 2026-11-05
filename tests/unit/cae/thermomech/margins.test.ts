@@ -9,7 +9,7 @@ import { analysisInputHash } from '@cae/hash/inputHash';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { expectCase } from '../../physics/benchmarkCases';
 import { PACK } from '../../physics/thermomech/thermomechFixtures';
-import { strengthModel } from '../marginsFixtures';
+import { STAND_IN_MESH, strengthModel } from '../marginsFixtures';
 import { mustRun } from '../deckFixtures';
 import { hashOf, portOf, thermoFixture, withThermalSource, type ThermalSource } from './fixtures';
 
@@ -87,7 +87,7 @@ describe('VC-TMC-50 staleness chain thermal -> thermo_static', () => {
   it('is solved, with a margin, before the thermal case is edited', () => {
     const { doc, ctx, analysisId } = solvedChain();
     expect((execute(doc, 'analysis_report', { analysisId }, ctx).data as Report).state).toBe('solved');
-    const margins = execute(doc, 'compute_margins', { analysisId, allowable: 'ftu' }, ctx);
+    const margins = execute(doc, 'compute_margins', { analysisId, allowable: 'ftu', ...STAND_IN_MESH }, ctx);
     expect(margins.rejected).not.toBe(true);
     // max sxx = 105 MPa at the largest node id, thermal load case limit: MS = 400 / (105 x 1.5) - 1
     expect((margins.data as { rows: { ms: number; loadCase: string }[] }).rows[0]).toMatchObject({ loadCase: 'thermal' });
@@ -100,7 +100,7 @@ describe('VC-TMC-50 staleness chain thermal -> thermo_static', () => {
     const { doc, ctx, analysisId, source } = solvedChain();
     const edited = mustRun(doc, 'add_result_probe', { analysisId: source.thermalId, name: 'p', point: [1, 1, 1], quantity: 'temperature' });
     const report = execute(edited, 'analysis_report', { analysisId }, ctx);
-    const margins = execute(edited, 'compute_margins', { analysisId }, ctx);
+    const margins = execute(edited, 'compute_margins', { analysisId, ...STAND_IN_MESH }, ctx);
     const check = execute(edited, 'check_thermo_mechanical', { analysisId }, ctx);
     expect(margins.document).toBe(edited);
     expectCase(PACK, 'VC-TMC-50', {

@@ -9,7 +9,7 @@ import { marginDispositionPayload } from '@cae/margins/disposition';
 import { screenSingularities } from '@cae/margins/singularity';
 import { caseIn } from './helpers';
 import { barMesh, mustRun } from './deckFixtures';
-import { marginBar, type MarginBar } from './marginsFixtures';
+import { marginBar, STAND_IN_MESH, type MarginBar } from './marginsFixtures';
 
 interface Row {
   rowId: string;
@@ -39,7 +39,7 @@ interface Margins {
 }
 
 const margins = (bar: MarginBar, params: Record<string, unknown> = {}): ReturnType<typeof execute> =>
-  execute(bar.recorded, 'compute_margins', { analysisId: bar.analysisId, ...params }, bar.ctx);
+  execute(bar.recorded, 'compute_margins', { analysisId: bar.analysisId, ...STAND_IN_MESH, ...params }, bar.ctx);
 const dataOf = (result: ReturnType<typeof execute>): Margins => result.data as Margins;
 
 describe('compute_margins singularity screening', () => {
@@ -217,6 +217,7 @@ describe('dispose_margin on a singular row', () => {
       'dispose_margin',
       {
         analysisId: bar.analysisId,
+        ...STAND_IN_MESH,
         rowId: row?.rowId,
         decision: 'accepted',
         justification: 'peak at a point support',
@@ -247,7 +248,7 @@ describe('dispose_margin on a singular row', () => {
   });
 
   it('check_analysis does not raise FEA_MS_NEGATIVE for a singular FAIL row', () => {
-    const check = execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId }, bar.ctx);
+    const check = execute(bar.recorded, 'check_analysis', { analysisId: bar.analysisId, ...STAND_IN_MESH }, bar.ctx);
     const items = (check.data as { items: { code: string; ids: string[] }[] }).items;
     const negative = items.find((item) => item.code === 'FEA_MS_NEGATIVE');
     expect(negative?.ids.every((id) => id === bar.analysisId || !['r3', 'r4'].includes(id)) ?? true).toBe(true);

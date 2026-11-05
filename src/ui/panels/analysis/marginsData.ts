@@ -23,6 +23,8 @@ export interface MarginRowView {
   readonly status: string;
   /** What to show for the status: `FAIL (accepted)` when the command says so, else the status. */
   readonly statusLabel: string;
+  /** Stable code of a row that is not assessed (`FEA_MESH_INADEQUATE`), else ''. */
+  readonly code: string;
   readonly disposition: string;
   readonly singular: boolean;
   readonly unverified: boolean;
@@ -69,6 +71,7 @@ function parseRow(entry: unknown): MarginRowView[] {
       ms: typeof entry['ms'] === 'number' ? entry['ms'] : null,
       status,
       statusLabel: str(entry['statusLabel']) || status,
+      code: status === 'NOT_ASSESSED' ? str(entry['code']) : '',
       disposition: str(entry['disposition'], 'none'),
       singular: entry['singular'] === true,
       unverified: entry['unverified'] === true,
@@ -112,7 +115,7 @@ export function dispositionText(disposition: string): string {
   return disposition === 'pending_human' ? 'pending human review' : disposition.replace(/_/g, ' ');
 }
 
-/** Panel tone of a margin status: FAIL bad, MARGINAL warn, PASS ok. */
+/** Panel tone of a margin status: FAIL bad, MARGINAL and NOT_ASSESSED (inadequate mesh) warn, PASS ok. */
 export function statusToneOf(status: string): 'ok' | 'warn' | 'bad' {
-  return status === 'FAIL' ? 'bad' : status === 'MARGINAL' ? 'warn' : 'ok';
+  return status === 'FAIL' ? 'bad' : status === 'MARGINAL' || status === 'NOT_ASSESSED' ? 'warn' : 'ok';
 }

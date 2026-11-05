@@ -93,6 +93,7 @@ describe('thermal_distortion_report', () => {
         { name: 'by plane', onPlane: { entityId: fixture.boxId, point: [0, 0, 0], normal: [0, 0, 5], distance: 0.01 }, tolerance: 0.25 },
       ],
       points: [{ name: 'centre', point: [5, 5, 0.1] }],
+      acceptInadequateMesh: true,
     });
     const data = result.data as {
       unit: string;
@@ -114,6 +115,23 @@ describe('thermal_distortion_report', () => {
     expect(data.maxDisplacement).toBeCloseTo(Math.hypot(0.1, 0.3), 12);
     expect(result.summary).toContain('review required');
     expect(result.summary).toContain('exceed');
+  });
+
+  it('FR-INT-06: on an inadequate mesh the flatness tolerance verdict is not assessed unless acceptInadequateMesh', () => {
+    const { fixture, port } = solved();
+    const faces = [{ name: 'by set', targetKey: 'C_fc-1.1', tolerance: 0.1 }];
+    const gated = report(fixture, port, { faces });
+    const data = gated.data as { faces: (FaceRow & { code?: string })[]; meshAdequacy: { verdict: string }; overrides?: string[] };
+    expect(data.meshAdequacy.verdict).toBe('inadequate');
+    expect(data.faces[0]).toMatchObject({ withinTolerance: null, code: 'FEA_MESH_INADEQUATE' });
+    expect(data.faces[0]?.flatnessAfter).toBeCloseTo(0.2, 12);
+    expect(gated.summary).toContain('NOT ASSESSED (FEA_MESH_INADEQUATE');
+    expect(gated.summary).not.toContain('exceed');
+    expect(data.overrides).toBeUndefined();
+    const accepted = report(fixture, port, { faces, acceptInadequateMesh: true });
+    const acceptedData = accepted.data as { faces: FaceRow[]; overrides?: string[] };
+    expect(acceptedData.faces[0]?.withinTolerance).toBe(false);
+    expect(acceptedData.overrides).toEqual(['acceptInadequateMesh']);
   });
 
   it('converts analysis lengths to the document unit (in)', () => {

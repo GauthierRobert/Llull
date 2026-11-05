@@ -42,6 +42,11 @@ export const marginDispositionPayloadQuery = defineCommand({
     const row = table.rows.find((candidate) => candidate.rowId === rowId);
     if (row === undefined)
       return fail('FEA_MARGIN_ROW_NOT_FOUND', `no margin row '${rowId}' in '${analysisId}' (${table.rows.length} row(s))`);
+    if (row.status === 'NOT_ASSESSED')
+      return fail(
+        'FEA_MESH_INADEQUATE',
+        `row '${rowId}' is not assessed: the mesh of the results is inadequate, so there is no margin to disposition (refine the mesh, or recompute with acceptInadequateMesh: true on the engineer's decision)`,
+      );
     if (row.status === 'PASS')
       return fail('FEA_MARGIN_PARAM_INVALID', `row '${rowId}' is PASS: only FAIL and MARGINAL rows are dispositioned`);
     const rowKey = String(row['rowKey']);

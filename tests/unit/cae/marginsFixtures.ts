@@ -8,9 +8,15 @@ import { parseFrd } from '@cae/results/frdReader';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { withCase } from '@cae/shared/access';
 import { barDocument, barMesh, facesOn, hashOf, mustRun, portOf, X0_NODES, X2_NODES, type SolvedBar } from './deckFixtures';
-import type { FeArtifactPort } from '@core/model/analysis';
+import type { FeArtifactPort, FeMeshArtifact } from '@core/model/analysis';
 import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
+
+/**
+ * The 8-node, 6-tet fixture bar is NOT a fine mesh (one layer through its depth, measured inadequate): tests of the stress arithmetic opt in to
+ * its mesh explicitly with these params (spread into the command params); nothing is stamped on the results.
+ */
+export const STAND_IN_MESH = { acceptInadequateMesh: true } as const;
 
 const SOURCE = { citation: 'synthetic test fixture', locator: 'tests/unit/cae/margins' };
 
@@ -38,12 +44,81 @@ export interface MarginBarOptions {
   readonly globalSize?: number;
   /** The point supports (nodes 1 and 3) are singular sources (no face in the mesh artifact). Default: false. */
   readonly pointSupportsSingular?: boolean;
+  /**
+   * A REAL mesh of the 2 x 1 x 1 bar instead of the 8-node stand-in (build it for the part id; its nodes must contain the corners): the results
+   * carry the same uniform 210 MPa uniaxial field at every node, so the stress arithmetic is unchanged and the mesh is measured honestly.
+   */
+  readonly lattice?: (boxId: string) => FeMeshArtifact;
+  /** A verdict to record on the results (display only: the gate always measures the mesh; used to prove a forged record gates nothing). */
+  readonly recordedAdequacy?: unknown;
 }
 
 export interface MarginBar extends SolvedBar {
   readonly ctx: ExecutionContext;
   /** The document with mesh and results recorded (verified against `port`). */
   readonly recorded: CadDocument;
+}
+
+type Steps = FeResultsArtifact['steps'];
+
+/** The faces (element id, CalculiX label) of the tets of `mesh` whose three nodes all lie in `nodeIds`. */
+function facesIn(mesh: FeMeshArtifact, nodeIds: ReadonlySet<number>): [number, number][] {
+  const labels = [
+    [0, 1, 2],
+    [0, 3, 1],
+    [1, 3, 2],
+    [2, 3, 0],
+  ] as const;
+  return (mesh.blocks[0]?.elements ?? []).flatMap((element) =>
+    labels.flatMap((corner, index): [number, number][] =>
+      corner.every((at) => nodeIds.has(element[at + 1] ?? -1)) ? [[element[0] ?? 0, index + 1]] : [],
+    ),
+  );
+}
+
+/** A lattice mesh of the bar with the node / face sets of the constraints and the uniform uniaxial results (sxx 210 MPa, ux = 0.001 x). */
+function latticeOf(
+  base: FeMeshArtifact,
+  doc: CadDocument,
+  analysisId: string,
+  constraints: Record<string, string>,
+  pullId: string,
+): { mesh: FeMeshArtifact; steps: Steps } {
+  const at = (x: number): Set<number> => new Set(base.nodes.filter((node) => node[1] === x).map((node) => node[0]));
+  const nearest = (y: number): number =>
+    (base.nodes.find((node) => node[1] === 0 && node[2] === y && node[3] === 0) ?? base.nodes[0])?.[0] ?? 1;
+  const [x0, x2] = [at(0), at(2)];
+  const mesh: FeMeshArtifact = {
+    ...base,
+    inputHash: analysisInputHash(doc, analysisId, 'mesh'),
+    nodeSets: {
+      [`C_${constraints['x0']}`]: [...x0],
+      [`C_${constraints['nodeA']}`]: [nearest(0)],
+      [`C_${constraints['nodeB']}`]: [nearest(1)],
+      [`C_${pullId}`]: [...x2],
+    },
+    faceSets: {
+      [`C_${constraints['x0']}`]: facesIn(base, x0),
+      [`C_${constraints['nodeA']}`]: facesIn(base, x0),
+      [`C_${constraints['nodeB']}`]: facesIn(base, x0),
+      [`C_${pullId}`]: facesIn(base, x2),
+    },
+  };
+  const values = (tensor: (node: FeMeshArtifact['nodes'][number]) => number[]): Record<string, number[]> =>
+    Object.fromEntries(mesh.nodes.map((node) => [String(node[0]), tensor(node)]));
+  return {
+    mesh,
+    steps: [
+      {
+        step: 1,
+        time: 1,
+        fields: {
+          DISP: { components: ['D1', 'D2', 'D3'], values: values((node) => [0.001 * node[1], 0, 0]) },
+          STRESS: { components: ['SXX', 'SYY', 'SZZ', 'SXY', 'SYZ', 'SZX'], values: values(() => [210, 0, 0, 0, 0, 0]) },
+        },
+      },
+    ],
+  };
 }
 
 /** Bar of ~210 MPa von Mises, strengths Ftu 300 / Fty 250 MPa by default. */
@@ -89,7 +164,11 @@ export function marginBar(options: MarginBarOptions = {}): MarginBar {
       ? {}
       : { [`C_${bar.constraints['nodeA']}`]: facesOn(X0_NODES), [`C_${bar.constraints['nodeB']}`]: facesOn(X0_NODES) }),
   };
-  const mesh = barMesh(doc, bar.analysisId, bar.boxId, sets, faces);
+  const lattice =
+    options.lattice === undefined
+      ? null
+      : latticeOf(options.lattice(bar.boxId), doc, bar.analysisId, bar.constraints, pull.affected[0] ?? '');
+  const mesh = lattice?.mesh ?? barMesh(doc, bar.analysisId, bar.boxId, sets, faces);
   const meshHash = hashOf(mesh);
   const results: FeResultsArtifact = {
     kind: 'fe_results',
@@ -97,7 +176,8 @@ export function marginBar(options: MarginBarOptions = {}): MarginBar {
     inputHash: analysisInputHash(doc, bar.analysisId, 'full'),
     solver: 'CalculiX',
     solverVersion: '2.21',
-    steps: parseFrd(readFileSync('tests/unit/cae/fixtures/static.frd', 'utf8')),
+    steps: lattice?.steps ?? parseFrd(readFileSync('tests/unit/cae/fixtures/static.frd', 'utf8')),
+    ...(options.recordedAdequacy === undefined ? {} : ({ adequacy: options.recordedAdequacy } as Partial<FeResultsArtifact>)),
   };
   const resultsHash = hashOf(results);
   const port: FeArtifactPort = portOf(mesh, results);

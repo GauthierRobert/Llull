@@ -7,6 +7,8 @@ import type { Vec3 } from '@core/model/vectors';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import { ACCEPT_INADEQUATE_MESH } from '../margins/adequacyGate';
+import { adequacyOf, blocksAssessment, inadequacyReasons } from '../results/adequacy';
 import { caseOf } from '../shared/access';
 import { analysisLengthMetres } from '../shared/defaults';
 import { analysisIdSchema } from '../shared/schemas';
@@ -46,7 +48,9 @@ const lengthFactor = (doc: CadDocument, mesh: FeMeshArtifact): number => analysi
 
 /**
  * @invariant read-only; data { unit, maxDisplacement, faces[{ name, nodes, flatnessBefore, flatnessAfter, change, normal, tolerance?, withinTolerance?,
- *   reviewRequired }], points[{ name, nodeId, distance, displacement[3], magnitude }], reviewRequired: true }; lengths in document units
+ *   code?, reviewRequired }], points[{ name, nodeId, distance, displacement[3], magnitude }], meshAdequacy, overrides?, reviewRequired: true }; lengths in
+ *   document units; on an inadequate mesh (FR-INT-06) every withinTolerance is null with code FEA_MESH_INADEQUATE (the measured flatness stays) unless
+ *   acceptInadequateMesh (data.overrides)
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; unsolved / no artifact / not verifiable on this machine -> FEA_RESULTS_MISSING; stale ->
  *   FEA_RESULTS_STALE; recorded summary that differs from its artifact -> FEA_SUMMARY_MISMATCH; face without a
  *   usable node set (< 3 non-collinear nodes) -> FEA_TARGET_UNRESOLVED; no DISP field -> FEA_RESULTS_MISSING (refusals)
@@ -59,7 +63,8 @@ export const thermalDistortionReport = defineCommand({
     'each named point, the displacement of the nearest node. A face is a mesh node set (targetKey of an existing constraint / load / ' +
     'probe target) or the nodes of a solid lying on a plane (onPlane). Lengths are in document units. Reads the stored results ' +
     'artifact; refused when the results are stale or missing. reviewRequired is always true: it is an engineering number for a ' +
-    'qualified reviewer, not a drawing verdict.',
+    'qualified reviewer, not a drawing verdict. On an inadequate mesh (too few element layers through a wall, data.meshAdequacy) the flatness ' +
+    'tolerance verdict is not assessed (withinTolerance null, code FEA_MESH_INADEQUATE) unless acceptInadequateMesh: true (recorded in data.overrides).',
   annotations: { readOnly: true },
   params: z.object({
     analysisId: analysisIdSchema,
@@ -73,8 +78,14 @@ export const thermalDistortionReport = defineCommand({
       )
       .optional()
       .describe('Points whose displacement to report (nearest mesh node).'),
+    acceptInadequateMesh: z
+      .boolean()
+      .optional()
+      .describe(
+        'Default false: on an inadequate mesh the flatness tolerance verdict is not assessed (withinTolerance null). true: the verdict is computed anyway and data.overrides records acceptInadequateMesh; only on the explicit decision of the engineer.',
+      ),
   }),
-  run: (doc, { analysisId, faces = [], points = [] }, ctx): CommandResult => {
+  run: (doc, { analysisId, faces = [], points = [], acceptInadequateMesh }, ctx): CommandResult => {
     const fail = (code: string, message: string, ids: readonly string[] = [analysisId]): CommandResult =>
       refuseTmc(doc, 'thermal_distortion_report', code, message, ids);
     const analysisCase = caseOf(doc, analysisId);
@@ -92,7 +103,7 @@ export const thermalDistortionReport = defineCommand({
         `the mesh or results artifact is not verifiable on this machine: ${trust.problem?.message ?? 'no artifact store'}`,
       );
     const loaded: Loaded = { mesh, results };
-    return measure(doc, analysisId, loaded, faces, points, fail);
+    return measure(doc, analysisId, loaded, faces, points, fail, acceptInadequateMesh === true);
   },
 });
 
@@ -131,6 +142,7 @@ function measure(
   faces: readonly FaceInput[],
   points: readonly { name: string; point: Vec3 }[],
   fail: Failer,
+  accept: boolean,
 ): CommandResult {
   const step = results.steps[results.steps.length - 1];
   const displacement = step?.fields['DISP'];
@@ -191,10 +203,33 @@ function measure(
     .map((row) => `${row.name} flatness ${row.flatnessBefore.toPrecision(6)} -> ${row.flatnessAfter.toPrecision(6)} ${unit}`)
     .concat(pointRows.map((row) => `${row.name} |u| ${row.magnitude.toPrecision(6)} ${unit}`))
     .join('; ');
-  const exceeding = faceRows.filter((row) => row.withinTolerance === false).length;
+  const adequacy = adequacyOf(results, mesh);
+  const inadequate = blocksAssessment(adequacy);
+  const gated = inadequate && !accept;
+  const rows = gated
+    ? faceRows.map((row) => (row.tolerance === undefined ? row : { ...row, withinTolerance: null, code: 'FEA_MESH_INADEQUATE' }))
+    : faceRows;
+  const exceeding = rows.filter((row) => row.withinTolerance === false).length;
+  const toleranced = faceRows.filter((row) => row.tolerance !== undefined).length;
+  const verdict = gated
+    ? toleranced === 0
+      ? ''
+      : `; flatness tolerance NOT ASSESSED (FEA_MESH_INADEQUATE: ${inadequacyReasons(adequacy).join('; ')}; refine the mesh, or pass acceptInadequateMesh: true on the engineer's decision)`
+    : exceeding > 0
+      ? `; ${exceeding} face(s) exceed the given flatness tolerance${inadequate ? ' (inadequate mesh accepted by acceptInadequateMesh)' : ''}`
+      : '';
   return report(
     doc,
-    `thermal_distortion_report: '${analysisId}' max |u| ${maxDisplacement.toPrecision(6)} ${unit}${text === '' ? '' : `; ${text}`}${exceeding > 0 ? `; ${exceeding} face(s) exceed the given flatness tolerance` : ''}; review required.`,
-    { analysisId, unit, maxDisplacement, faces: faceRows, points: pointRows, reviewRequired: true },
+    `thermal_distortion_report: '${analysisId}' max |u| ${maxDisplacement.toPrecision(6)} ${unit}${text === '' ? '' : `; ${text}`}${verdict}; review required.`,
+    {
+      analysisId,
+      unit,
+      maxDisplacement,
+      faces: rows,
+      points: pointRows,
+      meshAdequacy: adequacy,
+      ...(inadequate && accept ? { overrides: [ACCEPT_INADEQUATE_MESH] } : {}),
+      reviewRequired: true,
+    },
   );
 }

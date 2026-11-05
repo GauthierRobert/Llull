@@ -6,7 +6,11 @@
 
 import type { FatigueCase } from '@core/model/durability';
 import type { FeArtifactPort } from '@core/model/analysis';
+import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import type { CadDocument } from '@core/model/types';
+import { ACCEPT_INADEQUATE_MESH } from '../margins/adequacyGate';
+import { blocksAssessment } from '../results/adequacy';
+import { inadequacyReasons } from '../results/adequacy';
 import { nodeCoordinates, nodeEntities } from '../results/fields';
 import { evaluateCycles, isEvaluationFailure, type Evaluation, type Failure } from './evaluate';
 import { cyclesOfNode, fatigueFieldInput, FIELD_COMPONENTS, FLAG_BITS, readFatigueField } from './feField';
@@ -33,7 +37,11 @@ export interface FeEvaluation {
   readonly nodesEvaluated: number;
   readonly skippedNodes: number;
   readonly minMargin: number | null;
-  readonly status: Evaluation['status'];
+  /** `NOT_ASSESSED` when the mesh is inadequate and not accepted: the rows carry no verdict (FR-INT-06). */
+  readonly status: Evaluation['status'] | 'NOT_ASSESSED';
+  readonly adequacy: FeMeshAdequacy;
+  /** `['acceptInadequateMesh']` when the caller's acceptance let an inadequate mesh through. */
+  readonly overrides: readonly string[];
 }
 
 const STATUS_RANK: Readonly<Record<Evaluation['status'], number>> = { PASS: 0, MARGINAL: 1, FAIL: 2 };
@@ -54,6 +62,8 @@ const agrees = (native: number, reference: number): boolean =>
 
 /**
  * Hot-spot evaluation of an FE-driven case from its current FatigueField.
+ * @invariant an inadequate mesh (FR-INT-06) gives status NOT_ASSESSED, no minMargin and an error item FEA_MESH_INADEQUATE unless `acceptInadequateMesh`
+ *   (then a warning item and overrides ['acceptInadequateMesh'])
  * @failure no scatter factor (when `needScatter`) -> FAT_SCATTER_FACTOR_UNSET; the job-input failures of `fatigueFieldInput`;
  *   no current field -> FAT_RESULTS_MISSING; a field bound to something else -> FAT_FIELD_INVALID
  */
@@ -62,6 +72,7 @@ export function evaluateFeCase(
   fatigueCase: FatigueCase,
   artifacts: FeArtifactPort | null | undefined,
   needScatter: boolean,
+  acceptInadequateMesh = false,
 ): FeEvaluation | Failure {
   if (needScatter && fatigueCase.factors.scatter === undefined)
     return { code: 'FAT_SCATTER_FACTOR_UNSET', message: 'no scatter factor on the case', ids: [fatigueCase.id] };
@@ -109,6 +120,28 @@ export function evaluateFeCase(
         [fatigueCase.id],
       ),
     );
+  const inadequate = blocksAssessment(input.adequacy);
+  const gated = inadequate && !acceptInadequateMesh;
+  if (inadequate)
+    items.push(
+      item(
+        'FEA_MESH_INADEQUATE',
+        gated ? 'error' : 'warning',
+        `the mesh of analysis '${fatigueCase.analysisId ?? ''}' is inadequate (${inadequacyReasons(input.adequacy).join('; ')}): ${gated ? 'the hot spots are not assessed' : 'hot spots computed anyway on acceptInadequateMesh'}`,
+        'refine the mesh (fea_mesh, fea_solve) until the wall has the required element layers, or accept it with acceptInadequateMesh: true on the explicit decision of the engineer',
+        [fatigueCase.analysisId ?? fatigueCase.id],
+      ),
+    );
+  if (input.adequacy.verdict === 'marginal')
+    items.push(
+      item(
+        'FEA_MESH_MARGINAL',
+        'warning',
+        `the mesh of analysis '${fatigueCase.analysisId ?? ''}' is marginal, a thin region is under-resolved but not gated (${inadequacyReasons(input.adequacy).join('; ')})`,
+        'refine the mesh on the thin region (fea_mesh, fea_solve)',
+        [fatigueCase.analysisId ?? fatigueCase.id],
+      ),
+    );
   const margins = hotSpots.map((spot) => spot.evaluation.margin);
   const minMargin = margins.some((margin) => margin === null) ? null : Math.min(...(margins as number[]));
   const status = hotSpots.reduce<Evaluation['status']>(
@@ -122,7 +155,9 @@ export function evaluateFeCase(
     fatigueInputHash: input.key,
     nodesEvaluated: input.nodeIds.length,
     skippedNodes: input.skippedNodes,
-    minMargin,
-    status,
+    minMargin: gated ? null : minMargin,
+    status: gated ? 'NOT_ASSESSED' : status,
+    adequacy: input.adequacy,
+    overrides: inadequate && acceptInadequateMesh ? [ACCEPT_INADEQUATE_MESH] : [],
   };
 }

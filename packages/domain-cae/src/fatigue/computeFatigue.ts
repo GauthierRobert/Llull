@@ -5,6 +5,8 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { FatigueCase } from '@core/model/durability';
 import type { CadDocument } from '@core/model/types';
+import { marginalWarnings } from '../margins/adequacyGate';
+import { inadequacyReasons } from '../results/adequacy';
 import { refuseFatigue } from './codes';
 import { evaluateCase, isEvaluationFailure, type Evaluation } from './evaluate';
 import { evaluateFeCase } from './feHotspots';
@@ -55,13 +57,26 @@ function factorsOf(fatigueCase: FatigueCase): Record<string, unknown> {
   };
 }
 
+const acceptInadequateMesh = z
+  .boolean()
+  .optional()
+  .describe(
+    'FE case only. Default false: when the mesh of the analysis results is inadequate (too few element layers through a wall) the hot spots are NOT_ASSESSED (code FEA_MESH_INADEQUATE, no margin, status never PASS). true: numeric rows are computed anyway and data.overrides records acceptInadequateMesh; set it only on the explicit decision of the engineer.',
+  );
+
 const marginText = (margin: number | null): string => (margin === null ? 'n/a' : margin.toFixed(4));
 
 /** compute_fatigue of an FE-driven case: hot spots ranked by damage over every node of the current FatigueField. */
-function computeFe(doc: CadDocument, fatigueCase: FatigueCase, artifacts: Parameters<typeof evaluateFeCase>[2]): CommandResult {
-  const evaluation = evaluateFeCase(doc, fatigueCase, artifacts, true);
+function computeFe(
+  doc: CadDocument,
+  fatigueCase: FatigueCase,
+  artifacts: Parameters<typeof evaluateFeCase>[2],
+  accept: boolean,
+): CommandResult {
+  const evaluation = evaluateFeCase(doc, fatigueCase, artifacts, true, accept);
   if (isEvaluationFailure(evaluation))
     return refuseFatigue(doc, 'compute_fatigue', evaluation.code, evaluation.message, evaluation.ids, ['caseId']);
+  const gated = evaluation.status === 'NOT_ASSESSED';
   const rows = evaluation.hotSpots.map((spot) => ({
     rowKey: spot.rowKey,
     node: spot.node,
@@ -71,7 +86,11 @@ function computeFe(doc: CadDocument, fatigueCase: FatigueCase, artifacts: Parame
     nativeDamagePerBlock: spot.nativeDamage,
     selection: 'all_nodes',
     ...rowOf(fatigueCase, spot.evaluation),
+    ...(gated ? { margin: null, lifeBlocks: null, status: 'NOT_ASSESSED', code: 'FEA_MESH_INADEQUATE' } : {}),
   }));
+  const meshNote = gated
+    ? ` NOT ASSESSED (FEA_MESH_INADEQUATE: ${inadequacyReasons(evaluation.adequacy).join('; ')}; refine the mesh, or pass acceptInadequateMesh: true on the engineer's decision).`
+    : '';
   const worst = evaluation.hotSpots[0];
   const life =
     worst === undefined
@@ -81,7 +100,9 @@ function computeFe(doc: CadDocument, fatigueCase: FatigueCase, artifacts: Parame
         : `, min life ${worst.evaluation.lifeBlocks.toPrecision(8)} blocks`;
   return report(
     doc,
-    `compute_fatigue ${fatigueCase.id}: ${rows.length} hot spot(s) ranked by damage over all ${evaluation.nodesEvaluated} nodes (fatigue field ${evaluation.fatigueInputHash.slice(0, 12)})${life}, min margin ${marginText(evaluation.minMargin)} with scatter factor ${fatigueCase.factors.scatter?.value} (${fatigueCase.factors.scatter?.source}); ${evaluation.status}. ${REVIEW_NOTE}`,
+    gated
+      ? `compute_fatigue ${fatigueCase.id}: ${rows.length} hot spot(s) over all ${evaluation.nodesEvaluated} nodes (fatigue field ${evaluation.fatigueInputHash.slice(0, 12)}); NOT_ASSESSED.${meshNote} ${REVIEW_NOTE}`
+      : `compute_fatigue ${fatigueCase.id}: ${rows.length} hot spot(s) ranked by damage over all ${evaluation.nodesEvaluated} nodes (fatigue field ${evaluation.fatigueInputHash.slice(0, 12)})${life}, min margin ${marginText(evaluation.minMargin)} with scatter factor ${fatigueCase.factors.scatter?.value} (${fatigueCase.factors.scatter?.source}); ${evaluation.status}${evaluation.overrides.length > 0 ? ' (inadequate mesh accepted by acceptInadequateMesh)' : ''}${evaluation.adequacy.verdict === 'marginal' ? '; FEA_MESH_MARGINAL: a thin region of the mesh is under-resolved (not gated), see data.warnings' : ''}. ${REVIEW_NOTE}`,
     {
       caseId: fatigueCase.id,
       method: fatigueCase.method,
@@ -92,6 +113,9 @@ function computeFe(doc: CadDocument, fatigueCase: FatigueCase, artifacts: Parame
       nodesEvaluated: evaluation.nodesEvaluated,
       minMargin: evaluation.minMargin,
       status: evaluation.status,
+      meshAdequacy: evaluation.adequacy,
+      warnings: [...marginalWarnings(evaluation.adequacy)],
+      ...(evaluation.overrides.length > 0 ? { overrides: evaluation.overrides } : {}),
       factors: factorsOf(fatigueCase),
       rows,
       items: evaluation.items,
@@ -104,6 +128,7 @@ function computeFe(doc: CadDocument, fatigueCase: FatigueCase, artifacts: Parame
  * @affects nothing; read-only, data { caseId, rows[{ rowKey, rangesMPa, damagePerBlock, lifeBlocks, requiredLife, margin, status, ... }], minMargin, factors, items, reviewRequired: true }
  * @invariant D per block = sum(count_i / N_i) over rainflow cycles (Miner); life = damageLimit / D; margin = life / (scatter x required) - 1; every factor is named with its source and `defaulted`;
  *   FE case: rows = the `locations.count` nodes of largest damage in the current FatigueField (all nodes), each recomputed by the TypeScript reference
+ * @invariant FE case on an inadequate mesh (FR-INT-06): rows and status NOT_ASSESSED, FEA_MESH_INADEQUATE, never PASS, unless acceptInadequateMesh (data.overrides)
  * @failure unknown case -> FAT_CASE_NOT_FOUND; no scatter factor -> FAT_SCATTER_FACTOR_UNSET; FE case without a current fatigue field -> FAT_RESULTS_MISSING;
  *   stale analysis -> FAT_RESULTS_STALE; curve / allowable / history problems -> their FAT_* code (unchanged doc)
  */
@@ -116,13 +141,13 @@ export const computeFatigue = defineCommand({
     'Returns data { rows[{ rowKey, rangesMPa [[range, count]], damagePerBlock, lifeBlocks, requiredLife, margin, status PASS|MARGINAL|FAIL, extrapolated, curve, meanStress, unverified, reviewRequired }], ' +
     'minMargin, factors (each with source and defaulted), items[] }. A fatigue case with analysisId (FE) reads the fatigue field of every node written by the fatigue_field ' +
     'transport (llull fatigue_field caseId=...; native llull-compute): rows are the locations.count nodes of largest damage (h1, h2, ... with node, part, at, selection all_nodes), ' +
-    'each recomputed here; without a current field it is refused with FAT_RESULTS_MISSING. Results are not approved: a qualified engineer must review.',
-  params: z.object({ caseId: z.string().describe('Fatigue case id (affected[0] of create_fatigue_case).') }),
+    'each recomputed here; without a current field it is refused with FAT_RESULTS_MISSING. On an inadequate mesh (too few element layers through a wall, data.meshAdequacy) the hot spots are NOT_ASSESSED (FEA_MESH_INADEQUATE) unless acceptInadequateMesh: true (recorded in data.overrides). Results are not approved: a qualified engineer must review.',
+  params: z.object({ caseId: z.string().describe('Fatigue case id (affected[0] of create_fatigue_case).'), acceptInadequateMesh }),
   run: (doc, params, ctx): CommandResult => {
     const fatigueCase = fatigueCaseOf(doc, params.caseId);
     if (fatigueCase === undefined)
       return refuseFatigue(doc, 'compute_fatigue', 'FAT_CASE_NOT_FOUND', `no fatigue case '${params.caseId}'`, [params.caseId], ['caseId']);
-    if (fatigueCase.analysisId !== undefined) return computeFe(doc, fatigueCase, ctx?.feaArtifacts);
+    if (fatigueCase.analysisId !== undefined) return computeFe(doc, fatigueCase, ctx?.feaArtifacts, params.acceptInadequateMesh === true);
     const evaluation = evaluateCase(doc, fatigueCase, true);
     if (isEvaluationFailure(evaluation))
       return refuseFatigue(doc, 'compute_fatigue', evaluation.code, evaluation.message, evaluation.ids, ['caseId']);
@@ -156,7 +181,7 @@ export const checkFatigue = defineCommand({
     'Readiness / review check of a fatigue case: scatter factor set, curve present and verified, history valid, mean-stress model sensible, life margin and marginal band ' +
     '(FE case: the current fatigue field and its hot spots). Returns data { status pass|warn|fail, items[{ code, severity, ids, message, remediation }], reviewRequired: true }. ' +
     'Run it last, after compute_fatigue.',
-  params: z.object({ caseId: z.string().describe('Fatigue case id.') }),
+  params: z.object({ caseId: z.string().describe('Fatigue case id.'), acceptInadequateMesh }),
   run: (doc, params, ctx): CommandResult => {
     const fatigueCase = fatigueCaseOf(doc, params.caseId);
     if (fatigueCase === undefined)
@@ -171,7 +196,7 @@ export const checkFatigue = defineCommand({
     const evaluation =
       fatigueCase.analysisId === undefined
         ? evaluateCase(doc, fatigueCase, false)
-        : evaluateFeCase(doc, fatigueCase, ctx?.feaArtifacts, false);
+        : evaluateFeCase(doc, fatigueCase, ctx?.feaArtifacts, false, params.acceptInadequateMesh === true);
     if (isEvaluationFailure(evaluation))
       items.push(item(evaluation.code, 'error', evaluation.message, 'see the command description of compute_fatigue', evaluation.ids));
     else items.push(...evaluation.items);

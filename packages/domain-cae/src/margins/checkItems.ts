@@ -33,9 +33,14 @@ const describeRow = (row: MarginRow): string =>
  * FEA_DISPOSITION_PENDING (warning for FAIL rows without a valid human disposition),
  * FEA_DISPOSITION_FOREIGN_DOCUMENT (error: a recorded disposition signed for another document, e.g. copied in) and FEA_DISPOSITION_UNBOUND (error: one that records no document uid). Empty when no margin can be computed (stale, unverified, no allowable): the other checks name those problems.
  */
-export function marginItems(doc: CadDocument, analysisId: string, ctx: ExecutionContext | undefined): MarginCheckItem[] {
+export function marginItems(doc: CadDocument, analysisId: string, ctx: ExecutionContext | undefined, accept = false): MarginCheckItem[] {
   const band = caseOf(doc, analysisId)?.marginalBand;
-  const table = marginTable(doc, analysisId, band === undefined ? {} : { marginalBand: band }, ctx);
+  const table = marginTable(
+    doc,
+    analysisId,
+    { ...(band === undefined ? {} : { marginalBand: band }), ...(accept ? { acceptInadequateMesh: true } : {}) },
+    ctx,
+  );
   if ('code' in table) return [];
   const items: MarginCheckItem[] = [];
   const failed = table.rows.filter((row) => row.status === 'FAIL' && row['singular'] !== true);

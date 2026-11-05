@@ -34,6 +34,11 @@ function MarginRow({ row }: { row: MarginRowView }): React.ReactElement {
       <td className="analysis__margin-ms">{row.ms === null ? '—' : formatSignificant(row.ms, 3)}</td>
       <td>
         <span className={`analysis__margin-status analysis__margin-status--${statusToneOf(row.status)}`}>{row.statusLabel}</span>
+        {row.status === 'NOT_ASSESSED' && (
+          <div className="analysis__margin-reason" data-testid={`analysis-margin-reason-${row.rowId}`}>
+            {row.code === '' ? 'not assessed' : row.code} · part {row.part}
+          </div>
+        )}
       </td>
       <td>
         {note === '' ? '—' : <span className={classNames(row.disposition === 'pending_human' && 'analysis__margin-pending')}>{note}</span>}

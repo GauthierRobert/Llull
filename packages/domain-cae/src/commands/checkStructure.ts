@@ -3,7 +3,7 @@
 import type { AnalysisCase } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { buildDeckContext } from '../decks/context';
-import { partAdequacy, MIN_ELEMENTS_ACROSS } from '../results/adequacy';
+import { adequacyOf, meshAdequacy } from '../results/adequacy';
 import { eigenReport } from '../results/eigenReport';
 import { partRestraints } from '../results/restraint';
 import { feRemediation } from '../shared/feCodes';
@@ -116,8 +116,8 @@ function eigenResultItems(analysis: AnalysisCase, trust: Trust): StructureItem[]
 
 /**
  * Supports and mesh adequacy from the verified mesh artifact: FEA_UNDERCONSTRAINED when a part's supports remove fewer than six rigid-body
- * motions (skipped for a modal case without any support, which has its own item); FEA_MESH_ADEQUACY when fewer than two element edges fit across the
- * thinnest dimension of a part.
+ * motions (skipped for a modal case without any support, which has its own item); FEA_MESH_INADEQUATE (error) / FEA_MESH_MARGINAL (warning)
+ * from the through-thickness element layers of each part (recorded on the results when solved, else measured on the mesh).
  */
 function meshItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): StructureItem[] {
   if (trust.meshArtifact === null) return [];
@@ -136,15 +136,17 @@ function meshItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): Stru
             part.entityIds,
           ),
         );
-  for (const part of partAdequacy(trust.meshArtifact))
-    if (part.elementsAcross < MIN_ELEMENTS_ACROSS)
+  const adequacy =
+    trust.resultsArtifact === null ? meshAdequacy(trust.meshArtifact) : adequacyOf(trust.resultsArtifact, trust.meshArtifact);
+  for (const part of adequacy.parts)
+    if (part.verdict !== 'adequate')
       items.push(
         item(
-          'FEA_MESH_ADEQUACY',
-          'warning',
-          `part '${part.entityId}': about ${Number(part.elementsAcross.toPrecision(2))} element edge(s) across its thinnest bounding-box dimension (${Number(part.thinnestExtent.toPrecision(4))} ${analysis.unitSystem.split('-')[1] ?? ''} over a mean edge of ${Number(part.meanEdge.toPrecision(4))}); ` +
-            (heat ? 'the temperature gradient across that dimension is under-resolved' : 'bending is under-resolved') +
-            '. Heuristic: the axis-aligned bounding box can miss a thin wall of a rotated or curved part and flag a thick, slender one',
+          part.verdict === 'inadequate' ? 'FEA_MESH_INADEQUATE' : 'FEA_MESH_MARGINAL',
+          part.verdict === 'inadequate' ? 'error' : 'warning',
+          `part '${part.entityId}': ${Number(part.elementsThrough.toFixed(2))} ${part.order} element layer(s) through its wall at the 5th percentile of ${part.samples} sampled boundary faces, ${Number(part.minimumLayers.toFixed(2))} at the thinnest spot (${part.required} needed); ` +
+            (heat ? 'the temperature gradient across the wall is under-resolved' : 'bending is under-resolved') +
+            (part.verdict === 'inadequate' && !heat ? '; compute_margins reports not_assessed rows for these results' : ''),
           [part.entityId],
         ),
       );

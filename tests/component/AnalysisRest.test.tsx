@@ -256,6 +256,38 @@ describe('AnalysisPanel FEA-REST UI', () => {
     expect(screening).toContain('Re-entrant corners are not screened');
   });
 
+  it('FR-INT-06: a not-assessed row names its reason (FEA_MESH_INADEQUATE) and the part, not only a tone', () => {
+    seedAnalysis();
+    solvedStatic();
+    mocks.margins = {
+      isError: false,
+      summary: 'compute_margins: NOT ASSESSED',
+      data: {
+        minMs: null,
+        reviewRequired: true,
+        warnings: ["FEA_MESH_INADEQUATE: part 'wing_skin': 1.2 element layer(s) through the wall (C3D4 needs 4)"],
+        rows: [
+          marginRow({
+            rowId: 'r1',
+            ms: null,
+            applied: null,
+            status: 'NOT_ASSESSED',
+            statusLabel: 'NOT ASSESSED (inadequate mesh)',
+            code: 'FEA_MESH_INADEQUATE',
+          }),
+        ],
+      },
+    };
+    render(<AnalysisPanel />);
+    const row = screen.getByTestId('analysis-margin-r1');
+    expect(row.textContent).toContain('NOT ASSESSED (inadequate mesh)');
+    const reason = within(row).getByTestId('analysis-margin-reason-r1');
+    expect(reason.textContent).toContain('FEA_MESH_INADEQUATE');
+    expect(reason.textContent).toContain('wing_skin');
+    expect(screen.getByTestId('analysis-margins-warnings').textContent).toContain('FEA_MESH_INADEQUATE');
+    expect(screen.queryByTestId('analysis-margin-reason-r2')).toBeNull();
+  });
+
   it('shows the refusal of compute_margins', () => {
     seedAnalysis();
     solvedStatic();
