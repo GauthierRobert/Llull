@@ -34,6 +34,7 @@ export function runCommandOutcome(doc: CadDocument, name: string, params: unknow
         changed: result.document !== doc,
         ...(result.data !== undefined ? { data: result.data } : {}),
         ...(result.error !== undefined ? { error: result.error } : {}),
+        ...(result.provenance !== undefined ? { provenance: result.provenance } : {}),
       },
     };
   } catch (error) {

@@ -25,7 +25,7 @@ const distance = (a: Vec3, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[
  */
 export const deformCurveToCurve = defineCommand({
   name: 'deform_curve_to_curve',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Deform a 3D solid or mesh by dragging curves: each pair names an initial nurbs_curve (lying on or near the body) and the target nurbs_curve it must land on. The curves are sampled at ' +
     'equal fractions of their arc length (samples per curve), and a smooth displacement field (a triharmonic spline, C2, no folds for moderate moves) that carries the initial samples onto ' +

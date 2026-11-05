@@ -281,7 +281,7 @@ const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } a
 function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   return {
     name: 'manifold',
-    info: () => ({ capabilities: ['analyze', 'distance'] }),
+    info: () => ({ capabilities: ['analyze', 'distance'], active: 'manifold' }),
     unsupported: new Set(['fillet', 'chamfer', 'shell', 'blend', 'faceSlab', 'sheetSolid', 'faceBlend', 'fullRound']),
     solid: (entity) => withOwned(() => entityToManifold(mod, entity)),
     boolean: (op: BooleanOp, a, b) => withOwned(() => a[COMBINE[op]](b)),

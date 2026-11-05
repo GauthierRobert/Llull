@@ -54,7 +54,7 @@ function limitPatches(kernel: GeometryKernel | null, entity: SubdivisionEntity):
  */
 export const checkSubdivision = defineCommand({
   name: COMMAND,
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   description:
     'Pass / warn / fail verdict for a subdivision solid with coded findings: DIR_CHECK_DEGENERATE_FACE (fail: a zero-area cage face), ' +
     'DIR_CHECK_SELF_INTERSECTION (fail: the level mesh crosses itself), DIR_CHECK_SYMMETRY_DEVIATION (warn: declared symmetry violated), ' +

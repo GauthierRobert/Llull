@@ -5,6 +5,8 @@
 import type { CadDocument, EntityId } from '@core/model/types';
 import { postCommand, postRedo, postUndo, ServerCommandError } from './serverCommands';
 import type { ServerCommandResponse } from './serverCommands';
+import { isDegraded } from '@core/commands/provenance';
+import { useKernelStatusStore } from './kernelStatus';
 import { measureAfter, statusSummaryFor } from './feedback';
 import { newCommandId } from './liveOrigin';
 import { registerCommandCancel, takeApplied, takeCancelled } from './commandCancel';
@@ -74,8 +76,12 @@ export function postDispatch(set: StoreSet, get: StoreGet, name: string, params:
         lastSummary: statusSummaryFor(name, response.summary, options) ?? state.lastSummary,
         canUndo: response.canUndo,
         canRedo: response.canRedo,
-        lastMeasure: measureAfter(name, response.data, state.lastMeasure),
+        lastMeasure: measureAfter(name, response.data, state.lastMeasure, response.provenance),
       }));
+      // a result that names its kernel settles the chip: degraded sets the reason, any other kernel result (the exact one answered) clears it
+      if (isDegraded(response.provenance))
+        useKernelStatusStore.getState().setDegradedReason(response.provenance.fallbackReason ?? 'the exact kernel did not answer');
+      else if (response.provenance !== undefined) useKernelStatusStore.getState().setDegradedReason(null);
       options?.onResult?.({ summary: response.summary, changed: responseChanged(response) });
     })
     .catch((err: unknown) => {

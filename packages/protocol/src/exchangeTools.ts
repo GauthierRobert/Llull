@@ -14,6 +14,7 @@ import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
 import { safeFileName } from '@lib/safeFileName';
+import { restoreStepNames, withAsciiStepNames } from '@lib/stepNames';
 import type { ToolDefinition } from './tools';
 import { applyFeaToolCall, type FeaToolsPort } from './feaTools';
 import { applyLibraryToolCall, type MaterialLibraryStorePort } from './libraryTools';
@@ -265,9 +266,11 @@ export async function exportStepFile(
   const codeData = code.data as { text: string; fileName: string; solidCount: number; source: string } | undefined;
   if (codeData === undefined) return { error: `export_step: ${code.summary}` };
   if (codeData.solidCount === 0) return { error: 'export_step: the model has no 3D solids to export.' };
+  // CadQuery's STEP writer double-encodes non-ASCII names: the script carries ASCII placeholders, the STEP gets the real names back.
+  const ascii = withAsciiStepNames(codeData.text);
   let run: Awaited<ReturnType<CadExchangePort['runProgram']>>;
   try {
-    run = await port.runProgram({ language, source: codeData.text, step: true });
+    run = await port.runProgram({ language, source: ascii.source, step: true });
   } catch (error) {
     // a sweep / loft the code could not build (the script's last line is "ValueError: SWG_CODEGEN_UNSUPPORTED: ..."): the native kernel still has its exact faces
     const failure = lastLine(error instanceof Error ? error.message : String(error));
@@ -287,16 +290,18 @@ export async function exportStepFile(
     return { ...exact, summary, ...(savedTo !== undefined ? { savedTo } : {}) };
   }
   if (run.stepBase64 === undefined) return { error: 'export_step: the Python bridge returned no STEP data.' };
+  const stepBase64 =
+    ascii.placeholders.names.size === 0 ? run.stepBase64 : btoa(restoreStepNames(atob(run.stepBase64), ascii.placeholders));
   // export_code already sanitised the base name; only the extension changes.
   const fileName = codeData.fileName.replace(/\.[^.]+$/, '.step');
   const savedTo =
-    options.save !== false && port.writeExchangeFile !== undefined ? await port.writeExchangeFile(fileName, run.stepBase64) : undefined;
-  const bytes = Math.floor((run.stepBase64.length * 3) / 4);
+    options.save !== false && port.writeExchangeFile !== undefined ? await port.writeExchangeFile(fileName, stepBase64) : undefined;
+  const bytes = Math.floor((stepBase64.length * 3) / 4);
   const summary =
     `export_step: ${codeData.solidCount} solid(s) from ${codeData.source} → ${fileName} ` +
     `(${bytes} bytes, exact B-rep via ${language})` +
     (savedTo !== undefined ? `; saved to ${savedTo}.` : '; returned as data.stepBase64.');
-  return { stepBase64: run.stepBase64, fileName, bytes, summary, ...(savedTo !== undefined ? { savedTo } : {}) };
+  return { stepBase64, fileName, bytes, summary, ...(savedTo !== undefined ? { savedTo } : {}) };
 }
 
 async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args: Record<string, unknown>): Promise<ShapedToolResult> {

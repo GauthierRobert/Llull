@@ -31,7 +31,7 @@ function defaultReference(axis: Vec3): Vec3 {
  */
 export const scaleNonuniform = defineCommand({
   name: 'scale_nonuniform',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Scale a 3D solid or mesh by a different factor on each axis (a sphere becomes an ellipsoid, a cylinder an elliptic cylinder). ' +
     'factors are unitless multipliers along the frame x, y, z axes (default: world x, y, z) about center (default: the body bounding-box centre). ' +

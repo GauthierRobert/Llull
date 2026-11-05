@@ -77,10 +77,11 @@ function rebuild(
  *   source is kept with keepSource
  * @invariant the result has the section outline and depth recovered from the mesh; its bounds equal the mesh bounds
  * @failure missing id, non-mesh entity, no constant section (sphere, taper, several regions, open mesh), holes without a kernel -> no-op
+ * @invariant kernel-optional: a section with holes needs the kernel (named refusal without); a solid section needs none
  */
 export const meshToSolid = defineCommand({
   name: 'mesh_to_solid',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Rebuild a mesh solid (from import_mesh / the CLI tool import_step) that is a constant-section prism as an editable extrusion: it looks for an axis ' +
     'along which every vertex lies on two parallel planes and all side faces are parallel to the axis, extracts the outline polygon of ' +

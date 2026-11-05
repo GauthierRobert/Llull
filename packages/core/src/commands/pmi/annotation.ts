@@ -63,9 +63,11 @@ export const addSurfaceTexture = defineCommand({
  * @affects adds 1 NotePmi; affected = [pmiId]
  * @invariant text non-empty; with entityId + facesNear the note is attached to those faces (OCC kernel needed), else it is a free note
  * @failure empty text; facesNear without entityId; attached note without OCC topology -> coded refusal, affected:[]
+ * @invariant kernel-optional: a note attached to faces needs the kernel (PMI refusal without); a free note needs none
  */
 export const addPmiNote = defineCommand({
   name: 'add_pmi_note',
+  annotations: { kernelOptional: true },
   description:
     'Add a text note to the PMI: a drawing / model note such as "BREAK ALL SHARP EDGES 0.2-0.5". Free by default (no kernel needed); with ' +
     'entityId + facesNear it is attached to faces of a 3D solid (needs the OCC kernel) and placed on their annotation plane. Text is stored as ' +

@@ -144,7 +144,7 @@ const SOLID_OPERANDS_NOTE =
  */
 export const booleanOperation = defineCommand({
   name: 'boolean',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Combine two 3D solid entities with a CSG operation into a single mesh entity: ' +
     'op "union" merges them, "subtract" removes the volume of b from a (order matters: result = a minus b), ' +

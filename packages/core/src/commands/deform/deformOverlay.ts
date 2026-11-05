@@ -39,10 +39,11 @@ function boundsOf(positions: ReadonlyArray<number>): { centre: Vec3; radius: num
  * @affects none (read-only); data = frame axes, region planes, lattice net (rest and displaced), flow base / target curves, flow sheets, reference wire, all in world coordinates (the recipe frame is kernel-local, moved by the entity position / rotation)
  * @invariant computed on read from the recipe's outermost deform node and the mesh bounds, nothing stored; a viewport draws exactly these polylines (no geometry is derived in the UI)
  * @failure unknown id -> DEF_ENTITY_NOT_FOUND; no deform node -> DEF_NOT_DEFORMED; degenerate recorded frame -> DEF_FRAME_DEGENERATE; compareTo missing a field -> DEF_COMPARE_INVALID
+ * @invariant kernel-optional: the source mesh is rebuilt through the exact kernel (sourceMeshOf) when present, the stored mesh otherwise
  */
 export const deformOverlayQuery = defineCommand({
   name: 'deform_overlay',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Geometry to DRAW a deformation for review, in world coordinates (document units): data.frame {origin, x, y, z, length} (the deformation frame axes), data.region {start, end, infinite, falloff, startCentre, endCentre, radius} ' +
     '(the slab the law acts on; infinite = the law holds on the whole axis), data.lattice {degrees, splineDegrees, oriented, rest[], moved[], box[8], displaced} (deform_lattice: control points at rest and displaced, i-major then j then k; ' +

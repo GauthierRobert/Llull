@@ -37,9 +37,20 @@ function LiveIndicator(): React.ReactElement {
   );
 }
 
-/** Hidden once the kernel is ready; solid/boolean commands do nothing until then. */
+/** Hidden once the kernel is ready and exact; solid/boolean commands do nothing until then; "Mesh kernel (degraded)" while the exact kernel is unavailable. */
 function KernelIndicator(): React.ReactElement | null {
   const status = useKernelStatusStore((s) => s.status);
+  const degradedReason = useKernelStatusStore((s) => s.degradedReason);
+  if (status === 'ready' && degradedReason !== null)
+    return (
+      <span
+        className="status-summary status-kernel status-kernel--degraded"
+        role="status"
+        title={`Answered by the mesh kernel: ${degradedReason}. Fillets, shells and exact volumes are unavailable or approximate.`}
+      >
+        Mesh kernel (degraded)
+      </span>
+    );
   if (status === 'ready') return null;
   const label =
     status === 'loading'

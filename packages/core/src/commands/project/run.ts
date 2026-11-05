@@ -9,6 +9,7 @@ import { runLoopItem } from './loop';
 import { isLoopNode } from './loopHeader';
 import { validatePlan } from './validate';
 import { PLAN_FIX, type PlanFix, planError } from './planErrors';
+import { isDegraded } from '../provenance';
 import {
   isPlanAction,
   isRepeatStep,
@@ -153,16 +154,22 @@ export function runProject(doc: CadDocument, { actions, onError = 'abort', valid
     const expanded = steps.length === actions.length ? '' : ` (${steps.length} commands executed)`;
     summary = `Plan complete: ${okCount}/${actions.length} plan step(s) ok${expanded}, ${affected.length} entit${affected.length === 1 ? 'y' : 'ies'} affected.`;
   }
+  const degradedSteps = [...new Set(steps.filter((step) => isDegraded(step.provenance)).map((step) => step.index))];
+  const degraded = steps.find((step) => isDegraded(step.provenance))?.provenance;
+  if (degradedSteps.length > 0)
+    summary += ` Answered by the mesh kernel at step${degradedSteps.length > 1 ? 's' : ''} ${degradedSteps.join(', ')} (exact kernel requested).`;
   return {
     document: finalDoc,
     summary,
     affected,
+    ...(degraded === undefined ? {} : { provenance: degraded }),
     data: {
       ok: allOk,
       validated: false,
       stepCount: actions.length,
       steps,
       failedAt,
+      ...(degradedSteps.length === 0 ? {} : { degradedSteps }),
       ...(aborted ? {} : { aliases: reportedAliases(run.bindings, actions) }),
       ...(scene ? { scene } : {}),
     },

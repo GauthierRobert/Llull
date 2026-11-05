@@ -53,10 +53,11 @@ interface MeasureBoundingBoxData {
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { min: Vec3, max: Vec3, size: Vec3 }
  * @failure missing entity id, empty document -> no-op, affected:[], no data
+ * @invariant kernel-optional: a kernel result keeps exact bounds from the kernel when present, mesh bounds otherwise
  */
 export const measureBoundingBox = defineCommand({
   name: 'measure_bounding_box',
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   description:
     'Compute the world-space axis-aligned bounding box (AABB) only; use mass_properties for mass, centroid and inertia. Three modes: (a) entityId — AABB of one entity; ' +
     '(b) useSelection:true — combined AABB of the current document selection; ' +
@@ -251,6 +252,7 @@ const massIn = (massG: number, unit: MassUnit): number => (unit === 'g' ? massG 
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { volume, volumeUnit, method? } plus, when a density is known, { density (g/unit³), densityKgPerM3, mass in massUnit,
  *            massG, massKg, massLb, densitySource(s), densityDefaulted, unverified, unverifiedReasons } (and legacy unit:'g' when massUnit is g)
+ * @invariant kernel-optional: with an exact kernel the B-rep is integrated (method "exact"); without one the closed form or the display triangles answer (method "closed-form" / "mesh")
  * @failure non-solid entity, missing id, a density <= 0 or with a bad unit, an unusable density model -> no-op, affected:[], no data
  *
  * Density resolution (`geometry/resolveDensity`, 08 TR-MAT-10): the material's PHY-01 density model (preferred, at 20 degC), else its
@@ -258,7 +260,7 @@ const massIn = (massG: number, unit: MassUnit): number => (unit === 'g' ? massG 
  */
 export const massProperties = defineCommand({
   name: 'mass_properties',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Measure the volume, area, centroid, inertia and (when a density is known) the mass of a 3D solid, in the document unit. ' +
     'Use measure_bounding_box for the bounding box alone and geometric_validation_properties for the unit-density values a STEP file embeds. ' +

@@ -272,7 +272,7 @@ export function checkBlendFaces(kernel: GeometryKernel, entity: Entity, only: Re
 
 export const checkBlends = defineCommand({
   name: 'check_blends',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { kernelOptional: true, readOnly: true, idempotent: true },
   description:
     'Read-only continuity and radius check of the blends of solids: the results of fillet_edge, fillet_faces, fillet_full_round and blend_union (every solid with such a blend when `ids` is omitted). For each blend face the exact kernel measures, at `samples` points along each contact line where the ' +
     'blend meets a support face: the gap between the faces (g0Gap, document units), the angle between the outward normals (g1AngleRad, radians), and the normal-curvature jump (g2Gap in 1/unit, g2Rel relative: ' +

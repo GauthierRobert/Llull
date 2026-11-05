@@ -148,7 +148,7 @@ function checkSweep(
  */
 export const checkSweepLoft = defineCommand({
   name: 'check_sweep_loft',
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { kernelOptional: true, readOnly: true, idempotent: true },
   description:
     'Read-only check of sweeps and lofts (every sweep and loft when `ids` is omitted; list the ids of swept or lofted sheets to check them too): the frame mode must be defined along the whole path (SWG_CHECK_FRAME_DEGENERATE), the laws finite and positive ' +
     '(SWG_CHECK_LAW_INVALID), and the swept surface must not fold onto itself — at 256 samples the fold margin (path curvature radius / section extent toward the centre of curvature) must stay above ' +

@@ -37,7 +37,7 @@ interface Move {
  */
 export const deformLattice = defineCommand({
   name: 'deform_lattice',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Free-form deformation of a 3D solid or mesh: a regular lattice of control points (degrees [l, m, n], l + 1 by m + 1 by n + 1 points, 1..8 per axis) fills a box ' +
     'in the frame; moving control points bends the space inside the box smoothly (Bernstein polynomials, Sederberg & Parry 1986) and the body with it. ' +

@@ -76,10 +76,11 @@ function faceDatum(positions: readonly number[], indices: readonly number[], hol
  * @invariant data = HoleTableData; rows sorted by face normal, then y, then x (rounded to 1e-6); a drill point that add_hole defaulted is named
  *   { value: 118, defaulted: true, source: 'R8' } and flagged unverified (AF-31)
  * @failure missing / non-solid entity (FTR_PART_NOT_FOUND) -> rejected no-op; no kernel and no authored holes (FTR_NEEDS_EXACT_KERNEL); a part with no holes -> empty rows
+ * @invariant kernel-optional: holes are recognised on the exact B-rep through the kernel (machinedPart); the authored list is used without one
  */
 export const holeTable = defineCommand({
   name: 'hole_table',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'List the holes of a part as a table for drawings: one row per hole with its label (H1, H2, ... in table order), position x, y from the ' +
     'top-left corner of its face (x along the face, y downwards, document length units), kind (simple, counterbore, countersink, counterdrill), ' +

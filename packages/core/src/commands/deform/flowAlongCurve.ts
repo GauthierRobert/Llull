@@ -25,7 +25,7 @@ import { type Refusal, defaultTolerance, resolveTargetFrame } from './target';
  */
 export const flowAlongCurve = defineCommand({
   name: 'flow_along_curve',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Lay a straight 3D solid or mesh along a NURBS curve: the body axis (frame z, default the longest bounding-box direction, starting at the body start) ' +
     'is mapped onto the curve by arc length, the cross-section follows the curve frame (N and B perpendicular to the tangent), so a straight bar becomes a bar ' +

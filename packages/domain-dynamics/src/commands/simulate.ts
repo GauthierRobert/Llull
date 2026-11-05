@@ -39,10 +39,11 @@ type Attempt =
  * @invariant deterministic: same document + params → same data; a model without loops or cylinders returns exactly the legacy data
  * @failure no bodies, invalid model, no physics engine installed, engine error or divergence -> no-op with the reason;
  *          FPR_LOOP_PRISMATIC / FPR_SPHERICAL_TREE (topology), FPR_LOOP_OPEN (a loop is open at the start pose) -> rejected, nothing run
+ * @invariant kernel-optional: body mass properties (buildSimulationModel) are exact with a kernel, mesh integration otherwise
  */
 export const simulateMotion = defineCommand({
   name: 'simulate_motion',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Run the rigid-body physics of the mechanism (bodies, joints, gears, motors, propellers) forward in time with a real physics ' +
     'engine (MuJoCo) and report what happens: final speed of every joint (rpm), when it settled, engine torque and power, propeller ' +

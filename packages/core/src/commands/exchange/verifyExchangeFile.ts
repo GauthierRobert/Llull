@@ -88,10 +88,11 @@ const issueOf = (verification: ProductVerification): Issue | null => {
  * @invariant data = { format, schemaName, fileUnit, unitFactor, census, embeddedGvp[], products[], band, issues[], unverified, reviewRequired, policy };
  *   without a kernel only the file's own claims are reported (band 'not-checkable'); lengths of recomputed values are millimetres
  * @failure empty or non-STEP / non-IGES text -> no-op, error.code KRN_STEP_UNREADABLE; unreadable by the kernel -> issue, no band
+ * @invariant kernel-optional: validation properties are recomputed through the kernel importExchange when present, noted otherwise
  */
 export const verifyExchangeFile = defineCommand({
   name: 'verify_exchange_file',
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   description:
     'Verify a STEP (AP203 / AP214 / AP242) or IGES file before using it: file schema, length unit with its exact factor to millimetres (25.4 for inch), entity census ' +
     '(PMI, tessellation, B-rep and assembly types for STEP; entity types and untranslated types for IGES) and the geometric validation properties the sender embedded ' +

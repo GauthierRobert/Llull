@@ -40,10 +40,11 @@ const INFINITE_FORMULAS: Readonly<Record<string, string>> = {
  * @affects none (read-only); data = law, frame, region, path, jacobian, volume check, maxDisplacement, approximation, regionCrease, fibres, unverified, provenance
  * @invariant everything is computed on read from the recipe's outermost deform node, nothing is stored; fields only the exact kernel knows are null
  * @failure unknown id -> DEF_ENTITY_NOT_FOUND; no deform node -> DEF_NOT_DEFORMED; source not rebuildable -> DEF_SOURCE_UNAVAILABLE
+ * @invariant kernel-optional: the exact deformation path (loadTarget) needs the kernel; the mesh path answers without one
  */
 export const analyzeDeformation = defineCommand({
   name: 'analyze_deformation',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Report how a deformation command (twist_body, taper_body, stretch_body, bend_body, scale_nonuniform) moved a body, as numbers instead of a visual judgement. ' +
     'data: law (kind and parameters, angles in radians), frame (origin, axis, reference), region, path ("exact" or "mesh"), jacobian {min, max, minAt, bound} ' +

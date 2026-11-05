@@ -1,6 +1,6 @@
 /**
  * Express entry: middleware + route mounting only (L1, L6).
- *   GET /health            liveness + active kernel (Host allowlist; `insecure: true` when token-less)
+ *   GET /health            liveness + active kernel (`kernel`), { active, requested, fallbackReason } (`kernelStatus`), autosave; Host allowlist; `insecure: true` when token-less
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
  *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
@@ -19,7 +19,7 @@ import cors from 'cors';
 import { exchangeOptionsWithDwg } from './dwgConvert';
 import { buildImportRouter } from './importRoutes';
 import { buildExchangeRouter } from './exchangeRoutes';
-import { getActiveKernelName } from './geometryKernel';
+import { getActiveKernelName, getKernelStatus } from './geometryKernel';
 import { getAutosaveStatus } from './liveDocument';
 import { buildLiveRouter } from './liveRoutes';
 import { buildRecoveryRouter } from './recoveryRoutes';
@@ -78,6 +78,7 @@ app.get(
     res.json({
       status: 'ok',
       kernel: getActiveKernelName(),
+      kernelStatus: getKernelStatus(),
       autosave: getAutosaveStatus(),
       ...(insecure ? { insecure: true } : {}),
       ...(proof !== undefined ? { proof } : {}),

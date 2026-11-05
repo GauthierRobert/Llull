@@ -37,9 +37,11 @@ import { extrudeText } from './textExtrusion';
  * @failure no/ambiguous source, profile < 3 points or non-finite, open/unsupported sketch, pieces that do not close, depth <= 0,
  *   zero-length axis -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
+ * @invariant kernel-optional: a thin (offset band) profile needs the kernel; a plain profile and text extrude without one
  */
 export const extrudeProfile = defineCommand({
   name: 'extrude_profile',
+  annotations: { kernelOptional: true },
   description:
     'Extrude a closed 2D profile along +Z into an extrusion solid. Right-handed world frame, +Z up. ' +
     'Give EXACTLY ONE source: `profile` (inline array of [x, y] points, at least 3, implicitly closed, ' +

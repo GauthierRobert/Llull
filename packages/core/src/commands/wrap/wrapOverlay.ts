@@ -60,10 +60,11 @@ function consumedBefore(doc: CadDocument, id: string): ReadonlySet<string> {
  *   solid it consumed), sampled along the placed curve in world coordinates; data.edges = the B-rep edges of the solid with the faces they join and their convexity (what a chain of faces across them is built on), sampled, null without an exact kernel
  * @invariant computed on read, nothing stored; the viewport draws exactly these polylines (no geometry is derived in the UI); capped at 64 curves and 400 edges with data.truncated naming what was cut
  * @failure unknown id -> WRP_ENTITY_NOT_FOUND; not a 3D solid -> WRP_NOT_A_SOLID; no exact kernel, or one that cannot build the solid -> the curves only (data.edges null, data.edgesNote says why)
+ * @invariant kernel-optional: the solid edges come from the exact kernel when present, a note says so otherwise
  */
 export const wrapOverlay = defineCommand({
   name: 'wrap_overlay',
-  annotations: { readsMeshTriangles: true, readOnly: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'Geometry to DRAW the wrap results of a solid for review, in world coordinates (document units): data.curves [{ id, face, faceName, source: "solid" | "earlier", length, points[] }] (every curve with onFace that lies on this solid, ' +
     'or on a solid it was made from that no longer exists, read from the history, e.g. the curves of a split_at_silhouette; sampled along the placed curve), data.edges [{ edge, faces[], convexity: "smooth" | "convex" | "concave" | "unknown", points[] }] (the B-rep edges of the solid ' +

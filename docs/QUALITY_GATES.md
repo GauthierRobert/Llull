@@ -157,7 +157,7 @@ and shell-only parts (the NEMA 17 screws). In the renderer: no error on any of t
 including 900 instances, 1 100-entity drawings and documents 2 000 km from the origin.
 
 CadQuery's own STEP writer double-encodes non-ASCII names (`Ã20 Welle`), and llull's
-`export_step` goes through CadQuery. The proposed export round-trip gate should cover names.
+`export_step` goes through CadQuery. Fixed: `export_step` now sends ASCII placeholders as names to the CadQuery script and writes the real names back into the returned STEP as ISO 10303-21 strings (`@lib/stepNames`); the native `export_step_ap242` path already encoded them correctly. The proposed export round-trip gate should still cover names.
 
 `as1-oc-214`'s known `aspect` failure is **not** a defect. It renders correctly, but the 3D aspect
 check runs in perspective, and its tall brackets near the camera read 15.5 % wide. An orthographic

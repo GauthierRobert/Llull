@@ -16,9 +16,11 @@ import { compositesOf, findPart, findRosette, withComposites } from './state';
  * @affects creates doc.composites.parts[part-<step>.<k>]
  * @invariant the part frame is the developed frame of the face: plane = rosette origin projected on the face with x = the projected 0-degree axis; cylinder (s = r*azimuth, axial) and cone (polar about the apex) = flat pattern coordinates
  * @failure unknown entity or rosette -> CMP_REF_MISSING; no / two faces at the point -> CMP_FACE_NOT_FOUND / CMP_FACE_AMBIGUOUS; unsupported solid -> CMP_FACE_UNSUPPORTED
+ * @invariant kernel-optional: tool faces other than a box / cylinder / cone need the exact kernel (resolveToolFace)
  */
 export const createCompositePart = defineCommand({
   name: 'create_composite_part',
+  annotations: { kernelOptional: true },
   description:
     'Create a composite part on a tool face: the face of solid `toolSurface.entityId` that contains (is nearest to) the point ' +
     '`toolSurface.faceNear` [x, y, z] in document units (re-resolved on every replay). Box faces, cylinder sides / caps and cone sides / ' +

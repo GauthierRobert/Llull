@@ -57,10 +57,11 @@ function inertiaProblem(tensor: Symmetric3): string | null {
  * @invariant body.density is stored in kg/m³ whatever densityUnit was given
  * @failure empty / unknown / 2D / already-used entity, taken id, non-positive density or mass, unknown densityUnit,
  *          inertiaKgM2 not positive definite or breaking the triangle inequality -> no-op
+ * @invariant kernel-optional: exact mass through bodyMassProperties when a kernel is present, mesh integration otherwise
  */
 export const addRigidBody = defineCommand({
   name: 'add_rigid_body',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Make a set of 3D entities move together as ONE rigid body for physics simulation (simulate_motion). Mass, centre of mass and ' +
     "inertia are computed from the entities' real geometry: each entity uses its assigned material (density model, else plain density), else `density` (kg/m³, " +
