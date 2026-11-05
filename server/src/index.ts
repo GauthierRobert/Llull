@@ -19,6 +19,7 @@ import { exchangeOptionsWithDwg } from './dwgConvert';
 import { buildImportRouter } from './importRoutes';
 import { buildExchangeRouter } from './exchangeRoutes';
 import { getActiveKernelName } from './geometryKernel';
+import { getAutosaveStatus } from './liveDocument';
 import { buildLiveRouter } from './liveRoutes';
 import { buildPreviewRouter } from './previewRoutes';
 import { buildSigningRouter } from './plm/signingRoutes';
@@ -57,7 +58,7 @@ app.get('/health', (req, res) => {
     typeof challenge === 'string' && challenge !== '' && token !== undefined && token !== ''
       ? createHmac('sha256', token).update(challenge).digest('hex')
       : undefined;
-  res.json({ status: 'ok', kernel: getActiveKernelName(), ...(proof !== undefined ? { proof } : {}) });
+  res.json({ status: 'ok', kernel: getActiveKernelName(), autosave: getAutosaveStatus(), ...(proof !== undefined ? { proof } : {}) });
 });
 app.use(hostAllowlist());
 const jsonBody = express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' });

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { useLiveDocument } from '@ui/hooks/useLiveDocument';
+import { useHostStatusStore } from '@ui/store/hostStatusStore';
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -125,5 +126,44 @@ describe('useLiveDocument', () => {
       await Promise.resolve();
     });
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+  it('after 3 consecutive failed resyncs the view is out of sync; a good resync clears it (TR-INT-16)', async () => {
+    vi.useRealTimers();
+    let failing = true;
+    const snapshot = { epoch: 'e', seq: 1, stateHash: 'h', document: useStore.getState().document };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => (failing ? Promise.reject(new Error('offline')) : Promise.resolve({ ok: true, json: () => Promise.resolve(snapshot) }))),
+    );
+    render(<Harness />);
+    const listener = FakeEventSource.instances[0]?.listeners.get('command');
+    const gapEvent = { data: JSON.stringify({ epoch: 'e', seq: 9, name: 'x', params: {}, stateHash: 'h' }) };
+    const settle = async (): Promise<void> => {
+      await act(async () => {
+        for (let i = 0; i < 8; i += 1) await Promise.resolve();
+      });
+    };
+    for (let i = 0; i < 2; i += 1) {
+      act(() => void listener?.(gapEvent as MessageEvent));
+      await settle();
+    }
+    expect(useHostStatusStore.getState().outOfSync).toBe(false);
+    act(() => void listener?.(gapEvent as MessageEvent));
+    await settle();
+    expect(useHostStatusStore.getState().outOfSync).toBe(true);
+    failing = false;
+    act(() => void listener?.(gapEvent as MessageEvent));
+    await settle();
+    expect(useHostStatusStore.getState().outOfSync).toBe(false);
+  });
+  it('shows an autosave failure announced by the backend and clears it on the next stream', () => {
+    render(<Harness />);
+    const status = FakeEventSource.instances[0]?.listeners.get('status');
+    act(() => {
+      status?.({ data: JSON.stringify({ epoch: 'e', autosave: { ok: false, code: 'DSF_SAVE_IO', message: 'x' } }) } as MessageEvent);
+    });
+    expect(useHostStatusStore.getState().autosave).toMatchObject({ ok: false, code: 'DSF_SAVE_IO' });
+    act(() => FakeEventSource.instances[0]?.onopen?.());
+    expect(useHostStatusStore.getState().autosave).toEqual({ ok: true });
   });
 });

@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { createAutosaver } from './autosave';
+import { type AutosaveStatus, createAutosaver } from './autosave';
 import type { Response } from 'express';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
@@ -52,7 +52,20 @@ const autosaver = createAutosaver({
   filePath: AUTOSAVE_PATH,
   debounceMs: positiveInteger(process.env['LLULL_AUTOSAVE_DEBOUNCE_MS'], 300),
   serialize: serializeDocument,
+  onStatus: (status) => reportAutosaveStatus(status),
 });
+
+let _autosaveStatus: AutosaveStatus = { ok: true };
+
+/** The autosave state (`GET /health`, SSE `status`): ok, or the stable code of the failure that is still standing. */
+export function getAutosaveStatus(): AutosaveStatus {
+  return _autosaveStatus;
+}
+
+function reportAutosaveStatus(status: AutosaveStatus): void {
+  _autosaveStatus = status;
+  broadcast('status', { epoch: _epoch, autosave: status });
+}
 
 export function flushAutosave(): void {
   if (AUTOSAVE_ENABLED) autosaver.flush();
@@ -123,7 +136,7 @@ function writeSseFrame(res: Response, frame: string): boolean {
   }
 }
 
-function broadcast(eventType: 'snapshot' | 'command' | 'progress', payload: unknown): void {
+function broadcast(eventType: 'snapshot' | 'command' | 'progress' | 'status', payload: unknown): void {
   if (_subscribers.size === 0) return;
   let frame: string;
   try {
@@ -179,6 +192,7 @@ export function publishLiveProgress(event: LiveProgressReport): void {
 export function subscribeLive(res: Response): () => void {
   _subscribers.add(res);
   if (!writeSseEvent(res, 'snapshot', getLiveSnapshot())) _subscribers.delete(res);
+  else if (!_autosaveStatus.ok) writeSseEvent(res, 'status', { epoch: _epoch, autosave: _autosaveStatus });
   return (): void => void _subscribers.delete(res);
 }
 
