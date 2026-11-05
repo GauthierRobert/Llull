@@ -5,6 +5,7 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { getActiveKernelName, installGeometryKernel, occtCallTimeoutMs } from '../src/geometryKernel';
 import { nativeKernelBinary } from './kernelTestSupport';
+import { requireTool } from '../../tests/requireTool';
 
 afterEach(() => {
   delete process.env['LLULL_KERNEL'];
@@ -30,7 +31,7 @@ describe('LLULL_KERNEL', () => {
     expect(getGeometryKernel()).not.toBeNull();
   });
 
-  it.skipIf(nativeKernelBinary === null)(
+  it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
     'occt-native starts the native kernel and fillet_edge runs through the injected context',
     async () => {
       process.env['LLULL_KERNEL'] = 'occt-native';
@@ -72,7 +73,7 @@ describe('kernel_info through the composition root (TR-KRN-04)', () => {
     expect(infoOf()).toMatchObject({ active: 'manifold', fallbackReason: 'NATIVE_TOOL_MISSING: injected' });
   });
 
-  it.skipIf(nativeKernelBinary === null)(
+  it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
     'the native kernel reports OCCT 7.9.2, its ports and that it runs in its own process',
     async () => {
       process.env['LLULL_KERNEL'] = 'occt-native';

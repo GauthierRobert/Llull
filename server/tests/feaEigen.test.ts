@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { isRecord } from '@lib/isRecord';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, Workspace, type Session } from './feaThermomechSupport';
 
 const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
@@ -74,7 +74,7 @@ function resultsOf(json: Record<string, unknown>): Record<string, unknown> {
   return isRecord(results) ? results : {};
 }
 
-describe.skipIf(!READY)('modal and buckling analyses', () => {
+describe.skipIf(feaToolsMissing(true))('modal and buckling analyses', () => {
   it('cantilever first natural frequency matches the Euler-Bernoulli value within 2 %', async () => {
     const length = 200;
     const { session, analysisId, summary } = await solved('modal', barPlan(length, { analysisType: 'modal', modes: 4 }, []));

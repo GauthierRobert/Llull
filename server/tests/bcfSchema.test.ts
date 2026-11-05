@@ -13,13 +13,14 @@ import { join } from 'node:path';
 import { execute } from '@core/commands/registry';
 import { unzip } from '@lib/zipRead';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { requireTool } from '../../tests/requireTool';
 
 const XSD_DIR = process.env['LLULL_BCF_XSD_DIR'] ?? '';
 const hasXmllint = spawnSync('xmllint', ['--version']).error === undefined;
 const hasSchemas = XSD_DIR !== '' && existsSync(join(XSD_DIR, 'markup.xsd')) && existsSync(join(XSD_DIR, 'visinfo.xsd'));
 if (!hasXmllint || !hasSchemas)
   console.warn('bcfSchema: xmllint or LLULL_BCF_XSD_DIR (markup.xsd, visinfo.xsd) missing: schema validation skipped');
-const schemaIt = hasXmllint && hasSchemas ? it : it.skip;
+const schemaIt = it.skipIf(requireTool('oracle:xmllint', hasXmllint) || !hasSchemas);
 
 function reviewed(): CadDocument {
   let doc = createEmptyDocument();

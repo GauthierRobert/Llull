@@ -14,6 +14,7 @@ import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { describeNative, liveKernels } from './kernelTestSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const SFA = process.env['LLULL_SFA'] || path.join(os.homedir(), 'tools', 'sfa-5.51', 'sfa-cl.exe');
 const PLAN = path.resolve(__dirname, '../../docs/aerospace/03-gdt-mbd-pmi/validation/draft_plan_gdt_plate.json');
@@ -65,7 +66,7 @@ function plateStep(): string {
   return (exported.data as { step: string }).step;
 }
 
-describeNative.skipIf(reason !== null)('SFA on the AP242 files llull writes (VC-GDT-22)', () => {
+describeNative.skipIf(requireTool('oracle:sfa', reason === null))('SFA on the AP242 files llull writes (VC-GDT-22)', () => {
   it('reads the plate round-trip file without syntax errors and reports its semantic PMI', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'llull-sfa-'));
     try {

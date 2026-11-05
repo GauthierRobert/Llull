@@ -7,9 +7,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { STEFAN_BOLTZMANN as SIGMA, viewFactorParallel } from '@cae/thermal/thermalClosedForms';
 import { closeCase, expectCase, loadPlan, openCase, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing } from './feaTestSupport';
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('wall and radiation benchmarks (netgen + ccx)', () => {
+describe.skipIf(feaToolsMissing())('wall and radiation benchmarks (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('radiation');

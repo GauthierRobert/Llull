@@ -10,6 +10,7 @@ import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
+import { requireTool } from '../../tests/requireTool';
 
 interface CliJson {
   readonly data: {
@@ -42,7 +43,7 @@ function capture(): { io: CliIo; out: string[] } {
 
 afterAll(() => setGeometryKernel(null));
 
-describe.skipIf(nativeKernelBinary === null)('XCH through the CLI', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('XCH through the CLI', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'llull-xch-'));
   const doc = path.join(dir, 'part.llull');
   const step = path.join(dir, 'part.stp');

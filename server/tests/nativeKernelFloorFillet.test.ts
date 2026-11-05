@@ -14,6 +14,7 @@ import { createEmptyDocument, type Entity, type ShapeRecipe } from '@core/model/
 import { createNativeKernel } from '../src/nativeKernel';
 import type { IsolatedKernel } from '../src/isolatedKernel';
 import { nativeBinaryPath, nativeInstallHint } from '../src/native/nativeBinary';
+import { requireTool } from '../../tests/requireTool';
 
 const binary = nativeBinaryPath('llull-kernel');
 if (binary === null && process.env['LLULL_REQUIRE_NATIVE_KERNEL'] === '1') throw new Error(nativeInstallHint('llull-kernel'));
@@ -21,7 +22,7 @@ if (binary === null && process.env['LLULL_REQUIRE_NATIVE_KERNEL'] === '1') throw
 const rel = (actual: number, expected: number): number => Math.abs(actual - expected) / Math.abs(expected);
 const { PI } = Math;
 
-describe.skipIf(binary === null)('native pocket floor fillet', () => {
+describe.skipIf(requireTool('native:llull-kernel', binary !== null))('native pocket floor fillet', () => {
   let native: IsolatedKernel;
   beforeAll(() => {
     native = createNativeKernel(binary!, { callTimeoutMs: 120_000 });

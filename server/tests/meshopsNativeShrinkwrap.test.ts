@@ -15,10 +15,11 @@ import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { grid, hashOf, icosphere, noisy, withHoles } from './meshopsNativeSupport';
 import { soupOf } from './meshopsRepairSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshopsNativeShrinkwrap: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const engine = BINARY === null ? null : createNativeMeshEngine({ binary: BINARY });
 const nativeEngine = (): NonNullable<typeof engine> => engine as NonNullable<typeof engine>;
 

@@ -7,5 +7,11 @@ import { workspaceAliases } from '../workspaceAliases.ts';
 
 export default defineConfig({
   resolve: { alias: workspaceAliases() },
-  test: { globals: true, environment: 'node', include: ['tests/**/*.test.ts'], testTimeout: 30_000 },
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['tests/**/*.test.ts'],
+    globalSetup: ['../tests/requireToolTeardown.ts'],
+    testTimeout: 30_000,
+  },
 });

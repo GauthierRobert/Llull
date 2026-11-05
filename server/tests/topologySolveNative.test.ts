@@ -19,11 +19,12 @@ import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runTopologySolve } from '../src/native/topologySolve';
 import { mbbModel, studyOf } from '../../tests/unit/cae/topology/support';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn('topologySolveNative: llull-compute not built (cargo build --profile compute -p llull-compute in solver/): skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 let dir = '';
 let store: FeArtifactCache;

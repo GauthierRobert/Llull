@@ -3,6 +3,7 @@ import { thermalResultsSummary } from '@cae/thermal/summary';
 import { expectCase } from '../../physics/benchmarkCases';
 import { hasCcx, solveWithCcx } from './ccxRun';
 import { addBc, barMesh, barTets, facesOn, must, thermalFixture, withMaterial, type BarMesh, type ThermalFixture } from './fixtures';
+import { requireTool } from '../../../requireTool';
 
 const PACK = '03-thermal-analysis';
 const source = { citation: 'test input of the validation case (not a material claim)' };
@@ -14,7 +15,7 @@ const nodeIdsOn = (bar: BarMesh, i: number): number[] => [
   bar.nodeAt(i, 1, 1),
 ];
 
-describe.skipIf(!hasCcx)('thermal chain against CalculiX 2.21 on hand-built tet bars', () => {
+describe.skipIf(requireTool('calculix', hasCcx))('thermal chain against CalculiX 2.21 on hand-built tet bars', () => {
   it.each([
     ['N-m-kg-s', 'm', 1],
     ['N-mm-t-s', 'mm', 1000],

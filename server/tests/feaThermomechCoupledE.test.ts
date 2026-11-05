@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { isRecord } from '@lib/isRecord';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, planPath, Workspace } from './feaThermomechSupport';
 
 const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
@@ -70,7 +70,7 @@ function barPlan(): unknown[] {
   return steps;
 }
 
-describe.skipIf(!READY)('coupled procedure follows E(T)', () => {
+describe.skipIf(feaToolsMissing(true))('coupled procedure follows E(T)', () => {
   it('writes an E, nu, T table and the restrained bar at 120 degC gives sigma_xx = -E(120 degC) alpha dT within 1 %', async () => {
     const file = path.join(workspace.dir, 'coupled-et.plan.json');
     writeFileSync(file, JSON.stringify(barPlan()));

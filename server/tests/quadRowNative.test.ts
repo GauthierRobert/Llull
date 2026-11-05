@@ -14,10 +14,11 @@ import { _resetLiveDoc } from '../src/liveDocument';
 import { _clearResultCache } from '../src/native/deferredRun';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('quadRowNative: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 function hemisphere(level: number): MeshData {
   const sphere = icosphere(10, level);

@@ -63,6 +63,7 @@ export default defineConfig(({ command }) => ({
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
+    globalSetup: ['./tests/requireToolTeardown.ts'],
     // Domain suites run whole engineering solves (portal-frame design, golden plans) that take
     // several seconds, more under coverage instrumentation.
     testTimeout: 30_000,

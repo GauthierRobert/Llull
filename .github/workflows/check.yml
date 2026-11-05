@@ -152,6 +152,8 @@ jobs:
         working-directory: server
         env:
           LLULL_REQUIRE_NATIVE_KERNEL: '1'
+          # This job builds llull-kernel + llull-mesh (the five files above need nothing else): a skipped native suite fails the job (TR-INT-13).
+          LLULL_REQUIRE_TOOLS: native
           LLULL_NATIVE_DIR: ${{ github.workspace }}/desktop/build/native
 
   check:

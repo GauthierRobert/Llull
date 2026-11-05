@@ -13,10 +13,11 @@ import { docWithMeshes, gridMesh, icosphere } from '../../tests/helpers/meshFixt
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { _clearResultCache, resolveDeferred } from '../src/native/deferredRun';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('quadRemeshOpenNative: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const engine = BINARY === null ? null : createNativeMeshEngine({ binary: BINARY });
 const context = (): ExecutionContext => ({ ...defaultContext(), meshProcessing: engine });
 const exec = (doc: CadDocument, params: unknown): Promise<CommandResult> => {

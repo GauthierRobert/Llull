@@ -10,7 +10,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { Workspace } from './feaThermomechSupport';
 
 const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
@@ -92,7 +92,7 @@ const plan = [
   { command: 'add_result_probe', params: { analysisId: '$an', name: 'sx', point: [50, 0, 10], quantity: 's_xx' } },
 ];
 
-describe.skipIf(!READY)('thermo_static follows E(T)', () => {
+describe.skipIf(feaToolsMissing(true))('thermo_static follows E(T)', () => {
   it('restrained bar at 400 degC: sigma_xx = -E(400 degC) alpha dT within 0.5 %, not the 20 degC value', async () => {
     const file = path.join(workspace.dir, 'et.plan.json');
     writeFileSync(file, JSON.stringify(plan));

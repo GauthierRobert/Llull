@@ -15,8 +15,9 @@ import { nativeBinaryPath } from '@server/native/nativeBinary';
 import { chooseBackendPort, startBackend } from '../src/backend';
 import { backendEnv, backendOrigin } from '../src/backendEnv';
 import { desktopLayout } from '../src/layout';
+import { requireTool } from '../../tests/requireTool';
 
-const native = nativeBinaryPath('llull-compute') === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', nativeBinaryPath('llull-compute') !== null));
 const repoRoot = path.resolve(__dirname, '..', '..');
 
 /** Newest modification time under `dir` (recursive). */

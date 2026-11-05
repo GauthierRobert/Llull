@@ -15,6 +15,7 @@ import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import { installGeometryKernel } from '../src/geometryKernel';
 import { createPythonExchangePort } from '../src/pythonExchange';
 import { BRIDGE_SCRIPT, BUILD123D_PYTHON, CADQUERY_PYTHON, probePython } from './exchangeTestSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const cadqueryProbe = probePython(CADQUERY_PYTHON);
 const build123dProbe = BUILD123D_PYTHON === undefined ? null : probePython(BUILD123D_PYTHON);
@@ -162,7 +163,7 @@ const deviationTable: Array<{ language: string; name: string; deviation: number;
 // Suites
 
 function describeLanguage(language: PythonBackend, enabled: boolean): void {
-  describe.skipIf(!enabled)(`${language} exchange against the real bridge`, () => {
+  describe.skipIf(requireTool('python', enabled))(`${language} exchange against the real bridge`, () => {
     let doc: CadDocument;
     let bodies: StepBody[];
 
@@ -223,7 +224,7 @@ afterAll(() => setGeometryKernel(null));
 describeLanguage('cadquery', hasCadQuery);
 describeLanguage('build123d', hasBuild123d);
 
-describe.skipIf(!hasCadQuery)('parametric round trip (cadquery)', () => {
+describe.skipIf(requireTool('python', hasCadQuery))('parametric round trip (cadquery)', () => {
   let doc: CadDocument;
   let code: string;
   let traced: unknown;
@@ -278,7 +279,7 @@ describe.skipIf(!hasCadQuery)('parametric round trip (cadquery)', () => {
   });
 });
 
-describe.skipIf(!hasCadQuery)('non-llull scripts (cadquery)', () => {
+describe.skipIf(requireTool('python', hasCadQuery))('non-llull scripts (cadquery)', () => {
   it('raw CadQuery is traced:false and imported as one mesh with the right bbox', async () => {
     const run = await port.runProgram({
       language: 'cadquery',
@@ -323,7 +324,7 @@ describe.skipIf(!hasCadQuery)('non-llull scripts (cadquery)', () => {
   });
 });
 
-describe.skipIf(!hasCadQuery)('STEP names and colours (cadquery)', () => {
+describe.skipIf(requireTool('python', hasCadQuery))('STEP names and colours (cadquery)', () => {
   it('set_entity_name survives export -> import as the body name; colour kept', async () => {
     expect(await installGeometryKernel()).toBe(true);
     let current = createEmptyDocument();
@@ -339,13 +340,13 @@ describe.skipIf(!hasCadQuery)('STEP names and colours (cadquery)', () => {
   }, 120_000);
 });
 
-describe.skipIf(!hasCadQuery)('probe op', () => {
+describe.skipIf(requireTool('python', hasCadQuery))('probe op', () => {
   it('reports python and cadquery versions', () => {
     expect(cadqueryProbe.cadquery).toMatch(/\d/);
   });
 });
 
-describe.skipIf(!hasCadQuery)('fidelity summary', () => {
+describe.skipIf(requireTool('python', hasCadQuery))('fidelity summary', () => {
   it('prints the per-primitive deviation table', () => {
     const lines = deviationTable.map(
       (row) => `${row.language.padEnd(9)} ${row.name.padEnd(20)} dev=${row.deviation.toFixed(4)} tol=${row.tolerance.toFixed(4)}`,

@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing } from './feaTestSupport';
 import { dataOf, planPath, Workspace } from './feaThermomechSupport';
 
 type Step = { command: string; params: Record<string, unknown>; as?: string };
@@ -72,7 +72,7 @@ async function growth(name: string, orientation: Step[]): Promise<{ deck: string
   return { deck: String(dataOf(exported.json)['text']), u, vonMises: isRecord(max) ? Number(max['value']) : Number.NaN };
 }
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('orthotropic thermal expansion in CalculiX 2.21', () => {
+describe.skipIf(feaToolsMissing())('orthotropic thermal expansion in CalculiX 2.21', () => {
   it('grows 10 x alpha_i x dT along each axis with *EXPANSION, TYPE=ORTHO and an isotropic *ELASTIC, stress free', async () => {
     const { deck, u, vonMises } = await growth('ortho', []);
     expect(deck).toContain('*EXPANSION, TYPE=ORTHO, ZERO=20');

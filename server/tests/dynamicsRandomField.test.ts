@@ -29,10 +29,11 @@ import { randomPostStep } from '../src/native/randomField';
 import { mustRun, readyRandomStrip, strip } from '../../tests/unit/cae/dynamics/fixtures';
 import { modalResults, stripMesh } from '../../tests/unit/cae/dynamics/solvedFixtures';
 import { syntheticInput } from '../../tests/unit/cae/dynamics/syntheticBasis';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('dynamicsRandomField: llull-compute not built (cargo build --release in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 let dir = '';
 let store: FeArtifactCache;

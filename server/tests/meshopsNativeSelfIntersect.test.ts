@@ -14,10 +14,11 @@ import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { resolveDeferred } from '../src/native/deferredRun';
 import { box, grid, icosphere, noisy } from './meshopsNativeSupport';
 import { flipFaces, sideBySide, soupOf, stream } from './meshopsRepairSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshopsNativeSelfIntersect: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const engine = BINARY === null ? null : createNativeMeshEngine({ binary: BINARY });
 
 const nativeRun = (mesh: MeshData, op: MeshOp): Promise<MeshOpResult | MeshEngineFailure> =>
