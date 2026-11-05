@@ -3,6 +3,7 @@ import { render, act } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { useLiveDocument } from '@ui/hooks/useLiveDocument';
 import { useHostStatusStore } from '@ui/store/hostStatusStore';
+import { useRecoveryStore } from '@ui/store/recoveryStore';
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -165,5 +166,16 @@ describe('useLiveDocument', () => {
     expect(useHostStatusStore.getState().autosave).toMatchObject({ ok: false, code: 'DSF_SAVE_IO' });
     act(() => FakeEventSource.instances[0]?.onopen?.());
     expect(useHostStatusStore.getState().autosave).toEqual({ ok: true });
+  });
+  it('keeps the file the backend says the document belongs to, and forgets it on a snapshot of a backend without one (review 7)', () => {
+    render(<Harness />);
+    const source = FakeEventSource.instances[0];
+    act(() => source?.listeners.get('document')?.({ data: JSON.stringify({ epoch: 'e', path: 'C:/w/A.llull' }) } as MessageEvent));
+    expect(useRecoveryStore.getState().documentPath).toBe('C:/w/A.llull');
+    const snapshot = { epoch: 'e2', seq: 0, stateHash: 'h', document: useStore.getState().document };
+    act(() => source?.listeners.get('snapshot')?.({ data: JSON.stringify(snapshot) } as MessageEvent));
+    expect(useRecoveryStore.getState().documentPath).toBeNull();
+    act(() => source?.listeners.get('document')?.({ data: 'not json' } as MessageEvent)); // ignored
+    expect(useRecoveryStore.getState().documentPath).toBeNull();
   });
 });

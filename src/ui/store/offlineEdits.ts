@@ -11,7 +11,7 @@ import { useSessionStore } from './sessionStore';
 
 export function preserveOfflineEdits(offlineDocument: CadDocument, changeCount: number): void {
   const json = serializeDocument(offlineDocument);
-  void postRecovery('offline', { json, changeCount }).then(
+  void postRecovery('offline', { json, changeCount, path: useRecoveryStore.getState().documentPath }).then(
     () => {
       useRecoveryStore.getState().setOfflineEditsKept(true);
       void useRecoveryStore.getState().refresh(false);

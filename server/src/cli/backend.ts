@@ -95,9 +95,13 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
       } finally {
         lock.release();
       }
-      return {
-        note: lock.tookOver === null ? null : `DSF_LOCK_STALE: took over the lock left by pid ${lock.tookOver.pid} (no longer running).`,
-      };
+      const notes = [
+        lock.tookOver === null ? null : `DSF_LOCK_STALE: took over the lock left by pid ${lock.tookOver.pid} (no longer running).`,
+        lock.warning === null
+          ? null
+          : `${lock.warning}: this folder takes no lock file; ${path.basename(docPath)} was written without one.`,
+      ].filter((note): note is string => note !== null);
+      return { note: notes.length === 0 ? null : notes.join(' ') };
     } catch (error) {
       if (error instanceof DocumentLockedError) return { refusal: refusedOutcome(error.code, error.message, docPath, LOCKED_REMEDIATION) };
       if (error instanceof SaveConflictError)

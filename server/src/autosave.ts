@@ -96,6 +96,8 @@ export function createAutosaver(options: AutosaverOptions): Autosaver {
       succeeded(doc);
     } catch (err) {
       failed(writeFailureCode(err), err);
+      failedDoc = doc; // a failed synchronous write is retried like an async one (never left failing without a retry)
+      scheduleRetry();
     }
   };
 

@@ -11,6 +11,9 @@ interface RecoveryState {
   open: boolean;
   /** Edits made while the backend was unreachable were saved as a recoverable copy. */
   offlineEditsKept: boolean;
+  /** The file the backend's document belongs to (SSE `document`); null: untitled / not announced. Offline edits are filed under it. */
+  documentPath: string | null;
+  setDocumentPath(path: string | null): void;
   /** Ask the backend; open the dialog when there is something to recover (`reveal`). Resolves false when the backend cannot answer. */
   refresh(reveal: boolean): Promise<boolean>;
   setOpen(open: boolean): void;
@@ -22,6 +25,8 @@ export const useRecoveryStore = create<RecoveryState>()((set, get) => ({
   slots: [],
   open: false,
   offlineEditsKept: false,
+  documentPath: null,
+  setDocumentPath: (documentPath) => set({ documentPath }),
   async refresh(reveal) {
     try {
       const { slots } = await fetchRecoverySlots();

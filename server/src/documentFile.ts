@@ -3,6 +3,7 @@
  * Format = `serializeDocument` / `deserializeDocument`.
  */
 
+import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
@@ -19,13 +20,18 @@ export function readDocumentFile(docPath: string): CadDocument {
 export interface FileStamp {
   readonly mtimeMs: number;
   readonly size: number;
+  /** SHA-256 of the content; null for a file above HASH_LIMIT_BYTES (the time stamp decides then). */
+  readonly sha256: string | null;
 }
+
+const HASH_LIMIT_BYTES = 512 * 1024 * 1024;
 
 /** null when the file does not exist. */
 export function stampOf(docPath: string): FileStamp | null {
   try {
     const { mtimeMs, size } = fs.statSync(docPath);
-    return { mtimeMs, size };
+    const sha256 = size <= HASH_LIMIT_BYTES ? createHash('sha256').update(fs.readFileSync(docPath)).digest('hex') : null;
+    return { mtimeMs, size, sha256 };
   } catch {
     return null;
   }
@@ -42,8 +48,15 @@ export class SaveConflictError extends Error {
   }
 }
 
-const sameStamp = (a: FileStamp | null, b: FileStamp | null): boolean =>
-  a === null || b === null ? a === b : a.mtimeMs === b.mtimeMs && a.size === b.size;
+/**
+ * The same file content, by what can be known. Sizes differ -> changed. Same size -> compare the content hash: a touched time stamp
+ * (cloud sync, antivirus) is no change, and a same-size rewrite inside a coarse time-stamp granularity (FAT: 2 s) is still caught.
+ */
+const sameStamp = (a: FileStamp | null, b: FileStamp | null): boolean => {
+  if (a === null || b === null) return a === b;
+  if (a.size !== b.size) return false;
+  return a.sha256 !== null && b.sha256 !== null ? a.sha256 === b.sha256 : a.mtimeMs === b.mtimeMs;
+};
 
 /**
  * Atomically write `doc` to `docPath`, creating its directory; the replaced file is kept as `<docPath>.bak` (SC-D1). Returns the stamp of

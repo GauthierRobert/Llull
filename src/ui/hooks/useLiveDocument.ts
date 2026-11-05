@@ -6,7 +6,8 @@
 
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
-import type { LiveCommandEvent, LiveProgressEvent, LiveSnapshotEvent, LiveStatusEvent } from '@protocol/liveSync';
+import type { LiveCommandEvent, LiveDocumentEvent, LiveProgressEvent, LiveSnapshotEvent, LiveStatusEvent } from '@protocol/liveSync';
+import { useRecoveryStore } from '@ui/store/recoveryStore';
 import { useHostStatusStore } from '@ui/store/hostStatusStore';
 import { useJobProgressStore } from '@ui/store/jobProgressStore';
 import { noteApplied } from '@ui/store/commandCancel';
@@ -120,7 +121,8 @@ export function useLiveDocument(): void {
         try {
           const snapshot = JSON.parse((e as MessageEvent<string>).data) as LiveSnapshotEvent;
           markLiveOrigin({ kind: 'snapshot' });
-          hydrateLiveDocument(snapshot);
+          hydrateLiveDocument(snapshot); // files the offline edits under the previous path first
+          useRecoveryStore.getState().setDocumentPath(null); // the host's `document` event follows when the document has a file
           resyncFailures = 0;
           useHostStatusStore.getState().setOutOfSync(false);
         } catch {
@@ -146,6 +148,16 @@ export function useLiveDocument(): void {
         markLiveOrigin(null);
         if (applied) return;
         resync();
+      });
+
+      // The file the document belongs to (open / Save As / restore); never touches the document.
+      es.addEventListener('document', (e: Event) => {
+        try {
+          const event = JSON.parse((e as MessageEvent<string>).data) as LiveDocumentEvent;
+          useRecoveryStore.getState().setDocumentPath(typeof event.path === 'string' ? event.path : null);
+        } catch {
+          // Malformed JSON from server: ignore, stay connected.
+        }
       });
 
       // Host health (autosave failing / recovered); never touches the document.

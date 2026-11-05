@@ -125,3 +125,59 @@ describe('live host exposes the autosave status', () => {
     }
   });
 });
+
+describe('a failed synchronous write is retried (review 9)', () => {
+  it('flush() that fails keeps the document and retries until it lands, reporting ok again', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-autosave-sync-'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const statuses: AutosaveStatus[] = [];
+      let broken = true;
+      const file = path.join(dir, 'a.json');
+      const saver = createAutosaver({
+        filePath: file,
+        debounceMs: 60_000,
+        retryBaseMs: 10,
+        serialize: () => {
+          if (broken) throw Object.assign(new Error('disk'), { code: 'EIO' });
+          return '{"v":2}';
+        },
+        onStatus: (status) => statuses.push(status),
+      });
+      saver.schedule(createEmptyDocument());
+      saver.flush();
+      expect(statuses[0]).toMatchObject({ ok: false, code: 'DSF_SAVE_IO' });
+      broken = false;
+      await until(() => statuses.some((status) => status.ok));
+      expect(statuses.at(-1)).toEqual({ ok: true });
+      expect(fs.readFileSync(file, 'utf8')).toBe('{"v":2}');
+      saver.stop();
+    } finally {
+      warn.mockRestore();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a stopped saver does not schedule retries', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-autosave-stop-'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const timers = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      const saver = createAutosaver({
+        filePath: path.join(dir, 'a.json'),
+        debounceMs: 60_000,
+        serialize: () => {
+          throw new Error('disk');
+        },
+      });
+      saver.stop();
+      timers.mockClear();
+      saver.schedule(createEmptyDocument()); // stopped: written synchronously, fails, no retry timer
+      expect(timers).not.toHaveBeenCalled();
+    } finally {
+      timers.mockRestore();
+      warn.mockRestore();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -125,6 +125,46 @@ describe('backend supervisor', () => {
     expect(started[0]?.stopped()).toBe(true);
   });
 
+  it('stop() waits for a restart that is starting and stops the process it started (no orphan, no restart after stop)', async () => {
+    const { base, started } = harness();
+    const first = await superviseBackend(base); // only used to get a running backend through the harness
+    await first.stop();
+    started.length = 0;
+    const listeners: ((code: number | null) => void)[] = [];
+    const stops: string[] = [];
+    let finishStart: (backend: RunningBackend) => void = () => undefined;
+    let startCount = 0;
+    const slowStart = (): Promise<RunningBackend> => {
+      startCount += 1;
+      const name = `child${startCount}`;
+      const backend: RunningBackend = {
+        url: 'http://127.0.0.1:1',
+        pid: 2000 + startCount,
+        onUnexpectedExit: (listener) => void listeners.push(listener),
+        stop: () => {
+          stops.push(name);
+          return Promise.resolve();
+        },
+      };
+      if (startCount === 1) return Promise.resolve(backend);
+      return new Promise((resolve) => {
+        finishStart = () => resolve(backend);
+      });
+    };
+    const supervised = await superviseBackend({ ...base, start: slowStart as never });
+    listeners[0]?.(1); // the first child crashes: the restart begins and its start is pending
+    await settle();
+    expect(startCount).toBe(2);
+    let stopped = false;
+    const stopping = supervised.stop().then(() => void (stopped = true));
+    await settle();
+    expect(stopped).toBe(false); // stop() is still waiting for the start in flight
+    finishStart({} as RunningBackend);
+    await stopping;
+    expect(stops).toContain('child2'); // the child that was starting is stopped too
+    expect(stops).toContain('child1');
+  });
+
   it('a stop() is not a crash: no restart', async () => {
     const { base, started, states } = harness();
     const supervised = await superviseBackend(base);

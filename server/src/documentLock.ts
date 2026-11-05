@@ -35,7 +35,11 @@ export class DocumentLockedError extends Error {
 
 function lockedMessage(documentPath: string, holder: LockInfo | null): string {
   const base = path.basename(documentPath);
-  if (holder === null) return `DSF_DOC_LOCKED: ${base} is locked by another llull process.`;
+  if (holder === null)
+    return (
+      `DSF_DOC_LOCKED: ${base} has a lock file llull cannot read (${lockPathOf(documentPath)}). ` +
+      'If no llull is running, delete that file and try again.'
+    );
   const who = `pid ${holder.pid} on ${holder.host} since ${holder.since}`;
   return holder.app === 'desktop'
     ? `DSF_DOC_LOCKED: ${base} is open in the llull desktop app (${who}). Use --app to edit the open document, or close it there first.`
@@ -46,6 +50,8 @@ export interface DocumentLock {
   readonly documentPath: string;
   /** The holder of a stale lock that was taken over (DSF_LOCK_STALE), else null. */
   readonly tookOver: LockInfo | null;
+  /** The folder takes no lock file (read-only, or a volume without exclusive create): the document opened WITHOUT a lock. */
+  readonly warning: 'DSF_LOCK_UNAVAILABLE' | null;
   release(): void;
 }
 
@@ -109,18 +115,62 @@ export function releaseAllDocumentLocks(): void {
   held.clear();
 }
 
-/** Create the lock file only if it does not exist (hard-link of a private temp: atomic and exclusive on POSIX and NTFS). */
-function createExclusive(lockPath: string, info: LockInfo): boolean {
+type Created = 'created' | 'exists' | 'unavailable';
+
+const codeOf = (error: unknown): string | undefined => (error as NodeJS.ErrnoException).code;
+const UNWRITABLE = new Set(['EACCES', 'EROFS', 'EPERM']);
+
+/**
+ * Create the lock file only if it does not exist: a hard link of a private temp (atomic and exclusive on POSIX and NTFS); on volumes that cannot
+ * link (FAT / exFAT, some SMB shares: EPERM, ENOTSUP, EINVAL, EXDEV) an exclusive 'wx' create. 'unavailable': the folder takes no file at all.
+ */
+function createExclusive(lockPath: string, info: LockInfo): Created {
+  const text = JSON.stringify(info);
   const staged = `${lockPath}.${process.pid}.tmp`;
-  fs.writeFileSync(staged, JSON.stringify(info), 'utf8');
+  try {
+    fs.writeFileSync(staged, text, 'utf8');
+  } catch (error) {
+    if (UNWRITABLE.has(codeOf(error) ?? '')) return 'unavailable';
+    throw error;
+  }
   try {
     fs.linkSync(staged, lockPath);
-    return true;
+    return 'created';
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
-    throw error;
+    if (codeOf(error) === 'EEXIST') return 'exists';
+    return createByOpen(lockPath, text);
   } finally {
     fs.rmSync(staged, { force: true });
+  }
+}
+
+function createByOpen(lockPath: string, text: string): Created {
+  try {
+    const fd = fs.openSync(lockPath, 'wx');
+    try {
+      fs.writeSync(fd, text);
+    } finally {
+      fs.closeSync(fd);
+    }
+    return 'created';
+  } catch (error) {
+    if (codeOf(error) === 'EEXIST') return 'exists';
+    if (UNWRITABLE.has(codeOf(error) ?? '')) return 'unavailable';
+    throw error;
+  }
+}
+
+/** A crash between the temp write and the link leaves `<lock>.<pid>.tmp`: remove those of pids that are gone. */
+function removeDeadTemporaries(lockPath: string): void {
+  const prefix = `${path.basename(lockPath)}.`;
+  try {
+    for (const name of fs.readdirSync(path.dirname(lockPath))) {
+      const match = name.startsWith(prefix) ? /^(\d+)\.tmp$/.exec(name.slice(prefix.length)) : null;
+      const pid = match?.[1] === undefined ? 0 : Number(match[1]);
+      if (pid > 0 && pid !== process.pid && !processIsAlive(pid)) fs.rmSync(path.join(path.dirname(lockPath), name), { force: true });
+    }
+  } catch {
+    // Missing or unreadable folder: nothing to clean.
   }
 }
 
@@ -133,12 +183,16 @@ export function acquireDocumentLock(documentPath: string, app: LockApp): Documen
   const lockPath = lockPathOf(resolved);
   const mine: LockInfo = { pid: process.pid, host: os.hostname(), user: os.userInfo().username, app, since: new Date().toISOString() };
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  removeDeadTemporaries(lockPath);
   let tookOver: LockInfo | null = null;
   const ours = held.get(lockPath);
   const present = readLock(lockPath);
   if (ours !== undefined && present !== null && sameHolder(present, ours)) return handle(resolved, lockPath, ours, null);
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (createExclusive(lockPath, mine)) {
+    const created = createExclusive(lockPath, mine);
+    if (created === 'unavailable')
+      return { documentPath: resolved, tookOver: null, warning: 'DSF_LOCK_UNAVAILABLE', release: () => undefined };
+    if (created === 'created') {
       held.set(lockPath, mine);
       installExitHook();
       return handle(resolved, lockPath, mine, tookOver);
@@ -153,32 +207,65 @@ export function acquireDocumentLock(documentPath: string, app: LockApp): Documen
   throw new DocumentLockedError(resolved, readLock(lockPath));
 }
 
-/** Remove the lock of a dead holder. Renames it aside first so only one taker wins; a lock that is no longer the stale one is put back. */
-function removeStale(lockPath: string, stale: LockInfo): boolean {
-  const aside = `${lockPath}.${process.pid}.stale`;
-  try {
-    fs.renameSync(lockPath, aside);
-  } catch {
-    return false;
+const TAKEOVER_STALE_MS = 10_000;
+
+/** Take the takeover mutex `<lock>.takeover` ('wx'); one older than TAKEOVER_STALE_MS belongs to a crashed taker and is removed once. */
+function takeMutex(mutexPath: string): boolean {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      fs.closeSync(fs.openSync(mutexPath, 'wx'));
+      return true;
+    } catch (error) {
+      if (codeOf(error) !== 'EEXIST') return false;
+      try {
+        if (Date.now() - fs.statSync(mutexPath).mtimeMs < TAKEOVER_STALE_MS) return false;
+        fs.rmSync(mutexPath, { force: true });
+      } catch {
+        return false;
+      }
+    }
   }
-  const moved = readLock(aside);
-  if (moved !== null && sameHolder(moved, stale)) {
-    fs.rmSync(aside, { force: true });
-    return true;
-  }
-  try {
-    fs.linkSync(aside, lockPath); // someone else's fresh lock: restore it
-  } catch {
-    // another one was created meanwhile: theirs stands
-  }
-  fs.rmSync(aside, { force: true });
   return false;
+}
+
+/**
+ * Remove the lock of a dead holder. Takeovers are serialized by the mutex, and the lock is checked to still be the stale one both before and
+ * after it is renamed aside (a fresh lock of a live process is put back), so two takers never both end up holding the document.
+ */
+function removeStale(lockPath: string, stale: LockInfo): boolean {
+  const mutexPath = `${lockPath}.takeover`;
+  if (!takeMutex(mutexPath)) return false;
+  try {
+    const present = readLock(lockPath);
+    if (present === null || !sameHolder(present, stale)) return false;
+    const aside = `${lockPath}.${process.pid}.stale`;
+    try {
+      fs.renameSync(lockPath, aside);
+    } catch {
+      return false;
+    }
+    const moved = readLock(aside);
+    if (moved !== null && sameHolder(moved, stale)) {
+      fs.rmSync(aside, { force: true });
+      return true;
+    }
+    try {
+      fs.linkSync(aside, lockPath); // someone else's fresh lock: restore it
+    } catch {
+      // another one was created meanwhile: theirs stands
+    }
+    fs.rmSync(aside, { force: true });
+    return false;
+  } finally {
+    fs.rmSync(mutexPath, { force: true });
+  }
 }
 
 function handle(documentPath: string, lockPath: string, info: LockInfo, tookOver: LockInfo | null): DocumentLock {
   return {
     documentPath,
     tookOver,
+    warning: null,
     release() {
       held.delete(lockPath);
       releaseFile(lockPath, info);

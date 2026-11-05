@@ -55,6 +55,7 @@ export async function superviseBackend(options: SupervisorOptions): Promise<Supe
   let stopping = false;
   let attempts: number[] = []; // times of the restart attempts inside the window
   let wake: (() => void) | null = null; // ends a backoff wait early when stop() is called
+  let restarting: Promise<void> = Promise.resolve(); // the restart in flight (stop() waits for it, then stops what it started)
 
   const pause = (ms: number): Promise<void> =>
     new Promise((resolve) => {
@@ -84,7 +85,7 @@ export async function superviseBackend(options: SupervisorOptions): Promise<Supe
           return;
         }
         current = next;
-        next.onUnexpectedExit((code) => void onExit(code));
+        next.onUnexpectedExit(onExit);
         emit({ state: 'running' });
         return;
       } catch (error) {
@@ -93,10 +94,11 @@ export async function superviseBackend(options: SupervisorOptions): Promise<Supe
     }
   };
 
-  const onExit = (code: number | null): Promise<void> =>
-    stopping ? Promise.resolve() : restart(`the backend exited (code ${String(code)})`);
+  const onExit = (code: number | null): void => {
+    if (!stopping) restarting = restart(`the backend exited (code ${String(code)})`);
+  };
 
-  current.onUnexpectedExit((code) => void onExit(code));
+  current.onUnexpectedExit(onExit);
 
   return {
     url: options.url,
@@ -107,6 +109,7 @@ export async function superviseBackend(options: SupervisorOptions): Promise<Supe
     async stop() {
       stopping = true;
       wake?.();
+      await restarting.catch(() => undefined); // a start in flight ends with its own child stopped (see restart)
       await current.stop();
     },
   };

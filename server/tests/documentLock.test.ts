@@ -1,5 +1,5 @@
 /** A-09: the lock file next to a document (DSF_DOC_LOCKED / DSF_LOCK_STALE) and the on-disk check at save (DSF_SAVE_CONFLICT), also through the `llull --doc` CLI. */
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -167,5 +167,151 @@ describe('llull --doc', () => {
     expect(fs.readFileSync(file).equals(external)).toBe(true);
     const forced = createLocalBackend(file, { dryRun: false, forceOverwrite: true, exchangeOptions: () => ({}) as never });
     expect((await forced.run('add_box', { size: [3, 3, 3] })).changed).toBe(true);
+  });
+});
+
+describe('lock creation on volumes without hard links, and in folders that take no lock (review 3)', () => {
+  const errno = (code: string): Error => Object.assign(new Error(code), { code });
+
+  it.each(['EPERM', 'ENOTSUP', 'EINVAL', 'EXDEV'])('falls back to an exclusive create when link() fails with %s', (code) => {
+    vi.spyOn(fs, 'linkSync').mockImplementation(() => {
+      throw errno(code);
+    });
+    try {
+      const lock = acquireDocumentLock(file, 'desktop');
+      expect(lock.warning).toBeNull();
+      expect((JSON.parse(fs.readFileSync(lockPathOf(file), 'utf8')) as LockInfo).pid).toBe(process.pid);
+      expect(() => acquireDocumentLock(file, 'cli')).not.toThrow(); // re-entrant for this process
+      lock.release();
+      expect(fs.existsSync(lockPathOf(file))).toBe(false);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('the fallback still refuses a lock somebody else holds', async () => {
+    writeLock({ pid: await liveOtherProcess(), app: 'desktop' });
+    vi.spyOn(fs, 'linkSync').mockImplementation(() => {
+      throw errno('EPERM');
+    });
+    try {
+      expect(() => acquireDocumentLock(file, 'cli')).toThrow(DocumentLockedError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it.each(['EACCES', 'EROFS'])('an unwritable folder (%s) opens without a lock and says DSF_LOCK_UNAVAILABLE', (code) => {
+    const real = fs.writeFileSync.bind(fs);
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((target: fs.PathOrFileDescriptor, data: string, ...rest: unknown[]) => {
+      if (String(target).endsWith('.tmp')) throw errno(code);
+      return (real as (...args: unknown[]) => void)(target, data, ...rest);
+    }) as typeof fs.writeFileSync);
+    try {
+      const lock = acquireDocumentLock(file, 'desktop');
+      expect(lock.warning).toBe('DSF_LOCK_UNAVAILABLE');
+      expect(fs.existsSync(lockPathOf(file))).toBe(false);
+      expect(() => lock.release()).not.toThrow();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('the CLI reports DSF_LOCK_UNAVAILABLE next to a successful write', async () => {
+    const real = fs.writeFileSync.bind(fs);
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((target: fs.PathOrFileDescriptor, data: string, ...rest: unknown[]) => {
+      if (String(target).endsWith('.tmp')) throw errno('EROFS');
+      return (real as (...args: unknown[]) => void)(target, data, ...rest);
+    }) as typeof fs.writeFileSync);
+    try {
+      const { io, out } = capture();
+      expect(await runCli(['exec', 'add_box', '{"size":[1,1,1]}', '--doc', file, '--json'], io)).toBe(EXIT_OK);
+      expect(out.join('')).toContain('DSF_LOCK_UNAVAILABLE');
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(Object.keys(readDocumentFile(file).entities)).toHaveLength(1);
+  });
+});
+
+describe('takeover race, unreadable-lock message, leftover temporaries (review 6)', () => {
+  it('refuses while another taker holds the takeover mutex, leaving the stale lock where it is', async () => {
+    const pid = await deadPid();
+    writeLock({ pid });
+    fs.writeFileSync(`${lockPathOf(file)}.takeover`, '');
+    expect(() => acquireDocumentLock(file, 'cli')).toThrow(DocumentLockedError);
+    expect((JSON.parse(fs.readFileSync(lockPathOf(file), 'utf8')) as LockInfo).pid).toBe(pid);
+  });
+
+  it('removes a takeover mutex left by a crashed taker (older than 10 s) and takes over', async () => {
+    writeLock({ pid: await deadPid() });
+    const mutex = `${lockPathOf(file)}.takeover`;
+    fs.writeFileSync(mutex, '');
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(mutex, old, old);
+    expect(acquireDocumentLock(file, 'cli').tookOver).not.toBeNull();
+    expect(fs.existsSync(mutex)).toBe(false);
+  });
+
+  it('a fresh lock that appears between the check and the rename is put back, never taken (both would hold otherwise)', async () => {
+    writeLock({ pid: await deadPid() });
+    const live = await liveOtherProcess();
+    const real = fs.renameSync.bind(fs);
+    vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (String(from) === lockPathOf(file)) writeLock({ pid: live, since: '2026-11-05T11:00:00.000Z' }); // a live process took it just now
+      return real(from, to);
+    });
+    try {
+      expect(() => acquireDocumentLock(file, 'cli')).toThrow(DocumentLockedError);
+      expect((JSON.parse(fs.readFileSync(lockPathOf(file), 'utf8')) as LockInfo).pid).toBe(live);
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(fs.existsSync(`${lockPathOf(file)}.takeover`)).toBe(false);
+  });
+
+  it('an unreadable lock names the lock file and says to delete it when no llull is running', () => {
+    fs.writeFileSync(lockPathOf(file), 'garbage');
+    let message = '';
+    try {
+      acquireDocumentLock(file, 'cli');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain(lockPathOf(file));
+    expect(message).toMatch(/delete that file/);
+  });
+
+  it('removes <lock>.<pid>.tmp files of dead pids and keeps those of live ones', async () => {
+    const alive = `${lockPathOf(file)}.${await liveOtherProcess()}.tmp`;
+    const dead = `${lockPathOf(file)}.${await deadPid()}.tmp`;
+    fs.writeFileSync(dead, '{}');
+    fs.writeFileSync(alive, '{}');
+    acquireDocumentLock(file, 'cli');
+    expect(fs.existsSync(dead)).toBe(false);
+    expect(fs.existsSync(alive)).toBe(true);
+  });
+});
+
+describe('save conflict compares content, not only the time stamp (review 8)', () => {
+  it('a touched time stamp with the same content is no conflict (cloud sync, antivirus)', () => {
+    writeDocumentFile(file, createEmptyDocument());
+    const loaded = stampOf(file);
+    const later = new Date(Date.now() + 60_000);
+    fs.utimesSync(file, later, later);
+    expect(() => writeDocumentFile(file, createEmptyDocument(), { stamp: loaded })).not.toThrow();
+  });
+
+  it('a same-size rewrite that keeps the time stamp (FAT 2 s granularity) is still a conflict', () => {
+    writeDocumentFile(file, createEmptyDocument());
+    const loaded = stampOf(file);
+    const text = fs.readFileSync(file, 'utf8');
+    const changed = text.replace(/a/, 'b');
+    expect(changed).not.toBe(text);
+    const mtime = fs.statSync(file).mtime;
+    fs.writeFileSync(file, changed);
+    fs.utimesSync(file, mtime, mtime);
+    expect(stampOf(file)?.size).toBe(loaded?.size);
+    expect(() => writeDocumentFile(file, createEmptyDocument(), { stamp: loaded })).toThrow(SaveConflictError);
   });
 });
