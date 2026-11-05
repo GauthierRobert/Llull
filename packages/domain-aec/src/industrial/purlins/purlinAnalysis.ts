@@ -6,7 +6,7 @@ import { levelMembersInMm } from '../common/memberSupport';
 import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 import { ROOF_PRESSURE_CASE_MIN_CPE, valleyLines } from '../frames/frameModelTypes';
 import { purlinWind } from './purlinWind';
-import { yieldStrength } from '../steelDesign/steelDesign';
+import { isSteelRefusal, memberStrength } from '../steelDesign/steelGrades';
 import {
   CPE_WALL,
   CPI_PRESSURE,
@@ -15,6 +15,7 @@ import {
   type Located,
   PURLIN_DEFLECTION_RATIO,
   type PurlinRow,
+  refusedPurlinRow,
   RAIL_DEFLECTION_RATIO,
   TOLERANCE,
   type Verdict,
@@ -129,7 +130,12 @@ export function analysePurlins(
         const tributary = neighbours.length === 0 ? DEFAULT_TRIBUTARY : neighbours.reduce((sum, gap) => sum + gap, 0) / 2;
         const pitch = Math.abs(purlin.member.roll);
         const cosine = Math.cos(pitch);
-        const fy = yieldStrength(purlin.member.material);
+        const strength = memberStrength(purlin.member.material, purlin.profile);
+        if (isSteelRefusal(strength)) {
+          rows.push(refusedPurlinRow(purlin, 'purlin', strength));
+          return;
+        }
+        const fy = strength.fy;
         const trib = tributary / 1000;
         const selfWeight = weightKnPerMetre(purlin.profile.massPerMetre);
         // Vertical dead per metre of purlin, snow on plan (× cos pitch); normal comp. × cos pitch.
@@ -220,7 +226,12 @@ export function analysePurlins(
     const lower = levels[index - 1] ?? 0;
     const upper = levels[index + 1] ?? Math.max(eaves ?? z + (z - lower), z);
     const trib = (upper - lower) / 2 / 1000;
-    const fy = yieldStrength(rail.member.material);
+    const strength = memberStrength(rail.member.material, rail.profile);
+    if (isSteelRefusal(strength)) {
+      rows.push(refusedPurlinRow(rail, 'rail', strength));
+      continue;
+    }
+    const fy = strength.fy;
     const gableDistance = Math.max(0, Math.min(rail.yMin - y0, yEnd - rail.yMax));
     const suctionZone: WallZone = gableDistance < eAlong / 5 - TOLERANCE ? 'A' : gableDistance < eAlong - TOLERANCE ? 'B' : 'C';
     const suction = Math.abs(CPE_WALL[suctionZone]) + CPI_SUCTION;

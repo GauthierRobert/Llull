@@ -8,9 +8,9 @@ import {
   lateralTorsionalReduction,
   memberBuckling,
   sectionResistance,
-  boltResistance,
-  yieldStrength,
 } from '@aec/industrial/steelDesign/steelDesign';
+import { boltResistance } from '@aec/industrial/steelDesign/steelBolts';
+import { steelStrength } from '@aec/industrial/steelDesign/steelGrades';
 import { framesOf } from '@aec/industrial/frames/frameModelFrames';
 import { craneActions, valleyLines, craneCapacityOf, DOWNWIND_ROOF_FACTOR } from '@aec/industrial/frames/frameModelTypes';
 import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
@@ -411,12 +411,12 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
 
 describe('design helpers', () => {
   it('reads yield strengths, bolt resistances and the next section size', () => {
-    expect(yieldStrength('S275')).toBe(275);
-    expect(yieldStrength('steel')).toBe(355);
-    const m20 = boltResistance(20);
+    expect(steelStrength('S275', 12)).toMatchObject({ fy: 275 });
+    expect(steelStrength('steel', 12)).toMatchObject({ code: 'STL_GRADE_UNKNOWN' });
+    const m20 = boltResistance(20) as { tension: number; shear: number };
     expect(m20.tension / 1000).toBeCloseTo(141.1, 1);
     expect(m20.shear / 1000).toBeCloseTo(94.1, 1);
-    expect(boltResistance(23).tension).toBe(boltResistance(22).tension);
+    expect(boltResistance(23)).toMatchObject({ code: 'STL_BOLT_SIZE_NONSTANDARD' });
     expect(nextProfile('IPE450')).toBe('IPE500');
     expect(nextProfile('IPE600')).toMatch(/^HE[AB]/);
     expect(nextProfile('NOPE')).toBeNull();

@@ -14,6 +14,7 @@ import {
 } from '../common/craneParams';
 import type { CraneModel, FrameLoads } from './frameModelTypes';
 import { existingLevelIdParam } from '../../building/levelParams';
+import { boltClassProblem, DEFAULT_BOLT_CLASS, resolveBoltClass } from '../steelDesign/steelBolts';
 
 /** Load parameters shared by check_portal_frames and design_portal_frames. */
 export const FRAME_LOAD_SHAPE = {
@@ -42,10 +43,31 @@ export const FRAME_LOAD_SHAPE = {
   levelId: existingLevelIdParam,
 };
 
-type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>>;
+/** Bolt property class shared by the commands that check bolts (portal frames, foundations). */
+export const BOLT_CLASS_SHAPE = {
+  boltClass: z
+    .string()
+    .optional()
+    .describe(
+      'Bolt property class of the end-plate connection and anchor bolts: 4.6, 5.6, 6.8, 8.8 or 10.9 (EN 1993-1-8 Tab. 3.4). ' +
+        'Omitted = 8.8, reported in data.defaulted and in the summary. Bolt diameters must be exact ISO metric sizes M12..M36 (M12, M14, M16, M18, M20, M22, M24, M27, M30, M36) ' +
+        'or the check is refused with STL_BOLT_SIZE_NONSTANDARD; an unknown class is refused with STL_BOLT_CLASS_UNKNOWN.',
+    ),
+};
+
+type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>> & { readonly boltClass?: string | undefined };
+
+/** Inputs a check replaced by a default, listed in data.defaulted. */
+export interface DefaultedInput {
+  readonly input: string;
+  readonly value: string;
+}
 
 /** Validated loads + level, or the failure reason. */
-export function resolveFrameLoads(doc: CadDocument, params: FrameLoadParams): { loads: FrameLoads; levelId: string } | { reason: string } {
+export function resolveFrameLoads(
+  doc: CadDocument,
+  params: FrameLoadParams,
+): { loads: FrameLoads; levelId: string; defaulted: DefaultedInput[] } | { reason: string } {
   const { deadLoad = 0.5, snowLoad = 0.8, windPressure = 0, craneCapacity } = params;
   if (
     !isNonNegativeNumber(deadLoad) ||
@@ -55,6 +77,9 @@ export function resolveFrameLoads(doc: CadDocument, params: FrameLoadParams): { 
   ) {
     return { reason: 'deadLoad, snowLoad, windPressure and craneCapacity must be >= 0' };
   }
+  const bolt = resolveBoltClass(params.boltClass);
+  const classProblem = boltClassProblem(bolt.boltClass);
+  if (classProblem !== null) return { reason: classProblem.message };
   const { hoistingClass, hoistingSpeed, craneSelfWeight, minHookApproach, wheelBase } = params;
   const craneProblem = craneValueProblem({ hoistingSpeed, minHookApproach, craneSelfWeight, wheelBase });
   if (craneProblem !== undefined) return { reason: craneProblem };
@@ -73,12 +98,18 @@ export function resolveFrameLoads(doc: CadDocument, params: FrameLoadParams): { 
       deadLoad,
       snowLoad,
       windPressure,
+      boltClass: bolt.boltClass,
       ...(craneCapacity !== undefined ? { craneCapacity } : {}),
       ...(Object.keys(craneModel).length > 0 ? { craneModel } : {}),
     },
     levelId,
+    defaulted: bolt.defaulted ? [{ input: 'boltClass', value: bolt.boltClass }] : [],
   };
 }
+
+/** Summary clause naming the bolt class, flagged when it was defaulted. */
+export const describeBolts = (loads: FrameLoads, defaulted: ReadonlyArray<DefaultedInput>): string =>
+  `bolts class ${loads.boltClass ?? DEFAULT_BOLT_CLASS}${defaulted.some(({ input }) => input === 'boltClass') ? ' (defaulted)' : ''}`;
 
 /** "G = 0.5 kN/m² + self-weight, S = 0.8, W = 0.7 (qp), cranes from runways". */
 export function describeLoads(loads: FrameLoads): string {

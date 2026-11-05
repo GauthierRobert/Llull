@@ -1,7 +1,8 @@
 import type { SteelMemberElement } from '@aec/building/types';
 import { findProfile, sectionProperties } from '../../steel/profiles';
 import { craneActions, CRANE_FACTORS, type CraneModel } from '../frames/frameModelTypes';
-import { lateralTorsionalReduction, sectionResistance, yieldStrength } from '../steelDesign/steelDesign';
+import { lateralTorsionalReduction, sectionResistance } from '../steelDesign/steelDesign';
+import { isSteelRefusal, memberStrength, REFUSED_UTILISATION } from '../steelDesign/steelGrades';
 import {
   BUFFER_SPEED_RATIO,
   CLASSES,
@@ -44,7 +45,24 @@ export function checkBeam(
 ): RunwayCheckRow[] {
   const profile = findProfile(beam.profile);
   if (!profile || !(span > 0)) return [];
-  const fy = yieldStrength(beam.material);
+  const strength = memberStrength(beam.material, profile);
+  if (isSteelRefusal(strength)) {
+    return [
+      {
+        elementId: beam.id,
+        mark: beam.mark,
+        profile: profile.name,
+        span: round(span, 0),
+        kind: 'strength',
+        check: `not checked — ${strength.message}`,
+        value: 0,
+        limit: 0,
+        unit: '-',
+        utilisation: REFUSED_UTILISATION,
+      },
+    ];
+  }
+  const fy = strength.fy;
   const section = sectionProperties(profile);
   const resistance = sectionResistance(profile, fy);
   const wheelBase = model.wheelBase ?? 3000;

@@ -1,6 +1,7 @@
 import type { SteelMemberElement } from '@aec/building/types';
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { bucklingReduction, eulerForce } from '../steelDesign/steelDesign';
+import type { SteelRefusal } from '../steelDesign/steelGrades';
 import { CRANE_FACTORS, craneActions } from '../frames/frameModelTypes';
 import { GAMMA_CRANE } from '../../shared/loadFactors';
 import { bufferForce, GAMMA_BUFFER } from '../runway/runwayCheckModel';
@@ -101,3 +102,20 @@ export function bucklingResistance(profile: SteelProfile, fy: number, length: nu
 }
 
 export type Panel = { readonly group: string; readonly roof: boolean; readonly bay: string; readonly braces: Located[] };
+
+/** Failed row of a member whose steel grade or governing thickness was refused (never a pass). */
+export function refusedRow(group: string, member: SteelMemberElement, kind: BracingRow['kind'], refusal: SteelRefusal): BracingRow {
+  return {
+    group,
+    elementId: member.id,
+    elementIds: [member.id],
+    mark: member.mark,
+    kind,
+    force: 0,
+    resistance: 0,
+    moment: 0,
+    momentResistance: 0,
+    utilisation: NO_MEMBER_UTILISATION,
+    check: `${member.profile} not checked — ${refusal.message}`,
+  };
+}

@@ -6,6 +6,7 @@ import type { FrameLoads } from '../frames/frameModelTypes';
 import { baseReactions } from '../frames/frameModelSolve';
 import { type ClayLayer, type FoundationRow, MAX_UTILISATION, type PadSettlement } from './foundationModel';
 import { differentialRows, footingRows } from './foundationRows';
+import { DEFAULT_BOLT_CLASS } from '../steelDesign/steelBolts';
 import { plateRows } from './foundationPlateRows';
 import { reactionColumn, slabSharePerColumn, slidingHorizontalOf } from './foundationThrust';
 import { combine, findFooting, findPlate, hasCase, ultimateCombinations } from './foundationCombinations';
@@ -78,7 +79,9 @@ export function checkFoundations(
     }
     if (plate) {
       plates += 1;
-      rows.push(...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind));
+      rows.push(
+        ...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind, loads.boltClass ?? DEFAULT_BOLT_CLASS),
+      );
     }
   }
   rows.push(...differentialRows(doc, settlements));

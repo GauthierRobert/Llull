@@ -3,7 +3,8 @@
 import type { CadDocument } from '@core/model/types';
 import { levelMembersInMm } from '../common/memberSupport';
 import { round } from '../../shared/numeric';
-import { sectionResistance, yieldStrength } from '../steelDesign/steelDesign';
+import { sectionResistance } from '../steelDesign/steelDesign';
+import { isSteelRefusal, memberStrength } from '../steelDesign/steelGrades';
 import { craneCapacityOf } from '../frames/frameModelTypes';
 import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 import { DEFAULT_CRANE_SPAN } from '../runway/runwayCheckModel';
@@ -22,6 +23,7 @@ import {
   bucklingResistance,
   craneWallForce,
   near,
+  refusedRow,
 } from './bracingModel';
 import { distance3 } from '@lib/vec3';
 
@@ -63,7 +65,12 @@ function gablePostRows(
       const tributary = (right - left) / 2 / 1000;
       const height = Math.abs(post.end[2] - post.start[2]) / 1000;
       const load = GAMMA_Q * windPressure * CP_POST * tributary;
-      const fy = yieldStrength(post.member.material);
+      const strength = memberStrength(post.member.material, post.profile);
+      if (isSteelRefusal(strength)) {
+        rows.push(refusedRow('gable posts', post.member, 'gable-post', strength));
+        return;
+      }
+      const fy = strength.fy;
       const resistance = sectionResistance(post.profile, fy);
       const moment = (load * height * height) / 8;
       const reaction = (load * height) / 2;
@@ -207,7 +214,12 @@ export function analyseBracing(
       ? (bayForce * (hallWidth / 2 - Math.max(0, Math.min(xLow - x0, x1 - xHigh)))) / hallWidth
       : bayForce / bayWallPanels(panel.bay) + craneShare;
     const tension = (shear * length) / dy;
-    const fy = yieldStrength(member.material);
+    const strength = memberStrength(member.material, profile);
+    if (isSteelRefusal(strength)) {
+      rows.push(refusedRow(panel.group, member, 'diagonal', strength));
+      continue;
+    }
+    const fy = strength.fy;
     const npl = sectionResistance(profile, fy).axial / 1000;
     const ids = panel.braces.map(({ member: brace }) => brace.id);
     const diagonalRow = (force: number, check: string): BracingRow => ({
@@ -254,9 +266,12 @@ export function analyseBracing(
           ({ member: candidate, start: s }) =>
             candidate.role === 'column' && near(s[0], start[0]) && (near(s[1], bayStart) || near(s[1], bayEnd)),
         );
-    if (strut) {
+    const strutStrength = strut ? memberStrength(strut.member.material, strut.profile) : undefined;
+    if (strut && strutStrength && isSteelRefusal(strutStrength)) {
+      rows.push(refusedRow(panel.group, strut.member, 'strut', strutStrength));
+    } else if (strut && strutStrength && !isSteelRefusal(strutStrength)) {
       const compression = panel.roof ? (shear * dx) / dy : (shear * dz) / dy;
-      const strutFy = yieldStrength(strut.member.material);
+      const strutFy = strutStrength.fy;
       const purlinGap = purlinGapAlong(strut, bayStart, bayEnd);
       const strutLength = panel.roof ? purlinGap : dz;
       const strutResistance = bucklingResistance(strut.profile, strutFy, strutLength) / 1000;
@@ -290,8 +305,10 @@ export function analyseBracing(
           Math.abs(s[2] - eavesZ) < EAVES_Z_TOLERANCE,
       );
       const reaction = bayForce / 2;
-      const fyEaves = eavesStrut ? yieldStrength(eavesStrut.member.material) : 0;
-      const eavesResistance = eavesStrut ? bucklingResistance(eavesStrut.profile, fyEaves, dy) / 1000 : 0;
+      const eavesStrength = eavesStrut ? memberStrength(eavesStrut.member.material, eavesStrut.profile) : undefined;
+      const eavesRefusal = eavesStrength && isSteelRefusal(eavesStrength) ? eavesStrength : undefined;
+      const fyEaves = eavesStrength && !isSteelRefusal(eavesStrength) ? eavesStrength.fy : 0;
+      const eavesResistance = eavesStrut && !eavesRefusal ? bucklingResistance(eavesStrut.profile, fyEaves, dy) / 1000 : 0;
       rows.push({
         group: panel.group,
         elementId: eavesStrut?.member.id ?? member.id,
@@ -302,10 +319,12 @@ export function analyseBracing(
         resistance: eavesResistance,
         moment: 0,
         momentResistance: 0,
-        utilisation: eavesStrut ? reaction / eavesResistance : NO_MEMBER_UTILISATION,
-        check: eavesStrut
-          ? `eaves strut ${eavesStrut.member.profile} compression ${reaction.toFixed(1)} kN (truss reaction at the outer wall line, independent of the number of spans) ≤ χ·Npl,Rd ${eavesResistance.toFixed(1)} kN (minor axis, Lcr ${dy.toFixed(0)} mm bay)`
-          : `no eaves strut found at x ${round(wallX, 0)} mm in bay ${panel.bay} mm: truss reaction ${reaction.toFixed(1)} kN has no compression member`,
+        utilisation: eavesStrut && !eavesRefusal ? reaction / eavesResistance : NO_MEMBER_UTILISATION,
+        check: eavesRefusal
+          ? `eaves strut ${eavesStrut?.member.profile ?? ''} not checked — ${eavesRefusal.message}`
+          : eavesStrut
+            ? `eaves strut ${eavesStrut.member.profile} compression ${reaction.toFixed(1)} kN (truss reaction at the outer wall line, independent of the number of spans) ≤ χ·Npl,Rd ${eavesResistance.toFixed(1)} kN (minor axis, Lcr ${dy.toFixed(0)} mm bay)`
+            : `no eaves strut found at x ${round(wallX, 0)} mm in bay ${panel.bay} mm: truss reaction ${reaction.toFixed(1)} kN has no compression member`,
       });
     }
   }

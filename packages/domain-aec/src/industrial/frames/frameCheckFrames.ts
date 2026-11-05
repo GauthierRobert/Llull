@@ -4,7 +4,9 @@ import { findProfile } from '../../steel/profiles';
 import { windCasesOf, type FrameLoads, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
 import { framesOf } from './frameModelFrames';
-import { memberBuckling, sectionResistance, yieldStrength } from '../steelDesign/steelDesign';
+import { memberBuckling, sectionResistance } from '../steelDesign/steelDesign';
+import { isSteelRefusal, memberStrength, REFUSED_UTILISATION, strengthNote } from '../steelDesign/steelGrades';
+import { DEFAULT_BOLT_CLASS } from '../steelDesign/steelBolts';
 import { type CheckRow, SLS_CRANE, SLS_SWAY, SLS_VERTICAL, connectionCheck, solveUltimate, ultimateCombinations } from './frameCheckSolve';
 
 /** Forces of a row that reports a stability or deflection limit rather than member forces. */
@@ -49,7 +51,23 @@ export function checkFrames(
         if (member?.category !== 'member' || !forces) return;
         const profile = analysis.section ?? findProfile(member.profile);
         if (!profile) return;
-        const fy = yieldStrength(member.material);
+        const strength = memberStrength(member.material, profile);
+        if (isSteelRefusal(strength)) {
+          keep({
+            frame: frame.label,
+            elementId: member.id,
+            mark: member.mark,
+            kind: member.role === 'column' ? 'column' : 'rafter',
+            combination: combination.name,
+            axial: 0,
+            moment: 0,
+            shear: 0,
+            utilisation: REFUSED_UTILISATION,
+            check: `${member.profile} not checked — ${strength.message}`,
+          });
+          return;
+        }
+        const fy = strength.fy;
         const resistance = sectionResistance(profile, fy);
         const moment = forces.maxMoment * amplification;
         const shear = Math.max(...forces.shear.map(Math.abs));
@@ -73,7 +91,7 @@ export function checkFrames(
           moment: moment / 1e6,
           shear: shear / 1000,
           utilisation: Math.max(section, buckling.utilisation, shearRatio),
-          check: `${governing} (${analysis.section && analysis.section.h > (findProfile(member.profile)?.h ?? 0) ? `${member.profile} haunched h${profile.h.toFixed(0)}` : member.profile} class ${resistance.sectionClass}, ${member.material}${amplification > 1 ? `, sway ×${amplification.toFixed(2)}` : ''})`,
+          check: `${governing} (${analysis.section && analysis.section.h > (findProfile(member.profile)?.h ?? 0) ? `${member.profile} haunched h${profile.h.toFixed(0)}` : member.profile} class ${resistance.sectionClass}, ${member.material} ${strengthNote(strength)}${amplification > 1 ? `, sway ×${amplification.toFixed(2)}` : ''})`,
         });
       });
       for (const connection of Object.values(building.elements)) {
@@ -91,7 +109,7 @@ export function checkFrames(
         const list = connectionForces.get(connection.id) ?? [];
         list.push({ moment, shear });
         connectionForces.set(connection.id, list);
-        const verdict = connectionCheck(doc, building, connection, moment, shear);
+        const verdict = connectionCheck(doc, building, connection, moment, shear, loads.boltClass ?? DEFAULT_BOLT_CLASS);
         if (!verdict) continue;
         keep({
           frame: frame.label,

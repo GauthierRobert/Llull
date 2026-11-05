@@ -1,5 +1,5 @@
 /**
- * EN 1993 resistances used by the frame checks: material, bolts, cross-sections and members (flexural buckling with the §6.3.3 interaction,
+ * EN 1993 resistances used by the frame checks: cross-sections and members (flexural buckling with the §6.3.3 interaction,
  * method 2 simplified).
  */
 
@@ -8,48 +8,6 @@ import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 
 export const E_STEEL = 210000; // N/mm²
 const GAMMA_M1 = 1.0;
-const GAMMA_M2 = 1.25;
-const BOLT_FUB = 800; // grade 8.8, N/mm²
-/** Tensile stress areas of metric bolts, mm² (ISO 898-1). */
-const STRESS_AREA: Readonly<Record<number, number>> = { 12: 84.3, 16: 157, 20: 245, 22: 303, 24: 353, 27: 459, 30: 561, 36: 817 };
-
-/** Yield strength from a grade name ("S355" → 355 N/mm²); 355 when unknown. */
-export function yieldStrength(grade: string): number {
-  const value = Number(/S\s*(\d{3})/i.exec(grade)?.[1]);
-  return Number.isFinite(value) && value > 0 ? value : 355;
-}
-
-/** Tensile stress area (mm²) of the standard bolt size nearest to `diameterMm`. */
-function stressArea(diameterMm: number): number {
-  const nominal = Object.keys(STRESS_AREA)
-    .map(Number)
-    .reduce((best, size) => (Math.abs(size - diameterMm) < Math.abs(best - diameterMm) ? size : best));
-  return STRESS_AREA[nominal] as number;
-}
-
-/** Design resistances of one grade 8.8 bolt (EN 1993-1-8 Tab. 3.4), N. */
-export function boltResistance(diameterMm: number): { tension: number; shear: number } {
-  const area = stressArea(diameterMm);
-  return { tension: (0.9 * BOLT_FUB * area) / GAMMA_M2, shear: (0.6 * BOLT_FUB * area) / GAMMA_M2 };
-}
-
-/** Anchor bolt grade → [fub, fyb] N/mm². */
-const ANCHOR_GRADES: Readonly<Record<number, readonly [number, number]>> = {
-  4.6: [400, 240],
-  5.6: [500, 300],
-  8.8: [800, 640],
-  10.9: [1000, 900],
-};
-
-/**
- * Design resistances of one anchor bolt, N: tension 0.9 fub As / γM2; shear (threads in the shear plane, EN 1993-1-8 §6.2.2(7)) αbc fub As
- * / γM2 with αbc = 0.44 − 0.0003 fyb.
- */
-export function anchorBoltResistance(diameterMm: number, grade = 8.8): { tension: number; shear: number } {
-  const [fub, fyb] = ANCHOR_GRADES[grade] ?? (ANCHOR_GRADES[8.8] as readonly [number, number]);
-  const area = stressArea(diameterMm);
-  return { tension: (0.9 * fub * area) / GAMMA_M2, shear: ((0.44 - 0.0003 * fyb) * fub * area) / GAMMA_M2 };
-}
 
 /**
  * Cross-section resistances (EN 1993-1-1 §6.2, γM0 = 1): Npl, Mpl (class 1–2) or Mel (class 3), Vpl with Av ≈ h·tw; classification of

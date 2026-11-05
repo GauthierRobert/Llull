@@ -7,7 +7,9 @@ import { toMm } from '@core/model/units';
 import { buildingConnectionSolids } from '../connections/evaluateConnections';
 import { type FrameModel, type WindCase, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
-import { amplificationOf, boltResistance, horneAlphaCritical } from '../steelDesign/steelDesign';
+import { amplificationOf, horneAlphaCritical } from '../steelDesign/steelDesign';
+import { boltResistance, isBoltRefusal } from '../steelDesign/steelBolts';
+import { REFUSED_UTILISATION } from '../steelDesign/steelGrades';
 import { GAMMA_CRANE } from '../../shared/loadFactors';
 
 export interface CheckRow {
@@ -190,6 +192,7 @@ export function connectionCheck(
   connection: MomentConnectionElement,
   moment: number,
   shear: number,
+  boltClass: string,
 ): { utilisation: number; check: string } | null {
   const solids = buildingConnectionSolids(doc, building, connection);
   const plate = solids?.find((solid) => solid.part === 'plate');
@@ -207,7 +210,8 @@ export function connectionCheck(
   const sumSquares = levers.reduce((sum, lever) => sum + lever * lever, 0);
   const tension = (Math.abs(moment) * Math.max(...levers)) / sumSquares;
   const perBoltShear = Math.abs(shear) / levers.length;
-  const resistance = boltResistance(toMm(doc, connection.boltDiameter));
+  const resistance = boltResistance(toMm(doc, connection.boltDiameter), boltClass);
+  if (isBoltRefusal(resistance)) return { utilisation: REFUSED_UTILISATION, check: `bolts not checked — ${resistance.message}` };
   const tensionRatio = tension / resistance.tension;
   const combined = perBoltShear / resistance.shear + tension / (1.4 * resistance.tension);
   return {

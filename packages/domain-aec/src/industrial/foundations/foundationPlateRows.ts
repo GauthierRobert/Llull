@@ -5,7 +5,7 @@ import type { BasePlateElement, BuildingModel } from '@aec/building/types';
 import type { CadDocument } from '@core/model/types';
 import { findProfile } from '../../steel/profiles';
 import type { BaseReaction } from '../frames/frameModelSolve';
-import { anchorBoltResistance, yieldStrength } from '../steelDesign/steelDesign';
+import { anchorBoltResistance, isBoltRefusal } from '../steelDesign/steelBolts';
 import { BEARING_STRENGTH, checkPlateMN } from '../connections/basePlateMN';
 import { type FoundationRow, MAX_UTILISATION } from './foundationModel';
 import { type Candidate, combine, hasCase, plateDemands, ultimateCombinations, worst } from './foundationCombinations';
@@ -19,14 +19,20 @@ export function plateRows(
   footingMark: string,
   plate: BasePlateElement,
   wind: boolean,
+  boltClass: string,
 ): FoundationRow[] {
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
   const toMm = unitsToMm(doc);
   const areaMm2 = toMm(plate.length) * toMm(plate.width);
   const bolts = Math.max(1, plate.boltCount);
-  const resistance = anchorBoltResistance(toMm(plate.boltDiameter));
-  const [tensionLimit, shearLimit] = [resistance.tension / 1000, resistance.shear / 1000];
+  const resistance = anchorBoltResistance(toMm(plate.boltDiameter), boltClass);
   const row = rowOf(columnMark, footingMark, plate.id);
+  if (isBoltRefusal(resistance)) {
+    return [
+      row(`anchor bolts not checked — ${resistance.message}`, { value: 0, limit: 0, combination: '—', utilisation: MAX_UTILISATION }, '-'),
+    ];
+  }
+  const [tensionLimit, shearLimit] = [resistance.tension / 1000, resistance.shear / 1000];
   const rows: FoundationRow[] = [];
 
   const bearing: Candidate[] = ultimateCombinations(wind, crane, false).map((combination) => {
@@ -67,7 +73,8 @@ export function plateRows(
     }
   }
   const tensionWorst = worst(tension);
-  if (wind && tensionWorst) rows.push(row(`anchor tension Ft,Rd M${Math.round(toMm(plate.boltDiameter))} 8.8`, tensionWorst, 'kN/bolt'));
+  if (wind && tensionWorst)
+    rows.push(row(`anchor tension Ft,Rd M${Math.round(toMm(plate.boltDiameter))} ${boltClass}`, tensionWorst, 'kN/bolt'));
   const interactionWorst = worst(interaction);
   if (interactionWorst) rows.push(row('anchor shear + tension (Fv/Fv,Rd + Ft/1.4Ft,Rd)', interactionWorst, '-'));
   const column = building.elements[plate.memberId];
@@ -81,9 +88,8 @@ export function plateRows(
       boltDiameter: toMm(plate.boltDiameter),
       columnDepth: profile.h,
     };
-    const fy = yieldStrength(plate.material);
     const moments: Array<Candidate & { detail: string }> = plateDemands(reaction, wind).map((demand) => {
-      const verdict = checkPlateMN(geometry, demand.normal, demand.moment, fy);
+      const verdict = checkPlateMN(geometry, demand.normal, demand.moment, { grade: plate.material, boltClass });
       return {
         value: verdict.boltTension,
         limit: verdict.boltLimit,

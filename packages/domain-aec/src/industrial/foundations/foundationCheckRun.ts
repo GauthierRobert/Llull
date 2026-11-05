@@ -1,7 +1,7 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from '../frames/frameLoadParams';
+import { BOLT_CLASS_SHAPE, describeBolts, describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from '../frames/frameLoadParams';
 import { DEFAULT_TIE_CAPACITY } from './foundationModel';
 import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { checkFoundations } from './foundationAssessment';
@@ -11,6 +11,7 @@ import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from '../report
 
 const foundationCheckParams = z.object({
   ...FRAME_LOAD_SHAPE,
+  ...BOLT_CLASS_SHAPE,
   ...SOIL_SHAPE,
   tieCapacity: z
     .number()
@@ -23,6 +24,8 @@ const foundationCheckParams = z.object({
 /**
  * @affects none; data = { rows: FoundationRow[], csv, maxUtilisation, failures }
  * @failure bad params / unknown level / no footing or base plate under a frame column -> no data
+ * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op; STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE / STL_BOLT_SIZE_NONSTANDARD -> the row fails (utilisation 99), never passes
+ * @invariant boltClass omitted -> 8.8, listed in data.defaulted and named in the summary
  */
 export const foundationCheck = defineCommand({
   name: 'check_foundations',
@@ -39,7 +42,7 @@ export const foundationCheck = defineCommand({
     'wind, and the ground slab weight adds its friction, shared per column); (4) base plate: concrete bearing under 1.35G + 1.5S / wind ' +
     '/ crane combinations vs fjd = 2/3 × 1.5 × fcd (C25/30, fcd 16.7 N/mm²) over the whole plate area, anchor tension (uplift shared by ' +
     'all bolts vs 0.9 fub As / 1.25) and bolt shear + tension interaction (shear αbc fub As / 1.25 with αbc = 0.44 − 0.0003 fyb, threads ' +
-    "in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), always grade 8.8. Fixed column bases (base plates with fixity 'fixed', " +
+    "in the shear plane, EN 1993-1-8 §6.2.2(7); Ft/1.4), property class boltClass (default 8.8, reported in data.defaulted). Fixed column bases (base plates with fixity 'fixed', " +
     'add_portal_frame_building columnBase) add the base moment: bearing eccentricity e = (M + H·lever) / (V + W), an overturning EQU row ' +
     "(stabilising 0.9G·B/2 vs destabilising moment) and a 'base plate M+N' row (concrete bearing block fjd, tension anchor bolts Ft = " +
     '(M − N zc)/z, plate bending; EN 1993-1-8 §6.2.8 simplified; design_portal_frames sizes the plate). Simplifications: pinned bases ' +
@@ -59,7 +62,7 @@ export const foundationCheck = defineCommand({
     const { soilBearing, soilModulus } = soil;
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `check_foundations failed: ${resolved.reason}.`);
-    const { loads, levelId } = resolved;
+    const { loads, levelId, defaulted } = resolved;
     const tieCapacity = params.tieCapacity ?? DEFAULT_TIE_CAPACITY;
     if (tieCapacity <= 0) return noop(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
     const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
@@ -83,11 +86,11 @@ export const foundationCheck = defineCommand({
     return report(
       doc,
       `Checked ${footings} footing(s) and ${plates} base plate(s) on level '${levelId}' ` +
-        `(${describeLoads(loads)}, soil ${soilBearing} kPa, Es ${soilModulus} MPa, ${thrustTie ? `thrust taken by a tie / slab (capacity ${tieCapacity} kN)` : 'thrust resisted by pad friction'}): ${rows.length} check(s), ` +
+        `(${describeLoads(loads)}, ${describeBolts(loads, defaulted)}, soil ${soilBearing} kPa, Es ${soilModulus} MPa, ${thrustTie ? `thrust taken by a tie / slab (capacity ${tieCapacity} kN)` : 'thrust resisted by pad friction'}): ${rows.length} check(s), ` +
         (unchecked > 0 ? `${unchecked} footing(s) not checked (no analysed frame column, e.g. gable posts); ` : '') +
         `max utilisation ${round(worstRow.utilisation)} (${worstRow.column} ${worstRow.check}, ${worstRow.combination}); ` +
         failureSummary(failures, (row) => `${row.column} ${row.check}`, 'all OK (no reinforcement check).'),
-      { rows, csv, maxUtilisation: worstRow.utilisation, failures: failureIds },
+      { rows, csv, maxUtilisation: worstRow.utilisation, failures: failureIds, defaulted },
     );
   },
 });

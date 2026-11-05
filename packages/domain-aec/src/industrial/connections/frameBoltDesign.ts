@@ -14,6 +14,7 @@ export function sizeBoltGroups(
   initial: BuildingModel,
   rows: ReadonlyArray<CheckRow>,
   targetUtilisation: number,
+  boltClass: string,
 ): { building: BuildingModel; changes: string[]; changed: string[]; limited: boolean } {
   let building = initial;
   const changes: string[] = [];
@@ -41,7 +42,7 @@ export function sizeBoltGroups(
           }
           const trialBuilding = withElement(building, trial);
           for (const forces of row.forces ?? []) {
-            const verdict = connectionCheck(doc, trialBuilding, trial, forces.moment, forces.shear);
+            const verdict = connectionCheck(doc, trialBuilding, trial, forces.moment, forces.shear, boltClass);
             if (verdict === null) {
               feasible = false;
               break;

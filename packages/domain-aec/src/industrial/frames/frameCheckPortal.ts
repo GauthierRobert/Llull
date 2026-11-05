@@ -4,11 +4,13 @@ import { noop, report } from '@core/commands/noop';
 import { checkFrames } from './frameCheckFrames';
 import { round } from '../../shared/numeric';
 import { checkTable, failureSummary } from '../reports/checkReport';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
+import { BOLT_CLASS_SHAPE, describeBolts, describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 
 /**
  * @affects none; data = { rows: CheckRow[], csv, maxUtilisation, failures, combinations, alphaCritical }
  * @failure negative loads / unknown level / no frame -> no data
+ * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op; STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE / STL_BOLT_SIZE_NONSTANDARD -> the row fails (utilisation 99), never passes
+ * @invariant boltClass omitted -> 8.8, listed in data.defaulted and named in the summary
  */
 export const checkPortalFrames = defineCommand({
   name: 'check_portal_frames',
@@ -22,15 +24,15 @@ export const checkPortalFrames = defineCommand({
     'the brackets; combinations C / C5 with the crane at the left or right rail), with sway imperfections and Horne αcr per storey (all ' +
     'moments amplified by 1/(1−1/αcr) when αcr < 10). Checks: member cross-section (EN 1993-1-1 §6.2), flexural buckling with N–M ' +
     'interaction and lateral-torsional buckling (§6.3; columns full height, LTB between side rails, rafters between purlins, compression ' +
-    'flanges assumed fly-braced at purlins / rails), frame sway stability (αcr ≥ 3), end-plate bolt groups (EN 1993-1-8, grade 8.8) and ' +
+    'flanges assumed fly-braced at purlins / rails), frame sway stability (αcr ≥ 3), end-plate bolt groups (EN 1993-1-8, property class boltClass, default 8.8 reported as defaulted) and ' +
     'SLS deflections (rafters span/200 under snow, eaves h/150 under wind, rail level h/400 under crane). Returns the worst utilisation ' +
     'per element; values > 1 fail. Bracing, foundations and crane runway beams are checked by check_bracing, check_foundations and ' +
     'check_crane_runways. To resize failing sections use design_portal_frames (same loads; this command never modifies the model). A preliminary design check, not a substitute for the engineer of record.',
-  params: z.object(FRAME_LOAD_SHAPE),
+  params: z.object({ ...FRAME_LOAD_SHAPE, ...BOLT_CLASS_SHAPE }),
   run: (doc, params): CommandResult => {
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `check_portal_frames failed: ${resolved.reason}.`);
-    const { loads, levelId } = resolved;
+    const { loads, levelId, defaulted } = resolved;
     const { rows, frames, skipped, combinations, minAlphaCritical } = checkFrames(doc, levelId, loads);
     if (frames === 0) {
       return noop(
@@ -56,7 +58,7 @@ export const checkPortalFrames = defineCommand({
     );
     return report(
       doc,
-      `Checked ${frames} frame(s), ${rows.length} check(s) over ${combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
+      `Checked ${frames} frame(s), ${rows.length} check(s) over ${combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}, ${describeBolts(loads, defaulted)}): ` +
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'} ${worst?.kind ?? ''}, ${worst?.frame ?? '—'}, ${worst?.combination ?? '—'}); ` +
         `min αcr ${Number.isFinite(minAlphaCritical) ? round(minAlphaCritical, 1) : '—'}; ` +
         failureSummary(
@@ -72,6 +74,7 @@ export const checkPortalFrames = defineCommand({
         failures: [...new Set(failures.map((row) => row.elementId))],
         combinations,
         alphaCritical: Number.isFinite(minAlphaCritical) ? minAlphaCritical : null,
+        defaulted,
       },
     );
   },

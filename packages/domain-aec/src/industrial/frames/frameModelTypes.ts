@@ -106,6 +106,8 @@ export interface FrameLoads {
   readonly craneCapacity?: number;
   /** Crane model overrides (EN 1991-3); undefined fields take the defaults of `craneActions`. */
   readonly craneModel?: CraneModel;
+  /** Bolt property class of the connection and anchor bolt checks (4.6 … 10.9); undefined = default class. */
+  readonly boltClass?: string;
 }
 
 /** Simplified external pressure coefficients of the walls (EN 1991-1-4 zones D / E). Roofs: `windCoefficients.ts`. */
