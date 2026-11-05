@@ -51,7 +51,7 @@ export const clearDocument = defineCommand({
     'Preserves units, camera, displayPrecision and kernelSettings (modeling tolerances) so view framing and tolerances survive. ' +
     'Set keepLayers=true to also preserve layers and the active layer scheme; ' +
     'by default layers are reset to a single default "Layer 0".',
-  annotations: { destructive: true },
+  annotations: { destructive: true, layerManagement: true },
   params: z.object({
     keepLayers: z
       .boolean()

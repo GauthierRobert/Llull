@@ -280,8 +280,9 @@ describe('catalogue sheet refusals', () => {
     [
       'a prototype key in columns',
       'family,type,standard,size\nf,pipe,ASME B36.10M,NPS 2\n',
+      // The engine refuses an own __proto__ key before validation (zod would drop it, so the command never sees it).
       JSON.parse('{"columns":{"__proto__":"family"}}') as Record<string, unknown>,
-      'PSC_CATALOG_INVALID',
+      'CMD_RESERVED_ID',
       'columns',
     ],
     [

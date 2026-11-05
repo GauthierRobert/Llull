@@ -5,6 +5,7 @@ import type { CommandDefinition, CommandResult, ExecutionContext, ParamsSchema }
 import { isReservedKey } from '../lib/reservedKey';
 import { formatIssues, issuePaths } from './schema';
 import { derivationViolation } from './derivation';
+import { layerLockViolation } from './layerLock';
 import { pluginGuards } from '../plugins/host';
 import { commandError, rejection } from './noop';
 import { errorMessage } from '../lib/errorMessage';
@@ -29,6 +30,35 @@ function hasMalformedPosition(entity: unknown): boolean {
   if (typeof entity !== 'object' || entity === null) return false;
   const position = (entity as { position?: unknown }).position;
   return position !== undefined && (!Array.isArray(position) || position.length !== 3);
+}
+
+const MAX_PARAM_DEPTH = 64;
+const TOO_DEEP = Symbol('params nested too deeply');
+
+/**
+ * Dotted path of the object that owns a `__proto__` key (JSON.parse creates it as an own key), TOO_DEEP when nesting exceeds MAX_PARAM_DEPTH, or null.
+ * zod drops such a key from the parsed output, so the command would never see it: refuse it before validation instead. Arrays are walked by
+ * index and primitive elements are skipped (a mesh payload holds millions of numbers).
+ */
+function ownProtoKeyPath(value: unknown, path = '', depth = 0): string | typeof TOO_DEEP | null {
+  if (typeof value !== 'object' || value === null) return null;
+  if (depth > MAX_PARAM_DEPTH) return TOO_DEEP;
+  const child = (key: string): string => (path === '' ? key : `${path}.${key}`);
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const element: unknown = value[index];
+      if (typeof element !== 'object' || element === null) continue;
+      const found = ownProtoKeyPath(element, child(String(index)), depth + 1);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, '__proto__')) return path;
+  for (const key of Object.keys(value)) {
+    const found = ownProtoKeyPath((value as Record<string, unknown>)[key], child(key), depth + 1);
+    if (found !== null) return found;
+  }
+  return null;
 }
 
 /** Param keys whose string values are looked up as keys in document records (ids). */
@@ -101,6 +131,7 @@ export function corruptionReason(entity: unknown): string | null {
  * @failure run throws (warned with stack), id-like params equal an Object.prototype key
  * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
  * components or a non-Vec3 position -> no-op, affected:[]
+ * @failure the result adds, changes or removes an entity on a layer locked in the input document -> no-op, LAYER_LOCKED (unless annotations.layerManagement, ctx.replaying, or plugin-derived entities)
  * @failure a top-level param key the schema does not declare -> rejected: unknown param 'k' (closest declared key suggested), CMD_UNKNOWN_PARAM (unless annotations.metadataKeys: tolerated, stripped)
  * @invariant non-object params are coerced to {} so field destructuring cannot throw;
  * a 2-number `position` is padded to [x, y, 0]; free-text params are never rejected
@@ -122,8 +153,22 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
       `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
       commandError('CMD_RESERVED_ID', 'Use an id that is not a JavaScript property name (constructor, __proto__, toString, …).'),
     );
+  const protoPath = ownProtoKeyPath(safeParams);
+  if (protoPath === TOO_DEEP)
+    return rejection(
+      doc,
+      `${def.name} rejected: params nested too deeply (more than ${MAX_PARAM_DEPTH} levels). Document unchanged.`,
+      commandError('CMD_INVALID_PARAMS', 'Flatten the params: no object or array may nest more than 64 levels deep.'),
+    );
+  if (protoPath !== null)
+    return rejection(
+      doc,
+      `${def.name} rejected: params carry a "__proto__" key at ${protoPath || '(params)'}; validation would drop it silently. Use a different key.`,
+      commandError('CMD_RESERVED_ID', 'Remove the "__proto__" key from the params.', [], [protoPath || '(params)']),
+    );
   const unknownKeys = unknownParamsRejection(def, doc, safeParams);
   if (unknownKeys !== null) return unknownKeys;
+  let parsedParams: unknown = safeParams;
   if (def.paramsValidator) {
     let checked: ReturnType<typeof def.paramsValidator.safeParse>;
     try {
@@ -142,10 +187,11 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
         `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
         commandError('CMD_INVALID_PARAMS', invalidParamsFix(def.name, issuePaths(checked.error)), [], issuePaths(checked.error)),
       );
+    parsedParams = checked.data;
   }
   let result: CommandResult;
   try {
-    result = def.run(doc, safeParams, ctx);
+    result = def.run(doc, parsedParams, ctx);
   } catch (error) {
     const reason = warnAndDescribe(`command '${def.name}' threw:`, error);
     return rejection(
@@ -162,6 +208,8 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
       violation.error ??
         commandError('CMD_DERIVED_GEOMETRY', 'Edit the domain object that derives this geometry instead of the derived entities.'),
     );
+  const locked = layerLockViolation(def, doc, result.document, ctx);
+  if (locked !== null) return rejection(doc, locked.summary, locked.error);
   if (result.document !== doc) {
     for (const id of result.affected) {
       const reason = corruptionReason(result.document.entities[id]);

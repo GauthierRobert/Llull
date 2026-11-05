@@ -12,7 +12,12 @@ import { runWithFullMeshes } from './meshAssetView';
  *   query feeds another command's result (an archive, an anchor), so it refuses MESH_ASSET_LOD_ONLY like a command that writes
  */
 export function runCommand(def: CommandDefinition<unknown>, doc: CadDocument, params: unknown, ctx: ExecutionContext): CommandResult {
-  const inner: ExecutionContext = ctx.nested === true ? ctx : { ...ctx, nested: true };
+  const inner: ExecutionContext = {
+    ...ctx,
+    nested: true,
+    lockJudgedByCaller: ctx.judgesNestedLocks === true,
+    judgesNestedLocks: def.annotations?.layerManagement !== true && ctx.replaying !== true,
+  };
   const run = (): CommandResult => {
     const reads = def.annotations?.readsMeshTriangles;
     if (reads === undefined || reads === false) return def.run(doc, params, inner);
@@ -22,5 +27,5 @@ export function runCommand(def: CommandDefinition<unknown>, doc: CadDocument, pa
     const degradable = def.annotations?.readOnly === true && def.annotations.writesArtifact !== true && ctx.nested !== true;
     return runWithFullMeshes(doc, def.name, params, inner, whole, degradable, (view) => def.run(view, params, inner));
   };
-  return inner === ctx ? run() : runInContext(inner, run);
+  return runInContext(inner, run);
 }

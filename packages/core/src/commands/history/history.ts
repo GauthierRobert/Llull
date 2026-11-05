@@ -169,7 +169,7 @@ export const editStepParams = defineCommand({
   params: z.object({
     stepId: z.string().describe('Id of the FeatureStep whose params are to be replaced (from doc.featureHistory[*].id).'),
     params: z
-      .object({})
+      .looseObject({})
       .describe(
         'New params object for the step. Must be compatible with the command named in the step ' +
           '(i.e. a valid params object for step.name). The document is regenerated after replacement.',
@@ -277,7 +277,7 @@ export const insertStep = defineCommand({
         'Registry command name (snake_case) for the new step, e.g. "add_box". ' +
           'Must be a known command name; unknown names are stored but skipped during replay.',
       ),
-    params: z.object({}).describe('Params object for the command named in `name`. Must be compatible with that command.'),
+    params: z.looseObject({}).describe('Params object for the command named in `name`. Must be compatible with that command.'),
     label: z.string().optional().describe('Optional human/AI-readable label for this step, e.g. "Base plate".'),
   }),
   annotations: { metaHistory: true },

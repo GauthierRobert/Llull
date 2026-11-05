@@ -272,12 +272,13 @@ export function untypedArray(description: string): z.ZodArray<z.ZodAny> {
 }
 
 /**
- * Advertise `schema` to agents but never reject at runtime: `run` receives the raw value and keeps
- * its own fallback (e.g. a malformed rotation falls back to [0, 0, 0]). Use only where the command
- * already tolerated bad input before the zod migration.
+ * Advertise `schema` to agents but never reject at runtime: an invalid value reaches `run` unchanged (the parsed
+ * output keeps the raw input) and `run` keeps its own fallback or refusal (e.g. a malformed rotation falls back to
+ * [0, 0, 0]), so `run` must read it as `unknown`. Use only where the command already tolerated bad input before the
+ * zod migration.
  */
 export function tolerant<T extends z.ZodType>(schema: T): z.ZodCatch<T> {
-  return schema.catch(undefined as never);
+  return schema.catch((context) => context.value as never);
 }
 
 /** Optional hex-color param; `defaultColor` is advertised in the description and applied by `run`. */
