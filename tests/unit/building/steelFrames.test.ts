@@ -464,7 +464,7 @@ describe('member rows of a frame', () => {
     const channel = check2(portal({ base: 'fixed', columnProfile: 'UPN200' }));
     expect(rowOf(channel, 'SC1').analysed).toBe(false);
     expect(rowOf(channel, 'SC1').detail).toContain('not covered');
-    const slender = withMember(portal({ base: 'fixed' }), 'SC1', { profile: 'CHS139.7x5', material: 'S960' });
+    const slender = withMember(portal({ base: 'fixed' }), 'SC1', { profile: 'IPE600', material: 'S460' });
     const class4 = rowOf(check2(slender), 'SC1');
     expect(class4.analysed).toBe(false);
     expect(class4.detail).toContain('class 4');

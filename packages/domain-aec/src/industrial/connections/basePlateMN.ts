@@ -3,9 +3,11 @@
  * bolts on the other, plate bending, and a catalogue sizing.
  */
 
-import { anchorBoltResistance } from '../steelDesign/steelDesign';
+import { anchorBoltResistance, isBoltRefusal } from '../steelDesign/steelBolts';
+import { isSteelRefusal, steelStrength } from '../steelDesign/steelGrades';
 import { FCD } from '../foundations/footingModel';
 import { MAX_UTILISATION } from '../foundations/foundationModel';
+import { refusedFields, type RowRefusal } from '../common/utilisation';
 import { bisect } from '@lib/bisect';
 
 const CONCENTRATION_FACTOR = 1.5;
@@ -34,6 +36,14 @@ interface PlateMnCheck {
   readonly bearingLength: number;
   readonly requiredThickness: number;
   readonly check: string;
+  /** Named refusal (STL_*) when the grade, thickness, bolt class or bolt size was refused: the plate was not checked. */
+  readonly refusal?: RowRefusal;
+}
+
+/** Plate steel grade and anchor bolt property class a plate is checked with. */
+export interface PlateBasis {
+  readonly grade: string;
+  readonly boltClass: string;
 }
 
 /** Distance of the bolt columns from the plate centre along the length (as laid out in plateLayout). */
@@ -52,8 +62,21 @@ function boltOffsets(geometry: PlateMnGeometry): number[] {
  * distance between the bolt lines, and plate bending (cantilever beyond the flange, t ≥ c √(3 fjd / fy), and bolt prying lever of the
  * tension row).
  */
-export function checkPlateMN(geometry: PlateMnGeometry, normal: number, moment: number, yieldStrength: number): PlateMnCheck {
+export function checkPlateMN(geometry: PlateMnGeometry, normal: number, moment: number, basis: PlateBasis): PlateMnCheck {
   const { length, width, thickness, boltDiameter, columnDepth } = geometry;
+  const strength = steelStrength(basis.grade, thickness);
+  const anchor = anchorBoltResistance(boltDiameter, basis.boltClass);
+  const refused = (refusal: RowRefusal): PlateMnCheck => ({
+    ...refusedFields(refusal),
+    boltTension: 0,
+    boltLimit: 0,
+    bearingLength: 0,
+    requiredThickness: 0,
+    check: `not checked — ${refusal.message}`,
+  });
+  if (isSteelRefusal(strength)) return refused(strength);
+  if (isBoltRefusal(anchor)) return refused(anchor);
+  const yieldStrength = strength.fy;
   const [axial, bending] = [normal * 1000, Math.abs(moment) * 1e6];
   const offsets = boltOffsets(geometry).filter((offset) => offset > 1e-6);
   const boltsPerSide = 2 * offsets.length;
@@ -80,7 +103,7 @@ export function checkPlateMN(geometry: PlateMnGeometry, normal: number, moment: 
     bearing = (axial + tension) / (bearingForce * maxBlock);
   }
   const perBolt = boltsPerSide > 0 ? tension / boltsPerSide : tension > 0 ? Number.POSITIVE_INFINITY : 0;
-  const boltLimit = anchorBoltResistance(boltDiameter).tension;
+  const boltLimit = anchor.tension;
   const boltRatio = perBolt / boltLimit;
   const overhang = Math.max(0, (length - columnDepth) / 2);
   const compressionLength = Math.min(block, overhang);
@@ -142,9 +165,9 @@ export interface PlateDemand {
 export function sizeBasePlate(
   column: { readonly depth: number; readonly width: number },
   demands: ReadonlyArray<PlateDemand>,
-  yieldStrength: number,
+  basis: PlateBasis,
   target = 1,
-): { sizing: PlateSizing; passes: boolean } {
+): { sizing: PlateSizing; passes: boolean; refusal?: string } {
   let best: { sizing: PlateSizing; worst: number } | null = null;
   for (const sizing of CATALOGUE) {
     const geometry: PlateMnGeometry = {
@@ -158,7 +181,10 @@ export function sizeBasePlate(
     const columns = sizing.boltCount / 2;
     const edge = Math.max(2 * sizing.boltDiameter, 40);
     if (columns > 1 && (geometry.length - 2 * edge) / (columns - 1) < MIN_PITCH_FACTOR * sizing.boltDiameter) continue;
-    const worst = Math.max(0, ...demands.map((demand) => checkPlateMN(geometry, demand.normal, demand.moment, yieldStrength).utilisation));
+    const checks = demands.map((demand) => checkPlateMN(geometry, demand.normal, demand.moment, basis));
+    const refusal = checks.find((check) => check.refusal !== undefined)?.refusal;
+    if (refusal !== undefined) return { sizing, passes: false, refusal: refusal.message };
+    const worst = Math.max(0, ...checks.map((check) => check.utilisation));
     if (worst <= target) return { sizing, passes: true };
     if (best === null || worst < best.worst) best = { sizing, worst };
   }

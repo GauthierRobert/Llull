@@ -3,6 +3,7 @@ import type { CadDocument } from '@core/model/types';
 import type { BaseReaction } from '../frames/frameModelSolve';
 import type { LoadCase } from '../frames/frameModelTypes';
 import { toMetres } from '@core/model/units';
+import type { RowRefusal } from '../common/utilisation';
 
 export interface FoundationRow {
   /** Column mark. */
@@ -17,6 +18,8 @@ export interface FoundationRow {
   readonly unit: string;
   readonly utilisation: number;
   readonly combination: string;
+  /** Set when the row's input (anchor class / size, plate grade / thickness) was refused: the row was not computed. */
+  readonly refusal?: RowRefusal;
 }
 
 export interface ClayLayer {

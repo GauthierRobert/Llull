@@ -4,15 +4,15 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { elementAffected } from '../../building/model';
-import { failingRows, maxUtilisation } from '../common/utilisation';
+import { failingRows, maxUtilisation, refusedRows, type UtilisationRow } from '../common/utilisation';
 
 const LIMITED_NOTE = 'largest available size reached for some elements';
 
-type UtilisationStats = { maxUtilisation: number; failures: number };
+type UtilisationStats = { maxUtilisation: number; failures: number; refusedCount: number };
 
-/** Maximum utilisation and number of rows above 1. */
-export function utilisationStats(rows: ReadonlyArray<{ utilisation: number }>): UtilisationStats {
-  return { maxUtilisation: maxUtilisation(rows), failures: failingRows(rows).length };
+/** Maximum computed utilisation, number of computed rows above 1 and number of refused rows (never part of the other two). */
+export function utilisationStats(rows: ReadonlyArray<UtilisationRow>): UtilisationStats {
+  return { maxUtilisation: maxUtilisation(rows), failures: failingRows(rows).length, refusedCount: refusedRows(rows).length };
 }
 
 /**
@@ -22,13 +22,15 @@ export function utilisationStats(rows: ReadonlyArray<{ utilisation: number }>): 
 export function noChangeResult(
   doc: CadDocument,
   subject: string,
-  rows: ReadonlyArray<{ utilisation: number }>,
+  rows: ReadonlyArray<UtilisationRow>,
   limited: boolean,
 ): CommandResult {
   const stats = utilisationStats(rows);
+  const codes = [...new Set(refusedRows(rows).map((row) => row.refusal?.code))].join(', ');
+  const refusedNote = stats.refusedCount > 0 ? `${stats.refusedCount} row(s) not designed — ${codes} (refused, not checked); ` : '';
   return report(
     doc,
-    `Designed ${subject}: no change needed (max utilisation ${stats.maxUtilisation.toFixed(2)}${limited ? `; ${LIMITED_NOTE}` : ''}).`,
+    `Designed ${subject}: ${refusedNote}no change needed (max utilisation ${stats.maxUtilisation.toFixed(2)}${limited ? `; ${LIMITED_NOTE}` : ''}).`,
     { changes: [], ...stats },
   );
 }
@@ -48,6 +50,6 @@ export function designResult(
 export function finalUtilisationText(stats: UtilisationStats, failingNoun: string, limited: boolean): string {
   return (
     'Max utilisation now ' +
-    `${stats.maxUtilisation.toFixed(2)}${stats.failures > 0 ? `, ${stats.failures} ${failingNoun} still failing` : ''}${limited ? ` (${LIMITED_NOTE})` : ''}.`
+    `${stats.maxUtilisation.toFixed(2)}${stats.failures > 0 ? `, ${stats.failures} ${failingNoun} still failing` : ''}${stats.refusedCount > 0 ? `, ${stats.refusedCount} ${failingNoun} refused (not checked)` : ''}${limited ? ` (${LIMITED_NOTE})` : ''}.`
   );
 }

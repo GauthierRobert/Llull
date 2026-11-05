@@ -7,7 +7,7 @@ import { type ClayLayer, type FoundationRow } from '@aec/industrial/foundations/
 import { foundationCheck } from '@aec/industrial/foundations/foundationCheckRun';
 import { consolidationSettlement } from '@aec/industrial/foundations/foundationSettlement';
 import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
-import { anchorBoltResistance, boltResistance } from '@aec/industrial/steelDesign/steelDesign';
+import { anchorBoltResistance, boltResistance } from '@aec/industrial/steelDesign/steelBolts';
 import { mapElements } from './elementEdits';
 import { expectNoOp } from '../../helpers/expectNoOp';
 
@@ -128,12 +128,12 @@ describe('check_foundations', () => {
 
 describe('foundation check review fixes', () => {
   it('uses M24 8.8 anchor shear alpha_bc = 0.44 - 0.0003 fyb', () => {
-    const resistance = anchorBoltResistance(24);
+    const resistance = anchorBoltResistance(24) as { tension: number; shear: number };
     expect(resistance.shear).toBeCloseTo((0.248 * 800 * 353) / 1.25, 6);
     expect(resistance.tension).toBeCloseTo((0.9 * 800 * 353) / 1.25, 6);
-    expect(resistance.shear).toBeLessThan(boltResistance(24).shear);
-    expect(anchorBoltResistance(24, 99)).toEqual(resistance);
-    expect(anchorBoltResistance(24, 10.9).tension).toBeGreaterThan(resistance.tension);
+    expect(resistance.shear).toBeLessThan((boltResistance(24) as { shear: number }).shear);
+    expect(anchorBoltResistance(24, '99')).toMatchObject({ code: 'STL_BOLT_CLASS_UNKNOWN' });
+    expect((anchorBoltResistance(24, '10.9') as { tension: number }).tension).toBeGreaterThan(resistance.tension);
   });
   it('computes the thrust tie force with 1.35G on the gravity combination', () => {
     const doc = hall();

@@ -1,0 +1,2060 @@
+{
+  "note": "Per-file ratchet of the INT-14 source scan for the files outside the check / design / analysis name tier (tests/unit/contract/fallbackInventory.test.ts). hits = scan hits not covered by a line entry in fallback_scan_allowlist.json or a pending entry of fallback_inventory.json. A file may not gain a hit (a new fallback fails the scan); when hits are fixed or allowlisted the count must be lowered. These hits were recorded, not reviewed one by one: see INT-FB-013.",
+  "entries": [
+    {
+      "file": "domain-aec/src/building/drawings/planIndustrial.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/elements/curvedWalls.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/elements/elements.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/elements/slabOpenings.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/elements/structure.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 2 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/elements/walls.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/exchange/ifcElementExport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/exchange/ifcStep.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/geometry/curvedWallGeometry.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/geometry/stairGeometry.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/quantities/costing.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/building/quantities/takeoffBasics.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/alignment/alignmentGeometry.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/alignment/superelevation.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/civilCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/crs/crsCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainageCommands.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainageFlow.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainageHgl.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainageLongSectionCommand.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainageLongSectionSvg.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainageNetwork.ts",
+      "hits": 9,
+      "reason": "recorded at the INT-14 scan extension: 9 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainagePipeCommands.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainageSizing.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/earthworks/earthworksCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/earthworks/platformDaylight.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/exchange/civilDxf.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/exchange/landxml.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/road/corridorMesh.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/road/roadCommands.ts",
+      "hits": 7,
+      "reason": "recorded at the INT-14 scan extension: 7 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/road/roadReport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/road/roadReportCommands.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/road/roadSection.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/road/roadSuperelevationCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/road/roadSvg.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/sheets/civilSheetCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/sheets/planProfileSheet.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/surface/delaunay.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/surface/tin.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/civil/survey/surveyCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/anchorPlan/anchorPlanLayout.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/clash/clash.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/common/memberSupport.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/connections/connectionSupport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/connections/plates.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/connections/plateSupport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/equipment/equipment.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameLoadParams.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameLoads.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameModelFrames.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameModelTypes.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/framing/gridFramingCommands.ts",
+      "hits": 7,
+      "reason": "recorded at the INT-14 scan extension: 7 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/framing/memberSteelCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/piping/pipeHydraulics.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/piping/pipeSpans.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/piping/pipeSupportAttach.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/piping/pipeSupportMember.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/piping/pipeSupports.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/piping/supportParts.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/piping/supportSchedule.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/portal/portal.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/portal/portalInputs.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/purlins/purlinWind.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelAreaLoads.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelFrameModel.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelFrameSolve.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelFraming.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelMemberBars.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelRackReport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/bundled.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/commands/engineering.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/familySchemas.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/file.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/nominal.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/rules.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/sectionProperties.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/shapes/flanged.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/shapes/geometry.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/sheetImport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/common/pipeCentrelines.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/commands/plantDataTable.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/commands/plantReport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/commands/renumberTags.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/importTable/importDiff.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/plantReports/equipmentList.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/plantReports/inferNozzles.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/plantReports/lineList.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/plantReports/modelledNozzles.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/plantReports/mto.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/plantReports/mtoItems.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/properties.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/data/units.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/display/addPipeMarkers.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/codecheck/tankShell.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/addVessel.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/exchangerParams.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/newEquipment.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/nozzleParams.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/pumpParams.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/tankParams.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/tankShellThickness.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/vesselParams.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/geometry/exchangerFrame.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/geometry/exchangerMass.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/geometry/legacyOthers.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/geometry/planStubs.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/geometry/tankFrame.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/geometry/vesselCog.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/geometry/vesselMass.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/bom.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/commands/addFieldWeld.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/commands/cutListCommand.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/commands/exportPipingGa.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/commands/splitSpools.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/commands/weldList.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/ga/pipingGa.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/iso/isoGraph.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/iso/isoLayout.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/iso/isoRender.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/iso/isoSheet.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/iso/isoSheets.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/iso/isoSkew.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/iso/isoSymbols.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/iso/isoTables.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/legacyNetwork.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/pcf/pcfLexer.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/pcf/pcfRead.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/routeImport/importRoute.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/routeImport/plan.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/spools.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/supports.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/welds.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/authoring/classes.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/checks/ruleConsistency.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/commands/addPidEquipment.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/commands/exportPidSvg.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/commands/renumberPidLines.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/dexpi/proteusContext.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/dexpi/proteusRead.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/dexpi20/from20Diagram.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/dexpi20/names20.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/dexpi20/to20.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/dexpi20/to20Diagram.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/pid/link3d/sequence.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/autoRoute/lines.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/autoRoute/obstacles.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/autoRoute/problem.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/clashBodies.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/commands/convertPipeRun.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/commands/editRoute.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/commands/inlineComponents.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/commands/lineHeatLoss.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/fittings.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/graph.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/heatLoss.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/ports.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/routeBranch.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/routeInline.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/routeParts.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/runCarrier.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/takeoff.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/spec/file.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/code/codeStress.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/code/sif.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/commands/analyze.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/commands/conditions.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/commands/guidedCantilever.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/commands/restraints.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/commands/thermalGrowth.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/model/build.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/model/layout.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/model/restraints.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/model/sources.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/report/overlay.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/stress/solve/primitives.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/access/graph/surfaces.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/assembly/assemblyParts.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/grating/addGrating.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/grating/gratingMeasure.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/ladder/boxFootprint.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/ladder/ladderClearance.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/ladder/ladderDefaults.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/ladder/ladderGate.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/ladder/ladderMeasure.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/platform/addAccessPlatform.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/platform/platformMeasure.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/quantities/accessTakeoff.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/rack/rackMeasure.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/railing/addRailing.ts",
+      "hits": 8,
+      "reason": "recorded at the INT-14 scan extension: 8 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/railing/railingDefaults.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/railing/railingValidate.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/stair/addSteelStair.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/stair/steelStairMeasure.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/stair/updateSteelStair.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/cloudOverlay.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/compareCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/cropCommands.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/extractionCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/fitCommands.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/queryCommands.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/region.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/registrationQuery.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/sliceCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/scan/traceCommand.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/shared/briefList.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aec/src/steel/profiles.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/aeroDragCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/airfoilCommands.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/atmosphereCommand.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/dragBuildupCommand.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/roadLoadBassett.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/roadLoadRun.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/vlmLoads.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/vlmModel.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/aerodynamics/wingCommand.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/caseCommands.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/caseParams.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/flowJob.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/flowResult.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/memoryEstimate.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/prepare.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/recordCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/regime.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/selfIntersection.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/smallFeatures.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/surfaceStage.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/symmetry.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/topology.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/voxel.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/cfd/weld.ts",
+      "hits": 9,
+      "reason": "recorded at the INT-14 scan extension: 9 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/analyzeCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/ap242/part21.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/ap242/standardReader.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/cutPieces.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/derive.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/drape/net.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/drape/plyDrape.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/drape/producibility.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/drapeCommands.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/massCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/notation.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/partCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/plyBook.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/sampleCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/sandwich.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/sectionCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/composites/zoneCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fasteners/catalogCommands.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fasteners/layoutCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fasteners/partGeometry.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fasteners/placeStack.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fasteners/rowCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fasteners/selection.ts",
+      "hits": 8,
+      "reason": "recorded at the INT-14 scan extension: 8 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fasteners/stackMeasure.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fluids/compressibleCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fluids/nozzleCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fluids/nozzleDiagnostics.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/fluids/nozzleInputs.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/shared/airState.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/sheetmetal/commands/cornerRelief.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/sheetmetal/commands/flange.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/sheetmetal/convert/graph.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/sheetmetal/flangeTrim.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/sheetmetal/foldWeld.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/sheetmetal/geometry2d.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/sheetmetal/reliefOps.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/surfacing/aircraftFrame.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/surfacing/airfoilCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/surfacing/fuselageCommand.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/surfacing/fuselageMasterLines.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/surfacing/fuselageSectionAt.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/surfacing/fuselageSections.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/surfacing/openvspWing.ts",
+      "hits": 10,
+      "reason": "recorded at the INT-14 scan extension: 9 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-aero/src/surfacing/wingCommands.ts",
+      "hits": 9,
+      "reason": "recorded at the INT-14 scan extension: 8 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/analytic/formulas.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/commands/loads.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/commands/probeHistory.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/commands/report.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/commands/resultField.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/commands/resultView.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/decks/bdf/loads.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/decks/bdf/model.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/decks/loadDistribution.ts",
+      "hits": 10,
+      "reason": "recorded at the INT-14 scan extension: 10 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/decks/mechanical.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/dynamics/deck.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/dynamics/math/randomResponse.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/dynamics/math/sdof.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/dynamics/randomSetup.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/dynamics/setupCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/dynamics/srsCommand.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/dynamics/summary.ts",
+      "hits": 8,
+      "reason": "recorded at the INT-14 scan extension: 7 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/explicit/artifact.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/explicit/constraints.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/explicit/contactCommands.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/explicit/laws.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/explicit/mesh.ts",
+      "hits": 10,
+      "reason": "recorded at the INT-14 scan extension: 9 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/explicit/queries.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/explicit/shellCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fatigue/countCycles.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fatigue/evaluate.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fatigue/fatigueLife.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fatigue/feField.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fatigue/feHotspots.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fatigue/feStress.ts",
+      "hits": 8,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s), 3 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fatigue/lifeMath.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fatigue/rainflow.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 3 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fracture/damageTolerance.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fracture/growthCaseCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fracture/growthLaws.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fracture/integrate.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fracture/kQueries.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fracture/kSolutions.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/fracture/setup.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/margins/computeMargins.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/margins/plyMargins.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/margins/singularity.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/nonlinear/curves.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/nonlinear/deck.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/nonlinear/history.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/reliability/nataf.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/reliability/sampling.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/reliability/studies.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/reliability/studyCommands.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/cylindrical.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/eigenReport.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/fieldFaces.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/fieldRaster.ts",
+      "hits": 12,
+      "reason": "recorded at the INT-14 scan extension: 12 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/fields.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/fieldSurface.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/frdReader.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/op2Results.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/plotRequest.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/plotSetup.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s), 2 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/probeInterpolation.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/probes.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/restraint.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/results/vtuWriter.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/shared/target.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/shell/boxPlate.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/shell/faceLoops.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/shell/meshGeometry.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/shell/shellDeck.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/shell/shellResults.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/amplitude.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/computeViewFactors.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/deckFilmSink.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/deckStep.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/heatBalance.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/meshGeometry.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/report.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/storedEnergy.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/summary.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermal/thermalUnits.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/coupledDeck.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/distortion.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/fitAtTemperature.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/mappedField.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/mapping.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/plane.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/stackup.ts",
+      "hits": 5,
+      "reason": "recorded at the INT-14 scan extension: 5 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/tableImport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/thermomech/transientSummary.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/contours.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/derive.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/job.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/loads.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/mapping.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/rebuild.ts",
+      "hits": 8,
+      "reason": "recorded at the INT-14 scan extension: 8 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/rebuildCompliance.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/reportQuery.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/schemas.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/voxel.ts",
+      "hits": 7,
+      "reason": "recorded at the INT-14 scan extension: 7 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-cae/src/topology/widthSamples.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/connections.ts",
+      "hits": 10,
+      "reason": "recorded at the INT-14 scan extension: 10 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/cylinders.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/drives.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/engine/compareReference.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/engine/losses.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/engine/operatingPoint.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/engine/reference.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/engine/timestepConvergence.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/inspect.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/motionClearanceRun.ts",
+      "hits": 11,
+      "reason": "recorded at the INT-14 scan extension: 11 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/phaseCompare.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/plot.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/simulate.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/commands/springs.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/accuracy.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/dynamicsLoads.ts",
+      "hits": 6,
+      "reason": "recorded at the INT-14 scan extension: 6 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/energyReport.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/engine/brakeCalibration.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/engine/engineRealism.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/engineReport.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/mobility.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/motionPoses.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/periodicity.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/propellerTable.ts",
+      "hits": 10,
+      "reason": "recorded at the INT-14 scan extension: 10 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/simulationModel.ts",
+      "hits": 4,
+      "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/simulationReport.ts",
+      "hits": 3,
+      "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-dynamics/src/sim/speedTrend.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/bodyCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/graphCommand.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/latticeFacts.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/latticeProperties.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s), 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/opCommands.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/primitiveCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/primitives.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/propertiesQuery.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/sampledInputs.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/scalarCommand.ts",
+      "hits": 2,
+      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+    },
+    {
+      "file": "domain-implicit/src/sectionCommand.ts",
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 destructuring default(s); not line-reviewed, tracked by INT-FB-013"
+    }
+  ]
+}

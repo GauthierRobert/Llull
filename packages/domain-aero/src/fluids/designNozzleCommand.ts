@@ -55,6 +55,7 @@ export function raoAngles(expansionRatio: number): { entranceDeg: number; exitDe
 
 /**
  * @affects creates 1 revolution solid (the nozzle wall, axis +Z through `position`, throat at z = position, flow towards +z)
+ * @invariant every omitted design parameter (contractionRatio, convergentHalfAngleDeg, segments, lengthFraction, chamberLength, halfAngleDeg, chart angles) is listed in data.defaulted and the summary
  * @invariant inner exit radius = R_t √ε, chamber radius = R_t √ε_c; throat arcs 1.5 R_t upstream / 0.382 R_t downstream (Rao); composes revolve_profile
  * @failure non-positive sizes, bad angles, wall thicker than the downstream arc radius -> FLD_PARAM_INVALID; contour that cannot close -> FLD_CONTOUR_INVALID
  */
@@ -114,6 +115,7 @@ export const designNozzle = defineCommand({
       divergent = { shape: 'conical', halfAngle: half * RAD };
     } else {
       const fraction = params.lengthFraction ?? 0.8;
+      if (params.lengthFraction === undefined) defaulted.push('lengthFraction 0.8');
       if (!(fraction >= 0.6 && fraction <= 1)) return fail('FLD_PARAM_INVALID', 'lengthFraction must be within 0.6..1', 'lengthFraction');
       const chart = raoAngles(eps);
       if ((params.entranceAngleDeg === undefined || params.exitAngleDeg === undefined) && (chart === null || fraction !== 0.8))
@@ -131,6 +133,9 @@ export const designNozzle = defineCommand({
       divergent = { shape: 'bell', lengthFraction: fraction, entranceAngle: entrance * RAD, exitAngle: exit * RAD };
     }
     if (params.contractionRatio === undefined) defaulted.push('contractionRatio 3');
+    if (params.convergentHalfAngleDeg === undefined) defaulted.push('convergentHalfAngleDeg 30');
+    if (params.segments === undefined) defaulted.push('segments 96');
+    if (params.chamberLength === undefined) defaulted.push('chamberLength 0');
     const contour = nozzleContour({
       throatRadius: rt,
       expansionRatio: eps,

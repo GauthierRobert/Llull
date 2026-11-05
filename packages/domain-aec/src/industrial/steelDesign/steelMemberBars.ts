@@ -10,7 +10,7 @@ import { elementsOf, getBuilding } from '../../building/model';
 import type { CarrierDoc } from '../../plant/piping/runCarrier';
 import { weightKnPerMetre } from '../../shared/numeric';
 import { findProfile, sectionProperties, type SteelProfile } from '../../steel/profiles';
-import { yieldStrength } from './steelDesign';
+import { isSteelRefusal, memberStrength } from './steelGrades';
 import { distance3 } from '@lib/vec3';
 
 type BarKind = 'column' | 'beam' | 'brace' | 'skipped';
@@ -115,7 +115,11 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
     const end = point(element.end);
     const length = distance3(end, start);
     const profile = findProfile(element.profile) ?? null;
-    const { kind, reason } = classify(element.role, profile, element.profile, length, end[2] - start[2]);
+    const classified = classify(element.role, profile, element.profile, length, end[2] - start[2]);
+    const strength = profile ? memberStrength(element.material, profile) : undefined;
+    const refusal = strength && isSteelRefusal(strength) ? strength.message : undefined;
+    const { kind, reason } =
+      classified.kind !== 'skipped' && refusal !== undefined ? { kind: 'skipped' as const, reason: refusal } : classified;
     bars.push({
       id: element.id,
       mark: element.mark,
@@ -123,7 +127,7 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
       profileName: profile?.name ?? element.profile,
       profile,
       levelId: element.levelId,
-      fy: yieldStrength(element.material),
+      fy: strength && !isSteelRefusal(strength) ? strength.fy : 0,
       start,
       end,
       length,

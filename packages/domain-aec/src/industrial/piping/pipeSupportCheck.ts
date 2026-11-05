@@ -27,6 +27,7 @@ import {
 } from './pipeSupportLayout';
 import { riserRows, type RiserRow } from './pipeSupportRiser';
 import { orphanSupports } from './pipeCarrier';
+import { defaultedClause, defaultedInputs } from '../common/defaulted';
 
 export interface PipeSupportRow {
   readonly id: string;
@@ -167,6 +168,7 @@ function rowOf(
  * @affects none; data = { ok, pipes: PipeSupportRow[], totals, csv, assumptions }
  * @invariant every pipe (of the level / line filter) has exactly one row
  * @invariant a support whose pipe or run no longer exists (a file with one loads) is listed in data.orphans with code RTE_SUPPORT_ORPHAN and makes ok false
+ * @invariant omitted spanFactor / overhangRatio -> data.defaulted and the summary
  * @failure no pipes and no orphan supports / unknown level / line without pipes / spanFactor <= 0 / overhangRatio < 0 -> no-op, no data
  */
 export const checkPipeSupports = defineCommand({
@@ -205,6 +207,7 @@ export const checkPipeSupports = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { spanFactor = 1, overhangRatio = 0.5 } = params;
+    const defaulted = defaultedInputs(params, { spanFactor, overhangRatio });
     if (!isPositiveNumber(spanFactor)) return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
     if (!isNonNegativeNumber(overhangRatio)) return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
     const unknownLevel = unknownLevelFailure(doc, 'check_pipe_supports', params.levelId);
@@ -263,6 +266,7 @@ export const checkPipeSupports = defineCommand({
           : `; ${orphans.length} orphan support(s) RTE_SUPPORT_ORPHAN: ${orphans.map((support) => `${support.mark} (pipe ${support.pipeId} gone)`).join(', ')}`) +
         (failing.length === 0 ? '' : `, ${failing.length} failing: ${list}`) +
         (unattached > 0 ? `; ${unattached} unattached support(s)` : '') +
+        (defaulted.length > 0 ? `; ${defaultedClause(defaulted)}` : '') +
         '.',
       {
         ok: failing.length === 0 && orphans.length === 0,
@@ -279,6 +283,7 @@ export const checkPipeSupports = defineCommand({
         },
         spanFactor,
         overhangRatio,
+        defaulted,
         csv,
         assumptions: ASSUMPTIONS,
       },

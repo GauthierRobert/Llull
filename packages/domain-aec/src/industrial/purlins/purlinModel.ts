@@ -1,5 +1,7 @@
 import type { Located as BracingLocated } from '../bracing/bracingModel';
 import type { RoofCoefficients, RoofZone, ZoneCpe } from '../common/windCoefficients';
+import { refusedFields, type RowRefusal } from '../common/utilisation';
+import type { SteelRefusal } from '../steelDesign/steelGrades';
 
 /** Internal pressure coefficient: +0.2 maximises uplift / suction, -0.3 maximises wall pressure. */
 export const CPI_SUCTION = 0.2;
@@ -50,6 +52,8 @@ export interface Verdict {
   readonly unit: 'kNm' | 'kN' | 'mm';
   readonly utilisation: number;
   readonly combination: string;
+  /** Set when the member's grade / thickness was refused: the row was not computed. */
+  readonly refusal?: RowRefusal;
 }
 
 /** Governing verdict of a purlin or rail. */
@@ -78,4 +82,21 @@ export interface Located extends BracingLocated {
   readonly length: number;
   readonly yMin: number;
   readonly yMax: number;
+}
+
+/** Failed row of a purlin or rail whose steel grade or governing thickness was refused (never a pass). */
+export function refusedPurlinRow(located: Located, kind: PurlinRow['kind'], refusal: SteelRefusal): PurlinRow {
+  return {
+    elementId: located.member.id,
+    mark: located.member.mark,
+    kind,
+    zone: '—',
+    span: located.length / 1000,
+    check: `${located.member.profile} not checked — ${refusal.message}`,
+    value: 0,
+    limit: 0,
+    unit: 'kN',
+    ...refusedFields(refusal),
+    combination: '—',
+  };
 }

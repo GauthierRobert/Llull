@@ -15,6 +15,8 @@ export const RAILS: Readonly<Record<RailSize, { height: number; foot: number; ma
   A100: { height: 95, foot: 200, mass: 74.3, inertia: 856e4 }, flat50x30: { height: 30, foot: 50, mass: 11.8, inertia: 11.25e4 },
 };
 
+import type { RowRefusal } from '../common/utilisation';
+
 export interface RunwayCheckRow {
   readonly elementId: string;
   readonly mark: string;
@@ -27,6 +29,8 @@ export interface RunwayCheckRow {
   readonly limit: number;
   readonly unit: string;
   readonly utilisation: number;
+  /** Set when the beam's grade / thickness was refused: the row was not computed. */
+  readonly refusal?: RowRefusal;
 }
 
 /** Bridge span (mm) when no paired runway beam is found and craneSpan is not given. */

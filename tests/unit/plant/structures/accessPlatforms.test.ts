@@ -92,6 +92,15 @@ describe('check_access: platform egress (STA_ACCESS_NO_EGRESS)', () => {
     expect(check(two, { egressRoutesRequired: 3 }).findings[0]?.measured.value).toBe(2);
   });
 
+  it('reports an omitted egressRoutesRequired (1 route) in data.defaulted and the summary (INT-14)', () => {
+    const omitted = execute(ladderAt(deck(), 3000), 'check_access', { rulesets: ISO, include: ['platforms'] });
+    expect((omitted.data as { defaulted: unknown }).defaulted).toEqual([{ input: 'egressRoutesRequired', value: 1 }]);
+    expect(omitted.summary).toContain('egressRoutesRequired 1 (defaulted)');
+    const given = execute(ladderAt(deck(), 3000), 'check_access', { rulesets: ISO, include: ['platforms'], egressRoutesRequired: 1 });
+    expect((given.data as { defaulted: unknown }).defaulted).toEqual([]);
+    expect(given.summary).not.toContain('(defaulted)');
+  });
+
   it('a ladder and a steel stair count as two routes', () => {
     const withLadder = ladderAt(deck(), 1000);
     const withStair = apply(withLadder, 'add_steel_stair', {

@@ -226,6 +226,15 @@ describe('brake calibration at declaration (VC-FPR-15, FR-FPR-72 / 78)', () => {
     expect(data.accuracy['kinematics']).toBeDefined();
   });
 
+  it('reports the 1000 rpm used for the pressure curve when no speed is given (INT-14)', () => {
+    const noSpeed = execute(doc, 'engine_quick_check', { cylinder });
+    expect((noSpeed.data as { defaulted: unknown }).defaulted).toEqual([{ input: 'rpm', value: 1000, use: 'cylinder pressure curve' }]);
+    expect(noSpeed.summary).toContain('rpm 1000 (defaulted, cylinder pressure curve)');
+    const given = execute(doc, 'engine_quick_check', { cylinder, rpm: 4000 });
+    expect((given.data as { defaulted: unknown }).defaulted).toEqual([]);
+    expect(given.summary).not.toContain('(defaulted)');
+  });
+
   it('refuses a brake target without engine losses (FPR_NO_LOSSES) and one that cannot be reached', () => {
     const plain = sliderCrank({ rMm: 30.5, lMm: 130 }).doc;
     const request = (target: Record<string, unknown>, from: CadDocument): ReturnType<typeof execute> =>
