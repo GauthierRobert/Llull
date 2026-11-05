@@ -186,7 +186,7 @@ Gates 1–4 can reuse this corpus and the Playwright harness as they are. A nigh
 
 ## Code-export oracle — `tests/unit/chamferCodegenOracle.test.ts`
 
-The exported CadQuery / build123d program of a variable or two-leg chamfer is RUN with real OCP and compared with the analytic removed volume (the value the native kernel is held to) and with absolute vertex positions. It needs a python that imports OCP, cadquery and build123d: `uv venv` + `uv pip install cadquery build123d`, then `LLULL_PYTHON=<venv>/Scripts/python.exe npx vitest run tests/unit/chamferCodegenOracle.test.ts` (about 3 minutes). Without such a python the suite is skipped with a warning; with `CI` set it fails instead.
+The exported CadQuery / build123d program of a variable or two-leg chamfer is RUN with real OCP and compared with the analytic removed volume (the value the native kernel is held to) and with absolute vertex positions. It needs a python that imports OCP, cadquery and build123d: `uv venv` + `uv pip install cadquery build123d`, then `LLULL_PYTHON=<venv>/Scripts/python.exe npx vitest run tests/unit/chamferCodegenOracle.test.ts` (about 3 minutes). Without such a python the suite is skipped (counted as `python:ocp`); a run with `LLULL_REQUIRE_TOOLS=python:ocp` fails instead (the check job of CI sets it).
 
 ## Drawing gate — `quality/drawings/`
 

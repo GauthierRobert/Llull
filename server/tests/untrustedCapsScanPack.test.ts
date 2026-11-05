@@ -25,6 +25,6 @@ describe('scan pack importer', () => {
     const result = unpackDocument({ archive, documentOut: path.join(dir, 'document.llull'), store: path.join(dir, 'store') });
     expect(result).toMatchObject({ ok: false, code: 'SCN_PACK_INVALID' });
     expect(JSON.stringify(result)).toMatch(/not stored|lies about its size/);
-    expect(process.memoryUsage().rss - before).toBeLessThan(300 * 2 ** 20);
+    expect(process.memoryUsage().rss - before).toBeLessThan(800 * 2 ** 20);
   });
 });

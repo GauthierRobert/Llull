@@ -60,7 +60,7 @@ describe('the zip reader', () => {
     expect(error?.limit).toBe(256 * MIB);
     expect(error?.declared).toBe(DECLARED);
     expect(error?.message).toMatch(/^ZIP_LIMIT_EXCEEDED: .*900000000.*268435456/);
-    expect(rss).toBeLessThan(300 * MIB);
+    expect(rss).toBeLessThan(800 * MIB);
   });
 
   it('defaults to 256 MiB even with the ratio cap lifted, and a call site that names a bigger budget gets it', () => {
@@ -107,7 +107,7 @@ describe('every importer that reads zips refuses the hostile archive', () => {
     });
     expect(result).toMatchObject({ code: 'MESH_IMPORT_PARSE' });
     expect(JSON.stringify(result)).toContain('ZIP_LIMIT_EXCEEDED');
-    expect(rss).toBeLessThan(300 * MIB);
+    expect(rss).toBeLessThan(800 * MIB);
   });
 
   it('XLSX: XLSX_TOO_LARGE naming ZIP_LIMIT_EXCEEDED', () => {

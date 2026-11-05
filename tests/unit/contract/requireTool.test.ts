@@ -1,8 +1,8 @@
-import { readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SKIP_RUN_ENV, requireTool, requireTools, skipRoot, toolFamily } from '../../requireTool';
-import { requiredFamilies, summarize } from '../../requireToolTeardown';
+import { parseRequired, summarize } from '../../requireToolTeardown';
 
 const run = `unit-${process.pid}-${Date.now()}`;
 const directory = join(skipRoot(), run);
@@ -46,7 +46,7 @@ describe('requireTool (TR-INT-13)', () => {
   });
 
   it('prints the skipped-by-tool counts and passes when no skipped tool is required', () => {
-    const result = summarize([{ tool: 'calculix', family: 'calculix' }], requiredFamilies(undefined));
+    const result = summarize([{ tool: 'calculix', family: 'calculix' }], parseRequired(undefined).entries);
     expect(result).toEqual({ line: 'skipped by tool: calculix 1, python 0, native 0', failure: null });
   });
 
@@ -55,11 +55,36 @@ describe('requireTool (TR-INT-13)', () => {
       { tool: 'calculix', family: 'calculix' },
       { tool: 'native:llull-mesh', family: 'native' },
     ] as const;
-    const result = summarize(records, requiredFamilies('calculix, python'));
+    const result = summarize(records, parseRequired('calculix, python').entries);
     expect(result.failure).toContain('TST_REQUIRED_TOOL_SKIPPED');
     expect(result.failure).toContain('calculix');
     expect(result.failure).not.toContain('llull-mesh');
-    expect(summarize(records, requiredFamilies('python')).failure).toBeNull();
-    expect(summarize(records, requiredFamilies('calculix,python,native')).failure).toContain('llull-mesh');
+    expect(summarize(records, parseRequired('python').entries).failure).toBeNull();
+    expect(summarize(records, parseRequired('calculix,python,native').entries).failure).toContain('llull-mesh');
+  });
+
+  it('records nothing when no run is active (no ad-hoc directory accumulates)', () => {
+    delete process.env[SKIP_RUN_ENV];
+    expect(requireTool('python', false)).toBe(true);
+    expect(existsSync(join(skipRoot(), 'adhoc'))).toBe(false);
+  });
+
+  it('matches an exact tool id as well as a family, and a python capability id', () => {
+    const records = [
+      { tool: 'native:llull-mesh', family: 'native' },
+      { tool: 'python:ocp', family: 'python' },
+    ] as const;
+    expect(parseRequired('native:llull-kernel').entries).toEqual(['native:llull-kernel']);
+    expect(summarize(records, parseRequired('native:llull-kernel').entries).failure).toBeNull();
+    expect(summarize(records, parseRequired('native:llull-mesh').entries).failure).toContain('native:llull-mesh');
+    expect(summarize(records, parseRequired('python:ocp').entries).failure).toContain('python:ocp');
+    expect(summarize(records, parseRequired('python').entries).failure).toContain('python:ocp');
+  });
+
+  it('reports unknown names instead of dropping them', () => {
+    expect(parseRequired('Python, calculix:x, native:, pyton,native:llull-kernel,')).toEqual({
+      entries: ['native:llull-kernel'],
+      unknown: ['Python', 'calculix:x', 'native:', 'pyton'],
+    });
   });
 });
