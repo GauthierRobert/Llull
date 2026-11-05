@@ -1,9 +1,11 @@
 /**
- * Recovery slots over REST (A-08, FR-DSF-05..07, FR-DSF-23). Host state, never a document change: restoring a slot is the UI's `load_document`
- * followed by `POST /recovery/adopt`.
+ * Recovery slots over REST (A-08, FR-DSF-05..07, FR-DSF-23). Host state, never a document change: opening or restoring a document is
+ * `hold`, then the `load_document` command, then `bind` / `adopt` (or `release` when the load failed).
  *   GET  /recovery            `{ slots: [{ ...meta, active }] }`, newest first
  *   GET  /recovery/:id        `{ meta, json }`
- *   POST /recovery/bind       `{ path: string | null, dropPrevious }` BEFORE loading another document: its autosaves go to that document's own slot
+ *   POST /recovery/hold       `{}` BEFORE loading another document: the previous slot is flushed and the load stays out of it
+ *   POST /recovery/release    `{}` the load failed: the previous document keeps its slot and takes the changes made meanwhile
+ *   POST /recovery/bind       `{ path: string | null, dropPrevious }` AFTER the load succeeded: the live document belongs to that path's slot
  *   POST /recovery/saved      `{ stateHash }` the live document equals its file: the slot is removed (no-op when the document changed since)
  *   POST /recovery/adopt      `{ id }` the live document is the restored slot `id`
  *   POST /recovery/discard    `{ id }`
@@ -15,7 +17,7 @@ import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
 import { documentHash } from '@protocol/liveSync';
-import { getLiveDoc, recoverySession, recoveryStore } from './liveDocument';
+import { getLiveDoc, publishDocumentPath, recoverySession, recoveryStore } from './liveDocument';
 import { isSlotId } from './recovery';
 import { guardMutation, guardRead } from './security';
 
@@ -37,11 +39,22 @@ export function buildRecoveryRouter(restLimiter: RequestHandler): Router {
     res.json(found);
   });
 
+  router.post('/recovery/hold', restLimiter, mutate, (_req, res) => {
+    recoverySession.hold();
+    res.json({ ok: true });
+  });
+
+  router.post('/recovery/release', restLimiter, mutate, (_req, res) => {
+    recoverySession.release();
+    res.json({ ok: true });
+  });
+
   router.post('/recovery/bind', restLimiter, mutate, (req, res) => {
     const { path: documentPath, dropPrevious } = bodyOf(req.body);
     if (documentPath !== null && (typeof documentPath !== 'string' || documentPath === ''))
       return void res.status(400).json({ error: 'path must be a file path or null.' });
     recoverySession.bind(documentPath, dropPrevious === true);
+    publishDocumentPath();
     res.json({ ok: true, slot: recoverySession.current().id });
   });
 
@@ -56,6 +69,7 @@ export function buildRecoveryRouter(restLimiter: RequestHandler): Router {
     const { id } = bodyOf(req.body);
     const meta = typeof id === 'string' && isSlotId(id) ? recoverySession.adopt(id, getLiveDoc()) : null;
     if (meta === null) return void res.status(404).json({ error: 'No such recovery slot.' });
+    publishDocumentPath();
     res.json({ ok: true, meta });
   });
 

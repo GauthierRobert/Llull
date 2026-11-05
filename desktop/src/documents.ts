@@ -20,8 +20,18 @@ interface Snapshot {
 
 export interface DocumentSession {
   readonly currentPath: () => string | null; // absolute; null = unsaved
-  /** @failure the file is locked by another writer -> DocumentLockedError (DSF_DOC_LOCKED); nothing changes */
-  open(filePath: string): Promise<void>;
+  /**
+   * @returns `warning` DSF_LOCK_UNAVAILABLE when the folder takes no lock file (the document is open without one), else null
+   * @failure the file is locked by another writer -> DocumentLockedError (DSF_DOC_LOCKED); the file is not a document -> rejects; nothing changes
+   */
+  open(filePath: string): Promise<OpenResult>;
+  /**
+   * Restore recovery slot `slotId` as the live document (`load_document`, then the backend adopts the slot). The session takes the slot's file as
+   * its path only when that file still exists, has not changed since the slot's last change and can be locked; otherwise the document is untitled
+   * and the next Save is a Save As, so a restore can never overwrite the file that was open before.
+   * @failure unknown slot or a document the load refuses -> rejects; the open document, its path, lock and recovery slot are untouched
+   */
+  restore(slotId: string): Promise<void>;
   /**
    * Save As `filePath`, or to the current path. @failure no path -> rejects; another process holds the file's lock -> DocumentLockedError
    * (DSF_DOC_LOCKED); the file changed on disk since it was opened or last saved -> SaveConflictError (DSF_SAVE_CONFLICT) unless `overwrite`
@@ -33,6 +43,10 @@ export interface DocumentSession {
   /** Replace the live document with a serialized one (Vault check-out / check-in); the result counts as saved, with no file path. */
   loadDocument(json: string): Promise<void>;
   hasUnsavedChanges(): Promise<boolean>;
+}
+
+interface OpenResult {
+  readonly warning: 'DSF_LOCK_UNAVAILABLE' | null;
 }
 
 interface SessionOptions {
@@ -51,6 +65,7 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
     if (previous !== null && previous !== next && previous.documentPath !== next?.documentPath) previous.release();
   };
   let savedHash: string | null = null;
+  const RESTORED_UNSAVED = 'restored-from-recovery'; // never equals a state hash: a restored document is unsaved
 
   const snapshot = async (): Promise<Snapshot> => {
     const { ok, status, body } = await requestJson(`${options.url}/live/snapshot`, { token: options.token, fetchImpl: options.fetchImpl });
@@ -75,36 +90,90 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
    * The backend's recovery slots (A-08). Best effort: a failure here must never stop a document operation, and the backend's own slot
    * only gets more conservative when a call is missed (a slot stays longer).
    */
-  const recovery = async (action: 'bind' | 'saved', body: unknown): Promise<void> => {
+  const recovery = async (action: 'hold' | 'release' | 'bind' | 'saved' | 'adopt', body: unknown): Promise<void> => {
     try {
       await requestJson(`${options.url}/recovery/${action}`, { body, token: options.token, fetchImpl: options.fetchImpl });
     } catch (error) {
       console.warn(`[documents] recovery ${action} failed: ${errorMessage(error)}`);
     }
   };
-  /** Called BEFORE another document is loaded: its autosaves go to that document's own slot, the previous slot is the user's call (confirmed discard). */
+  /** The live document now belongs to `documentPath`'s slot; the previous slot is dropped (the user confirmed the discard or saved). */
   const bindRecovery = (documentPath: string | null): Promise<void> => recovery('bind', { path: documentPath, dropPrevious: true });
+  /**
+   * Replace the live document: the backend keeps the load out of the previous document's recovery slot (`hold`), `finish` rebinds once the
+   * load succeeded, and a failed load (`release`) leaves the previous document bound to its own slot, intact.
+   */
+  const replacing = async (load: () => Promise<void>, finish: () => Promise<void>): Promise<void> => {
+    await recovery('hold', {});
+    try {
+      await load();
+    } catch (error) {
+      await recovery('release', {});
+      throw error;
+    }
+    await finish();
+  };
   /** The live document equals a file: its recovery slot is no longer needed. */
   const markRecoverySaved = (stateHash: string): Promise<void> => recovery('saved', { stateHash });
+
+  /** The file of a restored slot, locked, when it is still the file the slot was taken from; null otherwise (the restored document is untitled). */
+  const claimSlotFile = (slotPath: unknown, changedAt: unknown): { lock: DocumentLock; stamp: FileStamp } | null => {
+    if (typeof slotPath !== 'string') return null;
+    const stamp = stampOf(slotPath);
+    if (stamp === null || typeof changedAt !== 'string' || !(stamp.mtimeMs <= Date.parse(changedAt))) return null; // missing, or edited since
+    try {
+      return { lock: acquireDocumentLock(slotPath, 'desktop'), stamp };
+    } catch {
+      return null; // held by another process (or unwritable): never write the restored document over it
+    }
+  };
 
   return {
     currentPath: () => currentPath,
     async open(filePath) {
       const absolute = path.resolve(filePath);
       const taken = acquireDocumentLock(absolute, 'desktop');
+      let stamp: FileStamp | null;
       try {
-        loadedStamp = stampOf(absolute);
+        stamp = stampOf(absolute);
         const json = fs.readFileSync(absolute, 'utf8');
-        await bindRecovery(absolute);
-        await command('load_document', { json });
+        await replacing(
+          () => command('load_document', { json }),
+          () => bindRecovery(absolute),
+        );
       } catch (error) {
         if (taken.documentPath !== lock?.documentPath) taken.release();
         throw error;
       }
       holdOnly(taken);
       currentPath = absolute;
+      loadedStamp = stamp;
       savedHash = (await snapshot()).stateHash;
       await markRecoverySaved(savedHash);
+      return { warning: taken.warning };
+    },
+    async restore(slotId) {
+      const { ok, status, body } = await requestJson(`${options.url}/recovery/${encodeURIComponent(slotId)}`, {
+        token: options.token,
+        fetchImpl: options.fetchImpl,
+      });
+      if (!ok || !isRecord(body) || typeof body['json'] !== 'string' || !isRecord(body['meta']))
+        throw new Error(`the recovery copy cannot be read (HTTP ${status})`);
+      const json = body['json'];
+      const claimed = claimSlotFile(body['meta']['path'], body['meta']['changedAt']);
+      try {
+        await replacing(
+          () => command('load_document', { json }),
+          () => recovery('adopt', { id: slotId }),
+        );
+      } catch (error) {
+        if (claimed !== null && claimed.lock.documentPath !== lock?.documentPath) claimed.lock.release();
+        throw error;
+      }
+      holdOnly(claimed?.lock ?? null);
+      currentPath = claimed?.lock.documentPath ?? null;
+      loadedStamp = claimed?.stamp ?? null;
+      savedHash = RESTORED_UNSAVED;
     },
     async save(filePath, saveOptions) {
       const target = filePath !== undefined ? path.resolve(filePath) : currentPath;
@@ -127,8 +196,10 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       return target;
     },
     async newDocument() {
-      await bindRecovery(null);
-      await command('clear_document', {}, true);
+      await replacing(
+        () => command('clear_document', {}, true),
+        () => bindRecovery(null),
+      );
       holdOnly(null);
       currentPath = null;
       loadedStamp = null;
@@ -138,8 +209,10 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       return (await snapshot()).document;
     },
     async loadDocument(json) {
-      await bindRecovery(null);
-      await command('load_document', { json });
+      await replacing(
+        () => command('load_document', { json }),
+        () => bindRecovery(null),
+      );
       holdOnly(null);
       currentPath = null;
       loadedStamp = null;

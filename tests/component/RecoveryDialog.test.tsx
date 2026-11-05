@@ -41,6 +41,7 @@ function stubBackend(slots: RecoverySlotInfo[]): Backend {
 const connect = (): void => void act(() => useStore.setState({ liveStatus: 'connected', liveSeq: 0 }));
 
 afterEach(() => {
+  delete (window as unknown as { llull?: unknown }).llull;
   vi.unstubAllGlobals();
   useStore.setState(useStore.getInitialState(), true); // this suite runs in its own module graph: leave no connection state behind
   useRecoveryStore.setState(useRecoveryStore.getInitialState(), true);
@@ -63,6 +64,7 @@ describe('RecoveryDialog', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Restore' })[0] as HTMLElement);
     await waitFor(() => expect(backend.posts.map((p) => p.url)).toContain('/recovery/adopt'));
+    expect(backend.posts.map((p) => p.url).slice(0, 2)).toEqual(['/recovery/hold', '/recovery/adopt']); // the load stays out of the open document's slot
     const dispatch = useStore.getState().dispatch as unknown as ReturnType<typeof vi.fn>;
     expect(dispatch).toHaveBeenCalledWith('load_document', { json: '{"slot":"doc-a"}' }, expect.anything());
     expect(backend.posts.find((p) => p.url === '/recovery/adopt')?.body).toEqual({ id: 'doc-a' });
@@ -106,5 +108,54 @@ describe('RecoveryDialog', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     expect(await screen.findByText('Offline edits of A.llull')).toBeTruthy();
+  });
+});
+
+describe('RecoveryDialog restore through the desktop host (review 1)', () => {
+  const host = (outcome: { ok: boolean; message: string; cancelled: boolean }): ReturnType<typeof vi.fn> => {
+    const restoreRecovery = vi.fn(() => Promise.resolve(outcome));
+    (window as unknown as { llull: unknown }).llull = { exportThreeMf: () => Promise.resolve({}), restoreRecovery };
+    return restoreRecovery;
+  };
+
+  it('restores through the desktop session: no renderer load_document, no adopt call, the slot leaves the list', async () => {
+    const backend = stubBackend([slot('doc-a', 'A.llull', 'C:/w/A.llull')]);
+    answerDispatch({ summary: 'loaded', changed: true });
+    const restoreRecovery = host({ ok: true, message: 'Restored', cancelled: false });
+    render(<RecoveryDialog />);
+    connect();
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(restoreRecovery).toHaveBeenCalledWith('doc-a'));
+    await waitFor(() => expect(screen.queryByText('A.llull')).toBeNull());
+    expect(useSessionStore.getState().dirty).toBe(true);
+    expect(useStore.getState().dispatch).not.toHaveBeenCalled();
+    expect(backend.posts.map((p) => p.url)).not.toContain('/recovery/adopt');
+  });
+
+  it('a refused restore keeps the slot and says why; a cancelled one is silent', async () => {
+    stubBackend([slot('doc-a', 'A.llull', 'C:/w/A.llull')]);
+    const restoreRecovery = host({ ok: false, message: 'the recovery copy cannot be read', cancelled: false });
+    render(<RecoveryDialog />);
+    connect();
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(useStore.getState().lastSummary).toContain('cannot be read'));
+    expect(screen.getByText('A.llull')).toBeTruthy();
+    useStore.getState().setStatusMessage('');
+    restoreRecovery.mockResolvedValueOnce({ ok: false, message: 'Restore cancelled', cancelled: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(restoreRecovery).toHaveBeenCalledTimes(2));
+    expect(useStore.getState().lastSummary ?? '').toBe('');
+    expect(screen.getByText('A.llull')).toBeTruthy();
+  });
+
+  it('without the desktop host a refused load gives the hold back (release) and keeps the slot', async () => {
+    const backend = stubBackend([slot('doc-a', 'A.llull', 'C:/w/A.llull')]);
+    answerDispatch({ summary: 'bad', changed: false });
+    render(<RecoveryDialog />);
+    connect();
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(backend.posts.map((p) => p.url)).toContain('/recovery/release'));
+    expect(backend.posts.map((p) => p.url)).not.toContain('/recovery/adopt');
+    expect(screen.getByText('A.llull')).toBeTruthy();
   });
 });

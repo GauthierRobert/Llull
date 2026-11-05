@@ -79,6 +79,16 @@ export interface LiveStatusEvent {
   readonly autosave: LiveAutosaveStatus;
 }
 
+/**
+ * SSE `document` event (host state, NOT a document change): the file the live document belongs to (null: untitled). Sent after a snapshot when
+ * it has a path, and whenever the host rebinds the document (open / Save As / restore), so a client that later loses the backend knows which
+ * file its offline edits started from.
+ */
+export interface LiveDocumentEvent {
+  readonly epoch: string;
+  readonly path: string | null;
+}
+
 /** SSE `snapshot` event and `GET /live/snapshot` body: the full server document at `seq`. */
 export interface LiveSnapshotEvent {
   readonly epoch: string;

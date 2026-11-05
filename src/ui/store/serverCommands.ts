@@ -94,7 +94,10 @@ export function fetchRecoverySlot(id: string): Promise<{ meta: RecoverySlotInfo;
   return request(`/recovery/${encodeURIComponent(id)}`);
 }
 
-/** `adopt` (the open document is this restored slot), `discard` (drop it) or `offline` (keep edits made while the backend was unreachable). */
-export function postRecovery(action: 'adopt' | 'discard' | 'offline', body: unknown): Promise<unknown> {
+/**
+ * `hold` / `release` (a document is about to replace the open one / the load failed), `adopt` (the open document is this restored slot),
+ * `discard` (drop it) or `offline` (keep edits made while the backend was unreachable).
+ */
+export function postRecovery(action: 'hold' | 'release' | 'adopt' | 'discard' | 'offline', body: unknown): Promise<unknown> {
   return request(`/recovery/${action}`, body);
 }

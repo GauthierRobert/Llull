@@ -211,9 +211,32 @@ async function openDocument(filePath?: string): Promise<void> {
   if (target === undefined) return;
   const chosen = target;
   await guarded('Open', async () => {
-    await session?.open(chosen);
+    const opened = await session?.open(chosen);
     app.addRecentDocument(chosen);
+    if (opened?.warning === 'DSF_LOCK_UNAVAILABLE')
+      void dialog.showMessageBox({
+        type: 'warning',
+        message: 'This folder does not support lock files.',
+        detail: `DSF_LOCK_UNAVAILABLE: ${path.basename(chosen)} is open without a lock, so another llull could write it at the same time.`,
+      });
   });
+}
+
+/**
+ * Document Recovery > Restore (IPC `llull:restore-recovery`): confirm what happens to the open document, then restore the slot through the
+ * session so its path, lock and saved state follow the restored document.
+ */
+async function restoreRecovery(slotId: unknown): Promise<{ ok: boolean; message: string; cancelled: boolean }> {
+  if (session === null) return { ok: false, message: 'The backend is not running yet', cancelled: false };
+  if (typeof slotId !== 'string') return { ok: false, message: 'Refused: not a recovery copy', cancelled: false };
+  if (!(await confirmDiscard())) return { ok: false, message: 'Restore cancelled', cancelled: true };
+  try {
+    await session.restore(slotId);
+    refreshTitleAndDiscovery();
+    return { ok: true, message: 'Restored', cancelled: false };
+  } catch (error) {
+    return { ok: false, message: errorMessage(error), cancelled: false };
+  }
 }
 
 async function newDocument(): Promise<void> {
@@ -421,6 +444,11 @@ Your unsaved work is kept in the recovery folder (File > Open Data Folder).`,
     ipcSenderAllowed(event, window?.webContents ?? null, url)
       ? exportThreeMf()
       : { ok: false, message: 'Refused: the caller is not the app window' },
+  );
+  ipcMain.handle('llull:restore-recovery', (event, slotId: unknown) =>
+    ipcSenderAllowed(event, window?.webContents ?? null, url)
+      ? restoreRecovery(slotId)
+      : { ok: false, message: 'Refused: the caller is not the app window', cancelled: false },
   );
   session = createDocumentSession({ url, token });
   Menu.setApplicationMenu(

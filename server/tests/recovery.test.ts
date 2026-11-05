@@ -208,3 +208,170 @@ describe('recovery REST and supervised resume', () => {
     expect(store.list().map((slot) => slot.id)).toContain(id); // still offered to the user
   });
 });
+
+describe('replacing the open document (review 2, 4)', () => {
+  it('a held load stays out of the previous slot; a failed load (release) keeps A bound with its edits', () => {
+    const { session: live, store } = session();
+    const fileA = path.join(dir, 'A.llull');
+    live.bind(fileA, true);
+    live.schedule(boxDoc(1));
+    live.hold();
+    live.schedule(boxDoc(7)); // whatever changes while held is not A's slot content until it is released
+    live.flush();
+    expect(store.read(slotIdForPath(fileA))?.json).toBe(serializeDocument(boxDoc(1)));
+    live.release();
+    live.flush();
+    expect(live.current().id).toBe(slotIdForPath(fileA));
+    expect(store.read(slotIdForPath(fileA))?.json).toBe(serializeDocument(boxDoc(7)));
+  });
+
+  it('bind after a held load drops the previous slot only then, and the loaded document goes to the new slot', () => {
+    const { session: live, store } = session();
+    const fileA = path.join(dir, 'A.llull');
+    const fileB = path.join(dir, 'B.llull');
+    live.bind(fileA, true);
+    live.schedule(boxDoc(1));
+    live.hold();
+    live.schedule(boxDoc(2)); // B loaded
+    expect(store.read(slotIdForPath(fileA))?.json).toBe(serializeDocument(boxDoc(1)));
+    live.bind(fileB, true);
+    live.flush();
+    expect(store.read(slotIdForPath(fileA))).toBeNull();
+    expect(store.read(slotIdForPath(fileB))?.json).toBe(serializeDocument(boxDoc(2)));
+  });
+
+  it('adopt archives a previous slot that holds different unsaved work instead of removing it', () => {
+    const { session: live, store } = session();
+    const fileA = path.join(dir, 'A.llull');
+    live.bind(fileA, true);
+    live.schedule(boxDoc(1)); // unsaved work of A
+    live.flush();
+    store.writeMeta({
+      id: 'doc-other',
+      path: path.join(dir, 'other.llull'),
+      kind: 'document',
+      label: 'other.llull',
+      changedAt: '2026-11-05T09:00:00.000Z',
+      changeCount: 2,
+    });
+    fs.writeFileSync(store.docFile('doc-other'), serializeDocument(boxDoc(3)));
+    live.hold();
+    expect(live.adopt('doc-other', boxDoc(3))?.id).toBe('doc-other');
+    const jsons = store.list().map((slot) => store.read(slot.id)?.json);
+    expect(jsons).toContain(serializeDocument(boxDoc(1))); // A's work is still offered
+    expect(store.list().filter((slot) => slot.path === path.resolve(fileA))).toHaveLength(1);
+    expect(store.read(slotIdForPath(fileA))).toBeNull(); // archived under another id: the name is free for A again
+  });
+
+  it('adopt removes a previous slot that holds the very document being restored', () => {
+    const { session: live, store } = session();
+    live.schedule(boxDoc(3));
+    live.flush();
+    const previous = live.current().id;
+    store.writeMeta({ id: 'doc-same', path: null, kind: 'document', label: 'x', changedAt: '2026-11-05T09:00:00.000Z', changeCount: 1 });
+    fs.writeFileSync(store.docFile('doc-same'), serializeDocument(boxDoc(3)));
+    live.adopt('doc-same', boxDoc(3));
+    expect(store.read(previous)).toBeNull();
+  });
+
+  it('REST: hold / release / bind announce the path to live subscribers', async () => {
+    vi.resetModules();
+    vi.stubEnv('LLULL_RECOVERY_DIR', dir);
+    try {
+      const { app } = await import('../src/index');
+      const live = await import('../src/liveDocument');
+      const { makeFakeRes, parseSseFrame } = await import('./sseTestHelpers');
+      const res = makeFakeRes();
+      live.subscribeLive(res);
+      const fileA = path.join(dir, 'A.llull');
+      expect((await request(app).post('/recovery/hold').send({})).body).toEqual({ ok: true });
+      expect((await request(app).post('/recovery/release').send({})).body).toEqual({ ok: true });
+      await request(app).post('/recovery/bind').send({ path: fileA, dropPrevious: false });
+      const frames = res.written.map(parseSseFrame);
+      expect(frames.find((frame) => frame.event === 'document')?.data['path']).toBe(path.resolve(fileA));
+      const late = makeFakeRes();
+      live.subscribeLive(late);
+      expect(late.written.map((frame) => parseSseFrame(frame).event)).toEqual(['snapshot', 'document']);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe('a fresh backend announces its slot (review 5)', () => {
+  it('writes active.json at start, so a resuming restart before the first edit does not load the previous session slot', async () => {
+    const store = createRecoveryStore(dir);
+    const previous = slotIdForPath(path.join(dir, 'old.llull'));
+    fs.writeFileSync(store.docFile(previous), serializeDocument(boxDoc(5)));
+    store.writeMeta({
+      id: previous,
+      path: path.resolve(dir, 'old.llull'),
+      kind: 'document',
+      label: 'old.llull',
+      changedAt: '2026-11-05T10:00:00.000Z',
+      changeCount: 1,
+    });
+    store.writeActive(previous, path.resolve(dir, 'old.llull'));
+    const boot = async (resume: boolean): Promise<{ order: readonly string[]; slot: string }> => {
+      vi.resetModules();
+      vi.stubEnv('LLULL_RECOVERY_DIR', dir);
+      vi.stubEnv('LLULL_RECOVERY_RESUME', resume ? '1' : '');
+      vi.stubEnv('VITEST', '');
+      vi.stubEnv('TEST', '');
+      vi.stubEnv('LLULL_AUTOSAVE_DISABLED', '');
+      const live = await import('../src/liveDocument');
+      const result = { order: live.getLiveDoc().order, slot: live.recoverySession.current().id };
+      live.stopAutosave();
+      vi.unstubAllEnvs();
+      return result;
+    };
+    const fresh = await boot(false); // the user's new session: nothing edited yet, then it crashes
+    expect(store.readActive()?.id).toBe(fresh.slot);
+    const restarted = await boot(true);
+    expect(restarted.order).toEqual([]);
+    expect(store.list().map((slot) => slot.id)).toContain(previous); // still offered, never loaded behind the user's back
+  });
+});
+
+describe('autosave status follows the recovery binding (review 9)', () => {
+  const failingSession = (
+    storeDir: string,
+    statuses: { ok: boolean }[],
+    broken: { value: boolean },
+  ): ReturnType<typeof createRecoverySession> =>
+    createRecoverySession({
+      store: createRecoveryStore(storeDir),
+      debounceMs: 60_000,
+      serialize: (doc) => {
+        if (broken.value) throw new Error('disk');
+        return serializeDocument(doc);
+      },
+      onStatus: (status) => statuses.push(status),
+      initial: { id: 'untitled-first', path: null },
+    });
+
+  it('a saved document ends the failure of its own slot', () => {
+    const statuses: { ok: boolean }[] = [];
+    const live = failingSession(dir, statuses, { value: true });
+    live.schedule(boxDoc(1));
+    live.flush();
+    expect(statuses.at(-1)?.ok).toBe(false);
+    live.markSaved(); // the document equals its file: nothing is at risk
+    expect(statuses.at(-1)).toEqual({ ok: true });
+  });
+
+  it('a rebinding keeps the failure of a slot that is kept, until that slot is dropped', () => {
+    const statuses: { ok: boolean }[] = [];
+    const broken = { value: true };
+    const live = failingSession(dir, statuses, broken);
+    live.schedule(boxDoc(1));
+    live.flush();
+    live.bind(path.join(dir, 'B.llull'), false); // the failing untitled slot is kept
+    broken.value = false;
+    live.schedule(boxDoc(2));
+    live.flush(); // B writes fine, but the untitled slot still failed
+    expect(statuses.at(-1)?.ok).toBe(false);
+    live.bind(path.join(dir, 'C.llull'), true); // B is dropped: not the failing one
+    expect(statuses.at(-1)?.ok).toBe(false);
+  });
+});

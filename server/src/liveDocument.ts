@@ -30,6 +30,8 @@ export const recoveryStore = createRecoveryStore(RECOVERY_DIR);
 interface StartState {
   readonly doc: CadDocument;
   readonly binding: { id: string; path: string | null };
+  /** The state of a crashed backend's slot was loaded. */
+  readonly resumed: boolean;
 }
 
 /**
@@ -37,13 +39,13 @@ interface StartState {
  * A backend restarted by the desktop's supervisor (`LLULL_RECOVERY_RESUME=1`) resumes the slot the crashed one was working on (A-10).
  */
 function startState(): StartState {
-  const fresh: StartState = { doc: createEmptyDocument(), binding: { id: newUntitledSlotId(), path: null } };
+  const fresh: StartState = { doc: createEmptyDocument(), binding: { id: newUntitledSlotId(), path: null }, resumed: false };
   if (!AUTOSAVE_ENABLED || process.env['LLULL_RECOVERY_RESUME'] !== '1') return fresh;
   const active = recoveryStore.readActive();
   const found = active === null ? null : recoveryStore.read(active.id);
   if (active === null || found === null) return fresh;
   try {
-    return { doc: deserializeDocument(found.json), binding: { id: active.id, path: found.meta.path } };
+    return { doc: deserializeDocument(found.json), binding: { id: active.id, path: found.meta.path }, resumed: true };
   } catch (err) {
     recoveryStore.quarantine(active.id);
     console.warn(`[liveDocument] recovery slot ${active.id} unreadable (${errorMessage(err)}); moved aside, starting empty.`);
@@ -59,6 +61,7 @@ export const recoverySession = createRecoverySession({
   serialize: serializeDocument,
   onStatus: (status) => reportAutosaveStatus(status),
   initial: started.binding,
+  announceActive: AUTOSAVE_ENABLED && !started.resumed,
 });
 
 let _autosaveStatus: AutosaveStatus = { ok: true };
@@ -142,7 +145,7 @@ function writeSseFrame(res: Response, frame: string): boolean {
   }
 }
 
-function broadcast(eventType: 'snapshot' | 'command' | 'progress' | 'status', payload: unknown): void {
+function broadcast(eventType: 'snapshot' | 'command' | 'progress' | 'status' | 'document', payload: unknown): void {
   if (_subscribers.size === 0) return;
   let frame: string;
   try {
@@ -194,11 +197,20 @@ export function publishLiveProgress(event: LiveProgressReport): void {
   broadcast('progress', { epoch: _epoch, ...event });
 }
 
+/** Tell the live subscribers which file the document now belongs to (after an open / Save As / restore rebound it). */
+export function publishDocumentPath(): void {
+  broadcast('document', { epoch: _epoch, path: recoverySession.current().path });
+}
+
 /** Register an SSE `Response` and send it the opening snapshot; returns the unsubscribe function. */
 export function subscribeLive(res: Response): () => void {
   _subscribers.add(res);
   if (!writeSseEvent(res, 'snapshot', getLiveSnapshot())) _subscribers.delete(res);
-  else if (!_autosaveStatus.ok) writeSseEvent(res, 'status', { epoch: _epoch, autosave: _autosaveStatus });
+  else {
+    if (!_autosaveStatus.ok) writeSseEvent(res, 'status', { epoch: _epoch, autosave: _autosaveStatus });
+    const documentPath = recoverySession.current().path;
+    if (documentPath !== null) writeSseEvent(res, 'document', { epoch: _epoch, path: documentPath });
+  }
   return (): void => void _subscribers.delete(res);
 }
 

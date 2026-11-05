@@ -1,7 +1,8 @@
 /** DocumentSession against a recording fake backend: the order of recovery calls around open / save / new (A-08). */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
 import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import path from 'node:path';
 import { createEmptyDocument } from '@core/model/types';
@@ -25,7 +26,12 @@ interface Fake {
   readonly calls: string[];
 }
 
-function fakeBackend(): Fake {
+interface FakeSlot {
+  readonly meta: { id: string; path: string | null; changedAt: string };
+  readonly json: string;
+}
+
+function fakeBackend(slots: Record<string, FakeSlot> = {}): Fake {
   const calls: string[] = [];
   let hash = 'h0';
   const json = (body: unknown): Promise<Response> =>
@@ -36,8 +42,15 @@ function fakeBackend(): Fake {
     if (route === '/live/snapshot') return json({ stateHash: hash, document: createEmptyDocument() });
     if (route === '/command') {
       calls.push(`command:${String(body['name'])}`);
+      const params = body['params'] as { json?: string } | undefined;
+      if (body['name'] === 'load_document' && params?.json !== undefined && !params.json.startsWith('{'))
+        return json({ summary: 'load_document rejected: not a document', affected: [], isError: true, changed: false });
       hash = `h-${String(body['name'])}`;
       return json({ summary: 'ok', affected: [], isError: false, changed: true });
+    }
+    if (route.startsWith('/recovery/') && init.method === 'GET') {
+      const slot = slots[decodeURIComponent(route.slice('/recovery/'.length))];
+      return slot === undefined ? Promise.resolve(new Response('{}', { status: 404 })) : json(slot);
     }
     calls.push(`${route.slice(1)}:${JSON.stringify(body)}`);
     return json({ ok: true });
@@ -46,24 +59,29 @@ function fakeBackend(): Fake {
 }
 
 describe('DocumentSession recovery calls', () => {
-  it('open binds the new document BEFORE loading it (so B never lands in A slot), then marks it saved', async () => {
+  it('open holds A slot BEFORE loading (B never lands in it), binds B only after the load succeeded, then marks it saved', async () => {
     const backend = fakeBackend();
     const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: backend.fetchImpl });
     const file = path.join(dir, 'B.llull');
     writeFileSync(file, serializeDocument(createEmptyDocument()));
     await session.open(file);
     expect(backend.calls).toEqual([
-      `recovery/bind:${JSON.stringify({ path: file, dropPrevious: true })}`,
+      'recovery/hold:{}',
       'command:load_document',
+      `recovery/bind:${JSON.stringify({ path: file, dropPrevious: true })}`,
       `recovery/saved:${JSON.stringify({ stateHash: 'h-load_document' })}`,
     ]);
   });
 
-  it('new document binds an untitled slot first; Save As moves the binding to the new file and marks it saved', async () => {
+  it('new document binds an untitled slot after the clear; Save As moves the binding to the new file and marks it saved', async () => {
     const backend = fakeBackend();
     const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: backend.fetchImpl });
     await session.newDocument();
-    expect(backend.calls[0]).toBe(`recovery/bind:${JSON.stringify({ path: null, dropPrevious: true })}`);
+    expect(backend.calls).toEqual([
+      'recovery/hold:{}',
+      'command:clear_document',
+      `recovery/bind:${JSON.stringify({ path: null, dropPrevious: true })}`,
+    ]);
     backend.calls.length = 0;
     const file = path.join(dir, 'C.llull');
     await session.save(file);
@@ -131,5 +149,119 @@ describe('DocumentSession file lock and save conflict (A-09)', () => {
     await expect(session.save()).rejects.toBeInstanceOf(SaveConflictError);
     await expect(session.save(undefined, { overwrite: true })).resolves.toBe(file);
     await expect(session.save()).resolves.toBe(file); // the overwrite refreshed what the session knows
+  });
+});
+
+describe('DocumentSession replacing the open document (review 1, 2)', () => {
+  it('a file that is not a document leaves A bound to its own slot: nothing is dropped or rebound, the hold is released', async () => {
+    const backend = fakeBackend();
+    const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: backend.fetchImpl });
+    const a = path.join(dir, 'A.llull');
+    const bad = path.join(dir, 'B.llull');
+    writeFileSync(a, serializeDocument(createEmptyDocument()));
+    writeFileSync(bad, 'this is not json');
+    await session.open(a);
+    backend.calls.length = 0;
+    await expect(session.open(bad)).rejects.toThrow(/rejected/);
+    expect(backend.calls).toEqual(['recovery/hold:{}', 'command:load_document', 'recovery/release:{}']);
+    expect(session.currentPath()).toBe(a);
+    expect(existsSync(lockPathOf(a))).toBe(true);
+    expect(existsSync(lockPathOf(bad))).toBe(false);
+  });
+
+  it('restoring a slot of another file: the session leaves A, Save then writes only the slot file, never A', async () => {
+    const other = path.join(dir, 'other.llull');
+    const original = serializeDocument(createEmptyDocument());
+    writeFileSync(other, original);
+    const slot: FakeSlot = {
+      meta: { id: 'doc-other', path: other, changedAt: new Date(Date.now() + 60_000).toISOString() },
+      json: serializeDocument(createEmptyDocument()),
+    };
+    const backend = fakeBackend({ 'doc-other': slot });
+    const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: backend.fetchImpl });
+    const a = path.join(dir, 'A.llull');
+    writeFileSync(a, original);
+    await session.open(a);
+    backend.calls.length = 0;
+    await session.restore('doc-other');
+    expect(backend.calls).toEqual(['recovery/hold:{}', 'command:load_document', 'recovery/adopt:{"id":"doc-other"}']);
+    expect(session.currentPath()).toBe(other);
+    expect(existsSync(lockPathOf(a))).toBe(false);
+    expect(existsSync(lockPathOf(other))).toBe(true);
+    expect(await session.hasUnsavedChanges()).toBe(true);
+    const aBefore = readFileSync(a, 'utf8');
+    await session.save();
+    expect(readFileSync(a, 'utf8')).toBe(aBefore);
+  });
+
+  it('restoring an untitled slot, or one whose file changed since, is path-less: Save needs Save As and A.llull stays as it was', async () => {
+    const a = path.join(dir, 'A.llull');
+    const changed = path.join(dir, 'changed.llull');
+    writeFileSync(a, serializeDocument(createEmptyDocument()));
+    writeFileSync(changed, serializeDocument(createEmptyDocument()));
+    const slots: Record<string, FakeSlot> = {
+      untitled: { meta: { id: 'untitled', path: null, changedAt: '2026-11-05T10:00:00.000Z' }, json: '{}' },
+      stale: { meta: { id: 'stale', path: changed, changedAt: '2000-01-01T00:00:00.000Z' }, json: '{}' }, // the file is newer than the slot
+    };
+    const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: fakeBackend(slots).fetchImpl });
+    await session.open(a);
+    const before = readFileSync(a, 'utf8');
+    for (const id of ['untitled', 'stale']) {
+      await session.restore(id);
+      expect(session.currentPath()).toBeNull();
+      expect(existsSync(lockPathOf(a))).toBe(false);
+      await expect(session.save()).rejects.toThrow(/Save As/);
+    }
+    expect(readFileSync(a, 'utf8')).toBe(before);
+    expect(existsSync(lockPathOf(changed))).toBe(false);
+  });
+
+  it('a slot whose file is locked by another process is restored path-less (never written over it)', async () => {
+    const locked = path.join(dir, 'locked.llull');
+    writeFileSync(locked, serializeDocument(createEmptyDocument()));
+    const holder = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+    try {
+      await new Promise((resolve) => holder.once('spawn', resolve));
+      writeFileSync(
+        lockPathOf(locked),
+        JSON.stringify({ pid: holder.pid, host: hostname(), user: 'u', app: 'cli', since: '2026-11-05T09:00:00.000Z' }),
+      );
+      const slot: FakeSlot = { meta: { id: 's', path: locked, changedAt: new Date(Date.now() + 60_000).toISOString() }, json: '{}' };
+      const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: fakeBackend({ s: slot }).fetchImpl });
+      await session.restore('s');
+      expect(session.currentPath()).toBeNull();
+    } finally {
+      holder.kill();
+    }
+  });
+
+  it('a refused restore (unknown slot / document refused) changes nothing and releases the hold', async () => {
+    const backend = fakeBackend({ bad: { meta: { id: 'bad', path: null, changedAt: '2026-11-05T10:00:00.000Z' }, json: 'nope' } });
+    const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: backend.fetchImpl });
+    const a = path.join(dir, 'A.llull');
+    writeFileSync(a, serializeDocument(createEmptyDocument()));
+    await session.open(a);
+    backend.calls.length = 0;
+    await expect(session.restore('missing')).rejects.toThrow(/cannot be read/);
+    await expect(session.restore('bad')).rejects.toThrow(/rejected/);
+    expect(backend.calls).toEqual(['recovery/hold:{}', 'command:load_document', 'recovery/release:{}']);
+    expect(session.currentPath()).toBe(a);
+  });
+
+  it('open reports DSF_LOCK_UNAVAILABLE when the folder takes no lock, and still opens', async () => {
+    const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: fakeBackend().fetchImpl });
+    const file = path.join(dir, 'A.llull');
+    writeFileSync(file, serializeDocument(createEmptyDocument()));
+    const real = fs.writeFileSync.bind(fs);
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((target: fs.PathOrFileDescriptor, data: string, ...rest: unknown[]) => {
+      if (String(target).endsWith('.tmp')) throw Object.assign(new Error('read-only'), { code: 'EROFS' });
+      return (real as (...args: unknown[]) => void)(target, data, ...rest);
+    }) as typeof fs.writeFileSync);
+    try {
+      await expect(session.open(file)).resolves.toEqual({ warning: 'DSF_LOCK_UNAVAILABLE' });
+      expect(session.currentPath()).toBe(file);
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });
