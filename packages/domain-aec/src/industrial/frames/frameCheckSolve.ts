@@ -7,7 +7,9 @@ import { toMm } from '@core/model/units';
 import { buildingConnectionSolids } from '../connections/evaluateConnections';
 import { type FrameModel, type WindCase, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
-import { amplificationOf, boltResistance, horneAlphaCritical } from '../steelDesign/steelDesign';
+import { amplificationOf, horneAlphaCritical } from '../steelDesign/steelDesign';
+import { boltResistance, isBoltRefusal } from '../steelDesign/steelBolts';
+import { refusedFields, type RowRefusal } from '../common/utilisation';
 import { GAMMA_CRANE } from '../../shared/loadFactors';
 
 export interface CheckRow {
@@ -25,6 +27,8 @@ export interface CheckRow {
   readonly shear: number;
   readonly utilisation: number;
   readonly check: string;
+  /** Set when the member's grade / thickness or the connection's bolts were refused: the row was not computed. */
+  readonly refusal?: RowRefusal;
   /** Connections only: signed design moment (N·mm, sagging +) and shear (N) per ULS combination. */
   readonly forces?: ReadonlyArray<{ readonly moment: number; readonly shear: number }>;
 }
@@ -190,7 +194,8 @@ export function connectionCheck(
   connection: MomentConnectionElement,
   moment: number,
   shear: number,
-): { utilisation: number; check: string } | null {
+  boltClass: string,
+): { utilisation: number; check: string; refusal?: RowRefusal } | null {
   const solids = buildingConnectionSolids(doc, building, connection);
   const plate = solids?.find((solid) => solid.part === 'plate');
   if (!solids || !plate) return null;
@@ -207,7 +212,8 @@ export function connectionCheck(
   const sumSquares = levers.reduce((sum, lever) => sum + lever * lever, 0);
   const tension = (Math.abs(moment) * Math.max(...levers)) / sumSquares;
   const perBoltShear = Math.abs(shear) / levers.length;
-  const resistance = boltResistance(toMm(doc, connection.boltDiameter));
+  const resistance = boltResistance(toMm(doc, connection.boltDiameter), boltClass);
+  if (isBoltRefusal(resistance)) return { ...refusedFields(resistance), check: `bolts not checked — ${resistance.message}` };
   const tensionRatio = tension / resistance.tension;
   const combined = perBoltShear / resistance.shear + tension / (1.4 * resistance.tension);
   return {

@@ -14,11 +14,12 @@ import { runStackupMonteCarlo } from '../src/native/stackupMonteCarlo';
 import { isNativeTool, runNativeTool } from '../src/native/tools';
 import { buildNativeToolDefinitions } from '@protocol/nativeTools';
 import reference from '../../docs/aerospace/03-gdt-mbd-pmi/validation/stackup_reference.json';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn('stackupNative: llull-compute not built (cargo build --release -p llull-compute in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 const doc = createEmptyDocument();
 const host: FeaHost = {

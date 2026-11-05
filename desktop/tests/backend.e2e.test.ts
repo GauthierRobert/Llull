@@ -20,6 +20,7 @@ import { backendEnv, backendOrigin, desktopExportDir, nativeBundleDir } from '..
 import { createDocumentSession, type DocumentSession } from '../src/documents';
 import { export3mfToFile } from '../src/exportFile';
 import { desktopLayout } from '../src/layout';
+import { requireTool } from '../../tests/requireTool';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const work = mkdtempSync(path.join(tmpdir(), 'llull-desktop-e2e-'));
@@ -138,7 +139,7 @@ describe('desktop backend', () => {
     await expect(session.save()).rejects.toThrow(/Save As/);
   });
 
-  it.skipIf(process.env['LLULL_TEST_PYTHON'] === undefined)(
+  it.skipIf(requireTool('python', process.env['LLULL_TEST_PYTHON'] !== undefined))(
     'imports a STEP file into the open document with the bundled-Python path (llull import_step --app)',
     async () => {
       const part = path.join(work, 'part.llull');
@@ -157,7 +158,7 @@ describe('desktop backend', () => {
 // The KI7 default: with the native bundle (here the local release build of llull-kernel standing in for resources/native) the app
 // starts the backend on the native OCCT 7.9 kernel, exactly as src/main.ts computes it.
 
-describe.skipIf(nativeKernelBinary === null)('desktop backend with the native bundle (KI7)', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('desktop backend with the native bundle (KI7)', () => {
   let native: RunningBackend | undefined;
 
   beforeAll(async () => {

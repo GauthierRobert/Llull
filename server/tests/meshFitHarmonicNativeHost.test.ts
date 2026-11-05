@@ -17,10 +17,11 @@ import { _resetLiveDoc, getLiveDoc } from '../src/liveDocument';
 import { _clearResultCache } from '../src/native/deferredRun';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('meshFitHarmonicNativeHost: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 /** The upper hemisphere of an icosphere (a disk), as a mesh entity. */
 function hemisphereDoc(level: number): { doc: CadDocument; triangles: number } {

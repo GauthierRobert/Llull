@@ -7,13 +7,15 @@ import { crashReportsView, writeDesktopCrashReport } from './crashes';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
-import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
+import { chooseBackendPort, type RunningBackend } from './backend';
+import { superviseBackend } from './backendSupervisor';
 import { backendEnv, backendOrigin, desktopExportDir, nativeBundleDir } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
 import { trustPendingKeys } from './keyTrust';
 import { partNumberOf, vaultCheckIn, vaultCheckOut, type VaultDeps } from './vault';
 import { currentHolder } from '@server/plm/vault/vault';
 import { createDocumentSession, type DocumentSession } from './documents';
+import { SaveConflictError } from '@server/documentFile';
 import { export3mfToFile } from './exportFile';
 import { ipcSenderAllowed } from './ipcGuard';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
@@ -120,6 +122,27 @@ function interceptQuit(event: { preventDefault(): void }): void {
   });
 }
 
+/** Save; a file changed on disk since it was opened is never overwritten unasked (DSF_SAVE_CONFLICT): overwrite, Save As, or cancel. */
+async function saveResolvingConflict(target: string): Promise<string | undefined> {
+  try {
+    return await session?.save(target);
+  } catch (error) {
+    if (!(error instanceof SaveConflictError)) throw error;
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      buttons: ['Overwrite', 'Save As…', 'Cancel'],
+      defaultId: 2,
+      cancelId: 2,
+      message: 'This file changed on disk since you opened it.',
+      detail: error.message,
+    });
+    if (response === 0) return session?.save(target, { overwrite: true });
+    if (response !== 1) return undefined;
+    const chosen = await dialog.showSaveDialog({ defaultPath: DEFAULT_SAVE_NAME, filters: FILE_FILTERS });
+    return chosen.canceled || chosen.filePath === undefined ? undefined : session?.save(chosen.filePath);
+  }
+}
+
 async function saveDocument(forceDialog: boolean): Promise<boolean> {
   if (session === null) return false;
   let target = forceDialog ? null : session.currentPath();
@@ -131,9 +154,9 @@ async function saveDocument(forceDialog: boolean): Promise<boolean> {
   const chosen = target;
   let ok = false;
   await guarded('Save', async () => {
-    const saved = await session?.save(chosen);
+    const saved = await saveResolvingConflict(chosen);
     if (saved !== undefined) app.addRecentDocument(saved);
-    ok = true;
+    ok = saved !== undefined;
   });
   return ok;
 }
@@ -188,9 +211,32 @@ async function openDocument(filePath?: string): Promise<void> {
   if (target === undefined) return;
   const chosen = target;
   await guarded('Open', async () => {
-    await session?.open(chosen);
+    const opened = await session?.open(chosen);
     app.addRecentDocument(chosen);
+    if (opened?.warning === 'DSF_LOCK_UNAVAILABLE')
+      void dialog.showMessageBox({
+        type: 'warning',
+        message: 'This folder does not support lock files.',
+        detail: `DSF_LOCK_UNAVAILABLE: ${path.basename(chosen)} is open without a lock, so another llull could write it at the same time.`,
+      });
   });
+}
+
+/**
+ * Document Recovery > Restore (IPC `llull:restore-recovery`): confirm what happens to the open document, then restore the slot through the
+ * session so its path, lock and saved state follow the restored document.
+ */
+async function restoreRecovery(slotId: unknown): Promise<{ ok: boolean; message: string; cancelled: boolean }> {
+  if (session === null) return { ok: false, message: 'The backend is not running yet', cancelled: false };
+  if (typeof slotId !== 'string') return { ok: false, message: 'Refused: not a recovery copy', cancelled: false };
+  if (!(await confirmDiscard())) return { ok: false, message: 'Restore cancelled', cancelled: true };
+  try {
+    await session.restore(slotId);
+    refreshTitleAndDiscovery();
+    return { ok: true, message: 'Restored', cancelled: false };
+  } catch (error) {
+    return { ok: false, message: errorMessage(error), cancelled: false };
+  }
 }
 
 async function newDocument(): Promise<void> {
@@ -309,7 +355,7 @@ async function showCrashReports(): Promise<void> {
 function onMainProcessError(error: unknown): void {
   const report = writeDesktopCrashReport(error, {
     directory: crashDirectory,
-    autosavePath: path.join(app.getPath('userData'), 'autosave.json'),
+    recoveryDir: path.join(app.getPath('userData'), 'recovery'),
     appVersion: app.getVersion(),
   });
   console.error('[llull-desktop] unexpected error:', error);
@@ -366,10 +412,10 @@ async function boot(): Promise<void> {
   const port = await chooseBackendPort(userData);
   const url = backendOrigin(port);
   const nativeDir = nativeBundleDir(layout.nativeDir, process.platform, existsSync);
-  backend = await startBackend(
-    (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
-    layout.serverEntry,
-    backendEnv({
+  backend = await superviseBackend({
+    fork: (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
+    entry: layout.serverEntry,
+    env: backendEnv({
       port,
       token,
       layout,
@@ -381,7 +427,17 @@ async function boot(): Promise<void> {
     }),
     url,
     token,
-  );
+    // A crashed backend is restarted with its document (A-10); the window shows a banner meanwhile. Giving up is never silent.
+    onState: (state) => {
+      if (state.state === 'failed')
+        dialog.showErrorBox(
+          'llull backend stopped',
+          `${state.reason}
+
+Your unsaved work is kept in the recovery folder (File > Open Data Folder).`,
+        );
+    },
+  });
   backendUrl = url;
   exportDir = desktopExportDir(process.env, userData);
   ipcMain.handle('llull:export-3mf', (event) =>
@@ -389,7 +445,12 @@ async function boot(): Promise<void> {
       ? exportThreeMf()
       : { ok: false, message: 'Refused: the caller is not the app window' },
   );
-  session = createDocumentSession({ url, token });
+  ipcMain.handle('llull:restore-recovery', (event, slotId: unknown) =>
+    ipcSenderAllowed(event, window?.webContents ?? null, url)
+      ? restoreRecovery(slotId)
+      : { ok: false, message: 'Refused: the caller is not the app window', cancelled: false },
+  );
+  session = createDocumentSession({ url, token, onWarning: (message) => dialog.showErrorBox('llull - Recovery', message) });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       menuTemplate(

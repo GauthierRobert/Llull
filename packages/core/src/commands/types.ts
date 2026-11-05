@@ -101,6 +101,11 @@ export interface CommandAnnotations {
    */
   readonly metadataKeys?: boolean;
   /**
+   * Exempt from the locked-layer guard of `execute` (FR-INT-08): layer management itself (update_layer, delete_layer, set_entity_layer, which keeps its own rule), document-wide
+   * replacement (load_document, clear_document) and build_project, whose nested steps are each guarded. Not emitted in tool schemas.
+   */
+  readonly layerManagement?: boolean;
+  /**
    * Session command (OQ-MAT-09): changes the in-memory document only. `execute` appends no FeatureStep and the host neither logs nor
    * syncs it; its effect is never serialized (private material-library values, TR-MAT-31). Not emitted in tool schemas.
    */
@@ -252,6 +257,10 @@ export interface ExportFilePort {
 export interface ExecutionContext {
   /** Set by `runCommand` while a command runs: a command it executes in turn is nested (a query then refuses an unreadable mesh asset instead of degrading). */
   readonly nested?: boolean;
+  /** Set by `runCommand`: the command about to run is itself checked by the locked-layer guard, so the executes it makes are judged by its guard on the final result. */
+  readonly judgesNestedLocks?: boolean;
+  /** Set by `runCommand`: this call is nested in a command that judges locked layers on its final result, so its own guard defers to it (layerLock.ts). */
+  readonly lockJudgedByCaller?: boolean;
   /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
   readonly kernel: GeometryKernel | null;
   /** Rigid-body physics engine for `simulate_motion`; null/absent while none is installed. */

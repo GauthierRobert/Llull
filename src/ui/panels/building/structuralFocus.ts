@@ -4,7 +4,7 @@ import type { BuildingModel } from '@aec/index';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { boundsCenter, entityBoundsInDoc, mergeBounds, type Bounds } from '@core/geometry/bounds';
 import type { PanelFocus } from '@ui/store/focusStore';
-import { isFailing, type ReportRow } from './structuralReport';
+import { isFailing, isRefused, type ReportRow } from './structuralReport';
 import { utilisationColor } from './utilisationColor';
 
 function boundsOf(doc: CadDocument, entityIds: readonly string[]): Bounds | null {
@@ -26,7 +26,7 @@ export function memberFocus(doc: CadDocument, row: ReportRow): PanelFocus {
   return {
     key: `building:member:${row.key}`,
     label: `${row.label} · ${value}`,
-    color: utilisationColor(row.utilisation, !isFailing(row)),
+    color: utilisationColor(row.utilisation, !isFailing(row), isRefused(row)),
     entityIds: [...entityIds],
     markers: bounds === null ? [] : [{ position: boundsCenter(bounds), label: value }],
   };

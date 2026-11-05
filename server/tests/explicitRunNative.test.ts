@@ -19,11 +19,12 @@ import { createComputeRunner } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runExplicitRun } from '../src/native/explicitRun';
 import { barModel, must, replayPlan } from '../../tests/unit/cae/explicit/support';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn('explicitRunNative: llull-compute not built (cargo build --profile compute -p llull-compute in solver/): skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 let dir = '';
 let store: FeArtifactCache;

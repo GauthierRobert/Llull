@@ -9,7 +9,13 @@ import { boltSize } from '../../industrial/evaluate';
 import { trayLength } from '../../industrial/piping/trays';
 import { plateMass } from '../../industrial/connections/plates';
 import { supportSchedule } from '../../industrial/piping/supportSchedule';
-import { type ConnectionWelds, connectionMass, connectionWelds } from '../../industrial/connections/connections';
+import {
+  type ConnectionWelds,
+  type WeldRefusal,
+  connectionMass,
+  connectionWelds,
+  isWeldRefusal,
+} from '../../industrial/connections/connections';
 import { columnSectionArea, scaleFor, slabNetArea, stairVolume, wallQuantities } from './takeoffBasics';
 import { memberLength, memberMass, panelArea } from './takeoffCompute';
 import { netConcreteVolumes } from './netConcrete';
@@ -60,8 +66,10 @@ function levelName(building: BuildingModel, levelId: string): string {
 }
 
 /** "a8 flanges / a5 web · 3.2 m" (empty without welds). */
-function weldLabel(welds: ConnectionWelds | null): string {
-  return welds ? `a${welds.flangeThroat} flanges / a${welds.webThroat} web · ${(welds.length / 1000).toFixed(1)} m` : '';
+function weldLabel(welds: ConnectionWelds | WeldRefusal | null): string {
+  if (!welds) return '';
+  if (isWeldRefusal(welds)) return `refused (${welds.refusal.code})`;
+  return `a${welds.flangeThroat} flanges / a${welds.webThroat} web · ${(welds.length / 1000).toFixed(1)} m`;
 }
 
 function hostWallOf(building: BuildingModel, opening: OpeningElement): WallElement | CurvedWallElement | undefined {

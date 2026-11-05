@@ -13,6 +13,9 @@ import {
   getState,
 } from '../helpers/storeTestHelpers';
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
+import { useRecoveryStore } from '@ui/store/recoveryStore';
+import { useSessionStore } from '@ui/store/sessionStore';
+import { browserStorage, readAutosave } from '@ui/store/autosave';
 
 const dispatchId = (name: string, params: unknown): string => localDispatch(name, params).affected[0]!;
 const order = (): string[] => getState().document.order;
@@ -232,19 +235,78 @@ describe('CadStore — offline fallback', () => {
     expect(order()[0]).not.toBe(undoneId);
   });
 
-  it('reconnect adopts the backend snapshot over local edits and says so', () => {
+  it('reconnect adopts the backend snapshot but keeps the offline edits as a recoverable copy (FR-DSF-23)', async () => {
     offline();
     getState().dispatch('add_box', { size: [1, 1, 1] });
     expect(order()).toHaveLength(1);
-    const spy = vi.fn();
+    const offlineJson = serializeDocument(getState().document);
+    const spy = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, slots: [] }) }));
     vi.stubGlobal('fetch', spy);
     online();
     getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
-    expect(spy).not.toHaveBeenCalled();
     expect(order()).toHaveLength(0);
     expect(getState().liveSeq).toBe(3);
     expect(getState().localUndoStack).toHaveLength(0);
-    expect(getState().lastSummary).toContain('Backend reconnected');
+    expect(getState().lastSummary).toContain('kept as a recoverable copy');
+    const calls = spy.mock.calls as unknown as [string, { body: string }][];
+    const kept = calls.find(([url]) => url.endsWith('/recovery/offline'));
+    expect(JSON.parse(kept?.[1].body ?? '{}')).toMatchObject({ json: offlineJson, changeCount: 1 });
+    await flushPromises();
+    expect(useRecoveryStore.getState().offlineEditsKept).toBe(true);
+  });
+
+  it('offline edits that leave NO entity (deleted everything) are kept too, filed under the path the edits started from (review 7)', async () => {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
+    useStore.setState({ liveBase: base, liveEpoch: TEST_EPOCH, liveSeq: 1 });
+    getState().setDocument(base);
+    useRecoveryStore.getState().setDocumentPath('C:/work/A.llull');
+    offline();
+    getState().dispatch('delete_entities', { ids: [...base.order] });
+    expect(order()).toHaveLength(0);
+    const offlineJson = serializeDocument(getState().document);
+    const spy = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, slots: [] }) }));
+    vi.stubGlobal('fetch', spy);
+    online();
+    getState().hydrateLiveDocument(liveSnapshot(base, 3));
+    expect(getState().lastSummary).toContain('kept as a recoverable copy');
+    const calls = spy.mock.calls as unknown as [string, { body: string }][];
+    const kept = calls.find(([url]) => url.endsWith('/recovery/offline'));
+    expect(JSON.parse(kept?.[1].body ?? '{}')).toMatchObject({ json: offlineJson, path: 'C:/work/A.llull' });
+    await flushPromises();
+    useRecoveryStore.getState().setDocumentPath(null);
+  });
+
+  it('a parameter-only offline edit is kept, and an unchanged local document is not (review 7)', () => {
+    const base = createEmptyDocument();
+    useStore.setState({ liveBase: base, liveEpoch: TEST_EPOCH, liveSeq: 1 });
+    const spy = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, slots: [] }) }));
+    vi.stubGlobal('fetch', spy);
+    getState().hydrateLiveDocument(liveSnapshot(base, 2));
+    expect(spy).not.toHaveBeenCalled(); // nothing differs from the last live state
+    offline();
+    getState().dispatch('set_parameter', { name: 'width', expression: '5' });
+    expect(Object.keys(getState().document.parameters ?? {})).toContain('width');
+    expect(order()).toHaveLength(0);
+    online();
+    getState().hydrateLiveDocument(liveSnapshot(base, 3));
+    const calls = spy.mock.calls as unknown as [string, { body: string }][];
+    expect(calls.some(([url]) => url.endsWith('/recovery/offline'))).toBe(true);
+  });
+
+  it('when the backend cannot keep the offline edits they are offered from the device instead, never dropped', async () => {
+    offline();
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    const offlineJson = serializeDocument(getState().document);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('down'))),
+    );
+    online();
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
+    await flushPromises();
+    expect(useSessionStore.getState().pendingLocalCopy?.json).toBe(offlineJson);
+    const storage = browserStorage();
+    expect(storage === null ? null : readAutosave(storage)?.json).toBe(offlineJson);
   });
 
   it('reconnect without local edits just hydrates and clears local stacks', () => {

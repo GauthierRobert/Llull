@@ -1,0 +1,435 @@
+{
+  "note": "Hits of the INT-14 source scan (tests/unit/contract/fallbackInventory.test.ts) that are not engineering inputs, or are tracked in fallback_inventory.json. Each entry: file (under packages/), match (substring of the trimmed source line, unique per file), reason.",
+  "entries": [
+    {
+      "file": "domain-aec/src/civil/drainage/drainageAnalysisCommands.ts",
+      "match": "metres(pipePlanLength(civil, p) ?? 0),",
+      "reason": "schedule column of a pipe whose end manholes are unresolved: 0 is displayed, never used in a check"
+    },
+    {
+      "file": "domain-aec/src/civil/drainage/drainageAnalysisCommands.ts",
+      "match": "minVelocity: params.minVelocity ?? 0,",
+      "reason": "size_drainage_pipes: omitted minVelocity means \"not enforced\", stated in the param description; 0 adds no limit"
+    },
+    {
+      "file": "domain-aec/src/civil/road/roadChecks.ts",
+      "match": "const maxRate = alignment.superelevation?.maxRate ?? 0;",
+      "reason": "documented: superelevation unset assumes e = 0 and data.warnings says so (roadChecks.ts)"
+    },
+    {
+      "file": "domain-aec/src/industrial/bracing/bracingCheckRun.ts",
+      "match": "maxUtilisation: worst?.utilisation ?? 0,",
+      "reason": "empty-result guard of a reported maximum or count (no rows => 0); presentation of the summary/data, not a pass/fail input"
+    },
+    {
+      "file": "domain-aec/src/industrial/bracing/bracingCheckRun.ts",
+      "match": "const { windPressure = 0.6, deadLoad = 0.5, snowLoad = 0.8 } = params;",
+      "reason": "documented param default; the command lists the omitted value in data.defaulted and names it in the summary (defaultedInputs)"
+    },
+    {
+      "file": "domain-aec/src/industrial/common/memberSupport.ts",
+      "match": "spec.material?.trim() || 'S355'",
+      "reason": "authoring default: a member created without a material is stored with S355 (visible on the element and documented in the command param); checks read the stored material and never substitute a grade"
+    },
+    {
+      "file": "domain-aec/src/industrial/foundations/footingDesignRow.ts",
+      "match": "asRequired: closest?.asRequired ?? 0,",
+      "reason": "no candidate design found: the row is flagged by the caller; 0 fills the unfilled display columns"
+    },
+    {
+      "file": "domain-aec/src/industrial/foundations/footingDesignRow.ts",
+      "match": "shearUtilisation: closest?.shear ?? 0,",
+      "reason": "no candidate design found: the row is flagged by the caller; 0 fills the unfilled display columns"
+    },
+    {
+      "file": "domain-aec/src/industrial/foundations/footingDesignRow.ts",
+      "match": "punchingUtilisation: closest?.punching ?? 0,",
+      "reason": "no candidate design found: the row is flagged by the caller; 0 fills the unfilled display columns"
+    },
+    {
+      "file": "domain-aec/src/industrial/foundations/footingDesignRow.ts",
+      "match": "punchingDistance: closest?.punchingDistance ?? 0,",
+      "reason": "no candidate design found: the row is flagged by the caller; 0 fills the unfilled display columns"
+    },
+    {
+      "file": "domain-aec/src/industrial/foundations/foundationCheckRun.ts",
+      "match": "maxUtilisation: worstRow?.utilisation ?? 0,",
+      "reason": "empty-result guard of a reported maximum (no computed row => 0, the summary says every row was refused); presentation of the data, not a pass/fail input"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameCheckFrames.ts",
+      "match": "check: `${governing} (${analysis.section && analysis.section.h > (findProfile(member.profile)?.h ?? 0) ? `${member.profile} haunched h${profile.h.toFixed(0)}` : member.profile} class ${resistance.sectionClass}, ${member.material} ${strengthNote(strength)}${amplification > 1 ? `, sway ×${amplification.toFixed(2)}` : ''})`,",
+      "reason": "haunch comparison label; profile found earlier"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameCheckFrames.ts",
+      "match": "const middle = ((a?.x ?? 0) + (b?.x ?? 0)) / 2;",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameCheckPortal.ts",
+      "match": "maxUtilisation: worst?.utilisation ?? 0,",
+      "reason": "empty-result guard of a reported maximum or count (no rows => 0); presentation of the summary/data, not a pass/fail input"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameCheckSolve.ts",
+      "match": "const increment = Math.max(0, piece.compression - (above?.compression ?? 0));",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameCheckSolve.ts",
+      "match": "drift: Math.abs((horne?.displacements[piece.member.geometry.b]?.[0] ?? 0) - (horne?.displacements[piece.member.geometry.a]?.[0] ?? 0)),",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameDesign.ts",
+      "match": "const { targetUtilisation = 0.95, allowFixedBases = true } = params;",
+      "reason": "documented param default; the command lists the omitted value in data.defaulted and names it in the summary (defaultedInputs)"
+    },
+    {
+      "file": "domain-aec/src/industrial/frames/frameDesignLoop.ts",
+      "match": "kilograms += metres * (findProfile(element.profile)?.massPerMetre ?? 0);",
+      "reason": "stiffening-factor Map lookup / catalogue mass of an already resolved profile: additive identity"
+    },
+    {
+      "file": "domain-aec/src/industrial/piping/pipeSupportCheck.ts",
+      "match": "const { spanFactor = 1, overhangRatio = 0.5 } = params;",
+      "reason": "documented param default; the command lists the omitted value in data.defaulted and names it in the summary (defaultedInputs)"
+    },
+    {
+      "file": "domain-aec/src/industrial/purlins/purlinAnalysis.ts",
+      "match": "members: (current?.members ?? 0) + 1,",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/purlins/purlinAnalysis.ts",
+      "match": "maxUtilisation: Math.max(current?.maxUtilisation ?? 0, utilisation),",
+      "reason": "empty-result guard of a reported maximum or count (no rows => 0); presentation of the summary/data, not a pass/fail input"
+    },
+    {
+      "file": "domain-aec/src/industrial/purlins/purlinAnalysis.ts",
+      "match": "const sign = Math.sign(round(sorted[0]?.member.roll ?? 0, 4));",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/purlins/purlinCheckRun.ts",
+      "match": "maxUtilisation: worst?.utilisation ?? 0,",
+      "reason": "empty-result guard of a reported maximum or count (no rows => 0); presentation of the summary/data, not a pass/fail input"
+    },
+    {
+      "file": "domain-aec/src/industrial/purlins/purlinCheckRun.ts",
+      "match": "const { windPressure = 0.6, snowLoad = 0.8, roofDeadLoad = 0.3 } = params;",
+      "reason": "documented param default; the command lists the omitted value in data.defaulted and names it in the summary (defaultedInputs)"
+    },
+    {
+      "file": "domain-aec/src/industrial/purlins/purlinDesign.ts",
+      "match": "const { targetUtilisation = 0.95, ...loadParams } = params;",
+      "reason": "documented param default; the command lists the omitted value in data.defaulted and names it in the summary (defaultedInputs)"
+    },
+    {
+      "file": "domain-aec/src/industrial/runway/runwayCheckRun.ts",
+      "match": "maxUtilisation: worst?.utilisation ?? 0,",
+      "reason": "empty-result guard of a reported maximum (no computed row => 0, the summary says every row was refused); presentation of the data, not a pass/fail input"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelBracingChecks.ts",
+      "match": "const planeCount = planes.get(`${g.storey}|${g.direction}`)?.size ?? 1;",
+      "reason": "plane/bay/diagonal count looked up with a key built from the same member list; a miss cannot occur, 1 is the neutral count"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelBracingChecks.ts",
+      "match": "const bayCount = bays.get(key(g))?.size ?? 1;",
+      "reason": "plane/bay/diagonal count looked up with a key built from the same member list; a miss cannot occur, 1 is the neutral count"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelBracingChecks.ts",
+      "match": "rows.push(braceRow(g, shear, (diagonals.get(bayKey(g)) ?? 1) >= 2, phiText));",
+      "reason": "plane/bay/diagonal count looked up with a key built from the same member list; a miss cannot occur, 1 is the neutral count"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelBracingChecks.ts",
+      "match": "const slot = planes.get(`${storey}|${direction}`)?.size ?? 0;",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelFrameChecks.ts",
+      "match": "const ends: [number, number] = [diagram.stations[0] ?? 0, diagram.stations[diagram.stations.length - 1] ?? 0];",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelFrameChecks.ts",
+      "match": "const length = Math.abs((top?.y ?? 0) - (bottom?.y ?? 0));",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelFrameChecks.ts",
+      "match": "const zText = `z ${metres(bottom?.y ?? 0)}–${metres(top?.y ?? 0)} m`;",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelFrameChecks.ts",
+      "match": "const utilisation = buckling?.utilisation ?? weak?.utilisation ?? 0;",
+      "reason": "empty-result guard of a reported maximum or count (no rows => 0); presentation of the summary/data, not a pass/fail input"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelFrameChecks.ts",
+      "match": "const chi = buckling ? Math.min(buckling.chiMajor, buckling.chiMinor) : (weak?.chi ?? 1);",
+      "reason": "chi displayed for a member where neither buckling check applies (utilisation 0 in the same row); display value only"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelMembersCheck.ts",
+      "match": "maxUtilisation: worst?.utilisation ?? 0,",
+      "reason": "empty-result guard of a reported maximum or count (no rows => 0); presentation of the summary/data, not a pass/fail input"
+    },
+    {
+      "file": "domain-aec/src/industrial/steelDesign/steelStructureAnalysis.ts",
+      "match": "const massKg = new Map(bars.map((bar) => [bar.id, ((bar.profile?.massPerMetre ?? 0) * bar.length) / 1000]));",
+      "reason": "absent Map/array/record element (noUncheckedIndexedAccess) contributes the additive identity 0 or a neutral count; not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/plant/catalog/commands/check.ts",
+      "match": "const issues = checkCatalogRules(catalog, rules).sort((a, b) => (RANK[a.status] ?? 3) - (RANK[b.status] ?? 3));",
+      "reason": "sort order of an unknown status; presentation only"
+    },
+    {
+      "file": "domain-aec/src/plant/data/ifcRead/idsCheck.ts",
+      "match": "const set = this.file.entities.get(refsOf(rel.args[5])[0] ?? -1);",
+      "reason": "absent IFC reference id sentinel for a Map.get; no entity has id -1"
+    },
+    {
+      "file": "domain-aec/src/plant/data/ifcRead/idsCheck.ts",
+      "match": "const reference = this.file.entities.get(refsOf(rel.args[5])[0] ?? -1);",
+      "reason": "absent IFC reference id sentinel for a Map.get; no entity has id -1"
+    },
+    {
+      "file": "domain-aec/src/plant/data/ifcRead/idsCheck.ts",
+      "match": "const source = this.file.entities.get(refsOf(reference.args[3])[0] ?? -1);",
+      "reason": "absent IFC reference id sentinel for a Map.get; no entity has id -1"
+    },
+    {
+      "file": "domain-aec/src/plant/display/checkPipeMarkers.ts",
+      "match": "spacingMm = DEFAULT_SPACING_MM, insulationMm = 0",
+      "reason": "drawing annotation layout (marker spacing and the offset drawn around insulation); no engineering check reads it"
+    },
+    {
+      "file": "domain-aec/src/plant/equipment/commands/checkEquipment.ts",
+      "match": "(SEVERITY_ORDER[a.severity] ?? 2) - (SEVERITY_ORDER[b.severity] ?? 2) ||",
+      "reason": "sort order of an unknown severity; presentation only"
+    },
+    {
+      "file": "domain-aec/src/plant/fabrication/check.ts",
+      "match": "const short = cutPieces(analysis, rules.weldGapMm.value, rules.fieldFitAllowanceMm?.value ?? 0).filter(",
+      "reason": "guarded default: the field-fit allowance is read only for field_fit weld joints (cutList.ts), and this branch is skipped when a field_fit joint exists while the rule is unset, so 0 is never applied to a joint that needs it"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/checks.ts",
+      "match": "[`runs.${run.id}.legs.${part.leg ?? 0}`],",
+      "reason": "leg index of a part outside a leg: path label only"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/checks.ts",
+      "match": "const stemHeight = placed.stemHeightMm ?? 0;",
+      "reason": "placed item without a stem height: 0 is the physical absence of a stem"
+    },
+    {
+      "file": "domain-aec/src/plant/piping/slopeChecks.ts",
+      "match": "const step = placed.flat?.invertStepMm ?? 0;",
+      "reason": "pipe without an invert step is flat: 0 is the physical absence of a step"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/access/edgeChecks.ts",
+      "match": "Math.max(0, ...rulesets.map((ruleset) => ruleById(ruleset === 'iso_14122' ? 'ISO-GRD-TOP' : 'OSHA-GRD-TOP').min ?? 0));",
+      "reason": "rule entry without a minimum contributes 0 to a max over rulesets"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/access/stairChecks.ts",
+      "match": "const landingAt = stair.landingAt ?? 0;",
+      "reason": "stair without an intermediate landing: landing at the stair start (geometry)"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/grating/checkGrating.ts",
+      "match": "const undersideMm = toMm(doc, (level?.elevation ?? 0) + panel.topOffset) - type.barDepthMm;",
+      "reason": "level elevation datum for a panel whose level record is absent; geometry datum, not an engineering input"
+    },
+    {
+      "file": "domain-aec/src/plant/structures/grating/checkGrating.ts",
+      "match": "deflectionMm: (spanMm) => params.deflectionLimitMm ?? spanMm / (params.deflectionRatio ?? 1),",
+      "reason": "unreachable: run() refuses unless exactly one of deflectionLimitMm / deflectionRatio is given"
+    },
+    {
+      "file": "domain-aec/src/scan/designPrimitives.ts",
+      "match": "const elevation = doc.building?.levels[element.levelId]?.elevation ?? 0;",
+      "reason": "level elevation datum: geometry datum, not an engineering input"
+    },
+    {
+      "file": "domain-aero/src/composites/analysis.ts",
+      "match": "const load: Load6 = [loads?.Nx ?? 0, loads?.Ny ?? 0, loads?.Nxy ?? 0, loads?.Mx ?? 0, loads?.My ?? 0, loads?.Mxy ?? 0];",
+      "reason": "an omitted load component is zero load (physical meaning of absence)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "const contraction = params.contractionRatio ?? 3;",
+      "reason": "documented design-parameter default; every omitted value is listed in data.defaulted and named in the summary (design_nozzle test, INT-14)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "const convergent = params.convergentHalfAngleDeg ?? 30;",
+      "reason": "documented design-parameter default; every omitted value is listed in data.defaulted and named in the summary (design_nozzle test, INT-14)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "const segments = params.segments ?? 96;",
+      "reason": "documented design-parameter default; every omitted value is listed in data.defaulted and named in the summary (design_nozzle test, INT-14)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "if (!(convergent >= 15 && convergent <= 60) || !((params.chamberLength ?? 0) >= 0) || !(segments >= 16 && segments <= 256))",
+      "reason": "documented design-parameter default; every omitted value is listed in data.defaulted and named in the summary (design_nozzle test, INT-14)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "const half = params.halfAngleDeg ?? 15;",
+      "reason": "documented design-parameter default; every omitted value is listed in data.defaulted and named in the summary (design_nozzle test, INT-14)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "const fraction = params.lengthFraction ?? 0.8;",
+      "reason": "documented design-parameter default; every omitted value is listed in data.defaulted and named in the summary (design_nozzle test, INT-14)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "chamberLength: params.chamberLength ?? 0,",
+      "reason": "documented design-parameter default; every omitted value is listed in data.defaulted and named in the summary (design_nozzle test, INT-14)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "totalLength: sig(contour.convergentLength + (params.chamberLength ?? 0) + contour.divergentLength),",
+      "reason": "documented design-parameter default; every omitted value is listed in data.defaulted and named in the summary (design_nozzle test, INT-14)"
+    },
+    {
+      "file": "domain-aero/src/fluids/designNozzleCommand.ts",
+      "match": "exitAngleDeg: sig((contour.points[contour.points.length - 1]?.angle ?? 0) / RAD),",
+      "reason": "last contour point angle; contour is non-empty by construction"
+    },
+    {
+      "file": "domain-cae/src/analytic/analyticCheck.ts",
+      "match": ": ` FE ${significantNumber(compare?.value ?? 0, 6)} vs analytic: ${",
+      "reason": "summary text when no comparison value exists; display only"
+    },
+    {
+      "file": "domain-cae/src/commands/analysis.ts",
+      "match": "return max === undefined || (Number.isFinite(max) && max > (min ?? 0));",
+      "reason": "frequency band without a lower bound starts at 0 Hz (band semantics); echoed in the summary"
+    },
+    {
+      "file": "domain-cae/src/commands/analysis.ts",
+      "match": "modes === undefined ? '' : `, ${modes} mode(s)${band === undefined ? '' : ` in ${band.min ?? 0}-${band.max ?? 'inf'} Hz`}`;",
+      "reason": "frequency band without a lower bound starts at 0 Hz (band semantics); echoed in the summary"
+    },
+    {
+      "file": "domain-cae/src/commands/check.ts",
+      "match": "if (load?.kind === 'force' && load.target !== undefined && (load.target.facesNear?.length ?? 0) === 0)",
+      "reason": "count of optional face hints; 0 means none given"
+    },
+    {
+      "file": "domain-cae/src/dynamics/quickChecks.ts",
+      "match": "const lo = Math.max(points[0]?.[0] ?? 0, band?.[0] ?? 0);",
+      "reason": "empty spectrum guard of a band limit; the input is validated non-empty before use"
+    },
+    {
+      "file": "domain-cae/src/dynamics/quickChecks.ts",
+      "match": "const zeta = zetaIn ?? 1 / (2 * (Q ?? 0));",
+      "reason": "unreachable: damping must be given as zeta or Q (DYN_DAMPING_UNSET refuses otherwise)"
+    },
+    {
+      "file": "domain-cae/src/dynamics/quickChecks.ts",
+      "match": "? { points: [[bandHz?.[0] ?? 0, white] as const, [bandHz?.[1] ?? 0, white] as const], name: null, unverified: true, grade: null }",
+      "reason": "flat-spectrum display geometry when bandHz is given"
+    },
+    {
+      "file": "domain-cae/src/explicit/quickCheck.ts",
+      "match": "return Math.sqrt((E * (1 - nu)) / ((1 + nu) * (1 - 2 * nu) * (inputs['rho_kg_m3'] ?? 1)));",
+      "reason": "unreachable: run() refuses a missing or non-finite input with EXP_INPUT_MISSING before evaluate"
+    },
+    {
+      "file": "domain-cae/src/thermomech/thermalStressCheck.ts",
+      "match": ": `${output.rows?.length ?? 0} row(s)`;",
+      "reason": "row count of an optional output table; text only"
+    },
+    {
+      "file": "domain-cae/src/vnv/checkConvergence.ts",
+      "match": "const ratio = (samples[k]?.h ?? 0) / (samples[k - 1]?.h ?? 1);",
+      "reason": "index guard: samples has >= 2 entries, validated before the loop"
+    },
+    {
+      "file": "domain-cae/src/vnv/checkConvergence.ts",
+      "match": "const p = params.assumedOrder ?? 0;",
+      "reason": "two-level study: 0 is the unset marker of an optional assumedOrder (checkConvergence.ts)"
+    },
+    {
+      "file": "domain-cae/src/vnv/checkConvergence.ts",
+      "match": "required = requiredSpacing(params.gciTarget, gci21Fine, p, samples[0]?.h ?? 0);",
+      "reason": "index guard: samples has >= 2 entries, validated above"
+    },
+    {
+      "file": "domain-cae/src/vnv/checkConvergence.ts",
+      "match": "? `${head}, observed order ${p.toPrecision(4)}, extrapolated ${(summaryReport.extrapolated ?? 0).toPrecision(6)} ${params.unit}; ` +",
+      "reason": "summary text of an optional extrapolated value; display only"
+    },
+    {
+      "file": "domain-dynamics/src/commands/checkMotionClearance.ts",
+      "match": "clearance: (params.clearanceMm ?? 0) / mmPerUnit,",
+      "reason": "documented param default (no extra clearance); echoed in data.tolerances"
+    },
+    {
+      "file": "domain-dynamics/src/commands/checkMotionClearance.ts",
+      "match": "tolerances: { epsTouchMm: params.touchToleranceMm ?? DEFAULT_TOUCH_MM, clearanceMm: params.clearanceMm ?? 0, resolutionS },",
+      "reason": "documented param default (no extra clearance); echoed in data.tolerances"
+    },
+    {
+      "file": "domain-dynamics/src/commands/checkMotionClearance.ts",
+      "match": ": `closest ${closest.a} / ${closest.b} ${(closest.minClearanceMm ?? 0).toPrecision(4)} mm at t = ${(closest.timeS ?? 0).toPrecision(4)} s` +",
+      "reason": "summary text of an optional value; display only"
+    },
+    {
+      "file": "domain-dynamics/src/commands/checkPrototype.ts",
+      "match": "const durationS = params.durationS ?? durationOf(checked, params.cycles ?? 1, params.settleS);",
+      "reason": "documented param default (1 cycle) in the param description"
+    },
+    {
+      "file": "domain-dynamics/src/commands/dynamicsSimChecks.ts",
+      "match": "const residual = loops.residualM ?? 0;",
+      "reason": "optional diagnostic absent (no loops / crank / energy record) contributes 0 to a ratio or residual"
+    },
+    {
+      "file": "domain-dynamics/src/commands/dynamicsSimChecks.ts",
+      "match": "const worst = Math.max(closure.ratio, closure.crankSide?.ratio ?? 0);",
+      "reason": "optional diagnostic absent (no loops / crank / energy record) contributes 0 to a ratio or residual"
+    },
+    {
+      "file": "domain-dynamics/src/commands/dynamicsSimChecks.ts",
+      "match": "values: { balanceErrorFraction: balance, balanceErrorJ: run.energy?.balanceErrorJ ?? 0 },",
+      "reason": "optional diagnostic absent (no loops / crank / energy record) contributes 0 to a ratio or residual"
+    },
+    {
+      "file": "domain-dynamics/src/commands/quickCheck.ts",
+      "match": "let offset = (params.offsetMm ?? 0) / 1000;",
+      "reason": "documented param default (no offset) in the param description"
+    },
+    {
+      "file": "domain-dynamics/src/commands/quickCheck.ts",
+      "match": "...(omega !== undefined ? { powerKW: (torque * omega) / 1000, rpm: params.rpm ?? 0 } : {}),",
+      "reason": "power row only built when omega is defined; rpm echoes the input"
+    },
+    {
+      "file": "domain-dynamics/src/commands/quickCheck.ts",
+      "match": "displacementM3: displacement ?? 0,",
+      "reason": "optional displacement shown in the result row; display only"
+    },
+    {
+      "file": "domain-dynamics/src/commands/quickCheck.ts",
+      "match": "? `Mean torque ${(mean['meanTorqueNm'] ?? 0).toPrecision(5)} N·m at MEP ${(mean['mepBar'] ?? 0).toPrecision(5)} bar.`",
+      "reason": "summary text of an optional mean value; display only"
+    }
+  ]
+}

@@ -9,10 +9,11 @@ import { type CadDocument, type EntityId, createEmptyDocument } from '@core/mode
 import { isLocalMode, runLocally, stepLocalHistory } from './localMode';
 import { postDispatch, postHistoryStep } from './onlineMode';
 import type { CadStoreState, DispatchOptions, LiveStatus } from './storeTypes';
-import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from '@protocol/liveSync';
+import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand, documentHash } from '@protocol/liveSync';
 import { reuseUnchanged } from './reuseUnchanged';
 import { execute } from '@core/commands/registry';
 import { withFailureTracking } from '@ui/report/failureStore';
+import { preserveOfflineEdits } from './offlineEdits';
 
 /** Selection survives a document replacement, minus ids that no longer exist. */
 const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): CadDocument => ({
@@ -21,7 +22,7 @@ const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): C
 });
 
 const SET_SELECTION = 'set_selection';
-const REPLACED_LOCAL_EDITS = 'Backend reconnected: edits made while it was offline were replaced by its document.';
+const KEPT_LOCAL_EDITS = 'Backend reconnected: the edits you made while it was offline were kept as a recoverable copy.';
 
 export const useStore = create<CadStoreState>()((set, get) => {
   const stepHistory = (direction: 'undo' | 'redo'): void => {
@@ -89,6 +90,11 @@ export const useStore = create<CadStoreState>()((set, get) => {
     hydrateLiveDocument(snapshot: LiveSnapshotEvent): void {
       const { liveEpoch, liveSeq } = get();
       if (snapshot.epoch === liveEpoch && snapshot.seq < liveSeq) return; // stale resync response
+      // Offline edits = the local document differs from the last live state (also when they left no entity: everything deleted, or only
+      // parameters / layers / settings changed). The undo stack only counts them.
+      const changedOffline = documentHash(get().document) !== documentHash(get().liveBase);
+      const offlineEdits = changedOffline ? Math.max(1, get().localUndoStack.length) : 0;
+      if (offlineEdits > 0) preserveOfflineEdits(get().document, offlineEdits); // never replaced silently (FR-DSF-23)
       const adopted = reuseUnchanged(get().liveBase, snapshot.document);
       set({
         liveBase: adopted,
@@ -97,7 +103,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
         document: withLocalSelection(reuseUnchanged(get().document, adopted), get().document.selection),
         localUndoStack: [],
         localRedoStack: [],
-        ...(get().localUndoStack.length > 0 ? { lastSummary: REPLACED_LOCAL_EDITS } : {}),
+        ...(offlineEdits > 0 ? { lastSummary: KEPT_LOCAL_EDITS } : {}),
       });
     },
 

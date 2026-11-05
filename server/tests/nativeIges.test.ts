@@ -10,6 +10,7 @@ import { sha256Hex } from '@lib/sha256';
 import { box, booleanRecipe, leaf, nativeKernelBinary } from './kernelTestSupport';
 import { entity } from './nativeKernelCorpus';
 import { nativeReferenceHarness } from './nativeReferenceSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const harness = nativeReferenceHarness();
 const OPTIONS: ImportShapesOptions = { precision: 0.01, maxTolerance: 1, heal: true, sew: true };
@@ -37,7 +38,7 @@ async function roundTrip(recipe: unknown): Promise<number> {
   return mass.volume;
 }
 
-describe.skipIf(nativeKernelBinary === null)('native IGES export and import', () => {
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))('native IGES export and import', () => {
   it('a 20 x 10 x 5 box survives the round trip', async () => {
     const volume = await roundTrip(leaf(box([0, 0, 0], [20, 10, 5])));
     expect(Math.abs(volume - 1000) / 1000).toBeLessThan(1e-4);

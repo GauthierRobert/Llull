@@ -15,7 +15,7 @@ import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { FEA_TOOL_ENV, feaToolsMissing } from './feaTestSupport';
 
 const AREA = 10 * 10; // mm^2
 const FORCE = 1000; // N
@@ -105,7 +105,7 @@ afterAll(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('FE pipeline (netgen + ccx)', () => {
+describe.skipIf(feaToolsMissing())('FE pipeline (netgen + ccx)', () => {
   it('refuses to solve or export before a mesh exists', async () => {
     const solve = await cli('fea_solve', `analysisId=${analysisId}`);
     expect(solve.code).toBe(EXIT_COMMAND_ERROR);

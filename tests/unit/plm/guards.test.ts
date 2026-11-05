@@ -114,6 +114,10 @@ describe('S2 lifecycle guards (VC-PLM-02, 03, 08, 09, 25)', () => {
       liveDefinitionMatches: boolean;
     };
     expect(verify).toMatchObject({ contentHashMatches: true, liveDefinitionMatches: false });
+    const failed = run(loaded.document, 'verify_release', { revision: 'A' });
+    expect(failed.data).toMatchObject({ state: 'fail', geometryVerified: false });
+    expect(failed.summary).toContain('FAILED verification');
+    expect(failed.summary.startsWith('partial:')).toBe(false);
     const restored = run(loaded.document, 'restore_revision_snapshot', { revision: 'A' });
     expect(restored.rejected, restored.summary).toBeUndefined();
     expect((run(restored.document, 'plm_status', {}).data as { integrity: Record<string, string> }).integrity['A']).toBe('ok');
@@ -130,7 +134,7 @@ describe('S2 lifecycle guards (VC-PLM-02, 03, 08, 09, 25)', () => {
     expect(run(createEmptyDocument(), 'load_document', { json: text }).summary).toContain('content hash mismatch');
   });
 
-  it('S2-11: verify_release of an untouched revision, and refusal for unreleased ones', () => {
+  it('S2-11 (INT-FB-007): verify_release of an untouched revision, and refusal for unreleased ones', () => {
     const doc = releasedB();
     const verified = run(doc, 'verify_release', { revision: 'A' });
     expect(verified.data).toMatchObject({
@@ -139,6 +143,14 @@ describe('S2 lifecycle guards (VC-PLM-02, 03, 08, 09, 25)', () => {
       signaturesValid: 'n/a (none attached)',
     });
     expect(verified.document).toBe(doc);
+    expect(verified.data).toMatchObject({
+      geometryVerified: false,
+      state: 'partial',
+      unchecked: [{ scope: 'geometry', reason: 'regeneration not implemented' }],
+    });
+    expect((verified.data as { unchecked: Array<{ scope: string }> }).unchecked[0]?.scope).toBe('geometry');
+    expect(verified.summary.startsWith('partial:')).toBe(true);
+    expect(verified.summary).toContain('verified');
     expect(code(inWork(), 'verify_release', { revision: 'A' })).toBe('PLM_NOT_RELEASED');
     expect(code(doc, 'verify_release', { revision: 'Q' })).toBe('PLM_REVISION_UNKNOWN');
   });
@@ -219,5 +231,39 @@ describe('S2 lifecycle guards (VC-PLM-02, 03, 08, 09, 25)', () => {
     expect(APPROVALS).toHaveLength(2);
     expect(readValidation('sample_document.json')).toContain('"entities"');
     expect(loadSample().plm).toBeUndefined();
+  });
+});
+
+describe('verify_release title block (INT-15)', () => {
+  const releasedWith = (sheet: Record<string, unknown>): CadDocument => {
+    const drawn = run(inWork(), 'create_sheet', { name: 'S1', views: ['front'], ...sheet }).document;
+    const review = run(drawn, 'submit_for_review', { at: T, by: 'u-1' }).document;
+    return run(review, 'release_item', {
+      approvals: [
+        { role: 'design-authority', userId: 'u-1' },
+        { role: 'checker', userId: 'u-2' },
+      ],
+      at: T,
+      by: 'u-1',
+    }).document;
+  };
+
+  it('a consistent title block still verifies as partial (geometry unchecked)', () => {
+    const clean = run(releasedWith({}), 'verify_release', { revision: 'A' });
+    expect(clean.data).toMatchObject({ titleBlockConsistent: true, liveDefinitionMatches: true, state: 'partial' });
+  });
+
+  it('a title block out of step with the managed identity while hash and live definition agree is a failure, not "verified except geometry"', () => {
+    const done = releasedWith({ partNumber: 'OTHER' });
+    const result = run(done, 'verify_release', { revision: 'A' });
+    expect(result.data).toMatchObject({
+      contentHashMatches: true,
+      liveDefinitionMatches: true,
+      titleBlockConsistent: false,
+      state: 'fail',
+    });
+    expect(result.summary).toContain('FAILED verification');
+    expect(result.summary.startsWith('partial:')).toBe(false);
+    expect(result.summary).toContain('title block');
   });
 });

@@ -1,0 +1,138 @@
+{
+  "note": "Fallback inventory of the engineering check code (FR-INT-14, TR-INT-14). One entry per default, clamp, nearest-row lookup or catch-all branch of an engineering input. policy: refuse | default-and-report | conservative-neighbour | pending. A non-pending entry names the unit test (relative to the repo root) that proves it and that test must contain the entry id; a pending entry carries a reason and no test. The source scan of tests/unit/contract/fallbackInventory.test.ts catches new unlisted patterns; its allowlist is fallback_scan_allowlist.json.",
+  "entries": [
+    {
+      "id": "INT-FB-001",
+      "file": "packages/domain-aec/src/industrial/steelDesign/steelGrades.ts",
+      "symbol": "steelStrength",
+      "kind": "default",
+      "input": "steel grade text (was: any unparseable grade checked as S355)",
+      "policy": "refuse",
+      "code": "STL_GRADE_UNKNOWN",
+      "test": "tests/unit/building/resultIntegrity.test.ts"
+    },
+    {
+      "id": "INT-FB-002",
+      "file": "packages/domain-aec/src/industrial/steelDesign/steelGrades.ts",
+      "symbol": "steelStrength",
+      "kind": "default",
+      "input": "governing thickness (was: ignored, t <= 40 mm value for every thickness)",
+      "policy": "refuse",
+      "code": "STL_THICKNESS_OUT_OF_RANGE",
+      "test": "tests/unit/building/resultIntegrity.test.ts"
+    },
+    {
+      "id": "INT-FB-003",
+      "file": "packages/domain-aec/src/industrial/steelDesign/steelBolts.ts",
+      "symbol": "resolveBoltClass",
+      "kind": "default",
+      "input": "bolt property class (was: always 8.8)",
+      "policy": "default-and-report",
+      "code": "STL_BOLT_CLASS_UNKNOWN",
+      "test": "tests/unit/building/resultIntegrity.test.ts"
+    },
+    {
+      "id": "INT-FB-004",
+      "file": "packages/domain-aec/src/industrial/steelDesign/steelBolts.ts",
+      "symbol": "stressArea",
+      "kind": "nearest",
+      "input": "bolt diameter (was: snapped to the nearest stress-area table size)",
+      "policy": "refuse",
+      "code": "STL_BOLT_SIZE_NONSTANDARD",
+      "test": "tests/unit/building/resultIntegrity.test.ts"
+    },
+    {
+      "id": "INT-FB-005",
+      "file": "packages/domain-aec/src/civil/road/roadChecks.ts",
+      "symbol": "speedRowFor",
+      "kind": "clamp",
+      "input": "road design speed above 120 km/h (was: clamped to the 120 km/h row)",
+      "policy": "refuse",
+      "code": "CIV_SPEED_OUT_OF_TABLE",
+      "test": "tests/unit/civil/roadCommands.test.ts"
+    },
+    {
+      "id": "INT-FB-006",
+      "file": "packages/domain-aec/src/civil/road/roadChecks.ts",
+      "symbol": "speedRowFor",
+      "kind": "nearest",
+      "input": "road design speed between table rows (next higher row, named in the summary)",
+      "policy": "conservative-neighbour",
+      "test": "tests/unit/civil/roadCommands.test.ts"
+    },
+    {
+      "id": "INT-FB-007",
+      "file": "packages/plm/src/commands/verify.ts",
+      "symbol": "verifyRelease",
+      "kind": "catch-all",
+      "input": "geometry regeneration (not implemented: data.unchecked, state 'partial')",
+      "policy": "default-and-report",
+      "test": "tests/unit/plm/guards.test.ts"
+    },
+    {
+      "id": "INT-FB-008",
+      "file": "packages/domain-aec/src/civil/drainage/drainageAnalysisCommands.ts",
+      "symbol": "criteriaDefaults",
+      "kind": "default",
+      "input": "drainage criteria left out (rainfall intensity, velocity limits, cover, depth ratio, manhole K, freeboard, 5 min inlet time)",
+      "policy": "default-and-report",
+      "test": "tests/unit/civil/drainage.test.ts"
+    },
+    {
+      "id": "INT-FB-009",
+      "file": "packages/domain-aec/src/industrial/piping/pipeSpans.ts",
+      "symbol": "isGasService",
+      "kind": "catch-all",
+      "input": "pipe service text: a service not matching the gas / air / steam regex takes the water-filled span column",
+      "policy": "pending",
+      "reason": "free-text service; the fallback is on the conservative side (water-filled spans are the shorter ones). Replacing the regex by an enum changes the add_pipe_support / pipe service model, larger than this fix: planned with the piping service enum."
+    },
+    {
+      "id": "INT-FB-010",
+      "file": "packages/domain-aec/src/industrial/runway/runwayBeamCheck.ts",
+      "symbol": "checkBeam",
+      "kind": "default",
+      "input": "crane wheel base left out (3000 mm)",
+      "policy": "pending",
+      "reason": "documented default in the wheelBase param description but not yet listed in the result data.defaulted of check_crane_runways / check_portal_frames.",
+      "match": "const wheelBase = model.wheelBase ?? 3000;"
+    },
+    {
+      "id": "INT-FB-011",
+      "file": "packages/domain-aec/src/plant/fabrication/check.ts",
+      "symbol": "checkFabrication (ISO_CUT_LENGTH_SHORT)",
+      "kind": "default",
+      "input": "minimum cut piece rule left out of the project rule set (no minimum: only pieces of 0 mm or less are flagged)",
+      "policy": "pending",
+      "reason": "an absent optional rule disables the minimum-cut-length check without being reported in the result; it should add an info finding naming the unset rule. Planned with the fabrication rule-set work.",
+      "match": "rules.minCutPieceMm?.value ?? 0"
+    },
+    {
+      "id": "INT-FB-012",
+      "file": "packages/domain-aec/src/industrial/frames/frameLoadParams.ts",
+      "symbol": "resolveFrameLoads",
+      "kind": "default",
+      "input": "frame loads left out (deadLoad 0.5, snowLoad 0.8, windPressure 0 kN/m2): echoed in the summary but not listed in data.defaulted",
+      "policy": "pending",
+      "reason": "check_portal_frames / design_portal_frames / check_foundations print the loads used in the summary; listing them in data.defaulted like boltClass needs the shared load shape and its tests reworked. Planned under INT-14."
+    },
+    {
+      "id": "INT-FB-013",
+      "file": "tests/unit/contract/fallbackInventory.test.ts",
+      "symbol": "fallback_scan_baseline.json",
+      "kind": "default",
+      "input": "numeric ?? / || defaults and destructuring defaults in the domain-* files outside the check / design / analysis name tier (recorded as a per-file hit count)",
+      "policy": "pending",
+      "reason": "the scan was extended to every non-test source file of packages/domain-*: these hits are ratcheted per file (a new one fails the scan) but were not individually reviewed. Only the grade fallbacks (S355 and any grade parser) were reviewed; review the rest and promote engineering inputs to refuse / default-and-report entries."
+    },
+    {
+      "id": "INT-FB-014",
+      "file": "packages/domain-aec/src/plant/structures/assembly/assemblyParts.ts",
+      "symbol": "placeMemberRuns",
+      "kind": "default",
+      "input": "steel grade of generated rack / platform members (was: the unparseable text \"steel\", checked as S355)",
+      "policy": "pending",
+      "reason": "generated members now store the explicit grade S355 (visible in the model, checked like any stored grade) but add_pipe_rack / add_access_platform have no grade parameter and derived members cannot be edited; add a steelGrade field to the rack and platform specs."
+    }
+  ]
+}

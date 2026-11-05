@@ -5,13 +5,13 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeCase, editStep, expectCase, loadPlan, openCase, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing } from './feaTestSupport';
 
 const AREA_M2 = 0.1 * 0.1;
 /** The probes at 0.0099 / 0.0101 m sit in a linear field per slab: extrapolate the two interface temperatures to z = 0.01 m. */
 const EXTRAPOLATION = 0.01 / 0.0099;
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('thermal contact conductance (netgen + ccx)', () => {
+describe.skipIf(feaToolsMissing())('thermal contact conductance (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('contact');

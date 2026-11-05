@@ -2,11 +2,16 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
+import { refusedEntries } from '../reports/checkReport';
+import { refusedRows } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
+import { defaultedInputs, withDefaulted } from '../common/defaulted';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
+import { DEFAULT_BOLT_CLASS } from '../steelDesign/steelBolts';
 import { designFixedPlates } from '../connections/plateDesign';
 import { isValidTargetUtilisation, targetUtilisationParam } from '../common/profileGroups';
-import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
+import { BOLT_CLASS_SHAPE, describeBolts, describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 import { sizeBoltGroups } from '../connections/frameBoltDesign';
 import { checkFrames } from './frameCheckFrames';
 import { frameMassKg, scoreRows, sizeFrames, withFixedBases } from './frameDesignLoop';
@@ -19,6 +24,10 @@ const FIXED_BASE_MASS_GAIN = 0.75;
  * @affects up-sizes failing rafter / column profiles (all members of that role and section on the
  *          level, keeping frames uniform) and sizes the bolt groups of every moment connection
  * @failure bad loads / unknown level / no frame / no section large enough -> no-op or partial report
+ * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op
+ * @failure STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE on a column / rafter -> "not designed — <code>": document unchanged, members named in data.refused, nothing up-sized
+ * @invariant a refused row (also STL_BOLT_SIZE_NONSTANDARD on a connection) is never up-sized for, never counted in maxUtilisation / failures; data.refusedCount reports it
+ * @invariant boltClass omitted -> 8.8, listed in data.defaulted and named in the summary
  */
 export const designPortalFrames = defineCommand({
   name: 'design_portal_frames',
@@ -28,10 +37,11 @@ export const designPortalFrames = defineCommand({
     'targetUtilisation (uniformly for all frames) — strength / buckling failures to the next heavier profile of the same family, sway and ' +
     'stability failures (column-stiffness driven) by up-sizing the columns only to the section whose inertia the sway ratio asks for, with ' +
     'fixed column bases tried when pinned bases cannot pass (allowFixedBases) — then sizes the bolt groups of the ' +
-    'moment connections (bolt diameter M20–M30 and rows) per connection type for every combination. Reports every change and the final ' +
+    'moment connections (bolt diameter M20–M30 and rows) per connection type for every combination (bolt property class boltClass, default 8.8 reported in data.defaulted). Reports every change and the final ' +
     'utilisations.',
   params: z.object({
     ...FRAME_LOAD_SHAPE,
+    ...BOLT_CLASS_SHAPE,
     targetUtilisation: targetUtilisationParam,
     allowFixedBases: z
       .boolean()
@@ -46,7 +56,31 @@ export const designPortalFrames = defineCommand({
       return noop(doc, 'design_portal_frames failed: targetUtilisation must be in [0.5, 1].');
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `design_portal_frames failed: ${resolved.reason}.`);
-    const { loads, levelId } = resolved;
+    const { loads, levelId, defaulted } = resolved;
+    const settings = defaultedInputs(params, { targetUtilisation, allowFixedBases });
+    const withBolts = (result: CommandResult): CommandResult =>
+      withDefaulted(
+        {
+          ...result,
+          summary: `${result.summary} Bolts: ${describeBolts(loads, defaulted)}.`,
+          data: { ...(result.data as object), defaulted },
+        },
+        settings,
+      );
+    const initial = checkFrames(doc, levelId, loads);
+    const refused = refusedRows(initial.rows.filter((row) => row.kind !== 'connection'));
+    if (initial.frames > 0 && refused.length > 0) {
+      const entries = refusedEntries(refused, (row) => `${row.mark} ${row.kind}`);
+      const codes = [...new Set(entries.map((entry) => entry.code))].join(', ');
+      return withBolts(
+        report(
+          doc,
+          `design_portal_frames: not designed — ${codes}: ${refused.length} member row(s) refused (${briefList(entries, (entry) => entry.label)}): ` +
+            `${entries[0]?.message ?? ''}. No profile, plate or bolt was changed; correct the material / section and re-run.`,
+          { changes: [], maxUtilisation: null, failures: null, refusedCount: refused.length, refused: entries },
+        ),
+      );
+    }
     const pinned = sizeFrames(doc, levelId, loads, targetUtilisation);
     if (pinned.noFrames) return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
     // Sway is column-stiffness driven: fixed bases (4x stiffer than pinned under a rigid rafter) are tried when pinned bases fail, or cost
@@ -78,19 +112,19 @@ export const designPortalFrames = defineCommand({
     const { current, changes, changed, analysed } = sizing;
     let { limited } = sizing;
     const rows = sizing.settledRows ?? checkFrames(current, levelId, loads).rows;
-    const bolts = sizeBoltGroups(current, getBuilding(current), rows, targetUtilisation);
+    const bolts = sizeBoltGroups(current, getBuilding(current), rows, targetUtilisation, loads.boltClass ?? DEFAULT_BOLT_CLASS);
     let building = bolts.building;
     changes.push(...bolts.changes);
     for (const id of bolts.changed) changed.add(id);
     if (bolts.limited) limited = true;
     const plates = designFixedPlates(current, building, levelId, loads, targetUtilisation);
     building = plates.building;
-    if (plates.changed.length > 0) changes.push(...plates.descriptions);
+    if (plates.changed.length > 0 || plates.unresolved > 0) changes.push(...plates.descriptions);
     for (const id of plates.changed) changed.add(id);
     if (plates.unresolved > 0) limited = true;
     if (changed.size === 0) {
       const final = checkFrames(doc, levelId, loads);
-      return noChangeResult(doc, `${final.frames} frame(s)`, final.rows, limited);
+      return withBolts(noChangeResult(doc, `${final.frames} frame(s)`, final.rows, limited));
     }
     const document = regenerateBuilding(doc, building);
     const final = checkFrames(document, levelId, loads);
@@ -98,14 +132,16 @@ export const designPortalFrames = defineCommand({
       (element) => element.category === 'member' && element.levelId === levelId && element.role === 'column' && !analysed.has(element.id),
     );
     const stats = utilisationStats(final.rows);
-    return designResult(
-      document,
-      `Designed ${final.frames} frame(s) for ${final.combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
-        `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ${finalUtilisationText(stats, 'element(s)', limited)}${baseNote} Frames ` +
-        `only (verify bracing, foundations and runways with their checks)${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
-      changed,
-      changes,
-      stats,
+    return withBolts(
+      designResult(
+        document,
+        `Designed ${final.frames} frame(s) for ${final.combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
+          `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ${finalUtilisationText(stats, 'element(s)', limited)}${baseNote} Frames ` +
+          `only (verify bracing, foundations and runways with their checks)${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
+        changed,
+        changes,
+        stats,
+      ),
     );
   },
 });

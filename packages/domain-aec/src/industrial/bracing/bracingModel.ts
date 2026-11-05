@@ -1,6 +1,8 @@
 import type { SteelMemberElement } from '@aec/building/types';
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { bucklingReduction, eulerForce } from '../steelDesign/steelDesign';
+import type { SteelRefusal } from '../steelDesign/steelGrades';
+import { refusedFields, type RowRefusal } from '../common/utilisation';
 import { CRANE_FACTORS, craneActions } from '../frames/frameModelTypes';
 import { GAMMA_CRANE } from '../../shared/loadFactors';
 import { bufferForce, GAMMA_BUFFER } from '../runway/runwayCheckModel';
@@ -48,7 +50,7 @@ export const CP_POST = 0.8 + 0.2;
 /** EN 1993-1-1 §5.3.3 bracing equivalent force ratio (simplified 1/200). */
 export const STABILITY_RATIO = 1 / 200;
 
-/** Utilisation reported when a required member is missing (always a failure). */
+/** Utilisation reported when a required member is missing: a genuine failure of the design, not a refusal. */
 export const NO_MEMBER_UTILISATION = 99;
 
 /** Eaves purlin sits within this of the wall line in x (lift of the purlin off the rafter), mm. */
@@ -77,6 +79,8 @@ export interface BracingRow {
   readonly momentResistance: number;
   readonly utilisation: number;
   readonly check: string;
+  /** Set when the member's grade / thickness was refused: the row was not computed. */
+  readonly refusal?: RowRefusal;
 }
 
 export type Point = readonly [number, number, number];
@@ -101,3 +105,20 @@ export function bucklingResistance(profile: SteelProfile, fy: number, length: nu
 }
 
 export type Panel = { readonly group: string; readonly roof: boolean; readonly bay: string; readonly braces: Located[] };
+
+/** Failed row of a member whose steel grade or governing thickness was refused (never a pass). */
+export function refusedRow(group: string, member: SteelMemberElement, kind: BracingRow['kind'], refusal: SteelRefusal): BracingRow {
+  return {
+    group,
+    elementId: member.id,
+    elementIds: [member.id],
+    mark: member.mark,
+    kind,
+    force: 0,
+    resistance: 0,
+    moment: 0,
+    momentResistance: 0,
+    ...refusedFields(refusal),
+    check: `${member.profile} not checked — ${refusal.message}`,
+  };
+}

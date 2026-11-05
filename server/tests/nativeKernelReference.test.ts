@@ -22,6 +22,7 @@ import {
   relative,
   WorstDeviations,
 } from './nativeReferenceSupport';
+import { requireTool } from '../../tests/requireTool';
 
 interface Measured {
   readonly volume_mm3: number;
@@ -95,7 +96,7 @@ const maxRelative = (actual: readonly number[], expected: readonly number[]): nu
 const maxAbsolute = (actual: readonly number[], expected: readonly number[]): number =>
   Math.max(...expected.map((value, index) => Math.abs(actual[index]! - value)));
 
-describe.skipIf(nativeKernelBinary === null)(
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
   'VC-KRN-25: native kernel vs the OCP 7.9.3 analytic cross-check (occt_crosscheck.json)',
   () => {
     it('covers every reference case', () => {
@@ -134,62 +135,65 @@ describe.skipIf(nativeKernelBinary === null)(
   },
 );
 
-describe.skipIf(nativeKernelBinary === null)('VC-KRN-25: the default Gauss rule on curved faces (closed form)', () => {
-  // Ring: r from 1 to the arc through (2, 0), (2.5, 1), (2, 2) (centre r = 1.25, radius 1.25), h from 0 to 2, revolved about Z.
-  // OCCT's adaptive Eps rule (the WASM kernel's) gives Ixx = 55.616 / Iyy = 55.586 here: 2.7e-4 off and not axisymmetric.
-  const outer = (h: number): number => 1.25 + Math.sqrt(1.25 ** 2 - (h - 1) ** 2);
-  const simpson = (f: (h: number) => number, n = 20_000): number => {
-    let sum = f(0) + f(2);
-    for (let i = 1; i < n; i++) sum += (i % 2 === 1 ? 4 : 2) * f((2 * i) / n);
-    return (sum * 2) / n / 3;
-  };
-  const ring = (h: number): number => Math.PI * (outer(h) ** 2 - 1);
-  const volume = simpson(ring);
-  const centre = simpson((h) => h * ring(h)) / volume;
-  const izz = simpson((h) => (Math.PI * (outer(h) ** 4 - 1)) / 2);
-  const ixx = izz / 2 + simpson((h) => (h - centre) ** 2 * ring(h));
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
+  'VC-KRN-25: the default Gauss rule on curved faces (closed form)',
+  () => {
+    // Ring: r from 1 to the arc through (2, 0), (2.5, 1), (2, 2) (centre r = 1.25, radius 1.25), h from 0 to 2, revolved about Z.
+    // OCCT's adaptive Eps rule (the WASM kernel's) gives Ixx = 55.616 / Iyy = 55.586 here: 2.7e-4 off and not axisymmetric.
+    const outer = (h: number): number => 1.25 + Math.sqrt(1.25 ** 2 - (h - 1) ** 2);
+    const simpson = (f: (h: number) => number, n = 20_000): number => {
+      let sum = f(0) + f(2);
+      for (let i = 1; i < n; i++) sum += (i % 2 === 1 ? 4 : 2) * f((2 * i) / n);
+      return (sum * 2) / n / 3;
+    };
+    const ring = (h: number): number => Math.PI * (outer(h) ** 2 - 1);
+    const volume = simpson(ring);
+    const centre = simpson((h) => h * ring(h)) / volume;
+    const izz = simpson((h) => (Math.PI * (outer(h) ** 4 - 1)) / 2);
+    const ixx = izz / 2 + simpson((h) => (h - centre) ** 2 * ring(h));
 
-  it('arc-profile revolution about Z: volume and inertia at the closed form, Ixx = Iyy', async () => {
-    const curves: CurveSegment<Vec2>[] = [
-      {
-        type: 'line',
-        points: [
-          [1, 0],
-          [2, 0],
-        ],
-      },
-      {
-        type: 'arc',
-        points: [
-          [2, 0],
-          [2.5, 1],
-          [2, 2],
-        ],
-      },
-      {
-        type: 'line',
-        points: [
-          [2, 2],
-          [1, 2],
-        ],
-      },
-      {
-        type: 'line',
-        points: [
-          [1, 2],
-          [1, 0],
-        ],
-      },
-    ];
-    const solid = entity('revolution', { profile: sampleProfile(curves), curves, axis: [0, 0, 1], angle: 2 * Math.PI, segments: 32 });
-    const mass = (await harness.on('massProperties', leaf(solid))) as ExactMassProperties;
-    expect(worst.record('arc revolution volume vs closed form', relative(mass.volume, volume), 'ring')).toBeLessThan(1e-12);
-    const inertia = maxRelative(diagonal(mass), [ixx, ixx, izz]);
-    expect(worst.record('arc revolution inertia vs closed form', inertia, 'ring')).toBeLessThan(1e-12);
-  });
-});
+    it('arc-profile revolution about Z: volume and inertia at the closed form, Ixx = Iyy', async () => {
+      const curves: CurveSegment<Vec2>[] = [
+        {
+          type: 'line',
+          points: [
+            [1, 0],
+            [2, 0],
+          ],
+        },
+        {
+          type: 'arc',
+          points: [
+            [2, 0],
+            [2.5, 1],
+            [2, 2],
+          ],
+        },
+        {
+          type: 'line',
+          points: [
+            [2, 2],
+            [1, 2],
+          ],
+        },
+        {
+          type: 'line',
+          points: [
+            [1, 2],
+            [1, 0],
+          ],
+        },
+      ];
+      const solid = entity('revolution', { profile: sampleProfile(curves), curves, axis: [0, 0, 1], angle: 2 * Math.PI, segments: 32 });
+      const mass = (await harness.on('massProperties', leaf(solid))) as ExactMassProperties;
+      expect(worst.record('arc revolution volume vs closed form', relative(mass.volume, volume), 'ring')).toBeLessThan(1e-12);
+      const inertia = maxRelative(diagonal(mass), [ixx, ixx, izz]);
+      expect(worst.record('arc revolution inertia vs closed form', inertia, 'ring')).toBeLessThan(1e-12);
+    });
+  },
+);
 
-describe.skipIf(nativeKernelBinary === null)(
+describe.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
   'VC-KRN-25: native kernel vs the OCP 7.9.3 behaviour probe (occt_behaviour_probe.json)',
   () => {
     const [A, B, C] = [100, 50, 20];

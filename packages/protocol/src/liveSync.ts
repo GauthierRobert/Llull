@@ -65,6 +65,34 @@ export type LiveProgressReport = {
 /** The `progress` event as the stream carries it: the report with the server epoch. */
 export type LiveProgressEvent = LiveProgressReport & { readonly epoch: string };
 
+/**
+ * SSE `status` event (host health, NOT a document change: no `seq`, not in the command log): the backend's autosave started failing
+ * (`ok: false`, stable `DSF_*` code) or works again (`ok: true`). Also sent to a subscriber that connects while it is failing, and
+ * mirrored in `GET /health` as `autosave`.
+ */
+export type LiveAutosaveStatus =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly code: 'DSF_SAVE_DISK_FULL' | 'DSF_SAVE_IO' | 'DSF_AUTOSAVE_FAILED' | 'DSF_HOLD_EXPIRED';
+      readonly message: string;
+    };
+
+export interface LiveStatusEvent {
+  readonly epoch: string;
+  readonly autosave: LiveAutosaveStatus;
+}
+
+/**
+ * SSE `document` event (host state, NOT a document change): the file the live document belongs to (null: untitled). Sent after a snapshot when
+ * it has a path, and whenever the host rebinds the document (open / Save As / restore), so a client that later loses the backend knows which
+ * file its offline edits started from.
+ */
+export interface LiveDocumentEvent {
+  readonly epoch: string;
+  readonly path: string | null;
+}
+
 /** SSE `snapshot` event and `GET /live/snapshot` body: the full server document at `seq`. */
 export interface LiveSnapshotEvent {
   readonly epoch: string;

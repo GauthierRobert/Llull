@@ -6,7 +6,9 @@
 
 import { useEffect } from 'react';
 import { useStore } from '@ui/store';
-import type { LiveCommandEvent, LiveProgressEvent, LiveSnapshotEvent } from '@protocol/liveSync';
+import type { LiveCommandEvent, LiveDocumentEvent, LiveProgressEvent, LiveSnapshotEvent, LiveStatusEvent } from '@protocol/liveSync';
+import { useRecoveryStore } from '@ui/store/recoveryStore';
+import { useHostStatusStore } from '@ui/store/hostStatusStore';
 import { useJobProgressStore } from '@ui/store/jobProgressStore';
 import { noteApplied } from '@ui/store/commandCancel';
 import { hasApiToken, liveStreamUrl, liveTicketStreamUrl } from '@ui/serverConfig';
@@ -15,6 +17,8 @@ import { isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
 
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30000;
+/** Consecutive failed snapshot resyncs after which the view is declared out of sync (TR-INT-16). */
+const OUT_OF_SYNC_AFTER_FAILURES = 3;
 
 /** The fields the chip reads are there with the right types (a malformed or foreign payload is ignored). */
 function isProgressEvent(value: unknown): value is LiveProgressEvent {
@@ -43,6 +47,7 @@ export function useLiveDocument(): void {
     let disposed = false;
     let resyncInFlight = false;
     let resyncQueued = false;
+    let resyncFailures = 0;
 
     // One snapshot fetch at a time; failures arriving meanwhile coalesce into one follow-up.
     const resync = (): void => {
@@ -59,8 +64,14 @@ export function useLiveDocument(): void {
           } finally {
             markLiveOrigin(null);
           }
+          resyncFailures = 0;
+          useHostStatusStore.getState().setOutOfSync(false);
         })
-        .catch(() => undefined) // next event or reconnect resyncs
+        .catch(() => {
+          // The next event or reconnect resyncs again; a run of failures is shown, never swallowed.
+          resyncFailures += 1;
+          if (resyncFailures >= OUT_OF_SYNC_AFTER_FAILURES) useHostStatusStore.getState().setOutOfSync(true);
+        })
         .finally(() => {
           resyncInFlight = false;
           if (resyncQueued && !disposed) {
@@ -102,6 +113,7 @@ export function useLiveDocument(): void {
 
       es.onopen = () => {
         attempt = 0;
+        useHostStatusStore.getState().setAutosave({ ok: true }); // a failing autosave is announced again right after the opening snapshot
         setLiveStatus('connected');
       };
 
@@ -109,7 +121,10 @@ export function useLiveDocument(): void {
         try {
           const snapshot = JSON.parse((e as MessageEvent<string>).data) as LiveSnapshotEvent;
           markLiveOrigin({ kind: 'snapshot' });
-          hydrateLiveDocument(snapshot);
+          hydrateLiveDocument(snapshot); // files the offline edits under the previous path first
+          useRecoveryStore.getState().setDocumentPath(null); // the host's `document` event follows when the document has a file
+          resyncFailures = 0;
+          useHostStatusStore.getState().setOutOfSync(false);
         } catch {
           // Malformed JSON from server — ignore, stay connected.
         } finally {
@@ -133,6 +148,26 @@ export function useLiveDocument(): void {
         markLiveOrigin(null);
         if (applied) return;
         resync();
+      });
+
+      // The file the document belongs to (open / Save As / restore); never touches the document.
+      es.addEventListener('document', (e: Event) => {
+        try {
+          const event = JSON.parse((e as MessageEvent<string>).data) as LiveDocumentEvent;
+          useRecoveryStore.getState().setDocumentPath(typeof event.path === 'string' ? event.path : null);
+        } catch {
+          // Malformed JSON from server: ignore, stay connected.
+        }
+      });
+
+      // Host health (autosave failing / recovered); never touches the document.
+      es.addEventListener('status', (e: Event) => {
+        try {
+          const event = JSON.parse((e as MessageEvent<string>).data) as LiveStatusEvent;
+          useHostStatusStore.getState().setAutosave(event.autosave);
+        } catch {
+          // Malformed JSON from server: ignore, stay connected.
+        }
       });
 
       // A native job of a running command reports here; an event type this client does not know is simply not listened to.

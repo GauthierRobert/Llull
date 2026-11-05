@@ -78,7 +78,7 @@
 | `set_units` | Set the document unit of length and/or the display precision (decimal places). |  |
 | `stack_on` | Translate movingId so that its bounding-box minimum face along axis exactly meets the bounding-box maximum face of baseId. |  |
 | `ungroup_entities` | Dissolve a group, removing it from the document. |  |
-| `update_layer` | Change one or more properties of a layer: rename it (name), show or hide it (visible; hidden layers are not rendered), lock or unlock it (locked; entities on a… |  |
+| `update_layer` | Change one or more properties of a layer: rename it (name), show or hide it (visible; hidden layers are not rendered), lock or unlock it (locked; every command… |  |
 
 ## 2d
 

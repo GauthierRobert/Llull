@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
 const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
@@ -24,7 +24,7 @@ afterAll(() => {
   workspace.dispose();
 });
 
-describe.skipIf(!READY)('VC-TMC-01.a / 05 with the coupled procedure', () => {
+describe.skipIf(feaToolsMissing(true))('VC-TMC-01.a / 05 with the coupled procedure', () => {
   it('check_thermo_mechanical is clean, fea_export writes the coupled step, and the restrained bar gives -E alpha dT', async () => {
     const session = workspace.open('coupled-bar');
     const analysisId = await session.idOf(planPath('tmc_coupled_bar'), 'an');
@@ -45,7 +45,7 @@ describe.skipIf(!READY)('VC-TMC-01.a / 05 with the coupled procedure', () => {
   }, 240_000);
 });
 
-describe.skipIf(!READY)('VC-TMC-05 thick cylinder with the coupled procedure (one analysis, no separate heat case)', () => {
+describe.skipIf(feaToolsMissing(true))('VC-TMC-05 thick cylinder with the coupled procedure (one analysis, no separate heat case)', () => {
   it('hoop stress at the bore and the outer surface, axial stress at the bore (free ends)', async () => {
     const session = workspace.open('coupled-cylinder');
     const analysisId = await session.idOf(planPath('tmc_coupled_cylinder'), 'an');

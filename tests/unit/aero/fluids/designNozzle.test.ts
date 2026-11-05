@@ -45,6 +45,28 @@ describe('design_nozzle (VC-FLD-20..22)', () => {
     expect(result.defaulted.join(' ')).toContain('Huzel');
   });
 
+  it('lists every omitted design parameter in data.defaulted and says so in the summary (INT-14)', () => {
+    const defaulted = ok(doc, 'design_nozzle', { throatRadius: 50, expansionRatio: 25, wallThickness: 4 });
+    const list = (defaulted.data as Design).defaulted.join(' | ');
+    for (const text of ['contractionRatio 3', 'convergentHalfAngleDeg 30', 'segments 96', 'lengthFraction 0.8', 'chamberLength 0']) {
+      expect(list).toContain(text);
+    }
+    expect(defaulted.summary).toContain('convergentHalfAngleDeg 30');
+    const explicit = design({
+      throatRadius: 50,
+      expansionRatio: 25,
+      wallThickness: 4,
+      contractionRatio: 3,
+      convergentHalfAngleDeg: 30,
+      segments: 96,
+      lengthFraction: 0.8,
+      chamberLength: 0,
+    });
+    expect(explicit.result.defaulted.join(' ')).not.toMatch(
+      /segments|chamberLength|lengthFraction|convergentHalfAngleDeg|contractionRatio/,
+    );
+  });
+
   it('chart lookup interpolates between the digitised points and is held at the ends', () => {
     expect(raoAngles(9.93)?.entranceDeg).toBeCloseTo(25.21, 9);
     expect(raoAngles(5)?.entranceDeg).toBeCloseTo(22.57, 9);

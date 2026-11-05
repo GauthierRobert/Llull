@@ -211,7 +211,7 @@ export const loadDocument = defineCommand({
     'Replace the current document with one parsed from a serialized JSON string ' +
     'produced by serializeDocument (envelope format: llull-document v3; v1 and v2 are still read). ' +
     'On parse or validation failure the document is left unchanged.',
-  annotations: { metaHistory: true, idempotent: true },
+  annotations: { metaHistory: true, idempotent: true, layerManagement: true },
   params: z.object({
     json: z
       .string()

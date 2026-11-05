@@ -20,6 +20,7 @@ import type { ExchangeOptions } from '../src/pythonExchange';
 import { EXIT_COMMAND_ERROR, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from '../src/cli/main';
 import { withFileContent } from '../src/cli/exchange';
 import { getLiveDoc } from '../src/liveDocument';
+import { requireTool } from '../../tests/requireTool';
 
 const triangle = { positions: [0, 0, 0, 10, 0, 0, 0, 10, 0], name: 'plate', color: '#336699' };
 const fakePort: CadExchangePort = {
@@ -145,7 +146,7 @@ describe('llull CLI — exchange tools', () => {
 
 const realPython = process.env['LLULL_TEST_PYTHON'];
 
-describe.skipIf(realPython === undefined)('llull CLI — real CadQuery STEP round trip', () => {
+describe.skipIf(requireTool('python', realPython !== undefined))('llull CLI — real CadQuery STEP round trip', () => {
   it('exports STEP with CadQuery and imports it back', async () => {
     const dir = work();
     const real = (): ExchangeOptions => exchangeOptionsWithDwg({ LLULL_PYTHON: realPython });

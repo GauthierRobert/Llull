@@ -10,6 +10,8 @@ export interface UtilisationMark {
   readonly utilisation: number;
   /** The check reports the member as failing whatever its ratio. */
   readonly failing: boolean;
+  /** The check refused the member's input: not computed, drawn neutral (neither pass nor fail). */
+  readonly refused: boolean;
   readonly label: string;
 }
 

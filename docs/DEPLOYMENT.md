@@ -7,8 +7,8 @@ seats, audit trail or admin routes: one local backend per machine, started by th
 | Piece           | What it is                                                                                     |
 | --------------- | ---------------------------------------------------------------------------------------------- |
 | Desktop app     | Electron shell (`desktop/`): starts the local backend on loopback and shows the React UI in it |
-| Local backend   | `server/` bundle: the live document, autosave, exchange (STEP / DWG / CadQuery), exports        |
-| `llull` CLI     | `server/src/cli`: the agent path (Claude Code, scripts, CI), on a file or on the open app       |
+| Local backend   | `server/` bundle: the live document, autosave, exchange (STEP / DWG / CadQuery), exports       |
+| `llull` CLI     | `server/src/cli`: the agent path (Claude Code, scripts, CI), on a file or on the open app      |
 | Native binaries | `solver/` (`llull-compute`, `llull-kernel`), bundled with the app when built                   |
 
 ## 1. Install
@@ -38,7 +38,10 @@ file. Procedure: the `llull-cli` skill; reference: `node server/bin/llull.cjs he
   writes it, owner-only, to `~/.llull/desktop.json` for the CLI. Every REST call needs it as
   `Authorization: Bearer <token>`; the SSE stream takes a single-use 30 s `?ticket=` minted by
   `POST /live/ticket`. Other local processes and websites cannot reach the document.
-- The only allowed browser origin is the app's own; Host headers other than loopback names are refused
+- A backend with no token refuses every mutating route (`401 SEC_TOKEN_REQUIRED`) unless started with
+  `--insecure-no-token` (`LLULL_INSECURE_NO_TOKEN=1`: logged, `insecure: true` in `/health`); a standalone launch
+  without either generates a per-launch token and prints it. There is no default allowed browser origin
+  (`LLULL_ALLOWED_ORIGINS` names one explicitly); Host headers other than loopback names are refused
   (DNS rebinding).
 
 Every server variable (rate limits, timeouts, Python bridge, kernel) is listed in
@@ -56,7 +59,7 @@ WebAssembly/library build into the app) unless llull's licence allows it.
 
 ## 5. Backup and upgrade
 
-The open document is autosaved to `autosave.json` in the app's user-data directory; File › Save writes
-`.llull` files wherever the user chooses. Back up those files like any other engineering data. The autosave is
-versioned and migrated on load; an unreadable one is moved aside as `autosave.json.unreadable-<ts>` and the
-app starts empty. Upgrading is installing the new build over the old one.
+Every open document is autosaved to its own recovery slot in the `recovery` folder of the app's user-data directory (one slot per document
+path, plus one per untitled session); a clean save removes the slot and the next launch lists the slots that remain (Document Recovery).
+File › Save writes `.llull` files wherever the user chooses. Back up those files like any other engineering data. Slots are versioned and migrated
+on load; an unreadable one is moved aside as `<slot>.json.unreadable-<ts>` and the app starts empty. Upgrading is installing the new build over the old one.

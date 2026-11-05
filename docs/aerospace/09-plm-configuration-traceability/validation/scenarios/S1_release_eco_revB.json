@@ -363,6 +363,9 @@
         "data.contentHashMatches": true,
         "data.reconstructedFrom": "release snapshot A",
         "data.signaturesValid": "n/a (none attached)",
+        "data.geometryVerified": false,
+        "data.state": "partial",
+        "summaryContains": "partial:",
         "note": "A is superseded; verify_release accepts released, superseded and obsolete revisions"
       }
     }

@@ -20,7 +20,7 @@ import { extractCurves, type CurveData } from '@cae/nonlinear/curves';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
 import { defaultFeArtifactStore } from '../src/fea/artifactStore';
 import { REPO_ROOT } from './packCli';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { FEA_TOOL_ENV, feaToolsMissing } from './feaTestSupport';
 
 const PLANS = 'docs/physics/05-nonlinear-structural/validation/plans';
 const VALIDITY = {
@@ -97,7 +97,7 @@ afterAll(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('PHY-05 validation plans with ccx', () => {
+describe.skipIf(feaToolsMissing())('PHY-05 validation plans with ccx', () => {
   it('VC-NLS-40.b: the plastic cantilever collapses at M_p / L = 500 N', async () => {
     const { curve } = await replay('nls_cantilever_plastic_collapse');
     const peak = Math.max(...curve.load.map(Math.abs));

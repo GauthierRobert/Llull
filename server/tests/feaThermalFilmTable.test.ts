@@ -7,7 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeCase, editStep, loadPlan, openCase, type PlanStep, type ThermalCase } from './feaThermalSupport';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing } from './feaTestSupport';
 
 const FACE_TEMPERATURE = (-280 + Math.sqrt(280 ** 2 + 4 * 26000)) / 2;
 const FLUX_W_M2 = (50 * (100 - FACE_TEMPERATURE)) / 0.1;
@@ -25,7 +25,7 @@ function transientPlan(film: Record<string, unknown>): PlanStep[] {
   ];
 }
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('film coefficient table h(T) (netgen + ccx)', () => {
+describe.skipIf(feaToolsMissing())('film coefficient table h(T) (netgen + ccx)', () => {
   let opened: ThermalCase | undefined;
   beforeEach(async () => {
     opened = await openCase('filmtable');

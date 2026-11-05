@@ -7,7 +7,8 @@ import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import { bufferStiffnessField, craneSelfWeightField, craneValueProblem, travelSpeedField } from '../common/craneParams';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_TRAVEL_SPEED } from '../runway/runwayCheckModel';
 import { round } from '../../shared/numeric';
-import { checkTable, failureSummary } from '../reports/checkReport';
+import { checkTable, failureSummary, refusedEntries } from '../reports/checkReport';
+import { defaultedClause, defaultedInputs } from '../common/defaulted';
 import { analyseBracing, locateMembers } from './bracingAnalysis';
 import { existingLevelIdParam } from '../../building/levelParams';
 
@@ -15,6 +16,8 @@ import { existingLevelIdParam } from '../../building/levelParams';
  * @affects none; data = { rows: BracingRow[], csv, maxUtilisation, failures, windForce, ... }
  * @invariant ULS wind = 1.5 · qp · 1.3 · gable area; tension-only diagonals; Npl,Rd = A·fy
  * @failure negative loads / unknown level / no bracing / no rafters -> no data
+ * @failure STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE (member material / section) -> the row carries `refusal`, is listed in data.refused and the summary ("refused (<code>)"), never counts in maxUtilisation or failures, never passes
+ * @invariant omitted windPressure / deadLoad / snowLoad -> data.defaulted and the summary
  */
 export const checkBracing = defineCommand({
   name: 'check_bracing',
@@ -31,7 +34,7 @@ export const checkBracing = defineCommand({
     'on the two outer walls: panel shear V = w·(W/2 − d) (w = bay force / W, d = distance of the panel edge from the nearest wall), so ' +
     'wall-side panels carry about half the bay force. Struts: wall = column, Lcr = column height; roof = rafter, Lcr = purlin gap along ' +
     'the rafter; plus the eaves purlin carrying the truss reaction (bay force / 2) with Lcr = bay length (row flagged utilisation 99 if ' +
-    'absent). On multi-span halls the internal column lines carry no wall bracing, so the roof truss still spans the full hall width and ' +
+    'absent; a member whose grade is refused is a refused row, not a utilisation). On multi-span halls the internal column lines carry no wall bracing, so the roof truss still spans the full hall width and ' +
     'the reaction (bay force / 2) acts at the two OUTER wall lines only: the eaves-strut force equals that of a single-span hall of the ' +
     'same gable area (it grows with the gable, e.g. a monopitch gable is larger than a duopitch one), and a light eaves purlin such as ' +
     'the default C200x75x2.5 over a 6 m bay (about 36 kN) can fail at qp above about 0.7 kN/m²: fit a heavier eaves purlin ' +
@@ -64,6 +67,7 @@ export const checkBracing = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, deadLoad = 0.5, snowLoad = 0.8 } = params;
+    const defaulted = defaultedInputs(params, { windPressure, deadLoad, snowLoad });
     if (!isNonNegativeNumber(windPressure) || !isNonNegativeNumber(deadLoad) || !isNonNegativeNumber(snowLoad)) {
       return noop(doc, 'check_bracing failed: windPressure, deadLoad, snowLoad must be >= 0.');
     }
@@ -102,7 +106,7 @@ export const checkBracing = defineCommand({
       craneSides,
       craneFoundation,
     } = analysis;
-    const { csv, failures, worst } = checkTable(
+    const { csv, failures, refused, worst } = checkTable(
       rows,
       ['Group', 'Mark', 'Type', 'Force (kN)', 'Resistance (kN)', 'M (kNm)', 'Utilisation', 'Status', 'Check'],
       (row, status) => [
@@ -112,7 +116,7 @@ export const checkBracing = defineCommand({
         round(row.force, 1),
         round(row.resistance, 1),
         round(row.moment, 1),
-        round(row.utilisation),
+        row.refusal ? `refused (${row.refusal.code})` : round(row.utilisation),
         status,
         row.check,
       ],
@@ -123,12 +127,15 @@ export const checkBracing = defineCommand({
         `ULS wind ${round(windUltimate, 1)} kN, roof level ${round(roofWind, 1)} kN + stability ${round(stability, 1)} kN ` +
         `over ${bayCount} braced bay(s) = ${round(bayForce, 1)} kN each; ${rows.length} check(s), ` +
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'} ${worst?.kind ?? ''}, ${worst?.group ?? '—'}); ` +
-        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary, tension-only diagonals).'),
+        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary, tension-only diagonals).', refused) +
+        (defaulted.length > 0 ? ` Defaulted: ${defaultedClause(defaulted)}.` : ''),
       {
         rows,
         csv,
         maxUtilisation: worst?.utilisation ?? 0,
         failures: [...new Set(failures.flatMap((row) => row.elementIds))],
+        refused: refusedEntries(rows, (row) => `${row.mark} ${row.kind}`),
+        defaulted,
         gableArea,
         windForce: windUltimate,
         roofForce,

@@ -17,6 +17,7 @@ import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runScanImport } from '../src/scan/scanImport';
 import { DEFAULT_IMPORT_OPTIONS } from '../src/scan/scanStore';
 import { createPointCloudPort } from '../src/scan/pointCloudPort';
+import { requireTool } from '../../tests/requireTool';
 
 const DATA = path.resolve(__dirname, '../../docs/plant/10-pointcloud-brownfield/validation/data');
 const TRUTH = (
@@ -25,7 +26,7 @@ const TRUTH = (
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn('scanNative: llull-compute not built (cargo build --profile compute -p llull-compute in solver/): skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 let store = '';
 let ctx: ExecutionContext;

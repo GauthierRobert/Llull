@@ -6,7 +6,7 @@ import { type BaseReaction } from '../frames/frameModelSolve';
 import { WIND_CASES, WIND_PRESSURE_CASES, type LoadCase } from '../frames/frameModelTypes';
 import { type Combination, type Factors, TOLERANCE_METRES } from './foundationModel';
 import { GAMMA_CRANE } from '../../shared/loadFactors';
-import { highestUtilisation } from '../common/utilisation';
+import { highestUtilisation, refusedRows, type RowRefusal } from '../common/utilisation';
 
 /** Factored base reaction: vertical v and horizontal h in kN, base moment m in kN·m (CCW +). */
 export function combine(reaction: BaseReaction, factors: Factors): { v: number; h: number; m: number } {
@@ -129,8 +129,9 @@ export function findPlate(building: BuildingModel, columnId: string): BasePlateE
   return elementsOf(building, 'plate').find((plate) => plate.memberId === columnId) ?? null;
 }
 
-export type Candidate = { value: number; limit: number; combination: string; utilisation: number };
+export type Candidate = { value: number; limit: number; combination: string; utilisation: number; refusal?: RowRefusal };
 
+/** The refused candidate when there is one (a refused check is never hidden behind a computed one), else the highest utilisation. */
 export function worst<T extends Candidate>(candidates: ReadonlyArray<T>): T | null {
-  return highestUtilisation(candidates) ?? null;
+  return refusedRows(candidates)[0] ?? highestUtilisation(candidates) ?? null;
 }

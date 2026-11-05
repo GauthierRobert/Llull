@@ -9,7 +9,7 @@ import { sizeBasePlate, type PlateDemand } from './basePlateMN';
 import { plateDemands } from '../foundations/foundationCombinations';
 import { type FrameLoads } from '../frames/frameModelTypes';
 import { baseReactions } from '../frames/frameModelSolve';
-import { yieldStrength } from '../steelDesign/steelDesign';
+import { DEFAULT_BOLT_CLASS } from '../steelDesign/steelBolts';
 
 /**
  * Sizes every fixed base plate of a level (one catalogue entry per column profile, from the worst demands of all its columns) and stores
@@ -42,13 +42,19 @@ export function designFixedPlates(
   let unresolved = 0;
   for (const [profileName, group] of groups) {
     const profile = findProfile(profileName);
-    if (!profile) continue;
-    const { sizing, passes } = sizeBasePlate(
+    const firstPlate = group.plates[0];
+    if (!profile || !firstPlate) continue;
+    const { sizing, passes, refusal } = sizeBasePlate(
       { depth: profile.h, width: profile.b },
       group.demands,
-      yieldStrength(group.plates[0]?.material ?? 'S355'),
+      { grade: firstPlate.material, boltClass: loads.boltClass ?? DEFAULT_BOLT_CLASS },
       target,
     );
+    if (refusal !== undefined) {
+      unresolved += 1;
+      descriptions.push(`${profileName} fixed bases not designed — ${refusal}`);
+      continue;
+    }
     if (!passes) unresolved += 1;
     descriptions.push(
       `${profileName} fixed bases: plate ${profile.h + 2 * sizing.margin} × ${profile.b + 2 * sizing.margin} × ${sizing.thickness}, ${sizing.boltCount} × M${sizing.boltDiameter}${passes ? '' : ' (largest catalogue plate, still failing)'}`,

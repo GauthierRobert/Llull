@@ -22,12 +22,13 @@ import { assetKey, DEFAULT_IMPORT_OPTIONS, hasAsset, importerVersion, listAssets
 import { createPointCloudPort } from '../src/scan/pointCloudPort';
 import { AssetReader, crc32 } from '../src/scan/assetReader';
 import { EXIT_OK, EXIT_USAGE, runCli, type CliIo } from '../src/cli/main';
+import { requireTool } from '../../tests/requireTool';
 
 const DATA = path.resolve(__dirname, '../../docs/plant/10-pointcloud-brownfield/validation/data');
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn('scanImport: llull-compute not built (cargo build --profile compute -p llull-compute in solver/): native cases skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 let store = '';
 let work = '';

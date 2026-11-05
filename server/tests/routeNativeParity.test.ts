@@ -24,13 +24,14 @@ import { parseRouteResult, runAutoRoute } from '../src/native/autoRoute';
 import type { NativeDeps } from '../src/native/fatigueField';
 import { isNativeTool, runNativeTool } from '../src/native/tools';
 import { EXIT_COMMAND_ERROR, EXIT_OK, runCli, type CliIo } from '../src/cli/main';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null)
   console.warn(
     'routeNativeParity: llull-compute not built (cargo build --profile compute -p llull-compute in solver/): native runs skipped',
   );
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 let dir = '';
 let store: FeArtifactCache;

@@ -12,23 +12,32 @@ import { horizontalElements } from '../alignment/alignmentGeometry';
 import { validateProfile, verticalCurves } from '../alignment/profileGeometry';
 import { stationText } from '../model';
 import { toMetres } from '@core/model/units';
+import { isTableRefusal, lookupConservative, type TableRefusal } from '../../shared/designTable';
 
 /** Comfort criterion: rate of change of lateral acceleration (m/s^3). */
 export const LATERAL_JERK = 0.6;
 
+type SpeedRow = readonly [number, number, number, number];
+
 /** Speed km/h -> [side friction f, minimum crest K, minimum sag K]. */
 // prettier-ignore
-const SPEED_TABLE: ReadonlyArray<readonly [number, number, number, number]> = [
+const SPEED_TABLE: readonly [SpeedRow, ...SpeedRow[]] = [
   [20, 0.35, 1, 3], [30, 0.28, 2, 6], [40, 0.23, 4, 9], [50, 0.19, 7, 13], [60, 0.17, 11, 18], [70, 0.15, 17, 23], [80, 0.14, 26, 30],
   [90, 0.13, 39, 38], [100, 0.12, 52, 45], [110, 0.11, 74, 55], [120, 0.09, 95, 63],
 ];
 
-function rowFor(speed: number): readonly [number, number, number, number] {
-  return SPEED_TABLE.find((row) => row[0] >= speed) ?? (SPEED_TABLE[SPEED_TABLE.length - 1] as readonly [number, number, number, number]);
+/**
+ * Table row of a design speed: the next higher row for an intermediate speed (conservative for f and K).
+ * @failure CIV_SPEED_OUT_OF_TABLE — speed outside [20, 120] km/h
+ */
+export function speedRowFor(speed: number): { row: SpeedRow; exact: boolean } | TableRefusal {
+  return lookupConservative(SPEED_TABLE, speed, { direction: 'up', code: 'CIV_SPEED_OUT_OF_TABLE', label: 'design speed', unit: 'km/h' });
 }
 
 export interface DesignChecks {
   readonly designSpeedKmh: number;
+  /** Table speed whose f and K were used (the next higher row for an intermediate design speed). */
+  readonly tableSpeedKmh: number;
   readonly assumptions: string;
   readonly horizontal: ReadonlyArray<{
     readonly station: string;
@@ -56,8 +65,10 @@ export interface DesignChecks {
   readonly warnings: string[];
 }
 
-export function designChecks(doc: CadDocument, alignment: AlignmentObject, designSpeedKmh: number): DesignChecks {
-  const [, friction, crestK, sagK] = rowFor(designSpeedKmh);
+export function designChecks(doc: CadDocument, alignment: AlignmentObject, designSpeedKmh: number): DesignChecks | TableRefusal {
+  const hit = speedRowFor(designSpeedKmh);
+  if (isTableRefusal(hit)) return hit;
+  const [tableSpeedKmh, friction, crestK, sagK] = hit.row;
   const maxRate = alignment.superelevation?.maxRate ?? 0;
   const minRadius = (designSpeedKmh * designSpeedKmh) / (127 * (maxRate + friction));
   const failures: string[] = [];
@@ -133,8 +144,9 @@ export function designChecks(doc: CadDocument, alignment: AlignmentObject, desig
   }
   return {
     designSpeedKmh,
+    tableSpeedKmh,
     assumptions:
-      `Minimum radius R = V^2/(127(e+f)) with e = ${maxRate} and f = ${friction} (table value for ${rowFor(designSpeedKmh)[0]} km/h); ` +
+      `Minimum radius R = V^2/(127(e+f)) with e = ${maxRate} and f = ${friction} (table value for ${tableSpeedKmh} km/h${hit.exact ? '' : `: design speed ${designSpeedKmh} km/h is checked with the ${tableSpeedKmh} km/h row`}); ` +
       `minimum K crest ${crestK}, sag ${sagK} (stopping sight distance); spiral Ls >= V^3/(46.656 C R) with C = ${LATERAL_JERK} m/s^3; ` +
       'grade breaks over 0.5 % need a vertical curve.',
     horizontal,

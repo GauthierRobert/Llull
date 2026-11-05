@@ -12,11 +12,12 @@ import { execute } from '@core/commands/registry';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { base64ToUint8Array } from '@lib/base64';
 import { unzip } from '../../tests/helpers/unzipStore';
+import { requireTool } from '../../tests/requireTool';
 
 const DATA = resolve(__dirname, '../../docs/design/05-implicit-lattice/validation/data/3mf');
 const hasJava = spawnSync('java', ['-version']).status === 0;
 if (!hasJava) console.warn('threeMfImplicit: java not found, schema validation skipped');
-const withJava = hasJava ? it : it.skip;
+const withJava = it.skipIf(requireTool('oracle:java', hasJava));
 
 function step(
   doc: CadDocument,

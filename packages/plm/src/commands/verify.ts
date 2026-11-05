@@ -83,6 +83,8 @@ function signatureStatus(plm: PlmModel, revision: Revision, ctx: ExecutionContex
 /**
  * @affects nothing (read-only)
  * @invariant recomputes every hash and signature on demand; released, superseded and obsolete revisions all verify
+ * @invariant a sheet title block out of step with the managed identity (current revision) fails the verification, like a hash or signature mismatch
+ * @invariant never a clean pass over geometry: data.geometryVerified is false, data.unchecked lists the skipped scopes and data.state is 'partial' (summary starts 'partial:') when everything checked verifies, 'fail' when anything does not
  */
 export const verifyRelease = defineCommand({
   name: 'verify_release',
@@ -90,7 +92,8 @@ export const verifyRelease = defineCommand({
     'Verify a frozen revision (released, superseded or obsolete): the snapshot still hashes to the recorded content hash, the live definition still ' +
     'matches it while the revision is the current released one, every recorded signature still verifies (needs the host verifier), and sheet title ' +
     'blocks agree with the managed identity. Returns data { contentHashMatches, liveDefinitionMatches, signaturesValid, titleBlockConsistent, ' +
-    'reconstructedFrom }. Read-only. Regenerating geometry to compare fingerprints is not implemented yet.',
+    'reconstructedFrom, geometryVerified, unchecked, state }. Read-only. Geometry is NOT regenerated or compared (not implemented): ' +
+    "geometryVerified is always false, unchecked lists every scope not checked ({ scope, reason }), and state is 'partial' when all the checks that ran verify (the summary then starts 'partial:'), 'fail' when any of them fails; never a clean pass.",
   annotations: { readOnly: true },
   params: z.object({ revision: z.string().describe('Revision label, e.g. "A".') }),
   run: (doc, { revision: label }, ctx): CommandResult => {
@@ -119,16 +122,24 @@ export const verifyRelease = defineCommand({
         : 'n/a (not the current released revision)';
     const signaturesValid = signatureStatus(plm, revision, ctx);
     const titleBlockConsistent = label === plm.item.currentRevision ? titleBlockMismatches(doc, plm).length === 0 : 'n/a';
-    const ok = contentHashMatches && live !== false && signaturesValid !== false;
+    const ok = contentHashMatches && live !== false && signaturesValid !== false && titleBlockConsistent !== false;
+    const unchecked: Array<{ scope: string; reason: string }> = [{ scope: 'geometry', reason: 'regeneration not implemented' }];
+    if (typeof signaturesValid === 'string' && signaturesValid.startsWith('unverified')) {
+      unchecked.push({ scope: 'signatures', reason: 'no verifier port' });
+    }
+    const state = ok ? 'partial' : 'fail';
     return report(
       doc,
-      `${revisionText(plm, label)} ${ok ? 'verified' : 'FAILED verification'}: content hash ${contentHashMatches ? 'matches' : 'MISMATCH'}, live definition ${String(live)}, signatures ${String(signaturesValid)}.`,
+      `${ok ? 'partial: ' : ''}${revisionText(plm, label)} ${ok ? 'verified except geometry (not regenerated)' : 'FAILED verification'}: content hash ${contentHashMatches ? 'matches' : 'MISMATCH'}, live definition ${String(live)}, signatures ${String(signaturesValid)}, title blocks ${titleBlockConsistent === false ? 'INCONSISTENT with the managed identity' : String(titleBlockConsistent)}.`,
       {
         contentHashMatches,
         liveDefinitionMatches: live,
         signaturesValid,
         titleBlockConsistent,
         reconstructedFrom: `release snapshot ${label}`,
+        geometryVerified: false,
+        unchecked,
+        state,
         integrity: integrityOf(doc, plm, ctx)[label] ?? null,
       },
     );

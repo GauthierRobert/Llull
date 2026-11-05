@@ -1,6 +1,7 @@
 /**
- * Layer management commands. Locked-layer policy: only `set_entity_layer` honours locks (it refuses to move an entity OFF a locked layer);
- * layer operations and geometry edits are never blocked.
+ * Layer management commands. Locked-layer policy: `execute` refuses every command that adds, changes or removes an entity on a layer locked in the
+ * input document (`layerLock.ts`, LAYER_LOCKED, any caller). These commands carry `layerManagement` and are exempt; `set_entity_layer` also refuses
+ * to move an entity OFF a locked layer by its own rule.
  */
 
 import { type CadDocument, type Layer, DEFAULT_LAYER_ID } from '../../model/types';
@@ -51,11 +52,11 @@ export const addLayer = defineCommand({
  */
 export const updateLayer = defineCommand({
   name: 'update_layer',
-  annotations: { idempotent: true },
+  annotations: { idempotent: true, layerManagement: true },
   description:
     'Change one or more properties of a layer: rename it (name), show or hide it (visible; hidden ' +
-    'layers are not rendered), lock or unlock it (locked; entities on a locked layer cannot be ' +
-    'reassigned via set_entity_layer, but geometry edits are not blocked), or tint it (color). ' +
+    'layers are not rendered), lock or unlock it (locked; every command that would add, change or delete an entity on a locked layer is refused with LAYER_LOCKED until ' +
+    'the layer is unlocked), or tint it (color). ' +
     'Give at least one field; fields not given are kept. Entities are not affected. ' +
     'Graceful no-op if the layer id does not exist, no field is given, the name is empty or the color is not #rrggbb.',
   params: z.object({
@@ -92,7 +93,7 @@ export const updateLayer = defineCommand({
  */
 export const setEntityLayer = defineCommand({
   name: 'set_entity_layer',
-  annotations: { idempotent: true },
+  annotations: { idempotent: true, layerManagement: true },
   description:
     'Move an entity to a different layer by updating its layerId. Graceful no-op if the entity or target layer does not exist. ' +
     'Rejected (graceful no-op) if the entity currently resides on a LOCKED layer — ' +
@@ -113,6 +114,8 @@ export const setEntityLayer = defineCommand({
         `Entity ${entityId} is on locked layer ${entity.layerId} ("${sourceLayer.name}"). ` +
           `Unlock the source layer before reassigning its entities.`,
       );
+    if (targetLayer.locked && layerId !== entity.layerId)
+      return noop(doc, `Layer ${layerId} ("${targetLayer.name}") is locked: unlock it before moving ${entityId} onto it.`);
     return changed(
       replaceEntity(doc, { ...entity, layerId }),
       `Entity ${entityId}: moved from layer ${entity.layerId} to ${layerId} ("${targetLayer.name}").`,
@@ -129,7 +132,7 @@ export const setEntityLayer = defineCommand({
  */
 export const deleteLayer = defineCommand({
   name: 'delete_layer',
-  annotations: { destructive: true },
+  annotations: { destructive: true, layerManagement: true },
   description:
     'Delete a layer by id. All entities that were on the deleted layer are automatically ' +
     'reassigned to the default layer (layer-default). The default layer cannot be deleted. ' +

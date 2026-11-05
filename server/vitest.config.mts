@@ -15,6 +15,7 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
+    globalSetup: ['../tests/requireToolTeardown.ts'],
     // Live OpenCascade / Manifold solves (booleans, fillets, STEP) take seconds each.
     testTimeout: 30_000,
     maxWorkers: testWorkers(),

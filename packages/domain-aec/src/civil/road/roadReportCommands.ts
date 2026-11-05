@@ -13,11 +13,16 @@ import { alignmentLength } from '../alignment/alignmentGeometry';
 import { civilObjectOrNoop, getCivil } from '../model';
 import { alignmentIdParam } from './roadParams';
 import { designChecks } from './roadChecks';
+import { isTableRefusal } from '../../shared/designTable';
 import { analyseStations, reportCsv, reportRows, reportStations } from './roadReport';
 import { longSectionSvg } from '../sheets/longSectionSvg';
 import { crossSectionSvg, MAX_CROSS_SECTIONS } from './crossSectionSvg';
 import { validateProfile } from '../alignment/profileGeometry';
 import { toMetres } from '@core/model/units';
+
+/** " (checked with the 70 km/h row)" when the design speed falls between table rows. */
+const rowNote = (checks: { designSpeedKmh: number; tableSpeedKmh: number }): string =>
+  checks.tableSpeedKmh === checks.designSpeedKmh ? '' : ` (checked with the ${checks.tableSpeedKmh} km/h row)`;
 
 const intervalField = (spacing: string, fallback: string): z.ZodOptional<z.ZodNumber> =>
   z.number().optional().describe(`${spacing} spacing, document units. Default: ${fallback}.`);
@@ -38,6 +43,7 @@ function checkedAlignment(
 /**
  * @affects none (read-only)
  * @failure unknown alignment / interval <= 0 -> no-op
+ * @failure CIV_SPEED_OUT_OF_TABLE (designSpeedKmh outside 20..120) -> no-op
  */
 export const alignmentReport = defineCommand({
   name: 'alignment_report',
@@ -47,7 +53,8 @@ export const alignmentReport = defineCommand({
     'mass-haul ordinate (cum. cut - cum. fill, no bulking). Also `data.csv`. With `designSpeedKmh` it checks horizontal curve radii ' +
     'against R = V^2 / (127 (e + f)) with e = the set_superelevation maxRate (0 plus a warning when none is set) and f from a simple speed table (0.28 at 30 .. 0.09 at 120 km/h), and vertical curve ' +
     'K against minimum crest / sag K (AASHTO-style stopping sight distance table), plus grade breaks over 0.5 % without a vertical ' +
-    'curve; failures are listed.',
+    'curve; failures are listed. A design speed between table rows uses the next higher row (named in the summary); a speed outside 20..120 km/h ' +
+    'is refused with CIV_SPEED_OUT_OF_TABLE.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     alignmentId: alignmentIdParam,
@@ -69,14 +76,16 @@ export const alignmentReport = defineCommand({
       fillM3: last?.cumulativeFillM3 ?? 0,
       netM3: last?.massHaulM3 ?? 0,
     };
-    const checks = params.designSpeedKmh === undefined ? undefined : designChecks(doc, alignment, params.designSpeedKmh);
+    const outcome = params.designSpeedKmh === undefined ? undefined : designChecks(doc, alignment, params.designSpeedKmh);
+    if (outcome && isTableRefusal(outcome)) return noop(doc, `alignment_report failed: ${outcome.message}.`);
+    const checks = outcome;
     const earthworks = rows.some((row) => row.cutAreaM2 !== null)
       ? `cut ${totals.cutM3} m3, fill ${totals.fillM3} m3, net ${totals.netM3} m3 (+ = surplus)`
       : 'earthworks need a profile, a road section and a ground surface';
     const checkText = checks
       ? (checks.failures.length === 0
-          ? ` Design speed ${checks.designSpeedKmh} km/h: all checks pass.`
-          : ` Design speed ${checks.designSpeedKmh} km/h: ${checks.failures.length} failure(s): ${checks.failures.join(' ')}`) +
+          ? ` Design speed ${checks.designSpeedKmh} km/h${rowNote(checks)}: all checks pass.`
+          : ` Design speed ${checks.designSpeedKmh} km/h${rowNote(checks)}: ${checks.failures.length} failure(s): ${checks.failures.join(' ')}`) +
         checks.warnings.map((warning) => ` WARNING: ${warning}`).join('')
       : '';
     return report(

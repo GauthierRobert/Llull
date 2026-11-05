@@ -14,6 +14,7 @@ import { setGeometryKernel, type ShapeTopology } from '@core/geometry/kernel';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { createPythonExchangePort } from '../src/pythonExchange';
 import { BRIDGE_SCRIPT, CADQUERY_PYTHON, probePython } from './exchangeTestSupport';
+import { requireTools } from '../../tests/requireTool';
 
 const hasCadQuery = probePython(CADQUERY_PYTHON).cadquery !== null;
 
@@ -43,7 +44,12 @@ function filletedBlock(): { doc: CadDocument; id: string } {
   return { doc: filleted.document, id: filleted.affected[0]! };
 }
 
-describe.skipIf(!hasCadQuery || nativeKernelBinary === null)('exact recipes through CadQuery', () => {
+describe.skipIf(
+  requireTools([
+    ['python', hasCadQuery],
+    ['native:llull-kernel', nativeKernelBinary !== null],
+  ]),
+)('exact recipes through CadQuery', () => {
   let doc: CadDocument;
   let code: string;
 

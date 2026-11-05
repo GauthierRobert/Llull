@@ -16,10 +16,11 @@ import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { createNativeMeshEngine } from '../src/native/meshProcessingEngine';
 import { resolveDeferred } from '../src/native/deferredRun';
 import { describeNative, leaf, liveKernels } from './kernelTestSupport';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('fitSubdivisionNative: llull-compute not built (cargo build --release in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const engine = BINARY === null ? null : createNativeMeshEngine({ binary: BINARY });
 const context = (): ExecutionContext => ({ ...defaultContext(), meshProcessing: engine });
 /** `execute` as the host runs it: the native job is awaited between two runs of the command (TECHNICAL_SPEC 13.8). */

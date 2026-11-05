@@ -17,7 +17,9 @@ export interface HaunchTrial {
 }
 
 const excess = (rows: ReadonlyArray<CheckRow>, target: number): number =>
-  rows.filter((row) => row.kind !== 'connection').reduce((sum, row) => sum + Math.max(0, row.utilisation - target), 0);
+  rows
+    .filter((row) => row.kind !== 'connection' && row.refusal === undefined)
+    .reduce((sum, row) => sum + Math.max(0, row.utilisation - target), 0);
 
 /**
  * Lengthens the eaves haunches of the rafters in the failing rows to the next step (uniformly for every rafter of those sections) and keeps

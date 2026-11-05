@@ -225,16 +225,17 @@ describe('design_footings pad sizing', () => {
 });
 
 describe('base plate under M + N', () => {
+  const PLATE = { grade: 'S355', boltClass: '8.8' };
   const geometry = { length: 500, width: 450, thickness: 40, boltCount: 4, boltDiameter: 24, columnDepth: 300 };
   it('carries a small eccentricity by bearing alone (no bolt tension)', () => {
-    const verdict = checkPlateMN(geometry, 500, 10, 355);
+    const verdict = checkPlateMN(geometry, 500, 10, PLATE);
     expect(verdict.boltTension).toBe(0);
     expect(verdict.bearingLength).toBeCloseTo(500e3 / (450 * BEARING_STRENGTH), 3);
     expect(verdict.utilisation).toBeLessThan(1);
   });
   it('satisfies Ft z + N zc = M and C = N + Ft with tension bolts', () => {
     const [normal, moment] = [200, 150];
-    const verdict = checkPlateMN(geometry, normal, moment, 355);
+    const verdict = checkPlateMN(geometry, normal, moment, PLATE);
     const tension = verdict.boltTension * 1000 * 2;
     const block = verdict.bearingLength;
     const centroid = 500 / 2 - block / 2;
@@ -245,20 +246,20 @@ describe('base plate under M + N', () => {
     expect(verdict.check).toContain('bolt Ft');
   });
   it('is symmetric in the moment sign and shares uplift with a moment between the bolt groups', () => {
-    expect(checkPlateMN(geometry, 200, -150, 355).utilisation).toBeCloseTo(checkPlateMN(geometry, 200, 150, 355).utilisation, 9);
-    const uplift = checkPlateMN(geometry, -100, 10, 355);
+    expect(checkPlateMN(geometry, 200, -150, PLATE).utilisation).toBeCloseTo(checkPlateMN(geometry, 200, 150, PLATE).utilisation, 9);
+    const uplift = checkPlateMN(geometry, -100, 10, PLATE);
     expect(uplift.bearingLength).toBe(0);
     const lever = 500 / 2 - 48;
     expect(uplift.boltTension * 1000 * 2).toBeCloseTo((100e3 + 10e6 / lever) / 2, 0);
   });
   it('fails plates without tension bolts that need them', () => {
-    expect(checkPlateMN({ ...geometry, boltCount: 2 }, 100, 300, 355).utilisation).toBeGreaterThan(1);
+    expect(checkPlateMN({ ...geometry, boltCount: 2 }, 100, 300, PLATE).utilisation).toBeGreaterThan(1);
   });
   it('sizes the lightest catalogue plate that passes and grows with the demand', () => {
     const column = { depth: 390, width: 300 };
     const demand = { normal: 130, moment: 270 };
-    const light = sizeBasePlate(column, [{ normal: 150, moment: 20 }], 355);
-    const heavy = sizeBasePlate(column, [demand], 355);
+    const light = sizeBasePlate(column, [{ normal: 150, moment: 20 }], PLATE);
+    const heavy = sizeBasePlate(column, [demand], PLATE);
     expect(light.passes).toBe(true);
     expect(heavy.passes).toBe(true);
     expect(light.sizing.boltCount).toBe(4);
@@ -275,10 +276,10 @@ describe('base plate under M + N', () => {
       },
       demand.normal,
       demand.moment,
-      355,
+      PLATE,
     );
     expect(verdict.utilisation).toBeLessThanOrEqual(1);
-    expect(sizeBasePlate(column, [{ normal: 50, moment: 5000 }], 355).passes).toBe(false);
+    expect(sizeBasePlate(column, [{ normal: 50, moment: 5000 }], PLATE).passes).toBe(false);
   });
   it('is sized by design_portal_frames and reported as "base plate M+N" by check_foundations', () => {
     const doc = hall({ columnBase: 'fixed' });

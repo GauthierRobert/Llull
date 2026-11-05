@@ -117,11 +117,17 @@ function flatten(
 }
 
 const MAX_COMPONENT_DEPTH = 8;
+/** Largest expansion of the model part of a 3MF archive (mesh XML deflates about 10:1; 200 is the archive default, named here on purpose). */
+const MAX_MODEL_RATIO = 200;
 
 export function parse3mf(bytes: Uint8Array, limits: ParseLimits): ParsedMeshFile | MeshParseFailure {
   let model: Uint8Array | undefined;
   try {
-    const entries = unzip(bytes, { select: (name) => name.toLowerCase().endsWith('.model'), maxBytes: limits.maxBytes });
+    const entries = unzip(bytes, {
+      select: (name) => name.toLowerCase().endsWith('.model'),
+      maxBytes: limits.maxBytes,
+      maxRatio: MAX_MODEL_RATIO,
+    });
     model = (
       entries.find((e) => e.name.toLowerCase() === '3d/3dmodel.model') ?? entries.find((e) => e.name.toLowerCase().endsWith('.model'))
     )?.data;

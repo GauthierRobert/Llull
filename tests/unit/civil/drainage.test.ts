@@ -587,3 +587,60 @@ describe('criteria validation and purity', () => {
     }
   });
 });
+
+describe('drainage criteria defaults are reported (INT-14, INT-FB-008)', () => {
+  type Defaulted = Array<{ input: string; value: number }>;
+  it('check_drainage_network lists every criterion it defaulted, in data and summary', () => {
+    const result = run(network(), 'check_drainage_network', {});
+    const defaulted = (result.data as { defaulted: Defaulted }).defaulted;
+    const byName = Object.fromEntries(defaulted.map(({ input, value }) => [input, value]));
+    expect(byName).toMatchObject({
+      rainfallIntensityMmH: 50,
+      minVelocity: 0.6,
+      maxVelocity: 3,
+      minCoverM: 0.9,
+      maxDepthRatio: 0.8,
+      manholeLossK: 0.5,
+      freeboardM: 0.3,
+    });
+    expect(result.summary).toContain('Defaults applied: rainfallIntensityMmH 50, minVelocity 0.6, maxVelocity 3');
+  });
+  it('does not list a criterion the caller gave, nor the intensity when an IDF curve replaces it', () => {
+    const result = run(network(), 'check_drainage_network', { minVelocity: 0.3, maxVelocity: 4, idf: { a: 1000, b: 10, c: 0.8 } });
+    const names = (result.data as { defaulted: Defaulted }).defaulted.map(({ input }) => input);
+    expect(names).not.toContain('minVelocity');
+    expect(names).not.toContain('maxVelocity');
+    expect(names).not.toContain('rainfallIntensityMmH');
+    expect(names).toContain('minCoverM');
+    const full = run(network(), 'check_drainage_network', {
+      rainfallIntensityMmH: 60,
+      minVelocity: 0.6,
+      maxVelocity: 3,
+      minCoverM: 0.9,
+      maxDepthRatio: 0.8,
+      manholeLossK: 0.5,
+      freeboardM: 0.3,
+    });
+    expect((full.data as { defaulted: Defaulted }).defaulted.map(({ input }) => input)).not.toContain('maxDepthRatio');
+    expect(full.summary).toContain('Defaults applied: entryTimeMin 5.');
+  });
+  it('reports the 5 min inlet time only when a manhole has no entryTimeMin', () => {
+    const doc = network();
+    const names = (run(doc, 'check_drainage_network', {}).data as { defaulted: Defaulted }).defaulted.map(({ input }) => input);
+    expect(names).toContain('entryTimeMin');
+    const all = ['manhole-1', 'manhole-2', 'manhole-3'].reduce(
+      (current, manholeId) => run(current, 'update_manhole', { manholeId, entryTimeMin: 7 }).document,
+      doc,
+    );
+    const given = (run(all, 'check_drainage_network', {}).data as { defaulted: Defaulted }).defaulted.map(({ input }) => input);
+    expect(given).not.toContain('entryTimeMin');
+  });
+  it('size_drainage_pipes reports the defaulted intensity and depth ratio', () => {
+    const sized = run(network(), 'size_drainage_pipes', {});
+    expect((sized.data as { defaulted: Defaulted }).defaulted).toEqual([
+      { input: 'rainfallIntensityMmH', value: 50 },
+      { input: 'maxDepthRatio', value: 0.8 },
+    ]);
+    expect(sized.summary).toContain('Defaults applied: rainfallIntensityMmH 50, maxDepthRatio 0.8');
+  });
+});

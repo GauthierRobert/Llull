@@ -19,10 +19,11 @@ import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { NATIVE_GEOMETRY_LIMITS, createNativeGeometryQueryEngine, installGeometryQueryEngine } from '../src/native/geometryQueryEngine';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('geomqNative: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const engine = BINARY === null ? meshBvhEngine : createNativeGeometryQueryEngine(BINARY);
 
 let kernel: GeometryKernel;

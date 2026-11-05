@@ -10,7 +10,7 @@ import { EXIT_OK } from '../src/cli/main';
 import { createNativeTestKernel, nativeKernelBinary } from './kernelTestSupport';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { isRecord } from '@lib/isRecord';
-import { HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { feaToolsMissing, HAS_CCX, HAS_MESHER } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
 const READY = HAS_MESHER && HAS_CCX && nativeKernelBinary !== null;
@@ -26,7 +26,7 @@ afterAll(() => {
   workspace.dispose();
 });
 
-describe.skipIf(!READY)('VC-TMC-08 thermal bow of a beam with a linear through-thickness gradient', () => {
+describe.skipIf(feaToolsMissing(true))('VC-TMC-08 thermal bow of a beam with a linear through-thickness gradient', () => {
   it('VC-TMC-08.c: cantilever tip deflection kappa L^2 / 2 (L = 500 mm)', async () => {
     const session = workspace.open('cantilever');
     const probes = await session.solved(await session.idOf(planPath('tmc_gradient_cantilever'), 'an'), 2);

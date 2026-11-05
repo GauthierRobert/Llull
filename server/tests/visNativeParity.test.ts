@@ -15,10 +15,11 @@ import type { RasterPort, RasterScene } from '@core/model/raster';
 import { rasterScenePixels } from '@core/commands/render/raster';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { createNativeRasterPort, installRasterPort } from '../src/native/rasterPort';
+import { requireTool } from '../../tests/requireTool';
 
 const BINARY = nativeBinaryPath('llull-compute');
 if (BINARY === null) console.warn('visNativeParity: llull-compute not built (cargo build in solver/): native runs skipped');
-const native = BINARY === null ? it.skip : it;
+const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 
 type Json = Record<string, unknown>;
 

@@ -13,7 +13,7 @@ import { useIsFocused } from '@ui/store/focusStore';
 import { useStructuralOverlayStore } from '@ui/store/structuralOverlayStore';
 import { memberFocus } from './structuralFocus';
 import { UTILISATION_COLORS, UTILISATION_LEGEND, toUtilisationMarks, utilisationBand, utilisationColor } from './utilisationColor';
-import { allRows, isFailing, toWarnings, worstRows, type ReportRow } from './structuralReport';
+import { allRows, isFailing, isRefused, toWarnings, worstRows, type ReportRow } from './structuralReport';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 
 interface Report {
@@ -52,29 +52,32 @@ function MemberRow({ row }: { row: ReportRow }): React.ReactElement {
   const focusItem = useFocusItem();
   const focus = memberFocus(document, row);
   const failing = isFailing(row);
+  const refused = isRefused(row);
   return (
     <ListRow
       buttonTestId="frame-check-row"
-      swatch={utilisationColor(row.utilisation, !failing)}
+      swatch={utilisationColor(row.utilisation, !failing, refused)}
       selected={useIsFocused(focus.key)}
       onSelect={() => focusItem(focus)}
     >
-      <StatusChip tone={failing ? 'bad' : 'ok'} text={failing ? 'FAIL' : 'OK'} />
+      <StatusChip tone={refused ? 'warn' : failing ? 'bad' : 'ok'} text={refused ? 'REFUSED' : failing ? 'FAIL' : 'OK'} />
       <span className="panel__row-main">{row.label}</span>
       <span className="panel__row-meta">{row.detail !== '' ? row.detail : row.utilisation.toFixed(2)}</span>
     </ListRow>
   );
 }
 
-const BAND_TONE = { ok: 'ok', warn: 'warn', fail: 'bad' } as const;
+const BAND_TONE = { ok: 'ok', warn: 'warn', fail: 'bad', refused: 'warn' } as const;
 
-/** Max utilisation and number of failing members of a check, as the panel's headline. */
+/** Max computed utilisation, failing and refused members of a check, as the panel's headline (a refused row is not a utilisation). */
 function utilisationKpis(rows: readonly ReportRow[]): Kpi[] {
-  const worst = rows.reduce((max, row) => Math.max(max, row.utilisation), 0);
+  const worst = rows.filter((row) => !isRefused(row)).reduce((max, row) => Math.max(max, row.utilisation), 0);
   const failing = rows.filter(isFailing).length;
+  const refused = rows.filter(isRefused).length;
   return [
     { key: 'max-ur', label: 'Max utilisation', value: worst.toFixed(2), tone: BAND_TONE[utilisationBand(worst)] },
     { key: 'failing', label: 'Failing', value: `${failing} / ${rows.length}`, tone: failing > 0 ? 'bad' : 'ok' },
+    ...(refused > 0 ? [{ key: 'refused', label: 'Refused', value: `${refused} / ${rows.length}`, tone: 'warn' as const }] : []),
   ];
 }
 

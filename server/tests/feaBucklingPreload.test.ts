@@ -17,7 +17,7 @@ import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { deserializeDocument } from '@core/commands/persistence/serialization';
 import { isRecord } from '@lib/isRecord';
 import { EXIT_OK, runCli, type CliIo } from '../src/cli/main';
-import { FEA_TOOL_ENV, HAS_CCX, HAS_MESHER } from './feaTestSupport';
+import { FEA_TOOL_ENV, feaToolsMissing } from './feaTestSupport';
 
 type Step = Record<string, unknown>;
 
@@ -105,7 +105,7 @@ const endForce = (name: string, fx: number, loadCase: string): Step => ({
   params: { analysisId: '$an', name, kind: 'force', vector: [fx, 0, 0], loadCase, target: { entityId: '$bar', facesNear: [[300, 5, 5]] } },
 });
 
-describe.skipIf(!HAS_MESHER || !HAS_CCX)('eigen decks against CalculiX 2.21', () => {
+describe.skipIf(feaToolsMissing())('eigen decks against CalculiX 2.21', () => {
   it('free-free modal (*FREQUENCY n, -1): six rigid-body modes, then the free-free bending pair; total effective mass = rho V', async () => {
     const { eigen, summary } = await report('free', bar(200, { analysisType: 'modal', modes: 10 }, [], false));
     expect(eigen['rigidBodyModes']).toBe(6);

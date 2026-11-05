@@ -42,6 +42,7 @@ Flags
   --server URL                act on a running llull server's live document instead
                               ($LLULL_SERVER; --token T or $LLULL_TOKEN for Bearer auth)
   --dry-run                   run against the local file but never write it
+  --force-overwrite           save even though the file changed on disk since it was loaded (DSF_SAVE_CONFLICT)
   --no-fit                    run: keep the camera as it is (by default a plan that never sets it is framed with fit_view)
   --save PATH                 write the file a command returns (export_stl, export_3mf, export_code,
                               export_step_ap242, export_iges, sheets, export_urdf, export_nc_files → a directory);

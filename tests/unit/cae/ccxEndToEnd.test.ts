@@ -11,6 +11,7 @@ import { parseDat } from '@cae/results/datReader';
 import { parseFrd } from '@cae/results/frdReader';
 import { resultsSummary } from '@cae/results/summary';
 import { X0_NODES, X2_NODES, barDocument, barMesh, facesOn, hashOf, solvedBar } from './deckFixtures';
+import { requireTool } from '../../requireTool';
 
 /** The CalculiX binary: `LLULL_CCX` or `ccx` on the PATH (the tests are skipped when it cannot be started). */
 const CCX = process.env['LLULL_CCX'] ?? 'ccx';
@@ -48,7 +49,7 @@ function solve(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact): Run 
   }
 }
 
-describe.skipIf(!hasCcx)('CalculiX closed-form checks of the written deck', () => {
+describe.skipIf(requireTool('calculix', hasCcx))('CalculiX closed-form checks of the written deck', () => {
   it('axial bar under a prescribed end displacement: sigma = E * u / L and the reaction F = sigma * A within 1e-6', () => {
     const bar = solvedBar();
     const { steps, dat, results } = solve(bar.doc, bar.analysisId, bar.mesh);

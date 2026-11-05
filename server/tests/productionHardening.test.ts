@@ -12,7 +12,7 @@ import { contentSecurityPolicy } from '../src/security';
 import { liveSubscriberCount } from '../src/liveDocument';
 import { convertDwgLimited } from '../src/dwgConvert';
 
-const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_LIVE_MAX_PER_CLIENT', 'LLULL_PYTHON_QUEUE_MAX'];
+const ENV_KEYS = ['LLULL_AUTH_TOKEN', 'LLULL_ALLOWED_ORIGINS', 'LLULL_LIVE_MAX_PER_CLIENT', 'LLULL_PYTHON_QUEUE_MAX'];
 afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
 });
@@ -68,6 +68,7 @@ describe('python queue cap', () => {
 
 describe('CSRF on token-less reads', () => {
   it('refuses cross-site fetches and foreign origins, allows plain and allowlisted requests', async () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     expect((await request(app).get('/live/snapshot').set('Sec-Fetch-Site', 'cross-site')).status).toBe(403);
     expect((await request(app).get('/live/snapshot').set('Origin', 'https://evil.example')).status).toBe(403);
     expect((await request(app).get('/live/snapshot').set('Sec-Fetch-Site', 'same-origin')).status).toBe(200);
@@ -87,12 +88,15 @@ describe('security headers and probes', () => {
     expect(res.headers['referrer-policy']).toBe('no-referrer');
   });
 
-  it('serves /health to any Host while other routes keep the loopback allowlist', async () => {
-    expect((await request(app).get('/health').set('Host', '10.1.2.3:3001')).status).toBe(200);
+  it('serves /health through the Host allowlist like every route; only a challenge probe skips the Host check', async () => {
+    expect((await request(app).get('/health').set('Host', '10.1.2.3:3001')).status).toBe(403);
+    expect((await request(app).get('/health').set('Host', 'localhost:3001')).status).toBe(200);
+    expect((await request(app).get('/health').set('Host', '10.1.2.3:3001').query({ challenge: 'ab12' })).status).toBe(200);
     expect((await request(app).get('/live/snapshot').set('Host', '10.1.2.3:3001')).status).toBe(403);
   });
 
   it('CSP covers wasm, blob workers/images and forbids framing', () => {
+    process.env['LLULL_ALLOWED_ORIGINS'] = 'http://localhost:5173';
     const csp = contentSecurityPolicy();
     for (const part of [
       "script-src 'self' 'wasm-unsafe-eval'",

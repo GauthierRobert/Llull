@@ -11,6 +11,8 @@ import { noop } from '@core/commands/noop';
 import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../../steel/profiles';
 import { boltSize } from '../evaluate';
+import { isSteelRefusal, memberStrength } from '../steelDesign/steelGrades';
+import type { RowRefusal } from '../common/utilisation';
 import { buildingConnectionSolids } from './evaluateConnections';
 import { appendConnections, findMomentJoints } from './connectionSupport';
 import { polygonArea } from '@lib/polygon';
@@ -110,20 +112,29 @@ export function fullStrengthFactor(fy: number): number {
   return (beta * fy * 1.25) / (Math.SQRT2 * fu);
 }
 
+/** Welds not sized because the rafter's steel grade or governing thickness was refused (never a default grade). */
+export interface WeldRefusal {
+  readonly refusal: RowRefusal;
+}
+
+export const isWeldRefusal = (welds: ConnectionWelds | WeldRefusal): welds is WeldRefusal => 'refusal' in welds;
+
 /**
  * Full-strength double fillet welds of the rafter (and haunch) to the end plate(s): throat a = fullStrengthFactor(fy) · t, rounded up to
- * whole mm, ≥ 3 mm.
+ * whole mm, ≥ 3 mm; fy from the rafter material at the governing thickness of its section (the welded parts), never a default grade.
+ * @failure STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE (rafter material / section) -> WeldRefusal (schedule "refused (<code>)", takeoff "not quantified"), no weld sizes
  */
 export function connectionWelds(
   doc: Pick<CadDocument, 'units'>,
   building: BuildingModel,
   connection: MomentConnectionElement,
-): ConnectionWelds | null {
+): ConnectionWelds | WeldRefusal | null {
   const rafter = building.elements[connection.rafterId];
   const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
-  if (!profile) return null;
-  const fy = Number(/S\s*(\d{3})/i.exec(rafter?.category === 'member' ? rafter.material : '')?.[1]) || 355;
-  const factor = fullStrengthFactor(fy);
+  if (rafter?.category !== 'member' || !profile) return null;
+  const strength = memberStrength(rafter.material, profile);
+  if (isSteelRefusal(strength)) return { refusal: { code: strength.code, message: strength.message } };
+  const factor = fullStrengthFactor(strength.fy);
   const throat = (thickness: number): number => Math.max(3, Math.ceil(factor * thickness));
   const [flangeThroat, webThroat] = [throat(profile.tf), throat(profile.tw)];
   const flanges = 2 * (2 * profile.b - profile.tw);

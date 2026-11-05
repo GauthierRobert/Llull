@@ -21,7 +21,8 @@ export const addPipeRack = defineCommand({
     'All lengths in DOCUMENT UNITS. Give the run as `length` + `bentSpacing` (n = ceil(length / bentSpacing) equal bays: 60 m at 6 m = 11 bents) or explicit `stations`, the width as `width` (two column lines) or `baysAcross`, and `tiers` as top-of-steel elevations above the level (a pipe resting on a tier beam has its underside there). ' +
     'The origin is the first bent on the first column line; the width extends to the left of `direction`. The members carry assemblyId and cannot be edited directly (CMD_DERIVED_GEOMETRY): change the rack with update_pipe_rack, remove it with delete_building_element on the assembly. ' +
     'No grid lines or foundations are created (bents and lines are named in the member notes with gridPrefix). Result data: assemblyId, partCount (the member ids are in affected and in the assembly partIds), bents, columns, tierBeams, struts, braces, lengths in metres (columnLengthM ...), steelMassKgExBracing (catalogue kg/m), defaults. ' +
-    'Then run check_steel_members: pipes (add_pipe_run / route_pipe) resting on the tier beams load them with their steel + content weight, and data.racks reports the rack.',
+    'Then run check_steel_members: pipes (add_pipe_run / route_pipe) resting on the tier beams load them with their steel + content weight, and data.racks reports the rack. ' +
+    'Every generated member is stored in steel grade S355 (derived members cannot be edited; no grade parameter yet).',
   params: z.object({
     origin: rackFieldParams.origin,
     direction: rackFieldParams.direction,

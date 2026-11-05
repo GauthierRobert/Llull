@@ -15,6 +15,7 @@ import request from 'supertest';
 import type { Express } from 'express';
 import { BUILD123D_PYTHON, CADQUERY_PYTHON, parseBuffer, probePython } from './exchangeTestSupport';
 import { exchangeToolDefinitions } from '../src/cli/exchange';
+import { requireTool } from '../../tests/requireTool';
 
 const hasCadQuery = probePython(CADQUERY_PYTHON).cadquery !== null;
 const hasBuild123d = BUILD123D_PYTHON !== undefined && probePython(BUILD123D_PYTHON).build123d !== null;
@@ -124,7 +125,7 @@ describe('GET /export/step without Python', () => {
     expect(res.body.error).toMatch(/LLULL_PYTHON/);
   });
 
-  it.skipIf(nativeKernelBinary === null)(
+  it.skipIf(requireTool('native:llull-kernel', nativeKernelBinary !== null))(
     'falls back to the exact OCC kernel: a STEP solid with analytic faces',
     async () => {
       const server = await loadServer({ LLULL_PYTHON: 'off' });
@@ -149,7 +150,7 @@ describe('GET /export/step without Python', () => {
   });
 });
 
-describe.skipIf(!hasCadQuery)('GET /export/step with CadQuery', () => {
+describe.skipIf(requireTool('python', hasCadQuery))('GET /export/step with CadQuery', () => {
   it('returns a real STEP file as an attachment', async () => {
     const server = await loadServer({ LLULL_PYTHON: CADQUERY_PYTHON });
     seedPlateWithHole(server);
@@ -171,7 +172,7 @@ describe.skipIf(!hasCadQuery)('GET /export/step with CadQuery', () => {
   });
 });
 
-describe.skipIf(!hasBuild123d)('GET /export/step with build123d', () => {
+describe.skipIf(requireTool('python', hasBuild123d))('GET /export/step with build123d', () => {
   it('uses LLULL_PYTHON_BUILD123D for language=build123d', async () => {
     const server = await loadServer({ LLULL_PYTHON: CADQUERY_PYTHON, LLULL_PYTHON_BUILD123D: BUILD123D_PYTHON });
     seedPlateWithHole(server);
@@ -228,7 +229,7 @@ describe('exchange tools without Python', () => {
   });
 });
 
-describe.skipIf(!hasCadQuery)('exchange tools with CadQuery', () => {
+describe.skipIf(requireTool('python', hasCadQuery))('exchange tools with CadQuery', () => {
   let server: LoadedServer;
 
   beforeAll(async () => {
@@ -303,7 +304,7 @@ describe.skipIf(!hasCadQuery)('exchange tools with CadQuery', () => {
   }, 120_000);
 });
 
-describe.skipIf(!hasCadQuery)('exchange tools with an exchange directory', () => {
+describe.skipIf(requireTool('python', hasCadQuery))('exchange tools with an exchange directory', () => {
   let server: LoadedServer;
   let exchangeDir: string;
 

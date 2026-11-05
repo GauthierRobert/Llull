@@ -231,6 +231,28 @@ describe('BuildingPanel', () => {
     expect(screen.queryByText('FAIL')).toBeNull();
     expect(screen.queryByTestId('frame-check-next-step')).toBeNull();
   });
+  it('shows a row whose steel grade was refused as REFUSED, outside the max utilisation, never OK or FAIL', () => {
+    localDispatch('add_portal_frame_building', { span: 18000, length: 12000, cladding: false });
+    useStore.setState((state) => {
+      const building = state.document.building;
+      if (!building) return state;
+      const elements = Object.fromEntries(
+        Object.entries(building.elements).map(([id, element]) => [
+          id,
+          element.category === 'member' ? { ...element, material: 'A36' } : element,
+        ]),
+      );
+      return { document: { ...state.document, building: { ...building, elements } } };
+    });
+    render(<BuildingPanel />);
+    fireEvent.click(screen.getByTestId('frame-check'));
+    const rows = screen.getAllByTestId('frame-check-row');
+    expect(rows[0]).toHaveTextContent(/^REFUSED/);
+    expect(rows[0]).toHaveTextContent('refused (STL_GRADE_UNKNOWN)');
+    expect(screen.getByLabelText('Structural summary')).toHaveTextContent(/Refused/);
+    expect(screen.getByLabelText('Structural summary')).not.toHaveTextContent(/Max utilisation99/);
+    expect(screen.getByTestId('frame-check-summary')).toHaveTextContent('refused (STL_GRADE_UNKNOWN)');
+  });
   it('runs the bracing, foundation and crane runway checks', () => {
     localDispatch('add_portal_frame_building', { span: 18000, length: 12000, cladding: false, crane: { capacity: 5, railHeight: 5000 } });
     render(<BuildingPanel />);

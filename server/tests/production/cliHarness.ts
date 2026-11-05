@@ -4,6 +4,7 @@
  * `POST /command` and `POST /exchange`), and the live document it edits.
  */
 
+import { randomBytes } from 'node:crypto';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { app } from '../../src/index';
@@ -23,9 +24,12 @@ export interface ToolOutcome {
 
 let server: Server | null = null;
 let baseUrl = '';
+// The backend refuses mutations without a token (SEC_TOKEN_REQUIRED): the harness runs it with a per-run token, like a standalone launch.
+const token = randomBytes(24).toString('hex');
 
 export async function startServer(): Promise<void> {
   if (server) return;
+  process.env['LLULL_AUTH_TOKEN'] = token;
   const listening = await new Promise<Server>((resolve) => {
     const started: Server = app.listen(0, '127.0.0.1', () => resolve(started));
   });
@@ -52,7 +56,7 @@ export function liveDocument(): CadDocument {
 
 /** One tool call as `llull exec <tool>` sends it to the running backend; the text is what the CLI prints. */
 export async function callTool(tool: string, args: Record<string, unknown>): Promise<ToolOutcome> {
-  const backend = createRemoteBackend(baseUrl, { token: undefined });
+  const backend = createRemoteBackend(baseUrl, { token });
   const raw = exchangeTool(tool) !== undefined ? await backend.exchange(tool, args) : await backend.run(tool, args);
   const outcome = withFailureStatus(tool, raw);
   return { text: resultText(outcome), isError: outcome.isError, data: outcome.data };

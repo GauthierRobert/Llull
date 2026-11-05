@@ -10,6 +10,7 @@ import type { MeshData } from '@core/model/types';
 import type { BooleanOp, ShapeRecipe } from '@core/model/types';
 import type { Entity, Vec3 } from '@core/model/types';
 import { meshBounds } from '../../tests/helpers/meshBounds';
+import { requireTool } from '../../tests/requireTool';
 
 /** The native `llull-kernel` binary (`cargo build --release -p llull-kernel` in solver/, or LLULL_KERNEL_BIN / LLULL_NATIVE_DIR), or null. */
 export const nativeKernelBinary = nativeBinaryPath('llull-kernel');
@@ -17,8 +18,38 @@ export const nativeKernelBinary = nativeBinaryPath('llull-kernel');
 if (nativeKernelBinary === null && process.env['LLULL_REQUIRE_NATIVE_KERNEL'] === '1') throw new Error(nativeInstallHint('llull-kernel'));
 if (nativeKernelBinary === null) console.warn(`[native kernel tests] skipped: ${nativeInstallHint('llull-kernel')}`);
 
-/** `describe` for suites that run the real native kernel: skipped (with the reason logged above) when the binary is not built. */
-export const describeNative: typeof describe = describe.skipIf(nativeKernelBinary === null) as typeof describe;
+/**
+ * `describe` for suites that run the real native kernel: skipped (with the reason logged above) when the binary is not built. The skip is recorded
+ * (requireTool) when a suite is declared with it, so a file that only imports this module is not counted.
+ */
+const kernelMissing = (): boolean => requireTool('native:llull-kernel', nativeKernelBinary !== null);
+
+const WHEN_PRESENT_VARIANTS = ['only', 'concurrent', 'sequential', 'shuffle', 'todo'] as const;
+
+/**
+ * A `describe` that skips whenever `missing()` is true, for the call, `.each` and every variant (`.only`, `.concurrent`, `.sequential`, `.shuffle`,
+ * `.todo`, `.skip`; `.skipIf(x)` / `.runIf(x)` combine `x` with the missing-binary condition). `missing` is read when the suite is declared.
+ */
+export function skippingDescribe(base: typeof describe, missing: () => boolean): typeof describe {
+  return new Proxy(base, {
+    apply: (_target, _this, args: unknown[]) => Reflect.apply(base.skipIf(missing()), undefined, args),
+    get: (target, key, receiver) => {
+      if (key === 'each') {
+        return (...args: unknown[]) => {
+          const chain = base.skipIf(missing());
+          return Reflect.apply(chain.each, chain, args);
+        };
+      }
+      if (key === 'skipIf') return (condition: boolean) => base.skipIf(missing() || condition);
+      if (key === 'runIf') return (condition: boolean) => base.skipIf(missing() || !condition);
+      if ((WHEN_PRESENT_VARIANTS as readonly (string | symbol)[]).includes(key))
+        return missing() ? base.skip : Reflect.get(target, key, receiver);
+      return Reflect.get(target, key, receiver);
+    },
+  });
+}
+
+export const describeNative: typeof describe = skippingDescribe(describe, kernelMissing);
 
 let probedCapabilities: readonly string[] | undefined;
 
@@ -47,6 +78,7 @@ export function describeNativeWhen(options: {
   readonly label: string;
 }): typeof describe {
   const missing = (options.capabilities ?? []).filter((capability) => !nativeCapabilities().includes(capability));
+  requireTool('native:llull-kernel', nativeKernelBinary !== null && missing.length === 0);
   const reason =
     nativeKernelBinary === null
       ? `no native llull-kernel binary (${nativeInstallHint('llull-kernel')})`

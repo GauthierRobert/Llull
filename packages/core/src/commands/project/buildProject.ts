@@ -57,7 +57,7 @@ export const buildProject = defineCommand({
   }),
   // Each inner step is recorded in featureHistory by `execute`; recording the plan itself too would replay every step twice.
   // Plan files carry descriptive top-level keys (id, status, expected, notes, …); every step's own params stay strict.
-  annotations: { metaHistory: true, metadataKeys: true },
+  annotations: { metaHistory: true, metadataKeys: true, layerManagement: true },
   run: (doc, params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
     if (context.projectDepth >= MAX_PROJECT_DEPTH)

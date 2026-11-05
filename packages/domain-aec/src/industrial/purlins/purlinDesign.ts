@@ -14,6 +14,7 @@ import { noop } from '@core/commands/noop';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { designResult, finalUtilisationText, noChangeResult, utilisationStats } from '../reports/designReport';
+import { type DefaultedValue, defaultedInputs, withDefaulted } from '../common/defaulted';
 import { sweepFrame } from '../../shared/mesh';
 import { findProfile, lightestProfile, sectionProperties } from '../../steel/profiles';
 
@@ -50,6 +51,7 @@ export function nextSecondaryProfile(name: string): string | null {
  *          level, keeping rows uniform) and re-seats them on the rafters / columns
  * @invariant a deeper purlin moves along the rafter normal, a deeper rail outwards, by half the depth change
  * @failure bad loads / unknown level / no purlins / no section large enough -> no-op or partial report
+ * @invariant a refused row (STL_*) is never up-sized for and never counted in maxUtilisation / failures; data.refusedCount reports it; omitted targetUtilisation and loads -> data.defaulted
  */
 export const designPurlins = defineCommand({
   name: 'design_purlins',
@@ -64,12 +66,13 @@ export const designPurlins = defineCommand({
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95, ...loadParams } = params;
     if (!isValidTargetUtilisation(targetUtilisation)) return noop(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
-    const analyse = (document: CadDocument): { rows: PurlinRow[]; summary: string } => {
+    const analyse = (document: CadDocument): { rows: PurlinRow[]; summary: string; defaulted: DefaultedValue[] } => {
       const result = checkPurlins.run(document, loadParams);
-      const data = result.data as { rows: PurlinRow[] } | undefined;
-      return { rows: data?.rows ?? [], summary: result.summary };
+      const data = result.data as { rows: PurlinRow[]; defaulted: DefaultedValue[] } | undefined;
+      return { rows: data?.rows ?? [], summary: result.summary, defaulted: data?.defaulted ?? [] };
     };
     const first = analyse(doc);
+    const targetDefaulted = [...defaultedInputs(params, { targetUtilisation }), ...first.defaulted];
     if (first.rows.length === 0) return noop(doc, `design_purlins failed: ${first.summary}`);
     const { current, limited, changes, changed } = iterateUpsizing(doc, (current) => {
       const { rows } = analyse(current);
@@ -77,7 +80,7 @@ export const designPurlins = defineCommand({
       const levelId = levelOf(building, rows);
       const groups: ProfileGroups = new Map();
       for (const row of rows) {
-        if (row.utilisation <= targetUtilisation) continue;
+        if (row.refusal !== undefined || row.utilisation <= targetUtilisation) continue;
         const member = building.elements[row.elementId];
         if (member?.category !== 'member') continue;
         addProfileGroup(groups, member);
@@ -88,17 +91,21 @@ export const designPurlins = defineCommand({
         return { building: reseatResized(current, resizedBuilding, resizedIds, group.profile, larger), changedIds: resizedIds };
       });
     });
-    if (changed.size === 0) return noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited);
+    if (changed.size === 0)
+      return withDefaulted(noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited), targetDefaulted);
     const document = regenerateBuilding(doc, getBuilding(current));
     const final = analyse(document).rows;
     const stats = utilisationStats(final);
-    return designResult(
-      document,
-      `Designed ${final.length} purlin / rail row(s): ${changes.join('; ')}. ${finalUtilisationText(stats, 'row(s)', limited)} ` +
-        'Re-seated on rafters / columns; verify bracing eaves struts with check_bracing.',
-      changed,
-      changes,
-      stats,
+    return withDefaulted(
+      designResult(
+        document,
+        `Designed ${final.length} purlin / rail row(s): ${changes.join('; ')}. ${finalUtilisationText(stats, 'row(s)', limited)} ` +
+          'Re-seated on rafters / columns; verify bracing eaves struts with check_bracing.',
+        changed,
+        changes,
+        stats,
+      ),
+      targetDefaulted,
     );
   },
 });

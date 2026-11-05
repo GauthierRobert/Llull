@@ -17,6 +17,9 @@ import { checkStairHeadroom, headroomContext, stairHeadroomRules, type StairHead
 
 type Verdict = 'pass' | 'warn' | 'fail';
 
+/** Independent routes to grade a platform needs when egressRoutesRequired is omitted (reported in data.defaulted). */
+const DEFAULT_EGRESS_ROUTES = 1;
+
 const CHECKED_CATEGORIES: ReadonlyArray<BimCategory> = ['stair', 'steelStair', 'slab', 'grating', 'railing', 'ladder', 'assembly'];
 
 const staleAssemblyFinding = (id: string, kind: AssemblyKind, reason: string): Finding => {
@@ -44,6 +47,7 @@ const verdictOf = (findings: readonly Finding[]): Verdict =>
 
 /**
  * @affects none: read-only query, answers in `data` { verdict, findings, byId, edges, checked, ruleTableVersion, reviewRequired, unverifiedRulesUsed, notEvaluated }
+ * @invariant omitted egressRoutesRequired with the platform rules on -> 1 route, listed in data.defaulted and the summary
  * @invariant grade A breach = fail, grade B breach = warn + STA_RULE_UNVERIFIED, grade C never evaluated; reviewRequired is always true
  * @failure an id that is not a building element -> STA_UNKNOWN_ELEMENT; unknown ruleset -> CMD_INVALID_PARAMS
  */
@@ -159,9 +163,10 @@ export const checkAccess = defineCommand({
     }
 
     let platformReports: PlatformReport[] = [];
+    const platformsDefaulted = include.includes('platforms') && params.egressRoutesRequired === undefined;
     if (include.includes('platforms')) {
       const judged = checkPlatforms(doc, building, platforms, params.rulesets, {
-        routes: params.egressRoutesRequired ?? 1,
+        routes: params.egressRoutesRequired ?? DEFAULT_EGRESS_ROUTES,
         source: params.egressSource,
       });
       findings.push(...judged.findings);
@@ -201,6 +206,7 @@ export const checkAccess = defineCommand({
     const fails = findings.filter((finding) => finding.severity === 'fail').length;
     const data = {
       verdict,
+      defaulted: platformsDefaulted ? [{ input: 'egressRoutesRequired', value: DEFAULT_EGRESS_ROUTES }] : [],
       findings,
       byId,
       edges,
@@ -251,7 +257,7 @@ export const checkAccess = defineCommand({
     return report(
       doc,
       `check_access: ${verdict} — ${stairs.length} stair(s)${steelStairs.length > 0 ? `, ${steelStairs.length} steel stair(s)` : ''}, ${railings.length} railing(s), ${ladders.length} ladder(s), ${platformReports.length} platform(s), ${surfaceIds.length} slab/grating surface(s) (${edges.length} edges): ${fails} fail, ${findings.length - fails} warn ` +
-        `(rule table ${RULE_TABLE_VERSION}); review required.`,
+        `(rule table ${RULE_TABLE_VERSION}); review required${platformsDefaulted ? `; egressRoutesRequired ${DEFAULT_EGRESS_ROUTES} (defaulted)` : ''}.`,
       data,
     );
   },
