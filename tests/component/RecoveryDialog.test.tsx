@@ -40,7 +40,11 @@ function stubBackend(slots: RecoverySlotInfo[]): Backend {
 
 const connect = (): void => void act(() => useStore.setState({ liveStatus: 'connected', liveSeq: 0 }));
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  useStore.setState(useStore.getInitialState(), true); // this suite runs in its own module graph: leave no connection state behind
+  useRecoveryStore.setState(useRecoveryStore.getInitialState(), true);
+});
 
 describe('RecoveryDialog', () => {
   it('lists every recovery slot of the previous session (not the open document), restores one and discards another', async () => {
