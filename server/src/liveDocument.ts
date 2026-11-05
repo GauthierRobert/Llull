@@ -1,8 +1,9 @@
 /** The ONE shared `CadDocument` (desktop UI + CLI `--app`): store, autosave, SSE broadcast (`GET /live`). */
-import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { createAutosaver } from './autosave';
+import type { AutosaveStatus } from './autosave';
+import { createRecoveryStore, metaBase, newUntitledSlotId } from './recovery';
+import { createRecoverySession, type SlotBinding } from './recoverySession';
 import type { Response } from 'express';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
@@ -19,48 +20,73 @@ import {
 import { isTestRun, positiveInteger } from './env';
 import { logLiveCommand, rebaseCommandLog } from './liveCommandLog';
 
-const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
+/** Where the per-document recovery slots live (A-08). The desktop puts them in its user-data folder. */
+const RECOVERY_DIR = process.env['LLULL_RECOVERY_DIR'] ?? path.resolve(__dirname, '..', '.recovery');
 
 const AUTOSAVE_ENABLED = !isTestRun() /* keep the user's saved project */ && process.env['LLULL_AUTOSAVE_DISABLED'] !== 'true';
 
-function loadAutosave(): CadDocument {
-  if (!AUTOSAVE_ENABLED) return createEmptyDocument();
+export const recoveryStore = createRecoveryStore(RECOVERY_DIR);
+
+interface StartState {
+  readonly doc: CadDocument;
+  readonly binding: SlotBinding;
+  /** The state of a crashed backend's slot was loaded. */
+  readonly resumed: boolean;
+}
+
+/**
+ * A fresh backend starts empty and unnamed (the previous session's slots are offered by the UI, never loaded behind the user's back).
+ * A backend restarted by the desktop's supervisor (`LLULL_RECOVERY_RESUME=1`) resumes the slot the crashed one was working on (A-10).
+ */
+function startState(): StartState {
+  const fresh: StartState = { doc: createEmptyDocument(), binding: { id: newUntitledSlotId(), path: null, base: null }, resumed: false };
+  if (!AUTOSAVE_ENABLED || process.env['LLULL_RECOVERY_RESUME'] !== '1') return fresh;
+  const active = recoveryStore.readActive();
+  const found = active === null ? null : recoveryStore.read(active.id);
+  if (active === null || found === null) return fresh;
   try {
-    return fs.existsSync(AUTOSAVE_PATH) ? deserializeDocument(fs.readFileSync(AUTOSAVE_PATH, 'utf8')) : createEmptyDocument();
+    return {
+      doc: deserializeDocument(found.json),
+      binding: { id: active.id, path: found.meta.path, base: metaBase(found.meta) },
+      resumed: true,
+    };
   } catch (err) {
-    const quarantined = quarantineAutosave();
-    console.warn(
-      `[liveDocument] autosave load failed (${errorMessage(err)}); ` +
-        `${quarantined !== null ? `moved it to ${quarantined}; ` : ''}starting empty.`,
-    );
-    return createEmptyDocument();
+    recoveryStore.quarantine(active.id);
+    console.warn(`[liveDocument] recovery slot ${active.id} unreadable (${errorMessage(err)}); moved aside, starting empty.`);
+    return fresh;
   }
 }
 
-/** Rename an unreadable autosave aside so the first autosave cannot overwrite it. */
-function quarantineAutosave(): string | null {
-  const target = `${AUTOSAVE_PATH}.unreadable-${Date.now()}`;
-  try {
-    fs.renameSync(AUTOSAVE_PATH, target);
-    return target;
-  } catch {
-    return null;
-  }
-}
+const started = startState();
 
-const autosaver = createAutosaver({
-  filePath: AUTOSAVE_PATH,
+export const recoverySession = createRecoverySession({
+  store: recoveryStore,
   debounceMs: positiveInteger(process.env['LLULL_AUTOSAVE_DEBOUNCE_MS'], 300),
   serialize: serializeDocument,
+  onStatus: (status) => reportAutosaveStatus(status),
+  initial: started.binding,
+  announceActive: AUTOSAVE_ENABLED && !started.resumed,
 });
 
+let _autosaveStatus: AutosaveStatus = { ok: true };
+
+/** The autosave state (`GET /health`, SSE `status`): ok, or the stable code of the failure that is still standing. */
+export function getAutosaveStatus(): AutosaveStatus {
+  return _autosaveStatus;
+}
+
+function reportAutosaveStatus(status: AutosaveStatus): void {
+  _autosaveStatus = status;
+  broadcast('status', { epoch: _epoch, autosave: status });
+}
+
 export function flushAutosave(): void {
-  if (AUTOSAVE_ENABLED) autosaver.flush();
+  if (AUTOSAVE_ENABLED) recoverySession.flush();
 }
 
 /** Flush, then write every later mutation synchronously (shutdown start). */
 export function stopAutosave(): void {
-  if (AUTOSAVE_ENABLED) autosaver.stop();
+  if (AUTOSAVE_ENABLED) recoverySession.stop();
 }
 
 export function closeAllSubscribers(): void {
@@ -74,7 +100,7 @@ export function closeAllSubscribers(): void {
   _subscribers.clear();
 }
 
-let _liveDoc: CadDocument = loadAutosave();
+let _liveDoc: CadDocument = started.doc;
 rebaseCommandLog(_liveDoc);
 
 let _seq = 0; // changes since process start
@@ -123,7 +149,7 @@ function writeSseFrame(res: Response, frame: string): boolean {
   }
 }
 
-function broadcast(eventType: 'snapshot' | 'command' | 'progress', payload: unknown): void {
+function broadcast(eventType: 'snapshot' | 'command' | 'progress' | 'status' | 'document', payload: unknown): void {
   if (_subscribers.size === 0) return;
   let frame: string;
   try {
@@ -146,7 +172,7 @@ interface LiveCommand {
 export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
   _liveDoc = next;
   _seq += 1;
-  if (AUTOSAVE_ENABLED) autosaver.schedule(next);
+  if (AUTOSAVE_ENABLED) recoverySession.schedule(next);
   if (command === undefined) rebaseCommandLog(next);
   else logLiveCommand(next, command.name, command.params);
   if (command === undefined) {
@@ -175,10 +201,20 @@ export function publishLiveProgress(event: LiveProgressReport): void {
   broadcast('progress', { epoch: _epoch, ...event });
 }
 
+/** Tell the live subscribers which file the document now belongs to (after an open / Save As / restore rebound it). */
+export function publishDocumentPath(): void {
+  broadcast('document', { epoch: _epoch, path: recoverySession.current().path });
+}
+
 /** Register an SSE `Response` and send it the opening snapshot; returns the unsubscribe function. */
 export function subscribeLive(res: Response): () => void {
   _subscribers.add(res);
   if (!writeSseEvent(res, 'snapshot', getLiveSnapshot())) _subscribers.delete(res);
+  else {
+    if (!_autosaveStatus.ok) writeSseEvent(res, 'status', { epoch: _epoch, autosave: _autosaveStatus });
+    const documentPath = recoverySession.current().path;
+    if (documentPath !== null) writeSseEvent(res, 'document', { epoch: _epoch, path: documentPath });
+  }
   return (): void => void _subscribers.delete(res);
 }
 

@@ -69,7 +69,7 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     LLULL_REQUIRE_TOKEN_FOR_REST: 'true',
     LLULL_ALLOWED_ORIGINS: backendOrigin(input.port),
     LLULL_STATIC_DIR: input.layout.webDir,
-    LLULL_AUTOSAVE_PATH: path.join(input.userDataDir, 'autosave.json'),
+    LLULL_RECOVERY_DIR: path.join(input.userDataDir, 'recovery'),
     LLULL_BODY_LIMIT: DESKTOP_BODY_LIMIT,
     LLULL_PYTHON: input.layout.python,
     LLULL_EXPORT_DIR: input.exportDir ?? desktopExportDir(input.baseEnv, input.userDataDir),

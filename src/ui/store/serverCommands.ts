@@ -73,3 +73,31 @@ export function fetchLatestCrashReport(): Promise<unknown> {
 export function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
   return request('/live/snapshot');
 }
+
+/** One recovery slot as the backend lists it (`GET /recovery`). */
+export interface RecoverySlotInfo {
+  readonly id: string;
+  readonly path: string | null;
+  readonly kind: 'document' | 'offline';
+  readonly label: string;
+  readonly changedAt: string;
+  readonly changeCount: number;
+  /** The slot of the document that is open now. */
+  readonly active: boolean;
+}
+
+export function fetchRecoverySlots(): Promise<{ slots: RecoverySlotInfo[] }> {
+  return request('/recovery');
+}
+
+export function fetchRecoverySlot(id: string): Promise<{ meta: RecoverySlotInfo; json: string }> {
+  return request(`/recovery/${encodeURIComponent(id)}`);
+}
+
+/**
+ * `hold` / `release` (a document is about to replace the open one / the load failed), `adopt` (the open document is this restored slot),
+ * `discard` (drop it) or `offline` (keep edits made while the backend was unreachable).
+ */
+export function postRecovery(action: 'hold' | 'release' | 'adopt' | 'discard' | 'offline', body: unknown): Promise<unknown> {
+  return request(`/recovery/${action}`, body);
+}

@@ -138,6 +138,7 @@ async function backendOf(args: ParsedArgv, io: CliIo, observer?: StepObserver): 
   const localSignal = withDeadline(io.signal, timeoutOf(args), io.now === undefined ? deadlineFromEnv(io.env) : undefined);
   return createLocalBackend(docPathOf(args, io), {
     dryRun: booleanFlag(args, 'dry-run'),
+    forceOverwrite: booleanFlag(args, 'force-overwrite'),
     ...(observer !== undefined ? { observer } : {}),
     ...(localSignal !== undefined ? { signal: localSignal } : {}),
     ...(io.armInterrupt !== undefined ? { armInterrupt: io.armInterrupt } : {}),

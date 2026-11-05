@@ -1,7 +1,7 @@
 /**
  * LOCAL MODE: while the backend is unreachable (not started yet, restarting) commands run through `execute` in the renderer
  * with a bounded snapshot stack for undo / redo. Nothing is queued: on reconnect the backend's snapshot is adopted (the
- * backend document is the truth; the autosave copy keeps the local work recoverable).
+ * backend document is the truth) and the local work is kept as a recoverable copy (offlineEdits.ts, FR-DSF-23).
  */
 
 import { execute } from '@core/commands/registry';
@@ -32,7 +32,7 @@ export function selectionAfter(current: EntityId[], affected: readonly EntityId[
 export function runLocally(set: StoreSet, get: StoreGet, name: string, params: unknown, options?: DispatchOptions): void {
   const state = get();
   // The renderer is the host while offline: plm `at` / `by` are filled like the backend does. These acts are NOT audited (the audit chain is
-  // server-only) and the offline work is replaced by the backend's document on reconnect.
+  // server-only) and the offline work is kept as a recoverable copy, not merged, on reconnect.
   const result = execute(state.document, name, fillHostParams(name, params, { now: new Date(), user: () => OFFLINE_USER }));
   const summary = `${result.summary}${LOCAL_SUFFIX}`;
   const lastMeasure = measureAfter(name, result.data, state.lastMeasure);

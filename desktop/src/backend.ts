@@ -70,6 +70,10 @@ export type ForkBackend = (entry: string, env: Record<string, string>) => Backen
 
 export interface RunningBackend {
   readonly url: string;
+  /** The backend process id (undefined before it started). */
+  readonly pid?: number | undefined;
+  /** Called when the process exits on its own after it started answering (a crash), never for `stop()`. */
+  onUnexpectedExit(listener: (code: number | null) => void): void;
   /** Resolves once the process exited (killed after a grace period). */
   stop(): Promise<void>;
 }
@@ -96,10 +100,17 @@ export async function startBackend(
   if (!fs.existsSync(entry)) throw new Error(`backend bundle missing: ${entry} (run npm run build in desktop/)`);
   const child = fork(entry, env);
   let exitReason: string | null = null;
+  let started = false;
+  let stopping = false;
+  const crashListeners: ((code: number | null) => void)[] = [];
+  let crashed: { readonly code: number | null } | null = null; // kept so a listener added after the crash still hears it
   const exited = new Promise<void>((resolve) => {
     child.once('exit', (code) => {
       exitReason = `the local backend exited (code ${String(code)})`;
       resolve();
+      if (!started || stopping) return;
+      crashed = { code };
+      for (const listener of crashListeners) listener(code);
     });
   });
   try {
@@ -108,9 +119,17 @@ export async function startBackend(
     child.kill();
     throw new Error(errorMessage(error), { cause: error });
   }
+  started = true;
+  if (exitReason !== null) crashed = { code: null }; // it ended right after its last health answer
   return {
     url,
+    pid: child.pid,
+    onUnexpectedExit: (listener) => {
+      crashListeners.push(listener);
+      if (crashed !== null) listener(crashed.code);
+    },
     stop: async () => {
+      stopping = true;
       if (exitReason !== null) return;
       // the whole tree: the server's native jobs (llull-compute) run detached and would outlive a plain kill of the server on Windows
       if (child.pid !== undefined) killPidTree(child.pid, () => void child.kill());

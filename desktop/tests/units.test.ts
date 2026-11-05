@@ -64,7 +64,7 @@ describe('backendEnv', () => {
       LLULL_REQUIRE_TOKEN_FOR_REST: 'true',
       LLULL_ALLOWED_ORIGINS: 'http://127.0.0.1:4000',
       LLULL_STATIC_DIR: path.join('/r', 'web'),
-      LLULL_AUTOSAVE_PATH: path.join('/u', 'autosave.json'),
+      LLULL_RECOVERY_DIR: path.join('/u', 'recovery'),
       LLULL_PYTHON: layout.python,
     });
     expect(env['LLULL_KERNEL']).toBe('occt-native');

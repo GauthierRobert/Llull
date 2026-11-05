@@ -59,7 +59,7 @@ WebAssembly/library build into the app) unless llull's licence allows it.
 
 ## 5. Backup and upgrade
 
-The open document is autosaved to `autosave.json` in the app's user-data directory; File › Save writes
-`.llull` files wherever the user chooses. Back up those files like any other engineering data. The autosave is
-versioned and migrated on load; an unreadable one is moved aside as `autosave.json.unreadable-<ts>` and the
-app starts empty. Upgrading is installing the new build over the old one.
+Every open document is autosaved to its own recovery slot in the `recovery` folder of the app's user-data directory (one slot per document
+path, plus one per untitled session); a clean save removes the slot and the next launch lists the slots that remain (Document Recovery).
+File › Save writes `.llull` files wherever the user chooses. Back up those files like any other engineering data. Slots are versioned and migrated
+on load; an unreadable one is moved aside as `<slot>.json.unreadable-<ts>` and the app starts empty. Upgrading is installing the new build over the old one.
