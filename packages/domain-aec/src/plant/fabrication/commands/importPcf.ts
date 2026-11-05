@@ -69,7 +69,7 @@ export const importPcf = defineCommand({
       return refuseIso(doc, 'import_pcf', 'ISO_PARAM_INVALID', `${routeOnly.join(', ')} apply to as route only`, [], routeOnly.slice());
     const read = readPcf(params.text);
     if (!read.ok) return refuseIso(doc, 'import_pcf', read.code, read.message, [], read.paths);
-    const lineId = params.lineIdOverride?.trim() ?? read.file.lineId;
+    const lineId = params.lineIdOverride ?? read.file.lineId;
     const file = { ...read.file, lineId };
     const taken = lineIdsInUse(doc).has(lineId);
     if (taken && params.preview !== true)

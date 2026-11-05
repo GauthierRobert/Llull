@@ -124,6 +124,7 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
     );
   const unknownKeys = unknownParamsRejection(def, doc, safeParams);
   if (unknownKeys !== null) return unknownKeys;
+  let parsedParams: unknown = safeParams;
   if (def.paramsValidator) {
     let checked: ReturnType<typeof def.paramsValidator.safeParse>;
     try {
@@ -142,10 +143,11 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
         `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
         commandError('CMD_INVALID_PARAMS', invalidParamsFix(def.name, issuePaths(checked.error)), [], issuePaths(checked.error)),
       );
+    parsedParams = checked.data;
   }
   let result: CommandResult;
   try {
-    result = def.run(doc, safeParams, ctx);
+    result = def.run(doc, parsedParams, ctx);
   } catch (error) {
     const reason = warnAndDescribe(`command '${def.name}' threw:`, error);
     return rejection(
