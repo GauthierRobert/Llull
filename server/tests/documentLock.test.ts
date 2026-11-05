@@ -1,6 +1,7 @@
 /** A-09: the lock file next to a document (DSF_DOC_LOCKED / DSF_LOCK_STALE) and the on-disk check at save (DSF_SAVE_CONFLICT), also through the `llull --doc` CLI. */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -130,6 +131,38 @@ describe('save conflict', () => {
     const loaded = stampOf(file); // null: no file yet
     writeDocumentFile(file, createEmptyDocument());
     expect(() => writeDocumentFile(file, createEmptyDocument(), { stamp: loaded })).toThrow(SaveConflictError);
+  });
+});
+
+describe('stamps of large documents (second review 4)', () => {
+  const readsOf = (spy: { mock: { calls: unknown[][] } }): number => spy.mock.calls.filter((call) => String(call[0]) === file).length;
+
+  it('the stamp of a save is the sha256 of the file written, computed without reading the file back', () => {
+    const spy = vi.spyOn(fs, 'readFileSync');
+    let stamp;
+    try {
+      stamp = writeDocumentFile(file, execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document);
+      expect(readsOf(spy)).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(stamp?.sha256).toBe(createHash('sha256').update(fs.readFileSync(file)).digest('hex'));
+    expect(stamp?.size).toBe(fs.statSync(file).size);
+    expect(stamp?.mtimeMs).toBe(fs.statSync(file).mtimeMs);
+  });
+
+  it('a file whose size and time stamp are unchanged (and old) is not read again at the next save', () => {
+    writeDocumentFile(file, createEmptyDocument());
+    const old = new Date(Date.now() - 3_600_000);
+    fs.utimesSync(file, old, old);
+    const loaded = stampOf(file);
+    const spy = vi.spyOn(fs, 'readFileSync');
+    try {
+      expect(() => writeDocumentFile(file, createEmptyDocument(), { stamp: loaded })).not.toThrow();
+      expect(readsOf(spy)).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

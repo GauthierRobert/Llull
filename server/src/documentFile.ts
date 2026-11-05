@@ -26,12 +26,21 @@ export interface FileStamp {
 
 const HASH_LIMIT_BYTES = 512 * 1024 * 1024;
 
-/** null when the file does not exist. */
-export function stampOf(docPath: string): FileStamp | null {
+const statOf = (docPath: string): { mtimeMs: number; size: number } | null => {
   try {
     const { mtimeMs, size } = fs.statSync(docPath);
-    const sha256 = size <= HASH_LIMIT_BYTES ? createHash('sha256').update(fs.readFileSync(docPath)).digest('hex') : null;
-    return { mtimeMs, size, sha256 };
+    return { mtimeMs, size };
+  } catch {
+    return null;
+  }
+};
+
+/** null when the file does not exist. */
+export function stampOf(docPath: string): FileStamp | null {
+  const stat = statOf(docPath);
+  if (stat === null) return null;
+  try {
+    return { ...stat, sha256: stat.size <= HASH_LIMIT_BYTES ? createHash('sha256').update(fs.readFileSync(docPath)).digest('hex') : null };
   } catch {
     return null;
   }
@@ -48,15 +57,23 @@ export class SaveConflictError extends Error {
   }
 }
 
+const FAT_GRANULARITY_MS = 2000;
+
 /**
- * The same file content, by what can be known. Sizes differ -> changed. Same size -> compare the content hash: a touched time stamp
- * (cloud sync, antivirus) is no change, and a same-size rewrite inside a coarse time-stamp granularity (FAT: 2 s) is still caught.
+ * The file at `docPath` is what `expected` says, by the cheapest proof that holds. Missing / existing, then size, then the time stamp:
+ * the same size and the same time stamp is no change, which spares hashing a large document at every save. A touched time stamp (cloud sync,
+ * antivirus) with the same content is no change either (the hash decides). Caveat: a coarse time stamp (FAT: 2 s) lets a same-size rewrite
+ * keep it, so while the stamp is younger than that the hash decides as well.
  */
-const sameStamp = (a: FileStamp | null, b: FileStamp | null): boolean => {
-  if (a === null || b === null) return a === b;
-  if (a.size !== b.size) return false;
-  return a.sha256 !== null && b.sha256 !== null ? a.sha256 === b.sha256 : a.mtimeMs === b.mtimeMs;
-};
+function unchangedOnDisk(docPath: string, expected: FileStamp | null): boolean {
+  const current = statOf(docPath);
+  if (current === null || expected === null) return current === expected;
+  if (current.size !== expected.size) return false;
+  const sameTime = current.mtimeMs === expected.mtimeMs;
+  if (sameTime && (expected.sha256 === null || Date.now() - expected.mtimeMs > FAT_GRANULARITY_MS)) return true;
+  if (expected.sha256 === null) return false;
+  return stampOf(docPath)?.sha256 === expected.sha256;
+}
 
 /**
  * Atomically write `doc` to `docPath`, creating its directory; the replaced file is kept as `<docPath>.bak` (SC-D1). Returns the stamp of
@@ -65,8 +82,14 @@ const sameStamp = (a: FileStamp | null, b: FileStamp | null): boolean => {
  * @failure the file on disk is not what `expected` says -> SaveConflictError (DSF_SAVE_CONFLICT); nothing is written
  */
 export function writeDocumentFile(docPath: string, doc: CadDocument, expected?: { readonly stamp: FileStamp | null }): FileStamp | null {
-  if (expected !== undefined && !sameStamp(stampOf(docPath), expected.stamp)) throw new SaveConflictError(path.resolve(docPath));
+  if (expected !== undefined && !unchangedOnDisk(docPath, expected.stamp)) throw new SaveConflictError(path.resolve(docPath));
   fs.mkdirSync(path.dirname(path.resolve(docPath)), { recursive: true });
-  writeFileKeepingBackup(docPath, serializeDocument(doc));
-  return stampOf(docPath);
+  const text = serializeDocument(doc);
+  writeFileKeepingBackup(docPath, text);
+  // The hash is of the bytes just written (never read back: a large document is hashed once, not re-read).
+  const stat = statOf(docPath);
+  const size = Buffer.byteLength(text, 'utf8');
+  return stat === null
+    ? null
+    : { mtimeMs: stat.mtimeMs, size, sha256: size <= HASH_LIMIT_BYTES ? createHash('sha256').update(text, 'utf8').digest('hex') : null };
 }
