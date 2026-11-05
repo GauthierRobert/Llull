@@ -96,7 +96,13 @@ checked with the 70 km/h row"). Every table found by the inventory (TR-INT-14) m
   `warning: answered by the mesh kernel (<reason>); exact kernel unavailable` (also in `--json` as `provenance`);
   `planKernelWarning.ts` warns for every kernel-optional or kernel-required step of a plan;
 - UI: the `StatusBar` kernel chip turns into "Mesh kernel (degraded)" with the reason in its tooltip while
-  `requested ≠ active`; measure and mass panels show "approximate (mesh)" on degraded values.
+  `requested ≠ active`; measure and mass panels show "approximate (mesh)" on degraded values;
+- scope: every command that reads `ctx.kernel` (directly or through a kernel helper) is `requiresKernel` or `kernelOptional`, or allowlisted with a
+  reason in `tests/unit/contract/kernelConsumers.test.ts` (a static scan of `packages/*/src`); a command that composes others through a nested `execute`
+  carries the worst (degraded) provenance of its nested calls (`ExecutionContext.provenanceScope`, run state, not document state);
+- **open item (known gap)**: the provenance is read from `GeometryKernel.info()` when `execute` runs. A native sidecar that dies permanently AFTER install
+  keeps reporting `occt-native` (its `info()` is the install-time description) until the host reinstalls a kernel; no degraded result is stamped for it.
+  A kernel without `info()` reads as the in-process Manifold, exact not requested (never degraded): a host that falls back must describe itself.
 
 ## 5. Locked layers enforced for every caller (FR-INT-08) · Lane 1
 

@@ -2,7 +2,12 @@
 
 import type { CommandDefinition, CommandResult, ExecutionContext, ResultProvenance } from './types';
 
-/** Provenance of a kernel-using command run with `ctx`, read from the kernel's own description (`GeometryKernel.info`). */
+/**
+ * Provenance of a kernel-using command run with `ctx`, read from the kernel's own description (`GeometryKernel.info`).
+ * @invariant a kernel without `info()` reads as the in-process Manifold with exact not requested (never degraded): the renderer's local-mode kernel is that
+ *   Manifold by design, so the degraded chip of the UI relies on the backend's `/health` (requested vs active), not on this function
+ * @invariant known gap: a native sidecar that dies permanently after install still describes itself as `occt-native` (TR-INT-09 open item)
+ */
 export function kernelProvenance(ctx: ExecutionContext): ResultProvenance {
   const kernel = ctx.kernel;
   if (kernel === null) return { kernel: 'none', exactRequested: false };
