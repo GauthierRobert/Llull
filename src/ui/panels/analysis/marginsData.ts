@@ -23,6 +23,8 @@ export interface MarginRowView {
   readonly status: string;
   /** What to show for the status: `FAIL (accepted)` when the command says so, else the status. */
   readonly statusLabel: string;
+  /** Stable code of a row that is not assessed (`FEA_MESH_INADEQUATE`), else ''. */
+  readonly code: string;
   readonly disposition: string;
   readonly singular: boolean;
   readonly unverified: boolean;
@@ -69,6 +71,7 @@ function parseRow(entry: unknown): MarginRowView[] {
       ms: typeof entry['ms'] === 'number' ? entry['ms'] : null,
       status,
       statusLabel: str(entry['statusLabel']) || status,
+      code: status === 'NOT_ASSESSED' ? str(entry['code']) : '',
       disposition: str(entry['disposition'], 'none'),
       singular: entry['singular'] === true,
       unverified: entry['unverified'] === true,

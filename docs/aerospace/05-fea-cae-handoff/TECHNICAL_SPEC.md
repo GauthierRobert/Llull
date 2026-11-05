@@ -525,8 +525,8 @@ Check items from `check_analysis` use the same codes with a severity.
 | `FEA_TOOL_MISSING` | error | `llull-mesh` missing or its Netgen / OCCT libraries do not load, or ccx not found | tool name | install hint (desktop bundle / `LLULL_MESH_BIN` / `LLULL_CCX`) (AF-41) |
 | `FEA_FACE_MAP_AMBIGUOUS` | error | llull face → mesher face not unique | face indices | heal geometry and re-mesh |
 | `FEA_MESH_INVERTED` | error | any element with scaled Jacobian ≤ 0 | element ids | refine, or change `order`/`optimize` |
-| `FEA_MESH_INADEQUATE` | error | 5th percentile of the tetrahedra crossed by rays through a wall below the budget (C3D4 4, C3D10 2; 10-result-integrity TR-INT-07, pending VNV-M3) | part id | reduce `globalSize` or add a refinement |
-| `FEA_MESH_MARGINAL` | warning | 5th percentile meets the budget, the thinnest sampled spot does not | part id | refine the thin wall |
+| `FEA_MESH_INADEQUATE` | error | 5th percentile of the element layers (hit distance over the local element size) of rays through a wall below the budget (C3D4 4, C3D10 2; 10-result-integrity TR-INT-07, pending VNV-M3) | part id | reduce `globalSize` or add a refinement |
+| `FEA_MESH_MARGINAL` | warning | 5th percentile meets the budget, the thinnest sampled spot is under 75 % of it | part id | refine the thin wall |
 | `FEA_MESH_STALE` | error | mesh `inputHash` ≠ current | analysis id | `fea_mesh` |
 | `FEA_RESULTS_MISSING` | error | no results, or artifact absent on this machine | analysis id | `fea_solve` |
 | `FEA_RESULTS_STALE` | error | results `inputHash` ≠ current | analysis id, changed inputs | `fea_mesh` then `fea_solve` |

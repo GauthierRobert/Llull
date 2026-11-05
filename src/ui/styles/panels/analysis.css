@@ -387,3 +387,8 @@
 .analysis__margin-pending {
   color: var(--warning, #d9a23a);
 }
+
+.analysis__margin-reason {
+  color: var(--warning, #d9a23a);
+  font-size: 0.85em;
+}

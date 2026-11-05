@@ -3,6 +3,12 @@
  * (fea_mesh with Netgen, fea_solve with CalculiX). The quadratic mesh with several layers through the width reproduces the Timoshenko tip
  * deflection 7.634 mm within 2 % and records an `adequate` mesh; one linear element through the width records `inadequate` and the
  * fea_solve summary says so. Skipped without llull-mesh or `ccx`.
+ *
+ * Expected element layers (hit distance / local element size, size = mean tet edge / 1.26, the Kuhn cell calibration of the measure): the load acts
+ * along z, so the bending depth is DEPTH = 50 mm (y, the width b = 20 mm, is the thin direction of the section and governs the 5th percentile).
+ *   C3D10, globalSize 6: edges about 5-6 mm, size about 4-5 mm: about 4-5 layers through b, about 10-12 through DEPTH; budget 2 (adequate, >= 2x margin).
+ *   C3D4, globalSize 40: no edge is below the section scale (the 20 mm width), so size >= about 16 mm: at most about 1.3 layers through b and about 3
+ *   through DEPTH; budget 4 (inadequate through the bending depth as well as the width). Estimates, not measured here (no ccx / llull-mesh on the author machine).
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -137,8 +143,8 @@ describe.skipIf(!HAS_MESHER || !HAS_CCX)('cantilever tip deflection and mesh ade
     expect(Math.abs(Math.abs(mean) / TIMOSHENKO_MM - 1)).toBeLessThan(0.02);
   }, 600_000);
 
-  it('C3D4 with one element through the width: the recorded verdict is inadequate and fea_solve says so', async () => {
-    const { mesh, results, summary } = await solveCantilever('linear', 1, 25);
+  it('C3D4 with about one element through the width and under 4 through the depth: the recorded verdict is inadequate and fea_solve says so', async () => {
+    const { mesh, results, summary } = await solveCantilever('linear', 1, 40);
     expect(mesh.blocks[0]?.type).toBe('C3D4');
     expect(results.adequacy?.verdict, JSON.stringify(results.adequacy)).toBe('inadequate');
     expect(summary).toContain('Mesh adequacy: INADEQUATE');

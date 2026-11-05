@@ -68,7 +68,7 @@ checked with the 70 km/h row"). Every table found by the inventory (TR-INT-14) m
 
 **TR-INT-07 Measure.** Replace the bounding-box heuristic in `packages/domain-cae/src/results/adequacy.ts`:
 - for each part, compute local thickness at a sample of boundary faces (≥ 200 per part or all faces if fewer): cast a ray along
-  the inward face normal through the tet mesh and record the hit distance t and the number of element layers crossed n;
+  the inward face normal through the tet mesh and record the hit distance t and the tets crossed, and the local element size h (mean edge length of the crossed tets over 1.26, the mean edge of a Kuhn-split cell, so a structured hex-equivalent layer is 1); the element layers are n = t / h (not the count of tets crossed: one layer is about 3 tets);
 - `elementsThrough = p5(n)` over the samples (5th percentile, so thin walls govern), separately per element order;
 - thresholds: linear tets (C3D4) need ≥ 4 layers in bending regions, quadratic (C3D10) ≥ 2. These budgets come from the
   convergence studies of VC-INT-12 (target grade until VNV-M3 replaces them with measured convergence);
