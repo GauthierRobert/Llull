@@ -55,7 +55,7 @@ export const kernelInfo = defineCommand({
   description:
     'Report which geometry kernel is active for this session: "occt" (exact B-rep: STEP import, fillets, exact volumes) or "manifold" (mesh booleans only), ' +
     'its OCCT version / build, the optional capabilities it has (topology, analyze, distance, exportStep, importShapes, brepBlobs, ...), the isolation ' +
-    '(worker, in-process or process) and, when the exact kernel failed to start, the fallback reason. Also returns the implicit field engine (data.fieldEngine: name "ts" or the native llull-field, with its sample and triangle limits) and the document modelingTolerance ' +
+    '(worker, in-process or process), the kernel that was requested (data.requested; differs from active while a fallback answers) and, when the exact kernel failed to start, the fallback reason. Also returns the implicit field engine (data.fieldEngine: name "ts" or the native llull-field, with its sample and triangle limits) and the document modelingTolerance ' +
     '(linear mm, angular rad, maxImportTolerance mm) with its source, and warnings KRN_KERNEL_FALLBACK / KRN_KERNEL_MISMATCH ' +
     '(the document was written by another kernel or OCCT version). Call this before relying on exact results.',
   annotations: { readOnly: true, idempotent: true },
@@ -87,6 +87,7 @@ export const kernelInfo = defineCommand({
       active,
       ...(info?.occtVersion === undefined ? {} : { occtVersion: info.occtVersion }),
       ...(info?.build === undefined ? {} : { build: info.build }),
+      ...(info?.exactRequested === undefined ? {} : { requested: info.exactRequested ? 'occt' : 'manifold' }),
       capabilities: info?.capabilities ?? [],
       ...(info?.isolation === undefined ? {} : { isolation: info.isolation }),
       ...(info?.fallbackReason === undefined ? {} : { fallbackReason: info.fallbackReason }),

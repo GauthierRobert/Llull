@@ -20,6 +20,20 @@ import { startNativeKernel } from './nativeKernel';
 type ActiveKernel = 'manifold' | 'occt';
 
 let activeKernel: ActiveKernel | null = null;
+/** Why the exact kernel is not the active one, and whether it was asked for (`/health`, `kernel_info`). */
+let kernelStatus: KernelStatus = { active: null, requested: 'occt' };
+
+export interface KernelStatus {
+  readonly active: ActiveKernel | null;
+  /** The kernel the host asked for: `manifold` only through the diagnostic override `LLULL_KERNEL=manifold`. */
+  readonly requested: ActiveKernel;
+  readonly fallbackReason?: string;
+}
+
+/** The installed kernel against the requested one: `requested !== active` means a degraded (mesh) kernel answers. */
+export function getKernelStatus(): KernelStatus {
+  return kernelStatus;
+}
 
 /** Kernel actually installed, or null before/without one. */
 export function getActiveKernelName(): ActiveKernel | null {
@@ -44,7 +58,10 @@ export function occtCallTimeoutMs(env: NodeJS.ProcessEnv = process.env): number 
 }
 
 /** `kernel` whose `info()` also tells how the server runs it (`kernel_info`, TR-KRN-04); every other member is the kernel's own. */
-function described(kernel: GeometryKernel, extra: Pick<KernelInfo, 'isolation' | 'fallbackReason'>): GeometryKernel {
+function described(
+  kernel: GeometryKernel,
+  extra: Pick<KernelInfo, 'isolation' | 'fallbackReason' | 'active' | 'exactRequested'>,
+): GeometryKernel {
   return { ...kernel, info: () => ({ capabilities: [], ...kernel.info?.(), ...extra }) };
 }
 
@@ -78,11 +95,15 @@ export async function installGeometryKernel(options: KernelInstallOptions = {}):
   warned = false;
   await installMeshEngine(env);
   let fallbackReason: string | undefined;
-  if (env['LLULL_KERNEL']?.trim().toLowerCase() !== 'manifold') {
+  const exactRequested = env['LLULL_KERNEL']?.trim().toLowerCase() !== 'manifold';
+  const requested: ActiveKernel = exactRequested ? 'occt' : 'manifold';
+  kernelStatus = { active: null, requested };
+  if (exactRequested) {
     const native = startNative({ callTimeoutMs: occtCallTimeoutMs(env) }, env);
     if ('kernel' in native) {
-      setGeometryKernel(described(native.kernel, { isolation: 'process' }));
+      setGeometryKernel(described(native.kernel, { isolation: 'process', active: 'occt-native', exactRequested }));
       activeKernel = 'occt';
+      kernelStatus = { active: 'occt', requested };
       return true;
     }
     fallbackReason = native.reason;
@@ -90,9 +111,15 @@ export async function installGeometryKernel(options: KernelInstallOptions = {}):
   }
   try {
     setGeometryKernel(
-      described(await createManifoldKernel(), { isolation: 'in-process', ...(fallbackReason === undefined ? {} : { fallbackReason }) }),
+      described(await createManifoldKernel(), {
+        isolation: 'in-process',
+        active: 'manifold',
+        exactRequested,
+        ...(fallbackReason === undefined ? {} : { fallbackReason }),
+      }),
     );
     activeKernel = 'manifold';
+    kernelStatus = { active: 'manifold', requested, ...(fallbackReason === undefined ? {} : { fallbackReason }) };
     return true;
   } catch (error) {
     warnUnavailable('geometry kernel unavailable; boolean commands will no-op', error);

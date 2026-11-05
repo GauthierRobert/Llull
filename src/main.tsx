@@ -15,6 +15,7 @@ import { setMeshProcessingEngine } from '@core/geometry/mesh/engine';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createManifoldMeshEngine } from '@kernel-manifold/manifoldMeshEngine';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
+import { refreshBackendKernelStatus } from '@ui/services/backendKernel';
 
 // Renderer kernel: Manifold (WASM, in-process) runs the commands this renderer executes itself (local mode while
 // the backend restarts, read-only queries, panel analyses). Exact B-rep work runs in the local backend (LLULL_KERNEL).
@@ -28,6 +29,9 @@ createManifoldKernel()
     console.error('Manifold kernel init failed', e);
     useKernelStatusStore.getState().setStatus('failed');
   });
+
+// The backend's exact kernel may have fallen back to the mesh kernel (FR-INT-07): the status bar says so while it lasts.
+void refreshBackendKernelStatus();
 
 // Mesh modelling (07 MSH): the same WASM serves the mesh-engine port (hull, Minkowski, offset, wrap, mesh booleans); without it those ops refuse cleanly.
 createManifoldMeshEngine()

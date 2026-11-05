@@ -470,6 +470,12 @@
   border-bottom: 1px solid var(--divider);
 }
 
+.mhud-approximate {
+  padding: var(--space-1) var(--space-3);
+  font-style: italic;
+  opacity: 0.8;
+}
+
 .mhud-title {
   display: inline-flex;
   align-items: center;

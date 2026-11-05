@@ -13,9 +13,28 @@ const plan = {
 
 describe('planKernelWarnings', () => {
   it('warns about commands Manifold cannot perform, including inside loops, and points at the native kernel', async () => {
-    const [warning] = planKernelWarnings(plan, await createManifoldKernel());
-    expect(warning).toMatch(/fillet_edge, shell_solid/);
-    expect(warning).toMatch(/native llull-kernel/);
+    const warnings = planKernelWarnings(plan, await createManifoldKernel());
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toMatch(/^fillet_edge cannot be performed/);
+    expect(warnings[1]).toMatch(/^shell_solid cannot be performed/);
+    expect(warnings[0]).toMatch(/native llull-kernel/);
+  });
+
+  it('warns once per kernel-required or kernel-optional command: boolean + mass_properties + fillet_edge give 3 warnings (VC-INT-17)', async () => {
+    const mixed = {
+      actions: [
+        { command: 'add_box', params: {} },
+        { command: 'boolean', params: {} },
+        { command: 'boolean', params: {} },
+        { command: 'mass_properties', params: {} },
+        { command: 'fillet_edge', params: {} },
+      ],
+    };
+    const warnings = planKernelWarnings(mixed, await createManifoldKernel());
+    expect(warnings).toHaveLength(3);
+    expect(warnings.join(' ')).toMatch(/boolean is kernel-optional/);
+    expect(warnings.join(' ')).toMatch(/mass_properties is kernel-optional/);
+    expect(warnings.join(' ')).toMatch(/fillet_edge cannot be performed/);
   });
 
   it('warns when no kernel is installed', () => {

@@ -53,6 +53,18 @@ export interface CommandResult {
    * FeatureStep `execute` records; never returned to the caller.
    */
   recordExtras?: Readonly<Record<string, unknown>>;
+  /**
+   * Which kernel answered (FR-INT-07): set by `execute` for commands annotated `requiresKernel` or `kernelOptional`, and by a plan for its
+   * degraded steps. Never stored in the document.
+   */
+  provenance?: ResultProvenance;
+}
+
+/** Which geometry kernel produced a result, whether the exact one was asked for, and why it did not answer when it was. */
+export interface ResultProvenance {
+  readonly kernel: 'occt-native' | 'manifold' | 'none';
+  readonly exactRequested: boolean;
+  readonly fallbackReason?: string;
 }
 
 /**
@@ -98,6 +110,11 @@ export interface CommandAnnotations {
    * refuses to regenerate a history containing it. Not emitted in tool schemas.
    */
   readonly requiresKernel?: boolean;
+  /**
+   * Works with or without a kernel (exact path when present, mesh path or a named refusal otherwise). `execute` stamps `CommandResult.provenance`
+   * on its results; a contract test keeps this annotation and the `@invariant kernel-optional` tag in step. Not emitted in tool schemas.
+   */
+  readonly kernelOptional?: boolean;
   /**
    * Reads the triangles of mesh entities (measures, analyses, exports, kernel input). `execute` runs it on the full-resolution mesh of
    * every asset-backed mesh the params reach, directly or through a group, layer, component, instance or record id, or all of them when none is named (07 MSH FR-MSH-02, TECHNICAL_SPEC 13.11); when an asset cannot be read, a readOnly query that is not `writesArtifact` answers from the display mesh with a named warning (`data.lodOnly`) and every other command refuses MESH_ASSET_LOD_ONLY; MESH_ASSET_TOO_LARGE above MESH_FULL_READ_TRIANGLE_CAP refuses all. 'document' = the scope is every solid of the document whatever the params name (a drawing view without entityIds). Not emitted in tool schemas.

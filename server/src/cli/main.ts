@@ -10,7 +10,7 @@ import { createLocalBackend, createRemoteBackend, saveDocumentWithBackup, type C
 import { describeCommand, listCatalog, searchCatalog, suggestNames, toolsetCounts, type CatalogEntry } from './catalog';
 import { planAliases } from './aliases';
 import { deadlineFromEnv, withDeadline } from './deadline';
-import { planText, resultJson, resultText, type PrintableResult } from './output';
+import { degradedWarning, planText, resultJson, resultText, type PrintableResult } from './output';
 import { createStepObserver, type StepObserver } from './progress';
 import { resolveFileRefs } from './fileParams';
 import { saveDataFiles, withoutPayloads, withSaveDefaults } from './saveFiles';
@@ -223,6 +223,8 @@ function finish(result: PrintableResult, args: ParsedArgv, io: CliIo, text: (r: 
       return EXIT_COMMAND_ERROR;
     }
   }
+  const degraded = degradedWarning(printable);
+  if (degraded !== null) io.stderr(degraded);
   if (!booleanFlag(args, 'quiet') || printable.isError) io.stdout(booleanFlag(args, 'json') ? resultJson(printable) : text(printable));
   return printable.isError ? EXIT_COMMAND_ERROR : EXIT_OK;
 }

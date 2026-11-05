@@ -6,6 +6,7 @@
 import { shapeToolCallContent } from '@protocol/index';
 import { isRecord } from '@lib/isRecord';
 import type { CommandOutcome } from '@protocol/restProtocol';
+import { isDegraded } from '@core/commands/provenance';
 import { formatDuration } from './progress';
 import { elideLargePayloads, type SavedFile } from './saveFiles';
 import { aliasLine, type PlanAliases } from './aliases';
@@ -33,10 +34,18 @@ export function resultJson(result: PrintableResult): string {
     changed: result.changed,
     ...(result.data !== undefined ? { data: result.data } : {}),
     ...(result.error !== undefined ? { error: result.error } : {}),
+    ...(result.provenance !== undefined ? { provenance: result.provenance } : {}),
     ...(result.saved !== undefined ? { saved: result.saved } : {}),
     ...(result.warnings !== undefined ? { warnings: result.warnings } : {}),
     ...(result.planAliases !== undefined ? { aliases: result.planAliases.aliases, consumedAliases: result.planAliases.consumed } : {}),
   });
+}
+
+/** The one stderr line of a result the mesh kernel answered while the exact kernel was requested (FR-INT-07), else null. */
+export function degradedWarning(result: CommandOutcome): string | null {
+  const provenance = result.provenance;
+  if (!isDegraded(provenance)) return null;
+  return `warning: answered by the mesh kernel (${provenance.fallbackReason ?? 'the exact kernel did not answer'}); exact kernel unavailable`;
 }
 
 function savedLines(saved: readonly SavedFile[] | undefined): string[] {

@@ -19,7 +19,7 @@ import { type Refusal, resolveTargetFrame } from './target';
  */
 export const deformByPoint = defineCommand({
   name: 'deform_by_point',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Push the material of a 3D solid or mesh around a point: every point within radius of `point` moves along `direction` by distance x falloff(r), where r = ' +
     '(distance from `point`) / radius and the falloff is 1 at the point and 0 at and beyond radius (smooth_c2 = (1 - r^2)^3, curvature-continuous, the default; cubic = 1 - 3r^2 + 2r^3). ' +

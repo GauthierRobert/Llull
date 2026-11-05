@@ -143,7 +143,7 @@ export function MeasurementHUD(): React.ReactElement | null {
 
   if (!lastMeasure) return null;
 
-  const { command, data } = lastMeasure;
+  const { command, data, approximate } = lastMeasure;
   const isKnownMeasurement =
     isDistanceData(data) ||
     isAngleData(data) ||
@@ -168,6 +168,11 @@ export function MeasurementHUD(): React.ReactElement | null {
       </div>
 
       <div className="mhud-body">
+        {approximate === true && (
+          <div className="mhud-approximate" title="The mesh kernel answered because the exact kernel is unavailable.">
+            approximate (mesh)
+          </div>
+        )}
         {isDistanceData(data) && <DistanceResult data={data} />}
         {isAngleData(data) && <AngleResult data={data} />}
         {isAreaData(data) && <AreaResult data={data} />}

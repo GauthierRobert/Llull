@@ -42,6 +42,7 @@ function starPoints(entity: SubdivisionEntity): Array<{ id: string; kind: 'verte
  */
 export const subdivisionToNurbs = defineCommand({
   name: COMMAND,
+  annotations: { kernelOptional: true },
   description:
     'Convert a subdivision solid to exact NURBS geometry for STEP, CAM and booleans. output "sheets" (default, no kernel needed): one bicubic nurbs_surface ' +
     'per patch of the once-refined cage (`faces` "unpacked") or one B-spline surface per maximal block of regular quads (`faces` "packed", fewer entities); ' +

@@ -14,6 +14,7 @@ import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
 import { sealDocumentUid } from '../model/documentUid';
+import { withProvenance } from './provenance';
 import { runCommand } from './runCommand';
 import { withOmittedArraysNotice } from './instanceArray/omittedNotice';
 
@@ -43,6 +44,7 @@ function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
  * @invariant a mutating command (not `readOnly` / `metaHistory` / `session`) that changes the document appends FeatureStep `step-<n>` (n =
  *   doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay re-mints identical ids; an execute nested inside a running step joins
  *   it (no extra step)
+ * @invariant a result of a `requiresKernel` / `kernelOptional` command carries `provenance` (kernel, exactRequested, fallbackReason); never stored in the document
  * @invariant before any command runs, the kernel is given every document B-rep blob it has not seen (`GeometryKernel.loadBlob`)
  * @invariant commands see the exact kernel through `kernelMeshGuard`: a recipe over more than KERNEL_MESH_LEAF_CAP imported-mesh triangles is refused (null) and the summary says so
  * @failure nextStepNumber not a safe integer >= 1 (a mutating command would re-mint ids), unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
@@ -56,6 +58,12 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
 }
 
 function executeGuarded(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext): CommandResult {
+  const result = executeCommand(doc, commandName, params, ctx);
+  const def = getCommand(commandName);
+  return def === undefined || result.rejected === true ? result : withProvenance(def, ctx, result);
+}
+
+function executeCommand(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext): CommandResult {
   const def = getCommand(commandName);
   if (!def) return rejection(doc, `Unknown command: ${commandName}`, unknownCommandError());
   const annotations = def.annotations;

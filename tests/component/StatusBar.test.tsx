@@ -159,3 +159,22 @@ describe('StatusBar — geometry kernel', () => {
     expect(screen.queryByText(/geometry kernel/i)).toBeNull();
   });
 });
+
+// StatusBar: degraded kernel chip (FR-INT-07, VC-INT-16)
+
+describe('StatusBar: degraded kernel', () => {
+  beforeEach(() => {
+    resetStore();
+    useKernelStatusStore.setState({ status: 'ready', degradedReason: null });
+  });
+  it('shows nothing while the exact kernel is the active one', () => {
+    render(<StatusBar />);
+    expect(screen.queryByText(/mesh kernel/i)).toBeNull();
+  });
+  it('shows "Mesh kernel (degraded)" with the reason in its tooltip while the exact kernel is unavailable', () => {
+    useKernelStatusStore.setState({ degradedReason: 'llull-kernel binary not found' });
+    render(<StatusBar />);
+    const chip = screen.getByText('Mesh kernel (degraded)');
+    expect(chip.getAttribute('title')).toContain('llull-kernel binary not found');
+  });
+});

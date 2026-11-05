@@ -1,5 +1,5 @@
 import type { SceneSnapshot } from '../inspect/sceneTypes';
-import type { CommandError } from '../types';
+import type { CommandError, ResultProvenance } from '../types';
 
 export interface PlanAction {
   command: string;
@@ -54,6 +54,8 @@ export interface StepReport {
   data?: unknown;
   /** A mutating step's `data` (e.g. add_platform cut/fill) is kept when <= 4000 JSON chars; larger is dropped and its size reported here. */
   dataOmittedChars?: number;
+  /** Which kernel answered this step (FR-INT-07), for a step that uses the kernel. */
+  provenance?: ResultProvenance;
 }
 
 export interface BuildProjectData {
@@ -70,6 +72,8 @@ export interface BuildProjectData {
   aliases?: Record<string, string[]>;
   /** Validation issues (validate mode only). */
   issues?: string[];
+  /** Indices (into `steps`) of the steps the mesh kernel answered while the exact kernel was requested (FR-INT-07). */
+  degradedSteps?: number[];
   /** Final document snapshot (omitted in validate mode — nothing changed). */
   scene?: SceneSnapshot;
 }

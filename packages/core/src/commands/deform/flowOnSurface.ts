@@ -85,7 +85,7 @@ function faceTarget(doc: CadDocument, kernel: GeometryKernel | null, entityId: s
  */
 export const flowOnSurface = defineCommand({
   name: 'flow_on_surface',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Wrap a body designed flat (a plate, an embossed logo, a rib) onto a curved target surface, or move a body laid out on a CURVED base sheet (base.sheetId: a plate bent on a drum, say) onto the target (x, y arc lengths and w the normal offset on both sheets). The base is a plane (origin, normal, uDirection): the body x axis is uDirection, ' +
     'y is normal x uDirection, w is the offset along the normal. The point (x, y, w) goes to S(u*, v*) + w N(u*, v*) on the target, where x and y are ARC LENGTHS on the target ' +

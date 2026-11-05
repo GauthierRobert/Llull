@@ -1,6 +1,6 @@
 /**
  * Express entry: middleware + route mounting only (L1, L6).
- *   GET /health            liveness + active kernel
+ *   GET /health            liveness + active kernel (`kernel`) and { active, requested, fallbackReason } (`kernelStatus`)
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
  *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
@@ -18,7 +18,7 @@ import cors from 'cors';
 import { exchangeOptionsWithDwg } from './dwgConvert';
 import { buildImportRouter } from './importRoutes';
 import { buildExchangeRouter } from './exchangeRoutes';
-import { getActiveKernelName } from './geometryKernel';
+import { getActiveKernelName, getKernelStatus } from './geometryKernel';
 import { buildLiveRouter } from './liveRoutes';
 import { buildPreviewRouter } from './previewRoutes';
 import { buildSigningRouter } from './plm/signingRoutes';
@@ -57,7 +57,7 @@ app.get('/health', (req, res) => {
     typeof challenge === 'string' && challenge !== '' && token !== undefined && token !== ''
       ? createHmac('sha256', token).update(challenge).digest('hex')
       : undefined;
-  res.json({ status: 'ok', kernel: getActiveKernelName(), ...(proof !== undefined ? { proof } : {}) });
+  res.json({ status: 'ok', kernel: getActiveKernelName(), kernelStatus: getKernelStatus(), ...(proof !== undefined ? { proof } : {}) });
 });
 app.use(hostAllowlist());
 const jsonBody = express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' });

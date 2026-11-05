@@ -101,7 +101,7 @@ export function execStep(
     ok: boolean,
     summary: string,
     affected: string[],
-    extra: Pick<StepReport, 'error' | 'data' | 'dataOmittedChars'>,
+    extra: Pick<StepReport, 'error' | 'data' | 'dataOmittedChars' | 'provenance'>,
   ): { ok: boolean; affected: string[] } => {
     run.steps.push({ index, command, ok, summary, affected, ...extra, ...(path ? { path } : {}) });
     return { ok, affected };
@@ -127,7 +127,10 @@ export function execStep(
   // query that answered (mass_properties, inspect_topology, …) is a success that changes nothing.
   const answered = getCommand(command)?.annotations?.readOnly === true && result.data !== undefined;
   const ok = result.affected.length > 0 || result.document !== run.current || answered;
-  const extra = ok ? stepData(result.data, answered) : { error: result.error ?? planError(PLAN_FIX.noEffect, location) };
+  const extra = {
+    ...(ok ? stepData(result.data, answered) : { error: result.error ?? planError(PLAN_FIX.noEffect, location) }),
+    ...(result.provenance === undefined ? {} : { provenance: result.provenance }),
+  };
   report(ok, label ? `${label}: ${result.summary}` : result.summary, result.affected, extra);
   run.onStep?.({ phase: 'end', ...event, ok, stepPosition: run.steps.length - 1 });
   if (!ok) return { ok, affected: [] };

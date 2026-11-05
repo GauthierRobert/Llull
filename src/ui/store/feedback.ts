@@ -1,6 +1,8 @@
 /** Status-bar and measurement feedback rules shared by local and online dispatch. Presentation only. */
 
 import { getCommand } from '@core/commands/registry';
+import { isDegraded } from '@core/commands/provenance';
+import type { ResultProvenance } from '@core/commands/types';
 import type { DispatchOptions, LastMeasure } from './storeTypes';
 
 /** Camera commands report their internals; the status bar shows a short label instead. */
@@ -13,7 +15,7 @@ export function statusSummaryFor(name: string, summary: string, options: Dispatc
 }
 
 /** Only read-only query commands that return data produce a measurement card. */
-export function measureAfter(name: string, data: unknown, previous: LastMeasure | null): LastMeasure | null {
+export function measureAfter(name: string, data: unknown, previous: LastMeasure | null, provenance?: ResultProvenance): LastMeasure | null {
   if (data === undefined || getCommand(name)?.annotations?.readOnly !== true) return previous;
-  return { command: name, data };
+  return { command: name, data, ...(isDegraded(provenance) ? { approximate: true as const } : {}) };
 }

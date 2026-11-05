@@ -19,6 +19,10 @@ export interface KernelInfo {
   readonly capabilities: readonly string[];
   /** How the host runs the kernel: a worker thread, the host process itself, or a separate OS process (native sidecar, RS-1). */
   readonly isolation?: 'worker' | 'in-process' | 'process';
+  /** Which kernel this is, when the host says so (absent: derived from `occtVersion`). */
+  readonly active?: 'occt-native' | 'manifold';
+  /** True unless the host asked for the mesh kernel on purpose (`LLULL_KERNEL=manifold`); absent: false. */
+  readonly exactRequested?: boolean;
   /** Set when the exact kernel failed to start and a fallback kernel is active. */
   readonly fallbackReason?: string;
 }

@@ -4,7 +4,7 @@
  * (the one reader of a command-bus body, used by every non-browser client).
  */
 
-import type { CommandError } from '@core/commands/types';
+import type { CommandError, ResultProvenance } from '@core/commands/types';
 import { isRecord } from '@lib/isRecord';
 
 /**
@@ -23,6 +23,8 @@ export interface CommandOutcome {
    * failure the command reported itself (an aborted or refused `build_project`, a command's own coded no-op).
    */
   error?: CommandError;
+  /** Which kernel answered, for a command that uses the kernel (FR-INT-07). */
+  provenance?: ResultProvenance;
 }
 
 /**
@@ -77,7 +79,17 @@ export function parseCommandResponse(body: unknown, status: number): CommandOutc
     changed: body['changed'] === true,
     ...(body['data'] !== undefined ? { data: body['data'] } : {}),
     ...(isCommandError(body['error']) ? { error: body['error'] } : {}),
+    ...(isProvenance(body['provenance']) ? { provenance: body['provenance'] } : {}),
   };
+}
+
+function isProvenance(value: unknown): value is ResultProvenance {
+  return (
+    isRecord(value) &&
+    (value['kernel'] === 'occt-native' || value['kernel'] === 'manifold' || value['kernel'] === 'none') &&
+    typeof value['exactRequested'] === 'boolean' &&
+    (value['fallbackReason'] === undefined || typeof value['fallbackReason'] === 'string')
+  );
 }
 
 function isStringList(value: unknown): value is string[] {

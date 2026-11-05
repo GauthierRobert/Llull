@@ -5,6 +5,8 @@ import type { LiveCommandEvent, LiveSnapshotEvent } from '@protocol/liveSync';
 export interface LastMeasure {
   command: string;
   data: unknown;
+  /** The mesh kernel answered while the exact kernel was requested: the figures are approximate (FR-INT-07). */
+  approximate?: true;
 }
 
 export type LiveStatus = 'connecting' | 'connected' | 'disconnected';

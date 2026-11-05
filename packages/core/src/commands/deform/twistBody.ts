@@ -15,7 +15,7 @@ import { type Refusal, resolveRegion, resolveTargetFrame } from './target';
  */
 export const twistBody = defineCommand({
   name: 'twist_body',
-  annotations: { readsMeshTriangles: true },
+  annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
     'Twist a 3D solid or mesh about an axis: each cross-section perpendicular to the axis is rotated by angleDeg times a ramp that goes from 0 at region.start ' +
     'to 1 at region.end (past the end the body keeps the full rotation); with region.infinite true the rate angleDeg per (end - start) holds along the whole axis, also beyond both ends. Volume is unchanged. Use it for twisted bars, drill flutes, blades, balusters. ' +

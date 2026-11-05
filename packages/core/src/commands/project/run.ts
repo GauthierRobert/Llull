@@ -9,6 +9,7 @@ import { runLoopItem } from './loop';
 import { isLoopNode } from './loopHeader';
 import { validatePlan } from './validate';
 import { PLAN_FIX, type PlanFix, planError } from './planErrors';
+import { isDegraded } from '../provenance';
 import {
   isPlanAction,
   isRepeatStep,
@@ -153,16 +154,20 @@ export function runProject(doc: CadDocument, { actions, onError = 'abort', valid
     const expanded = steps.length === actions.length ? '' : ` (${steps.length} commands executed)`;
     summary = `Plan complete: ${okCount}/${actions.length} plan step(s) ok${expanded}, ${affected.length} entit${affected.length === 1 ? 'y' : 'ies'} affected.`;
   }
+  const degradedSteps = steps.flatMap((step, position) => (isDegraded(step.provenance) ? [position] : []));
+  const degraded = steps[degradedSteps[0] ?? -1]?.provenance;
   return {
     document: finalDoc,
     summary,
     affected,
+    ...(degraded === undefined ? {} : { provenance: degraded }),
     data: {
       ok: allOk,
       validated: false,
       stepCount: actions.length,
       steps,
       failedAt,
+      ...(degradedSteps.length === 0 ? {} : { degradedSteps }),
       ...(aborted ? {} : { aliases: reportedAliases(run.bindings, actions) }),
       ...(scene ? { scene } : {}),
     },
