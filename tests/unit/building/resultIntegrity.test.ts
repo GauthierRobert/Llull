@@ -5,6 +5,7 @@ import { execute } from '@core/commands/registry';
 import type { BuildingElement } from '@aec/building/types';
 import { anchorBoltResistance, boltResistance } from '@aec/industrial/steelDesign/steelBolts';
 import { isSteelRefusal, steelStrength } from '@aec/industrial/steelDesign/steelGrades';
+import { checkPlateMN, sizeBasePlate } from '@aec/industrial/connections/basePlateMN';
 import { mapElements } from './elementEdits';
 import { check, rowOf, squareBay } from './steelFixtures';
 
@@ -226,5 +227,34 @@ describe('bolt class parameter (VC-INT-08, 09; INT-FB-003)', () => {
     const odd = mapElements(hall(), (element) => (element.category === 'connection' ? { ...element, boltDiameter: 19 } : element));
     const rows = rowsOf(odd, 'check_portal_frames');
     expect(rows.some((row) => row.check.includes('STL_BOLT_SIZE_NONSTANDARD') && row.utilisation > 1)).toBe(true);
+  });
+});
+
+describe('base plate refusals (INT-FB-001, INT-FB-004)', () => {
+  const geometry = { length: 500, width: 450, thickness: 40, boltCount: 4, boltDiameter: 24, columnDepth: 300 };
+  it('checkPlateMN fails a plate of unknown grade, of unknown anchor class and of non-standard anchor size', () => {
+    const grade = checkPlateMN(geometry, 200, 150, { grade: 'A36', boltClass: '8.8' });
+    expect(grade.refusal).toContain('STL_GRADE_UNKNOWN');
+    const anchorClass = checkPlateMN(geometry, 200, 150, { grade: 'S355', boltClass: '12.9' });
+    expect(anchorClass.refusal).toContain('STL_BOLT_CLASS_UNKNOWN');
+    const size = checkPlateMN({ ...geometry, boltDiameter: 25 }, 200, 150, { grade: 'S355', boltClass: '8.8' });
+    expect(size.refusal).toContain('STL_BOLT_SIZE_NONSTANDARD');
+    for (const refused of [grade, anchorClass, size]) {
+      expect(refused.utilisation).toBeGreaterThan(1);
+      expect(refused.check).toContain('not checked');
+    }
+    expect(checkPlateMN(geometry, 200, 150, { grade: 'S355', boltClass: '8.8' }).refusal).toBeUndefined();
+  });
+  it('checks a plate over 40 mm with the 40 < t <= 80 band: lower fy needs a thicker plate', () => {
+    const thick = { ...geometry, thickness: 50 };
+    const thin = checkPlateMN(geometry, 200, 150, { grade: 'S355', boltClass: '8.8' });
+    const banded = checkPlateMN(thick, 200, 150, { grade: 'S355', boltClass: '8.8' });
+    expect(banded.requiredThickness).toBeGreaterThan(thin.requiredThickness);
+    expect(banded.requiredThickness / thin.requiredThickness).toBeCloseTo(Math.sqrt(355 / 335), 6);
+  });
+  it('sizeBasePlate reports the refusal instead of a plate', () => {
+    const outcome = sizeBasePlate({ depth: 390, width: 300 }, [{ normal: 150, moment: 20 }], { grade: 'Fe360', boltClass: '8.8' });
+    expect(outcome.passes).toBe(false);
+    expect(outcome.refusal).toContain('STL_GRADE_UNKNOWN');
   });
 });
