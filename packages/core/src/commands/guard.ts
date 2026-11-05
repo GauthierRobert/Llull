@@ -5,6 +5,7 @@ import type { CommandDefinition, CommandResult, ExecutionContext, ParamsSchema }
 import { isReservedKey } from '../lib/reservedKey';
 import { formatIssues, issuePaths } from './schema';
 import { derivationViolation } from './derivation';
+import { layerLockViolation } from './layerLock';
 import { pluginGuards } from '../plugins/host';
 import { commandError, rejection } from './noop';
 import { errorMessage } from '../lib/errorMessage';
@@ -101,6 +102,7 @@ export function corruptionReason(entity: unknown): string | null {
  * @failure run throws (warned with stack), id-like params equal an Object.prototype key
  * (would alias entity-bag lookups), or affected entities contain NaN/Infinity/undefined vector
  * components or a non-Vec3 position -> no-op, affected:[]
+ * @failure the result adds, changes or removes an entity on a layer locked in the input document -> no-op, LAYER_LOCKED (unless annotations.layerManagement, ctx.replaying, or plugin-derived entities)
  * @failure a top-level param key the schema does not declare -> rejected: unknown param 'k' (closest declared key suggested), CMD_UNKNOWN_PARAM (unless annotations.metadataKeys: tolerated, stripped)
  * @invariant non-object params are coerced to {} so field destructuring cannot throw;
  * a 2-number `position` is padded to [x, y, 0]; free-text params are never rejected
@@ -164,6 +166,8 @@ function checkedRun(def: CommandDefinition<unknown>, doc: CadDocument, params: u
       violation.error ??
         commandError('CMD_DERIVED_GEOMETRY', 'Edit the domain object that derives this geometry instead of the derived entities.'),
     );
+  const locked = layerLockViolation(def, doc, result.document, ctx);
+  if (locked !== null) return rejection(doc, locked.summary, locked.error);
   if (result.document !== doc) {
     for (const id of result.affected) {
       const reason = corruptionReason(result.document.entities[id]);

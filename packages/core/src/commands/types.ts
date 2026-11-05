@@ -89,6 +89,11 @@ export interface CommandAnnotations {
    */
   readonly metadataKeys?: boolean;
   /**
+   * Exempt from the locked-layer guard of `execute` (FR-INT-08): layer management itself (update_layer, delete_layer, set_entity_layer, which keeps its own rule), document-wide
+   * replacement (load_document, clear_document) and build_project, whose nested steps are each guarded. Not emitted in tool schemas.
+   */
+  readonly layerManagement?: boolean;
+  /**
    * Session command (OQ-MAT-09): changes the in-memory document only. `execute` appends no FeatureStep and the host neither logs nor
    * syncs it; its effect is never serialized (private material-library values, TR-MAT-31). Not emitted in tool schemas.
    */

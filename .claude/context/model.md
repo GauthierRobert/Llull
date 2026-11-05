@@ -104,7 +104,7 @@ interface FeatureStep {
   affected?: readonly EntityId[];
 }
 
-interface Layer { readonly id: string; name: string; visible: boolean; locked: boolean; color?: string }
+interface Layer { readonly id: string; name: string; visible: boolean; locked: boolean; color?: string }  // locked: `execute` refuses any command that adds, changes or removes an entity on it (LAYER_LOCKED, commands/layerLock.ts)
 interface CameraState { target: Vec3; azimuth: number; polar: number; distance: number } // spherical orbit
 const DEFAULT_LAYER_ID = 'layer-default';
 createEmptyDocument(): CadDocument   // one default layer 'Layer 0', every table empty
