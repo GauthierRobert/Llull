@@ -13,7 +13,8 @@ import { deferralCount } from '@core/geometry/mesh/engine';
 import type { PlanStepEvent } from '@core/commands/types';
 import { runHostCommand, runHostCommandResolved } from '../plm/hostRun';
 import { formatJobProgress, formatStreamedProgress } from './progress';
-import { readDocumentFile, writeDocumentFile } from '../documentFile';
+import { type FileStamp, readDocumentFile, SaveConflictError, stampOf, writeDocumentFile } from '../documentFile';
+import { acquireDocumentLock, DocumentLockedError } from '../documentLock';
 import { renameWithRetry } from '../writeFileAtomic';
 
 export interface CliBackend {
@@ -30,8 +31,17 @@ export function saveDocumentWithBackup(docPath: string, doc: CadDocument): void 
   writeDocumentFile(docPath, doc);
 }
 
+/** A refusal the host decided (lock, conflict): a failed outcome with a machine-readable code, nothing written. */
+function refusedOutcome(code: string, summary: string, documentPath: string, remediation: string): CommandOutcome {
+  return { summary, affected: [], isError: true, changed: false, error: { code, ids: [], paths: [documentPath], remediation } };
+}
+
+const LOCKED_REMEDIATION = 'Use --app for the open document, or retry when the other writer is done.';
+
 interface LocalOptions {
   readonly dryRun: boolean;
+  /** Save even though the file changed on disk since it was loaded (--force-overwrite). */
+  readonly forceOverwrite?: boolean;
   readonly observer?: StepObserver; // build_project progress, per-step timing, `--timeout`
   readonly exchangeOptions: () => ExchangeOptions; // created on first use
   /** Ctrl-C: cancels the command in flight (its native mesh jobs are killed, nothing is saved). */
@@ -65,14 +75,45 @@ function onceOnly(onStep: (event: PlanStepEvent) => void): (event: PlanStepEvent
 /** Offline backend: load, `execute`, save when the document changed. */
 export function createLocalBackend(docPath: string, options: LocalOptions): CliBackend {
   let doc: CadDocument | null = null;
+  let loadedStamp: FileStamp | null = null; // the file as this process loaded / last saved it (DSF_SAVE_CONFLICT)
   const currentDoc = (): CadDocument => {
-    doc ??= readDocumentFile(docPath);
+    if (doc === null) {
+      loadedStamp = stampOf(docPath); // before the read: a change in between is caught at save time
+      doc = readDocumentFile(docPath);
+    }
     return doc;
   };
+  /**
+   * The write path of every local save (A-09): the lock next to the file (DSF_DOC_LOCKED; a dead holder's lock is taken over and
+   * reported as DSF_LOCK_STALE), then the on-disk check against what was loaded (DSF_SAVE_CONFLICT unless --force-overwrite).
+   */
+  const saveGuarded = (document: CadDocument): { refusal: CommandOutcome } | { note: string | null } => {
+    try {
+      const lock = acquireDocumentLock(docPath, 'cli'); // held for the write only: a CLI call is one load-modify-save
+      try {
+        loadedStamp = writeDocumentFile(docPath, document, options.forceOverwrite === true ? undefined : { stamp: loadedStamp });
+      } finally {
+        lock.release();
+      }
+      return {
+        note: lock.tookOver === null ? null : `DSF_LOCK_STALE: took over the lock left by pid ${lock.tookOver.pid} (no longer running).`,
+      };
+    } catch (error) {
+      if (error instanceof DocumentLockedError) return { refusal: refusedOutcome(error.code, error.message, docPath, LOCKED_REMEDIATION) };
+      if (error instanceof SaveConflictError)
+        return { refusal: refusedOutcome(error.code, error.message, docPath, 'Reload the file, or pass --force-overwrite to replace it.') };
+      throw error;
+    }
+  };
   const finished = (document: CadDocument, outcome: CommandOutcome): CommandOutcome => {
+    let result = outcome;
+    if (outcome.changed && !options.dryRun) {
+      const saved = saveGuarded(document);
+      if ('refusal' in saved) return saved.refusal; // nothing written: the in-memory document is not adopted
+      if (saved.note !== null) result = { ...outcome, summary: `${outcome.summary} ${saved.note}` };
+    }
     doc = document;
-    if (outcome.changed && !options.dryRun) saveDocumentWithBackup(docPath, document);
-    return outcome.data !== undefined ? { ...outcome, data: options.observer?.withDurations(outcome.data) ?? outcome.data } : outcome;
+    return result.data !== undefined ? { ...result, data: options.observer?.withDurations(result.data) ?? result.data } : result;
   };
   /** The host's fixed commands (exchange follow-ups): synchronous, never a native mesh job. */
   const runFixed = (name: string, params: unknown): CommandOutcome => {
@@ -119,12 +160,25 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
       });
     }
     if (!options.dryRun) {
-      // Park the current file first: a crash at any point leaves both versions on disk.
-      const parked = `${docPath}.${process.pid}.swap`;
-      const hasCurrent = fs.existsSync(docPath);
-      if (hasCurrent) fs.copyFileSync(docPath, parked);
-      renameWithRetry(backup, docPath);
-      if (hasCurrent) renameWithRetry(parked, backup);
+      let lock: ReturnType<typeof acquireDocumentLock>;
+      try {
+        lock = acquireDocumentLock(docPath, 'cli');
+      } catch (error) {
+        if (error instanceof DocumentLockedError)
+          return Promise.resolve(refusedOutcome(error.code, error.message, docPath, LOCKED_REMEDIATION));
+        throw error;
+      }
+      try {
+        // Park the current file first: a crash at any point leaves both versions on disk.
+        const parked = `${docPath}.${process.pid}.swap`;
+        const hasCurrent = fs.existsSync(docPath);
+        if (hasCurrent) fs.copyFileSync(docPath, parked);
+        renameWithRetry(backup, docPath);
+        if (hasCurrent) renameWithRetry(parked, backup);
+      } finally {
+        lock.release();
+      }
+      doc = null; // the file is another version now: the next load re-reads it and its stamp
     }
     return Promise.resolve({
       summary: `${label}: swapped ${docPath} with its previous version (${path.basename(backup)}).`,

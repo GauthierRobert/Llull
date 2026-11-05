@@ -10,7 +10,8 @@ import { isRecord } from '@lib/isRecord';
 import { outcomeIsFailure } from '@protocol/commandOutcome';
 import { parseCommandResponse } from '@protocol/restProtocol';
 import { requestJson, type FetchLike } from '@server/restClient';
-import { writeDocumentFile } from '@server/documentFile';
+import { type FileStamp, stampOf, writeDocumentFile } from '@server/documentFile';
+import { acquireDocumentLock, type DocumentLock } from '@server/documentLock';
 
 interface Snapshot {
   readonly stateHash: string;
@@ -19,9 +20,13 @@ interface Snapshot {
 
 export interface DocumentSession {
   readonly currentPath: () => string | null; // absolute; null = unsaved
+  /** @failure the file is locked by another writer -> DocumentLockedError (DSF_DOC_LOCKED); nothing changes */
   open(filePath: string): Promise<void>;
-  /** Save As `filePath`, or to the current path. @failure no path -> rejects */
-  save(filePath?: string): Promise<string>;
+  /**
+   * Save As `filePath`, or to the current path. @failure no path -> rejects; another process holds the file's lock -> DocumentLockedError
+   * (DSF_DOC_LOCKED); the file changed on disk since it was opened or last saved -> SaveConflictError (DSF_SAVE_CONFLICT) unless `overwrite`
+   */
+  save(filePath?: string, options?: { readonly overwrite?: boolean }): Promise<string>;
   newDocument(): Promise<void>;
   /** The live document of the app (what Save would write). */
   currentDocument(): Promise<CadDocument>;
@@ -38,6 +43,13 @@ interface SessionOptions {
 
 export function createDocumentSession(options: SessionOptions): DocumentSession {
   let currentPath: string | null = null;
+  let lock: DocumentLock | null = null; // the lock file of the open document (A-09): held while it is open
+  let loadedStamp: FileStamp | null = null; // the file as opened / last saved (DSF_SAVE_CONFLICT)
+  const holdOnly = (next: DocumentLock | null): void => {
+    const previous = lock;
+    lock = next;
+    if (previous !== null && previous !== next && previous.documentPath !== next?.documentPath) previous.release();
+  };
   let savedHash: string | null = null;
 
   const snapshot = async (): Promise<Snapshot> => {
@@ -79,18 +91,35 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
     currentPath: () => currentPath,
     async open(filePath) {
       const absolute = path.resolve(filePath);
-      const json = fs.readFileSync(absolute, 'utf8');
-      await bindRecovery(absolute);
-      await command('load_document', { json });
+      const taken = acquireDocumentLock(absolute, 'desktop');
+      try {
+        loadedStamp = stampOf(absolute);
+        const json = fs.readFileSync(absolute, 'utf8');
+        await bindRecovery(absolute);
+        await command('load_document', { json });
+      } catch (error) {
+        if (taken.documentPath !== lock?.documentPath) taken.release();
+        throw error;
+      }
+      holdOnly(taken);
       currentPath = absolute;
       savedHash = (await snapshot()).stateHash;
       await markRecoverySaved(savedHash);
     },
-    async save(filePath) {
+    async save(filePath, saveOptions) {
       const target = filePath !== undefined ? path.resolve(filePath) : currentPath;
       if (target === null) throw new Error('no file chosen for this document (use Save As)');
       const current = await snapshot();
-      writeDocumentFile(target, current.document);
+      const taken = target === currentPath && lock !== null ? lock : acquireDocumentLock(target, 'desktop');
+      try {
+        // The conflict check applies to the file this session opened or saved; Save As onto another file was confirmed by the OS dialog.
+        const guard = target === currentPath && saveOptions?.overwrite !== true ? { stamp: loadedStamp } : undefined;
+        loadedStamp = writeDocumentFile(target, current.document, guard);
+      } catch (error) {
+        if (taken !== lock) taken.release();
+        throw error;
+      }
+      holdOnly(taken);
       if (target !== currentPath) await bindRecovery(target);
       currentPath = target;
       savedHash = current.stateHash;
@@ -100,7 +129,9 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
     async newDocument() {
       await bindRecovery(null);
       await command('clear_document', {}, true);
+      holdOnly(null);
       currentPath = null;
+      loadedStamp = null;
       savedHash = (await snapshot()).stateHash;
     },
     async currentDocument() {
@@ -109,7 +140,9 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
     async loadDocument(json) {
       await bindRecovery(null);
       await command('load_document', { json });
+      holdOnly(null);
       currentPath = null;
+      loadedStamp = null;
       savedHash = (await snapshot()).stateHash;
       await markRecoverySaved(savedHash);
     },

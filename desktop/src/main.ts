@@ -14,6 +14,7 @@ import { trustPendingKeys } from './keyTrust';
 import { partNumberOf, vaultCheckIn, vaultCheckOut, type VaultDeps } from './vault';
 import { currentHolder } from '@server/plm/vault/vault';
 import { createDocumentSession, type DocumentSession } from './documents';
+import { SaveConflictError } from '@server/documentFile';
 import { export3mfToFile } from './exportFile';
 import { ipcSenderAllowed } from './ipcGuard';
 import { DEFAULT_SAVE_NAME, DOCUMENT_EXTENSIONS, DOCUMENT_FILE_PATTERN } from '@protocol/documentFiles';
@@ -120,6 +121,27 @@ function interceptQuit(event: { preventDefault(): void }): void {
   });
 }
 
+/** Save; a file changed on disk since it was opened is never overwritten unasked (DSF_SAVE_CONFLICT): overwrite, Save As, or cancel. */
+async function saveResolvingConflict(target: string): Promise<string | undefined> {
+  try {
+    return await session?.save(target);
+  } catch (error) {
+    if (!(error instanceof SaveConflictError)) throw error;
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      buttons: ['Overwrite', 'Save As…', 'Cancel'],
+      defaultId: 2,
+      cancelId: 2,
+      message: 'This file changed on disk since you opened it.',
+      detail: error.message,
+    });
+    if (response === 0) return session?.save(target, { overwrite: true });
+    if (response !== 1) return undefined;
+    const chosen = await dialog.showSaveDialog({ defaultPath: DEFAULT_SAVE_NAME, filters: FILE_FILTERS });
+    return chosen.canceled || chosen.filePath === undefined ? undefined : session?.save(chosen.filePath);
+  }
+}
+
 async function saveDocument(forceDialog: boolean): Promise<boolean> {
   if (session === null) return false;
   let target = forceDialog ? null : session.currentPath();
@@ -131,9 +153,9 @@ async function saveDocument(forceDialog: boolean): Promise<boolean> {
   const chosen = target;
   let ok = false;
   await guarded('Save', async () => {
-    const saved = await session?.save(chosen);
+    const saved = await saveResolvingConflict(chosen);
     if (saved !== undefined) app.addRecentDocument(saved);
-    ok = true;
+    ok = saved !== undefined;
   });
   return ok;
 }
