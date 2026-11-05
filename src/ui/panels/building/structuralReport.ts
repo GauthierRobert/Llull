@@ -10,10 +10,14 @@ export interface ReportRow {
   readonly ok: boolean;
   /** Shown instead of the utilisation when the check is not a ratio (pipe span vs allowed). */
   readonly detail: string;
+  /** Code of the refusal (STL_*) when the check refused the row's input: the row was not computed, it is neither a pass nor a failure. */
+  readonly refusedCode?: string;
 }
 
+export const isRefused = (row: ReportRow): boolean => row.refusedCode !== undefined;
+
 export function isFailing(row: ReportRow): boolean {
-  return row.utilisation > 1 || !row.ok;
+  return !isRefused(row) && (row.utilisation > 1 || !row.ok);
 }
 
 /** check_pipe_supports: one row per pipe, ratio = largest span / allowed span. */
@@ -54,6 +58,7 @@ export function allRows(data: unknown): ReportRow[] {
       return typeof value === 'string' ? value : '';
     };
     const label = [text('mark') || text('column'), text('kind') || text('check'), text('frame')].filter((part) => part !== '').join(' · ');
+    const code = isRecord(row.refusal) && typeof row.refusal.code === 'string' ? row.refusal.code : undefined;
     return [
       {
         key: `${index}:${text('elementId')}`,
@@ -61,15 +66,16 @@ export function allRows(data: unknown): ReportRow[] {
         label,
         utilisation: row.utilisation,
         ok: row.ok !== false,
-        detail: '',
+        detail: code === undefined ? '' : `refused (${code})`,
+        ...(code === undefined ? {} : { refusedCode: code }),
       },
     ];
   });
 }
 
-/** The `limit` most utilised rows of a check result, worst first. */
+/** The `limit` most utilised rows of a check result, worst first; refused rows (not computed) come before every computed one. */
 export function worstRows(data: unknown, limit = 12): ReportRow[] {
   return allRows(data)
-    .sort((a, b) => b.utilisation - a.utilisation)
+    .sort((a, b) => Number(isRefused(b)) - Number(isRefused(a)) || b.utilisation - a.utilisation)
     .slice(0, limit);
 }

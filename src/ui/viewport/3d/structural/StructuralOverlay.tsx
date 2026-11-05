@@ -77,7 +77,9 @@ export function StructuralOverlay({ hulls = false }: { hulls?: boolean }): React
       return;
     }
     setTints(
-      new Map(marks.flatMap((mark) => mark.entityIds.map((id) => [id, utilisationColor(mark.utilisation, !mark.failing)] as const))),
+      new Map(
+        marks.flatMap((mark) => mark.entityIds.map((id) => [id, utilisationColor(mark.utilisation, !mark.failing, mark.refused)] as const)),
+      ),
     );
     return () => setTints(new Map());
   }, [hulls, shown, marks]);
@@ -89,7 +91,7 @@ export function StructuralOverlay({ hulls = false }: { hulls?: boolean }): React
           const entity = document.entities[id];
           return entity === undefined ? [] : [entityBoundsInDoc(document, entity)];
         });
-        return { mark, boxes, color: utilisationColor(mark.utilisation, !mark.failing) };
+        return { mark, boxes, color: utilisationColor(mark.utilisation, !mark.failing, mark.refused) };
       }),
     [marks, document],
   );

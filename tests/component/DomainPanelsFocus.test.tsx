@@ -49,7 +49,9 @@ describe('utilisation colouring (pure)', () => {
       { key: '1:b', elementId: 'b', label: 'Gone', utilisation: 0.5, ok: true, detail: '' },
     ];
     const building = { elements: { a: { entityIds: ['e1'] } } } as never;
-    expect(toUtilisationMarks(rows, building)).toEqual([{ key: '0:a', entityIds: ['e1'], utilisation: 1.2, failing: true, label: 'Col' }]);
+    expect(toUtilisationMarks(rows, building)).toEqual([
+      { key: '0:a', entityIds: ['e1'], utilisation: 1.2, failing: true, refused: false, label: 'Col' },
+    ]);
   });
 });
 
