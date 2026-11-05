@@ -17,7 +17,7 @@ type PartEntry = FeMeshAdequacy['parts'][number];
  */
 export const LINEAR_LAYERS_REQUIRED = 4;
 /** Element layers required through the wall of a quadratic tetrahedron (C3D10). Target value of TR-INT-07, pending the VNV-M3 convergence study. */
-export const QUADRATIC_LAYERS_REQUIRED = 2;
+const QUADRATIC_LAYERS_REQUIRED = 2;
 /** A part with at most this many boundary faces is measured on every face. */
 const ALL_FACES = 2000;
 /** Above it: boundary faces are bucketed by position (a GRID^3 grid over the boundary) and area class, and this many (smallest hash) are taken per bucket. */
