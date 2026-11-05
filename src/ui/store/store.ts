@@ -13,6 +13,7 @@ import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from 
 import { reuseUnchanged } from './reuseUnchanged';
 import { execute } from '@core/commands/registry';
 import { withFailureTracking } from '@ui/report/failureStore';
+import { preserveOfflineEdits } from './offlineEdits';
 
 /** Selection survives a document replacement, minus ids that no longer exist. */
 const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): CadDocument => ({
@@ -21,7 +22,7 @@ const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): C
 });
 
 const SET_SELECTION = 'set_selection';
-const REPLACED_LOCAL_EDITS = 'Backend reconnected: edits made while it was offline were replaced by its document.';
+const KEPT_LOCAL_EDITS = 'Backend reconnected: the edits you made while it was offline were kept as a recoverable copy.';
 
 export const useStore = create<CadStoreState>()((set, get) => {
   const stepHistory = (direction: 'undo' | 'redo'): void => {
@@ -89,6 +90,8 @@ export const useStore = create<CadStoreState>()((set, get) => {
     hydrateLiveDocument(snapshot: LiveSnapshotEvent): void {
       const { liveEpoch, liveSeq } = get();
       if (snapshot.epoch === liveEpoch && snapshot.seq < liveSeq) return; // stale resync response
+      const offlineEdits = get().document.order.length > 0 ? get().localUndoStack.length : 0; // an empty document has nothing to keep
+      if (offlineEdits > 0) preserveOfflineEdits(get().document, offlineEdits); // never replaced silently (FR-DSF-23)
       const adopted = reuseUnchanged(get().liveBase, snapshot.document);
       set({
         liveBase: adopted,
@@ -97,7 +100,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
         document: withLocalSelection(reuseUnchanged(get().document, adopted), get().document.selection),
         localUndoStack: [],
         localRedoStack: [],
-        ...(get().localUndoStack.length > 0 ? { lastSummary: REPLACED_LOCAL_EDITS } : {}),
+        ...(offlineEdits > 0 ? { lastSummary: KEPT_LOCAL_EDITS } : {}),
       });
     },
 

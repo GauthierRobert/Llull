@@ -13,6 +13,9 @@ import {
   getState,
 } from '../helpers/storeTestHelpers';
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
+import { useRecoveryStore } from '@ui/store/recoveryStore';
+import { useSessionStore } from '@ui/store/sessionStore';
+import { browserStorage, readAutosave } from '@ui/store/autosave';
 
 const dispatchId = (name: string, params: unknown): string => localDispatch(name, params).affected[0]!;
 const order = (): string[] => getState().document.order;
@@ -232,19 +235,40 @@ describe('CadStore — offline fallback', () => {
     expect(order()[0]).not.toBe(undoneId);
   });
 
-  it('reconnect adopts the backend snapshot over local edits and says so', () => {
+  it('reconnect adopts the backend snapshot but keeps the offline edits as a recoverable copy (FR-DSF-23)', async () => {
     offline();
     getState().dispatch('add_box', { size: [1, 1, 1] });
     expect(order()).toHaveLength(1);
-    const spy = vi.fn();
+    const offlineJson = serializeDocument(getState().document);
+    const spy = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, slots: [] }) }));
     vi.stubGlobal('fetch', spy);
     online();
     getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
-    expect(spy).not.toHaveBeenCalled();
     expect(order()).toHaveLength(0);
     expect(getState().liveSeq).toBe(3);
     expect(getState().localUndoStack).toHaveLength(0);
-    expect(getState().lastSummary).toContain('Backend reconnected');
+    expect(getState().lastSummary).toContain('kept as a recoverable copy');
+    const calls = spy.mock.calls as unknown as [string, { body: string }][];
+    const kept = calls.find(([url]) => url.endsWith('/recovery/offline'));
+    expect(JSON.parse(kept?.[1].body ?? '{}')).toMatchObject({ json: offlineJson, changeCount: 1 });
+    await flushPromises();
+    expect(useRecoveryStore.getState().offlineEditsKept).toBe(true);
+  });
+
+  it('when the backend cannot keep the offline edits they are offered from the device instead, never dropped', async () => {
+    offline();
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    const offlineJson = serializeDocument(getState().document);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('down'))),
+    );
+    online();
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
+    await flushPromises();
+    expect(useSessionStore.getState().pendingLocalCopy?.json).toBe(offlineJson);
+    const storage = browserStorage();
+    expect(storage === null ? null : readAutosave(storage)?.json).toBe(offlineJson);
   });
 
   it('reconnect without local edits just hydrates and clears local stacks', () => {

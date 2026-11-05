@@ -7,7 +7,8 @@ import { crashReportsView, writeDesktopCrashReport } from './crashes';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
-import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
+import { chooseBackendPort, type RunningBackend } from './backend';
+import { superviseBackend } from './backendSupervisor';
 import { backendEnv, backendOrigin, desktopExportDir, nativeBundleDir } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
 import { trustPendingKeys } from './keyTrust';
@@ -388,10 +389,10 @@ async function boot(): Promise<void> {
   const port = await chooseBackendPort(userData);
   const url = backendOrigin(port);
   const nativeDir = nativeBundleDir(layout.nativeDir, process.platform, existsSync);
-  backend = await startBackend(
-    (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
-    layout.serverEntry,
-    backendEnv({
+  backend = await superviseBackend({
+    fork: (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
+    entry: layout.serverEntry,
+    env: backendEnv({
       port,
       token,
       layout,
@@ -403,7 +404,17 @@ async function boot(): Promise<void> {
     }),
     url,
     token,
-  );
+    // A crashed backend is restarted with its document (A-10); the window shows a banner meanwhile. Giving up is never silent.
+    onState: (state) => {
+      if (state.state === 'failed')
+        dialog.showErrorBox(
+          'llull backend stopped',
+          `${state.reason}
+
+Your unsaved work is kept in the recovery folder (File > Open Data Folder).`,
+        );
+    },
+  });
   backendUrl = url;
   exportDir = desktopExportDir(process.env, userData);
   ipcMain.handle('llull:export-3mf', (event) =>

@@ -3,6 +3,7 @@
 import React from 'react';
 import { useHostStatusStore } from '@ui/store/hostStatusStore';
 import { useRecoveryStore } from '@ui/store/recoveryStore';
+import { useStore } from '@ui/store';
 
 const AUTOSAVE_TEXT: Record<string, string> = {
   DSF_SAVE_DISK_FULL: 'The disk is full',
@@ -14,9 +15,16 @@ export function HostStatusBanner(): React.ReactElement | null {
   const autosave = useHostStatusStore((s) => s.autosave);
   const outOfSync = useHostStatusStore((s) => s.outOfSync);
   const offlineEditsKept = useRecoveryStore((s) => s.offlineEditsKept);
-  if (autosave.ok && !outOfSync && !offlineEditsKept) return null;
+  // The backend was there and is not now: the desktop restarts it (A-10); until then edits run locally and are kept.
+  const reconnecting = useStore((s) => s.liveStatus === 'disconnected' && s.sseEverConnected);
+  if (autosave.ok && !outOfSync && !offlineEditsKept && !reconnecting) return null;
   return (
     <div className="restored-banner host-status-banner" role="alert">
+      {reconnecting && (
+        <span>
+          The backend is not responding; llull is restarting it. You can keep working: your edits are kept and offered back when it returns.
+        </span>
+      )}
       {!autosave.ok && (
         <span>
           Autosave is failing ({autosave.code}): {AUTOSAVE_TEXT[autosave.code] ?? autosave.message}. Save your work to a file; llull keeps
