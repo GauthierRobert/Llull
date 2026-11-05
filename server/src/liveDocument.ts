@@ -2,8 +2,8 @@
 import path from 'path';
 import { randomUUID } from 'crypto';
 import type { AutosaveStatus } from './autosave';
-import { createRecoveryStore, newUntitledSlotId } from './recovery';
-import { createRecoverySession } from './recoverySession';
+import { createRecoveryStore, metaBase, newUntitledSlotId } from './recovery';
+import { createRecoverySession, type SlotBinding } from './recoverySession';
 import type { Response } from 'express';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
@@ -29,7 +29,7 @@ export const recoveryStore = createRecoveryStore(RECOVERY_DIR);
 
 interface StartState {
   readonly doc: CadDocument;
-  readonly binding: { id: string; path: string | null };
+  readonly binding: SlotBinding;
   /** The state of a crashed backend's slot was loaded. */
   readonly resumed: boolean;
 }
@@ -39,13 +39,17 @@ interface StartState {
  * A backend restarted by the desktop's supervisor (`LLULL_RECOVERY_RESUME=1`) resumes the slot the crashed one was working on (A-10).
  */
 function startState(): StartState {
-  const fresh: StartState = { doc: createEmptyDocument(), binding: { id: newUntitledSlotId(), path: null }, resumed: false };
+  const fresh: StartState = { doc: createEmptyDocument(), binding: { id: newUntitledSlotId(), path: null, base: null }, resumed: false };
   if (!AUTOSAVE_ENABLED || process.env['LLULL_RECOVERY_RESUME'] !== '1') return fresh;
   const active = recoveryStore.readActive();
   const found = active === null ? null : recoveryStore.read(active.id);
   if (active === null || found === null) return fresh;
   try {
-    return { doc: deserializeDocument(found.json), binding: { id: active.id, path: found.meta.path }, resumed: true };
+    return {
+      doc: deserializeDocument(found.json),
+      binding: { id: active.id, path: found.meta.path, base: metaBase(found.meta) },
+      resumed: true,
+    };
   } catch (err) {
     recoveryStore.quarantine(active.id);
     console.warn(`[liveDocument] recovery slot ${active.id} unreadable (${errorMessage(err)}); moved aside, starting empty.`);

@@ -184,6 +184,8 @@ describe('recovery REST and supervised resume', () => {
       label: 'A.llull',
       changedAt: '2026-11-05T10:00:00.000Z',
       changeCount: 4,
+      baseSha256: null,
+      baseSize: null,
     });
     store.writeActive(id, path.resolve(fileA));
     const load = async (resume: boolean): Promise<{ order: readonly string[]; slot: string }> => {
@@ -252,6 +254,8 @@ describe('replacing the open document (review 2, 4)', () => {
       label: 'other.llull',
       changedAt: '2026-11-05T09:00:00.000Z',
       changeCount: 2,
+      baseSha256: null,
+      baseSize: null,
     });
     fs.writeFileSync(store.docFile('doc-other'), serializeDocument(boxDoc(3)));
     live.hold();
@@ -267,7 +271,16 @@ describe('replacing the open document (review 2, 4)', () => {
     live.schedule(boxDoc(3));
     live.flush();
     const previous = live.current().id;
-    store.writeMeta({ id: 'doc-same', path: null, kind: 'document', label: 'x', changedAt: '2026-11-05T09:00:00.000Z', changeCount: 1 });
+    store.writeMeta({
+      id: 'doc-same',
+      path: null,
+      kind: 'document',
+      label: 'x',
+      changedAt: '2026-11-05T09:00:00.000Z',
+      changeCount: 1,
+      baseSha256: null,
+      baseSize: null,
+    });
     fs.writeFileSync(store.docFile('doc-same'), serializeDocument(boxDoc(3)));
     live.adopt('doc-same', boxDoc(3));
     expect(store.read(previous)).toBeNull();
@@ -309,6 +322,8 @@ describe('a fresh backend announces its slot (review 5)', () => {
       label: 'old.llull',
       changedAt: '2026-11-05T10:00:00.000Z',
       changeCount: 1,
+      baseSha256: null,
+      baseSize: null,
     });
     store.writeActive(previous, path.resolve(dir, 'old.llull'));
     const boot = async (resume: boolean): Promise<{ order: readonly string[]; slot: string }> => {
@@ -451,6 +466,52 @@ describe('a hold that is never ended (second review 1)', () => {
       recoverySession.schedule(boxDoc(9)); // not held any more: written to the current slot
       recoverySession.flush();
       expect(createRecoveryStore(dir).read(recoverySession.current().id)?.json).toBe(serializeDocument(boxDoc(9)));
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe('the base of a slot (second review 3)', () => {
+  const base = { sha256: 'a'.repeat(64), size: 1234 };
+
+  it('bind records the file base in the slot meta; a save moves it', () => {
+    const { session: live, store } = session();
+    const fileA = path.join(dir, 'A.llull');
+    live.bind(fileA, true, base);
+    live.schedule(boxDoc(1));
+    live.flush();
+    expect(store.read(slotIdForPath(fileA))?.meta).toMatchObject({ baseSha256: base.sha256, baseSize: 1234 });
+    const saved = { sha256: 'b'.repeat(64), size: 99 };
+    live.schedule(boxDoc(2));
+    live.setBase(saved); // the file was saved while a newer change sits in the slot
+    expect(store.read(slotIdForPath(fileA))?.meta).toMatchObject({ baseSha256: saved.sha256, baseSize: 99 });
+    live.flush();
+    expect(store.read(slotIdForPath(fileA))?.meta).toMatchObject({ baseSha256: saved.sha256 });
+  });
+
+  it('a slot bound without a base (untitled, or an old slot) has none', () => {
+    const { session: live, store } = session();
+    live.schedule(boxDoc(1));
+    live.flush();
+    expect(store.read('untitled-first')?.meta).toMatchObject({ baseSha256: null, baseSize: null });
+  });
+
+  it('REST: bind and saved carry the base; garbage bases are ignored', async () => {
+    vi.resetModules();
+    vi.stubEnv('LLULL_RECOVERY_DIR', dir);
+    try {
+      const { app } = await import('../src/index');
+      const { recoverySession } = await import('../src/liveDocument');
+      const fileA = path.join(dir, 'A.llull');
+      await request(app).post('/recovery/bind').send({ path: fileA, dropPrevious: false, baseSha256: base.sha256, baseSize: base.size });
+      expect(recoverySession.current().base).toEqual(base);
+      await request(app)
+        .post('/recovery/saved')
+        .send({ stateHash: 'nope', baseSha256: 'c'.repeat(64), baseSize: 5 });
+      expect(recoverySession.current().base).toEqual({ sha256: 'c'.repeat(64), size: 5 });
+      await request(app).post('/recovery/bind').send({ path: fileA, dropPrevious: false, baseSha256: 7 });
+      expect(recoverySession.current().base).toBeNull();
     } finally {
       vi.unstubAllEnvs();
     }

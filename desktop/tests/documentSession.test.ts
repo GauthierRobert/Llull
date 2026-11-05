@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { createEmptyDocument } from '@core/model/types';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import type { FetchLike } from '@server/restClient';
@@ -26,8 +27,13 @@ interface Fake {
   readonly calls: string[];
 }
 
+const baseOf = (text: string): { baseSha256: string; baseSize: number } => ({
+  baseSha256: createHash('sha256').update(text, 'utf8').digest('hex'),
+  baseSize: Buffer.byteLength(text, 'utf8'),
+});
+
 interface FakeSlot {
-  readonly meta: { id: string; path: string | null; changedAt: string };
+  readonly meta: { id: string; path: string | null; changedAt: string; baseSha256?: string | null };
   readonly json: string;
 }
 
@@ -63,13 +69,14 @@ describe('DocumentSession recovery calls', () => {
     const backend = fakeBackend();
     const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: backend.fetchImpl });
     const file = path.join(dir, 'B.llull');
-    writeFileSync(file, serializeDocument(createEmptyDocument()));
+    const text = serializeDocument(createEmptyDocument());
+    writeFileSync(file, text);
     await session.open(file);
     expect(backend.calls).toEqual([
       'recovery/hold:{}',
       'command:load_document',
-      `recovery/bind:${JSON.stringify({ path: file, dropPrevious: true })}`,
-      `recovery/saved:${JSON.stringify({ stateHash: 'h-load_document' })}`,
+      `recovery/bind:${JSON.stringify({ path: file, dropPrevious: true, ...baseOf(text) })}`,
+      `recovery/saved:${JSON.stringify({ stateHash: 'h-load_document', ...baseOf(text) })}`,
     ]);
   });
 
@@ -85,9 +92,10 @@ describe('DocumentSession recovery calls', () => {
     backend.calls.length = 0;
     const file = path.join(dir, 'C.llull');
     await session.save(file);
+    const written = baseOf(readFileSync(file, 'utf8'));
     expect(backend.calls).toEqual([
-      `recovery/bind:${JSON.stringify({ path: file, dropPrevious: true })}`,
-      `recovery/saved:${JSON.stringify({ stateHash: 'h-clear_document' })}`,
+      `recovery/bind:${JSON.stringify({ path: file, dropPrevious: true, ...written })}`,
+      `recovery/saved:${JSON.stringify({ stateHash: 'h-clear_document', ...written })}`,
     ]);
     backend.calls.length = 0;
     await session.save(); // same file: no rebind
@@ -174,7 +182,7 @@ describe('DocumentSession replacing the open document (review 1, 2)', () => {
     const original = serializeDocument(createEmptyDocument());
     writeFileSync(other, original);
     const slot: FakeSlot = {
-      meta: { id: 'doc-other', path: other, changedAt: new Date(Date.now() + 60_000).toISOString() },
+      meta: { id: 'doc-other', path: other, changedAt: '2026-11-05T10:00:00.000Z', baseSha256: baseOf(original).baseSha256 },
       json: serializeDocument(createEmptyDocument()),
     };
     const backend = fakeBackend({ 'doc-other': slot });
@@ -201,12 +209,13 @@ describe('DocumentSession replacing the open document (review 1, 2)', () => {
     writeFileSync(changed, serializeDocument(createEmptyDocument()));
     const slots: Record<string, FakeSlot> = {
       untitled: { meta: { id: 'untitled', path: null, changedAt: '2026-11-05T10:00:00.000Z' }, json: '{}' },
-      stale: { meta: { id: 'stale', path: changed, changedAt: '2000-01-01T00:00:00.000Z' }, json: '{}' }, // the file is newer than the slot
+      stale: { meta: { id: 'stale', path: changed, changedAt: '2026-11-05T10:00:00.000Z', baseSha256: 'f'.repeat(64) }, json: '{}' }, // the file is not the base the slot started from
+      nobase: { meta: { id: 'nobase', path: changed, changedAt: '2026-11-05T10:00:00.000Z', baseSha256: null }, json: '{}' },
     };
     const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: fakeBackend(slots).fetchImpl });
     await session.open(a);
     const before = readFileSync(a, 'utf8');
-    for (const id of ['untitled', 'stale']) {
+    for (const id of ['untitled', 'stale', 'nobase']) {
       await session.restore(id);
       expect(session.currentPath()).toBeNull();
       expect(existsSync(lockPathOf(a))).toBe(false);
@@ -216,9 +225,47 @@ describe('DocumentSession replacing the open document (review 1, 2)', () => {
     expect(existsSync(lockPathOf(changed))).toBe(false);
   });
 
+  it('a file rewritten outside before the first edit is not the slot base: the restore is untitled and the file untouched', async () => {
+    const f = path.join(dir, 'F.llull');
+    const original = serializeDocument(createEmptyDocument());
+    writeFileSync(f, original);
+    const backend = fakeBackend();
+    const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: backend.fetchImpl });
+    await session.open(f);
+    const bound = backend.calls.find((call) => call.startsWith('recovery/bind:'));
+    const base = JSON.parse((bound ?? '').slice('recovery/bind:'.length)) as { baseSha256: string };
+    const external = serializeDocument(createEmptyDocument()) + ' ';
+    writeFileSync(f, external); // someone else rewrites F before the first edit; the slot is then written "after" it
+    const slot: FakeSlot = {
+      meta: { id: 'doc-f', path: f, changedAt: new Date(Date.now() + 60_000).toISOString(), baseSha256: base.baseSha256 },
+      json: '{}',
+    };
+    const restoring = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: fakeBackend({ 'doc-f': slot }).fetchImpl });
+    await restoring.restore('doc-f');
+    expect(restoring.currentPath()).toBeNull();
+    await expect(restoring.save()).rejects.toThrow(/Save As/);
+    expect(readFileSync(f, 'utf8')).toBe(external);
+  });
+
+  it('a file that still equals the slot base keeps its path, and Save conflicts if it changes afterwards', async () => {
+    const f = path.join(dir, 'K.llull');
+    const text = serializeDocument(createEmptyDocument());
+    writeFileSync(f, text);
+    const slot: FakeSlot = {
+      meta: { id: 'doc-k', path: f, changedAt: '2026-11-05T10:00:00.000Z', baseSha256: baseOf(text).baseSha256 },
+      json: '{}',
+    };
+    const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: fakeBackend({ 'doc-k': slot }).fetchImpl });
+    await session.restore('doc-k');
+    expect(session.currentPath()).toBe(f);
+    appendFileSync(f, ' ');
+    await expect(session.save()).rejects.toBeInstanceOf(SaveConflictError);
+  });
+
   it('a slot whose file is locked by another process is restored path-less (never written over it)', async () => {
     const locked = path.join(dir, 'locked.llull');
-    writeFileSync(locked, serializeDocument(createEmptyDocument()));
+    const lockedText = serializeDocument(createEmptyDocument());
+    writeFileSync(locked, lockedText);
     const holder = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
     try {
       await new Promise((resolve) => holder.once('spawn', resolve));
@@ -226,7 +273,10 @@ describe('DocumentSession replacing the open document (review 1, 2)', () => {
         lockPathOf(locked),
         JSON.stringify({ pid: holder.pid, host: hostname(), user: 'u', app: 'cli', since: '2026-11-05T09:00:00.000Z' }),
       );
-      const slot: FakeSlot = { meta: { id: 's', path: locked, changedAt: new Date(Date.now() + 60_000).toISOString() }, json: '{}' };
+      const slot: FakeSlot = {
+        meta: { id: 's', path: locked, changedAt: '2026-11-05T10:00:00.000Z', baseSha256: baseOf(lockedText).baseSha256 },
+        json: '{}',
+      };
       const session = createDocumentSession({ url: 'http://127.0.0.1:1', token: 't', fetchImpl: fakeBackend({ s: slot }).fetchImpl });
       await session.restore('s');
       expect(session.currentPath()).toBeNull();

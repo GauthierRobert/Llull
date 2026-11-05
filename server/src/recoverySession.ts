@@ -9,7 +9,23 @@ import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import type { CadDocument } from '@core/model/types';
 import { type AutosaveStatus, createAutosaver } from './autosave';
-import { type RecoverySlotMeta, type RecoveryStore, newUntitledSlotId, slotIdForPath, slotLabel } from './recovery';
+import {
+  type RecoverySlotMeta,
+  type RecoveryStore,
+  type SlotBase,
+  baseFields,
+  metaBase,
+  newUntitledSlotId,
+  slotIdForPath,
+  slotLabel,
+} from './recovery';
+
+export interface SlotBinding {
+  readonly id: string;
+  readonly path: string | null;
+  /** The document file as opened / last saved (null: untitled, or not known). */
+  readonly base: SlotBase | null;
+}
 
 export interface RecoverySession {
   /** A change to the live document. */
@@ -28,7 +44,9 @@ export interface RecoverySession {
    * The live document now belongs to `documentPath` (null: untitled). The previous binding's slot is kept unless `dropPrevious` (the user
    * chose to discard it); a stale unrecovered slot already holding the new name is archived, never overwritten.
    */
-  bind(documentPath: string | null, dropPrevious: boolean): void;
+  bind(documentPath: string | null, dropPrevious: boolean, base?: SlotBase | null): void;
+  /** The file was saved (or re-read): that is the base of the slot from now on, whether or not the slot is removed. */
+  setBase(base: SlotBase | null): void;
   /** The live document equals its file (or was discarded): its slot and any pending write go away. */
   markSaved(): void;
   /**
@@ -36,7 +54,7 @@ export interface RecoverySession {
    * holds nothing but the restored document, ARCHIVED (offered again by Document Recovery) when it holds different unsaved work.
    */
   adopt(id: string, current: CadDocument): RecoverySlotMeta | null;
-  current(): { id: string; path: string | null };
+  current(): SlotBinding;
 }
 
 interface SessionOptions {
@@ -44,7 +62,7 @@ interface SessionOptions {
   readonly debounceMs: number;
   readonly serialize: (doc: CadDocument) => string;
   readonly onStatus: (status: AutosaveStatus) => void;
-  readonly initial: { id: string; path: string | null };
+  readonly initial: { id: string; path: string | null; base?: SlotBase | null };
   readonly now?: () => Date;
   /** Write `active.json` for `initial` now (a fresh backend), so a resuming restart never loads the previous session's slot. */
   readonly announceActive?: boolean;
@@ -59,7 +77,7 @@ const isEmpty = (doc: CadDocument): boolean => doc.order.length === 0;
 export function createRecoverySession(options: SessionOptions): RecoverySession {
   const { store } = options;
   const now = options.now ?? ((): Date => new Date());
-  let binding = options.initial;
+  let binding: SlotBinding = { ...options.initial, base: options.initial.base ?? null };
   let changeCount = 0;
   let stopped = false;
   let held = false;
@@ -106,6 +124,7 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
           label: slotLabel(bound.path),
           changedAt: now().toISOString(),
           changeCount,
+          ...baseFields(binding.base),
         });
         store.writeActive(bound.id, bound.path);
       },
@@ -158,7 +177,7 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
     }
   }
 
-  const rebind = (next: { id: string; path: string | null }): void => {
+  const rebind = (next: SlotBinding): void => {
     saver.flush();
     binding = next;
     changeCount = 0;
@@ -174,12 +193,12 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
     holdTimer = null;
   }
 
-  function bindNow(documentPath: string | null, dropPrevious: boolean): void {
+  function bindNow(documentPath: string | null, dropPrevious: boolean, base: SlotBase | null): void {
     const previous = binding;
     const nextId = documentPath === null ? newUntitledSlotId() : slotIdForPath(documentPath);
     const resolved = documentPath === null ? null : path.resolve(documentPath);
     if (nextId === previous.id) {
-      binding = { id: nextId, path: resolved };
+      binding = { id: nextId, path: resolved, base };
       return replayHeld();
     }
     saver.flush();
@@ -188,7 +207,7 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
       if (failedSlot === previous.id) clearFailure();
     }
     if (documentPath !== null && store.read(nextId) !== null) store.archive(nextId);
-    rebind({ id: nextId, path: resolved });
+    rebind({ id: nextId, path: resolved, base });
   }
 
   function adoptNow(id: string, current: CadDocument): RecoverySlotMeta | null {
@@ -205,7 +224,7 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
       }
     }
     dropHold();
-    binding = { id, path: found.meta.path };
+    binding = { id, path: found.meta.path, base: metaBase(found.meta) };
     changeCount = found.meta.changeCount;
     saver = makeSaver();
     store.writeActive(id, found.meta.path);
@@ -241,7 +260,12 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
       holdTimer.unref();
     },
     release: replayHeld,
-    bind: (documentPath, dropPrevious) => endingHold(() => bindNow(documentPath, dropPrevious)),
+    bind: (documentPath, dropPrevious, base = null) => endingHold(() => bindNow(documentPath, dropPrevious, base)),
+    setBase(base) {
+      binding = { ...binding, base };
+      const found = store.read(binding.id);
+      if (found !== null) store.writeMeta({ ...found.meta, ...baseFields(base) });
+    },
     adopt: (id, current) => endingHold(() => adoptNow(id, current)),
     markSaved() {
       saver.flush(); // settles an in-flight write (it can no longer land), then the slot goes

@@ -12,6 +12,12 @@ import { isRecord } from '@lib/isRecord';
 import { readJsonFile } from './readJsonFile';
 import { writeFileAtomic } from './writeFileAtomic';
 
+/** The file the slot's document was opened from or last saved to: what a restore must still find on disk to take the file's path back. */
+export interface SlotBase {
+  readonly sha256: string;
+  readonly size: number;
+}
+
 export interface RecoverySlotMeta {
   readonly id: string;
   /** Absolute path of the document the slot belongs to; null = an untitled document. */
@@ -22,7 +28,18 @@ export interface RecoverySlotMeta {
   /** ISO time of the last change that reached the slot. */
   readonly changedAt: string;
   readonly changeCount: number;
+  /** SHA-256 and size of the document file as opened / last saved (null: untitled, or unknown). */
+  readonly baseSha256: string | null;
+  readonly baseSize: number | null;
 }
+
+export const metaBase = (meta: RecoverySlotMeta): SlotBase | null =>
+  meta.baseSha256 === null || meta.baseSize === null ? null : { sha256: meta.baseSha256, size: meta.baseSize };
+
+export const baseFields = (base: SlotBase | null): Pick<RecoverySlotMeta, 'baseSha256' | 'baseSize'> => ({
+  baseSha256: base?.sha256 ?? null,
+  baseSize: base?.size ?? null,
+});
 
 const META_SUFFIX = '.meta.json';
 const SLOT_ID = /^[A-Za-z0-9._-]{1,80}$/;
@@ -47,7 +64,9 @@ function parseMeta(value: unknown): RecoverySlotMeta | null {
   if (typeof id !== 'string' || !isSlotId(id) || typeof label !== 'string' || typeof changedAt !== 'string') return null;
   if (documentPath !== null && typeof documentPath !== 'string') return null;
   if ((kind !== 'document' && kind !== 'offline') || typeof changeCount !== 'number') return null;
-  return { id, path: documentPath, kind, label, changedAt, changeCount };
+  const { baseSha256, baseSize } = value;
+  const base = typeof baseSha256 === 'string' && typeof baseSize === 'number' ? { sha256: baseSha256, size: baseSize } : null;
+  return { id, path: documentPath, kind, label, changedAt, changeCount, ...baseFields(base) };
 }
 
 export interface RecoveryStore {
@@ -61,7 +80,7 @@ export interface RecoveryStore {
   /** Rename a slot to a fresh id so a new document may take its name; returns the new id. */
   archive(id: string): string | null;
   /** A slot holding `json` (offline edits) with a unique id. */
-  addOffline(json: string, documentPath: string | null, changeCount: number, now: Date): RecoverySlotMeta;
+  addOffline(json: string, documentPath: string | null, changeCount: number, now: Date, base: SlotBase | null): RecoverySlotMeta;
   readActive(): { id: string; path: string | null } | null;
   writeActive(id: string, documentPath: string | null): void;
   /** Move an unreadable slot aside (kept for inspection) so it cannot be overwritten. */
@@ -124,7 +143,7 @@ export function createRecoveryStore(dir: string): RecoveryStore {
       writeMeta({ ...meta, id: archived });
       return archived;
     },
-    addOffline(json, documentPath, changeCount, now) {
+    addOffline(json, documentPath, changeCount, now, base) {
       const id = `offline-${now.getTime().toString(36)}-${randomBytes(3).toString('hex')}`;
       fs.mkdirSync(dir, { recursive: true });
       writeFileAtomic(docFile(id), json);
@@ -135,6 +154,7 @@ export function createRecoveryStore(dir: string): RecoveryStore {
         label: `Offline edits of ${slotLabel(documentPath)}`,
         changedAt: now.toISOString(),
         changeCount,
+        ...baseFields(base),
       };
       writeMeta(meta);
       return meta;

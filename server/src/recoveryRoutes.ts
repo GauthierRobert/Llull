@@ -18,8 +18,15 @@ import { isRecord } from '@lib/isRecord';
 import { errorMessage } from '@lib/errorMessage';
 import { documentHash } from '@protocol/liveSync';
 import { getLiveDoc, publishDocumentPath, recoverySession, recoveryStore } from './liveDocument';
-import { isSlotId } from './recovery';
+import { type SlotBase, isSlotId } from './recovery';
 import { guardMutation, guardRead } from './security';
+
+const baseOf = (body: Record<string, unknown>): SlotBase | null => {
+  const { baseSha256, baseSize } = body;
+  return typeof baseSha256 === 'string' && /^[0-9a-f]{64}$/.test(baseSha256) && typeof baseSize === 'number' && baseSize >= 0
+    ? { sha256: baseSha256, size: baseSize }
+    : null;
+};
 
 const bodyOf = (body: unknown): Record<string, unknown> => (isRecord(body) ? body : {});
 
@@ -51,17 +58,19 @@ export function buildRecoveryRouter(restLimiter: RequestHandler): Router {
 
   router.post('/recovery/bind', restLimiter, mutate, (req, res) => {
     const { path: documentPath, dropPrevious } = bodyOf(req.body);
+    const base = baseOf(bodyOf(req.body));
     if (documentPath !== null && (typeof documentPath !== 'string' || documentPath === '')) {
       recoverySession.release(); // a refused bind still ends the hold
       return void res.status(400).json({ error: 'path must be a file path or null.' });
     }
-    recoverySession.bind(documentPath, dropPrevious === true);
+    recoverySession.bind(documentPath, dropPrevious === true, base);
     publishDocumentPath();
     res.json({ ok: true, slot: recoverySession.current().id });
   });
 
   router.post('/recovery/saved', restLimiter, mutate, (req, res) => {
     const { stateHash } = bodyOf(req.body);
+    if ('baseSha256' in bodyOf(req.body)) recoverySession.setBase(baseOf(bodyOf(req.body)));
     const matches = typeof stateHash === 'string' && stateHash === documentHash(getLiveDoc());
     if (matches) recoverySession.markSaved();
     res.json({ ok: true, removed: matches });
@@ -99,6 +108,7 @@ export function buildRecoveryRouter(restLimiter: RequestHandler): Router {
       typeof documentPath === 'string' ? documentPath : recoverySession.current().path, // the document the edits belong to
       typeof changeCount === 'number' ? changeCount : 0,
       new Date(),
+      recoverySession.current().base,
     );
     res.json({ ok: true, meta });
   });
