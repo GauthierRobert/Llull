@@ -345,7 +345,7 @@ describe('alignment_report', () => {
     expect(checks.warnings).toEqual([]);
     expect(result.summary).not.toContain('WARNING');
   });
-  it('checks an intermediate design speed with the next higher table row and names it (VC-INT-11)', () => {
+  it('checks an intermediate design speed with the next higher table row and names it (VC-INT-11, INT-FB-006)', () => {
     const { doc, id } = withAlignment(surveyedDocument(flat(100), 21, 20), { points: xy(50, 100, 250, 100, 250, 300), radii: [100] });
     const banked = execute(doc, 'set_superelevation', { alignmentId: id, maxRate: 0.06 }).document;
     const result = execute(banked, 'alignment_report', { alignmentId: id, designSpeedKmh: 65 });
@@ -359,7 +359,7 @@ describe('alignment_report', () => {
     expect(exact.summary).not.toContain('checked with the');
     expect((exact.data as { checks: { tableSpeedKmh: number } }).checks.tableSpeedKmh).toBe(70);
   });
-  it('refuses design speeds outside the 20..120 km/h table (VC-INT-10)', () => {
+  it('refuses design speeds outside the 20..120 km/h table (VC-INT-10, INT-FB-005)', () => {
     const { doc, id } = designed(101);
     for (const speed of [130, 121, 19.9]) {
       const result = execute(doc, 'alignment_report', { alignmentId: id, designSpeedKmh: speed });

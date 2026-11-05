@@ -134,7 +134,7 @@ describe('S2 lifecycle guards (VC-PLM-02, 03, 08, 09, 25)', () => {
     expect(run(createEmptyDocument(), 'load_document', { json: text }).summary).toContain('content hash mismatch');
   });
 
-  it('S2-11: verify_release of an untouched revision, and refusal for unreleased ones', () => {
+  it('S2-11 (INT-FB-007): verify_release of an untouched revision, and refusal for unreleased ones', () => {
     const doc = releasedB();
     const verified = run(doc, 'verify_release', { revision: 'A' });
     expect(verified.data).toMatchObject({

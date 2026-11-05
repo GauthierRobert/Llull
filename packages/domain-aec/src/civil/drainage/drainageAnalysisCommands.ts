@@ -11,7 +11,7 @@ import { briefList } from '../../shared/briefList';
 import { csvLines } from '@lib/csv';
 import { analyseNetwork } from './drainageNetwork';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
-import { DEFAULT_CRITERIA, idfError, type DrainageCriteria, type Idf } from './drainageCriteria';
+import { DEFAULT_CRITERIA, DEFAULT_ENTRY_TIME_MIN, idfError, type DrainageCriteria, type Idf } from './drainageCriteria';
 import { sizeNetwork } from './drainageSizing';
 
 export const COMMERCIAL_DIAMETERS_MM = [150, 225, 300, 375, 450, 525, 600, 750, 900, 1050, 1200];
@@ -64,6 +64,20 @@ export function criteriaFrom(params: CriteriaInput): DrainageCriteria | string {
   return criteria;
 }
 
+/** Criteria the caller left out, taken from DEFAULT_CRITERIA: listed in data.defaulted and named in the summary. */
+export function criteriaDefaults(params: CriteriaInput): Array<{ input: string; value: number }> {
+  const keys = ['minVelocity', 'maxVelocity', 'minCoverM', 'maxDepthRatio', 'manholeLossK', 'freeboardM'] as const;
+  const missing = keys.filter((key) => params[key] === undefined).map((key) => ({ input: key, value: DEFAULT_CRITERIA[key] }));
+  const rainfall =
+    params.idf === undefined && params.rainfallIntensityMmH === undefined
+      ? [{ input: 'rainfallIntensityMmH', value: DEFAULT_CRITERIA.rainfallIntensityMmH }]
+      : [];
+  return [...rainfall, ...missing];
+}
+
+const defaultsText = (defaulted: ReadonlyArray<{ input: string; value: number }>): string =>
+  defaulted.length === 0 ? '' : ` Defaults applied: ${defaulted.map(({ input, value }) => `${input} ${value}`).join(', ')}.`;
+
 /** The criteria of a command's params, or the no-op result naming `command` when they are invalid. */
 export function criteriaOrFailure(doc: CadDocument, params: CriteriaInput, command: string): DrainageCriteria | CommandResult {
   const criteria = criteriaFrom(params);
@@ -91,6 +105,7 @@ function rainfallText(criteria: DrainageCriteria): string {
 /**
  * @affects none (read-only)
  * @failure bad criteria -> no-op
+ * @invariant every criterion left out (and the 5 min inlet time when a manhole has no entryTimeMin) is listed in data.defaulted and named in the summary
  */
 export const checkDrainageNetwork = defineCommand({
   name: 'check_drainage_network',
@@ -129,6 +144,9 @@ export const checkDrainageNetwork = defineCommand({
       });
     }
     const { pipes, manholes, diverging } = analyseNetwork(doc, civil, criteria);
+    const defaulted: Array<{ input: string; value: number }> = criteriaDefaults(params);
+    const noEntryTime = civilObjectsOf(civil, 'manhole').filter((manhole) => manhole.entryTimeMin === undefined).length;
+    if (noEntryTime > 0) defaulted.push({ input: 'entryTimeMin', value: DEFAULT_ENTRY_TIME_MIN });
     const failures = [
       ...pipes.filter((row) => row.status === 'fail').map((r) => `${r.id} ${r.name}: ${r.reasons.join('; ')}`),
       ...manholes.filter((row) => row.status === 'fail').map((r) => `${r.id} ${r.name}: ${r.reasons.join('; ')}`),
@@ -194,8 +212,9 @@ export const checkDrainageNetwork = defineCommand({
         `${manholes.length} manholes; Tc ${Math.min(...tcs)}-${Math.max(...tcs)} min; HGL: ${surcharged} surcharged pipe(s), ${flooded} ` +
         'flooding manhole(s). ' +
         (failures.length === 0 ? 'No failures.' : `${failures.length} failure(s): ${worst}`) +
-        split,
-      { pipes, manholes, failures, diverging, csv },
+        split +
+        defaultsText(defaulted),
+      { pipes, manholes, failures, diverging, csv, defaulted },
     );
   },
 });
@@ -256,6 +275,7 @@ export const drainageSchedule = defineCommand({
 /**
  * @affects modifies the diameter of every pipe that needs a different commercial size
  * @failure no pipes / bad criteria -> no-op
+ * @invariant rainfall intensity and maxDepthRatio left out are listed in data.defaulted and named in the summary
  */
 export const sizeDrainagePipes = defineCommand({
   name: 'size_drainage_pipes',
@@ -287,6 +307,11 @@ export const sizeDrainagePipes = defineCommand({
       'size_drainage_pipes',
     );
     if ('summary' in criteria) return criteria;
+    const defaulted = criteriaDefaults({
+      rainfallIntensityMmH: params.rainfallIntensityMmH,
+      idf: params.idf,
+      maxDepthRatio: params.maxDepthRatio,
+    }).filter(({ input }) => input === 'rainfallIntensityMmH' || input === 'maxDepthRatio');
     const candidates = [...(params.diameters ?? COMMERCIAL_DIAMETERS_MM)].sort((a, b) => a - b);
     if (candidates.length === 0 || candidates.some((d) => !(d > 0)))
       return noop(doc, 'size_drainage_pipes failed: diameters must be positive millimetres.');
@@ -308,7 +333,7 @@ export const sizeDrainagePipes = defineCommand({
       document,
       summary:
         `Resized ${sized.changed.length} pipe(s) at ${rainfallText(criteria)} (${passes}): ` +
-        `${sized.changed.join(', ')}.${note}${crown}`,
+        `${sized.changed.join(', ')}.${note}${crown}${defaultsText(defaulted)}`,
       affected: civilAffected(
         document,
         sized.changed.map((entry) => entry.split(' ')[0] ?? ''),
@@ -319,6 +344,7 @@ export const sizeDrainagePipes = defineCommand({
         iterations: sized.iterations,
         converged: sized.converged,
         crownWarnings: sized.crownWarnings,
+        defaulted,
       },
     };
   },

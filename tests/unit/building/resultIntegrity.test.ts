@@ -26,7 +26,7 @@ interface Row {
 const rowsOf = (doc: CadDocument, tool: string, params: Record<string, unknown> = {}): Row[] =>
   (execute(doc, tool, params).data as { rows: Row[] }).rows;
 
-describe('steelStrength (VC-INT-03, 04, 05, 27)', () => {
+describe('steelStrength (VC-INT-03, 04, 05, 27; INT-FB-001, INT-FB-002)', () => {
   it.each(BAD_GRADES)("refuses grade '%s' with STL_GRADE_UNKNOWN instead of using S355", (grade) => {
     const outcome = steelStrength(grade, 12);
     expect(isSteelRefusal(outcome)).toBe(true);
@@ -58,7 +58,7 @@ describe('steelStrength (VC-INT-03, 04, 05, 27)', () => {
   });
 });
 
-describe('bolt resistance (VC-INT-06, 07, 08)', () => {
+describe('bolt resistance (VC-INT-06, 07, 08; INT-FB-004)', () => {
   it('M20 class 10.9: Fv,Rd = 98,000 N and Ft,Rd = 176,400 N', () => {
     const resistance = boltResistance(20, '10.9') as { shear: number; tension: number };
     expect(resistance.shear).toBeCloseTo(98000, 6);
@@ -162,7 +162,7 @@ describe('hall checks refuse a bad grade (VC-INT-03)', () => {
   });
 });
 
-describe('bolt class parameter (VC-INT-08, 09)', () => {
+describe('bolt class parameter (VC-INT-08, 09; INT-FB-003)', () => {
   const anchorCheck = (doc: CadDocument, params: Record<string, unknown> = {}): ReturnType<typeof execute> =>
     execute(doc, 'check_foundations', params);
   const defaultedOf = (result: ReturnType<typeof execute>): unknown => (result.data as { defaulted: unknown }).defaulted;
