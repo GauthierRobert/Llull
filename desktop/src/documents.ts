@@ -45,6 +45,12 @@ export interface DocumentSession {
   hasUnsavedChanges(): Promise<boolean>;
 }
 
+type RecoveryAction = 'hold' | 'release' | 'bind' | 'saved' | 'adopt';
+interface RecoveryStep {
+  readonly action: 'bind' | 'adopt';
+  readonly body: unknown;
+}
+
 interface OpenResult {
   readonly warning: 'DSF_LOCK_UNAVAILABLE' | null;
 }
@@ -53,6 +59,8 @@ interface SessionOptions {
   readonly url: string;
   readonly token: string;
   readonly fetchImpl?: FetchLike;
+  /** A recovery problem the user should hear about (default: console.warn). */
+  readonly onWarning?: (message: string) => void;
 }
 
 export function createDocumentSession(options: SessionOptions): DocumentSession {
@@ -86,24 +94,34 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       throw new Error(outcome.summary !== '' ? outcome.summary : `${name} failed (HTTP ${status})`);
   };
 
-  /**
-   * The backend's recovery slots (A-08). Best effort: a failure here must never stop a document operation, and the backend's own slot
-   * only gets more conservative when a call is missed (a slot stays longer).
-   */
-  const recovery = async (action: 'hold' | 'release' | 'bind' | 'saved' | 'adopt', body: unknown): Promise<void> => {
+  const warn = options.onWarning ?? ((message: string): void => console.warn(`[documents] ${message}`));
+  /** One recovery call; the problem as text, or null when the backend took it. */
+  const attempt = async (action: RecoveryAction, body: unknown): Promise<string | null> => {
     try {
-      await requestJson(`${options.url}/recovery/${action}`, { body, token: options.token, fetchImpl: options.fetchImpl });
+      const { ok, status } = await requestJson(`${options.url}/recovery/${action}`, {
+        body,
+        token: options.token,
+        fetchImpl: options.fetchImpl,
+      });
+      return ok ? null : `HTTP ${status}`;
     } catch (error) {
-      console.warn(`[documents] recovery ${action} failed: ${errorMessage(error)}`);
+      return errorMessage(error);
     }
   };
+  /** The backend's recovery slots (A-08). Best effort: a missed call only makes the backend's slot more conservative (it stays longer). */
+  const recovery = async (action: RecoveryAction, body: unknown): Promise<void> => {
+    const problem = await attempt(action, body);
+    if (problem !== null) console.warn(`[documents] recovery ${action} failed: ${problem}`);
+  };
   /** The live document now belongs to `documentPath`'s slot; the previous slot is dropped (the user confirmed the discard or saved). */
-  const bindRecovery = (documentPath: string | null): Promise<void> => recovery('bind', { path: documentPath, dropPrevious: true });
+  const bindStep = (documentPath: string | null): RecoveryStep => ({ action: 'bind', body: { path: documentPath, dropPrevious: true } });
+  const bindRecovery = (documentPath: string | null): Promise<void> => recovery('bind', bindStep(documentPath).body);
   /**
    * Replace the live document: the backend keeps the load out of the previous document's recovery slot (`hold`), `finish` rebinds once the
-   * load succeeded, and a failed load (`release`) leaves the previous document bound to its own slot, intact.
+   * load succeeded, and a failed load (`release`) leaves the previous document bound to its own slot, intact. A finishing call that fails
+   * twice releases the hold (autosave must not stay paused) and is reported through `onWarning`.
    */
-  const replacing = async (load: () => Promise<void>, finish: () => Promise<void>): Promise<void> => {
+  const replacing = async (load: () => Promise<void>, finish: RecoveryStep): Promise<void> => {
     await recovery('hold', {});
     try {
       await load();
@@ -111,7 +129,13 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       await recovery('release', {});
       throw error;
     }
-    await finish();
+    let problem = await attempt(finish.action, finish.body);
+    if (problem !== null) problem = await attempt(finish.action, finish.body); // once more
+    if (problem === null) return;
+    await recovery('release', {});
+    warn(
+      `recovery ${finish.action} failed (${problem}); the document is open, but its recovery copy may be out of date. Save it to a file.`,
+    );
   };
   /** The live document equals a file: its recovery slot is no longer needed. */
   const markRecoverySaved = (stateHash: string): Promise<void> => recovery('saved', { stateHash });
@@ -137,10 +161,7 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       try {
         stamp = stampOf(absolute);
         const json = fs.readFileSync(absolute, 'utf8');
-        await replacing(
-          () => command('load_document', { json }),
-          () => bindRecovery(absolute),
-        );
+        await replacing(() => command('load_document', { json }), bindStep(absolute));
       } catch (error) {
         if (taken.documentPath !== lock?.documentPath) taken.release();
         throw error;
@@ -162,10 +183,7 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       const json = body['json'];
       const claimed = claimSlotFile(body['meta']['path'], body['meta']['changedAt']);
       try {
-        await replacing(
-          () => command('load_document', { json }),
-          () => recovery('adopt', { id: slotId }),
-        );
+        await replacing(() => command('load_document', { json }), { action: 'adopt', body: { id: slotId } });
       } catch (error) {
         if (claimed !== null && claimed.lock.documentPath !== lock?.documentPath) claimed.lock.release();
         throw error;
@@ -196,10 +214,7 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       return target;
     },
     async newDocument() {
-      await replacing(
-        () => command('clear_document', {}, true),
-        () => bindRecovery(null),
-      );
+      await replacing(() => command('clear_document', {}, true), bindStep(null));
       holdOnly(null);
       currentPath = null;
       loadedStamp = null;
@@ -209,10 +224,7 @@ export function createDocumentSession(options: SessionOptions): DocumentSession 
       return (await snapshot()).document;
     },
     async loadDocument(json) {
-      await replacing(
-        () => command('load_document', { json }),
-        () => bindRecovery(null),
-      );
+      await replacing(() => command('load_document', { json }), bindStep(null));
       holdOnly(null);
       currentPath = null;
       loadedStamp = null;

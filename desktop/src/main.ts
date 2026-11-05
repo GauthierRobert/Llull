@@ -450,7 +450,7 @@ Your unsaved work is kept in the recovery folder (File > Open Data Folder).`,
       ? restoreRecovery(slotId)
       : { ok: false, message: 'Refused: the caller is not the app window', cancelled: false },
   );
-  session = createDocumentSession({ url, token });
+  session = createDocumentSession({ url, token, onWarning: (message) => dialog.showErrorBox('llull - Recovery', message) });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       menuTemplate(

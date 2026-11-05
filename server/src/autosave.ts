@@ -17,7 +17,7 @@ import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import type { CadDocument } from '@core/model/types';
 
-export type AutosaveFailureCode = 'DSF_SAVE_DISK_FULL' | 'DSF_SAVE_IO' | 'DSF_AUTOSAVE_FAILED';
+export type AutosaveFailureCode = 'DSF_SAVE_DISK_FULL' | 'DSF_SAVE_IO' | 'DSF_AUTOSAVE_FAILED' | 'DSF_HOLD_EXPIRED';
 
 export type AutosaveStatus = { readonly ok: true } | { readonly ok: false; readonly code: AutosaveFailureCode; readonly message: string };
 

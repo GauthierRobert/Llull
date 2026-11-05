@@ -9,6 +9,7 @@ const AUTOSAVE_TEXT: Record<string, string> = {
   DSF_SAVE_DISK_FULL: 'The disk is full',
   DSF_SAVE_IO: 'The recovery copy could not be written',
   DSF_AUTOSAVE_FAILED: 'The document could not be serialized for the recovery copy',
+  DSF_HOLD_EXPIRED: 'A document replacement did not finish; its changes were kept in the current recovery copy',
 };
 
 export function HostStatusBanner(): React.ReactElement | null {

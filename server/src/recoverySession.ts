@@ -19,7 +19,7 @@ export interface RecoverySession {
   stop(): void;
   /**
    * A document is about to REPLACE the live one: flush the current binding's slot, then keep later changes out of it. Ended by `bind`,
-   * `adopt`, `markSaved` or `release`.
+   * `adopt`, `markSaved`, `release`, or the hold TTL (the held changes then go to the current binding, status DSF_HOLD_EXPIRED).
    */
   hold(): void;
   /** The held replacement did not happen: the current binding takes over the changes that arrived meanwhile. */
@@ -48,7 +48,11 @@ interface SessionOptions {
   readonly now?: () => Date;
   /** Write `active.json` for `initial` now (a fresh backend), so a resuming restart never loads the previous session's slot. */
   readonly announceActive?: boolean;
+  /** A hold nobody ends (a crashed host, a lost request) expires after this long (default 30 s): the held changes go to the current binding. */
+  readonly holdTtlMs?: number;
 }
+
+const DEFAULT_HOLD_TTL_MS = 30_000;
 
 const isEmpty = (doc: CadDocument): boolean => doc.order.length === 0;
 
@@ -60,6 +64,8 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
   let stopped = false;
   let held = false;
   let heldDoc: CadDocument | null = null; // the newest change that arrived while held
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  const holdTtlMs = options.holdTtlMs ?? DEFAULT_HOLD_TTL_MS;
   let lastStatus: AutosaveStatus = { ok: true };
   let failedSlot: string | null = null; // the slot whose write failed and has not succeeded since
   let saver = makeSaver();
@@ -111,11 +117,45 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
   /** Leave the held state; what changed meanwhile goes to the current binding. */
   function replayHeld(): void {
     held = false;
+    if (holdTimer !== null) clearTimeout(holdTimer);
+    holdTimer = null;
     const doc = heldDoc;
     heldDoc = null;
     if (doc === null) return;
     changeCount += 1;
     saver.schedule(doc);
+  }
+
+  function expireHold(): void {
+    holdTimer = null;
+    if (!held) return;
+    console.warn('[recovery] a document replacement never finished; its changes go to the current slot');
+    if (heldDoc !== null) {
+      lastStatus = {
+        ok: false,
+        code: 'DSF_HOLD_EXPIRED',
+        message: 'A document replacement did not finish; its changes were kept in the current slot',
+      };
+      options.onStatus(lastStatus); // the replayed write reports ok again
+    }
+    replayHeld();
+    saver.flush(); // durable now: nobody is coming to finish the replacement
+  }
+
+  /** Shutdown / crash while held: the newest change is written to the current binding rather than lost (it stays held for a later bind). */
+  function persistHeld(): void {
+    if (!held || heldDoc === null) return;
+    changeCount += 1;
+    saver.schedule(heldDoc);
+  }
+
+  /** Whatever ends a replacement (also an error inside it), the hold ends with it. */
+  function endingHold<T>(run: () => T): T {
+    try {
+      return run();
+    } finally {
+      if (held) replayHeld();
+    }
   }
 
   const rebind = (next: { id: string; path: string | null }): void => {
@@ -127,6 +167,53 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
     replayHeld();
   };
 
+  function dropHold(): void {
+    held = false;
+    heldDoc = null;
+    if (holdTimer !== null) clearTimeout(holdTimer);
+    holdTimer = null;
+  }
+
+  function bindNow(documentPath: string | null, dropPrevious: boolean): void {
+    const previous = binding;
+    const nextId = documentPath === null ? newUntitledSlotId() : slotIdForPath(documentPath);
+    const resolved = documentPath === null ? null : path.resolve(documentPath);
+    if (nextId === previous.id) {
+      binding = { id: nextId, path: resolved };
+      return replayHeld();
+    }
+    saver.flush();
+    if (dropPrevious) {
+      store.remove(previous.id);
+      if (failedSlot === previous.id) clearFailure();
+    }
+    if (documentPath !== null && store.read(nextId) !== null) store.archive(nextId);
+    rebind({ id: nextId, path: resolved });
+  }
+
+  function adoptNow(id: string, current: CadDocument): RecoverySlotMeta | null {
+    const found = store.read(id);
+    if (found === null) return null; // endingHold gives the hold back
+    const previous = binding.id;
+    saver.flush();
+    if (previous !== id) {
+      const kept = store.read(previous);
+      if (kept !== null && kept.json !== found.json) store.archive(previous);
+      else {
+        store.remove(previous);
+        if (failedSlot === previous) clearFailure();
+      }
+    }
+    dropHold();
+    binding = { id, path: found.meta.path };
+    changeCount = found.meta.changeCount;
+    saver = makeSaver();
+    store.writeActive(id, found.meta.path);
+    saver.schedule(current);
+    saver.flush(); // durable now: the restored work must survive a crash right after
+    return store.read(id)?.meta ?? found.meta;
+  }
+
   return {
     schedule(doc) {
       if (held) {
@@ -135,64 +222,34 @@ export function createRecoverySession(options: SessionOptions): RecoverySession 
       }
       changeCount += 1;
       saver.schedule(doc);
+      if (!lastStatus.ok && lastStatus.code === 'DSF_HOLD_EXPIRED') clearFailure(); // the warning is shown until the next change
     },
-    flush: () => saver.flush(),
+    flush() {
+      persistHeld();
+      saver.flush();
+    },
     stop() {
+      persistHeld();
       stopped = true;
       saver.stop();
     },
     hold() {
       saver.flush();
       held = true;
+      if (holdTimer !== null) clearTimeout(holdTimer);
+      holdTimer = setTimeout(expireHold, holdTtlMs);
+      holdTimer.unref();
     },
     release: replayHeld,
-    bind(documentPath, dropPrevious) {
-      const previous = binding;
-      const nextId = documentPath === null ? newUntitledSlotId() : slotIdForPath(documentPath);
-      const resolved = documentPath === null ? null : path.resolve(documentPath);
-      if (nextId === previous.id) {
-        binding = { id: nextId, path: resolved };
-        return replayHeld();
-      }
-      saver.flush();
-      if (dropPrevious) {
-        store.remove(previous.id);
-        if (failedSlot === previous.id) clearFailure();
-      }
-      if (documentPath !== null && store.read(nextId) !== null) store.archive(nextId);
-      rebind({ id: nextId, path: resolved });
-    },
+    bind: (documentPath, dropPrevious) => endingHold(() => bindNow(documentPath, dropPrevious)),
+    adopt: (id, current) => endingHold(() => adoptNow(id, current)),
     markSaved() {
       saver.flush(); // settles an in-flight write (it can no longer land), then the slot goes
       store.remove(binding.id);
       changeCount = 0;
-      held = false;
-      heldDoc = null;
+      dropHold();
       saver = makeSaver();
       if (failedSlot === binding.id) clearFailure(); // the file holds the document: nothing is at risk any more
-    },
-    adopt(id, current) {
-      const found = store.read(id);
-      if (found === null) return null;
-      const previous = binding.id;
-      saver.flush();
-      if (previous !== id) {
-        const kept = store.read(previous);
-        if (kept !== null && kept.json !== found.json) store.archive(previous);
-        else {
-          store.remove(previous);
-          if (failedSlot === previous) clearFailure();
-        }
-      }
-      held = false;
-      heldDoc = null;
-      binding = { id, path: found.meta.path };
-      changeCount = found.meta.changeCount;
-      saver = makeSaver();
-      store.writeActive(id, found.meta.path);
-      saver.schedule(current);
-      saver.flush(); // durable now: the restored work must survive a crash right after
-      return store.read(id)?.meta ?? found.meta;
     },
     current: () => binding,
   };

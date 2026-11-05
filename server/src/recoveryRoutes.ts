@@ -51,8 +51,10 @@ export function buildRecoveryRouter(restLimiter: RequestHandler): Router {
 
   router.post('/recovery/bind', restLimiter, mutate, (req, res) => {
     const { path: documentPath, dropPrevious } = bodyOf(req.body);
-    if (documentPath !== null && (typeof documentPath !== 'string' || documentPath === ''))
+    if (documentPath !== null && (typeof documentPath !== 'string' || documentPath === '')) {
+      recoverySession.release(); // a refused bind still ends the hold
       return void res.status(400).json({ error: 'path must be a file path or null.' });
+    }
     recoverySession.bind(documentPath, dropPrevious === true);
     publishDocumentPath();
     res.json({ ok: true, slot: recoverySession.current().id });
@@ -68,7 +70,10 @@ export function buildRecoveryRouter(restLimiter: RequestHandler): Router {
   router.post('/recovery/adopt', restLimiter, mutate, (req, res) => {
     const { id } = bodyOf(req.body);
     const meta = typeof id === 'string' && isSlotId(id) ? recoverySession.adopt(id, getLiveDoc()) : null;
-    if (meta === null) return void res.status(404).json({ error: 'No such recovery slot.' });
+    if (meta === null) {
+      recoverySession.release(); // an unknown slot still ends the hold (adopt itself does when it ran)
+      return void res.status(404).json({ error: 'No such recovery slot.' });
+    }
     publishDocumentPath();
     res.json({ ok: true, meta });
   });

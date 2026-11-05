@@ -158,4 +158,17 @@ describe('RecoveryDialog restore through the desktop host (review 1)', () => {
     expect(backend.posts.map((p) => p.url)).not.toContain('/recovery/adopt');
     expect(screen.getByText('A.llull')).toBeTruthy();
   });
+
+  it('without the desktop host an adopt that fails at network level still gives the hold back (release)', async () => {
+    const backend = stubBackend([slot('doc-a', 'A.llull', 'C:/w/A.llull')]);
+    const ok = globalThis.fetch;
+    vi.stubGlobal('fetch', (url: string, init?: { method?: string; body?: string }) =>
+      new URL(url).pathname === '/recovery/adopt' ? Promise.reject(new Error('network down')) : ok(url, init as RequestInit),
+    );
+    answerDispatch({ summary: 'loaded', changed: true });
+    render(<RecoveryDialog />);
+    connect();
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(backend.posts.map((p) => p.url)).toContain('/recovery/release'));
+  });
 });

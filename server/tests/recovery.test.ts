@@ -217,7 +217,6 @@ describe('replacing the open document (review 2, 4)', () => {
     live.schedule(boxDoc(1));
     live.hold();
     live.schedule(boxDoc(7)); // whatever changes while held is not A's slot content until it is released
-    live.flush();
     expect(store.read(slotIdForPath(fileA))?.json).toBe(serializeDocument(boxDoc(1)));
     live.release();
     live.flush();
@@ -373,5 +372,87 @@ describe('autosave status follows the recovery binding (review 9)', () => {
     expect(statuses.at(-1)?.ok).toBe(false);
     live.bind(path.join(dir, 'C.llull'), true); // B is dropped: not the failing one
     expect(statuses.at(-1)?.ok).toBe(false);
+  });
+});
+
+describe('a hold that is never ended (second review 1)', () => {
+  const holdSession = (statuses: unknown[]): ReturnType<typeof createRecoverySession> =>
+    createRecoverySession({
+      store: createRecoveryStore(dir),
+      debounceMs: 1,
+      holdTtlMs: 5000,
+      serialize: serializeDocument,
+      onStatus: (status) => statuses.push(status),
+      initial: { id: 'untitled-first', path: null },
+    });
+
+  it('after the TTL the held edit reaches the current slot and a warning status is emitted, then cleared by the write', () => {
+    vi.useFakeTimers();
+    try {
+      const statuses: { ok: boolean; code?: string }[] = [];
+      const live = holdSession(statuses);
+      live.hold();
+      live.schedule(boxDoc(4)); // the edit while held; nobody ever binds
+      expect(createRecoveryStore(dir).read('untitled-first')).toBeNull();
+      vi.advanceTimersByTime(5001);
+      expect(createRecoveryStore(dir).read('untitled-first')?.json).toBe(serializeDocument(boxDoc(4)));
+      expect(statuses.some((status) => !status.ok && status.code === 'DSF_HOLD_EXPIRED')).toBe(true);
+      live.schedule(boxDoc(5)); // no longer held
+      live.flush();
+      expect(createRecoveryStore(dir).read('untitled-first')?.json).toBe(serializeDocument(boxDoc(5)));
+      expect(statuses.at(-1)).toEqual({ ok: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a bind before the TTL cancels it', () => {
+    vi.useFakeTimers();
+    try {
+      const statuses: unknown[] = [];
+      const live = holdSession(statuses);
+      live.hold();
+      live.bind(path.join(dir, 'B.llull'), false);
+      vi.advanceTimersByTime(6000);
+      expect(statuses).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('adopt of an unknown slot ends the hold', () => {
+    const live = holdSession([]);
+    live.hold();
+    live.schedule(boxDoc(2));
+    expect(live.adopt('doc-missing', boxDoc(2))).toBeNull();
+    live.flush();
+    expect(createRecoveryStore(dir).read('untitled-first')?.json).toBe(serializeDocument(boxDoc(2)));
+  });
+
+  it('flush() and stop() during a hold persist the held document into the current binding', () => {
+    const live = holdSession([]);
+    live.hold();
+    live.schedule(boxDoc(3));
+    live.flush();
+    expect(createRecoveryStore(dir).read('untitled-first')?.json).toBe(serializeDocument(boxDoc(3)));
+    live.schedule(boxDoc(6));
+    live.stop();
+    expect(createRecoveryStore(dir).read('untitled-first')?.json).toBe(serializeDocument(boxDoc(6)));
+  });
+
+  it('REST: /recovery/adopt for an unknown slot is a 404 that also ends the hold', async () => {
+    vi.resetModules();
+    vi.stubEnv('LLULL_RECOVERY_DIR', dir);
+    try {
+      const { app } = await import('../src/index');
+      const { recoverySession } = await import('../src/liveDocument');
+      await request(app).post('/recovery/hold').send({});
+      expect((await request(app).post('/recovery/adopt').send({ id: 'doc-nothere' })).status).toBe(404);
+      recoverySession.schedule(boxDoc(9)); // not held any more: written to the current slot
+      recoverySession.flush();
+      expect(createRecoveryStore(dir).read(recoverySession.current().id)?.json).toBe(serializeDocument(boxDoc(9)));
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

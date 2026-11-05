@@ -265,3 +265,45 @@ describe('DocumentSession replacing the open document (review 1, 2)', () => {
     }
   });
 });
+
+describe('DocumentSession finishing a replacement (second review 1d)', () => {
+  it('a bind that keeps failing is retried once, then the hold is released and the failure is surfaced', async () => {
+    const backend = fakeBackend();
+    const failing: FetchLike = (url, init) =>
+      new URL(url).pathname === '/recovery/bind' ? Promise.reject(new Error('down')) : backend.fetchImpl(url, init);
+    const warnings: string[] = [];
+    const session = createDocumentSession({
+      url: 'http://127.0.0.1:1',
+      token: 't',
+      fetchImpl: failing,
+      onWarning: (text) => warnings.push(text),
+    });
+    const file = path.join(dir, 'F.llull');
+    writeFileSync(file, serializeDocument(createEmptyDocument()));
+    await session.open(file);
+    expect(backend.calls.map((call) => call.split(':')[0])).toEqual(['recovery/hold', 'command', 'recovery/release', 'recovery/saved']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/recovery bind failed/);
+  });
+
+  it('a finishing call that fails once and then succeeds is not a warning', async () => {
+    const backend = fakeBackend();
+    let failures = 1;
+    const flaky: FetchLike = (url, init) => {
+      if (new URL(url).pathname === '/recovery/bind' && failures-- > 0) return Promise.resolve(new Response('{}', { status: 500 }));
+      return backend.fetchImpl(url, init);
+    };
+    const warnings: string[] = [];
+    const session = createDocumentSession({
+      url: 'http://127.0.0.1:1',
+      token: 't',
+      fetchImpl: flaky,
+      onWarning: (text) => warnings.push(text),
+    });
+    const file = path.join(dir, 'G.llull');
+    writeFileSync(file, serializeDocument(createEmptyDocument()));
+    await session.open(file);
+    expect(backend.calls.filter((call) => call.startsWith('recovery/bind'))).toHaveLength(1);
+    expect(warnings).toEqual([]);
+  });
+});

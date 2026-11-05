@@ -72,7 +72,11 @@ export type LiveProgressEvent = LiveProgressReport & { readonly epoch: string };
  */
 export type LiveAutosaveStatus =
   | { readonly ok: true }
-  | { readonly ok: false; readonly code: 'DSF_SAVE_DISK_FULL' | 'DSF_SAVE_IO' | 'DSF_AUTOSAVE_FAILED'; readonly message: string };
+  | {
+      readonly ok: false;
+      readonly code: 'DSF_SAVE_DISK_FULL' | 'DSF_SAVE_IO' | 'DSF_AUTOSAVE_FAILED' | 'DSF_HOLD_EXPIRED';
+      readonly message: string;
+    };
 
 export interface LiveStatusEvent {
   readonly epoch: string;

@@ -64,7 +64,10 @@ export function RecoveryDialog(): React.ReactElement | null {
                     useStore.getState().setStatusMessage(`Could not restore "${slot.label}"; it was kept for another try`);
                     return;
                   }
-                  void postRecovery('adopt', { id: slot.id }).finally(() => restored(slot));
+                  // whatever happens to the adopt, the hold ends: a failed one gives it back (the backend's TTL is the last resort)
+                  void postRecovery('adopt', { id: slot.id })
+                    .catch(() => postRecovery('release', {}).catch(() => undefined))
+                    .finally(() => restored(slot));
                 },
               },
             ),
