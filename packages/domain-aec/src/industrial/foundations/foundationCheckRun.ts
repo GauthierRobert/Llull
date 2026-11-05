@@ -7,7 +7,7 @@ import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { checkFoundations } from './foundationAssessment';
 import { defaultThrustTie } from './foundationThrust';
 import { round } from '../../shared/numeric';
-import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from '../reports/checkReport';
+import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells, refusedEntries } from '../reports/checkReport';
 
 const foundationCheckParams = z.object({
   ...FRAME_LOAD_SHAPE,
@@ -21,10 +21,13 @@ const foundationCheckParams = z.object({
     ),
 });
 
+/** Rule set the anchor-bolt rows follow: structural-bolt resistances, not an anchor design (EN 1992-4 / ETA). */
+const ANCHOR_BASIS = 'EN 1993-1-8 structural-bolt rules (simplified), not EN 1992-4 anchor design';
+
 /**
- * @affects none; data = { rows: FoundationRow[], csv, maxUtilisation, failures }
+ * @affects none; data = { rows: FoundationRow[], csv, maxUtilisation, failures, refused, defaulted, basis }
  * @failure bad params / unknown level / no footing or base plate under a frame column -> no data
- * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op; STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE / STL_BOLT_SIZE_NONSTANDARD -> the row fails (utilisation 99), never passes
+ * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op; STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE / STL_BOLT_SIZE_NONSTANDARD -> the row carries `refusal`, is listed in data.refused and the summary, never counts in maxUtilisation, never passes
  * @invariant boltClass omitted -> 8.8, listed in data.defaulted and named in the summary
  */
 export const foundationCheck = defineCommand({
@@ -79,18 +82,31 @@ export const foundationCheck = defineCommand({
     const {
       csv,
       failures,
+      refused,
       worst: worstRow,
     } = checkTable(rows, ['Column', 'Footing', ...LIMIT_COLUMNS], (row, status) => [row.column, row.footing, ...limitCells(row, status)]);
-    if (!worstRow) return noop(doc, `check_foundations failed: no portal frame column with a footing or base plate on level '${levelId}'.`);
+    if (rows.length === 0)
+      return noop(doc, `check_foundations failed: no portal frame column with a footing or base plate on level '${levelId}'.`);
     const failureIds = [...new Set(failures.map((row) => row.elementId))];
     return report(
       doc,
       `Checked ${footings} footing(s) and ${plates} base plate(s) on level '${levelId}' ` +
         `(${describeLoads(loads)}, ${describeBolts(loads, defaulted)}, soil ${soilBearing} kPa, Es ${soilModulus} MPa, ${thrustTie ? `thrust taken by a tie / slab (capacity ${tieCapacity} kN)` : 'thrust resisted by pad friction'}): ${rows.length} check(s), ` +
         (unchecked > 0 ? `${unchecked} footing(s) not checked (no analysed frame column, e.g. gable posts); ` : '') +
-        `max utilisation ${round(worstRow.utilisation)} (${worstRow.column} ${worstRow.check}, ${worstRow.combination}); ` +
-        failureSummary(failures, (row) => `${row.column} ${row.check}`, 'all OK (no reinforcement check).'),
-      { rows, csv, maxUtilisation: worstRow.utilisation, failures: failureIds, defaulted },
+        (worstRow
+          ? `max utilisation ${round(worstRow.utilisation)} (${worstRow.column} ${worstRow.check}, ${worstRow.combination}); `
+          : 'no computed row (every row refused); ') +
+        failureSummary(failures, (row) => `${row.column} ${row.check}`, 'all OK (no reinforcement check).', refused) +
+        ` Anchors: ${ANCHOR_BASIS}.`,
+      {
+        rows,
+        csv,
+        maxUtilisation: worstRow?.utilisation ?? 0,
+        failures: failureIds,
+        refused: refusedEntries(rows, (row) => `${row.column} ${row.check}`),
+        defaulted,
+        basis: { anchors: ANCHOR_BASIS },
+      },
     );
   },
 });

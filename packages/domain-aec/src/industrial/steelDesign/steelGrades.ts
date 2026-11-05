@@ -47,9 +47,6 @@ const GRADES: Readonly<Record<string, GradeRow>> = {
   S460: { upTo40: { fy: 460, fu: 540 }, upTo80: { fy: 430, fu: 540 }, source: 'EN 10025-3 S 460 N/NL' },
 };
 
-/** Utilisation reported on a row whose input was refused: always a failure. */
-export const REFUSED_UTILISATION = 99;
-
 const KNOWN_GRADES = Object.keys(GRADES).join(', ');
 const GRADE_GRAMMAR = /^S\s*(\d{3})(?:\s*(?:JR|J0|J2|K2|NL|N|ML|M|QL|Q|\+\s*(?:AR|N|M|QT)))*$/;
 

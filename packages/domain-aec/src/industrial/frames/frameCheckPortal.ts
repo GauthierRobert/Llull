@@ -3,13 +3,13 @@ import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
 import { checkFrames } from './frameCheckFrames';
 import { round } from '../../shared/numeric';
-import { checkTable, failureSummary } from '../reports/checkReport';
+import { checkTable, failureSummary, refusedEntries } from '../reports/checkReport';
 import { BOLT_CLASS_SHAPE, describeBolts, describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from './frameLoadParams';
 
 /**
- * @affects none; data = { rows: CheckRow[], csv, maxUtilisation, failures, combinations, alphaCritical }
+ * @affects none; data = { rows: CheckRow[], csv, maxUtilisation, failures, refused, combinations, alphaCritical, defaulted }
  * @failure negative loads / unknown level / no frame -> no data
- * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op; STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE / STL_BOLT_SIZE_NONSTANDARD -> the row fails (utilisation 99), never passes
+ * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op; STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE / STL_BOLT_SIZE_NONSTANDARD -> the row carries `refusal`, is listed in data.refused and the summary ("refused (<code>)"), never counts in maxUtilisation, never passes
  * @invariant boltClass omitted -> 8.8, listed in data.defaulted and named in the summary
  */
 export const checkPortalFrames = defineCommand({
@@ -40,7 +40,7 @@ export const checkPortalFrames = defineCommand({
         `check_portal_frames failed: no analysable portal frame on the level${skipped.length > 0 ? ` (${skipped.join(', ')})` : ''}.`,
       );
     }
-    const { csv, failures, worst } = checkTable(
+    const { csv, failures, refused, worst } = checkTable(
       rows,
       ['Frame', 'Mark', 'Type', 'N (kN)', 'M (kNm)', 'V (kN)', 'Utilisation', 'Status', 'Combination', 'Check'],
       (row, status) => [
@@ -50,7 +50,7 @@ export const checkPortalFrames = defineCommand({
         round(row.axial, 1),
         round(row.moment, 1),
         round(row.shear, 1),
-        round(row.utilisation),
+        row.refusal ? `refused (${row.refusal.code})` : round(row.utilisation),
         status,
         row.combination,
         row.check,
@@ -65,6 +65,7 @@ export const checkPortalFrames = defineCommand({
           failures,
           (row) => `${row.mark} ${row.kind}`,
           'all OK (frames only: see check_bracing, check_foundations, check_crane_runways).',
+          refused,
         ) +
         `${skipped.length > 0 ? ` Not checked: ${skipped.join(', ')}.` : ''}`,
       {
@@ -72,6 +73,7 @@ export const checkPortalFrames = defineCommand({
         csv,
         maxUtilisation: worst?.utilisation ?? 0,
         failures: [...new Set(failures.map((row) => row.elementId))],
+        refused: refusedEntries(rows, (row) => `${row.mark} ${row.kind}`),
         combinations,
         alphaCritical: Number.isFinite(minAlphaCritical) ? minAlphaCritical : null,
         defaulted,

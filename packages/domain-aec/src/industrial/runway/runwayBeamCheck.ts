@@ -2,7 +2,8 @@ import type { SteelMemberElement } from '@aec/building/types';
 import { findProfile, sectionProperties } from '../../steel/profiles';
 import { craneActions, CRANE_FACTORS, type CraneModel } from '../frames/frameModelTypes';
 import { lateralTorsionalReduction, sectionResistance } from '../steelDesign/steelDesign';
-import { isSteelRefusal, memberStrength, REFUSED_UTILISATION } from '../steelDesign/steelGrades';
+import { isSteelRefusal, memberStrength } from '../steelDesign/steelGrades';
+import { refusedFields } from '../common/utilisation';
 import {
   BUFFER_SPEED_RATIO,
   CLASSES,
@@ -58,7 +59,7 @@ export function checkBeam(
         value: 0,
         limit: 0,
         unit: '-',
-        utilisation: REFUSED_UTILISATION,
+        ...refusedFields(strength),
       },
     ];
   }

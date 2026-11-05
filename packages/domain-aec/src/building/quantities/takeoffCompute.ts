@@ -8,7 +8,7 @@ import { findProfile } from '../../steel/profiles';
 import { polygonNormal, boltSize } from '../../industrial/evaluate';
 import { trayLength } from '../../industrial/piping/trays';
 import { plateMass } from '../../industrial/connections/plates';
-import { connectionMass, connectionWelds } from '../../industrial/connections/connections';
+import { connectionMass, connectionWelds, isWeldRefusal } from '../../industrial/connections/connections';
 import {
   TakeoffAccumulator,
   type TakeoffLine,
@@ -156,7 +156,11 @@ export function computeTakeoff(doc: CadDocument, measure: 'net' | 'gross' = 'net
     takeoff.add('connection', connection.kind, `Moment connections, ${connection.kind}`, [['ea', 'count', 1]]);
     takeoff.add('connection', `bolt ${bolt}`, `Bolts ${bolt} 8.8`, [['ea', 'count', 2 * connection.boltRows]]);
     const welds = connectionWelds(doc, building, connection);
-    if (welds) {
+    if (welds && isWeldRefusal(welds)) {
+      takeoff.add('connection', `welds ${welds.refusal.code}`, `Fillet welds not quantified — ${welds.refusal.code}`, [
+        ['ea', 'connections', 1],
+      ]);
+    } else if (welds) {
       takeoff.add('connection', 'weld', 'Fillet welds', [['m', 'length', welds.length / 1000]]);
       takeoff.add('connection', 'weld metal', 'Fillet welds', [['kg', 'weld metal', welds.metal]]);
     }

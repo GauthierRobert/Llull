@@ -10,6 +10,7 @@ import { BEARING_STRENGTH, checkPlateMN } from '../connections/basePlateMN';
 import { type FoundationRow, MAX_UTILISATION } from './foundationModel';
 import { type Candidate, combine, hasCase, plateDemands, ultimateCombinations, worst } from './foundationCombinations';
 import { rowOf } from './foundationRows';
+import { refusedFields } from '../common/utilisation';
 
 export function plateRows(
   doc: CadDocument,
@@ -29,7 +30,7 @@ export function plateRows(
   const row = rowOf(columnMark, footingMark, plate.id);
   if (isBoltRefusal(resistance)) {
     return [
-      row(`anchor bolts not checked — ${resistance.message}`, { value: 0, limit: 0, combination: '—', utilisation: MAX_UTILISATION }, '-'),
+      row(`anchor bolts not checked — ${resistance.message}`, { value: 0, limit: 0, combination: '—', ...refusedFields(resistance) }, '-'),
     ];
   }
   const [tensionLimit, shearLimit] = [resistance.tension / 1000, resistance.shear / 1000];
@@ -95,6 +96,7 @@ export function plateRows(
         limit: verdict.boltLimit,
         combination: demand.combination,
         utilisation: verdict.utilisation,
+        ...(verdict.refusal ? { refusal: verdict.refusal } : {}),
         detail: `N ${demand.normal.toFixed(0)} kN, M ${demand.moment.toFixed(0)} kNm: ${verdict.check}`,
       };
     });

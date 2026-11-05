@@ -13,6 +13,7 @@ import {
   type ProfileGroups,
 } from '../common/profileGroups';
 import { refitPlates } from '../connections/plateSupport';
+import { maxUtilisation, refusedRows } from '../common/utilisation';
 import { checkFrames } from './frameCheckFrames';
 import type { CheckRow } from './frameCheckSolve';
 import type { FrameLoads } from './frameModelTypes';
@@ -92,7 +93,7 @@ export function sizeFrames(doc: CadDocument, levelId: string, loads: FrameLoads,
       const member = building.elements[elementId];
       if (member?.category === 'member') addProfileGroup(groups, member);
     };
-    const failing = rows.filter((row) => row.kind !== 'connection' && row.utilisation > target);
+    const failing = rows.filter((row) => row.kind !== 'connection' && row.refusal === undefined && row.utilisation > target);
     // Sway amplifies every moment: stiffen first and re-analyse before sizing members for strength.
     const swayRows = failing.filter(isSwayRow);
     const swayFirst = swayRows.length > 0;
@@ -176,12 +177,13 @@ export function withFixedBases(
   return { doc: { ...doc, building: next }, plateIds };
 }
 
-/** Unmet checks (connections excluded: their bolts are sized afterwards) and worst utilisation among `rows`. */
-export function scoreRows(rows: ReadonlyArray<CheckRow>, target: number): { failing: number; max: number } {
+/** Unmet checks (connections excluded: their bolts are sized afterwards), worst computed utilisation and refused rows among `rows`. */
+export function scoreRows(rows: ReadonlyArray<CheckRow>, target: number): { failing: number; max: number; refused: number } {
   const frameRows = rows.filter((row) => row.kind !== 'connection');
   return {
-    failing: frameRows.filter((row) => row.utilisation > target).length,
-    max: Math.max(0, ...frameRows.map((row) => row.utilisation)),
+    failing: frameRows.filter((row) => row.refusal === undefined && row.utilisation > target).length,
+    max: maxUtilisation(frameRows),
+    refused: refusedRows(frameRows).length,
   };
 }
 

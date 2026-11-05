@@ -1,6 +1,7 @@
 import type { Located as BracingLocated } from '../bracing/bracingModel';
 import type { RoofCoefficients, RoofZone, ZoneCpe } from '../common/windCoefficients';
-import { REFUSED_UTILISATION, type SteelRefusal } from '../steelDesign/steelGrades';
+import { refusedFields, type RowRefusal } from '../common/utilisation';
+import type { SteelRefusal } from '../steelDesign/steelGrades';
 
 /** Internal pressure coefficient: +0.2 maximises uplift / suction, -0.3 maximises wall pressure. */
 export const CPI_SUCTION = 0.2;
@@ -51,6 +52,8 @@ export interface Verdict {
   readonly unit: 'kNm' | 'kN' | 'mm';
   readonly utilisation: number;
   readonly combination: string;
+  /** Set when the member's grade / thickness was refused: the row was not computed. */
+  readonly refusal?: RowRefusal;
 }
 
 /** Governing verdict of a purlin or rail. */
@@ -93,7 +96,7 @@ export function refusedPurlinRow(located: Located, kind: PurlinRow['kind'], refu
     value: 0,
     limit: 0,
     unit: 'kN',
-    utilisation: REFUSED_UTILISATION,
+    ...refusedFields(refusal),
     combination: '—',
   };
 }

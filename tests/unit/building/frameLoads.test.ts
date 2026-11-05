@@ -21,7 +21,7 @@ import { GRAVITY } from '@aec/shared/numeric';
 import { hall } from './hallFixtures';
 import { xyz } from '../../helpers/xy';
 import { nextProfile } from '@aec/industrial/common/profileGroups';
-import { connectionWelds } from '@aec/industrial/connections/connections';
+import { type ConnectionWelds, connectionWelds } from '@aec/industrial/connections/connections';
 import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import { expectNoOp } from '../../helpers/expectNoOp';
 
@@ -501,7 +501,7 @@ describe('weld detailing', () => {
       (element): element is MomentConnectionElement => element.category === 'connection' && element.kind === 'eaves',
     )!;
     // IPE450: tf 14.6 → a9, tw 9.4 → a6.
-    const welds = connectionWelds(doc, doc.building!, connection)!;
+    const welds = connectionWelds(doc, doc.building!, connection) as ConnectionWelds;
     expect(welds).toMatchObject({ flangeThroat: 9, webThroat: 6 });
     expect(welds.length).toBeGreaterThan(2000);
     expect(welds.metal).toBeGreaterThan(0.5);

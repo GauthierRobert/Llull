@@ -5,7 +5,8 @@ import { windCasesOf, type FrameLoads, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
 import { framesOf } from './frameModelFrames';
 import { memberBuckling, sectionResistance } from '../steelDesign/steelDesign';
-import { isSteelRefusal, memberStrength, REFUSED_UTILISATION, strengthNote } from '../steelDesign/steelGrades';
+import { isSteelRefusal, memberStrength, strengthNote } from '../steelDesign/steelGrades';
+import { refusedFields } from '../common/utilisation';
 import { DEFAULT_BOLT_CLASS } from '../steelDesign/steelBolts';
 import { type CheckRow, SLS_CRANE, SLS_SWAY, SLS_VERTICAL, connectionCheck, solveUltimate, ultimateCombinations } from './frameCheckSolve';
 
@@ -26,7 +27,9 @@ export function checkFrames(
   const worst = new Map<string, CheckRow>();
   const keep = (row: CheckRow, key = row.elementId): void => {
     const current = worst.get(key);
-    if (!current || row.utilisation > current.utilisation) worst.set(key, row);
+    // A refused row is never displaced by a computed one: the element stays refused.
+    if (!current || (current.refusal === undefined && (row.refusal !== undefined || row.utilisation > current.utilisation)))
+      worst.set(key, row);
   };
   const connectionForces = new Map<string, { moment: number; shear: number }[]>();
   let unstable = 0;
@@ -62,7 +65,7 @@ export function checkFrames(
             axial: 0,
             moment: 0,
             shear: 0,
-            utilisation: REFUSED_UTILISATION,
+            ...refusedFields(strength),
             check: `${member.profile} not checked — ${strength.message}`,
           });
           return;
@@ -121,6 +124,7 @@ export function checkFrames(
           moment: Math.abs(moment) / 1e6,
           shear: Math.abs(shear) / 1000,
           utilisation: verdict.utilisation,
+          ...(verdict.refusal ? { refusal: verdict.refusal } : {}),
           check: `${connection.kind}: ${verdict.check}`,
         });
       }

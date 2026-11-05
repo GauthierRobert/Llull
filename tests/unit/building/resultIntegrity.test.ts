@@ -204,7 +204,7 @@ describe('bolt class parameter (VC-INT-08, 09; INT-FB-003)', () => {
     expect(foundation.summary).toContain('bolts class 8.8 (defaulted)');
     expect(defaultedOf(anchorCheck(hall(), { boltClass: '5.6' }))).toEqual([]);
     const design = execute(hall(), 'design_portal_frames', { windPressure: 0.7 });
-    expect(defaultedOf(design)).toEqual([{ input: 'boltClass', value: '8.8' }]);
+    expect(defaultedOf(design)).toEqual(expect.arrayContaining([{ input: 'boltClass', value: '8.8' }]));
     expect(design.summary).toContain('(defaulted)');
   });
   it('anchor rows follow the class: 4.6 anchors are weaker than 10.9', () => {
@@ -234,11 +234,11 @@ describe('base plate refusals (INT-FB-001, INT-FB-004)', () => {
   const geometry = { length: 500, width: 450, thickness: 40, boltCount: 4, boltDiameter: 24, columnDepth: 300 };
   it('checkPlateMN fails a plate of unknown grade, of unknown anchor class and of non-standard anchor size', () => {
     const grade = checkPlateMN(geometry, 200, 150, { grade: 'A36', boltClass: '8.8' });
-    expect(grade.refusal).toContain('STL_GRADE_UNKNOWN');
+    expect(grade.refusal?.code).toBe('STL_GRADE_UNKNOWN');
     const anchorClass = checkPlateMN(geometry, 200, 150, { grade: 'S355', boltClass: '12.9' });
-    expect(anchorClass.refusal).toContain('STL_BOLT_CLASS_UNKNOWN');
+    expect(anchorClass.refusal?.code).toBe('STL_BOLT_CLASS_UNKNOWN');
     const size = checkPlateMN({ ...geometry, boltDiameter: 25 }, 200, 150, { grade: 'S355', boltClass: '8.8' });
-    expect(size.refusal).toContain('STL_BOLT_SIZE_NONSTANDARD');
+    expect(size.refusal?.code).toBe('STL_BOLT_SIZE_NONSTANDARD');
     for (const refused of [grade, anchorClass, size]) {
       expect(refused.utilisation).toBeGreaterThan(1);
       expect(refused.check).toContain('not checked');

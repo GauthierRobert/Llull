@@ -89,7 +89,8 @@ export function boltResistance(
 }
 
 /**
- * Design resistances of one anchor bolt, N: tension k2 fub As / γM2; shear (threads in the shear plane, EN 1993-1-8 §6.2.2(7)) αbc fub As
+ * Design resistances of one anchor bolt, N, with the EN 1993-1-8 structural-bolt rules (simplified; anchor design proper is EN 1992-4 / an ETA,
+ * which this does not implement): tension k2 fub As / γM2; shear (threads in the shear plane, EN 1993-1-8 §6.2.2(7)) αbc fub As
  * / γM2 with αbc = 0.44 − 0.0003 fyb.
  * @failure STL_BOLT_CLASS_UNKNOWN | STL_BOLT_SIZE_NONSTANDARD — as boltResistance
  */

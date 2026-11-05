@@ -26,6 +26,7 @@ import {
   refusedRow,
 } from './bracingModel';
 import { distance3 } from '@lib/vec3';
+import { refusedFields } from '../common/utilisation';
 
 interface BracingInputs {
   readonly windPressure: number;
@@ -319,7 +320,7 @@ export function analyseBracing(
         resistance: eavesResistance,
         moment: 0,
         momentResistance: 0,
-        utilisation: eavesStrut && !eavesRefusal ? reaction / eavesResistance : NO_MEMBER_UTILISATION,
+        ...(eavesRefusal ? refusedFields(eavesRefusal) : { utilisation: eavesStrut ? reaction / eavesResistance : NO_MEMBER_UTILISATION }),
         check: eavesRefusal
           ? `eaves strut ${eavesStrut?.member.profile ?? ''} not checked — ${eavesRefusal.message}`
           : eavesStrut

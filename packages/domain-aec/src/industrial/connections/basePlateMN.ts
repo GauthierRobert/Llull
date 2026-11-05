@@ -7,6 +7,7 @@ import { anchorBoltResistance, isBoltRefusal } from '../steelDesign/steelBolts';
 import { isSteelRefusal, steelStrength } from '../steelDesign/steelGrades';
 import { FCD } from '../foundations/footingModel';
 import { MAX_UTILISATION } from '../foundations/foundationModel';
+import { refusedFields, type RowRefusal } from '../common/utilisation';
 import { bisect } from '@lib/bisect';
 
 const CONCENTRATION_FACTOR = 1.5;
@@ -35,8 +36,8 @@ interface PlateMnCheck {
   readonly bearingLength: number;
   readonly requiredThickness: number;
   readonly check: string;
-  /** Named refusal (STL_*) when the grade, thickness, bolt class or bolt size was refused: the plate is then not checked and fails. */
-  readonly refusal?: string;
+  /** Named refusal (STL_*) when the grade, thickness, bolt class or bolt size was refused: the plate was not checked. */
+  readonly refusal?: RowRefusal;
 }
 
 /** Plate steel grade and anchor bolt property class a plate is checked with. */
@@ -65,17 +66,16 @@ export function checkPlateMN(geometry: PlateMnGeometry, normal: number, moment: 
   const { length, width, thickness, boltDiameter, columnDepth } = geometry;
   const strength = steelStrength(basis.grade, thickness);
   const anchor = anchorBoltResistance(boltDiameter, basis.boltClass);
-  const refused = (refusal: string): PlateMnCheck => ({
-    utilisation: MAX_UTILISATION,
-    boltTension: MAX_UTILISATION,
+  const refused = (refusal: RowRefusal): PlateMnCheck => ({
+    ...refusedFields(refusal),
+    boltTension: 0,
     boltLimit: 0,
     bearingLength: 0,
     requiredThickness: 0,
-    check: `not checked — ${refusal}`,
-    refusal,
+    check: `not checked — ${refusal.message}`,
   });
-  if (isSteelRefusal(strength)) return refused(strength.message);
-  if (isBoltRefusal(anchor)) return refused(anchor.message);
+  if (isSteelRefusal(strength)) return refused(strength);
+  if (isBoltRefusal(anchor)) return refused(anchor);
   const yieldStrength = strength.fy;
   const [axial, bending] = [normal * 1000, Math.abs(moment) * 1e6];
   const offsets = boltOffsets(geometry).filter((offset) => offset > 1e-6);
@@ -183,7 +183,7 @@ export function sizeBasePlate(
     if (columns > 1 && (geometry.length - 2 * edge) / (columns - 1) < MIN_PITCH_FACTOR * sizing.boltDiameter) continue;
     const checks = demands.map((demand) => checkPlateMN(geometry, demand.normal, demand.moment, basis));
     const refusal = checks.find((check) => check.refusal !== undefined)?.refusal;
-    if (refusal !== undefined) return { sizing, passes: false, refusal };
+    if (refusal !== undefined) return { sizing, passes: false, refusal: refusal.message };
     const worst = Math.max(0, ...checks.map((check) => check.utilisation));
     if (worst <= target) return { sizing, passes: true };
     if (best === null || worst < best.worst) best = { sizing, worst };

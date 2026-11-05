@@ -8,13 +8,16 @@ import { isNonNegativeNumber } from '@lib/isFiniteNumber';
 import type { PurlinRow } from './purlinModel';
 import { analysePurlins, locatePurlinMembers } from './purlinAnalysis';
 import { round } from '../../shared/numeric';
-import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells } from '../reports/checkReport';
+import { LIMIT_COLUMNS, checkTable, failureSummary, limitCells, refusedEntries } from '../reports/checkReport';
+import { defaultedClause, defaultedInputs } from '../common/defaulted';
 import { maxUtilisation } from '../common/utilisation';
 
 /**
  * @affects none; data = { rows: PurlinRow[], csv, maxUtilisation, failures, zones, ... }
  * @invariant simply supported over one bay; ULS gravity 1.35G + 1.5S; uplift 1.5 W - 1.0 G
  * @failure negative loads / unknown level / no purlins -> no data
+ * @failure STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE (member material / section) -> the row carries `refusal`, is listed in data.refused and the summary ("refused (<code>)"), never counts in maxUtilisation or failures, never passes
+ * @invariant omitted windPressure / snowLoad / roofDeadLoad -> data.defaulted and the summary
  */
 export const checkPurlins = defineCommand({
   name: 'check_purlins',
@@ -44,6 +47,7 @@ export const checkPurlins = defineCommand({
   params: z.object({ ...PURLIN_LOAD_SHAPE }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, snowLoad = 0.8, roofDeadLoad = 0.3 } = params;
+    const defaulted = defaultedInputs(params, { windPressure, snowLoad, roofDeadLoad });
     if (!isNonNegativeNumber(windPressure) || !isNonNegativeNumber(snowLoad) || !isNonNegativeNumber(roofDeadLoad)) {
       return noop(doc, 'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.');
     }
@@ -53,7 +57,7 @@ export const checkPurlins = defineCommand({
     const analysis = analysePurlins(members, levelId, { windPressure, snowLoad, roofDeadLoad });
     if ('reason' in analysis) return noop(doc, analysis.reason);
     const { rows, zones, monopitch, eAcross, eAlong } = analysis;
-    const { csv, failures, worst } = checkTable(rows, ['Mark', 'Type', 'Zone', 'Span (m)', ...LIMIT_COLUMNS], (row, status) => [
+    const { csv, failures, refused, worst } = checkTable(rows, ['Mark', 'Type', 'Zone', 'Span (m)', ...LIMIT_COLUMNS], (row, status) => [
       row.mark,
       row.kind,
       row.zone,
@@ -69,13 +73,16 @@ export const checkPurlins = defineCommand({
         `max utilisation purlins ${maxOf(purlinRows)}, rails ${maxOf(rows.filter((row) => row.kind === 'rail'))} ` +
         `(governing ${worst?.mark ?? '—'} ${worst?.kind ?? ''} zone ${worst?.zone ?? '—'}: ${worst?.check ?? '—'}); ` +
         `e = ${round(eAcross / 1000, 1)} m across / ${round(eAlong / 1000, 1)} m along the ridge; ` +
-        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary).') +
+        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary).', refused) +
+        (defaulted.length > 0 ? ` Defaulted: ${defaultedClause(defaulted)}.` : '') +
         (skipped.length > 0 ? ` Not checked: ${skipped.join(', ')}.` : ''),
       {
         rows,
         csv,
         maxUtilisation: worst?.utilisation ?? 0,
         failures: failures.map((row) => row.elementId),
+        refused: refusedEntries(rows, (row) => `${row.mark} ${row.kind}`),
+        defaulted,
         zones,
         roofType: monopitch ? 'monopitch' : 'duopitch',
         edgeDistanceAcrossRidge: eAcross,

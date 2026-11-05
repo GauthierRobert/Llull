@@ -19,11 +19,12 @@ import { craneCapacityOf, type CraneModel } from '../frames/frameModelTypes';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_CRANE_SPAN, DEFAULT_TRAVEL_SPEED, type RunwayCheckRow } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
 import { round } from '../../shared/numeric';
-import { checkTable, failureSummary } from '../reports/checkReport';
+import { checkTable, failureSummary, refusedEntries } from '../reports/checkReport';
 import { existingLevelIdParam } from '../../building/levelParams';
 
 /**
- * @affects none; data = { rows: RunwayCheckRow[], csv, maxUtilisation, failures }
+ * @affects none; data = { rows: RunwayCheckRow[], csv, maxUtilisation, failures, refused }
+ * @failure STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE (member material / section) -> the row carries `refusal`, is listed in data.refused and the summary ("refused (<code>)"), never counts in maxUtilisation or failures, never passes
  * @failure bad params / unknown level / no crane beams -> no data
  */
 export const runwayCheck = defineCommand({
@@ -161,7 +162,7 @@ export const runwayCheck = defineCommand({
       capacities.add(capacity);
       rows.push(...beamRows);
     }
-    const { csv, failures, worst } = checkTable(
+    const { csv, failures, refused, worst } = checkTable(
       rows,
       ['Beam', 'Mark', 'Profile', 'Span (mm)', 'Kind', 'Check', 'Value', 'Limit', 'Unit', 'Utilisation', 'Status'],
       (row, status) => [
@@ -174,11 +175,11 @@ export const runwayCheck = defineCommand({
         row.value,
         row.limit,
         row.unit,
-        row.utilisation,
+        row.refusal ? `refused (${row.refusal.code})` : row.utilisation,
         status,
       ],
     );
-    if (beams === 0 || !worst) {
+    if (beams === 0 || rows.length === 0) {
       return noop(
         doc,
         `check_crane_runways failed: no crane runway beam with a known capacity on level '${levelId}' (add_crane_runway first, or pass craneCapacity).`,
@@ -187,9 +188,17 @@ export const runwayCheck = defineCommand({
     return report(
       doc,
       `Checked ${beams} crane runway beam(s), ${rows.length} check(s) (${[...capacities].join('/')} t, class ${craneClass}, wheelBase ${wheelBase} mm): ` +
-        `max utilisation ${round(worst.utilisation)} (${worst.mark} ${worst.kind}: ${worst.check}); ` +
-        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary, simply supported spans).'),
-      { rows, csv, maxUtilisation: worst.utilisation, failures: [...new Set(failures.map((row) => row.elementId))] },
+        (worst
+          ? `max utilisation ${round(worst.utilisation)} (${worst.mark} ${worst.kind}: ${worst.check}); `
+          : 'no computed row (every row refused); ') +
+        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary, simply supported spans).', refused),
+      {
+        rows,
+        csv,
+        maxUtilisation: worst?.utilisation ?? 0,
+        failures: [...new Set(failures.map((row) => row.elementId))],
+        refused: refusedEntries(rows, (row) => `${row.mark} ${row.kind}`),
+      },
     );
   },
 });

@@ -48,6 +48,7 @@ export const rowOf =
     unit,
     utilisation: best.utilisation,
     combination: best.combination,
+    ...(best.refusal ? { refusal: best.refusal } : {}),
   });
 
 /** Footing check rows (bearing, uplift, overturning, sliding, settlement) of one column's pad. */

@@ -2,7 +2,11 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { getBuilding } from '../../building/model';
-import { noop } from '@core/commands/noop';
+import { noop, report } from '@core/commands/noop';
+import { refusedEntries } from '../reports/checkReport';
+import { refusedRows } from '../common/utilisation';
+import { briefList } from '../../shared/briefList';
+import { defaultedInputs, withDefaulted } from '../common/defaulted';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { DEFAULT_BOLT_CLASS } from '../steelDesign/steelBolts';
 import { designFixedPlates } from '../connections/plateDesign';
@@ -20,7 +24,9 @@ const FIXED_BASE_MASS_GAIN = 0.75;
  * @affects up-sizes failing rafter / column profiles (all members of that role and section on the
  *          level, keeping frames uniform) and sizes the bolt groups of every moment connection
  * @failure bad loads / unknown level / no frame / no section large enough -> no-op or partial report
- * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op; STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE / STL_BOLT_SIZE_NONSTANDARD -> the row fails (utilisation 99), never passes
+ * @failure STL_BOLT_CLASS_UNKNOWN (boltClass outside 4.6..10.9) -> no-op
+ * @failure STL_GRADE_UNKNOWN / STL_THICKNESS_OUT_OF_RANGE on a column / rafter -> "not designed — <code>": document unchanged, members named in data.refused, nothing up-sized
+ * @invariant a refused row (also STL_BOLT_SIZE_NONSTANDARD on a connection) is never up-sized for, never counted in maxUtilisation / failures; data.refusedCount reports it
  * @invariant boltClass omitted -> 8.8, listed in data.defaulted and named in the summary
  */
 export const designPortalFrames = defineCommand({
@@ -51,11 +57,30 @@ export const designPortalFrames = defineCommand({
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `design_portal_frames failed: ${resolved.reason}.`);
     const { loads, levelId, defaulted } = resolved;
-    const withBolts = (result: CommandResult): CommandResult => ({
-      ...result,
-      summary: `${result.summary} Bolts: ${describeBolts(loads, defaulted)}.`,
-      data: { ...(result.data as object), defaulted },
-    });
+    const settings = defaultedInputs(params, { targetUtilisation, allowFixedBases });
+    const withBolts = (result: CommandResult): CommandResult =>
+      withDefaulted(
+        {
+          ...result,
+          summary: `${result.summary} Bolts: ${describeBolts(loads, defaulted)}.`,
+          data: { ...(result.data as object), defaulted },
+        },
+        settings,
+      );
+    const initial = checkFrames(doc, levelId, loads);
+    const refused = refusedRows(initial.rows.filter((row) => row.kind !== 'connection'));
+    if (initial.frames > 0 && refused.length > 0) {
+      const entries = refusedEntries(refused, (row) => `${row.mark} ${row.kind}`);
+      const codes = [...new Set(entries.map((entry) => entry.code))].join(', ');
+      return withBolts(
+        report(
+          doc,
+          `design_portal_frames: not designed — ${codes}: ${refused.length} member row(s) refused (${briefList(entries, (entry) => entry.label)}): ` +
+            `${entries[0]?.message ?? ''}. No profile, plate or bolt was changed; correct the material / section and re-run.`,
+          { changes: [], maxUtilisation: null, failures: null, refusedCount: refused.length, refused: entries },
+        ),
+      );
+    }
     const pinned = sizeFrames(doc, levelId, loads, targetUtilisation);
     if (pinned.noFrames) return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
     // Sway is column-stiffness driven: fixed bases (4x stiffer than pinned under a rigid rafter) are tried when pinned bases fail, or cost

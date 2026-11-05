@@ -41,6 +41,21 @@ function railDoc(xs: number[], dn: number | undefined = 100): CadDocument {
 const shoes = (doc: CadDocument, xs: number[], extra: Record<string, unknown> = {}): CadDocument =>
   step(doc, 'add_pipe_support', { pipeId: 'pipe-1', at: xs.map((x) => [x, 2000, 3027.15]), ...extra });
 
+describe('check_pipe_supports reports its defaulted criteria (INT-14)', () => {
+  it('lists spanFactor and overhangRatio when omitted, only the omitted one otherwise', () => {
+    const doc = railDoc([0, 6000, 12000]);
+    const defaulted = (params: Record<string, unknown>): unknown =>
+      (execute(doc, 'check_pipe_supports', params).data as { defaulted: unknown }).defaulted;
+    expect(defaulted({})).toEqual([
+      { input: 'spanFactor', value: '1' },
+      { input: 'overhangRatio', value: '0.5' },
+    ]);
+    expect(defaulted({ spanFactor: 0.8 })).toEqual([{ input: 'overhangRatio', value: '0.5' }]);
+    expect(defaulted({ spanFactor: 0.8, overhangRatio: 0.4 })).toEqual([]);
+    expect(execute(doc, 'check_pipe_supports', {}).summary).toContain('spanFactor 1 (defaulted)');
+  });
+});
+
 describe('check_pipe_supports registration', () => {
   it('is a read-only industrial tool', () => {
     expect(getCommand('check_pipe_supports')?.name).toBe(checkPipeSupports.name);

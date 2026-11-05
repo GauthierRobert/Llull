@@ -49,7 +49,7 @@ export const BOLT_CLASS_SHAPE = {
     .string()
     .optional()
     .describe(
-      'Bolt property class of the end-plate connection and anchor bolts: 4.6, 5.6, 6.8, 8.8 or 10.9 (EN 1993-1-8 Tab. 3.4). ' +
+      'Bolt property class of the end-plate connection and anchor bolts (anchors: simplified, structural-bolt rules of EN 1993-1-8, not the EN 1992-4 / ETA anchor design): 4.6, 5.6, 6.8, 8.8 or 10.9 (EN 1993-1-8 Tab. 3.4). ' +
         'Omitted = 8.8, reported in data.defaulted and in the summary. Bolt diameters must be exact ISO metric sizes M12..M36 (M12, M14, M16, M18, M20, M22, M24, M27, M30, M36) ' +
         'or the check is refused with STL_BOLT_SIZE_NONSTANDARD; an unknown class is refused with STL_BOLT_CLASS_UNKNOWN.',
     ),
