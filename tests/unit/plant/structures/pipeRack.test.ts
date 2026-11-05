@@ -511,6 +511,13 @@ describe('check_steel_members integration (SC-STA-04): moment frames across, bra
     totals: { notAnalysed: number };
   }>(doc, 'check_steel_members', {});
 
+  it('stores the explicit grade S355 on every generated member (no unparseable generic material)', () => {
+    const materials = new Set(
+      Object.values(doc.building?.elements ?? {}).flatMap((element) => (element.category === 'member' ? [element.material] : [])),
+    );
+    expect([...materials]).toEqual(['S355']);
+  });
+
   it('analyses every member: 11 moment frames, columns, tier beams, struts and braces', () => {
     expect(checked.members).toHaveLength(100);
     expect(checked.members.every((row) => row.analysed)).toBe(true);

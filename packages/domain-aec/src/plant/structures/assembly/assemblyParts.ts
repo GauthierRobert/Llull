@@ -105,6 +105,9 @@ export interface MemberRun {
   readonly note?: string;
 }
 
+/** Steel grade stored on every generated rack / platform member (no grade parameter yet: INT-FB-014); checks read it like any stored grade. */
+const GENERATED_STEEL_GRADE = 'S355';
+
 /** Places the runs as members; each takes the id and mark of an unused slot of its role (in creation order), else a new one. */
 export function placeMemberRuns(
   building: BuildingModel,
@@ -142,7 +145,7 @@ export function placeMemberRuns(
           start: run.start,
           end: run.end,
           roll: run.roll ?? 0,
-          material: 'steel',
+          material: GENERATED_STEEL_GRADE,
           ...(run.startJoint === undefined ? {} : { startJoint: run.startJoint }),
           ...(run.endJoint === undefined ? {} : { endJoint: run.endJoint }),
           ...(run.baseFixity === undefined ? {} : { baseFixity: run.baseFixity }),

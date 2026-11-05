@@ -13,10 +13,14 @@ import { dynamicsOf } from './bodies';
 import { accuracy, RIGID_BODY_WARNING, type Accuracy } from '../sim/accuracy';
 import { quickBrake } from '../sim/engine/quickBrake';
 
+/** Crank speed of the pressure curve when the caller gives no rpm (reported in data.defaulted). */
+const DEFAULT_CURVE_RPM = 1000;
+
 const DEFAULT_ANGLES = [0, 30, 60, 90, 120, 150, 180];
 
 /**
  * @affects nothing — read-only; data { source, geometry, angles[], mean? }
+ * @invariant a cylinder given without rpm uses 1000 rpm for the pressure curve: data.defaulted and the summary say so
  * @invariant exact slider-crank formulas (virtual work); mean torque = MEP · V_d / (4π) four-stroke, MEP · V_d / (2π) two-stroke
  * @failure unknown cylinder, no geometry (give the crank radius and rod length, or a cylinder id), rod not longer than the crank
  *          radius plus the offset, non-positive inputs -> no-op
@@ -68,6 +72,7 @@ export const engineQuickCheck = defineCommand({
     let offset = (params.offsetMm ?? 0) / 1000;
     let cycle = params.cycle ?? 'four_stroke';
     let displacement = params.displacementCm3 !== undefined ? params.displacementCm3 * 1e-6 : undefined;
+    const defaulted: Array<{ input: string; value: number; use: string }> = [];
     let model: { gauge: (phi: number) => number; areaM2: number; imepBar: number; peakBar: number } | undefined;
     if (params.cylinder !== undefined) {
       const dynamics = dynamicsOf(doc);
@@ -77,7 +82,8 @@ export const engineQuickCheck = defineCommand({
       if (isRefusal(topology)) return fail(`${topology.code}: ${topology.error}`);
       const layout = engineLayout(dynamics, topology, cylinder, toMetres(doc, 1));
       if ('error' in layout) return fail(layout.error);
-      const curve = pressureCurve(cylinder, layout, params.rpm ?? 1000);
+      if (params.rpm === undefined) defaulted.push({ input: 'rpm', value: DEFAULT_CURVE_RPM, use: 'cylinder pressure curve' });
+      const curve = pressureCurve(cylinder, layout, params.rpm ?? DEFAULT_CURVE_RPM);
       if ('error' in curve) return fail(`${curve.code}: ${curve.error}`);
       [radius, rod, offset, cycle] = [layout.slider.r, layout.slider.l, layout.slider.offset, cylinder.cycle];
       displacement ??= layout.displacementM3;
@@ -164,10 +170,11 @@ export const engineQuickCheck = defineCommand({
       ...(mean !== undefined ? { mean } : {}),
       ...(quick?.brake != null ? { brake: quick.brake } : {}),
       accuracy: accuracies,
+      defaulted,
     };
     const first = angles.find((a) => a.angleDeg === 90) ?? angles[0];
     const text = [
-      `engine_quick_check: r ${(radius * 1000).toPrecision(5)} mm, l ${(rod * 1000).toPrecision(5)} mm, stroke ${(stroke * 1000).toPrecision(5)} mm, λ ${(radius / rod).toPrecision(4)}.`,
+      `engine_quick_check: ${defaulted.map((entry) => `${entry.input} ${entry.value} (defaulted, ${entry.use})`).join(', ')}${defaulted.length > 0 ? '; ' : ''}r ${(radius * 1000).toPrecision(5)} mm, l ${(rod * 1000).toPrecision(5)} mm, stroke ${(stroke * 1000).toPrecision(5)} mm, λ ${(radius / rod).toPrecision(4)}.`,
       first !== undefined
         ? `At ${first.angleDeg} deg: travel ${first.travelMm.toPrecision(5)} mm, rod angle ${first.rodAngleDeg.toPrecision(4)} deg, ${first.torquePerNewtonNm.toPrecision(5)} N·m per N.`
         : '',
