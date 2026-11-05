@@ -14,6 +14,7 @@ import { reuseUnchanged } from './reuseUnchanged';
 import { execute } from '@core/commands/registry';
 import { withFailureTracking } from '@ui/report/failureStore';
 import { preserveOfflineEdits } from './offlineEdits';
+import { refreshBackendKernelStatus } from '@ui/services/backendKernel';
 
 /** Selection survives a document replacement, minus ids that no longer exist. */
 const withLocalSelection = (doc: CadDocument, selection: readonly EntityId[]): CadDocument => ({
@@ -118,7 +119,10 @@ export const useStore = create<CadStoreState>()((set, get) => {
     },
 
     setLiveStatus(status: LiveStatus): void {
+      const reconnected = status === 'connected' && get().sseEverConnected;
       set(status === 'connected' ? { liveStatus: status, sseEverConnected: true } : { liveStatus: status });
+      // the backend may have restarted with another kernel: re-read its state (the first connect is read by main.tsx)
+      if (reconnected) void refreshBackendKernelStatus();
     },
   };
 });

@@ -79,6 +79,7 @@ export const DOM_ISOLATED_SUITES: readonly string[] = [
   'tests/component/HostStatusBanner.test.tsx',
   'tests/component/RecoveryDialog.test.tsx',
   'tests/integration/dispatchOnResult.test.ts',
+  'tests/integration/kernelStatusReason.test.ts',
   'tests/integration/dispatchSelectAffected.test.ts',
   'tests/integration/store.test.ts',
   'tests/integration/undo.test.ts',

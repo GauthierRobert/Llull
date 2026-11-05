@@ -78,8 +78,10 @@ export function postDispatch(set: StoreSet, get: StoreGet, name: string, params:
         canRedo: response.canRedo,
         lastMeasure: measureAfter(name, response.data, state.lastMeasure, response.provenance),
       }));
+      // a result that names its kernel settles the chip: degraded sets the reason, any other kernel result (the exact one answered) clears it
       if (isDegraded(response.provenance))
         useKernelStatusStore.getState().setDegradedReason(response.provenance.fallbackReason ?? 'the exact kernel did not answer');
+      else if (response.provenance !== undefined) useKernelStatusStore.getState().setDegradedReason(null);
       options?.onResult?.({ summary: response.summary, changed: responseChanged(response) });
     })
     .catch((err: unknown) => {
