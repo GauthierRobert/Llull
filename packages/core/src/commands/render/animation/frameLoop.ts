@@ -6,7 +6,7 @@ import { encodePng } from '../../../lib/png';
 import { renderCameraRgba } from '../frames';
 import { rasterScenePixels } from '../raster';
 import { viewpointView } from '../viewSetup';
-import { viewProjector } from './viewProjector';
+import { viewProjection } from './viewProjector';
 import type { PixelStage, SurfaceShading } from '../types';
 import { appendOverlay } from './rasterOverlay';
 import { frameOverlayOf, type FrameOverlay } from './overlays';
@@ -47,7 +47,7 @@ export function renderAllFrames(input: FrameLoopInput): FrameLoopOutput {
     frameOverlayOf({
       width,
       height,
-      project: viewProjector(viewpointView(camera, width, height, centre), width, height),
+      ...viewProjection(viewpointView(camera, width, height, centre), width, height),
       font: input.font,
       traces: motion.traces,
       time: input.time,

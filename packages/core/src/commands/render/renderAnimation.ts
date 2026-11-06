@@ -112,7 +112,7 @@ export const renderAnimation = defineCommand({
     '"simulation" (runs simulate_motion ONCE, then draws each frame at its exact instant t = k · playbackRate / fps by interpolating the recorded poses; use ' +
     'playbackRate < 1 for slow motion, e.g. 0.01 shows a 0.06 s crank turn as 6 s), "sweep" (drives a joint or parameter from start to end, optionally and back, with the poses of motion_study) ' +
     '"clips" (the document\'s animate clips, evaluated exactly as the viewport plays them) or "still" (nothing moves: a camera-only film). By default the camera is fixed: framed once on every frame\'s bounds so nothing leaves the picture. ' +
-    'CAMERA PATHS (`camera`): `viewpointId` (a saved viewpoint, as saved), `walkthroughId` (the render_walkthrough camera at t = k / fps) or `orbit` {turns, axis?} (a turntable about the scene centre), combined with any source; a still source needs walkthroughId or orbit; the camera of each frame is in data.timeline[k].camera. ' +
+    'CAMERA PATHS (`camera`): `viewpointId` (a saved viewpoint, as saved), `walkthroughId` (the render_walkthrough camera at t = k / fps) or `orbit` {turns, axis?, loop?} (a turntable about the scene centre), combined with any source; a still source needs walkthroughId or orbit; the camera of each frame is in data.timeline[k].camera. ' +
     'Overlays are drawn into the picture: `time` label, `trace` (centre-of-mass path of named bodies with a dot at the current position), `readouts` (joint values, body positions, parameters or clip values as "name = value unit"; the same numbers are in data.timeline[k].readouts), data.traces[id] = { path, at[k] } gives the traced positions, `highlight: "moving"` (moving parts in the accent colour). ' +
     'REVIEW LOOP: first render format "frames" with `sheet` {every: n} and look at sheet.png (one image of every n-th frame, labelled #k t = … s) to check camera, overlays and motion; then render the format you want to keep. ' +
     'Formats: "frames" (PNG files frame-0001.png …), "apng" (animation.apng, loops forever), "gif" / "mp4" (animation.gif / animation.mp4 through the native video encoder, AV1 in MP4; a host without it refuses with NATIVE_TOOL_MISSING: use "apng"; `quality` draft | standard | high applies to mp4 only; a gif is made at most 50 fps, MOV_GIF_FPS_CLAMPED). The default is "mp4", so set `format` explicitly in a host without the encoder. ' +
@@ -157,13 +157,19 @@ export const renderAnimation = defineCommand({
             turns: z
               .number()
               .describe(
-                'Turns of the camera about the axis over the whole video (negative: the other way), non-zero, at most 100 in magnitude. Frame k is turned by 2π · turns · k / (frames − 1), so one turn ends where it began.',
+                'Turns of the camera about the axis over the whole video (negative: the other way), non-zero, at most 100 in magnitude. Frame k is turned by 2π · turns · k / (frames − 1), so one turn ends where it began (the last frame repeats the first; see loop).',
+              ),
+            loop: z
+              .boolean()
+              .optional()
+              .describe(
+                'true: frame k is turned by 2π · turns · k / frames instead, so the last frame stops one step short of the first and a looping GIF / MP4 repeats without a hitch (default false).',
               ),
             axis: vec3('Orbit axis [x, y, z] through the centre of the framed scene. Default [0, 0, 1] (a turntable).').optional(),
           })
           .optional()
           .describe(
-            'Turntable: the camera circles the centre of the scene. Starts from view / direction (default "iso", an orthographic camera sized to the circumscribed sphere so nothing leaves the picture) or from viewpointId (as saved). Not with walkthroughId.',
+            'Turntable: the camera circles the centre of the scene. Starts from view / direction (default "iso", an orthographic camera sized to the circumscribed sphere so nothing leaves the picture) or from viewpointId: then the saved framing is kept (nothing is refitted) and the orbit pivots about the centre of the motion bounds, so the scene may leave the picture. Not with walkthroughId.',
           ),
       })
       .optional()

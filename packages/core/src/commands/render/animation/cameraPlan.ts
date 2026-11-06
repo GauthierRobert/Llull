@@ -21,7 +21,7 @@ export interface CameraRequest {
   readonly viewpointId?: string | undefined;
   readonly walkthroughId?: string | undefined;
   readonly path?: CameraPath | undefined;
-  readonly orbit?: { readonly turns: number; readonly axis?: Vec3 | undefined } | undefined;
+  readonly orbit?: { readonly turns: number; readonly axis?: Vec3 | undefined; readonly loop?: boolean | undefined } | undefined;
 }
 
 interface FramedBase {
@@ -44,6 +44,7 @@ export type ResolvedCamera =
       readonly base: FramedBase | { readonly camera: ViewpointCamera };
       readonly turns: number;
       readonly axis: Vec3;
+      readonly loop: boolean;
     };
 
 export type CameraMode = ResolvedCamera['mode'];
@@ -86,7 +87,7 @@ export function resolveCamera(doc: CadDocument, request: CameraRequest): Resolve
     if (viewpoint === undefined) return refusal('MOV_UNKNOWN_ID', `camera: no viewpoint '${viewpointId}' (list_viewpoints)`, [viewpointId]);
     base = { camera: viewpoint.camera };
   }
-  if (orbit !== undefined) return { mode: 'orbit', base, turns: orbit.turns, axis: normalize3(axis) };
+  if (orbit !== undefined) return { mode: 'orbit', base, turns: orbit.turns, axis: normalize3(axis), loop: orbit.loop === true };
   return 'camera' in base ? { mode: 'viewpoint', camera: base.camera } : { mode: 'fixed', ...base };
 }
 
@@ -103,6 +104,8 @@ function resolveWalkthrough(doc: CadDocument, id: string, path: CameraPath): Res
     cameras.push(viewpoint.camera);
   }
   const seconds = walkthrough.keys.map((key) => key.seconds);
+  if (seconds.slice(0, -1).some((s) => !(s > 0) || !Number.isFinite(s)))
+    return refusal('MOV_CAMERA_INVALID', `camera: walkthrough '${id}' has a key span with seconds <= 0 or not finite`);
   return { mode: 'walkthrough', cameras, seconds, path, durationS: seconds.slice(0, -1).reduce((sum, s) => sum + s, 0) };
 }
 
@@ -127,7 +130,7 @@ const seconds4 = (s: number): number => +s.toFixed(4);
 /**
  * The camera of every frame of a `frames`-frame run at `fps`, given the bounds of the whole motion.
  * @invariant fixed / viewpoint: one value for all frames; walkthrough: the camera of `render_walkthrough` at t = frame / fps; orbit: frame k is turned by
- *   2π · turns · k / (frames − 1) about the axis through the centre of `bounds` (frame 0 is the base camera, a single frame is not turned)
+ *   2π · turns · k / (frames − 1) (k / frames with loop: the last frame is one step short of frame 0) about the axis through the centre of `bounds` (frame 0 is the base camera, a single frame is not turned)
  */
 export function buildCameraPlan(
   resolved: ResolvedCamera,
@@ -172,7 +175,8 @@ export function buildCameraPlan(
           ? resolved.base.camera
           : orbitFramedCamera(resolved.base.view, resolved.base.direction, bounds, width, height);
       const pivot = boundsCenter(bounds);
-      const angleOf = (frame: number): number => (frames > 1 ? (2 * Math.PI * resolved.turns * frame) / (frames - 1) : 0);
+      const angleOf = (frame: number): number =>
+        frames > 1 ? (2 * Math.PI * resolved.turns * frame) / (resolved.loop ? frames : frames - 1) : 0;
       return { mode: 'orbit', moves: true, cameraAt: (frame) => orbitCamera(base, pivot, resolved.axis, angleOf(frame)), warnings: [] };
     }
   }

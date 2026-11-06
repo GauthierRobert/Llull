@@ -7,7 +7,7 @@ import { setFontProvider } from '@core/commands/fontPort';
 import { execute } from '@core/commands/registry';
 import { computeSceneSnapshot } from '@core/commands/inspect/scene';
 import { makeProjector } from '@core/commands/render/camera';
-import { viewProjector } from '@core/commands/render/animation/viewProjector';
+import { viewProjection, viewProjector } from '@core/commands/render/animation/viewProjector';
 import { viewpointView } from '@core/commands/render/viewSetup';
 import { boundsCenter, boundsCorners } from '@core/geometry/bounds';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
@@ -233,6 +233,27 @@ describe('orbit camera', () => {
     expect(cameraOf(single.data, 0).eye.every(Number.isFinite)).toBe(true);
   });
 
+  it('with loop turns by 2π · turns · k / frames: the last frame stops one step short of the first and the step is uniform across the wrap', () => {
+    const { doc } = stage();
+    const { data } = run(doc, { source: still(1.2), camera: { orbit: { turns: 1, loop: true } } });
+    expect(data.frames).toBe(13);
+    const azimuth = (k: number): number => Math.atan2(cameraOf(data, k).eye[1] ?? 0, cameraOf(data, k).eye[0] ?? 0);
+    const step = (2 * Math.PI) / 13;
+    for (let k = 0; k < 13; k += 1) {
+      const turned = azimuth(k) - azimuth(0);
+      expect(Math.cos(turned - step * k)).toBeCloseTo(1, 9);
+      expect(Math.sin(turned - step * k)).toBeCloseTo(0, 9);
+    }
+    const last = cameraOf(data, 12).eye;
+    const first = cameraOf(data, 0).eye;
+    expect(Math.hypot(...sub(last, first))).toBeGreaterThan(1);
+    const wrap = azimuth(0) - azimuth(12);
+    expect(Math.cos(wrap - step)).toBeCloseTo(1, 9);
+    expect(Math.sin(wrap - step)).toBeCloseTo(0, 9);
+    const plain = run(doc, { source: still(1.2), camera: { orbit: { turns: 1 } } });
+    expect(cameraOf(plain.data, 12).eye[0]).toBeCloseTo(cameraOf(plain.data, 0).eye[0] ?? 0, 9);
+  });
+
   it('orbits a saved viewpoint about the scene centre, keeping its projection and distance', () => {
     const { doc, ids } = stage();
     const { data } = run(doc, { source: still(1), camera: { viewpointId: ids[0], orbit: { turns: 1 } } });
@@ -299,6 +320,72 @@ describe('viewpoint camera', () => {
   });
 });
 
+describe('viewProjection (perspective near plane)', () => {
+  const persp = viewpointView(asCamera(SOUTH), 200, 100, [0, 0, 0]);
+
+  it('splits a path that crosses the eye plane into runs of finite pixels and hides the points behind the eye', () => {
+    const { runs, visible } = viewProjection(persp, 200, 100);
+    const front: V3 = [0, 0, 10];
+    const behind: V3 = [0, -100, 10];
+    expect(visible(front)).toBe(true);
+    expect(visible(behind)).toBe(false);
+    const crossing = runs([front, behind, front, front]);
+    expect(crossing).toHaveLength(2);
+    expect(crossing.map((run) => run.length)).toEqual([2, 3]);
+    for (const [x, y] of crossing.flat()) {
+      expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+      expect(Math.abs(x - 100)).toBeLessThan(1e-6);
+    }
+    expect(runs([behind, behind])).toEqual([]);
+    const off = runs([
+      [10, 0, 10],
+      [10, -100, 10],
+    ]);
+    expect(off).toHaveLength(1);
+    for (const [x, y] of off.flat()) {
+      expect(x).toBeGreaterThanOrEqual(-8 - 1e-9);
+      expect(x).toBeLessThanOrEqual(208 + 1e-9);
+      expect(y).toBeGreaterThanOrEqual(-8 - 1e-9);
+      expect(y).toBeLessThanOrEqual(108 + 1e-9);
+    }
+    expect(runs([front, front])).toHaveLength(1);
+    const ortho = viewProjection(viewpointView(asCamera(TOP), 200, 100, [0, 0, 0]), 200, 100);
+    expect(ortho.runs([front, behind])).toHaveLength(1);
+    expect(ortho.visible(behind)).toBe(true);
+  });
+
+  it('draws a trace that crosses the eye plane without a segment across the frame (render_animation, camera beside the trace circle, looking across it)', () => {
+    const { document } = planDocument('mov_clip_spin.plan.json');
+    const box = document.order[0] ?? '';
+    const inside = { projection: 'perspective', eye: [0, -130, 0], direction: [1, 0, 0], up: [0, 0, 1], fovDeg: 60 } as const;
+    const saved = execute(document, 'save_viewpoint', { name: 'inside', camera: inside });
+    const result = execute(saved.document, 'render_animation', {
+      source: { kind: 'clips', duration: 2 },
+      fps: 10,
+      width: 160,
+      height: 90,
+      format: 'frames',
+      camera: { viewpointId: saved.affected[0] },
+      overlays: { trace: [box] },
+    });
+    expect(result.error).toBeUndefined();
+    const data = result.data as AnimationData;
+    const at = Object.values(data.traces ?? {})[0]?.at ?? [];
+    expect(at.some((point) => (point[0] ?? 0) < 0)).toBe(true);
+    expect(at.some((point) => (point[0] ?? 0) > 0)).toBe(true);
+    const frame = (k: number): ReturnType<typeof decodePng> => decodePng(fileBytes(data, `frame-${String(k + 1).padStart(4, '0')}.png`));
+    const yellow = (image: ReturnType<typeof decodePng>): number => {
+      let count = 0;
+      for (let i = 0; i < image.rgba.length; i += 4)
+        if (image.rgba[i] === 255 && image.rgba[i + 1] === 210 && image.rgba[i + 2] === 74) count += 1;
+      return count;
+    };
+    const behindFrame = at.findIndex((point) => (point[0] ?? 0) < -25);
+    expect(behindFrame).toBeGreaterThanOrEqual(0);
+    expect(yellow(frame(behindFrame))).toBeLessThan(160 * 90 * 0.05);
+  });
+});
+
 describe('viewProjector', () => {
   it('equals makeProjector for an orthographic view and the pinhole formula for a perspective one; behind the eye is pinned, not mirrored', () => {
     const ortho = viewpointView(asCamera(TOP), 200, 100, [0, 0, 0]);
@@ -348,6 +435,24 @@ describe('still source and refusals', () => {
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(result.summary).toContain('MOV_CAMERA_INVALID');
+  });
+
+  it('refuses a walkthrough with a key span of zero or negative seconds (no NaN camera)', () => {
+    const { doc, wt } = stage();
+    const review = doc.review;
+    const walkthrough = review?.walkthroughs[wt];
+    expect(walkthrough).toBeDefined();
+    for (const seconds of [0, -1]) {
+      const keys = (walkthrough?.keys ?? []).map((key, i) => (i === 0 ? { ...key, seconds } : key));
+      const broken = {
+        ...doc,
+        review:
+          review === undefined || walkthrough === undefined ? review : { ...review, walkthroughs: { [wt]: { ...walkthrough, keys } } },
+      } as CadDocument;
+      const result = execute(broken, 'render_animation', { source: still(1), camera: { walkthroughId: wt } });
+      expect(result.error?.code).toBe('MOV_CAMERA_INVALID');
+      expect(result.document).toBe(broken);
+    }
   });
 
   it('refuses unknown viewpoint / walkthrough ids (listing them), hostile keys, and a walkthrough whose viewpoint is gone', () => {
