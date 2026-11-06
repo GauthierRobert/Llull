@@ -49,14 +49,10 @@
       "define_acoustic_spectrum"
     ],
     "docs/physics/23-drives-physical-truth/validation/plans/drv_lead_screw.plan.json": ["add_transmission"],
-    "docs/physics/23-drives-physical-truth/validation/plans/drv_maxon_step.plan.json": ["check_motor_data", "set_motor_drive"],
     "docs/physics/23-drives-physical-truth/validation/plans/drv_servo_sizing.plan.json": [
-      "add_motion_profile",
       "add_transmission",
       "check_motion_truth",
-      "evaluate_motion_profile",
       "set_joint_physics",
-      "set_motor_drive",
       "size_drive"
     ],
     "docs/physics/23-drives-physical-truth/validation/plans/drv_stick_slip.plan.json": ["set_joint_physics"],

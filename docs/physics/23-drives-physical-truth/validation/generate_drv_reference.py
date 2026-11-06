@@ -399,15 +399,27 @@ def spin_down():
 
 
 def end_stop():
-    """Linear spring-damper stop, damping ratio z: restitution e = exp(-z pi / sqrt(1 - z^2)); peak penetration of a body
-    arriving at speed v: x_max = (v / wd) exp(-z wn t*) sin(wd t*), t* = atan(sqrt(1 - z^2) / z) / wd."""
+    """One-sided linear spring-damper stop (a stop pushes, it never pulls), damping ratio z, body arriving at speed v.
+    Compressing: x = (v / wd) exp(-z wn t) sin(wd t), force F = J (wn^2 x + 2 z wn xdot). The force reaches zero when
+    (1 - 2 z^2) sin(wd t) + 2 z sqrt(1 - z^2) cos(wd t) = 0, i.e. wd t_x = pi - atan(2 z sqrt(1 - z^2) / (1 - 2 z^2))
+    (z < 1/sqrt(2)); the stop then lets go and the body leaves at xdot(t_x) with no force, so the restitution is
+    e = -xdot(t_x) / v and the contact ends when the remaining penetration x(t_x) has been travelled at that speed.
+    Peak penetration: x_max = (v / wd) exp(-z wn t*) sin(wd t*), t* = atan(sqrt(1 - z^2) / z) / wd (before t_x).
+    The bilateral formula exp(-z pi / sqrt(1 - z^2)) lets the damper pull the body back and is NOT a stop (DRV-M0 13.2.3)."""
     j, k, z, v = 0.01, 1000.0, 0.2, 1.0  # kg m^2, N m/rad, -, rad/s
     wn = math.sqrt(k / j)
     wd = wn * math.sqrt(1 - z * z)
-    e = math.exp(-z * math.pi / math.sqrt(1 - z * z))
+    sigma = z * wn
+    theta = math.pi - math.atan(2 * z * math.sqrt(1 - z * z) / (1 - 2 * z * z))  # wd t_x
+    t_release = theta / wd
+    speed_out = -(v / wd) * math.exp(-sigma * t_release) * (wd * math.cos(theta) - sigma * math.sin(theta))
+    e = speed_out / v
+    x_release = (v / wd) * math.exp(-sigma * t_release) * math.sin(theta)
+    t_contact = t_release + x_release / speed_out
     t_star = math.atan(math.sqrt(1 - z * z) / z) / wd
-    x_max = (v / wd) * math.exp(-z * wn * t_star) * math.sin(wd * t_star)
-    return {"inertiaKgM2": j, "stopStiffnessNmPerRad": k, "dampingRatio": z, "impactSpeedRadS": v, "restitution": g12(e), "contactTimeS": g12(math.pi / wd), "peakPenetrationRad": g12(x_max), "peakPenetrationTimeS": g12(t_star)}
+    x_max = (v / wd) * math.exp(-sigma * t_star) * math.sin(wd * t_star)
+    e_bilateral = math.exp(-z * math.pi / math.sqrt(1 - z * z))
+    return {"inertiaKgM2": j, "stopStiffnessNmPerRad": k, "dampingRatio": z, "impactSpeedRadS": v, "restitution": g12(e), "restitutionBilateral": g12(e_bilateral), "releaseTimeS": g12(t_release), "contactTimeS": g12(t_contact), "peakPenetrationRad": g12(x_max), "peakPenetrationTimeS": g12(t_star)}
 
 
 # ---------------------------------------------------------------------------------------------------------------------

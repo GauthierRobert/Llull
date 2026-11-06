@@ -4,6 +4,8 @@
  * points in DOCUMENT units like every other coordinate.
  */
 
+import { idTaken } from '../lib/explicitId';
+import type { DcMotor, MotionProfile, MotorDrive, ParameterSource } from './drives';
 import type { Vec3 } from './vectors';
 
 /** Parent of a joint that is attached to the fixed world. */
@@ -99,11 +101,13 @@ export type TorquePoint = readonly [rpm: number, torque: number];
 
 /**
  * Drive on a joint. 'torque_curve': an engine — torque(rpm) × throttle, linear between points, held at the end values outside them.
- * 'speed': a governed drive holding `rpm` with at most `maxTorque` (N·m).
+ * 'speed': a governed drive holding `rpm` with at most `maxTorque` (N·m); `source` says where that bound comes from (absent: the bound is a
+ * guess, DRV_EFFORT_UNBOUNDED). 'dc': a datasheet DC motor with an optional gearhead, commanded by a `MotorDrive` (`DynamicsModel.drives`).
  */
 export type Motor =
   | { readonly id: string; readonly kind: 'torque_curve'; joint: string; curve: TorquePoint[]; throttle: number }
-  | { readonly id: string; readonly kind: 'speed'; joint: string; rpm: number; maxTorque: number };
+  | { readonly id: string; readonly kind: 'speed'; joint: string; rpm: number; maxTorque: number; source?: ParameterSource }
+  | DcMotor;
 
 /**
  * Propeller on a revolute joint, static-thrust model from the propeller's measured coefficients (n = rev/s, D = diameter):
@@ -243,6 +247,25 @@ export interface DynamicsModel {
   /** Absent in documents saved before point springs. */
   springs?: Record<string, PointSpring>;
   solver?: DynamicsSolverSettings;
+  /** Time profiles (PHY-23); absent until the first `add_motion_profile`. */
+  profiles?: Record<string, MotionProfile>;
+  /** Motor drives keyed by motor id (PHY-23); a datasheet motor without one is an open circuit. */
+  drives?: Record<string, MotorDrive>;
+}
+
+/** Every id used by any dynamics record (bodies, joints, gears, motors, propellers, cylinders, losses, springs, profiles share one id space). */
+export function dynamicsIdTaken(dynamics: DynamicsModel, id: string): boolean {
+  return [
+    dynamics.bodies,
+    dynamics.joints,
+    dynamics.gears,
+    dynamics.motors,
+    dynamics.propellers,
+    dynamics.cylinders ?? {},
+    dynamics.losses ?? {},
+    dynamics.springs ?? {},
+    dynamics.profiles ?? {},
+  ].some((table) => idTaken(table, id));
 }
 
 export function createDynamicsModel(): DynamicsModel {

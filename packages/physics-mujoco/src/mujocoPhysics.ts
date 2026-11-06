@@ -3,7 +3,14 @@
  * multibody dynamics: joints are exact (no drift between linked parts), gear couplings are equality constraints.
  */
 
-import type { PhysicsEngine, SimulationModel, SimulationOptions, SimulationTrace, StepPeak } from '@core/dynamics/physicsEngine';
+import type {
+  PhysicsEngine,
+  SimulationModel,
+  SimulationOptions,
+  SimulationState,
+  SimulationTrace,
+  StepPeak,
+} from '@core/dynamics/physicsEngine';
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { OBJECT_BODY, OBJECT_JOINT, OBJECT_TENDON, type MjData, type MjModel, type MujocoModule } from './bindings';
 import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './constraintForces';
@@ -95,6 +102,15 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       servoJoints.map((joint) => joint?.dof),
     );
     let appliedWork = 0;
+    const block = model.actuators;
+    let aux: Float64Array = block === undefined ? new Float64Array(0) : block.aux0.slice();
+    const auxTrace: number[][] = Array.from({ length: block?.size ?? 0 }, () => []);
+    const ledgerCumulative = new Float64Array(block?.ledgerLayout.length ?? 0);
+    const ledgerTrace: number[][] = Array.from({ length: block?.ledgerLayout.length ?? 0 }, () => []);
+    const actuatorJoints = (block?.joints ?? []).map((id) => jointIndex(joints, id));
+    const actuatorForce = new Float64Array(actuatorJoints.length);
+    const actuatorWorkTrace: number[] = [];
+    let actuatorWork = 0;
     const initialPosition = new Map(joints.map((joint) => [joint.id, data.qpos[joint.qpos] ?? 0]));
     model.servos.forEach((servo, i) => {
       data.ctrl[i] = servo.targetVelocity;
@@ -143,6 +159,9 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     mujoco.mj_forward(mjModel, data); // actuator forces of the start state, with the set-points above
     const record = (read?: Reactions): void => {
       trace.times.push(data.time);
+      auxTrace.forEach((series, slot) => series.push(aux[slot] ?? 0));
+      ledgerTrace.forEach((series, entry) => series.push(ledgerCumulative[entry] ?? 0));
+      if (options.energy === true && block !== undefined) actuatorWorkTrace.push(actuatorWork);
       for (const joint of joints) {
         trace.jointPosition[joint.id]?.push((data.qpos[joint.qpos] ?? 0) - (initialPosition.get(joint.id) ?? 0));
         trace.jointVelocity[joint.id]?.push(data.qvel[joint.dof] ?? 0);
@@ -180,12 +199,36 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     let previousVelocity = joints.map((joint) => data.qvel[joint.dof] ?? 0);
     for (let step = 1; step <= steps; step++) {
       if (gearLoss.length > 0) mujoco.mj_forward(mjModel, data); // constraint forces of the current state
-      previousVelocity = applyLoads(model, data, { joints, bodies, initialPosition, previousVelocity, timestep: options.timestep });
+      const applied = applyLoads(model, data, { joints, bodies, initialPosition, previousVelocity, timestep: options.timestep });
+      previousVelocity = applied.velocity;
+      if (block !== undefined) {
+        const out = block.advance(applied.state, aux, options.timestep);
+        aux = out.aux;
+        out.jointForces.forEach((force, k) => {
+          const dof = joints[actuatorJoints[k] ?? 0]?.dof ?? 0;
+          data.qfrc_applied[dof] = (data.qfrc_applied[dof] ?? 0) + force;
+          actuatorForce[k] = force;
+        });
+        out.ledger.forEach((energy, k) => {
+          ledgerCumulative[k] = (ledgerCumulative[k] ?? 0) + energy;
+        });
+        for (const { body, force } of out.bodyForces) {
+          const index = bodies.find((entry) => entry.id === body)?.index;
+          if (index !== undefined)
+            for (let axis = 0; axis < 3; axis++)
+              data.xfrc_applied[6 * index + axis] = (data.xfrc_applied[6 * index + axis] ?? 0) + (force[axis] ?? 0);
+        }
+      }
       if (gearLoss.length > 0) addGearLoss(mjModel, data, gearLoss);
       schedule.update();
       const before = options.energy === true ? stepWorkBasis(data, joints, servoJoints) : null;
       mujoco.mj_step(mjModel, data);
-      if (before !== null) appliedWork += stepWork(data, joints, servoJoints, before);
+      if (before !== null) {
+        appliedWork += stepWork(data, joints, servoJoints, before);
+        actuatorJoints.forEach((slot, k) => {
+          actuatorWork += (actuatorForce[k] ?? 0) * ((data.qpos[joints[slot]?.qpos ?? 0] ?? 0) - (before.position[slot] ?? 0));
+        });
+      }
       if (!data.qvel.every(Number.isFinite)) throw new Error(`simulation diverged at t = ${data.time.toFixed(4)} s.`);
       // anti-windup: after the step the set-point never leads the joint by more than the servo force limit allows (force = kp (act - q) - kv v);
       // a position hold (target speed 0) keeps its set-point
@@ -217,6 +260,9 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
             ...(springs.length > 0 ? { springs: springTrace } : {}),
           }
         : {}),
+      ...(block === undefined
+        ? {}
+        : { aux: auxTrace, ledger: ledgerTrace, ...(options.energy === true ? { actuatorWork: actuatorWorkTrace } : {}) }),
       ...(wantReactions ? { jointReaction: reaction, reactionPeaks: peaks, ...(slots.length > 0 ? { loopForce } : {}) } : {}),
       ...(slots.length > 0 ? { loopResidual: residual } : {}),
     };
@@ -268,6 +314,12 @@ function stepWork(
 /** Reaction reads per sample interval when tracking peaks between samples. */
 const PEAK_RESOLUTION = 50;
 
+function jointIndex(joints: readonly JointSlot[], id: string): number {
+  const index = joints.findIndex((joint) => joint.id === id);
+  if (index < 0) throw new Error(`actuator joint '${id}' is not a moving joint of the model`);
+  return index;
+}
+
 function jointDof(joints: readonly JointSlot[], id: string): number {
   return joints.find((joint) => joint.id === id)?.dof ?? 0;
 }
@@ -291,12 +343,12 @@ interface LoadContext {
  * for the step. A plain start-of-step evaluation is first-order accurate in h; the midpoint makes velocity-dependent loads (propeller
  * drag) second-order. Returns the current velocities (the next call's `previousVelocity`).
  */
-function applyLoads(model: SimulationModel, data: MjData, context: LoadContext): number[] {
+function applyLoads(model: SimulationModel, data: MjData, context: LoadContext): { velocity: number[]; state: SimulationState } {
   const { joints, bodies, initialPosition, previousVelocity, timestep } = context;
   const { qpos, qvel, qfrc_applied: jointForce, xfrc_applied: bodyForce } = data;
   const velocity = joints.map((joint) => qvel[joint.dof] ?? 0);
   const midVelocity = velocity.map((v, i) => v + 0.5 * (v - (previousVelocity[i] ?? v)));
-  const loads = model.loads({
+  const state: SimulationState = {
     time: data.time + 0.5 * timestep,
     jointPosition: Object.fromEntries(
       joints.map((joint, i) => [
@@ -305,13 +357,14 @@ function applyLoads(model: SimulationModel, data: MjData, context: LoadContext):
       ]),
     ),
     jointVelocity: Object.fromEntries(joints.map((joint, i) => [joint.id, midVelocity[i] ?? 0])),
-  });
+  };
+  const loads = model.loads(state);
   for (const joint of joints) jointForce[joint.dof] = loads.jointForces[joint.id] ?? 0;
   for (const { id, index } of bodies) {
     const force: Vec3 = loads.bodyForces[id] ?? [0, 0, 0];
     for (let axis = 0; axis < 3; axis++) bodyForce[6 * index + axis] = force[axis] ?? 0;
   }
-  return velocity;
+  return { velocity, state };
 }
 
 /** Load the MuJoCo WASM module (once per call) and wrap it as a `PhysicsEngine`. */

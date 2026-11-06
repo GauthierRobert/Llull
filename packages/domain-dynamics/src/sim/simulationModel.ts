@@ -18,6 +18,8 @@ import type {
   SimulationServo,
   SimulationSpring,
 } from '@core/dynamics/physicsEngine';
+import { buildActuators, type ActuatorRefusal, type DriveRuntime } from './actuators/block';
+import { dcParameters } from './actuators/dcMotor';
 import { prepareCylinders, withCylinderForces, type CylinderRuntime } from './cylinderLoads';
 import { withInstalledLosses } from './engineLossHook';
 import { consistentSpeeds } from './mobility';
@@ -77,8 +79,25 @@ function danglingReference(dynamics: DynamicsModel, movable: ReadonlySet<string>
 /** Smallest half-distance between the two pins of a revolute loop, m. */
 const MIN_HALF_SPAN = 0.005;
 
+const NO_EXTRA = { armature: 0, friction: 0 };
+const armatureOf = (joint: SimulationJoint): number => (joint.armature === undefined ? 0 : joint.armature);
+
+/** Inertia and friction a datasheet motor adds to its joint (rotor behind the gearhead, no-load friction), by joint id. */
+function motorJointExtras(dynamics: DynamicsModel): Record<string, { armature: number; friction: number }> {
+  const extras: Record<string, { armature: number; friction: number }> = {};
+  for (const motor of Object.values(dynamics.motors)) {
+    if (motor.kind !== 'dc') continue;
+    const p = dcParameters(motor);
+    const held = extras[motor.joint] ?? NO_EXTRA;
+    extras[motor.joint] = { armature: held.armature + p.armatureKgM2, friction: held.friction + p.frictionNm };
+  }
+  return extras;
+}
+
 export interface BuiltSimulation {
   readonly model: SimulationModel;
+  /** Driven datasheet motors of the run (empty when none). */
+  readonly drives: readonly DriveRuntime[];
   readonly cylinders: readonly CylinderRuntime[];
   readonly mass: Record<string, BodyMassProperties>;
   readonly topology: Topology;
@@ -88,7 +107,7 @@ export interface BuiltSimulation {
 export interface BuildRefusal {
   readonly error: string;
   /** FPR_* code when the refusal has one. */
-  readonly code?: TopologyRefusal['code'] | CurveCode;
+  readonly code?: TopologyRefusal['code'] | CurveCode | ActuatorRefusal['code'];
   readonly ids?: readonly string[];
 }
 
@@ -122,6 +141,7 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   if (isRefusal(topology)) return topology;
   const settings = solverSettingsOf(dynamics);
   const speeds = { ...initialVelocities(dynamics), ...consistentSpeeds(topology, initialVelocities(dynamics), metres) };
+  const extras = motorJointExtras(dynamics);
   const mass: Record<string, BodyMassProperties> = {};
   const bodies: SimulationBody[] = [];
   for (const id of topology.bodyOrder) {
@@ -134,13 +154,15 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
     let simulationJoint: SimulationJoint | null = null;
     if (entry !== undefined && entry.joint.kind !== 'spherical') {
       const axis = unitAxis(entry.joint.axis);
+      const motorExtra = extras[entry.joint.id] ?? NO_EXTRA;
       simulationJoint = {
         id: entry.joint.id,
         kind: entry.joint.kind,
         anchor: scale3(entry.joint.anchor, metres),
         axis: entry.flipped ? [-axis[0], -axis[1], -axis[2]] : axis,
         damping: entry.joint.damping,
-        friction: entry.joint.friction,
+        friction: entry.joint.friction + motorExtra.friction,
+        ...(motorExtra.armature > 0 ? { armature: motorExtra.armature } : {}),
         ...(entry.joint.stiffness !== undefined
           ? { stiffness: entry.joint.stiffness, springReference: (entry.flipped ? -1 : 1) * (entry.joint.springReference ?? 0) }
           : {}),
@@ -209,6 +231,14 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   const gasLoads = cylinders.length > 0 ? withCylinderForces(baseLoads, cylinders) : baseLoads;
   const loads = withInstalledLosses(gasLoads, Object.values(dynamics.losses ?? {}), cylinders);
   if ('error' in loads) return loads;
+  const actuators = buildActuators(dynamics, {
+    timestep,
+    inertiaOf: (jointId) => {
+      const joint = simulated.get(jointId);
+      return joint === undefined ? undefined : inertiaAboutJoint(bodies, joint) + armatureOf(joint);
+    },
+  });
+  if (actuators !== null && 'code' in actuators) return { error: `${actuators.code} — ${actuators.error}`, code: actuators.code };
   const solver = {
     integrator: settings.integrator,
     loopTimeConstant: settings.loopTimeConstantSteps * timestep,
@@ -216,6 +246,7 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   };
   return {
     cylinders,
+    drives: actuators?.drives ?? [],
     model: {
       gravity: dynamics.gravity,
       bodies,
@@ -224,10 +255,17 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
       solver,
       servos,
       ...(springs.length > 0 ? { springs } : {}),
+      ...(actuators === null ? {} : { actuators: actuators.block }),
       loads,
     },
     mass,
     topology,
     settings,
   };
+}
+
+/** kg·m² seen by joint `jointId` of a built simulation (bodies it carries + armature), or undefined when the joint cannot move. */
+export function jointInertiaOf(built: BuiltSimulation, jointId: string): number | undefined {
+  const joint = built.model.bodies.find((body) => body.joint?.id === jointId)?.joint;
+  return joint === undefined || joint === null ? undefined : inertiaAboutJoint(built.model.bodies, joint) + armatureOf(joint);
 }

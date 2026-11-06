@@ -8,6 +8,7 @@ import { createContactSet, deleteContactSet } from './contactSets';
 import { driveJointTo } from './driveJoint';
 import { addDriveRelation, deleteDriveRelation, evaluateMotion } from './jointsDrive';
 import { motionStudy } from './motionStudy';
+import { addMotionProfile, evaluateMotionProfile } from './profiles';
 
 export const motionCommands = commandCatalog(
   animate,
@@ -22,4 +23,6 @@ export const motionCommands = commandCatalog(
   createContactSet,
   deleteContactSet,
   driveJointTo,
+  addMotionProfile,
+  evaluateMotionProfile,
 );

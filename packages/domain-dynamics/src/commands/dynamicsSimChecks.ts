@@ -1,5 +1,7 @@
 /** Simulation-based items of check_dynamics: loop drift, cycle-energy closure, timestep sensitivity, propeller tip Mach. */
 
+import type { Motor } from '@core/model/dynamics';
+import { unboundedEffort } from '../sim/driveReport';
 import { type CheckThreshold, findingKey } from '@core/model/checkResult';
 import type { SimulationData } from '../sim/simulationReport';
 import { type ReviewItem, reviewItem } from '@core/model/reviewEnvelope';
@@ -84,6 +86,26 @@ export function loopDriftItem(run: SimulationRun): ReviewItem[] {
       { values: { residualUm: residual * 1e6, loops: loops.count }, threshold, ...(status === 'pass' ? {} : { unverified: true }) },
     ),
   ];
+}
+
+/** DRV_EFFORT_UNBOUNDED for sourced speed motors whose bound is more than 10x the peak effort the run used (the unsourced ones are static items). */
+export function usedEffortItems(motors: readonly Motor[], run: SimulationRun): ReviewItem[] {
+  return motors.flatMap((motor): ReviewItem[] => {
+    if (motor.kind !== 'speed' || motor.source === undefined) return [];
+    const peak = (run.series?.motorTorque[motor.id] ?? []).reduce((largest, value) => Math.max(largest, Math.abs(value)), 0);
+    const why = unboundedEffort(motor, peak);
+    return why === null
+      ? []
+      : [
+          item(
+            'DRV_EFFORT_UNBOUNDED',
+            'warn',
+            [motor.id],
+            'Lower the bound to a sourced limit close to the effort the motion needs, or size a motor for it.',
+            { note: why },
+          ),
+        ];
+  });
 }
 
 export function energyItem(run: SimulationRun): ReviewItem {

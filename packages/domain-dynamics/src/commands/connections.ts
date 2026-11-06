@@ -7,7 +7,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
 import { changed, commandError, failer, rejection } from '@core/commands/noop';
-import { dynamicsIdTaken, dynamicsOf, withDynamics } from './bodies';
+import { dynamicsIdTaken } from '@core/model/dynamics';
+import { dynamicsOf, withDynamics } from './bodies';
 import { BODY_JOINT_KINDS, bodyJointKind } from './kinematicKinds';
 
 const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;

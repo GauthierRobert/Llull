@@ -14,6 +14,7 @@ import { reactionsData, residualTier, type ReactionMode } from '../sim/reactions
 import { cycleAngleSeries, engineData } from '../sim/engineReport';
 import { realismOf } from './realismHook';
 import { idealGearWarnings } from '../sim/gearLoss';
+import { driveReport } from '../sim/driveReport';
 import { errorMessage } from '@lib/errorMessage';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
@@ -70,6 +71,13 @@ export const simulateMotion = defineCommand({
     'heat release was calibrated at is "calibrated", not validation evidence); plausibility[] (FPR_UNREALISTIC: peak-pressure angle and CA50 vs MBT, ' +
     'mechanical efficiency, Rotax-class propeller inertia / torque, reciprocating mass on the default density). A gear with efficiency (add_gear_coupling) ' +
     'loses (1 - efficiency) of its torque on the driven shaft; a propeller with a Ct / Cp table and airspeed follows J = V/(nD). ' +
+    'Datasheet DC motors (add_motor kind "dc" + set_motor_drive): data.drives gives per motor the peak and final current (A), terminal voltage (V), joint torque ' +
+    '(N·m) and shaft speed (rpm), RMS values, the number of samples where the current limit clipped the command, the tracking error of a prescribed / ' +
+    'closed-loop drive and whether the datasheet was verified; detail "drives" adds the per-sample series (voltage, current, shaft and joint torque, shaft speed, ' +
+    'electrical and mechanical power) and turns the energy ledger on. data.ledger (with `energy`, or detail "drives") lists the joules of every element ' +
+    '(electrical input net of regeneration, copper loss, magnetic energy, gearhead loss, friction and damping, propellers, kinetic, potential, external work) ' +
+    'and how well input - dissipated - stored closes (pass <= 1e-3, warn <= 1e-2 of the largest term). Warnings: DRV_ELECTRICAL_QUASI_STATIC (info), ' +
+    'DRV_TRACKING_ERROR, DRV_CONTROL_RATE / DRV_PROFILE_INVALID / DRV_TUNE_NO_INERTIA (refuse the run, nothing simulated). ' +
     'Next: read data.loops.tier first, then data.engineReport and data.reactions.',
   params: z.object({
     duration: z.number().positive().max(600).optional().describe('Simulated seconds. Default 5.'),
@@ -88,7 +96,12 @@ export const simulateMotion = defineCommand({
       .describe(
         'Recorded samples per second. Default 50, raised for loop mechanisms to 36 per turn of the crank so periodic motion is not aliased; engines: one per crank degree. At most 6001 samples per run.',
       ),
-    detail: z.enum(['summary', 'series', 'poses']).optional().describe('"summary" (default), "series" or "poses".'),
+    detail: z
+      .enum(['summary', 'series', 'poses', 'drives'])
+      .optional()
+      .describe(
+        '"summary" (default), "series", "poses", or "drives" (summary + per-sample series of every datasheet motor + the energy ledger).',
+      ),
     reactions: z
       .enum(['off', 'peaks', 'series'])
       .optional()
@@ -157,9 +170,12 @@ export const simulateMotion = defineCommand({
     const degreeInterval = resolved.maxSpeed > 0 ? Math.PI / 180 / resolved.maxSpeed : 1 / 50;
     const turnInterval = resolved.maxSpeed > 0 ? (2 * Math.PI) / SAMPLES_PER_TURN / resolved.maxSpeed : Infinity;
     const defaultInterval = hasCylinders ? degreeInterval : Math.min(1 / 50, turnInterval);
+    const hasDrives = Object.keys(dynamics.drives ?? {}).length > 0;
     const withEnergy =
       params.energy ??
-      (Object.values(dynamics.joints).some((joint) => joint.stiffness !== undefined) || Object.keys(dynamics.springs ?? {}).length > 0);
+      (params.detail === 'drives' ||
+        Object.values(dynamics.joints).some((joint) => joint.stiffness !== undefined) ||
+        Object.keys(dynamics.springs ?? {}).length > 0);
     const mode: ReactionMode = params.reactions ?? (structured ? 'peaks' : 'off');
     const attemptAt = (step: number): Attempt => {
       if (duration / step > MAX_STEPS)
@@ -206,12 +222,17 @@ export const simulateMotion = defineCommand({
         engine: engine.name,
         duration,
         timestep,
-        detail: params.detail ?? 'summary',
+        detail: params.detail === 'drives' ? 'summary' : (params.detail ?? 'summary'),
         metresPerUnit: metres,
+        drives: built.drives,
       });
+      const driven =
+        hasDrives && built.drives.length > 0
+          ? driveReport(built.drives, built.model.actuators?.ledgerLayout ?? [], trace, base.energy, timestep, params.detail === 'drives')
+          : null;
       const residual = trace.loopResidual ?? 0;
       const tier = residualTier(residual, settings.loopResidualPassM, settings.loopResidualFailM);
-      const warnings = [...base.warnings];
+      const warnings = [...base.warnings, ...(driven?.warnings ?? [])];
       if (halvings > 0)
         warnings.push(
           `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s left the loop residual above the fail tier, ${timestep} s is used`,
@@ -284,6 +305,7 @@ export const simulateMotion = defineCommand({
               },
             }
           : {}),
+        ...(driven === null ? {} : { drives: driven.drives, ...(driven.ledger === null ? {} : { ledger: driven.ledger }) }),
         ...(reactions !== null ? { reactions } : {}),
         ...(engineReport !== null ? { engineReport: { ...engineReport, ...(realism !== null ? { realism } : {}) } } : {}),
       };
