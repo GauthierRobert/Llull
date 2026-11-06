@@ -25,6 +25,8 @@ export function loadCaseProblems(
   cases: readonly LoadCaseDef[],
   forces: StressModel['forces'],
   displacements: StressModel['displacements'] = [],
+  wind: StressModel['wind'] = [],
+  seismic: StressModel['seismic'] = [],
 ): [string, string][] {
   const problems: [string, string][] = [];
   const names = new Set<string>();
@@ -45,6 +47,10 @@ export function loadCaseProblems(
       for (const primitive of loadCase.basic ?? [])
         if (primitive.startsWith('F') && !forces.some((force) => force.name === primitive))
           problems.push([`${path}.basic`, `case ${loadCase.name}: no force ${primitive} (pass it in forces)`]);
+        else if (primitive.startsWith('WIN') && !wind.some((entry) => entry.name === primitive))
+          problems.push([`${path}.basic`, `case ${loadCase.name}: no wind ${primitive} (pass it in wind)`]);
+        else if (primitive.startsWith('U') && !seismic.some((entry) => entry.name === primitive))
+          problems.push([`${path}.basic`, `case ${loadCase.name}: no static acceleration ${primitive} (pass it in seismic)`]);
         else if (primitive.startsWith('D') && !displacements.some((moved) => moved.name === primitive))
           problems.push([`${path}.basic`, `case ${loadCase.name}: no imposed displacement ${primitive} (pass it in displacements)`]);
     }

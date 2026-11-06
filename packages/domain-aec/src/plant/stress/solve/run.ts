@@ -1,12 +1,12 @@
 /** Solve every load case of a stress model (07 PST §5.5): primitive sets with non-linear supports, EXP as an algebraic combination. */
 
 import { pipeProperties } from '@lib/frame3d/section';
-import type { FrameElement, FrameModel } from '@lib/frame3d/types';
+import type { FrameElement, FrameLoadCase, FrameModel } from '@lib/frame3d/types';
 import type { CadDocument } from '@core/model/types';
 import type { BuiltModel } from '../model/build';
 import type { OperatingConditions, StressModel } from '../model/schema';
 import { loadCaseProblems } from './cases';
-import { solveWithContacts, type ContactOutcome } from './nonlinear';
+import { solveWithContacts, type ContactOutcome, type GroundSpring } from './nonlinear';
 import { caseLoads } from './primitives';
 
 export const SOLVER_VERSION = 'frame3d-1 contacts-1';
@@ -63,6 +63,35 @@ export function frameElements(built: BuiltModel, conditions: OperatingConditions
   }));
 }
 
+/** The selected spring hangers of the built model, split into constant-effort forces and variable ground springs; `skip` leaves out springs by id. */
+export function springSupports(
+  built: BuiltModel,
+  skip: ReadonlySet<string> = new Set(),
+): { readonly constantEffort: BuiltModel['springs']; readonly variable: GroundSpring[] } {
+  const kept = built.springs.filter((spring) => !skip.has(spring.id));
+  return {
+    constantEffort: kept.filter((spring) => spring.kind === 'constant'),
+    variable: kept
+      .filter((spring) => spring.kind === 'variable')
+      .map((spring) => ({ node: spring.node, stiffnessNPerMm: spring.rateNPerMm, preloadN: spring.coldLoadN })),
+  };
+}
+
+/** `load` with the constant-effort hanger forces added as nodal loads (upward, N). */
+export const withHangerLoads = (load: FrameLoadCase, hangers: readonly { node: number; hotLoadN: number }[]): FrameLoadCase =>
+  hangers.length === 0
+    ? load
+    : {
+        ...load,
+        nodal: [...(load.nodal ?? []), ...hangers.map((hanger) => ({ node: hanger.node, force: [0, 0, hanger.hotLoadN] as const }))],
+      };
+
+function withHangerForces(reactions: Float64Array, hangers: readonly { node: number; hotLoadN: number }[]): Float64Array {
+  const out = Float64Array.from(reactions);
+  for (const hanger of hangers) out[hanger.node * 6 + 2] = (out[hanger.node * 6 + 2] as number) + hanger.hotLoadN;
+  return out;
+}
+
 const nodeId = (index: number): string => `N${index + 1}`;
 
 /** Number of connected components of the element graph (a model with more than one is analysed as separate sub-models). */
@@ -83,7 +112,7 @@ export function solveModel(
   built: BuiltModel,
   conditions: OperatingConditions,
 ): SolveSuccess | SolveFailure {
-  const problems = loadCaseProblems(model.loadCases, model.forces, model.displacements);
+  const problems = loadCaseProblems(model.loadCases, model.forces, model.displacements, model.wind, model.seismic);
   if (model.loadCases.length === 0) problems.push(['loadCases', 'no load cases: set_stress_load_cases']);
   model.loadCases.forEach((loadCase, index) => {
     if (
@@ -112,7 +141,7 @@ export function solveModel(
   const states = new Map<string, CaseState>();
   for (const loadCase of model.loadCases) {
     if (loadCase.type === 'EXP') continue;
-    const loads = caseLoads(doc, built, conditions, loadCase.name, loadCase.basic ?? []);
+    const loads = caseLoads(doc, built, conditions, loadCase.name, loadCase.basic ?? [], model);
     if ('ok' in loads) return { ok: false, code: loads.code, message: loads.message, ids: [], paths: [loads.path] };
     if (loads.unverified.length > 0)
       warnings.push({
@@ -121,7 +150,9 @@ export function solveModel(
         ids: [],
       });
     const anchors = built.restraints.anchors.map((anchor) => ({ node: anchor.node, values: loads.prescribed.get(anchor.node) }));
-    const solved = solveWithContacts(frame, anchors, built.restraints.contacts, loads.load);
+    const { constantEffort, variable } = springSupports(built);
+    const load = withHangerLoads(loads.load, constantEffort);
+    const solved = solveWithContacts(frame, anchors, built.restraints.contacts, load, undefined, variable);
     if (!solved.ok) {
       const named = solved.dofs.map((dof) => `${nodeId(dof.node)} ${DOF_NAMES[dof.dof]}`);
       return {
@@ -136,7 +167,8 @@ export function solveModel(
       name: loadCase.name,
       type: loadCase.type,
       displacements: solved.result.displacements,
-      reactions: solved.result.reactions,
+      // a constant-effort hanger is an applied force in the solve; as a support it is the reaction it gives
+      reactions: constantEffort.length === 0 ? solved.result.reactions : withHangerForces(solved.result.reactions, constantEffort),
       elementForces: solved.result.elementForces,
       uniform: loads.uniform,
       pressureBar: loads.pressureBar,

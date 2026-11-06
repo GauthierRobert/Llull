@@ -1,7 +1,7 @@
 /**
  * Plant 07 PST: runs the validation pack's scenario plans through `build_project` (the path of `llull run plan.json`) and compares each `expected`
- * row with the step's `data`. SC-PST-03 (quick checks) is complete since M1; SC-PST-01, 02 and 04 (L-bend, PSI 3D, supports and guardrails) since M3; SC-PST-05 waits for M5
- * (tests/unit/contract/blockedPlanCommands.json).
+ * row with the step's `data`. SC-PST-03 (quick checks) is complete since M1; SC-PST-01, 02 and 04 (L-bend, PSI 3D, supports and guardrails) since M3; SC-PST-05 runs up to the .cii export since M5b
+ * (tests/unit/contract/blockedPlanCommands.json lists export_caesar_neutral).
  */
 
 import { readFileSync } from 'node:fs';
@@ -58,22 +58,39 @@ describe('SC-PST-03 quick checks (VC-PST-01, 03, 04, 05, 06)', () => {
   });
 });
 
-describe('SC-PST-05 step 0 (VC-PST-13 occasional arithmetic; the V1 steps wait for M5)', () => {
-  it('meets the occasional ratio and names the rule grade', () => {
-    const plan = JSON.parse(readFileSync(path.join(PLANS, 'sc-pst-05-springs-nozzles-export.json'), 'utf8')) as Plan & {
-      expected: Array<Expected & { value: unknown }>;
-    };
-    const first = plan.actions[0] as Plan['actions'][number];
-    const data = execute(createEmptyDocument(), first.command, first.params).data as Record<string, unknown>;
-    const rows = plan.expected.filter((row) => row.step === 0);
-    expect(rows).toHaveLength(2);
-    expect(Math.abs((data['occasionalRatio'] as number) - 0.76333)).toBeLessThanOrEqual(0.76333 * 1e-5);
-    expect(data['occasionalRuleGrade']).toBe(rows[1]?.value);
+describe('SC-PST-05 steps 0 to 5 (VC-PST-13 occasional arithmetic, VC-PST-14 springs, VC-PST-15 nozzles; step 6 .cii export is not built)', () => {
+  const plan = JSON.parse(readFileSync(path.join(PLANS, 'sc-pst-05-springs-nozzles-export.json'), 'utf8')) as Plan & {
+    expected: Array<Expected & { value: unknown }>;
+  };
+  const results = plan.actions.slice(0, 6).map((action) => execute(createEmptyDocument(), action.command, action.params));
+
+  /** The value of a plan path in a step: `error.code`, a data field, or `components[name=X].ratio` (looked up in the refusal detail when the step is refused). */
+  const valueOf = (step: number, expectedPath: string): unknown => {
+    const result = results[step] as ReturnType<typeof execute>;
+    if (expectedPath === 'error.code') return result.error?.code;
+    const source = (result.data ?? result.error?.detail) as Record<string, unknown>;
+    const component = /^components\[name=(\w+)\]\.(\w+)$/.exec(expectedPath);
+    if (component === null) return source[expectedPath];
+    const rows = source['components'] as Array<Record<string, unknown>>;
+    return rows.find((row) => row['name'] === component[1])?.[component[2] as string];
+  };
+
+  it('meets every expected row of steps 0 to 5 at its stated tolerance', () => {
+    const rows = plan.expected.filter((row) => row.step <= 5);
+    expect(rows).toHaveLength(11);
+    for (const row of rows) {
+      const actual = valueOf(row.step, row.path);
+      const label = `step ${row.step} ${row.path}: ${String(actual)} vs ${String(row.value)}`;
+      if (typeof row.value === 'number') {
+        expect(typeof actual, label).toBe('number');
+        expect(Math.abs((actual as number) - row.value), label).toBeLessThanOrEqual(row.abs ?? Math.abs(row.value) * (row.rel ?? 0));
+      } else expect(actual, label).toEqual(row.value);
+    }
   });
 });
 
 describe('toolset pipestress', () => {
-  it('lists the four M1 quick checks and the M3 model, analysis, record and approval commands and the M4 report', () => {
+  it('lists the quick checks, the model, analysis, record and approval commands, the report, the M5a component commands and the M5b spring and nozzle commands', () => {
     expect([...TOOLSETS.pipestress].sort()).toEqual([
       'add_stress_restraint',
       'analyze_pipe_stress',
@@ -81,18 +98,23 @@ describe('toolset pipestress', () => {
       'check_pipe_stress',
       'create_stress_model',
       'delete_sif_override',
+      'delete_spring_hanger',
       'delete_stress_component',
       'delete_stress_model',
       'delete_stress_restraint',
       'guided_cantilever',
+      'import_spring_table',
+      'nozzle_load_check',
       'pipe_sif',
       'pipe_stress_allowables',
       'pipe_stress_report',
       'record_pipe_stress_results',
+      'select_spring_hangers',
       'set_pipe_operating_conditions',
       'set_sif_override',
       'set_stress_component',
       'set_stress_load_cases',
+      'spring_variability',
       'thermal_growth',
       'update_stress_model',
     ]);

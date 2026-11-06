@@ -205,6 +205,7 @@ export function analyzeStressModel(doc: CadDocument, model: StressModel): Analys
     holders.set(anchor.node, new Set([...(holders.get(anchor.node) ?? []), ...anchor.sources]));
   for (const contact of built.restraints.contacts)
     holders.set(contact.node, new Set([...(holders.get(contact.node) ?? []), ...contact.sources]));
+  for (const spring of built.springs) holders.set(spring.node, new Set([...(holders.get(spring.node) ?? []), spring.id]));
   const supportLoads: SupportLoad[] = [];
   for (const state of solved.states)
     for (const [node, sources] of [...holders].sort((a, b) => a[0] - b[0])) {

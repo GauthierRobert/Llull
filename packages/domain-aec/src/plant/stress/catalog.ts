@@ -12,6 +12,9 @@ import { pipeStressReport } from './commands/pipeStressReport';
 import { pipeStressAllowables } from './commands/pipeStressAllowables';
 import { approvePipeStress, recordPipeStressResults } from './commands/record';
 import { addStressRestraint, deleteStressRestraint } from './commands/restraints';
+import { nozzleLoadCheck } from './commands/nozzleLoadCheck';
+import { deleteSpringHanger, importSpringTable, selectSpringHangers } from './commands/springs';
+import { springVariability } from './commands/springVariability';
 import { thermalGrowth } from './commands/thermalGrowth';
 
 export const pipeStressCommands = commandCatalog(
@@ -19,6 +22,11 @@ export const pipeStressCommands = commandCatalog(
   pipeStressAllowables,
   thermalGrowth,
   guidedCantilever,
+  springVariability,
+  nozzleLoadCheck,
+  importSpringTable,
+  selectSpringHangers,
+  deleteSpringHanger,
   createStressModel,
   updateStressModel,
   deleteStressModel,

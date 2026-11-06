@@ -60,11 +60,7 @@
       "size_drive"
     ],
     "docs/physics/23-drives-physical-truth/validation/plans/drv_stick_slip.plan.json": ["set_joint_physics"],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
-      "export_caesar_neutral",
-      "nozzle_load_check",
-      "spring_variability"
-    ],
+    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": ["export_caesar_neutral"],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": ["fit_steel_member"],
     "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": ["export_pdf"],
     "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-print-1to50.json": ["load_plot_style", "print_sheet"]

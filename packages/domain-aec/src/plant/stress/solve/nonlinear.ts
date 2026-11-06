@@ -19,6 +19,13 @@ const OBLIQUE_STIFFNESS = 1e9;
 const OBLIQUE_LENGTH = 100;
 const BAR_NEGLIGIBLE = 1e-9;
 
+/** A vertical (Z) ground spring: force on the pipe = stiffness x (value - u), value = preload / stiffness. */
+export interface GroundSpring {
+  readonly node: number;
+  readonly stiffnessNPerMm: number;
+  readonly preloadN: number;
+}
+
 export type ContactStatus = 'active' | 'lifted' | 'gap-open' | 'sliding';
 
 export interface ContactOutcome {
@@ -64,6 +71,7 @@ export function solveWithContacts(
   contacts: readonly Contact[],
   loadCase: FrameLoadCase,
   maxIterations = MAX_ITERATIONS,
+  springs: readonly GroundSpring[] = [],
 ): NonlinearResult {
   const active = contacts.map((contact) => contact.gapMm === 0);
   const friction: (FrictionState | null)[] = contacts.map((contact) =>
@@ -76,6 +84,13 @@ export function solveWithContacts(
     const restraints = new Map<number, FrameRestraint>();
     for (const anchor of anchors)
       for (let dof = 0; dof < 6; dof++) restraints.set(anchor.node * 6 + dof, { node: anchor.node, dof, value: anchor.values?.[dof] ?? 0 });
+    for (const spring of springs)
+      restraints.set(spring.node * 6 + 2, {
+        node: spring.node,
+        dof: 2,
+        stiffness: spring.stiffnessNPerMm,
+        value: spring.preloadN / spring.stiffnessNPerMm,
+      });
     contacts.forEach((contact, index) => {
       if (contact.direction !== undefined) return;
       const key = contact.node * 6 + contact.dof;
