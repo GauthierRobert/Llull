@@ -1,0 +1,267 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`render_animation golden digests > four-bar sweep there and back: 13 frames 1`] = `
+{
+  "camera": {
+    "direction": [
+      0,
+      0,
+      -1,
+    ],
+    "eye": [
+      1.9084936490627042,
+      -2.0192736371882347e-12,
+      12.976456405770602,
+    ],
+    "projection": "orthographic",
+    "up": [
+      0,
+      1,
+      0,
+    ],
+    "viewHeight": 8.649304270513735,
+  },
+  "fileSha256": "ddc4e3e2f3127644b5d944c5386d54b7d33c5fe8a7a051f1821734aa78960ae3",
+  "frameSha256": [
+    "b432cc862cda0ebaaf2457f852eef621f31fb6007800539d2818525cc0b95d8d",
+    "2f0a841cba234ede335eb3d9fa76d0385e26ac5c6a06cc1739d5ae701c796bf8",
+    "f078f64efde29221d61a888a41da14fbd36a52cdbc679877ae55f1e6dbbd10e2",
+    "e4035f34f0e641d18e86b1ce143d86450d704de83b18c432232e5bb80dac878d",
+    "683a4f0826f00914e2eb0ccb1b2ea51a1ec25d6979ee428417573b4f1e6460b9",
+    "dc93b931d4c7e550c912b76ffebdbb7fdacb4f7f1e36c5c4764031f708065e5d",
+    "f280840a0c13e7e6d0c76fa273cd213fd61f3fae35738a52c42e4c5b560e768b",
+    "dc93b931d4c7e550c912b76ffebdbb7fdacb4f7f1e36c5c4764031f708065e5d",
+    "53329a8df8917ea88506a601566436a1df9807fae94b8ffbac5e354a4b511d84",
+    "7ae507b7092d3fe67f0cf2efe566174a508d08538a11c492c3174acd6ecbbc6e",
+    "7002d4a808d81ba605611d0c17b5dadb9389e2eb02317d5e6174a5b8a54473f3",
+    "b64adc1b95f2ec3ecfbcc68dcff46a4ffba38ede736fb75e55e3a5dc56b61aa2",
+    "f280840a0c13e7e6d0c76fa273cd213fd61f3fae35738a52c42e4c5b560e768b",
+  ],
+  "frames": 13,
+  "rendererVersion": "llull-ts-raster/2",
+  "timeline": [
+    {
+      "frame": 0,
+      "readouts": {},
+      "tS": 0,
+    },
+    {
+      "frame": 1,
+      "readouts": {},
+      "tS": 0.1,
+    },
+    {
+      "frame": 2,
+      "readouts": {},
+      "tS": 0.2,
+    },
+    {
+      "frame": 3,
+      "readouts": {},
+      "tS": 0.3,
+    },
+    {
+      "frame": 4,
+      "readouts": {},
+      "tS": 0.4,
+    },
+    {
+      "frame": 5,
+      "readouts": {},
+      "tS": 0.5,
+    },
+    {
+      "frame": 6,
+      "readouts": {},
+      "tS": 0.6,
+    },
+    {
+      "frame": 7,
+      "readouts": {},
+      "tS": 0.7,
+    },
+    {
+      "frame": 8,
+      "readouts": {},
+      "tS": 0.8,
+    },
+    {
+      "frame": 9,
+      "readouts": {},
+      "tS": 0.9,
+    },
+    {
+      "frame": 10,
+      "readouts": {},
+      "tS": 1,
+    },
+    {
+      "frame": 11,
+      "readouts": {},
+      "tS": 1.1,
+    },
+    {
+      "frame": 12,
+      "readouts": {},
+      "tS": 1.2,
+    },
+  ],
+}
+`;
+
+exports[`render_animation golden digests > mov_clip_spin: 21 frames and the APNG 1`] = `
+{
+  "camera": {
+    "direction": [
+      0,
+      0,
+      -1,
+    ],
+    "eye": [
+      1.0302869668521453e-12,
+      -1.0302869668521453e-12,
+      250.00250000000776,
+    ],
+    "projection": "orthographic",
+    "up": [
+      0,
+      1,
+      0,
+    ],
+    "viewHeight": 222.22222222222683,
+  },
+  "fileSha256": "ca1cf116c14e163950ab71c1b09783823a79915db36b6d03b058c36a6f40efb7",
+  "frameSha256": [
+    "717161f1c69fc014561e1c163f3072ce5622d06f1dbfd54e3cc7f28b01659499",
+    "a4b39fbfbf3ab533fdb721e7891bb9cfc94d867bec74bd236c8fc9d03f00cb14",
+    "5ed2583b3adcebe14ba5e524fa1d977a3d63259928b861012a1ee0e5ed52e073",
+    "c7652324eae0e10a9bc26e8079037a15d070d234fcc4bc48c91c7a4f51ec4e4c",
+    "38741628feab9bcd09bcaf3b23cbe9af61c774c444da1f5bcc6379cf9df79b7f",
+    "75c93b7ad82c8f0a4bb12f8a55bcc8ad09cb3ea49da41c73c8ca6b22d1dc78b5",
+    "255494ea27798b62b03580a20ee1edb52395d5a85c6f75cf13409234c60a49bf",
+    "feda4bf7c3ab9f2addf7e4d37eb78368609f5797d864f08833368af4ffdc86da",
+    "9e58b6d1c82084ae12c4318700bd4cae42262907219ccebfde4baf90f4870a86",
+    "89d6dc68ff9f7de58c45ab1837e9b69f8b4681704d2ceba7f8b6b8673bddd1b3",
+    "2f7ce5096bcb7f8d66c5a4d26a1cfc2b5897661b7fe29d554631b4b0f95088a1",
+    "310d7daa0ae6b6dcf4cb14a9475597041708b220353bad9d48e149cf2546cea1",
+    "bad18d72c4d044a24a28b774c2a12880ed6030db2967eceb86f3d10cc276db42",
+    "8b6216fe453633cd0b3fcdff13efcf6ec1375c37982d33c79b57e0aa0e05632d",
+    "8cbd13cab31e9baf59818c8a4a5aec04a84fe95bbef4147b66de1632dc9f8f53",
+    "74d3a358abe271744cce1a2969583a654d2b51bc08d3343541f0c80871866c03",
+    "305e6beed5f9ccae53f6a354f12ca71872d05073944fba2c23d01831b578a373",
+    "c6428b2e19b69374e1d5d3c27e108de3ac0a5ef39e5be17e6e49992374700901",
+    "3cbbce67662073892c7bcba3820338c479e2353fd8fed09a689a20fac0eb9e42",
+    "3cdf4d05d48da7189d72a1520442f31ccaf0d213882c49e7994338a0baad646a",
+    "717161f1c69fc014561e1c163f3072ce5622d06f1dbfd54e3cc7f28b01659499",
+  ],
+  "frames": 21,
+  "rendererVersion": "llull-ts-raster/2",
+  "timeline": [
+    {
+      "frame": 0,
+      "readouts": {},
+      "tS": 0,
+    },
+    {
+      "frame": 1,
+      "readouts": {},
+      "tS": 0.1,
+    },
+    {
+      "frame": 2,
+      "readouts": {},
+      "tS": 0.2,
+    },
+    {
+      "frame": 3,
+      "readouts": {},
+      "tS": 0.3,
+    },
+    {
+      "frame": 4,
+      "readouts": {},
+      "tS": 0.4,
+    },
+    {
+      "frame": 5,
+      "readouts": {},
+      "tS": 0.5,
+    },
+    {
+      "frame": 6,
+      "readouts": {},
+      "tS": 0.6,
+    },
+    {
+      "frame": 7,
+      "readouts": {},
+      "tS": 0.7,
+    },
+    {
+      "frame": 8,
+      "readouts": {},
+      "tS": 0.8,
+    },
+    {
+      "frame": 9,
+      "readouts": {},
+      "tS": 0.9,
+    },
+    {
+      "frame": 10,
+      "readouts": {},
+      "tS": 1,
+    },
+    {
+      "frame": 11,
+      "readouts": {},
+      "tS": 1.1,
+    },
+    {
+      "frame": 12,
+      "readouts": {},
+      "tS": 1.2,
+    },
+    {
+      "frame": 13,
+      "readouts": {},
+      "tS": 1.3,
+    },
+    {
+      "frame": 14,
+      "readouts": {},
+      "tS": 1.4,
+    },
+    {
+      "frame": 15,
+      "readouts": {},
+      "tS": 1.5,
+    },
+    {
+      "frame": 16,
+      "readouts": {},
+      "tS": 1.6,
+    },
+    {
+      "frame": 17,
+      "readouts": {},
+      "tS": 1.7,
+    },
+    {
+      "frame": 18,
+      "readouts": {},
+      "tS": 1.8,
+    },
+    {
+      "frame": 19,
+      "readouts": {},
+      "tS": 1.9,
+    },
+    {
+      "frame": 20,
+      "readouts": {},
+      "tS": 2,
+    },
+  ],
+}
+`;
