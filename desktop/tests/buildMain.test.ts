@@ -1,6 +1,6 @@
 /**
  * The main-process bundle as built by `scripts/build-main.mjs` (the real build, into a temp folder): no native module in main.js (a `.node` addon, the SVG
- * rasterizer), a preload that requires only `electron` and exposes exactly `exportThreeMf` (no argument) over the one IPC channel.
+ * rasterizer), a preload that requires only `electron` and exposes exactly `exportThreeMf` (no argument) and `restoreRecovery` (a slot id, never a path).
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -41,7 +41,7 @@ describe.skipIf(!hasEsbuild)('desktop main bundle', () => {
     expect(main).not.toMatch(/["'`][^"'`\n]*\.node["'`]/);
   });
 
-  it('the preload requires only electron and exposes exactly exportThreeMf, which invokes the one channel with no argument', async () => {
+  it('the preload requires only electron and exposes exactly exportThreeMf (no argument) and restoreRecovery (a slot id), each on its own channel', async () => {
     const source = readFileSync(path.join(out, 'preload.js'), 'utf8');
     const required = [...source.matchAll(/require\(["']([^"']+)["']\)/g)].map((match) => match[1]);
     expect(new Set(required)).toEqual(new Set(['electron']));
@@ -62,8 +62,11 @@ describe.skipIf(!hasEsbuild)('desktop main bundle', () => {
       exports: {},
     });
     expect(exposed.map((entry) => entry.name)).toEqual(['llull']);
-    expect(Object.keys(exposed[0]?.api ?? {})).toEqual(['exportThreeMf']);
+    expect(Object.keys(exposed[0]?.api ?? {})).toEqual(['exportThreeMf', 'restoreRecovery']);
     await exposed[0]?.api['exportThreeMf']?.();
-    expect(calls).toEqual([['llull:export-3mf']]);
+    const restore = exposed[0]?.api['restoreRecovery'] as ((slotId: string) => Promise<unknown>) | undefined;
+    await restore?.('doc-a');
+    // restoreRecovery forwards a slot id only; the main process resolves the path itself.
+    expect(calls).toEqual([['llull:export-3mf'], ['llull:restore-recovery', 'doc-a']]);
   });
 });
