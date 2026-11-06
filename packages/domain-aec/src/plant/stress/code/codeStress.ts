@@ -232,7 +232,10 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
       rows: evaluate(term.state, false).filter((row) => row.node !== null),
     }));
     return (perTerm[0]?.rows ?? []).map((row, index) => {
-      const parts = perTerm.map((term) => term.factor * (term.rows[index]?.stressMPa ?? 0));
+      const parts = perTerm.map((term) => {
+        const termRow = term.rows[index];
+        return termRow === undefined ? 0 : term.factor * termRow.stressMPa;
+      });
       const stress = combination.method === 'scalar' ? parts.reduce((a, b) => a + b, 0) : Math.sqrt(parts.reduce((a, b) => a + b * b, 0));
       return {
         ...row,

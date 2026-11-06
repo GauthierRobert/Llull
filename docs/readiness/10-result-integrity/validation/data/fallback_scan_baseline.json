@@ -873,8 +873,8 @@
     },
     {
       "file": "domain-aec/src/plant/stress/solve/primitives.ts",
-      "hits": 2,
-      "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+      "hits": 1,
+      "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
     },
     {
       "file": "domain-aec/src/plant/structures/access/graph/surfaces.ts",

@@ -10,6 +10,10 @@ export const GRAVITY = 9.80665;
 /** 1 kPa = 1e-3 N/mm^2. */
 const KPA_TO_N_PER_MM2 = 1e-3;
 
+/** Thickness of the insulation, mm (none: no layer). */
+const insulationThickness = (conditions: OperatingConditions): number =>
+  conditions.insulation === undefined ? 0 : conditions.insulation.thicknessMm;
+
 export interface WeightField {
   /** Weight per unit length of each element, N/mm (positive; acts along -Z for gravity). */
   readonly perLength: Float64Array;
@@ -28,7 +32,7 @@ export function weightField(built: BuiltModel, conditions: OperatingConditions, 
     const stated = element.component?.weightKg !== undefined && element.component.weightKg !== null;
     const steel = stated ? 0 : (Math.PI / 4) * (element.odMm ** 2 - inner ** 2);
     const fluid = (Math.PI / 4) * inner ** 2;
-    const outer = element.odMm + 2 * (insulation?.thicknessMm ?? 0);
+    const outer = element.odMm + 2 * insulationThickness(conditions);
     const insulated =
       stated || insulation === undefined
         ? 0
@@ -66,7 +70,7 @@ export function windLoads(built: BuiltModel, conditions: OperatingConditions, wi
     const along = direction[0] * axis[0] + direction[1] * axis[1] + direction[2] * axis[2];
     const normal: Vec = [direction[0] - along * axis[0], direction[1] - along * axis[1], direction[2] - along * axis[2]];
     const size = Math.hypot(...normal);
-    const effective = element.odMm + 2 * (conditions.insulation?.thicknessMm ?? 0);
+    const effective = element.odMm + 2 * insulationThickness(conditions);
     const scale = wind.pressureKPa * KPA_TO_N_PER_MM2 * wind.dragCoefficient * effective * size;
     for (let i = 0; i < 3; i++) out[index * 3 + i] = scale * (normal[i] as number);
   });
