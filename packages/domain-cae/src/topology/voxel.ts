@@ -1,5 +1,6 @@
 /** Voxel grid of a topology study (TR-TOP-02): placement over the design domain AABB and ray-parity voxelisation of closed triangle meshes. */
 
+// @invariant display-mesh: voxelisation of the stored triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units), below the voxel size
 import type { SymmetryPlane, TopologyArtifactGrid, TopologyStudy } from '@core/model/topology';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import type { Triangle } from '@core/geometry/triangles';

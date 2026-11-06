@@ -35,3 +35,29 @@ export function withExactMesh(entity: Entity, kernel: GeometryKernel | null | un
   const mesh = shape === null ? null : kernel.tessellate(shape, options);
   return mesh === null || mesh.indices.length === 0 ? null : { ...entity, mesh };
 }
+
+/** Largest ratio of the bounding-box diagonal to a linear deflection the native kernel accepts (`NATIVE_TESSELLATION_BUDGET`; the same number as `mesh.rs`). */
+const MAX_DIAGONAL_PER_DEFLECTION = 1e6;
+
+/** Smallest `chordTolerance` an export accepts, document units. */
+export const MIN_CHORD_TOLERANCE = 1e-4;
+
+/**
+ * The smallest linear deflection the budget allows for `entity`, when `options` ask for less (the request would mesh the body into millions of triangles);
+ * null when the request is within budget or the entity has no kernel recipe. The box is read from the stored mesh.
+ */
+export function exactMeshBudget(entity: Entity, options: TessellationOptions): number | null {
+  if (entity.kind !== 'mesh' || entity.brep === undefined || entity.asset !== undefined) return null;
+  const min: [number, number, number] = [Infinity, Infinity, Infinity];
+  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  const positions = entity.mesh.positions;
+  for (let i = 0; i + 2 < positions.length; i += 3)
+    for (let axis = 0; axis < 3; axis++) {
+      min[axis] = Math.min(min[axis] as number, positions[i + axis] as number);
+      max[axis] = Math.max(max[axis] as number, positions[i + axis] as number);
+    }
+  const diagonal = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+  return Number.isFinite(diagonal) && diagonal / options.linearDeflection > MAX_DIAGONAL_PER_DEFLECTION
+    ? diagonal / MAX_DIAGONAL_PER_DEFLECTION
+    : null;
+}

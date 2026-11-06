@@ -1,5 +1,6 @@
 /** Keep-in / keep-out regions of a study as voxel masks on its grid. */
 
+// @invariant display-mesh: region masks from the stored triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units), below the voxel size
 import type { TopologyRegion } from '@core/model/topology';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { is3D, type CadDocument } from '@core/model/types';

@@ -10,6 +10,7 @@ import type { MeshData } from '../model/types';
 import type { ShapeRecipe } from '../model/types';
 import type { ChamferLegs, Feature, FeatureBase, FilletLaw, Term } from './program';
 import { lawNodes } from '../geometry/blend/law';
+import { PREVIOUS_DISPLAY_TOLERANCE, tessellateAt } from '../geometry/exactMesh';
 import { type FeatureRecipe, lowerFeature, needsReach, throughReach } from '../geometry/featureLowering';
 import { floorEdgeIndices } from '../geometry/featureFillet';
 import { featureNotes } from './featureNotes';
@@ -45,10 +46,10 @@ function edgeMidPoints(kernel: GeometryKernel | null, source: ShapeRecipe, edges
   return mids.every((mid): mid is Vec3 => mid !== undefined) ? mids : undefined;
 }
 
-/** Display triangles of a recipe node (the OpenSCAD fallback for fillets / shells). */
+/** Triangles of a recipe node (the OpenSCAD fallback for fillets / shells: a deliverable), at the kernel's explicit 0.1 / 0.5 deflections when it honours them. */
 function soupOf(kernel: GeometryKernel | null, recipe: ShapeRecipe): number[] | undefined {
   const shape = kernel?.evaluate(recipe) ?? null;
-  const mesh = shape === null ? null : (kernel?.tessellate(shape) ?? null);
+  const mesh = shape === null ? null : kernel === null ? null : tessellateAt(kernel, shape, PREVIOUS_DISPLAY_TOLERANCE);
   return mesh === null ? undefined : meshSoup(mesh);
 }
 

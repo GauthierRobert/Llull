@@ -95,4 +95,12 @@ describeNative('native display deflection scales with the part (DISP1)', () => {
     expect(deficit).toBeGreaterThan(0);
     expect(deficit).toBeLessThanOrEqual(AREA * 0.5);
   }, 120_000);
+
+  it('a tolerance beyond the budget is refused by the export and by the native kernel itself', () => {
+    const refused = execute(doc, 'export_stl', { chordTolerance: 1e-4 });
+    expect(refused.error?.code).toBe('EXPORT_TESSELLATION_BUDGET');
+    const shape = kernel.evaluate(body().brep as never);
+    expect(kernel.tessellate(shape as never, { linearDeflection: 1e-4, angularDeflection: 0.5 })).toBeNull();
+    expect(kernel.tessellate(shape as never, { linearDeflection: 5, angularDeflection: 0.5 })).not.toBeNull();
+  });
 });

@@ -1,5 +1,6 @@
 /** Rebuild aids of a recorded field: section contours for `suggest_rebuild` and the voxel comparison of a rebuilt solid with the optimum. */
 
+// @invariant display-mesh: voxel inside-test of the stored triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units), below the voxel size
 import type { FeTopologyArtifact, SymmetryPlane, TopologyStudy } from '@core/model/topology';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { eulerFromMat } from '@lib/axisRotation';

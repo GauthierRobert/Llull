@@ -12,7 +12,7 @@ import type { Vec3 } from '../../model/types';
 import type { Triangle } from '../../geometry/triangles';
 import { toMm } from '../../model/units';
 import { entityIdsField } from './exportFormats';
-import { chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
+import { budgetRefusal, chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
 import { buildThreeMf, writeThreeMf, type ThreeMfBody } from './threeMf';
 import { MAX_3MF_FILE_BYTES } from './threeMfFile';
 import { MAX_3MF_BYTES, ThreeMfInvalidMeshError, ThreeMfTooLargeError } from './threeMfStream';
@@ -155,6 +155,8 @@ export const export3mf = defineCommand({
     if (refused !== null) return refused;
     const used = exportTessellation(ctx, params.chordTolerance);
     const collected = collectExportParts(doc, params.entityIds, (ctx ?? currentContext()).meshAssets, used);
+    const overBudget = budgetRefusal(doc, 'export_3mf', used.chordTolerance, collected.overBudget);
+    if (overBudget !== null) return overBudget;
     const unreadable = exportAssetRefusal(doc, 'export_3mf', collected.unreadable);
     if (unreadable !== null) return unreadable;
     const mm = toMm(doc, 1);
@@ -287,6 +289,7 @@ export const export3mf = defineCommand({
     }
     const { objects } = built;
     const triangleCount = objects.reduce((sum, object) => sum + object.triangles, 0);
+    const tessellation = tessellationNote(tessellationReport(used, collected));
     const open = objects.filter((object) => !object.manifold && object.beams === undefined).map((object) => object.name);
     return report(
       doc,
@@ -299,7 +302,7 @@ export const export3mf = defineCommand({
           ? ` Kept as meshes (no beam lattice): ${skippedLattices.map((s) => `${s.id} (${s.reason})`).join('; ')}.`
           : '') +
         (open.length > 0 ? ` Not closed manifold shells: ${open.join(', ')}.` : '') +
-        ` ${tessellationNote(tessellationReport(used, collected.exactIds, collected.parts.length))}` +
+        (tessellation === '' ? '' : ` ${tessellation}`) +
         (collected.unknownIds.length > 0 ? ` Unknown ids skipped: ${collected.unknownIds.join(', ')}.` : ''),
       {
         format: '3mf',

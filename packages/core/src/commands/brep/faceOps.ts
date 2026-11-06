@@ -3,6 +3,7 @@
  * native OCC kernel; faces are picked by index, point or persistent name (recorded for regeneration, SC-N1).
  */
 
+// @invariant display-mesh: face operations locate faces by centroid / normal on the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); the kernel does the exact work
 import { round6 } from '../../lib/compactNumber';
 import type { Vec3 } from '../../model/types';
 import type { PlaneSpec } from '../../model/faceOps';

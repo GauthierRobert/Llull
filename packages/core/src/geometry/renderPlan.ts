@@ -5,6 +5,7 @@
  *   bucket per material class for LOD 2, and one batch per material class for unique (single-instance) prototypes
  */
 
+// @invariant display-mesh: render planning counts display triangles: the display mesh by definition
 import type { CadDocument, Entity } from '../model/types';
 import { is3D } from '../model/types';
 import { sha256Hex } from '../lib/sha256';

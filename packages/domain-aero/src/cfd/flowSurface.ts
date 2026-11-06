@@ -3,6 +3,7 @@
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { entityBoundsInDoc } from '@core/geometry/bounds';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
+import { PREVIOUS_DISPLAY_TOLERANCE, tessellateAt, withExactMesh } from '@core/geometry/exactMesh';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 import { soupIndices } from '@core/geometry/meshVolume';
 import { buildMeshBvh, bvhIntersects, type MeshBvh } from '@core/geometry/meshBvh';
@@ -94,24 +95,28 @@ function overlappingPairs(leaves: readonly Leaf[], doc: CadDocument): Array<read
   return pairs;
 }
 
+/** `entity` with the kernel's mesh at 0.1 / 0.5 in place of its stored display mesh, when the kernel honours explicit deflections and the entity keeps its recipe. */
+const exactOr = (entity: Entity, kernel: GeometryKernel | null): Entity =>
+  withExactMesh(entity, kernel, PREVIOUS_DISPLAY_TOLERANCE) ?? entity;
+
 /**
  * One surface for the bodies. With a kernel the solids are unioned (internal faces vanish); a kernel that cannot build the union, or no
  * kernel, falls back to the display triangles of each solid and reports which solids overlap or touch.
- * @invariant a single solid never needs a union; the display triangles are the entity's own tessellation
+ * @invariant a single solid never needs a union; its triangles are the kernel's mesh at 0.1 / 0.5 when the kernel honours explicit deflections (the flow solver reads them as STL), else the stored display mesh
  */
 export function buildSurface(doc: CadDocument, leaves: readonly Leaf[], kernel: GeometryKernel | null): BuiltSurface {
   if (leaves.length === 1) {
-    const { positions, indices } = soupOf(entityToTriangles((leaves[0] as Leaf).entity, doc));
+    const { positions, indices } = soupOf(entityToTriangles(exactOr((leaves[0] as Leaf).entity, kernel), doc));
     return { positions, indices, method: 'single_body', overlaps: [], notes: [] };
   }
   const notes: string[] = [];
   if (kernel !== null) {
     const handle = kernel.evaluate(unionRecipe(leaves));
-    const mesh = handle === null ? null : kernel.tessellate(handle);
+    const mesh = handle === null ? null : tessellateAt(kernel, handle, PREVIOUS_DISPLAY_TOLERANCE);
     if (mesh !== null) return { positions: [...mesh.positions], indices: [...mesh.indices], method: 'kernel_union', overlaps: [], notes };
     notes.push('the kernel could not union the bodies (open or invalid solid?): display triangles are used');
   } else notes.push('no geometry kernel installed: display triangles are used and overlaps cannot be removed');
-  const { positions, indices } = soupOf(leaves.flatMap((leaf) => entityToTriangles(leaf.entity, doc)));
+  const { positions, indices } = soupOf(leaves.flatMap((leaf) => entityToTriangles(exactOr(leaf.entity, kernel), doc)));
   return { positions, indices, method: 'display_triangles', overlaps: overlappingPairs(leaves, doc), notes };
 }
 

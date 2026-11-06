@@ -3,6 +3,7 @@
  * `=expr` params that produced them.
  */
 
+// @invariant display-mesh: a mesh-leaf fallback of the generated program reads the stored triangles of its source entity (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); the exact recipe is what the program normally writes
 import { type CadDocument, type Entity, type FeatureStep, type Vec3, is2D, is3D } from '../model/types';
 import { subdivide } from '../geometry/subdivision';
 import { settleLevels } from '../geometry/subd/settle';

@@ -1,5 +1,6 @@
 /** inspect_face_triangles: which B-rep face each display triangle belongs to, so a viewport highlights exactly the face the kernel names (04 DIR M-UI). */
 
+// @invariant display-mesh: labels are for the drawn triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); not re-tessellated so the indices match the viewport
 import { entityToTriangles } from '../../geometry/entityTriangles';
 import { operandRecipe } from '../../geometry/operandRecipe';
 import { type CadDocument, is3D } from '../../model/types';

@@ -1,5 +1,6 @@
 /** Frontal / wetted area of document solids in m² (document units converted), shared by frontal_area, compute_aero_drag and road_load_power. */
 
+// @invariant display-mesh: projected areas from the stored triangles: relative error about 1e-3 x diagonal / size (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import { z } from '@core/commands/schema';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { is3D } from '@core/model/types';

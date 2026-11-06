@@ -969,12 +969,17 @@ r(0.1) = 1.1 and r(0.25) = 1.25 to 1e-14 relative (the request: 1e-6). The volum
 | Consumer | Path |
 | --- | --- |
 | viewport, `render_view`, glTF export (a viewing format) | display mesh |
-| `export_stl`, `export_3mf`, `export_obj` (kernel-optional, param `chordTolerance`, default 0.1 document units + 0.5 rad = the accuracy before DISP1) | kernel re-tessellation at `chordTolerance` for a body that keeps its `brep`; else the stored mesh. The summary states which path and the tolerance |
+| `export_stl`, `export_3mf`, `export_obj` (kernel-optional, param `chordTolerance`, minimum 1e-4, default 0.1 document units + 0.5 rad = the accuracy before DISP1) | kernel re-tessellation at `chordTolerance` for a body or an instance of bodies that keeps its `brep`; else the stored mesh. The summary states which path and the tolerance (nothing when no body keeps a recipe; "no exact kernel" and "the kernel ignores options" are told apart). A tolerance finer than diagonal / 1e6 is refused (`EXPORT_TESSELLATION_BUDGET`, remediation = the smallest value; the native op refuses the same ratio with `NATIVE_TESSELLATION_BUDGET`) |
 | deform sources (`sourceMeshOf`, `loadTarget`, `output.mode: 'mesh'`) | kernel mesh at 0.1 / 0.5 when the kernel honours options (same accuracy as before), else display mesh |
+| OpenSCAD / FreeCAD fallback triangles of a fillet / shell (`codegen/recipeLowering.ts`, a deliverable) | kernel mesh at 0.1 / 0.5 when honoured |
+| flow-solver surface (`domain-aero/src/cfd/flowSurface.ts`, the STL of `flowJob.ts`) | kernel mesh (single body: `withExactMesh`; union: `tessellateAt`) at 0.1 / 0.5 when honoured |
+| `check_machining` thickness ray casts | kernel mesh at 0.1 / 0.5 when honoured |
 | FEA STL fallback (`server/src/fea/feaGeometry.ts`, only when the kernel has no STEP) | kernel mesh at 0.1 / 0.5 when honoured |
 | `inspect_face_triangles` | display mesh on purpose (indices must match the drawn triangles); the label of a triangle is exact except within max(0.1, 1e-3 D) of a face boundary or on a face thinner than that (@invariant) |
 | mass / inertia (`resolveMassProperties`) | native kernel: exact `massProperties`; the stored-mesh inertia scaled to the exact volume is the Manifold-only path (no explicit tolerance available) and `solidVolume` uses the exact topology volume |
-| other mesh readers (measures, clash, CFD / FEA surface meshes, scan fits, codegen mesh fallback) | stored display mesh: their accuracy is that of the display mesh, max(0.1, 1e-3 D) chord error |
+| every other reader of `kernel.tessellate` / `entityToTriangles` (bounds, diagonal, reach, face matching, measures, scan fits, voxelisation, drawing views, previews) | stored display mesh, max(0.1, 1e-3 D) chord error, accepted per file by an `@invariant display-mesh:` tag that `tests/unit/contract/kernelConsumers.test.ts` requires (a consumer must use `tessellateAt` / `withExactMesh` or carry the tag; stale tags fail) |
+
+Cost of the diagonal (cold, release, win32-x64): `bounding_diagonal` takes 0.23 ms on a 64-edge rim fillet (display mesh 18 ms, 1.3 %) and 17.7 ms on the long B-spline blend face of the 20 m block (display mesh of it 5.8 ms after the scaling, 4.0 s before: 0.4 % of the old cost); it is kept on the shape, so every later call is free. Explicit meshes are kept three per shape in `kernelFromOps`.
 
 Measured accuracy (sphere of diameter 2000, native): the display mesh holds 2836 triangles and loses at most area x 1e-3 D of volume (test `a_large_sphere_display_mesh_stays_within_the_stated_deflection_of_the_exact_volume`); `export_stl` with `chordTolerance` 0.5 holds the exported volume within area x 0.5 of the exact one (`server/tests/nativeDisplayDeflection.test.ts`).
 

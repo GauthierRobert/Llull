@@ -16,6 +16,9 @@ pub const FINE_DEFLECTION: (f64, f64) = (0.02, 0.2);
 const KNEE_DIAGONAL: f64 = 100.0;
 /// Diagonals above this are treated as unbounded (an open box reads as 1e100): the floor is kept.
 const MAX_DIAGONAL: f64 = 1e12;
+/// Largest ratio of the bounding-box diagonal to an explicit linear deflection a host may ask for (about 1.7 triangles per unit of it on a sphere): beyond it the
+/// request is refused with `NATIVE_TESSELLATION_BUDGET`. The TypeScript side (`geometry/exactMesh.ts`) states the same number.
+pub const MAX_DIAGONAL_PER_DEFLECTION: f64 = 1e6;
 
 /// Linear deflection for a shape whose bounding box has the given diagonal; the floor for a non-finite or unbounded one.
 pub fn scaled_linear(floor: f64, diagonal: f64) -> f64 {

@@ -10,7 +10,7 @@ import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import type { Triangle } from '../../geometry/triangles';
 import { facetNormal } from '../../geometry/tessellation';
-import { chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
+import { budgetRefusal, chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
 
 const formatVec3 = (v: Vec3): string => v.join(' ');
 
@@ -144,6 +144,8 @@ export const exportStl = defineCommand({
     const fmt: 'ascii' | 'binary' = params.format === 'binary' ? 'binary' : 'ascii';
     const used = exportTessellation(ctx, params.chordTolerance);
     const collected = collectExportParts(doc, params.entityIds, (ctx ?? currentContext()).meshAssets, used);
+    const overBudget = budgetRefusal(doc, 'export_stl', used.chordTolerance, collected.overBudget);
+    if (overBudget !== null) return overBudget;
     const unreadable = exportAssetRefusal(doc, 'export_stl', collected.unreadable);
     if (unreadable !== null) return unreadable;
     const tris = collected.parts.flatMap((part) => part.tris);
@@ -151,11 +153,7 @@ export const exportStl = defineCommand({
     const nonEmpty = collected.parts.filter((part) => part.tris.length > 0);
     // A lone named entity names its solid; several entities need `name` or `perEntity`.
     const solidName = cleanSolidName(params.name ?? (nonEmpty.length === 1 ? nonEmpty[0]?.name : undefined));
-    const summary = exportSummary('export_stl', fmt, {
-      ...collected,
-      tris,
-      tessellation: tessellationReport(used, collected.exactIds, collected.parts.length),
-    });
+    const summary = exportSummary('export_stl', fmt, { ...collected, tris, tessellation: tessellationReport(used, collected) });
     const data: ExportStlData =
       fmt === 'ascii'
         ? {

@@ -1,5 +1,6 @@
 /** project_to_face — project sketch curves onto the faces of a solid along a direction (or to the closest points): curves lying on the faces (03 WRP M2, native). */
 
+// @invariant display-mesh: only a bounding extent is read from the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); projection uses the exact face
 import type { BaseEntity, CadDocument, Entity, NurbsCurveEntity, Vec3 } from '../../model/types';
 import { is3D } from '../../model/types';
 import { nextId } from '../../lib/id';

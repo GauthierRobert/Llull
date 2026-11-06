@@ -3,6 +3,7 @@
  * nodal loads and gravity per load case, fixed dofs, material, objective, settings in voxel units).
  */
 
+// @invariant display-mesh: topology optimisation voxelises the stored triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units), below the voxel size for any sensible resolution
 import type { FeaConstraint, UnitSystem } from '@core/model/analysis';
 import type { TopologyArtifactGrid, TopologyStudy, WorldAxis } from '@core/model/topology';
 import { entityToTriangles } from '@core/geometry/entityTriangles';

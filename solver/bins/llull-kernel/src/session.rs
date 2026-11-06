@@ -5,7 +5,7 @@
 //! Shapes travel as handles `{"key": "<host recipe key>", "recipe"?: <ShapeRecipe>}`; a key-only handle whose shape is gone answers
 //! `shape not cached: <key>` (the host resends the recipe). `tessellate` returns `{"encoding": "base64-le", "positions": <f64[]>,
 //! "indices": <u32[]>}`; an optional second argument `{ linearDeflection, angularDeflection }` (absolute, positive) replaces the size-scaled display deflection. Error codes: `NATIVE_UNSUPPORTED` (op / recipe node not native yet: the host falls back), `NATIVE_BAD_REQUEST`,
-//! `NATIVE_OCC_FAILURE` (OCCT threw; result null), `NATIVE_PANIC`.
+//! `NATIVE_OCC_FAILURE` (OCCT threw; result null), `NATIVE_PANIC`, `NATIVE_TESSELLATION_BUDGET` (an explicit tessellation finer than the diagonal / 1e6 budget).
 
 use crate::exchange::{self, EXCHANGE_OPS};
 use crate::meshbrep::{self, MESH_BREP_CAPABILITIES, MESH_BREP_OPS};
@@ -14,8 +14,8 @@ use base64::Engine;
 use llull_kernel_occt::lru::Lru;
 use llull_kernel_occt::recipe::{EvalError, Evaluator, RECIPE_OPS, SOLID_KINDS};
 use llull_kernel_occt::{
-    analyze, export_step, mass_properties,
-    mesh::{display_mesh, mesh_at},
+    analyze, bounding_diagonal, export_step, mass_properties,
+    mesh::{display_mesh, mesh_at, MAX_DIAGONAL_PER_DEFLECTION},
     occt_version, Shape,
 };
 use serde_json::{json, Value};
@@ -25,6 +25,7 @@ pub const UNSUPPORTED: &str = "NATIVE_UNSUPPORTED";
 pub const BAD_REQUEST: &str = "NATIVE_BAD_REQUEST";
 pub const OCC_FAILURE: &str = "NATIVE_OCC_FAILURE";
 pub const PANIC: &str = "NATIVE_PANIC";
+pub const TESSELLATION_BUDGET: &str = "NATIVE_TESSELLATION_BUDGET";
 /// Same prefix as `SHAPE_NOT_CACHED` in `packages/core/src/geometry/shapeKernel.ts`.
 pub const NOT_CACHED: &str = "shape not cached";
 
@@ -163,19 +164,37 @@ impl Session {
                     Ok(found) => found,
                     Err(message) => return Reply::fail(BAD_REQUEST, message),
                 };
-                self.with_shape(first, |shape| {
-                    let mesh = match explicit {
-                        Some((linear, angular)) => mesh_at(shape, linear, angular)?,
-                        None => display_mesh(shape)?,
-                    };
-                    Ok(mesh.map_or(Value::Null, |mesh| {
+                let shape = match self.resolve(first) {
+                    Ok(Some(shape)) => shape,
+                    Ok(None) => return Reply::ok(Value::Null),
+                    Err(reply) => return reply,
+                };
+                let made = match explicit {
+                    Some((linear, angular)) => match bounding_diagonal(&shape) {
+                        Ok(diagonal) if diagonal / linear > MAX_DIAGONAL_PER_DEFLECTION => {
+                            return Reply::fail(
+                                TESSELLATION_BUDGET,
+                                format!(
+                                    "a linear deflection of {linear} on a shape of diagonal {diagonal} is over the budget (diagonal / deflection <= {MAX_DIAGONAL_PER_DEFLECTION}); use a deflection of at least {}",
+                                    diagonal / MAX_DIAGONAL_PER_DEFLECTION
+                                ),
+                            )
+                        }
+                        Ok(_) => mesh_at(&shape, linear, angular),
+                        Err(error) => Err(error),
+                    },
+                    None => display_mesh(&shape),
+                };
+                match made {
+                    Ok(mesh) => Reply::ok(mesh.map_or(Value::Null, |mesh| {
                         json!({
                             "encoding": "base64-le",
                             "positions": base64_of(&mesh.positions, f64::to_le_bytes),
                             "indices": base64_of(&mesh.indices, u32::to_le_bytes),
                         })
-                    }))
-                })
+                    })),
+                    Err(error) => Reply::fail(OCC_FAILURE, error),
+                }
             }
             "massProperties" => self.with_shape(first, |shape| {
                 let mass = mass_properties(shape)?;
@@ -357,6 +376,16 @@ mod tests {
         assert_eq!(again, display, "an explicit request does not change the display mesh");
     }
 
+    #[test]
+    fn an_explicit_deflection_beyond_the_budget_is_refused_by_name() {
+        let mut session = Session::new();
+        call(&mut session, "evaluate", json!([{ "key": "big", "recipe": sphere_recipe(1000.0) }]));
+        let refused = call(&mut session, "tessellate", json!([{ "key": "big" }, { "linearDeflection": 1e-4, "angularDeflection": 0.5 }]));
+        assert!(refused["error"].as_str().unwrap().starts_with(TESSELLATION_BUDGET), "{refused}");
+        assert_eq!(refused["result"], Value::Null);
+        let allowed = call(&mut session, "tessellate", json!([{ "key": "big" }, { "linearDeflection": 5.0, "angularDeflection": 0.5 }]));
+        assert!(allowed["error"].is_null(), "{allowed}");
+    }
     #[test]
     fn bad_tessellation_options_are_refused() {
         let mut session = Session::new();

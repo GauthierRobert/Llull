@@ -105,4 +105,72 @@ describe('fabrication exports re-tessellate kernel results at chordTolerance', (
     kernel.tessellate(shape as never, { linearDeflection: 0.2, angularDeflection: 0.5 });
     expect(requested.length).toBe(calls + 1);
   });
+
+  it('an instance of a kernel result is re-tessellated through its component, and the summary names the instance', () => {
+    setGeometryKernel(kernelOf(true));
+    let doc = documentWithResult();
+    const bodyId = doc.order[0] as string;
+    doc = execute(doc, 'create_component', { name: 'Part', entityIds: [bodyId], componentId: 'comp-part' }).document;
+    const inserted = execute(doc, 'insert_instance', { componentId: 'comp-part', position: [0, 0, 0] });
+    const result = execute(inserted.document, 'export_stl', { chordTolerance: 0.05 });
+    // the body itself (8 triangles re-tessellated) and its instance (8): the stored meshes would be 4 + 4
+    expect((result.data as { triangleCount: number }).triangleCount).toBe(16);
+    expect(requested).toContainEqual({ linearDeflection: 0.05, angularDeflection: 0.5 });
+    expect(result.summary).toContain(inserted.affected[0] as string);
+    setGeometryKernel(null);
+    expect((execute(inserted.document, 'export_stl', {}).data as { triangleCount: number }).triangleCount).toBe(8);
+  });
+
+  it('chordTolerance below the floor is rejected as an invalid parameter', () => {
+    const result = execute(createEmptyDocument(), 'export_stl', { chordTolerance: 1e-5 });
+    expect(result.summary).toMatch(/rejected: invalid params/);
+  });
+
+  it('a tolerance finer than diagonal / 1e6 is refused with a named code and the smallest allowed value', () => {
+    const big = { positions: TETRA.positions.map((v) => v * 1000), indices: TETRA.indices };
+    setGeometryKernel(
+      fakeKernel({
+        boolean: big,
+        honoursTessellationOptions: true,
+        tessellate: (native, options) => (options === undefined ? native.mesh : FINE),
+      }),
+    );
+    const doc = documentWithResult();
+    const refused = execute(doc, 'export_stl', { chordTolerance: 1e-4 });
+    expect(refused.error?.code).toBe('EXPORT_TESSELLATION_BUDGET');
+    expect(refused.data).toBeUndefined();
+    expect(refused.error?.remediation).toMatch(/chordTolerance 0\.00\d+ or larger/);
+    const allowed = execute(doc, 'export_stl', { chordTolerance: 0.01 });
+    expect(allowed.error).toBeUndefined();
+    expect(execute(doc, 'export_obj', { chordTolerance: 1e-4 }).error?.code).toBe('EXPORT_TESSELLATION_BUDGET');
+    expect(execute(doc, 'export_3mf', { chordTolerance: 1e-4 }).error?.code).toBe('EXPORT_TESSELLATION_BUDGET');
+  });
+
+  it('the kernel keeps at most three explicit meshes per shape (the latest)', () => {
+    const kernel = kernelOf(true);
+    setGeometryKernel(kernel);
+    const doc = documentWithResult();
+    const entity = Object.values(doc.entities).find((candidate) => candidate.kind === 'mesh');
+    const shape = kernel.evaluate((entity as Extract<typeof entity, { kind: 'mesh' }>).brep as never);
+    const at = (linearDeflection: number): unknown => kernel.tessellate(shape as never, { linearDeflection, angularDeflection: 0.5 });
+    [0.1, 0.2, 0.3, 0.4].forEach(at);
+    const calls = requested.length;
+    at(0.4);
+    expect(requested.length).toBe(calls);
+    at(0.1);
+    expect(requested.length).toBe(calls + 1);
+  });
+
+  it('the summary says nothing about tessellation when no body keeps an exact recipe, and tells a mesh kernel from no kernel', () => {
+    setGeometryKernel(kernelOf(true));
+    const primitives = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
+    expect(execute(primitives, 'export_stl', {}).summary).not.toMatch(/Tessellation:/);
+    const withResult = documentWithResult();
+    setGeometryKernel(null);
+    expect(execute(withResult, 'export_stl', {}).summary).toMatch(/because no exact kernel is installed/);
+    setGeometryKernel(kernelOf(false));
+    expect(execute(withResult, 'export_stl', {}).summary).toMatch(
+      /because the installed kernel \(a mesh kernel\) ignores tessellation options/,
+    );
+  });
 });

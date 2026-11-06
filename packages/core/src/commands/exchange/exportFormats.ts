@@ -7,7 +7,7 @@ import { exportRefusal, report } from '../noop';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import { facetNormal } from '../../geometry/tessellation';
-import { chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
+import { budgetRefusal, chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
 
 export const entityIdsField = z
   .array(z.string())
@@ -86,16 +86,14 @@ export const exportObj = defineCommand({
     const unitLabel = (units ?? doc.units).replace(/[\r\n\u2028\u2029]+/g, ' ').trim() || doc.units;
     const used = exportTessellation(ctx, params.chordTolerance);
     const collected = collectExportParts(doc, entityIds, (ctx ?? currentContext()).meshAssets, used);
+    const overBudget = budgetRefusal(doc, 'export_obj', used.chordTolerance, collected.overBudget);
+    if (overBudget !== null) return overBudget;
     const unreadable = exportAssetRefusal(doc, 'export_obj', collected.unreadable);
     if (unreadable !== null) return unreadable;
     const tris = collected.parts.flatMap((part) => part.tris);
     const triangleCount = tris.length;
     const text = buildObjText(collected.parts, `# llull OBJ export — units: ${unitLabel}`);
-    const summary = exportSummary('export_obj', 'obj', {
-      ...collected,
-      tris,
-      tessellation: tessellationReport(used, collected.exactIds, collected.parts.length),
-    });
+    const summary = exportSummary('export_obj', 'obj', { ...collected, tris, tessellation: tessellationReport(used, collected) });
     return report(doc, summary, { format: 'obj', text, triangleCount });
   },
 });

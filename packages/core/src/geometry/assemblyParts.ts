@@ -3,6 +3,7 @@
  * @invariant order follows `doc.order`; an instance is ONE part (its entities unioned, nested instances expanded), named by the instance id
  */
 
+// @invariant display-mesh: assembly clash / mass proxies use the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); exact checks go through the kernel
 import type { CadDocument, Entity, InstanceEntity, ShapeRecipe, Vec3 } from '../model/types';
 import { is2D, is3D } from '../model/types';
 import type { GeometryKernel } from './kernel';

@@ -116,6 +116,9 @@ interface HandleBody {
 }
 
 const toHandle = (body: HandleBody): ShapeHandle => body as unknown as ShapeHandle;
+/** Explicit meshes kept per shape (the latest ones): a fine mesh is megabytes, and a few tolerances cover the callers. */
+const EXPLICIT_VARIANTS_PER_SHAPE = 3;
+
 const bodyOf = (handle: ShapeHandle): HandleBody => handle as unknown as HandleBody;
 
 /** Error message prefix of a key-only handle whose shape is no longer cached (resend with recipe). */
@@ -354,6 +357,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
     const mesh = shape === null ? null : ops.tessellate(shape, options);
     if (mesh === null) return null;
     const variants = explicitMeshes.get(key) ?? new Map<string, MeshData>();
+    if (variants.size >= EXPLICIT_VARIANTS_PER_SHAPE) variants.delete(variants.keys().next().value as string);
     variants.set(variant, mesh);
     explicitMeshes.set(key, variants);
     return mesh;

@@ -4,6 +4,7 @@
  * sagitta r(1 − cos(π/n)), VC-SCN-42); any other solid through its display triangles. Document frame, metres.
  */
 
+// @invariant display-mesh: scan-to-design fits against the stored triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); scan noise is far larger
 import type { CadDocument, Entity } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { entityToTriangles } from '@core/geometry/entityTriangles';

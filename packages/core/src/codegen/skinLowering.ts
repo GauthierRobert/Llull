@@ -7,6 +7,7 @@
  *   poles, a failed face split, a closed loft without faces -> a mesh carrying a named SWG_CODEGEN_UNSUPPORTED reason (never a different solid)
  */
 
+// @invariant display-mesh: the skin fallback reads the stored triangles when no exact lowering exists (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import type { CadDocument, LoftEntity, SweepEntity, Vec2, Vec3 } from '../model/types';
 import type { CurveSegment } from '../model/curve';
 import type { NurbsSurfaceData } from '../lib/nurbs/surfaceTypes';

@@ -9,6 +9,7 @@ import { FTR_CODES } from '../../model/manufacturing';
 import type { MachinedHole } from '../../geometry/featureInstances';
 import { countersinkLand } from '../../lib/holeMath';
 import { buildMeshBvh } from '../../geometry/meshBvh';
+import { PREVIOUS_DISPLAY_TOLERANCE, tessellateAt } from '../../geometry/exactMesh';
 import { localThickness } from '../../geometry/featureThickness';
 import { meshDiagonal } from '../../geometry/meshExtent';
 import type { CommandResult } from '../types';
@@ -122,7 +123,7 @@ export const checkMachining = defineCommand({
     const recipe = operandRecipe(kernel, entity);
     const part = machinedPart(kernel, recipe);
     const shape = thickness === undefined ? kernel.evaluate(recipe) : null;
-    const mesh = shape === null ? null : kernel.tessellate(shape);
+    const mesh = shape === null ? null : tessellateAt(kernel, shape, PREVIOUS_DISPLAY_TOLERANCE);
     const bvh = mesh === null ? null : buildMeshBvh(mesh);
     const reach = mesh === null ? 0 : 2 * meshDiagonal(mesh);
     const thicknessAt = (hole: MachinedHole): number | null => thickness ?? (bvh === null ? null : localThickness(bvh, hole, reach));

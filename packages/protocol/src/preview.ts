@@ -4,6 +4,7 @@
  * writes a document, a log or a stream.
  */
 
+// @invariant display-mesh: a preview is a display artefact: the display mesh by definition
 import type { CadDocument, Entity } from '@core/model/types';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { roundTo } from '@lib/compactNumber';

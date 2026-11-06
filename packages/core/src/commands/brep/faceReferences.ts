@@ -4,6 +4,7 @@
  * index or point records the names of the faces it chose. Points pick the face nearest to them (the kernel's exact face distance).
  */
 
+// @invariant display-mesh: face references are matched by centroid on the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); a face thinner than that can match its neighbour
 import type { Vec3 } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import { hasNames, namesOf, referenceProblem, resolveNames } from '../../geometry/naming/references';

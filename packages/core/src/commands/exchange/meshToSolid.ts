@@ -1,5 +1,6 @@
 /** mesh_to_solid: rebuild a constant-section mesh (imported prism) as an editable extrusion recipe. */
 
+// @invariant display-mesh: converts the stored triangles of a mesh entity: their accuracy is the mesh's own (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units for a kernel result)
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { currentContext } from '../context';
