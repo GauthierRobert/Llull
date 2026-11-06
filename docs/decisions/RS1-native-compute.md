@@ -36,6 +36,7 @@ solver/                         one Cargo workspace (sibling of server/ and desk
   crates/llull-stats            aerospace 03 Monte Carlo stack-up (counter-based RNG streams)
   crates/llull-panel            aerospace 10 V1 3D panel / vortex-lattice influence build + dense LU (faer)
   crates/llull-explicit         physics 19 explicit dynamics (V1 / V2)
+  crates/llull-media            physics 22 motion video (MOV-M2): GIF (global palette, Bayer dither) and AV1 in MP4 (rav1e, own ISOBMFF muxer): `llull-compute media`
   crates/llull-kernel-occt      native OCCT 7.9 bindings (cxx) implementing the existing KernelOps worker protocol
   bins/llull-compute            job binary: `llull-compute <job> <job-folder>` (flow, topopt, cloud, raster, geomq, post, route, stats, panel, explicit)
   bins/llull-kernel             long-lived kernel process speaking KernelOps over stdio (replaced the OCCT WASM worker, which LC1 step 5 deleted)

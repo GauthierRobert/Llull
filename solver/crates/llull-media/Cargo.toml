@@ -1,0 +1,20 @@
+[package]
+name = "llull-media"
+description = "Motion-video encoders of llull-compute media (PHY-22 MOV M2): GIF (global palette, Bayer dither) and AV1 in MP4 (rav1e, own ISOBMFF muxer)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+color_quant = "1"
+gif = { version = "0.13", default-features = false, features = ["std"] }
+llull-protocol = { path = "../llull-protocol" }
+png = "0.17"
+# No asm (no NASM on the reference machine, the Rust paths are what is measured and pinned), no CLI / serialisation / signal features.
+rav1e = { version = "=0.8.1", default-features = false, features = ["threading"] }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

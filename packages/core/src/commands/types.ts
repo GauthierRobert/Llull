@@ -15,6 +15,7 @@ import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { CfdResultPort } from '../model/cfdResult';
 import type { MaterialLibrary } from '../model/materialLibrary';
 import type { RasterPort } from '../model/raster';
+import type { MediaPort } from '../model/media';
 import type { EntityPropertyReader } from '../model/entityProperties';
 import type { FontProvider } from '../geometry/fontPort';
 import type { PointCloudPort } from '../model/pointCloud';
@@ -294,6 +295,8 @@ export interface ExecutionContext {
   readonly libraries?: MaterialLibraryProvider | null;
   /** Native offscreen raster (`renderer: 'native'`, plant 09 VIS-M9 / RS-5); null/absent = NATIVE_TOOL_MISSING. */
   readonly raster?: RasterPort | null;
+  /** Native video encoder (`render_animation` format gif / mp4, PHY-22 MOV-M2); null/absent = NATIVE_TOOL_MISSING (use apng). */
+  readonly media?: MediaPort | null;
   /** Property bag of an entity through the installed plugins' providers (plant 09 VIS $3.4); absent = core keys only. */
   readonly properties?: EntityPropertyReader;
   /** Fonts the host bundles (03 WRP, Fira Sans); null/absent = outline text needs `import_font`. */
