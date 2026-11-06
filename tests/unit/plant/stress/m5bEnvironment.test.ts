@@ -213,3 +213,117 @@ describe('refusals', () => {
     );
   });
 });
+
+describe('OCC combinations by method (scalar, srss, algebraic)', () => {
+  const f = 1e-3 * 1.2 * DN100.odMm;
+  const Sg = (w * L ** 2) / 2 / section.Z; // sustained S_L at the root
+  const Sw = (f * L ** 2) / 2 / section.Z; // wind-only S_L at the root
+  const Sh = 138;
+
+  function scene(method: string | undefined): { doc: CadDocument; id: string } {
+    const sc = cantilever();
+    const doc = apply(sc.doc, 'set_stress_load_cases', {
+      modelId: sc.id,
+      cases: [
+        { name: 'SUS', type: 'SUS', basic: ['W'] },
+        { name: 'WINDY', type: 'OCC', basic: ['WIN1'] },
+        {
+          name: 'COMB',
+          type: 'OCC',
+          combine: [
+            { case: 'SUS', factor: 1 },
+            { case: 'WINDY', factor: 1 },
+          ],
+          ...(method === undefined ? {} : { method }),
+        },
+        { name: 'FULL', type: 'OCC', basic: ['W', 'WIN1'] },
+      ],
+      wind: [WIND],
+    });
+    return { doc, id: sc.id };
+  }
+  const rootRow = (
+    doc: CadDocument,
+    id: string,
+    name: string,
+  ): { stressMPa: number; ratio: number; allowableMPa: number; rule: string } => {
+    const data = analyzed(doc, id, { include: ['stresses'] });
+    const rows = (data.details?.stresses ?? []).filter((row) => row.case === name);
+    return rows.reduce((a, b) => (b.stressMPa > a.stressMPa ? b : a)) as {
+      stressMPa: number;
+      ratio: number;
+      allowableMPa: number;
+      rule: string;
+    };
+  };
+
+  it('scalar adds the term stresses (S_L(SUS) + S_L(wind), the B31.3 302.3.6 sum): Sg + Sw against 1.33 Sh', () => {
+    const { doc, id } = scene('scalar');
+    const row = rootRow(doc, id, 'COMB');
+    expectRel(row.stressMPa, Sg + Sw, 1e-7, 'scalar');
+    expectRel(row.allowableMPa, 1.33 * Sh, 1e-9, 'limit');
+    expectRel(row.ratio, (Sg + Sw) / (1.33 * Sh), 1e-7, 'ratio');
+    expect(row.rule).toBe('B313-OCC');
+  });
+
+  it('srss takes the root of the sum of squares of the term stresses, algebraic the stress of the summed loads (here the same biaxial moment)', () => {
+    const srss = rootRow(scene('srss').doc, scene('srss').id, 'COMB');
+    expectRel(srss.stressMPa, Math.hypot(Sg, Sw), 1e-7, 'srss');
+    const algebraic = scene(undefined);
+    const alg = rootRow(algebraic.doc, algebraic.id, 'COMB');
+    const full = rootRow(algebraic.doc, algebraic.id, 'FULL');
+    expectRel(alg.stressMPa, Math.hypot(Sg, Sw), 1e-6, 'algebraic = vector sum of orthogonal moments');
+    expectRel(alg.stressMPa, full.stressMPa, 1e-6, 'algebraic combination = the full occasional state');
+    // the scalar sum is the larger: the conservative reading of non-simultaneous peaks
+    expect(Sg + Sw).toBeGreaterThan(Math.hypot(Sg, Sw));
+  });
+
+  it('refuses malformed combinations: method without terms, scalar on EXP, basic with combine, a combination of a combination, an unknown term', () => {
+    const sc = cantilever();
+    const set = (cases: unknown[]): unknown => ({ modelId: sc.id, cases, wind: [WIND] });
+    const sus = { name: 'SUS', type: 'SUS', basic: ['W'] };
+    const term = { case: 'SUS', factor: 1 };
+    expectRefusal(
+      sc.doc,
+      'set_stress_load_cases',
+      set([sus, { name: 'X', type: 'OCC', basic: ['WIN1'], method: 'scalar' }]),
+      'PST_LOADCASE_INVALID',
+    );
+    expectRefusal(
+      sc.doc,
+      'set_stress_load_cases',
+      set([sus, { name: 'X', type: 'EXP', combine: [term], method: 'srss' }]),
+      'PST_LOADCASE_INVALID',
+    );
+    expectRefusal(
+      sc.doc,
+      'set_stress_load_cases',
+      set([sus, { name: 'X', type: 'OCC', basic: ['W'], combine: [term] }]),
+      'PST_LOADCASE_INVALID',
+    );
+    const first = { name: 'A', type: 'OCC', combine: [term], method: 'scalar' };
+    expectRefusal(
+      sc.doc,
+      'set_stress_load_cases',
+      set([sus, first, { name: 'B', type: 'OCC', combine: [{ case: 'A', factor: 1 }] }]),
+      'PST_LOADCASE_INVALID',
+    );
+    expectRefusal(
+      sc.doc,
+      'set_stress_load_cases',
+      set([sus, { name: 'X', type: 'OCC', combine: [{ case: 'NOPE', factor: 1 }] }]),
+      'PST_LOADCASE_INVALID',
+    );
+    expectRefusal(sc.doc, 'set_stress_load_cases', set([sus, { name: 'X', type: 'OCC', combine: [] }]), 'PST_LOADCASE_INVALID');
+  });
+});
+
+describe('duplicate names', () => {
+  it('two winds or two accelerations with one name are PST_LOADCASE_INVALID', () => {
+    const sc = cantilever();
+    const base = { modelId: sc.id, cases: [{ name: 'S', type: 'SUS', basic: ['W'] }] };
+    expectRefusal(sc.doc, 'set_stress_load_cases', { ...base, wind: [WIND, WIND] }, 'PST_LOADCASE_INVALID');
+    const shake = { name: 'U1', gFactors: [0, 0, 1] };
+    expectRefusal(sc.doc, 'set_stress_load_cases', { ...base, seismic: [shake, shake] }, 'PST_LOADCASE_INVALID');
+  });
+});

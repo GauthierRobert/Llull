@@ -7,6 +7,8 @@
 export const EXCLUDED_COMMANDS: Readonly<Record<string, string>> = {
   import_mesh:
     'takes structured arrays of numbers (already validated by the zod schema), not a file; the file readers are the import_mesh_file entry',
+  import_spring_table:
+    'takes structured arrays of numbers and names (zod-validated, a size list checked for order and duplicates in one pass), not a file; tested in tests/unit/plant/stress/m5bSprings.test.ts',
   load_plant_class_library: 'loads a bundled library by name; it reads no user-supplied text',
 };
 

@@ -103,6 +103,7 @@ describe('toolset pipestress', () => {
       'delete_stress_model',
       'delete_stress_restraint',
       'guided_cantilever',
+      'import_pipe_material_data',
       'import_spring_table',
       'nozzle_load_check',
       'pipe_sif',

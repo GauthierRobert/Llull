@@ -74,7 +74,13 @@ export const loadCaseSchema = z.object({
         factor: finite.describe('Algebraic factor, e.g. 1 and -1 for OPE - SUS.'),
       }),
     )
-    .describe('EXP: algebraic combination of solved cases.')
+    .describe('EXP: algebraic combination of solved cases. OCC: combination of solved OPE / SUS / OCC cases by `method`.')
+    .optional(),
+  method: z
+    .enum(['algebraic', 'scalar', 'srss'])
+    .describe(
+      'How an OCC case combines its terms: algebraic (default) adds the results with their factors and takes the code stress of the sum; scalar adds the code stresses of the terms (sum of |factor| x stress), e.g. S_L(SUS) + S_L(wind) of B31.3 302.3.6; srss takes the square root of the sum of the squares of the term stresses. EXP is always algebraic.',
+    )
     .optional(),
 });
 
@@ -135,19 +141,24 @@ export const springSizeSchema = z.object({
 
 export const springTableSchema = z.object({ id: z.string().min(1), source: z.string().min(3), sizes: z.array(springSizeSchema).min(1) });
 
-export const springSelectionSchema = z.object({
-  id: z.string().min(1),
-  at: z.union([z.object({ supportId: z.string().min(1) }), z.object({ pipeId: z.string().min(1), atMm: nonNegative })]),
-  kind: z.enum(['variable', 'constant']),
-  tableId: z.string().optional(),
-  size: z.string().optional(),
-  series: z.string().optional(),
-  rateNPerMm: nonNegative,
-  hotLoadN: positive,
-  coldLoadN: positive,
-  travelUpMm: finite,
-  variability: nonNegative,
-});
+export const springSelectionSchema = z
+  .object({
+    id: z.string().min(1),
+    at: z.union([z.object({ supportId: z.string().min(1) }), z.object({ pipeId: z.string().min(1), atMm: nonNegative })]),
+    kind: z.enum(['variable', 'constant']),
+    tableId: z.string().optional(),
+    size: z.string().optional(),
+    series: z.string().optional(),
+    rateNPerMm: nonNegative,
+    hotLoadN: positive,
+    coldLoadN: positive,
+    travelUpMm: finite,
+    variability: nonNegative,
+  })
+  .refine((spring) => spring.kind === 'constant' || spring.rateNPerMm > 0, {
+    message: 'a variable spring needs a positive rate',
+    path: ['rateNPerMm'],
+  });
 
 export const sifOverrideSchema = z.object({
   id: z.string().min(1),
@@ -230,8 +241,8 @@ export const stressModelSchema = z.object({
   displacements: z.array(displacementSchema),
   sifOverrides: z.array(sifOverrideSchema),
   components: z.array(componentSchema),
-  wind: z.array(windSchema),
-  seismic: z.array(accelerationSchema),
+  wind: z.array(windSchema).max(9),
+  seismic: z.array(accelerationSchema).max(9),
   springTables: z.array(springTableSchema),
   springs: z.array(springSelectionSchema),
   recorded: recordedSchema.optional(),

@@ -362,4 +362,26 @@ export const AEC_READERS: readonly HostileReader[] = [
     accepts: (result) => (result as ReturnType<typeof readStep>).entities.size === 3,
     budgetMs: 10_000,
   },
+  {
+    name: 'plant stress: import_pipe_material_data (material table rows as JSON)',
+    covers: ['import_pipe_material_data'],
+    input: 'text',
+    build: (records) =>
+      JSON.stringify(
+        Array.from({ length: Math.min(records, 200) }, (_, k) => ({ tempC: k * 10, ShMPa: 100, EGPa: 200, meanCtePerK: 1e-5 })),
+      ),
+    read: (input) => {
+      const rows = parsedJson(asText(input));
+      return execute(createEmptyDocument(), 'import_pipe_material_data', {
+        materialId: 'M',
+        designation: 'hostile',
+        rows,
+        referenceTempC: 20,
+        source: { citation: 'hostile table' },
+        licence: 'test',
+      });
+    },
+    accepts: (result) => (result as { rejected?: boolean }).rejected !== true,
+    skipLinear: 'more than 200 rows are refused up front by design (PST_TABLE_INVALID)',
+  },
 ];

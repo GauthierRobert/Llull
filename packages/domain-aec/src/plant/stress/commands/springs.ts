@@ -24,6 +24,8 @@ const at = z
   .describe('Where the hanger acts: {supportId} or {pipeId, atMm}.');
 
 const RESIDUAL_WARN_PCT = 1;
+const MAX_SIZES = 2000;
+const MAX_TABLES = 50;
 
 /**
  * @affects plant.stress.models[modelId].springTables: one table added or the one with the same tableId replaced; the approval is dropped
@@ -43,6 +45,15 @@ export const importSpringTable = defineCommand({
   run: (doc, params): CommandResult => {
     const model = modelOr(doc, 'import_spring_table', params.modelId);
     if (isRefusal(model)) return model;
+    if (params.sizes.length > MAX_SIZES || model.springTables.length >= MAX_TABLES)
+      return refuse(
+        doc,
+        'import_spring_table',
+        'PST_TABLE_INVALID',
+        `at most ${MAX_SIZES} sizes per table and ${MAX_TABLES} tables per model`,
+        [params.tableId],
+        ['sizes'],
+      );
     const keys = new Set<string>();
     for (const [index, size] of params.sizes.entries()) {
       const key = `${size.series}/${size.size}`;
@@ -85,7 +96,7 @@ export const selectSpringHangers = defineCommand({
     'Loads N, rates N/mm, travel mm. Returns data { modelId, operatingCase, springs[{ id, kind, size, series, rateNPerMm, hotLoadN, coldLoadN, travelUpMm, variability, operatingLoadN, residualPct }], warnings, defaulted }.',
   params: z.object({
     modelId: z.string().min(1).describe('Id of the stress model.'),
-    hangers: z.array(at).min(1).describe('The hanger points to design, each {supportId} or {pipeId, atMm}.'),
+    hangers: z.array(at).min(1).max(200).describe('The hanger points to design, each {supportId} or {pipeId, atMm}.'),
     tableId: z.string().min(1).describe('Spring table of the model (import_spring_table).'),
     maxVariability: z
       .number()

@@ -26,6 +26,11 @@ export interface CaseState {
   readonly residual: number;
   readonly iterations: number;
   readonly contacts: readonly ContactOutcome[];
+  /** OCC case combined by scalar or srss: the code stresses of the terms are combined, not the forces. */
+  readonly combination?: {
+    readonly method: 'scalar' | 'srss';
+    readonly terms: readonly { readonly state: CaseState; readonly factor: number }[];
+  };
 }
 
 export interface SolveFailure {
@@ -140,7 +145,7 @@ export function solveModel(
     });
   const states = new Map<string, CaseState>();
   for (const loadCase of model.loadCases) {
-    if (loadCase.type === 'EXP') continue;
+    if (loadCase.type === 'EXP' || loadCase.combine !== undefined) continue;
     const loads = caseLoads(doc, built, conditions, loadCase.name, loadCase.basic ?? [], model);
     if ('ok' in loads) return { ok: false, code: loads.code, message: loads.message, ids: [], paths: [loads.path] };
     if (loads.unverified.length > 0)
@@ -179,21 +184,27 @@ export function solveModel(
     });
   }
   for (const loadCase of model.loadCases) {
-    if (loadCase.type !== 'EXP') continue;
-    const terms = (loadCase.combine ?? []).map((term) => ({ state: states.get(term.case) as CaseState, factor: term.factor }));
+    if (loadCase.combine === undefined) continue;
+    const terms = loadCase.combine.map((term) => ({ state: states.get(term.case) as CaseState, factor: term.factor }));
+    const method = loadCase.method ?? 'algebraic';
     const mix = (pick: (state: CaseState) => Float64Array): Float64Array => {
       const out = new Float64Array(pick(terms[0]?.state as CaseState).length);
-      for (const { state, factor } of terms) pick(state).forEach((value, i) => (out[i] = (out[i] as number) + factor * value));
-      return out;
+      for (const { state, factor } of terms)
+        pick(state).forEach((value, i) => {
+          const part = factor * value;
+          out[i] = (out[i] as number) + (method === 'scalar' ? Math.abs(part) : method === 'srss' ? part * part : part);
+        });
+      return method === 'srss' ? out.map(Math.sqrt) : out;
     };
+    const expansion = loadCase.type === 'EXP';
     states.set(loadCase.name, {
       name: loadCase.name,
-      type: 'EXP',
+      type: expansion ? 'EXP' : 'OCC',
       displacements: mix((s) => s.displacements),
       reactions: mix((s) => s.reactions),
       elementForces: mix((s) => s.elementForces),
       uniform: mix((s) => s.uniform),
-      pressureBar: 0,
+      pressureBar: expansion ? 0 : Math.max(0, ...terms.map(({ state }) => state.pressureBar)),
       maxTempC: terms.reduce<number | null>(
         (largest, { state }) => (state.maxTempC === null ? largest : Math.max(largest ?? state.maxTempC, state.maxTempC)),
         null,
@@ -201,6 +212,7 @@ export function solveModel(
       residual: Math.max(0, ...terms.map(({ state }) => state.residual)),
       iterations: Math.max(0, ...terms.map(({ state }) => state.iterations)),
       contacts: [],
+      ...(method === 'algebraic' ? {} : { combination: { method, terms } }),
     });
   }
   return { ok: true, states: model.loadCases.map((loadCase) => states.get(loadCase.name) as CaseState), warnings };

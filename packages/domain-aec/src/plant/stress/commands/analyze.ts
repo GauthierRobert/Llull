@@ -5,11 +5,12 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { analyzeStressModel, type Analysis, type Finding } from '../analysis';
-import { remediationOf } from '../codes';
+import { refuse, remediationOf } from '../codes';
 import { modelGeometry } from '../model/geometry';
 import type { StressModel } from '../model/schema';
 import { SOLVER_VERSION } from '../solve/run';
 import { analysisRefusal, isRefusal, modelOr } from './common';
+import { decodeCursor, encodeCursor, pageOf } from './paging';
 
 const DEG = 180 / Math.PI;
 const nodeIndex = (id: string): number => Number(id.slice(1)) - 1;
@@ -92,7 +93,8 @@ function summary(analysis: Analysis, model: StressModel): Record<string, unknown
       },
       sections:
         'stiffness and expansion stress on the nominal wall; sustained and occasional stress on the wall less the corrosion allowance',
-      limits: 'end and interior extremum stations of each element; tees, reducers and component weights are not modelled (M5)',
+      limits:
+        'end and interior extremum stations of each element; OCC cases combined by scalar or srss are evaluated at the element end stations (nodes) only',
     },
   };
 }
@@ -108,6 +110,7 @@ export const analyzePipeStress = defineCommand({
     'Analyse a stress model: rebuild the finite element model from the current pipes and supports, solve every load case (weight, thermal, pressure, force primitives with non-linear supports re-evaluated per case) and apply the code check. ' +
     'Read-only. Default output is the summary: model size, solver residual and iterations per case, the largest displacement per case, the governing station per code case (ratio = stress / allowable), the findings with codes and remediation, the input hash and the support status. ' +
     '`include` adds details: "displacements" (node, mm, degrees), "reactions" (force N and moment N.mm at every anchor / support node per case), "stresses" (every station with stress, allowable, ratio, rule, SIFs); "geometry" (data.geometry: nodes { id, positionMm }, elements { id, pipeId, kind, nodeIds, pointsMm, odMm, wallMm, bendRadiusMm } and pipes { id, kind, pointsMm centreline, elementIds }, mm, building pipes and routed runs alike; use it to place support and reaction arrows); `cases` and `nodes` (ids like N3 from the summary) filter the details. ' +
+    'Large models: give `limit` (details per list) to page the details; the answer then carries data.page { limit, offset, total per list, nextCursor } and the next call passes cursor = nextCursor (the same limit and filters); a cursor from other inputs is PST_CURSOR_STALE. ' +
     'Units: mm, N, N.mm, MPa. reviewRequired is always true: a qualified engineer reviews the result. Refusals carry PST_* codes (PST_UNSTABLE names the free node and DOF; add an anchor or guide there). Next: check_pipe_stress, record_pipe_stress_results.',
   params: z.object({
     modelId: z.string().min(1).describe('Id of the stress model.'),
@@ -122,6 +125,14 @@ export const analyzePipeStress = defineCommand({
         'Details to add to the summary. Default none (summary only). "geometry" adds data.geometry (not filtered by cases / nodes).',
       )
       .optional(),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100000)
+      .describe('Page size: the most entries of each requested detail list to return (displacements, reactions, stresses). Default: all.')
+      .optional(),
+    cursor: z.string().describe('The data.page.nextCursor of the previous page (needs limit). Default: the first page.').optional(),
   }),
   annotations: { readOnly: true, idempotent: true },
   run: (doc, params): CommandResult => {
@@ -163,6 +174,47 @@ export const analyzePipeStress = defineCommand({
           (params.cases === undefined || params.cases.includes(row.case)) &&
           (params.nodes === undefined || row.node === null || params.nodes.includes(row.node)),
       );
+    let page: Record<string, unknown> | null = null;
+    if (params.cursor !== undefined && params.limit === undefined)
+      return refuse(
+        doc,
+        'analyze_pipe_stress',
+        'PST_PARAM_INVALID',
+        'a cursor needs the limit of the page it continues',
+        [model.id],
+        ['limit'],
+      );
+    if (params.limit !== undefined) {
+      let offset = 0;
+      if (params.cursor !== undefined) {
+        const decoded = decodeCursor(params.cursor, analysis.inputHash);
+        if (!decoded.ok)
+          return refuse(
+            doc,
+            'analyze_pipe_stress',
+            decoded.stale ? 'PST_CURSOR_STALE' : 'PST_PARAM_INVALID',
+            decoded.stale
+              ? 'the cursor was issued for other inputs (the model changed since)'
+              : 'the cursor is not one issued by this command',
+            [model.id],
+            ['cursor'],
+          );
+        offset = decoded.offset;
+      }
+      const totals: Record<string, number> = {};
+      for (const key of Object.keys(details)) {
+        const pageOfList = pageOf(details[key] as unknown[], offset, params.limit);
+        details[key] = pageOfList.items;
+        totals[key] = pageOfList.total;
+      }
+      const more = Object.values(totals).some((total) => total > offset + (params.limit as number));
+      page = {
+        limit: params.limit,
+        offset,
+        total: totals,
+        nextCursor: more ? encodeCursor(analysis.inputHash, offset + params.limit) : null,
+      };
+    }
     const worst = analysis.governing.reduce<{ ratio: number; case: string } | null>(
       (a, b) => (a === null || b.ratio > a.ratio ? b : a),
       null,
@@ -173,6 +225,7 @@ export const analyzePipeStress = defineCommand({
       {
         ...data,
         ...(Object.keys(details).length > 0 ? { details } : {}),
+        ...(page === null ? {} : { page }),
         ...(include.includes('geometry') ? { geometry: modelGeometry(analysis.built) } : {}),
       },
     );

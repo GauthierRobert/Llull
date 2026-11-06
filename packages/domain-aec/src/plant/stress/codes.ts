@@ -33,6 +33,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PST_RESULTS_INCOMPLETE: 'Add the missing sustained and expansion load cases, then record again.',
   PST_NOT_RECORDED: 'Run record_pipe_stress_results before approve_pipe_stress.',
   PST_CORROSION_EXCEEDS_WALL: 'Lower corrosionAllowanceMm below the wall thickness, or use a pipe with a thicker wall.',
+  PST_CURSOR_STALE: 'Start again without a cursor: the model, a pipe or a support changed since the first page.',
   PST_TABLE_INVALID: 'Fix the table rows named in the error paths (minN below maxN, one row per series and size).',
   PST_SPRING_TABLE_MISSING: 'import_spring_table first (vendor sizes, rates, load ranges, travel), then name its tableId.',
   PST_SPRING_NO_SIZE: 'Import a table with a size that holds the hot load and travel, or allow the constant-effort fallback.',

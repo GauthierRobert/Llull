@@ -5,6 +5,7 @@ import { deleteSifOverride, setSifOverride } from './commands/sifOverrides';
 import { deleteStressComponent, setStressComponent } from './commands/components';
 import { analyzePipeStress, checkPipeStress } from './commands/analyze';
 import { setPipeOperatingConditions, setStressLoadCases } from './commands/conditions';
+import { importPipeMaterialData } from './commands/importPipeMaterialData';
 import { guidedCantilever } from './commands/guidedCantilever';
 import { createStressModel, deleteStressModel, updateStressModel } from './commands/modelCommands';
 import { pipeSif } from './commands/pipeSif';
@@ -25,6 +26,7 @@ export const pipeStressCommands = commandCatalog(
   springVariability,
   nozzleLoadCheck,
   importSpringTable,
+  importPipeMaterialData,
   selectSpringHangers,
   deleteSpringHanger,
   createStressModel,

@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { apply, expectRefusal } from '../../../helpers/commandAssertions';
 import { analyzed, baseDoc, cases, conditioned, DN100, reaction, withModel, withPipe, type AnalysisData } from './m3Fixtures';
 import { expectRel } from './stressFixtures';
@@ -346,5 +347,56 @@ describe('import_spring_table', () => {
     expectRefusal(scene.doc, 'import_spring_table', bad([TABLE.S2, TABLE.S2]), 'PST_TABLE_INVALID');
     expectRefusal(scene.doc, 'import_spring_table', bad([]), 'CMD_INVALID_PARAMS');
     expectRefusal(scene.doc, 'import_spring_table', { ...(bad([TABLE.S2]) as object), modelId: 'nope' }, 'PST_MODEL_NOT_FOUND');
+  });
+});
+
+describe('stored springs, tables and loads are validated on load', () => {
+  type Raw = { document: { plant: { stress: { models: Record<string, Record<string, unknown>> } } } };
+  const stored = (): { raw: Raw; key: string } => {
+    const scene = frame();
+    const doc = select(withTable(scene, ['S3']), scene).document;
+    const raw = JSON.parse(serializeDocument(doc)) as Raw;
+    return { raw, key: Object.keys(raw.document.plant.stress.models)[0] as string };
+  };
+
+  it('round-trips a model with springs, a table and wind', () => {
+    const { raw } = stored();
+    expect(() => deserializeDocument(JSON.stringify(raw))).not.toThrow();
+  });
+
+  it('refuses a variable spring without a rate, duplicate ids, a negative preload and more than 9 winds', () => {
+    const corrupt = (edit: (model: Record<string, unknown>) => void): void => {
+      const { raw, key } = stored();
+      edit(raw.document.plant.stress.models[key] as Record<string, unknown>);
+      expect(() => deserializeDocument(JSON.stringify(raw))).toThrow();
+    };
+    corrupt((model) => (((model['springs'] as { rateNPerMm: number }[])[0] as { rateNPerMm: number }).rateNPerMm = 0));
+    corrupt((model) => (((model['springs'] as { coldLoadN: number }[])[0] as { coldLoadN: number }).coldLoadN = -1));
+    corrupt((model) => (model['springs'] = [...(model['springs'] as unknown[]), ...(model['springs'] as unknown[])]));
+    corrupt((model) => (model['springTables'] = [...(model['springTables'] as unknown[]), ...(model['springTables'] as unknown[])]));
+    corrupt(
+      (model) =>
+        (model['wind'] = Array.from({ length: 10 }, (_, i) => ({
+          name: `WIN${(i % 9) + 1}`,
+          pressureKPa: 1,
+          dragCoefficient: 1,
+          direction: [1, 0, 0],
+        }))),
+    );
+    corrupt(
+      (model) =>
+        (model['seismic'] = [
+          { name: 'U1', gFactors: [0, 0, 1] },
+          { name: 'U1', gFactors: [0, 1, 0] },
+        ]),
+    );
+  });
+
+  it('caps a table at 2000 sizes and 200 hangers per call', () => {
+    const scene = frame();
+    const many = Array.from({ length: 2001 }, (_, i) => ({ ...TABLE.S3, size: `X${i}` }));
+    expectRefusal(scene.doc, 'import_spring_table', { modelId: scene.id, tableId: 'T', source: 'cat', sizes: many }, 'PST_TABLE_INVALID');
+    const hangers = Array.from({ length: 201 }, (_, i) => ({ pipeId: scene.pipe, atMm: i }));
+    expectRefusal(withTable(scene, ['S3']), 'select_spring_hangers', { modelId: scene.id, hangers, tableId: 'T' }, 'CMD_INVALID_PARAMS');
   });
 });
