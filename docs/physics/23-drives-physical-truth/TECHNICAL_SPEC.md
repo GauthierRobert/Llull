@@ -636,3 +636,51 @@ a possible cross-check only; no change to M1.
 **13.8 Plan changes.** (a) M1 fixes the VC-DRV-20 reference (13.2.3) and the ζ map of TR-DRV-17. (b) M2 limits / backlash write K, B in acceleration units (J_eff) or use an
 explicit applied-force stop. (c) M2 run-time armature needs `mj_setConst` in the binding. (d) Every constraint row the adapter emits uses flat impedance and solref ≤ 4 dt
 (friction, equality, limits). (e) No port change was needed in M0.
+
+### DRV-M1 (2026-11-06): profiles, DC motor, drives, ledger
+
+**13.9 Built.** Commands (plugin `dynamics`, toolset assembly, except the two profile commands that live in core `commands/motion`): `add_motion_profile`, `evaluate_motion_profile`,
+`add_motor kind "dc"` (datasheet + gearhead + source, checked on entry), `check_motor_data`, `set_motor_drive` (voltage / torque / velocity / position / prescribed), `simulate_motion detail "drives"`
+(per-motor series, `data.drives`, `data.ledger`), `DRV_EFFORT_UNBOUNDED` in `check_dynamics`; `add_motor kind "speed"` takes an optional `source` for its `maxTorque`; `delete_dynamics_item`
+handles profiles (refused while a drive uses one, users listed) and drops the drive of a deleted motor or joint. Data: core `model/drives.ts`; `DynamicsModel` gains `profiles` and `drives`
+(load validation in `commands/persistence/drivesValidation.ts`: shapes, the profile compiled again, drive to motor and drive to profile cross references both ways). Core `geometry/motionProfile.ts`
+(pure evaluator, the unit table) and `lib/pchip.ts` (the Fritsch-Carlson interpolant of the propeller table, shared). Port (`dynamics/physicsEngine.ts`): `SimulationModel.actuators?: ActuatorBlock`
+as in 3.2 plus `joints` (the ids `jointForces` is indexed by), `SimulationJoint.armature?`, `SimulationTrace.{aux, ledger, actuatorWork}`; the MuJoCo adapter calls `advance` once per step with the
+midpoint state it gives `loads`, adds the joint and body forces, records aux and the cumulative ledger per sample, and writes `armature` into the joint. The jointPhysics and transmissions blocks
+are M2. Plugin laws: `sim/actuators/{dcMotor,controller,block,series,motorData}.ts`, `sim/{ledger,driveReport,endStop}.ts`.
+
+**13.10 Choices and corrections to the text above.**
+
+1. **D-DRV-01 as built.** The winding is the exponential of TR-DRV-06 with ω frozen at the engine's step-midpoint velocity (the extrapolation `loads` already uses); the torque is kt times the mean current. The
+   current in the series is the end-of-step current. L = 0 or τe < Δt/50 is quasi-static (no magnetic term; `DRV_ELECTRICAL_QUASI_STATIC` info). Torque, velocity, position and prescribed modes drive an ideal current
+   loop (L ignored there: the ledger closes without a magnetic term); only `voltage` mode integrates the winding. Current limit: `currentLimitA`, else `peakCurrentA`, else U/R; `busVoltageV` bounds R*i + ke*ω.
+2. **Gearhead (corrects TR-DRV-05 / 12 for the motor).** The mesh sits between the rotor and the joint, so the rotor's inertial torque is upstream of the loss: the joint sees `(J_o + η N² (J_r + J_g)) α = η N τ_em`.
+   The armature written to MuJoCo is therefore η_f N² J, not N² J (VC-DRV-10 reference 345.755 rad/s² is met to 0.5 %; N² J gave 328.5). The no-load friction kt I0 reaches the joint as η_f N kt I0.
+   Exact while motoring; when back-driving the armature is an approximation (η_b is applied to the torque only). Torque and braking torque use η_f (motoring, τ·ω_m >= 0) and 1/η_b (braking).
+3. **Open circuit.** A datasheet motor with no drive adds its armature and friction and no torque (its terminals are open); there is no `drives` data for it.
+4. **Controllers.** The measurement is the midpoint state (a half-step estimate), the command is held for k = round(1/(sampleHz Δt)) steps; k·Δt must equal 1/sampleHz to 1e-6 or the run is refused
+   (`DRV_CONTROL_RATE`, also refused at `set_motor_drive` when ω_c/sampleHz > 0.2). The integrator is not advanced while the clamped output pushes further into saturation. `tune` is resolved from the
+   reflected inertia at run time (bodies + armature), `gains` {kp, ki, kpPosition} are stored with the defaults ki 0 and kpPosition 0 filled in. Position mode is a P loop (kpPosition, plus the profile
+   velocity with feedforward) around the velocity PI. **Prescribed** is a PD servo with ω_n·Δt = 0.1 and the profile acceleration times J as feedforward (the S-curve of VC-DRV-24 then needs 0.1000 N·m
+   to 1 %; without the feedforward the servo's own transient put 3.6 % on the peak). Torque profiles are at the motor shaft; velocity / position profiles are the target joint's.
+5. **Profiles.** `ProfileSegment` is a flat object in the command (kind, law, to, duration, vmax, amax, jerk, accelFraction, sine and table fields) and a discriminated union in the model. Value
+   continuity is always checked; velocity continuity only for `position` profiles; `repeat > 1` needs the end to equal the start. The S-curve with a longer duration than the shortest stretches by lowering the
+   cruise speed (bisection on the monotone T(v)); a trapezoid with `amax` and a longer `duration` solves v from D = v (T - v/a). A duration-only S-curve uses `accelFraction` (default 1/3) and jerk fraction 1/4.
+   Sine segments are added to the value at their start (continuous by construction). Table times are relative to the segment start; its first value is the current value. Caps: 10000 segments, 100000 table
+   points, 10001 samples.
+6. **Effort.** `DRV_EFFORT_UNBOUNDED` is raised by `check_dynamics` for a speed motor without `source`, and for a sourced one whose bound is more than 10 times the peak servo torque of the run.
+   `simulate_motion` itself stays quiet about it (existing summaries unchanged). A governor whose bound is below what its start-up kick would use saturates, so its measured peak equals the bound.
+7. **End stops (TR-DRV-17, DRV-M0 13.8a).** `sim/endStop.ts` has the one-sided restitution e(ζ) = e^(-ζθ/√(1-ζ²))·|cos θ - ζ/√(1-ζ²) sin θ|, θ = atan2(2ζ√(1-ζ²), 2ζ²-1), and its numeric
+   inverse (bisection, domain ζ in [0, 0.999]); `generate_drv_reference.py` and `expected_results.json` carry restitution 0.571740 (spike 0.57194, 0.04 %), the release time 8.840 ms and the contact time
+   10.105 ms (spike 10.11 ms); the bilateral 0.526621 stays as `restitutionBilateral`. The reference file sha is `f0baa56b…15f24`; VC-DRV-20 now has 3 values (88 in all). `mujocoDriveSpike.test.ts` asserts
+   the new reference. No end-stop command yet (M2 `set_joint_physics`).
+8. **Announced speed.** A datasheet motor announces no top speed (its speed depends on the load): `FPR_SAMPLING_ALIASED` is not evaluated for a run whose only motors are datasheet motors.
+
+**13.11 Oracle results (MuJoCo 3.16.0, Δt 1e-5 unless stated).** VC-DRV-04: speed within 1.4e-5 relative and current within 2.7e-5 relative (end-of-step current) of the exact `dcStep` samples at 0.5 / 1 / 2 / 4.28 / 10 / 20 / 30 ms;
+peak 36.83 A at 0.87 ms. VC-DRV-05: input 8.67631 J, copper 4.34049 J, kinetic 4.33582 J, magnetic 1.0e-7 J, closure 2.3e-8 of the input (gate 1e-3). VC-DRV-03: 7589.15 rpm to 0.2 %. VC-DRV-23 (J 1e-3, ζ 1, ω_c 100,
+10 kHz, Δt 1e-4): 0.6976 / 1.0003 / 1.1349 / 1.0270 against 0.6967 / 1.0 / 1.1353 / 1.0270. VC-DRV-24: peak effort 0.100 N·m within 1 %, tracking error 1e-4 rad on a 1 rad move. VC-DRV-01 / 02 as in the plan,
+VC-DRV-21 / 22 to 1e-6, the gearhead case to 0.5 %.
+
+**13.12 Left.** Thermal model and its VCs (06-09, `size_drive`), `check_motion_truth`, `fit_drive_parameters`, plots, the prismatic `speed` motor of the stick-slip plan, transmissions, `set_joint_physics`, `add_load_schedule`, the
+`jointPhysics` / `transmissions` port blocks (M2); pmsm / stepper / induction (M4). Blocked plans remaining: `drv_lead_screw` (add_transmission), `drv_stick_slip` (set_joint_physics), `drv_servo_sizing` (add_transmission,
+set_joint_physics, size_drive, check_motion_truth); `drv_maxon_step` runs end to end (`tests/unit/drives/dcMotorStep.test.ts`).

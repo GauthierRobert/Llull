@@ -27,6 +27,19 @@ the motion in the 3D view (play / scrub / slow motion down to 1/100).
 Engine layout: `packages/core/src/dynamics/physicsEngine.ts` (the injected port), `packages/domain-dynamics/src/{sim,commands}/` (plugin `dynamics`: doc → model, force laws, report, commands; alias `@dynamics/*`),
 `packages/physics-mujoco/` (MJCF generation + stepping), `packages/core/src/geometry/{massProperties,entityMassProperties}.ts`.
 
+### Datasheet motors and drives (PHY-23, [spec](physics/23-drives-physical-truth/TECHNICAL_SPEC.md) section 13)
+
+`add_motor kind "dc"` stores a catalogue motor (R, L, kt = ke, rotor inertia, no-load current, optional gearhead and thermal data) with its source and grade;
+the redundant sheet numbers are checked first (`check_motor_data`: stall current and torque, back-EMF constant, no-load speed, mechanical time constant,
+speed/torque gradient, each within 2 %; `DRV_MOTOR_DATA_INCONSISTENT` unless `acceptInconsistent`). `add_motion_profile` stores a time profile (dwell, cam laws,
+trapezoid, 7-segment S-curve, sine, tables; `evaluate_motion_profile` reads value / velocity / acceleration and the peaks), and `set_motor_drive` commands the
+motor: `voltage` (exact winding law per step, current limit), `torque` (ideal current loop), `velocity` / `position` (discrete PI cascade with anti-windup,
+tuned from a bandwidth and the reflected inertia, zero-order hold at `sampleHz`) or `prescribed` (high-gain servo along a profile: the effort is the inverse dynamics).
+The law runs in the per-step `ActuatorBlock` of the physics port, so any engine integrates it; MuJoCo carries the rotor as joint `armature` (eta N^2 J) and the
+no-load friction as a friction level. `simulate_motion detail "drives"` returns per motor the voltage, current, shaft / joint torque, speed and powers, and the
+energy ledger (electrical input, copper, magnetic, gearhead loss, friction, kinetic, closure). A speed motor with no sourced torque bound is flagged
+`DRV_EFFORT_UNBOUNDED` by `check_dynamics`. Not yet: thermal model, transmissions with efficiency / locking / backlash, joint friction models (DRV-M2 and later).
+
 ### Springs, energy and unsettled-run warnings
 
 `add_body_joint` takes `stiffness` (N·m/rad revolute, N/m prismatic; 1 N/mm = 1000 N/m) and `springReference` (rad or m from the modelled

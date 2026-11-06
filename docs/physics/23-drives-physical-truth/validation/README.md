@@ -4,10 +4,10 @@ The pack follows one principle: **a physical-truth claim needs three independent
 another.
 
 1. **Analytic oracles.** [`generate_drv_reference.py`](generate_drv_reference.py) uses the Python standard library only and is run
-   as `python3 -I`. Re-runs are byte-identical: sha256 `9c519bb5…ec2b0e`, checked twice on 2026-11-04 with the bundled CPython
+   as `python3 -I`. Re-runs are byte-identical: sha256 `f0baa56b…15f24` (regenerated 2026-11-06 for the one-sided end stop, DRV-M1), checked twice with the bundled CPython
    `desktop/build/python/python.exe`. It writes [`drv_reference.json`](drv_reference.json), with closed-form solutions for the DC
    motor, thermal network, transmissions, friction, profiles, controllers and machines. The generator checks its own energy
-   identities and symmetry conditions. [`expected_results.json`](expected_results.json) holds 87 pinned values in pack schema §6.3,
+   identities and symmetry conditions. [`expected_results.json`](expected_results.json) holds 88 pinned values in pack schema §6.3,
    built from that file by [`build_expected_results.py`](build_expected_results.py).
 2. **A real datasheet.** maxon RE 40 148877 [R1] is internally consistent to 0.53 %. That makes it the shared test motor: real
    numbers, not invented ones.
@@ -58,7 +58,7 @@ in `expected_results.json`.
 | VC-DRV-17 | FR-DRV-08, TR-DRV-15      | 1 kg slide, stiction F_s 2 N / F_k 1 N, force ramp 1 N/s                                                              | breakaway at 2.000 s; acceleration just after 1.0 m/s²; no creep before (displacement ≤ 1e-9 m)                                                                                                              | 2 ms / 2 %          | generator, A                      |
 | VC-DRV-18 | FR-DRV-08, TR-DRV-15      | [`plans/drv_stick_slip.plan.json`](plans/drv_stick_slip.plan.json): m 1, k 100, v_b 0.1, F_s 2, F_k 1                 | period 0.671239 s = slip 0.471239 + stick 0.2; release at x = 0.02 m, slip ends at x = 0                                                                                                                     | 2 %                 | generator, A                      |
 | VC-DRV-19 | FR-DRV-08, TR-DRV-16      | wheel J 0.01, radial load 5 kg, pin r 10 mm, μ 0.2, torque 0.2 N·m                                                    | α = 10.19 rad/s² (friction 0.0981 N·m); Δt and Δt/2 differ by < 0.5 % (one-step lag)                                                                                                                         | 1 %                 | generator, A                      |
-| VC-DRV-20 | FR-DRV-09, TR-DRV-17      | end stop k 1000 N·m/rad, ζ 0.2, J 0.01, impact 1 rad/s                                                                | restitution 0.52662; peak penetration 2.391e-3 rad at 4.42 ms; contact time 10.14 ms                                                                                                                         | 3 % / 5 %           | generator, A; OQ-DRV-02           |
+| VC-DRV-20 | FR-DRV-09, TR-DRV-17      | end stop k 1000 N·m/rad, ζ 0.2, J 0.01, impact 1 rad/s                                                                | restitution 0.57174 (one-sided stop; the bilateral 0.52662 is not a stop); peak penetration 2.391e-3 rad at 4.42 ms; contact time 10.10 ms                                                                   | 3 % / 5 %           | generator, A; OQ-DRV-02           |
 | VC-DRV-21 | FR-DRV-10, TR-DRV-18      | trapezoid 0.1 m (v 0.5, a 5); S-curve (+ jerk 100); triangle 1 m in 1 s                                               | 0.300 s; 0.350 s; peaks 2 m/s, 4 m/s²                                                                                                                                                                        | 1e-9                | generator, A                      |
 | VC-DRV-22 | FR-DRV-10, TR-DRV-18      | `evaluate_motion_profile`, unit rise, each law                                                                        | (C_v, C_a): cycloidal (2, 6.28319), 3-4-5 (1.875, 5.77350), harmonic (1.57080, 4.93480), modified trapezoid (2, 4.88812), modified sine (1.75960, 5.52796)                                                   | 1e-6                | generator, A                      |
 | VC-DRV-23 | FR-DRV-11, TR-DRV-10      | velocity PI on J 1e-3, tuned ζ 1, ω_c 100 rad/s, sample 10 kHz, Δt 1e-4                                               | gains k_p 0.2, k_i 10; unit step response 0.6967 / 1.0 / 1.1353 / 1.0270 at 5 / 10 / 20 / 50 ms; overshoot peak 1.1353 at 20 ms                                                                              | 0.01 abs            | generator, A                      |
@@ -97,5 +97,5 @@ pass band is a target).
 The four plans are listed in `tests/unit/contract/blockedPlanCommands.json` until their commands exist. Small cases (VC-DRV-10,
 16, 17, 19–27, 29) are built as unit-test fixtures from the `drv_reference.json` inputs, not as plan files.
 
-Expected values: [`expected_results.json`](expected_results.json) (87 values) and [`drv_reference.json`](drv_reference.json).
+Expected values: [`expected_results.json`](expected_results.json) (88 values) and [`drv_reference.json`](drv_reference.json).
 Sources: [`sources.md`](sources.md).
