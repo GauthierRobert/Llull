@@ -67,12 +67,16 @@ FR → VC: 20→26, 21→27, 01→06, 02→01/02, 03→05, 04→04/19, 05→01, 
 
 ## Plans
 
-| File                                                                                       | Runs today                                               | Purpose                                                          |
-| ------------------------------------------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------------- |
-| [`plans/mov_slider_crank_base.plan.json`](plans/mov_slider_crank_base.plan.json)           | yes (2026-11-02)                                         | the mechanism (PHY-10 plan without its simulate / inspect steps) |
-| [`plans/mov_render_motion_instants.plan.json`](plans/mov_render_motion_instants.plan.json) | yes: frames at 0.0114, 0.0314 (M0; was 0.01218, 0.03132) | VC-MOV-03 reproducer                                             |
-| [`plans/mov_clip_spin.plan.json`](plans/mov_clip_spin.plan.json)                           | steps 1–3 yes; `render_animation` no (M1)                | VC-MOV-04, 07, 09                                                |
-| [`plans/mov_slider_crank_video.plan.json`](plans/mov_slider_crank_video.plan.json)         | base yes; `render_animation` no (M1 / M2)                | UC-1, VC-MOV-01, 02, 10, 15, 16                                  |
+| File                                                                                       | Runs today                                                                                                                | Purpose                                                          |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`plans/mov_slider_crank_base.plan.json`](plans/mov_slider_crank_base.plan.json)           | yes (2026-11-02)                                                                                                          | the mechanism (PHY-10 plan without its simulate / inspect steps) |
+| [`plans/mov_render_motion_instants.plan.json`](plans/mov_render_motion_instants.plan.json) | yes: frames at 0.0114, 0.0314 (M0; was 0.01218, 0.03132)                                                                  | VC-MOV-03 reproducer                                             |
+| [`plans/mov_clip_spin.plan.json`](plans/mov_clip_spin.plan.json)                           | yes (M1, 2026-11-06): 21 frames, APNG                                                                                     | VC-MOV-04, 07, 09                                                |
+| [`plans/mov_slider_crank_video.plan.json`](plans/mov_slider_crank_video.plan.json)         | base yes; `render_animation` as `format: "frames"` / `apng` (M1); its `mp4` is refused until MOV-M2 (NATIVE_TOOL_MISSING) | UC-1, VC-MOV-01, 02, 10, 15, 16                                  |
+
+## Status per VC (MOV-M1, 2026-11-06)
+
+Done in `tests/unit/renderAnimation*.test.ts`, `animationPose.test.ts`, `apng.test.ts`, `tests/golden/movAnimation.test.ts`: VC-MOV-01, 02, 03 (M0), 04, 05, 06, 07, 08, 11, 12, 13 (host without the encoder: `mp4` / `gif` refused, `apng` succeeds), 15, 16, 17 (trace = `render_motion` trace; overlay drawn through the scene a native port receives; the 1 % pixel diff against the real native raster is a server-suite check, not run here), 18, 24, and the APNG half of VC-MOV-09 (`check_media.py` on the command's own APNG: 21 frames, loop, 0.1 s; runs when a Python 3 is found: `LLULL_PYTHON`) and the player half of VC-MOV-19 (UI adapter and core `animationPoseAt` equal at 50 random times). Not in M1: VC-MOV-09 GIF half, 10, 14, 21, 22 (MOV-M2), 19 Export dialog half (M4), 20 (budgets measured in `TECHNICAL_SPEC.md` §13.5, the MP4 part at M2), 23 (M3), 25 (M0), 26 / 27 (M5).
 
 Expected values: [`expected_results.json`](expected_results.json) (pack schema §6.3) and [`mov_reference.json`](mov_reference.json);
 sources in [`sources.md`](sources.md).
