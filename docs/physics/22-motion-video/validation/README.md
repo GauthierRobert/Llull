@@ -17,7 +17,7 @@ Validation layer (three independent legs, so a defect in one cannot hide in anot
 2. **Container oracle**: [`check_media.py`](check_media.py) (Python stdlib) parses APNG / GIF / MP4 structure (chunk CRCs, APNG
    sequence numbers and acTL-before-IDAT per PNG-3 [R6], GIF blocks, delays and NETSCAPE loop, MP4 box tree, sample count,
    timescale, codec configuration box). It shares no code with llull's encoders. Self-tested 2026-11-02 on a llull PNG, a
-   synthetic 3-frame APNG, a 2-frame GIF and a truncated GIF (rejected); its MP4 branch has not run on a real file yet and is
+   synthetic 3-frame APNG, a 2-frame GIF and a truncated GIF (rejected); its MP4 branch ran on a real AV1 file in MOV-M0 (spike, [`playback.md`](playback.md)) and is
    first exercised by VC-MOV-10 in MOV-M2 (if it disagrees with `ffprobe` on that file, fix the checker before trusting either).
 3. **llull's own suites**: unit / golden / server / native / component tests listed per VC (TECHNICAL_SPEC §9), plus the
    human playback check of VC-MOV-10.
@@ -67,12 +67,12 @@ FR → VC: 20→26, 21→27, 01→06, 02→01/02, 03→05, 04→04/19, 05→01, 
 
 ## Plans
 
-| File                                                                                       | Runs today                                 | Purpose                                                          |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------- |
-| [`plans/mov_slider_crank_base.plan.json`](plans/mov_slider_crank_base.plan.json)           | yes (2026-11-02)                           | the mechanism (PHY-10 plan without its simulate / inspect steps) |
-| [`plans/mov_render_motion_instants.plan.json`](plans/mov_render_motion_instants.plan.json) | yes: shows the snapping (0.01218, 0.03132) | VC-MOV-03 reproducer                                             |
-| [`plans/mov_clip_spin.plan.json`](plans/mov_clip_spin.plan.json)                           | steps 1–3 yes; `render_animation` no (M1)  | VC-MOV-04, 07, 09                                                |
-| [`plans/mov_slider_crank_video.plan.json`](plans/mov_slider_crank_video.plan.json)         | base yes; `render_animation` no (M1 / M2)  | UC-1, VC-MOV-01, 02, 10, 15, 16                                  |
+| File                                                                                       | Runs today                                               | Purpose                                                          |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------------- |
+| [`plans/mov_slider_crank_base.plan.json`](plans/mov_slider_crank_base.plan.json)           | yes (2026-11-02)                                         | the mechanism (PHY-10 plan without its simulate / inspect steps) |
+| [`plans/mov_render_motion_instants.plan.json`](plans/mov_render_motion_instants.plan.json) | yes: frames at 0.0114, 0.0314 (M0; was 0.01218, 0.03132) | VC-MOV-03 reproducer                                             |
+| [`plans/mov_clip_spin.plan.json`](plans/mov_clip_spin.plan.json)                           | steps 1–3 yes; `render_animation` no (M1)                | VC-MOV-04, 07, 09                                                |
+| [`plans/mov_slider_crank_video.plan.json`](plans/mov_slider_crank_video.plan.json)         | base yes; `render_animation` no (M1 / M2)                | UC-1, VC-MOV-01, 02, 10, 15, 16                                  |
 
 Expected values: [`expected_results.json`](expected_results.json) (pack schema §6.3) and [`mov_reference.json`](mov_reference.json);
 sources in [`sources.md`](sources.md).

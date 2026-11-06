@@ -11,8 +11,8 @@ import { type MeshBvh, buildMeshBvh, bvhMinDistance } from '@core/geometry/meshB
 import type { AssemblyPart } from '@core/geometry/assemblyCheck/partTypes';
 import { overlapOf } from '@core/geometry/assemblyCheck/pairClassify';
 import { type CheckItem, findingKey } from '@core/model/checkResult';
-import { type BodyPoseAt, documentAtPose, pointAtPose } from '@core/geometry/bodyPose';
-import { STATIC_POSE, type PoseTrack, isMoving, poseAt, relativeTransform, relativeTravelBound, travelBound } from '../sim/motionPoses';
+import { type BodyPoseAt, type PoseTrack, documentAtPose, pointAtPose, poseAtFraction } from '@core/geometry/bodyPose';
+import { STATIC_POSE, isMoving, relativeTransform, relativeTravelBound, travelBound } from '../sim/motionPoses';
 import { collectParts } from '@core/geometry/assemblyParts';
 import { intentOf } from '@core/geometry/assemblyGraph';
 import { bisectEdge, goldenMinimum } from './motionRefine';
@@ -146,7 +146,7 @@ function poseOf(plan: MotionPlan, part: MotionPart, u: number): BodyPoseAt {
   const track = part.body === null ? undefined : plan.tracks[part.body];
   if (track === undefined) return STATIC_POSE;
   const i = Math.min(Math.floor(u), plan.times.length - 1);
-  return poseAt(track, i, u - i);
+  return poseAtFraction(track, i, u - i);
 }
 
 type Kind = 'interference' | 'touch' | 'unknown';
