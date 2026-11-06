@@ -29,7 +29,7 @@ import { getPiping, runPoints } from './model';
 import { legShifts } from './legShifts';
 import { isSloped, legFall } from './slope';
 import { derivedBranch, layoutBranches, oletPart, teeSlot } from './routeBranch';
-import { flangeParts, mintSet, setupEnd } from './routeEnds';
+import { capPart, flangeParts, mintSet, setupEnd } from './routeEnds';
 import { at, makeEnv, partOf, type Mint, type Slot } from './routeEnv';
 import { layoutInline } from './routeInline';
 import { chooseTurns, turnPartFields } from './routeTurns';
@@ -129,9 +129,11 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
   const counters: Record<string, number> = {};
   const mint: Mint = (kind) => `${run.id}/${kind}-${(counters[kind] = (counters[kind] ?? 0) + 1)}`;
   const startIds = start.set === null ? null : mintSet(mint);
+  const startCapId = start.cap === undefined ? null : mint('cap');
   const inlineSlots = layoutInline(env, lengths, dirs, mint);
   if (isFailure(inlineSlots)) return inlineSlots;
   const endIds = end.set === null ? null : mintSet(mint);
+  const endCapId = end.cap === undefined ? null : mint('cap');
   const fits = layoutBranches(env);
   if (isFailure(fits)) return fits;
   const shifts = legShifts(env, inlineSlots, fits, dirs, eps);
@@ -165,6 +167,8 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
       accessories: [startIds.gasket, startIds.bolts],
     });
   }
+  const startCap = startCapId === null ? null : capPart(run.id, startCapId, start, first, dirs[0] as Vec3, dnStart, od);
+  if (startCap !== null) parts.push(startCap);
   const external = (id: string): boolean => id === start.portId || id === end.portId || id.startsWith('open:');
   for (let leg = 0; leg < legCount; leg++) {
     const u = dirs[leg] as Vec3;
@@ -180,7 +184,7 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
     const head: Interval =
       startSide !== null
         ? {
-            id: startIds?.flange ?? startSide.fittingId ?? startSide.portId ?? 'open:start',
+            id: startIds?.flange ?? startCapId ?? startSide.fittingId ?? startSide.portId ?? 'open:start',
             start: 0,
             end: startSide.length,
             gap: startSide.gap,
@@ -198,7 +202,7 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
     const tail: Interval =
       endSide !== null
         ? {
-            id: endIds?.flange ?? endSide.portId ?? 'open:end',
+            id: endIds?.flange ?? endCapId ?? endSide.portId ?? 'open:end',
             start: length - endSide.length,
             end: length,
             gap: endSide.gap,
@@ -336,6 +340,12 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
       gapMm: end.set.gasketThickness,
       accessories: [endIds.gasket, endIds.bolts],
     });
+  }
+  if (endCapId !== null) {
+    const endPipe = env.pipeAt(dnEnd);
+    if (isFailure(endPipe)) return endPipe;
+    const cap = capPart(run.id, endCapId, end, last, scale3(dirs[legCount - 1] as Vec3, -1), dnEnd, endPipe.od);
+    if (cap !== null) parts.push(cap);
   }
   const pieces = parts.filter((part) => part.kind === 'pipe');
   const reasons = unverifiedReasons(lookup, parts);

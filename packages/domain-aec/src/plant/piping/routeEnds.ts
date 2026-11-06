@@ -7,11 +7,11 @@ import type { Vec3 } from '@core/model/vectors';
 import type { EndType, PartPort, PortSpec, RoutedPart, RunEnd } from '@aec/plant/types';
 import { len3, scale3, sub3 } from '@lib/vec3';
 import { fail, isFailure, type DerivationFailure } from './deriveTypes';
-import { isJoinFailure, joinFrom } from './connections';
+import { fittingEnd, isJoinFailure, joinFrom } from './connections';
 import { resolveFlangeSet, type FlangeFace, type FlangeSet } from './flangeSet';
 import { angleBetweenDeg, epsilonFor, unitVector } from './legs';
 import { portIdOf, portOfRef } from './ports';
-import { at, partOf, type EndSetup, type Env, type Mint } from './routeEnv';
+import { at, joinOf, partOf, type EndSetup, type Env, type Mint } from './routeEnv';
 import { branchStartSetup } from './routeBranch';
 import { isMiss } from './specLookup';
 
@@ -55,12 +55,30 @@ function socketPortSetup(env: Env, port: PortSpec, portId: string, side: 'start'
 }
 
 /**
+ * The setup of an open end closed by the spec's cap of size `dn`: the cap occupies its row `length` at the end and meets the pipe by the spec's
+ * connection rule for its end type (butt weld, socket weld, threaded).
+ * @failure no cap row -> its miss (RTE_SPEC_NO_COMPONENT / PSC_*); no `length` -> RTE_SPEC_NO_COMPONENT; no connection rule -> RTE_NO_CONNECTION_RULE
+ */
+function capSetup(env: Env, side: 'start' | 'end', dn: number): EndSetup | DerivationFailure {
+  const row = env.lookup.component({ types: ['cap'], dn });
+  if (isMiss(row)) return fail(row.miss, row.detail, [...row.ids, env.run.id], [side], { dn });
+  const length = row.dims['length'];
+  if (length === undefined || !(length > 0))
+    return fail('RTE_SPEC_NO_COMPONENT', `cap row ${row.key} has no length dimension (${row.source})`, [row.key], [side]);
+  const join = joinOf(env, fittingEnd(row), dn, row.dims, row.key, [env.run.id, row.key], [side]);
+  if (isFailure(join)) return join;
+  return { length, gap: join.gapMm, set: null, join, port: null, portId: null, cap: row };
+}
+
+/**
  * The setup of the port at one run end; `dn` is the run size there.
  * @failure port gone / wrong size / moved / turned away, no connection rule, flange set problems -> the RTE_* failure
  */
 export function setupEnd(env: Env, end: RunEnd, side: 'start' | 'end', dn: number): EndSetup | DerivationFailure {
   const { doc, line, lookup, weld } = env;
-  if (end.ref === undefined) return { length: 0, gap: 0, set: null, port: null, portId: null };
+  if (end.ref === undefined) return end.cap === true ? capSetup(env, side, dn) : { length: 0, gap: 0, set: null, port: null, portId: null };
+  if (end.cap === true)
+    return fail('RTE_CAP_INVALID', `the ${side} of run ${env.run.id} is connected to a port and also capped`, [env.run.id], [side]);
   const port = portOfRef(doc, end.ref);
   const portId = portIdOf(doc, end.ref);
   if (port === null) return fail('RTE_UNKNOWN_PORT', `the ${side} port ${portId} no longer exists`, [portId], [side]);
@@ -156,4 +174,14 @@ export function flangeParts(
     { dims: { ...set.flange.dims, pipeOutsideDiameter: pipeOd } },
   );
   return away ? [gasket, bolts, flange] : [flange, bolts, gasket];
+}
+
+/**
+ * The part of a cap at a run end: `face` is the end of the pipe run (the closed end), `into` the unit direction from the closed end toward the pipe;
+ * its single port is the mouth, `length` along `into` from the closed end, facing the pipe.
+ */
+export function capPart(runId: string, id: string, setup: EndSetup, face: Vec3, into: Vec3, dn: number, pipeOd: number): RoutedPart | null {
+  if (setup.cap === undefined || setup.join === undefined) return null;
+  const mouth: PartPort = { position: at(face, into, setup.length), direction: into, dn, endType: setup.join.end };
+  return partOf(runId, id, 'cap', setup.cap, [mouth], { centre: face, dims: { ...setup.cap.dims, outsideDiameter: pipeOd } });
 }
