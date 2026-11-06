@@ -29,7 +29,7 @@ export const checkReachability = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Can an operator reach each operating point (valve handwheel, instrument, equipment access point) from grade? Builds the access graph of the BUILDING model: grade (the lowest level) and the walking surfaces ' +
-    '(floor slabs, grating panels, generated platforms) are nodes; fixed ladders, steel and concrete stairs and surfaces that touch (within 10 mm, tops within 20 mm) are edges unless a guard-rail covers their whole shared boundary (a gap or a gate keeps them connected). For each target the surface it is operated from is the ' +
+    '(floor slabs, grating panels, generated platforms) are nodes; fixed ladders, steel and concrete stairs and surfaces that touch (within 10 mm, tops within 20 mm) are edges unless a guard-rail covers their whole shared boundary (a gap of 100 mm or more or a gate keeps them connected; a rail set back more than 150 mm from the boundary does not separate). For each target the surface it is operated from is the ' +
     'best one at or below the point within maxHorizontalReachMm in plan (inside the band and connected to grade first, then the highest), with height above it, plan reach and the route from grade. ' +
     'Findings (all fail, ruleset project): STA_OPERATING_HEIGHT (height above the surface outside operatingHeightMm), STA_REACH (no surface at or below the point within reach), STA_ACCESS_NO_EGRESS (the surface has no route to grade); ' +
     'a valve without an operating point is STA_TARGET_UNLOCATED (warn, never a pass). The band and the reach are project inputs with no default (their source is echoed). Points are ABSOLUTE document coordinates in DOCUMENT UNITS (z = elevation, not level-relative); ' +
@@ -51,7 +51,7 @@ export const checkReachability = defineCommand({
       .array(z.enum(['valves', 'nozzles', 'manways']))
       .optional()
       .describe(
-        'Targets read from the model: "valves" = the handwheel centre (valve centre + stem direction x catalogue stem height) of every valve of the routed piping, tagged by its tag (else its inline id). "nozzles" = the flange face centre of every equipment nozzle that is not a manway, tagged "<equipment mark>:<nozzle mark>" (kind equipment_nozzle). "manways" = the nozzles whose service contains "manway" (kind manway), same tag form. Equipment without nozzles gives no target; a nozzle that does not suit its template is skipped, as in equipment_ports.',
+        'Targets read from the model: "valves" = the handwheel centre (valve centre + stem direction x catalogue stem height) of every valve of the routed piping, tagged by its tag (else its inline id). "nozzles" = the flange face centre of every equipment nozzle that is not a manway, tagged "<equipment mark>:<nozzle mark>" (kind equipment_nozzle). "manways" = the nozzles whose service contains the word "manway" or "manways" (case-insensitive; not inside a longer word such as "manwayish", not after "non-"; kind manway), same tag form; every other nozzle is "nozzles". Equipment without nozzles gives no target; a nozzle that does not suit its template is skipped, as in equipment_ports.',
       ),
     operatingHeightMm: z
       .object({

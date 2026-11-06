@@ -8,6 +8,7 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { apply, data } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
+import { spanRange, type SupportGroup, type SupportLine } from '@aec/plant/structures/grating/gratingSupports';
 import { TYPE, gratedFrame } from './accessFixtures';
 
 interface Panel {
@@ -72,7 +73,56 @@ describe('check_grating wedge panels', () => {
     }
   });
 
+  it('a load that passes on the midspan chord fails on the widest span: STA_GRATING_OVERSTRESS', () => {
+    const base = answer.panels[0] as Panel & { allowableUniformKPa: number; selfWeightKPa: number };
+    const load = 1.2 * base.allowableUniformKPa - base.selfWeightKPa;
+    const mid = 2 * 2075 * Math.sin(Math.PI / 46);
+    // On the midspan chord (283.2 mm) the allowable is (span / mid)^2 times larger: the same load is under the limit there.
+    expect((load + base.selfWeightKPa) / (base.allowableUniformKPa * (base.spanMm / mid) ** 2)).toBeLessThan(1);
+    const failed = check(doc, { uniformLoadKPa: load });
+    expect(failed.panels[0]?.findings.map((finding) => finding.code)).toContain('STA_GRATING_OVERSTRESS');
+    expect(failed.verdict).toBe('fail');
+  });
+
   it('is read-only and pure', () => {
     expectPure(doc, () => execute(doc, 'check_grating', { uniformLoadKPa: 2, deflectionRatio: 100 }));
+  });
+});
+
+describe('spanRange', () => {
+  const line = (id: string, sMm: number, pMin: number, pMax: number, slope: number): SupportLine => ({
+    id,
+    sMm,
+    pMin,
+    pMax,
+    halfWidthMm: 0,
+    topMm: 0,
+    parallelism: 0,
+    slope,
+  });
+  const group = (members: SupportLine[]): SupportGroup => ({
+    sMm: members.reduce((sum, member) => sum + member.sMm, 0) / members.length,
+    halfWidthMm: 0,
+    members,
+  });
+
+  it('converging supports: the span at each side edge, the widest governs', () => {
+    const a = group([line('a', -100, 0, 1000, -0.1)]);
+    const b = group([line('b', 100, 0, 1000, 0.1)]);
+    // 200 + 0.2 (p - 500): 100 at p = 0, 300 at p = 1000
+    expect(spanRange(a, b, 0, 1000)).toEqual({ minMm: 100, maxMm: 300 });
+  });
+
+  it('a support line that does not cover the middle: the member nearest to it carries the side', () => {
+    const a = group([line('a1', -100, 0, 100, -0.1), line('a2', -100, 300, 500, -0.1)]);
+    const b = group([line('b', 100, 0, 1000, 0.1)]);
+    // mid 250 is under neither a1 (0..100) nor a2 (300..500); a2 is nearer: s = -60 at p = 0, -110 at p = 500; b: 50 and 100
+    const range = spanRange(a, b, 0, 500);
+    expect(range.minMm).toBeCloseTo(110, 9);
+    expect(range.maxMm).toBeCloseTo(210, 9);
+  });
+
+  it('parallel supports: both values are the centre distance', () => {
+    expect(spanRange(group([line('a', 0, 0, 10, 0)]), group([line('b', 400, 0, 10, 0)]), 0, 10)).toEqual({ minMm: 400, maxMm: 400 });
   });
 });

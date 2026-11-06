@@ -9,6 +9,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { apply, data } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
 import { rect } from './accessFixtures';
+import { runPlan } from '../../../golden/runPlan';
+import { structuresPlans } from '../../../golden/structuresPlans';
 
 interface Graph {
   surfaces: Array<{ id: string; connected: boolean; route: string[] | null }>;
@@ -93,6 +95,38 @@ describe('guard-rails as barriers between touching surfaces', () => {
       levelId: Object.keys(doc.building?.levels ?? {})[0],
     });
     expect(connectedB(wrongLevel)).toBe(true);
+  });
+
+  it('a rail set back 40 mm from the boundary still cuts; one set back 200 mm (beyond the 150 mm tolerance) does not', () => {
+    const at = (x: number): CadDocument =>
+      apply(doc, 'add_railing', {
+        path: [
+          [x, 0, 0],
+          [x, 2000, 0],
+        ],
+        levelId: upper,
+      });
+    expect(connectedB(at(3040))).toBe(false);
+    expect(connectedB(at(3200))).toBe(true);
+  });
+
+  it('gaps of 100 mm and 300 mm in the rail are detected and keep the decks connected', () => {
+    for (const [from, to] of [
+      [900, 1000],
+      [850, 1150],
+    ])
+      expect(connectedB(rail(doc, upper, { openings: [{ from, to, gate: false }] }))).toBe(true);
+  });
+
+  it('golden followups plan: deck B is unreachable through the guard-rail, deck A is reached by the stair', () => {
+    const built = runPlan(structuresPlans['plant_access_structures_followups'] as Parameters<typeof runPlan>[0]);
+    expect(built.failedSteps).toEqual([]);
+    const answer = data<{ unreachable: string[]; surfaces: Array<{ id: string; connected: boolean }> }>(built.document, 'access_graph', {});
+    expect(answer.surfaces.filter((surface) => surface.id.startsWith('slab')).map((surface) => [surface.id, surface.connected])).toEqual([
+      ['slab-1', true],
+      ['slab-2', false],
+    ]);
+    expect(answer.unreachable).toEqual(['slab-2']);
   });
 
   it('is read-only and pure', () => {

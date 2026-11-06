@@ -1,20 +1,23 @@
 /**
  * Guard-rails as barriers between touching surfaces (06 STA §5.7, STA-FU). Two surfaces that touch stay connected unless a guard-rail stands on their whole
- * shared boundary: every sample of the contact (every 50 mm along the outline of one surface that lies within 10 mm of the other) is within 50 mm in plan of a
- * guarded stretch of a `guardrail` railing standing on one of the two tops (50 mm). A gap or a gate in the rail is passable (a gate swings), so a sample
- * in a gap that is wider than the 100 mm of two samples opens the connection. A hand-rail is not a barrier. Pure, bounded (2000 samples per pair).
+ * shared boundary. The outline of one surface is sampled every 50 mm (every length/2000 beyond a 100 m outline) where it lies within 10 mm of the other. A sample is
+ * covered by a stretch of a `guardrail` railing standing on one of the two tops (50 mm) when its foot point lies on the stretch (25 mm slack at each end) and its
+ * plan distance to the stretch is at most 150 mm: the same 150 mm that edge protection allows between a rail and the edge line (`edgeChecks`), so a rail set back
+ * from the edge by up to 150 mm still separates; one set back further does not. A gap or a gate is passable (a gate swings): a gap of 100 mm or more is always
+ * detected (it holds a sample 25 mm or more from both rail ends) on outlines up to 100 m; a narrower gap, or 2 x length/2000 on a longer outline, may be missed. A
+ * hand-rail is not a barrier. Pure, bounded (2000 samples per pair).
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { toMm } from '@core/model/units';
-import { projectOntoSegment } from '@lib/polygon';
 import { elementsOf, getBuilding } from '@aec/building/model';
 import { guardedSegments } from '../../railing/railingLayout';
 import { boxesNear, boxOf, distanceToRegion, type Box } from './regions';
 import { CONNECT_Z_MM, CONTACT_GAP_MM, type SurfaceNode } from './types';
 
 const SAMPLE_MM = 50;
-const COVER_MM = 50;
+const COVER_MM = 150;
+const END_SLACK_MM = 25;
 const MAX_SAMPLES = 2000;
 
 /** A guarded stretch of a guard-rail, plan end points and absolute height of the surface it stands on, mm. */
@@ -72,6 +75,17 @@ function contactSamples(from: SurfaceNode, to: SurfaceNode): Vec2[] {
   return samples;
 }
 
+/** The foot of `point` lies on the stretch (with the end slack) and is at most 150 mm from it. */
+function covers(run: BarrierRun, point: Vec2): boolean {
+  const [dx, dy] = [run.b[0] - run.a[0], run.b[1] - run.a[1]];
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return Math.hypot(point[0] - run.a[0], point[1] - run.a[1]) <= END_SLACK_MM;
+  const [px, py] = [point[0] - run.a[0], point[1] - run.a[1]];
+  const along = (px * dx + py * dy) / length;
+  const across = Math.abs(px * dy - py * dx) / length;
+  return along >= -END_SLACK_MM && along <= length + END_SLACK_MM && across <= COVER_MM;
+}
+
 /** True when the shared boundary of `a` and `b` is covered along its whole length by guard-rails (see the file comment); false when they merely overlap. */
 export function separatedByRailing(a: SurfaceNode, b: SurfaceNode, runs: readonly BarrierRun[]): boolean {
   const near = runs.filter(
@@ -83,5 +97,5 @@ export function separatedByRailing(a: SurfaceNode, b: SurfaceNode, runs: readonl
   if (near.length === 0) return false;
   const samples = contactSamples(a, b);
   if (samples.length === 0) return false;
-  return samples.every((point) => near.some((run) => projectOntoSegment(point, run.a, run.b).distance <= COVER_MM));
+  return samples.every((point) => near.some((run) => covers(run, point)));
 }

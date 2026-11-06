@@ -6,8 +6,8 @@ import { elementsOf, getBuilding } from '@aec/building/model';
 import { equipmentPorts } from '../../../equipment/geometry/ports';
 import type { ReachTarget } from './valveTargets';
 
-/** A manway is a nozzle whose service names one (the equipment model has no manway type: `service: "manway"`). */
-const MANWAY = /manway/i;
+/** A manway is a nozzle whose service contains the word "manway" or "manways" (case-insensitive, not inside a longer word, not after "non-" / "non "); the equipment model has no manway kind yet. */
+const MANWAY = /(?<![a-z])(?<!non[-\s])manways?(?![a-z])/i;
 
 /** `nozzles` = every nozzle that is not a manway (kind `equipment_nozzle`); `manways` = the nozzles whose service names a manway (kind `manway`). Points in millimetres. */
 export function equipmentTargets(doc: CadDocument, kinds: ReadonlySet<'nozzles' | 'manways'>): ReachTarget[] {

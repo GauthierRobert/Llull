@@ -139,3 +139,25 @@ describe('check_reachability targetsFrom nozzles / manways', () => {
     );
   });
 });
+
+describe('which nozzles are manways', () => {
+  it('the word manway / manways, any case; not inside a longer word, not after "non-"', () => {
+    const services: Array<[string, boolean]> = [
+      ['Manway 24in', true],
+      ['MANWAYS', true],
+      ['access manway', true],
+      ['manwayish', false],
+      ['non-manway drain', false],
+      ['non manway', false],
+      ['inlet', false],
+    ];
+    let model = plant();
+    services.forEach(([service], index) => {
+      model = apply(model, 'add_nozzle', nozzle(`S${index}`, [1500, index * 100, 6900], service));
+    });
+    const manways = reach(model, ['manways']).targets.map((item) => item.tag);
+    const expected = services.flatMap(([, isManway], index) => (isManway ? [`C-101:S${index}`] : []));
+    expect(manways).toEqual(expected);
+    expect(reach(model, ['nozzles']).targets).toHaveLength(services.length - expected.length);
+  });
+});
