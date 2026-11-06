@@ -43,6 +43,7 @@ const PROPERTY_CATALOG: readonly PropertyCatalogEntry[] = [
   row('k', 'W/(m*K)', 'thermal conductivity'),
   row('cp', 'J/(kg*K)', 'specific heat capacity'),
   row('thermalStrain', '1', 'thermal strain (L - L_ref)/L_ref', { positive: false, ownerPack: 'PHY-01' }),
+  row('pipingAllowableStress', 'Pa', 'basic allowable stress S / S_h of a piping code table at temperature', { ownerPack: '07 PST' }),
   row('thermalDiffusivity', 'm^2/s', 'thermal diffusivity', { ownerPack: 'PHY-01' }),
   row('diffusionRate', '1/s', 'thermally activated rate (Arrhenius)', { ownerPack: 'PHY-01' }),
   row('rateFactor', '1', 'dimensionless strain-rate multiplier of a flow stress', { ownerPack: 'PHY-01' }),

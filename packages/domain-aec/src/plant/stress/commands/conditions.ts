@@ -5,7 +5,7 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { refuse } from '../codes';
 import type { OperatingConditions } from '../model/schema';
-import { displacementSchema, forceSchema, loadCaseSchema, thermalSourceSchema } from '../model/schema';
+import { accelerationSchema, displacementSchema, forceSchema, loadCaseSchema, thermalSourceSchema, windSchema } from '../model/schema';
 import { edited, withModel } from '../model/store';
 import { defaultLoadCases, loadCaseProblems } from '../solve/cases';
 import { thermalStrain } from '../solve/primitives';
@@ -212,13 +212,15 @@ export const setStressLoadCases = defineCommand({
   description:
     'Set the load cases of a stress model. Give preset "b31.3-default" (needs conditions with T1: L1 SUS = W + P1, L2 OPE = W + T1 + P1, L3 EXP = L2 - L1) or `cases`. ' +
     'Types: SUS (sustained, checked against S_h), HYD (hydrotest, checked against the stated hydrotest allowable of the conditions), OPE (operating, displacements and loads), OCC (the full occasional state, checked against 1.33 S_h in B31.3 and 1.15 / 1.2 S_h in B31.1), EXP (displacement stress range, checked against S_A). ' +
-    'OPE / SUS / OCC list `basic` primitive loads solved together: W (weight of pipe and contents), T1..T9, P1..P9 (from set_pipe_operating_conditions), F1..F9 (point loads from `forces`), D1..D9 (imposed anchor displacements from `displacements`: the node must be an anchor), WW (weight with the hydrotest water instead of the contents) and HP (the hydrotest pressure), the last two for HYD cases. EXP lists `combine` terms { case, factor } over solved cases, e.g. L2 x 1 and L1 x -1. ' +
-    'Supports with one-way, gap or friction behaviour are re-evaluated per case. `displacements` (optional) defines D1..D9: translation mm and rotation degrees at an anchor, e.g. a vessel nozzle growing in the operating case; a given list replaces the model displacements. `forces` (optional) defines F1..F9: a force N and moment N.mm in global axes at arc length atMm along a pipe; a given list replaces the model forces. Returns data { modelId, cases }.',
+    'OPE / SUS / OCC list `basic` primitive loads solved together: W (weight of pipe and contents), T1..T9, P1..P9 (from set_pipe_operating_conditions), F1..F9 (point loads from `forces`), WIN1..WIN9 (wind from `wind`), U1..U9 (static acceleration, seismic, from `seismic`), D1..D9 (imposed anchor displacements from `displacements`: the node must be an anchor), WW (weight with the hydrotest water instead of the contents) and HP (the hydrotest pressure), the last two for HYD cases. EXP lists `combine` terms { case, factor } over solved cases, e.g. L2 x 1 and L1 x -1. An OCC case may instead list `combine` terms with a `method`: algebraic (add the results with their factors, then the code stress), scalar (add the code stresses of the terms: the B31.3 occasional check S_L(sustained) + S_L(wind) <= 1.33 S_h is combine [SUS x 1, WIND x 1] scalar) or srss (root of the sum of the squares of the term stresses); scalar and srss are evaluated at the element end stations (nodes). ' +
+    'Supports with one-way, gap or friction behaviour are re-evaluated per case. `displacements` (optional) defines D1..D9: translation mm and rotation degrees at an anchor, e.g. a vessel nozzle growing in the operating case; a given list replaces the model displacements. `forces` (optional) defines F1..F9: a force N and moment N.mm in global axes at arc length atMm along a pipe; a given list replaces the model forces. `wind` (optional) defines WIN1..WIN9: the design velocity pressure q in kPa, the drag coefficient Cf and the direction the wind blows toward; every element carries the cross-flow drag q Cf (OD + 2 insulation) |w_n| w_n per length (w_n the wind component normal to the element axis), so an element along the wind carries nothing. `seismic` (optional) defines U1..U9: static accelerations as fractions of g along [x, y, z]; the load is the factor times the weight of pipe, contents, insulation and stated component weights, in that direction (run the +/- directions as separate cases). Both replace the lists of the model. Returns data { modelId, cases }.',
   params: z.object({
     modelId: z.string().min(1).describe('Id of the stress model.'),
     preset: z.literal('b31.3-default').describe('Generate the SUS / OPE / EXP set from the conditions. Give this or `cases`.').optional(),
     cases: z.array(loadCaseSchema).min(1).describe('Explicit load cases (name, type, basic or combine).').optional(),
     forces: z.array(forceSchema).describe('Point loads F1..F9; replaces the forces of the model.').optional(),
+    wind: z.array(windSchema).describe('Wind loads WIN1..WIN9; replaces the wind loads of the model.').optional(),
+    seismic: z.array(accelerationSchema).describe('Static acceleration loads U1..U9 (seismic); replaces the model list.').optional(),
     displacements: z
       .array(displacementSchema)
       .describe(
@@ -277,7 +279,16 @@ export const setStressLoadCases = defineCommand({
         lost,
         ['displacements'],
       );
-    const problems = loadCaseProblems(cases ?? [], forces, displacements);
+    const wind = params.wind ?? model.wind;
+    const seismic = params.seismic ?? model.seismic;
+    const problems = loadCaseProblems(cases ?? [], forces, displacements, wind, seismic);
+    for (const [label, names] of [
+      ['wind', wind.map((entry) => entry.name)],
+      ['seismic', seismic.map((entry) => entry.name)],
+    ] as const)
+      names.forEach((name, index) => {
+        if (names.indexOf(name) !== index) problems.push([label, `duplicate ${name}`]);
+      });
     if (problems.length > 0)
       return refuse(
         doc,
@@ -289,7 +300,16 @@ export const setStressLoadCases = defineCommand({
       );
     return {
       ...changed(
-        withModel(doc, edited(model, { loadCases: cases ?? [], forces: [...forces], displacements: [...displacements] })),
+        withModel(
+          doc,
+          edited(model, {
+            loadCases: cases ?? [],
+            forces: [...forces],
+            displacements: [...displacements],
+            wind: [...wind],
+            seismic: [...seismic],
+          }),
+        ),
         `set_stress_load_cases: ${model.id} ${(cases ?? []).map((entry) => `${entry.name} ${entry.type}`).join(', ')}.`,
         [model.id],
       ),

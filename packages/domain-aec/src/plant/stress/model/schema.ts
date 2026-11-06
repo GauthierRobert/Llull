@@ -62,9 +62,9 @@ export const loadCaseSchema = z.object({
     .enum(LOAD_CASE_TYPES)
     .describe('SUS sustained, OPE operating, OCC occasional state, HYD hydrotest, EXP displacement range (combination of cases).'),
   basic: z
-    .array(z.string().regex(/^(W|WW|HP|[TPFD][1-9])$/))
+    .array(z.string().regex(/^(W|WW|HP|[TPFDU][1-9]|WIN[1-9])$/))
     .describe(
-      'OPE / SUS / OCC / HYD: primitive loads solved together: W (weight), WW (weight with the hydrotest water), HP (hydrotest pressure), T1..T9, P1..P9, F1..F9, D1..D9.',
+      'OPE / SUS / OCC / HYD: primitive loads solved together: W (weight), WW (weight with the hydrotest water), HP (hydrotest pressure), T1..T9, P1..P9, F1..F9, D1..D9, U1..U9 (uniform acceleration load, seismic static), WIN1..WIN9 (wind).',
     )
     .optional(),
   combine: z
@@ -74,7 +74,13 @@ export const loadCaseSchema = z.object({
         factor: finite.describe('Algebraic factor, e.g. 1 and -1 for OPE - SUS.'),
       }),
     )
-    .describe('EXP: algebraic combination of solved cases.')
+    .describe('EXP: algebraic combination of solved cases. OCC: combination of solved OPE / SUS / OCC cases by `method`.')
+    .optional(),
+  method: z
+    .enum(['algebraic', 'scalar', 'srss'])
+    .describe(
+      'How an OCC case combines its terms: algebraic (default) adds the results with their factors and takes the code stress of the sum; scalar adds the code stresses of the terms (sum of |factor| x stress), e.g. S_L(SUS) + S_L(wind) of B31.3 302.3.6; srss takes the square root of the sum of the squares of the term stresses. EXP is always algebraic.',
+    )
     .optional(),
 });
 
@@ -100,6 +106,69 @@ export const displacementSchema = z.object({
   translationMm: vec3.describe('Imposed translation [x, y, z] of the anchor, mm, global axes.'),
   rotationDeg: vec3.describe('Imposed rotation [x, y, z] of the anchor, degrees, global axes. Default none.').optional(),
 });
+
+export const windSchema = z.object({
+  name: z
+    .string()
+    .regex(/^WIN[1-9]$/, 'WIN1 .. WIN9')
+    .describe('WIN1 .. WIN9: the name load cases use in basic.'),
+  pressureKPa: positive.describe(
+    'Design velocity pressure q of the wind in kPa (from the wind code for the site and height; stated, never defaulted).',
+  ),
+  dragCoefficient: positive.describe('Drag (shape) coefficient Cf of the pipe cross-section, for example 0.7 to 1.2 for a round pipe.'),
+  direction: vec3
+    .refine((v) => Math.hypot(...v) > 0, 'must not be the zero vector')
+    .describe('Direction the wind blows toward [x, y, z], global axes; normalised, normally horizontal.'),
+});
+
+export const accelerationSchema = z.object({
+  name: indexedName('U').describe('U1 .. U9: the name load cases use in basic.'),
+  gFactors: vec3.describe(
+    'Static acceleration as fractions of g along [x, y, z]; the load is factor x weight in that direction (seismic static).',
+  ),
+});
+
+const SPRING_SERIES = z.string().min(1);
+
+export const MAX_SPRING_SIZES = 2000;
+export const MAX_SPRING_TABLES = 50;
+export const MAX_SPRINGS = 200;
+
+export const springSizeSchema = z
+  .object({
+    size: z.string().min(1).describe('Vendor size designation, e.g. "10".'),
+    series: SPRING_SERIES.describe('Vendor series (spring type), e.g. "B".'),
+    minN: positive.describe('Smallest hot load of the working range of this size, N.'),
+    maxN: positive.describe('Largest hot load of the working range of this size, N.'),
+    rateNPerMm: positive.describe('Spring rate k, N per mm.'),
+    travelMm: positive.describe('Working travel of this size, mm (up or down from the cold position).'),
+  })
+  .refine((size) => size.minN < size.maxN, { message: 'minN must be below maxN', path: ['minN'] });
+
+export const springTableSchema = z.object({
+  id: z.string().min(1),
+  source: z.string().min(3),
+  sizes: z.array(springSizeSchema).min(1).max(MAX_SPRING_SIZES),
+});
+
+export const springSelectionSchema = z
+  .object({
+    id: z.string().min(1),
+    at: z.union([z.object({ supportId: z.string().min(1) }), z.object({ pipeId: z.string().min(1), atMm: nonNegative })]),
+    kind: z.enum(['variable', 'constant']),
+    tableId: z.string().optional(),
+    size: z.string().optional(),
+    series: z.string().optional(),
+    rateNPerMm: nonNegative,
+    hotLoadN: positive,
+    coldLoadN: positive,
+    travelUpMm: finite,
+    variability: nonNegative,
+  })
+  .refine((spring) => spring.kind === 'constant' || spring.rateNPerMm > 0, {
+    message: 'a variable spring needs a positive rate',
+    path: ['rateNPerMm'],
+  });
 
 export const sifOverrideSchema = z.object({
   id: z.string().min(1),
@@ -182,6 +251,10 @@ export const stressModelSchema = z.object({
   displacements: z.array(displacementSchema),
   sifOverrides: z.array(sifOverrideSchema),
   components: z.array(componentSchema),
+  wind: z.array(windSchema).max(9),
+  seismic: z.array(accelerationSchema).max(9),
+  springTables: z.array(springTableSchema).max(MAX_SPRING_TABLES),
+  springs: z.array(springSelectionSchema).max(MAX_SPRINGS),
   recorded: recordedSchema.optional(),
   approval: approvalSchema.optional(),
 });
@@ -196,5 +269,9 @@ export type StressRestraint = z.infer<typeof restraintSchema>;
 export type StressComponent = z.infer<typeof componentSchema>;
 export type StressDisplacement = z.infer<typeof displacementSchema>;
 export type SifOverride = z.infer<typeof sifOverrideSchema>;
+export type StressWind = z.infer<typeof windSchema>;
+export type StressAcceleration = z.infer<typeof accelerationSchema>;
+export type SpringTable = z.infer<typeof springTableSchema>;
+export type SpringSelection = z.infer<typeof springSelectionSchema>;
 export type StressForce = z.infer<typeof forceSchema>;
 export type RecordedResults = z.infer<typeof recordedSchema>;

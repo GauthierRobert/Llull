@@ -5,10 +5,10 @@ import { isCteRefusal, materialCteProvider, type CteBasis } from '@core/model/ma
 import type { CadDocument } from '@core/model/types';
 import { carbonSteelStrain, TABLE_RANGE_C } from '../code/thermalStrain';
 import type { BuiltModel } from '../model/build';
+import { accelerationLoads, weightField, windLoads } from './environment';
 import type { OperatingConditions, StressModel } from '../model/schema';
 
 const KELVIN = 273.15;
-const GRAVITY = 9.80665;
 const BAR_TO_MPA = 0.1;
 
 export interface PrimitiveFailure {
@@ -98,6 +98,7 @@ export function caseLoads(
   conditions: OperatingConditions,
   name: string,
   basic: readonly string[],
+  environment: Pick<StressModel, 'wind' | 'seismic'>,
 ): CaseLoads | PrimitiveFailure {
   const { elements } = built.layout;
   const nodal: NonNullable<FrameLoadCase['nodal']>[number][] = [];
@@ -110,28 +111,51 @@ export function caseLoads(
   const E = conditions.material.youngsModulusMPa;
   for (const primitive of basic) {
     if (primitive === 'W' || primitive === 'WW') {
-      const contents = primitive === 'WW' ? (conditions.hydro?.fluidDensityKgM3 ?? 0) : conditions.fluidDensityKgM3;
-      const insulation = conditions.insulation;
-      elements.forEach((element, index) => {
-        const inner = element.odMm - 2 * element.wallMm;
-        const stated = element.component?.weightKg !== undefined && element.component.weightKg !== null;
-        const steel = stated ? 0 : (Math.PI / 4) * (element.odMm ** 2 - inner ** 2);
-        const fluid = (Math.PI / 4) * inner ** 2;
-        const outer = element.odMm + 2 * (insulation?.thicknessMm ?? 0);
-        const insulated =
-          stated || insulation === undefined
-            ? 0
-            : insulation.densityKgM3 * (Math.PI / 4) * (outer ** 2 - element.odMm ** 2) + insulation.claddingKgM2 * 1e3 * Math.PI * outer;
-        const q = GRAVITY * 1e-9 * (conditions.material.densityKgM3 * steel + contents * fluid + insulated);
+      const field = weightField(
+        built,
+        conditions,
+        primitive === 'WW' ? (conditions.hydro?.fluidDensityKgM3 ?? 0) : conditions.fluidDensityKgM3,
+      );
+      field.perLength.forEach((q, index) => {
         elemental.push({ element: index, uniform: [0, 0, -q] });
         uniform[index * 3 + 2] = (uniform[index * 3 + 2] as number) - q;
-        if (element.component !== undefined && element.component.weightKg !== null) {
-          // the stated weight of a valve / flange acts at its end nodes, shared over the elements it is split into
-          const half = (element.component.weightKg * GRAVITY) / element.component.elements / 2;
-          nodal.push({ node: element.a, force: [0, 0, -half] }, { node: element.b, force: [0, 0, -half] });
-        }
       });
-      for (const point of built.pointWeights) nodal.push({ node: point.node, force: [0, 0, -point.kg * GRAVITY] });
+      for (const point of field.nodal) nodal.push({ node: point.node, force: [0, 0, -point.newtons] });
+    } else if (primitive.startsWith('WIN')) {
+      const wind = environment.wind.find((entry) => entry.name === primitive);
+      if (wind === undefined)
+        return {
+          ok: false,
+          code: 'PST_LOADCASE_INVALID',
+          message: `case ${name}: no wind ${primitive} (set_stress_load_cases wind)`,
+          path: 'loadCases',
+        };
+      const drag = windLoads(built, conditions, wind);
+      built.layout.elements.forEach((_, index) => {
+        const load: [number, number, number] = [drag[index * 3] as number, drag[index * 3 + 1] as number, drag[index * 3 + 2] as number];
+        elemental.push({ element: index, uniform: load });
+        for (let i = 0; i < 3; i++) uniform[index * 3 + i] = (uniform[index * 3 + i] as number) + (load[i] as number);
+      });
+    } else if (primitive.startsWith('U')) {
+      const acceleration = environment.seismic.find((entry) => entry.name === primitive);
+      if (acceleration === undefined)
+        return {
+          ok: false,
+          code: 'PST_LOADCASE_INVALID',
+          message: `case ${name}: no static acceleration ${primitive} (set_stress_load_cases seismic)`,
+          path: 'loadCases',
+        };
+      const shaken = accelerationLoads(weightField(built, conditions, conditions.fluidDensityKgM3), acceleration);
+      built.layout.elements.forEach((_, index) => {
+        const load: [number, number, number] = [
+          shaken.uniform[index * 3] as number,
+          shaken.uniform[index * 3 + 1] as number,
+          shaken.uniform[index * 3 + 2] as number,
+        ];
+        elemental.push({ element: index, uniform: load });
+        for (let i = 0; i < 3; i++) uniform[index * 3 + i] = (uniform[index * 3 + i] as number) + (load[i] as number);
+      });
+      for (const point of shaken.nodal) nodal.push({ node: point.node, force: point.force });
     } else if (primitive.startsWith('T')) {
       const entry = conditions.temperatures.find((candidate) => candidate.name === primitive);
       if (entry === undefined)

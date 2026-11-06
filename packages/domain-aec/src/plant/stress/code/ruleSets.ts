@@ -180,6 +180,42 @@ export const RULE_ROWS: Readonly<Record<string, RuleRow>> = {
     sources: ['07 TECHNICAL_SPEC 5.6'],
     grade: 'B',
   },
+  'SPRING-VARIABILITY': {
+    id: 'SPRING-VARIABILITY',
+    clause: 'MSS SP-58 practice (attribution not confirmed: B31.1 or SP-58)',
+    formula: 'P_cold = P_hot + k d (d up positive); V = |k d| / P_hot <= 0.25 (0.15 near rotating equipment)',
+    sources: ['S18'],
+    grade: 'B',
+  },
+  'NOZZLE-NEMA-SM23': {
+    id: 'NOZZLE-NEMA-SM23',
+    clause: 'NEMA SM 23, one connection',
+    formula: '3 F + M <= 500 De (F resultant force lbf, M resultant moment ft.lbf; De = D for D <= 8 in, (16 + D) / 3 above)',
+    sources: ['S19', 'S20'],
+    grade: 'B',
+  },
+  'NOZZLE-API617': {
+    id: 'NOZZLE-API617',
+    clause: 'API 617, one connection (1.85 x NEMA SM 23)',
+    formula: '3 F + M <= 1.85 x 500 De',
+    sources: ['S19', 'S20', 'FR-PST-14'],
+    grade: 'B',
+  },
+  'NOZZLE-API610-F12A': {
+    id: 'NOZZLE-API610-F12A',
+    clause: 'API 610 Annex F F.1.2 a',
+    formula:
+      'each force and moment component <= 2 x the Table 5 value of the nozzle size and orientation (Table 5 values imported by the user)',
+    sources: ['S21', 'S22', 'S23'],
+    grade: 'B',
+  },
+  'NOZZLE-USER': {
+    id: 'NOZZLE-USER',
+    clause: 'user nozzle limits',
+    formula: 'each stated component or resultant <= its stated limit (the caller owns the source)',
+    sources: ['caller'],
+    grade: 'C',
+  },
   'SIF-B31J': {
     id: 'SIF-B31J',
     clause: 'ASME B31J (mandatory for B31.3-2020 and later)',

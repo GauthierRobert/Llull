@@ -224,9 +224,39 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
     return out;
   };
 
+  // scalar / srss occasional combination: the code stresses of the terms at the element end stations are added (sum of |factor| x stress) or root-sum-squared
+  const combined = (state: CaseState): StressRow[] => {
+    const combination = state.combination as NonNullable<CaseState['combination']>;
+    const perTerm = combination.terms.map((term) => ({
+      factor: Math.abs(term.factor),
+      rows: evaluate(term.state, false).filter((row) => row.node !== null),
+    }));
+    const keyOf = (row: StressRow): string => `${row.element}|${row.node}`;
+    const byKey = perTerm.map((term) => new Map(term.rows.map((row) => [keyOf(row), row])));
+    return (perTerm[0]?.rows ?? []).map((row) => {
+      // a station a term does not have makes the combined stress NaN, which the analysis refuses (PST_STRESS_NOT_FINITE), never a silent zero
+      const parts = perTerm.map((term, termIndex) => {
+        const termRow = byKey[termIndex]?.get(keyOf(row));
+        return termRow === undefined ? Number.NaN : term.factor * termRow.stressMPa;
+      });
+      const stress = combination.method === 'scalar' ? parts.reduce((a, b) => a + b, 0) : Math.sqrt(parts.reduce((a, b) => a + b * b, 0));
+      return {
+        ...row,
+        case: state.name,
+        caseType: 'OCC',
+        stressMPa: stress,
+        allowableMPa: base.occasionalMPa,
+        ratio: stress / base.occasionalMPa,
+        rule: b311 ? 'B311-OCC' : 'B313-OCC',
+        equation: combination.method === 'scalar' ? 'sum of |factor| x term stress' : 'sqrt(sum of (factor x term stress)^2)',
+      };
+    });
+  };
+
   // OPE reports displacements and loads; the code limits apply to the sustained, occasional and expansion states
   for (const state of states)
-    if (state.type === 'SUS' || state.type === 'OCC' || state.type === 'HYD') rows.push(...evaluate(state, false));
+    if (state.type === 'SUS' || state.type === 'OCC' || state.type === 'HYD')
+      rows.push(...(state.combination === undefined ? evaluate(state, false) : combined(state)));
   for (const state of states) if (state.type === 'EXP') rows.push(...evaluate(state, true));
   return {
     rows,
