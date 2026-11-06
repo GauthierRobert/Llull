@@ -58,7 +58,7 @@ function encoderOf(report: Buffer, fallback: string): MediaEncoder {
 function session(binary: string, env: NodeJS.ProcessEnv, spec: MediaSpec, options: MediaPortOptions): MediaSession | MediaFailure {
   let folder: string;
   try {
-    folder = mkdtempSync(path.join(tmpdir(), 'llull-compute-'));
+    folder = mkdtempSync(path.join(tmpdir(), 'llull-media-'));
   } catch (error) {
     return failure('NATIVE_PROTOCOL', `cannot create the job folder: ${errorMessage(error)}`);
   }

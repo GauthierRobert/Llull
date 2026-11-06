@@ -27,7 +27,7 @@ const native = it.skipIf(requireTool('native:llull-compute', BINARY !== null));
 const KEEP = { ...process.env, LLULL_NATIVE_KEEP: '1' };
 const MISSING = path.join(tmpdir(), 'no-such-llull-compute.exe');
 
-const jobFolders = (): string[] => readdirSync(tmpdir()).filter((name) => name.startsWith('llull-compute-'));
+const jobFolders = (): string[] => readdirSync(tmpdir()).filter((name) => name.startsWith('llull-media-'));
 const newSince = (before: readonly string[]): string[] => jobFolders().filter((name) => !before.includes(name));
 const removeNew = (before: readonly string[]): void =>
   newSince(before).forEach((name) => rmSync(path.join(tmpdir(), name), { recursive: true, force: true }));
