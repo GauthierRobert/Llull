@@ -145,7 +145,7 @@ export const renderAnimation = defineCommand({
           .enum(['moving', 'none'])
           .optional()
           .describe('"moving": entities whose pose changes during the run are drawn in the accent colour; "none" (default).'),
-        accent: z.string().optional().describe('Accent colour #rrggbb for highlight. Default #ff9f1c.'),
+        accent: z.string().optional().describe('Accent colour #rgb or #rrggbb for highlight. Default #ff9f1c.'),
       })
       .optional()
       .describe('Pictures drawn into every frame.'),
@@ -153,12 +153,8 @@ export const renderAnimation = defineCommand({
       .enum(['frames', 'apng', 'gif', 'mp4'])
       .optional()
       .describe(
-        '"frames", "apng", "gif" or "mp4" (default). gif / mp4 need the native encoder and are refused without it (NATIVE_TOOL_MISSING).',
+        '"frames", "apng", "gif" or "mp4" (default). gif / mp4 need the native encoder and are refused without it (NATIVE_TOOL_MISSING): retry with format "apng".',
       ),
-    quality: z
-      .enum(['draft', 'standard', 'high'])
-      .optional()
-      .describe('Encoder quality for gif / mp4 (ignored by frames / apng). Default "standard".'),
     sheet: z
       .object({ every: z.number().int().min(1).describe('Every n-th frame becomes a cell (the last frame is always added).') })
       .optional()
@@ -170,7 +166,7 @@ export const renderAnimation = defineCommand({
       .max(1800)
       .optional()
       .describe('Refuse (MOV_FRAME_BUDGET) when the run needs more frames than this. Default and maximum 1800.'),
-    background: z.string().optional().describe('Frame background #rrggbb. Default #1a1a2e.'),
+    background: z.string().optional().describe('Frame background #rgb or #rrggbb. Default #1a1a2e.'),
     renderer: z
       .enum(['reference', 'native'])
       .optional()
@@ -197,10 +193,10 @@ export const renderAnimation = defineCommand({
       return fail('MOV_CAMERA_INVALID', 'camera.direction must be a finite, non-zero [x, y, z]', [], ['camera.direction']);
     const background = hexRgb(params.background ?? DEFAULT_BACKGROUND);
     if (background === null)
-      return fail('MOV_RENDER_INVALID', `background "${params.background ?? ''}" is not #rrggbb`, [], ['background']);
+      return fail('MOV_RENDER_INVALID', `background "${params.background ?? ''}" is not #rgb or #rrggbb`, [], ['background']);
     const accent = hexRgb(params.overlays?.accent ?? DEFAULT_ACCENT);
     if (accent === null)
-      return fail('MOV_RENDER_INVALID', `accent "${params.overlays?.accent ?? ''}" is not #rrggbb`, [], ['overlays.accent']);
+      return fail('MOV_RENDER_INVALID', `accent "${params.overlays?.accent ?? ''}" is not #rgb or #rrggbb`, [], ['overlays.accent']);
 
     const playbackRate = source.kind === 'simulation' ? (source.playbackRate ?? 1) : 1;
     const frames = frameCountOf(source.duration, fps, playbackRate);

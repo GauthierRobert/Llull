@@ -1,5 +1,5 @@
 /**
- * The `simulation` source of render_animation (FR-MOV-02): ONE simulate_motion run (`detail: 'poses+series'`, reached through `ctx.registry`), then every
+ * The `simulation` source of render_animation (FR-MOV-02): ONE simulate_motion run (`detail: 'poses'`, reached through `ctx.registry`), then every
  * frame at its exact instant t_k by pose interpolation (`posesAtTime`) and joint series interpolated linearly at the same instant.
  */
 
@@ -25,7 +25,7 @@ import {
 /** The recorded-sample cap of simulate_motion (TR-MOV-03). */
 const MAX_SAMPLES = 6001;
 
-/** The part of simulate_motion's `data` (detail 'poses+series') this source reads. */
+/** The part of simulate_motion's `data` (detail 'poses') this source reads. */
 interface SimulationRun {
   readonly warnings?: readonly string[];
   readonly poses?: { readonly times: number[]; readonly bodies: Record<string, { position: Vec3[]; orientation: Quaternion[] }> };
@@ -69,7 +69,7 @@ export function simulationSource(
   const sampleRate = Math.min(input.timestep === undefined ? Infinity : 1 / input.timestep, cap);
   const run = simulate.run(
     doc,
-    { duration: input.duration, detail: 'poses+series', sampleRate, ...(input.timestep === undefined ? {} : { timestep: input.timestep }) },
+    { duration: input.duration, detail: 'poses', sampleRate, ...(input.timestep === undefined ? {} : { timestep: input.timestep }) },
     ctx,
   );
   const data = run.data as SimulationRun | undefined;

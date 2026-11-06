@@ -1,6 +1,6 @@
 /**
  * render_animation, the `simulation` source on the PHY-10 slider-crank (PHY-22 MOV-M1): VC-MOV-01 / 02 / 15 / 16 / 17 against the closed form in
- * docs/physics/22-motion-video/validation, plus `simulate_motion detail: 'poses+series'` (TR-MOV-04) and the refusals of the source.
+ * docs/physics/22-motion-video/validation, plus `simulate_motion detail: 'poses'` (poses and series of one run) and the refusals of the source.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
@@ -108,7 +108,7 @@ describe('readouts equal one simulate_motion run (VC-MOV-16)', () => {
       duration: video.source.duration,
       timestep: video.source.timestep,
       sampleRate: 1 / video.source.timestep,
-      detail: 'poses+series',
+      detail: 'poses',
     }).data as typeof simulated;
   });
 
