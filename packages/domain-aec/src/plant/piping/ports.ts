@@ -20,7 +20,9 @@ export interface ResolvedPort {
   readonly spec: PortSpec;
 }
 
-export type PortResolution = { readonly ok: true; readonly port: ResolvedPort } | { readonly ok: false; readonly message: string; readonly code?: 'RTE_CAP_INVALID' };
+export type PortResolution =
+  | { readonly ok: true; readonly port: ResolvedPort }
+  | { readonly ok: false; readonly message: string; readonly code?: 'RTE_CAP_INVALID' };
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const unit = (v: Vec3): Vec3 => {
