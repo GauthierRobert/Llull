@@ -17,6 +17,8 @@ const KERNEL_HELPERS: readonly string[] = [
   'buildSimulationModel', // domain-dynamics: body mass properties through a kernel
   'staticChecks', // domain-dynamics
   'sourceMeshOf', // deform
+  'tessellateAt', // geometry/exactMesh: kernel mesh at explicit deflections
+  'withExactMesh', // geometry/exactMesh
   'exactOrMesh',
   'exactRecipe',
   'evaluateRecipe',

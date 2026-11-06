@@ -4,6 +4,7 @@
  */
 
 import type { GeometryKernel } from '@core/geometry/kernel';
+import { PREVIOUS_DISPLAY_TOLERANCE, tessellateAt } from '@core/geometry/exactMesh';
 import { operandRecipe } from '@core/geometry/operandRecipe';
 import { isCurvedPart } from '@core/geometry/curvedFaces';
 import { is3D, type CadDocument, type MeshData } from '@core/model/types';
@@ -53,7 +54,7 @@ export function partGeometry(doc: CadDocument, entityId: string, kernel: Geometr
   if (kernel !== null && shape !== null) {
     const step = kernel.exportStep([shape]);
     if (step !== null) return { kind: 'step', stepBase64: Buffer.from(step, 'utf8').toString('base64') };
-    const mesh = kernel.tessellate(shape);
+    const mesh = tessellateAt(kernel, shape, PREVIOUS_DISPLAY_TOLERANCE);
     if (mesh !== null && mesh.indices.length > 0)
       return { kind: 'stl', stlBase64: binaryStl(mesh).toString('base64'), curved: isCurvedPart(entity, mesh) };
   }

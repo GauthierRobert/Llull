@@ -5,6 +5,7 @@ import { type CadDocument, type Entity, type MeshData, type ShapeRecipe, type Ve
 import { type LocalExtent, localExtentOf } from '../../geometry/deform/bounds';
 import { resolveFrame, toLocal } from '../../geometry/deform/frame';
 import { entityToTriangles } from '../../geometry/entityTriangles';
+import { PREVIOUS_DISPLAY_TOLERANCE, tessellateAt } from '../../geometry/exactMesh';
 import type { GeometryKernel } from '../../geometry/kernel';
 import { hasMeshLeaf, operandRecipe } from '../../geometry/operandRecipe';
 import { recipeOf } from '../../geometry/shapeRecipe';
@@ -57,6 +58,7 @@ function extentOfPositions(positions: ReadonlyArray<number>): { min: Vec3; max: 
 
 /**
  * Resolve `id` to a deformable solid.
+ * @invariant the source mesh is the kernel's mesh at PREVIOUS_DISPLAY_TOLERANCE (0.1 document units, 0.5 rad) when the kernel honours explicit deflections, else its display mesh
  * @failure unknown id -> DEF_ENTITY_NOT_FOUND; 2D shape, curve, sheet, instance, image or an entity without triangles -> DEF_TARGET_UNSUPPORTED
  */
 export function loadTarget(doc: CadDocument, command: string, id: string, ctx: ExecutionContext | undefined): DeformTarget | CommandResult {
@@ -70,7 +72,7 @@ export function loadTarget(doc: CadDocument, command: string, id: string, ctx: E
   // a kernel would sew one face per stored triangle of a scan, anywhere in the recipe (superlinear: 327k triangles never finished)
   const faceted = hasMeshLeaf(source);
   const shape = kernel === null || faceted ? null : kernel.evaluate(source);
-  const built = shape === null || kernel === null ? null : kernel.tessellate(shape);
+  const built = shape === null || kernel === null ? null : tessellateAt(kernel, shape, PREVIOUS_DISPLAY_TOLERANCE);
   const mesh = built !== null && built.indices.length > 0 ? built : trianglesOf(entity, doc);
   if (mesh.indices.length === 0) return unsupported(`entity '${id}' (kind '${entity.kind}') has no triangles`);
   const { min, max } = extentOfPositions(mesh.positions);

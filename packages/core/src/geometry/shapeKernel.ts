@@ -13,7 +13,16 @@
 import type { BooleanOp, EdgeRadius, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { FaceOpParams } from '../model/faceOps';
 import type { DeformLawKind } from '../model/deform';
-import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology, StepAssemblyPart, StepOccurrence } from './kernel';
+import type {
+  GeometryKernel,
+  ShapeAnalysis,
+  ShapeDistance,
+  ShapeHandle,
+  ShapeTopology,
+  StepAssemblyPart,
+  StepOccurrence,
+  TessellationOptions,
+} from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { faceOpParamsOf } from './faceOpRecipe';
@@ -70,7 +79,10 @@ export interface KernelOps<S> {
   shell(shape: S, thickness: number, openNear?: readonly Vec3[]): S | null;
   place(shape: S, position: Vec3, rotation: Vec3): S | null;
   scale(shape: S, factor: number): S | null;
-  tessellate(shape: S): MeshData | null;
+  /** Display mesh without `options`; with them, the mesh at those absolute deflections (a kernel that cannot honour them leaves `honoursTessellationOptions` false). */
+  tessellate(shape: S, options?: TessellationOptions): MeshData | null;
+  /** True when `tessellate` honours its `options`. */
+  readonly honoursTessellationOptions?: boolean;
   topology(shape: S): ShapeTopology | null;
   exportStep(shapes: readonly S[]): string | null;
   /** Optional assembly STEP writer; a kernel without it leaves `GeometryKernel.exportStepAssembly` undefined. */
@@ -265,6 +277,7 @@ function faceQueryPort<S>(ops: FaceQueryOps<S> | undefined, onNative: OnNative<S
 export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKernel {
   const shapes = new Map<string, S | null>();
   const meshes = new Map<string, MeshData | null>();
+  const explicitMeshes = new Map<string, Map<string, MeshData>>();
   let depth = 0;
   let builds = 0;
   let epoch = ops.failureEpoch?.() ?? 0;
@@ -281,6 +294,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       const shape = shapes.get(key);
       shapes.delete(key);
       meshes.delete(key);
+      explicitMeshes.delete(key);
       if (shape !== null && shape !== undefined) safeRelease(shape);
     }
   };
@@ -330,6 +344,19 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
     if (recipe !== undefined) return evaluateNative(recipe);
     if (!shapes.has(key)) throw new Error(`${SHAPE_NOT_CACHED}: ${key}`);
     return shapes.get(key) ?? null;
+  };
+  /** Mesh at explicit deflections, cached apart from the display mesh (a null is not kept: a refusal at one tolerance says nothing about another). */
+  const explicitMesh = (handle: ShapeHandle, key: string, options: TessellationOptions): MeshData | null => {
+    const variant = `${options.linearDeflection}|${options.angularDeflection}`;
+    const kept = explicitMeshes.get(key)?.get(variant);
+    if (kept !== undefined) return kept;
+    const shape = nativeOf(handle);
+    const mesh = shape === null ? null : ops.tessellate(shape, options);
+    if (mesh === null) return null;
+    const variants = explicitMeshes.get(key) ?? new Map<string, MeshData>();
+    variants.set(variant, mesh);
+    explicitMeshes.set(key, variants);
+    return mesh;
   };
   const analyzeOps = ops.analyze?.bind(ops);
   const distanceOps = ops.distance?.bind(ops);
@@ -451,9 +478,11 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               : !(ops.unsupported?.has(op) ?? false),
     supportsDeform: (law) => ops.deform !== undefined && (ops.deformLaws?.has(law.kind) ?? true),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),
-    tessellate: (handle) =>
+    ...(ops.honoursTessellationOptions === true ? { honoursTessellationOptions: true } : {}),
+    tessellate: (handle, options) =>
       call(() => {
         const { key } = bodyOf(handle);
+        if (options !== undefined && ops.honoursTessellationOptions === true) return explicitMesh(handle, key, options);
         if (meshes.has(key)) return meshes.get(key) ?? null;
         const shape = nativeOf(handle);
         const mesh = shape === null ? null : ops.tessellate(shape);
@@ -477,6 +506,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       for (const shape of shapes.values()) if (shape !== null) safeRelease(shape);
       shapes.clear();
       meshes.clear();
+      explicitMeshes.clear();
     },
   };
 }

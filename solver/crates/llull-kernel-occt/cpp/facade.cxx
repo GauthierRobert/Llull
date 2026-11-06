@@ -22,6 +22,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepTools.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
@@ -343,6 +344,8 @@ std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix) {
 }
 
 MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_deflection) {
+  // OCCT keeps a triangulation that is already finer than asked: clean it so the mesh depends only on the deflection requested, not on earlier calls.
+  BRepTools::Clean(shape.shape);
   BRepMesh_IncrementalMesh mesher(shape.shape, linear_deflection, Standard_False, angular_deflection, Standard_False);
   MeshOut out;
   out.missing_faces = 0;
@@ -459,7 +462,7 @@ GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double
 
 double bounding_diagonal(const Shape &shape) {
   const Bnd_Box box = bounds_of(shape.shape);
-  if (box.IsVoid()) return 0.0;
+  if (box.IsVoid() || box.IsOpen()) return 0.0;
   return box.CornerMin().Distance(box.CornerMax());
 }
 

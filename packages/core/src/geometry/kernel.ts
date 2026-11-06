@@ -125,6 +125,12 @@ export interface StepOccurrence<S = ShapeHandle> {
   readonly rotation: Vec3;
 }
 
+/** Absolute deflections of an explicit tessellation: maximum chord error (document units) and maximum angle between neighbouring facet normals (radians). */
+export interface TessellationOptions {
+  readonly linearDeflection: number;
+  readonly angularDeflection: number;
+}
+
 /**
  * Every operation returns null when it cannot be performed (unsupported op, degenerate geometry, kernel limitation); commands treat null as
  * a no-op. Implementors must not mutate arguments. Exact topology and STEP: OCC only (Manifold is a mesh kernel: `topology` / `exportStep`
@@ -146,8 +152,18 @@ export interface GeometryKernel {
   /** Build (or reuse, by `recipeKey`) the kernel shape of a recipe. */
   evaluate(recipe: ShapeRecipe): ShapeHandle | null;
 
-  /** Display mesh of a shape (output only: never fed back into the kernel). */
-  tessellate(shape: ShapeHandle): MeshData | null;
+  /**
+   * Mesh of a shape (output only: never fed back into the kernel). Without `options` it is the DISPLAY mesh: the kernel picks its own
+   * deflection (the native kernel scales it with the size of the part), so a body's triangle count stays bounded. With `options` the mesh is
+   * built at exactly those absolute deflections (document units, radians), for consumers that need a stated accuracy (fabrication exports,
+   * deform sources).
+   * @invariant display and explicit meshes are cached apart: an explicit request never replaces, and is never served as, the display mesh
+   * @invariant kernel-optional: a kernel without `honoursTessellationOptions` (Manifold) ignores `options` and answers its display mesh
+   */
+  tessellate(shape: ShapeHandle, options?: TessellationOptions): MeshData | null;
+
+  /** True when `tessellate(shape, options)` really builds the mesh at those deflections (the native OCCT kernel); absent/false = options are ignored. */
+  readonly honoursTessellationOptions?: boolean;
 
   /** Exact faces/edges of a shape; null for kernels without a B-rep. */
   topology(shape: ShapeHandle): ShapeTopology | null;

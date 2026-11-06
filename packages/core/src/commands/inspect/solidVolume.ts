@@ -20,8 +20,8 @@ export type SolidVolume =
 
 /**
  * Exact volume of a kernel result (a mesh entity that keeps its B-rep recipe), or null when no kernel with exact topology (OCC) is
- * installed. The display mesh is a coarse tessellation (0.1 linear / 0.5 rad angular deflection), so its volume is off by up to ~1 % on
- * small curved parts — too much for a mass check against a drawing.
+ * installed. The display mesh is a coarse tessellation (the native kernel's deflection is max(0.1, 1e-3 x bounding-box diagonal) document units, 0.5 rad
+ * angular), so its volume is off by up to ~1 % on curved parts — too much for a mass check against a drawing.
  */
 function exactVolume(e: Entity, ctx: ExecutionContext | undefined): number | null {
   if (e.kind !== 'mesh' || e.brep === undefined) return null;

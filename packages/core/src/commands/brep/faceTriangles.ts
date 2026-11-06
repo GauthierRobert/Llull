@@ -18,6 +18,7 @@ const refuse = (doc: CadDocument, id: string, code: string, why: string, remedia
 /**
  * @affects nothing — read-only
  * @invariant data = { entityId, faceCount, triangleCount, faceOfTriangle[] }: `faceOfTriangle[t]` is the face index (the one of inspect_topology / inspect_faces) nearest the centroid of display triangle t, in the triangle order of the viewport (`entityToTriangles`); a tessellation triangle never straddles two faces
+ * @invariant the labels are for the DISPLAY triangles (the viewport's), whose chord error is at most max(0.1, 1e-3 x bounding-box diagonal) document units (the native deflection rule): a face thinner than that, or a centroid within it of a face boundary, can be labelled with the neighbouring face; the display mesh is deliberately not re-tessellated so the indices match what is drawn
  * @failure missing id, not a 3D solid, no exact kernel with face queries (KRN_NO_EXACT_KERNEL), unbuildable solid (KRN_SHAPE_UNAVAILABLE), more than MAX_LABELLED_TRIANGLES (KRN_TRIANGLE_LIMIT), kernel unable to answer (KRN_FACE_QUERY_FAILED) -> rejected no-op, no data
  */
 export const inspectFaceTriangles = defineCommand({

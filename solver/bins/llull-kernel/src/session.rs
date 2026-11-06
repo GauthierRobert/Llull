@@ -4,7 +4,7 @@
 //! request `{"id": n, "op": "<op>", "args": [...]}`, reply `{"id": n, "result": <value|null>, "error"?: "<CODE>: <message>"}`.
 //! Shapes travel as handles `{"key": "<host recipe key>", "recipe"?: <ShapeRecipe>}`; a key-only handle whose shape is gone answers
 //! `shape not cached: <key>` (the host resends the recipe). `tessellate` returns `{"encoding": "base64-le", "positions": <f64[]>,
-//! "indices": <u32[]>}`. Error codes: `NATIVE_UNSUPPORTED` (op / recipe node not native yet: the host falls back), `NATIVE_BAD_REQUEST`,
+//! "indices": <u32[]>}`; an optional second argument `{ linearDeflection, angularDeflection }` (absolute, positive) replaces the size-scaled display deflection. Error codes: `NATIVE_UNSUPPORTED` (op / recipe node not native yet: the host falls back), `NATIVE_BAD_REQUEST`,
 //! `NATIVE_OCC_FAILURE` (OCCT threw; result null), `NATIVE_PANIC`.
 
 use crate::exchange::{self, EXCHANGE_OPS};
@@ -13,7 +13,11 @@ use crate::queries::{self, QUERY_CAPABILITIES, QUERY_OPS};
 use base64::Engine;
 use llull_kernel_occt::lru::Lru;
 use llull_kernel_occt::recipe::{EvalError, Evaluator, RECIPE_OPS, SOLID_KINDS};
-use llull_kernel_occt::{analyze, export_step, mass_properties, mesh::display_mesh, occt_version, Shape};
+use llull_kernel_occt::{
+    analyze, export_step, mass_properties,
+    mesh::{display_mesh, mesh_at},
+    occt_version, Shape,
+};
 use serde_json::{json, Value};
 use std::rc::Rc;
 
@@ -60,6 +64,16 @@ pub struct Session {
     handles: Lru<HandleState>,
 }
 
+/// The optional absolute deflections `{ linearDeflection, angularDeflection }` of a `tessellate` request (positive and finite); `None` when absent.
+fn explicit_deflection(options: Option<&Value>) -> Result<Option<(f64, f64)>, String> {
+    let Some(options) = options.filter(|value| !value.is_null()) else { return Ok(None) };
+    let read = |key: &str| options.get(key).and_then(Value::as_f64).filter(|value| value.is_finite() && *value > 0.0);
+    match (read("linearDeflection"), read("angularDeflection")) {
+        (Some(linear), Some(angular)) => Ok(Some((linear, angular))),
+        _ => Err("tessellate options need positive finite linearDeflection and angularDeflection".to_string()),
+    }
+}
+
 fn base64_of<T: Copy, const N: usize>(values: &[T], bytes: impl Fn(T) -> [u8; N]) -> String {
     let raw: Vec<u8> = values.iter().flat_map(|value| bytes(*value)).collect();
     base64::engine::general_purpose::STANDARD.encode(raw)
@@ -96,6 +110,8 @@ fn info() -> Value {
         // output.preserveAnalytic: faces that stayed a plane / cylinder / cone / sphere are rebuilt analytic (the report has `analyticFaces`)
         "deform-analytic",
         "emboss",
+        // tessellate takes a second argument { linearDeflection, angularDeflection }: a sidecar without it would answer the display mesh
+        "tessellateOptions",
     ]
     .into_iter()
     .chain(QUERY_CAPABILITIES)
@@ -142,15 +158,25 @@ impl Session {
         match op {
             "info" => Reply::ok(info()),
             "evaluate" => self.with_shape(first, |_| Ok(json!({ "key": first.get("key") }))),
-            "tessellate" => self.with_shape(first, |shape| {
-                Ok(display_mesh(shape)?.map_or(Value::Null, |mesh| {
-                    json!({
-                        "encoding": "base64-le",
-                        "positions": base64_of(&mesh.positions, f64::to_le_bytes),
-                        "indices": base64_of(&mesh.indices, u32::to_le_bytes),
-                    })
-                }))
-            }),
+            "tessellate" => {
+                let explicit = match explicit_deflection(args.get(1)) {
+                    Ok(found) => found,
+                    Err(message) => return Reply::fail(BAD_REQUEST, message),
+                };
+                self.with_shape(first, |shape| {
+                    let mesh = match explicit {
+                        Some((linear, angular)) => mesh_at(shape, linear, angular)?,
+                        None => display_mesh(shape)?,
+                    };
+                    Ok(mesh.map_or(Value::Null, |mesh| {
+                        json!({
+                            "encoding": "base64-le",
+                            "positions": base64_of(&mesh.positions, f64::to_le_bytes),
+                            "indices": base64_of(&mesh.indices, u32::to_le_bytes),
+                        })
+                    }))
+                })
+            }
             "massProperties" => self.with_shape(first, |shape| {
                 let mass = mass_properties(shape)?;
                 let finite = [mass.volume, mass.area].iter().chain(&mass.centroid).chain(&mass.inertia).all(|value| value.is_finite());
@@ -307,6 +333,40 @@ mod tests {
         session.handle_line(&json!({ "id": 7, "op": op, "args": args }).to_string())
     }
 
+    fn sphere_recipe(radius: f64) -> Value {
+        json!({ "op": "solid", "entity": { "id": "s", "kind": "sphere", "position": [0, 0, 0], "rotation": [0, 0, 0], "radius": radius } })
+    }
+
+    fn triangle_count(reply: &Value) -> usize {
+        let indices = base64::engine::general_purpose::STANDARD.decode(reply["result"]["indices"].as_str().unwrap()).unwrap();
+        indices.len() / 12
+    }
+
+    #[test]
+    fn explicit_deflections_replace_the_size_scaled_display_deflection() {
+        let mut session = Session::new();
+        call(&mut session, "evaluate", json!([{ "key": "big", "recipe": sphere_recipe(1000.0) }]));
+        let display = triangle_count(&call(&mut session, "tessellate", json!([{ "key": "big" }])));
+        let fine = triangle_count(&call(
+            &mut session,
+            "tessellate",
+            json!([{ "key": "big" }, { "linearDeflection": 0.1, "angularDeflection": 0.5 }]),
+        ));
+        assert!(fine > 20 * display, "display {display} triangles, explicit 0.1 mm {fine}");
+        let again = triangle_count(&call(&mut session, "tessellate", json!([{ "key": "big" }])));
+        assert_eq!(again, display, "an explicit request does not change the display mesh");
+    }
+
+    #[test]
+    fn bad_tessellation_options_are_refused() {
+        let mut session = Session::new();
+        call(&mut session, "evaluate", json!([{ "key": "k1", "recipe": box_recipe(2.0) }]));
+        for options in [json!({}), json!({ "linearDeflection": 0.1 }), json!({ "linearDeflection": -1, "angularDeflection": 0.5 })] {
+            let reply = call(&mut session, "tessellate", json!([{ "key": "k1" }, options]));
+            assert!(reply["error"].as_str().unwrap().starts_with(BAD_REQUEST), "{reply}");
+        }
+        assert!(call(&mut session, "tessellate", json!([{ "key": "k1" }, null]))["error"].is_null());
+    }
     #[test]
     fn evaluates_then_answers_key_only_handles() {
         let mut session = Session::new();
@@ -361,6 +421,7 @@ mod tests {
             "deform-base-sheet",
             "deform-analytic",
             "emboss",
+            "tessellateOptions",
         ] {
             assert!(capabilities.contains(&json!(name)), "{name}");
         }

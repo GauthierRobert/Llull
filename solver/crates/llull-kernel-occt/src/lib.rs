@@ -175,6 +175,7 @@ pub(crate) struct Memo {
     json: std::cell::RefCell<std::collections::HashMap<&'static str, serde_json::Value>>,
     mass: std::cell::RefCell<Option<MassOut>>,
     analysis: std::cell::RefCell<Option<AnalysisOut>>,
+    diagonal: std::cell::Cell<Option<f64>>,
 }
 
 impl Shape {
@@ -308,9 +309,14 @@ pub fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64
     occt(ffi::tessellate(inner(shape)?, linear_deflection, angular_deflection))
 }
 
-/// Length of the diagonal of the tight bounding box (0 for an empty shape).
+/// Length of the diagonal of the tight bounding box, kept on the shape (0 for an empty or unbounded shape).
 pub fn bounding_diagonal(shape: &Shape) -> OcctResult<f64> {
-    occt(ffi::bounding_diagonal(inner(shape)?))
+    if let Some(found) = shape.1.diagonal.get() {
+        return Ok(found);
+    }
+    let diagonal = occt(ffi::bounding_diagonal(inner(shape)?))?;
+    shape.1.diagonal.set(Some(diagonal));
+    Ok(diagonal)
 }
 
 pub fn mass_properties(shape: &Shape) -> OcctResult<MassOut> {

@@ -7,6 +7,7 @@ import { exportRefusal, report } from '../noop';
 import { confirmExportControlled, defineCommand, z } from '../schema';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import { facetNormal } from '../../geometry/tessellation';
+import { chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
 
 export const entityIdsField = z
   .array(z.string())
@@ -49,12 +50,13 @@ function buildObjText(parts: readonly ExportPart[], header: string): string {
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.format === 'obj'; data.triangleCount >= 0
  * @invariant data.text is valid Wavefront OBJ with v/vn/f records
+ * @invariant kernel-optional: with an exact kernel honouring tessellation options, a body that keeps its exact recipe is re-tessellated at `chordTolerance` (default 0.1 document units, 0.5 rad), else its stored display mesh is exported; the summary says which path
  * @failure 2D-only or unknown entities silently skipped; empty → triangleCount:0
  * @failure never throws for user error
  */
 export const exportObj = defineCommand({
   name: 'export_obj',
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   description:
     'Export the document (or a subset of entities) to Wavefront OBJ text format. ' +
     'Produces a triangle tessellation in world space for every exportable 3D solid entity. ' +
@@ -67,6 +69,7 @@ export const exportObj = defineCommand({
   params: z.object({
     entityIds: entityIdsField,
     confirmExportControlled,
+    chordTolerance: chordToleranceField,
     units: z
       .string()
       .optional()
@@ -81,13 +84,18 @@ export const exportObj = defineCommand({
     if (refused !== null) return refused;
     // One comment line only: a newline in the label would inject arbitrary OBJ records.
     const unitLabel = (units ?? doc.units).replace(/[\r\n\u2028\u2029]+/g, ' ').trim() || doc.units;
-    const collected = collectExportParts(doc, entityIds, (ctx ?? currentContext()).meshAssets);
+    const used = exportTessellation(ctx, params.chordTolerance);
+    const collected = collectExportParts(doc, entityIds, (ctx ?? currentContext()).meshAssets, used);
     const unreadable = exportAssetRefusal(doc, 'export_obj', collected.unreadable);
     if (unreadable !== null) return unreadable;
     const tris = collected.parts.flatMap((part) => part.tris);
     const triangleCount = tris.length;
     const text = buildObjText(collected.parts, `# llull OBJ export — units: ${unitLabel}`);
-    const summary = exportSummary('export_obj', 'obj', { ...collected, tris });
+    const summary = exportSummary('export_obj', 'obj', {
+      ...collected,
+      tris,
+      tessellation: tessellationReport(used, collected.exactIds, collected.parts.length),
+    });
     return report(doc, summary, { format: 'obj', text, triangleCount });
   },
 });

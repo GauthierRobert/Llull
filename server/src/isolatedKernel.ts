@@ -312,7 +312,11 @@ export function createIsolatedKernel(options: IsolatedKernelOptions): IsolatedKe
       }
       return call('evaluate', [recipe]) === null ? null : handleOf(recipe);
     },
-    tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
+    get honoursTessellationOptions(): boolean {
+      return info().capabilities.includes('tessellateOptions');
+    },
+    tessellate: (shape, options) =>
+      shapeCall('tessellate', [shape], false, options === undefined ? [] : [options]) as ReturnType<GeometryKernel['tessellate']>,
     topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
     exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
     exportStepAssembly,
