@@ -74,6 +74,13 @@ export function exchangerReinforcement(
         'only shell and channel nozzles are checked (bonnets and covers are not covered)',
         `nozzles.${nozzle.mark}.location.on`,
       );
+    if (location.on === 'channel' && location.channel === 'rear' && template.rearChannel === undefined)
+      return notCovered(
+        nozzle,
+        'EQP_PARAM_INVALID',
+        'the exchanger has no rear channel (rearChannel is undefined)',
+        `nozzles.${nozzle.mark}.location.channel`,
+      );
     const sideName = location.on === 'shell' ? 'shellSide' : 'tubeSide';
     const thickness =
       location.on === 'shell'

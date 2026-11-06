@@ -64,6 +64,21 @@ describe('check_clashes: tube-bundle pull zone', () => {
     expect(clashes(skid(turned, 'S-1', -5000, 8000))).toEqual([]);
   });
 
+  it('two exchangers whose pull zones face each other do not clash through the zones alone', () => {
+    const first = exchanger('BEU');
+    const both = apply(first, 'add_heat_exchanger', {
+      ...bemParams,
+      tag: 'E-302',
+      temaType: 'BEU',
+      rearChannel: undefined,
+      clearance: 0,
+      location: [-14000, 8000],
+      planRotationDeg: 180,
+      angleConvention: 'east_ccw',
+    });
+    expect(clashes(both).filter((clash) => clash.kind === 'clearance')).toEqual([]);
+  });
+
   it('is pure: check_clashes returns the document unchanged', () => {
     const doc = skid(exchanger('BEU'), 'S-1', -5000);
     const result = execute(doc, 'check_clashes', {});

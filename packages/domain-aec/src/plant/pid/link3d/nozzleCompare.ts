@@ -22,13 +22,19 @@ export interface NozzleComparison {
 const same = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
 
 /**
- * Canonical form of a flange rating so the usual spellings compare equal: CL150 = Class 150 = 150# = 150 lb, PN16 = PN 16 = PN-16 (upper case, no separators).
- * Anything else is kept as written (upper case, no separators) and compares by equality.
+ * Canonical form of a flange rating, read as a token: class (CL150, Class 150, ASME 150, 150#, 150 lb) -> CL150, PN (PN16, PN 16, PN-16, PN2.5) -> PN16 /
+ * PN2.5 (the decimal is kept: PN2.5 differs from PN25); a trailing facing token (RF, FF, RTJ) is ignored. Anything else compares as written (upper case, no spaces).
  */
+const FACING_SUFFIX = '(?:\\s*[,/ ]\\s*(?:RF|FF|RTJ|RJ))?$';
+const PN_RATING = new RegExp(`^PN\\s*-?\\s*(\\d+(?:\\.\\d+)?)${FACING_SUFFIX}`);
+const CLASS_RATING = new RegExp(`^(?:CL|CLASS)?\\s*(\\d+)\\s*(?:#|LBS?)?${FACING_SUFFIX}`);
+
 function normaliseRating(text: string): string {
-  const compact = text.toUpperCase().replace(/[\s_.-]/g, '');
-  const cls = /^(?:CL|CLASS)(\d+)$/.exec(compact) ?? /^(\d+)(?:#|LB|LBS)$/.exec(compact);
-  return cls === null ? compact : `CL${cls[1]}`;
+  const upper = text.trim().toUpperCase().replace(/^ASME\s*/, '');
+  const pn = PN_RATING.exec(upper);
+  if (pn !== null) return `PN${Number(pn[1])}`;
+  const cls = CLASS_RATING.exec(upper);
+  return cls === null ? upper.replace(/\s+/g, '') : `CL${Number(cls[1])}`;
 }
 
 /**

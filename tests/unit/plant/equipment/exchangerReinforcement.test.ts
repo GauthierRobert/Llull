@@ -11,6 +11,8 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
+import type { EquipmentElement } from '@aec/building/types';
+import { elementsOf, getBuilding } from '@aec/building/model';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
 import { bemParams, mmDocument } from './equipmentFixtures';
 
@@ -161,6 +163,26 @@ describe('nozzle_reinforcement: exchangers', () => {
     expect(refused.summary).toContain('API 650');
     const high = query(exchanger(), { mark: 'S1', pressure: { value: 3, unit: 'MPa' } });
     expect(row(high, 'S1').requiredShellThicknessMm).toBeCloseTo((3 * 303) / (138 - 1.8), 9);
+  });
+
+  it('a rear-channel nozzle on an exchanger with no rear channel is refused EQP_PARAM_INVALID (nozzles.<mark>.location.channel)', () => {
+    const base = apply(mmDocument(), 'add_heat_exchanger', { ...bemParams, temaType: 'BEU', rearChannel: undefined, corrosionAllowance: 3 });
+    const building = getBuilding(base);
+    const element = elementsOf(building, 'equipment')[0] as EquipmentElement;
+    const nozzle = {
+      mark: 'R1',
+      dn: 100,
+      rating: 'CL150',
+      facing: 'RF',
+      location: { on: 'channel', channel: 'rear', station: 100, orientationDeg: 0 },
+      projection: 500,
+      neckOutsideDiameter: 114.3,
+      neckWall: 6.02,
+      flange: { outsideDiameter: 230, thickness: 24, placeholder: false, unverified: false },
+    };
+    const plant = { ...(element.plant as NonNullable<EquipmentElement['plant']>), nozzles: [nozzle] };
+    const doc = { ...base, building: { ...building, elements: { ...building.elements, [element.id]: { ...element, plant } } } } as CadDocument;
+    expectRefusal(doc, 'nozzle_reinforcement', { equipment: 'E-301', mark: 'R1' }, 'EQP_PARAM_INVALID', 'nozzles.R1.location.channel');
   });
 
   it('is a query: the document is unchanged', () => {

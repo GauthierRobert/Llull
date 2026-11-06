@@ -42,6 +42,13 @@ describe('P&ID nozzle rating against the 3D nozzle record', () => {
     expect(check(rated(clean(), 'P-101', 'N2', text('PN 16'))).items.map((f) => f.item)).toEqual(['P-101/N2']);
   });
 
+  it('reads the rating as a token: PN2.5 is not PN25 and PN16 is not CL150; a facing suffix and ASME 150 are accepted', () => {
+    for (const spelling of ['CL150 RF', 'ASME 150', '150# RF', 'Class 150, FF'])
+      expect(check(rated(clean(), 'V-101', 'N1', text(spelling))).items, spelling).toEqual([]);
+    for (const spelling of ['PN2.5', 'PN16 RF', 'CL15', 'CL1500'])
+      expect(check(rated(clean(), 'V-101', 'N1', text(spelling))).items.map((f) => f.item), spelling).toEqual(['V-101/N1']);
+  });
+
   it('a numeric rating attribute is not text and is not compared; the document is unchanged by the check', () => {
     const doc = rated(clean(), 'V-101', 'N1', { kind: 'quantity', value: 300, unit: 'lb' });
     expect(check(doc).items).toEqual([]);

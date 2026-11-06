@@ -72,6 +72,7 @@ export function externalClashes(
       const second = items[j] as Item;
       if (!(first.external || second.external) || first.id === second.id || first.group === second.group || disjoint(first, second))
         continue;
+      if (first.zone && second.zone) continue;
       if (first.connectedTo.includes(second.group) || second.connectedTo.includes(first.group)) continue;
       const depth = boxOverlap(first.box, second.box);
       if (!(depth > tolerance)) continue;
