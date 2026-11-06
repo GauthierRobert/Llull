@@ -8,7 +8,7 @@ import { failer, report } from '../noop';
 import { escapeXml } from '../../lib/escapeXml';
 import { clamp } from '../../lib/clamp';
 import type { Quaternion, Vec3 } from '../../model/vectors';
-import { documentAtPose, eulerDegOf, pointAtPose, posesAtSample, type BodyPoseAt } from '../../geometry/bodyPose';
+import { documentAtPose, eulerDegOf, pointAtPose, posesAtTime, type BodyPoseAt } from '../../geometry/bodyPose';
 import { springSvg } from '../../geometry/springDrawing';
 import { GROUND, createDynamicsModel } from '../../model/dynamics';
 import { boundsOfPoints, mergeBounds, type Bounds } from '../../geometry/bounds';
@@ -36,13 +36,6 @@ const CELL_CLIP = 'motion-cell';
 const formatTime = (time: number): string => `t = ${+time.toFixed(3)} s`;
 const roundVec = (v: Vec3): Vec3 => [round6(v[0]), round6(v[1]), round6(v[2])];
 
-/** Index of the sample closest to `time`. */
-function nearestSample(times: readonly number[], time: number): number {
-  let best = 0;
-  for (let i = 1; i < times.length; i++) if (Math.abs((times[i] ?? 0) - time) < Math.abs((times[best] ?? 0) - time)) best = i;
-  return best;
-}
-
 /** `count` times evenly spaced from 0 to `duration`, both ends included (one frame = the start). */
 const evenTimes = (count: number, duration: number): number[] =>
   Array.from({ length: count }, (_, i) => (count === 1 ? 0 : (duration * i) / (count - 1)));
@@ -64,6 +57,7 @@ function springEnds(doc: CadDocument, poses: Readonly<Record<string, BodyPoseAt>
 /**
  * @affects nothing — read-only; returns data { svg, width, height, view, duration, samples, frames[{ time, bodies{ id: { position, rotationDeg } }, springs?{ id: { a, b, length } } }], trace? }
  * @invariant frames are clipped to their cell (empty grid cells stay blank); the input document is never changed: frames render a copy whose rigid-body member entities are moved to the simulated pose
+ * @invariant frames sit at the requested instants (interpolated between samples, shortest-arc per step): sampleRate must resolve less than pi of body rotation per sample step
  * @failure no physics engine, no rigid bodies, simulation refused or failed, times outside 0..duration, unknown trace body id, invalid camera -> no-op with the reason
  */
 export const renderMotion = defineCommand({
@@ -77,7 +71,7 @@ export const renderMotion = defineCommand({
     'path of the named rigid bodies (e.g. the coupler or the end-effector) over all samples, with a dot at the current position. ' +
     'Camera as render_view: `view` or `direction`. Returns data.svg (the grid), data.width/height, and data.frames[{ time, bodies{ bodyId: ' +
     '{ position (centre of mass, document units), rotationDeg (Euler XYZ degrees from the start pose) } } }] to read numbers. Frames show ' +
-    "the nearest recorded sample (data.frames[].time is that sample's time). With the CLI, `llull render_motion … --save m.png` writes a PNG " +
+    'the requested instants exactly (poses are interpolated between recorded samples; data.frames[].time is the requested time). With the CLI, `llull render_motion … --save m.png` writes a PNG ' +
     'rasterized from data.svg (--save m.svg writes the SVG itself; if rasterizing fails the .svg is saved instead and the CLI reply shows data.svg as a short placeholder). Point springs (add_spring) are drawn as green zig-zag coils between their attachment points, which ride on their bodies ' +
     '(data.frames[].springs gives the end points and length). Read-only; needs the physics engine like simulate_motion.',
   params: z.object({
@@ -116,7 +110,7 @@ export const renderMotion = defineCommand({
       .positive()
       .optional()
       .describe(
-        'Recorded samples per second (the frames and the trace snap to these). Default as simulate_motion; raise it for a smoother trace.',
+        'Recorded samples per second (the trace is drawn through these; frames are interpolated between them). Default as simulate_motion; raise it for a smoother trace.',
       ),
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -150,9 +144,9 @@ export const renderMotion = defineCommand({
     if (poses === undefined || poses.times.length === 0) return fail('the simulation recorded no poses');
 
     const wanted = params.times ?? evenTimes(params.frames ?? DEFAULT_FRAMES, duration);
-    const indices = wanted.map((time) => nearestSample(poses.times, time));
-    const frameDocs = indices.map((index) => documentAtPose(doc, posesAtSample(poses, index)));
-    const springPoses = indices.map((index) => springEnds(doc, posesAtSample(poses, index)));
+    const framePoses = wanted.map((time) => posesAtTime(poses, time));
+    const frameDocs = framePoses.map((bodyPoses) => documentAtPose(doc, bodyPoses));
+    const springPoses = framePoses.map((bodyPoses) => springEnds(doc, bodyPoses));
     const springPoints = springPoses.flatMap((ends) => Object.values(ends).flatMap((end) => [end.a, end.b]));
     const paths = traced.map((id) => (poses.bodies[id]?.position ?? []) as Vec3[]);
     const pathBounds = paths.filter((path) => path.length > 0).map((path) => boundsOfPoints(path));
@@ -167,7 +161,7 @@ export const renderMotion = defineCommand({
     const rows = Math.ceil(wanted.length / columns);
     const cellHeight = height + LABEL_HEIGHT;
     const layers: string[] = [];
-    const frames = indices.map((index, k) => {
+    const frames = wanted.map((time, k) => {
       const frameDoc = frameDocs[k] ?? doc;
       const shading = surfaceShadingOf(frameDoc, ctx);
       const data = renderDocument(frameDoc, view, width, height, {
@@ -179,20 +173,22 @@ export const renderMotion = defineCommand({
       });
       const x = (k % columns) * width;
       const y = Math.floor(k / columns) * cellHeight;
-      const time = poses.times[index] ?? 0;
+      const bodyPoses = framePoses[k] ?? {};
       const project = makeProjector(data.camera, data.orthoHalf, width, height);
       const overlay = paths.flatMap((path, p) => {
         const color = TRACE_COLORS[p % TRACE_COLORS.length] ?? '#ffd24a';
         const screen = path.map((point) => project(point));
-        const here = screen[index];
+        const tracedId = traced[p];
+        const here = tracedId === undefined ? undefined : bodyPoses[tracedId]?.position;
+        const current = here === undefined ? undefined : project(here);
         const line =
           screen.length < 2
             ? ''
             : `<polyline points="${screen.map((s) => `${r2(s[0])},${r2(s[1])}`).join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.9"/>`;
         const dot =
-          here === undefined
+          current === undefined
             ? ''
-            : `<circle cx="${r2(here[0])}" cy="${r2(here[1])}" r="4.5" fill="${color}" stroke="#101020" stroke-width="1.5"/>`;
+            : `<circle cx="${r2(current[0])}" cy="${r2(current[1])}" r="4.5" fill="${color}" stroke="#101020" stroke-width="1.5"/>`;
         return [line, dot];
       });
       const springs = Object.entries(springPoses[k] ?? {});
@@ -207,7 +203,7 @@ export const renderMotion = defineCommand({
       return {
         time: round6(time),
         bodies: Object.fromEntries(
-          Object.entries(posesAtSample(poses, index)).map(([id, pose]) => [
+          Object.entries(bodyPoses).map(([id, pose]) => [
             id,
             { position: roundVec(pose.position), rotationDeg: eulerDegOf(pose.orientation) },
           ]),
