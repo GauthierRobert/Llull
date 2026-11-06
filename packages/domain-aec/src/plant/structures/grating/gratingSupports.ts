@@ -33,8 +33,8 @@ export interface SupportLine {
   readonly topMm: number;
   /** |cos| of the angle between the axis and the bars: 0 = perpendicular. */
   readonly parallelism: number;
-  /** ds/dp: how fast the axis position along the bars changes across them (0 = perpendicular; a radial bracket under a wedge panel is tan of half the wedge angle). Absent = 0. */
-  readonly slope?: number;
+  /** ds/dp: how fast the axis position along the bars changes across them (0 = perpendicular; a radial bracket under a wedge panel is tan of half the wedge angle). */
+  readonly slope: number;
 }
 
 /** Unit vector of a plan angle. */
@@ -159,10 +159,10 @@ export function spanRange(a: SupportGroup, b: SupportGroup, from: number, to: nu
     group.members.find((line) => line.pMin <= mid && mid <= line.pMax) ??
     ([...group.members].sort((x, y) => Math.abs((x.pMin + x.pMax) / 2 - mid) - Math.abs((y.pMin + y.pMax) / 2 - mid))[0] as SupportLine);
   const [la, lb] = [carrier(a), carrier(b)];
-  const at = (line: SupportLine, p: number): number => line.sMm + (line.slope ?? 0) * (p - (line.pMin + line.pMax) / 2);
+  const at = (line: SupportLine, p: number): number => line.sMm + line.slope * (p - (line.pMin + line.pMax) / 2);
   const spans = [from, to].map((p) => Math.abs(at(lb, p) - at(la, p)));
   const centre = Math.abs(b.sMm - a.sMm);
-  if (Math.abs((lb.slope ?? 0) - (la.slope ?? 0)) < 1e-6) return { minMm: centre, maxMm: centre };
+  if (Math.abs(lb.slope - la.slope) < 1e-6) return { minMm: centre, maxMm: centre };
   return { minMm: Math.min(...spans), maxMm: Math.max(...spans) };
 }
 
