@@ -1,0 +1,36 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [50, 8, 8], "position": [25, 0, 0], "anchor": "center" }, "as": "crank_box" },
+  { "command": "add_box", "params": { "size": [200, 8, 8], "position": [150, 0, 0], "anchor": "center" }, "as": "rod_box" },
+  { "command": "add_box", "params": { "size": [20, 20, 20], "position": [250, 0, 0], "anchor": "center" }, "as": "piston_box" },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$crank_box"], "id": "crank", "massKg": 100 } },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$rod_box"], "id": "rod", "massKg": 0.005 } },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$piston_box"], "id": "piston", "massKg": 0.5 } },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "prismatic", "child": "piston", "parent": "ground", "anchor": [250, 0, 0], "axis": [1, 0, 0], "id": "j_slide" }
+  },
+  {
+    "command": "add_body_joint",
+    "params": {
+      "kind": "revolute",
+      "child": "crank",
+      "parent": "ground",
+      "anchor": [0, 0, 0],
+      "axis": [0, 1, 0],
+      "initialVelocity": 100,
+      "id": "j_crank"
+    }
+  },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "revolute", "child": "rod", "parent": "crank", "anchor": [50, 0, 0], "axis": [0, 1, 0], "id": "j_crankpin" }
+  },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "spherical", "child": "piston", "parent": "rod", "anchor": [250, 0, 0], "id": "j_wristpin" }
+  },
+  { "command": "add_motor", "params": { "joint": "j_crank", "kind": "speed", "rpm": 954.929658551, "maxTorque": 1000000, "id": "drive" } },
+  { "command": "set_gravity", "params": { "gravity": [0, 0, 0] } },
+  { "command": "set_dynamics_solver", "params": { "loopTimeConstantSteps": 16 } }
+]

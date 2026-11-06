@@ -1,0 +1,107 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_cylinder", "params": { "radius": 5, "height": 5, "position": [0, 0, 0], "axis": [0, 0, 1] }, "as": "pinion_geo" },
+  { "command": "add_cylinder", "params": { "radius": 50, "height": 10, "position": [120, 0, 0], "axis": [0, 0, 1] }, "as": "disc_geo" },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$pinion_geo"], "id": "motor_shaft", "massKg": 0.000001 } },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$disc_geo"], "id": "load", "massKg": 1.096 } },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "revolute", "child": "motor_shaft", "parent": "ground", "anchor": [0, 0, 0], "axis": [0, 0, 1], "id": "j_motor" }
+  },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "revolute", "child": "load", "parent": "ground", "anchor": [120, 0, 0], "axis": [0, 0, 1], "id": "j_load" }
+  },
+  {
+    "command": "add_transmission",
+    "params": {
+      "kind": "gear",
+      "driver": "j_motor",
+      "driven": "j_load",
+      "ratio": 10,
+      "efficiency": 0.9,
+      "efficiencyBack": 0.88,
+      "id": "tr_gear"
+    }
+  },
+  {
+    "command": "set_joint_physics",
+    "params": {
+      "joint": "j_load",
+      "friction": {
+        "model": "coulomb",
+        "kineticNm": 0.02,
+        "viscousNmsPerRad": 0.001,
+        "source": { "name": "assumed for the sizing example", "grade": "C" }
+      }
+    }
+  },
+  { "command": "set_gravity", "params": { "gravity": [0, 0, 0] } },
+  {
+    "command": "add_motor",
+    "params": {
+      "joint": "j_motor",
+      "kind": "dc",
+      "id": "m_re40",
+      "datasheet": {
+        "nominalVoltageV": 48,
+        "terminalResistanceOhm": 1.13,
+        "terminalInductanceH": 0.00033,
+        "torqueConstantNmPerA": 0.0603,
+        "rotorInertiaKgM2": 0.0000137,
+        "noLoadCurrentA": 0.0686,
+        "nominalCurrentA": 3.17,
+        "stallTorqueNm": 2.56,
+        "noLoadSpeedRpm": 7590,
+        "maxSpeedRpm": 12000,
+        "thermal": {
+          "rthWindingHousingKPerW": 1.9,
+          "rthHousingAmbientKPerW": 4.7,
+          "tauWindingS": 41.5,
+          "tauMotorS": 809,
+          "maxWindingC": 155
+        }
+      },
+      "source": { "name": "maxon RE 40 148877, catalogue page CN-141 (2020-06)", "grade": "A" }
+    }
+  },
+  {
+    "command": "add_motion_profile",
+    "params": {
+      "id": "p_index",
+      "quantity": "position",
+      "unit": "deg",
+      "segments": [
+        { "kind": "move", "law": "s_curve", "to": 90, "duration": 0.3 },
+        { "kind": "dwell", "duration": 0.2 },
+        { "kind": "move", "law": "s_curve", "to": 0, "duration": 0.3 },
+        { "kind": "dwell", "duration": 0.2 }
+      ],
+      "repeat": 5
+    }
+  },
+  { "command": "evaluate_motion_profile", "params": { "profile": "p_index", "samples": 201 } },
+  {
+    "command": "set_motor_drive",
+    "params": {
+      "motor": "m_re40",
+      "mode": "position",
+      "profile": "p_index",
+      "target": "j_load",
+      "tune": { "bandwidthHz": 20, "dampingRatio": 1 },
+      "feedforward": true,
+      "currentLimitA": 10,
+      "busVoltageV": 48,
+      "sampleHz": 5000
+    }
+  },
+  {
+    "command": "simulate_motion",
+    "params": { "duration": 5, "timestep": 0.0001, "sampleRate": 1000, "detail": "drives", "energy": true, "reactions": "peaks" }
+  },
+  {
+    "command": "size_drive",
+    "params": { "motor": "m_re40", "duration": 5, "margin": 0.2, "ambientC": 25, "ratioSweep": [5, 8, 10, 12, 15, 20] }
+  },
+  { "command": "check_motion_truth", "params": { "duration": 1, "level": "full" } }
+]

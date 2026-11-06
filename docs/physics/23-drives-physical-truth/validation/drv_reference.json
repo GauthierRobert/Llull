@@ -1,0 +1,538 @@
+{
+ "pack": "23-drives-physical-truth",
+ "generatedBy": "generate_drv_reference.py",
+ "maxon148877": {
+  "datasheet": {
+   "nominalVoltageV": 48.0,
+   "noLoadSpeedRpm": 7590.0,
+   "noLoadCurrentA": 0.0686,
+   "nominalSpeedRpm": 7000.0,
+   "nominalTorqueNm": 0.187,
+   "nominalCurrentA": 3.17,
+   "stallTorqueNm": 2.56,
+   "stallCurrentA": 42.4,
+   "terminalResistanceOhm": 1.13,
+   "terminalInductanceH": 0.00033,
+   "torqueConstantNmPerA": 0.0603,
+   "speedConstantRpmPerV": 158.0,
+   "speedTorqueGradientRpmPerMNm": 2.97,
+   "mechanicalTimeConstantS": 0.00428,
+   "rotorInertiaKgM2": 1.37e-05,
+   "thermalResistanceWindingHousingKPerW": 1.9,
+   "thermalResistanceHousingAmbientKPerW": 4.7,
+   "thermalTimeConstantWindingS": 41.5,
+   "thermalTimeConstantMotorS": 809.0,
+   "maxWindingTemperatureC": 155.0,
+   "maxSpeedRpm": 12000.0
+  },
+  "derived": {
+   "electricalTimeConstantS": 0.00029203539823,
+   "frictionTorqueNm": 0.00413658,
+   "noLoadSpeedRadS": 794.734361526
+  },
+  "checks": [
+   {
+    "quantity": "stallCurrentA",
+    "derived": 42.4778761062,
+    "datasheet": 42.4,
+    "relError": 0.0018367006178
+   },
+   {
+    "quantity": "stallTorqueNm",
+    "derived": 2.5614159292,
+    "datasheet": 2.56,
+    "relError": 0.000553097345133
+   },
+   {
+    "quantity": "keFromSpeedConstantVsPerRad",
+    "derived": 0.0604385859843,
+    "datasheet": 0.0603,
+    "relError": 0.00229827502925
+   },
+   {
+    "quantity": "noLoadSpeedRpm",
+    "derived": 7589.15412491,
+    "datasheet": 7590.0,
+    "relError": -0.000111445993697
+   },
+   {
+    "quantity": "mechanicalTimeConstantS",
+    "derived": 0.00425759538405,
+    "datasheet": 0.00428,
+    "relError": -0.00523472335218
+   },
+   {
+    "quantity": "speedTorqueGradientRpmPerMNm",
+    "derived": 2.96287457198,
+    "datasheet": 2.97,
+    "relError": -0.00239913401266
+   }
+  ],
+  "maxAbsRelError": 0.00523472335218
+ },
+ "dcStep": {
+  "eigenvalues": [
+   -253.665765475,
+   -3170.57665877
+  ],
+  "steadySpeedRadS": 796.019900498,
+  "steadySpeedRpm": 7601.43011782,
+  "samples": [
+   {
+    "tS": 0.0005,
+    "currentA": 33.7089942695,
+    "speedRadS": 48.0256769665,
+    "speedRpm": 458.611433073
+   },
+   {
+    "tS": 0.001,
+    "currentA": 36.6002005455,
+    "speedRadS": 127.53822381,
+    "speedRpm": 1217.90032515
+   },
+   {
+    "tS": 0.002,
+    "currentA": 29.9364200213,
+    "speedRadS": 275.177865668,
+    "speedRpm": 2627.75505304
+   },
+   {
+    "tS": 0.00428,
+    "currentA": 16.8381177639,
+    "speedRadS": 503.853721465,
+    "speedRpm": 4811.44862198
+   },
+   {
+    "tS": 0.01,
+    "currentA": 3.94591488586,
+    "speedRadS": 727.552695532,
+    "speedRpm": 6947.61647122
+   },
+   {
+    "tS": 0.02,
+    "currentA": 0.312241979297,
+    "speedRadS": 790.602060475,
+    "speedRpm": 7549.69355659
+   },
+   {
+    "tS": 0.03,
+    "currentA": 0.0247078450639,
+    "speedRadS": 795.591184435,
+    "speedRpm": 7597.33618099
+   }
+  ],
+  "currentPeak": {
+   "tS": 0.00086586506656,
+   "currentA": 36.8298930978
+  },
+  "energyTo30ms": {
+   "inputJ": 8.67629789195,
+   "copperLossJ": 4.34048526188,
+   "kineticJ": 4.33581252934,
+   "magneticJ": 1.00728805271e-07,
+   "closureJ": -4.69376650121e-13
+  }
+ },
+ "thermal": {
+  "alphaPerK": 0.0039,
+  "steadyAtNominalCurrentC": 130.896616124,
+  "maxContinuousCurrentAt155CA": 3.4009782966,
+  "runawayCurrentA": 5.86349429556,
+  "transient10W": {
+   "powerW": 10.0,
+   "windingCapacityJPerK": 21.8421052632,
+   "housingCapacityJPerK": 172.127659574,
+   "timeConstantsS": [
+    916.526663665,
+    36.6312310716
+   ],
+   "steadyWindingRiseK": 66.0,
+   "samples": [
+    {
+     "tS": 10.0,
+     "windingRiseK": 4.07340806224,
+     "housingRiseK": 0.0638008393415
+    },
+    {
+     "tS": 41.5,
+     "windingRiseK": 12.2498586531,
+     "housingRiseK": 0.840861746595
+    },
+    {
+     "tS": 300.0,
+     "windingRiseK": 29.0317189412,
+     "housingRiseK": 11.7100725154
+    },
+    {
+     "tS": 809.0,
+     "windingRiseK": 44.7874662374,
+     "housingRiseK": 26.7479621944
+    },
+    {
+     "tS": 3000.0,
+     "windingRiseK": 64.057365009,
+     "housingRiseK": 45.1453268276
+    },
+    {
+     "tS": 10000.0,
+     "windingRiseK": 65.9990636159,
+     "housingRiseK": 46.9991060151
+    }
+   ]
+  },
+  "dutyCycle": {
+   "currentA": 6.0,
+   "onS": 1.0,
+   "offS": 3.0,
+   "rmsCurrentA": 3.0,
+   "rmsTorqueNm": 0.1809,
+   "periodicMeanWindingRiseAlpha0K": 67.122,
+   "steadyWindingAtRmsCurrentC": 115.923597465
+  }
+ },
+ "gear": {
+  "spinUp": {
+   "inputTorqueNm": 0.1,
+   "ratio": 10.0,
+   "efficiency": 0.9,
+   "inputInertiaKgM2": 1.37e-05,
+   "outputInertiaKgM2": 0.00137,
+   "outputAccelerationRadS2": 345.754898194,
+   "couplingTorqueInputNm": 0.0526315789474
+  },
+  "reflectedInertiaKgM2": 1.37e-05,
+  "optimalRatio": {
+   "motorInertiaKgM2": 1.37e-05,
+   "loadInertiaKgM2": 0.00137,
+   "loadAccelerationRadS2": 100.0,
+   "ratio": 10.0,
+   "minPeakMotorTorqueNm": 0.0274,
+   "sweep": [
+    {
+     "ratio": 2,
+     "peakMotorTorqueNm": 0.07124
+    },
+    {
+     "ratio": 5,
+     "peakMotorTorqueNm": 0.03425
+    },
+    {
+     "ratio": 8,
+     "peakMotorTorqueNm": 0.028085
+    },
+    {
+     "ratio": 10,
+     "peakMotorTorqueNm": 0.0274
+    },
+    {
+     "ratio": 12,
+     "peakMotorTorqueNm": 0.0278566666667
+    },
+    {
+     "ratio": 20,
+     "peakMotorTorqueNm": 0.03425
+    },
+    {
+     "ratio": 50,
+     "peakMotorTorqueNm": 0.07124
+    }
+   ]
+  },
+  "rmsTorque": {
+   "profile": [
+    [
+     2.0,
+     1.0
+    ],
+    [
+     0.0,
+     3.0
+    ]
+   ],
+   "rmsNm": 1.0
+  }
+ },
+ "leadScrew": {
+  "meanDiameterM": 0.01,
+  "leadM": 0.01,
+  "massKg": 10.0,
+  "screwInertiaKgM2": 1e-05,
+  "g": 9.81,
+  "leadAngleDeg": 17.6567871514,
+  "motorTorqueNm": 0.5,
+  "free": {
+   "mu": 0.1,
+   "frictionAngleDeg": 5.7105931375,
+   "forwardEfficiency": 0.736721215535,
+   "backDriveEfficiency": 0.664683210919,
+   "selfLocking": false,
+   "liftAccelerationMS2": 10.3302646826,
+   "liftTorqueStaticNm": 0.211926840005,
+   "fallAccelerationMotorOffMS2": 6.15454744465,
+   "holdingTorqueNm": 0.103777653854
+  },
+  "locking": {
+   "mu": 0.35,
+   "frictionAngleDeg": 19.2900462192,
+   "forwardEfficiency": 0.423228023042,
+   "backDriveEfficiency": 0.0,
+   "selfLocking": true,
+   "liftAccelerationMS2": 2.98701832705,
+   "liftTorqueStaticNm": 0.368905154368,
+   "fallAccelerationMotorOffMS2": 0.0,
+   "holdingTorqueNm": -0.0139858579307
+  },
+  "forceFromTorque": {
+   "torqueNm": 0.1,
+   "leadM": 0.005,
+   "efficiency": 0.9,
+   "forceN": 113.097335529
+  }
+ },
+ "backlash": {
+  "halfGapDeg": 0.25,
+  "totalGapDeg": 0.5,
+  "lostMotionOnReversalDeg": 0.5
+ },
+ "stickSlip": {
+  "massKg": 1.0,
+  "stiffnessNPerM": 100.0,
+  "beltSpeedMS": 0.1,
+  "staticN": 2.0,
+  "kineticN": 1.0,
+  "stickReleaseXM": 0.02,
+  "slipEndXM": -1.73472347598e-18,
+  "slipTimeS": 0.471238898038,
+  "stickTimeS": 0.2,
+  "periodS": 0.671238898038,
+  "minVelocityMS": -0.141421356237
+ },
+ "breakaway": {
+  "staticN": 2.0,
+  "coulombN": 1.0,
+  "massKg": 1.0,
+  "forceRateNPerS": 1.0,
+  "breakawayTimeS": 2.0,
+  "accelerationAfterBreakawayMS2": 1.0
+ },
+ "pinFriction": {
+  "inertiaKgM2": 0.01,
+  "radialLoadKg": 5.0,
+  "g": 9.81,
+  "pinRadiusM": 0.01,
+  "mu": 0.2,
+  "torqueNm": 0.2,
+  "frictionTorqueNm": 0.0981,
+  "accelerationRadS2": 10.19
+ },
+ "spinDown": {
+  "inertiaKgM2": 1.37e-05,
+  "coulombTorqueNm": 0.00414,
+  "viscousNmsPerRad": 1e-06,
+  "initialSpeedRadS": 800.0,
+  "stopTimeS": 2.42037274407,
+  "samples": [
+   {
+    "tS": 0.0,
+    "speedRadS": 800.0
+   },
+   {
+    "tS": 0.5,
+    "speedRadS": 622.958366876
+   },
+   {
+    "tS": 1.0,
+    "speedRadS": 452.261620363
+   },
+   {
+    "tS": 1.5,
+    "speedRadS": 287.682369958
+   },
+   {
+    "tS": 2.0,
+    "speedRadS": 129.001374465
+   },
+   {
+    "tS": 2.5,
+    "speedRadS": 0.0
+   }
+  ]
+ },
+ "endStop": {
+  "inertiaKgM2": 0.01,
+  "stopStiffnessNmPerRad": 1000.0,
+  "dampingRatio": 0.2,
+  "impactSpeedRadS": 1.0,
+  "restitution": 0.52662059933,
+  "contactTimeS": 0.0101394466899,
+  "peakPenetrationRad": 0.00239110858721,
+  "peakPenetrationTimeS": 0.00441984345009
+ },
+ "profiles": {
+  "trapezoid": {
+   "distanceM": 0.1,
+   "vmax": 0.5,
+   "amax": 5.0,
+   "durationS": 0.3,
+   "accelTimeS": 0.1
+  },
+  "triangle": {
+   "distanceM": 1.0,
+   "durationS": 1.0,
+   "peakVelocityMS": 2.0,
+   "peakAccelerationMS2": 4.0
+  },
+  "sCurve": {
+   "distanceM": 0.1,
+   "vmax": 0.5,
+   "amax": 5.0,
+   "jerk": 100.0,
+   "durationS": 0.35,
+   "jerkTimeS": 0.05
+  },
+  "camLaws": {
+   "cycloidal": {
+    "Cv": 2.0,
+    "Ca": 6.28318530718,
+    "Cj": 39.4784176044,
+    "formula": "s = x - sin(2 pi x) / (2 pi)"
+   },
+   "poly345": {
+    "Cv": 1.875,
+    "Ca": 5.7735026919,
+    "Cj": 60.0,
+    "formula": "s = 10x^3 - 15x^4 + 6x^5"
+   },
+   "harmonic": {
+    "Cv": 1.57079632679,
+    "Ca": 4.93480220054,
+    "formula": "s = (1 - cos(pi x)) / 2"
+   },
+   "modifiedTrapezoid": {
+    "Cv": 2.0,
+    "Ca": 4.88812376344,
+    "endVelocity": 1.89113373828e-16,
+    "definition": "sine ramps on 1/8, flat on 2/8 (Neklutin)"
+   },
+   "modifiedSine": {
+    "Cv": 1.75960338602,
+    "Ca": 5.52795707134,
+    "endVelocity": 6.74162351212e-16,
+    "definition": "sine of period 1/2 on [0, 1/8] and [7/8, 1], period 3/2 between"
+   }
+  }
+ },
+ "piSpeedLoop": {
+  "inertiaKgM2": 0.001,
+  "kp": 0.2,
+  "ki": 10.0,
+  "peakTimeS": 0.02,
+  "peakResponse": 1.13533528324,
+  "samples": [
+   {
+    "tS": 0.005,
+    "response": 0.696734670144
+   },
+   {
+    "tS": 0.01,
+    "response": 1.0
+   },
+   {
+    "tS": 0.02,
+    "response": 1.13533528324
+   },
+   {
+    "tS": 0.05,
+    "response": 1.026951788
+   }
+  ]
+ },
+ "inverseDynamics": {
+  "inertiaKgM2": 0.001,
+  "peakAccelerationRadS2": 100.0,
+  "peakTorqueNm": 0.1
+ },
+ "pmsm": {
+  "fluxLinkageWb": 0.01,
+  "polePairs": 4,
+  "inductanceH": 0.0002,
+  "currentLimitA": 20.0,
+  "busVoltageV": 24.0,
+  "phaseVoltageLimitV": 13.8564064606,
+  "maxTorqueNm": 1.2,
+  "baseSpeedRadS": 321.633760451,
+  "maxSpeedRadS": 577.35026919,
+  "envelope": [
+   {
+    "mechSpeedRadS": 100.0,
+    "torqueNm": 1.2,
+    "idA": 0.0
+   },
+   {
+    "mechSpeedRadS": 300.0,
+    "torqueNm": 1.2,
+    "idA": 0.0
+   },
+   {
+    "mechSpeedRadS": 400.0,
+    "torqueNm": 1.03042466974,
+    "idA": -10.25
+   },
+   {
+    "mechSpeedRadS": 500.0,
+    "torqueNm": 0.632139225171,
+    "idA": -17.0
+   },
+   {
+    "mechSpeedRadS": 550.0,
+    "torqueNm": 0.359262614798,
+    "idA": -19.0826446281
+   }
+  ]
+ },
+ "induction": {
+  "kloss": {
+   "breakdownTorqueNm": 100.0,
+   "breakdownSlip": 0.1,
+   "torqueAtSlip": {
+    "0.05": 80.0,
+    "0.1": 100.0,
+    "0.5": 38.4615384615,
+    "1.0": 19.801980198
+   },
+   "slipAtHalfBreakdown": 0.0267949192431
+  },
+  "circuit": {
+   "phaseVoltageV": 230.0,
+   "frequencyHz": 50.0,
+   "polePairs": 2,
+   "r1Ohm": 0.5,
+   "r2Ohm": 0.4,
+   "x1PlusX2Ohm": 2.0,
+   "syncSpeedRadS": 157.079632679,
+   "breakdownSlip": 0.194028500029,
+   "breakdownTorqueNm": 197.207641727,
+   "torqueAtBreakdownSlipNm": 197.207641727,
+   "startingTorqueNm": 84.0179275466
+  }
+ },
+ "stepper": {
+  "holdingTorqueNm": 0.5,
+  "rotorTeeth": 50,
+  "stepsPerRev": 200,
+  "rotorInertiaKgM2": 1e-05,
+  "naturalFrequencyHz": 251.646060522,
+  "staticDeflectionDegAtHalfHoldingTorque": 0.6
+ },
+ "hydraulic": {
+  "supplyPa": 10000000.0,
+  "boreM": 0.05,
+  "cd": 0.62,
+  "valveAreaM2": 2e-06,
+  "densityKgM3": 850.0,
+  "loadN": 5000.0,
+  "capPressurePa": 2546479.08947,
+  "flowM3S": 0.00016421315955,
+  "speedMS": 0.0836330754021
+ }
+}

@@ -1,0 +1,183 @@
+{
+  "pack": "22-motion-video",
+  "generatedBy": "generate_mov_reference.py",
+  "sliderCrank": {
+    "simDurationS": 0.0628318530718,
+    "fps": 30,
+    "playbackRate": 0.01,
+    "frames": 189,
+    "samples": [
+      {
+        "frame": 0,
+        "tS": 0.0,
+        "crankDeg": 0.0,
+        "pistonXmm": 250.0
+      },
+      {
+        "frame": 15,
+        "tS": 0.005,
+        "crankDeg": 28.6478897565,
+        "pistonXmm": 242.437376179
+      },
+      {
+        "frame": 30,
+        "tS": 0.01,
+        "crankDeg": 57.2957795131,
+        "pistonXmm": 222.539580398
+      },
+      {
+        "frame": 45,
+        "tS": 0.015,
+        "crankDeg": 85.9436692696,
+        "pistonXmm": 197.218323779
+      },
+      {
+        "frame": 60,
+        "tS": 0.02,
+        "crankDeg": 114.591559026,
+        "pistonXmm": 173.956477898
+      },
+      {
+        "frame": 75,
+        "tS": 0.025,
+        "crankDeg": 143.239448783,
+        "pistonXmm": 157.691593509
+      },
+      {
+        "frame": 90,
+        "tS": 0.03,
+        "crankDeg": 171.887338539,
+        "pistonXmm": 150.375868561
+      },
+      {
+        "frame": 105,
+        "tS": 0.035,
+        "crankDeg": 200.535228296,
+        "pistonXmm": 152.406625851
+      },
+      {
+        "frame": 120,
+        "tS": 0.04,
+        "crankDeg": 229.183118052,
+        "pistonXmm": 163.7055094
+      },
+      {
+        "frame": 135,
+        "tS": 0.045,
+        "crankDeg": 257.831007809,
+        "pistonXmm": 183.395991081
+      },
+      {
+        "frame": 150,
+        "tS": 0.05,
+        "crankDeg": 286.478897565,
+        "pistonXmm": 208.350976307
+      },
+      {
+        "frame": 165,
+        "tS": 0.055,
+        "crankDeg": 315.126787322,
+        "pistonXmm": 232.297736669
+      },
+      {
+        "frame": 180,
+        "tS": 0.06,
+        "crankDeg": 343.774677078,
+        "pistonXmm": 247.519961243
+      }
+    ]
+  },
+  "spinClip": {
+    "fps": 10,
+    "durationS": 2.0,
+    "frames": 21,
+    "samples": [
+      {
+        "frame": 0,
+        "angleRad": 0.0,
+        "centreMm": [
+          50.0,
+          0.0
+        ]
+      },
+      {
+        "frame": 5,
+        "angleRad": 1.57079632679,
+        "centreMm": [
+          3.06161699787e-15,
+          50.0
+        ]
+      },
+      {
+        "frame": 10,
+        "angleRad": 3.14159265359,
+        "centreMm": [
+          -50.0,
+          6.12323399574e-15
+        ]
+      },
+      {
+        "frame": 15,
+        "angleRad": 4.71238898038,
+        "centreMm": [
+          -9.18485099361e-15,
+          -50.0
+        ]
+      },
+      {
+        "frame": 20,
+        "angleRad": 6.28318530718,
+        "centreMm": [
+          50.0,
+          -1.22464679915e-14
+        ]
+      }
+    ]
+  },
+  "gifDelaysCs": {
+    "fps30": [
+      3,
+      4,
+      3,
+      3,
+      4,
+      3,
+      3,
+      4,
+      3,
+      3,
+      4,
+      3
+    ],
+    "fps24": [
+      4,
+      4,
+      5,
+      4,
+      4,
+      4,
+      4,
+      4,
+      5,
+      4,
+      4,
+      4
+    ],
+    "fps10": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "fps40": [
+      3,
+      2,
+      3,
+      2,
+      3,
+      2,
+      3,
+      2
+    ]
+  }
+}

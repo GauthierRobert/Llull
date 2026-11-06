@@ -1,0 +1,45 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_cylinder", "params": { "radius": 5, "height": 5, "position": [0, 0, 0], "axis": [0, 0, 1] }, "as": "hub" },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$hub"], "id": "rotor", "massKg": 0.000001 } },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "revolute", "child": "rotor", "parent": "ground", "anchor": [0, 0, 0], "axis": [0, 0, 1], "id": "j_shaft" }
+  },
+  { "command": "set_gravity", "params": { "gravity": [0, 0, 0] } },
+  {
+    "command": "add_motor",
+    "params": {
+      "joint": "j_shaft",
+      "kind": "dc",
+      "id": "m_re40",
+      "datasheet": {
+        "nominalVoltageV": 48,
+        "terminalResistanceOhm": 1.13,
+        "terminalInductanceH": 0.00033,
+        "torqueConstantNmPerA": 0.0603,
+        "rotorInertiaKgM2": 0.0000137,
+        "noLoadCurrentA": 0,
+        "nominalCurrentA": 3.17,
+        "stallTorqueNm": 2.56,
+        "noLoadSpeedRpm": 7590,
+        "speedConstantRpmPerV": 158,
+        "maxSpeedRpm": 12000,
+        "thermal": {
+          "rthWindingHousingKPerW": 1.9,
+          "rthHousingAmbientKPerW": 4.7,
+          "tauWindingS": 41.5,
+          "tauMotorS": 809,
+          "maxWindingC": 155
+        }
+      },
+      "source": { "name": "maxon RE 40 148877, catalogue page CN-141 (2020-06)", "grade": "A" }
+    }
+  },
+  { "command": "set_motor_drive", "params": { "motor": "m_re40", "mode": "voltage", "volts": 48 } },
+  { "command": "check_motor_data", "params": { "motor": "m_re40" } },
+  {
+    "command": "simulate_motion",
+    "params": { "duration": 0.03, "timestep": 0.00001, "sampleRate": 10000, "detail": "drives", "energy": true, "reactions": "off" }
+  }
+]

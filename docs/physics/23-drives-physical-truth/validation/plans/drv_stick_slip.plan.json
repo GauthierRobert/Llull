@@ -1,0 +1,40 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [400, 60, 10], "position": [0, 0, -5], "anchor": "center" }, "as": "belt_geo" },
+  { "command": "add_box", "params": { "size": [20, 20, 20], "position": [0, 0, 10], "anchor": "center" }, "as": "block_geo" },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$belt_geo"], "id": "belt", "massKg": 5 } },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$block_geo"], "id": "block", "massKg": 1 } },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "prismatic", "child": "belt", "parent": "ground", "anchor": [0, 0, -5], "axis": [1, 0, 0], "id": "j_belt" }
+  },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "prismatic", "child": "block", "parent": "belt", "anchor": [0, 0, 10], "axis": [1, 0, 0], "id": "j_block" }
+  },
+  {
+    "command": "add_spring",
+    "params": {
+      "bodyA": "block",
+      "bodyB": "ground",
+      "pointA": [0, 0, 10],
+      "pointB": [-200, 0, 10],
+      "stiffness": 100,
+      "freeLengthMm": 200,
+      "id": "s_anchor"
+    }
+  },
+  {
+    "command": "set_joint_physics",
+    "params": {
+      "joint": "j_block",
+      "friction": { "model": "stiction", "staticN": 2, "kineticN": 1, "source": { "name": "PHY-23 VC-DRV-18 (synthetic)", "grade": "A" } }
+    }
+  },
+  { "command": "set_gravity", "params": { "gravity": [0, 0, 0] } },
+  { "command": "add_motor", "params": { "joint": "j_belt", "kind": "speed", "speedMps": 0.1, "maxForceN": 10000, "id": "m_belt" } },
+  {
+    "command": "simulate_motion",
+    "params": { "duration": 3, "timestep": 0.00002, "sampleRate": 2000, "detail": "series", "energy": true, "reactions": "off" }
+  }
+]

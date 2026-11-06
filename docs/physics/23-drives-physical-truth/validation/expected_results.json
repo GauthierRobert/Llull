@@ -1,0 +1,1328 @@
+{
+  "pack": "23-drives-physical-truth",
+  "generatedBy": "generate_drv_reference.py (values) via drv_reference.json; behaviour cases (codes, purity, determinism, cross-engine, UI) are in README.md",
+  "cases": [
+    {
+      "id": "VC-DRV-01",
+      "quantity": "largest relative gap between the derived and the datasheet values (6 checks), maxon 148877",
+      "value": 0.00523472335218,
+      "unit": "1",
+      "tolerance": {
+        "max": 0.01
+      },
+      "source": "R1 datasheet + generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-02",
+        "TR-DRV-04"
+      ]
+    },
+    {
+      "id": "VC-DRV-03",
+      "quantity": "no-load speed, Coulomb friction kt*I0, ke = kt",
+      "value": 794.734361526,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.002
+      },
+      "source": "R1 + generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-05"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "speed after a 48 V step at t = 0.0005 s (rotor only, L = 0.33 mH)",
+      "value": 48.0256769665,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-05",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "current after a 48 V step at t = 0.0005 s",
+      "value": 33.7089942695,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.005,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "speed after a 48 V step at t = 0.001 s (rotor only, L = 0.33 mH)",
+      "value": 127.53822381,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-05",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "current after a 48 V step at t = 0.001 s",
+      "value": 36.6002005455,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.005,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "speed after a 48 V step at t = 0.002 s (rotor only, L = 0.33 mH)",
+      "value": 275.177865668,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-05",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "current after a 48 V step at t = 0.002 s",
+      "value": 29.9364200213,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.005,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "speed after a 48 V step at t = 0.00428 s (rotor only, L = 0.33 mH)",
+      "value": 503.853721465,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-05",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "current after a 48 V step at t = 0.00428 s",
+      "value": 16.8381177639,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.005,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "speed after a 48 V step at t = 0.01 s (rotor only, L = 0.33 mH)",
+      "value": 727.552695532,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-05",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "current after a 48 V step at t = 0.01 s",
+      "value": 3.94591488586,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.005,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "speed after a 48 V step at t = 0.02 s (rotor only, L = 0.33 mH)",
+      "value": 790.602060475,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-05",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "current after a 48 V step at t = 0.02 s",
+      "value": 0.312241979297,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.005,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "speed after a 48 V step at t = 0.03 s (rotor only, L = 0.33 mH)",
+      "value": 795.591184435,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-05",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "current after a 48 V step at t = 0.03 s",
+      "value": 0.0247078450639,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.005,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2x2 ODE)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-01",
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-04",
+      "quantity": "current peak after a 48 V step",
+      "value": 36.8298930978,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "TR-DRV-06"
+      ]
+    },
+    {
+      "id": "VC-DRV-05",
+      "quantity": "electrical input energy 0..30 ms",
+      "value": 8.67629789195,
+      "unit": "J",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (Simpson on the exact solution)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-20",
+        "TR-DRV-20"
+      ]
+    },
+    {
+      "id": "VC-DRV-05",
+      "quantity": "copper loss 0..30 ms",
+      "value": 4.34048526188,
+      "unit": "J",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-20",
+        "TR-DRV-20"
+      ]
+    },
+    {
+      "id": "VC-DRV-05",
+      "quantity": "rotor kinetic energy at 30 ms",
+      "value": 4.33581252934,
+      "unit": "J",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-20"
+      ]
+    },
+    {
+      "id": "VC-DRV-06",
+      "quantity": "steady winding temperature at the nominal current 3.17 A, ambient 25 C, alpha 0.0039",
+      "value": 130.896616124,
+      "unit": "degC",
+      "tolerance": {
+        "abs": 0.5
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-04",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-07",
+      "quantity": "winding rise above ambient, 10 W step, t = 10.0 s (alpha = 0)",
+      "value": 4.07340806224,
+      "unit": "K",
+      "tolerance": {
+        "rel": 0.01,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2-node solution)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-04",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-07",
+      "quantity": "winding rise above ambient, 10 W step, t = 41.5 s (alpha = 0)",
+      "value": 12.2498586531,
+      "unit": "K",
+      "tolerance": {
+        "rel": 0.01,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2-node solution)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-04",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-07",
+      "quantity": "winding rise above ambient, 10 W step, t = 300.0 s (alpha = 0)",
+      "value": 29.0317189412,
+      "unit": "K",
+      "tolerance": {
+        "rel": 0.01,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2-node solution)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-04",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-07",
+      "quantity": "winding rise above ambient, 10 W step, t = 809.0 s (alpha = 0)",
+      "value": 44.7874662374,
+      "unit": "K",
+      "tolerance": {
+        "rel": 0.01,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2-node solution)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-04",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-07",
+      "quantity": "winding rise above ambient, 10 W step, t = 3000.0 s (alpha = 0)",
+      "value": 64.057365009,
+      "unit": "K",
+      "tolerance": {
+        "rel": 0.01,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2-node solution)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-04",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-07",
+      "quantity": "winding rise above ambient, 10 W step, t = 10000.0 s (alpha = 0)",
+      "value": 65.9990636159,
+      "unit": "K",
+      "tolerance": {
+        "rel": 0.01,
+        "abs": 0.05
+      },
+      "source": "generate_drv_reference.py (exact 2-node solution)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-04",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-08",
+      "quantity": "RMS current, 6 A for 1 s then 0 A for 3 s",
+      "value": 3.0,
+      "unit": "A",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-12",
+        "TR-DRV-21"
+      ]
+    },
+    {
+      "id": "VC-DRV-08",
+      "quantity": "steady winding temperature at that RMS current",
+      "value": 115.923597465,
+      "unit": "degC",
+      "tolerance": {
+        "abs": 3.0
+      },
+      "source": "generate_drv_reference.py (periodic mean, cycle 4 s vs tau_w 41.5 s)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-12",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-09",
+      "quantity": "thermal runaway current (I^2 R25 alpha Rth = 1)",
+      "value": 5.86349429556,
+      "unit": "A",
+      "tolerance": {
+        "rel": 0.001
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-04",
+        "TR-DRV-09"
+      ]
+    },
+    {
+      "id": "VC-DRV-10",
+      "quantity": "output acceleration, 0.1 N m through N = 10, eta 0.9",
+      "value": 345.754898194,
+      "unit": "rad/s^2",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-06",
+        "TR-DRV-12"
+      ]
+    },
+    {
+      "id": "VC-DRV-11",
+      "quantity": "inertia-matching ratio sqrt(J_load / J_motor)",
+      "value": 10.0,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-13",
+        "TR-DRV-22"
+      ]
+    },
+    {
+      "id": "VC-DRV-11",
+      "quantity": "peak motor torque at the optimal ratio, alpha_load 100 rad/s^2",
+      "value": 0.0274,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-13",
+        "TR-DRV-22"
+      ]
+    },
+    {
+      "id": "VC-DRV-12",
+      "quantity": "RMS torque of 2 N m for 1 s then 0 for 3 s",
+      "value": 1.0,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-12",
+        "TR-DRV-21"
+      ]
+    },
+    {
+      "id": "VC-DRV-13",
+      "quantity": "lead screw forward efficiency, square thread, mu 0.1, lead = d_m = 10 mm",
+      "value": 0.736721215535,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-07",
+        "TR-DRV-13"
+      ]
+    },
+    {
+      "id": "VC-DRV-13",
+      "quantity": "lead screw back-drive efficiency, mu 0.1",
+      "value": 0.664683210919,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-07",
+        "TR-DRV-13"
+      ]
+    },
+    {
+      "id": "VC-DRV-13",
+      "quantity": "lift acceleration of 10 kg, 0.5 N m on the screw, mu 0.1",
+      "value": 10.3302646826,
+      "unit": "m/s^2",
+      "tolerance": {
+        "rel": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-07",
+        "TR-DRV-13"
+      ]
+    },
+    {
+      "id": "VC-DRV-13",
+      "quantity": "fall acceleration of 10 kg with the motor off, mu 0.1 (back-driven)",
+      "value": 6.15454744465,
+      "unit": "m/s^2",
+      "tolerance": {
+        "rel": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-07",
+        "TR-DRV-13"
+      ]
+    },
+    {
+      "id": "VC-DRV-14",
+      "quantity": "fall acceleration with the motor off, mu 0.35 (self-locking)",
+      "value": 0.0,
+      "unit": "m/s^2",
+      "tolerance": {
+        "abs": 0.0001
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-07",
+        "TR-DRV-13"
+      ]
+    },
+    {
+      "id": "VC-DRV-14",
+      "quantity": "lift acceleration, mu 0.35",
+      "value": 2.98701832705,
+      "unit": "m/s^2",
+      "tolerance": {
+        "rel": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-07",
+        "TR-DRV-13"
+      ]
+    },
+    {
+      "id": "VC-DRV-15",
+      "quantity": "axial force from 0.1 N m, lead 5 mm, eta 0.9",
+      "value": 113.097335529,
+      "unit": "N",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-16",
+      "quantity": "lost motion on reversal, backlash 0.5 deg",
+      "value": 0.5,
+      "unit": "deg",
+      "tolerance": {
+        "rel": 0.02
+      },
+      "source": "definition",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-06",
+        "TR-DRV-14"
+      ]
+    },
+    {
+      "id": "VC-DRV-17",
+      "quantity": "breakaway time, force ramp 1 N/s, Fs 2 N",
+      "value": 2.0,
+      "unit": "s",
+      "tolerance": {
+        "abs": 0.002
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-08",
+        "TR-DRV-15"
+      ]
+    },
+    {
+      "id": "VC-DRV-17",
+      "quantity": "acceleration just after breakaway, Fc 1 N, 1 kg",
+      "value": 1.0,
+      "unit": "m/s^2",
+      "tolerance": {
+        "rel": 0.02
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-08",
+        "TR-DRV-15"
+      ]
+    },
+    {
+      "id": "VC-DRV-18",
+      "quantity": "stick-slip limit-cycle period, mass on a belt",
+      "value": 0.671238898038,
+      "unit": "s",
+      "tolerance": {
+        "rel": 0.02
+      },
+      "source": "generate_drv_reference.py (derivation in the docstring)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-08",
+        "TR-DRV-15"
+      ]
+    },
+    {
+      "id": "VC-DRV-18",
+      "quantity": "slip phase duration",
+      "value": 0.471238898038,
+      "unit": "s",
+      "tolerance": {
+        "rel": 0.02
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-08",
+        "TR-DRV-15"
+      ]
+    },
+    {
+      "id": "VC-DRV-18",
+      "quantity": "stick phase duration",
+      "value": 0.2,
+      "unit": "s",
+      "tolerance": {
+        "rel": 0.02
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-08",
+        "TR-DRV-15"
+      ]
+    },
+    {
+      "id": "VC-DRV-19",
+      "quantity": "angular acceleration with load-dependent pin friction mu W r",
+      "value": 10.19,
+      "unit": "rad/s^2",
+      "tolerance": {
+        "rel": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-08",
+        "TR-DRV-16"
+      ]
+    },
+    {
+      "id": "VC-DRV-20",
+      "quantity": "restitution of a spring-damper end stop, zeta 0.2",
+      "value": 0.52662059933,
+      "unit": "1",
+      "tolerance": {
+        "rel": 0.03
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-09",
+        "TR-DRV-17"
+      ]
+    },
+    {
+      "id": "VC-DRV-20",
+      "quantity": "peak penetration, 1 rad/s into 1000 N m/rad, J 0.01",
+      "value": 0.00239110858721,
+      "unit": "rad",
+      "tolerance": {
+        "rel": 0.05
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-09",
+        "TR-DRV-17"
+      ]
+    },
+    {
+      "id": "VC-DRV-21",
+      "quantity": "trapezoid move duration, 0.1 m, vmax 0.5, amax 5",
+      "value": 0.3,
+      "unit": "s",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-21",
+      "quantity": "7-segment S-curve duration, jerk 100",
+      "value": 0.35,
+      "unit": "s",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law cycloidal: peak acceleration coefficient",
+      "value": 6.28318530718,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law cycloidal: peak velocity coefficient",
+      "value": 2.0,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law poly345: peak acceleration coefficient",
+      "value": 5.7735026919,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law poly345: peak velocity coefficient",
+      "value": 1.875,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law harmonic: peak acceleration coefficient",
+      "value": 4.93480220054,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law harmonic: peak velocity coefficient",
+      "value": 1.57079632679,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law modifiedTrapezoid: peak acceleration coefficient",
+      "value": 4.88812376344,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law modifiedTrapezoid: peak velocity coefficient",
+      "value": 2.0,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law modifiedSine: peak acceleration coefficient",
+      "value": 5.52795707134,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-22",
+      "quantity": "cam law modifiedSine: peak velocity coefficient",
+      "value": 1.75960338602,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-10",
+        "TR-DRV-18"
+      ]
+    },
+    {
+      "id": "VC-DRV-23",
+      "quantity": "PI speed loop step response at t = 0.005 s (zeta 1, wn 100)",
+      "value": 0.696734670144,
+      "unit": "1",
+      "tolerance": {
+        "abs": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-11",
+        "TR-DRV-19"
+      ]
+    },
+    {
+      "id": "VC-DRV-23",
+      "quantity": "PI speed loop step response at t = 0.01 s (zeta 1, wn 100)",
+      "value": 1.0,
+      "unit": "1",
+      "tolerance": {
+        "abs": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-11",
+        "TR-DRV-19"
+      ]
+    },
+    {
+      "id": "VC-DRV-23",
+      "quantity": "PI speed loop step response at t = 0.02 s (zeta 1, wn 100)",
+      "value": 1.13533528324,
+      "unit": "1",
+      "tolerance": {
+        "abs": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-11",
+        "TR-DRV-19"
+      ]
+    },
+    {
+      "id": "VC-DRV-23",
+      "quantity": "PI speed loop step response at t = 0.05 s (zeta 1, wn 100)",
+      "value": 1.026951788,
+      "unit": "1",
+      "tolerance": {
+        "abs": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-11",
+        "TR-DRV-19"
+      ]
+    },
+    {
+      "id": "VC-DRV-24",
+      "quantity": "inverse-dynamics peak torque of a prescribed profile on J = 1e-3",
+      "value": 0.1,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-05",
+        "TR-DRV-11"
+      ]
+    },
+    {
+      "id": "VC-DRV-25",
+      "quantity": "PMSM maximum torque 1.5 p lambda Imax",
+      "value": 1.2,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-25",
+      "quantity": "PMSM base speed (R = 0, id = 0)",
+      "value": 321.633760451,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-25",
+      "quantity": "PMSM maximum speed Vmax / (lambda - L Imax) / p",
+      "value": 577.35026919,
+      "unit": "rad/s",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-25",
+      "quantity": "PMSM envelope torque at 100.0 rad/s",
+      "value": 1.2,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-25",
+      "quantity": "PMSM envelope torque at 300.0 rad/s",
+      "value": 1.2,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-25",
+      "quantity": "PMSM envelope torque at 400.0 rad/s",
+      "value": 1.03042466974,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-25",
+      "quantity": "PMSM envelope torque at 500.0 rad/s",
+      "value": 0.632139225171,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-25",
+      "quantity": "PMSM envelope torque at 550.0 rad/s",
+      "value": 0.359262614798,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-07"
+      ]
+    },
+    {
+      "id": "VC-DRV-26",
+      "quantity": "Kloss torque at slip 0.05 (Tb 100, sb 0.1)",
+      "value": 80.0,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "Kloss formula R8 + generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-26",
+      "quantity": "Kloss torque at slip 0.1 (Tb 100, sb 0.1)",
+      "value": 100.0,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "Kloss formula R8 + generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-26",
+      "quantity": "Kloss torque at slip 0.5 (Tb 100, sb 0.1)",
+      "value": 38.4615384615,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "Kloss formula R8 + generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-26",
+      "quantity": "Kloss torque at slip 1.0 (Tb 100, sb 0.1)",
+      "value": 19.801980198,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-09
+      },
+      "source": "Kloss formula R8 + generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-26",
+      "quantity": "breakdown torque of the equivalent circuit",
+      "value": 197.207641727,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-26",
+      "quantity": "breakdown slip of the equivalent circuit",
+      "value": 0.194028500029,
+      "unit": "1",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-26",
+      "quantity": "starting torque of the equivalent circuit",
+      "value": 84.0179275466,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 1e-06
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-27",
+      "quantity": "stepper small-angle natural frequency sqrt(Th Nr / J) / 2 pi",
+      "value": 251.646060522,
+      "unit": "Hz",
+      "tolerance": {
+        "rel": 0.02
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-27",
+      "quantity": "stepper static deflection at half the holding torque (0.25 N m)",
+      "value": 0.6,
+      "unit": "deg",
+      "tolerance": {
+        "rel": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-03",
+        "TR-DRV-08"
+      ]
+    },
+    {
+      "id": "VC-DRV-28",
+      "quantity": "steady extension speed, meter-in orifice, 5 kN load",
+      "value": 0.0836330754021,
+      "unit": "m/s",
+      "tolerance": {
+        "rel": 0.01
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-07",
+        "TR-DRV-13"
+      ]
+    },
+    {
+      "id": "VC-DRV-29",
+      "quantity": "Coulomb torque recovered from synthetic spin-down (J known)",
+      "value": 0.00414,
+      "unit": "N m",
+      "tolerance": {
+        "rel": 0.005
+      },
+      "source": "generate_drv_reference.py (synthetic data)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-22",
+        "TR-DRV-25"
+      ]
+    },
+    {
+      "id": "VC-DRV-29",
+      "quantity": "viscous coefficient recovered from synthetic spin-down (J known)",
+      "value": 1e-06,
+      "unit": "N m s/rad",
+      "tolerance": {
+        "rel": 0.02
+      },
+      "source": "generate_drv_reference.py (synthetic data)",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-22",
+        "TR-DRV-25"
+      ]
+    }
+  ]
+}

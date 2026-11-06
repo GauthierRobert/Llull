@@ -1,0 +1,35 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_cylinder", "params": { "radius": 5, "height": 300, "position": [0, 0, 150], "axis": [0, 0, 1] }, "as": "screw_geo" },
+  { "command": "add_box", "params": { "size": [40, 40, 20], "position": [0, 0, 100], "anchor": "center" }, "as": "nut_geo" },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$screw_geo"], "id": "screw", "massKg": 0.8 } },
+  { "command": "add_rigid_body", "params": { "entityIds": ["$nut_geo"], "id": "nut", "massKg": 10 } },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "revolute", "child": "screw", "parent": "ground", "anchor": [0, 0, 0], "axis": [0, 0, 1], "id": "j_screw" }
+  },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "prismatic", "child": "nut", "parent": "ground", "anchor": [0, 0, 100], "axis": [0, 0, 1], "id": "j_nut" }
+  },
+  {
+    "command": "add_transmission",
+    "params": {
+      "kind": "lead_screw",
+      "screw": "j_screw",
+      "nut": "j_nut",
+      "leadMm": 10,
+      "meanDiameterMm": 10,
+      "mu": 0.1,
+      "flankAngleDeg": 0,
+      "id": "tr_screw",
+      "source": { "name": "PHY-23 VC-DRV-13 (synthetic)", "grade": "A" }
+    }
+  },
+  { "command": "set_gravity", "params": { "gravity": [0, 0, -9.81] } },
+  { "command": "add_motor", "params": { "joint": "j_screw", "kind": "torque_curve", "torque": 0.5, "id": "m_lift" } },
+  {
+    "command": "simulate_motion",
+    "params": { "duration": 0.2, "timestep": 0.0001, "sampleRate": 1000, "detail": "series", "energy": true, "reactions": "peaks" }
+  }
+]

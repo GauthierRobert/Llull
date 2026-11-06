@@ -1,0 +1,288 @@
+{
+  "pack": "22-motion-video",
+  "generatedBy": "generate_mov_reference.py (values) + quoted (codes, budgets)",
+  "note": "Behaviour-only cases (codes, purity, determinism, UI, packaging, licences) are listed in README.md and asserted by the suites, not here.",
+  "cases": [
+    {
+      "id": "VC-MOV-01",
+      "quantity": "frame count, slider-crank, playbackRate 0.01, fps 30",
+      "value": 189,
+      "unit": "frames",
+      "tolerance": { "abs": 0 },
+      "source": "generator (TR-MOV-01)",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-05", "TR-MOV-01"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 0 (t = 0 s, crank 0 deg)",
+      "value": 250,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 15 (t = 0.005 s, crank 28.6478897565 deg)",
+      "value": 242.437376179,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 30 (t = 0.01 s, crank 57.2957795131 deg)",
+      "value": 222.539580398,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 45 (t = 0.015 s, crank 85.9436692696 deg)",
+      "value": 197.218323779,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 60 (t = 0.02 s, crank 114.591559026 deg)",
+      "value": 173.956477898,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 75 (t = 0.025 s, crank 143.239448783 deg)",
+      "value": 157.691593509,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 90 (t = 0.03 s, crank 171.887338539 deg)",
+      "value": 150.375868561,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 105 (t = 0.035 s, crank 200.535228296 deg)",
+      "value": 152.406625851,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 120 (t = 0.04 s, crank 229.183118052 deg)",
+      "value": 163.7055094,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 135 (t = 0.045 s, crank 257.831007809 deg)",
+      "value": 183.395991081,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 150 (t = 0.05 s, crank 286.478897565 deg)",
+      "value": 208.350976307,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 165 (t = 0.055 s, crank 315.126787322 deg)",
+      "value": 232.297736669,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-02",
+      "quantity": "piston centre-of-mass x at frame 180 (t = 0.06 s, crank 343.774677078 deg)",
+      "value": 247.519961243,
+      "unit": "mm",
+      "tolerance": { "abs": 0.01 },
+      "source": "closed form r cos θ + sqrt(l² − r² sin² θ), r 50, l 200, ω 100 rad/s",
+      "grade": "A",
+      "proves": ["FR-MOV-02", "FR-MOV-08", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-03",
+      "quantity": "render_motion frames[].time for times [0.0114, 0.0314]",
+      "value": [0.0114, 0.0314],
+      "unit": "s",
+      "tolerance": { "abs": 1e-12 },
+      "baseline": [0.01218, 0.03132],
+      "source": "definition; baseline measured 2026-11-02 (M1)",
+      "grade": "A",
+      "proves": ["FR-MOV-13", "TR-MOV-02"]
+    },
+    {
+      "id": "VC-MOV-04",
+      "quantity": "spin clip frame count (fps 10, 2 s)",
+      "value": 21,
+      "unit": "frames",
+      "tolerance": { "abs": 0 },
+      "source": "generator",
+      "grade": "A",
+      "proves": ["FR-MOV-04"]
+    },
+    {
+      "id": "VC-MOV-04",
+      "quantity": "box centre [x, y] at frame 0 (angle 0 rad)",
+      "value": [50, 0],
+      "unit": "mm",
+      "tolerance": { "abs": 1e-9 },
+      "source": "generator: centre (50 cos θ, 50 sin θ)",
+      "grade": "A",
+      "proves": ["FR-MOV-04", "TR-MOV-05"]
+    },
+    {
+      "id": "VC-MOV-04",
+      "quantity": "box centre [x, y] at frame 5 (angle 1.57079632679 rad)",
+      "value": [3.06161699787e-15, 50],
+      "unit": "mm",
+      "tolerance": { "abs": 1e-9 },
+      "source": "generator: centre (50 cos θ, 50 sin θ)",
+      "grade": "A",
+      "proves": ["FR-MOV-04", "TR-MOV-05"]
+    },
+    {
+      "id": "VC-MOV-04",
+      "quantity": "box centre [x, y] at frame 10 (angle 3.14159265359 rad)",
+      "value": [-50, 6.12323399574e-15],
+      "unit": "mm",
+      "tolerance": { "abs": 1e-9 },
+      "source": "generator: centre (50 cos θ, 50 sin θ)",
+      "grade": "A",
+      "proves": ["FR-MOV-04", "TR-MOV-05"]
+    },
+    {
+      "id": "VC-MOV-04",
+      "quantity": "box centre [x, y] at frame 15 (angle 4.71238898038 rad)",
+      "value": [-9.18485099361e-15, -50],
+      "unit": "mm",
+      "tolerance": { "abs": 1e-9 },
+      "source": "generator: centre (50 cos θ, 50 sin θ)",
+      "grade": "A",
+      "proves": ["FR-MOV-04", "TR-MOV-05"]
+    },
+    {
+      "id": "VC-MOV-04",
+      "quantity": "box centre [x, y] at frame 20 (angle 6.28318530718 rad)",
+      "value": [50, -1.22464679915e-14],
+      "unit": "mm",
+      "tolerance": { "abs": 1e-9 },
+      "source": "generator: centre (50 cos θ, 50 sin θ)",
+      "grade": "A",
+      "proves": ["FR-MOV-04", "TR-MOV-05"]
+    },
+    {
+      "id": "VC-MOV-09",
+      "quantity": "GIF delays of the first 12 frames at 30 fps",
+      "value": [3, 4, 3, 3, 4, 3, 3, 4, 3, 3, 4, 3],
+      "unit": "cs",
+      "tolerance": { "abs": 0 },
+      "source": "GIF89a 1/100 s delays + cumulative round-half-up rule (generator)",
+      "grade": "A",
+      "proves": ["FR-MOV-09", "TR-MOV-13"]
+    },
+    {
+      "id": "VC-MOV-09",
+      "quantity": "GIF delays of the first 8 frames at 40 fps",
+      "value": [3, 2, 3, 2, 3, 2, 3, 2],
+      "unit": "cs",
+      "tolerance": { "abs": 0 },
+      "source": "generator",
+      "grade": "A",
+      "proves": ["TR-MOV-13"]
+    },
+    {
+      "id": "VC-MOV-09",
+      "quantity": "APNG frames / per-frame delay, mov_clip_spin",
+      "value": { "frames": 21, "delayS": 0.1, "loop": true },
+      "unit": "-",
+      "tolerance": { "abs": 0 },
+      "source": "PNG-3 acTL / fcTL (R6) + TR-MOV-10",
+      "grade": "A",
+      "proves": ["FR-MOV-09", "TR-MOV-10"]
+    },
+    {
+      "id": "VC-MOV-10",
+      "quantity": "MP4 samples / timescale / duration, slider-crank 30 fps",
+      "value": { "codec": "av01", "samples": 189, "timescale": 30, "durationS": 6.3 },
+      "unit": "-",
+      "tolerance": { "abs": 0 },
+      "source": "TR-MOV-13; ISOBMFF (R8), AV1 binding (R10)",
+      "grade": "C",
+      "proves": ["FR-MOV-14", "TR-MOV-13"]
+    },
+    {
+      "id": "VC-MOV-11",
+      "quantity": "frame count, clips, fps 24, 1.01 s",
+      "value": 25,
+      "unit": "frames",
+      "tolerance": { "abs": 0 },
+      "source": "TR-MOV-01",
+      "grade": "A",
+      "proves": ["TR-MOV-01"]
+    },
+    {
+      "id": "VC-MOV-15",
+      "quantity": "contact sheet cells, every 15 of 189 frames + last",
+      "value": 14,
+      "unit": "cells",
+      "tolerance": { "abs": 0 },
+      "source": "TR-MOV-16",
+      "grade": "A",
+      "proves": ["FR-MOV-09", "TR-MOV-16"]
+    },
+    {
+      "id": "VC-MOV-20",
+      "quantity": "300 frames 1280x720 native raster + MP4 standard, total",
+      "value": 60,
+      "unit": "s",
+      "tolerance": { "op": "<=" },
+      "source": "budget TECHNICAL_SPEC §8",
+      "grade": "C",
+      "proves": ["FR-MOV-12"]
+    }
+  ]
+}

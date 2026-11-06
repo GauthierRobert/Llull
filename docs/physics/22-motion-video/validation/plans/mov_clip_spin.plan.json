@@ -1,0 +1,16 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [100, 20, 10], "position": [50, 0, 0], "anchor": "center" }, "as": "arm" },
+  { "command": "animate", "params": { "targetId": "$arm", "mode": "spin", "speed": 3.14159265359, "axis": [0, 0, 1], "pivot": [0, 0, 0] } },
+  {
+    "command": "render_animation",
+    "params": {
+      "source": { "kind": "clips", "duration": 2 },
+      "fps": 10,
+      "width": 320,
+      "height": 240,
+      "camera": { "view": "top" },
+      "format": "apng"
+    }
+  }
+]
