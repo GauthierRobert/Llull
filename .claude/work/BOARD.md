@@ -13,6 +13,8 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
+- 2026-11-06 — merged MOV-M0 (`ae1edd05b`, cad-reviewer APPROVE + 4 fixes): `posesAtTime` (core `geometry/bodyPose.ts`), `render_motion` exact instants (VC-MOV-03); rav1e spike: deterministic at a fixed 4×2 tile layout, 14.2 fps at speed 10 without NASM (asm optional), all-permissive licences, AV1 MP4 plays via Media Foundation (owner: PowerPoint check in 22 `validation/playback.md`). Gate: full suite 25230 pass, 3 load timeouts (pass alone). WIP: MOV-M1 (lane6), DISP1 (lane2); then KRN-MSVC verification.
+
 - 2026-11-04 (later) — merged: DESK-TSC (server tests typechecked by `npm run typecheck` now), VIS-M8b (native `llull_bvh::instance`,
   bit-identical to the TS tree, 2.4x at 10⁶, not wired: plan in 09 §12.13), VIS-M8c (material classes + `render_walkthrough path: smooth`,
   09 §12.14), VIS-M8a (`export_gltf instancing: gpu`, 09 §12.15). Each after cad-reviewer (M8a, M8c) + review fixes. Next: VIS-M8d
@@ -206,7 +208,6 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **DRV-V1** Reference engine `packages/physics-reference` + cross-check, hydraulic cylinder, Andrews under `check_motion_truth`; VC-DRV-28, 31, 32. _Lane 1_ _deps: DRV-M3_
 - `[TODO]` **MOV-M5** PHY-22 drive readouts + synced plot strip + truth badge (TR-MOV-18/19, VC-MOV-26/27). _Lane 1_ _deps: MOV-M1, DRV-M3_
 - Motion video `docs/physics/22-motion-video/` (PHY-22 MOV, spec 2026-11-02 from the teardown-skill analysis; validation = analytic generator + `check_media.py` + suites, VC-MOV-01..25; order M0 → (M1 ∥ M2) → M3 → M4):
-- `[TODO]` **MOV-M0** Spike + decisions (`TECHNICAL_SPEC.md` §11): rav1e speed / determinism / NASM need, AV1 MP4 playback on Windows 11 + PowerPoint (`validation/playback.md`), licence audit; `posesAtTime` interpolation + `render_motion` exact instants (VC-MOV-03, baseline 0.0114 → 0.01218 s). _Lane 1_ _deps: —_
 - `[TODO]` **MOV-M1** `render_animation` (core, read-only): sources simulation / sweep / clips, playbackRate, fixed framed camera, overlays as raster primitives (time, trace, readouts, accent highlight), frames + APNG + `timeline.json` + contact sheet, clip math moved to core (`geometry/animationPose.ts`), `simulate_motion detail: 'poses+series'`; VC-MOV-01..09, 11, 12, 15..19, 24. _Lane 1 (+2 for the `animationMath.ts` switch)_ _deps: MOV-M0_
 - `[TODO]` **MOV-M2** Native encoder: `solver/crates/llull-media` (GIF global palette + Bayer, AV1 via rav1e + own ISOBMFF muxer) as `llull-compute media`, `MediaPort` / `ctx.media`, `server/src/native/mediaPort.ts`, desktop bundling, CLI `--save x.mp4` picks by extension; VC-MOV-10, 13, 14, 20..22, 25. _Lane 1 (crate, port) + 4 (server, CLI)_ _deps: MOV-M0_
 - `[TODO]` **MOV-M3** Camera paths (viewpoint, walkthrough, orbit, `still` source), `llull-cli` skill review-loop recipe (sheet → fix → encode), golden plans; VC-MOV-23. _Lane 1_ _deps: MOV-M1_
