@@ -2,7 +2,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
+import type { SimulationTrace } from '@core/dynamics/physicsEngine';
 import type { MotorDrive } from '@core/model/drives';
+import { AUX } from '@dynamics/sim/actuators/controller';
+import { ledgerOf } from '@dynamics/sim/ledger';
+import { buildSimulationModel } from '@dynamics/sim/simulationModel';
 import type { CadDocument } from '@core/model/types';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { dataOf, inertiaBench, simulate } from './fixtures';
@@ -100,5 +104,53 @@ describe('list_dynamics_loads with a datasheet motor', () => {
     const result = execute(doc, 'list_dynamics_loads', {});
     expect(result.summary).not.toContain('no-op');
     expect(JSON.stringify(result.data)).toContain('datasheet DC motor');
+  });
+});
+
+describe('anti-windup against the bus voltage', () => {
+  it('a velocity drive whose current the bus clips keeps a bounded integrator, however long the target is out of reach', () => {
+    // the current limit is out of the way (1000 A): only the 10 V bus cuts the current
+    const doc = withDrive({
+      mode: 'velocity',
+      profile: 'w',
+      gains: { kp: 0.01, ki: 10, kpPosition: 0 },
+      sampleHz: 10000,
+      busVoltageV: 10,
+      currentLimitA: 1000,
+    });
+    const built = buildSimulationModel(doc, 0.0001);
+    if ('error' in built || built.model.actuators === undefined) throw new Error('no actuators');
+    const block = built.model.actuators;
+    let aux = block.aux0;
+    let peak = 0;
+    for (let k = 0; k < 20000; k++) {
+      // the joint spins at +100 rad/s against a 2 rad/s target: the loop asks for reverse current the 10 V bus cannot give
+      aux = block.advance({ time: k * 0.0001, jointPosition: { j: 0 }, jointVelocity: { j: 100 } }, aux, 0.0001).aux;
+      peak = Math.max(peak, Math.abs(aux[AUX.integrator] ?? 0));
+    }
+    // unfrozen it grows by ki * error * Ts = 0.098 per sample (about 2000 N*m after 20000 samples); frozen it stays at the first sample
+    expect(peak).toBeLessThan(1);
+    expect(aux[AUX.clipped]).toBe(1);
+  });
+});
+
+describe('ledger potential energy', () => {
+  it('reports the change of potential energy, final minus initial, like the kinetic entry', () => {
+    const trace = { ledger: [], actuatorWork: [0, 0], energy: { kinetic: [1, 4], potential: [5, 7] } } as unknown as SimulationTrace;
+    const energy = {
+      initialTotalJ: 6,
+      finalKineticJ: 4,
+      finalPotentialJ: 7,
+      finalTotalJ: 11,
+      dissipatedJ: 0,
+      maxDeviationJ: 0,
+      maxDeviationFraction: 0,
+      inputWorkJ: 5,
+      propellerWorkJ: 0,
+    };
+    const ledger = ledgerOf([], trace, energy);
+    const entry = (kind: string): number | undefined => ledger?.entries.find((e) => e.kind === kind)?.joules;
+    expect(entry('kinetic')).toBe(3);
+    expect(entry('potential')).toBe(2);
   });
 });

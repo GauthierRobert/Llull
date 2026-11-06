@@ -44,7 +44,8 @@ const UNIT_SCALES: Readonly<Record<ProfileQuantity, Readonly<Record<string, numb
 
 /** Factor from `unit` to SI for the quantity, or null when the unit is not one of that quantity. */
 export function profileUnitScale(quantity: ProfileQuantity, unit: string): number | null {
-  return UNIT_SCALES[quantity][unit] ?? null;
+  const table = UNIT_SCALES[quantity];
+  return Object.hasOwn(table, unit) ? (table[unit] ?? null) : null;
 }
 
 /** True when a position / velocity unit is angular (rad, deg, rev, rpm, rad/s, deg/s), false when linear. */
@@ -288,7 +289,8 @@ function movePiece(origin: number, move: MoveSegment): Piece | ProfileRefusal {
   if (move.law === 's_curve') return sCurvePiece(origin, distance, move);
   const duration = move.duration ?? (move.law === 'linear' && finitePositive(move.vmax) ? Math.abs(distance) / move.vmax : undefined);
   if (duration === undefined) return refuse('DRV_PROFILE_INVALID', `${move.law} needs a duration`);
-  const shape = SHAPES[move.law];
+  if (!Object.hasOwn(SHAPES, move.law)) return refuse('DRV_PROFILE_INVALID', `unknown move law '${String(move.law)}'`);
+  const shape = SHAPES[move.law as keyof typeof SHAPES];
   return {
     duration,
     at: (tau) => {
@@ -298,7 +300,12 @@ function movePiece(origin: number, move: MoveSegment): Piece | ProfileRefusal {
   };
 }
 
+const isPoint = (point: unknown): point is readonly [number, number] =>
+  Array.isArray(point) && point.length === 2 && Number.isFinite(point[0]) && Number.isFinite(point[1]);
+
 function tablePiece(table: Extract<ProfileSegment, { kind: 'table' }>): Piece | ProfileRefusal {
+  if (!Array.isArray(table.points) || !table.points.every(isPoint))
+    return refuse('DRV_PROFILE_INVALID', 'table points must be an array of finite [time, value] pairs');
   const times = table.points.map((point) => point[0]);
   const values = table.points.map((point) => point[1]);
   if (table.points.length < 2) return refuse('DRV_PROFILE_INVALID', 'a table needs at least 2 points');
@@ -346,7 +353,7 @@ function sinePiece(origin: number, sine: Extract<ProfileSegment, { kind: 'sine' 
 }
 
 function segmentPiece(origin: number, segment: ProfileSegment): Piece | ProfileRefusal {
-  switch (segment.kind) {
+  switch (segment?.kind) {
     case 'dwell':
       return finitePositive(segment.duration)
         ? { duration: segment.duration, at: () => [origin, 0, 0] }
@@ -357,6 +364,8 @@ function segmentPiece(origin: number, segment: ProfileSegment): Piece | ProfileR
       return sinePiece(origin, segment);
     case 'table':
       return tablePiece(segment);
+    default:
+      return refuse('DRV_PROFILE_INVALID', `unknown segment kind '${String((segment as { kind?: unknown } | null)?.kind)}'`);
   }
 }
 
@@ -371,12 +380,14 @@ interface Placed {
  *   the repeat seam without `allowStep` -> DRV_PROFILE_DISCONTINUOUS; limits that cannot move the distance in `duration` -> DRV_PROFILE_INFEASIBLE with the shortest duration
  */
 export function compileProfile(profile: MotionProfile): CompiledProfile | ProfileRefusal {
-  if (profile.segments.length === 0) return refuse('DRV_PROFILE_INVALID', 'a profile needs at least one segment');
+  if (!Array.isArray(profile.segments) || profile.segments.length === 0)
+    return refuse('DRV_PROFILE_INVALID', 'a profile needs at least one segment');
   const repeat = profile.repeat ?? 1;
   if (!Number.isInteger(repeat) || repeat < 1 || repeat > 100000)
     return refuse('DRV_PROFILE_INVALID', 'repeat must be an integer from 1 to 100000');
   const first = profile.segments[0];
-  const start = profile.start ?? (first?.kind === 'table' ? (first.points[0]?.[1] ?? 0) : 0);
+  const tableStart = first?.kind === 'table' && Array.isArray(first.points) && isPoint(first.points[0]) ? first.points[0][1] : 0;
+  const start = profile.start ?? tableStart;
   if (!Number.isFinite(start)) return refuse('DRV_PROFILE_INVALID', 'start must be finite');
   const placed: Placed[] = [];
   let [time, value, previous]: [number, number, Derivatives | null] = [0, start, null];

@@ -19,8 +19,10 @@ export const AUX = {
   limited: 8,
   reference: 9,
   measured: 10,
+  /** 1 when the realized current was clipped by the current limit or the bus voltage in the last step. */
+  clipped: 11,
 } as const;
-export const AUX_SIZE = 11;
+export const AUX_SIZE = 12;
 
 export interface LoopGains {
   /** N·m per rad/s (or N per m/s). */
@@ -87,7 +89,11 @@ export function updateLoop(spec: LoopSpec, aux: Float64Array, slot: number, time
   const error = speedReference - v;
   const integrator = aux[slot + AUX.integrator] ?? 0;
   const unsaturated = spec.gains.kp * error + integrator + feedforward;
-  const pushing = Math.abs(unsaturated) > spec.torqueLimit && Math.sign(error) === Math.sign(unsaturated);
+  const held = aux[slot + AUX.heldTorque] ?? 0;
+  const commandClipped = Math.abs(unsaturated) > spec.torqueLimit && Math.sign(error) === Math.sign(unsaturated);
+  // the realized current was cut by the limit or the bus voltage although the loop asked for more in the direction of the error
+  const realizedClipped = (aux[slot + AUX.clipped] ?? 0) > 0 && Math.sign(error) === Math.sign(held);
+  const pushing = commandClipped || realizedClipped;
   const next = pushing ? integrator : integrator + spec.gains.ki * error * spec.periodSteps * dt;
   aux[slot + AUX.integrator] = next;
   aux[slot + AUX.heldTorque] = clamp(spec.gains.kp * error + next + feedforward, spec.torqueLimit);

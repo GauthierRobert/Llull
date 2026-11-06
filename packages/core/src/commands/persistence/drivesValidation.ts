@@ -7,6 +7,7 @@ import type { MotionProfile, ProfileQuantity } from '../../model/drives';
 
 type Check = (record: Record<string, unknown>) => string | null;
 
+const isNonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
 const isPositive = (value: unknown): boolean => isFiniteNumber(value) && value > 0;
 const isOptionalPositive = (value: unknown): boolean => value === undefined || isPositive(value);
 const isOptionalNonNegative = (value: unknown): boolean => value === undefined || (isFiniteNumber(value) && value >= 0);
@@ -66,8 +67,12 @@ export const profileProblem: Check = (profile) => {
     profile['segments'].some((segment) => !isRecord(segment) || typeof segment['kind'] !== 'string')
   )
     return 'segments must be an array of { kind, ... } objects';
-  const compiled = compileProfile(profile as unknown as MotionProfile);
-  return isProfileRefusal(compiled) ? `${compiled.code}: ${compiled.error}` : null;
+  try {
+    const compiled = compileProfile(profile as unknown as MotionProfile);
+    return isProfileRefusal(compiled) ? `${compiled.code}: ${compiled.error}` : null;
+  } catch {
+    return 'DRV_PROFILE_INVALID: the profile cannot be evaluated';
+  }
 };
 
 /** Cross references of drives (a drive belongs to a datasheet motor and names a stored profile), as problems with their paths. */
@@ -94,9 +99,15 @@ export const driveProblem: Check = (drive) => {
   if (!['currentLimitA', 'busVoltageV', 'sampleHz', 'effortLimit'].every((key) => isOptionalPositive(drive[key])))
     return 'limits and sampleHz must be positive numbers';
   const gains = drive['gains'];
-  if (gains !== undefined && (!isRecord(gains) || !isFiniteNumber(gains['kp']))) return 'gains must be { kp, ki?, kpPosition? }';
+  if (
+    gains !== undefined &&
+    (!isRecord(gains) || !isNonNegative(gains['kp']) || !isOptionalNonNegative(gains['ki']) || !isOptionalNonNegative(gains['kpPosition']))
+  )
+    return 'gains must be { kp >= 0, ki >= 0, kpPosition >= 0 } (finite numbers)';
   const tune = drive['tune'];
   if (tune !== undefined && (!isRecord(tune) || !isPositive(tune['bandwidthHz']) || !isPositive(tune['dampingRatio'])))
     return 'tune must be { bandwidthHz > 0, dampingRatio > 0 }';
+  if (drive['target'] !== undefined && typeof drive['target'] !== 'string') return 'target must be a joint id';
+  if (drive['feedforward'] !== undefined && typeof drive['feedforward'] !== 'boolean') return 'feedforward must be a boolean';
   return null;
 };

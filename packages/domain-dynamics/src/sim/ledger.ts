@@ -50,7 +50,7 @@ export function ledgerOf(layout: ActuatorBlock['ledgerLayout'], trace: Simulatio
       { element: 'joints', kind: 'friction_damping', joules: energy.dissipatedJ },
       { element: 'propellers', kind: 'propeller', joules: propellerWorkJ },
       { element: 'mechanism', kind: 'kinetic', joules: energy.finalKineticJ - (trace.energy?.kinetic[0] ?? 0) },
-      { element: 'mechanism', kind: 'potential', joules: energy.finalPotentialJ },
+      { element: 'mechanism', kind: 'potential', joules: energy.finalPotentialJ - (trace.energy?.potential[0] ?? 0) },
       { element: 'loads', kind: 'external_work', joules: externalWork },
     ],
     inputJ: input,

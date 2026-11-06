@@ -303,3 +303,79 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     mutate: { name: 'submit_for_review', params: constant({ comment: 'fuzz', at: '2026-11-02T10:00:00Z', by: 'u-0007' }) },
   },
 };
+
+/**
+ * The drive data of `doc.dynamics` (PHY-23: datasheet motors, profiles, drives). Dynamics is a core slice, not a plugin extension, so it has no row in
+ * SLICE_SEEDS; tests/unit/contract/pluginSliceFuzz.test.ts runs it with the targeted `driveMutations` as well.
+ */
+export const DYNAMICS_SEED: PluginSliceSeed = {
+  roots: ['dynamics'],
+  build: () => {
+    const steps: { name: string; params: Record<string, unknown> }[] = [
+      { name: 'add_cylinder', params: { radius: 5, height: 5, position: [0, 0, 0], axis: [0, 0, 1] } },
+      { name: 'add_rigid_body', params: { entityIds: ['$cylinder'], id: 'rotor', massKg: 0.001 } },
+      {
+        name: 'add_body_joint',
+        params: { kind: 'revolute', child: 'rotor', parent: 'ground', anchor: [0, 0, 0], axis: [0, 0, 1], id: 'j' },
+      },
+      {
+        name: 'add_motor',
+        params: {
+          joint: 'j',
+          kind: 'dc',
+          id: 'm',
+          datasheet: { nominalVoltageV: 48, terminalResistanceOhm: 1.13, torqueConstantNmPerA: 0.0603, rotorInertiaKgM2: 1e-5 },
+          gearhead: { ratio: 5, efficiency: 0.9 },
+          source: { name: 'seed sheet', grade: 'C' },
+        },
+      },
+      {
+        name: 'add_motion_profile',
+        params: {
+          id: 'w',
+          quantity: 'velocity',
+          unit: 'rad/s',
+          start: 1,
+          segments: [
+            { kind: 'move', law: 'cycloidal', to: 3, duration: 1 },
+            { kind: 'dwell', duration: 1 },
+          ],
+        },
+      },
+      {
+        name: 'add_motion_profile',
+        params: {
+          id: 'v',
+          quantity: 'voltage',
+          unit: 'V',
+          segments: [
+            {
+              kind: 'table',
+              points: [
+                [0, 0],
+                [1, 5],
+              ],
+              interpolation: 'monotone_cubic',
+            },
+          ],
+        },
+      },
+      {
+        name: 'set_motor_drive',
+        params: { motor: 'm', mode: 'velocity', profile: 'w', gains: { kp: 0.1, ki: 1 }, sampleHz: 1000, target: 'j', feedforward: true },
+      },
+    ];
+    let doc = createEmptyDocument();
+    let cylinder = '';
+    for (const step of steps) {
+      const params = JSON.parse(JSON.stringify(step.params).replace('$cylinder', cylinder)) as Record<string, unknown>;
+      const result = execute(doc, step.name, params);
+      if (result.document === doc) throw new Error(`DYNAMICS_SEED: ${step.name}: ${result.summary}`);
+      if (cylinder === '') cylinder = result.affected[0] ?? '';
+      doc = result.document;
+    }
+    return doc;
+  },
+  query: { name: 'check_motor_data', params: constant({ motor: 'm' }) },
+  mutate: { name: 'set_motor_drive', params: constant({ motor: 'm', mode: 'voltage', volts: 5 }) },
+};

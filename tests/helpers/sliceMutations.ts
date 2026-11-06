@@ -319,3 +319,77 @@ export function sampleMutations(raw: Record<string, unknown>, roots: readonly st
 export function hasRoot(raw: Record<string, unknown>, root: string): boolean {
   return at(raw, root.split('.')) !== undefined;
 }
+
+/** Targeted hostile edits of the drive data of `dynamics` (PHY-23): the segment kind / law / points of a profile and the gains of a drive. */
+export function driveMutations(raw: Record<string, unknown>): SliceMutation[] {
+  const edit = (label: string, change: (dynamics: Record<string, unknown>) => void): SliceMutation => ({
+    kind: 'type-string',
+    path: `dynamics.${label}`,
+    label: `dynamics | ${label}`,
+    apply: (document) => {
+      const copy = clone(document);
+      const dynamics = copy['dynamics'];
+      if (isObject(dynamics)) change(dynamics);
+      return copy;
+    },
+  });
+  const firstProfile = (dynamics: Record<string, unknown>): Record<string, unknown> => {
+    const profiles = dynamics['profiles'];
+    const profile = isObject(profiles) ? Object.values(profiles).find(isObject) : undefined;
+    if (profile === undefined) throw new Error('driveMutations: the seed has no profile');
+    return profile;
+  };
+  const setSegment = (segment: unknown) => (dynamics: Record<string, unknown>) => void (firstProfile(dynamics)['segments'] = [segment]);
+  const drive = (dynamics: Record<string, unknown>): Record<string, unknown> => {
+    const drives = dynamics['drives'];
+    const found = isObject(drives) ? Object.values(drives).find(isObject) : undefined;
+    if (found === undefined) throw new Error('driveMutations: the seed has no drive');
+    return found;
+  };
+  void raw;
+  return [
+    edit('segment kind foo', setSegment({ kind: 'foo' })),
+    edit('segment null', setSegment(null)),
+    edit('segment kind number', setSegment({ kind: 7 })),
+    edit('move law bogus', setSegment({ kind: 'move', law: 'bogus', to: 1, duration: 1 })),
+    edit('move law __proto__', setSegment({ kind: 'move', law: '__proto__', to: 1, duration: 1 })),
+    edit('move law constructor', setSegment({ kind: 'move', law: 'constructor', to: 1, duration: 1 })),
+    edit('table points string', setSegment({ kind: 'table', points: 'abc', interpolation: 'linear' })),
+    edit('table points nulls', setSegment({ kind: 'table', points: [null, null], interpolation: 'linear' })),
+    edit('table points missing', setSegment({ kind: 'table', interpolation: 'linear' })),
+    edit(
+      'table points triples',
+      setSegment({
+        kind: 'table',
+        points: [
+          [0, 1, 2],
+          [1, 2, 3],
+        ],
+        interpolation: 'monotone_cubic',
+      }),
+    ),
+    edit(
+      'table interpolation odd',
+      setSegment({
+        kind: 'table',
+        points: [
+          [0, 1],
+          [1, 2],
+        ],
+        interpolation: 'spline',
+      }),
+    ),
+    edit('sine amplitude string', setSegment({ kind: 'sine', amplitude: 'a', frequencyHz: 1, cycles: 1 })),
+    edit('segments not an array', (dynamics) => void (firstProfile(dynamics)['segments'] = { length: 1 })),
+    edit('profile start string', (dynamics) => void (firstProfile(dynamics)['start'] = 'x')),
+    edit('profile repeat huge', (dynamics) => void (firstProfile(dynamics)['repeat'] = 1e9)),
+    edit('gains kp string', (dynamics) => void (drive(dynamics)['gains'] = { kp: 'x', ki: 0, kpPosition: 0 })),
+    edit('gains ki null', (dynamics) => void (drive(dynamics)['gains'] = { kp: 1, ki: null, kpPosition: 0 })),
+    edit('gains kpPosition string', (dynamics) => void (drive(dynamics)['gains'] = { kp: 1, ki: 0, kpPosition: 'x' })),
+    edit('gains negative kp', (dynamics) => void (drive(dynamics)['gains'] = { kp: -1, ki: 0, kpPosition: 0 })),
+    edit('gains array', (dynamics) => void (drive(dynamics)['gains'] = [1, 2, 3])),
+    edit('tune bandwidth string', (dynamics) => void (drive(dynamics)['tune'] = { bandwidthHz: 'x', dampingRatio: 1 })),
+    edit('target number', (dynamics) => void (drive(dynamics)['target'] = 5)),
+    edit('feedforward string', (dynamics) => void (drive(dynamics)['feedforward'] = 'yes')),
+  ];
+}

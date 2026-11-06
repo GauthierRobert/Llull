@@ -209,6 +209,7 @@ export function buildActuators(dynamics: DynamicsModel, context: ActuatorContext
         const ke = params.torqueConstant;
         let volts = 0;
         let limited = 0;
+        let clipped = 0;
         let step;
         if (run.drive.mode === 'voltage') {
           volts = commandedVolts(run, state.time);
@@ -228,7 +229,8 @@ export function buildActuators(dynamics: DynamicsModel, context: ActuatorContext
           const lower = Math.max(-run.currentLimitA, (-run.busVoltageV - ke * omegaMotor) / params.resistanceOhm);
           const current = Math.min(upper, Math.max(lower, wanted));
           const saturated = run.loop !== null && Math.abs(held === undefined ? 0 : held) >= run.loop.torqueLimit * (1 - 1e-12);
-          limited = current === wanted && !saturated ? 0 : 1;
+          clipped = current === wanted ? 0 : 1;
+          limited = clipped === 0 && !saturated ? 0 : 1;
           volts = params.resistanceOhm * current + ke * omegaMotor;
           step = { current, meanCurrent: current, copperJ: params.resistanceOhm * current * current * dt, magneticJ: 0 };
         }
@@ -243,6 +245,7 @@ export function buildActuators(dynamics: DynamicsModel, context: ActuatorContext
         aux[base + AUX.shaftTorque] = shaftTorque;
         aux[base + AUX.jointTorque] = joint.torque;
         aux[base + AUX.limited] = limited;
+        aux[base + AUX.clipped] = clipped;
         aux[base + AUX.steps] = (aux[base + AUX.steps] ?? 0) + 1;
         ledger[run.ledgerBase] = electrical;
         ledger[run.ledgerBase + 1] = step.copperJ;
