@@ -33,6 +33,8 @@ export interface SupportLine {
   readonly topMm: number;
   /** |cos| of the angle between the axis and the bars: 0 = perpendicular. */
   readonly parallelism: number;
+  /** ds/dp: how fast the axis position along the bars changes across them (0 = perpendicular; a radial bracket under a wedge panel is tan of half the wedge angle). Absent = 0. */
+  readonly slope?: number;
 }
 
 /** Unit vector of a plan angle. */
@@ -53,6 +55,7 @@ export function supportLineOf(doc: CadDocument, building: BuildingModel, member:
   const cross = (x: number, y: number): number => -x * direction[1] + y * direction[0];
   const [cos, sin] = [Math.abs(Math.cos(member.roll)), Math.abs(Math.sin(member.roll))];
   const [pa, pb] = [cross(sx, sy), cross(ex, ey)];
+  const crossAxis = cross(axis[0], axis[1]);
   return {
     id: member.id,
     sMm: along((sx + ex) / 2, (sy + ey) / 2),
@@ -61,6 +64,7 @@ export function supportLineOf(doc: CadDocument, building: BuildingModel, member:
     halfWidthMm: (profile.b * cos + profile.h * sin) / 2,
     topMm: toMm(doc, level.elevation) + Math.max(sz, ez) + (profile.h * cos + profile.b * sin) / 2,
     parallelism: Math.abs(along(axis[0], axis[1])),
+    slope: Math.abs(crossAxis) > 1e-9 ? along(axis[0], axis[1]) / crossAxis : 0,
   };
 }
 
@@ -142,6 +146,24 @@ export function uncoveredStretch(members: ReadonlyArray<SupportLine>, pMin: numb
     reached = Math.max(reached, line.pMax);
   }
   return pMax - reached > END_TOLERANCE_MM ? [reached, pMax] : null;
+}
+
+/**
+ * Largest and smallest distance between two support groups over the panel width [from, to] (across the bars), mm. Parallel supports give one value; supports that
+ * converge (the radial brackets of a wedge panel) give the span at each side edge, the widest being the governing one. Each side is read from the member that
+ * covers the middle of the width (collinear members of a group share one line).
+ */
+export function spanRange(a: SupportGroup, b: SupportGroup, from: number, to: number): { readonly minMm: number; readonly maxMm: number } {
+  const mid = (from + to) / 2;
+  const carrier = (group: SupportGroup): SupportLine =>
+    group.members.find((line) => line.pMin <= mid && mid <= line.pMax) ??
+    ([...group.members].sort((x, y) => Math.abs((x.pMin + x.pMax) / 2 - mid) - Math.abs((y.pMin + y.pMax) / 2 - mid))[0] as SupportLine);
+  const [la, lb] = [carrier(a), carrier(b)];
+  const at = (line: SupportLine, p: number): number => line.sMm + (line.slope ?? 0) * (p - (line.pMin + line.pMax) / 2);
+  const spans = [from, to].map((p) => Math.abs(at(lb, p) - at(la, p)));
+  const centre = Math.abs(b.sMm - a.sMm);
+  if (Math.abs((lb.slope ?? 0) - (la.slope ?? 0)) < 1e-6) return { minMm: centre, maxMm: centre };
+  return { minMm: Math.min(...spans), maxMm: Math.max(...spans) };
 }
 
 /** Extent of a ring across the bars, mm. */
