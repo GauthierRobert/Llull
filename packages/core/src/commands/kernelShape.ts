@@ -3,6 +3,7 @@
  * evaluation, and the `mesh` result entity that carries the recipe.
  */
 
+// @invariant display-mesh: stores the display mesh next to the recipe in the result entity (that is what display means); accuracy-sensitive readers request explicit meshes
 import type { CadDocument, Entity, Vec3 } from '../model/types';
 import type { GeometryKernel, ShapeHandle } from '../geometry/kernel';
 import type { MeshData } from '../model/types';

@@ -1,5 +1,6 @@
 /** Bounding-box diagonal of a kernel shape, the length scale of the blend tolerances. */
 
+// @invariant display-mesh: only the extent is read, so the tessellation error (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units) is negligible against a diagonal
 import type { GeometryKernel, ShapeHandle } from '../../geometry/kernel';
 import { distance3 } from '../../lib/vec3';
 

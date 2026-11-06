@@ -1,5 +1,6 @@
 /** Shared plumbing of the mesh commands (07 MSH): entity -> welded world mesh, coded refusals, result entities, the `data` conventions (units, unverified, provenance, defaults). */
 
+// @invariant display-mesh: mesh commands read the stored triangles of a mesh entity, scan or kernel result (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units for a kernel result)
 import {
   DEFAULT_LAYER_ID,
   type CadDocument,

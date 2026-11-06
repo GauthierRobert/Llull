@@ -4,6 +4,7 @@
  * ISO 128-50). The 2D viewport and the DXF export draw solids through this one function.
  */
 
+// @invariant display-mesh: drawing views project the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); a drawing line is wider than that on the sheet at any sensible scale
 import { type CadDocument, type Entity, type EntityId, type Vec2, is3D } from '../model/types';
 import type { DrawingPrimitive } from '../model/drawing';
 import { polygonArea, pointInPolygon } from '../lib/polygon';

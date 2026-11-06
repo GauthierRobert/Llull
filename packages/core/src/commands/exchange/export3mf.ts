@@ -7,11 +7,12 @@ import { confirmExportControlled, defineCommand, z } from '../schema';
 import { codedRejection, exportRefusal, noop, report } from '../noop';
 import { uint8ArrayToBase64 } from '../../lib/base64';
 import { safeFileName } from '../../lib/safeFileName';
-import { collectExportParts } from '../../geometry/entityTriangles';
+import { collectExportParts, tessellationNote } from '../../geometry/entityTriangles';
 import type { Vec3 } from '../../model/types';
 import type { Triangle } from '../../geometry/triangles';
 import { toMm } from '../../model/units';
 import { entityIdsField } from './exportFormats';
+import { budgetRefusal, chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
 import { buildThreeMf, writeThreeMf, type ThreeMfBody } from './threeMf';
 import { MAX_3MF_FILE_BYTES } from './threeMfFile';
 import { MAX_3MF_BYTES, ThreeMfInvalidMeshError, ThreeMfTooLargeError } from './threeMfStream';
@@ -94,6 +95,7 @@ function latticeInMm(lattice: BeamLatticeExport, representation: readonly Triang
  * @invariant toFile (or, when it is not given, a host file sink and over 4000000 streamed triangles) writes the package to a host file in chunks (data.file = { path, bytes }, no base64): the cap is then 4000000000 bytes of archive or 2000000000 bytes of XML (about 20 million triangles)
  * @failure EXPORT_SINK_UNAVAILABLE (coded rejection, document unchanged) -> toFile true and the host has no file sink (or it could not open one)
  * @failure EXPORT_SINK_FAILED (coded rejection, document unchanged) -> the host file could not be written (I/O error); the partial file is discarded
+ * @invariant kernel-optional: with an exact kernel honouring tessellation options, a body that keeps its exact recipe is re-tessellated at `chordTolerance` (default 0.1 document units, 0.5 rad), else its stored display mesh is exported (the display mesh scales its deflection with the size of the part, so it is not accuracy-bounded in absolute units); the summary says which path
  * @failure no exportable 3D body -> no-op, no data; 2D and unknown ids skipped
  * @failure EXPORT_MESH_TOO_LARGE (coded rejection, document unchanged) -> the deflated model passes the cap (maxBytes, at most 375000000), or a non-indexed body has over 2000000 triangles
  * @failure EXPORT_MESH_INVALID (coded rejection, document unchanged) -> a streamed mesh has a triangle naming a vertex that does not exist
@@ -101,7 +103,7 @@ function latticeInMm(lattice: BeamLatticeExport, representation: readonly Triang
  */
 export const export3mf = defineCommand({
   name: 'export_3mf',
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   description:
     'Export the 3D bodies (all, or entityIds) as a 3MF package (.3mf, ZIP with 3D/3dmodel.model), the format slicers and print services ' +
     'read: one object per body carrying its name (set_entity_name, else the id) and its colour as a base material, one build item per ' +
@@ -145,12 +147,16 @@ export const export3mf = defineCommand({
       .describe(
         'Write implicit strut / graph lattice bodies as a 3MF Beam Lattice (nodes + beams with end radii, the clipping region as clippingmesh, the realised mesh as representationmesh) instead of their triangles: small files, slicer-native struts. TPMS and other bodies stay meshes; data.beamLattice lists what was written and what was skipped with the reason.',
       ),
+    chordTolerance: chordToleranceField,
     confirmExportControlled,
   }),
   run: (doc, params, ctx): CommandResult => {
     const refused = exportRefusal(doc, 'export_3mf', '3mf', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
-    const collected = collectExportParts(doc, params.entityIds, (ctx ?? currentContext()).meshAssets);
+    const used = exportTessellation(ctx, params.chordTolerance);
+    const collected = collectExportParts(doc, params.entityIds, (ctx ?? currentContext()).meshAssets, used);
+    const overBudget = budgetRefusal(doc, 'export_3mf', used.chordTolerance, collected.overBudget);
+    if (overBudget !== null) return overBudget;
     const unreadable = exportAssetRefusal(doc, 'export_3mf', collected.unreadable);
     if (unreadable !== null) return unreadable;
     const mm = toMm(doc, 1);
@@ -283,6 +289,7 @@ export const export3mf = defineCommand({
     }
     const { objects } = built;
     const triangleCount = objects.reduce((sum, object) => sum + object.triangles, 0);
+    const tessellation = tessellationNote(tessellationReport(used, collected));
     const open = objects.filter((object) => !object.manifold && object.beams === undefined).map((object) => object.name);
     return report(
       doc,
@@ -295,6 +302,7 @@ export const export3mf = defineCommand({
           ? ` Kept as meshes (no beam lattice): ${skippedLattices.map((s) => `${s.id} (${s.reason})`).join('; ')}.`
           : '') +
         (open.length > 0 ? ` Not closed manifold shells: ${open.join(', ')}.` : '') +
+        (tessellation === '' ? '' : ` ${tessellation}`) +
         (collected.unknownIds.length > 0 ? ` Unknown ids skipped: ${collected.unknownIds.join(', ')}.` : ''),
       {
         format: '3mf',

@@ -5,6 +5,7 @@
  *   chart method / anchor off the face -> a coded rejection (the document is returned unchanged)
  */
 
+// @invariant display-mesh: wrap sessions project onto the display mesh of a face (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); the exact face geometry is queried from the kernel
 import type { CadDocument, Entity, ShapeRecipe, Vec2, Vec3 } from '../../model/types';
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { FaceQueryPort, SurfaceParams } from '../../geometry/kernelPorts';

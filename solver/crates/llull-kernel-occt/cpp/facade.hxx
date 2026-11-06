@@ -117,6 +117,7 @@ std::unique_ptr<Shape> boolean_op(const Shape &a, const Shape &b, int32_t operat
 std::unique_ptr<Shape> prefixed(const Shape &shape, rust::Str prefix);
 
 MeshOut tessellate(const Shape &shape, double linear_deflection, double angular_deflection);
+double bounding_diagonal(const Shape &shape);
 MassOut mass_properties(const Shape &shape);
 AnalysisOut analyze(const Shape &shape);
 

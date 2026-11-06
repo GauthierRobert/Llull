@@ -17,6 +17,8 @@ const KERNEL_HELPERS: readonly string[] = [
   'buildSimulationModel', // domain-dynamics: body mass properties through a kernel
   'staticChecks', // domain-dynamics
   'sourceMeshOf', // deform
+  'tessellateAt', // geometry/exactMesh: kernel mesh at explicit deflections
+  'withExactMesh', // geometry/exactMesh
   'exactOrMesh',
   'exactRecipe',
   'evaluateRecipe',
@@ -209,5 +211,35 @@ describe('kernel-consuming commands carry the kernel annotation (TR-INT-09)', ()
     }
     const unlisted = [...exported].filter((name) => !KERNEL_HELPERS.includes(name) && name !== 'guardedKernel'); // guardedKernel wraps the kernel, it does not consume it
     expect(unlisted.sort()).toEqual([]);
+  });
+
+  /** Files that define, forward or wrap tessellation itself (or only spell it in generated code): not consumers of a mesh's accuracy. */
+  const MESH_INFRASTRUCTURE: ReadonlySet<string> = new Set([
+    'core/src/geometry/entityTriangles.ts', // builds the triangles of an entity (and re-tessellates through withExactMesh)
+    'core/src/geometry/exactMesh.ts', // the explicit-mesh helpers
+    'core/src/geometry/shapeKernel.ts', // the caching kernel: forwards tessellate with its options
+    'core/src/codegen/pythonRuntime.ts', // Python source text (CadQuery tessellate), not a kernel call
+    'kernel-manifold/src/manifoldKernel.ts', // the Manifold kernel (ignores options; welded entityToTriangles input)
+  ]);
+  const MESH_CONSUMER = /\.tessellate\(|\bentityToTriangles\(|\bentityTrianglePositions\(/;
+  const EXPLICIT_MESH = /\b(?:tessellateAt|withExactMesh)\b/;
+  const DISPLAY_TAG = /@invariant display-mesh: \S.{20,}/;
+  const relativePath = (path: string): string => relative(root, path).split(sep).join('/');
+
+  it('every consumer of kernel.tessellate / entityToTriangles requests an explicit mesh (tessellateAt, withExactMesh) or states its accepted display-mesh bound', () => {
+    const missing = files
+      .map((path) => ({ path: relativePath(path), text: readFileSync(path, 'utf8') }))
+      .filter(({ path, text }) => !MESH_INFRASTRUCTURE.has(path) && MESH_CONSUMER.test(text))
+      .filter(({ text }) => !EXPLICIT_MESH.test(text) && !DISPLAY_TAG.test(text))
+      .map(({ path }) => path);
+    expect(missing).toEqual([]);
+  });
+
+  it('a display-mesh tag stays on a file that still reads a mesh (no stale bounds)', () => {
+    const stale = files
+      .map((path) => ({ path: relativePath(path), text: readFileSync(path, 'utf8') }))
+      .filter(({ text }) => DISPLAY_TAG.test(text) && !MESH_CONSUMER.test(text))
+      .map(({ path }) => path);
+    expect(stale).toEqual([]);
   });
 });

@@ -5,6 +5,7 @@
  *   (mesh-only otherwise: on a curved exit wall the mesh depth is kernel-dependent); holes with different depths become separate groups
  */
 
+// @invariant display-mesh: hole extents along the axis are read from the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import type { ShapeRecipe, Vec2 } from '../../model/types';
 import type { FeatureFrame, HoleExtent } from '../../model/features';
 import type { GeometryKernel } from '../../geometry/kernel';

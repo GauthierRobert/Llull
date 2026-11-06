@@ -1,5 +1,6 @@
 /** Shared pieces of the surface-sheet commands (02 SRF M4-M5): surface lookup, creation fields, analysis targets, rounding. */
 
+// @invariant display-mesh: surface commands sample the stored triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import type { CadDocument, Entity, NurbsSurfaceEntity, Vec3 } from '../../model/types';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
 import type { CommandResult } from '../types';

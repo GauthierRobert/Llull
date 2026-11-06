@@ -5,6 +5,7 @@
  * @failure nothing within tolerance -> 'not_found'; a curved surface -> 'not_planar'
  */
 
+// @invariant display-mesh: faces are resolved by the pointing ray / centroid on the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { FeatureFrame } from '../../model/features';
 import type { ShapeRecipe, Vec3 } from '../../model/types';

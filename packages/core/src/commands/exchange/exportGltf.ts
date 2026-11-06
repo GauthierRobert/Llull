@@ -86,6 +86,7 @@ function withInlineBuffer(scene: GltfScene): Record<string, unknown> {
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.format matches the binary param; data.triangleCount >= 0
+ * @invariant viewing format: kernel results are written from their stored DISPLAY mesh (its deflection scales with the size of the part), never re-tessellated; use export_stl / export_3mf / export_obj with chordTolerance for fabrication accuracy
  * @invariant one node per exported entity (node.name = entity name or id); identical local geometry + appearance share one indexed mesh
  *   (node matrix = entity placement), a unique part keeps a world-space mesh; one material per
  *   distinct entity color; an entity in a group hangs under a node named after the group

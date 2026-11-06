@@ -1,5 +1,6 @@
 /** export_urdf: read-only export of the kinematic model (dynamics bodies + joints, or assembly instances + joints) as URDF + STL meshes. */
 
+// @invariant display-mesh: URDF visual meshes are a viewing artefact (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); fabrication exports re-tessellate at chordTolerance
 import type { CadDocument, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { currentContext } from '../context';

@@ -3,6 +3,7 @@
  * size, one face on the plane), so any kernel with booleans splits it, exact or mesh.
  */
 
+// @invariant display-mesh: only bounds and the cut plane position are read (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import type { CadDocument, Entity, ShapeRecipe, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';

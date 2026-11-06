@@ -3,6 +3,7 @@
  * Entry/exit come from the solid's triangles (flat faces are exact; a cylinder's caps are exact), merged across layers.
  */
 
+// @invariant display-mesh: stack thickness along the axis from the stored triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import { type CadDocument, type Vec3, is3D } from '@core/model/types';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { rayTriangleDistance } from '@core/geometry/triangleQueries';

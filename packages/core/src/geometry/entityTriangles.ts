@@ -8,6 +8,8 @@ import { solidTriangles } from './solidTriangles';
 import type { Triangle } from './triangles';
 import { isZeroRotation } from '../lib/eulerRotation';
 import type { Vec3 } from '../model/vectors';
+import { exactMeshBudget, withExactMesh } from './exactMesh';
+import type { GeometryKernel, TessellationOptions } from './kernel';
 
 /** World-space triangles of one entity; instances are expanded through their component (`doc`). 2D shapes return []. */
 export function entityToTriangles(e: Entity, doc: Pick<CadDocument, 'components'>): Triangle[] {
@@ -33,7 +35,8 @@ function fullComponentsOf(
   doc: Pick<CadDocument, 'components'>,
   instance: InstanceEntity,
   assets: MeshAssetPort | null | undefined,
-): { components: CadDocument['components']; unreadable: boolean } {
+  exact?: ExactTessellation,
+): { components: CadDocument['components']; unreadable: boolean; exact: boolean; recipe: boolean; overBudget: number | null } {
   const reached = new Set<string>();
   const pending = [instance.componentId];
   for (let id = pending.pop(); id !== undefined; id = pending.pop()) {
@@ -44,10 +47,23 @@ function fullComponentsOf(
   }
   let components = doc.components;
   let unreadable = false;
+  let refinedAny = false;
+  let hasRecipe = false;
+  let overBudget: number | null = null;
   for (const id of reached) {
     const component = doc.components[id] as Component;
     let entities = component.entities;
     for (const [childId, child] of Object.entries(component.entities)) {
+      if (child.kind === 'mesh' && child.asset === undefined && child.brep !== undefined) hasRecipe = true;
+      const tooFine = exact === undefined ? null : exactMeshBudget(child, exact.options);
+      if (tooFine !== null) overBudget = Math.max(overBudget ?? 0, tooFine);
+      if (child.kind === 'mesh' && child.asset === undefined && exact !== undefined && tooFine === null) {
+        const refined = withExactMesh(child, exact.kernel, exact.options);
+        if (refined !== null) {
+          refinedAny = true;
+          entities = { ...entities, [childId]: refined };
+        }
+      }
       if (child.kind !== 'mesh' || child.asset === undefined) continue;
       const full = assets?.readMesh(child.asset.key) ?? null;
       if (full === null) unreadable = true;
@@ -55,7 +71,7 @@ function fullComponentsOf(
     }
     if (entities !== component.entities) components = { ...components, [id]: { ...component, entities } };
   }
-  return { components, unreadable };
+  return { components, unreadable, exact: refinedAny, recipe: hasRecipe, overBudget };
 }
 
 /** One exportable 3D entity with its world-space triangles (the unit of per-entity exports). */
@@ -97,16 +113,36 @@ function lazyPart(id: string, entity: Entity, make: () => Triangle[], count?: nu
   };
 }
 
+/** The kernel to re-tessellate kernel results with and the absolute deflections to ask it for. */
+export interface ExactTessellation {
+  readonly kernel: GeometryKernel | null | undefined;
+  readonly options: TessellationOptions;
+}
+
 /**
  * The exportable 3D entities named by `requestedIds` (all of `doc.order` when undefined/empty), each with its world-space triangles.
  * Unknown ids are reported, 2D entities are counted and skipped. An asset-backed mesh exports at full resolution (07 MSH FR-MSH-27); one
  * whose asset cannot be read is listed in `unreadable` (with its code) and contributes no triangle.
+ * With `exact`, a kernel-result mesh (it keeps its `brep`) is re-tessellated by the kernel at those deflections instead of using the stored display
+ * mesh; its id is listed in `exactIds` (an entity the kernel cannot rebuild, or any other kind, keeps its stored triangles).
  */
 export function collectExportParts(
   doc: CadDocument,
   requestedIds: readonly string[] | undefined,
   assets?: MeshAssetPort | null,
-): { parts: ExportPart[]; skipped2D: number; unknownIds: string[]; unreadable: Array<{ id: string; code: string }> } {
+  exact?: ExactTessellation,
+): {
+  parts: ExportPart[];
+  skipped2D: number;
+  unknownIds: string[];
+  unreadable: Array<{ id: string; code: string }>;
+  exactIds: string[];
+  recipeBodies: number;
+  overBudget: Array<{ id: string; minimum: number }>;
+} {
+  const overBudget: Array<{ id: string; minimum: number }> = [];
+  const exactIds: string[] = [];
+  let recipeBodies = 0;
   const unreadable: Array<{ id: string; code: string }> = [];
   const unknownIds: string[] = [];
   let idsToProcess: readonly string[] = doc.order;
@@ -126,7 +162,17 @@ export function collectExportParts(
       continue;
     }
     if (entity.kind === 'instance') {
-      const { components, unreadable: lost } = fullComponentsOf(doc, entity, assets);
+      const {
+        components,
+        unreadable: lost,
+        exact: refinedChildren,
+        recipe,
+        overBudget: childBudget,
+      } = fullComponentsOf(doc, entity, assets, exact);
+      if (childBudget !== null && exact !== undefined && exact.kernel?.honoursTessellationOptions === true)
+        overBudget.push({ id, minimum: childBudget });
+      if (refinedChildren) exactIds.push(id);
+      if (recipe) recipeBodies++;
       if (lost) unreadable.push({ id, code: assets === undefined || assets === null ? 'MESH_ASSET_UNAVAILABLE' : 'MESH_ASSET_MISSING' });
       else parts.push(lazyPart(id, entity, () => entityToTriangles(entity, { components })));
       continue;
@@ -148,17 +194,24 @@ export function collectExportParts(
       );
       continue;
     }
+    if (entity.kind === 'mesh' && entity.brep !== undefined && entity.asset === undefined) recipeBodies++;
+    const tooFine =
+      exact === undefined || exact.kernel?.honoursTessellationOptions !== true ? null : exactMeshBudget(entity, exact.options);
+    if (tooFine !== null) overBudget.push({ id, minimum: tooFine });
+    const refined = exact === undefined || tooFine !== null ? null : withExactMesh(entity, exact.kernel, exact.options);
+    if (refined !== null) exactIds.push(id);
+    const source = refined ?? entity;
     parts.push(
       lazyPart(
         id,
         entity,
-        () => entityToTriangles(entity, doc),
+        () => entityToTriangles(source, doc),
         undefined,
-        entity.kind === 'mesh' ? indexedOf(entity, entity.mesh) : undefined,
+        source.kind === 'mesh' ? indexedOf(source, source.mesh) : undefined,
       ),
     );
   }
-  return { parts, skipped2D, unknownIds, unreadable };
+  return { parts, skipped2D, unknownIds, unreadable, exactIds, recipeBodies, overBudget };
 }
 
 /** Flattened `collectExportParts`: every triangle of the selection in one list. */
@@ -170,6 +223,16 @@ export function collectExportTriangles(
   return { tris: parts.flatMap((part) => part.tris), skipped2D, unknownIds };
 }
 
+/** What a fabrication export knows about its tessellation: the kernel it had, the bodies that keep an exact recipe, and those actually re-tessellated. */
+export interface TessellationReport {
+  readonly chordTolerance: number;
+  readonly kernel: 'none' | 'ignores-options' | 'honours-options';
+  /** Bodies (entities, instances of them) that keep an exact recipe: the only ones a tolerance can apply to. */
+  readonly recipeBodies: number;
+  /** Ids re-tessellated by the kernel at `chordTolerance`. */
+  readonly exactIds: readonly string[];
+}
+
 /** Summary line shared by the mesh export commands. */
 export function exportSummary(
   command: string,
@@ -178,12 +241,37 @@ export function exportSummary(
     tris,
     skipped2D,
     unknownIds,
-  }: Pick<ReturnType<typeof collectExportTriangles>, 'skipped2D' | 'unknownIds'> & { tris: { readonly length: number } },
+    tessellation,
+  }: Pick<ReturnType<typeof collectExportTriangles>, 'skipped2D' | 'unknownIds'> & {
+    tris: { readonly length: number };
+    tessellation?: TessellationReport;
+  },
 ): string {
   const parts = [`${command}: ${tris.length} triangle${tris.length !== 1 ? 's' : ''} exported (format=${format}).`];
   if (skipped2D > 0) parts.push(`${skipped2D} non-solid entit${skipped2D !== 1 ? 'ies' : 'y'} (2D shapes, 3D curves) skipped.`);
   if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
+  const note = tessellation === undefined ? '' : tessellationNote(tessellation);
+  if (note !== '') parts.push(note);
   return parts.join(' ');
+}
+
+/** The summary sentence on the tessellation of an export; '' when no body keeps an exact recipe (primitives, scans, 2D only: nothing a tolerance could change). */
+export function tessellationNote({ chordTolerance, kernel, recipeBodies, exactIds }: TessellationReport): string {
+  if (recipeBodies === 0) return '';
+  if (exactIds.length > 0) {
+    const rest = recipeBodies - exactIds.length;
+    return (
+      `Tessellation: re-tessellated by the exact kernel at chordTolerance ${chordTolerance} (angular 0.5 rad) for ${exactIds.length} body(ies) (${exactIds.join(', ')})` +
+      (rest > 0 ? `; ${rest} other kernel-result body(ies) could not be rebuilt and use their stored display triangles.` : '.')
+    );
+  }
+  const why =
+    kernel === 'none'
+      ? 'no exact kernel is installed'
+      : kernel === 'ignores-options'
+        ? 'the installed kernel (a mesh kernel) ignores tessellation options'
+        : 'the exact kernel could not rebuild them';
+  return `Tessellation: ${recipeBodies} kernel-result body(ies) exported from their stored display meshes because ${why}; chordTolerance ${chordTolerance} was not applied.`;
 }
 
 /** `doc` with every asset-backed mesh among `ids` carrying its full-resolution triangles instead of the display LOD (an unreadable one is left as is). */

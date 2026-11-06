@@ -84,6 +84,8 @@ mod edge_fold_tests;
 #[cfg(test)]
 mod features_tests;
 #[cfg(test)]
+mod mesh_tests;
+#[cfg(test)]
 mod naming_tests;
 #[cfg(test)]
 mod test_bridge;
@@ -154,6 +156,7 @@ mod ffi {
         fn prefixed(shape: &Shape, prefix: &str) -> Result<UniquePtr<Shape>>;
 
         fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<MeshOut>;
+        fn bounding_diagonal(shape: &Shape) -> Result<f64>;
         fn mass_properties(shape: &Shape) -> Result<MassOut>;
         fn analyze(shape: &Shape) -> Result<AnalysisOut>;
 
@@ -172,6 +175,7 @@ pub(crate) struct Memo {
     json: std::cell::RefCell<std::collections::HashMap<&'static str, serde_json::Value>>,
     mass: std::cell::RefCell<Option<MassOut>>,
     analysis: std::cell::RefCell<Option<AnalysisOut>>,
+    diagonal: std::cell::Cell<Option<f64>>,
 }
 
 impl Shape {
@@ -303,6 +307,16 @@ pub fn prefixed(shape: &Shape, prefix: &str) -> Built {
 
 pub fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> OcctResult<MeshOut> {
     occt(ffi::tessellate(inner(shape)?, linear_deflection, angular_deflection))
+}
+
+/// Length of the diagonal of the tight bounding box, kept on the shape (0 for an empty or unbounded shape).
+pub fn bounding_diagonal(shape: &Shape) -> OcctResult<f64> {
+    if let Some(found) = shape.1.diagonal.get() {
+        return Ok(found);
+    }
+    let diagonal = occt(ffi::bounding_diagonal(inner(shape)?))?;
+    shape.1.diagonal.set(Some(diagonal));
+    Ok(diagonal)
 }
 
 pub fn mass_properties(shape: &Shape) -> OcctResult<MassOut> {

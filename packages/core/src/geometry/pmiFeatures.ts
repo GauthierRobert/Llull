@@ -8,6 +8,7 @@
  *   within tolerance -> GDT_FACE_AMBIGUOUS
  */
 
+// @invariant display-mesh: PMI feature anchors are matched on the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import type { ShapeRecipe, Vec3 } from '../model/types';
 import type { PmiSurface } from '../model/pmi';
 import type { GeometryKernel, ShapeTopology } from './kernel';

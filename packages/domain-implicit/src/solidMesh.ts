@@ -1,5 +1,6 @@
 /** The closed triangle mesh of a solid entity, for `field_from_solid` (05 IMP §5.9). */
 
+// @invariant display-mesh: an implicit field is sampled against the stored triangles (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units), below the field resolution
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { soupIndices } from '@core/geometry/meshVolume';
 import { openEdgeCount } from '@core/geometry/meshClosure';

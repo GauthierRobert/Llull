@@ -953,6 +953,36 @@ r(0.1) = 1.1 and r(0.25) = 1.25 to 1e-14 relative (the request: 1e-6). The volum
 
 **Other changes in the readings.** VC-BLD-03 (straight, kink): top 170.000000, side 70.000000, volume 989.985248 (all exact). The time at 1000 mm is the display tessellation of the blend face (`BRepMesh`: 7.8 s against 1.7 s for the smooth law of the same size, 260 k triangles; `Build` itself is 12 ms); at 100 mm and below it is unchanged within noise. It comes from the absolute display deflection (BOARD: scale it with the model size), not from the law.
 
+**As built: DISP1, display deflection scaled with the model (2026-11).** The display tessellation (`mesh::display_mesh`, the `tessellate` op of the native kernel without options) used the absolute linear deflection 0.1 whatever the size. It is now `max(f, f x D / 100)` with `f` = 0.1 (0.02 for the finer retry of an open closed-solid mesh) and `D` the diagonal of the tight bounding box (`bounding_diagonal`, the same box as `mass_properties`): 1e-3 of the diagonal (2e-4 for the retry) above a 100-unit diagonal, the old value below it, so a part under 100 units meshes bit for bit as before. The angular deflection stays 0.5 rad (it already bounds the facets of a curved face, and it is what the large cases now hit). Measured on this machine (win32-x64, release build, `display_mesh` timed in a throwaway test, the block 20 x 10 x 5 x s with the straight 1 -> 2 x s law of `nativeBlendStraight.test.ts`, display mesh only):
+
+| s       | before            | after          |
+| ------- | ----------------- | -------------- |
+| 1       | 64 tri, 1 ms      | 64 tri, 8 ms   |
+| 10      | 1344 tri, 7 ms    | 644 tri, 8 ms  |
+| 100     | 22694 tri, 179 ms | 644 tri, 21 ms |
+| 1000    | 252884 tri, 4024 ms | 644 tri, 23 ms |
+
+(The 7.6 s of the table above also counted the contact-line sampling; the tessellation alone is 4.0 s here.) At s = 1000 the chord error allowed is 1e-3 of the part, the same relative accuracy a 100-unit part always had.
+
+**Explicit tessellation and the consumers of the display mesh.** The display mesh is stored in the result entity (`mesh`, next to its `brep` recipe) and read by many commands, so the port is now `GeometryKernel.tessellate(shape, options?)` with `TessellationOptions { linearDeflection, angularDeflection }` (absolute, document units / radians): the native `tessellate` op takes it as its second argument (`mesh::mesh_at`, no size scaling; capability `tessellateOptions`, surfaced as `kernel.honoursTessellationOptions`), Manifold ignores it (flag absent). A display and an explicit mesh are cached apart in `kernelFromOps`, and `tessellate` cleans the shape's triangulation first (OCCT keeps a finer one it already holds, which made the mesh depend on earlier calls). The constant of the knee (100) is in document units whatever they are (a metre document starts scaling at a 100 m diagonal); a non-finite or open box (diagonal over 1e12) keeps the floor; the diagonal is kept on the shape. Consumers and their path:
+
+| Consumer | Path |
+| --- | --- |
+| viewport, `render_view`, glTF export (a viewing format) | display mesh |
+| `export_stl`, `export_3mf`, `export_obj` (kernel-optional, param `chordTolerance`, minimum 1e-4, default 0.1 document units + 0.5 rad = the accuracy before DISP1) | kernel re-tessellation at `chordTolerance` for a body or an instance of bodies that keeps its `brep`; else the stored mesh. The summary states which path and the tolerance (nothing when no body keeps a recipe; "no exact kernel" and "the kernel ignores options" are told apart). A tolerance finer than diagonal / 1e6 is refused (`EXPORT_TESSELLATION_BUDGET`, remediation = the smallest value; the native op refuses the same ratio with `NATIVE_TESSELLATION_BUDGET`) |
+| deform sources (`sourceMeshOf`, `loadTarget`, `output.mode: 'mesh'`) | kernel mesh at 0.1 / 0.5 when the kernel honours options (same accuracy as before), else display mesh |
+| OpenSCAD / FreeCAD fallback triangles of a fillet / shell (`codegen/recipeLowering.ts`, a deliverable) | kernel mesh at 0.1 / 0.5 when honoured |
+| flow-solver surface (`domain-aero/src/cfd/flowSurface.ts`, the STL of `flowJob.ts`) | kernel mesh (single body: `withExactMesh`; union: `tessellateAt`) at 0.1 / 0.5 when honoured |
+| `check_machining` thickness ray casts | kernel mesh at 0.1 / 0.5 when honoured |
+| FEA STL fallback (`server/src/fea/feaGeometry.ts`, only when the kernel has no STEP) | kernel mesh at 0.1 / 0.5 when honoured |
+| `inspect_face_triangles` | display mesh on purpose (indices must match the drawn triangles); the label of a triangle is exact except within max(0.1, 1e-3 D) of a face boundary or on a face thinner than that (@invariant) |
+| mass / inertia (`resolveMassProperties`) | native kernel: exact `massProperties`; the stored-mesh inertia scaled to the exact volume is the Manifold-only path (no explicit tolerance available) and `solidVolume` uses the exact topology volume |
+| every other reader of `kernel.tessellate` / `entityToTriangles` (bounds, diagonal, reach, face matching, measures, scan fits, voxelisation, drawing views, previews) | stored display mesh, max(0.1, 1e-3 D) chord error, accepted per file by an `@invariant display-mesh:` tag that `tests/unit/contract/kernelConsumers.test.ts` requires (a consumer must use `tessellateAt` / `withExactMesh` or carry the tag; stale tags fail) |
+
+Cost of the diagonal (cold, release, win32-x64): `bounding_diagonal` takes 0.23 ms on a 64-edge rim fillet (display mesh 18 ms, 1.3 %) and 17.7 ms on the long B-spline blend face of the 20 m block (display mesh of it 5.8 ms after the scaling, 4.0 s before: 0.4 % of the old cost); it is kept on the shape, so every later call is free. Explicit meshes are kept three per shape in `kernelFromOps`.
+
+Measured accuracy (sphere of diameter 2000, native): the display mesh holds 2836 triangles and loses at most area x 1e-3 D of volume (test `a_large_sphere_display_mesh_stays_within_the_stated_deflection_of_the_exact_volume`); `export_stl` with `chordTolerance` 0.5 holds the exported volume within area x 0.5 of the exact one (`server/tests/nativeDisplayDeflection.test.ts`).
+
 Plans (`llull run ... --continue`, native kernel): unchanged, 6/8, 24/24, 14/15, 28/28, 4/9, 28/31, 32/32, 18/20, 33/33; only `expected_results.json` VC-BLD-03 `measuredNative` moved (contact line 6.4e-15, top face 170.000000, volume 989.985248).
 
 ### 13.15.4 Left (exactly)

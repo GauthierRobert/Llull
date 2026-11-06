@@ -3,6 +3,7 @@
  * is a `mesh` whose `brep` is a `feature(pocket)` node over the target's recipe.
  */
 
+// @invariant display-mesh: the pocket reach is read from the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units)
 import { type CadDocument, type Entity, type ShapeRecipe, type Vec2, is3D } from '../../model/types';
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { FtrCode } from '../../model/manufacturing';

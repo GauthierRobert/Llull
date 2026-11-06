@@ -3,6 +3,7 @@
  * face of a solid. The result is a `mesh` whose `brep` is a `feature(hole)` node over the target's recipe.
  */
 
+// @invariant display-mesh: the through-reach of a hole is read from the display mesh (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units), far below hole tolerances
 import { round6 } from '../../lib/compactNumber';
 import { type CadDocument, type Entity, type MeshData, type Vec2, is3D } from '../../model/types';
 import type { FeatureFrame, HoleExtent, HoleSpec } from '../../model/features';

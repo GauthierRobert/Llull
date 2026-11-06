@@ -10,6 +10,7 @@ import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import type { Triangle } from '../../geometry/triangles';
 import { facetNormal } from '../../geometry/tessellation';
+import { budgetRefusal, chordToleranceField, exportTessellation, tessellationReport } from './chordTolerance';
 
 const formatVec3 = (v: Vec3): string => v.join(' ');
 
@@ -80,13 +81,14 @@ export interface ExportStlData {
  * @invariant data.triangleCount >= 0; data.format matches the requested format;
  *            ASCII STL wraps content in 'solid <name>'…'endsolid <name>';
  *            binary STL is 84 + triangleCount*50 bytes, base64-encoded in stlBase64
+ * @invariant kernel-optional: with an exact kernel honouring tessellation options, a body that keeps its exact recipe is re-tessellated at `chordTolerance` (default 0.1 document units, 0.5 rad), else its stored display mesh is exported (the display mesh scales its deflection with the size of the part, so it is not accuracy-bounded in absolute units); the summary says which path
  * @failure 2D-only entities or unknown ids are silently skipped;
  *          empty selection or all-2D document → valid empty solid, triangleCount:0;
  *          never throws for user error
  */
 export const exportStl = defineCommand({
   name: 'export_stl',
-  annotations: { readOnly: true },
+  annotations: { kernelOptional: true, readOnly: true },
   description:
     'Export the document (or a subset of entities) to STL format — the standard triangle-mesh ' +
     'interchange format accepted by slicers, mesh editors, and 3D printers. ' +
@@ -126,6 +128,7 @@ export const exportStl = defineCommand({
           'set_entity_name, else the entity id) instead of one merged solid; `name` is then ignored. ' +
           'Default false. Binary STL has no per-solid names.',
       ),
+    chordTolerance: chordToleranceField,
     name: z
       .string()
       .optional()
@@ -139,7 +142,10 @@ export const exportStl = defineCommand({
     const refused = exportRefusal(doc, 'export_stl', 'stl', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
     const fmt: 'ascii' | 'binary' = params.format === 'binary' ? 'binary' : 'ascii';
-    const collected = collectExportParts(doc, params.entityIds, (ctx ?? currentContext()).meshAssets);
+    const used = exportTessellation(ctx, params.chordTolerance);
+    const collected = collectExportParts(doc, params.entityIds, (ctx ?? currentContext()).meshAssets, used);
+    const overBudget = budgetRefusal(doc, 'export_stl', used.chordTolerance, collected.overBudget);
+    if (overBudget !== null) return overBudget;
     const unreadable = exportAssetRefusal(doc, 'export_stl', collected.unreadable);
     if (unreadable !== null) return unreadable;
     const tris = collected.parts.flatMap((part) => part.tris);
@@ -147,7 +153,7 @@ export const exportStl = defineCommand({
     const nonEmpty = collected.parts.filter((part) => part.tris.length > 0);
     // A lone named entity names its solid; several entities need `name` or `perEntity`.
     const solidName = cleanSolidName(params.name ?? (nonEmpty.length === 1 ? nonEmpty[0]?.name : undefined));
-    const summary = exportSummary('export_stl', fmt, { ...collected, tris });
+    const summary = exportSummary('export_stl', fmt, { ...collected, tris, tessellation: tessellationReport(used, collected) });
     const data: ExportStlData =
       fmt === 'ascii'
         ? {

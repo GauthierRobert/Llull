@@ -2,13 +2,32 @@
 //! comes out open (a face without triangles, a seam gap) is meshed again finer, then refused rather than shown holed.
 //! Deviation from that policy: the finer retry runs for every open solid, not only freeform-heavy or thread-bearing ones.
 
-use crate::{tessellate, MeshOut, OcctResult, Shape};
+use crate::{bounding_diagonal, tessellate, MeshOut, OcctResult, Shape};
 use std::collections::HashMap;
 
 /// Display deflections: linear (document units), angular (radians) — the retired kernel's values.
 pub const DISPLAY_DEFLECTION: (f64, f64) = (0.1, 0.5);
 /// Retry deflections for a closed solid whose display mesh is open.
 pub const FINE_DEFLECTION: (f64, f64) = (0.02, 0.2);
+
+/// Diagonal (document units) up to which a part keeps the linear floor; above it the deflection is `floor x diagonal / KNEE_DIAGONAL`, i.e. 1e-3 of the
+/// diagonal at the display floor (0.1), 2e-4 at the fine retry (0.02). The constant is in document units whatever they are: a metre document starts
+/// scaling at a 100 m diagonal. Small parts mesh exactly as before.
+const KNEE_DIAGONAL: f64 = 100.0;
+/// Diagonals above this are treated as unbounded (an open box reads as 1e100): the floor is kept.
+const MAX_DIAGONAL: f64 = 1e12;
+/// Largest ratio of the bounding-box diagonal to an explicit linear deflection a host may ask for (about 1.7 triangles per unit of it on a sphere): beyond it the
+/// request is refused with `NATIVE_TESSELLATION_BUDGET`. The TypeScript side (`geometry/exactMesh.ts`) states the same number.
+pub const MAX_DIAGONAL_PER_DEFLECTION: f64 = 1e6;
+
+/// Linear deflection for a shape whose bounding box has the given diagonal; the floor for a non-finite or unbounded one.
+pub fn scaled_linear(floor: f64, diagonal: f64) -> f64 {
+    if diagonal.is_finite() && diagonal <= MAX_DIAGONAL {
+        floor.max(floor * diagonal / KNEE_DIAGONAL)
+    } else {
+        floor
+    }
+}
 
 /// Weld grid of the closure test: 1e-5 document units (`meshClosure.ts`).
 const GRID: f64 = 1e5;
@@ -51,14 +70,29 @@ fn acceptable(mesh: &MeshOut) -> bool {
     mesh.missing_faces == 0 && is_closed_mesh(&mesh.positions, &mesh.indices)
 }
 
-/// Display mesh of `shape`; `None` for an empty triangulation or a closed solid that stays open at the fine deflection.
+/// Display mesh of `shape` at the deflection scaled with its size; `None` for an empty triangulation or a closed solid that stays open at the fine deflection.
 pub fn display_mesh(shape: &Shape) -> OcctResult<Option<MeshOut>> {
-    let first = tessellate(shape, DISPLAY_DEFLECTION.0, DISPLAY_DEFLECTION.1)?;
-    if !first.closed_solid || acceptable(&first) {
-        return Ok(if first.positions.is_empty() { None } else { Some(first) });
+    let diagonal = bounding_diagonal(shape)?;
+    mesh_with(
+        shape,
+        (scaled_linear(DISPLAY_DEFLECTION.0, diagonal), DISPLAY_DEFLECTION.1),
+        (scaled_linear(FINE_DEFLECTION.0, diagonal), FINE_DEFLECTION.1),
+    )
+}
+
+/// Mesh of `shape` at the absolute deflections the caller asked for (document units, radians), without the size scaling; an open closed-solid mesh is
+/// retried at 0.2 x the linear and 0.4 x the angular deflection, the ratios of the display retry.
+pub fn mesh_at(shape: &Shape, linear: f64, angular: f64) -> OcctResult<Option<MeshOut>> {
+    mesh_with(shape, (linear, angular), (linear * 0.2, angular * 0.4))
+}
+
+fn mesh_with(shape: &Shape, first: (f64, f64), fine: (f64, f64)) -> OcctResult<Option<MeshOut>> {
+    let coarse = tessellate(shape, first.0, first.1)?;
+    if !coarse.closed_solid || acceptable(&coarse) {
+        return Ok(if coarse.positions.is_empty() { None } else { Some(coarse) });
     }
-    let fine = tessellate(shape, FINE_DEFLECTION.0, FINE_DEFLECTION.1)?;
-    Ok(if acceptable(&fine) { Some(fine) } else { None })
+    let retry = tessellate(shape, fine.0, fine.1)?;
+    Ok(if acceptable(&retry) { Some(retry) } else { None })
 }
 
 #[cfg(test)]
