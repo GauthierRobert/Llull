@@ -14,6 +14,7 @@ import { deriveRun } from '@aec/plant/piping/routeParts';
 import { pipingErrors } from '@aec/plant/piping/validate';
 import { apply, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
+import { data } from '../../../helpers/commandAssertions';
 import { capCatalog, capSpecOps } from './capFixtures';
 import { smallBoreDocument } from './smallBoreFixtures';
 
@@ -91,7 +92,8 @@ describe('set_run_end_cap', () => {
   it('counts the cap in the takeoff', () => {
     const { doc, runId } = openRun();
     const takeoff = ok(apply(doc, 'set_run_end_cap', { runId, end: 'end' }), 'piping_takeoff', {});
-    expect(JSON.stringify(takeoff.data)).toMatch(/"cap":1/);
+    const counts = (takeoff.data as { counts: Record<string, number> }).counts;
+    expect(counts['cap']).toBe(1);
   });
 
   it('is a no-op when the end is already in the requested state', () => {
@@ -134,7 +136,7 @@ describe('set_run_end_cap', () => {
     const refused = execute(huge.doc, 'set_run_end_cap', { runId: huge.runId, end: 'end' });
     expect(refused.rejected).toBe(true);
     expect(refused.document).toBe(huge.doc);
-    expect(refused.error?.code).toMatch(/^RTE_/);
+    expect(refused.error?.code).toBe('RTE_SEGMENT_TOO_SHORT');
   });
 
   it('is pure', () => {
@@ -163,5 +165,98 @@ describe('set_run_end_cap', () => {
     const derived = deriveRun(doc, bad);
     expect(derived.ok).toBe(false);
     if (!derived.ok) expect(derived.code).toBe('RTE_CAP_INVALID');
+  });
+});
+
+describe('set_run_end_cap: review follow-ups', () => {
+  const single = (length: number): { doc: CadDocument; runId: string } => {
+    const s = scene();
+    const routed = ok(s.doc, 'route_pipe', {
+      lineId: s.line,
+      from: { point: [0, 0, 0], direction: [1, 0, 0] },
+      legs: [{ direction: '+X', length }],
+    });
+    return { doc: routed.document, runId: (routed.data as { runId: string }).runId };
+  };
+
+  it('a single leg of 200 capped at both ends: one piece from 20 - 11.4 = 8.6 to 180 + 11.4 = 191.4, cut 182.8', () => {
+    const { doc, runId } = single(200);
+    const both = apply(apply(doc, 'set_run_end_cap', { runId, end: 'start' }), 'set_run_end_cap', { runId, end: 'end' });
+    expect(cuts(both, runId)).toEqual([[182.8]]);
+    expect(derivedOf(both, runId).parts.filter((part) => part.kind === 'cap')).toHaveLength(2);
+  });
+
+  it('two caps (20 + 20) on a leg of 30 do not fit: RTE_SEGMENT_TOO_SHORT, document unchanged', () => {
+    const { doc, runId } = single(30);
+    const one = apply(doc, 'set_run_end_cap', { runId, end: 'start' });
+    const refused = expectRefusal(one, 'set_run_end_cap', { runId, end: 'end' }, 'RTE_SEGMENT_TOO_SHORT');
+    expect(refused.document).toBe(one);
+  });
+
+  it('edit_route stretch_leg keeps the cap and the cap follows the new end point', () => {
+    const { doc, runId } = openRun();
+    const capped = apply(doc, 'set_run_end_cap', { runId, end: 'end' });
+    const stretched = apply(capped, 'edit_route', { runId, op: 'stretch_leg', index: 1, length: 1800 });
+    const run = runOf(stretched, runId);
+    expect(run.end.cap).toBe(true);
+    expect(run.end.point[0]).toBeCloseTo(1800, 6);
+    const cap = derivedOf(stretched, runId).parts.find((part) => part.kind === 'cap');
+    expect(cap?.centre?.[0]).toBeCloseTo(1800, 6);
+    expect(cap?.ports[0]?.position[0]).toBeCloseTo(1780, 6);
+    expect(cuts(stretched, runId)).toEqual([[970.4], [1761.8]]);
+  });
+
+  it('routing from a capped end is refused with RTE_CAP_INVALID, and works again once the cap is off', () => {
+    const { doc, runId } = openRun();
+    const capped = apply(doc, 'set_run_end_cap', { runId, end: 'end' });
+    const line = runOf(capped, runId).lineId;
+    const params = { lineId: line, from: { portId: `${runId}:end` }, legs: [{ direction: '+X', length: 500 }] };
+    const refused = expectRefusal(capped, 'route_pipe', params, 'RTE_CAP_INVALID');
+    expect(refused.summary).toContain('set_run_end_cap');
+    expect(ok(apply(capped, 'set_run_end_cap', { runId, end: 'end', cap: false }), 'route_pipe', params).rejected).toBeUndefined();
+  });
+
+  it('load validation rejects a run that continues from a capped end', () => {
+    const { doc, runId } = openRun();
+    const piping = JSON.parse(JSON.stringify(doc.plant?.piping)) as {
+      runs: Record<string, { start: Record<string, unknown>; end: Record<string, unknown> }>;
+    };
+    piping.runs[runId]?.end && (piping.runs[runId].end['cap'] = true);
+    const other = JSON.parse(JSON.stringify(piping.runs[runId])) as { id: string; start: Record<string, unknown> };
+    other.id = 'run-x';
+    other.start['ref'] = { kind: 'runEnd', runId, end: 'end' };
+    const withOther = {
+      ...piping,
+      runs: { ...piping.runs, ['run-x']: other },
+      runOrder: [...(piping as unknown as { runOrder: string[] }).runOrder, 'run-x'],
+    };
+    expect(pipingErrors(withOther).join()).toContain('capped end');
+  });
+
+  it('export_pcf writes exactly one CAP record with one END-POINT at the mouth', () => {
+    const { doc, runId } = openRun();
+    const capped = apply(doc, 'set_run_end_cap', { runId, end: 'end' });
+    const { files } = data<{ files: Array<{ content: string }> }>(capped, 'export_pcf', {});
+    const lines = files.flatMap((file) => file.content.split(String.fromCharCode(10)));
+    const starts = lines.flatMap((line, index) => (line === 'CAP' ? [index] : []));
+    const body = lines
+      .slice((starts[0] ?? 0) + 1)
+      .filter((line, index, all) => all.slice(0, index).every((prior) => prior.startsWith(' ')));
+    expect(starts).toHaveLength(1);
+    const endPoints = body.filter((line) => line.includes('END-POINT'));
+    expect(endPoints).toHaveLength(1);
+    expect(endPoints[0]?.trim()).toBe('END-POINT 1480.0 0.0 1000.0 25 SW');
+  });
+
+  it('export_ifc adds one cap fitting, one port and one port connection (the cap mouth pairs with the pipe)', () => {
+    const { doc, runId } = openRun();
+    const capped = apply(doc, 'set_run_end_cap', { runId, end: 'end' });
+    type Ifc = { ifc: string; piping: { productCount: number; portCount: number; connectionCount: number } };
+    const [before, after] = [data<Ifc>(doc, 'export_ifc', {}), data<Ifc>(capped, 'export_ifc', {})];
+    expect(after.piping.productCount).toBe(before.piping.productCount + 1);
+    expect(after.piping.portCount).toBe(before.piping.portCount + 1);
+    expect(after.piping.connectionCount).toBe(before.piping.connectionCount + 1);
+    expect(after.ifc.split('.OBSTRUCTION.').length - 1).toBe(1);
+    expect(before.ifc.split('.OBSTRUCTION.').length - 1).toBe(0);
   });
 });

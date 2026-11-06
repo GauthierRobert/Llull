@@ -189,6 +189,23 @@ function cycleErrors(raw: Record<string, unknown>): string[] {
   });
 }
 
+/** A run end that another run continues from (`runEnd` ref) must not carry a cap. */
+function cappedEndRefErrors(runs: unknown): string[] {
+  if (!isRecord(runs)) return [];
+  return Object.entries(runs).flatMap(([id, run]) =>
+    (['start', 'end'] as const).flatMap((side) => {
+      const end = isRecord(run) ? run[side] : undefined;
+      const ref = isRecord(end) ? end['ref'] : undefined;
+      if (!isRecord(ref) || ref['kind'] !== 'runEnd' || typeof ref['runId'] !== 'string') return [];
+      const target = runs[ref['runId']];
+      const targetEnd = isRecord(target) ? target[String(ref['end'])] : undefined;
+      return isRecord(targetEnd) && targetEnd['cap'] !== undefined
+        ? [`plant.piping.runs.${id}.${side}.ref continues from the capped end ${ref['runId']}:${String(ref['end'])}`]
+        : [];
+    }),
+  );
+}
+
 export function pipingErrors(raw: unknown): string[] {
   if (!isRecord(raw)) return ['plant.piping must be an object'];
   const lines = isRecord(raw['lines']) ? raw['lines'] : {};
@@ -209,6 +226,7 @@ export function pipingErrors(raw: unknown): string[] {
         : [`plant.piping.lines.${id} needs a lineNumber, a spec and a positive dn`],
     ),
     ...settingsErrors(raw),
+    ...cappedEndRefErrors(raw['runs']),
     ...tableErrors(raw, 'runs', 'runOrder', (id, run) => [
       ...(typeof run['lineId'] === 'string' && run['lineId'] in lines ? [] : [`plant.piping.runs.${id}.lineId must name a line`]),
       ...endErrors(`plant.piping.runs.${id}.start`, run['start'], true),

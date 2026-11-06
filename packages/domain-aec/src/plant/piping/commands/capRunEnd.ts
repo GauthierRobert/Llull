@@ -24,7 +24,7 @@ export const setRunEndCap = defineCommand({
     'no longer shows as RTE_OPEN_END in check_piping. Only an open end can be capped: an end connected to a tie-in, nozzle, branch or another run is ' +
     'refused (RTE_CAP_INVALID). cap: false removes the cap. Returns the run id (affected[0]); data = { runId, end, capped, capKey?, capLengthMm?, dn }. ' +
     'Refusals: RTE_UNKNOWN_RUN, RTE_CAP_INVALID, and the derivation codes when the spec has no usable cap row (RTE_SPEC_NO_COMPONENT, ' +
-    'RTE_NO_CONNECTION_RULE, RTE_LEG_TOO_SHORT: the cap does not fit its leg). Next: check_piping, piping_takeoff (counts the cap), export_pcf.',
+    'RTE_NO_CONNECTION_RULE, RTE_SEGMENT_TOO_SHORT: the cap does not fit its leg). Next: check_piping, piping_takeoff (counts the cap), export_pcf.',
   params: z.object({
     runId: z.string().describe('Pipe run id (affected[0] of route_pipe / auto_route_pipe / add_branch).'),
     end: z.enum(['start', 'end']).describe('Which end of the run: "start" (first point) or "end" (last point).'),
@@ -49,8 +49,7 @@ export const setRunEndCap = defineCommand({
           ['end'],
         );
     }
-    const { cap: removed, ...bare } = current;
-    void removed;
+    const bare = withoutCap(current);
     const next: RunEnd = cap ? { ...bare, cap: true } : bare;
     const result = rederive(withRuns(doc, [{ ...run, [end]: next }]), [runId]);
     if (!result.ok) return refuseDerivation(doc, 'set_run_end_cap', result, runId);
@@ -86,4 +85,10 @@ function connectedRunId(runs: Readonly<Record<string, PipeRun>>, runId: string, 
   return Object.values(runs).find((other) =>
     [other.start.ref, other.end.ref].some((ref) => ref?.kind === 'runEnd' && ref.runId === runId && ref.end === end),
   )?.id;
+}
+
+/** `end` without its `cap` flag. */
+function withoutCap(end: RunEnd): RunEnd {
+  const { cap, ...rest } = end;
+  return cap === undefined ? end : rest;
 }
