@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
@@ -152,5 +154,63 @@ describe('render_motion material class shading (VIS-M8h)', () => {
     const shaded = (execute(doc, 'render_motion', params, ctx(true)).data as Frames).svg;
     expect(shaded).not.toBe(plain);
     expect((execute(doc, 'render_motion', params, ctx(true)).data as Frames).svg).toBe(shaded);
+  });
+});
+
+describe('render_motion exact instants (VC-MOV-03)', () => {
+  beforeAll(async () => setPhysicsEngine(await createMujocoPhysics()));
+  const validation = resolve(process.cwd(), 'docs/physics/22-motion-video/validation');
+  const plan = JSON.parse(readFileSync(resolve(validation, 'plans/mov_render_motion_instants.plan.json'), 'utf8')) as {
+    command: string;
+    params: Record<string, unknown>;
+  }[];
+  const render = plan[plan.length - 1] ?? { command: '', params: {} };
+  const expected = (
+    JSON.parse(readFileSync(resolve(validation, 'expected_results.json'), 'utf8')) as {
+      cases: { id: string; value: number[]; baseline: number[] }[];
+    }
+  ).cases.find((c) => c.id === 'VC-MOV-03');
+  const mechanism = (): CadDocument =>
+    execute(createEmptyDocument(), 'build_project', {
+      actions: plan.slice(0, -1).map((s) => ({ command: s.command, params: s.params, ...('as' in s ? { as: s.as } : {}) })),
+    }).document;
+
+  it('reports the requested instants, not the nearest recorded sample', () => {
+    expect(render.command).toBe('render_motion');
+    const data = execute(mechanism(), 'render_motion', render.params).data as Frames;
+    expect(expected?.baseline).toEqual([0.01218, 0.03132]);
+    data.frames.forEach((frame, k) => expect(Math.abs(frame.time - (expected?.value[k] ?? NaN))).toBeLessThan(1e-12));
+  });
+
+  it('places the piston on the closed-form slider-crank position between recorded samples', () => {
+    const crank = 50;
+    const rod = 200;
+    const pistonX = (t: number): number => crank * Math.cos(100 * t) + Math.sqrt(rod ** 2 - (crank * Math.sin(100 * t)) ** 2);
+    const times = [0.0114, 0.0314];
+    const coarse = execute(mechanism(), 'render_motion', { ...render.params, sampleRate: 600 }).data as Frames;
+    coarse.frames.forEach((frame, k) => {
+      const t = times[k] ?? 0;
+      expect(Math.abs((frame.bodies['piston']?.position[0] ?? 0) - pistonX(t))).toBeLessThan(0.3);
+    });
+    expect(Math.abs(pistonX(0.0114) - pistonX(0.01218))).toBeGreaterThan(1);
+    const fine = execute(mechanism(), 'render_motion', { ...render.params, sampleRate: 50000 }).data as Frames;
+    fine.frames.forEach((frame, k) => {
+      expect(Math.abs((frame.bodies['piston']?.position[0] ?? 0) - pistonX(times[k] ?? 0))).toBeLessThan(0.01);
+    });
+  });
+
+  it('is pure and keeps the dot of a traced body on the interpolated position', () => {
+    const doc = mechanism();
+    const before = JSON.stringify(doc);
+    const result = execute(doc, 'render_motion', { ...render.params, trace: 'piston' });
+    expect(JSON.stringify(doc)).toBe(before);
+    expect(result.affected).toEqual([]);
+    expect((result.data as Frames).svg).toContain('<circle');
+  });
+
+  it('refuses a time past the duration as before', () => {
+    const result = execute(mechanism(), 'render_motion', { ...render.params, times: [0.0114, 0.5] });
+    expect(result.summary).toMatch(/exceed the duration/);
+    expect(result.data).toBeUndefined();
   });
 });

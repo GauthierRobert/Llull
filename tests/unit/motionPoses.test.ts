@@ -1,15 +1,7 @@
 /** Pose interpolation, motion detection and relative transforms of the motion-clearance check. */
 import { describe, expect, it } from 'vitest';
-import { type BodyPoseAt, posesAtSample } from '@core/geometry/bodyPose';
-import {
-  STATIC_POSE,
-  isMoving,
-  poseAt,
-  relativeTransform,
-  relativeTravelBound,
-  travelBound,
-  type PoseTrack,
-} from '@dynamics/sim/motionPoses';
+import { type BodyPoseAt, type PoseTrack, poseAtFraction as poseAt, posesAtSample, posesAtTime } from '@core/geometry/bodyPose';
+import { STATIC_POSE, isMoving, relativeTransform, relativeTravelBound, travelBound } from '@dynamics/sim/motionPoses';
 import type { Quaternion } from '@core/model/vectors';
 
 const IDENTITY: Quaternion = [1, 0, 0, 0];
@@ -182,5 +174,60 @@ describe('relativeTravelBound', () => {
     const b1 = pose([30 * Math.cos(0.02), 30 * Math.sin(0.02), 0], small);
     const bound = relativeTravelBound(STATIC_POSE, STATIC_POSE, b0, b1, [30, 0, 0], 5);
     expect(bound).toBeGreaterThanOrEqual(30 * 0.02 * 0.99);
+  });
+});
+
+describe('posesAtTime', () => {
+  const times = [0, 0.1, 0.2];
+  const bodies = {
+    slide: track(
+      [
+        [0, 0, 0],
+        [10, 0, 0],
+        [30, 0, 0],
+      ],
+      [IDENTITY, IDENTITY, IDENTITY],
+    ),
+    turn: track(
+      [
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+      ],
+      [IDENTITY, QUARTER_Z, [0, 0, 0, 1]],
+    ),
+    short: track([[0, 0, 0]], [IDENTITY]),
+  };
+  const run = { times, bodies };
+
+  it('blends the bracketing samples at an instant between them', () => {
+    const at = posesAtTime(run, 0.15);
+    expect(at['slide']?.position[0]).toBeCloseTo(20, 12);
+    expect(at['slide']?.start).toEqual([0, 0, 0]);
+    expect(at['turn']?.orientation[3]).toBeCloseTo(Math.sin((3 * Math.PI) / 8), 9);
+    expect(posesAtTime(run, 0.05)['slide']?.position[0]).toBeCloseTo(5, 12);
+  });
+
+  it('returns a recorded sample bit-exactly when the instant hits it (within 1e-12 s)', () => {
+    expect(posesAtTime(run, 0.1)['slide']?.position).toEqual([10, 0, 0]);
+    expect(posesAtTime(run, 0.1 + 5e-13)['slide']?.position).toEqual([10, 0, 0]);
+    expect(posesAtTime(run, 0.1 - 5e-13)['turn']?.orientation).toEqual(QUARTER_Z);
+    expect(posesAtTime(run, 0)['slide']?.position).toEqual([0, 0, 0]);
+  });
+
+  it('clamps outside the run and leaves out bodies without that sample or an empty run', () => {
+    expect(posesAtTime(run, -1)['slide']?.position).toEqual([0, 0, 0]);
+    expect(posesAtTime(run, 9)['slide']?.position).toEqual([30, 0, 0]);
+    expect(Object.keys(posesAtTime(run, 0.15)).sort()).toEqual(['slide', 'turn']);
+    expect(Object.keys(posesAtTime(run, 0))).toContain('short');
+    expect(posesAtTime({ times: [], bodies }, 0.1)).toEqual({});
+  });
+
+  it('matches posesAtSample at every recorded time', () => {
+    times.forEach((time, index) =>
+      expect(posesAtTime({ times, bodies: { slide: bodies.slide, turn: bodies.turn } }, time)).toEqual(
+        posesAtSample({ bodies: { slide: bodies.slide, turn: bodies.turn } }, index),
+      ),
+    );
   });
 });
