@@ -48,8 +48,6 @@
       "define_acoustic_exposure",
       "define_acoustic_spectrum"
     ],
-    "docs/physics/22-motion-video/validation/plans/mov_clip_spin.plan.json": ["render_animation"],
-    "docs/physics/22-motion-video/validation/plans/mov_slider_crank_video.plan.json": ["render_animation"],
     "docs/physics/23-drives-physical-truth/validation/plans/drv_lead_screw.plan.json": ["add_transmission"],
     "docs/physics/23-drives-physical-truth/validation/plans/drv_maxon_step.plan.json": ["check_motor_data", "set_motor_drive"],
     "docs/physics/23-drives-physical-truth/validation/plans/drv_servo_sizing.plan.json": [

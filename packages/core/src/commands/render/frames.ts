@@ -12,6 +12,7 @@ import { ORIGIN } from '../../lib/vec3';
 import type { ViewpointCamera } from '../../model/review';
 import { computeSceneSnapshot } from '../inspect/scene';
 import { rasterScenePixels } from './raster';
+import type { RasterScene } from '../../model/raster';
 import type { PixelStage, SurfaceShading } from './types';
 import { renderDocument } from './scene';
 import { viewpointView } from './viewSetup';
@@ -32,6 +33,48 @@ export function sceneCenter(doc: CadDocument): Vec3 {
   return bounds ? boundsCenter(bounds) : ORIGIN;
 }
 
+/** Optional parts of one frame: material class shading, a hook that adds primitives to the raster scene before the pixel stage, and flat entity colours. */
+export interface FrameExtras {
+  readonly shading?: ReadonlyMap<string, SurfaceShading>;
+  /** Receives the screen-space scene the pixel stage is about to draw and returns the scene to draw (overlays appended). */
+  readonly augment?: (scene: RasterScene) => RasterScene;
+  readonly colorOverrides?: Readonly<Record<string, string>>;
+}
+
+/** Opaque RGBA (`width` × `height` × 4) of `doc` seen by `camera` over `background` (#rrggbb). */
+export function renderCameraRgba(
+  doc: CadDocument,
+  camera: ViewpointCamera,
+  width: number,
+  height: number,
+  background: readonly [number, number, number],
+  center: Vec3,
+  pixels: PixelStage = rasterScenePixels,
+  extras: FrameExtras = {},
+): Uint8Array {
+  let drawn: Uint8Array | null = null;
+  const capture: PixelStage = (scene) => {
+    drawn = pixels(extras.augment === undefined ? scene : extras.augment(scene));
+    return new Uint8Array(drawn.length);
+  };
+  renderDocument(doc, 'custom', width, height, {
+    view: viewpointView(camera, width, height, center),
+    caption: false,
+    background: null,
+    pixels: capture,
+    ...(extras.shading === undefined ? {} : { shading: extras.shading }),
+    ...(extras.colorOverrides === undefined ? {} : { colorOverrides: extras.colorOverrides }),
+  });
+  const source: Uint8Array = drawn ?? new Uint8Array(width * height * 4);
+  const out = new Uint8Array(width * height * 4);
+  for (let i = 0; i < width * height; i += 1) {
+    const alpha = (source[i * 4 + 3] ?? 0) / 255;
+    for (let c = 0; c < 3; c += 1) out[i * 4 + c] = Math.round((source[i * 4 + c] ?? 0) * alpha + (background[c] ?? 0) * (1 - alpha));
+    out[i * 4 + 3] = 255;
+  }
+  return out;
+}
+
 /** PNG of `doc` seen by `camera`, `width` × `height`, over `background` (#rrggbb). */
 export function renderCameraPng(
   doc: CadDocument,
@@ -43,24 +86,6 @@ export function renderCameraPng(
   pixels: PixelStage = rasterScenePixels,
   shading?: ReadonlyMap<string, SurfaceShading>,
 ): Uint8Array {
-  let drawn: Uint8Array | null = null;
-  const capture: PixelStage = (scene) => {
-    drawn = pixels(scene);
-    return new Uint8Array(drawn.length);
-  };
-  renderDocument(doc, 'custom', width, height, {
-    view: viewpointView(camera, width, height, center),
-    caption: false,
-    background: null,
-    pixels: capture,
-    ...(shading === undefined ? {} : { shading }),
-  });
-  const source: Uint8Array = drawn ?? new Uint8Array(width * height * 4);
-  const out = new Uint8Array(width * height * 4);
-  for (let i = 0; i < width * height; i += 1) {
-    const alpha = (source[i * 4 + 3] ?? 0) / 255;
-    for (let c = 0; c < 3; c += 1) out[i * 4 + c] = Math.round((source[i * 4 + c] ?? 0) * alpha + (background[c] ?? 0) * (1 - alpha));
-    out[i * 4 + 3] = 255;
-  }
-  return encodePng(width, height, out, true);
+  const rgba = renderCameraRgba(doc, camera, width, height, background, center, pixels, shading === undefined ? {} : { shading });
+  return encodePng(width, height, rgba, true);
 }

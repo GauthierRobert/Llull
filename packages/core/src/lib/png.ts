@@ -16,7 +16,8 @@ function adler32(bytes: Uint8Array): number {
   return ((b << 16) | a) >>> 0;
 }
 
-function chunk(type: string, data: Uint8Array): Uint8Array {
+/** One PNG chunk: length, type, data, CRC-32 of type + data. */
+export function pngChunk(type: string, data: Uint8Array): Uint8Array {
   const out = new Uint8Array(12 + data.length);
   const view = new DataView(out.buffer);
   view.setUint32(0, data.length);
@@ -82,9 +83,9 @@ export function encodePng(width: number, height: number, rgba: Uint8Array, compr
   }
   const parts = [
     new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', header),
-    chunk('IDAT', compress ? deflatedZlib(raw) : storedZlib(raw)),
-    chunk('IEND', new Uint8Array(0)),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', compress ? deflatedZlib(raw) : storedZlib(raw)),
+    pngChunk('IEND', new Uint8Array(0)),
   ];
   const png = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
   let offset = 0;
