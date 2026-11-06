@@ -49,7 +49,7 @@ export const simulateMotion = defineCommand({
     'engine (MuJoCo) and report what happens: final speed of every joint (rpm), when it settled, engine torque and power, propeller ' +
     'thrust / torque / absorbed power, and measured gear ratios (a self-check). Gravity applies (set_gravity). Read-only. For kinematic poses of component instances without mass or forces (add_joint) use evaluate_motion instead; plot_simulation charts and render_motion animates the result of this run. ' +
     'detail "summary" (default) = numbers only; "series" adds per-sample time series (speeds, positions, torques, thrust, power) for ' +
-    'plotting; `energy: true` adds the kinetic / potential / total / dissipated energy balance (J; automatic when a joint or add_spring has a spring) with the work put in by motors / governors / gas pressure (inputWorkJ), the work absorbed by propellers and balanceErrorJ (initial + input - dissipated - propellers - final, ~0), and data.springs (length range and force per add_spring); "poses" also adds every body\'s pose per sample (for playback). Warnings flag a run that has not settled. ' +
+    'plotting; `energy: true` adds the kinetic / potential / total / dissipated energy balance (J; automatic when a joint or add_spring has a spring) with the work put in by motors / governors / gas pressure (inputWorkJ), the work absorbed by propellers and balanceErrorJ (initial + input - dissipated - propellers - final, ~0), and data.springs (length range and force per add_spring); "poses" and "poses+series" also add every body\'s pose per sample (for playback; the series stay in data.series). Warnings flag a run that has not settled. ' +
     'Typical: duration 10 s, timestep 0.001 s (use 0.0002 s for fast, light parts). ' +
     'Closed loops (slider-crank, four-bar): before integrating, the start pose is checked and a loop open by more than 1 µm is refused ' +
     '(FPR_LOOP_OPEN, nothing is run or snapped); with loops the default timestep is the "auto" rule min(1 ms, 0.5 deg of crank at the ' +
@@ -88,7 +88,12 @@ export const simulateMotion = defineCommand({
       .describe(
         'Recorded samples per second. Default 50, raised for loop mechanisms to 36 per turn of the crank so periodic motion is not aliased; engines: one per crank degree. At most 6001 samples per run.',
       ),
-    detail: z.enum(['summary', 'series', 'poses']).optional().describe('"summary" (default), "series" or "poses".'),
+    detail: z
+      .enum(['summary', 'series', 'poses', 'poses+series'])
+      .optional()
+      .describe(
+        '"summary" (default), "series", "poses" or "poses+series". "poses+series" is what render_animation reads: from ONE run, data.poses (every body pose per sample) AND data.series (times and the per-sample position / velocity of every joint, keyed by joint id), so pictures and readouts come from the same samples.',
+      ),
     reactions: z
       .enum(['off', 'peaks', 'series'])
       .optional()

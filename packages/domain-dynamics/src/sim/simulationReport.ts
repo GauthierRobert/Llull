@@ -14,7 +14,7 @@ import { findPeriod, tailMean, type Period } from './periodicity';
 import { energyOf, type EnergyData, type EnergySeries } from './energyReport';
 import { speedTrend, trendWarning } from './speedTrend';
 
-export type SimulationDetail = 'summary' | 'series' | 'poses';
+export type SimulationDetail = 'summary' | 'series' | 'poses' | 'poses+series';
 
 /** A speed has settled once it stays within this fraction of its final value. */
 const SETTLE_BAND = 0.02;
