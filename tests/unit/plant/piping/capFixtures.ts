@@ -10,7 +10,7 @@ const family = (id: string, size: Record<string, unknown>): Record<string, unkno
   sizes: [{ nps: 1, class: 3000, socketDepth: 13, ...size, provenance: cite }],
 });
 
-export const CAP_CATALOG_ID = 'test-sw-caps';
+const CAP_CATALOG_ID = 'test-sw-caps';
 export const capCatalog = {
   format: 'llull-piping-catalog',
   schemaVersion: 1,
