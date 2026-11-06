@@ -87,6 +87,8 @@ export interface RenderOptions {
   pixels?: PixelStage;
   /** Entity id -> material class surface (metalness, roughness): the entity's faces get the Blinn-Phong highlight in raster mode. */
   shading?: ReadonlyMap<string, SurfaceShading>;
+  /** Entity id -> `#rrggbb`: the entity (and the parts of an instance) is drawn flat in that colour instead of its own / its material's (render_animation highlight). */
+  colorOverrides?: Readonly<Record<string, string>>;
 }
 
 /** Surface response of a material class, both in [0, 1]. */

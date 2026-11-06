@@ -36,6 +36,13 @@ function withMaterialColor(doc: CadDocument, e: Entity): Entity {
   return material === undefined || material.color === e.color ? e : { ...e, color: material.color };
 }
 
+/** `e` drawn flat in `color` (a mesh's per-face colours are dropped). */
+function withColorOverride(e: Entity, color: string): Entity {
+  if (!('faceColors' in e)) return { ...e, color };
+  const { faceColors: _faceColors, ...rest } = e;
+  return { ...rest, color };
+}
+
 /** Z-up orthographic SVG render of every entity in `doc.order`. @pure */
 export function renderDocument(
   doc: CadDocument,
@@ -63,8 +70,9 @@ export function renderDocument(
   const items: EntityPolygons[] = [];
   for (const e of orderedEntities(doc)) {
     const id = e.id;
+    const override = options.colorOverrides?.[id];
     let polygons: PreDepthPolygon[] = drawableEntities(doc, e).flatMap((drawable) => [
-      ...tessellateEntity(withMaterialColor(doc, drawable)),
+      ...tessellateEntity(override === undefined ? withMaterialColor(doc, drawable) : withColorOverride(drawable, override)),
       ...dimensionStrokes(doc, drawable, worldPerPx, backgroundOption),
     ]);
     if (cut && (cutIds === null || cutIds.has(id))) {

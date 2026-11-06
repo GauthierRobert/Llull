@@ -8,63 +8,27 @@
 
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
 import { useStore, useViewportStore } from '@ui/store';
-import type { Animation, CadDocument, Vec3 } from '@core/model/types';
-import { ORIGIN } from '@lib/vec3';
+import type { Animation } from '@core/model/types';
 import {
+  animationMembers,
   composeAnimatedPoseInto,
-  createPoseScratch,
-  evaluateAnimationScalar,
+  createAnimatedPose,
+  createContribution,
+  fillAnimationContribution,
   type AnimatedPose,
   type AnimationContribution,
-} from './animationMath';
+} from '@core/geometry/animationPose';
+import { applyAnimatedPose } from './animationMath';
 import { markSceneMoved } from './frameActivity';
 import { SceneObjectCache } from './sceneObjectCache';
 
-/** Unit direction of `v`, or +Z for a near-zero vector. */
-function writeUnitAxis(target: THREE.Vector3, v: Vec3): void {
-  target.set(v[0], v[1], v[2]);
-  const len = target.length();
-  if (len < 1e-9) target.set(0, 0, 1);
-  else target.divideScalar(len);
-}
-
-/** The animation's pivot, else the target's position (a group's: its member centroid). */
-function writePivot(target: THREE.Vector3, anim: Animation, memberIds: string[], entities: CadDocument['entities']): void {
-  if (anim.pivot) {
-    target.set(anim.pivot[0], anim.pivot[1], anim.pivot[2]);
-  } else if (anim.targetKind === 'entity') {
-    const [x, y, z] = entities[anim.targetId]?.position ?? ORIGIN;
-    target.set(x, y, z);
-  } else {
-    target.set(0, 0, 0);
-    let count = 0;
-    for (const id of memberIds) {
-      const position = entities[id]?.position;
-      if (position === undefined) continue;
-      target.x += position[0];
-      target.y += position[1];
-      target.z += position[2];
-      count += 1;
-    }
-    const divisor = Math.max(count, 1);
-    target.set(target.x / divisor, target.y / divisor, target.z / divisor);
-  }
-}
-
 function createFrameBuffers(): {
   pose: AnimatedPose;
-  scratch: ReturnType<typeof createPoseScratch>;
   contributionsByEntity: Map<string, AnimationContribution[]>;
   pool: AnimationContribution[];
 } {
-  return {
-    pose: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() },
-    scratch: createPoseScratch(),
-    contributionsByEntity: new Map(),
-    pool: [],
-  };
+  return { pose: createAnimatedPose(), contributionsByEntity: new Map(), pool: [] };
 }
 
 export function AnimationPlayer(): null {
@@ -98,7 +62,7 @@ export function AnimationPlayer(): null {
     // Keep the demand Canvas alive.
     if (animationPlaying || activeClickAnimationIds.size > 0) invalidate();
 
-    const { pose, scratch, contributionsByEntity, pool } = buffers;
+    const { pose, contributionsByEntity, pool } = buffers;
     for (const [entityId, parts] of contributionsByEntity) {
       if (parts.length === 0) contributionsByEntity.delete(entityId);
       else parts.length = 0;
@@ -112,15 +76,12 @@ export function AnimationPlayer(): null {
       const phase = (phaseMap.current.get(anim.id) ?? 0) + (running ? delta : 0);
       phaseMap.current.set(anim.id, phase);
 
-      const memberIds = anim.targetKind === 'entity' ? [anim.targetId] : (groups[anim.targetId]?.memberIds ?? []);
+      const memberIds = animationMembers(anim, groups);
       if (memberIds.length === 0) continue;
 
-      const contribution = (pool[pooled] ??= { channel: anim.channel, axis: new THREE.Vector3(), scalar: 0, pivot: new THREE.Vector3() });
+      const contribution = (pool[pooled] ??= createContribution());
       pooled += 1;
-      contribution.channel = anim.channel;
-      contribution.scalar = evaluateAnimationScalar(anim, phase);
-      writeUnitAxis(contribution.axis, anim.axis);
-      if (anim.channel === 'rotation') writePivot(contribution.pivot, anim, memberIds, entities);
+      fillAnimationContribution(contribution, anim, phase, memberIds, entities);
       for (const memberId of memberIds) {
         if (!entities[memberId]) continue;
         const parts = contributionsByEntity.get(memberId);
@@ -136,9 +97,8 @@ export function AnimationPlayer(): null {
       const entity = entities[entityId];
       const object = objectCache.get(scene, entityId);
       if (!entity || !object || parts.length === 0) continue;
-      composeAnimatedPoseInto(pose, entity.position, entity.rotation, parts, scratch);
-      object.position.copy(pose.position);
-      object.quaternion.copy(pose.quaternion);
+      composeAnimatedPoseInto(pose, entity.position, entity.rotation, parts);
+      applyAnimatedPose(object, pose);
       if (moving) markSceneMoved();
     }
   });

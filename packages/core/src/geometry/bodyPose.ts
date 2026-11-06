@@ -163,15 +163,20 @@ export interface RecordedPoses {
 /** Instants closer than this to a recorded sample are that sample (bit-exact). */
 const SAMPLE_SNAP_S = 1e-12;
 
+/** The two recorded samples around an instant and how far between them it lies: `weight` 0 / 1 when it sits on one (within 1e-12 s) or outside the run. */
+export interface SampleBracket {
+  readonly before: number;
+  readonly after: number;
+  readonly weight: number;
+}
+
 /**
- * Every body's pose at time `time` (seconds) of a recorded run: the bracketing samples blended by poseAtFraction (screw motion of the
- * centre, slerp orientation); the sample itself when `time` is within 1e-12 s of it; clamped to the first / last sample outside the run.
- * @invariant sampleRate must resolve less than pi of body rotation per sample step (shortest-arc interpolation); pure; time = a sample time returns that sample's pose unchanged; bodies without samples are left out
+ * Bracketing samples of `time` in ascending sample `times`, or null for an empty run.
+ * @invariant before <= after; weight in [0, 1]; weight 0 (or 1) when `time` is within 1e-12 s of sample `before` (or `after`) or beyond the first / last sample
  */
-export function posesAtTime(poses: RecordedPoses, time: number): Record<string, BodyPoseAt> {
-  const { times } = poses;
+export function sampleBracket(times: readonly number[], time: number): SampleBracket | null {
   const last = times.length - 1;
-  if (last < 0) return {};
+  if (last < 0) return null;
   let low = 0;
   let high = last;
   while (high - low > 1) {
@@ -181,11 +186,22 @@ export function posesAtTime(poses: RecordedPoses, time: number): Record<string, 
   }
   const t0 = times[low] ?? 0;
   const t1 = times[high] ?? t0;
-  let index = low;
-  let fraction = 0;
-  if (time <= t0 + SAMPLE_SNAP_S) index = low;
-  else if (time >= t1 - SAMPLE_SNAP_S) index = high;
-  else fraction = (time - t0) / (t1 - t0);
+  if (time <= t0 + SAMPLE_SNAP_S) return { before: low, after: high, weight: 0 };
+  if (time >= t1 - SAMPLE_SNAP_S) return { before: low, after: high, weight: 1 };
+  return { before: low, after: high, weight: (time - t0) / (t1 - t0) };
+}
+
+/**
+ * Every body's pose at time `time` (seconds) of a recorded run: the bracketing samples blended by poseAtFraction (screw motion of the
+ * centre, slerp orientation); the sample itself when `time` is within 1e-12 s of it; clamped to the first / last sample outside the run.
+ * @invariant sampleRate must resolve less than pi of body rotation per sample step (shortest-arc interpolation); pure; time = a sample time returns that sample's pose unchanged; bodies without samples are left out
+ */
+export function posesAtTime(poses: RecordedPoses, time: number): Record<string, BodyPoseAt> {
+  const bracket = sampleBracket(poses.times, time);
+  if (bracket === null) return {};
+  const onAfter = bracket.weight === 1;
+  const index = onAfter ? bracket.after : bracket.before;
+  const fraction = bracket.weight === 0 || onAfter ? 0 : bracket.weight;
   const result: Record<string, BodyPoseAt> = {};
   for (const [id, track] of Object.entries(poses.bodies)) {
     if (track.position[index] === undefined || track.orientation[index] === undefined) continue;
