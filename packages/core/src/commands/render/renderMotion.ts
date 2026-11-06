@@ -57,6 +57,7 @@ function springEnds(doc: CadDocument, poses: Readonly<Record<string, BodyPoseAt>
 /**
  * @affects nothing — read-only; returns data { svg, width, height, view, duration, samples, frames[{ time, bodies{ id: { position, rotationDeg } }, springs?{ id: { a, b, length } } }], trace? }
  * @invariant frames are clipped to their cell (empty grid cells stay blank); the input document is never changed: frames render a copy whose rigid-body member entities are moved to the simulated pose
+ * @invariant frames sit at the requested instants (interpolated between samples, shortest-arc per step): sampleRate must resolve less than pi of body rotation per sample step
  * @failure no physics engine, no rigid bodies, simulation refused or failed, times outside 0..duration, unknown trace body id, invalid camera -> no-op with the reason
  */
 export const renderMotion = defineCommand({

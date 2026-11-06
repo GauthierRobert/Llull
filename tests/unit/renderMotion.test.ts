@@ -208,6 +208,16 @@ describe('render_motion exact instants (VC-MOV-03)', () => {
     expect((result.data as Frames).svg).toContain('<circle');
   });
 
+  it('puts the trace dot on the interpolated position, not on the nearest recorded sample', () => {
+    const dotX = (time: number): number => {
+      const svg = (
+        execute(mechanism(), 'render_motion', { ...render.params, times: [time], sampleRate: 100, trace: 'piston' }).data as Frames
+      ).svg;
+      return Number(/<circle cx="([-0-9.]+)" cy="[-0-9.]+" r="4.5"/.exec(svg)?.[1] ?? NaN);
+    };
+    expect(Math.abs(dotX(0.0114) - dotX(0.01))).toBeGreaterThan(0.5);
+  });
+
   it('refuses a time past the duration as before', () => {
     const result = execute(mechanism(), 'render_motion', { ...render.params, times: [0.0114, 0.5] });
     expect(result.summary).toMatch(/exceed the duration/);

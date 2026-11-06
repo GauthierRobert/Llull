@@ -139,11 +139,15 @@ function screwPosition(here: Vec3, next: Vec3, a: Quaternion, b: Quaternion, fra
   return add3(add3(partial, centre), scale3(along, fraction));
 }
 
-/** Pose of a body at sample `index` plus `fraction` (0..1) of the way to the next sample (screw interpolation, slerp orientation). */
-export function poseAtFraction(track: PoseTrack, index: number, fraction: number): BodyPoseAt {
+/**
+ * Pose of a body at sample `index` plus `fraction` of the way to the next sample (screw interpolation, slerp orientation).
+ * @invariant fraction is clamped to [0, 1]; the relative rotation of a step is taken on the shortest arc (at most pi), so the recording must resolve less than pi of rotation per sample step
+ */
+export function poseAtFraction(track: PoseTrack, index: number, requested: number): BodyPoseAt {
   const start = track.position[0] ?? [0, 0, 0];
   const here = track.position[index] ?? start;
   const hereQ = track.orientation[index] ?? IDENTITY_ORIENTATION;
+  const fraction = Math.min(1, requested);
   if (fraction <= 0 || index + 1 >= track.position.length) return { start, position: here, orientation: hereQ };
   const next = track.position[index + 1] ?? here;
   const nextQ = track.orientation[index + 1] ?? hereQ;
@@ -162,7 +166,7 @@ const SAMPLE_SNAP_S = 1e-12;
 /**
  * Every body's pose at time `time` (seconds) of a recorded run: the bracketing samples blended by poseAtFraction (screw motion of the
  * centre, slerp orientation); the sample itself when `time` is within 1e-12 s of it; clamped to the first / last sample outside the run.
- * @invariant pure; time = a sample time returns that sample's pose unchanged; bodies without samples are left out
+ * @invariant sampleRate must resolve less than pi of body rotation per sample step (shortest-arc interpolation); pure; time = a sample time returns that sample's pose unchanged; bodies without samples are left out
  */
 export function posesAtTime(poses: RecordedPoses, time: number): Record<string, BodyPoseAt> {
   const { times } = poses;
@@ -181,9 +185,7 @@ export function posesAtTime(poses: RecordedPoses, time: number): Record<string, 
   let fraction = 0;
   if (time <= t0 + SAMPLE_SNAP_S) index = low;
   else if (time >= t1 - SAMPLE_SNAP_S) index = high;
-  else {
-    fraction = (time - t0) / (t1 - t0);
-  }
+  else fraction = (time - t0) / (t1 - t0);
   const result: Record<string, BodyPoseAt> = {};
   for (const [id, track] of Object.entries(poses.bodies)) {
     if (track.position[index] === undefined || track.orientation[index] === undefined) continue;
