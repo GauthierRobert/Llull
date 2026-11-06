@@ -552,19 +552,87 @@ check:coverage`, server suite (`packReplay23`), the plans' `blockedPlanCommands.
 
 ## 11. Open questions and proposed decisions
 
-| #         | Question                                                                                               | Proposed                                                                                                                                                                                                                                                                  |
-| --------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D-DRV-01  | Core motor law vs MuJoCo's native `dcmotor` actuator [R4]                                              | **Core law** (TR-DRV-05/06): engine-independent (the reference engine and PMSM / stepper / induction need it anyway), exact per-step ledger, one implementation. M0 compares it with `dcmotor` on VC-DRV-04; if they disagree beyond the tolerance, investigate before M1 |
-| D-DRV-02  | Language of the laws and the reference engine (C7)                                                     | TypeScript, in-process (per-step callback); Rust only after a measured need                                                                                                                                                                                               |
-| D-DRV-03  | Transmission losses: force law (today's smoothed loss torque) or friction level                        | **Friction level** on the input joint (TR-DRV-12): holds at rest, gives self-locking without a special case, no sign smoothing (the chatter Modelica warns about [R9]); `gearLoss.ts` retired                                                                             |
-| D-DRV-04  | `add_gear_coupling` kept beside `add_transmission`?                                                    | No (owner rule: no backward compatibility). One command; golden plans and docs updated in M2                                                                                                                                                                              |
-| D-DRV-05  | Default copper α                                                                                       | 0.0039 /K (maxon catalogue convention [R1]); Simscape uses 3.93e-3 [R5]; overridable per motor                                                                                                                                                                            |
-| D-DRV-06  | Ship a motor catalogue?                                                                                | Not in this pack (licences of vendor data). Datasheet entry by the agent with a source; a local user library later (V2)                                                                                                                                                   |
-| OQ-DRV-01 | Is writing `dof_frictionloss` between steps supported by the 3.16 JS bindings without a recompile?     | M0; fallback: rebuild the model only when the level changes by > 1 % (bounded cost), or a joint `general` actuator with a velocity-dependent bias (loses the hold-at-rest property: last resort)                                                                          |
-| OQ-DRV-02 | MuJoCo limit restitution with `solreflimit` direct form: is the impact exactly a linear spring-damper? | M0 measures VC-DRV-20; if solimp shaping distorts it, set solimp flat (0.9999, 0.9999) on limits                                                                                                                                                                          |
-| OQ-DRV-03 | PHY-21 Q2 (two mechanism models)                                                                       | out of scope; profiles are shared so a later unification keeps them                                                                                                                                                                                                       |
-| OQ-DRV-04 | IFToMM per-problem reference tables (pendulum, slider-crank) were not reachable                        | V1 cross-engine cases use the reference engine; pin IFToMM values when read (grade upgrade)                                                                                                                                                                               |
+| #         | Question                                                                                               | Proposed                                                                                                                                                                                                                                                                                                        |
+| --------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-DRV-01  | Core motor law vs MuJoCo's native `dcmotor` actuator [R4]                                              | **Core law** (TR-DRV-05/06): engine-independent (the reference engine and PMSM / stepper / induction need it anyway), exact per-step ledger, one implementation. **DECIDED (DRV-M0, §13.7)**: `dcmotor` is first order (speed 1.5 % off at dt 1e-5, current 5 % off at dt 1e-4); the core law is within 0.005 % |
+| D-DRV-02  | Language of the laws and the reference engine (C7)                                                     | TypeScript, in-process (per-step callback); Rust only after a measured need                                                                                                                                                                                                                                     |
+| D-DRV-03  | Transmission losses: force law (today's smoothed loss torque) or friction level                        | **Friction level** on the input joint (TR-DRV-12): holds at rest, gives self-locking without a special case, no sign smoothing (the chatter Modelica warns about [R9]); `gearLoss.ts` retired                                                                                                                   |
+| D-DRV-04  | `add_gear_coupling` kept beside `add_transmission`?                                                    | No (owner rule: no backward compatibility). One command; golden plans and docs updated in M2                                                                                                                                                                                                                    |
+| D-DRV-05  | Default copper α                                                                                       | 0.0039 /K (maxon catalogue convention [R1]); Simscape uses 3.93e-3 [R5]; overridable per motor                                                                                                                                                                                                                  |
+| D-DRV-06  | Ship a motor catalogue?                                                                                | Not in this pack (licences of vendor data). Datasheet entry by the agent with a source; a local user library later (V2)                                                                                                                                                                                         |
+| OQ-DRV-01 | Is writing `dof_frictionloss` between steps supported by the 3.16 JS bindings without a recompile?     | **DECIDED (DRV-M0, §13.1)**: yes, a plain array write takes effect at the next `mj_step`; emit flat `solimpfriction` 0.9999 or the hold creeps. No fallback needed (a rebuild costs 0.64 ms anyway)                                                                                                             |
+| OQ-DRV-02 | MuJoCo limit restitution with `solreflimit` direct form: is the impact exactly a linear spring-damper? | **DECIDED (DRV-M0, §13.2)**: yes with a flat `solimplimit` (0.9999 0.9999 0.001); but the direct form is an ACCELERATION law (divide K, B by the row's effective inertia) and a one-sided stop has e = 0.5717, not the bilateral 0.5266                                                                         |
+| OQ-DRV-03 | PHY-21 Q2 (two mechanism models)                                                                       | out of scope; profiles are shared so a later unification keeps them                                                                                                                                                                                                                                             |
+| OQ-DRV-04 | IFToMM per-problem reference tables (pendulum, slider-crank) were not reachable                        | V1 cross-engine cases use the reference engine; pin IFToMM values when read (grade upgrade)                                                                                                                                                                                                                     |
 
 ## 12. References
 
 [R1]–[R33], M1: [`validation/sources.md`](validation/sources.md).
+
+## 13. As built
+
+### DRV-M0 (spike, 2026-11-06): MuJoCo 3.16.0 WASM
+
+Pinned by `tests/unit/mujocoDriveSpike.test.ts` (20 tests, raw MJCF through `@mujoco/mujoco`; no port or adapter code changed). Numbers: Node, reference machine.
+
+**13.1 `dof_frictionloss` per step (OQ-DRV-01: decided, works).** `model.dof_frictionloss[i] = x` between two `mj_step` calls takes effect at the next step (no
+recompile, no `mj_setConst`). J 0.01, 1.5 N·m applied: level 2 holds, lowered to 0.5 it slips at (1.5 − 0.5)/0.01 · 0.1 s = 10.000 rad/s, raised to 3 it stops
+(|ω| < 1e-6). The row is `efc_type 1` (friction-DOF), `efc_id` = dof, `efc_force` = −1.5000 while sticking (the reaction is readable). **The hold is not exact by
+default**: the soft row impedance leaks a constant creep, 0.158 rad/s with the default `solimpfriction`, 1.5e-4 rad/s with `solimpfriction="0.9999 0.9999 0.001"`,
+1.5e-5 rad/s adding `solreffriction="0.0002 1"` (2 timesteps at 1e-4). Rule for M2 (TR-DRV-02): always emit flat `solimpfriction` 0.9999 and `solreffriction`
+= 2 dt. The fallback was not needed, its cost: `from_xml_string` + `MjData` = 0.64 ms for a one-body model, against 1.2 µs per `mj_step`.
+
+**13.2 Limit with `solreflimit [−k, −b]` (OQ-DRV-02: decided, with corrections to TR-DRV-17).**
+
+1. **The direct form is an acceleration law**, scaled by the row's effective inertia. The same (k, b) gives an identical impact on J 0.01 and J 0.04 (restitution
+   equal to 1e-6, peak to 1e-9; `armature` changes nothing either), and passing K = 1000 N·m/rad unscaled gives ω_n 10x too low (restitution 0.94, peak 2.9x). M1 / M2
+   must write `solreflimit = [−K/J_eff, −B/J_eff]`. In a multibody J_eff of the row depends on the configuration, so either rewrite the row's solref per step from the
+   effective inertia, or use the explicit alternative (item 5). M2 decides with a multi-body test; a single hinge on a fixed chain is exact either way.
+2. With flat `solimplimit="0.9999 0.9999 0.001"`, J 0.01, K 1000, ζ 0.2 (ω_n 316.2 s⁻¹), 1 rad/s impact at dt 1e-5: restitution **0.57194** vs the one-sided
+   spring-damper oracle (force ≥ 0, explicit 1e-6 s) **0.57169** (0.04 %); peak penetration **2.39138e-3 rad** vs 2.39086e-3 (0.02 %) and vs the reference
+   `endStop.peakPenetrationRad` 2.39111e-3; contact ends at 10.11 ms. The default `solimplimit` (0.9, 0.95) moves the peak by 0.5 % and e by 0.003: flat is the rule.
+3. **VC-DRV-20 reference defect (to fix in M1).** The reference `endStop.restitution` 0.52662 = exp(−ζπ/√(1−ζ²)) is the BILATERAL spring-damper (the damper keeps
+   pulling after the spring force reached zero). A stop cannot pull; the one-sided value is **0.5717** (8.6 % higher, measured and by the oracle), far outside the
+   3 % tolerance. M1 regenerates `endStop.restitution` in `generate_drv_reference.py` / `expected_results.json` and changes the ζ ⇄ e map of TR-DRV-17 to a numeric
+   inverse of the one-sided e(ζ) instead of ζ = −ln e/√(π²+ln²e). Peak penetration and contact time agree with the reference.
+4. Timestep: restitution error against dt 1e-5 is +0.45 % at dt 1e-4 (ω_n dt 0.03) and +6.8 % at dt 1e-3 (0.32). Rule: ω_n dt ≤ 0.05, else a coarse-step refusal.
+5. Explicit alternative (stop force `−max(0, Kq + Bq̇)` through `qfrc_applied`, dt 1e-4): restitution within 0.05 of the oracle (asserted to one decimal only).
+   The limit row is readable: `efc_type 3` (joint limit), `efc_force` in N·m = K x + B v of the stop within 1 %.
+
+**13.3 Fixed tendon as backlash (works).** Two hinges, `<fixed limited range="±gap/2" solreflimit="−K −B" solimplimit=flat>` with coefficients (1, −1): the driver
+crosses the free gap alone (first load motion at 0.0316 s vs analytic √(gap/α) = 0.03162 s; no constraint row while inside), deepest penetration 1.6e-4 rad (1.6 % of the
+10 mrad gap, K 1e6, ζ 0.5 in acceleration units), then both turn together (1.0000 rad/s at 0.3 s, momentum + 0.1 N·m on J 0.03, as predicted). Row: `efc_type 4`
+(tendon limit); `ten_length` is readable. Same acceleration-law caveat as 13.2. TR-DRV-03 stands.
+
+**13.4 Hinge–slide equality (works; needs a tight solref).** `<joint joint1=slide joint2=hinge polycoef="0 ratio 0 0 0">` with `solref="0.0004 1"` (4 dt) and flat solimp
+holds q_b = ratio·q_a to 6e-8 relative; the angular acceleration matches the reflected inertia J + m·ratio² to 4 decimals and the row force (`efc_type 0`) is the
+nut's m·a = 3.18e-4 N. **The default equality solref (0.02 1, solimp 0.9/0.95) lags by 73 %** under a 0.5 mN·m load: the adapter must always set `solref` ≤ 4 dt and flat
+`solimp` on transmission equalities (TR-DRV-03). Valid for hinge–hinge and hinge–slide.
+
+**13.5 Armature (works with a refresh).** `armature="0.02"` on J 0.01 gives ω = T t/(J + a) exactly (3.333333333 rad/s). **Writing `dof_armature` alone is silently ignored**
+(the value reads back but the mass matrix is not rebuilt); `mj_setConst(model, data)` after the write applies it (ω 2.000000000 for 0.04 + 0.01). M2 must add `mj_setConst`
+to the `MujocoModule` binding if armature changes at run time; a build-time `armature` (rotor J·N²) needs nothing.
+
+**13.6 Constraint rows (readable per row).** `nefc`, `efc_type`, `efc_id`, `efc_force` give friction (type 1), equality (0), joint limit (3) and tendon limit (4) rows
+separately, in generalised-force units of the row (N·m on a hinge, N on a slide); every value above was read this way. `efc_*` are already declared in `bindings.ts`.
+
+**13.7 `dcmotor` vs the core law (D-DRV-01: decided, core law).** MuJoCo 3.16 has `<dcmotor motorconst resistance inductance>` (one `act` state = current). Maxon 148877,
+48 V step, rotor only; errors against the exact `dcStep` solution at the reference samples on the step grid (4.28 ms is on the grid only for dt 1e-5) and the peak 36.8299 A:
+
+| Law              | dt     | max speed error | max current error | peak current error |
+| ---------------- | ------ | --------------- | ----------------- | ------------------ |
+| core (spec 5.1)  | 1e-5   | < 0.001 %       | 0.001 %           | 0.0001 %           |
+| core             | 2.5e-5 | 0.002 %         | 0.006 %           | 0.001 %            |
+| core             | 1e-4   | 0.044 %         | 0.10 %            | 0.03 %             |
+| native `dcmotor` | 1e-5   | 1.53 %          | 0.06 %            | 0.001 %            |
+| native `dcmotor` | 2.5e-5 | 3.76 %          | 0.36 %            | 0.009 %            |
+| native `dcmotor` | 1e-4   | 13.9 %          | 5.2 %             | 0.15 %             |
+
+The native law is first order: the current state is staggered by about half a step against the velocity (a constant absolute speed error of about α·dt/2 = 0.73 rad/s at
+dt 1e-5, hence large at 0.5 ms) and its late-time current error grows with dt. It fails the 0.5 % acceptance (AC-3) at every step tested; the core law passes with a margin
+of 5x at dt 1e-4 (a third of L/R = 0.29 ms). The core law is the exponential of 5.1 with ω_mid = ω + ½Δt·kt·i/J and torque kt · (mean current over the step). `dcmotor` stays
+a possible cross-check only; no change to M1.
+
+**13.8 Plan changes.** (a) M1 fixes the VC-DRV-20 reference (13.2.3) and the ζ map of TR-DRV-17. (b) M2 limits / backlash write K, B in acceleration units (J_eff) or use an
+explicit applied-force stop. (c) M2 run-time armature needs `mj_setConst` in the binding. (d) Every constraint row the adapter emits uses flat impedance and solref ≤ 4 dt
+(friction, equality, limits). (e) No port change was needed in M0.
