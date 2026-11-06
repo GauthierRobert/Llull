@@ -1,0 +1,16 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [100, 20, 10], "position": [0, 0, 0], "anchor": "center" }, "as": "plate" },
+  {
+    "command": "render_animation",
+    "params": {
+      "source": { "kind": "still", "duration": 1.2 },
+      "fps": 10,
+      "width": 240,
+      "height": 135,
+      "camera": { "orbit": { "turns": 1 } },
+      "sheet": { "every": 4 },
+      "format": "apng"
+    }
+  }
+]
