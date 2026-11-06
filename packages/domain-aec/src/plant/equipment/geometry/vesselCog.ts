@@ -6,7 +6,7 @@
  */
 
 import type { Vec3 } from '@core/model/vectors';
-import type { NozzleRecord, VesselDesignData, VesselTemplate } from '../plantData';
+import type { EquipmentTemplate, NozzleRecord, VesselDesignData, VesselTemplate } from '../plantData';
 import { headFillCentroid, headMetalCentroid } from './headCentroid';
 import { headMetalVolume } from './headOffset';
 import type { HeadShape } from './heads';
@@ -105,15 +105,12 @@ function metalParts(
   return { lumps, defaulted };
 }
 
-/** Neck + flange of each nozzle as one lump at the middle between the wall point and the flange face. */
-function nozzleLumps(
-  template: VesselTemplate,
-  geometry: VesselGeometry,
+/** Neck + flange of each nozzle (`masses`, one per nozzle) as one lump at the middle between the wall point and the flange face. */
+export function nozzleLumpsOf(
+  template: EquipmentTemplate,
   nozzles: readonly NozzleRecord[],
-  scale: number,
-  density: number,
+  masses: ReadonlyArray<{ kg: number }>,
 ): CogPart[] {
-  const masses = nozzleMassParts(scale, geometry, nozzles, density);
   return nozzles.flatMap((nozzle, index): CogPart[] => {
     const placement = placeNozzle(template, nozzle);
     const kg = masses[index]?.kg;
@@ -171,7 +168,10 @@ export function vesselCog(
 ): VesselCog {
   const mass = vesselMass(scale, template, geometry, design);
   const { lumps, defaulted } = metalParts(template, geometry, design, mass.parts);
-  const empty = [...lumps, ...(nozzles.length === 0 ? [] : nozzleLumps(template, geometry, nozzles, scale, mass.densityKgM3))];
+  const empty = [
+    ...lumps,
+    ...(nozzles.length === 0 ? [] : nozzleLumpsOf(template, nozzles, nozzleMassParts(scale, geometry, nozzles, mass.densityKgM3))),
+  ];
   const cubic = scale ** 3;
   const vertical = template.orientation === 'vertical';
   const fullLevel = vertical ? geometry.length + geometry.second.depth : 2 * geometry.radius;
