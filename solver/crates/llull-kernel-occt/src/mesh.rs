@@ -2,13 +2,26 @@
 //! comes out open (a face without triangles, a seam gap) is meshed again finer, then refused rather than shown holed.
 //! Deviation from that policy: the finer retry runs for every open solid, not only freeform-heavy or thread-bearing ones.
 
-use crate::{tessellate, MeshOut, OcctResult, Shape};
+use crate::{bounding_diagonal, tessellate, MeshOut, OcctResult, Shape};
 use std::collections::HashMap;
 
 /// Display deflections: linear (document units), angular (radians) — the retired kernel's values.
 pub const DISPLAY_DEFLECTION: (f64, f64) = (0.1, 0.5);
 /// Retry deflections for a closed solid whose display mesh is open.
 pub const FINE_DEFLECTION: (f64, f64) = (0.02, 0.2);
+
+/// Diagonal (document units) up to which a part keeps the linear floor; above it the deflection is `floor x diagonal / KNEE_DIAGONAL`, i.e. 1e-3 of the
+/// diagonal at the display floor (0.1), 2e-4 at the fine retry (0.02). Small parts mesh exactly as before.
+const KNEE_DIAGONAL: f64 = 100.0;
+
+/// Linear deflection for a shape whose bounding box has the given diagonal.
+pub fn scaled_linear(floor: f64, diagonal: f64) -> f64 {
+    if diagonal.is_finite() {
+        floor.max(floor * diagonal / KNEE_DIAGONAL)
+    } else {
+        floor
+    }
+}
 
 /// Weld grid of the closure test: 1e-5 document units (`meshClosure.ts`).
 const GRID: f64 = 1e5;
@@ -53,11 +66,12 @@ fn acceptable(mesh: &MeshOut) -> bool {
 
 /// Display mesh of `shape`; `None` for an empty triangulation or a closed solid that stays open at the fine deflection.
 pub fn display_mesh(shape: &Shape) -> OcctResult<Option<MeshOut>> {
-    let first = tessellate(shape, DISPLAY_DEFLECTION.0, DISPLAY_DEFLECTION.1)?;
+    let diagonal = bounding_diagonal(shape)?;
+    let first = tessellate(shape, scaled_linear(DISPLAY_DEFLECTION.0, diagonal), DISPLAY_DEFLECTION.1)?;
     if !first.closed_solid || acceptable(&first) {
         return Ok(if first.positions.is_empty() { None } else { Some(first) });
     }
-    let fine = tessellate(shape, FINE_DEFLECTION.0, FINE_DEFLECTION.1)?;
+    let fine = tessellate(shape, scaled_linear(FINE_DEFLECTION.0, diagonal), FINE_DEFLECTION.1)?;
     Ok(if acceptable(&fine) { Some(fine) } else { None })
 }
 

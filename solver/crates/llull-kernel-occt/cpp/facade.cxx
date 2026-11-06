@@ -457,6 +457,12 @@ GProp_GProps surface_props(const Shape &shape, const TopoDS_Shape &piece, double
   return fixed();
 }
 
+double bounding_diagonal(const Shape &shape) {
+  const Bnd_Box box = bounds_of(shape.shape);
+  if (box.IsVoid()) return 0.0;
+  return box.CornerMin().Distance(box.CornerMax());
+}
+
 MassOut mass_properties(const Shape &shape) {
   // Part frame (TR-KRN-41): integrate about the bounding-box centre rounded to 1 mm, then shift the centroid back.
   const Bnd_Box box = bounds_of(shape.shape);
