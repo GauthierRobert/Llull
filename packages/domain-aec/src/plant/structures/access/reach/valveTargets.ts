@@ -9,8 +9,8 @@ export interface ReachTarget {
   readonly kind: string;
   /** Operating point, absolute mm; null = the source could not locate it (reported, never judged as passing). */
   readonly pointMm: readonly [number, number, number] | null;
-  readonly source: 'explicit' | 'valves';
-  /** What the target comes from: `explicit` or the inline id of the valve. */
+  readonly source: 'explicit' | 'valves' | 'nozzles' | 'manways';
+  /** What the target comes from: `explicit`, the inline id of the valve or the element id of the equipment. */
   readonly ref: string;
 }
 
