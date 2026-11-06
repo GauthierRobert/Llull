@@ -8,6 +8,7 @@ import { setFieldEngine } from '@core/geometry/field/engine';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { setMaterialLibraryProvider } from '@core/commands/libraryPort';
 import { setFontProvider } from '@core/commands/fontPort';
+import { setMediaPort } from '@core/commands/mediaPort';
 import { setPipingLibraryProvider } from '@aec/plant/catalog/libraryPort';
 
 installDefaultPlugins();
@@ -20,4 +21,5 @@ setMeshProcessingEngine(null);
 setFieldEngine(null);
 setMaterialLibraryProvider(null);
 setFontProvider(null);
+setMediaPort(null);
 setPipingLibraryProvider(null);

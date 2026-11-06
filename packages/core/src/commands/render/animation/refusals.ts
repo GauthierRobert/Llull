@@ -10,7 +10,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   MOV_RENDER_BUDGET: 'use a smaller width / height or fewer frames; format "mp4" streams frames and has no pixel budget',
   MOV_CAMERA_INVALID: 'give either view or a finite non-zero direction, not both',
   MOV_RENDER_INVALID: 'colours are #rgb or #rrggbb',
-  MOV_ENCODE_FAILED: 'retry with format "frames"; the summary names the encoder error',
+  MOV_ENCODE_FAILED: 'retry with format "apng" or "frames" (or a smaller size); the summary names the encoder error',
   NATIVE_TOOL_MISSING:
     'this host has no video encoder / native raster: use format "apng" (or "frames") and renderer "reference", or run in the llull CLI / desktop app with llull-compute built',
   NATIVE_JOB_FAILED: 'retry with renderer "reference"; the job log is in the summary',
