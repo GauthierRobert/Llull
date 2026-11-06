@@ -374,7 +374,7 @@ export const renderAnimation = defineCommand({
     const summary =
       `render_animation: ${frames} frame(s) at ${fps} fps (${+(frames / fps).toFixed(4)} s of video, ${source.kind} ${source.duration} s${playbackRate === 1 ? '' : ` at playbackRate ${playbackRate}`}), ${width}×${height}, ` +
       `${view} view, format ${format}; ${analysis.moving.length} moving entit${analysis.moving.length === 1 ? 'y' : 'ies'}` +
-      `${warnings.length === 0 ? '' : `; warnings: ${warnings.map((w) => w.code).join(', ')}`}. Save the files with --save <dir>/ (or --save out.${format === "frames" ? "png" : format}).`;
+      `${warnings.length === 0 ? '' : `; warnings: ${warnings.map((w) => w.code).join(', ')}`}. Save the files with --save <dir>/ (or --save out.${format === 'frames' ? 'png' : format}).`;
     if (run === null)
       return report(doc, summary, {
         ...base,

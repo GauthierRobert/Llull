@@ -45,14 +45,19 @@ export function saveAnimationFiles(files: readonly NamedBytes[], target: string)
   const extension = path.extname(target).toLowerCase();
   const wanted = extension === '.png' ? SHEET : VIDEO_EXTENSIONS.has(extension) ? extension : null;
   if (wanted === null) return null;
-  const pick = files.find((file) => (wanted === SHEET ? file.name === SHEET : file.name !== null && path.extname(file.name).toLowerCase() === wanted));
+  const pick = files.find((file) =>
+    wanted === SHEET ? file.name === SHEET : file.name !== null && path.extname(file.name).toLowerCase() === wanted,
+  );
   if (pick === undefined) {
     const have = files.map((file) => file.name ?? '(unnamed)').filter((name) => name !== TIMELINE);
     const hint = wanted === SHEET ? 'render with `sheet` {every: n} to get sheet.png' : `render with format "${wanted.slice(1)}"`;
-    throw new Error(`the result has no ${wanted === SHEET ? SHEET : `${wanted} file`} (${hint}); it carries ${have.slice(0, 4).join(', ')}${have.length > 4 ? ', …' : ''}.`);
+    throw new Error(
+      `the result has no ${wanted === SHEET ? SHEET : `${wanted} file`} (${hint}); it carries ${have.slice(0, 4).join(', ')}${have.length > 4 ? ', …' : ''}.`,
+    );
   }
   const saved = [write(target, pick.bytes)];
   const timeline = files.find((file) => file.name === TIMELINE);
-  if (wanted !== SHEET && timeline !== undefined) saved.push(write(target.slice(0, target.length - path.extname(target).length) + '.timeline.json', timeline.bytes));
+  if (wanted !== SHEET && timeline !== undefined)
+    saved.push(write(target.slice(0, target.length - path.extname(target).length) + '.timeline.json', timeline.bytes));
   return saved;
 }
