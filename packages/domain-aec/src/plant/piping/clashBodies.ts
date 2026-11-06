@@ -62,8 +62,12 @@ function flangePieces(part: RoutedPart): Piece[] {
 /** The straight pieces of a part's solid body (none for parts that are not modelled). */
 function pieces(part: RoutedPart): Piece[] {
   const [first, second, third] = part.ports;
-  if (first === undefined || second === undefined) return [];
   const od = part.dims['outsideDiameter'];
+  if (part.kind === 'cap')
+    return first === undefined || od === undefined || part.centre === undefined
+      ? []
+      : [{ from: part.centre, to: first.position, half: od / 2, insulated: false }];
+  if (first === undefined || second === undefined) return [];
   switch (part.kind) {
     case 'pipe':
       return od === undefined ? [] : [{ from: first.position, to: second.position, half: od / 2, insulated: true }];

@@ -14,6 +14,7 @@ import { runPlan } from '../golden/runPlan';
 import { plans, type GoldenAction } from '../golden/plans';
 import { plmPlans } from '../golden/plmPlans';
 import { implicitPlans } from '../golden/implicitPlans';
+import { cappedRunSteps } from '../golden/pipingPlansCap';
 import { rteJson } from '../unit/plant/piping/rteFixtures';
 import { recordedModel } from '../unit/plant/stress/m3Fixtures';
 import { libraryDocument } from '../unit/plant/data/dataFixtures';
@@ -204,7 +205,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   piping: {
     roots: ['plant.piping'],
-    build: planOf(plans, 'piping_pump_to_vessel'),
+    build: planOf({ seed: [...(plans['piping_pump_to_vessel'] as GoldenAction[]), ...cappedRunSteps] }, 'seed'),
     query: { name: 'piping_takeoff', params: constant({}) },
     mutate: { name: 'set_piping_settings', params: constant({ lineNumberTemplate: '{dn}-{fluid}-{seq}-{class}' }) },
   },

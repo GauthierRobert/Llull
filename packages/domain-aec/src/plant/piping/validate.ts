@@ -36,6 +36,8 @@ const isRef = (ref: unknown, branchAllowed: boolean): boolean =>
 const endErrors = (path: string, end: unknown, branchAllowed: boolean): string[] => {
   if (!isRecord(end) || !isVec3(end['point']) || (end['direction'] !== undefined && !isVec3(end['direction'])))
     return [`${path} needs a finite point`];
+  if (end['cap'] !== undefined && (end['cap'] !== true || end['ref'] !== undefined))
+    return [`${path}.cap must be true on an open end (an end with a port ref cannot be capped)`];
   return end['ref'] === undefined || isRef(end['ref'], branchAllowed)
     ? []
     : [`${path}.ref must be a ${branchAllowed ? 'tieIn, nozzle, runEnd or branch' : 'tieIn, nozzle or runEnd'} reference`];

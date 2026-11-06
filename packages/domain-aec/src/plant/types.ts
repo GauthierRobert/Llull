@@ -106,6 +106,8 @@ export interface RunEnd {
   readonly ref?: PortRef;
   readonly point: Vec3;
   readonly direction?: Vec3;
+  /** An open end closed by a cap of the line spec (`set_run_end_cap`): the cap row is read at derivation; never together with `ref`. */
+  readonly cap?: true;
 }
 
 /** How an auto-routed run was found (`auto_route_pipe`): the validated solution's numbers and the engine that produced them. */
