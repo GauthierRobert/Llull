@@ -2,7 +2,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
-import { createEmptyDocument } from '@core/model/types';
+import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { baseDoc, withModel, withPipe } from '../../unit/plant/stress/m3Fixtures';
 import { readStep } from '@lib/stepRead';
 import { parseDn, parseNps } from '@aec/plant/catalog/nominal';
 import { parseCatalogFile } from '@aec/plant/catalog/file';
@@ -93,6 +94,22 @@ const LINE_NUMBER_FIELDS = { dn: 100, service: 'HC', sequence: '001', spec: 'A1A
 
 const STEP_HEAD = "ISO-10303-21;\nHEADER;\nFILE_SCHEMA(('IFC4X3_ADD2'));\nENDSEC;\nDATA;\n";
 const STEP_TAIL = 'ENDSEC;\nEND-ISO-10303-21;\n';
+
+const sizesJson = (count: number, size: (k: number) => Record<string, unknown>): string =>
+  JSON.stringify(Array.from({ length: count }, (_, k) => size(k)));
+
+const springScene = ((): { doc: CadDocument; id: string } => {
+  const pipe = withPipe(
+    baseDoc(),
+    [
+      [0, 0, 0],
+      [1000, 0, 0],
+    ],
+    114.3,
+  );
+  const model = withModel(pipe.doc, [pipe.id]);
+  return { doc: model.doc, id: model.id };
+})();
 
 export const AEC_READERS: readonly HostileReader[] = [
   {
@@ -367,9 +384,7 @@ export const AEC_READERS: readonly HostileReader[] = [
     covers: ['import_pipe_material_data'],
     input: 'text',
     build: (records) =>
-      JSON.stringify(
-        Array.from({ length: Math.min(records, 200) }, (_, k) => ({ tempC: k * 10, ShMPa: 100, EGPa: 200, meanCtePerK: 1e-5 })),
-      ),
+      JSON.stringify(Array.from({ length: records }, (_, k) => ({ tempC: k * 10, ShMPa: 100, EGPa: 200, meanCtePerK: 1e-5 }))),
     read: (input) => {
       const rows = parsedJson(asText(input));
       return execute(createEmptyDocument(), 'import_pipe_material_data', {
@@ -382,6 +397,26 @@ export const AEC_READERS: readonly HostileReader[] = [
       });
     },
     accepts: (result) => (result as { rejected?: boolean }).rejected !== true,
-    skipLinear: 'more than 200 rows are refused up front by design (PST_TABLE_INVALID)',
+  },
+  {
+    name: 'plant stress: import_spring_table (size list as JSON)',
+    covers: ['import_spring_table'],
+    input: 'text',
+    build: (records) => sizesJson(records, (k) => ({ size: `S${k}`, series: 'A', minN: 100, maxN: 200, rateNPerMm: 5, travelMm: 20 })),
+    extra: [
+      {
+        name: 'a hundred thousand identical sizes',
+        input: () => sizesJson(100_000, () => ({ size: 'S', series: 'A', minN: 100, maxN: 200, rateNPerMm: 5, travelMm: 20 })),
+      },
+      {
+        name: 'a hundred thousand sizes with an empty load range',
+        input: () => sizesJson(100_000, (k) => ({ size: `S${k}`, series: 'A', minN: 300, maxN: 200, rateNPerMm: 5, travelMm: 20 })),
+      },
+    ],
+    read: (input) => {
+      const sizes = parsedJson(asText(input));
+      return execute(springScene.doc, 'import_spring_table', { modelId: springScene.id, tableId: 'T', source: 'hostile catalogue', sizes });
+    },
+    accepts: (result) => (result as { rejected?: boolean }).rejected !== true,
   },
 ];

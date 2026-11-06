@@ -1,6 +1,8 @@
 /** `analyze_pipe_stress`, `check_pipe_stress` (07 PST M3): read-only queries over the model rebuilt from the current document. */
 
 import { defineCommand, z } from '@core/commands/schema';
+import { jcsJson } from '@lib/jcs';
+import { sha256Hex } from '@lib/sha256';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
@@ -109,8 +111,8 @@ export const analyzePipeStress = defineCommand({
   description:
     'Analyse a stress model: rebuild the finite element model from the current pipes and supports, solve every load case (weight, thermal, pressure, force primitives with non-linear supports re-evaluated per case) and apply the code check. ' +
     'Read-only. Default output is the summary: model size, solver residual and iterations per case, the largest displacement per case, the governing station per code case (ratio = stress / allowable), the findings with codes and remediation, the input hash and the support status. ' +
-    '`include` adds details: "displacements" (node, mm, degrees), "reactions" (force N and moment N.mm at every anchor / support node per case), "stresses" (every station with stress, allowable, ratio, rule, SIFs); "geometry" (data.geometry: nodes { id, positionMm }, elements { id, pipeId, kind, nodeIds, pointsMm, odMm, wallMm, bendRadiusMm } and pipes { id, kind, pointsMm centreline, elementIds }, mm, building pipes and routed runs alike; use it to place support and reaction arrows); `cases` and `nodes` (ids like N3 from the summary) filter the details. ' +
-    'Large models: give `limit` (details per list) to page the details; the answer then carries data.page { limit, offset, total per list, nextCursor } and the next call passes cursor = nextCursor (the same limit and filters); a cursor from other inputs is PST_CURSOR_STALE. ' +
+    '`include` adds details: "displacements" (node, mm, degrees; not for OCC cases combined by scalar or srss, whose displacements and reactions are not physical states), "reactions" (force N and moment N.mm at every anchor / support node per case), "stresses" (every station with stress, allowable, ratio, rule, SIFs); "geometry" (data.geometry: nodes { id, positionMm }, elements { id, pipeId, kind, nodeIds, pointsMm, odMm, wallMm, bendRadiusMm } and pipes { id, kind, pointsMm centreline, elementIds }, mm, building pipes and routed runs alike; use it to place support and reaction arrows); `cases` and `nodes` (ids like N3 from the summary) filter the details. ' +
+    'Large models: give `limit` (details per list) to page the details; the answer then carries data.page { limit, offset, total per list, nextCursor } and the next call passes cursor = nextCursor (the same limit and filters); a cursor from other inputs or with another limit / include / cases / nodes is PST_CURSOR_STALE; every page re-solves the model. ' +
     'Units: mm, N, N.mm, MPa. reviewRequired is always true: a qualified engineer reviews the result. Refusals carry PST_* codes (PST_UNSTABLE names the free node and DOF; add an anchor or guide there). Next: check_pipe_stress, record_pipe_stress_results.',
   params: z.object({
     modelId: z.string().min(1).describe('Id of the stress model.'),
@@ -147,7 +149,7 @@ export const analyzePipeStress = defineCommand({
     const details: Record<string, unknown> = {};
     if (include.includes('displacements'))
       details['displacements'] = analysis.states
-        .filter(wanted)
+        .filter((state) => wanted(state) && state.combination === undefined)
         .flatMap((state) =>
           analysis.built.layout.nodes.flatMap((_, n) =>
             nodeWanted(n)
@@ -185,16 +187,17 @@ export const analyzePipeStress = defineCommand({
         ['limit'],
       );
     if (params.limit !== undefined) {
+      const queryHash = sha256Hex(jcsJson({ limit: params.limit, include, cases: params.cases ?? null, nodes: params.nodes ?? null }));
       let offset = 0;
       if (params.cursor !== undefined) {
-        const decoded = decodeCursor(params.cursor, analysis.inputHash);
+        const decoded = decodeCursor(params.cursor, analysis.inputHash, queryHash);
         if (!decoded.ok)
           return refuse(
             doc,
             'analyze_pipe_stress',
             decoded.stale ? 'PST_CURSOR_STALE' : 'PST_PARAM_INVALID',
             decoded.stale
-              ? 'the cursor was issued for other inputs (the model changed since)'
+              ? 'the cursor was issued for other inputs or another query (the model, limit, include, cases or nodes changed since)'
               : 'the cursor is not one issued by this command',
             [model.id],
             ['cursor'],
@@ -212,7 +215,7 @@ export const analyzePipeStress = defineCommand({
         limit: params.limit,
         offset,
         total: totals,
-        nextCursor: more ? encodeCursor(analysis.inputHash, offset + params.limit) : null,
+        nextCursor: more ? encodeCursor(analysis.inputHash, queryHash, offset + params.limit) : null,
       };
     }
     const worst = analysis.governing.reduce<{ ratio: number; case: string } | null>(

@@ -99,6 +99,11 @@ describe('import_pipe_material_data: allowable stress and modulus tables', () =>
     expectRel((at('pipingAllowableStress', 300, 'MPa').data as { value: number }).value, 124, 1e-9, 'Sh at the last row');
   });
 
+  it('the Pa catalogue row accepts the MPa table: the same value reads as 134 MPa and 134e6 Pa', () => {
+    expectRel((at('pipingAllowableStress', 150, 'Pa').data as { value: number }).value, 134e6, 1e-9, 'Sh in Pa');
+    expectRel((at('pipingAllowableStress', 150, 'MPa').data as { value: number }).value, 134, 1e-9, 'Sh in MPa');
+  });
+
   it('is refused outside the rows (never extrapolated) and every value is unverified', () => {
     expect(at('pipingAllowableStress', 350, 'MPa').rejected).toBe(true);
     expect(at('E', 10, 'GPa').rejected).toBe(true);
@@ -175,9 +180,16 @@ describe('import_pipe_material_data: refusals', () => {
     expectRefusal(doc, 'import_pipe_material_data', { ...base(good), source: undefined }, 'CMD_INVALID_PARAMS');
   });
 
+  it('a row count past 201 is refused by the schema, 201 by the coded refusal', () => {
+    const rows = (n: number): unknown[] => Array.from({ length: n }, (_, i) => ({ tempC: i, ShMPa: 100 }));
+    expectRefusal(doc, 'import_pipe_material_data', base(rows(201)), 'PST_TABLE_INVALID');
+    expectRefusal(doc, 'import_pipe_material_data', base(rows(202)), 'CMD_INVALID_PARAMS');
+  });
+
   it('is pure', () => {
     const before = JSON.stringify(doc);
     const result = execute(doc, 'import_pipe_material_data', base(good));
+    expect(result.affected).toEqual(['M']);
     expect(result.document).not.toBe(doc);
     expect(JSON.stringify(doc)).toBe(before);
   });

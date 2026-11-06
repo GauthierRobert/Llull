@@ -278,6 +278,14 @@ describe('OCC combinations by method (scalar, srss, algebraic)', () => {
     expect(Sg + Sw).toBeGreaterThan(Math.hypot(Sg, Sw));
   });
 
+  it('a scalar or srss case has no reactions or displacements in the details (they are not physical states)', () => {
+    const { doc, id } = scene('scalar');
+    const data = analyzed(doc, id, { include: ['reactions', 'displacements'] });
+    expect((data.details?.reactions ?? []).some((row) => row.case === 'COMB')).toBe(false);
+    expect((data.details?.displacements ?? []).some((row) => row.case === 'COMB')).toBe(false);
+    expect((data.details?.reactions ?? []).some((row) => row.case === 'WINDY')).toBe(true);
+  });
+
   it('refuses malformed combinations: method without terms, scalar on EXP, basic with combine, a combination of a combination, an unknown term', () => {
     const sc = cantilever();
     const set = (cases: unknown[]): unknown => ({ modelId: sc.id, cases, wind: [WIND] });

@@ -8,7 +8,15 @@ import { elementsOf, getBuilding } from '../../../building/model';
 import { analyzeStressModel } from '../analysis';
 import { DEFAULT_MAX_VARIABILITY, pickSpring } from '../code/springs';
 import { refuse } from '../codes';
-import { springSizeSchema, type SpringSelection, type SpringTable, type StressModel } from '../model/schema';
+import {
+  MAX_SPRING_SIZES,
+  MAX_SPRING_TABLES,
+  MAX_SPRINGS,
+  springSizeSchema,
+  type SpringSelection,
+  type SpringTable,
+  type StressModel,
+} from '../model/schema';
 import { edited, withModel } from '../model/store';
 import { hangerLoads, sameLocation } from '../solve/springDesign';
 import { isRefusal, modelOr } from './common';
@@ -24,8 +32,6 @@ const at = z
   .describe('Where the hanger acts: {supportId} or {pipeId, atMm}.');
 
 const RESIDUAL_WARN_PCT = 1;
-const MAX_SIZES = 2000;
-const MAX_TABLES = 50;
 
 /**
  * @affects plant.stress.models[modelId].springTables: one table added or the one with the same tableId replaced; the approval is dropped
@@ -40,19 +46,23 @@ export const importSpringTable = defineCommand({
     modelId: z.string().min(1).describe('Id of the stress model.'),
     tableId: z.string().min(1).describe('Name of the table, e.g. "vendorX-B-series"; select_spring_hangers refers to it.'),
     source: z.string().min(3).describe('Catalogue, edition and page the values come from.'),
-    sizes: z.array(springSizeSchema).min(1).describe('Spring sizes: size, series, load range minN..maxN (N), rate (N/mm), travel (mm).'),
+    sizes: z
+      .array(springSizeSchema)
+      .min(1)
+      .max(MAX_SPRING_SIZES)
+      .describe('Spring sizes: size, series, load range minN..maxN (N), rate (N/mm), travel (mm).'),
   }),
   run: (doc, params): CommandResult => {
     const model = modelOr(doc, 'import_spring_table', params.modelId);
     if (isRefusal(model)) return model;
-    if (params.sizes.length > MAX_SIZES || model.springTables.length >= MAX_TABLES)
+    if (model.springTables.length >= MAX_SPRING_TABLES && !model.springTables.some((entry) => entry.id === params.tableId))
       return refuse(
         doc,
         'import_spring_table',
         'PST_TABLE_INVALID',
-        `at most ${MAX_SIZES} sizes per table and ${MAX_TABLES} tables per model`,
+        `at most ${MAX_SPRING_TABLES} tables per model`,
         [params.tableId],
-        ['sizes'],
+        ['tableId'],
       );
     const keys = new Set<string>();
     for (const [index, size] of params.sizes.entries()) {
@@ -202,9 +212,10 @@ export const selectSpringHangers = defineCommand({
               ['maxVariability'],
             );
     }
-    const next: StressModel = edited(model, {
-      springs: [...model.springs.filter((spring) => !targets.some((target) => sameLocation(target.at, spring.at))), ...selections],
-    });
+    const kept = model.springs.filter((spring) => !targets.some((target) => sameLocation(target.at, spring.at)));
+    if (kept.length + selections.length > MAX_SPRINGS)
+      return fail('PST_PARAM_INVALID', `a model holds at most ${MAX_SPRINGS} spring hangers`, [model.id], ['hangers']);
+    const next: StressModel = edited(model, { springs: [...kept, ...selections] });
     const nextDoc = withModel(doc, next);
     const analysis = analyzeStressModel(nextDoc, next);
     if (!analysis.ok) return fail(analysis.code, `with the springs: ${analysis.message}`, analysis.ids, analysis.paths);
@@ -213,7 +224,7 @@ export const selectSpringHangers = defineCommand({
       const node = (analysis.built.springs.find((entry) => entry.id === spring.id) as { node: number }).node;
       const operatingLoadN = state === undefined ? Number.NaN : (state.reactions[node * 6 + 2] as number);
       const residualPct = ((operatingLoadN - spring.hotLoadN) / spring.hotLoadN) * 100;
-      if (Math.abs(residualPct) > RESIDUAL_WARN_PCT)
+      if (!Number.isFinite(residualPct) || Math.abs(residualPct) > RESIDUAL_WARN_PCT)
         warnings.push({
           code: 'PST_SPRING_LOAD_DEVIATION',
           message: `spring ${spring.id}: operating load ${operatingLoadN.toFixed(1)} N differs from the hot load ${spring.hotLoadN.toFixed(1)} N by ${residualPct.toFixed(2)} % (target 1 %)`,

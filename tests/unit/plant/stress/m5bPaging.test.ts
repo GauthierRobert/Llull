@@ -69,7 +69,7 @@ describe('analyze_pipe_stress limit / cursor', () => {
       modelId: id,
       include: ['stresses'],
       limit: 2,
-      cursor: `${(full as unknown as { inputHash: string }).inputHash.slice(0, 16)}:${total + 10}`,
+      cursor: (first.data as Data).page?.nextCursor?.replace(/:\d+$/, `:${total + 10}`),
     });
     expect((past.data as Data).details?.['stresses']).toEqual([]);
     expect((past.data as Data).page?.nextCursor).toBeNull();
@@ -83,7 +83,7 @@ describe('analyze_pipe_stress limit / cursor', () => {
     expectRefusal(
       doc,
       'analyze_pipe_stress',
-      { modelId: id, include: ['stresses'], limit: 2, cursor: 'ffffffffffffffff:2' },
+      { modelId: id, include: ['stresses'], limit: 2, cursor: 'ffffffffffffffff:00000000:2' },
       'PST_CURSOR_STALE',
     );
     const changed = apply(edited, 'set_pipe_operating_conditions', {

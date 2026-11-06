@@ -343,7 +343,7 @@ describe('import_spring_table', () => {
     expect(second.plant?.stress?.models[scene.id]?.springTables).toHaveLength(1);
     expect(second.plant?.stress?.models[scene.id]?.springTables[0]?.sizes).toHaveLength(2);
     const bad = (sizes: unknown[]): unknown => ({ modelId: scene.id, tableId: 'X', source: 'cat', sizes });
-    expectRefusal(scene.doc, 'import_spring_table', bad([{ ...TABLE.S2, minN: 600, maxN: 300 }]), 'PST_TABLE_INVALID');
+    expectRefusal(scene.doc, 'import_spring_table', bad([{ ...TABLE.S2, minN: 600, maxN: 300 }]), 'CMD_INVALID_PARAMS');
     expectRefusal(scene.doc, 'import_spring_table', bad([TABLE.S2, TABLE.S2]), 'PST_TABLE_INVALID');
     expectRefusal(scene.doc, 'import_spring_table', bad([]), 'CMD_INVALID_PARAMS');
     expectRefusal(scene.doc, 'import_spring_table', { ...(bad([TABLE.S2]) as object), modelId: 'nope' }, 'PST_MODEL_NOT_FOUND');
@@ -395,7 +395,7 @@ describe('stored springs, tables and loads are validated on load', () => {
   it('caps a table at 2000 sizes and 200 hangers per call', () => {
     const scene = frame();
     const many = Array.from({ length: 2001 }, (_, i) => ({ ...TABLE.S3, size: `X${i}` }));
-    expectRefusal(scene.doc, 'import_spring_table', { modelId: scene.id, tableId: 'T', source: 'cat', sizes: many }, 'PST_TABLE_INVALID');
+    expectRefusal(scene.doc, 'import_spring_table', { modelId: scene.id, tableId: 'T', source: 'cat', sizes: many }, 'CMD_INVALID_PARAMS');
     const hangers = Array.from({ length: 201 }, (_, i) => ({ pipeId: scene.pipe, atMm: i }));
     expectRefusal(withTable(scene, ['S3']), 'select_spring_hangers', { modelId: scene.id, hangers, tableId: 'T' }, 'CMD_INVALID_PARAMS');
   });

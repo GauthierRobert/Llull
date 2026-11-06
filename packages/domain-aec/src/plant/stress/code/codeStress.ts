@@ -231,10 +231,13 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
       factor: Math.abs(term.factor),
       rows: evaluate(term.state, false).filter((row) => row.node !== null),
     }));
-    return (perTerm[0]?.rows ?? []).map((row, index) => {
-      const parts = perTerm.map((term) => {
-        const termRow = term.rows[index];
-        return termRow === undefined ? 0 : term.factor * termRow.stressMPa;
+    const keyOf = (row: StressRow): string => `${row.element}|${row.node}`;
+    const byKey = perTerm.map((term) => new Map(term.rows.map((row) => [keyOf(row), row])));
+    return (perTerm[0]?.rows ?? []).map((row) => {
+      // a station a term does not have makes the combined stress NaN, which the analysis refuses (PST_STRESS_NOT_FINITE), never a silent zero
+      const parts = perTerm.map((term, termIndex) => {
+        const termRow = byKey[termIndex]?.get(keyOf(row));
+        return termRow === undefined ? Number.NaN : term.factor * termRow.stressMPa;
       });
       const stress = combination.method === 'scalar' ? parts.reduce((a, b) => a + b, 0) : Math.sqrt(parts.reduce((a, b) => a + b * b, 0));
       return {

@@ -52,7 +52,10 @@ export const importPipeMaterialData = defineCommand({
       .string()
       .min(1)
       .describe('Material designation and form as in the table, e.g. "ASTM A106 Gr. B seamless pipe". Recorded in every model citation.'),
-    rows: z.array(row).describe('Table rows by temperature, 2 to 200, tempC strictly increasing.'),
+    rows: z
+      .array(row)
+      .max(MAX_ROWS + 1)
+      .describe('Table rows by temperature, 2 to 200, tempC strictly increasing.'),
     SMYSMPa: finite
       .refine((value) => value > 0, 'must be positive')
       .describe('Specified minimum yield strength in MPa (stored as Fty).')
@@ -193,7 +196,7 @@ export const importPipeMaterialData = defineCommand({
       ...changed(
         next,
         `import_pipe_material_data: ${params.materialId} (${params.designation}) ${rows.length} rows ${first} to ${last} degC: ${models.map((model) => model['property']).join(', ')}; basis unspecified (unverified)${defaulted.length > 0 ? `; defaulted ${defaulted.join(', ')}` : ''}.`,
-        [],
+        [params.materialId],
       ),
       data: {
         materialId: params.materialId,

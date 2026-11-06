@@ -402,7 +402,7 @@ be hidden) so the agent never silently under-states a SIF.
 ### 5.8 Spring hangers (TR-PST-08, V1)
 
 1. Restrained-weight case: hanger locations rigid in −Z, solve W (+ insulation) ⇒ hot load P_hot at each.
-2. Operating thermal case with hangers replaced by their (zero) force ⇒ vertical travel d at each.
+2. Operating thermal case with each hanger replaced by its P_hot as an upward force (a hanger removed with zero force would drop the pipe; see §21) ⇒ vertical travel d at each.
 3. For each vendor size in the imported table with P_hot within its working range: P_cold = P_hot + k d (d up
    positive), variability V = |k d| / P_hot; choose the smallest size and the lowest-rate series with V ≤ max
    (0.25, 0.15 near rotating equipment, both named); none ⇒ constant-effort hanger with load P_hot and travel d,

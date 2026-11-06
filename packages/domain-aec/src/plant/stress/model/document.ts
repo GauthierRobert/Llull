@@ -58,6 +58,18 @@ export function stressErrors(raw: unknown): string[] {
           'springs',
           model.springs.map((entry) => entry.id),
         ),
+        ...model.springs.flatMap((spring, index) => {
+          if (spring.kind !== 'variable') return [];
+          const path = `plant.stress.models.${id}.springs.${index}`;
+          return [
+            ...(spring.tableId === undefined || spring.size === undefined || spring.series === undefined
+              ? [`${path}: a variable spring needs tableId, size and series`]
+              : []),
+            ...(spring.tableId !== undefined && !model.springTables.some((table) => table.id === spring.tableId)
+              ? [`${path}.tableId: no spring table ${spring.tableId}`]
+              : []),
+          ];
+        }),
       ];
     }),
     ...ids.filter((id) => models[id]?.id !== id).map((id) => `plant.stress.models.${id}.id must equal its key`),

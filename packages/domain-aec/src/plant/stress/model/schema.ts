@@ -130,16 +130,26 @@ export const accelerationSchema = z.object({
 
 const SPRING_SERIES = z.string().min(1);
 
-export const springSizeSchema = z.object({
-  size: z.string().min(1).describe('Vendor size designation, e.g. "10".'),
-  series: SPRING_SERIES.describe('Vendor series (spring type), e.g. "B".'),
-  minN: positive.describe('Smallest hot load of the working range of this size, N.'),
-  maxN: positive.describe('Largest hot load of the working range of this size, N.'),
-  rateNPerMm: positive.describe('Spring rate k, N per mm.'),
-  travelMm: positive.describe('Working travel of this size, mm (up or down from the cold position).'),
-});
+export const MAX_SPRING_SIZES = 2000;
+export const MAX_SPRING_TABLES = 50;
+export const MAX_SPRINGS = 200;
 
-export const springTableSchema = z.object({ id: z.string().min(1), source: z.string().min(3), sizes: z.array(springSizeSchema).min(1) });
+export const springSizeSchema = z
+  .object({
+    size: z.string().min(1).describe('Vendor size designation, e.g. "10".'),
+    series: SPRING_SERIES.describe('Vendor series (spring type), e.g. "B".'),
+    minN: positive.describe('Smallest hot load of the working range of this size, N.'),
+    maxN: positive.describe('Largest hot load of the working range of this size, N.'),
+    rateNPerMm: positive.describe('Spring rate k, N per mm.'),
+    travelMm: positive.describe('Working travel of this size, mm (up or down from the cold position).'),
+  })
+  .refine((size) => size.minN < size.maxN, { message: 'minN must be below maxN', path: ['minN'] });
+
+export const springTableSchema = z.object({
+  id: z.string().min(1),
+  source: z.string().min(3),
+  sizes: z.array(springSizeSchema).min(1).max(MAX_SPRING_SIZES),
+});
 
 export const springSelectionSchema = z
   .object({
@@ -243,8 +253,8 @@ export const stressModelSchema = z.object({
   components: z.array(componentSchema),
   wind: z.array(windSchema).max(9),
   seismic: z.array(accelerationSchema).max(9),
-  springTables: z.array(springTableSchema),
-  springs: z.array(springSelectionSchema),
+  springTables: z.array(springTableSchema).max(MAX_SPRING_TABLES),
+  springs: z.array(springSelectionSchema).max(MAX_SPRINGS),
   recorded: recordedSchema.optional(),
   approval: approvalSchema.optional(),
 });
