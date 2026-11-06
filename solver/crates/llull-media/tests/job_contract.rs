@@ -161,20 +161,12 @@ fn mp4_has_the_streaming_box_tree_one_av1_track_and_one_sample_per_frame() {
 
 #[test]
 fn mp4_bytes_do_not_depend_on_the_thread_count() {
-    let mut one = Spec::new("mp4", 8);
-    one.width = 256;
-    one.height = 144;
-    one.threads = Some(1);
-    let mut four = Spec::new("mp4", 8);
-    four.width = 256;
-    four.height = 144;
-    four.threads = Some(4);
-    let (a, _) = encoded(&one, "mp4-threads-1");
-    let (b, _) = encoded(&four, "mp4-threads-4");
-    let (x, y) = (std::fs::read(a.join("out.mp4")).unwrap(), std::fs::read(b.join("out.mp4")).unwrap());
-    assert_eq!(x, y, "fixed tile layout: same packets for 1 and 4 threads");
-    let (c, _) = encoded(&one, "mp4-threads-1b");
-    assert_eq!(x, std::fs::read(c.join("out.mp4")).unwrap(), "byte-identical rerun");
+    let with_threads = |threads: u32| Spec { width: 256, height: 144, threads: Some(threads), ..Spec::new("mp4", 8) };
+    let bytes = |threads: u32, name: &str| std::fs::read(encoded(&with_threads(threads), name).0.join("out.mp4")).unwrap();
+    let one = bytes(1, "mp4-threads-1");
+    assert_eq!(one, bytes(4, "mp4-threads-4"), "fixed tile layout: same packets for 1 and 4 threads");
+    assert_eq!(one, bytes(8, "mp4-threads-8"), "and for the default maximum of 8 threads");
+    assert_eq!(one, bytes(1, "mp4-threads-1b"), "byte-identical rerun");
 }
 
 #[test]

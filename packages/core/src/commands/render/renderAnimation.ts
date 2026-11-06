@@ -34,6 +34,7 @@ const DEFAULT_FPS = 30;
 const DEFAULT_ACCENT = '#ff9f1c';
 const DEFAULT_BACKGROUND = '#1a1a2e';
 const MAX_FRAMES = 1800;
+const MAX_GIF_FPS = 50;
 /** Named guard: frames × width × height above this is refused for frames / apng (MOV_RENDER_BUDGET). */
 const MAX_TOTAL_PIXELS = 100_000_000;
 
@@ -105,10 +106,10 @@ export const renderAnimation = defineCommand({
     'or "clips" (the document\'s animate clips, evaluated exactly as the viewport plays them). The camera is fixed: framed once on every frame\'s bounds so nothing leaves the picture. ' +
     'Overlays are drawn into the picture: `time` label, `trace` (centre-of-mass path of named bodies with a dot at the current position), `readouts` (joint values, body positions, parameters or clip values as "name = value unit"; the same numbers are in data.timeline[k].readouts), data.traces[id] = { path, at[k] } gives the traced positions, `highlight: "moving"` (moving parts in the accent colour). ' +
     'REVIEW LOOP: first render format "frames" with `sheet` {every: n} and look at sheet.png (one image of every n-th frame, labelled #k t = … s) to check camera, overlays and motion; then render the format you want to keep. ' +
-    'Formats: "frames" (PNG files frame-0001.png …), "apng" (animation.apng, loops forever), "gif" / "mp4" (animation.gif / animation.mp4 through the native video encoder, AV1 in MP4; a host without it refuses with NATIVE_TOOL_MISSING: use "apng"; `quality` draft | standard | high trades encode time for size). The default is "mp4", so set `format` explicitly in a host without the encoder. ' +
+    'Formats: "frames" (PNG files frame-0001.png …), "apng" (animation.apng, loops forever), "gif" / "mp4" (animation.gif / animation.mp4 through the native video encoder, AV1 in MP4; a host without it refuses with NATIVE_TOOL_MISSING: use "apng"; `quality` draft | standard | high applies to mp4 only; a gif is made at most 50 fps, MOV_GIF_FPS_CLAMPED). The default is "mp4", so set `format` explicitly in a host without the encoder. ' +
     'Always in data.files: timeline.json (and sheet.png with `sheet`). The reference renderer (default) gives data.frameSha256[] (and fileSha256 for apng), stable per rendererVersion; renderer "native" draws on the GPU through llull-compute (no digests). ' +
     'Budgets (stable codes): MOV_FRAME_BUDGET (more than maxFrames, at most 1800), MOV_RENDER_BUDGET (frames × width × height over 1e8 for frames / apng). Other refusals: MOV_ENCODE_FAILED (the encoder failed; nothing is returned), MOV_NO_MOTION, MOV_UNKNOWN_ID, MOV_SOURCE_FAILED, MOV_CAMERA_INVALID, MOV_RENDER_INVALID, NATIVE_TOOL_MISSING. ' +
-    'Warnings in data.warnings: MOV_SAMPLES_SPARSE (the simulation samples are further apart than a frame; poses are interpolated), MOV_SIZE_ROUNDED (odd mp4 size rounded down to even), MOV_CLICK_CLIPS_SKIPPED, MOV_LOOP_OPEN, MOV_OVERLAY_TEXT_SKIPPED (no bundled font: labels not drawn). ' +
+    'Warnings in data.warnings: MOV_SAMPLES_SPARSE (the simulation samples are further apart than a frame; poses are interpolated), MOV_SIZE_ROUNDED (odd mp4 size rounded down to even), MOV_GIF_FPS_CLAMPED (gif above 50 fps made at 50), MOV_CLICK_CLIPS_SKIPPED, MOV_LOOP_OPEN, MOV_OVERLAY_TEXT_SKIPPED (no bundled font: labels not drawn). ' +
     'Read-only: the document is never changed. CLI: `--save dir/` writes all files, `--save out.mp4` (or .gif, .apng) writes that one file and out.timeline.json.',
   params: z.object({
     source: sourceSchema.describe('What moves: a simulation, a joint / parameter sweep or the animation clips.'),
@@ -162,7 +163,7 @@ export const renderAnimation = defineCommand({
       .enum(['draft', 'standard', 'high'])
       .optional()
       .describe(
-        'Video encoder effort for gif / mp4 (ignored by frames / apng): "draft" and "standard" (default) encode fast, "high" is slower and sharper. Default "standard".',
+        'Encoder effort for format "mp4" only (gif, frames and apng ignore it): "draft" = a smaller, softer file in the same encode time as "standard" (default); "high" = sharper, about twice the encode time.',
       ),
     sheet: z
       .object({ every: z.number().int().min(1).describe('Every n-th frame becomes a cell (the last frame is always added).') })
@@ -191,8 +192,11 @@ export const renderAnimation = defineCommand({
     ): CommandResult =>
       animationRejection(doc, 'render_animation', code, message, ids, paths, warnings.length === 0 ? undefined : { warnings });
     const { source } = params;
-    const fps = params.fps ?? DEFAULT_FPS;
     const format = params.format ?? 'mp4';
+    // GIF delays are whole centiseconds and viewers clamp 1 cs to 10 cs: above 50 fps the whole animation is made at 50 fps
+    const askedFps = params.fps ?? DEFAULT_FPS;
+    const fps = format === 'gif' ? Math.min(askedFps, MAX_GIF_FPS) : askedFps;
+    const videoFormat = format === 'gif' || format === 'mp4' ? format : null;
     const askedWidth = clamp(Math.round(params.width ?? 1280), 64, 1920);
     const askedHeight = clamp(Math.round(params.height ?? 720), 64, 1080);
     // 4:2:0 needs even sides: an odd mp4 size is rounded down by one
@@ -287,6 +291,11 @@ export const renderAnimation = defineCommand({
         code: 'MOV_SIZE_ROUNDED',
         message: `mp4 needs even sides: ${askedWidth}×${askedHeight} rendered as ${width}×${height}`,
       });
+    if (fps !== askedFps)
+      warnings.push({
+        code: 'MOV_GIF_FPS_CLAMPED',
+        message: `a GIF cannot show delays under 2 cs (viewers clamp 1 cs to 10 cs): ${askedFps} fps rendered as ${fps} fps`,
+      });
     if (wantsText && font === null)
       warnings.push({
         code: 'MOV_OVERLAY_TEXT_SKIPPED',
@@ -321,10 +330,10 @@ export const renderAnimation = defineCommand({
       if (apng === null) return fail('MOV_ENCODE_FAILED', 'the APNG writer rejected the frames');
       files.push({ fileName: 'animation.apng', base64: uint8ArrayToBase64(apng) });
       if (run === null) fileSha256 = sha256Hex(apng);
-    } else if (media !== undefined) {
+    } else if (media !== undefined && videoFormat !== null) {
       const video = encodeVideo(
         media,
-        { format: format as 'gif' | 'mp4', width, height, fps, quality: params.quality ?? 'standard', frames },
+        { format: videoFormat, width, height, fps, quality: params.quality ?? 'standard', frames },
         drawn.pngs,
       );
       if (!video.ok) return fail(video.code, video.message, [], ['format'], warnings);

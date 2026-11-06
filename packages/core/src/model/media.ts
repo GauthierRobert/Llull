@@ -1,7 +1,7 @@
 /**
  * Optional native video encoder port (PHY-22 MOV-M2, TECHNICAL_SPEC §3 / TR-MOV-11): `ctx.media` turns the PNG frames of `render_animation` into
- * a GIF or an AV1 MP4. Synchronous like `RasterPort`: the host blocks on its encoder job. Frames are handed over one at a time (`add`), so a host
- * keeps one picture in memory, never the whole clip. Absent = `render_animation` refuses gif / mp4 with NATIVE_TOOL_MISSING (apng still works).
+ * a GIF or an AV1 MP4. Synchronous like `RasterPort`: the host blocks on its encoder job. The command holds every PNG of the clip (at most 1800 frames);
+ * the host session streams them (`add` one at a time), so the host keeps one picture in memory at a time. Absent = `render_animation` refuses gif / mp4 with NATIVE_TOOL_MISSING (apng still works).
  */
 
 type MediaFormat = 'gif' | 'mp4';

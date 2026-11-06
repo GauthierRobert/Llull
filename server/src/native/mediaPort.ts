@@ -10,7 +10,7 @@
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import path from 'node:path';
 import type { MediaEncoder, MediaFailure, MediaPort, MediaSession, MediaSpec } from '@core/model/media';
 import { setMediaPort } from '@core/commands/mediaPort';
@@ -19,17 +19,31 @@ import { isRecord } from '@lib/isRecord';
 import { readOutputSync, runComputeSync } from './computeJob';
 import { nativeBinaryPath } from './nativeBinary';
 
-/** Named guards: process start allowance + a generous per-frame share (the encode runs at 4..15 frames per second, spec §13.6). */
+/** Named guards: process start allowance + a per-frame share by effort (measured on 22 cores at 4.7 fps "high", 10 fps mp4, 44 fps gif; spec §13.6.1). */
 const TIMEOUT_BASE_MS = 30_000;
-const TIMEOUT_PER_FRAME_MS = 500;
+const TIMEOUT_PER_FRAME_MS = { gif: 250, mp4: 750, high: 1500 } as const;
+/** Cores the measurements ran on; fewer cores stretch the wait in proportion (at most 4×). */
+const REFERENCE_CORES = 8;
+const MAX_SLOWDOWN = 4;
 /** One progress line per frame (~100 bytes) plus the events around them. */
 const MAX_STDOUT_BYTES = 16 * 1024 * 1024;
 
 const failure = (code: string, message: string): MediaFailure => ({ ok: false, code, message });
 
+/**
+ * Wait for a whole encode: 30 s + a per-frame share (gif 0.25 s, mp4 0.75 s, mp4 `high` 1.5 s) times 8 / cores (1..4).
+ * 300 frames of 1280×720 on a 4-core machine: standard 30 + 300 × 0.75 × 2 = 480 s against about 90 s expected there.
+ */
+export function encodeTimeoutMs(spec: MediaSpec, cores: number): number {
+  const share =
+    spec.format === 'gif' ? TIMEOUT_PER_FRAME_MS.gif : spec.quality === 'high' ? TIMEOUT_PER_FRAME_MS.high : TIMEOUT_PER_FRAME_MS.mp4;
+  const slowdown = Math.min(MAX_SLOWDOWN, Math.max(1, REFERENCE_CORES / Math.max(1, cores)));
+  return TIMEOUT_BASE_MS + Math.ceil(spec.frames * share * slowdown);
+}
+
 /** Tuning of a port: tests shrink the wait. */
-export interface MediaPortOptions {
-  /** Wait for the whole job in ms. Default: 30 s + 0.5 s per frame. */
+interface MediaPortOptions {
+  /** Wait for the whole job in ms. Default: `encodeTimeoutMs`. */
   readonly timeoutMs?: number;
 }
 
@@ -73,7 +87,7 @@ function session(binary: string, env: NodeJS.ProcessEnv, spec: MediaSpec, option
         if (added !== spec.frames) return failure('NATIVE_JOB_INPUT', `${added} frames were added, ${spec.frames} announced`);
         const { format, width, height, fps, quality, frames } = spec;
         writeFileSync(path.join(folder, 'job.json'), JSON.stringify({ version: 1, format, width, height, fps, quality, frames }));
-        const timeout = options.timeoutMs ?? TIMEOUT_BASE_MS + frames * TIMEOUT_PER_FRAME_MS;
+        const timeout = options.timeoutMs ?? encodeTimeoutMs(spec, availableParallelism());
         const run = runComputeSync(binary, ['media', folder], folder, timeout, env, MAX_STDOUT_BYTES);
         if (!run.ok) return failure(run.code ?? 'NATIVE_PROTOCOL', run.message ?? 'llull-compute media failed');
         const bytes = readOutputSync(folder, run, `out.${format}`);

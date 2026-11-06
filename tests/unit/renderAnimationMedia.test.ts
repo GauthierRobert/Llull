@@ -120,6 +120,27 @@ describe('mp4 / gif through ctx.media (TR-MOV-11)', () => {
     expect(codes(encode({}, { width: 96, height: 72 }).result.data)).not.toContain('MOV_SIZE_ROUNDED');
   });
 
+  it('rounds only the odd side (odd width only, odd height only)', () => {
+    const widthOnly = encode({}, { width: 97, height: 72 });
+    expect([(widthOnly.result.data as Data).width, (widthOnly.result.data as Data).height]).toEqual([96, 72]);
+    expect(codes(widthOnly.result.data)).toContain('MOV_SIZE_ROUNDED');
+    const heightOnly = encode({}, { width: 96, height: 73 });
+    expect([(heightOnly.result.data as Data).width, (heightOnly.result.data as Data).height]).toEqual([96, 72]);
+    expect(codes(heightOnly.result.data)).toContain('MOV_SIZE_ROUNDED');
+  });
+
+  it('makes a gif above 50 fps at 50 fps with MOV_GIF_FPS_CLAMPED (1 cs delays are shown as 10 cs), and leaves mp4 and gif at 50 alone', () => {
+    const gif = encode({}, { format: 'gif', fps: 60 });
+    const data = gif.result.data as Data;
+    expect(gif.recording.specs[0]).toMatchObject({ format: 'gif', fps: 50, frames: 101 });
+    expect([data.fps, data.frames, data.videoDurationS]).toEqual([50, 101, 2.02]);
+    expect(codes(data)).toContain('MOV_GIF_FPS_CLAMPED');
+    expect(encode({}, { format: 'mp4', fps: 60 }).recording.specs[0]?.fps).toBe(60);
+    const edge = encode({}, { format: 'gif', fps: 50 });
+    expect(edge.recording.specs[0]?.fps).toBe(50);
+    expect(codes(edge.result.data)).not.toContain('MOV_GIF_FPS_CLAMPED');
+  });
+
   it('pins fileSha256 only for a deterministic encoder on reference frames', () => {
     const loose = encode({ encoder: { ...ENCODER, deterministic: false } });
     const data = loose.result.data as Data;

@@ -15,9 +15,9 @@ import { getMediaPort, setMediaPort } from '@core/commands/mediaPort';
 import { execute } from '@core/commands/registry';
 import { base64ToUint8Array } from '@lib/base64';
 import { createEmptyDocument } from '@core/model/types';
-import type { MediaPort } from '@core/model/media';
+import type { MediaPort, MediaSpec } from '@core/model/media';
 import { requireTool } from '../../tests/requireTool';
-import { createNativeMediaPort, installMediaPort } from '../src/native/mediaPort';
+import { createNativeMediaPort, encodeTimeoutMs, installMediaPort } from '../src/native/mediaPort';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 
 const BINARY = nativeBinaryPath('llull-compute');
@@ -236,5 +236,30 @@ describe('the encoder fails or is missing (VC-MOV-13, 14)', () => {
     expect(result.data).toBeUndefined();
     expect(Date.now() - started, 'the wait is bounded by the frames and the kill, not by the encode').toBeLessThan(60_000);
     expect(newSince(before)).toEqual([]);
+  });
+});
+
+describe('the wait for an encode (timeout by quality and cores)', () => {
+  const spec = (format: 'gif' | 'mp4', quality: 'draft' | 'standard' | 'high', frames: number): MediaSpec => ({
+    format,
+    width: 1280,
+    height: 720,
+    fps: 30,
+    quality,
+    frames,
+  });
+
+  it('is 30 s plus a per-frame share: gif 0.25 s, mp4 0.75 s, high 1.5 s, on 8 or more cores', () => {
+    expect(encodeTimeoutMs(spec('mp4', 'standard', 300), 8)).toBe(30_000 + 300 * 750);
+    expect(encodeTimeoutMs(spec('mp4', 'draft', 300), 22)).toBe(30_000 + 300 * 750);
+    expect(encodeTimeoutMs(spec('mp4', 'high', 300), 8)).toBe(30_000 + 300 * 1500);
+    expect(encodeTimeoutMs(spec('gif', 'high', 300), 8)).toBe(30_000 + 300 * 250);
+  });
+
+  it('stretches with fewer cores, at most four times, and covers high on a 4-core machine (about 3x the 64 s measured)', () => {
+    expect(encodeTimeoutMs(spec('mp4', 'high', 300), 4)).toBe(30_000 + 300 * 1500 * 2);
+    expect(encodeTimeoutMs(spec('mp4', 'high', 300), 1)).toBe(30_000 + 300 * 1500 * 4);
+    expect(encodeTimeoutMs(spec('mp4', 'high', 300), 0)).toBe(30_000 + 300 * 1500 * 4);
+    expect(encodeTimeoutMs(spec('mp4', 'high', 300), 4)).toBeGreaterThan(3 * 64_358);
   });
 });

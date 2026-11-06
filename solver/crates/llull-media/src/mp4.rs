@@ -96,8 +96,22 @@ fn moov(width: u16, height: u16, fps: u32, packets: &[Packet], av1c: &[u8], data
     boxed("moov", &[mvhd, boxed("trak", &[tkhd, mdia])])
 }
 
+/// Largest file the 32-bit box sizes and the 32-bit `stco` offset can describe.
+const MAX_FILE_BYTES: u64 = u32::MAX as u64;
+
+/// Error text when a file of `total` bytes does not fit the 32-bit boxes, else None.
+fn size_refusal(total: u64) -> Option<String> {
+    (total >= MAX_FILE_BYTES).then(|| format!("the MP4 would be {total} bytes: files of 4 GiB or more need 64-bit boxes, which this muxer does not write (lower the size, fps or duration)"))
+}
+
 /// The file of `packets` (decode order = display order) as `width` x `height` AV1 at `fps` frames per second.
-pub fn mux(width: usize, height: usize, fps: u32, packets: &[Packet], av1c: &[u8]) -> Vec<u8> {
+/// A string describes the refusal of a file of 4 GiB or more.
+pub fn mux(width: usize, height: usize, fps: u32, packets: &[Packet], av1c: &[u8]) -> Result<Vec<u8>, String> {
+    // generous allowance for ftyp + moov (about 12 bytes of sample tables per frame plus the headers)
+    let data_bytes: u64 = packets.iter().map(|p| p.data.len() as u64).sum();
+    if let Some(refusal) = size_refusal(data_bytes + 16 * packets.len() as u64 + 4096) {
+        return Err(refusal);
+    }
     let ftyp = boxed("ftyp", &[b"isom".to_vec(), u32b(0x200), b"isomiso6av01mp41".to_vec()]);
     let (w, h) = (width as u16, height as u16);
     // the chunk offset sits inside moov: its size does not depend on the value, so one pass measures it
@@ -105,5 +119,24 @@ pub fn mux(width: usize, height: usize, fps: u32, packets: &[Packet], av1c: &[u8
     let data_offset = (ftyp.len() + measured.len() + 8) as u32;
     let moov = moov(w, h, fps, packets, av1c, data_offset);
     let data: Vec<u8> = packets.iter().flat_map(|p| p.data.iter().copied()).collect();
-    [ftyp, moov, boxed("mdat", &[data])].concat()
+    Ok([ftyp, moov, boxed("mdat", &[data])].concat())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn files_of_4_gib_or_more_are_refused_with_a_reason_and_smaller_ones_pass() {
+        assert!(size_refusal(u64::from(u32::MAX) - 1).is_none());
+        assert!(size_refusal(u64::from(u32::MAX)).unwrap().contains("4 GiB"));
+        assert!(size_refusal(6_000_000_000).is_some());
+    }
+
+    #[test]
+    fn a_tiny_clip_is_muxed() {
+        let packets = vec![Packet { data: vec![1, 2, 3], key: true }];
+        let file = mux(64, 64, 30, &packets, &[0x81, 0, 0, 0]).unwrap();
+        assert_eq!(&file[4..8], b"ftyp");
+    }
 }

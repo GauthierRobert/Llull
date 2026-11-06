@@ -12,7 +12,7 @@ use crate::av1::{preset, Av1Encoder};
 use crate::gif_encoder::{sample_frames, GifWriter};
 use crate::mp4::mux;
 use crate::pixels::{decode_png, Rgb};
-use crate::yuv::to_yuv420;
+use crate::yuv::{to_yuv420, Yuv420};
 use llull_protocol::{emit, sha256_hex, Event, Output};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -136,33 +136,57 @@ fn encode_gif(folder: &Path, job: &MediaJob, out: &mut impl Write) -> Result<(Ve
     Ok((bytes, EncoderInfo { name: "llull-media-gif", version: env!("CARGO_PKG_VERSION").to_string(), deterministic: true }))
 }
 
-fn encode_mp4(folder: &Path, job: &MediaJob, threads: usize, out: &mut impl Write) -> Result<(Vec<u8>, EncoderInfo), JobError> {
-    let (width, height) = (job.width as usize, job.height as usize);
-    let chosen = preset(&job.quality).ok_or_else(|| input_error("unknown quality"))?;
-    let mut encoder = Av1Encoder::new(width, height, job.fps as u32, chosen, threads).map_err(encode_error)?;
-    // a reader thread decodes and converts frame k + 1 while the encoder threads work on frame k (the encoder pool is idle during a serial decode)
+/// Feeds frames 0..`frames` to `push` in order: a reader thread runs `read` for frame k + 1 while `push` works on frame k (the encoder pool is idle
+/// during a serial decode). The first error of either side is returned; the receiving end is owned by `consume`, so it is dropped on every return and a
+/// reader blocked on the full channel always wakes (a borrowed receiver would deadlock the scope until the host timeout).
+fn prefetch_encode<R, P, G>(frames: usize, read: R, push: P, step: G) -> Result<(), JobError>
+where
+    R: Fn(usize) -> Result<Yuv420, JobError> + Sync,
+    P: FnMut(&Yuv420) -> Result<(), JobError>,
+    G: FnMut(usize),
+{
+    fn consume(
+        receiver: std::sync::mpsc::Receiver<Result<Yuv420, JobError>>,
+        mut push: impl FnMut(&Yuv420) -> Result<(), JobError>,
+        mut step: impl FnMut(usize),
+    ) -> Result<(), JobError> {
+        for (k, planes) in receiver.iter().enumerate() {
+            push(&planes?)?;
+            step(k + 1);
+        }
+        Ok(())
+    }
     let (sender, receiver) = std::sync::mpsc::sync_channel(PREFETCH_FRAMES);
+    let read = &read;
     std::thread::scope(|scope| {
         scope.spawn(move || {
-            for k in 0..job.frames as usize {
-                let planes = read_frame(folder, k, job).map(|frame| to_yuv420(&frame));
+            for k in 0..frames {
+                let planes = read(k);
                 let failed = planes.is_err();
                 if sender.send(planes).is_err() || failed {
                     return;
                 }
             }
         });
-        for (k, planes) in receiver.iter().enumerate() {
-            encoder.push(&planes?).map_err(encode_error)?;
-            progress(out, k + 1, job.frames, "mp4 frame");
-        }
-        Ok::<(), JobError>(())
-    })?;
+        consume(receiver, push, step)
+    })
+}
+
+fn encode_mp4(folder: &Path, job: &MediaJob, threads: usize, out: &mut impl Write) -> Result<(Vec<u8>, EncoderInfo), JobError> {
+    let (width, height) = (job.width as usize, job.height as usize);
+    let chosen = preset(&job.quality).ok_or_else(|| input_error("unknown quality"))?;
+    let mut encoder = Av1Encoder::new(width, height, job.fps as u32, chosen, threads).map_err(encode_error)?;
+    prefetch_encode(
+        job.frames as usize,
+        |k| read_frame(folder, k, job).map(|frame| to_yuv420(&frame)),
+        |planes| encoder.push(planes).map_err(encode_error),
+        |step| progress(out, step, job.frames, "mp4 frame"),
+    )?;
     let encoded = encoder.finish().map_err(encode_error)?;
     if encoded.packets.len() as u64 != job.frames {
         return Err(encode_error(format!("rav1e produced {} packets for {} frames", encoded.packets.len(), job.frames)));
     }
-    let bytes = mux(width, height, job.fps as u32, &encoded.packets, &encoded.av1c);
+    let bytes = mux(width, height, job.fps as u32, &encoded.packets, &encoded.av1c).map_err(encode_error)?;
     Ok((bytes, EncoderInfo { name: "rav1e", version: rav1e::version::short(), deterministic: true }))
 }
 
@@ -198,4 +222,82 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
     };
     let report_json = serde_json::to_vec(&report).map_err(|error| encode_error(error.to_string()))?;
     Ok(vec![write(folder, name, &bytes)?, write(folder, "report.json", &report_json)?])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc::channel;
+    use std::time::Duration;
+
+    fn planes() -> Yuv420 {
+        Yuv420 { y: vec![16; 4], u: vec![128], v: vec![128] }
+    }
+
+    /// Runs `body` on a thread and fails the test instead of hanging when it does not finish in 20 s.
+    fn within_deadline<T: Send + 'static>(body: impl FnOnce() -> T + Send + 'static) -> T {
+        let (done, wait) = channel();
+        std::thread::spawn(move || {
+            let _ = done.send(body());
+        });
+        wait.recv_timeout(Duration::from_secs(20)).expect("the prefetch pipeline deadlocked")
+    }
+
+    #[test]
+    fn an_encoder_failure_mid_clip_returns_its_error_at_once_instead_of_blocking_the_reader() {
+        let result = within_deadline(|| {
+            let mut pushed = 0;
+            prefetch_encode(
+                500,
+                |_| Ok(planes()),
+                |_| {
+                    pushed += 1;
+                    if pushed == 3 {
+                        Err(encode_error("rav1e failed"))
+                    } else {
+                        Ok(())
+                    }
+                },
+                |_| {},
+            )
+        });
+        assert_eq!(result.unwrap_err(), encode_error("rav1e failed"));
+    }
+
+    #[test]
+    fn a_frame_that_cannot_be_read_stops_the_clip_with_its_input_error() {
+        let result = within_deadline(|| {
+            let mut steps = Vec::new();
+            let result = prefetch_encode(
+                10,
+                |k| if k == 4 { Err(input_error("frame 4 is missing")) } else { Ok(planes()) },
+                |_| Ok(()),
+                |step| steps.push(step),
+            );
+            (result, steps)
+        });
+        assert_eq!(result.0.unwrap_err().code, "NATIVE_JOB_INPUT");
+        assert_eq!(result.1, [1, 2, 3, 4], "the four good frames were encoded first");
+    }
+
+    #[test]
+    fn every_frame_is_pushed_in_order_with_its_step() {
+        let (order, steps) = within_deadline(|| {
+            let mut order = Vec::new();
+            let mut steps = Vec::new();
+            prefetch_encode(
+                7,
+                |k| Ok(Yuv420 { y: vec![k as u8; 4], u: vec![128], v: vec![128] }),
+                |p| {
+                    order.push(p.y[0]);
+                    Ok(())
+                },
+                |s| steps.push(s),
+            )
+            .unwrap();
+            (order, steps)
+        });
+        assert_eq!(order, [0, 1, 2, 3, 4, 5, 6]);
+        assert_eq!(steps, [1, 2, 3, 4, 5, 6, 7]);
+    }
 }
