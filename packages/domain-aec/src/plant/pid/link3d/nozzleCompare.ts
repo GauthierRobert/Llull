@@ -22,6 +22,16 @@ export interface NozzleComparison {
 const same = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
 
 /**
+ * Canonical form of a flange rating so the usual spellings compare equal: CL150 = Class 150 = 150# = 150 lb, PN16 = PN 16 = PN-16 (upper case, no separators).
+ * Anything else is kept as written (upper case, no separators) and compares by equality.
+ */
+function normaliseRating(text: string): string {
+  const compact = text.toUpperCase().replace(/[\s_.-]/g, '');
+  const cls = /^(?:CL|CLASS)(\d+)$/.exec(compact) ?? /^(\d+)(?:#|LB|LBS)$/.exec(compact);
+  return cls === null ? compact : `CL${cls[1]}`;
+}
+
+/**
  * @param connected normalised `TAG:MARK` of every nozzle a 3D line starts or ends on
  * @invariant an equipment without nozzle records (a legacy block) gives one coded skip, never a finding per nozzle
  */
@@ -85,6 +95,18 @@ export function compareNozzles(
           item: label,
           message: `nozzle ${label}: P&ID DN ${nozzle.dn} but the 3D nozzle ${record.mark} is DN ${record.dn}`,
           values: { pidDn: nozzle.dn, modelDn: record.dn },
+        }),
+      );
+    const rating = nozzle.attributes['rating'];
+    if (rating !== undefined && rating.kind !== 'quantity' && normaliseRating(rating.value) !== normaliseRating(record.rating))
+      out.findings.push(
+        makeFinding3d({
+          code: 'P3D_CLASS_MISMATCH',
+          pidIds: [nozzle.id],
+          elementIds: [element.id],
+          item: label,
+          message: `nozzle ${label}: P&ID rating ${rating.value} but the 3D nozzle ${record.mark} is ${record.rating}`,
+          values: { pidRating: rating.value, modelRating: record.rating },
         }),
       );
   }

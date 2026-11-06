@@ -8,7 +8,7 @@ import { runChecks } from '../checks/runChecks';
 
 /**
  * @affects nothing (read-only query of `doc.plant.pid`)
- * @invariant 16 rules (TECHNICAL_SPEC §5.5), each pass linear in the items; findings sorted errors first, then rule order, natural item label, key; findingKey = pid:<code>:<sorted ids> is stable; status fail with any error, warn with any warning, else pass; accepted findings are hidden unless includeAccepted
+ * @invariant 17 rules (TECHNICAL_SPEC §5.5), each pass linear in the items; findings sorted errors first, then rule order, natural item label, key; findingKey = pid:<code>:<sorted ids> is stable; status fail with any error, warn with any warning, else pass; accepted findings are hidden unless includeAccepted
  * @failure sheet (number or id) not found -> PID_SHEET_NOT_FOUND; a document without a P&ID passes with no findings
  */
 export const checkPid = defineCommand({
@@ -19,7 +19,7 @@ export const checkPid = defineCommand({
     'PID_EQUIPMENT_UNCONNECTED (error; a Tank, PressureVessel or ProcessColumn none of whose nozzles has a line), PID_SIZE_MISMATCH (error; inline dn differs from its segment dn, a reducer is exempt), PID_SPEC_MISMATCH (error; inline pipingClass differs from its segment, a spec break is exempt: class SpecBreak or attribute specBreak), ' +
     'PID_FLOW_DIRECTION_CONFLICT (error; segments meeting at an inline item all flow in or all out, or a check valve against the flow), PID_OPC_UNRESOLVED (error; no partner connector of the opposite direction with the same pairKey on another sheet), PID_TAG_DUPLICATE (error; one tag on several items), ' +
     'PID_SEGMENT_INVALID (error; a drawn segment is not one chain, or a port is used by several segment ends), PID_CONTROL_VALVE_NO_ACTUATOR (warning; an operated valve without actuating system, or an actuating system without controller), ' +
-    'PID_SAFETY_VALVE_NO_SET_PRESSURE (warning, reviewRequired; a safety / relief valve without SetPressureHigh), PID_LINE_NUMBER_MISSING (warning), PID_INSTRUMENT_UNCONNECTED (warning; no measuring / signal line, not a loop partner), PID_TAG_NONSTANDARD (info; instrument letters outside ISA 5.1). ' +
+    'PID_SAFETY_VALVE_NO_SET_PRESSURE (warning, reviewRequired; a safety / relief valve without SetPressureHigh), PID_LINE_NUMBER_MISSING (warning), PID_INSTRUMENT_UNCONNECTED (warning; no measuring / signal line, not a loop partner), PID_TAG_NONSTANDARD (info; instrument letters outside ISA 5.1), PID_STAMP_STALE (warning; a sheet signed for construction was changed afterwards: its content hash differs from the stamped one). ' +
     'Returns data = { check: "pid", status (fail | warn | pass), items (errors first, then warnings, infos; each by rule order) [{ code, status, severity, ids, tags, sheet, item, message, findingKey, remediation, values, reviewRequired? }], countsByCode (every rule run, zero included), ' +
     'summary { errors, warnings, infos, reviewRequired, accepted }, rulesRun, provenance }. Each finding names its fix in `remediation`. `sheet` limits the check to one sheet, `rules` to some codes. Refusal: PID_SHEET_NOT_FOUND. ' +
     'Next: fix the findings with update_pid_item / add_pid_line / reverse_pid_flow / delete_pid_item, then check again; pid_report lists the model.',
@@ -30,7 +30,7 @@ export const checkPid = defineCommand({
       .min(1)
       .optional()
       .describe('Check only this sheet: its number (e.g. "PID-001") or its id. Omit for the whole P&ID.'),
-    rules: z.array(z.enum(PID_RULES)).optional().describe('Run only these rule codes (e.g. ["PID_SIZE_MISMATCH"]). Omit for all 16 rules.'),
+    rules: z.array(z.enum(PID_RULES)).optional().describe('Run only these rule codes (e.g. ["PID_SIZE_MISMATCH"]). Omit for all 17 rules.'),
     includeAccepted: z
       .boolean()
       .optional()
