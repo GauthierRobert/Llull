@@ -24,15 +24,5 @@ export function sheetContentSha256(pid: PidModel, sheet: PidSheet): string {
         .some((id) => onSheet.has(id)),
     ),
   );
-  return sha256Hex(
-    jcsJson({
-      id: sheet.id,
-      number: sheet.number,
-      title: sheet.title,
-      paper: sheet.paper,
-      items,
-      symbols,
-      acceptances,
-    }),
-  );
+  return sha256Hex(jcsJson({ id: sheet.id, number: sheet.number, title: sheet.title, paper: sheet.paper, items, symbols, acceptances }));
 }

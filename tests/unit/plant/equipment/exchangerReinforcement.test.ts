@@ -166,7 +166,12 @@ describe('nozzle_reinforcement: exchangers', () => {
   });
 
   it('a rear-channel nozzle on an exchanger with no rear channel is refused EQP_PARAM_INVALID (nozzles.<mark>.location.channel)', () => {
-    const base = apply(mmDocument(), 'add_heat_exchanger', { ...bemParams, temaType: 'BEU', rearChannel: undefined, corrosionAllowance: 3 });
+    const base = apply(mmDocument(), 'add_heat_exchanger', {
+      ...bemParams,
+      temaType: 'BEU',
+      rearChannel: undefined,
+      corrosionAllowance: 3,
+    });
     const building = getBuilding(base);
     const element = elementsOf(building, 'equipment')[0] as EquipmentElement;
     const nozzle = {
@@ -181,7 +186,10 @@ describe('nozzle_reinforcement: exchangers', () => {
       flange: { outsideDiameter: 230, thickness: 24, placeholder: false, unverified: false },
     };
     const plant = { ...(element.plant as NonNullable<EquipmentElement['plant']>), nozzles: [nozzle] };
-    const doc = { ...base, building: { ...building, elements: { ...building.elements, [element.id]: { ...element, plant } } } } as CadDocument;
+    const doc = {
+      ...base,
+      building: { ...building, elements: { ...building.elements, [element.id]: { ...element, plant } } },
+    } as CadDocument;
     expectRefusal(doc, 'nozzle_reinforcement', { equipment: 'E-301', mark: 'R1' }, 'EQP_PARAM_INVALID', 'nozzles.R1.location.channel');
   });
 

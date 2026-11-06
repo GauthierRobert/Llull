@@ -30,7 +30,10 @@ const PN_RATING = new RegExp(`^PN\\s*-?\\s*(\\d+(?:\\.\\d+)?)${FACING_SUFFIX}`);
 const CLASS_RATING = new RegExp(`^(?:CL|CLASS)?\\s*(\\d+)\\s*(?:#|LBS?)?${FACING_SUFFIX}`);
 
 function normaliseRating(text: string): string {
-  const upper = text.trim().toUpperCase().replace(/^ASME\s*/, '');
+  const upper = text
+    .trim()
+    .toUpperCase()
+    .replace(/^ASME\s*/, '');
   const pn = PN_RATING.exec(upper);
   if (pn !== null) return `PN${Number(pn[1])}`;
   const cls = CLASS_RATING.exec(upper);

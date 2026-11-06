@@ -96,7 +96,13 @@ describe('check_pid: PID_STAMP_STALE', () => {
   it('only what is on the sheet counts: a finding accepted on sheet B, a symbol of a class A does not use, and an edit on B leave a signed sheet A clean', () => {
     const a = issued();
     const withB = apply(a, 'create_pid_sheet', { number: 'PID-010', paper: 'A3' });
-    const onB = apply(withB, 'add_pid_equipment', { sheet: 'PID-010', class: 'Tank', tag: 'T-910', at: [60, 150], nozzles: [{ subTag: 'N1', side: 'left' }] });
+    const onB = apply(withB, 'add_pid_equipment', {
+      sheet: 'PID-010',
+      class: 'Tank',
+      tag: 'T-910',
+      at: [60, 150],
+      nozzles: [{ subTag: 'N1', side: 'left' }],
+    });
     expect(stale(onB)).toEqual([]);
     const key = check(onB, { sheet: 'PID-010', rules: ['PID_NOZZLE_UNCONNECTED'] }).items[0]?.findingKey as string;
     const accepted = apply(onB, 'accept_pid_finding', { findingKey: key, reason: 'known', by: 'bob', at: AT });
