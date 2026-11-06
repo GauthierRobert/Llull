@@ -16,16 +16,16 @@ import { hexRgb } from './frames';
 import { nativeRun, REFERENCE_RENDERER_VERSION } from './rendererProvenance';
 import { surfaceShadingOf } from './surfaceShading';
 import type { MediaEncoder } from '../../model/media';
-import type { ViewName } from './camera';
 import { encodeVideo } from './animation/encodeVideo';
 import { analyseMotion } from './animation/analysis';
-import { framedCamera } from './animation/framing';
+import { buildCameraPlan, resolveCamera } from './animation/cameraPlan';
 import { renderAllFrames } from './animation/frameLoop';
 import { overlayFont } from './animation/overlayText';
 import { animationRejection } from './animation/refusals';
 import { buildSheet, cellSize, sheetFrames } from './animation/sheet';
 import { clipSource } from './animation/clipSource';
 import { simulationSource } from './animation/simulationSource';
+import { stillSource } from './animation/stillSource';
 import { sweepSource } from './animation/sweepSource';
 import { frameCountOf } from './animation/timeline';
 import type { AnimationWarning, MotionFrames, OverlayIds, SourceRefusal } from './animation/types';
@@ -86,11 +86,19 @@ const sourceSchema = z.discriminatedUnion('kind', [
       .max(600)
       .describe('Video seconds of the animation clips to render (animate, trigger auto; click clips are skipped).'),
   }),
+  z.object({
+    kind: z
+      .literal('still')
+      .describe(
+        'Source: nothing moves, only the camera does. Needs camera.walkthroughId or camera.orbit (else MOV_NO_MOTION); no trace or readouts.',
+      ),
+    duration: z.number().positive().max(600).describe('Video seconds to render (playbackRate is 1); frames = floor(duration · fps) + 1.'),
+  }),
 ]);
 
 /**
- * @affects nothing — read-only; data { frames, fps, videoDurationS, sourceDurationS, playbackRate, width, height, format, camera, files[{ fileName, base64 }], timeline[{ frame, tS, sample?, readouts }], moving, traces?{ id: { path (all samples, 6 decimals), at (per frame, exact) } }, renderer, rendererVersion?, frameSha256?, fileSha256?, sheet?, sampleIntervalS?, warnings[{ code, message }] }
- * @invariant frames = floor(sourceDuration · fps / playbackRate + 1e-9) + 1; timeline[k].tS = k · playbackRate / fps; pose, readouts and trace dot of frame k come from the same source state; the camera is one value for all frames
+ * @affects nothing — read-only; data { frames, fps, videoDurationS, sourceDurationS, playbackRate, width, height, format, camera (frame 0), cameraMode, files[{ fileName, base64 }], timeline[{ frame, tS, sample?, readouts }], moving, traces?{ id: { path (all samples, 6 decimals), at (per frame, exact) } }, renderer, rendererVersion?, frameSha256?, fileSha256?, sheet?, sampleIntervalS?, warnings[{ code, message }] }
+ * @invariant frames = floor(sourceDuration · fps / playbackRate + 1e-9) + 1; timeline[k].tS = k · playbackRate / fps; pose, readouts and trace dot of frame k come from the same source state; the camera is one value for all frames unless camera.walkthroughId / camera.orbit (then data.timeline[k].camera)
  * @invariant the input document is deep-equal before and after; no FeatureStep is appended; reference frames are byte-deterministic per rendererVersion (frameSha256, APNG fileSha256)
  * @failure no motion -> MOV_NO_MOTION; unknown id -> MOV_UNKNOWN_ID; frames > maxFrames -> MOV_FRAME_BUDGET; frames × pixels > 1e8 (frames / apng) -> MOV_RENDER_BUDGET; bad camera -> MOV_CAMERA_INVALID; bad colour -> MOV_RENDER_INVALID
  * @failure gif / mp4 without ctx.media, or renderer native without ctx.raster -> NATIVE_TOOL_MISSING; simulation refused -> MOV_SOURCE_FAILED; APNG writer or video encoder failure -> MOV_ENCODE_FAILED
@@ -103,13 +111,14 @@ export const renderAnimation = defineCommand({
     'RENDER A MOVING MECHANISM as a time-exact frame sequence, a timeline of the numbers behind each frame and a contact sheet. Sources: ' +
     '"simulation" (runs simulate_motion ONCE, then draws each frame at its exact instant t = k · playbackRate / fps by interpolating the recorded poses; use ' +
     'playbackRate < 1 for slow motion, e.g. 0.01 shows a 0.06 s crank turn as 6 s), "sweep" (drives a joint or parameter from start to end, optionally and back, with the poses of motion_study) ' +
-    'or "clips" (the document\'s animate clips, evaluated exactly as the viewport plays them). The camera is fixed: framed once on every frame\'s bounds so nothing leaves the picture. ' +
+    '"clips" (the document\'s animate clips, evaluated exactly as the viewport plays them) or "still" (nothing moves: a camera-only film). By default the camera is fixed: framed once on every frame\'s bounds so nothing leaves the picture. ' +
+    'CAMERA PATHS (`camera`): `viewpointId` (a saved viewpoint, as saved), `walkthroughId` (the render_walkthrough camera at t = k / fps) or `orbit` {turns, axis?} (a turntable about the scene centre), combined with any source; a still source needs walkthroughId or orbit; the camera of each frame is in data.timeline[k].camera. ' +
     'Overlays are drawn into the picture: `time` label, `trace` (centre-of-mass path of named bodies with a dot at the current position), `readouts` (joint values, body positions, parameters or clip values as "name = value unit"; the same numbers are in data.timeline[k].readouts), data.traces[id] = { path, at[k] } gives the traced positions, `highlight: "moving"` (moving parts in the accent colour). ' +
     'REVIEW LOOP: first render format "frames" with `sheet` {every: n} and look at sheet.png (one image of every n-th frame, labelled #k t = … s) to check camera, overlays and motion; then render the format you want to keep. ' +
     'Formats: "frames" (PNG files frame-0001.png …), "apng" (animation.apng, loops forever), "gif" / "mp4" (animation.gif / animation.mp4 through the native video encoder, AV1 in MP4; a host without it refuses with NATIVE_TOOL_MISSING: use "apng"; `quality` draft | standard | high applies to mp4 only; a gif is made at most 50 fps, MOV_GIF_FPS_CLAMPED). The default is "mp4", so set `format` explicitly in a host without the encoder. ' +
     'Always in data.files: timeline.json (and sheet.png with `sheet`). The reference renderer (default) gives data.frameSha256[] (and fileSha256 for apng), stable per rendererVersion; renderer "native" draws on the GPU through llull-compute (no digests). ' +
     'Budgets (stable codes): MOV_FRAME_BUDGET (more than maxFrames, at most 1800), MOV_RENDER_BUDGET (frames × width × height over 1e8 for frames / apng). Other refusals: MOV_ENCODE_FAILED (the encoder failed; nothing is returned), MOV_NO_MOTION, MOV_UNKNOWN_ID, MOV_SOURCE_FAILED, MOV_CAMERA_INVALID, MOV_RENDER_INVALID, NATIVE_TOOL_MISSING. ' +
-    'Warnings in data.warnings: MOV_SAMPLES_SPARSE (the simulation samples are further apart than a frame; poses are interpolated), MOV_SIZE_ROUNDED (odd mp4 size rounded down to even), MOV_GIF_FPS_CLAMPED (gif above 50 fps made at 50), MOV_CLICK_CLIPS_SKIPPED, MOV_LOOP_OPEN, MOV_OVERLAY_TEXT_SKIPPED (no bundled font: labels not drawn). ' +
+    'Warnings in data.warnings: MOV_SAMPLES_SPARSE (the simulation samples are further apart than a frame; poses are interpolated), MOV_SIZE_ROUNDED (odd mp4 size rounded down to even), MOV_GIF_FPS_CLAMPED (gif above 50 fps made at 50), MOV_CLICK_CLIPS_SKIPPED, MOV_CAMERA_PATH_DURATION (walkthrough and video lengths differ), MOV_LOOP_OPEN, MOV_OVERLAY_TEXT_SKIPPED (no bundled font: labels not drawn). ' +
     'Read-only: the document is never changed. CLI: `--save dir/` writes all files, `--save out.mp4` (or .gif, .apng) writes that one file and out.timeline.json.',
   params: z.object({
     source: sourceSchema.describe('What moves: a simulation, a joint / parameter sweep or the animation clips.'),
@@ -125,9 +134,42 @@ export const renderAnimation = defineCommand({
             'Named view; planar mechanisms read best face-on ("front" for a crank in the XZ plane, "top" for the XY plane). Default "iso".',
           ),
         direction: vec3('Viewing direction [x, y, z] from the scene toward the camera (Z-up). Give this OR view, not both.').optional(),
+        viewpointId: z
+          .string()
+          .optional()
+          .describe(
+            'A saved viewpoint (save_viewpoint, vp-<n>) used exactly as saved in every frame (not reframed). Not with view / direction / walkthroughId.',
+          ),
+        walkthroughId: z
+          .string()
+          .optional()
+          .describe(
+            'A walkthrough (create_walkthrough, wt-<n>): the camera of frame k is the one render_walkthrough gives at t = k / fps (video time, whatever playbackRate). It holds on the last key when the video is longer (warning MOV_CAMERA_PATH_DURATION). Not with view / direction / viewpointId / orbit.',
+          ),
+        path: z
+          .enum(['linear', 'smooth'])
+          .optional()
+          .describe(
+            'With walkthroughId: "linear" (default) or "smooth" (eye on a Catmull-Rom spline through the keys), as render_walkthrough.',
+          ),
+        orbit: z
+          .object({
+            turns: z
+              .number()
+              .describe(
+                'Turns of the camera about the axis over the whole video (negative: the other way), non-zero, at most 100 in magnitude. Frame k is turned by 2π · turns · k / (frames − 1), so one turn ends where it began.',
+              ),
+            axis: vec3('Orbit axis [x, y, z] through the centre of the framed scene. Default [0, 0, 1] (a turntable).').optional(),
+          })
+          .optional()
+          .describe(
+            'Turntable: the camera circles the centre of the scene. Starts from view / direction (default "iso", an orthographic camera sized to the circumscribed sphere so nothing leaves the picture) or from viewpointId (as saved). Not with walkthroughId.',
+          ),
       })
       .optional()
-      .describe('The one fixed camera, framed on all frames.'),
+      .describe(
+        'The camera. Default: one fixed iso camera framed on all frames. Moving modes (walkthroughId, orbit) record the camera of each frame in data.timeline[k].camera.',
+      ),
     overlays: z
       .object({
         time: z.boolean().optional().describe('Draw "t = … s" (simulated time) top left. Default false.'),
@@ -202,11 +244,15 @@ export const renderAnimation = defineCommand({
     // 4:2:0 needs even sides: an odd mp4 size is rounded down by one
     const width = format === 'mp4' ? askedWidth - (askedWidth % 2) : askedWidth;
     const height = format === 'mp4' ? askedHeight - (askedHeight % 2) : askedHeight;
-    const camera = params.camera ?? {};
-    if (camera.view !== undefined && camera.direction !== undefined)
-      return fail('MOV_CAMERA_INVALID', 'camera gives both view and direction', [], ['camera']);
-    if (camera.direction !== undefined && !(camera.direction.every(Number.isFinite) && Math.hypot(...camera.direction) > 1e-9))
-      return fail('MOV_CAMERA_INVALID', 'camera.direction must be a finite, non-zero [x, y, z]', [], ['camera.direction']);
+    const resolved = resolveCamera(doc, params.camera ?? {});
+    if ('refused' in resolved) return fail(resolved.refused.code, resolved.refused.message, resolved.refused.ids, ['camera']);
+    if (source.kind === 'still' && (resolved.mode === 'fixed' || resolved.mode === 'viewpoint'))
+      return fail(
+        'MOV_NO_MOTION',
+        'a still source with a fixed camera shows the same picture in every frame: give camera.walkthroughId or camera.orbit',
+        [],
+        ['camera'],
+      );
     const background = hexRgb(params.background ?? DEFAULT_BACKGROUND);
     if (background === null)
       return fail('MOV_RENDER_INVALID', `background "${params.background ?? ''}" is not #rgb or #rrggbb`, [], ['background']);
@@ -266,26 +312,28 @@ export const renderAnimation = defineCommand({
               },
               ids,
             )
-          : clipSource(doc, { fps, frames }, ids);
+          : source.kind === 'clips'
+            ? clipSource(doc, { fps, frames }, ids)
+            : stillSource(doc, { fps, frames }, ids);
     if ('refused' in made) return fail(made.refused.code, made.refused.message, made.refused.ids, [], made.refused.warnings);
     const motion = made;
 
-    const analysis = analyseMotion(motion, frames);
-    if (analysis.bounds === null || analysis.moving.length === 0)
+    const analysis = analyseMotion(motion, source.kind === 'still' ? 1 : frames);
+    if (analysis.bounds === null || (source.kind !== 'still' && analysis.moving.length === 0))
       return fail(
         'MOV_NO_MOTION',
-        `nothing moves during the ${source.kind} run (every entity keeps its pose in all ${frames} frames)`,
+        `${analysis.bounds === null ? 'there is nothing to draw' : `nothing moves during the ${source.kind} run (every entity keeps its pose in all ${frames} frames)`}`,
         [],
         [],
         motion.warnings,
       );
-    const view: ViewName = camera.direction === undefined ? (camera.view ?? 'iso') : 'custom';
-    const fixed = framedCamera(view, camera.direction, analysis.bounds, width, height);
+    const plan = buildCameraPlan(resolved, analysis.bounds, width, height, fps, frames);
+    const timeline = plan.moves ? motion.timeline.map((entry, k) => ({ ...entry, camera: plan.cameraAt(k) })) : motion.timeline;
     const colorOverrides =
       params.overlays?.highlight === 'moving' ? Object.fromEntries(analysis.moving.map((id) => [id, hexOf(accent)])) : undefined;
     const font = overlayFont(ctx);
     const wantsText = params.overlays?.time === true || ids.readouts.length > 0 || ids.trace.length > 0 || params.sheet !== undefined;
-    const warnings: AnimationWarning[] = [...motion.warnings];
+    const warnings: AnimationWarning[] = [...motion.warnings, ...plan.warnings];
     if (width !== askedWidth || height !== askedHeight)
       warnings.push({
         code: 'MOV_SIZE_ROUNDED',
@@ -308,7 +356,8 @@ export const renderAnimation = defineCommand({
       frames,
       width,
       height,
-      camera: fixed,
+      cameraAt: plan.cameraAt,
+      cameraMoves: plan.moves,
       bounds: analysis.bounds,
       background,
       pixels: run?.pixels,
@@ -345,10 +394,7 @@ export const renderAnimation = defineCommand({
         files.push({ fileName: `frame-${String(k + 1).padStart(4, '0')}.png`, base64: uint8ArrayToBase64(png) }),
       );
     }
-    files.push({
-      fileName: 'timeline.json',
-      base64: textToBase64(JSON.stringify({ fps, playbackRate, frames, timeline: motion.timeline })),
-    });
+    files.push({ fileName: 'timeline.json', base64: textToBase64(JSON.stringify({ fps, playbackRate, frames, timeline })) });
     let sheetData: { frames: number[]; columns: number; width: number; height: number } | undefined;
     if (params.sheet !== undefined) {
       const sheet = buildSheet(drawn.cells, cellSize(width, height), font);
@@ -364,9 +410,10 @@ export const renderAnimation = defineCommand({
       width,
       height,
       format,
-      camera: fixed,
+      camera: plan.cameraAt(0),
+      cameraMode: plan.mode,
       files,
-      timeline: motion.timeline,
+      timeline,
       moving: analysis.moving,
       ...(motion.traces.length === 0
         ? {}
@@ -382,7 +429,7 @@ export const renderAnimation = defineCommand({
     };
     const summary =
       `render_animation: ${frames} frame(s) at ${fps} fps (${+(frames / fps).toFixed(4)} s of video, ${source.kind} ${source.duration} s${playbackRate === 1 ? '' : ` at playbackRate ${playbackRate}`}), ${width}×${height}, ` +
-      `${view} view, format ${format}; ${analysis.moving.length} moving entit${analysis.moving.length === 1 ? 'y' : 'ies'}` +
+      `${plan.mode} camera, format ${format}; ${analysis.moving.length} moving entit${analysis.moving.length === 1 ? 'y' : 'ies'}` +
       `${warnings.length === 0 ? '' : `; warnings: ${warnings.map((w) => w.code).join(', ')}`}. Save the files with --save <dir>/ (or --save out.${format === 'frames' ? 'png' : format}).`;
     if (run === null)
       return report(doc, summary, {

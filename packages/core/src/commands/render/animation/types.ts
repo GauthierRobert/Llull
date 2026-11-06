@@ -2,6 +2,7 @@
 
 import type { CadDocument } from '../../../model/types';
 import type { Vec3 } from '../../../model/vectors';
+import type { ViewpointCamera } from '../../../model/review';
 
 export interface ReadoutValue {
   readonly value: number;
@@ -18,6 +19,8 @@ export interface FrameSample {
 export interface AnimationTimelineEntry {
   readonly frame: number;
   readonly tS: number;
+  /** The camera of this frame, present only when the camera moves (walkthrough, orbit). */
+  readonly camera?: ViewpointCamera;
   readonly sample?: FrameSample;
   readonly readouts: Readonly<Record<string, ReadoutValue>>;
 }

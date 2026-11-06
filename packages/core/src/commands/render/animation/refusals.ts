@@ -3,13 +3,16 @@
 import { tableRejection } from '../../noop';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
-  MOV_NO_MOTION: 'add rigid bodies and joints (add_rigid_body, add_body_joint), a joint or parameter to sweep, or an auto clip (animate)',
+  MOV_NO_MOTION:
+    'add rigid bodies and joints (add_rigid_body, add_body_joint), a joint or parameter to sweep, an auto clip (animate), or the still source with a camera path',
   MOV_SOURCE_FAILED: 'run simulate_motion (or motion_study) on its own and fix what it reports',
-  MOV_UNKNOWN_ID: 'name existing ids: rigid body or joint ids (simulation), joint or parameter ids (sweep), clip / entity ids (clips)',
+  MOV_UNKNOWN_ID:
+    'name existing ids: rigid body or joint ids (simulation), joint or parameter ids (sweep), clip / entity ids (clips), viewpoint / walkthrough ids (camera: list_viewpoints)',
   MOV_FRAME_BUDGET: 'lower fps or the duration, raise playbackRate (simulation), or raise maxFrames (at most 1800)',
   MOV_RENDER_BUDGET:
     'use a smaller width / height or fewer frames; format "mp4" / "gif" has no pixel budget (the host encoder session takes the frames one at a time)',
-  MOV_CAMERA_INVALID: 'give either view or a finite non-zero direction, not both',
+  MOV_CAMERA_INVALID:
+    'give one of view / direction, viewpointId or walkthroughId (orbit may follow view / direction / viewpointId; path only with walkthroughId); direction and orbit.axis finite and non-zero, orbit.turns non-zero',
   MOV_RENDER_INVALID: 'colours are #rgb or #rrggbb',
   MOV_ENCODE_FAILED: 'retry with format "apng" or "frames" (or a smaller size); the summary names the encoder error',
   NATIVE_TOOL_MISSING:

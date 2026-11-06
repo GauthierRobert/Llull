@@ -42,12 +42,14 @@ export interface AnimationData {
   width: number;
   height: number;
   format: string;
-  camera: { projection: string; eye: number[]; direction: number[]; up: number[]; viewHeight: number };
+  cameraMode?: string;
+  camera: { projection: string; eye: number[]; direction: number[]; up: number[]; viewHeight: number; fovDeg?: number };
   files: { fileName: string; base64: string }[];
   timeline: {
     frame: number;
     tS: number;
     sample?: { before: number; after: number; weight: number };
+    camera?: AnimationData['camera'];
     readouts: Record<string, { value: number; unit: string }>;
   }[];
   moving: string[];
