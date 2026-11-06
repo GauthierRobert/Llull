@@ -221,7 +221,7 @@ describe('set_run_end_cap: review follow-ups', () => {
     const piping = JSON.parse(JSON.stringify(doc.plant?.piping)) as {
       runs: Record<string, { start: Record<string, unknown>; end: Record<string, unknown> }>;
     };
-    piping.runs[runId]?.end && (piping.runs[runId].end['cap'] = true);
+    (piping.runs[runId] as { end: Record<string, unknown> }).end['cap'] = true;
     const other = JSON.parse(JSON.stringify(piping.runs[runId])) as { id: string; start: Record<string, unknown> };
     other.id = 'run-x';
     other.start['ref'] = { kind: 'runEnd', runId, end: 'end' };
@@ -241,7 +241,7 @@ describe('set_run_end_cap: review follow-ups', () => {
     const starts = lines.flatMap((line, index) => (line === 'CAP' ? [index] : []));
     const body = lines
       .slice((starts[0] ?? 0) + 1)
-      .filter((line, index, all) => all.slice(0, index).every((prior) => prior.startsWith(' ')));
+      .filter((_line, index, all) => all.slice(0, index).every((prior) => prior.startsWith(' ')));
     expect(starts).toHaveLength(1);
     const endPoints = body.filter((line) => line.includes('END-POINT'));
     expect(endPoints).toHaveLength(1);
