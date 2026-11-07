@@ -163,6 +163,9 @@ describe('record_convergence_study (VC-VNV-10 at the level of artifacts, VC-VNV-
     expect(reversed.error?.code).toBe('VNV_LEVELS_INVALID');
     expect(reversed.error?.paths).toEqual(['study.levels.1.h']);
     expect(refuse({ analysisId: bar.analysisId, study: { ...bar.study, levels: levels.slice(0, 2) } }).error?.code).toBe(
+      'VNV_LEVELS_INVALID',
+    );
+    expect(refuse({ analysisId: bar.analysisId, study: { ...bar.study, levels: levels.slice(0, 1) } }).error?.code).toBe(
       'CMD_INVALID_PARAMS',
     );
     expect(refuse({ analysisId: bar.analysisId, study: { ...bar.study, quantity: { kind: 'probe' } } }).error?.code).toBe(

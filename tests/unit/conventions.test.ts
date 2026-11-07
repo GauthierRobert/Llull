@@ -208,3 +208,31 @@ describe('CONVENTIONS_GUIDE plant equipment section (plant 03 EQP, AF-03)', () =
     expect(section).toMatch(/available: false/);
   });
 });
+
+describe('CONVENTIONS_GUIDE solution verification section (PHY-00 V&V, VNV-M4)', () => {
+  const section = CONVENTIONS_GUIDE.slice(CONVENTIONS_GUIDE.indexOf('## 18. Solution verification'));
+
+  it('exists, names the three refinement kinds, the least-squares method and the human gate', () => {
+    expect(section.length).toBeGreaterThan(500);
+    for (const pattern of [
+      /refinement=h/,
+      /dt the transient time step/,
+      /p the element order/,
+      /least squares/,
+      /provenance\.procedure/,
+      /VNV_HUMAN_GATE/,
+      /estimated/,
+    ]) {
+      expect(section).toMatch(pattern);
+    }
+  });
+
+  it('names only registered commands (the host transport is written as a whole CLI line)', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    const names = [...section.matchAll(/`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`/g)].map((match) => match[1] ?? '');
+    expect(names).toEqual(
+      expect.arrayContaining(['check_verification', 'check_convergence', 'delete_convergence_study', 'accept_verification_exception']),
+    );
+    expect(names.filter((name) => getCommand(name) === undefined)).toEqual([]);
+  });
+});

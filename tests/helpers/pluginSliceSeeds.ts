@@ -25,6 +25,7 @@ import { docWith, sampleCatalogFile } from '../unit/aero/fasteners/fixtures';
 import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
 import { barModel } from '../unit/cae/explicit/support';
+import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import {
@@ -233,6 +234,12 @@ function cfdDocument(): CadDocument {
 }
 
 /** The 05 bar with a verified convergence study (PHY-00 VNV-M3): the cae slice with its studies, behind an in-memory artifact port. */
+let lsqSeed: ReturnType<typeof studyBar> | undefined;
+const lsqFixture = (): ReturnType<typeof studyBar> => (lsqSeed ??= studyBar({ cells: [8, 4, 2, 1] }));
+let dtSeed: ReturnType<typeof dtStudyBar> | undefined;
+const dtFixture = (): ReturnType<typeof dtStudyBar> => (dtSeed ??= dtStudyBar());
+let orderSeed: ReturnType<typeof orderStudyBar> | undefined;
+const orderFixture = (): ReturnType<typeof orderStudyBar> => (orderSeed ??= orderStudyBar());
 let studySeed: ReturnType<typeof studyBar> | undefined;
 const studyFixture = (): ReturnType<typeof studyBar> => (studySeed ??= studyBar());
 
@@ -396,6 +403,46 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     roots: ['analysis'],
     build: () => recordedStudy(studyFixture()).doc,
     ctx: () => studyFixture().ctx,
+    query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
+    mutate: {
+      name: 'delete_convergence_study',
+      params: (doc) => ({
+        analysisId: analysisId(doc),
+        studyId: Object.keys(doc.analysis?.cases[analysisId(doc)]?.studies ?? {})[0] ?? 'missing',
+      }),
+    },
+  },
+  // PHY-00 VNV-M4: a least-squares (4 levels), a time-step (dt) and an element-order (p) study
+  'cae#studies-lsq': {
+    roots: ['analysis'],
+    build: () => recordedStudy(lsqFixture()).doc,
+    ctx: () => lsqFixture().ctx,
+    query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
+    mutate: {
+      name: 'delete_convergence_study',
+      params: (doc) => ({
+        analysisId: analysisId(doc),
+        studyId: Object.keys(doc.analysis?.cases[analysisId(doc)]?.studies ?? {})[0] ?? 'missing',
+      }),
+    },
+  },
+  'cae#studies-dt': {
+    roots: ['analysis'],
+    build: () => recordKind(dtFixture()).doc,
+    ctx: () => dtFixture().ctx,
+    query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
+    mutate: {
+      name: 'delete_convergence_study',
+      params: (doc) => ({
+        analysisId: analysisId(doc),
+        studyId: Object.keys(doc.analysis?.cases[analysisId(doc)]?.studies ?? {})[0] ?? 'missing',
+      }),
+    },
+  },
+  'cae#studies-order': {
+    roots: ['analysis'],
+    build: () => recordKind(orderFixture()).doc,
+    ctx: () => orderFixture().ctx,
     query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
     mutate: {
       name: 'delete_convergence_study',

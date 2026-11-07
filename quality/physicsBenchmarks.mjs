@@ -14,9 +14,19 @@ const measurements = path.join(cache, 'unit-measurements.jsonl');
 mkdirSync(path.join(cache, 'reports'), { recursive: true });
 rmSync(measurements, { force: true });
 
+// shell: true joins the arguments with spaces. Node refuses to spawn a .cmd with shell: false (EINVAL), so on win32 every argument is quoted; one
+// holding a double quote or a percent sign (cmd would expand it) is refused rather than escaped.
+const shellQuote = (arg) => {
+  if (/["%]/.test(arg)) throw new Error('unsafe argument for the cmd shell: ' + arg);
+  return '"' + arg + '"';
+};
 const run = (command, args, env = {}) =>
-  spawnSync(command, args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } }).status ??
-  1;
+  spawnSync(command, process.platform === 'win32' ? args.map(shellQuote) : args, {
+    cwd: root,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+    env: { ...process.env, ...env },
+  }).status ?? 1;
 
 const env = { LLULL_PHYSICS_MEASUREMENTS: measurements };
 const tests = run('npx', ['vitest', 'run', 'tests/unit/physics', 'tests/unit/cae'], env);

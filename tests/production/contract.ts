@@ -58,7 +58,8 @@ type CriterionArea =
   | 'survey'
   | 'earthworks'
   | 'roads'
-  | 'drainage';
+  | 'drainage'
+  | 'verification';
 
 export interface Criterion {
   /** kebab-case, unique per scenario; the id used in `knownIssues`. */
@@ -79,6 +80,8 @@ export interface Scenario {
   brief: string;
   /** Deterministic tool-call sequence (scripted driver). */
   script: ToolCall[];
+  /** Host tools the script calls that are not registry commands (FE transports): the in-process run skips the scenario, the scripted gate needs the tools. */
+  hostTools?: readonly string[];
   criteria: Criterion[];
   /** Criteria that fail today, per driver. Ratchet: a known issue that passes fails the gate. */
   knownIssues: Partial<Record<DriverId, string[]>>;

@@ -7,7 +7,13 @@ import type { CadDocument } from '@core/model/types';
 import type { CaseStudy } from './studyState';
 
 /** Codes whose finding a qualified reviewer may accept (a numeric GCI above the target is the owner's call, never accepted). */
-export const ACCEPTABLE_CODES = ['VNV_NOT_ASYMPTOTIC', 'VNV_OSCILLATORY', 'VNV_DIVERGENT', 'VNV_ORDER_MISMATCH'] as const;
+export const ACCEPTABLE_CODES = [
+  'VNV_NOT_ASYMPTOTIC',
+  'VNV_OSCILLATORY',
+  'VNV_DIVERGENT',
+  'VNV_ORDER_MISMATCH',
+  'VNV_LSQ_POOR_FIT',
+] as const;
 
 export const EXCEPTION_ACT = 'acceptance of a verification exception';
 

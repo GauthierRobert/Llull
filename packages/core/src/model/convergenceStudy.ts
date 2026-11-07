@@ -2,10 +2,15 @@
  * Convergence studies (PHY-00 VNV-M3): recorded on `AnalysisCase.studies`. A study holds only what was MEASURED (one value per mesh level, each bound to
  * the mesh / results artifacts and the input hash of its level); the report (observed order, extrapolation, GCI) and the staleness are always
  * recomputed from it, never stored.
- * @invariant JSON-serialisable and finite; levels are finest first (index 0); lengths of `controls` / `h` are in DOCUMENT units' analysis length
+ * @invariant JSON-serialisable and finite; levels are finest first (index 0); one study follows ONE refinement kind (never mixed): `h` mesh size (level `h`
+ * is the representative spacing, analysis length unit), `dt` transient time step (level `h` is the fixed increment in seconds; the mesh is the case's own),
+ * `p` element order (two levels: order 2 then order 1 on the same mesh size; level `h` is 1 / order, a nominal size)
  */
 
 import type { NamedValue } from './topology';
+
+/** What a study refines: the mesh size, the transient time step or the element order. */
+export type StudyRefinement = 'h' | 'dt' | 'p';
 
 /** The scalar result a study follows across refinement levels. */
 export type StudyQuantity =
@@ -18,10 +23,10 @@ export type StudyQuantity =
 export interface StudyLevel<C> {
   /** 0 = finest. */
   readonly index: number;
-  /** The mesh controls this level was meshed with (the case's own controls, `globalSize` and refinement sizes scaled). */
+  /** The mesh controls this level was meshed with (kind h: the case's controls with `globalSize` and refinement sizes scaled; dt: the case's own; p: the case's with `order` set). */
   readonly controls: C;
   readonly elements: number;
-  /** Representative spacing h = (measure / elements)^(1/dimension), analysis length unit. */
+  /** The level's refinement size: h = (measure / elements)^(1/dimension) in the analysis length unit (kind h), the time increment in seconds (dt), 1 / order (p). */
   readonly h: number;
   /** The quantity at this level, in the study unit. */
   readonly value: number;
@@ -59,12 +64,12 @@ export interface ConvergenceStudy<C> {
   readonly analysisId: string;
   readonly quantity: StudyQuantity;
   readonly unit: string;
-  readonly refinement: 'h';
-  /** Nominal refinement ratio between consecutive levels (informative; the GCI uses the measured spacings). */
+  readonly refinement: StudyRefinement;
+  /** Nominal refinement ratio between consecutive levels (informative; the arithmetic uses the measured sizes). */
   readonly ratio: number;
-  /** Analysed domain measure behind every `h`: volume (3), area (2) in the analysis length unit^dimension. */
-  readonly measure: { readonly value: number; readonly dimension: 1 | 2 | 3 };
-  /** 3 to 6 levels, finest first. */
+  /** Analysed domain measure behind every `h` (kind h only; absent for dt and p): volume (3) in the analysis length unit^dimension. */
+  readonly measure?: { readonly value: number; readonly dimension: 1 | 2 | 3 };
+  /** 3 to 6 levels (kinds h, dt) or exactly 2 (kind p), finest first. */
   readonly levels: readonly StudyLevel<C>[];
   readonly formalOrder?: NamedValue;
   readonly safetyFactor: NamedValue;

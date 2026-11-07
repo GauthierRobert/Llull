@@ -392,3 +392,23 @@
   color: var(--warning, #d9a23a);
   font-size: 0.85em;
 }
+
+.analysis__study {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--border, #3a3f47);
+  border-radius: 6px;
+}
+
+.analysis__verification-items {
+  margin: 8px 0 0;
+  padding-left: 16px;
+}
+
+.analysis__verification-item {
+  margin-bottom: 4px;
+}
+
+.analysis__verification-accepted {
+  color: var(--text-muted, #9aa0a6);
+}

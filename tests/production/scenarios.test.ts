@@ -22,7 +22,8 @@ function run(scenario: Scenario, doc: CadDocument): CadDocument {
 
 describe('production scenarios (in-process scripted driver)', () => {
   for (const scenario of SCENARIOS) {
-    it(scenario.id, () => {
+    // a scenario that calls host tools (FE transports) needs the real backend: the scripted gate runs it (physics.test.ts grades its criteria here)
+    it.skipIf(scenario.hostTools !== undefined)(scenario.id, () => {
       let baseline = createEmptyDocument();
       let document = baseline;
       for (const step of chainOf(scenario)) {

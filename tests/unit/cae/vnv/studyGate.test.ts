@@ -362,3 +362,35 @@ describe('accept_verification_exception: spend last, and a kept entry is re-veri
     expect(study(replayWith({ documentUid: 'e'.repeat(32) }), bar, studyId).exception).toBeUndefined();
   });
 });
+
+describe('accept_verification_exception on a least-squares study (VNV_LSQ_POOR_FIT, PHY-00 VNV-M4)', () => {
+  // 4 levels, monotone but badly fitted by f0 + a h^p: the fit standard deviation exceeds the finest-level correction
+  const poorBar = (): StudyBar => studyBar({ cells: [8, 4, 2, 1], value: (_h, level) => 100 + [0, 0.05, 0.15, 0.55][level]! });
+  const bar = poorBar();
+  const { doc, studyId } = recordedStudy(bar);
+
+  it('a reviewer accepts the poor fit; check_verification lists it as accepted with the port-verified signer and the status relaxes', () => {
+    const port = signingPort();
+    const signature = signatureFor(doc, bar, studyId, 'VNV_LSQ_POOR_FIT');
+    const accepted = accept(doc, bar, studyId, humanContext(bar, port), { code: 'VNV_LSQ_POOR_FIT', signature });
+    expect(accepted.rejected).not.toBe(true);
+    expect(accepted.affected).toEqual([studyId]);
+    const data = execute(accepted.document, 'check_verification', { analysisId: bar.analysisId, gciTarget: 0.5 }, humanContext(bar, port))
+      .data as { items: { code: string; accepted?: { signer: string } }[] };
+    expect(data.items.find((item) => item.code === 'VNV_LSQ_POOR_FIT')?.accepted?.signer).toBe(SIGNER);
+  });
+
+  it('an agent gets VNV_HUMAN_GATE and a well-fitted study has nothing to accept (VNV_EXCEPTION_NOT_APPLICABLE)', () => {
+    const refused = accept(doc, bar, studyId, bar.ctx, { code: 'VNV_LSQ_POOR_FIT' });
+    expect(refused.error?.code).toBe('VNV_HUMAN_GATE');
+    expect(refused.document).toBe(doc);
+    const good = studyBar({ cells: [8, 4, 2, 1] });
+    const recorded = recordedStudy(good);
+    const port = signingPort();
+    const none = accept(recorded.doc, good, recorded.studyId, humanContext(good, port), {
+      code: 'VNV_LSQ_POOR_FIT',
+      signature: signatureFor(recorded.doc, good, recorded.studyId, 'VNV_LSQ_POOR_FIT'),
+    });
+    expect(none.error?.code).toBe('VNV_EXCEPTION_NOT_APPLICABLE');
+  });
+});

@@ -2,10 +2,11 @@ import type { Scenario } from '../contract';
 import { civilSite } from './civilSite';
 import { extractionBuilding } from './extractionBuilding';
 import { extractionRevision } from './extractionRevision';
+import { physicsBenchmarks } from './physicsBenchmarks';
 import { pipeRack } from './pipeRack';
 
 /** Every production scenario, in run order (a scenario's `startsFrom` comes before it). */
-export const SCENARIOS: readonly Scenario[] = [extractionBuilding, extractionRevision, pipeRack, civilSite];
+export const SCENARIOS: readonly Scenario[] = [extractionBuilding, extractionRevision, pipeRack, civilSite, physicsBenchmarks];
 
 function scenarioById(id: string): Scenario {
   const scenario = SCENARIOS.find((s) => s.id === id);

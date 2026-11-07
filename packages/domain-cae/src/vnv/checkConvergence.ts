@@ -1,10 +1,11 @@
-/** check_convergence: grid-convergence study of a scalar result from measured samples (PHY-00, Celik et al. 2008 / Roache GCI). */
+/** check_convergence: grid-convergence study of a scalar result from measured samples (PHY-00, Celik et al. 2008 / Roache GCI; least-squares fit over 4+ samples). */
 
 import { representativeSpacing, type ConvergenceSample } from '@lib/convergence';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { codedRejection, report } from '@core/commands/noop';
-import { analyseSamples, percent } from './convergenceAnalysis';
+import { percent } from './analysisShared';
+import { analyseSamples } from './convergenceAnalysis';
 
 const FORMULAS = [
   'R = e32/e21, e21 = f2 - f1, e32 = f3 - f2 (finest first)',
@@ -13,6 +14,12 @@ const FORMULAS = [
   'GCI21_fine = Fs |(f1 - f2)/f1| / (r21^p - 1)',
   'AR = r21^p GCI21_fine / GCI32_fine',
   'h* = h1 / (GCI21 / GCI*)^(1/p)',
+];
+
+const LSQ_FORMULAS = [
+  'f(h) = f0 + a h^p fitted to every sample (weights 1): for each p, (f0, a) from the straight-line fit of f against h^p; p minimises the residual over [0.05, 8], then Gauss-Newton on (f0, a, p)',
+  'standard error: sqrt(diag(s^2 (J^T J)^-1)), s^2 = sum r^2 / (n - 3)',
+  'U = Fs |f1 - f0| + s, s = sqrt(sum r^2 / (n - 3)): llull implementation choice, not confirmed against Eca & Hoekstra 2014',
 ];
 
 const fail = (doc: Parameters<typeof report>[0], why: string, path: string, code = 'VNV_SAMPLES_INVALID'): CommandResult =>
@@ -42,8 +49,9 @@ export const checkConvergence = defineCommand({
     'the asymptotic ratio (≈ 1 in the asymptotic range) and, with gciTarget, the spacing needed to reach it. Classifies first: ' +
     'oscillatory or divergent samples return a code (VNV_OSCILLATORY / VNV_DIVERGENT) and NO extrapolated value. Safety factor 1.25 ' +
     '(≥ 3 levels) or 3 (two levels, needs assumedOrder) as named defaults. Warnings: VNV_ORDER_MISMATCH (|p − formalOrder| > 0.5), ' +
-    'VNV_NOT_ASYMPTOTIC, VNV_RATIO_TOO_SMALL, VNV_TWO_LEVEL_ONLY. Read-only; next: refine further, or report the GCI as an estimated ' +
-    'discretisation error.',
+    'VNV_NOT_ASYMPTOTIC, VNV_RATIO_TOO_SMALL, VNV_TWO_LEVEL_ONLY. With method least_squares and 4 or more samples it instead fits f = f0 + a h^p to all ' +
+    'of them (Eca & Hoekstra model): p with its standard error, f0, the fit residual and an uncertainty (data.lsq; the form Fs |f1 - f0| + s is an llull implementation choice, not confirmed against Eca & Hoekstra), warnings VNV_LSQ_POOR_FIT / VNV_LSQ_FEW_DOF (4 samples leave 1 degree of freedom), VNV_LSQ_NO_FIT (order outside [0.05, 8]: no extrapolation). Read-only; ' +
+    'next: refine further, or report the GCI as an estimated discretisation error.',
   params: z.object({
     quantity: z.string().describe('What was measured, e.g. "tip u_y" or "max von Mises at the lug".'),
     unit: z.string().describe("Unit of every sample value, e.g. 'mm', 'MPa', '1' (dimensionless)."),
@@ -71,7 +79,17 @@ export const checkConvergence = defineCommand({
     orderTolerance: z.number().positive().optional().describe('Allowed |p − formalOrder| before VNV_ORDER_MISMATCH. Default 0.5 (named).'),
     assumedOrder: z.number().positive().optional().describe('Order assumed for a two-sample study (required with exactly 2 samples).'),
     safetyFactor: z.number().positive().optional().describe('GCI safety factor Fs. Default 1.25 (≥ 3 samples) or 3 (2 samples).'),
-    gciTarget: z.number().positive().optional().describe('Target GCI21 as a fraction (0.01 = 1 %): adds requiredSpacing and a check.'),
+    gciTarget: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Target GCI21 (or least-squares uncertainty) as a fraction (0.01 = 1 %): adds requiredSpacing and a check.'),
+    method: z
+      .enum(['gci', 'least_squares'])
+      .optional()
+      .describe(
+        "'gci' (default): Celik triplet of the finest three samples, the others as extra triplets. 'least_squares': fit f = f0 + a h^p to ALL samples (needs 4 or more; Eca & Hoekstra model): reports p, f0, standard errors, the fit residual and an uncertainty = Fs |f1 - f0| + fit standard deviation (llull implementation choice, not confirmed against Eca & Hoekstra). Prefer it for noisy unstructured-mesh studies.",
+      ),
   }),
   run: (doc, params): CommandResult => {
     const samples: ConvergenceSample[] = [];
@@ -91,7 +109,7 @@ export const checkConvergence = defineCommand({
     samples.sort((a, b) => a.h - b.h);
     const outcome = analyseSamples(samples, params);
     if (!outcome.ok) return fail(doc, outcome.message, outcome.path, outcome.code);
-    const { findings, triplets, summaryReport, safetyFactor, formalOrder, defaults, required } = outcome.analysis;
+    const { findings, triplets, summaryReport, safetyFactor, formalOrder, defaults, required, lsq, method } = outcome.analysis;
     const { p, gci21Fine, asymptoticRatio, status } = summaryReport;
 
     const extrapolates = status === 'monotone' || status === 'two_level';
@@ -110,19 +128,27 @@ export const checkConvergence = defineCommand({
       ...(summaryReport.gci32Fine !== undefined ? { gci32Fine: summaryReport.gci32Fine } : {}),
       ...(asymptoticRatio !== undefined ? { asymptoticRatio } : {}),
       ...(required !== undefined ? { requiredSpacing: required } : {}),
+      ...(lsq !== undefined ? { lsq } : {}),
       triplets,
       safetyFactor,
       ...(formalOrder !== undefined ? { formalOrder } : {}),
       defaults,
       fractionUnit: 'fraction (ea21, eext21, gci21, gci32Fine; 0.01 = 1 %)',
-      provenance: { procedure: 'celik2008-gci', formulas: FORMULAS, samples, safetyFactor: safetyFactor.value },
+      provenance: {
+        procedure: method,
+        formulas: method === 'celik2008-gci' ? FORMULAS : LSQ_FORMULAS,
+        samples,
+        safetyFactor: safetyFactor.value,
+      },
     };
     const head = `check_convergence ${params.quantity}: ${status} over ${samples.length} levels`;
     const summary =
-      extrapolates && p !== undefined && gci21Fine !== undefined && summaryReport.extrapolated !== undefined
-        ? `${head}, observed order ${p.toPrecision(4)}, extrapolated ${summaryReport.extrapolated.toPrecision(6)} ${params.unit}; ` +
-          `estimated discretisation error (GCI, Fs ${safetyFactor.value}) ${percent(gci21Fine)} of the finest value.`
-        : `${head}; no extrapolated value${findings.length > 0 ? ` (${findings.map((f) => f.code).join(', ')})` : ''}.`;
+      lsq !== undefined
+        ? `${head}, least-squares fit (${lsq.method}): observed order ${lsq.p.toPrecision(4)} (standard error ${lsq.standardError?.p.toPrecision(2) ?? 'n/a'}), extrapolated ${lsq.f0.toPrecision(6)} ${params.unit}, fit standard deviation ${lsq.residual.standardDeviation.toPrecision(3)} ${params.unit}; estimated uncertainty ${lsq.uncertainty.relative === undefined ? `${lsq.uncertainty.absolute.toPrecision(3)} ${params.unit}` : `${percent(lsq.uncertainty.relative)} of the finest value`}.`
+        : extrapolates && p !== undefined && gci21Fine !== undefined && summaryReport.extrapolated !== undefined
+          ? `${head}, observed order ${p.toPrecision(4)}, extrapolated ${summaryReport.extrapolated.toPrecision(6)} ${params.unit}; ` +
+            `estimated discretisation error (GCI, Fs ${safetyFactor.value}) ${percent(gci21Fine)} of the finest value.`
+          : `${head}; no extrapolated value${findings.length > 0 ? ` (${findings.map((f) => f.code).join(', ')})` : ''}.`;
     return report(doc, summary, data);
   },
 });

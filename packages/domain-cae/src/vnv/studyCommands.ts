@@ -61,7 +61,7 @@ export const acceptVerificationException = defineCommand({
   name: 'accept_verification_exception',
   description:
     "Record a qualified reviewer's acceptance of ONE non-converged finding of a convergence study (VNV_NOT_ASYMPTOTIC, VNV_OSCILLATORY, " +
-    'VNV_DIVERGENT or VNV_ORDER_MISMATCH) so the study may support a margin anyway. HUMAN GATE. Only a human-held signature over this exact study ' +
+    'VNV_DIVERGENT, VNV_ORDER_MISMATCH or VNV_LSQ_POOR_FIT) so the study may support a margin anyway. HUMAN GATE. Only a human-held signature over this exact study ' +
     'verifies (09 PLM signing port): an agent has none and always gets VNV_HUMAN_GATE with the document unchanged. Do not retry or work around it: ' +
     'hand the study to the reviewer, who accepts it in the desktop app. The acceptance never changes a number or the GCI, covers only the levels it ' +
     'was signed on, and ends when the study is re-run or the document is copied.',

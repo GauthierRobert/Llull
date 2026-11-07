@@ -71,6 +71,10 @@ stay green.
 | data integrity             | save → reopen identical, history replay identical; revisions keep ids, marks and GlobalIds                                                                                                                                                    |
 | civil (survey → drainage)  | every survey point at its E/N/Z with its code; TIN over the survey hull (±1 %) with the exact z range; pad on the brief outline balanced (\|cut × swell − fill\| < 1 % of fill, level within 0.5 m of the mean surveyed ground); road through the brief PIs with clothoids ≥ Barnett's minimum, the brief template and superelevation, no `alignment_report` design-check failure at the design speed, grades ≤ 8 %, full banking reached, profile over the whole road; storm network falling pipe by pipe to the outfall in commercial sizes, no surcharged pipe / flooding manhole / check failure under the IDF storm and tailwater, Manning full-bore capacity (computed independently) ≥ design flow; plan-profile sheet on ISO A2 at a standard scale with title block; LandXML well-formed (independent reader) with CgPoints, TIN Surface, Alignment (spirals + profile) and PipeNetwork, pipe slopes = invert drop / length as ratios |
 
+## Physics scenario (PHY-00 V1)
+
+`physics-benchmarks` (a finite-element result proved to the owner's GCI target: a convergence study of the 05 cantilever tip deflection, nine criteria in `tests/production/criteria/physicsVerification.ts`) calls the FE transports, so it needs Netgen (`llull-mesh`) and CalculiX. The in-process run skips it (`Scenario.hostTools`; its criteria are graded on a hand-recorded study in `tests/production/physics.test.ts`), `npm run production:scripted` runs it where the tools exist and skips it elsewhere, and it has no UI flow. Its row below stays `not run` until a machine with the tools records it.
+
 ## Results (2026-10)
 
 | scenario            | scripted | ui      | agent                           |
@@ -79,6 +83,7 @@ stay green.
 | revision B          | 30 / 30  | 30 / 30 | not run                         |
 | pipe rack           | 28 / 28  | 28 / 28 | not run                         |
 | civil site          | 11 / 11  | 11 / 11 | not run                         |
+| physics benchmarks  | not run  | n/a     | not run                         |
 
 Every acceptance criterion passes through the CLI backend calls and through the UI; `knownIssues` is empty
 for both drivers. The structure, equipment, lines, openings and stairs are modelled exactly; the

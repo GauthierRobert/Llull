@@ -18,6 +18,7 @@ All entries accessed **2026-10-15**. Access grades:
 | S7 | ASME V&V 10-2019 (R2025) Standard for V&V in Computational Solid Mechanics | ASME (paid) | https://www.asme.org/codes-standards/find-codes-standards/standard-for-verification-and-validation-in-computational-solid-mechanics | search extract | Edition and R2025 reaffirmation listing; scope: common language, conceptual framework, guidance, glossary; high-consequence CSM focus; ~40 pages. No clause content. |
 | S8 | ASME V&V 20-2009 (R2016) Standard for V&V in CFD and Heat Transfer | ASME / ANSI (paid) | https://webstore.ansi.org/standards/asme/asme202009 ; https://sandia.gov/research/publications/details/overview-of-asme-vv-20-2009-standard-for-verification-and-validation-in-com-2010-03-01 | search extract | Scope: quantifies accuracy from comparison of solution and data for a specified variable at a validation point; uses experimental-uncertainty concepts; validation uncertainty and model error. Formulas **not** seen. |
 | S9 | "On the quantification of discretization uncertainty: comparison of two paradigms" | arXiv 2103.14559 | https://arxiv.org/abs/2103.14559 | search extract | Roache recommends Fs = 3 in general and 1.25 when the order is known and the asymptotic range is verified (as summarised by the search engine). Paper not opened. |
+| S11 | Eça & Hoekstra, "A procedure for the estimation of the numerical uncertainty of CFD calculations based on grid refinement studies", JCP 262, 104–130, 2014 | Elsevier | https://doi.org/10.1016/j.jcp.2014.01.006 | **not read** (citation from memory of the literature, DOI unchecked) | Used for the MODEL only: least-squares fit f = f0 + α h^p over four or more grids with the order as a fitted unknown, and an uncertainty built from the extrapolation distance times a safety factor plus the fit's standard deviation. llull implements the model with equal weights and U = Fs |f1 − f0| + s (s = sqrt(Σr²/(n − 3))); the published weighting, p bounds and safety-factor rules are NOT confirmed here (TECHNICAL_SPEC §11 Q7). The numerical results are checked against an independent scipy fit of the same model, not against the paper. |
 | S10 | CFD workshop paper (CEHIPAR) on Fs ranges | Lisbon 2006 workshop | https://maretec.tecnico.ulisboa.pt/~maretec.daemon/html_files/CFD_workshops/html_files_2006/papers/Paper_CEHIPAR.pdf | search extract | Fs = 1.25 for 0.5 < p < 3.5, 3.0 for 3.5 < p < 4.5 (text partly garbled in the extract). Not used as a default. |
 | L1 | llull repository | this repo | `package.json`, `docs/QUALITY_GATES.md`, `docs/PRODUCTION_GATE.md`, `packages/core/src/commands/project/types.ts`, `commands/parametric/parameters.ts`, `server/src/cli/usage.ts` | local | Quality/production gate scripts, plan format, CLI flags, `set_parameter` regeneration. |
 | L2 | 05 FEA pack | this repo | `docs/aerospace/05-fea-cae-handoff/` | local | AnalysisCase, artifact store, staleness, beamp plan and VC-FEA-10.b = 0.0888411 mm, LE10 −5.38 MPa. |
@@ -35,6 +36,7 @@ All entries accessed **2026-10-15**. Access grades:
 | R8 | S5 |
 | R9 | S4 |
 | R10 | S9 |
+| R11 | S11 |
 
 ## Not verified (follow-up needed)
 

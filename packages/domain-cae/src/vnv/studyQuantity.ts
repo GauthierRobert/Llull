@@ -1,7 +1,7 @@
 /** The scalar a convergence study follows: its params schema, and its reading (value, unit) from verified mesh / results artifacts. */
 
 import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ResultsSummary } from '@core/model/analysis';
-import type { StudyQuantity } from '@core/model/convergenceStudy';
+import type { StudyQuantity, StudyRefinement } from '@core/model/convergenceStudy';
 import type { NamedValue } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
 import { z } from '@core/commands/schema';
@@ -113,6 +113,7 @@ export function quantityValue(
   const { lengthToAnalysis } = deck;
   const reading = evaluateProbes(analysis, mesh, results, lengthToAnalysis).find((entry) => entry.probeId === quantity.probeId);
   if (reading === undefined) return unavailable(`probe '${quantity.probeId}' cannot be evaluated for a ${analysis.type} analysis`);
+  if (analysis.type === 'heat_transient') return transientEnd(analysis, probe.quantity, reading);
   const wanted = reading.values.filter((entry) => quantity.loadCase === undefined || entry.loadCase === quantity.loadCase);
   if (wanted.length !== 1)
     return unavailable(
@@ -121,6 +122,29 @@ export function quantityValue(
         : `probe '${quantity.probeId}' has ${wanted.length} values: name the load case`,
     );
   const value = finite(wanted[0]?.value, `probe '${quantity.probeId}'`);
+  return typeof value === 'number' ? { value, unit: reading.unit } : value;
+}
+
+/** A transient probe is followed at the END of the step: the last written result set, which must reach the case's end time. */
+function transientEnd(
+  analysis: AnalysisCase,
+  probeQuantity: string,
+  reading: {
+    readonly probeId: string;
+    readonly unit: string;
+    readonly values: readonly { readonly time: number; readonly value: number | null }[];
+  },
+): Reading | QuantityProblem {
+  const end = analysis.thermal?.step.endTimeS;
+  const last = reading.values.reduce<{ readonly time: number; readonly value: number | null } | undefined>(
+    (latest, entry) => (latest === undefined || entry.time > latest.time ? entry : latest),
+    undefined,
+  );
+  if (end === undefined || last === undefined || !(Math.abs(last.time - end) <= 1e-6 * end))
+    return unavailable(
+      `the results of '${analysis.id}' do not reach the end time (${last === undefined ? 'no result set' : `last time ${last.time} s`}, end ${end ?? 'unset'} s)`,
+    );
+  const value = finite(last.value, `probe '${reading.probeId}' (${probeQuantity}) at ${end} s`);
   return typeof value === 'number' ? { value, unit: reading.unit } : value;
 }
 
@@ -147,13 +171,23 @@ export function meshMeasure(mesh: FeMeshArtifact): Measure | QuantityProblem {
   return { value: volume, dimension: 3, elements: index.elements.size };
 }
 
+const TIME_INTEGRATION =
+  'backward-Euler time integration of CalculiX heat transfer (llull assumption; reviewer-confirmable, PHY-00 TECHNICAL_SPEC 11)';
 const TEXTBOOK = 'a priori FE error estimates (textbook; reviewer-confirmable, PHY-00 TECHNICAL_SPEC 5.4)';
 
 /**
  * The named default formal order of the quantity for `order` 1 (linear) or 2 (quadratic) tetrahedra: displacement 2 / 3, stress 1 / 2, and the
- * eigenvalue quantities (frequency, buckling factor) twice the energy rate (stress rate) 2 / 4. Undefined for quantities the table does not cover.
+ * eigenvalue quantities (frequency, buckling factor) twice the energy rate (stress rate) 2 / 4; a time-step study 1 (backward Euler), an order study none.
+ * Undefined for quantities the table does not cover.
  */
-export function formalOrderDefault(analysis: AnalysisCase, quantity: StudyQuantity, order: 1 | 2): NamedValue | undefined {
+export function formalOrderDefault(
+  analysis: AnalysisCase,
+  quantity: StudyQuantity,
+  order: 1 | 2,
+  refinement: StudyRefinement,
+): NamedValue | undefined {
+  if (refinement === 'dt') return { value: 1, source: TIME_INTEGRATION, defaulted: true };
+  if (refinement === 'p') return undefined;
   const rates = { displacement: [2, 3], stress: [1, 2], eigen: [2, 4] } as const;
   const probe =
     quantity.kind === 'probe' && Object.hasOwn(analysis.probes, quantity.probeId) ? analysis.probes[quantity.probeId] : undefined;

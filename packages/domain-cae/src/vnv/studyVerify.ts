@@ -15,6 +15,18 @@ export interface StudyProblem {
   readonly ids: readonly string[];
 }
 
+/** Why the level's `h` is not what its refinement kind derives (null = it is): the mesh spacing, the order, or (dt) nothing here: the time step is bound by the input hash. */
+function sizeMismatch(study: CaseStudy, level: CaseStudy['levels'][number], volume: number, where: string): string | null {
+  if (study.refinement === 'p') return level.h === 1 / level.controls.order ? null : `${where}: h is not 1 / order`;
+  if (study.refinement === 'dt') return null;
+  const { measure } = study;
+  if (measure === undefined) return 'an h study needs its measure';
+  if (level.index === 0 && volume !== measure.value) return `the finest mesh has volume ${volume}, not ${measure.value}`;
+  return representativeSpacing(measure.value, level.elements, measure.dimension) === level.h
+    ? null
+    : `${where}: h is not (measure / elements)^(1/${measure.dimension})`;
+}
+
 const mismatch = (message: string, ids: readonly string[]): StudyProblem => ({ code: 'VNV_SUMMARY_MISMATCH', message, ids });
 
 /**
@@ -61,7 +73,7 @@ export function verifyStudy(
     )
       return mismatch(`${where}: solver / mesher names differ from the artifacts`, ids);
     if (!current) continue;
-    const levelDoc = levelDocument(doc, analysisCase, level.controls);
+    const levelDoc = levelDocument(doc, analysisCase, study.refinement, level);
     if (meshArtifact.inputHash !== analysisInputHash(levelDoc, analysisCase.id, 'mesh'))
       return mismatch(`${where}: the mesh artifact was built for other inputs than the level controls`, [analysisCase.id, level.meshHash]);
     const measure = meshMeasure(meshArtifact);
@@ -73,10 +85,8 @@ export function verifyStudy(
       };
     if (measure.elements !== level.elements)
       return mismatch(`${where}: the mesh has ${measure.elements} tetrahedra, not ${level.elements}`, ids);
-    if (level.index === 0 && measure.value !== study.measure.value)
-      return mismatch(`the finest mesh has volume ${measure.value}, not ${study.measure.value}`, ids);
-    if (representativeSpacing(study.measure.value, level.elements, study.measure.dimension) !== level.h)
-      return mismatch(`${where}: h is not (measure / elements)^(1/${study.measure.dimension})`, ids);
+    const sizeProblem = sizeMismatch(study, level, measure.value, where);
+    if (sizeProblem !== null) return mismatch(sizeProblem, ids);
     const summary = resultsSummary(levelDoc, analysisCase.id, meshArtifact, resultsArtifact, level.resultsHash);
     const reading = quantityValue(
       levelDoc,

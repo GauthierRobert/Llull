@@ -2,6 +2,7 @@
 
 import { isRecord } from '@lib/isRecord';
 import { ACCEPTABLE_CODES } from './studyException';
+import { kindProblem, levelBounds, REFINEMENTS } from './studyKinds';
 
 const HASH = /^[0-9a-f]{64}$/;
 const RESERVED = ['__proto__', 'constructor', 'prototype'];
@@ -81,21 +82,31 @@ function studyProblems(study: unknown, id: string, analysisId: string, where: st
   if (study['analysisId'] !== analysisId) problems.push(`${where}.analysisId must be '${analysisId}'`);
   problems.push(...quantityProblem(study['quantity'], `${where}.quantity`));
   if (!text(study['unit'])) problems.push(`${where}.unit must be text`);
-  if (study['refinement'] !== 'h') problems.push(`${where}.refinement must be 'h'`);
+  const refinement = study['refinement'];
+  if (!REFINEMENTS.some((kind) => kind === refinement)) problems.push(`${where}.refinement must be one of ${REFINEMENTS.join(', ')}`);
   if (!(finite(study['ratio']) && study['ratio'] > 1)) problems.push(`${where}.ratio must be > 1`);
   const measure = study['measure'];
-  if (!isRecord(measure) || !positive(measure['value']) || measure['dimension'] !== 3) problems.push(`${where}.measure is malformed`);
+  if (refinement === 'h') {
+    if (!isRecord(measure) || !positive(measure['value']) || measure['dimension'] !== 3) problems.push(`${where}.measure is malformed`);
+  } else if (measure !== undefined) problems.push(`${where}.measure is only for an 'h' study`);
   problems.push(...namedProblem(study['safetyFactor'], `${where}.safetyFactor`));
   if (study['formalOrder'] !== undefined) problems.push(...namedProblem(study['formalOrder'], `${where}.formalOrder`));
   if (study['verified'] !== undefined && study['verified'] !== false) problems.push(`${where}.verified must be false when present`);
   const levels = study['levels'];
-  if (!Array.isArray(levels) || levels.length < 3 || levels.length > 6) problems.push(`${where}.levels must hold 3 to 6 levels`);
+  const [lowest, highest] = levelBounds(String(refinement));
+  if (!Array.isArray(levels) || levels.length < lowest || levels.length > highest)
+    problems.push(`${where}.levels must hold ${lowest === highest ? lowest : `${lowest} to ${highest}`} levels`);
   else {
     let previousH = 0;
     levels.forEach((level, index) => {
       problems.push(...levelProblems(level, index, previousH, where));
       if (isRecord(level) && positive(level['h'])) previousH = level['h'];
     });
+    const mixed = kindProblem(
+      String(refinement),
+      levels.map((level) => (isRecord(level) ? level['controls'] : undefined)),
+    );
+    if (mixed !== null) problems.push(`${where}.levels: ${mixed.message}`);
   }
   if (study['exception'] !== undefined)
     problems.push(...exceptionProblems(study['exception'], `${where}.exception`, Array.isArray(levels) ? levels.length : undefined));

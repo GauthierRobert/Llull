@@ -413,7 +413,7 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 | M1 | `lib/convergence.ts`, `check_convergence`, `compare_to_expected`, expected-results schema + adapter, unit tests (VC 01–09, 12) | none (pure) | 1 w |
 | M2 | `run_benchmarks` host transport, `quality:physics`, Vitest measurement reporter, Markdown report | M1, AF-14 | 1.5 w |
 | M3 | `run_convergence_study`, `record_convergence_study`, `check_verification`, staleness, human gate (VC 10, 11, 13–16) | 05 FEA M3, 09 PLM signing port | 2 w |
-| M4 (V1) | time-step and order refinement, least squares, production scenario, UI panel | PHY-03 / PHY-09 transports | 2 w |
+| M4 (V1) | time-step and order refinement, least squares, production scenario, UI panel: **built (§13 M4)** | PHY-03 transports (PHY-09: see §13 M4) | 2 w |
 
 ## 11. Open questions / decisions needed
 
@@ -430,6 +430,9 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 5. Should B-grade benchmark warnings block a release for the packs that are B-only (e.g. PHY-17)?
 6. Should `run_benchmarks` also run the aerospace packs' `expected_results.json` files that do not yet follow §6.3
    (03 GDT, 08 MAT), through adapters, or only after they migrate?
+7. **Least squares (M4):** the Eça & Hoekstra paper was not read. A human with access should confirm (a) the weighting of the published fit, (b) the p bounds (llull searches [0.05, 8]), (c) the uncertainty
+   U = Fs |f1 − f0| + s (llull: Fs 1.25, s over n − 3) and its safety-factor rules, (d) the poor-fit band (s above |f1 − f0|, an llull choice). Results are checked against an independent scipy fit of the same model only.
+8. **Time-step formal order (M4):** order 1 for CalculiX heat transfer is an assumption (backward Euler); confirm against the CalculiX manual before relying on VNV_ORDER_MISMATCH for dt studies.
 
 ## 12. References
 
@@ -441,6 +444,7 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 - [R7] NPARC "Examining Spatial (Grid) Convergence" — https://www.grc.nasa.gov/WWW/wind/valid/tutorial/spatconv.html (blocked; via [R8])
 - [R8] `convergence` 0.6.7, GPL-3.0 — https://pypi.org/project/convergence/0.6.7/ (sdist read; values quoted, no code copied)
 - [R9] `gcat`, MIT — https://github.com/gabrielbdsantos/gcat (commit 0b4f6fd839762bca6ad756b89c900296738f2b4e, read)
+- [R11] Eça & Hoekstra 2014, JCP 262, 104–130 — https://doi.org/10.1016/j.jcp.2014.01.006 (model only; not read, see sources S11)
 - [R10] arXiv 2103.14559 — https://arxiv.org/abs/2103.14559 (search extract)
 - llull: `.claude/rules/architecture.md`, `.claude/context/command-layer.md`, `docs/QUALITY_GATES.md`, `docs/PRODUCTION_GATE.md`, `packages/core/src/commands/project/types.ts`, 05 FEA TECHNICAL_SPEC.
 
@@ -502,8 +506,7 @@ are core. The transport is in `server/` and forwards: it holds no V&V arithmetic
   and spent through `ctx.humanSignature`; `check_verification` re-verifies it (a re-run or a copied document voids it); an agent always gets `VNV_HUMAN_GATE`.
   `VNV_INPUT_UNVERIFIED` can never be accepted away.
 - **Not built:** the "benchmark regressions of the solver in use" item of FR-VNV-09 (it needs a `run_benchmarks` report, a host artifact, not document data); VC-VNV-11
-  (LE10 with tet10 needs the native kernel and CalculiX); progress lines per level (AF-40: the FE port has no progress channel); the `VerificationPanel` UI (§7, review
-  only); the `llull guide` V&V section; the golden plan of VC-VNV-13 (needs the real pipeline: covered by `tests/unit/cae/vnv/studies.test.ts` with fake artifacts and by
+  (LE10 with tet10 needs the native kernel and CalculiX); progress lines per level (AF-40: the FE port has no progress channel); the golden plan of VC-VNV-13 (needs the real pipeline: covered by `tests/unit/cae/vnv/studies.test.ts` with fake artifacts and by
   `server/tests/feaConvergence.test.ts`).
 - **Earlier deviations** (M1 / M2): refusals carry the code in `error { code, ids, paths, remediation }`; `compare_to_expected` verdicts are results with `data.code`;
   harness recipes run in-process without a kernel (a `$alias` needs AF-14 `aliases`: `VNV_HARNESS_UNSUPPORTED`; no pack ships a recipe yet); unit measurements are recorded
@@ -511,4 +514,50 @@ are core. The transport is in `server/` and forwards: it holds no V&V arithmetic
 
 `quantityValue` (value of a quantity from artifacts) is not a hostile-input reader despite its former `read*` name: it reads typed, hash-verified artifacts, never external text or bytes.
 
-M4 (V1) not started, including FR-VNV-19 / VC-VNV-22 (least-squares order).
+### M4 (V1) as built
+
+- **Refinement kinds** (`study.refinement`: `'h' | 'dt' | 'p'`, required on `record_convergence_study`; `run_convergence_study refinement=`, default `h`). One study follows ONE kind through the
+  same model, staleness (hash of the case with the level's control), report and gate. What a level's control is:
+  - `h`: the mesh sizes (`globalSize`, `minSize`, refinement sizes scaled), level `h` = (V / N)^(1/3), as in M3.
+  - `dt`: the transient step of a `heat_transient` case (`thermal.step`). The level runs with FIXED increments (`fixedIncrements`, `initialIncrementS` = the level's `h` in seconds, `endTimeS` kept,
+    every other increment / output field of the case's own step dropped because CalculiX excludes them with DIRECT; every increment is written) on the case's OWN mesh (one mesh artifact, shared). The
+    quantity is read at the END of the step (a transient probe: the last result set, which must reach `endTimeS`). Every level's increment must divide the end time (else `VNV_PARAM_INVALID`); default
+    finest increment = end / (8 x ratio^(levels - 1)) (an llull choice, named in the code). Named default formal order 1 (backward-Euler time integration of CalculiX heat transfer, an llull assumption,
+    reviewer-confirmable, open question 8). **Decision (PHY-03 / PHY-09 transports):** only `heat_transient` has a time step these transports run (`fea_mesh` + `fea_solve`); the structural-dynamics
+    analyses of PHY-09 are frequency-domain (no time step) or `explicit_dynamics` (a stability-governed step with `timeStepScale`, run by its own solver path), and a dt study of any other case is
+    `VNV_CASE_UNSUPPORTED` naming the reason. Coupled temperature-displacement transients are not covered (the results need the thermo-mechanical reader).
+  - `p`: the element order. **Decision:** CalculiX offers orders 1 and 2 only, so an order study has exactly TWO levels (order 2 = level 0, order 1 = level 1, the case's mesh size, level `h` = 1 / order).
+    Two values cannot give an observed order, so the report is the order-1 / order-2 DIFFERENCE (`report.orderPair`: both values, absolute and relative difference), status `order_pair`, no `p`, no
+    extrapolation, no Fs; findings `VNV_P_TWO_LEVEL` (warning) and, with a `gciTarget`, `VNV_P_DIFFERENCE_ABOVE_TARGET` (fail; the difference is an indicator, never judged as a GCI). The study is not stale
+    because the case itself now meshes at the other order (it carries its own orders).
+- **Mixed kinds are refused.** `kindProblem` (`studyKinds.ts`, shared by the record command and the load validation) accepts levels that differ only in their kind's control (h: the sizes; dt: nothing in the
+  mesh; p: the order) and refuses the rest with `VNV_MIXED_REFINEMENT`; level counts are h and dt 3 to 6, p exactly 2 (`VNV_LEVELS_INVALID`). `measure` exists only on an `h` study (`VNV_PARAM_INVALID` otherwise;
+  load validation names it). `run_convergence_study` plans the levels in the pure `planStudy` (`refinement`; `finest` = the increment in seconds for dt) and `levelDocumentOf(doc, id, refinement, level)`; the
+  server only loops mesh + solve per level and forwards.
+- **Least-squares observed order (FR-VNV-19, VC-VNV-22), decision: the Eça & Hoekstra model, implemented from the model, not from the paper (open question 7).** `leastSquaresOrder` (`@lib/convergence`) fits
+  f = f0 + α h^p to 4 or more samples: for each p the linear parameters come from a weighted straight-line fit of f against h^p (equal weights by default; the function takes weights), p minimises the residual over
+  [0.05, 8] (grid of 0.05, golden section, then Gauss-Newton on all three parameters, which recovers an exact law to rounding: p to 1e-12). It reports p, f0, α, the weighted residual sum, the plain residual rms
+  sqrt(Σr² / n), the fit standard deviation s = sqrt(Σr² / (n - 3)), the degrees of freedom and the asymptotic standard errors sqrt(diag(s² (JᵀJ)⁻¹)). `leastSquaresUncertainty` = Fs |f1 − f0| + s (absolute) and
+  its fraction of |f1|. An optimum on the search boundary (a plateau, divergence) is `{ converged: false }`, reported as status `divergent` (never a refusal).
+  - `check_verification` uses it for every h / dt study of 4 or more levels (`report.lsq`, `provenance.procedure = 'eca-hoekstra-lsq'`; `p` and `extrapolated` = f0; no `gci21`; the target is judged against
+    the LSQ uncertainty fraction; the Celik triplets stay listed); exactly 3 levels keep the Celik triplet (`celik2008-gci`). `check_convergence` keeps the triplet by default and fits with `method=least_squares`
+    (4 or more samples, else `VNV_SAMPLES_INVALID`). Classification first: every triplet oscillating (or a zero difference among non-zero ones) gives `VNV_OSCILLATORY`, every triplet divergent gives
+    `VNV_DIVERGENT`: no fit, no extrapolation. New finding `VNV_LSQ_POOR_FIT` (warning, acceptable by a reviewer like the other non-converged findings): s above the finest-level correction |f1 − f0| (llull band).
+  - Review fixes: an optimum on the [0.05, 8] boundary is the finding `VNV_LSQ_NO_FIT` (status `no_fit`, no extrapolation; NOT divergent; not in ACCEPTABLE_CODES because there is nothing to accept, the remedy is more levels or the 3-level triplet); 4 levels leave 1 degree of freedom and warn `VNV_LSQ_FEW_DOF` (a warning: status warn, never pass; also not acceptable; degrees of freedom shown in the summary); the uncertainty form is labelled an llull implementation choice; no required spacing for a least-squares result; a dt / p study is stale when the case mesh controls (sizes, refinements; order for dt) differ from the finest level; an order study never satisfies VNV_NO_CONVERGENCE_STUDY.
+  - Oracles: the exact law f = 10 + 0.5 h^1.5 (and 10 + 0.5 h², F0 + C h²) at 4, 5 and 6 levels recovers p and f0 to 1e-9; a noisy 5-level set is pinned to an independent `scipy.optimize.least_squares` fit
+    (p, f0, α, residual, standard errors) to 1e-8 or better.
+- **UI.** `VerificationPanel` is a section of the Analysis panel (`src/ui/panels/analysis/VerificationPanel.tsx`, reader `verificationData.ts`): for the open case it runs `check_verification` (server-side when
+  online) and shows per study its refinement kind, levels (size column per kind), observed order (± standard error), GCI or least-squares fit residual and uncertainty, the order difference, staleness and the
+  exceptions accepted with the signer RETURNED BY THE PORT. It dispatches only `delete_convergence_study`. **Gap:** accepting an exception is a signed human act and the signing route has none for it:
+  `server/src/plm/signingRoutes.ts` `DISPOSE_ACTS` lists only dispose_margin / dispose_thermal_limit / dispose_fit_result / set_review_disposition, and the `gate` kind is limited to the PLM `GATED_COMMANDS`.
+  Needed (not built here): a read-only payload command for `EXCEPTION_ACT` (like `margin_disposition_payload`) and that act in `DISPOSE_ACTS`; the panel then adds a dialog like `DispositionDialog`. The panel
+  says so.
+- **Production scenario `physics-benchmarks` (FR-VNV-12, V1).** No plan or golden existed for it (the spec only names it), so it is built from the validation plan `vnv_beamp_convergence`
+  (`tests/production/{physics,criteria/physicsVerification,scenarios/physicsBenchmarks}.ts`): the brief gives the model and the owner's 2 % GCI target; the scripted driver sends the plan as one
+  `build_project`, then `run_convergence_study` (host transport) and `check_verification`; nine criteria read the final document (set-up; study recorded with its artifacts; current; monotone with a positive
+  order; error within the target; extrapolation within 2 % of 0.0888411 mm; no exception forged; `check_verification` answers; save / load). The in-process run skips it (`Scenario.hostTools`), the scripted
+  gate needs Netgen + CalculiX. **Not run end to end in this lane** (no `ccx` on the machine): the criteria are proved in-process on a hand-recorded study of a known law
+  (`tests/production/physics.test.ts`), the real pipeline is covered by `server/tests/feaConvergence.test.ts` and `feaConvergenceKinds.test.ts` where the tools exist. No UI flow (`knownIssues.ui` empty).
+- **Guide.** `llull guide` gained section 18 (solution verification: the three kinds, the least-squares method, the reporting rules, the human gate).
+- **Not built (M4):** the PHY-09 dynamics transports for a dt study (above); shell and plane-stress studies (still `VNV_CASE_UNSUPPORTED`); weights other than 1 in the fit through the commands (the library
+  takes them); the exception signing route (above); a rail tab for the panel (a section of the Analysis panel instead: a rail tab touches the shell store).
