@@ -173,6 +173,8 @@ function parseReport(raw: unknown): ReportView | null {
 
 function parseStudy(entry: unknown): StudyView[] {
   if (!isRecord(entry) || typeof entry['id'] !== 'string' || !isRefinement(entry['refinement']) || !isState(entry['state'])) return [];
+  const levels = num(entry['levels']);
+  if (levels === null) return [];
   return [
     {
       id: entry['id'],
@@ -180,7 +182,7 @@ function parseStudy(entry: unknown): StudyView[] {
       quantity: quantityText(entry['quantity']),
       unit: str(entry['unit']),
       state: entry['state'],
-      levels: num(entry['levels']) ?? 0,
+      levels,
       codes: strings(entry['codes']),
       reviewRequired: entry['reviewRequired'] === true,
       reviewReasons: strings(entry['reviewReasons']),

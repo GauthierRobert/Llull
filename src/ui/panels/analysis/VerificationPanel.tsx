@@ -180,7 +180,7 @@ export function VerificationPanel({ analysisCase }: { analysisCase: AnalysisCase
       hint="Mesh, time-step and element-order convergence studies of this case (read-only; run them with run_convergence_study)."
     >
       <label className="field" htmlFor={`${ids}-target`}>
-        <span className="field__label">GCI target (% of the finest value; set by the owner, no default)</span>
+        <span className="field__label">GCI target (%)</span>
         <input
           id={`${ids}-target`}
           type="number"
@@ -192,6 +192,9 @@ export function VerificationPanel({ analysisCase }: { analysisCase: AnalysisCase
           onChange={(e) => setTargetText(e.target.value)}
         />
       </label>
+      <p className="analysis__hint">
+        Required GCI of the finest level, as a percentage of its value: the owner's number, there is no default.
+      </p>
       {answer.status === 'loading' && <p className="analysis__hint">Checking the studies…</p>}
       {answer.status === 'done' && view === null && <StatusLine text={answer.summary} testId="verification-refused" />}
       {view !== null && (
