@@ -90,7 +90,7 @@ function gearedFreeDisk(diskKg: number): Action[] {
       params: { kind: 'revolute', child: 'disk', parent: 'arm', anchor: [50, 0, 0], axis: [0, 0, 1], id: 'jDisk' },
     },
     { command: 'add_body_joint', params: { kind: 'revolute', child: 'w', anchor: [300, 0, 0], axis: [0, 0, 1], id: 'jW' } },
-    { command: 'add_gear_coupling', params: { driver: 'jArm', driven: 'jW', ratio: -1, id: 'g' } },
+    { command: 'add_transmission', params: { kind: 'gear', driver: 'jArm', driven: 'jW', ratio: -1, id: 'g' } },
     { command: 'add_motor', params: { joint: 'jArm', kind: 'speed', rpm: 60, maxTorque: 1000, id: 'drive' } },
     { command: 'set_gravity', params: { gravity: [0, 0, 0] } },
   ];

@@ -2,6 +2,7 @@
 
 import type { DynamicsModel } from '@core/model/dynamics';
 import type { ReferenceData, ReferencePoint } from '@core/model/prototype';
+import { couplingsOf } from '@core/model/transmissions';
 import { comparePoint, summariseComparison, type PointComparison } from '../../sim/engine/referenceComparison';
 import type { AccuracyBand } from '../../sim/accuracy';
 import type { CommandResult } from '@core/commands/types';
@@ -28,9 +29,10 @@ const statusOf = (comparison: PointComparison): ReviewItem['status'] => comparis
 /** Speed ratio (driven / driver) from `crank` to `joint` through the gear couplings; 1 when they are the same joint, null when unconnected. */
 function ratioFromCrank(dynamics: DynamicsModel, crank: string, joint: string): number | null {
   let [current, ratio] = [crank, 1];
-  for (let guard = 0; guard <= Object.keys(dynamics.gears).length; guard++) {
+  const couplings = couplingsOf(dynamics);
+  for (let guard = 0; guard <= couplings.length; guard++) {
     if (current === joint) return ratio;
-    const gear = Object.values(dynamics.gears).find((candidate) => candidate.driver === current);
+    const gear = couplings.find((candidate) => candidate.driver === current);
     if (gear === undefined) return null;
     [current, ratio] = [gear.driven, ratio * gear.ratio];
   }

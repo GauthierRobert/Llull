@@ -19,7 +19,7 @@ import { combustionOrigin } from '@dynamics/sim/engine/combustionOrigin';
 import { comparePoint, summariseComparison } from '@dynamics/sim/engine/referenceComparison';
 import { REFERENCE_PRESET_NAMES, REFERENCE_PRESETS } from '@dynamics/sim/engine/referencePresets';
 import { isRotaxReduction, outsideBand } from '@dynamics/sim/engine/plausibility';
-import { idealGearWarnings } from '@dynamics/sim/gearLoss';
+import { idealGearWarnings } from '@dynamics/sim/transmissionReport';
 import { sourcedMaterial } from '@core/commands/document/sourcedMaterials';
 import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import { validateMaterialValue } from '@core/commands/persistence/guards';
@@ -391,37 +391,47 @@ describe('gear couplings with tooth counts and efficiency (FR-FPR-74)', () => {
 
   it('tooth counts give the exact ratio z_driver / z_driven (21/51), reversed for an external mesh, with the efficiency stored', () => {
     const doc = twoShafts();
-    const result = execute(doc, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 });
-    const gear = Object.values(result.document.dynamics?.gears ?? {})[0];
+    const result = execute(doc, 'add_transmission', {
+      kind: 'gear',
+      driver: 'crank_j',
+      driven: 'prop_j',
+      teeth: [21, 51],
+      efficiency: 0.99,
+    });
+    const gear = Object.values(result.document.dynamics?.transmissions ?? {})[0];
     expect(gear).toMatchObject({ ratio: 21 / 51, efficiency: 0.99, teeth: [21, 51] });
-    expect(result.summary).toMatch(/teeth 21\/51.*efficiency 0.99/);
-    const reversed = execute(doc, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], reverseRotation: true });
-    expect(Object.values(reversed.document.dynamics?.gears ?? {})[0]?.ratio).toBeCloseTo(-21 / 51, 12);
+    expect(result.summary).toMatch(/teeth 21\/51.*η_f 0.99/);
+    const reversed = execute(doc, 'add_transmission', {
+      kind: 'gear',
+      driver: 'crank_j',
+      driven: 'prop_j',
+      teeth: [21, 51],
+      reverseRotation: true,
+    });
+    expect((Object.values(reversed.document.dynamics?.transmissions ?? {})[0] as { ratio: number }).ratio).toBeCloseTo(-21 / 51, 12);
     expect(reversed.summary).toMatch(/ideal/);
     expect(
-      idealGearWarnings(
-        reversed.document.dynamics ?? { gravity: [0, 0, 0], bodies: {}, joints: {}, gears: {}, motors: {}, propellers: {} },
-      ),
+      idealGearWarnings(reversed.document.dynamics ?? { gravity: [0, 0, 0], bodies: {}, joints: {}, motors: {}, propellers: {} }),
     ).toHaveLength(1);
     expect(
-      idealGearWarnings(result.document.dynamics ?? { gravity: [0, 0, 0], bodies: {}, joints: {}, gears: {}, motors: {}, propellers: {} }),
+      idealGearWarnings(result.document.dynamics ?? { gravity: [0, 0, 0], bodies: {}, joints: {}, motors: {}, propellers: {} }),
     ).toEqual([]);
   });
 
   it('refuses neither ratio nor teeth, disagreeing ones, and an efficiency outside (0, 1]; a ratio alone still works', () => {
     const doc = twoShafts();
     const bad = (params: Record<string, unknown>): string => {
-      const result = execute(doc, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', ...params });
+      const result = execute(doc, 'add_transmission', { kind: 'gear', driver: 'crank_j', driven: 'prop_j', ...params });
       expect(result.affected).toEqual([]);
       return result.summary;
     };
     expect(bad({})).toMatch(/ratio or tooth counts/);
     expect(bad({ ratio: 0.5, teeth: [21, 51] })).toMatch(/disagrees/);
-    expect(bad({ ratio: 0.5, efficiency: 1.2 })).toMatch(/invalid params/);
-    expect(bad({ ratio: 0.5, efficiency: 0 })).toMatch(/invalid params/);
-    const plain = execute(doc, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', ratio: 0.5 });
-    expect(Object.values(plain.document.dynamics?.gears ?? {})[0]).toEqual(expect.objectContaining({ ratio: 0.5 }));
-    expect(Object.values(plain.document.dynamics?.gears ?? {})[0]).not.toHaveProperty('efficiency');
+    expect(bad({ ratio: 0.5, efficiency: 1.2 })).toMatch(/DRV_EFFICIENCY_INVALID/);
+    expect(bad({ ratio: 0.5, efficiency: 0 })).toMatch(/DRV_EFFICIENCY_INVALID/);
+    const plain = execute(doc, 'add_transmission', { kind: 'gear', driver: 'crank_j', driven: 'prop_j', ratio: 0.5 });
+    expect(Object.values(plain.document.dynamics?.transmissions ?? {})[0]).toEqual(expect.objectContaining({ ratio: 0.5 }));
+    expect(Object.values(plain.document.dynamics?.transmissions ?? {})[0]).not.toHaveProperty('efficiency');
   });
 });
 
@@ -832,20 +842,42 @@ describe('load validation of the new slices', () => {
       dynamicsProblems({
         gravity: [0, 0, 0],
         bodies: {},
-        joints: {},
+        joints: {
+          a: {
+            id: 'a',
+            kind: 'revolute',
+            parent: 'ground',
+            child: 'x',
+            anchor: [0, 0, 0],
+            axis: [0, 0, 1],
+            damping: 0,
+            friction: 0,
+            initialVelocity: 0,
+          },
+          b: {
+            id: 'b',
+            kind: 'revolute',
+            parent: 'ground',
+            child: 'y',
+            anchor: [0, 0, 0],
+            axis: [0, 0, 1],
+            damping: 0,
+            friction: 0,
+            initialVelocity: 0,
+          },
+        },
         motors: {},
         propellers: {},
-        gears: { g: { id: 'g', driver: 'a', driven: 'b', ratio: 2, ...extra } },
+        transmissions: { g: { kind: 'gear', id: 'g', driver: 'a', driven: 'b', ratio: 2, ...extra } },
       });
     expect(gearDoc({ efficiency: 0.9, teeth: [21, 51] })).toEqual([]);
-    expect(gearDoc({ efficiency: 1.5 })[0]).toMatch(/efficiency must be in \(0, 1\]/);
+    expect(gearDoc({ efficiency: 1.5 })[0]).toMatch(/efficiency and efficiencyBack must be in \(0, 1\]/);
     expect(gearDoc({ teeth: [21] })[0]).toMatch(/teeth must be/);
     const propDoc = (extra: Record<string, unknown>): string[] =>
       dynamicsProblems({
         gravity: [0, 0, 0],
         bodies: {},
         joints: {},
-        gears: {},
         motors: {},
         propellers: {
           p: {

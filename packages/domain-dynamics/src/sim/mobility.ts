@@ -5,6 +5,7 @@
  */
 
 import { GROUND, type DynamicJoint, type DynamicsModel } from '@core/model/dynamics';
+import { couplingsOf } from '@core/model/transmissions';
 import type { Vec3 } from '@core/model/vectors';
 import type { Topology } from './topology';
 import { applyMat3, mulMat3 } from '@lib/axisRotation';
@@ -261,7 +262,7 @@ function gearConstraintRows(dynamics: DynamicsModel, topology: Topology): { rows
   const indexOf = (id: string): number => topology.tree.findIndex((entry) => entry.joint.id === id);
   const rows: { gear: string; row: number[] }[] = [];
   const skipped: string[] = [];
-  for (const gear of Object.values(dynamics.gears)) {
+  for (const gear of couplingsOf(dynamics)) {
     const [driver, driven] = [indexOf(gear.driver), indexOf(gear.driven)];
     if (driver < 0 || driven < 0) {
       skipped.push(gear.id);

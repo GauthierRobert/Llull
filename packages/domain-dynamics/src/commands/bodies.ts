@@ -3,6 +3,7 @@
 import type { CadDocument } from '@core/model/types';
 import { createDynamicsModel, dynamicsIdTaken, type DynamicsModel } from '@core/model/dynamics';
 import { is3D } from '@core/model/types';
+import { transmissionJoints } from '@core/model/transmissions';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
@@ -141,17 +142,19 @@ export const setGravity = defineCommand({
 });
 
 /**
- * @affects removes 1 dynamics record; removing a body also removes its joints and springs, and removing a joint its gears, motors and propellers
+ * @affects removes 1 dynamics record; removing a body also removes its joints and springs, and removing a joint its transmissions, joint physics, load schedules, motors and propellers
  * @failure unknown id -> no-op
  */
 export const deleteDynamicsItem = defineCommand({
   name: 'delete_dynamics_item',
   annotations: { destructive: true },
   description:
-    'Remove a rigid body, joint, gear coupling, motor, propeller, cylinder pressure, point spring (add_spring) or motion profile (add_motion_profile) from the physics model by id. Cascades: a body ' +
-    'takes its joints and springs with it; a joint takes the gears, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
-    'A profile that a motor drive still uses is refused (the users are listed): change the drive first. Entities (geometry) are never deleted.',
-  params: z.object({ id: z.string().describe('Id of the body / joint / gear / motor / propeller / cylinder / spring to remove.') }),
+    'Remove a rigid body, joint, transmission (add_transmission), joint physics (set_joint_physics, by its joint id), load schedule (add_load_schedule), motor, propeller, cylinder pressure, point spring (add_spring) or motion profile (add_motion_profile) from the physics model by id. Cascades: a body ' +
+    'takes its joints and springs with it; a joint takes the transmissions, its joint physics, load schedules, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
+    'A profile that a motor drive or a load schedule still uses is refused (the users are listed): change the drive first. Entities (geometry) are never deleted.',
+  params: z.object({
+    id: z.string().describe('Id of the body / joint / transmission / load schedule / motor / propeller / cylinder / spring to remove.'),
+  }),
   run: (doc, { id }): CommandResult => {
     const dynamics = dynamicsOf(doc);
     if (!dynamicsIdTaken(dynamics, id)) return failer(doc, 'delete_dynamics_item')(`no dynamics record '${id}'`);
@@ -163,6 +166,12 @@ export const deleteDynamicsItem = defineCommand({
       )(
         `profile '${id}' is used by the drive of motor(s) ${users.map((drive) => `'${drive.id}'`).join(', ')}; set_motor_drive another profile first`,
       );
+    const loads = Object.values(dynamics.loadSchedules ?? {}).filter((load) => load.profile === id);
+    if (loads.length > 0)
+      return failer(
+        doc,
+        'delete_dynamics_item',
+      )(`profile '${id}' is used by load schedule(s) ${loads.map((load) => `'${load.id}'`).join(', ')}; delete them first`);
     const keep = <T>(table: Record<string, T>, drop: (key: string, value: T) => boolean): Record<string, T> =>
       Object.fromEntries(Object.entries(table).filter(([key, value]) => !drop(key, value)));
     const joints = keep(dynamics.joints, (key, joint) => key === id || joint.parent === id || joint.child === id);
@@ -171,7 +180,6 @@ export const deleteDynamicsItem = defineCommand({
       ...dynamics,
       bodies: keep(dynamics.bodies, (key) => key === id),
       joints,
-      gears: keep(dynamics.gears, (key, gear) => key === id || goneJoint(gear.driver) || goneJoint(gear.driven)),
       motors: keep(dynamics.motors, (key, motor) => key === id || goneJoint(motor.joint)),
       propellers: keep(dynamics.propellers, (key, propeller) => key === id || goneJoint(propeller.joint)),
       ...(dynamics.cylinders === undefined
@@ -182,11 +190,47 @@ export const deleteDynamicsItem = defineCommand({
         ? {}
         : { springs: keep(dynamics.springs, (key, spring) => key === id || spring.bodyA === id || spring.bodyB === id) }),
       ...(dynamics.profiles === undefined ? {} : { profiles: keep(dynamics.profiles, (key) => key === id) }),
+      ...(dynamics.transmissions === undefined
+        ? {}
+        : {
+            transmissions: keep(dynamics.transmissions, (key, transmission) => {
+              const { driver, driven } = transmissionJoints(transmission);
+              return key === id || goneJoint(driver) || goneJoint(driven);
+            }),
+          }),
+      ...(dynamics.jointPhysics === undefined ? {} : { jointPhysics: keep(dynamics.jointPhysics, (key) => key === id || goneJoint(key)) }),
+      ...(dynamics.loadSchedules === undefined
+        ? {}
+        : {
+            loadSchedules: keep(
+              dynamics.loadSchedules,
+              (key, load) =>
+                key === id ||
+                ('joint' in load.target
+                  ? goneJoint(load.target.joint)
+                  : dynamics.bodies[load.target.body] === undefined || load.target.body === id),
+            ),
+          }),
     };
     const motors = next.motors;
     const withDrives: DynamicsModel =
       dynamics.drives === undefined ? next : { ...next, drives: keep(dynamics.drives, (key) => motors[key] === undefined) };
-    const removed = (['bodies', 'joints', 'gears', 'motors', 'propellers', 'cylinders', 'losses', 'springs', 'profiles', 'drives'] as const)
+    const removed = (
+      [
+        'bodies',
+        'joints',
+        'transmissions',
+        'jointPhysics',
+        'loadSchedules',
+        'motors',
+        'propellers',
+        'cylinders',
+        'losses',
+        'springs',
+        'profiles',
+        'drives',
+      ] as const
+    )
       .map((table) => Object.keys(dynamics[table] ?? {}).length - Object.keys(withDrives[table] ?? {}).length)
       .reduce((a, b) => a + b, 0);
     return report(

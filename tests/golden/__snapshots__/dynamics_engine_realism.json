@@ -186,8 +186,8 @@
       },
       {
         "id": "#30",
-        "name": "add_gear_coupling",
-        "params": {"id":"#31","driver":"#21","driven":"#29","teeth":[21,51],"efficiency":0.99},
+        "name": "add_transmission",
+        "params": {"kind":"gear","id":"#31","driver":"#21","driven":"#29","teeth":[21,51],"efficiency":0.99},
         "suppressed": false,
         "affected": ["#31"]
       },
@@ -271,12 +271,12 @@
         "#27": {"id":"#27","kind":"prismatic","parent":"ground","child":"#17","anchor":[160.5,0,0],"axis":[1,0,0],"damping":0,"friction":0,"initialVelocity":0},
         "#29": {"id":"#29","kind":"revolute","parent":"ground","child":"#19","anchor":[0,300,0],"axis":[0,0,1],"damping":0,"friction":0,"initialVelocity":0}
       },
-      "gears": {
-        "#31": {"id":"#31","driver":"#21","driven":"#29","ratio":0.411764706,"efficiency":0.99,"teeth":[21,51]}
-      },
       "motors": {},
       "propellers": {
         "#37": {"id":"#37","joint":"#29","diameter":1.75,"thrustCoefficient":0.1,"powerCoefficient":0.05,"airDensity":1.225,"thrustDirection":[0,0,1],"airspeedMps":20,"table":{"points":[[0,0.1,0.05],[0.4,0.08,0.055],[0.8,0.02,0.04]],"source":"synthetic test table","grade":"C"},"inertiaKgM2":0.25}
+      },
+      "transmissions": {
+        "#31": {"kind":"gear","id":"#31","driver":"#21","driven":"#29","ratio":0.411764706,"teeth":[21,51],"efficiency":0.99}
       },
       "losses": {
         "#33": {"id":"#33","#13":"#21","cylinders":[],"model":{"kind":"chen_flynn","aPa":40000,"bRatio":0.005,"cPaPerRpm":5,"dPaPerRpm2":0.0000015,"source":"test input (not measured data)"},"oilTempFactor":1}

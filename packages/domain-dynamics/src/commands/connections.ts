@@ -1,4 +1,4 @@
-/** Joints between rigid bodies and gear couplings between joints. */
+/** Joints between rigid bodies (transmissions between joints: transmissions.ts). */
 
 import { GROUND, type DynamicJoint } from '@core/model/dynamics';
 import type { Vec3 } from '@core/model/vectors';
@@ -139,90 +139,6 @@ export const addBodyJoint = defineCommand({
       withDynamics(doc, next),
       `add_body_joint: ${kind} '${jointId}' — '${child.id}' on '${parent}', ${sense}${spring}; ${role}.`,
       [jointId],
-    );
-  },
-});
-
-/**
- * @affects adds 1 gear coupling to doc.dynamics (affected: [gearId])
- * @invariant driver !== driven, both existing joints; ratio finite and non-zero; a joint is driven by at most one gear
- * @failure unknown joint, self-coupling, zero ratio, already-driven joint, circular coupling, taken id -> no-op
- */
-export const addGearCoupling = defineCommand({
-  name: 'add_gear_coupling',
-  description:
-    'Couple two physics joints (add_body_joint) rigidly, like meshing gears, a belt or a chain: speed(driven) = ratio × speed(driver), enforced by the physics ' +
-    "engine, so each side feels the other's inertia and load. ratio = -teeth(driver)/teeth(driven) for an external spur mesh (opposite " +
-    'rotation), +teeth(driver)/teeth(driven) for a belt or an internal ring gear. Planetary with fixed ring, sun → carrier: ' +
-    'ratio = sunTeeth / (sunTeeth + ringTeeth). Planets relative to the carrier: -ringTeeth / planetTeeth (driver = carrier joint). ' +
-    'Kinematic-only equivalent for add_joint joints: add_drive_relation. Returns the coupling id in affected[0].',
-  params: z.object({
-    driver: z.string().describe('Joint id whose speed drives the other (e.g. the crankshaft joint).'),
-    driven: z.string().describe('Joint id that follows (e.g. the propeller joint).'),
-    ratio: z
-      .number()
-      .optional()
-      .describe('speed(driven) / speed(driver); negative reverses the direction. Give this OR `teeth`; with both they must agree.'),
-    teeth: z
-      .tuple([z.number().int().positive(), z.number().int().positive()])
-      .optional()
-      .describe(
-        'Tooth counts [driver, driven]: ratio = driverTeeth / drivenTeeth, exact (Rotax 912 reduction 21/51 pinion on the crank: [21, 51] gives 2388.24 rpm from 5800 rpm), negated by `reverseRotation`.',
-      ),
-    reverseRotation: z
-      .boolean()
-      .optional()
-      .describe('With `teeth`: true for an external spur mesh (the driven shaft turns the other way, ratio negative). Default false.'),
-    efficiency: z
-      .number()
-      .gt(0)
-      .max(1)
-      .optional()
-      .describe(
-        'Mesh efficiency in (0, 1] (FR-FPR-74): the transmitted torque is reduced by (1 - efficiency) on the driven shaft, against its rotation. ' +
-          'Real spur meshes are above 0.98 with peaks 0.993-0.999 [NASA TM 81426]; 0.99 is the usual value. Omitted = ideal gear (1, no loss).',
-      ),
-    id: z.string().optional().describe('Optional explicit coupling id.'),
-  }),
-  run: (doc, { driver, driven, teeth, reverseRotation, efficiency, id, ...rest }): CommandResult => {
-    const fail = failer(doc, 'add_gear_coupling');
-    const fromTeeth = teeth === undefined ? undefined : (reverseRotation === true ? -1 : 1) * (teeth[0] / teeth[1]);
-    if (rest.ratio === undefined && fromTeeth === undefined) return fail('give a ratio or tooth counts');
-    if (rest.ratio !== undefined && fromTeeth !== undefined && Math.abs(rest.ratio - fromTeeth) > 1e-9 * Math.abs(fromTeeth))
-      return fail(`ratio ${rest.ratio} disagrees with the tooth counts (${teeth?.join('/')} give ${fromTeeth})`);
-    const ratio = rest.ratio ?? fromTeeth ?? 0;
-    const dynamics = dynamicsOf(doc);
-    if (dynamics.joints[driver] === undefined) return fail(`driver joint '${driver}' not found (add_body_joint first)`);
-    if (dynamics.joints[driven] === undefined) return fail(`driven joint '${driven}' not found`);
-    if (driver === driven) return fail('a joint cannot drive itself');
-    if (!(Math.abs(ratio) > 0) || !Number.isFinite(ratio)) return fail('ratio must be finite and non-zero');
-    const twice = Object.values(dynamics.gears).find((gear) => gear.driven === driven);
-    if (twice !== undefined) return fail(`joint '${driven}' is already driven by gear '${twice.id}'`);
-    const driverOf = new Map(Object.values(dynamics.gears).map((gear) => [gear.driven, gear.driver]));
-    for (let current: string | undefined = driver, guard = 0; current !== undefined && guard <= driverOf.size; guard++) {
-      if (current === driven) return fail(`'${driven}' already drives '${driver}' through gears: the coupling would be circular`);
-      current = driverOf.get(current);
-    }
-    const gearId = idOrNext(id, 'gear');
-    if (dynamicsIdTaken(dynamics, gearId)) return fail(`id '${gearId}' is already used`);
-    return changed(
-      withDynamics(doc, {
-        ...dynamics,
-        gears: {
-          ...dynamics.gears,
-          [gearId]: {
-            id: gearId,
-            driver,
-            driven,
-            ratio,
-            ...(efficiency !== undefined ? { efficiency } : {}),
-            ...(teeth !== undefined ? { teeth } : {}),
-          },
-        },
-      }),
-      `add_gear_coupling: '${gearId}' — speed(${driven}) = ${Number(ratio.toPrecision(8))} × speed(${driver})` +
-        `${teeth === undefined ? '' : ` (teeth ${teeth.join('/')})`}, efficiency ${efficiency ?? 1}${efficiency === undefined ? ' (ideal; 0.99 is typical for a real mesh)' : ''}.`,
-      [gearId],
     );
   },
 });

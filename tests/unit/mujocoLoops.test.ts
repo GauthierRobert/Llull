@@ -75,7 +75,7 @@ describe('constraint forces and their signs (TR-FPR-07)', () => {
     const model: SimulationModel = {
       gravity: [0, 0, -9.81],
       bodies: [bob([1, 0, 0], null)],
-      gears: [],
+      transmissions: [],
       loops: [{ id: 'pin', kind: 'spherical', bodyA: 'world', bodyB: 'bob', anchor: [1, 0, 0], axis: [0, 0, 1], halfSpan: 0.01 }],
       solver,
       servos: [],
@@ -93,7 +93,7 @@ describe('constraint forces and their signs (TR-FPR-07)', () => {
     const model: SimulationModel = {
       gravity: [0, 0, -9.81],
       bodies: [bob([1, 0, 0], null)],
-      gears: [],
+      transmissions: [],
       loops: [{ id: 'hinge', kind: 'revolute', bodyA: 'world', bodyB: 'bob', anchor: [1, 0, 0], axis: [0, 1, 0], halfSpan: 0.05 }],
       solver,
       servos: [],
@@ -119,7 +119,7 @@ describe('constraint forces and their signs (TR-FPR-07)', () => {
     const model: SimulationModel = {
       gravity: [0, 0, -9.81],
       bodies: [bob([1, 0, 0], joint)],
-      gears: [],
+      transmissions: [],
       loops: [],
       solver,
       servos: [],
@@ -140,7 +140,7 @@ describe('constraint forces and their signs (TR-FPR-07)', () => {
     const model: SimulationModel = {
       gravity: [0, 0, 0],
       bodies: [bob([0, 0, 0], null)],
-      gears: [],
+      transmissions: [],
       loops: [],
       solver,
       servos: [],

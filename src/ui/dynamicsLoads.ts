@@ -4,7 +4,7 @@ import type { LoadLayer } from '@dynamics/index';
 
 export const LOAD_LAYER_LABELS: Readonly<Record<LoadLayer, string>> = {
   gravity: 'Weight',
-  joints: 'Joints & gears',
+  joints: 'Joints & transmissions',
   drives: 'Motor torque',
   thrust: 'Thrust',
   reactions: 'Joint reactions',
