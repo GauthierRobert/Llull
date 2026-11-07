@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { PipeRun, PipingModel } from '@aec/plant/types';
@@ -140,6 +141,24 @@ describe('set_run_end_cap closure blindFlange', () => {
       'RTE_CAP_INVALID',
     );
     expect(refused.summary).toContain('blind flange');
+  });
+
+  it('edit_route stretch_leg keeps the blind and the blind follows the new end point (2500: pieces 2500 - 152 - 101.4 = 2246.6)', () => {
+    const { doc, runId } = openRun();
+    const closed = apply(doc, 'set_run_end_cap', { ...blindOf, runId });
+    const stretched = apply(closed, 'edit_route', { runId, op: 'stretch_leg', index: 1, length: 2500 });
+    expect(runOf(stretched, runId).end.blind).toBe(true);
+    const derived = derivedOf(stretched, runId);
+    expect(derived.legs[1]?.cutLengthsMm[0]).toBeCloseTo(2246.6, 9);
+    expect(derived.parts.find((part) => part.typeKey === 'flangeBlind')?.centre?.[1]).toBeCloseTo(2500, 9);
+  });
+
+  it('survives a save and load: the blind end is still valid and derives the same parts', () => {
+    const { doc, runId } = openRun();
+    const closed = apply(doc, 'set_run_end_cap', { ...blindOf, runId });
+    const loaded = deserializeDocument(serializeDocument(closed));
+    expect(runOf(loaded, runId).end.blind).toBe(true);
+    expect(derivedOf(loaded, runId).parts.map((part) => part.id)).toEqual(derivedOf(closed, runId).parts.map((part) => part.id));
   });
 
   it('is pure', () => {
