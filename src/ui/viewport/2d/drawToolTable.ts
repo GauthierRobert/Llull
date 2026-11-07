@@ -71,6 +71,13 @@ const DESCRIPTORS: Partial<Record<DrawToolKind, DrawToolDescriptor>> = {
   },
   spline: openChain('draw_spline'),
   wall: { maxPoints: null, preview: 'chain', commit: (points, dispatch) => dispatch('draw_walls', wallChainParams(points, false)) },
+  hatch: {
+    maxPoints: 1,
+    preview: () => null,
+    commit: ([at], dispatch) => {
+      if (at) dispatch('hatch_region', { point: [at[0], at[1]] });
+    },
+  },
   point: {
     maxPoints: 1,
     preview: () => null,

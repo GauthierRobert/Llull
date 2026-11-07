@@ -1,0 +1,186 @@
+{
+  "format": "llull-document",
+  "version": 3,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "rectangle",
+        "width": 100,
+        "height": 60,
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#3": {
+        "id": "#3",
+        "kind": "circle",
+        "center": [50,30],
+        "radius": 10,
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#4": {
+        "id": "#4",
+        "kind": "region",
+        "loops": [[[0,0],[50,0],[50,30],[0,30]],[[30,15],[29.9039264,15.9754516],[29.6193977,16.9134172],[29.1573481,17.7778512],[28.5355339,18.5355339],[27.7778512,19.1573481],[26.9134172,19.6193977],[25.9754516,19.9039264],[25,20],[24.0245484,19.9039264],[23.0865828,19.6193977],[22.2221488,19.1573481],[21.4644661,18.5355339],[20.8426519,17.7778512],[20.3806023,16.9134172],[20.0960736,15.9754516],[20,15],[20.0960736,14.0245484],[20.3806023,13.0865828],[20.8426519,12.2221488],[21.4644661,11.4644661],[22.2221488,10.8426519],[23.0865828,10.3806023],[24.0245484,10.0960736],[25,10],[25.9754516,10.0960736],[26.9134172,10.3806023],[27.7778512,10.8426519],[28.5355339,11.4644661],[29.1573481,12.2221488],[29.6193977,13.0865828],[29.9039264,14.0245484]]],
+        "curves": [[{"type":"line","points":[[0,0],[50,0]]},{"type":"line","points":[[50,0],[50,30]]},{"type":"line","points":[[50,30],[0,30]]},{"type":"line","points":[[0,30],[0,0]]}],[{"type":"arc","points":[[30,15],[25,20],[20,15]]},{"type":"arc","points":[[20,15],[25,10],[30,15]]}]],
+        "hatch": {"pattern":"lines","angle":0,"spacing":2.5},
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#5": {
+        "id": "#5",
+        "kind": "rectangle",
+        "width": 20,
+        "height": 20,
+        "position": [120,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#6": {
+        "id": "#6",
+        "kind": "region",
+        "loops": [[[120,0],[140,0],[140,20],[120,20]]],
+        "curves": [[{"type":"line","points":[[120,0],[140,0]]},{"type":"line","points":[[140,0],[140,20]]},{"type":"line","points":[[140,20],[120,20]]},{"type":"line","points":[[120,20],[120,0]]}]],
+        "hatch": {"pattern":"cross","angle":0.785398163,"spacing":4},
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#7": {
+        "id": "#7",
+        "kind": "polyline",
+        "points": [[0,80],[40,80],[40,90],[10,90],[10,110],[0,110]],
+        "closed": true,
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      },
+      "#8": {
+        "id": "#8",
+        "kind": "region",
+        "loops": [[[0,80],[40,80],[40,90],[10,90],[10,110],[0,110]]],
+        "curves": [[{"type":"line","points":[[0,80],[40,80]]},{"type":"line","points":[[40,80],[40,90]]},{"type":"line","points":[[40,90],[10,90]]},{"type":"line","points":[[10,90],[10,110]]},{"type":"line","points":[[10,110],[0,110]]},{"type":"line","points":[[0,110],[0,80]]}]],
+        "hatch": {"pattern":"solid","angle":0.785398163,"spacing":2},
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#4a90d9"
+      }
+    },
+    "order": [
+      "#1",
+      "#3",
+      "#4",
+      "#5",
+      "#6",
+      "#7",
+      "#8"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#9",
+        "name": "draw_rectangle",
+        "params": {"width":100,"height":60},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#10",
+        "name": "draw_arc",
+        "params": {"center":[50,30],"radius":10},
+        "suppressed": false,
+        "affected": ["#3"]
+      },
+      {
+        "id": "#11",
+        "name": "hatch_region",
+        "params": {"ids":["#1","#3"],"pattern":"lines","angle":0,"spacing":5},
+        "suppressed": false,
+        "affected": ["#4"]
+      },
+      {
+        "id": "#12",
+        "name": "draw_rectangle",
+        "params": {"width":20,"height":20,"position":[120,0,0]},
+        "suppressed": false,
+        "affected": ["#5"]
+      },
+      {
+        "id": "#13",
+        "name": "hatch_region",
+        "params": {"point":[130,10],"pattern":"cross","angle":0.785398163,"spacing":4},
+        "suppressed": false,
+        "affected": ["#6"]
+      },
+      {
+        "id": "#14",
+        "name": "draw_polyline",
+        "params": {"points":[[0,80],[40,80],[40,90],[10,90],[10,110],[0,110]],"closed":true},
+        "suppressed": false,
+        "affected": ["#7"]
+      },
+      {
+        "id": "#15",
+        "name": "hatch_region",
+        "params": {"ids":["#7"],"pattern":"solid"},
+        "suppressed": false,
+        "affected": ["#8"]
+      },
+      {
+        "id": "#16",
+        "name": "scale_entity",
+        "params": {"id":"#4","factor":0.5},
+        "suppressed": false,
+        "affected": ["#4"]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 9
+  }
+}

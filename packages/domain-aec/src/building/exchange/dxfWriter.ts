@@ -1,4 +1,5 @@
-import type { Vec2 } from '@core/model/types';
+import type { RegionEntity, Vec2 } from '@core/model/types';
+import { regionFaces, regionHatchLines } from '@core/geometry/region';
 import { ansi31Hatch } from '@lib/hatch';
 import { sampleArc } from '@lib/arc';
 import { dimensionGeometry } from '@core/geometry/dimensionGeometry';
@@ -53,6 +54,21 @@ function writeFill(
   const { vertices, triangles } = triangulatePolygon(outer, holes);
   for (const [i, j, k] of triangles) {
     writer.solid(patternLayer(layer), vertices[i] as Vec2, vertices[j] as Vec2, vertices[k] as Vec2);
+  }
+}
+
+/**
+ * A region as R12 entities: every loop a closed polyline on `layer`, the pattern as LINEs (or SOLID triangles for a solid hatch) on
+ * `<layer>-PATT` — the same convention as drawing fills (R12 has no HATCH entity).
+ */
+export function writeRegion(writer: DxfWriter, layer: string, region: RegionEntity, world: (point: Vec2) => Vec2): void {
+  for (const loop of region.loops) writer.polyline(layer, loop.map(world), true);
+  for (const [a, b] of regionHatchLines(region)) writer.line(patternLayer(layer), world(a), world(b));
+  if (region.hatch?.pattern !== 'solid') return;
+  for (const { outer, holes } of regionFaces(region.loops)) {
+    const { vertices, triangles } = triangulatePolygon(outer, holes);
+    for (const [i, j, k] of triangles)
+      writer.solid(patternLayer(layer), world(vertices[i] as Vec2), world(vertices[j] as Vec2), world(vertices[k] as Vec2));
   }
 }
 

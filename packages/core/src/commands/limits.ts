@@ -31,3 +31,6 @@ export const MAX_IMAGE_PIXEL_SIDE = 16_384;
 export const MAX_GLTF_NODES = 200_000;
 export const MAX_GLTF_INSTANCES = 1_000_000;
 export const MAX_GLTF_DEPTH = 64;
+/** Total points over all loops of one region, and loops per region: bounds the pairwise crossing check and the hatch clipping. */
+export const MAX_REGION_POINTS = 4_000;
+export const MAX_REGION_LOOPS = 256;

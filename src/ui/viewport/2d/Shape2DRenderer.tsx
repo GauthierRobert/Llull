@@ -8,6 +8,7 @@ import { ArcRenderer, CircleRenderer, EllipseRenderer } from './entities/Ellipti
 import { RectangleRenderer } from './entities/RectangleRenderer';
 import { PointRenderer } from './entities/PointRenderer';
 import { SplineRenderer } from './entities/SplineRenderer';
+import { RegionRenderer } from './entities/RegionRenderer';
 import { TextRenderer2D } from './entities/TextRenderer2D';
 import { DimensionRenderer2D } from './entities/DimensionRenderer2D';
 import { ImageUnderlayRenderer } from './entities/ImageUnderlayRenderer';
@@ -23,6 +24,7 @@ const RENDERERS: { [K in Shape2DKind]: RenderBranch<Extract<Entity, { kind: K }>
   point: PointRenderer,
   ellipse: EllipseRenderer,
   spline: SplineRenderer,
+  region: RegionRenderer,
   text: TextRenderer2D,
   dimension: DimensionRenderer2D,
   image: ImageUnderlayRenderer,

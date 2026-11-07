@@ -1,4 +1,5 @@
 import { closedShapeArea } from '../../geometry/shapeArea';
+import { chainLength } from '../../geometry/curveSegments';
 import { sheetArea } from '../../geometry/sheetArea';
 import { distance, polygonArea, polygonPerimeter } from '../../lib/polygon';
 import type { CommandResult } from '../types';
@@ -18,14 +19,16 @@ export const measureArea = defineCommand({
   annotations: { readOnly: true },
   description:
     'Compute the area of a closed 2D shape or of a surface sheet. Provide either: (a) an entityId for a closed ' +
-    'polyline, rectangle, circle, or ellipse entity, or for a nurbs_surface sheet (its surface area, after any trim_surface by curves); or (b) an explicit polygon as points ([[x,y],...], >= 3 points). ' +
+    'polyline, rectangle, circle, or ellipse entity, for a region (hatch_region: NET area = outer loop minus holes plus islands, exact over curved loops), or for a nurbs_surface sheet (its surface area, after any trim_surface by curves); or (b) an explicit polygon as points ([[x,y],...], >= 3 points). ' +
     'Returns data: { area, unit } where unit is the squared document unit (e.g. "mm²"). ' +
     'Open polylines are rejected with an explanatory message. Does not modify the document.',
   params: z.object({
     entityId: z
       .string()
       .optional()
-      .describe("Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', or 'ellipse'."),
+      .describe(
+        "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', 'ellipse', or 'region' (net area).",
+      ),
     points: z
       .array(z.tuple([z.number(), z.number()]))
       .optional()
@@ -54,7 +57,7 @@ export const measureArea = defineCommand({
     if (area === null)
       return noop(
         doc,
-        `measure_area: entity '${entityId}' is kind '${e.kind}'; supported kinds are 'circle', 'rectangle', 'ellipse', 'polyline'.`,
+        `measure_area: entity '${entityId}' is kind '${e.kind}'; supported kinds are 'circle', 'rectangle', 'ellipse', 'polyline', 'region'.`,
       );
     return measured(area, ` of ${entityId}`);
   },
@@ -71,12 +74,12 @@ export const measurePerimeter = defineCommand({
   description:
     "Compute the perimeter or total length of a 2D shape. Supported entity kinds: 'line' (segment length), " +
     "'polyline' (sum of segment lengths; closed polyline adds last→first segment), " +
-    "'rectangle' (2*(width+height)), 'circle' (circumference 2πr), 'arc' (arc length r*|angle|). " +
+    "'rectangle' (2*(width+height)), 'circle' (circumference 2πr), 'arc' (arc length r*|angle|), 'region' (total boundary length: outer loop plus every hole). " +
     'Returns data: { perimeter, unit }. Does not modify the document.',
   params: z.object({
     entityId: z
       .string()
-      .describe("Id of the 2D shape entity to measure. Supported kinds: 'line', 'polyline', 'rectangle', 'circle', 'arc'."),
+      .describe("Id of the 2D shape entity to measure. Supported kinds: 'line', 'polyline', 'rectangle', 'circle', 'arc', 'region'."),
   }),
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
@@ -102,11 +105,17 @@ export const measurePerimeter = defineCommand({
         perimeter = e.radius * positiveSweep(e.endAngle - e.startAngle);
         break;
       }
+      case 'region':
+        perimeter = e.loops.reduce((sum, loop, i) => {
+          const chain = e.curves?.[i];
+          return sum + (chain === undefined ? polygonPerimeter(loop) : chainLength(chain));
+        }, 0);
+        break;
       default:
         return noop(
           doc,
           `measure_perimeter: entity '${entityId}' is kind '${e.kind}'; ` +
-            "supported kinds are 'line', 'polyline', 'rectangle', 'circle', 'arc'.",
+            "supported kinds are 'line', 'polyline', 'rectangle', 'circle', 'arc', 'region'.",
         );
     }
     return report(doc, `Perimeter of ${entityId} = ${formatLength(doc, perimeter)}.`, { perimeter, unit: doc.units });

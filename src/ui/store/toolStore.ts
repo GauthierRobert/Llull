@@ -4,7 +4,18 @@ import { create } from 'zustand';
 
 export type ViewMode = '3d' | '2d';
 
-export type DrawToolKind = 'none' | 'move' | 'line' | 'polyline' | 'wall' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline';
+export type DrawToolKind =
+  | 'none'
+  | 'move'
+  | 'line'
+  | 'polyline'
+  | 'wall'
+  | 'circle'
+  | 'rectangle'
+  | 'point'
+  | 'ellipse'
+  | 'spline'
+  | 'hatch';
 
 export type ModifyToolKind = 'none' | 'offset' | 'fillet' | 'chamfer' | 'trim' | 'extend' | 'explode';
 
