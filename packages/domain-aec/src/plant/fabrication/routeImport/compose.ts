@@ -36,6 +36,10 @@ export interface Composed {
   readonly supportIds: readonly string[];
   readonly droppedSupports: number;
   readonly commands: readonly string[];
+  /** Spec length of the cap of each capped run (plan run key), mm. */
+  readonly capLengths: Readonly<Record<string, number>>;
+  /** The plan that was executed (a cap's closed end filled in). */
+  readonly plan: RoutePlan;
 }
 
 interface Applied {
@@ -68,6 +72,13 @@ function step(
 
 const isStep = (value: CommandResult | Applied): value is Applied => 'next' in value;
 
+/** Catalogue type of an inline item: the valve type, a (flat-sided) reducer, or the flanged joint / instrument. */
+function inlineTypeOf(item: PlannedRun['inline'][number], valveType: string): string {
+  if (item.type === 'valve') return valveType;
+  if (item.type === 'reducer') return item.flat === undefined ? 'reducerConcentric' : 'reducerEccentric';
+  return item.type;
+}
+
 /** Compass-or-vector legs along `points`; with an end port the last segment is left to the closing leg. */
 function legsOf(points: readonly Vec3[], closing: boolean): Array<{ direction: unknown; length: number }> {
   const segments = points.slice(1).map((point, k) => ({ from: points[k] as Vec3, to: point }));
@@ -88,7 +99,49 @@ function locate(points: readonly Vec3[], centre: Vec3): { leg: number; centreDis
   return undefined;
 }
 
+/** How far beyond the joint a closure's end is probed when it does not fit at the joint (mm): longer than any cap or blind flange. */
+const CLOSURE_PROBE_MM = 2000;
+
+/** `point` moved `length` further along the last segment of `points`. */
+function beyondEnd(points: readonly Vec3[], length: number): Vec3 {
+  const [a, b] = [points[points.length - 2] as Vec3, points[points.length - 1] as Vec3];
+  const u = normalize3(sub3(b, a));
+  return [b[0] + u[0] * length, b[1] + u[1] * length, b[2] + u[2] * length];
+}
+
+/**
+ * The routed line of a plan. The file gives the joint of a cap and its pipe, not the cap's closed end, and the RTE's run ends at the closed end (the spec cap takes its row length
+ * out of the last leg): a plan with such a cap is composed once to learn the spec cap length, then again with each run ending one cap length beyond the joint, so the cap sits
+ * where the file has it.
+ */
 export function composeRoute(original: CadDocument, input: ComposeInput, ctx: ExecutionContext | undefined): Composed | CommandResult {
+  let first = composeOnce(original, input, ctx);
+  if (
+    !isComposed(first) &&
+    first.error?.code === 'RTE_SEGMENT_TOO_SHORT' &&
+    input.plan.runs.some((planned) => planned.cap?.tip === undefined && planned.cap !== undefined)
+  ) {
+    // A closure right after an elbow, or on a last piece shorter than the closure: with the run ending at the joint the closure does not fit. Probe with the end well beyond it to learn the spec length, then place it exactly.
+    const probe = input.plan.runs.map((planned): PlannedRun => {
+      if (planned.cap === undefined || planned.cap.tip !== undefined) return planned;
+      return { ...planned, points: [...planned.points.slice(0, -1), beyondEnd(planned.points, CLOSURE_PROBE_MM)] };
+    });
+    const probed = composeOnce(original, { ...input, plan: { ...input.plan, runs: probe } }, ctx);
+    if (isComposed(probed)) first = probed;
+  }
+  if (!isComposed(first)) return first;
+  const open = input.plan.runs.filter((planned) => planned.cap !== undefined && planned.cap.tip === undefined);
+  if (open.length === 0 || open.every((planned) => first.capLengths[planned.key] === undefined)) return first;
+  const runs = input.plan.runs.map((planned): PlannedRun => {
+    const length = first.capLengths[planned.key];
+    if (planned.cap === undefined || planned.cap.tip !== undefined || length === undefined) return planned;
+    const tip = beyondEnd(planned.points, length);
+    return { ...planned, points: [...planned.points.slice(0, -1), tip], cap: { ...planned.cap, tip } };
+  });
+  return composeOnce(original, { ...input, plan: { ...input.plan, runs } }, ctx);
+}
+
+function composeOnce(original: CadDocument, input: ComposeInput, ctx: ExecutionContext | undefined): Composed | CommandResult {
   const { plan } = input;
   const main = plan.runs[0] as PlannedRun;
   const reducerInBranch = plan.runs.find((run) => run.parent !== undefined && run.inline.some((item) => item.type === 'reducer'));
@@ -103,6 +156,7 @@ export function composeRoute(original: CadDocument, input: ComposeInput, ctx: Ex
     );
   const commands: string[] = [];
   const portIds: string[] = [];
+  const capLengths: Record<string, number> = {};
   let doc = original;
   /** A nested command: its result, or (document untouched) the import's refusal carrying the step's code. */
   const run = (name: string, params: Record<string, unknown>): CommandResult => {
@@ -124,6 +178,16 @@ export function composeRoute(original: CadDocument, input: ComposeInput, ctx: Ex
     const id = made.affected[0] as string;
     portIds.push(id);
     return id;
+  };
+
+  /** A run that ends in a cap: the spec cap on its end (its length is how far the closed end lies beyond the joint). */
+  const closeEnd = (planned: PlannedRun, runId: string): CommandResult | undefined => {
+    if (planned.cap === undefined) return undefined;
+    const capped = run('set_run_end_cap', { runId, end: 'end', cap: true, closure: planned.cap.kind });
+    if (capped.rejected === true) return capped;
+    const length = (capped.data as { capLengthMm?: number } | undefined)?.capLengthMm;
+    if (length !== undefined) capLengths[planned.key] = length;
+    return undefined;
   };
 
   const created = run('create_pipeline', {
@@ -163,9 +227,12 @@ export function composeRoute(original: CadDocument, input: ComposeInput, ctx: Ex
         [lost.item.componentId],
       );
     const inlineParams = located.map(({ item, at }) => ({
-      type: item.type === 'valve' ? input.valveType : 'reducerConcentric',
+      type: inlineTypeOf(item, input.valveType),
+      ...(item.lengthMm === undefined ? {} : { lengthMm: item.lengthMm }),
+      ...(item.endType === undefined ? {} : { endType: item.endType }),
       at,
       ...(item.dn2 === undefined ? {} : { dn2: item.dn2 }),
+      ...(item.flat === undefined ? {} : 'side' in item.flat ? { flat: item.flat.side } : { flatDirection: item.flat.direction }),
       ...(item.stem === undefined ? {} : { stemDirection: item.stem }),
     }));
     if (planned.parent === undefined) {
@@ -178,6 +245,8 @@ export function composeRoute(original: CadDocument, input: ComposeInput, ctx: Ex
       });
       if (routed.rejected === true) return routed;
       runIds[planned.key] = routed.affected[0] as string;
+      const closed = closeEnd(planned, runIds[planned.key] as string);
+      if (closed !== undefined) return closed;
       continue;
     }
     const header = runIds[planned.parent];
@@ -191,6 +260,8 @@ export function composeRoute(original: CadDocument, input: ComposeInput, ctx: Ex
     if (branched.rejected === true) return branched;
     const branchRun = branched.affected[0] as string;
     runIds[planned.key] = branchRun;
+    const closed = closeEnd(planned, branchRun);
+    if (closed !== undefined) return closed;
     for (const item of inlineParams) {
       const placed = run('insert_inline_component', { runId: branchRun, ...item });
       if (placed.rejected === true) return placed;
@@ -220,7 +291,7 @@ export function composeRoute(original: CadDocument, input: ComposeInput, ctx: Ex
       supportIds.push(...created.map((entry) => entry.id));
     }
   }
-  return { composed: true, document: doc, lineId, runIds, portIds, weldIds, supportIds, droppedSupports, commands };
+  return { composed: true, document: doc, lineId, runIds, portIds, weldIds, supportIds, droppedSupports, commands, capLengths, plan };
 }
 
 export const isComposed = (value: Composed | CommandResult): value is Composed => 'composed' in value;

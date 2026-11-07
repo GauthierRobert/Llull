@@ -63,7 +63,7 @@ function flangePieces(part: RoutedPart): Piece[] {
 function pieces(part: RoutedPart): Piece[] {
   const [first, second, third] = part.ports;
   const od = part.dims['outsideDiameter'];
-  if (part.kind === 'cap')
+  if (part.kind === 'cap' || part.typeKey === 'flangeBlind')
     return first === undefined || od === undefined || part.centre === undefined
       ? []
       : [{ from: part.centre, to: first.position, half: od / 2, insulated: false }];

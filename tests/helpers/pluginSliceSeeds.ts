@@ -14,6 +14,7 @@ import { runPlan } from '../golden/runPlan';
 import { plans, type GoldenAction } from '../golden/plans';
 import { plmPlans } from '../golden/plmPlans';
 import { implicitPlans } from '../golden/implicitPlans';
+import { blindRunSteps } from '../golden/pipingPlansBlind';
 import { cappedRunSteps } from '../golden/pipingPlansCap';
 import { rteJson } from '../unit/plant/piping/rteFixtures';
 import { recordedModel } from '../unit/plant/stress/m3Fixtures';
@@ -159,9 +160,9 @@ function buildingWithEquipment(): CadDocument {
   return run(doc, 'add_pump', { ...pumpParams, location: [30000, 20000] });
 }
 
-/** Pump-to-vessel plus a capped run, plus a run that continues from the open end of another (a `runEnd` ref: a capped end must never be one). */
+/** Pump-to-vessel plus a capped run and a blind-flanged line with a flanged joint and an instrument, plus a run that continues from the open end of another (a `runEnd` ref: a capped end must never be one). */
 function pipingSeedDocument(): CadDocument {
-  const base = planDocument([...(plans['piping_pump_to_vessel'] as GoldenAction[]), ...cappedRunSteps], 'piping seed');
+  const base = planDocument([...(plans['piping_pump_to_vessel'] as GoldenAction[]), ...cappedRunSteps, ...blindRunSteps], 'piping seed');
   const piping = base.plant?.piping;
   const capped = piping?.runOrder.at(-1);
   const line = capped === undefined ? undefined : piping?.runs[capped]?.lineId;

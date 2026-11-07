@@ -7,9 +7,11 @@
  */
 
 import type { Vec3 } from '@core/model/vectors';
-import { distance3, normalize3, sub3 } from '@lib/vec3';
+import { add3, distance3, normalize3, sub3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
 import type { NetworkComponent, NetworkPoint, WeldKind } from '../model';
+import { bodyOf, type PlannedInline } from './inlineBody';
+import { eccentricStep, isShifted, storedCorner, ZERO, type FlatSide } from './eccentric';
 
 /** Most components a line may have in route mode: every part is derived from the spec by a command, and the re-derivation grows with the line. */
 export const MAX_ROUTE_COMPONENTS = 400;
@@ -21,16 +23,6 @@ export interface PlannedPort {
   readonly dn: number;
 }
 
-export interface PlannedInline {
-  readonly type: 'valve' | 'reducer';
-  readonly componentId: string;
-  readonly centre: Vec3;
-  /** Reducers: the size the run continues at. */
-  readonly dn2?: number;
-  /** Valves: direction from the centre toward the handwheel, when the file gives a spindle direction. */
-  readonly stem?: Vec3;
-}
-
 export interface PlannedRun {
   readonly key: string;
   readonly dn: number;
@@ -39,6 +31,11 @@ export interface PlannedRun {
   readonly startPort?: PlannedPort;
   readonly endPort?: PlannedPort;
   readonly inline: readonly PlannedInline[];
+  /**
+   * The run ends closed by a cap or a blind flange: the pipe (a blind: its gasket) meets it at `mouth`; `tip` is its closed end when the file gives it (a CAP with two
+   * END-POINTs, a FLANGE-BLIND's outer face).
+   */
+  readonly cap?: { readonly kind: 'cap' | 'blindFlange'; readonly mouth: Vec3; readonly tip?: Vec3 };
   /** The run this one branches off (absent for the main run). */
   readonly parent?: string;
   readonly consumed: readonly string[];
@@ -66,30 +63,16 @@ export interface RoutePlan {
   readonly supports: readonly PlannedSupport[];
   /** Gaskets the spec rebuilds with its flange sets (bolt sets are not counted: they have no position). */
   readonly rebuilt: readonly string[];
+  /** Flanged joints the file draws without a gasket (flange against flange, a flanged body or a blind): the spec adds one (ISO_ROUTE_GASKET_ADDED). */
+  readonly gasketless: readonly string[];
 }
 
 export interface RouteRefusal {
   readonly ok: false;
-  readonly code: 'ISO_ROUTE_UNSUPPORTED' | 'ISO_ROUTE_TOO_LARGE';
+  readonly code: 'ISO_ROUTE_UNSUPPORTED' | 'ISO_ROUTE_TOO_LARGE' | 'ISO_ROUTE_FLAT_MISSING' | 'ISO_PARAM_INVALID';
   readonly message: string;
   readonly ids: readonly string[];
 }
-
-const UNSUPPORTED: Readonly<Record<string, string>> = {
-  CAP: 'a cap',
-  'FLANGE-BLIND': 'a blind flange',
-  INSTRUMENT: 'an instrument',
-  'REDUCER-ECCENTRIC': 'an eccentric reducer (its flat side is not in the file)',
-};
-
-const SPINDLE: Readonly<Record<string, Vec3>> = {
-  UP: [0, 0, 1],
-  DOWN: [0, 0, -1],
-  NORTH: [0, 1, 0],
-  SOUTH: [0, -1, 0],
-  EAST: [1, 0, 0],
-  WEST: [-1, 0, 0],
-};
 
 interface Seed {
   readonly key: string;
@@ -119,24 +102,17 @@ function onSegment(point: Vec3, a: Vec3, b: Vec3): boolean {
   return along >= -1 && along <= length + 1 && Math.abs(distance3(point, a) ** 2 - along ** 2) <= 1;
 }
 
-const stemOf = (component: NetworkComponent): { stem?: Vec3 } => {
-  const stem = SPINDLE[component.extra?.['SPINDLE-DIRECTION'] ?? ''];
-  return stem === undefined ? {} : { stem };
-};
+export interface PlanOptions {
+  /** Flat side of the eccentric reducers whose END-POINTs lie on one axis (the file does not say). */
+  readonly eccentricFlat?: FlatSide | undefined;
+}
 
-export function planRoute(components: readonly NetworkComponent[]): RoutePlan | RouteRefusal {
+export function planRoute(components: readonly NetworkComponent[], options: PlanOptions = {}): RoutePlan | RouteRefusal {
   if (components.length > MAX_ROUTE_COMPONENTS)
     return refuse(
       'ISO_ROUTE_TOO_LARGE',
       `${components.length} components: route mode rebuilds at most ${MAX_ROUTE_COMPONENTS} per line`,
       [],
-    );
-  const unsupported = components.filter((component) => UNSUPPORTED[component.type] !== undefined);
-  if (unsupported.length > 0)
-    return refuse(
-      'ISO_ROUTE_UNSUPPORTED',
-      `route mode cannot rebuild ${[...new Set(unsupported.map((component) => UNSUPPORTED[component.type]))].join(', ')}`,
-      unsupported.map((component) => component.id),
     );
   const at = (i: number): NetworkComponent => components[i] as NetworkComponent;
   const index = new Map<string, number[]>();
@@ -147,6 +123,7 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
   const visited = new Set<number>();
   const welds: PlannedWeld[] = [];
   const rebuilt: string[] = [];
+  const gasketless: string[] = [];
   let shopWelds = 0;
   const take = (i: number): void => void visited.add(i);
   const free = (key: string, ...except: number[]): number[] =>
@@ -176,8 +153,9 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
   ): { valve: PlannedInline; consumed: string[]; out: NetworkPoint } | RouteRefusal {
     const valve = at(valveIndex);
     const far = otherEnd(valve, valveFaceKey);
-    if (far === undefined || valve.ends.some((valveEnd) => valveEnd.endType !== 'FL'))
-      return refuse('ISO_ROUTE_UNSUPPORTED', `valve ${valve.id} is not a flanged valve between two flanges`, [valve.id]);
+    const near = valve.ends.find((bodyEnd) => bodyEnd !== far);
+    if (far === undefined || near === undefined || valve.ends.some((valveEnd) => valveEnd.endType !== 'FL'))
+      return refuse('ISO_ROUTE_UNSUPPORTED', `${valve.type} ${valve.id} is not a flanged body between two flanges`, [valve.id]);
     const farKey = nodeKey(far.xyz);
     const gasket2 = free(farKey, valveIndex).find((j) => at(j).type === 'GASKET');
     const faceKey = gasket2 === undefined ? farKey : nodeKey(otherEnd(at(gasket2), farKey)?.xyz ?? far.xyz);
@@ -186,23 +164,28 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
     );
     const out = flange2 === undefined ? undefined : otherEnd(at(flange2), faceKey);
     if (flange2 === undefined || out === undefined)
-      return refuse('ISO_ROUTE_UNSUPPORTED', `valve ${valve.id} has no flange on its far side`, [valve.id, flange.id]);
+      return refuse('ISO_ROUTE_UNSUPPORTED', `${valve.type} ${valve.id} has no flange on its far side`, [valve.id, flange.id]);
     for (const j of [gasket, gasket2, valveIndex, flange2]) if (j !== undefined) take(j);
     for (const j of [gasket, gasket2]) if (j !== undefined) rebuilt.push(at(j).id);
-    return {
-      valve: {
-        type: 'valve',
-        componentId: valve.id,
-        centre: midpoint(valve.ends[0]?.xyz ?? far.xyz, valve.ends[1]?.xyz ?? far.xyz),
-        ...stemOf(valve),
-      },
-      consumed: [valve.id, at(flange2).id],
-      out,
-    };
+    if (gasket === undefined) gasketless.push(flange.id, valve.id);
+    if (gasket2 === undefined) gasketless.push(valve.id, at(flange2).id);
+    return { valve: bodyOf(valve, near.xyz, far.xyz, ZERO, true), consumed: [valve.id, at(flange2).id], out };
   }
 
   const structural = components.filter((component) => !['WELD', 'BOLT', 'SUPPORT', 'OLET'].includes(component.type));
-  const startEnd = structural.flatMap((component) => component.ends).find((end) => free(nodeKey(end.xyz)).length === 1);
+  // A free end is a start unless it is the closed end of a cap or blind (the run is walked from the other end, which the closure then ends).
+  const freeEnds = structural
+    .flatMap((component) => component.ends.map((end) => ({ component, end })))
+    .filter(({ end }) => free(nodeKey(end.xyz)).length === 1);
+  const closureEnd = ({ component }: (typeof freeEnds)[number]): boolean => component.type === 'CAP' || component.type === 'FLANGE-BLIND';
+  const startPick = freeEnds.find((entry) => !closureEnd(entry)) ?? freeEnds[0];
+  const startEnd = startPick?.end;
+  if (startPick !== undefined && closureEnd(startPick))
+    return refuse(
+      'ISO_ROUTE_UNSUPPORTED',
+      'every free end of the line is the closed end of a cap or a blind flange: route mode closes one end of a run (the walk starts at the other)',
+      freeEnds.map(({ component }) => component.id),
+    );
   if (startEnd === undefined)
     return refuse('ISO_ROUTE_UNSUPPORTED', 'the line has no free end to start from (a closed loop, or no pipe component)', []);
 
@@ -225,6 +208,9 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
     let endPort: PlannedPort | undefined;
     let key = seed.startKey;
     let end = seed.start;
+    /** Offset of the actual axis from the stored one (an eccentric reducer upstream on this leg). */
+    let shift: Vec3 = ZERO;
+    let cap: { kind: 'cap' | 'blindFlange'; mouth: Vec3; tip?: Vec3 } | undefined;
 
     // A flange set at the free start (an optional gasket on the face, then the flange entered by its flanged face) is the start port.
     if (seed.parent === undefined) {
@@ -249,12 +235,20 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
       }
     }
 
-    for (let guard = 0; guard <= components.length + 2 && endPort === undefined; guard++) {
+    for (let guard = 0; guard <= components.length + 2 && endPort === undefined && cap === undefined; guard++) {
       arrive(key);
       const i = free(key)[0];
       if (i === undefined) break;
       const component = at(i);
+      if (component.type === 'CAP') {
+        take(i);
+        consumed.push(component.id);
+        const tip = otherEnd(component, key)?.xyz;
+        cap = { kind: 'cap', mouth: sub3(end, shift), ...(tip === undefined ? {} : { tip: sub3(tip, shift) }) };
+        break;
+      }
       const exit = otherEnd(component, key);
+      const entry = component.ends.find((componentEnd) => componentEnd !== exit);
       if (exit === undefined)
         return refuse('ISO_ROUTE_UNSUPPORTED', `${component.type} ${component.id} has no second end point`, [component.id]);
       take(i);
@@ -267,12 +261,21 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
           const [a, b] = [component.ends[0]?.xyz, component.ends[1]?.xyz];
           if (a === undefined || b === undefined)
             return refuse('ISO_ROUTE_UNSUPPORTED', `${component.id} has no end points`, [component.id]);
-          points.push(component.centre ?? cornerOf(a, b));
+          const centre = component.centre ?? cornerOf(a, b);
+          const next = sub3(exit.xyz, centre);
+          points.push(isShifted(shift) && distance3(exit.xyz, centre) > 1e-6 ? storedCorner(centre, shift, normalize3(next)) : centre);
+          shift = ZERO;
           break;
         }
         case 'TEE': {
           const [a, b] = [component.ends[0]?.xyz, component.ends[1]?.xyz];
           const centre = component.centre ?? (a !== undefined && b !== undefined ? midpoint(a, b) : undefined);
+          if (isShifted(shift))
+            return refuse(
+              'ISO_ROUTE_UNSUPPORTED',
+              `tee ${component.id} lies downstream of an eccentric reducer on the same leg, where the axis is off the stored line: the RTE cannot branch there`,
+              [component.id],
+            );
           if (component.branch === undefined || centre === undefined)
             return refuse('ISO_ROUTE_UNSUPPORTED', `tee ${component.id} has no branch point`, [component.id]);
           addBranch(seed.key, centre, component.branch);
@@ -282,19 +285,44 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
           inline.push({
             type: 'reducer',
             componentId: component.id,
-            centre: midpoint(component.ends[0]?.xyz ?? end, component.ends[1]?.xyz ?? end),
+            centre: sub3(midpoint(component.ends[0]?.xyz ?? end, component.ends[1]?.xyz ?? end), shift),
             dn2: exit.boreMm,
           });
           break;
+        case 'REDUCER-ECCENTRIC': {
+          const entry = component.ends.find((reducerEnd) => nodeKey(reducerEnd.xyz) === key) ?? exit;
+          const stored = sub3(entry.xyz, shift);
+          const before = points[points.length - 1] as Vec3;
+          const step = eccentricStep(
+            component,
+            entry,
+            exit,
+            distance3(stored, before) > 1e-6 ? normalize3(sub3(stored, before)) : undefined,
+            options.eccentricFlat,
+          );
+          if ('message' in step) return refuse(step.code, step.message, [component.id]);
+          const centre = sub3(midpoint(entry.xyz, exit.xyz), add3(shift, [step.offset[0] / 2, step.offset[1] / 2, step.offset[2] / 2]));
+          inline.push({ type: 'reducer', componentId: component.id, centre, dn2: exit.boreMm, flat: step.flat });
+          shift = add3(shift, step.offset);
+          break;
+        }
         case 'VALVE':
-          if (component.ends.some((valveEnd) => valveEnd.endType === 'FL'))
-            return refuse('ISO_ROUTE_UNSUPPORTED', `flanged valve ${component.id} is not between two flanges with gaskets`, [component.id]);
-          inline.push({
-            type: 'valve',
-            componentId: component.id,
-            centre: midpoint(component.ends[0]?.xyz ?? end, component.ends[1]?.xyz ?? end),
-            ...stemOf(component),
-          });
+        case 'INSTRUMENT':
+          if (component.ends.some((bodyEnd) => bodyEnd.endType === 'FL'))
+            return refuse(
+              'ISO_ROUTE_UNSUPPORTED',
+              `flanged ${component.type.toLowerCase()} ${component.id} is not between two flanges with gaskets`,
+              [component.id],
+            );
+          if (component.type === 'INSTRUMENT' && component.ends.some((bodyEnd) => bodyEnd.endType !== 'BW'))
+            return refuse(
+              'ISO_ROUTE_UNSUPPORTED',
+              `instrument ${component.id} has ${[...new Set(component.ends.map((bodyEnd) => bodyEnd.endType))].join(' / ')} ends: route mode takes an instrument with butt-weld ends, or flanged between flange sets (socket-weld and threaded instruments are not rebuilt)`,
+              [component.id],
+            );
+          if (entry === undefined)
+            return refuse('ISO_ROUTE_UNSUPPORTED', `${component.type} ${component.id} has no first end point`, [component.id]);
+          inline.push(bodyOf(component, entry.xyz, exit.xyz, shift, false));
           break;
         case 'FLANGE': {
           if (exit.endType !== 'FL')
@@ -306,7 +334,13 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
           const faceKey = nodeKey(exit.xyz);
           const beyond = free(faceKey, i);
           const gasket = beyond.length === 1 && at(beyond[0] as number).type === 'GASKET' ? (beyond[0] as number) : undefined;
-          if (beyond.length === 0 || gasket !== undefined) {
+          const blindBeyond = beyond.find((j) => at(j).type === 'FLANGE-BLIND');
+          const flangeBeyond = beyond.find(
+            (j) =>
+              ['FLANGE', 'VALVE', 'INSTRUMENT'].includes(at(j).type) &&
+              at(j).ends.some((flangeEnd) => flangeEnd.endType === 'FL' && nodeKey(flangeEnd.xyz) === faceKey),
+          );
+          if (beyond.length === 0 || gasket !== undefined || blindBeyond !== undefined || flangeBeyond !== undefined) {
             const far = gasket === undefined ? exit : otherEnd(at(gasket), faceKey);
             if (far === undefined)
               return refuse('ISO_ROUTE_UNSUPPORTED', `gasket ${at(gasket as number).id} has no second end point`, [
@@ -314,6 +348,22 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
               ]);
             const farKey = nodeKey(far.xyz);
             const onward = free(farKey, ...(gasket === undefined ? [] : [gasket]));
+            const blind = onward.find((j) => at(j).type === 'FLANGE-BLIND');
+            if (blind !== undefined) {
+              // A blind flange closes the run: the gasket (when the file has one) and the blind are rebuilt by the spec behind the flange.
+              take(blind);
+              consumed.push(at(blind).id);
+              if (gasket === undefined) gasketless.push(component.id, at(blind).id);
+              if (gasket !== undefined) {
+                take(gasket);
+                rebuilt.push(at(gasket).id);
+              }
+              const tip = otherEnd(at(blind), farKey)?.xyz;
+              cap = { kind: 'blindFlange', mouth: sub3(far.xyz, shift), ...(tip === undefined ? {} : { tip: sub3(tip, shift) }) };
+              end = far.xyz;
+              key = farKey;
+              continue;
+            }
             if (onward.length === 0) {
               // The flange ends the run: the face (outside the gasket, when the file has one) is a port.
               if (gasket !== undefined) {
@@ -325,16 +375,35 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
               key = farKey;
               continue;
             }
-            const valve = onward.find((j) => at(j).type === 'VALVE');
+            const mate = onward.find(
+              (j) =>
+                at(j).type === 'FLANGE' && at(j).ends.some((flangeEnd) => flangeEnd.endType === 'FL' && nodeKey(flangeEnd.xyz) === farKey),
+            );
+            const outPoint = mate === undefined ? undefined : otherEnd(at(mate), farKey);
+            if (mate !== undefined && outPoint !== undefined) {
+              // Flange - [gasket] - flange: a mid-line flanged joint, rebuilt by the spec with its own gasket and bolts.
+              take(mate);
+              if (gasket !== undefined) {
+                take(gasket);
+                rebuilt.push(at(gasket).id);
+              }
+              consumed.push(at(mate).id);
+              if (gasket === undefined) gasketless.push(component.id, at(mate).id);
+              inline.push({ type: 'flangedJoint', componentId: component.id, centre: sub3(midpoint(exit.xyz, far.xyz), shift) });
+              end = outPoint.xyz;
+              key = nodeKey(outPoint.xyz);
+              continue;
+            }
+            const valve = onward.find((j) => at(j).type === 'VALVE' || at(j).type === 'INSTRUMENT');
             if (valve === undefined)
               return refuse(
                 'ISO_ROUTE_UNSUPPORTED',
-                `flange ${component.id} is joined to something that is not a valve: a flanged joint outside a valve set`,
+                `flange ${component.id} is joined to something that is neither a flange, a valve nor an instrument: a flanged joint outside a flanged set`,
                 [component.id],
               );
             const through = valveSet(component, gasket, valve, farKey);
             if ('ok' in through) return through;
-            inline.push(through.valve);
+            inline.push({ ...through.valve, centre: sub3(through.valve.centre, shift) });
             consumed.push(...through.consumed);
             end = through.out.xyz;
             key = nodeKey(through.out.xyz);
@@ -353,7 +422,7 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
       key = nodeKey(exit.xyz);
     }
     arrive(key);
-    points.push(end);
+    points.push(cap?.tip ?? sub3(end, shift));
     const line = dedupe(points);
     if (line.length < 2)
       return refuse('ISO_ROUTE_UNSUPPORTED', `run ${seed.key} has no length (it starts and ends at one point)`, consumed);
@@ -363,6 +432,7 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
       points: line,
       ...(startPort === undefined ? {} : { startPort }),
       ...(endPort === undefined ? {} : { endPort }),
+      ...(cap === undefined ? {} : { cap }),
       inline,
       ...(seed.parent === undefined ? {} : { parent: seed.parent }),
       consumed,
@@ -393,5 +463,5 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
         ]
       : [],
   );
-  return { ok: true, runs, welds, shopWelds, supports, rebuilt };
+  return { ok: true, runs, welds, shopWelds, supports, rebuilt, gasketless: [...new Set(gasketless)] };
 }

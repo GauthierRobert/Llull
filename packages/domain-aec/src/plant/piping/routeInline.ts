@@ -17,6 +17,7 @@ import { operatorBodies, operatorKind } from './operator';
 import { flangeParts, mintSet, type FlangeSetIds } from './routeEnds';
 import { at, joinOf, partOf, type Env, type Mint, type Slot } from './routeEnv';
 import { inlineInOrder, isReducer, isValve, startDn } from './runSizes';
+import { FLANGED_JOINT, flangedJointSlot, INSTRUMENT, instrumentSlot } from './routeFlangedInline';
 import { isStraight, straightSlot } from './routeStraight';
 import { isMiss } from './specLookup';
 
@@ -34,6 +35,9 @@ export const INLINE_TYPES = [
   'coupling',
   'union',
 ] as const satisfies readonly ComponentType[];
+
+/** `insert_inline_component` types: the catalogue ones plus the flanged joint and the instrument (see routeFlangedInline). */
+export const INLINE_COMPONENT_TYPES = [...INLINE_TYPES, FLANGED_JOINT, INSTRUMENT] as const;
 
 /** Unit stem direction used when none is given: perpendicular to the pipe, up (+Z), or +X on a vertical pipe. */
 export function defaultStem(direction: Vec3): Vec3 {
@@ -291,10 +295,14 @@ export function layoutInline(env: Env, legLengths: readonly number[], dirs: read
       ? valveSlot(env, located, mint)
       : isReducer(comp)
         ? reducerSlot(env, located, mint)
-        : isStraight(comp)
-          ? straightSlot(env, comp, dn, mint)
-          : null;
-    if (slot === null) return noComponent(`${comp.type} cannot be placed inline (${INLINE_TYPES.join(', ')})`, comp);
+        : comp.type === FLANGED_JOINT
+          ? flangedJointSlot(env, comp, dn, mint)
+          : comp.type === INSTRUMENT
+            ? instrumentSlot(env, comp, dn, mint)
+            : isStraight(comp)
+              ? straightSlot(env, comp, dn, mint)
+              : null;
+    if (slot === null) return noComponent(`${comp.type} cannot be placed inline (${INLINE_COMPONENT_TYPES.join(', ')})`, comp);
     if (isFailure(slot)) return slot;
     slots.push(slot);
     dn = located.dnOut;
