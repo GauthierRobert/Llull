@@ -7,6 +7,7 @@ import { positiveInteger } from '../env';
 import { defaultFeArtifactStore } from './artifactStore';
 import { caeHooks } from './caeHooks';
 import { createCcxRunner } from './ccxProcess';
+import { runConvergenceStudy } from './feaConvergence';
 import { runFeaExport } from './feaExport';
 import { runFeaImportField } from './feaImportField';
 import { runFeaImportResults } from './feaImportResults';
@@ -39,10 +40,15 @@ export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToo
     if (binary === null) throw new Error(`${nativeInstallHint('llull-mesh')}; FEA_TOOL_MISSING`);
     return callNativeMesher(binary, request, timeoutMs, env);
   };
+  const mesh: FeaToolsPort['mesh'] = (analysisId, host) =>
+    runFeaMesh(analysisId, host, { mesher, store, hooks: caeHooks, kernel: guardedFeaKernel });
+  const solve: FeaToolsPort['solve'] = (analysisId, options, host) =>
+    runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs, beforeDeck, randomPost });
   return {
-    mesh: (analysisId, host) => runFeaMesh(analysisId, host, { mesher, store, hooks: caeHooks, kernel: guardedFeaKernel }),
-    solve: (analysisId, options, host) =>
-      runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs, beforeDeck, randomPost }),
+    mesh,
+    solve,
+    convergenceStudy: (analysisId, options, host) =>
+      runConvergenceStudy(analysisId, options, host, { store, hooks: caeHooks, mesh, solve }),
     exportDeck: (analysisId, host, options) => Promise.resolve(runFeaExport(analysisId, host, { store, hooks: caeHooks }, options)),
     importResults: (analysisId, file, host) => Promise.resolve(runFeaImportResults(analysisId, file, host, { store, hooks: caeHooks })),
     importField: (analysisId, table, host) => Promise.resolve(runFeaImportField(analysisId, table, host, { store, hooks: caeHooks })),

@@ -11,7 +11,15 @@ export { CONVENTIONS_GUIDE } from './conventions';
 export type { CadExchangePort, DwgConverterPort, ProgramRun } from './exchangeTools';
 export { buildExchangeToolDefinitions, applyExchangeToolCall, exportStepFile } from './exchangeTools';
 
-export type { FeaToolsPort, FeaHost, FeaToolResult, FieldTableInput, FeaExportFormat, ResultsFileInput } from './feaTools';
+export type {
+  ConvergenceStudyOptions,
+  FeaToolsPort,
+  FeaHost,
+  FeaToolResult,
+  FieldTableInput,
+  FeaExportFormat,
+  ResultsFileInput,
+} from './feaTools';
 export { buildFeaToolDefinitions, FEA_SOLVE_TIMEOUT_S } from './feaTools';
 export { buildLibraryToolDefinitions, type MaterialLibraryStorePort, type LibraryRegistration } from './libraryTools';
 export { buildNativeToolDefinitions } from './nativeTools';

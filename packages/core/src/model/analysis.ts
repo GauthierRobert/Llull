@@ -12,6 +12,7 @@ import type { DurabilityModel } from './durability';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
+import type { CaseStudies } from './convergenceStudy';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -490,7 +491,8 @@ interface FitDisposition extends Pick<Disposition, 'decision' | 'justification' 
 }
 export type FitDispositions = Readonly<Record<string, FitDisposition>>;
 
-export interface AnalysisCase {
+/** Carries the PHY-00 convergence `studies` / `studyOrder` of the case (see convergenceStudy.ts). */
+export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly id: string;
   readonly name: string;
   readonly type: AnalysisType;
@@ -543,6 +545,7 @@ export interface AnalysisModel {
   readonly durability?: DurabilityModel;
   /** PHY-09 spectrum / time-history library and equivalent-load provenance; absent until the first spectrum or history command. */
   readonly vibration?: DynamicsLibrary;
+  readonly exceptionLedger?: readonly import('./convergenceStudy').StudyExceptionRecord[];
 }
 
 /** Mesh artifact (JSON, no typed arrays); stored by the host under `sha256Hex(canonicalJson(artifact))`. */

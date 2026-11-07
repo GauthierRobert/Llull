@@ -6,6 +6,7 @@ import { orientationErrors } from '../thermomech/validateOrientations';
 import { durabilityErrors } from './validateDurability';
 import { settingsErrors } from './validateSettings';
 import { defeatureErrors, idealizationErrors } from './validateIdealization';
+import { ledgerErrors, studyErrors } from '../vnv/validateStudies';
 
 const TYPES = [
   'static',
@@ -47,6 +48,7 @@ const QUANTITIES = [
   'u_y_rel',
   'u_z_rel',
 ];
+const ELEMENT_FAMILIES = ['tet', 'tri', 'quad', 'shell_quad', 'shell_tri', 'hex_dominant'];
 const IDEALIZATION_KINDS = ['solid', 'plane_stress', 'shell', 'beam'];
 
 const isVec3 = (value: unknown): boolean =>
@@ -124,6 +126,9 @@ function checkMesh(scope: Scope, mesh: unknown, where: string): void {
   const size = mesh['globalSize'];
   if (typeof size !== 'number' || !(size > 0)) scope.errors.push(`${where}: mesh.globalSize must be > 0`);
   if (mesh['order'] !== 1 && mesh['order'] !== 2) scope.errors.push(`${where}: mesh.order must be 1 or 2`);
+  if (!oneOf(ELEMENT_FAMILIES, mesh['elementFamily'])) scope.errors.push(`${where}: mesh.elementFamily is unknown`);
+  if (mesh['minSize'] !== undefined && !(typeof mesh['minSize'] === 'number' && mesh['minSize'] > 0))
+    scope.errors.push(`${where}: mesh.minSize must be > 0 when present`);
   if (mesh['bonding'] !== undefined && mesh['bonding'] !== 'conformal')
     scope.errors.push(`${where}: mesh.bonding must be 'conformal' when present`);
   const refinements = mesh['refinements'];
@@ -133,6 +138,19 @@ function checkMesh(scope: Scope, mesh: unknown, where: string): void {
       scope.errors.push(`${where}: mesh.refinements[${index}] needs size > 0`);
     else checkTarget(scope, refinement['target'], `${where}: mesh.refinements[${index}]`);
   });
+}
+
+/** The mesh controls every level of every study was meshed with: the same validator as the case's own controls. */
+function checkStudyControls(scope: Scope, analysisCase: Record<string, unknown>, where: string): void {
+  const studies = analysisCase['studies'];
+  if (!isRecord(studies)) return;
+  for (const [studyId, study] of Object.entries(studies)) {
+    const levels = isRecord(study) ? study['levels'] : undefined;
+    if (Array.isArray(levels))
+      levels.forEach((level, index) => {
+        if (isRecord(level)) checkMesh(scope, level['controls'], `${where}.studies['${studyId}'].levels[${index}]`);
+      });
+  }
 }
 
 function checkNonlinear(scope: Scope, analysisCase: Record<string, unknown>, where: string): void {
@@ -215,6 +233,8 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
   }
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
   errors.push(...settingsErrors(analysisCase, where));
+  errors.push(...studyErrors(analysisCase, id, where));
+  checkStudyControls(scope, analysisCase, where);
   for (const summary of ['meshSummary', 'results'])
     if (
       analysisCase[summary] !== undefined &&
@@ -235,5 +255,5 @@ export function analysisErrors(raw: Record<string, unknown>): string[] {
   scope.errors.push(...paths.map((path) => `${path} is not a finite number`));
   const order = analysis['caseOrder'] as unknown[];
   checkBag(scope, 'analysis.cases', analysis['cases'], order, (id, analysisCase) => checkCase(scope, id, analysisCase));
-  return [...scope.errors, ...durabilityErrors(raw)];
+  return [...scope.errors, ...ledgerErrors(analysis), ...durabilityErrors(raw)];
 }

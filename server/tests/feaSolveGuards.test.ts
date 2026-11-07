@@ -114,6 +114,7 @@ describe('timeoutS bounds (review finding 9)', () => {
       },
       exportDeck: () => Promise.resolve(ok('')),
       importField: () => Promise.resolve(ok('')),
+      convergenceStudy: () => Promise.resolve(ok('')),
       importResults: () => Promise.resolve(ok('')),
     };
     const deps = { port: null, allowCodeExecution: false, getDoc: createEmptyDocument, applyCommand: () => ok(''), fea: port };
