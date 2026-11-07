@@ -12,6 +12,7 @@ import { createPipeline } from './commands/pipeline';
 import { autoRoutePipe, routeProblem } from './commands/autoRoute';
 import { autoRouteLines, routeLinesOrder } from './commands/autoRouteLines';
 import { convertPipeRun } from './commands/convertPipeRun';
+import { setRunEndCap } from './commands/capRunEnd';
 import { deletePipeRun } from './commands/deleteRun';
 import { editRoute } from './commands/editRoute';
 import { exportPipeStep } from './commands/exportPipeStep';
@@ -57,6 +58,7 @@ export const pipingPlugin: CadPlugin = {
     autoRouteLines,
     routeLinesOrder,
     deletePipeRun,
+    setRunEndCap,
   ),
   // check_clashes sees the pipe runs and their insulation once the plugin is installed (registered at install, not at import; the clash code does not import the plugin).
   onInstall: () => registerClashSource(pipingClashBodies),

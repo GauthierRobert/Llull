@@ -27,6 +27,15 @@ export interface BuiltModel {
   }[];
   /** Imposed displacements of anchor nodes: 6 values (mm, rad). */
   readonly displacements: readonly { readonly name: string; readonly node: number; readonly values: readonly number[] }[];
+  /** Selected spring hangers (07 PST §5.8) at their nodes: a variable one is a vertical ground spring with preload, a constant-effort one an upward force. */
+  readonly springs: readonly {
+    readonly id: string;
+    readonly node: number;
+    readonly kind: 'variable' | 'constant';
+    readonly rateNPerMm: number;
+    readonly hotLoadN: number;
+    readonly coldLoadN: number;
+  }[];
   /** Stated weights of tees / olets (kg) at their junction node. */
   readonly pointWeights: readonly { readonly node: number; readonly kg: number }[];
   readonly warnings: readonly { readonly code: string; readonly message: string; readonly ids: readonly string[] }[];
@@ -230,6 +239,11 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
     if ('ok' in placed) return placed;
     attachments.push(placed);
   }
+  for (const spring of model.springs) {
+    const placed = locate(spring.at, `spring:${spring.id}`, `spring ${spring.id}`);
+    if ('ok' in placed) return placed;
+    attachments.push(placed);
+  }
   const set = ruleSetOf(model.rule);
   const components = layoutComponents(model, sources, steps);
   if ('ok' in components) return components;
@@ -256,8 +270,22 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
   );
   if ('ok' in overridden) return overridden;
   const finished: Layout = { ...layout, elements: overridden.elements };
-  const restraints = mapRestraints(model, sources.supports, finished);
-  if ('ok' in restraints) return restraints;
+  const mapped = mapRestraints(model, sources.supports, finished);
+  if ('ok' in mapped) return mapped;
+  // a hanger support that a selected spring stands for no longer acts as a rigid one-way rest
+  const replaced = new Set(model.springs.flatMap((spring) => ('supportId' in spring.at ? [spring.at.supportId] : [])));
+  const restraints: RestraintSet = {
+    ...mapped,
+    contacts: mapped.contacts.filter((contact) => !contact.sources.every((id) => replaced.has(id))),
+  };
+  const springs: BuiltModel['springs'][number][] = model.springs.map((spring) => ({
+    id: spring.id,
+    node: (finished.attached.get(`spring:${spring.id}`) as { node: number }).node,
+    kind: spring.kind,
+    rateNPerMm: spring.rateNPerMm,
+    hotLoadN: spring.hotLoadN,
+    coldLoadN: spring.coldLoadN,
+  }));
   const displacements: BuiltModel['displacements'][number][] = [];
   for (const [index, moved] of model.displacements.entries()) {
     const node = (finished.attached.get(`displacement:${index}`) as { node: number }).node;
@@ -325,5 +353,5 @@ export function buildStressModel(doc: CadDocument, model: StressModel): BuiltMod
         ]
       : []),
   ];
-  return { sources, layout: finished, restraints, walls, set, forces, displacements, pointWeights, warnings };
+  return { sources, layout: finished, restraints, walls, set, forces, displacements, springs, pointWeights, warnings };
 }

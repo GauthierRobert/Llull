@@ -20,7 +20,9 @@ export interface ResolvedPort {
   readonly spec: PortSpec;
 }
 
-export type PortResolution = { readonly ok: true; readonly port: ResolvedPort } | { readonly ok: false; readonly message: string };
+export type PortResolution =
+  | { readonly ok: true; readonly port: ResolvedPort }
+  | { readonly ok: false; readonly message: string; readonly code?: 'RTE_CAP_INVALID' };
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const unit = (v: Vec3): Vec3 => {
@@ -117,6 +119,12 @@ export function resolvePortId(doc: CadDocument, portId: string): PortResolution 
   if (tieIn !== undefined) return { ok: true, port: { id: portId, ref: { kind: 'tieIn', id: tieIn.id }, spec: tieIn.port } };
   const [head, tail] = portId.split(/:(?=[^:]*$)/);
   const run = head === undefined ? undefined : piping.runs[head];
+  if (run !== undefined && (tail === 'start' || tail === 'end') && run[tail].cap === true)
+    return {
+      ok: false,
+      code: 'RTE_CAP_INVALID',
+      message: `${portId} is closed by a cap: remove it first with set_run_end_cap { runId: "${run.id}", end: "${tail}", cap: false }`,
+    };
   if (run !== undefined && (tail === 'start' || tail === 'end')) {
     const spec = runEndPort(piping, run, tail);
     if (spec !== null) return { ok: true, port: { id: portId, ref: { kind: 'runEnd', runId: run.id, end: tail }, spec } };

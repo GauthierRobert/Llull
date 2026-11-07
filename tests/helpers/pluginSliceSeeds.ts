@@ -14,6 +14,7 @@ import { runPlan } from '../golden/runPlan';
 import { plans, type GoldenAction } from '../golden/plans';
 import { plmPlans } from '../golden/plmPlans';
 import { implicitPlans } from '../golden/implicitPlans';
+import { cappedRunSteps } from '../golden/pipingPlansCap';
 import { rteJson } from '../unit/plant/piping/rteFixtures';
 import { recordedModel } from '../unit/plant/stress/m3Fixtures';
 import { libraryDocument } from '../unit/plant/data/dataFixtures';
@@ -158,6 +159,29 @@ function buildingWithEquipment(): CadDocument {
   return run(doc, 'add_pump', { ...pumpParams, location: [30000, 20000] });
 }
 
+/** Pump-to-vessel plus a capped run, plus a run that continues from the open end of another (a `runEnd` ref: a capped end must never be one). */
+function pipingSeedDocument(): CadDocument {
+  const base = planDocument([...(plans['piping_pump_to_vessel'] as GoldenAction[]), ...cappedRunSteps], 'piping seed');
+  const piping = base.plant?.piping;
+  const capped = piping?.runOrder.at(-1);
+  const line = capped === undefined ? undefined : piping?.runs[capped]?.lineId;
+  if (piping === undefined || capped === undefined || line === undefined) return base;
+  const open = execute(base, 'route_pipe', {
+    lineId: line,
+    from: { point: [3000, 0, 0], direction: [1, 0, 0] },
+    legs: [{ direction: '+X', length: 500 }],
+  });
+  const openRun = open.affected[0];
+  if (openRun === undefined) throw new Error(`pluginSliceSeeds: piping seed route refused: ${open.summary}`);
+  const next = execute(open.document, 'route_pipe', {
+    lineId: line,
+    from: { portId: `${openRun}:end` },
+    legs: [{ direction: '+X', length: 400 }],
+  });
+  if (next.rejected === true) throw new Error(`pluginSliceSeeds: piping seed continuation refused: ${next.summary}`);
+  return next.document;
+}
+
 const planOf = (table: Record<string, GoldenAction[]>, name: string) => (): CadDocument => planDocument(table[name], name);
 
 /** The golden PLM plan needs a signature port that accepts a confirmation naming its signer (as tests/golden/golden.test.ts does). */
@@ -204,7 +228,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   piping: {
     roots: ['plant.piping'],
-    build: planOf(plans, 'piping_pump_to_vessel'),
+    build: pipingSeedDocument,
     query: { name: 'piping_takeoff', params: constant({}) },
     mutate: { name: 'set_piping_settings', params: constant({ lineNumberTemplate: '{dn}-{fluid}-{seq}-{class}' }) },
   },

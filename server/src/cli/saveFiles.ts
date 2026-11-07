@@ -10,6 +10,7 @@ import { nonEmptyString } from '@lib/nonEmptyString';
 import { rasterizeSvg } from '../renderImage';
 import { isHostedExport } from '../exportFiles';
 import { moveHostedFile } from '../hostedFile';
+import { saveAnimationFiles } from './saveAnimation';
 
 export interface OutputFile {
   readonly name: string | null; // suggested: `fileName`, or a `name` with an extension
@@ -106,6 +107,8 @@ function saveHostedFile(hosted: { path: string; bytes: number; name: string | nu
 export function saveDataFiles(data: unknown, target: string, exportDir?: string): SavedFile[] {
   const hosted = hostedFileOf(data, exportDir);
   if (hosted !== null) return saveHostedFile(hosted, target);
+  const animation = saveAnimationFiles(filesOfData(data), target);
+  if (animation !== null) return animation;
   const wantsPng = path.extname(target).toLowerCase() === '.png';
   const svg = wantsPng ? svgOfData(data) : undefined;
   const png = svg !== undefined ? pngOfSvg(svg, data) : null;

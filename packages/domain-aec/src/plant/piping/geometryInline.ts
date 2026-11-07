@@ -133,6 +133,15 @@ function oletEntities(part: RoutedPart, line: PipeLine): Entity[] {
   return [cylinder(part, line, FITTING_LAYER_ID, 'Olet', frame.origin, frame.axis, frame.length, (branch / 2) * (1 + OLET_RADIUS))];
 }
 
+/** A cap: a cylinder of the pipe OD from the closed end (`centre`) over the row length toward the mouth. */
+function capEntities(part: RoutedPart, line: PipeLine): Entity[] {
+  const mouth = part.ports[0];
+  const od = part.dims['outsideDiameter'];
+  const length = part.dims['length'];
+  if (mouth === undefined || part.centre === undefined || od === undefined || length === undefined) return [];
+  return [cylinder(part, line, FITTING_LAYER_ID, 'Cap', part.centre, mouth.direction, length, od / 2)];
+}
+
 /** The display entities of `part` (none for a bolt set or a stub-in; valves, tees: more than one). */
 export function partEntities(part: RoutedPart, line: PipeLine): Entity[] {
   switch (part.kind) {
@@ -144,6 +153,8 @@ export function partEntities(part: RoutedPart, line: PipeLine): Entity[] {
       return teeEntities(part, line);
     case 'olet':
       return oletEntities(part, line);
+    case 'cap':
+      return capEntities(part, line);
     default: {
       const entity = partEntity(part, line);
       return entity === null ? [] : [entity];

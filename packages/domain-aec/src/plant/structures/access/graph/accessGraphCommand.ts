@@ -19,7 +19,7 @@ export const accessGraph = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only access graph of the BUILDING model (the one check_reachability and the platform egress check of check_access search): nodes are grade (the lowest level) and the walking surfaces (floor slabs, loose grating panels, ' +
-    'generated platforms and circular platforms as one node each); edges are fixed ladders, steel stairs and concrete stairs (an end meets a surface within 50 mm in height and 600 mm in plan) and surfaces whose tops differ by at most 20 mm and whose outlines touch (within 10 mm), ' +
+    'generated platforms and circular platforms as one node each); edges are fixed ladders, steel stairs and concrete stairs (an end meets a surface within 50 mm in height and 600 mm in plan) and surfaces whose tops differ by at most 20 mm and whose outlines touch (within 10 mm) unless a guard-rail stands on their whole shared boundary (a gap of 100 mm or more or a gate keeps them connected; a rail set back more than 150 mm from the boundary does not separate), ' +
     'plus surfaces standing on grade. Answers the surfaces (id, mark, kind, level, top, area, whether it connects to grade, the route from grade and its legs), the connectors (kind, id, from, to, clear width, rise) and the ladders / stairs that meet no surface at an end with the reason. ' +
     'Lengths are millimetres whatever the document units. Grade is the lowest building level (gradeLevelId, gradeElevationMm). Pass surfaceIds to list only those surfaces (a platform, slab or grating id).',
   params: z.object({

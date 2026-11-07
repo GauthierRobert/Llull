@@ -33,6 +33,15 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PST_RESULTS_INCOMPLETE: 'Add the missing sustained and expansion load cases, then record again.',
   PST_NOT_RECORDED: 'Run record_pipe_stress_results before approve_pipe_stress.',
   PST_CORROSION_EXCEEDS_WALL: 'Lower corrosionAllowanceMm below the wall thickness, or use a pipe with a thicker wall.',
+  PST_CURSOR_STALE: 'Start again without a cursor: the model, a pipe or a support changed since the first page.',
+  PST_TABLE_INVALID: 'Fix the table rows named in the error paths (minN below maxN, one row per series and size).',
+  PST_SPRING_TABLE_MISSING: 'import_spring_table first (vendor sizes, rates, load ranges, travel), then name its tableId.',
+  PST_SPRING_NO_SIZE: 'Import a table with a size that holds the hot load and travel, or allow the constant-effort fallback.',
+  PST_SPRING_NOT_FOUND: 'Pass the id returned by select_spring_hangers (data.springs[].id).',
+  PST_SPRING_VARIABILITY: 'Use a lower spring rate, a larger size, or a constant-effort hanger; 0.15 applies near rotating equipment.',
+  PST_NOZZLE_OVERLOAD:
+    'Reduce the nozzle load: add flexibility, move supports or anchors, or use a limit that applies (confirm the rule with the equipment vendor).',
+  PST_NOZZLE_LIMIT_MISSING: 'Pass the limit table (api610 table + orientation) or userLimits for the standard.',
   PST_HUMAN_GATE: 'A qualified reviewer signs in the desktop app; an agent cannot approve stress results.',
 };
 
@@ -61,6 +70,10 @@ const FINDING_REMEDIATION: Readonly<Record<string, string>> = {
   PST_COMPONENT_WEIGHT_MISSING: 'set_stress_component with weightKg (catalogue weight of the valve or flange).',
   PST_REDUCER_SIF:
     'A reducer has no code factor in a read source: take the manufacturer or B31J value and confirm with a qualified engineer.',
+  PST_NOZZLE_LIMIT_UNVERIFIED: 'Check the resultant and cumulative limits with the equipment vendor; the table values are caller-supplied.',
+  PST_SPRING_CONSTANT_EFFORT:
+    'No variable spring of the table fits: size a constant-effort hanger from the vendor for the stated load and travel.',
+  PST_SPRING_LOAD_DEVIATION: 'Re-run select_spring_hangers (the stiffer system changed the travel) or check the spring table values.',
   PST_SHARP_CORNERS: 'Give elbowRadiusFactor 1.5 (long radius) for bends with SIFs.',
   PST_RESTRAINT_OVERRIDDEN: 'Two restraints act on the same degree of freedom; the later one is used.',
   PST_INSTALL_TEMP_DEFAULTED: 'Set installTempC explicitly.',

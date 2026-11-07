@@ -6,6 +6,7 @@
 import type { CadDocument } from '@core/model/types';
 import { MM_PER_UNIT } from '@core/model/units';
 import { elementsOf, getBuilding } from '@aec/building/model';
+import { barrierRuns, separatedByRailing, type BarrierRun } from './barriers';
 import { connectorEdges } from './connectors';
 import { boxesNear, ringsWithin } from './regions';
 import { gradeNode, surfaceNodes } from './surfaces';
@@ -23,8 +24,8 @@ import {
 const touching = (a: SurfaceNode, b: SurfaceNode): boolean =>
   a.regions.some((x) => b.regions.some((y) => boxesNear(x.box, y.box, CONTACT_GAP_MM) && ringsWithin(x.outer, y.outer, CONTACT_GAP_MM)));
 
-/** Pairs of surfaces whose tops differ by at most 20 mm and whose outlines touch or overlap (within 10 mm), plus the surfaces standing on grade. */
-function contactEdges(nodes: readonly SurfaceNode[], gradeMm: number): AccessEdge[] | GraphRefusal {
+/** Pairs of surfaces whose tops differ by at most 20 mm and whose outlines touch or overlap (within 10 mm) without a guard-rail along their whole shared boundary, plus the surfaces standing on grade. */
+function contactEdges(nodes: readonly SurfaceNode[], gradeMm: number, barriers: readonly BarrierRun[]): AccessEdge[] | GraphRefusal {
   const edges: AccessEdge[] = [];
   const walkable = nodes.filter((node) => node.kind !== 'grade');
   for (const node of walkable)
@@ -52,7 +53,7 @@ function contactEdges(nodes: readonly SurfaceNode[], gradeMm: number): AccessEdg
           code: 'STA_ACCESS_GRAPH_LIMIT',
           message: `more than ${GRAPH_LIMITS.contactTests} outline contact tests between walking surfaces`,
         };
-      if (!touching(a, b)) continue;
+      if (!touching(a, b) || separatedByRailing(a, b, barriers)) continue;
       const [first, second] = a.id < b.id ? [a, b] : [b, a];
       edges.push({
         id: `adjacent:${first.id}|${second.id}`,
@@ -87,7 +88,7 @@ export function buildAccessGraph(doc: CadDocument): AccessGraph | GraphRefusal {
   const gradeMm = lowest.elevation * MM_PER_UNIT[doc.units];
   const nodes = [gradeNode(gradeMm), ...surfaceNodes(doc, building)];
   const { edges: connected, dangling } = connectorEdges(doc, building, nodes);
-  const contacts = contactEdges(nodes, gradeMm);
+  const contacts = contactEdges(nodes, gradeMm, barrierRuns(doc));
   if ('code' in contacts) return contacts;
   return { nodes, edges: [...connected, ...contacts], dangling, gradeMm, gradeLevelId: lowest.id };
 }

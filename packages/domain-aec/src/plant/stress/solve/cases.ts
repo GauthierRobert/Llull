@@ -25,6 +25,8 @@ export function loadCaseProblems(
   cases: readonly LoadCaseDef[],
   forces: StressModel['forces'],
   displacements: StressModel['displacements'] = [],
+  wind: StressModel['wind'] = [],
+  seismic: StressModel['seismic'] = [],
 ): [string, string][] {
   const problems: [string, string][] = [];
   const names = new Set<string>();
@@ -32,7 +34,15 @@ export function loadCaseProblems(
     const path = `cases.${index}`;
     if (names.has(loadCase.name)) problems.push([`${path}.name`, `duplicate case name ${loadCase.name}`]);
     names.add(loadCase.name);
-    if (loadCase.type === 'EXP') {
+    if (loadCase.method !== undefined && (loadCase.combine ?? []).length === 0)
+      problems.push([`${path}.method`, `case ${loadCase.name}: method applies to a case with combine terms`]);
+    if (loadCase.method !== undefined && loadCase.method !== 'algebraic' && loadCase.type !== 'OCC')
+      problems.push([`${path}.method`, `${loadCase.type} case ${loadCase.name} combines algebraically; scalar and srss are for OCC cases`]);
+    if (loadCase.type === 'OCC' && loadCase.combine !== undefined) {
+      if (loadCase.basic !== undefined)
+        problems.push([`${path}.basic`, `OCC case ${loadCase.name} has combine terms; it has no primitive loads`]);
+      if (loadCase.combine.length === 0) problems.push([`${path}.combine`, `OCC case ${loadCase.name} needs combine terms`]);
+    } else if (loadCase.type === 'EXP') {
       if ((loadCase.combine ?? []).length === 0)
         problems.push([`${path}.combine`, `EXP case ${loadCase.name} needs combine terms (for example OPE - SUS)`]);
       if (loadCase.basic !== undefined)
@@ -41,10 +51,17 @@ export function loadCaseProblems(
       if ((loadCase.basic ?? []).length === 0)
         problems.push([`${path}.basic`, `${loadCase.type} case ${loadCase.name} needs primitive loads (W, T1, P1, F1 ...)`]);
       if (loadCase.combine !== undefined)
-        problems.push([`${path}.combine`, `${loadCase.type} case ${loadCase.name} is solved from primitives; only EXP combines`]);
+        problems.push([
+          `${path}.combine`,
+          `${loadCase.type} case ${loadCase.name} is solved from primitives; only EXP and OCC cases combine`,
+        ]);
       for (const primitive of loadCase.basic ?? [])
         if (primitive.startsWith('F') && !forces.some((force) => force.name === primitive))
           problems.push([`${path}.basic`, `case ${loadCase.name}: no force ${primitive} (pass it in forces)`]);
+        else if (primitive.startsWith('WIN') && !wind.some((entry) => entry.name === primitive))
+          problems.push([`${path}.basic`, `case ${loadCase.name}: no wind ${primitive} (pass it in wind)`]);
+        else if (primitive.startsWith('U') && !seismic.some((entry) => entry.name === primitive))
+          problems.push([`${path}.basic`, `case ${loadCase.name}: no static acceleration ${primitive} (pass it in seismic)`]);
         else if (primitive.startsWith('D') && !displacements.some((moved) => moved.name === primitive))
           problems.push([`${path}.basic`, `case ${loadCase.name}: no imposed displacement ${primitive} (pass it in displacements)`]);
     }
@@ -55,6 +72,8 @@ export function loadCaseProblems(
       if (target === undefined) problems.push([`cases.${index}.combine`, `${loadCase.name} combines unknown case ${term.case}`]);
       else if (target.type === 'EXP')
         problems.push([`cases.${index}.combine`, `${loadCase.name} combines the EXP case ${term.case}; combine OPE / SUS / OCC cases`]);
+      else if (target.combine !== undefined)
+        problems.push([`cases.${index}.combine`, `${loadCase.name} combines the combination ${term.case}; combine solved cases`]);
     }
   });
   return problems;

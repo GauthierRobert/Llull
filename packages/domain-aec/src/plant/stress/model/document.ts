@@ -36,6 +36,42 @@ export function stressErrors(raw: unknown): string[] {
     ...(modelOrder.length === ids.length && ids.every((id) => modelOrder.includes(id))
       ? []
       : ['plant.stress.modelOrder must list every model id once']),
+    ...ids.flatMap((id) => {
+      const model = models[id];
+      if (model === undefined) return [];
+      const duplicates = (label: string, names: readonly string[]): string[] =>
+        names.filter((name, index) => names.indexOf(name) !== index).map((name) => `plant.stress.models.${id}.${label}: duplicate ${name}`);
+      return [
+        ...duplicates(
+          'wind',
+          model.wind.map((entry) => entry.name),
+        ),
+        ...duplicates(
+          'seismic',
+          model.seismic.map((entry) => entry.name),
+        ),
+        ...duplicates(
+          'springTables',
+          model.springTables.map((entry) => entry.id),
+        ),
+        ...duplicates(
+          'springs',
+          model.springs.map((entry) => entry.id),
+        ),
+        ...model.springs.flatMap((spring, index) => {
+          if (spring.kind !== 'variable') return [];
+          const path = `plant.stress.models.${id}.springs.${index}`;
+          return [
+            ...(spring.tableId === undefined || spring.size === undefined || spring.series === undefined
+              ? [`${path}: a variable spring needs tableId, size and series`]
+              : []),
+            ...(spring.tableId !== undefined && !model.springTables.some((table) => table.id === spring.tableId)
+              ? [`${path}.tableId: no spring table ${spring.tableId}`]
+              : []),
+          ];
+        }),
+      ];
+    }),
     ...ids.filter((id) => models[id]?.id !== id).map((id) => `plant.stress.models.${id}.id must equal its key`),
   ];
 }

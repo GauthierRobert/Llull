@@ -2,34 +2,14 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { humanGate, humanGatePayload } from '@core/model/humanGate';
 import { withDocumentUid } from '@core/model/documentUid';
-import { jcsJson } from '@lib/jcs';
-import { sha256Hex } from '@lib/sha256';
 import { isoUtc } from '../../../shared/isoUtc';
 import { runChecks } from '../checks/runChecks';
+import { sheetContentSha256 } from '../checks/sheetContent';
 import { refusePid } from '../dexpi/codes';
-import { PID_SHEET_STATUSES, type PidModel, type PidSheet } from '../model';
+import { PID_SHEET_STATUSES, type PidSheet } from '../model';
 import { getPid, withPid } from '../state';
 
 const ACT = 'pid:issue_pid_sheet';
-
-/** SHA-256 of what a sheet shows: its identity fields, every item drawn on it in item order, the project symbols and the acceptances (status, revision and the issue stamp are not part of it). */
-export function sheetContentSha256(pid: PidModel, sheet: PidSheet): string {
-  const items = pid.itemOrder.flatMap((id) => {
-    const item = pid.items[id];
-    return item !== undefined && item.sheetId === sheet.id ? [item] : [];
-  });
-  return sha256Hex(
-    jcsJson({
-      id: sheet.id,
-      number: sheet.number,
-      title: sheet.title,
-      paper: sheet.paper,
-      items,
-      symbols: pid.symbols ?? null,
-      acceptances: pid.acceptances ?? null,
-    }),
-  );
-}
 
 /**
  * @affects plant.pid.sheets[sheet] (status, revision; issued_for_construction also the issue stamp: signer, time, signature id, signed payload hash, content hash); a metaHistory command: no feature step, sheet status and stamps are carried across a history replay

@@ -1,6 +1,6 @@
 # PHY-22 MOV — Motion video: render a moving mechanism to frames, APNG, GIF and MP4 — Functional specification
 
-Status: specification (2026-11-02); MOV-M0 and MOV-M1 built (2026-11-06, `TECHNICAL_SPEC.md` §13): `render_animation` frames / APNG / timeline / sheet, exact `render_motion` instants; GIF / MP4 are MOV-M2. Gap id `MOV`. Template:
+Status: specification (2026-11-02); MOV-M0, MOV-M1 and MOV-M2 built (2026-11-06, `TECHNICAL_SPEC.md` §13): `render_animation` frames / APNG / GIF / MP4 (AV1) / timeline / sheet, exact `render_motion` instants. Gap id `MOV`. Template:
 [`../../aerospace/TEMPLATE.md`](../../aerospace/TEMPLATE.md); operator model: [`../../aerospace/AGENT_FIRST.md`](../../aerospace/AGENT_FIRST.md);
 pack conventions: [`../README.md`](../README.md) §6. Origin: analysis of the `teardown` Claude Code skill [R1] (2026-11-02), which
 renders machine simulators to 60 fps video; this pack takes its useful ideas (time-pure frames, one input drives everything, a

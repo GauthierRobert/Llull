@@ -23,6 +23,7 @@ import {
   groupOf,
   isPerpendicular,
   ringToMm,
+  spanRange,
   supportLineOf,
   uncoveredStretch,
   type SupportGroup,
@@ -66,7 +67,7 @@ function currentSupports(
   building: BuildingModel,
   panel: GratingElement,
   type: GratingType,
-): { readonly sides: readonly [SupportGroup, SupportGroup] } | { readonly problem: Finding } {
+): { readonly sides: readonly [SupportGroup, SupportGroup]; readonly across: readonly [number, number] } | { readonly problem: Finding } {
   const direction = barDirection(panel.bearingBarAngle);
   const level = building.levels[panel.levelId];
   const undersideMm = toMm(doc, (level?.elevation ?? 0) + panel.topOffset) - type.barDepthMm;
@@ -122,7 +123,7 @@ function currentSupports(
     sides.push(groupOf(lines));
   }
   const [x, y] = sides as [SupportGroup, SupportGroup];
-  return { sides: [x, y] };
+  return { sides: [x, y], across: [from, to] };
 }
 
 /**
@@ -134,7 +135,7 @@ export const checkGrating = defineCommand({
   name: 'check_grating',
   description:
     'Check grating panels for bending strength and deflection as simply supported spans (NAAMM MBG 531 basis: F = 18000 psi, E = 29000 ksi, bearing bars only). ' +
-    'The span is re-measured from the supporting members now in the model. Per panel: spanMm, allowableUniformKPa (U = 8FS/L2, self weight excluded as in the tables), ' +
+    'The span is re-measured from the supporting members now in the model. Per panel: spanMm (a WEDGE panel, whose two supports converge like the radial brackets of a circular platform, is judged on its WIDEST span, at the side edge farthest from the convergence; spanMinMm and wedge are reported, and a curved outer edge is read at its bulge, conservative by 1/cos of the half wedge angle), allowableUniformKPa (U = 8FS/L2, self weight excluded as in the tables), ' +
     'allowableConcentratedKNPerM (C = 4FS/L, midspan line load across the width), deflectionMm under the APPLIED load alone, totalDeflectionMm and the utilisations including the ' +
     'grating self weight, and findings STA_GRATING_OVERSTRESS / STA_GRATING_DEFLECTION (fail), STA_GRATING_SPAN_DIRECTION / STA_NO_SUPPORT_FOUND (supports edited since), ' +
     'STA_GRATING_TYPE_UNVERIFIED (warn). No defaults: give the design uniform load in kPa (kN/m2) and exactly one deflection limit. Lengths in the answer are millimetres whatever the document units. ' +
@@ -224,7 +225,9 @@ export const checkGrating = defineCommand({
         return { id: panel.id, mark: panel.mark, gratingType: type.name, verdict: 'fail' as const, findings };
       }
       const [a, b] = supports.sides;
-      const centre = Math.abs(b.sMm - a.sMm);
+      const range = spanRange(a, b, supports.across[0], supports.across[1]);
+      const wedge = range.maxMm - range.minMm > 1e-6;
+      const centre = range.maxMm;
       const spanMm = basis === 'clear' ? centre - a.halfWidthMm - b.halfWidthMm : centre;
       if (!(spanMm > 0)) {
         findings.push(
@@ -287,6 +290,8 @@ export const checkGrating = defineCommand({
         gratingType: type.name,
         spanMm: round(spanMm, 3),
         spanBasis: basis,
+        wedge,
+        spanMinMm: round(basis === 'clear' ? range.minMm - a.halfWidthMm - b.halfWidthMm : range.minMm, 3),
         supportIds: panel.supportIds,
         areaM2: round(gratingAreaM2(doc, panel), 6),
         allowableUniformKPa: round(allowableU, 4),

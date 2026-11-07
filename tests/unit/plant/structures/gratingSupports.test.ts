@@ -134,6 +134,7 @@ describe('support lines carry the panel width', () => {
       halfWidthMm: 50,
       topMm: 0,
       parallelism: 0,
+      slope: 0,
     });
     expect(uncoveredStretch([line(0, 1500), line(1500, 3000)], 0, 3000)).toBeNull();
     expect(uncoveredStretch([line(0, 1000), line(1600, 3000)], 0, 3000)).toEqual([1000, 1600]);

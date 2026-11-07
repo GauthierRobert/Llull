@@ -135,6 +135,10 @@ export const createStressModel = defineCommand({
       displacements: [],
       sifOverrides: [],
       components: [],
+      wind: [],
+      seismic: [],
+      springTables: [],
+      springs: [],
     };
     return {
       ...changed(

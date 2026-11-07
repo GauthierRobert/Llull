@@ -20,7 +20,7 @@ const CENTRAL_FRACTION = 0.8;
 
 export interface ReinforcementResult {
   readonly mark: string;
-  readonly on: 'shell' | 'head';
+  readonly on: 'shell' | 'head' | 'channel';
   readonly clause: string;
   /** Required thickness t_r of a seamless shell / sphere (corroded, E = 1). */
   readonly requiredShellThicknessMm: number;

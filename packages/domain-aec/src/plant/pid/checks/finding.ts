@@ -22,6 +22,7 @@ export const PID_RULES = [
   'PID_LINE_NUMBER_MISSING',
   'PID_INSTRUMENT_UNCONNECTED',
   'PID_TAG_NONSTANDARD',
+  'PID_STAMP_STALE',
 ] as const;
 export type PidRule = (typeof PID_RULES)[number];
 
@@ -42,6 +43,7 @@ export const RULE_SEVERITY: Readonly<Record<PidRule, Severity>> = {
   PID_LINE_NUMBER_MISSING: 'warning',
   PID_INSTRUMENT_UNCONNECTED: 'warning',
   PID_TAG_NONSTANDARD: 'info',
+  PID_STAMP_STALE: 'warning',
 };
 
 export const RULE_REMEDIATION: Readonly<Record<PidRule, string>> = {
@@ -71,6 +73,8 @@ export const RULE_REMEDIATION: Readonly<Record<PidRule, string>> = {
   PID_INSTRUMENT_UNCONNECTED:
     'Draw its measuring or signal line (add_pid_signal_line, or add_pid_instrument measures), or put another instrument in its loop.',
   PID_TAG_NONSTANDARD: 'Keep the tag, or rename it with ISA 5.1 letters (parse_instrument_tag explains the letters).',
+  PID_STAMP_STALE:
+    'The sheet changed after it was signed: issue_pid_sheet back to draft (clears the stamp) and issue it again with a new revision, or accept the finding (accept_pid_finding) if the change is known.',
 };
 
 export interface Finding {

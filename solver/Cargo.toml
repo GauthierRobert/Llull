@@ -8,6 +8,7 @@ default-members = [
   "crates/llull-protocol",
   "crates/llull-jsmath",
   "crates/llull-bvh",
+  "crates/llull-media",
   "crates/llull-post",
   "crates/llull-raster",
   "crates/llull-gpu",
@@ -102,3 +103,10 @@ codegen-units = 1
 inherits = "release"
 lto = "fat"
 panic = "abort"
+
+# PHY-22 MOV: the encoder tests run rav1e / NeuQuant on real frame sizes (unoptimised rav1e is ~50x slower).
+[profile.dev.package.llull-media]
+opt-level = 3
+
+[profile.dev.package.rav1e]
+opt-level = 3
