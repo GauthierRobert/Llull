@@ -49,7 +49,7 @@ export const setDeliverableStatus = defineCommand({
       .string()
       .optional()
       .describe(
-        'Scope of a report deliverable (hierarchy node code, path S1/P1/U10 or id), given when the revision is created; omit for the whole plant. Not allowed for ifc.',
+        'Scope of a report deliverable (hierarchy node code, path S1/P1/U10 or id), given when the revision is created; omit for the whole plant. For ifc the IFC file is limited to that node (export_ifc plant.scope).',
       ),
     at: isoUtc.describe(
       'When the step happened: ISO-8601 UTC, e.g. 2026-11-02T09:30:00Z. The host (UI / llull CLI) fills it and overwrites a caller value; commands never read a clock. Part of what a human signs.',

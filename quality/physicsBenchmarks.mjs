@@ -22,7 +22,7 @@ const env = { LLULL_PHYSICS_MEASUREMENTS: measurements };
 const tests = run('npx', ['vitest', 'run', 'tests/unit/physics', 'tests/unit/cae'], env);
 if (tests !== 0) process.exit(tests);
 // FE benchmarks through the real Netgen + CalculiX pipeline (skipped inside the suite when the tools are absent).
-const feTests = run('npm', ['--prefix', 'server', 'test', '--', 'feaThermal', 'feaThermomech'], env);
+const feTests = run('npm', ['--prefix', 'server', 'test', '--', 'feaThermal', 'feaThermomech', 'feaConvergence'], env);
 if (feTests !== 0) process.exit(feTests);
 process.exit(
   run('node', [

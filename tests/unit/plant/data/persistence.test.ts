@@ -103,6 +103,9 @@ describe('plant.data persistence', () => {
     ['class property', [['classes.Mine.properties', (list: unknown) => [{ ...(list as object[])[0], unit: 'mm' }]]], /properties\[0\]/],
     ['class property shape', [['classes.Mine.properties', [5]]], /properties\[0\] must be/],
     ['class ifc', [['classes.Tank.ifc.predefinedType', 'NOPE']], /ifc:/],
+    ['class ifc entity from the prototype chain', [['classes.Tank.ifc.entity', 'constructor']], /constructor is not an IFC4X3_ADD2 class/],
+    ['class ifc objectType not a string', [['classes.Tank.ifc.objectType', {}]], /ifc must be/],
+    ['class ifc predefinedType not a string', [['classes.Tank.ifc.predefinedType', 7]], /ifc must be/],
     [
       'class override',
       [['classes.Mine.properties', [{ name: 'DesignPressure', displayName: 'x', type: 'text' }]]],

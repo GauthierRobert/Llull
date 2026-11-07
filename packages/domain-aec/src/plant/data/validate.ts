@@ -112,7 +112,13 @@ function classShapeErrors(key: string, cls: Record<string, unknown>): string[] {
     });
   const ifc = cls['ifc'];
   if (ifc !== undefined) {
-    if (!isRecord(ifc) || typeof ifc['entity'] !== 'string') errors.push(`${path}.ifc must be { entity, predefinedType?, objectType? }`);
+    if (
+      !isRecord(ifc) ||
+      typeof ifc['entity'] !== 'string' ||
+      (ifc['predefinedType'] !== undefined && typeof ifc['predefinedType'] !== 'string') ||
+      (ifc['objectType'] !== undefined && typeof ifc['objectType'] !== 'string')
+    )
+      errors.push(`${path}.ifc must be { entity: string, predefinedType?: string, objectType?: string }`);
     else {
       const problem = ifcMappingProblem(ifc as unknown as Parameters<typeof ifcMappingProblem>[0]);
       if (problem !== null) errors.push(`${path}.ifc: ${problem}`);

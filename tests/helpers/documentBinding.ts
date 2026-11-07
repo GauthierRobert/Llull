@@ -1,6 +1,7 @@
 /** GATE-UID: one check that a human signature of a gated act is bound to the document it was made for (VIS-ID), shared by every gated command. */
 
 import { expect } from 'vitest';
+import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
@@ -24,6 +25,12 @@ function pinnedPort(seen: string[] = []): HumanSignaturePort {
 }
 
 /**
+ * Gated commands whose recorded step still holds the signature object (the param is not named `confirmation`, so `withoutConfirmations` keeps it): found by this
+ * check on 2026-11-07, reported to the owner of the command; fix = rename the param and keep the proof in the record.
+ */
+const KNOWN_SIGNATURE_IN_HISTORY: readonly string[] = ['dispose_fit_result'];
+
+/**
  * Run `attempt` three times: unsigned (to learn the payload the command verifies), signed for `doc` (must clear), the same signature in `doc` copied into
  * another document (must be refused with the gate's own code, document unchanged).
  * @invariant fails when the signed payload does not name the document: the copy would verify
@@ -33,6 +40,8 @@ export function expectBoundToDocument(
   attempt: (document: CadDocument, confirmation: Record<string, unknown>, ctx: ExecutionContext) => CommandResult,
   gateCode: string,
   nonce = 'n1',
+  /** Whether a replay of the signed document (`replay_history`, recorded steps carry `{ verified: true }`) still holds the act: omit for acts that keep no state a replay could lose. */
+  keepsAcceptance?: (replayed: CadDocument, signed: CadDocument) => boolean,
 ): void {
   const seen: string[] = [];
   const ctx: ExecutionContext = { ...defaultContext(), humanSignature: pinnedPort(seen) };
@@ -43,6 +52,17 @@ export function expectBoundToDocument(
   const signed = attempt(doc, confirmation, { ...defaultContext(), humanSignature: pinnedPort() });
   expect(signed.error, signed.summary).toBeUndefined();
   expect(signed.rejected, signed.summary).toBeUndefined();
+  // the recorded step carries no signature object: it would reach the history, the command log and live sync (and fail as spent on replay)
+  if (signed.document.featureHistory.length > doc.featureHistory.length) {
+    const step = signed.document.featureHistory.at(-1);
+    const holds = JSON.stringify(step?.params ?? null).includes(confirmation.payload);
+    // ratchet: a known defect must keep failing here until it is fixed and removed from KNOWN_SIGNATURE_IN_HISTORY
+    expect(holds, `the recorded step ${step?.name ?? ''} holds the signature`).toBe(KNOWN_SIGNATURE_IN_HISTORY.includes(step?.name ?? ''));
+  }
+  if (keepsAcceptance !== undefined) {
+    const replayed = execute(signed.document, 'replay_history', {}, { ...defaultContext(), humanSignature: pinnedPort() }).document;
+    expect(keepsAcceptance(replayed, signed.document), 'a replay lost the acceptance').toBe(true);
+  }
   const copied = inAnotherDocument(doc);
   const refused = attempt(copied, confirmation, { ...defaultContext(), humanSignature: pinnedPort() });
   expect(refused.error?.code, refused.summary).toBe(gateCode);

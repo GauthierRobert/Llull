@@ -285,13 +285,27 @@ function connectNozzles(
 /**
  * Appends the pipe products of `doc` to the IFC being written.
  * @param parentPlacement local placement of the IfcBuilding (world origin): the plant coordinates are absolute
+ * @param inScope when given, only the runs of the routed lines it accepts are exported (hierarchy-scoped export)
  */
-export function exportPipingProducts(context: Context, doc: CadDocument, parentPlacement: string, equipmentPorts: PortState): PipingIfc {
+export function exportPipingProducts(
+  context: Context,
+  doc: CadDocument,
+  parentPlacement: string,
+  equipmentPorts: PortState,
+  inScope?: (lineId: string) => boolean,
+): PipingIfc {
   const piping = getPiping(doc);
   const empty: PipingIfc = { products: [], productCount: 0, portCount: 0, connectionCount: 0, systemCount: 0, bodiless: 0, brokenRuns: [] };
   if (piping.runOrder.length === 0 || doc.units !== 'mm') return empty;
   const { writer } = context;
-  const selection = selectRuns(doc);
+  const all = selectRuns(doc);
+  const selection = {
+    graphRuns: all.graphRuns.filter((entry) => inScope?.(entry.lineId) ?? true),
+    broken: all.broken.filter((entry) => {
+      const lineId = piping.runs[entry.runId]?.lineId;
+      return lineId === undefined || (inScope?.(lineId) ?? true);
+    }),
+  };
   const graph = buildGraph(doc, selection.graphRuns);
   const refs = new Map<string, { product: string; ports: string[] }>();
   const byLine = new Map<string, string[]>();

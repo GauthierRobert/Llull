@@ -1,45 +1,31 @@
 import type { CadDocument } from '@core/model/types';
-import type { BuildingElement, BuildingLevel, EquipmentElement, PipeElement } from '@aec/building/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
-import { elementsOf, fileSlug, getBuilding, orderedElements } from '../model';
+import { fileSlug, getBuilding } from '../model';
 import { getPiping } from '../../plant/piping/model';
 import { noop, report, exportRefusal } from '@core/commands/noop';
-import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
-import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
-import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrialExport';
-import { exportOther } from './ifcOtherExport';
-import { exportGrating, exportRailing } from '../../plant/structures/exchange/ifcAccessExport';
-import { exportSteelStair } from '../../plant/structures/exchange/ifcSteelStairExport';
-import { exportLadder } from '../../plant/structures/exchange/ifcLadderExport';
-import { exportAssembly } from '../../plant/structures/exchange/ifcPlatformExport';
-import { isRackStrut } from '../../plant/structures/rack/rackMeasure';
-import { exportPipeSupport } from './ifcSupportExport';
+import { type Context, StepWriter, ifcGuid, ifcString, placement } from './ifcStep';
 import { type PipingIfc, exportPipingProducts } from './ifcPipingExport';
-import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
-import { plantIfcView, type PlantIfcView } from '../../plant/data/view';
+import { plantIfcView } from '../../plant/data/view';
+import { type IfcOmitted, type IfcScope, ifcScopeOf, omittedMessage, omittedOf, omittedTotal } from './ifcScope';
+import { exportLevels } from './ifcLevels';
+import { type PlantContext } from './ifcElements';
+import { refuseDat } from '../../plant/data/codes';
 import {
   type ExportProxy,
   type ExportWarning,
   type IfcSchema,
   type PlantIfcOptions,
-  type PlantIfcRun,
-  addPlantPsets,
-  elementTag,
   entityCounts,
-  equipmentProduct,
   newRun,
   plantUnits,
   predefinedTypeCounts,
   writeSystems,
 } from './ifcPlant';
-import { type PlantSpatial, containerOf, writePlantNodes } from './ifcPlantHierarchy';
-import { equipmentProperties, exportEquipmentPorts, parametricBody } from './ifcEquipmentExport';
+import { writePlantNodes } from './ifcPlantHierarchy';
 import { connectRealNozzles } from './ifcNozzleConnections';
-import { type PortState, exportPipeProducts, finishNozzles, newPortState } from './ifcPorts';
-
-type LevelElement = Extract<BuildingElement, { levelId: string }>;
+import { finishNozzles, newPortState } from './ifcPorts';
 
 export interface IfcExport {
   readonly filename: string;
@@ -62,160 +48,15 @@ export interface IfcExport {
   /** Equipment exported as IfcBuildingElementProxy (IFC4X3_ADD2) and why. */
   readonly proxies: readonly ExportProxy[];
   readonly warnings: readonly ExportWarning[];
+  /** Id of the hierarchy node the export is limited to (plant.scope), null for the whole document. */
+  readonly scope: string | null;
+  /** What the scope left out: building elements and routed lines, with no plant object or with one outside the subtree (null without a scope). */
+  readonly omitted: IfcOmitted | null;
 }
 
-/** Everything one export run threads through the element exporters. */
-interface PlantContext {
-  readonly run: PlantIfcRun;
-  readonly ports: PortState;
-  readonly spatial: PlantSpatial | null;
-  readonly view: PlantIfcView;
-}
-
-/** Every IFC product of one element placed on `level`, in export order (hosted openings follow their wall). */
-function exportElement(
-  context: Context,
-  doc: CadDocument,
-  element: LevelElement,
-  level: BuildingLevel,
-  storeyPlacement: string,
-  plant: PlantContext,
-): Exported[] {
+function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, options: PlantIfcOptions, scope: IfcScope | null): IfcExport {
   const building = getBuilding(doc);
-  switch (element.category) {
-    case 'wall':
-      return exportWallElement(context, building, element, storeyPlacement);
-    case 'curvedWall':
-      return exportCurvedWallElement(context, building, element, storeyPlacement);
-    case 'equipment':
-      return exportEquipment(context, doc, element, level, storeyPlacement, plant);
-    case 'pipe':
-      return plant.run.x3
-        ? exportPipe(context, element, level, storeyPlacement, plant)
-        : exportLegacyPipe(context, element, storeyPlacement, plant);
-    case 'member': {
-      const exported = exportIndustrial(context, element, storeyPlacement, undefined, isRackStrut(building, element));
-      return exported ? [exported] : [];
-    }
-    case 'footing':
-    case 'panel':
-    case 'tray': {
-      const exported = exportIndustrial(context, element, storeyPlacement);
-      return exported ? [exported] : [];
-    }
-    case 'pipeSupport': {
-      const exported = exportPipeSupport(context, doc, building, element, carrierOfSupport(doc, building, element), storeyPlacement);
-      return exported ? [exported] : [];
-    }
-    case 'grating': {
-      const exported = exportGrating(context, element, storeyPlacement);
-      return exported ? [exported] : [];
-    }
-    case 'railing': {
-      const exported = exportRailing(context, doc, element, storeyPlacement);
-      return exported ? [exported] : [];
-    }
-    case 'ladder': {
-      const exported = exportLadder(context, doc, element, storeyPlacement);
-      return exported ? [exported] : [];
-    }
-    case 'steelStair': {
-      const exported = exportSteelStair(context, doc, element, storeyPlacement);
-      return exported ? [exported] : [];
-    }
-    case 'assembly':
-      return [exportAssembly(context, element, storeyPlacement)];
-    case 'connection':
-      return exportConnection(context, doc, element, building, level, storeyPlacement);
-    case 'plate': {
-      const member = building.elements[element.memberId];
-      return member?.category === 'member' ? exportPlate(context, doc, element, member, level, storeyPlacement) : [];
-    }
-    case 'slab':
-    case 'column':
-    case 'beam':
-    case 'stair':
-    case 'room':
-      return [exportOther(context, element, level, storeyPlacement)];
-  }
-}
-
-/** Appends `refs` to the list of `key` in place (linear in the products, unlike copying the list). */
-function appendTo(lists: Map<string, string[]>, key: string, refs: readonly string[]): void {
-  const list = lists.get(key);
-  if (list === undefined) lists.set(key, [...refs]);
-  else list.push(...refs);
-}
-
-/** Spatial element of the plant node an object sits in (IFC4X3_ADD2 with the hierarchy option), else no entry. */
-const containerFor = (plant: PlantContext, hierarchyId: string): { container: string } | Record<string, never> => {
-  const container = plant.run.x3 && plant.run.options.hierarchy ? containerOf(plant.spatial, plant.view, hierarchyId) : null;
-  return container === null ? {} : { container };
-};
-
-function exportEquipment(
-  context: Context,
-  doc: CadDocument,
-  element: EquipmentElement,
-  level: BuildingLevel,
-  storeyPlacement: string,
-  plant: PlantContext,
-): Exported[] {
-  const { run } = plant;
-  const classified = run.view.forElement(element.id);
-  const product = equipmentProduct(run, element);
-  const body = parametricBody(context, element, level, run);
-  const exported = exportIndustrial(context, element, storeyPlacement, {
-    tag: elementTag(run, element.id),
-    product,
-    ...(body === null ? {} : { body: body.solids }),
-    properties: equipmentProperties(doc, element),
-  });
-  if (!exported) return [];
-  plant.ports.equipment.set(element.id, { ref: exported.ref, storeyPlacement, level });
-  if (run.options.ports) exportEquipmentPorts(context, plant.ports, doc, element, level, storeyPlacement, exported.ref);
-  if (!run.x3 || classified === undefined) return [exported];
-  const where = containerFor(plant, classified.object.hierarchyId);
-  addPlantPsets(
-    context,
-    { seed: element.id, ref: exported.ref },
-    classified,
-    'container' in where ? { name: level.name, elevation: context.mm(level.elevation) } : undefined,
-  );
-  return [{ ...exported, ...where }];
-}
-
-/** A pipe in IFC4: one IfcPipeSegment for the run, its Tag the plant tag when classified. */
-function exportLegacyPipe(context: Context, element: PipeElement, storeyPlacement: string, plant: PlantContext): Exported[] {
-  const exported = exportIndustrial(context, element, storeyPlacement, { tag: elementTag(plant.run, element.id), product: null });
-  return exported ? [exported] : [];
-}
-
-/** A pipe in IFC4X3_ADD2: segments, bends and ports of its straights, in the system of its process line. */
-function exportPipe(
-  context: Context,
-  element: PipeElement,
-  level: BuildingLevel,
-  storeyPlacement: string,
-  plant: PlantContext,
-): Exported[] {
-  const { run, view } = plant;
-  const classified = view.forElement(element.id);
-  const owner = classified?.object.lineId === undefined ? undefined : view.forObject(classified.object.lineId);
-  const line = classified?.isLine === true ? classified : owner?.isLine === true ? owner : null;
-  if (line !== null && run.options.systems === 'line' && !run.systems.has(line.object.id))
-    run.systems.set(line.object.id, { object: line, members: [] });
-  const where = classified === undefined ? {} : containerFor(plant, classified.object.hierarchyId);
-  return exportPipeProducts(context, run, plant.ports, element, level, storeyPlacement, {
-    base: classified?.tag ?? (element.mark === '' ? element.id : element.mark),
-    line,
-    container: 'container' in where ? where.container : null,
-  });
-}
-
-function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, options: PlantIfcOptions): IfcExport {
-  const building = getBuilding(doc);
-  const view = plantIfcView(doc);
+  const view = scope?.view ?? plantIfcView(doc);
   const run = newRun(schema, options, view);
   const ports = newPortState();
   const writer = new StepWriter();
@@ -255,64 +96,33 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
   if (site !== null) writer.add(`IFCRELAGGREGATES('${context.guid('rel:project-site')}',$,$,$,${projectRef},(${site}))`);
   writer.add(`IFCRELAGGREGATES('${context.guid('rel:site-building')}',$,$,$,${buildingParent},(${buildingRef}))`);
   const spatial = spatialFirst ?? (plantNodes ? writePlantNodes(context, view, projectRef, site) : null);
-  const plant: PlantContext = { run, ports, spatial, view };
-  const plantContained = new Map<string, string[]>();
-  const storeys: string[] = [];
-  const byMaterial = new Map<string, string[]>();
-  let productCount = 0;
-  let elementCount = 0;
-  for (const levelId of building.levelOrder) {
-    const level = building.levels[levelId];
-    if (!level) continue;
-    const storeyPlacement = placement(context, buildingPlacement, 0, 0, context.mm(level.elevation));
-    const storey = writer.add(
-      `IFCBUILDINGSTOREY('${context.guid(level.id)}',$,${ifcString(level.name)},$,$,${storeyPlacement},$,$,.ELEMENT.,${ifcReal(context.mm(level.elevation))})`,
-    );
-    storeys.push(storey);
-    const contained: string[] = [];
-    const spaces: string[] = [];
-    const productOf = new Map<string, string>();
-    for (const element of orderedElements(building)) {
-      if (!('levelId' in element) || element.levelId !== level.id) continue;
-      const exportedProducts = exportElement(context, doc, element, level, storeyPlacement, plant);
-      if (exportedProducts.length > 0) elementCount += 1;
-      const first = exportedProducts[0];
-      if (first !== undefined) productOf.set(element.id, first.ref);
-      const aggregated = 'assemblyId' in element && element.assemblyId !== undefined;
-      for (const exported of exportedProducts) {
-        if (exported.container !== undefined) appendTo(plantContained, exported.container, [exported.ref]);
-        else if (!aggregated) (element.category === 'room' ? spaces : contained).push(exported.ref);
-        productCount += 1;
-        if (exported.material === null) continue;
-        appendTo(byMaterial, exported.material, [exported.ref, ...(exported.parts ?? [])]);
-      }
-    }
-    for (const assembly of elementsOf(building, 'assembly')) {
-      const refs = assembly.partIds.flatMap((id) => productOf.get(id) ?? []);
-      const assemblyRef = productOf.get(assembly.id);
-      if (assembly.levelId === level.id && assemblyRef !== undefined && refs.length > 0)
-        writer.add(`IFCRELAGGREGATES('${context.guid(`rel:assembly-parts:${assembly.id}`)}',$,$,$,${assemblyRef},(${refs.join(',')}))`);
-    }
-    if (contained.length > 0) {
-      writer.add(
-        `IFCRELCONTAINEDINSPATIALSTRUCTURE('${context.guid(`rel:contains:${level.id}`)}',$,$,$,(${contained.join(',')}),${storey})`,
-      );
-    }
-    if (spaces.length > 0) {
-      writer.add(`IFCRELAGGREGATES('${context.guid(`rel:spaces:${level.id}`)}',$,$,$,${storey},(${spaces.join(',')}))`);
-    }
-  }
+  const plant: PlantContext = {
+    run,
+    ports,
+    spatial,
+    view,
+    ...(scope === null ? {} : { lineInScope: (objectId: string) => scope.hasObject(objectId) }),
+  };
+  const levels = exportLevels(context, doc, buildingPlacement, plant, scope);
+  const { storeys, byMaterial, plantContained } = levels;
+  let productCount = levels.productCount;
   for (const [container, refs] of plantContained) {
     writer.add(
       `IFCRELCONTAINEDINSPATIALSTRUCTURE('${context.guid(`rel:contains:plant:${container}`)}',$,$,$,(${refs.join(',')}),${container})`,
     );
   }
   if (run.x3 && options.ports) {
-    finishNozzles(context, doc, ports);
+    finishNozzles(context, doc, ports, scope === null ? undefined : (objectId) => scope.hasObject(objectId));
     connectRealNozzles(context, doc, ports);
   }
   if (run.x3 && options.systems === 'line') writeSystems(context, run);
-  const piping = exportPipingProducts(context, doc, buildingPlacement, ports);
+  const piping = exportPipingProducts(
+    context,
+    doc,
+    buildingPlacement,
+    ports,
+    scope === null ? undefined : (lineId) => scope.lineMembership(lineId) === 'inScope',
+  );
   if (piping.products.length > 0) {
     writer.add(
       `IFCRELCONTAINEDINSPATIALSTRUCTURE('${context.guid('rel:contains:piping')}',$,$,$,(${piping.products.join(',')}),${buildingRef})`,
@@ -326,6 +136,9 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
     const materialRef = writer.add(`IFCMATERIAL(${ifcString(material)},$,$)`);
     writer.add(`IFCRELASSOCIATESMATERIAL('${context.guid(`rel:material:${material}`)}',$,$,$,(${refs.join(',')}),${materialRef})`);
   }
+  const omitted = scope === null ? null : omittedOf(doc, scope, levels.omittedElements);
+  if (scope !== null && omitted !== null && omittedTotal(omitted) > 0)
+    run.warnings.push({ code: 'DAT_IFC_SCOPE_OMITTED', id: scope.nodeId, message: omittedMessage(omitted) });
   const name = fileSlug(project.name, 'project');
   const ifc = [
     'ISO-10303-21;',
@@ -347,7 +160,7 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
     ifc,
     entityCount: writer.count,
     productCount,
-    elementCount,
+    elementCount: levels.elementCount,
     piping: pipingSummary,
     schema,
     counts: entityCounts(context),
@@ -357,6 +170,8 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
     openPorts: ports.portCount - ports.connected.size,
     proxies: run.proxies,
     warnings: run.warnings,
+    scope: scope?.nodeId ?? null,
+    omitted,
   };
 }
 
@@ -377,9 +192,9 @@ function plantNote(result: IfcExport): string {
 }
 
 /**
- * @affects none; data = { filename, ifc, entityCount, productCount, elementCount, piping, schema, counts, predefinedTypes, ports, connections, openPorts, proxies, warnings }
+ * @affects none; data = { filename, ifc, entityCount, productCount, elementCount, piping, schema, counts, predefinedTypes, ports, connections, openPorts, proxies, warnings, scope, omitted }
  * @invariant IFC4 (default) is unchanged except the Tag of classified equipment and pipes; IFC4X3_ADD2 adds the plant hierarchy, class mapping, pipe decomposition, ports, systems, SI units and property sets
- * @failure no levels and no pipe runs -> no data; export-controlled document without confirmExportControlled -> refused
+ * @failure no levels and no pipe runs -> no data; plant.scope naming no (or an ambiguous) hierarchy node -> DAT_HIERARCHY_UNKNOWN; export-controlled document without confirmExportControlled -> refused
  */
 export const exportIfc = defineCommand({
   name: 'export_ifc',
@@ -393,7 +208,9 @@ export const exportIfc = defineCommand({
     'the pipe products, ports, connections and systems and lists the runs that do not derive (not exported). With schema "IFC4X3_ADD2" the plant data (define_plant_hierarchy, assign_plant_object) is exported too: hierarchy as IfcSite / IfcFacility ' +
     '/ IfcFacilityPartCommon, classified equipment as the IFC class and PredefinedType of its plant class (IfcTank, IfcPump, ... ; unmapped = IfcBuildingElementProxy listed in data.proxies), pipes split into IfcPipeSegment per straight and ' +
     'IfcPipeFitting BEND per vertex with IfcDistributionPort (SINK in, SOURCE out), IfcRelNests and one IfcRelConnectsPorts per connection (RelatingPort = SOURCE), nozzle ports inferred where a line from/to meets its equipment, one ' +
-    'IfcDistributionSystem per process line, SI units (Pa, K, kg, m3/s) and Pset_llullPlant. Tag = plant tag in both schemas. data.counts, predefinedTypes, ports, connections, openPorts, proxies and warnings describe the result.',
+    'IfcDistributionSystem per process line, SI units (Pa, K, kg, m3/s) and Pset_llullPlant. Tag = plant tag in both schemas. data.counts, predefinedTypes, ports, connections, openPorts, proxies and warnings describe the result. ' +
+    'plant.scope limits the file to one hierarchy node: only the building elements and routed lines whose plant object sits at that node or below are written (anything without a plant object is left out), ' +
+    'under the spatial nodes from the root down to it; a port whose partner is outside the scope stays open (data.openPorts); data.scope is the node id; data.omitted counts what it left out ({ elements, routedLines } each { noPlantObject, outsideScope }) and the warning DAT_IFC_SCOPE_OMITTED repeats it; storeys without an exported product are not written; systems and nozzle ports carry nothing of a line outside the scope. Unknown, empty or ambiguous node: DAT_HIERARCHY_UNKNOWN.',
   params: z.object({
     confirmExportControlled,
     timestamp: z
@@ -418,6 +235,12 @@ export const exportIfc = defineCommand({
           .enum(['line', 'none'])
           .optional()
           .describe('IFC4X3_ADD2: "line" writes one IfcDistributionSystem per process line (default); "none" writes none.'),
+        scope: z
+          .string()
+          .optional()
+          .describe(
+            'Hierarchy node (code, path S1/P1/U10 or id) to limit the export to: its plant objects and everything below it, with the nodes above it as the spatial structure. Elements and routed lines with no plant object are left out. Omit for the whole document.',
+          ),
         hierarchy: z
           .boolean()
           .optional()
@@ -433,24 +256,28 @@ export const exportIfc = defineCommand({
   run: (doc, { confirmExportControlled, timestamp, schema: requested, plant }, ctx): CommandResult => {
     const refused = exportRefusal(doc, 'export_ifc', 'data', confirmExportControlled, ctx);
     if (refused !== null) return refused;
+    const scoped = plant?.scope === undefined ? null : ifcScopeOf(doc, plant.scope);
+    if (scoped?.ok === false) return refuseDat(doc, 'export_ifc', 'DAT_HIERARCHY_UNKNOWN', scoped.message, [], ['plant.scope']);
     const building = getBuilding(doc);
     if (building.levelOrder.length === 0 && getPiping(doc).runOrder.length === 0)
       return noop(doc, 'export_ifc: the building model has no levels (add_level / draw_walls first) and no pipe runs.');
     const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(building.project.date);
     const stamp = timestamp ?? (isoDate ? `${building.project.date}T00:00:00` : '1970-01-01T00:00:00');
     const schema = requested ?? 'IFC4';
-    const result = buildIfc(doc, stamp, schema, {
-      ports: plant?.ports ?? true,
-      systems: plant?.systems ?? 'line',
-      hierarchy: plant?.hierarchy ?? true,
-    });
+    const result = buildIfc(
+      doc,
+      stamp,
+      schema,
+      { ports: plant?.ports ?? true, systems: plant?.systems ?? 'line', hierarchy: plant?.hierarchy ?? true },
+      scoped?.scope ?? null,
+    );
     const dateNote =
       timestamp === undefined && building.project.date !== '' && !isoDate
         ? ` Project date "${building.project.date}" is not YYYY-MM-DD, so the header uses ${stamp}.`
         : '';
     return report(
       doc,
-      `${schema} ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${pipingNote(result.piping)}${plantNote(result)}${dateNote}`,
+      `${schema} ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${result.counts['IfcBuildingStorey'] ?? 0} storey(s), ${result.entityCount} STEP entities.${pipingNote(result.piping)}${plantNote(result)}${result.scope === null || result.omitted === null ? '' : ` Scope: hierarchy node ${result.scope}; ${omittedMessage(result.omitted)}.`}${dateNote}`,
       result,
     );
   },
