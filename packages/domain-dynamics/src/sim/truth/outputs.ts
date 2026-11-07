@@ -60,8 +60,18 @@ export function outputCatalogue(run: RunData): OutputDef[] {
     );
   }
   if (run.energy?.balanceErrorJ !== undefined)
-    defs.push({ key: 'energy.balanceErrorJ', kind: 'error', unit: 'J', read: (r) => present(Math.abs(r.energy?.balanceErrorJ ?? Number.NaN)) });
+    defs.push({
+      key: 'energy.balanceErrorJ',
+      kind: 'error',
+      unit: 'J',
+      read: (r) => present(Math.abs(r.energy?.balanceErrorJ ?? Number.NaN)),
+    });
   if (run.ledger !== undefined)
-    defs.push({ key: 'ledger.closureErrorJ', kind: 'error', unit: 'J', read: (r) => present(Math.abs(r.ledger?.closureErrorJ ?? Number.NaN)) });
+    defs.push({
+      key: 'ledger.closureErrorJ',
+      kind: 'error',
+      unit: 'J',
+      read: (r) => present(Math.abs(r.ledger?.closureErrorJ ?? Number.NaN)),
+    });
   return defs;
 }

@@ -23,11 +23,26 @@ export function effortItems(motors: readonly Motor[], run: RunData | null): Revi
     const why = unboundedEffort(motor, peak);
     return why === null
       ? []
-      : [reviewItem('dynamics', 'DRV_EFFORT_UNBOUNDED', 'warn', [motor.id], EFFORT_FIX, { note: why, ...(peak === null ? {} : { values: { peakEffortUsed: peak } }), unverified: true })];
+      : [
+          reviewItem('dynamics', 'DRV_EFFORT_UNBOUNDED', 'warn', [motor.id], EFFORT_FIX, {
+            note: why,
+            ...(peak === null ? {} : { values: { peakEffortUsed: peak } }),
+            unverified: true,
+          }),
+        ];
   });
   return items.length > 0 || governors.length === 0 || run === null
     ? items
-    : [reviewItem('dynamics', 'DRV_EFFORT_UNBOUNDED', 'pass', governors.map((motor) => motor.id), 'None.', { note: 'every governor bound is sourced and within 10 x the effort used' })];
+    : [
+        reviewItem(
+          'dynamics',
+          'DRV_EFFORT_UNBOUNDED',
+          'pass',
+          governors.map((motor) => motor.id),
+          'None.',
+          { note: 'every governor bound is sourced and within 10 x the effort used' },
+        ),
+      ];
 }
 
 /** DRV_PARAM_UNSOURCED: the inputs of grade C or without a source (warn, the weakest first), or a pass item naming the lowest grade when all are A / B. */
@@ -35,7 +50,10 @@ export function provenanceItem(inputs: readonly ProvenanceInput[]): ReviewItem {
   const weak = inputs.filter((input) => input.grade === 'C' || input.grade === 'unsourced');
   if (weak.length === 0)
     return reviewItem('dynamics', 'DRV_PARAM_UNSOURCED', 'pass', [], 'None.', {
-      note: inputs.length === 0 ? 'no graded drive-physics input in the model' : `every graded input is A or B (lowest: ${inputs[0]?.id} ${inputs[0]?.grade})`,
+      note:
+        inputs.length === 0
+          ? 'no graded drive-physics input in the model'
+          : `every graded input is A or B (lowest: ${inputs[0]?.id} ${inputs[0]?.grade})`,
     });
   return reviewItem(
     'dynamics',

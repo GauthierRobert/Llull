@@ -49,9 +49,17 @@ export function stopPenetrationItems(run: RunData, dynamics: DynamicsModel): Rev
         'DRV_STOP_PENETRATION',
         status,
         [key],
-        status === 'pass' ? 'None.' : 'The stop gives way too far for its travel: raise its stiffness (set_joint_physics limits / add_transmission meshStiffness) or lower the impact speed.',
+        status === 'pass'
+          ? 'None.'
+          : 'The stop gives way too far for its travel: raise its stiffness (set_joint_physics limits / add_transmission meshStiffness) or lower the impact speed.',
         {
-          values: { peakPenetration: stop.peakPenetration, travel, penetrationRatio: ratio, peakForce: stop.peakForce, effectiveInertia: stop.effectiveInertia },
+          values: {
+            peakPenetration: stop.peakPenetration,
+            travel,
+            penetrationRatio: ratio,
+            peakForce: stop.peakForce,
+            effectiveInertia: stop.effectiveInertia,
+          },
           threshold,
           ...(status === 'pass' ? {} : { unverified: true }),
         },

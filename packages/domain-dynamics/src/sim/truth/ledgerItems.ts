@@ -24,13 +24,18 @@ const threshold: CheckThreshold = {
 };
 
 /** Kinetic energy (J) a velocity servo puts into its joint by jumping it from the initial speed to its target: 1/2 J |v_target^2 - v_0^2|, per motor. */
-function jumpEnergies(dynamics: DynamicsModel, inertiaOf: (joint: string) => number | undefined): { readonly motor: string; readonly joules: number }[] {
+function jumpEnergies(
+  dynamics: DynamicsModel,
+  inertiaOf: (joint: string) => number | undefined,
+): { readonly motor: string; readonly joules: number }[] {
   return Object.values(dynamics.motors).flatMap((motor) => {
     if (motor.kind !== 'speed' && motor.kind !== 'linear_speed') return [];
     const target = motor.kind === 'speed' ? motor.rpm * RAD_PER_S_PER_RPM : motor.speedMps;
     const start = dynamics.joints[motor.joint]?.initialVelocity;
     const inertia = inertiaOf(motor.joint);
-    return start === undefined || inertia === undefined ? [] : [{ motor: motor.id, joules: 0.5 * inertia * Math.abs(target * target - start * start) }];
+    return start === undefined || inertia === undefined
+      ? []
+      : [{ motor: motor.id, joules: 0.5 * inertia * Math.abs(target * target - start * start) }];
   });
 }
 
@@ -44,10 +49,14 @@ export function ledgerItems(run: RunData, dynamics: DynamicsModel, inertiaOf: (j
   const relative = ledger === undefined ? run.energy?.balanceErrorFraction : ledger.closureRelative;
   if (relative === undefined)
     return [
-      reviewItem('dynamics', 'DRV_LEDGER_CLOSURE', 'not_run', [], 'Run with energy recording (a datasheet motor with a drive, or energy: true) so the books can be checked.', {
-        unverified: true,
-        note: 'the run recorded neither a ledger nor an energy balance',
-      }),
+      reviewItem(
+        'dynamics',
+        'DRV_LEDGER_CLOSURE',
+        'not_run',
+        [],
+        'Run with energy recording (a datasheet motor with a drive, or energy: true) so the books can be checked.',
+        { unverified: true, note: 'the run recorded neither a ledger nor an energy balance' },
+      ),
     ];
   const status: ReviewItem['status'] = relative <= PASS_GATE ? 'pass' : relative <= WARN_GATE ? 'warn' : 'fail';
   const basis = ledger === undefined ? 'energy balance (no actuator ledger)' : 'energy ledger';
@@ -56,13 +65,20 @@ export function ledgerItems(run: RunData, dynamics: DynamicsModel, inertiaOf: (j
     'DRV_LEDGER_CLOSURE',
     status,
     [],
-    status === 'pass' ? 'None.' : 'Energy does not close: refine the timestep, or see the named cause below; do not size from a ledger that does not close.',
+    status === 'pass'
+      ? 'None.'
+      : 'Energy does not close: refine the timestep, or see the named cause below; do not size from a ledger that does not close.',
     {
       values: {
         closureRelative: relative,
         ...(ledger === undefined
           ? {}
-          : { closureErrorJ: ledger.closureErrorJ, inputJ: ledger.inputJ, dissipatedJ: ledger.dissipatedJ, storedChangeJ: ledger.storedChangeJ }),
+          : {
+              closureErrorJ: ledger.closureErrorJ,
+              inputJ: ledger.inputJ,
+              dissipatedJ: ledger.dissipatedJ,
+              storedChangeJ: ledger.storedChangeJ,
+            }),
       },
       threshold,
       note: `${basis}: closure ${relative.toExponential(2)} of the largest term`,
@@ -107,7 +123,9 @@ export function ledgerOrderItems(run: RunData, rows: readonly StudyRow[]): Revie
       'DRV_LEDGER_ORDER',
       shrinks || atRoundOff ? 'info' : 'warn',
       Object.keys(run.stops),
-      shrinks || atRoundOff ? 'None.' : 'The closure error does not shrink with the step: the stop or backlash is not resolved; refine the step or stiffen / soften the stop.',
+      shrinks || atRoundOff
+        ? 'None.'
+        : 'The closure error does not shrink with the step: the stop or backlash is not resolved; refine the step or stiffen / soften the stop.',
       {
         values: row.order === null ? {} : { observedOrder: row.order },
         note: atRoundOff

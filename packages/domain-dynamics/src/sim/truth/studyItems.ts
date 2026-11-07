@@ -52,7 +52,8 @@ const threshold: CheckThreshold = {
   defaulted: true,
 };
 
-const FIX_STEP = 'Refine the timestep (simulate_motion timestep, set_dynamics_solver) until the result stops moving, or report it with its GCI.';
+const FIX_STEP =
+  'Refine the timestep (simulate_motion timestep, set_dynamics_solver) until the result stops moving, or report it with its GCI.';
 
 const byGci = (gci: number): ReviewItem['status'] => (gci <= GCI_GATE ? 'pass' : gci <= GCI_FAIL ? 'warn' : 'fail');
 
@@ -66,7 +67,14 @@ function valueRow(base: Base): StudyRow {
   const fineSteps = [...steps].reverse();
   const scale = Math.max(...values.map(Math.abs));
   if (Math.max(...values) - Math.min(...values) <= ROUND_OFF * Math.max(scale, Number.MIN_VALUE))
-    return row(base, { order: null, orderAssumed: false, gci: 0, status: 'pass', note: 'identical at every step to round-off', irregular: false });
+    return row(base, {
+      order: null,
+      orderAssumed: false,
+      gci: 0,
+      status: 'pass',
+      note: 'identical at every step to round-off',
+      irregular: false,
+    });
   const [f1, f2, f3] = fine;
   if (f1 === undefined || f2 === undefined)
     return row(base, { order: null, orderAssumed: false, gci: null, status: 'not_run', note: 'fewer than two levels', irregular: false });
@@ -92,7 +100,14 @@ function valueRow(base: Base): StudyRow {
     SAFETY,
   );
   if ('orderNotConverged' in triplet)
-    return row(base, { order: null, orderAssumed: false, gci: null, status: 'warn', note: 'the observed order did not converge', irregular: true });
+    return row(base, {
+      order: null,
+      orderAssumed: false,
+      gci: null,
+      status: 'warn',
+      note: 'the observed order did not converge',
+      irregular: true,
+    });
   if (triplet.status === 'converged_exactly')
     return row(base, { order: null, orderAssumed: false, gci: 0, status: 'pass', note: 'two levels agree exactly', irregular: false });
   if (triplet.status !== 'monotone' || triplet.p === undefined) {
@@ -125,7 +140,14 @@ function valueRow(base: Base): StudyRow {
 function errorRow(base: Base, scale: number): StudyRow {
   const { values, steps } = base;
   if (Math.max(...values) <= ERROR_FLOOR * scale)
-    return row(base, { order: null, orderAssumed: false, gci: null, status: 'pass', note: 'at round-off of the energy scale at every step', irregular: false });
+    return row(base, {
+      order: null,
+      orderAssumed: false,
+      gci: null,
+      status: 'pass',
+      note: 'at round-off of the energy scale at every step',
+      irregular: false,
+    });
   const [coarse, mid, fine] = values;
   if (coarse === undefined || mid === undefined)
     return row(base, { order: null, orderAssumed: false, gci: null, status: 'not_run', note: 'fewer than two levels', irregular: false });
@@ -144,7 +166,14 @@ function errorRow(base: Base, scale: number): StudyRow {
   }
   if (fine === undefined) {
     const order = Math.log2(coarse / mid);
-    return row(base, { order, orderAssumed: false, gci: null, status: 'pass', note: `two levels: the error falls with the step, slope ${order.toPrecision(3)}`, irregular: false });
+    return row(base, {
+      order,
+      orderAssumed: false,
+      gci: null,
+      status: 'pass',
+      note: `two levels: the error falls with the step, slope ${order.toPrecision(3)}`,
+      irregular: false,
+    });
   }
   const triplet = gciTriplet(
     [
@@ -155,7 +184,14 @@ function errorRow(base: Base, scale: number): StudyRow {
     SAFETY,
   );
   if ('orderNotConverged' in triplet || triplet.status !== 'monotone' || triplet.p === undefined)
-    return row(base, { order: null, orderAssumed: false, gci: null, status: 'warn', note: 'the error falls but its order is undefined', irregular: true });
+    return row(base, {
+      order: null,
+      orderAssumed: false,
+      gci: null,
+      status: 'warn',
+      note: 'the error falls but its order is undefined',
+      irregular: true,
+    });
   const inside = triplet.p >= ORDER_RANGE[0] && triplet.p <= ERROR_ORDER_TOP;
   return row(base, {
     order: triplet.p,
@@ -174,7 +210,14 @@ export function studyRows(defs: readonly OutputDef[], runs: readonly RunData[], 
     const values = read.filter((value): value is number => value !== null);
     const base: Base = { key: def.key, kind: def.kind, unit: def.unit, values, steps };
     if (values.length !== read.length)
-      return row(base, { order: null, orderAssumed: false, gci: null, status: 'not_run', note: 'a run did not report this output', irregular: false });
+      return row(base, {
+        order: null,
+        orderAssumed: false,
+        gci: null,
+        status: 'not_run',
+        note: 'a run did not report this output',
+        irregular: false,
+      });
     return def.kind === 'error' ? errorRow(base, scale) : valueRow(base);
   });
 }
