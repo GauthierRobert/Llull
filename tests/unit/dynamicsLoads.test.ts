@@ -79,7 +79,6 @@ describe('dynamicsLoads', () => {
     doc = run(doc, 'add_propeller', { joint: jointId, diameter: 1, thrustCoefficient: 0.1, powerCoefficient: 0.05, id: 'prop' }).doc;
     const result = {
       joints: {},
-      gears: {},
       series: {
         times: [0, 1, 2],
         jointVelocity: { [jointId]: [0, 100, 200] },
@@ -121,7 +120,7 @@ describe('dynamicsLoads', () => {
     const gearDisc = run(base, 'add_cylinder', { radius: 50, height: 20, axis: [0, 1, 0], position: [300, 0, 0] });
     const body = run(gearDisc.doc, 'add_rigid_body', { entityIds: [gearDisc.id], name: 'pinion' });
     const joint = run(body.doc, 'add_body_joint', { kind: 'revolute', child: body.id, anchor: [300, 0, 0], axis: [0, 1, 0] });
-    const doc = run(joint.doc, 'add_gear_coupling', { driver: jointId, driven: joint.id, ratio: -2 }).doc;
+    const doc = run(joint.doc, 'add_transmission', { kind: 'gear', driver: jointId, driven: joint.id, ratio: -2 }).doc;
     const link = dynamicsLoads(doc, null, bodyCentres(doc)).find((item) => item.shape === 'link');
     expect(link).toMatchObject({ value: 'ratio -2', origin: [0, 0, 0], end: [300, 0, 0] });
   });
@@ -139,7 +138,6 @@ describe('dynamicsLoads', () => {
       joints: {},
       motors: {},
       propellers: {},
-      gears: {},
       poses: {
         times: [0, 1],
         bodies: {

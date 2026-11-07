@@ -1,11 +1,12 @@
 /**
  * Rigid-body dynamics definition of a document (`CadDocument.dynamics`): which entities move together (bodies), how bodies are connected
- * (joints), coupled (gears) and loaded (motors, propellers). Physical quantities are SI (kg, m, s, N, N·m, rad); joint anchors are world
+ * (joints), coupled (transmissions) and loaded (motors, propellers). Physical quantities are SI (kg, m, s, N, N·m, rad); joint anchors are world
  * points in DOCUMENT units like every other coordinate.
  */
 
 import { idTaken } from '../lib/explicitId';
 import type { DcMotor, MotionProfile, MotorDrive, ParameterSource } from './drives';
+import type { JointPhysics, LoadSchedule, Transmission } from './transmissions';
 import type { Vec3 } from './vectors';
 
 /** Parent of a joint that is attached to the fixed world. */
@@ -61,21 +62,6 @@ export interface DynamicJoint {
 }
 
 /**
- * Rigid gear / belt / chain coupling: velocity(driven) = ratio × velocity(driver), enforced as a constraint (both inertias interact).
- * @invariant driver !== driven, both existing joints; ratio finite, non-zero
- */
-interface GearCoupling {
-  readonly id: string;
-  driver: string;
-  driven: string;
-  ratio: number;
-  /** Mesh efficiency in (0, 1] (FR-FPR-74): the share of the transmitted power that reaches the driven shaft. Absent = ideal (1). */
-  efficiency?: number;
-  /** Tooth counts [driver, driven] the ratio was derived from; `ratio` stays authoritative. */
-  teeth?: readonly [driver: number, driven: number];
-}
-
-/**
  * Linear point-to-point spring-damper between two bodies (or a body and the ground), a MuJoCo spatial tendon between two attachment
  * points. Force along the line of the points: F = stiffness · (length - freeLengthM) + damping · d(length)/dt, positive = pulling together.
  * @invariant bodyA !== bodyB; stiffness > 0, damping >= 0, freeLengthM >= 0; points distinct at the modelled pose
@@ -102,11 +88,12 @@ export type TorquePoint = readonly [rpm: number, torque: number];
 /**
  * Drive on a joint. 'torque_curve': an engine — torque(rpm) × throttle, linear between points, held at the end values outside them.
  * 'speed': a governed drive holding `rpm` with at most `maxTorque` (N·m); `source` says where that bound comes from (absent: the bound is a
- * guess, DRV_EFFORT_UNBOUNDED). 'dc': a datasheet DC motor with an optional gearhead, commanded by a `MotorDrive` (`DynamicsModel.drives`).
+ * guess, DRV_EFFORT_UNBOUNDED). 'linear_speed': the same governor on a prismatic joint (m/s, N). 'dc': a datasheet DC motor with an optional gearhead, commanded by a `MotorDrive` (`DynamicsModel.drives`).
  */
 export type Motor =
   | { readonly id: string; readonly kind: 'torque_curve'; joint: string; curve: TorquePoint[]; throttle: number }
   | { readonly id: string; readonly kind: 'speed'; joint: string; rpm: number; maxTorque: number; source?: ParameterSource }
+  | { readonly id: string; readonly kind: 'linear_speed'; joint: string; speedMps: number; maxForceN: number; source?: ParameterSource }
   | DcMotor;
 
 /**
@@ -237,7 +224,6 @@ export interface DynamicsModel {
   gravity: Vec3;
   bodies: Record<string, RigidBody>;
   joints: Record<string, DynamicJoint>;
-  gears: Record<string, GearCoupling>;
   motors: Record<string, Motor>;
   propellers: Record<string, PropellerLoad>;
   /** Absent in documents saved before PHY-21. */
@@ -251,23 +237,30 @@ export interface DynamicsModel {
   profiles?: Record<string, MotionProfile>;
   /** Motor drives keyed by motor id (PHY-23); a datasheet motor without one is an open circuit. */
   drives?: Record<string, MotorDrive>;
+  /** Gear / belt / screw / rack couplings (PHY-23); absent until the first `add_transmission`. */
+  transmissions?: Record<string, Transmission>;
+  /** Joint physics keyed by joint id (PHY-23): friction model, end stops, armature. */
+  jointPhysics?: Record<string, JointPhysics>;
+  /** Profiles applied as forces (PHY-23). */
+  loadSchedules?: Record<string, LoadSchedule>;
 }
 
-/** Every id used by any dynamics record (bodies, joints, gears, motors, propellers, cylinders, losses, springs, profiles share one id space). */
+/** Every id used by any dynamics record (bodies, joints, transmissions, motors, propellers, cylinders, losses, springs, profiles, load schedules share one id space). */
 export function dynamicsIdTaken(dynamics: DynamicsModel, id: string): boolean {
   return [
     dynamics.bodies,
     dynamics.joints,
-    dynamics.gears,
+    dynamics.transmissions ?? {},
     dynamics.motors,
     dynamics.propellers,
     dynamics.cylinders ?? {},
     dynamics.losses ?? {},
     dynamics.springs ?? {},
     dynamics.profiles ?? {},
+    dynamics.loadSchedules ?? {},
   ].some((table) => idTaken(table, id));
 }
 
 export function createDynamicsModel(): DynamicsModel {
-  return { gravity: [0, 0, -9.81], bodies: {}, joints: {}, gears: {}, motors: {}, propellers: {} };
+  return { gravity: [0, 0, -9.81], bodies: {}, joints: {}, motors: {}, propellers: {} };
 }

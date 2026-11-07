@@ -1868,8 +1868,8 @@
     },
     {
       "file": "domain-dynamics/src/commands/connections.ts",
-      "hits": 10,
-      "reason": "recorded at the INT-14 scan extension: 10 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
+      "hits": 9,
+      "reason": "recorded at the INT-14 scan extension: 9 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
     },
     {
       "file": "domain-dynamics/src/commands/cylinders.ts",

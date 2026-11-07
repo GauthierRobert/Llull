@@ -1,4 +1,4 @@
-/** Load-time validation of the engine-realism fields (losses, gear efficiency, propeller table, reference data). */
+/** Load-time validation of the engine-realism fields (losses, propeller table, reference data). */
 
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
@@ -29,16 +29,6 @@ export const lossesProblem: Check = (losses) => {
     return isPoints(model['points'], 2, 2) ? null : 'fmep_table needs points [[rpm, FMEP Pa], ...] (at least 2)';
   return "model.kind must be 'chen_flynn' or 'fmep_table'";
 };
-
-/** Optional gear fields: efficiency in (0, 1], teeth [driver, driven] positive integers. */
-export function gearExtrasProblem(gear: Record<string, unknown>): string | null {
-  const efficiency = gear['efficiency'];
-  if (efficiency !== undefined && !(isFiniteNumber(efficiency) && efficiency > 0 && efficiency <= 1)) return 'efficiency must be in (0, 1]';
-  const teeth = gear['teeth'];
-  if (teeth !== undefined && !(Array.isArray(teeth) && teeth.length === 2 && teeth.every((n) => Number.isInteger(n) && n > 0)))
-    return 'teeth must be [driver, driven] positive integers';
-  return null;
-}
 
 /** Optional propeller fields: airspeedMps >= 0, inertiaKgM2 > 0 and the C_T(J), C_P(J) table with its source. */
 export function propellerExtrasProblem(propeller: Record<string, unknown>): string | null {

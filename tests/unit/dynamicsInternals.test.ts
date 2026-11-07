@@ -108,7 +108,7 @@ describe('simulation model', () => {
       ...createDynamicsModel(),
       bodies: { A: { id: 'A', entityIds: [a], fixed: false }, B: { id: 'B', entityIds: [b], fixed: false } },
       joints: { ja: joint('ja', 'A', 'ground', 10), jb: joint('jb', 'B') },
-      gears: { g: { id: 'g', driver: 'ja', driven: 'jb', ratio: -2 } },
+      transmissions: { g: { kind: 'gear', id: 'g', driver: 'ja', driven: 'jb', ratio: -2 } },
     }));
     const built = buildSimulationModel(doc, 0.001);
     if ('error' in built) throw new Error(built.error);
@@ -134,9 +134,9 @@ describe('simulation model', () => {
       ...createDynamicsModel(),
       bodies: { A: { id: 'A', entityIds: [a], fixed: true }, B: { id: 'B', entityIds: [b], fixed: false } },
       joints: { ja: joint('ja', 'A'), jb: joint('jb', 'B') },
-      gears: { g: { id: 'g', driver: 'ja', driven: 'jb', ratio: 1 } },
+      transmissions: { g: { kind: 'gear', id: 'g', driver: 'ja', driven: 'jb', ratio: 1 } },
     }));
-    expect(buildSimulationModel(fixedGear, 0.001)).toEqual({ error: expect.stringMatching(/gear 'g' uses joint 'ja'/) });
+    expect(buildSimulationModel(fixedGear, 0.001)).toEqual({ error: expect.stringMatching(/transmission 'g' uses joint 'ja'/) });
     const arc = execute(createEmptyDocument(), 'draw_arc', { center: [0, 0], radius: 1 });
     const flat = {
       ...arc.document,
@@ -211,7 +211,7 @@ describe('report on a hand-built trace', () => {
     ...createDynamicsModel(),
     bodies: { A: { id: 'A', name: 'crank', entityIds: ['x'], fixed: false }, B: { id: 'B', entityIds: ['y'], fixed: false } },
     joints: { ja: joint('ja', 'A'), jb: joint('jb', 'B') },
-    gears: { g: { id: 'g', driver: 'ja', driven: 'jb', ratio: 0.5 } },
+    transmissions: { g: { kind: 'gear', id: 'g', driver: 'ja', driven: 'jb', ratio: 0.5 } },
     motors: { gov: { id: 'gov', kind: 'speed', joint: 'ja', rpm: 100, maxTorque: 10 } },
     propellers: { idle: { ...propeller, id: 'idle', joint: 'jb', powerCoefficient: 0 } },
   };
@@ -237,13 +237,13 @@ describe('report on a hand-built trace', () => {
       trace((t) => (t > 1.5 ? 6 : 5)),
       { ...run, detail: 'poses' },
     );
-    expect(data.warnings.some((w) => /gear 'g' deviated .* at t = 1\.600 s — the coupled inertias/.test(w))).toBe(true);
+    expect(data.warnings.some((w) => /transmission 'g' deviated .* at t = 1\.600 s — the coupled inertias/.test(w))).toBe(true);
     expect(data.motors['gov']).toEqual({ joint: 'ja', torque: 3, power: 30 });
     expect(data.bodies['A']).toEqual({ name: 'crank', massKg: 2, centerOfMass: [1000, 0, 0] });
     expect(data.bodies['B']).toEqual({ massKg: 1, centerOfMass: [0, 0, 0] });
     expect(data.propellers['idle']?.figureOfMerit).toBeNull();
     expect(data.poses?.bodies['A']?.position[0]).toEqual([1000, 0, 0]);
-    expect(simulationSummary(data)).toMatch(/Motor gov: 3 N·m, 0\.03 kW.*Gear g: ratio 0\.5 held within 20 %/);
+    expect(simulationSummary(data)).toMatch(/Motor gov: 3 N·m, 0\.03 kW.*Transmission g: ratio 0\.5 held within 20 %/);
   });
 
   it('calls an early slip a start transient and leaves the ratio unmeasured for a stopped driver', () => {
@@ -263,7 +263,7 @@ describe('report on a hand-built trace', () => {
       ),
       { ...run, detail: 'summary' },
     );
-    expect(stopped.gears['g']).toEqual({ ratio: 0.5, measuredRatio: null, maxRatioError: 0 });
+    expect(stopped.transmissions['g']).toEqual({ ratio: 0.5, measuredRatio: null, maxRatioError: 0 });
     expect(stopped.warnings).toEqual([]);
   });
 });

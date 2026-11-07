@@ -10,6 +10,7 @@ import { nextId } from '../../lib/id';
 import { roundSignificant } from '../../lib/significant';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { isOpenCage } from '../../geometry/subd/boundary';
+import { settleBudgetProblem } from '../../geometry/subd/settle';
 import { cageToNurbs } from '../../geometry/subd/toNurbs';
 import { buildTopology, faceArea } from '../../geometry/subd/topology';
 import { dirRejection } from './codes';
@@ -174,6 +175,7 @@ export const subdivisionToNurbs = defineCommand({
       warnings: [
         ...(effectiveG1 && converted.g1ToleranceMet === false ? ['DIR_CONVERT_G1_TOLERANCE_NOT_MET'] : []),
         ...(shapeRatio !== null && shapeRatio > SHAPE_MOVED_RATIO ? ['DIR_CONVERT_G1_SHAPE_MOVED'] : []),
+        ...(settleBudgetProblem(entity) !== null ? ['DIR_SHARPNESS_BUDGET'] : []),
       ],
       packedQuads: converted.packedQuads,
       packedBlocks: converted.packedBlocks,
@@ -195,6 +197,9 @@ export const subdivisionToNurbs = defineCommand({
         : '') +
       (report.warnings.includes('DIR_CONVERT_G1_SHAPE_MOVED')
         ? ` [DIR_CONVERT_G1_SHAPE_MOVED: ${g1Label}, deviation ${report.maxDeviation} ${doc.units} = ${report.deviationRatio}x the G0 patches]`
+        : '') +
+      (report.warnings.includes('DIR_SHARPNESS_BUDGET')
+        ? ` [DIR_SHARPNESS_BUDGET: ${settleBudgetProblem(entity)}; the leftover sharpness is read as infinite]`
         : '');
     if (solid && kernel !== null) {
       const built = evaluateRecipe(kernel, recipeOf(entity));

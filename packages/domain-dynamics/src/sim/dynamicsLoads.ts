@@ -3,6 +3,7 @@
 // the Physics "Loads & forces" review list and drawn by the viewport's DynamicsLoadsOverlay, so both always show the same thing.
 
 import type { CadDocument } from '@core/model/types';
+import { couplingsOf } from '@core/model/transmissions';
 import type { Vec3 } from '@core/model/vectors';
 import { GROUND, type DynamicJoint, type DynamicsModel, type Motor, type PropellerLoad } from '@core/model/dynamics';
 import { toMetres } from '@core/model/units';
@@ -155,18 +156,18 @@ function jointItems(context: Context): LoadItem[] {
       magnitude: null,
     } satisfies LoadItem;
   });
-  for (const gear of Object.values(dynamics.gears)) {
+  for (const gear of couplingsOf(dynamics)) {
     const driver = dynamics.joints[gear.driver];
     const driven = dynamics.joints[gear.driven];
     if (driver === undefined || driven === undefined) continue;
-    const measured = playback?.result.gears[gear.id]?.measuredRatio;
+    const measured = playback?.result.transmissions[gear.id]?.measuredRatio;
     items.push({
       id: gear.id,
       layer: 'joints',
       shape: 'link',
       title: `${gear.driver} → ${gear.driven}`,
       value: `ratio ${formatQuantity(gear.ratio)}`,
-      detail: `gear / belt coupling: driven speed = ${formatQuantity(gear.ratio)} × driver${
+      detail: `transmission: driven speed = ${formatQuantity(gear.ratio)} × driver${
         measured !== undefined && measured !== null ? ` · measured ${formatQuantity(measured)}` : ''
       }`,
       origin: driver.anchor,
@@ -184,6 +185,12 @@ function motorDesign(motor: Motor): { value: string; detail: string; magnitude: 
       value: `${formatQuantity(motor.rpm)} rpm`,
       detail: `speed governor: holds ${formatQuantity(motor.rpm)} rpm with at most ${formatQuantity(motor.maxTorque)} N·m`,
       magnitude: motor.maxTorque,
+    };
+  if (motor.kind === 'linear_speed')
+    return {
+      value: `${formatQuantity(motor.speedMps)} m/s`,
+      detail: `linear speed governor: holds ${formatQuantity(motor.speedMps)} m/s with at most ${formatQuantity(motor.maxForceN)} N`,
+      magnitude: motor.maxForceN,
     };
   if (motor.kind === 'dc') {
     const p = dcParameters(motor);

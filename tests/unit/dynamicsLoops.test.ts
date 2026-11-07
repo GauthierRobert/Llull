@@ -114,18 +114,18 @@ describe('mobility and redundancy (VC-FPR-20)', () => {
     const { doc } = sliderCrank({ wrist: 'revolute', startDeg: 40, order: ['slide_j', 'wrist_j', 'crank_j', 'rod_j'] });
     expect(topologyOf(doc).tree.find((entry) => entry.joint.id === 'wrist_j')?.flipped).toBe(true);
     const base = inspect(doc).mobility;
-    const consistent = execute(doc, 'add_gear_coupling', { id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio });
+    const consistent = execute(doc, 'add_transmission', { kind: 'gear', id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio });
     const same = inspect(consistent.document).mobility;
     expect(same.dof).toBe(base.dof);
     expect(same.redundant.length).toBe(base.redundant.length + 1);
-    const opposite = execute(doc, 'add_gear_coupling', { id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: -ratio });
+    const opposite = execute(doc, 'add_transmission', { kind: 'gear', id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: -ratio });
     expect(inspect(opposite.document).mobility.dof).toBe(base.dof - 1);
   });
 
   it('a coupling to a loop-closing joint adds no row and is reported', () => {
     const { doc } = sliderCrank({ wrist: 'revolute', startDeg: 40 });
-    const coupled = execute(doc, 'add_gear_coupling', { id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: 2 });
-    expect(inspect(coupled.document).warnings.some((w) => w.startsWith("FPR_GEAR_ON_LOOP_JOINT: gear coupling 'g'"))).toBe(true);
+    const coupled = execute(doc, 'add_transmission', { kind: 'gear', id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: 2 });
+    expect(inspect(coupled.document).warnings.some((w) => w.startsWith("FPR_GEAR_ON_LOOP_JOINT: transmission 'g'"))).toBe(true);
   });
 
   it('a gear coupling between two tree joints is one more constraint row (DOF - 1); a loop joint on either side adds none', () => {
@@ -145,7 +145,7 @@ describe('mobility and redundancy (VC-FPR-20)', () => {
       ['crank_j', 'shaft_j'],
       ['shaft_j', 'crank_j'],
     ] as const) {
-      const geared = execute(spun.document, 'add_gear_coupling', { id: 'g', driver, driven, ratio: 0.5 });
+      const geared = execute(spun.document, 'add_transmission', { kind: 'gear', id: 'g', driver, driven, ratio: 0.5 });
       expect(geared.affected).toEqual(['g']);
       const mobility = inspect(geared.document).mobility as InspectData['mobility'] & { constraintRows: number };
       expect(mobility.dof).toBe(1);
@@ -155,7 +155,7 @@ describe('mobility and redundancy (VC-FPR-20)', () => {
     // a revolute wrist closes the loop (not a tree joint): a coupling to it has no tree coordinate to constrain and adds no row
     const closed = sliderCrank({ wrist: 'revolute', startDeg: 40 }).doc;
     const before = inspect(closed).mobility;
-    const coupled = execute(closed, 'add_gear_coupling', { id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: 2 });
+    const coupled = execute(closed, 'add_transmission', { kind: 'gear', id: 'g', driver: 'crank_j', driven: 'wrist_j', ratio: 2 });
     expect(coupled.affected).toEqual(['g']);
     expect(inspect(coupled.document).mobility).toMatchObject({ dof: before.dof, rank: before.rank });
   });

@@ -48,14 +48,7 @@
       "define_acoustic_exposure",
       "define_acoustic_spectrum"
     ],
-    "docs/physics/23-drives-physical-truth/validation/plans/drv_lead_screw.plan.json": ["add_transmission"],
-    "docs/physics/23-drives-physical-truth/validation/plans/drv_servo_sizing.plan.json": [
-      "add_transmission",
-      "check_motion_truth",
-      "set_joint_physics",
-      "size_drive"
-    ],
-    "docs/physics/23-drives-physical-truth/validation/plans/drv_stick_slip.plan.json": ["set_joint_physics"],
+    "docs/physics/23-drives-physical-truth/validation/plans/drv_servo_sizing.plan.json": ["check_motion_truth", "size_drive"],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": ["export_caesar_neutral"],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": ["fit_steel_member"],
     "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": ["export_pdf"],

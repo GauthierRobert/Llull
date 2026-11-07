@@ -21,9 +21,9 @@ function dcDescription(motor: DcMotor): string {
 
 /**
  * @affects adds 1 motor to doc.dynamics (affected: [motorId])
- * @invariant joint exists; torque_curve: >= 1 point, strictly increasing rpm, throttle in [0, 1]; speed: maxTorque > 0;
+ * @invariant joint exists; torque_curve: >= 1 point, strictly increasing rpm, throttle in [0, 1]; speed: maxTorque > 0 (revolute) or speedMps + maxForceN > 0 (prismatic);
  *   dc: datasheet passes check_motor_data or carries acceptInconsistent, gearhead efficiencies in (0, 1]
- * @failure unknown or prismatic joint, missing / unsorted curve, bad throttle, missing rpm / maxTorque, taken id -> no-op;
+ * @failure unknown joint, prismatic joint for a non-speed kind, missing / unsorted curve, bad throttle, missing rpm / maxTorque, taken id -> no-op;
  *   dc without datasheet / source -> no-op; inconsistent dc datasheet -> DRV_MOTOR_DATA_INCONSISTENT (checks listed in the error detail)
  */
 export const addMotor = defineCommand({
@@ -33,7 +33,7 @@ export const addMotor = defineCommand({
     'throttle, e.g. curve [[0, 300], [2000, 420], [2800, 400], [3200, 0]], times `throttle` (0..1). A single constant torque: ' +
     '`torque: 50` (same as a one-point curve). The speed then rises until the load (propeller, friction, damping) absorbs the torque — ' +
     'the physically settled operating point. kind "speed" = a governed drive that holds `rpm` using at most `maxTorque` N·m (a test ' +
-    "rig / constant-speed prop governor). Torque acts in the joint's positive direction (right-hand rule about the joint axis). " +
+    "rig / constant-speed prop governor); on a PRISMATIC joint it holds `speedMps` m/s with at most `maxForceN` N (a belt, a conveyor, a driven slide). Torque acts in the joint's positive direction (right-hand rule about the joint axis). " +
     'kind "dc" = a datasheet permanent-magnet DC motor (resistance, inductance, torque constant, rotor inertia, optional gearhead): give `datasheet`, ' +
     '`source` (where the numbers come from) and optionally `gearhead`; the sheet is checked for consistency first (check_motor_data, DRV_MOTOR_DATA_INCONSISTENT ' +
     'unless `acceptInconsistent` gives a reason, and the motor is then unverified); the motor is commanded by set_motor_drive (voltage, torque, velocity, ' +
@@ -51,8 +51,10 @@ export const addMotor = defineCommand({
       .describe('torque_curve: [[rpm, torque N·m], …] with increasing rpm; linear between points, held flat outside them.'),
     torque: z.number().optional().describe('torque_curve shortcut: one constant torque in N·m (instead of curve).'),
     throttle: z.number().min(0).max(1).optional().describe('torque_curve: fraction of the curve torque, 0..1. Default 1.'),
-    rpm: z.number().optional().describe('speed: target shaft speed in rpm.'),
-    maxTorque: z.number().positive().optional().describe('speed: torque limit in N·m.'),
+    rpm: z.number().optional().describe('speed on a revolute joint: target shaft speed in rpm.'),
+    maxTorque: z.number().positive().optional().describe('speed on a revolute joint: torque limit in N·m.'),
+    speedMps: z.number().optional().describe('speed on a PRISMATIC joint: target speed in m/s.'),
+    maxForceN: z.number().positive().optional().describe('speed on a prismatic joint: force limit in N.'),
     datasheet: datasheetSchema.optional().describe('dc: the motor datasheet (SI units).'),
     gearhead: gearheadSchema.optional().describe('dc: gearhead between the motor shaft and the joint. Default none (direct drive).'),
     source: sourceSchema
@@ -70,13 +72,14 @@ export const addMotor = defineCommand({
     const dynamics = dynamicsOf(doc);
     const joint = dynamics.joints[params.joint];
     if (joint === undefined) return fail(`joint '${params.joint}' not found (add_body_joint first)`);
-    if (joint.kind !== 'revolute')
+    const linear = joint.kind === 'prismatic' && params.kind === 'speed';
+    if (joint.kind !== 'revolute' && !linear)
       return codedRejection(
         doc,
         'add_motor',
         'DRV_JOINT_INVALID',
-        `joint '${params.joint}' is prismatic; motors (rpm, N·m) drive revolute joints`,
-        'Drive a revolute joint (a prismatic axis needs a transmission, DRV-M2).',
+        `joint '${params.joint}' is ${joint.kind}; torque_curve and dc motors (rpm, N·m) drive revolute joints`,
+        'Drive a revolute joint and couple it to the prismatic one with add_transmission (screw, rack), or use kind "speed" with speedMps / maxForceN on the prismatic joint.',
         [params.joint],
       );
     const motorId = idOrNext(params.id, 'motor');
@@ -106,6 +109,17 @@ export const addMotor = defineCommand({
       if (curve.some(([rpm, torque]) => !Number.isFinite(rpm) || !Number.isFinite(torque))) return fail('curve values must be finite');
       if (curve.some((point, i) => i > 0 && point[0] <= (curve[i - 1]?.[0] ?? -Infinity))) return fail('curve rpm values must increase');
       motor = { id: motorId, kind: 'torque_curve', joint: params.joint, curve, throttle: params.throttle ?? 1 };
+    } else if (linear) {
+      if (params.speedMps === undefined || params.maxForceN === undefined)
+        return fail('speed motor on a prismatic joint needs `speedMps` and `maxForceN`');
+      motor = {
+        id: motorId,
+        kind: 'linear_speed',
+        joint: params.joint,
+        speedMps: params.speedMps,
+        maxForceN: params.maxForceN,
+        ...(params.source === undefined ? {} : { source: toSource(params.source) }),
+      };
     } else {
       if (params.rpm === undefined || params.maxTorque === undefined) return fail('speed motor needs `rpm` and `maxTorque`');
       motor = {
@@ -118,11 +132,13 @@ export const addMotor = defineCommand({
       };
     }
     const what =
-      motor.kind === 'speed'
-        ? `holds ${motor.rpm} rpm (≤ ${motor.maxTorque} N·m${motor.source === undefined ? ', bound unsourced' : `, source ${motor.source.name} grade ${motor.source.grade}`})`
-        : motor.kind === 'dc'
-          ? `DC motor ${motor.source.name}: ${verdict}; ${dcDescription(motor)}; commanded by set_motor_drive`
-          : `torque curve of ${motor.curve.length} point(s), peak ${Math.max(...motor.curve.map(([, t]) => t))} N·m, throttle ${motor.throttle}`;
+      motor.kind === 'linear_speed'
+        ? `holds ${motor.speedMps} m/s (≤ ${motor.maxForceN} N${motor.source === undefined ? ', bound unsourced' : `, source ${motor.source.name} grade ${motor.source.grade}`})`
+        : motor.kind === 'speed'
+          ? `holds ${motor.rpm} rpm (≤ ${motor.maxTorque} N·m${motor.source === undefined ? ', bound unsourced' : `, source ${motor.source.name} grade ${motor.source.grade}`})`
+          : motor.kind === 'dc'
+            ? `DC motor ${motor.source.name}: ${verdict}; ${dcDescription(motor)}; commanded by set_motor_drive`
+            : `torque curve of ${motor.curve.length} point(s), peak ${Math.max(...motor.curve.map(([, t]) => t))} N·m, throttle ${motor.throttle}`;
     return changed(
       withDynamics(doc, { ...dynamics, motors: { ...dynamics.motors, [motorId]: motor } }),
       `add_motor: '${motorId}' on joint '${params.joint}' — ${what}.`,

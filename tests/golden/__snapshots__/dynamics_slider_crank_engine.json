@@ -178,7 +178,6 @@
         "#19": {"id":"#19","kind":"spherical","parent":"#11","child":"#13","anchor":[160.5,0,0],"axis":[0,0,1],"damping":0,"friction":0,"initialVelocity":0},
         "#21": {"id":"#21","kind":"prismatic","parent":"ground","child":"#13","anchor":[160.5,0,0],"axis":[1,0,0],"damping":0,"friction":0,"initialVelocity":0}
       },
-      "gears": {},
       "motors": {},
       "propellers": {},
       "solver": {

@@ -194,7 +194,7 @@ describe('gear ratio through the loop mechanism (VC-FPR-16)', () => {
       axis: [0, 0, 1],
       id: 'prop_j',
     });
-    const gear = execute(joint.document, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', ratio: 21 / 51 });
+    const gear = execute(joint.document, 'add_transmission', { kind: 'gear', driver: 'crank_j', driven: 'prop_j', ratio: 21 / 51 });
     const data = run(governed(gear.document, 5800), { duration: 0.03 });
     expect(Math.abs((data.joints['prop_j']?.finalRpm ?? 0) - 2388.24) / 2388.24).toBeLessThan(1e-3);
     expect(data.joints['crank_j']?.finalRpm ?? 0).toBeCloseTo(5800, -1);
@@ -314,7 +314,7 @@ describe('invariances', () => {
       axis: [0, 0, 1],
       id: 'prop_j',
     });
-    const gear = execute(joint.document, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', ratio: 21 / 51 });
+    const gear = execute(joint.document, 'add_transmission', { kind: 'gear', driver: 'crank_j', driven: 'prop_j', ratio: 21 / 51 });
     const data = run(governed(gear.document, 1500), { duration: 0.2 });
     const ripple = data.engineReport?.speedRipple;
     const propInertia = 0.5 * (600 * Math.PI * 0.15 ** 2 * 0.015) * 0.15 ** 2;

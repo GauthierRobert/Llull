@@ -238,8 +238,8 @@ describe('dart limit mask', () => {
 describe('sharpness above three', () => {
   const cage = (): Cage => cube({ edgeSharpness: [{ a: 0, b: 1, s: 5 }] });
 
-  it('settles at ceil(5) = 5 levels, not at the cap of 3, so the operator is the surface refineOnce defines', () => {
-    expect(settleLevels(cage())).toBe(3);
+  it('settles at ceil(5) = 5 levels on every path, so the operator is the surface refineOnce defines', () => {
+    expect(settleLevels(cage())).toBe(5);
     expect(fullSettleLevels(cage())).toBe(5);
     expect(sampleLevel(cage(), 1)).toBe(5);
     expect(limitSurfaceMesh(cage(), 1).level).toBe(5);
@@ -256,10 +256,9 @@ describe('sharpness above three', () => {
     }
   });
 
-  it('the capped settling used by the other exact paths stops at 3 levels with the edge still sharp', () => {
+  it('the settled cage of the other exact paths is fully settled: no sharpness is left', () => {
     const settled = settledCage(cage());
-    expect(settled.levels).toBe(3);
-    expect(settled.cage.edgeSharpness?.length).toBeGreaterThan(0);
-    expect(Math.max(...(settled.cage.edgeSharpness ?? []).map((e) => e.s))).toBeCloseTo(2, 12);
+    expect(settled.levels).toBe(5);
+    expect(settled.cage.edgeSharpness ?? []).toEqual([]);
   });
 });

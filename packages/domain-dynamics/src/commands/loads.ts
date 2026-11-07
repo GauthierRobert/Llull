@@ -1,4 +1,4 @@
-/** Listing what acts on the rigid-body model (list_dynamics_loads): weights, joint axes, gears, motor torques, propeller thrust. */
+/** Listing what acts on the rigid-body model (list_dynamics_loads): weights, joint axes, transmissions, motor torques, propeller thrust. */
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -15,7 +15,7 @@ export const listDynamicsLoads = defineCommand({
   annotations: { readsMeshTriangles: true, readOnly: true },
   description:
     'List every load of the physics model at its design values: each body weight at its centre of mass (gravity layer), every joint axis and ' +
-    'gear coupling (joints), motor drive torque (drives) and propeller thrust at the governed speed (thrust). Each load has a short SI value, ' +
+    'transmission (joints), motor drive torque (drives) and propeller thrust at the governed speed (thrust). Each load has a short SI value, ' +
     'the setup behind it (detail), an origin and unit direction in document units and a magnitude (N or N·m; null when it is not a quantity). ' +
     'Filter with layers. Read-only; needs no physics engine. For the values during a run use simulate_motion.',
   params: z.object({ layers: z.array(z.enum(LOAD_LAYERS)).optional().describe('Keep only these layers (default: all of them).') }),

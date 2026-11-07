@@ -4,6 +4,7 @@
  */
 
 import type { DynamicsModel } from '@core/model/dynamics';
+import { couplingsOf } from '@core/model/transmissions';
 import type { Vec3 } from '@core/model/vectors';
 import { RAD_PER_S_PER_RPM, motorForce, propellerOutput } from './forceLaws';
 import type { SimulationTrace } from '@core/dynamics/physicsEngine';
@@ -79,7 +80,7 @@ export interface SimulationData {
     { joint: string; rpm: number; thrust: number; torque: number; power: number; tipMach: number; figureOfMerit: number | null }
   >;
   /** measuredRatio = driven / driver speed at the end; maxRatioError over all samples with motion. */
-  readonly gears: Record<string, { ratio: number; measuredRatio: number | null; maxRatioError: number }>;
+  readonly transmissions: Record<string, { ratio: number; measuredRatio: number | null; maxRatioError: number }>;
   readonly warnings: string[];
   /** Energy balance in J, present when the run recorded energy (simulate_motion `energy: true`, or the model has a joint spring). */
   readonly energy?: EnergyData;
@@ -210,7 +211,7 @@ export function simulationData(
   const motorTorque = Object.fromEntries(
     Object.values(dynamics.motors).map((m) => [
       m.id,
-      m.kind === 'speed'
+      m.kind === 'speed' || m.kind === 'linear_speed'
         ? seriesOf(trace.servoForce, m.id)
         : m.kind === 'dc'
           ? datasheetTorque(m.id, run.drives, trace)
@@ -288,15 +289,15 @@ export function simulationData(
       return [p.id, { joint: p.joint, rpm: omega / RAD_PER_S_PER_RPM, ...end, tipMach, figureOfMerit }];
     }),
   );
-  const gears = Object.fromEntries(
-    Object.values(dynamics.gears).map((gear) => {
+  const transmissions = Object.fromEntries(
+    couplingsOf(dynamics).map((gear) => {
       const [driver, driven] = [velocityOf(gear.driver), velocityOf(gear.driven)];
       const { worst: error, index } = gearRatioError(gear.ratio, driver, driven);
       if (error > 0.01) {
         const at = last(trace.times.slice(0, index + 1));
         const late = at > run.duration * 0.1;
         warnings.push(
-          `gear '${gear.id}' deviated from its ratio by up to ${(error * 100).toFixed(2)} % at t = ${at.toFixed(3)} s` +
+          `transmission '${gear.id}' deviated from its ratio by up to ${(error * 100).toFixed(2)} % at t = ${at.toFixed(3)} s` +
             (late
               ? ' — the coupled inertias are too different for this timestep: lower the timestep'
               : ' (start transient: the light driver accelerates violently; a lower timestep or the real crankshaft inertia reduces it)'),
@@ -322,7 +323,7 @@ export function simulationData(
     motors,
     ...(Object.keys(freeBodies).length > 0 ? { freeBodies } : {}),
     propellers,
-    gears,
+    transmissions,
     warnings,
     ...(balance !== null ? { energy: balance.data } : {}),
     ...(springs !== null ? { springs } : {}),
@@ -389,8 +390,8 @@ export function simulationSummary(data: SimulationData): string {
       `Propeller ${id}: ${formatNumber(prop.rpm, 1)} rpm, thrust ${formatNumber(prop.thrust, 1)} N, ` +
         `torque ${formatNumber(prop.torque, 1)} N·m, absorbing ${formatNumber(prop.power / 1000, 2)} kW.`,
     );
-  for (const [id, gear] of Object.entries(data.gears))
-    parts.push(`Gear ${id}: ratio ${formatNumber(gear.ratio, 4)} held within ${formatNumber(gear.maxRatioError * 100, 3)} %.`);
+  for (const [id, gear] of Object.entries(data.transmissions))
+    parts.push(`Transmission ${id}: ratio ${formatNumber(gear.ratio, 4)} held within ${formatNumber(gear.maxRatioError * 100, 3)} %.`);
   if (data.energy !== undefined) {
     const e = data.energy;
     const joules = (value: number): string => formatNumber(Math.abs(value) < 1e-9 ? 0 : value, 4);

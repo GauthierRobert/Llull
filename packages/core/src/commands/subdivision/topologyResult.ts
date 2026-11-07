@@ -8,6 +8,7 @@ import { replaceEntity } from '../entity/entityOps';
 import { cageProblem } from '../../geometry/subdivision';
 import type { CageState } from '../../geometry/subd/cageState';
 import { withCageState } from '../../geometry/subd/cageState';
+import { settleBudgetProblem } from '../../geometry/subd/settle';
 import { isOpenCage } from '../../geometry/subd/boundary';
 import { pairVertices, symmetricTopologyProblem } from '../../geometry/subd/symmetry';
 import { buildTopology } from '../../geometry/subd/topology';
@@ -42,6 +43,8 @@ export function finishedCage(
   const rebuilt = withCageState(entity, state, symmetry);
   const problem = cageProblem(rebuilt);
   if (problem !== null) return reject('DIR_CAGE_INVALID', `the result is not a valid cage: ${problem}`);
+  const budget = settleBudgetProblem(rebuilt);
+  if (budget !== null) return reject('DIR_SHARPNESS_BUDGET', budget);
   // `boundary` is present only while the cage is open
   if (rebuilt.boundary === undefined || !isOpenCage(buildTopology(state.vertices.length, state.faces))) {
     const { boundary, ...closed } = rebuilt;

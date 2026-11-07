@@ -14,6 +14,8 @@ export const DIR_REMEDIATION: Readonly<Record<string, string>> = {
   DIR_LEVELS_RANGE: 'levels is an integer 0..4.',
   DIR_CAGE_TOO_LARGE: 'Lower levels or the cage size: at most 50000 cage vertices and 1000000 refined quads (cage faces x 4^levels).',
   DIR_SHARPNESS_RANGE: 'Sharpness is 0 (smooth) .. 10 (infinitely sharp).',
+  DIR_SHARPNESS_BUDGET:
+    'A semi-sharp edge or corner needs ceil(sharpness) settling levels, and the settled cage may have at most 100000 quads: lower the sharpness, use fewer cage faces, or use 10 (infinitely sharp).',
   DIR_CAGE_OPEN:
     'The cage must be closed (every edge shared by two faces), or pass `boundary` ("edge_and_corner" / "edge_only") to accept an open cage, or fill_cage_hole.',
   DIR_CAGE_EMPTY: 'The deletion would remove every face: delete the entity instead.',

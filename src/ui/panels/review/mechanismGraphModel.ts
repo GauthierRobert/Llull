@@ -2,6 +2,7 @@
 // dashed, gear couplings dotted with their ratio. Read from inspect_dynamics data (topology, mobility, problems) and the dynamics model.
 
 import { GROUND, type DynamicsModel } from '@core/model/dynamics';
+import { couplingsOf } from '@core/model/transmissions';
 import { isRecord } from '@lib/isRecord';
 
 type EdgeKind = 'tree' | 'loop' | 'gear';
@@ -63,7 +64,7 @@ function topologyEdges(dynamics: DynamicsModel, data: Record<string, unknown>): 
 }
 
 function gearEdges(dynamics: DynamicsModel): GraphEdge[] {
-  return Object.values(dynamics.gears).flatMap((gear) => {
+  return couplingsOf(dynamics).flatMap((gear) => {
     const [driver, driven] = [dynamics.joints[gear.driver], dynamics.joints[gear.driven]];
     if (driver === undefined || driven === undefined) return [];
     return [

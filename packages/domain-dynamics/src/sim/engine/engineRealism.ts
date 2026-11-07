@@ -5,6 +5,7 @@
  */
 
 import type { DynamicsModel, EngineLosses } from '@core/model/dynamics';
+import { couplingsOf } from '@core/model/transmissions';
 import type { CylinderRuntime } from '../cylinderLoads';
 import type { EngineData } from '../engineReport';
 import type { SimulationTrace } from '@core/dynamics/physicsEngine';
@@ -109,7 +110,7 @@ function governorIsOnlyLoad(dynamics: DynamicsModel, crank: string): boolean {
     governors.length === 1 &&
     Object.values(dynamics.motors).length === 1 &&
     Object.keys(dynamics.propellers).length === 0 &&
-    Object.keys(dynamics.gears).length === 0 &&
+    Object.keys(dynamics.transmissions ?? {}).length === 0 &&
     Object.values(dynamics.joints).every((joint) => joint.damping === 0 && joint.friction === 0)
   );
 }
@@ -313,7 +314,7 @@ function plausibilityFindings(input: RealismInput, losses: LossReport | null): P
       ),
     );
   for (const propeller of Object.values(dynamics.propellers)) {
-    const gear = Object.values(dynamics.gears).find((candidate) => candidate.driven === propeller.joint);
+    const gear = couplingsOf(dynamics).find((candidate) => candidate.driven === propeller.joint);
     if (gear === undefined || !isRotaxReduction(gear.ratio)) continue;
     const joint = dynamics.joints[propeller.joint];
     const body = input.mass[joint?.child ?? ''];

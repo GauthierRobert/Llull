@@ -5,6 +5,8 @@
 
 import type { DynamicsModel } from '@core/model/dynamics';
 import { motorFrictionOn } from './actuators/dcMotor';
+import { effectiveFriction } from './jointPhysics';
+import { heatSeries } from './transmissionReport';
 import { propellerOutput } from './forceLaws';
 import type { SimulationTrace } from '@core/dynamics/physicsEngine';
 
@@ -56,19 +58,24 @@ function integrate(times: readonly number[], power: readonly number[]): number[]
   return cumulative;
 }
 
-/** Cumulative dissipated energy per sample (0 at the first): joint damping and friction, spring dampers. */
+/**
+ * Cumulative dissipated energy per sample (0 at the first): joint damping and constant friction (integrated from the sampled speed), spring
+ * dampers, plus the heat the engine measured for transmission losses, friction models and end stops (`trace.heat`, already cumulative).
+ */
 function dissipatedSeries(dynamics: DynamicsModel, trace: SimulationTrace): number[] {
   const power = trace.times.map((_, i) => {
     const joints = Object.values(dynamics.joints).reduce((sum, joint) => {
       const v = trace.jointVelocity[joint.id]?.[i] ?? 0;
-      return sum + joint.damping * v * v + (joint.friction + motorFrictionOn(dynamics, joint.id)) * Math.abs(v);
+      const { dry, damping } = effectiveFriction(dynamics, joint);
+      return sum + damping * v * v + (dry + motorFrictionOn(dynamics, joint.id)) * Math.abs(v);
     }, 0);
     return Object.values(dynamics.springs ?? {}).reduce((sum, spring) => {
       const v = trace.springs?.[spring.id]?.velocity[i] ?? 0;
       return sum + spring.damping * v * v;
     }, joints);
   });
-  return integrate(trace.times, power);
+  const heat = heatSeries(trace);
+  return integrate(trace.times, power).map((joules, i) => joules + (heat[i] ?? 0));
 }
 
 /** Cumulative work absorbed by the propellers per sample (0 at the first). */
