@@ -12,12 +12,6 @@ import { Icon } from './Icon';
 import { ModalDialog } from './ModalDialog';
 import { CameraFields, OutputFields, SourceFields } from './ExportAnimationFields';
 
-interface Preview {
-  readonly sheetSrc: string | null;
-  readonly summary: string;
-  readonly warnings: readonly AnimationWarning[];
-}
-
 const formatSeconds = (seconds: number): string => `${Number(seconds.toFixed(2))} s`;
 
 /** The playback transport as the dialog sees it: where the bar is and what it plays. */
@@ -42,7 +36,8 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
     return defaultAnimationForm(useStore.getState().document, result === null ? null : { duration: result.duration, speed });
   });
   const [busy, setBusy] = useState<'preview' | 'save' | null>(null);
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [sheetSrc, setSheetSrc] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<readonly AnimationWarning[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const titleId = useId();
@@ -51,7 +46,8 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
 
   const update = (patch: Partial<AnimationForm>): void => {
     setForm((previous) => ({ ...previous, ...patch }));
-    setPreview(null);
+    setSheetSrc(null);
+    setWarnings([]);
     setNotice('');
   };
 
@@ -72,11 +68,8 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
     }
     if (purpose === 'preview') {
       const sheet = outcome.files.find((file) => file.fileName === 'sheet.png');
-      setPreview({
-        sheetSrc: sheet === undefined ? null : `data:image/png;base64,${sheet.base64}`,
-        summary: outcome.summary,
-        warnings: outcome.warnings,
-      });
+      setSheetSrc(sheet === undefined ? null : `data:image/png;base64,${sheet.base64}`);
+      setWarnings(outcome.warnings);
       return;
     }
     const video = videoFileOf(outcome.files);
@@ -85,9 +78,8 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
       return;
     }
     saveAnimationFile(video);
-    setNotice(
-      `${video.fileName} is ready: choose where to save it in the file dialog.${outcome.warnings.map((w) => ` ${w.message}`).join('')}`,
-    );
+    setWarnings(outcome.warnings);
+    setNotice(`${video.fileName} is ready: choose where to save it in the file dialog.`);
   };
 
   return (
@@ -115,23 +107,18 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
             <OutputFields form={form} update={update} />
           </div>
           <div className="export-animation__preview" aria-label="Preview" data-testid="export-animation-preview">
-            {preview === null ? (
+            {sheetSrc === null ? (
               <p className="export-animation__hint">
                 Preview draws a contact sheet of the film at low resolution, so you can check the camera and the motion before saving.
               </p>
             ) : (
-              <>
-                {preview.sheetSrc !== null && (
-                  <img src={preview.sheetSrc} alt="Contact sheet of the animation" data-testid="export-animation-sheet" />
-                )}
-                <p className="export-animation__hint">{preview.summary}</p>
-                {preview.warnings.map((warning) => (
-                  <p key={warning.code} className="export-animation__warning" data-testid="export-animation-warning">
-                    {warning.code}: {warning.message}
-                  </p>
-                ))}
-              </>
+              <img src={sheetSrc} alt="Contact sheet of the animation" data-testid="export-animation-sheet" />
             )}
+            {warnings.map((warning) => (
+              <p key={`${warning.code}:${warning.message}`} className="export-animation__warning" data-testid="export-animation-warning">
+                {warning.code}: {warning.message}
+              </p>
+            ))}
           </div>
         </div>
         {error !== '' && (

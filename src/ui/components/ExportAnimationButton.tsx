@@ -8,7 +8,7 @@ export function ExportAnimationButton({ testId = 'export-animation-open' }: { te
   return (
     <button
       type="button"
-      className="btn btn--sm"
+      className="btn btn--sm btn--ghost"
       onClick={() => setOpen(true)}
       title="Render the motion to an MP4, GIF or APNG file"
       data-testid={testId}
