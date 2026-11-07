@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { flattenDxf, parseDxf, codeNumber } from '@lib/dxfRead';
+import { flattenDxf, parseDxf } from '@lib/dxfRead';
+import { codeNumber } from '@lib/dxfRecord';
 import { aciToHex, insUnitsMillimetres } from '@lib/dxfUnits';
 import { expectPure } from '../helpers/expectNoOp';
 
@@ -188,7 +189,7 @@ describe('dxf reader', () => {
     expect(arc?.kind === 'arc' && arc.start).toBeCloseTo(Math.PI / 2, 9);
     expect(arc?.kind === 'arc' && arc.end).toBeCloseTo(Math.PI, 9);
     const text = primitives.find((p) => p.kind === 'text' && p.layer === 'ANNO');
-    expect(text?.kind === 'text' && text.content).toBe('Site plan');
+    expect(text?.kind === 'text' && text.content).toBe('Site' + String.fromCharCode(10) + 'plan');
     // Uniform insert: block line (1,0)->(2,0) relative to base (1,0), scaled 2, rotated 90°.
     const blockLine = primitives.find((p) => p.kind === 'line' && p.layer === 'MARKS');
     expect(blockLine?.kind === 'line' && blockLine.b[0]).toBeCloseTo(20, 9);
@@ -196,7 +197,7 @@ describe('dxf reader', () => {
     expect(primitives.some((p) => p.kind === 'circle' && p.layer === 'MARKS')).toBe(true);
     // Non-uniform insert turns the circle into a closed polyline.
     expect(primitives.some((p) => p.kind === 'polyline' && p.layer === 'MARKS' && p.closed)).toBe(true);
-    expect(skipped.get('HATCH')).toBe(1);
+    expect(skipped.get('HATCH (unreadable boundary)')).toBe(1);
     expect(skipped.get('INSERT')).toBe(1);
   });
   it('maps colours and units', () => {
