@@ -14,9 +14,15 @@ const measurements = path.join(cache, 'unit-measurements.jsonl');
 mkdirSync(path.join(cache, 'reports'), { recursive: true });
 rmSync(measurements, { force: true });
 
+// shell: true joins the arguments with spaces: quote the ones that contain one (a checkout path such as 'Dev Projects')
+const shellQuote = (arg) => (/\s/.test(arg) ? '"' + arg + '"' : arg);
 const run = (command, args, env = {}) =>
-  spawnSync(command, args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } }).status ??
-  1;
+  spawnSync(command, process.platform === 'win32' ? args.map(shellQuote) : args, {
+    cwd: root,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+    env: { ...process.env, ...env },
+  }).status ?? 1;
 
 const env = { LLULL_PHYSICS_MEASUREMENTS: measurements };
 const tests = run('npx', ['vitest', 'run', 'tests/unit/physics', 'tests/unit/cae'], env);
