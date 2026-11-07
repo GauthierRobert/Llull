@@ -22,6 +22,7 @@ import { AnalysisModes } from './AnalysisModes';
 import { AnalysisProbes } from './AnalysisProbes';
 import { AnalysisResults } from './AnalysisResults';
 import { AnalysisSetup } from './AnalysisSetup';
+import { VerificationPanel } from './VerificationPanel';
 import { TopologyPanel } from './TopologyPanel';
 import { useHostQuery } from './useHostQuery';
 
@@ -136,6 +137,9 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
             />
           )}
           <AnalysisResults key={`results-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
+          {(detail.described.state === 'solved' || (detail.described.analysisCase.studyOrder ?? []).length > 0) && (
+            <VerificationPanel key={`verification-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
+          )}
           {detail.described.analysisCase.type === 'static' && (
             <TopologyPanel key={`topology-${detail.described.analysisCase.id}`} analysisId={detail.described.analysisCase.id} />
           )}
