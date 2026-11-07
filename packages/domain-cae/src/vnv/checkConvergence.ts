@@ -49,8 +49,9 @@ export const checkConvergence = defineCommand({
     'the asymptotic ratio (≈ 1 in the asymptotic range) and, with gciTarget, the spacing needed to reach it. Classifies first: ' +
     'oscillatory or divergent samples return a code (VNV_OSCILLATORY / VNV_DIVERGENT) and NO extrapolated value. Safety factor 1.25 ' +
     '(≥ 3 levels) or 3 (two levels, needs assumedOrder) as named defaults. Warnings: VNV_ORDER_MISMATCH (|p − formalOrder| > 0.5), ' +
-    'VNV_NOT_ASYMPTOTIC, VNV_RATIO_TOO_SMALL, VNV_TWO_LEVEL_ONLY. Read-only; next: refine further, or report the GCI as an estimated ' +
-    'discretisation error.',
+    'VNV_NOT_ASYMPTOTIC, VNV_RATIO_TOO_SMALL, VNV_TWO_LEVEL_ONLY. With method least_squares and 4 or more samples it instead fits f = f0 + a h^p to all ' +
+    'of them (Eca & Hoekstra model): p with its standard error, f0, the fit residual and an uncertainty (data.lsq), warning VNV_LSQ_POOR_FIT. Read-only; ' +
+    'next: refine further, or report the GCI as an estimated discretisation error.',
   params: z.object({
     quantity: z.string().describe('What was measured, e.g. "tip u_y" or "max von Mises at the lug".'),
     unit: z.string().describe("Unit of every sample value, e.g. 'mm', 'MPa', '1' (dimensionless)."),

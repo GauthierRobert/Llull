@@ -345,7 +345,7 @@
 
 | Command | Description | Flags |
 | ------- | ----------- | ----- |
-| `accept_verification_exception` | Record a qualified reviewer's acceptance of ONE non-converged finding of a convergence study (VNV_NOT_ASYMPTOTIC, VNV_OSCILLATORY, VNV_DIVERGENT or VNV_ORDER_M… |  |
+| `accept_verification_exception` | Record a qualified reviewer's acceptance of ONE non-converged finding of a convergence study (VNV_NOT_ASYMPTOTIC, VNV_OSCILLATORY, VNV_DIVERGENT, VNV_ORDER_MIS… |  |
 | `add_analysis_step` | Append a step to a nonlinear_static analysis (needs set_nonlinear_controls first). |  |
 | `add_cavity_radiation` | Group faces into a radiation cavity of a heat_* analysis (CalculiX *RADIATE, CAVITY with view factors computed by the solver); returns the cavity id in affecte… |  |
 | `add_contact` | Add a penalty contact to an explicit_dynamics case (llull_explicit, CPU path): surface_to_surface checks the exterior faces of parts a and b both ways; nodes_t… |  |
