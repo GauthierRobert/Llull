@@ -176,6 +176,20 @@ describe('reference series and the datasheet thermal block (DRV-M3) survive a sa
     bad('thermal alpha', (d) => void (sheet(d)['thermal'] = { ...(sheet(d)['thermal'] as object), alphaPerK: -1 }), /alphaPerK >= 0/);
   });
 
+  it('names the document budget when the series together exceed 500000 points', () => {
+    const problems = problemsAfter((d) => {
+      const stored = table(d, 'referenceSeries');
+      for (let k = 0; k < 6; k++)
+        stored['b' + k] = {
+          ...(stored['rs'] ?? {}),
+          id: 'b' + k,
+          times: Array.from({ length: 100_000 }, (_, i) => i),
+          values: Array.from({ length: 100_000 }, () => 0),
+        };
+    });
+    expect(problems.join(' | ')).toMatch(/dynamics\.referenceSeries: 600003 points in all exceed the document budget of 500000/);
+  });
+
   it('a document with a refused series is rejected as a whole by load_document, with the path', () => {
     const saved = JSON.parse(serializeDocument(DYNAMICS_SEED.build())) as {
       document: { dynamics: { referenceSeries: Record<string, Record<string, unknown>> } };

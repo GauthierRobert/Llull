@@ -92,13 +92,20 @@ describe('check_motion_truth on the servo sizing plan (VC-DRV-34, UC-2)', () => 
     expect(result.document).toBe(doc);
     expect(result.affected).toEqual([]);
     expect(doc).toEqual(before);
-    expect(result.summary).toMatch(/^check_motion_truth: verdict plausible — 0 fail, 1 warn, 0 not_run/);
+    expect(result.summary).toMatch(
+      /^check_motion_truth: verdict plausible for outputs \[j_load\.finalVelocity\] only — 0 fail, 1 warn, 0 not_run/,
+    );
     expect(result.summary).toMatch(/hash [0-9a-f]{16}/);
     expect(result.summary).toMatch(/Computed by llull, not approved/);
     const data = truthOf(result);
     expect(data.status).toBe('warn');
     expect(itemsOf(data, 'DRV_TIMESTEP_STUDY').map((item) => item.ids[0])).toEqual(['j_load.finalVelocity']);
     expect(data.study?.rows[0]?.orderAssumed).toBe(true);
+    const scope = itemsOf(data, 'DRV_STUDY_SCOPE');
+    expect(scope).toHaveLength(1);
+    expect(scope[0]).toMatchObject({ status: 'info', ids: ['j_load.finalVelocity'] });
+    expect(scope[0]?.note).toMatch(/holds for those outputs, not for the rest of the model/);
+    expect((result.data as { verdictScope: string }).verdictScope).toBe('outputs [j_load.finalVelocity] only');
     expect(itemsOf(data, 'DRV_TIMESTEP_STUDY')[0]?.note).toMatch(/order assumed 1/);
   });
 });

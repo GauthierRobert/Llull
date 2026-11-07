@@ -5,7 +5,8 @@ import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { z } from '@core/commands/schema';
 import { changed, failer, report } from '@core/commands/noop';
 import { dynamicsIdTaken } from '@core/model/dynamics';
-import { SERIES_QUANTITIES, type ReferenceSeries } from '@core/model/drives';
+import { MAX_TOTAL_POINTS, SERIES_QUANTITIES, type ReferenceSeries } from '@core/model/drives';
+import { elementAt } from '@lib/elementAt';
 import { idOrNext, idTaken } from '@lib/explicitId';
 import { type ReviewItem, reviewItem, reviewResult, reviewSummary } from '@core/model/reviewEnvelope';
 import { compareSeries, type SeriesComparison } from '../../sim/seriesComparison';
@@ -72,6 +73,11 @@ export function addSeriesReference(
   const problem = seriesProblem(doc, params.series);
   if (problem !== null) return fail(problem);
   const dynamics = dynamicsOf(doc);
+  const held = Object.values(dynamics.referenceSeries ?? {}).reduce((sum, entry) => sum + entry.times.length, 0);
+  if (held + params.series.times.length > MAX_TOTAL_POINTS)
+    return fail(
+      `the document would hold ${held + params.series.times.length} reference points (budget ${MAX_TOTAL_POINTS}): delete a series first`,
+    );
   const id = params.id ?? idOrNext(undefined, 'ref');
   if (dynamicsIdTaken(dynamics, id) || idTaken(doc.prototype?.references ?? {}, id)) return fail(`id '${id}' is already used`);
   const record: ReferenceSeries = {
@@ -148,7 +154,7 @@ export function compareSeriesRun(
   references: readonly ReferenceSeries[],
   ctx: ExecutionContext | undefined,
 ): { readonly items: ReviewItem[]; readonly run: RunData } | { readonly error: string } {
-  const span = Math.max(...references.map((reference) => reference.times[reference.times.length - 1] ?? 0));
+  const span = references.reduce((largest, reference) => Math.max(largest, elementAt(reference.times, reference.times.length - 1)), 0);
   if (!(span > 0)) return { error: 'the references end at t = 0: nothing to simulate' };
   const timestep = drivenTimestep(Object.values(dynamicsOf(doc).drives ?? {}));
   const run = runSizing(doc, { duration: Math.min(600, span), ...(timestep === undefined ? {} : { timestep }) }, ctx);

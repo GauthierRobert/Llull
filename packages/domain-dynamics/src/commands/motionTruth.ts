@@ -3,6 +3,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
+import { elementAt } from '@lib/elementAt';
 import { failer, report } from '@core/commands/noop';
 import { type ReviewItem, reviewItem, reviewResult } from '@core/model/reviewEnvelope';
 import { buildSimulationModel, jointInertiaOf } from '../sim/simulationModel';
@@ -101,7 +102,7 @@ export const checkMotionTruth = defineCommand({
     'at the start configuration: its peak force is approximate). (d) DRV_EFFORT_UNBOUNDED (a governor bound without source, or over 10 x the effort used). ' +
     '(e) DRV_PARAM_UNSOURCED: inputs of grade C or without a source, weakest first (motor sheets, transmission losses, joint friction). (f) DRV_REFERENCE_MATCH / ' +
     'DRV_REFERENCE_MISMATCH for every stored time series (add_reference_data with `series`). (g) engines ["reference"] asks for the independent reference engine: ' +
-    'not installed yet (NATIVE_TOOL_MISSING, not_run). Cost: quick = 3 runs of the duration, full = 7 (the step halves, the work doubles). Read-only. Next: fix the ' +
+    'not installed yet (NATIVE_TOOL_MISSING, not_run). Cost: quick = 2 runs (dt, dt/2: about 3 times the work of one run), full = 3 runs (dt, dt/2, dt/4: about 7 times; the step halves, the work doubles). With `outputs` the timestep study covers only those outputs and the verdict is stated for them (item DRV_STUDY_SCOPE, info). Read-only. Next: fix the ' +
     'failing / warned items (each carries its remediation), regrade inputs with measured values, then check_prototype. Computed by llull, not approved: a qualified engineer must review.',
   params: z.object({
     duration: z
@@ -186,7 +187,7 @@ export const checkMotionTruth = defineCommand({
     items.push(provenanceItem(provenance));
     const references = Object.values(dynamics.referenceSeries ?? {});
     if (references.length > 0) {
-      const span = Math.max(...references.map((reference) => reference.times[reference.times.length - 1] ?? 0));
+      const span = references.reduce((largest, reference) => Math.max(largest, elementAt(reference.times, reference.times.length - 1)), 0);
       if (typeof base !== 'string' && span <= duration + 1e-9) items.push(...referenceItems(references, base));
       else {
         const compared = compareSeriesRun(doc, references, ctx);
@@ -205,7 +206,21 @@ export const checkMotionTruth = defineCommand({
           'Wait for the reference engine (physics-reference), or rely on the timestep study and the stored measurements.',
         ),
       );
+    if (params.outputs !== undefined)
+      items.push(
+        reviewItem(
+          'dynamics',
+          'DRV_STUDY_SCOPE',
+          'info',
+          params.outputs,
+          'Run without `outputs` for a verdict that covers every output of the model.',
+          {
+            note: `the timestep study covered only [${params.outputs.join(', ')}]: the verdict holds for those outputs, not for the rest of the model`,
+          },
+        ),
+      );
     const verdict = truthVerdict(items);
+    const scope = params.outputs === undefined ? '' : ` for outputs [${params.outputs.join(', ')}] only`;
     const result = reviewResult(
       'dynamics',
       items,
@@ -221,13 +236,14 @@ export const checkMotionTruth = defineCommand({
     const count = (status: ReviewItem['status']): number => result.items.filter((item) => item.status === status).length;
     const weakest = provenance[0];
     const summary =
-      `${NAME}: verdict ${verdict} — ${count('fail')} fail, ${count('warn')} warn, ${count('not_run')} not_run, ${count('pass')} pass, ${count('info')} info (hash ${result.inputsHash}); ` +
+      `${NAME}: verdict ${verdict}${scope} — ${count('fail')} fail, ${count('warn')} warn, ${count('not_run')} not_run, ${count('pass')} pass, ${count('info')} info (hash ${result.inputsHash}); ` +
       `${typeof base === 'string' ? 'no run' : `dt ${base.timestep} s over ${duration} s, level ${level}`}` +
       `${weakest === undefined ? '' : `; lowest-grade input ${weakest.id} (${weakest.grade})`}. ` +
       `${verdict === 'trusted' ? 'Next: check_prototype.' : 'Next: fix the failing / warned items (see remediation), regrade the weak inputs, then re-run.'} Computed by llull, not approved — needs a qualified engineer.`;
     return report(doc, summary, {
       ...result,
       verdict,
+      verdictScope: params.outputs === undefined ? 'all outputs' : `outputs [${params.outputs.join(', ')}] only`,
       timestepS: typeof base === 'string' ? null : base.timestep,
       durationS: duration,
       study,

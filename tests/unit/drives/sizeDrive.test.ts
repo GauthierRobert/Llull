@@ -213,6 +213,36 @@ describe('size_drive thermal and limit findings', () => {
     expect(codes(data)).toContain('DRV_RMS_OVER');
   });
 
+  it('a short burst that overheats at its peak although the RMS is low: DRV_THERMAL_PEAK_OVER fails (the steady criterion assumes the cycle repeats)', () => {
+    // 40 A (2.41 N*m) for 2 s, then 318 s idle: RMS 40 * sqrt(2 / 320) = 3.16 A, the steady winding at that RMS is below the limit, the winding itself is not
+    const doc = inertiaBench(0.05, { sheet }, [
+      {
+        command: 'add_motion_profile',
+        params: {
+          id: 'burst',
+          quantity: 'torque',
+          unit: 'N*m',
+          start: 0.0603 * 40,
+          segments: [
+            { kind: 'dwell', duration: 2 },
+            { kind: 'move', law: 'linear', to: 0, duration: 0.01 },
+            { kind: 'dwell', duration: 317.99 },
+          ],
+        },
+      },
+      { command: 'set_motor_drive', params: { motor: 'm', mode: 'torque', profile: 'burst' } },
+    ]);
+    const data = dataOf(execute(doc, 'size_drive', { motor: 'm' }));
+    expect(data.thermal?.steadyAtRmsC ?? 1000).toBeLessThan(155);
+    expect(data.thermal?.peakWindingC ?? 0).toBeGreaterThan(155);
+    expect(codes(data)).toContain('DRV_THERMAL_PEAK_OVER');
+    expect(codes(data)).not.toContain('DRV_THERMAL_OVER');
+    const finding = data.findings.find((entry) => entry.code === 'DRV_THERMAL_PEAK_OVER');
+    expect(finding?.status).toBe('fail');
+    expect(finding?.limit).toBe(155);
+    expect(data.verdict).toBe('over');
+  });
+
   it('a margin above the headroom raises DRV_MARGIN_LOW and the verdict reads marginal', () => {
     const data = dataOf(execute(torqueBench(2.8), 'size_drive', { motor: 'm', margin: 0.2 }));
     expect(data.limiting?.factor).toBe('rms_current');

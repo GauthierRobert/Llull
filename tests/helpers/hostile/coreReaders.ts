@@ -222,6 +222,17 @@ export const CORE_READERS: readonly HostileReader[] = [
         input: () => mechanismDynamics(3, (record) => void ('times' in record && (record['quantity'] = 'ledger_energy'))),
       },
       {
+        name: 'six series of 100000 points exceed the document budget',
+        input: () =>
+          mechanismDynamics(6, (record) => {
+            if ('times' in record)
+              [record['times'], record['values']] = [
+                Array.from({ length: 100_000 }, (_, k) => k),
+                Array.from({ length: 100_000 }, () => 0),
+              ];
+          }),
+      },
+      {
         name: 'series with 200000 points',
         input: () =>
           mechanismDynamics(1, (record) => {

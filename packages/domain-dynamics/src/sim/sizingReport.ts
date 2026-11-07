@@ -122,6 +122,8 @@ const FIX = {
   DRV_SPEED_OVER: 'Raise the gear reduction or choose a motor rated for the shaft speed.',
   DRV_THERMAL_OVER:
     'The winding would exceed its limit at this duty: reduce the RMS torque, add cooling (a lower housing resistance) or choose a larger motor.',
+  DRV_THERMAL_PEAK_OVER:
+    'A short burst heats the winding above its limit although the RMS current is fine: lower the peak current, spread the move over more time or choose a larger motor.',
   DRV_THERMAL_RUNAWAY:
     'The RMS current is above the runaway current: the copper loss heats the winding faster than the housing removes it. Reduce the RMS torque.',
   DRV_VOLTAGE_LIMITED:
@@ -192,6 +194,13 @@ export function sizingOf(motor: DcMotor, run: DriveRunData, ambientC: number, re
     else if (thermalReport.steadyAtRmsC !== null && thermalReport.steadyAtRmsC > thermal.maxWindingC)
       findings.push(
         finding('DRV_THERMAL_OVER', 'fail', [id], FIX.DRV_THERMAL_OVER, { value: thermalReport.steadyAtRmsC, limit: thermal.maxWindingC }),
+      );
+    if (thermalReport.peakWindingC > thermal.maxWindingC)
+      findings.push(
+        finding('DRV_THERMAL_PEAK_OVER', 'fail', [id], FIX.DRV_THERMAL_PEAK_OVER, {
+          value: thermalReport.peakWindingC,
+          limit: thermal.maxWindingC,
+        }),
       );
     findings.push(
       finding(

@@ -39,6 +39,8 @@ export type FitResult =
       readonly residualRms: number;
       readonly samplesUsed: number;
       readonly condition: number;
+      /** Why a sigma is null although there are spare equations (the normal matrix could not be inverted), else null. */
+      readonly sigmaNote: string | null;
       readonly model: 'mechanical' | 'electrical';
     }
   | {
@@ -80,7 +82,7 @@ function solve(
   const [n, p] = [rows.length, names.length];
   if (n < p) return fail('DRV_FIT_DATA', `${n} usable sample(s) cannot determine ${p} unknowns`);
   const solution = solveLeastSquares(rows, y);
-  const columns = names.map((_, j) => rows.map((row) => row[j] ?? 0));
+  const columns = names.map((_, j) => rows.map((row) => elementAt(row, j)));
   if (!Number.isFinite(solution.conditionEstimate) || solution.conditionEstimate > MAX_CONDITION)
     return fail(
       'DRV_FIT_UNIDENTIFIABLE',
@@ -90,13 +92,22 @@ function solve(
   const residual = rows.map((row, k) => elementAt(y, k) - row.reduce((sum, v, j) => sum + v * elementAt(solution.coefficients, j), 0));
   const rss = residual.reduce((sum, r) => sum + r * r, 0);
   let sigmas: (number | null)[] = names.map(() => null);
+  let sigmaNote: string | null = null;
   if (n > p) {
+    // equilibrate the columns first (divide by their largest magnitude, as the solver does): X^T X of badly scaled columns squares the spread
+    const scale = columns.map((column) => column.reduce((largest, v) => Math.max(largest, Math.abs(v)), 0));
+    const scaled = columns.map((column, j) => column.map((v) => (scale[j] === 0 ? v : v / elementAt(scale, j))));
     const normal = names.map((_, a) =>
-      names.map((__, b) => elementAt(columns, a).reduce((sum, v, k) => sum + v * elementAt(elementAt(columns, b), k), 0)),
+      names.map((__, b) => elementAt(scaled, a).reduce((sum, v, k) => sum + v * elementAt(elementAt(scaled, b), k), 0)),
     );
     const inverse = invertDense(normal);
     const variance = rss / (n - p);
-    if (inverse !== null) sigmas = names.map((_, j) => Math.sqrt(Math.max(0, variance * (inverse[j]?.[j] ?? 0))));
+    if (inverse === null) sigmaNote = 'the normal matrix is singular to working precision: no sigma could be computed';
+    else
+      sigmas = names.map((_, j) => {
+        const unit = scale[j] === 0 ? 1 : elementAt(scale, j);
+        return Math.sqrt(Math.max(0, (variance * elementAt(elementAt(inverse, j), j)) / (unit * unit)));
+      });
   }
   return {
     ok: true,
@@ -104,8 +115,16 @@ function solve(
     residualRms: Math.sqrt(rss / n),
     samplesUsed: n,
     condition: solution.conditionEstimate,
+    sigmaNote,
     model,
   };
+}
+
+/** The regressor of a named parameter; a name the model does not have is an invariant breach (the command filters names by model). */
+function termOf(regressor: Readonly<Record<string, number>>, name: string): number {
+  const value = regressor[name];
+  if (value === undefined) throw new RangeError(`no regressor '${name}'`);
+  return value;
 }
 
 const finiteAll = (values: readonly number[]): boolean => values.every(Number.isFinite);
@@ -132,9 +151,9 @@ export function fitMechanical(channels: Channels, unknowns: readonly string[], k
     if (![before, here, after].every((v) => Math.abs(v) > floor) || Math.sign(before) !== Math.sign(after)) continue;
     const alpha = (after - before) / (elementAt(t, k + 1) - elementAt(t, k - 1));
     const regressor: Readonly<Record<string, number>> = { inertia: alpha, coulombNm: Math.sign(here), viscousNmsPerRad: here };
-    const torque = channels.torque === undefined ? 0 : (channels.torque[k] ?? 0);
-    rows.push(unknowns.map((name) => regressor[name] ?? 0));
-    y.push(torque - Object.entries(known).reduce((sum, [name, value]) => sum + value * (regressor[name] ?? 0), 0));
+    const torque = channels.torque === undefined ? 0 : elementAt(channels.torque, k);
+    rows.push(unknowns.map((name) => termOf(regressor, name)));
+    y.push(torque - Object.entries(known).reduce((sum, [name, value]) => sum + value * termOf(regressor, name), 0));
   }
   return solve('mechanical', unknowns, rows, y);
 }
@@ -159,11 +178,13 @@ export function fitElectrical(channels: Channels, unknowns: readonly string[], k
     const slope =
       inductance === undefined ? 0 : (elementAt(current, k + 1) - elementAt(current, k - 1)) / (elementAt(t, k + 1) - elementAt(t, k - 1));
     const regressor: Readonly<Record<string, number>> = { resistance: elementAt(current, k), torqueConstant: elementAt(omega, k) };
-    rows.push(unknowns.map((name) => regressor[name] ?? 0));
+    rows.push(unknowns.map((name) => termOf(regressor, name)));
     y.push(
-      (voltage[k] ?? 0) -
+      elementAt(voltage, k) -
         (inductance === undefined ? 0 : inductance * slope) -
-        Object.entries(known).reduce((sum, [name, value]) => sum + value * (regressor[name] ?? 0), 0),
+        Object.entries(known)
+          .filter(([name]) => name !== 'inductance')
+          .reduce((sum, [name, value]) => sum + value * termOf(regressor, name), 0),
     );
   }
   return solve('electrical', unknowns, rows, y);

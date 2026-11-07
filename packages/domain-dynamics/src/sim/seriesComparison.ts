@@ -86,8 +86,8 @@ function interpolateAll(times: readonly number[], values: readonly number[], at:
 export function compareSeries(reference: ReferenceSeries, run: RunData): SeriesComparison | SeriesRefusal {
   const simulated = simulatedOf(reference, run);
   if ('refusal' in simulated) return simulated;
-  const last = reference.times[reference.times.length - 1] ?? 0;
-  const recordedEnd = simulated.times[simulated.times.length - 1] ?? 0;
+  const last = elementAt(reference.times, reference.times.length - 1);
+  const recordedEnd = elementAt(simulated.times, simulated.times.length - 1);
   if (reference.quantity !== 'ledger_energy' && simulated.times.length < 2)
     return { refusal: 'the run recorded fewer than two samples: simulate longer or sample faster' };
   if (reference.quantity !== 'ledger_energy' && last > recordedEnd + 1e-9)

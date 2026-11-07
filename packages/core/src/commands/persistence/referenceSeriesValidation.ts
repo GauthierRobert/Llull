@@ -2,7 +2,7 @@
 
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
-import { SERIES_QUANTITIES } from '../../model/drives';
+import { MAX_TOTAL_POINTS, SERIES_QUANTITIES } from '../../model/drives';
 
 /** Most points of one series (a 100 kHz recording of one second). */
 const MAX_POINTS = 100_000;
@@ -44,4 +44,17 @@ export function referenceSeriesReferenceProblems(dynamics: Record<string, unknow
       return [`dynamics.referenceSeries['${id}']: no datasheet (dc) motor '${target}'`];
     return [];
   });
+}
+
+/** The total point budget across `dynamics.referenceSeries`, as a problem with its path. */
+export function referenceSeriesBudgetProblems(dynamics: Record<string, unknown>): string[] {
+  const series = dynamics['referenceSeries'];
+  if (!isRecord(series)) return [];
+  const total = Object.values(series).reduce<number>(
+    (sum, record) => sum + (isRecord(record) && Array.isArray(record['times']) ? record['times'].length : 0),
+    0,
+  );
+  return total > MAX_TOTAL_POINTS
+    ? [`dynamics.referenceSeries: ${total} points in all exceed the document budget of ${MAX_TOTAL_POINTS}`]
+    : [];
 }

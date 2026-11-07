@@ -89,7 +89,7 @@ const REMEDIATION =
   'Add the missing experiment: a spin-down plus a spin-up with a measured torque (separates J from the friction), a bench-measured J or `known.inertia`, or a step response with varied speed (separates R from kt).';
 
 /**
- * @affects nothing — read-only; returns { model, values { name: { value, sigma, unit } }, residualRms, samplesUsed, condition, neglected } in data
+ * @affects nothing — read-only; returns { model, values { name: { value, sigma, unit } }, residualRms, samplesUsed, condition, sigmaNote, neglected } in data
  * @invariant input deep-equal, no FeatureStep; every model is linear in its unknowns (one least squares), sigma is the 1-sigma of the residual covariance (null with no
  *            spare equation); a regressor above condition 1e8 is refused, never fitted; a spin-down with the inertia unknown and no torque is refused (homogeneous)
  * @failure unknown series / mixed unknowns / a name in both `unknowns` and `known` -> no-op; the data cannot separate the unknowns -> DRV_FIT_UNIDENTIFIABLE
@@ -168,11 +168,12 @@ export const fitDriveParameters = defineCommand({
     return report(
       doc,
       `${NAME}: ${result.model} fit of ${result.samplesUsed} sample(s): ${text}; residual RMS ${result.residualRms.toPrecision(3)}, condition ${result.condition.toPrecision(3)} (limit ${MAX_CONDITION.toExponential(0)}).` +
-        `${neglected.length > 0 ? ' Neglected: inductance.' : ''} Next: check_motor_data, then store the value with a source.`,
+        `${neglected.length > 0 ? ' Neglected: inductance.' : ''}${result.sigmaNote === null ? '' : ` Sigma: ${result.sigmaNote}.`} Next: check_motor_data, then store the value with a source.`,
       {
         model: result.model,
         values,
         residualRms: result.residualRms,
+        sigmaNote: result.sigmaNote,
         samplesUsed: result.samplesUsed,
         condition: result.condition,
         neglected,

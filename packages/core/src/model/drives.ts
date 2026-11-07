@@ -133,6 +133,8 @@ export const SERIES_QUANTITIES = [
   'motor_speed',
   'ledger_energy',
 ] as const;
+/** Most points over all the reference series of one document (5 series of the per-series maximum): a document is read whole, so the sum is bounded too. */
+export const MAX_TOTAL_POINTS = 500_000;
 export type SeriesQuantity = (typeof SERIES_QUANTITIES)[number];
 
 /**

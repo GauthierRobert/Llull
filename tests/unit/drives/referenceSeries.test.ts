@@ -106,6 +106,56 @@ describe('add_reference_data with a time series', () => {
   });
 });
 
+describe('ids and budget', () => {
+  it('a series and an engine reference never share an id (either order), so compare / delete reach the right item', () => {
+    const doc = bench();
+    const withSeries = execute(doc, 'add_reference_data', {
+      id: 'x',
+      series: { quantity: 'joint_velocity', target: 'j', times: [0, 1], values: [0, 1] },
+      source: SOURCE,
+    }).document;
+    const engine = { id: 'x', quantity: 'brake_power_kW', points: [{ rpm: 5000, value: 50 }], source: 'datasheet' };
+    const refused = execute(withSeries, 'add_reference_data', engine);
+    expect(refused.summary).toMatch(/reference 'x' already exists/);
+    expect(refused.document).toBe(withSeries);
+    const withEngine = execute(doc, 'add_reference_data', engine).document;
+    const other = execute(withEngine, 'add_reference_data', {
+      id: 'x',
+      series: { quantity: 'joint_velocity', target: 'j', times: [0, 1], values: [0, 1] },
+      source: SOURCE,
+    });
+    expect(other.summary).toMatch(/id 'x' is already used/);
+    // a series id that is a joint id is refused too (shared dynamics id space)
+    expect(
+      execute(doc, 'add_reference_data', {
+        id: 'j',
+        series: { quantity: 'joint_velocity', target: 'j', times: [0, 1], values: [0, 1] },
+        source: SOURCE,
+      }).summary,
+    ).toMatch(/already used/);
+  });
+
+  it('the document holds at most 500000 reference points: one more series past the budget is refused with the count', () => {
+    let doc = bench();
+    const times = Array.from({ length: 100_000 }, (_, k) => k);
+    const values = times.map(() => 0);
+    for (let k = 0; k < 5; k++)
+      doc = execute(doc, 'add_reference_data', {
+        id: 's' + k,
+        series: { quantity: 'joint_velocity', target: 'j', times, values },
+        source: SOURCE,
+      }).document;
+    expect(Object.keys(doc.dynamics?.referenceSeries ?? {})).toHaveLength(5);
+    const over = execute(doc, 'add_reference_data', {
+      id: 's5',
+      series: { quantity: 'joint_velocity', target: 'j', times: [0, 1], values: [0, 1] },
+      source: SOURCE,
+    });
+    expect(over.summary).toMatch(/500002 reference points \(budget 500000\)/);
+    expect(over.document).toBe(doc);
+  });
+});
+
 describe('compare_to_reference on a time series', () => {
   const store = (
     doc: CadDocument,

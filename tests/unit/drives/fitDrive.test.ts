@@ -171,6 +171,25 @@ describe('electrical fit from a step response', () => {
   });
 });
 
+describe('sigma of badly scaled columns', () => {
+  it('measuring the current in mA instead of A (columns 1e6 apart) gives sigma(R) exactly 1000 times smaller, and is never null with spare equations', () => {
+    const next = noise(11);
+    const t = Array.from({ length: 300 }, (_, k) => k * 1e-3);
+    const amps = t.map((time) => 2e-3 * (1 + Math.sin(2 * Math.PI * 7 * time)));
+    const omega = t.map((time) => 3000 + 800 * Math.cos(2 * Math.PI * 3 * time + 1));
+    const voltage = t.map((_, k) => 1.13 * amps[k]! + 0.0603 * omega[k]! + 1e-3 * next());
+    const inA = dataOf(fit({ series: { t, omega, current: amps, voltage }, unknowns: ['resistance', 'torqueConstant'] }));
+    const inMilliA = dataOf(
+      fit({ series: { t, omega, current: amps.map((a) => a * 1000), voltage }, unknowns: ['resistance', 'torqueConstant'] }),
+    );
+    const [sigmaA, sigmaMilli] = [inA.values['resistance']!.sigma, inMilliA.values['resistance']!.sigma];
+    expect(sigmaA).not.toBeNull();
+    expect(Math.abs((sigmaA ?? 0) / ((sigmaMilli ?? 1) * 1000) - 1)).toBeLessThan(1e-6);
+    expect(inA.values['torqueConstant']!.sigma).toBeCloseTo(inMilliA.values['torqueConstant']!.sigma ?? Number.NaN, 12);
+    expect((inA as unknown as { sigmaNote: unknown }).sigmaNote).toBeNull();
+  });
+});
+
 describe('fit_drive_parameters refusals', () => {
   const series = { t: [0, 1, 2, 3], omega: [4, 3, 2, 1] };
 

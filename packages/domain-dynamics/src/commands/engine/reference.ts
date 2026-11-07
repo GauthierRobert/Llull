@@ -6,6 +6,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { idOrNext, idTaken } from '@lib/explicitId';
 import { changed, failer } from '@core/commands/noop';
+import { dynamicsIdTaken } from '@core/model/dynamics';
+import { dynamicsOf } from '../bodies';
 import { addSeriesReference, seriesSchema } from './referenceSeries';
 
 const pointSchema = z.object({
@@ -111,7 +113,8 @@ export const addReferenceData = defineCommand({
     const referenceId = params.id ?? params.preset ?? idOrNext(undefined, 'ref');
     const prototype = doc.prototype ?? createPrototypeModel();
     const references = prototype.references ?? {};
-    if (idTaken(references, referenceId)) return fail(`reference '${referenceId}' already exists`);
+    if (idTaken(references, referenceId) || dynamicsIdTaken(dynamicsOf(doc), referenceId))
+      return fail(`reference '${referenceId}' already exists (the id is used by an engine reference or a dynamics record)`);
     const condition = {
       throttle: params.throttle ?? preset?.condition.throttle ?? 'full',
       altitudeM: params.altitudeM ?? preset?.condition.altitudeM ?? 0,

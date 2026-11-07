@@ -157,7 +157,7 @@ export const sizeDrive = defineCommand({
     '(trapezoid-weighted, TR-DRV-21), the winding temperature from the 2-node thermal network (steady value at the RMS current, peak and end of the run; ' +
     'runaway above the current where copper loss feeds itself), the margin of each factor (capacity / demand - 1: peak_current vs the peak or stall current, ' +
     'rms_current vs the nominal current, speed vs the maximum speed, thermal vs the winding limit) and the LIMITING factor (smallest margin). Coded findings: ' +
-    'DRV_PEAK_OVER, DRV_RMS_OVER, DRV_SPEED_OVER, DRV_THERMAL_OVER, DRV_THERMAL_RUNAWAY (fail), DRV_VOLTAGE_LIMITED (the current limit or bus voltage clipped ' +
+    'DRV_PEAK_OVER, DRV_RMS_OVER, DRV_SPEED_OVER, DRV_THERMAL_OVER (the steady winding at the RMS current, which assumes the cycle REPEATS indefinitely), DRV_THERMAL_PEAK_OVER (the winding temperature of the simulated window itself, from ambient, exceeds the limit: a single burst), DRV_THERMAL_RUNAWAY (fail), DRV_VOLTAGE_LIMITED (the current limit or bus voltage clipped ' +
     'the command), DRV_MARGIN_LOW (limiting margin under `margin`), DRV_TRACKING_ERROR, DRV_PARAM_UNSOURCED (inputs of grade C or without a source: the ' +
     'result is unverified, the lowest-grade input is named), DRV_THERMAL_MODEL_FORM (info). verdict "ok" | "marginal" | "over". `ratioSweep` lists reductions N ' +
     '(motor turns per output turn) of the gear driven by the motor\'s joint (add_transmission kind "gear"): the model is copied and re-run per N and each row ' +

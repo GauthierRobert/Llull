@@ -12,6 +12,8 @@ import type { StudyRow } from './studyItems';
 
 const PASS_GATE = 1e-3;
 const WARN_GATE = 1e-2;
+/** A velocity servo has jump-started when its joint is within this fraction of the speed step from the target at the first recorded sample. */
+const JUMP_REACHED = 0.2;
 /** A closure error is attributed to a servo jump start when it is within this factor (either way) of the jump's kinetic energy. */
 const JUMP_MATCH = 4;
 
@@ -23,17 +25,23 @@ const threshold: CheckThreshold = {
   defaulted: true,
 };
 
-/** Kinetic energy (J) a velocity servo puts into its joint by jumping it from the initial speed to its target: 1/2 J |v_target^2 - v_0^2|, per motor. */
+/**
+ * Kinetic energy (J) a velocity servo puts into its joint by jumping it from the initial speed to its target: 1/2 J |v_target^2 - v_0^2|, per motor that
+ * really jumped: its joint is already within 20 % of the speed step from the target at the first recorded sample (a servo that saturates and ramps is not one).
+ */
 function jumpEnergies(
   dynamics: DynamicsModel,
   inertiaOf: (joint: string) => number | undefined,
+  run: RunData,
 ): { readonly motor: string; readonly joules: number }[] {
   return Object.values(dynamics.motors).flatMap((motor) => {
     if (motor.kind !== 'speed' && motor.kind !== 'linear_speed') return [];
     const target = motor.kind === 'speed' ? motor.rpm * RAD_PER_S_PER_RPM : motor.speedMps;
     const start = dynamics.joints[motor.joint]?.initialVelocity;
     const inertia = inertiaOf(motor.joint);
-    return start === undefined || inertia === undefined
+    const first = run.series?.jointVelocity[motor.joint]?.[1];
+    const jumped = first !== undefined && start !== undefined && Math.abs(first - target) <= JUMP_REACHED * Math.abs(target - start);
+    return start === undefined || inertia === undefined || !jumped
       ? []
       : [{ motor: motor.id, joules: 0.5 * inertia * Math.abs(target * target - start * start) }];
   });
@@ -86,7 +94,7 @@ export function ledgerItems(run: RunData, dynamics: DynamicsModel, inertiaOf: (j
     },
   );
   if (status === 'pass' || ledger === undefined) return [closure];
-  const jumps = jumpEnergies(dynamics, inertiaOf);
+  const jumps = jumpEnergies(dynamics, inertiaOf, run);
   const jump = jumps.reduce((sum, entry) => sum + entry.joules, 0);
   const error = Math.abs(ledger.closureErrorJ);
   if (!(jump > 0) || error < jump / JUMP_MATCH || error > jump * JUMP_MATCH) return [closure];
@@ -100,7 +108,7 @@ export function ledgerItems(run: RunData, dynamics: DynamicsModel, inertiaOf: (j
       'Start the servo at its target speed (initialVelocity on the joint) or drive it with a velocity profile that ramps: a jump from rest puts an impulse into the work estimate that one step cannot resolve.',
       {
         values: { closureErrorJ: error, jumpKineticJ: jump },
-        note: `the closure error ${error.toPrecision(3)} J matches the kinetic energy ${jump.toPrecision(3)} J that velocity servo(s) ${jumps.map((entry) => `'${entry.motor}'`).join(', ')} give the joint in two steps: the servo work of a jump start is estimated from the force at the start and end of the step and misses the impulse (first-order servo work estimate, spec 13.15 item 5)`,
+        note: `the closure error ${error.toPrecision(3)} J is consistent with a servo jump start: it is of the order of the kinetic energy ${jump.toPrecision(3)} J that velocity servo(s) ${jumps.map((entry) => `'${entry.motor}'`).join(', ')} give the joint in its first steps (the joint was at the target speed by the first sample): the servo work of a jump start is estimated from the force at the start and end of the step and misses the impulse (first-order servo work estimate, spec 13.15 item 5)`,
         unverified: true,
       },
     ),

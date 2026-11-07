@@ -94,7 +94,10 @@ export const compareToReference = defineCommand({
   }),
   run: (doc, params, ctx): CommandResult => {
     const fail = failer(doc, NAME);
-    if (params.reference === 'all_series' || dynamicsOf(doc).referenceSeries?.[params.reference] !== undefined)
+    if (
+      params.reference === 'all_series' ||
+      (doc.prototype?.references?.[params.reference] === undefined && dynamicsOf(doc).referenceSeries?.[params.reference] !== undefined)
+    )
       return compareSeriesReferences(doc, params.reference, ctx);
     const references = doc.prototype?.references ?? {};
     const selected =

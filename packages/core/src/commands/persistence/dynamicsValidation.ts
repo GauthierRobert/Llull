@@ -6,7 +6,7 @@ import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
 import { dcMotorProblem, driveProblem, driveReferenceProblems, profileProblem } from './drivesValidation';
 import { lossesProblem, propellerExtrasProblem } from './engineValidation';
-import { referenceSeriesProblem, referenceSeriesReferenceProblems } from './referenceSeriesValidation';
+import { referenceSeriesBudgetProblems, referenceSeriesProblem, referenceSeriesReferenceProblems } from './referenceSeriesValidation';
 import { jointPhysicsProblem, loadScheduleProblem, transmissionProblem, transmissionReferenceProblems } from './transmissionsValidation';
 
 const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
@@ -203,6 +203,11 @@ export function dynamicsProblems(value: unknown): string[] {
       }
     }
   }
-  errors.push(...driveReferenceProblems(value), ...transmissionReferenceProblems(value), ...referenceSeriesReferenceProblems(value));
+  errors.push(
+    ...driveReferenceProblems(value),
+    ...transmissionReferenceProblems(value),
+    ...referenceSeriesReferenceProblems(value),
+    ...referenceSeriesBudgetProblems(value),
+  );
   return errors;
 }
