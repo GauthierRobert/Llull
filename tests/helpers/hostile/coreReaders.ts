@@ -262,11 +262,14 @@ export const CORE_READERS: readonly HostileReader[] = [
     covers: [
       'core/src/commands/persistence/drivesValidation.ts:profileProblem',
       'core/src/commands/persistence/drivesValidation.ts:driveProblem',
+      'core/src/commands/persistence/machinesValidation.ts:pmsmMotorProblem',
+      'core/src/commands/persistence/machinesValidation.ts:stepperMotorProblem',
+      'core/src/commands/persistence/machinesValidation.ts:inductionMotorProblem',
     ],
     input: 'text',
     build: (records) => driveDynamics(records),
     read: (input) => dynamicsProblems(parsedJson(asText(input))),
-    accepts: (result) => Array.isArray(result) && result.every((problem) => String(problem).includes('no datasheet (dc) motor')),
+    accepts: (result) => Array.isArray(result) && result.every((problem) => String(problem).includes('no datasheet motor')),
     maxRecords: 20000,
     extra: [
       { name: 'segment of an unknown kind', input: () => driveDynamics(3, { kind: 'foo' }) },

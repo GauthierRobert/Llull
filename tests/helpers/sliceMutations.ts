@@ -393,10 +393,95 @@ export function driveMutations(raw: Record<string, unknown>): SliceMutation[] {
     edit('feedforward string', (dynamics) => void (drive(dynamics)['feedforward'] = 'yes')),
     ...mechanismMutations(edit),
     ...referenceMutations(edit),
+    ...machineMutations(edit),
   ];
 }
 
 type Edit = (label: string, change: (dynamics: Record<string, unknown>) => void) => SliceMutation;
+
+/** Targeted hostile edits of the PMSM, stepper and induction records and of their drives (PHY-23 DRV-M4). */
+function machineMutations(edit: Edit): SliceMutation[] {
+  const motor = (dynamics: Record<string, unknown>, id: string): Record<string, unknown> => {
+    const motors = dynamics['motors'];
+    const found = isObject(motors) ? motors[id] : undefined;
+    if (!isObject(found)) throw new Error(`machineMutations: the seed has no motor ${id}`);
+    return found;
+  };
+  const sheet = (dynamics: Record<string, unknown>, id: string): Record<string, unknown> => {
+    const datasheet = motor(dynamics, id)['datasheet'];
+    if (!isObject(datasheet)) throw new Error('machineMutations: the motor has no datasheet');
+    return datasheet;
+  };
+  const drive = (dynamics: Record<string, unknown>, id: string): Record<string, unknown> => {
+    const drives = dynamics['drives'];
+    const found = isObject(drives) ? drives[id] : undefined;
+    if (!isObject(found)) throw new Error(`machineMutations: the seed has no drive ${id}`);
+    return found;
+  };
+  const sheetSet =
+    (id: string, key: string, value: unknown) =>
+    (dynamics: Record<string, unknown>): void =>
+      void (sheet(dynamics, id)[key] = value);
+  const sheetDrop =
+    (id: string, ...keys: string[]) =>
+    (dynamics: Record<string, unknown>): void => {
+      for (const key of keys) delete sheet(dynamics, id)[key];
+    };
+  const driveSet =
+    (id: string, key: string, value: unknown) =>
+    (dynamics: Record<string, unknown>): void =>
+      void (drive(dynamics, id)[key] = value);
+  return [
+    edit('pmsm polePairs zero', sheetSet('mp', 'polePairs', 0)),
+    edit('pmsm polePairs fractional', sheetSet('mp', 'polePairs', 1.5)),
+    edit('pmsm polePairs string', sheetSet('mp', 'polePairs', '4')),
+    edit('pmsm no flux and no torque constant', sheetDrop('mp', 'fluxLinkageWb', 'torqueConstantNmPerA')),
+    edit('pmsm flux negative', sheetSet('mp', 'fluxLinkageWb', -0.01)),
+    edit('pmsm inductance zero', sheetSet('mp', 'inductanceH', 0)),
+    edit('pmsm bus voltage null', sheetSet('mp', 'busVoltageV', null)),
+    edit('pmsm peak current negative', sheetSet('mp', 'peakCurrentA', -20)),
+    edit('pmsm friction negative', sheetSet('mp', 'frictionNm', -1)),
+    edit('pmsm datasheet array', (dynamics) => void (motor(dynamics, 'mp')['datasheet'] = [1, 2])),
+    edit('pmsm voltage drive', (dynamics) => void (drive(dynamics, 'mp')['mode'] = 'voltage')),
+    edit('pmsm frequency drive', (dynamics) => void (drive(dynamics, 'mp')['mode'] = 'frequency')),
+    edit('stepper stepsPerRev 201', sheetSet('ms', 'stepsPerRev', 201)),
+    edit('stepper stepsPerRev zero', sheetSet('ms', 'stepsPerRev', 0)),
+    edit('stepper stepsPerRev string', sheetSet('ms', 'stepsPerRev', '200')),
+    edit('stepper holding torque negative', sheetSet('ms', 'holdingTorqueNm', -1)),
+    edit('stepper inductance zero', sheetSet('ms', 'phaseInductanceH', 0)),
+    edit('stepper detent negative', sheetSet('ms', 'detentTorqueNm', -1)),
+    edit('stepper damping string', sheetSet('ms', 'dampingNmsPerRad', 'x')),
+    edit('stepper pull-out curve string', sheetSet('ms', 'pullOutCurve', 'abc')),
+    edit('stepper pull-out curve empty', sheetSet('ms', 'pullOutCurve', [])),
+    edit(
+      'stepper pull-out curve decreasing',
+      sheetSet('ms', 'pullOutCurve', [
+        [10, 0.5],
+        [5, 0.4],
+      ]),
+    ),
+    edit('stepper pull-out curve negative torque', sheetSet('ms', 'pullOutCurve', [[0, -0.5]])),
+    edit('stepper pull-out curve nulls', sheetSet('ms', 'pullOutCurve', [[null, null]])),
+    edit('stepper pull-out curve triples', sheetSet('ms', 'pullOutCurve', [[0, 1, 2]])),
+    edit('stepper torque drive', (dynamics) => void (drive(dynamics, 'ms')['mode'] = 'torque')),
+    edit('stepper step division zero', driveSet('ms', 'stepDivision', 0)),
+    edit('stepper step division fractional', driveSet('ms', 'stepDivision', 1.5)),
+    edit('stepper step division huge', driveSet('ms', 'stepDivision', 100000)),
+    edit('stepper step division string', driveSet('ms', 'stepDivision', 'x')),
+    edit('induction polePairs zero', sheetSet('mi', 'polePairs', 0)),
+    edit('induction rated frequency zero', sheetSet('mi', 'ratedFrequencyHz', 0)),
+    edit('induction rated voltage string', sheetSet('mi', 'ratedVoltageV', 'x')),
+    edit('induction rotor resistance negative', sheetSet('mi', 'rotorResistanceOhm', -0.4)),
+    edit('induction stator leakage negative', sheetSet('mi', 'statorLeakageReactanceOhm', -1)),
+    edit('induction rotor leakage missing', sheetDrop('mi', 'rotorLeakageReactanceOhm')),
+    edit('induction magnetising zero', sheetSet('mi', 'magnetisingReactanceOhm', 0)),
+    edit('induction iron loss negative', sheetSet('mi', 'ironLossResistanceOhm', -1)),
+    edit('induction torque drive', (dynamics) => void (drive(dynamics, 'mi')['mode'] = 'torque')),
+    edit('induction frequency negative', driveSet('mi', 'frequencyHz', -50)),
+    edit('induction frequency string', driveSet('mi', 'frequencyHz', 'x')),
+    edit('induction drive on a missing motor', (dynamics) => void (isObject(dynamics['motors']) && delete dynamics['motors']['mi'])),
+  ];
+}
 
 /** Targeted hostile edits of the datasheet thermal block and of the reference series (PHY-23 DRV-M3). */
 function referenceMutations(edit: Edit): SliceMutation[] {

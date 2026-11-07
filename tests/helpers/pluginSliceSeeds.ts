@@ -348,6 +348,100 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
 };
 
+type SeedStep = { name: string; params: Record<string, unknown>; as?: string };
+
+/** One PMSM, one stepper and one induction motor (DRV-M4) on their own rotor, each with a drive that the validation cross-checks against the motor kind. */
+function machineSteps(): SeedStep[] {
+  const rotor = (id: string, x: number): SeedStep[] => [
+    { name: 'add_cylinder', params: { radius: 5, height: 5, position: [x, 200, 0], axis: [0, 0, 1] }, as: `cyl_${id}` },
+    { name: 'add_rigid_body', params: { entityIds: [`$cyl_${id}`], id: `rotor_${id}`, massKg: 0.01 } },
+    {
+      name: 'add_body_joint',
+      params: { kind: 'revolute', child: `rotor_${id}`, parent: 'ground', anchor: [x, 200, 0], axis: [0, 0, 1], id: `j_${id}` },
+    },
+  ];
+  const source = { name: 'seed sheet', grade: 'C' };
+  return [
+    ...rotor('p', 0),
+    ...rotor('s', 50),
+    ...rotor('i', 100),
+    {
+      name: 'add_motor',
+      params: {
+        joint: 'j_p',
+        kind: 'pmsm',
+        id: 'mp',
+        pmsmDatasheet: {
+          polePairs: 4,
+          phaseResistanceOhm: 0.05,
+          inductanceH: 0.0002,
+          fluxLinkageWb: 0.01,
+          rotorInertiaKgM2: 1e-5,
+          busVoltageV: 24,
+          peakCurrentA: 20,
+          thermal: { rthWindingHousingKPerW: 1.9, rthHousingAmbientKPerW: 4.7, tauWindingS: 41.5, tauMotorS: 809, maxWindingC: 155 },
+        },
+        gearhead: { ratio: 3, efficiency: 0.9 },
+        source,
+      },
+    },
+    {
+      name: 'add_motor',
+      params: {
+        joint: 'j_s',
+        kind: 'stepper',
+        id: 'ms',
+        stepperDatasheet: {
+          stepsPerRev: 200,
+          holdingTorqueNm: 0.5,
+          ratedCurrentA: 2,
+          phaseResistanceOhm: 1.5,
+          phaseInductanceH: 0.003,
+          rotorInertiaKgM2: 1e-5,
+          detentTorqueNm: 0.01,
+          pullOutCurve: [
+            [0, 0.5],
+            [600, 0.2],
+          ],
+        },
+        source,
+      },
+    },
+    {
+      name: 'add_motor',
+      params: {
+        joint: 'j_i',
+        kind: 'induction',
+        id: 'mi',
+        inductionDatasheet: {
+          polePairs: 2,
+          ratedVoltageV: 230,
+          ratedFrequencyHz: 50,
+          statorResistanceOhm: 0.5,
+          rotorResistanceOhm: 0.4,
+          statorLeakageReactanceOhm: 1,
+          rotorLeakageReactanceOhm: 1,
+          magnetisingReactanceOhm: 40,
+          ironLossResistanceOhm: 800,
+          rotorInertiaKgM2: 0.2,
+        },
+        source,
+      },
+    },
+    {
+      name: 'add_motion_profile',
+      params: { id: 'pp', quantity: 'position', unit: 'deg', segments: [{ kind: 'move', law: 'linear', to: 90, duration: 1 }] },
+    },
+    {
+      name: 'add_motion_profile',
+      params: { id: 'fp', quantity: 'frequency', unit: 'Hz', segments: [{ kind: 'move', law: 'linear', to: 50, duration: 2 }] },
+    },
+    { name: 'set_motor_drive', params: { motor: 'mp', mode: 'torque', profile: 'tq', currentLimitA: 15, busVoltageV: 48 } },
+    { name: 'set_motor_drive', params: { motor: 'ms', mode: 'position', profile: 'pp', stepDivision: 4, currentLimitA: 1.5 } },
+    { name: 'set_motor_drive', params: { motor: 'mi', mode: 'frequency', profile: 'fp' } },
+  ];
+}
+
 /**
  * The drive data of `doc.dynamics` (PHY-23: datasheet motors with thermal data, profiles, drives, transmissions, joint physics, load schedules, reference series). Dynamics is a core slice, not a plugin extension, so it has no row in
  * SLICE_SEEDS; tests/unit/contract/pluginSliceFuzz.test.ts runs it with the targeted `driveMutations` as well.
@@ -469,6 +563,7 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
           bandRel: 0.1,
         },
       },
+      ...machineSteps(),
     ];
     let doc = createEmptyDocument();
     const ids = new Map<string, string>();
