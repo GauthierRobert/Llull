@@ -12,7 +12,7 @@ import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { technicalView } from '@core/geometry/technicalView';
 import { TOP_VIEW } from '@core/geometry/viewProjection';
 import { assembleDxf, type DxfLineType } from '@lib/dxfWriter';
-import { CENTER_LAYERS, DxfWriter, HIDDEN_LAYERS, writePrimitive } from './dxfWriter';
+import { CENTER_LAYERS, DxfWriter, HIDDEN_LAYERS, writePrimitive, writeRegion } from './dxfWriter';
 
 /** Strokes + label of a dimension (R12 DXF has no associative DIMENSION without anonymous blocks); false when its references are gone. */
 function writeDimension(writer: DxfWriter, doc: CadDocument, entity: DimensionEntity, layer: string): boolean {
@@ -42,6 +42,9 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): number {
       case 'polyline':
       case 'spline':
         writer.polyline(layer, entity.points.map(world), entity.closed);
+        break;
+      case 'region':
+        writeRegion(writer, layer, entity, world);
         break;
       case 'rectangle':
         writer.polyline(
@@ -177,7 +180,7 @@ export const exportBuildingDxf = defineCommand({
     '(A-WALL, A-DOOR, A-GLAZ, S-GRID…), plus the document’s own 2D drafting and its 3D solids as a technical top view (visible edges on ' +
     'OBJ-VISIBLE, hidden edges dashed on OBJ-HIDDEN, centre lines on OBJ-CENTER). Drafting dimensions (linear, aligned, radial, diameter, ' +
     'angular) are exported as extension / dimension lines, arrowheads and the measured text on the dimension’s layer (not as associative ' +
-    'DIMENSION entities). data.dxf holds the file text; data.dimensions counts them.',
+    'DIMENSION entities). A hatched region (hatch_region) is exported as its loop outlines plus the pattern lines (or SOLID triangles) on the <layer>-PATT layer (R12 has no HATCH entity). data.dxf holds the file text; data.dimensions counts them.',
   params: z.object({
     confirmExportControlled,
     levelId: z.string().optional().describe('Level to plot. Default: the active level.'),
