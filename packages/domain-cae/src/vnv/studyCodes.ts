@@ -10,6 +10,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'give 3 to 6 levels (h, dt) or exactly 2 (p: order 2 then 1), finest first (index 0, 1, ...), with strictly increasing size h and finite values',
   VNV_MIXED_REFINEMENT: 'one study refines ONE thing: mesh size (h), time step (dt) or element order (p); run a separate study for each',
   VNV_LSQ_POOR_FIT: 'add finer levels or follow a smoother quantity; a reviewer may accept the fit (accept_verification_exception)',
+  VNV_LSQ_NO_FIT: 'observed order outside [0.05, 8]: add levels, or use 3 levels (Celik triplet)',
+  VNV_LSQ_FEW_DOF: 'add a fifth level before relying on the least-squares fit',
   VNV_P_TWO_LEVEL: 'add an h study at order 2 to measure the observed order and the GCI',
   VNV_P_DIFFERENCE_ABOVE_TARGET: 'refine the mesh (h study at order 2) and re-run',
   VNV_QUANTITY_UNAVAILABLE:

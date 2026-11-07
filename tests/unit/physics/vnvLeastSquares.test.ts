@@ -114,17 +114,45 @@ describe('check_convergence method least_squares: statuses and findings', () => 
     for (const outcome of [oscillating, diverging, exact]) expect(outcome.data['extrapolated']).toBeUndefined();
   });
 
-  it('a monotone set no order fits (a plateau after a jump) is reported divergent, never refused', () => {
-    const plateau = run([1, 1.1, 1.3, 1.31]);
-    expect(plateau.status).toBe('divergent');
-    expect(plateau.data['p']).toBeUndefined();
+  it('an order outside [0.05, 8] is VNV_LSQ_NO_FIT (not divergent, no extrapolation): exact h^8 data and slowly converging data', () => {
+    for (const values of [[1, 2, 4, 8].map((h) => 10 + 0.001 * h ** 8), [1, 2, 4, 8].map((h) => 10 + h ** 0.01), [1, 1.1, 1.3, 1.31]]) {
+      const samples = values.map((value, index) => ({ h: 2 ** index, value }));
+      const result = execute(doc, 'check_convergence', { quantity: 'q', unit: '1', samples, method: 'least_squares' });
+      const data = result.data as {
+        status: string;
+        codes: string[];
+        p?: number;
+        extrapolated?: number;
+        findings: { remediation: string }[];
+      };
+      expect(data.status).toBe('no_fit');
+      expect(data.codes, JSON.stringify(values)).toEqual(['VNV_LSQ_NO_FIT']);
+      expect(data.codes).not.toContain('VNV_DIVERGENT');
+      expect(data.p).toBeUndefined();
+      expect(data.extrapolated).toBeUndefined();
+      expect(data.findings[0]?.remediation).toBe('observed order outside [0.05, 8]: add levels, or use 3 levels (Celik triplet)');
+    }
+  });
+
+  it('data whose differences shrink toward the coarse grids is classified divergent by its triplets (never reaches the fit)', () => {
+    const samples = [10, 10.02, 10.03, 10.036].map((value, index) => ({ h: 2 ** index, value }));
+    const data = execute(doc, 'check_convergence', { quantity: 'q', unit: '1', samples, method: 'least_squares' }).data as {
+      status: string;
+    };
+    expect(data.status).toBe('divergent');
+  });
+
+  it('4 levels leave 1 degree of freedom: VNV_LSQ_FEW_DOF warns, 5 levels do not', () => {
+    const law = (n: number): number[] => Array.from({ length: n }, (_, k) => 10 + 0.5 * (0.1 * 2 ** k) ** 2);
+    expect(run(law(4)).codes).toContain('VNV_LSQ_FEW_DOF');
+    expect(run(law(5)).codes).not.toContain('VNV_LSQ_FEW_DOF');
   });
 
   it('judges the owner target against the fit uncertainty, flags a formal-order mismatch and a finest value of 0', () => {
     const law = [0, 1, 2, 3].map((k) => 10 + 0.5 * (0.1 * 2 ** k) ** 2);
     const tight = run(law, { gciTarget: 1e-9, formalOrder: 4 });
     expect(tight.codes).toEqual(expect.arrayContaining(['VNV_GCI_ABOVE_TARGET', 'VNV_ORDER_MISMATCH']));
-    expect(tight.data['requiredSpacing']).toBeGreaterThan(0);
+    expect(tight.data['requiredSpacing']).toBeUndefined();
     const zero = run([0, 0.3, 1.2, 4.8]);
     expect(zero.codes).toContain('VNV_RELATIVE_UNDEFINED');
     expect(zero.data['gciAbs']).toBeGreaterThan(0);

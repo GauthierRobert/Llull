@@ -188,13 +188,14 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
   let required: number | undefined;
   const finest = samples[0];
   if (options.gciTarget !== undefined && gci21Fine !== undefined && p !== undefined && finest !== undefined) {
-    required = requiredSpacing(options.gciTarget, gci21Fine, p, finest.h);
+    // the needed spacing assumes the GCI scaling (error ~ h^p): not offered for a least-squares uncertainty, whose fit term does not scale that way
+    if (lsq === undefined) required = requiredSpacing(options.gciTarget, gci21Fine, p, finest.h);
     if (gci21Fine > options.gciTarget) {
       findings.push({
         code: 'VNV_GCI_ABOVE_TARGET',
         severity: 'fail',
         message: `${lsq !== undefined ? 'least-squares uncertainty' : 'GCI21'} ${percent(gci21Fine)} is above the target ${percent(options.gciTarget)}`,
-        remediation: `refine: the target needs h ≈ ${required.toPrecision(4)}`,
+        remediation: required === undefined ? 'add finer levels' : `refine: the target needs h ≈ ${required.toPrecision(4)}`,
       });
     }
   }

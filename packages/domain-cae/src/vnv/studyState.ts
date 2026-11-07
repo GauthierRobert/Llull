@@ -4,6 +4,7 @@ import type { AnalysisCase, MeshControls, ThermalStep } from '@core/model/analys
 import type { ConvergenceStudy, StudyExceptionRecord, StudyRefinement } from '@core/model/convergenceStudy';
 import type { CadDocument } from '@core/model/types';
 import type { ConvergenceSample } from '@lib/convergence';
+import { canonicalJson } from '@lib/canonicalJson';
 import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../decks/elastic';
 import { analysisInputHash } from '../hash/inputHash';
 import { analysisOf, withCase } from '../shared/access';
@@ -89,6 +90,14 @@ export function staleReasons(doc: CadDocument, analysisCase: AnalysisCase, study
     reasons.push(
       `the case now meshes with ${now.elementFamily} order ${now.order}${now.bonding === undefined ? '' : ` ${now.bonding}`}, the study with ${finest.elementFamily} order ${finest.order}${finest.bonding === undefined ? '' : ` ${finest.bonding}`}`,
     );
+  // a dt / p study carries no mesh sizes of its own to scale: any other change of the case's mesh controls (sizes, refinements, minSize) stales it
+  if (finest !== undefined && study.refinement !== 'h') {
+    const { order: _finestOrder, ...finestRest } = finest;
+    const { order: _nowOrder, ...nowRest } = now;
+    const same =
+      study.refinement === 'p' ? canonicalJson(finestRest) === canonicalJson(nowRest) : canonicalJson(finest) === canonicalJson(now);
+    if (!same) reasons.push('the case mesh controls (sizes, refinements) differ from the ones the study was run with');
+  }
   return reasons;
 }
 

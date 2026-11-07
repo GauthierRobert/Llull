@@ -34,7 +34,7 @@ export const checkVerification = defineCommand({
     'studies recorded by run_convergence_study, re-derives each from the artifact store, and returns status pass | warn | fail with items ' +
     '[{ code, severity, ids, message, remediation }] and studies [{ id, refinement h | dt | p, state current | stale | unverifiable | untrusted, report { p, extrapolated, ' +
     'gci21 { fine, coarse } as a FRACTION (0.01 = 1 %), asymptoticRatio, safetyFactor, triplets, provenance.procedure }, reviewRequired }]. A study of 4 or more levels is FITTED by ' +
-    'least squares (procedure eca-hoekstra-lsq; report.lsq { p, f0, standardError, residual, uncertainty { absolute, relative } }), exactly 3 levels use the Celik GCI triplet, ' +
+    'least squares (procedure eca-hoekstra-lsq; report.lsq { p, f0, standardError, residual, uncertainty { absolute, relative } }; the uncertainty form Fs |f1 - f0| + s is an llull implementation choice, not confirmed against Eca & Hoekstra; VNV_LSQ_FEW_DOF warns at 4 levels (1 degree of freedom), VNV_LSQ_NO_FIT when the order falls outside [0.05, 8]: no extrapolation), exactly 3 levels use the Celik GCI triplet, ' +
     'a dt study follows the transient time step, a p study (orders 2 and 1) gives only an order-difference indicator (report.orderPair), never an order or extrapolation. Codes: VNV_NO_CONVERGENCE_STUDY ' +
     '(no study for a governing quantity), VNV_STUDY_STALE (the analysis changed after the study: re-run it), VNV_GCI_ABOVE_TARGET, VNV_GCI_TARGET_UNSET ' +
     '(no target given: ask the owner, there is no default), VNV_OSCILLATORY / VNV_DIVERGENT / VNV_ORDER_MISMATCH / VNV_NOT_ASYMPTOTIC / ' +
@@ -55,7 +55,7 @@ export const checkVerification = defineCommand({
       .max(MAX_QUANTITIES)
       .optional()
       .describe(
-        'The governing quantities of the design (e.g. the max von Mises of the margin load case): each needs a study, else VNV_NO_CONVERGENCE_STUDY.',
+        'The governing quantities of the design (e.g. the max von Mises of the margin load case): each needs an h or dt study (an order study is only an indicator and does not count), else VNV_NO_CONVERGENCE_STUDY.',
       ),
   }),
   run: (doc, { analysisId, gciTarget, quantities }, ctx): CommandResult => {
@@ -73,8 +73,10 @@ export const checkVerification = defineCommand({
     const items: VerificationItem[] = entries.flatMap((entry) => [...entry.items]);
     const missing =
       governing.length > 0
-        ? governing.filter((quantity) => !studies.some((study) => canonicalJson(study.quantity) === canonicalJson(quantity)))
-        : studies.length === 0
+        ? governing.filter(
+            (quantity) => !studies.some((study) => study.refinement !== 'p' && canonicalJson(study.quantity) === canonicalJson(quantity)),
+          )
+        : studies.every((study) => study.refinement === 'p')
           ? [null]
           : [];
     for (const quantity of missing)
@@ -114,10 +116,10 @@ export const checkVerification = defineCommand({
     const first = studyEntries.find((entry) => entry.state === 'current');
     const numbers = first?.report;
     const gci = (numbers?.['gci21'] as { fine?: number } | undefined)?.fine;
-    const lsq = numbers?.['lsq'] as { p: number; uncertainty: { relative?: number } } | undefined;
+    const lsq = numbers?.['lsq'] as { p: number; residual: { degreesOfFreedom: number }; uncertainty: { relative?: number } } | undefined;
     const lead =
       lsq?.uncertainty.relative !== undefined
-        ? ` ${first?.id}: least-squares observed order ${lsq.p.toPrecision(4)}, estimated uncertainty ${(lsq.uncertainty.relative * 100).toPrecision(3)} % of the finest value.`
+        ? ` ${first?.id}: least-squares observed order ${lsq.p.toPrecision(4)} (${lsq.residual.degreesOfFreedom} degree(s) of freedom), estimated uncertainty ${(lsq.uncertainty.relative * 100).toPrecision(3)} % of the finest value.`
         : numbers !== undefined && typeof numbers['p'] === 'number' && gci !== undefined
           ? ` ${first?.id}: observed order ${numbers['p'].toPrecision(4)}, estimated discretisation error (GCI) ${(gci * 100).toPrecision(3)} % of the finest value.`
           : '';

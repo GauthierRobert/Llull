@@ -12,7 +12,7 @@ import { analyseOrderPair } from '@cae/vnv/orderPairAnalysis';
 import { planStudy, studyParams, type LevelRun } from '@cae/vnv/studyRun';
 import { expectCase } from '../../physics/benchmarkCases';
 import { mustRun } from '../deckFixtures';
-import { K, OFFSET, QUADRATIC, T0, dtStudyBar, orderStudyBar, recordKind } from './kindFixtures';
+import { type KindBar, K, OFFSET, QUADRATIC, T0, dtStudyBar, orderStudyBar, recordKind } from './kindFixtures';
 import { C, F0, recordedStudy, studyBar } from './studyFixtures';
 
 type Entry = {
@@ -244,10 +244,10 @@ describe('element-order (p) studies', () => {
     expect(entry?.report?.orderPair?.difference.absolute).toBeCloseTo(OFFSET, 12);
     expect(entry?.report?.orderPair?.difference.relative).toBeCloseTo(OFFSET / QUADRATIC, 12);
     expect(entry?.report?.provenance?.procedure).toBe('order-difference');
-    expect(data.items.map((item) => item.code)).toEqual(['VNV_P_TWO_LEVEL', 'VNV_P_DIFFERENCE_ABOVE_TARGET']);
+    expect(data.items.map((item) => item.code)).toEqual(['VNV_P_TWO_LEVEL', 'VNV_P_DIFFERENCE_ABOVE_TARGET', 'VNV_NO_CONVERGENCE_STUDY']);
     expect(data.status).toBe('fail');
     const lenient = verify(bar, result.document, { gciTarget: 0.1 }).data;
-    expect(lenient.items.map((item) => item.code)).toEqual(['VNV_P_TWO_LEVEL']);
+    expect(lenient.items.map((item) => item.code)).toEqual(['VNV_P_TWO_LEVEL', 'VNV_NO_CONVERGENCE_STUDY']);
     expectCase('00-vv-harness', 'VC-VNV-24', entry?.report?.orderPair?.difference.relative ?? Number.NaN);
   });
 
@@ -356,5 +356,46 @@ describe('analyseOrderPair', () => {
     expect(outcome.analysis.orderPair?.difference).toEqual({ absolute: 3 });
     expect(outcome.analysis.findings.map((finding) => finding.code)).toEqual(['VNV_P_TWO_LEVEL']);
     expect(outcome.analysis.summaryReport.status).toBe('order_pair');
+  });
+});
+
+describe('dt and p studies go stale when the case mesh controls change (not only order, family, bonding)', () => {
+  const edits: [string, (bar: KindBar, doc: Parameters<typeof mustRun>[0]) => ReturnType<typeof mustRun>][] = [
+    ['globalSize', (bar, doc) => mustRun(doc, 'set_mesh_controls', { analysisId: bar.analysisId, globalSize: 0.4 })],
+    [
+      'a refinement',
+      (bar, doc) =>
+        mustRun(doc, 'set_mesh_controls', {
+          analysisId: bar.analysisId,
+          refinements: [{ target: { entityId: doc.order[0], facesNear: [[0, 0, 0]] }, size: 0.1 }],
+        }),
+    ],
+  ];
+  for (const [kind, make] of [
+    ['dt', dtStudyBar],
+    ['p', orderStudyBar],
+  ] as const) {
+    for (const [what, edit] of edits) {
+      it(`${kind}: a change of ${what} stales the study`, () => {
+        const bar = make();
+        const { doc } = recordKind(bar);
+        expect(verify(bar, doc).data.studies[0]?.state).toBe('current');
+        const changed = verify(bar, edit(bar, doc)).data;
+        expect(changed.studies[0]?.state).toBe('stale');
+        expect(changed.items.map((item) => item.code)).toContain('VNV_STUDY_STALE');
+      });
+    }
+  }
+});
+
+describe('VNV_NO_CONVERGENCE_STUDY and order studies', () => {
+  it('a p study does not satisfy the governing-quantity requirement; an h or dt study does', () => {
+    const order = orderStudyBar();
+    const quantities = [order.study['quantity']];
+    const withOrder = verify(order, recordKind(order).doc, { quantities }).data;
+    expect(withOrder.items.map((item) => item.code)).toContain('VNV_NO_CONVERGENCE_STUDY');
+    const dt = dtStudyBar();
+    const withDt = verify(dt, recordKind(dt).doc, { quantities: [dt.study['quantity']] }).data;
+    expect(withDt.items.map((item) => item.code)).not.toContain('VNV_NO_CONVERGENCE_STUDY');
   });
 });

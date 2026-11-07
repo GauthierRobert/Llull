@@ -19,7 +19,7 @@ const FORMULAS = [
 const LSQ_FORMULAS = [
   'f(h) = f0 + a h^p fitted to every sample (weights 1): for each p, (f0, a) from the straight-line fit of f against h^p; p minimises the residual over [0.05, 8], then Gauss-Newton on (f0, a, p)',
   'standard error: sqrt(diag(s^2 (J^T J)^-1)), s^2 = sum r^2 / (n - 3)',
-  'U = Fs |f1 - f0| + s, s = sqrt(sum r^2 / (n - 3)) (after Eca & Hoekstra 2014)',
+  'U = Fs |f1 - f0| + s, s = sqrt(sum r^2 / (n - 3)): llull implementation choice, not confirmed against Eca & Hoekstra 2014',
 ];
 
 const fail = (doc: Parameters<typeof report>[0], why: string, path: string, code = 'VNV_SAMPLES_INVALID'): CommandResult =>
@@ -50,7 +50,7 @@ export const checkConvergence = defineCommand({
     'oscillatory or divergent samples return a code (VNV_OSCILLATORY / VNV_DIVERGENT) and NO extrapolated value. Safety factor 1.25 ' +
     '(≥ 3 levels) or 3 (two levels, needs assumedOrder) as named defaults. Warnings: VNV_ORDER_MISMATCH (|p − formalOrder| > 0.5), ' +
     'VNV_NOT_ASYMPTOTIC, VNV_RATIO_TOO_SMALL, VNV_TWO_LEVEL_ONLY. With method least_squares and 4 or more samples it instead fits f = f0 + a h^p to all ' +
-    'of them (Eca & Hoekstra model): p with its standard error, f0, the fit residual and an uncertainty (data.lsq), warning VNV_LSQ_POOR_FIT. Read-only; ' +
+    'of them (Eca & Hoekstra model): p with its standard error, f0, the fit residual and an uncertainty (data.lsq; the form Fs |f1 - f0| + s is an llull implementation choice, not confirmed against Eca & Hoekstra), warnings VNV_LSQ_POOR_FIT / VNV_LSQ_FEW_DOF (4 samples leave 1 degree of freedom), VNV_LSQ_NO_FIT (order outside [0.05, 8]: no extrapolation). Read-only; ' +
     'next: refine further, or report the GCI as an estimated discretisation error.',
   params: z.object({
     quantity: z.string().describe('What was measured, e.g. "tip u_y" or "max von Mises at the lug".'),
@@ -88,7 +88,7 @@ export const checkConvergence = defineCommand({
       .enum(['gci', 'least_squares'])
       .optional()
       .describe(
-        "'gci' (default): Celik triplet of the finest three samples, the others as extra triplets. 'least_squares': fit f = f0 + a h^p to ALL samples (needs 4 or more; Eca & Hoekstra model): reports p, f0, standard errors, the fit residual and an uncertainty = Fs |f1 - f0| + fit standard deviation. Prefer it for noisy unstructured-mesh studies.",
+        "'gci' (default): Celik triplet of the finest three samples, the others as extra triplets. 'least_squares': fit f = f0 + a h^p to ALL samples (needs 4 or more; Eca & Hoekstra model): reports p, f0, standard errors, the fit residual and an uncertainty = Fs |f1 - f0| + fit standard deviation (llull implementation choice, not confirmed against Eca & Hoekstra). Prefer it for noisy unstructured-mesh studies.",
       ),
   }),
   run: (doc, params): CommandResult => {

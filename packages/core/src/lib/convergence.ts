@@ -8,7 +8,7 @@ export interface ConvergenceSample {
   readonly value: number;
 }
 
-export type ConvergenceStatus = 'monotone' | 'oscillatory' | 'divergent' | 'converged_exactly' | 'two_level' | 'order_pair';
+export type ConvergenceStatus = 'monotone' | 'oscillatory' | 'divergent' | 'converged_exactly' | 'two_level' | 'order_pair' | 'no_fit';
 
 export interface TripletReport {
   readonly levels: readonly [number, number, number];
@@ -386,7 +386,7 @@ export function leastSquaresOrder(samples: readonly ConvergenceSample[], weights
 }
 
 /**
- * Uncertainty of the finest sample from a least-squares fit, after Eca & Hoekstra 2014: `fs` times the extrapolation distance |f1 - f0| plus the standard
+ * Uncertainty of the finest sample from a least-squares fit (llull implementation choice, NOT confirmed against Eca & Hoekstra 2014): `fs` times the extrapolation distance |f1 - f0| plus the standard
  * deviation of the fit (the weighting of the published procedure is reviewer-confirmable, TECHNICAL_SPEC 11).
  * @invariant absolute, in the unit of f; `relative` (a fraction of |f1|) is absent when f1 = 0
  */

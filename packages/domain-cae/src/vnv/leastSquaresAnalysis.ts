@@ -64,9 +64,16 @@ export function fitOutcome(samples: readonly ConvergenceSample[], triplets: read
   const fit = leastSquaresOrder(samples);
   if (!fit.converged)
     return {
-      status: 'divergent',
-      summaryReport: withStatus('divergent'),
-      findings: [divergent(`no finite positive order fits the samples (${fit.reason})`)],
+      status: 'no_fit',
+      summaryReport: { levels: base.levels, r21: base.r21, r32: base.r32, ratio: base.ratio, status: 'no_fit' },
+      findings: [
+        {
+          code: 'VNV_LSQ_NO_FIT',
+          severity: 'warning',
+          message: `no observed order in [0.05, 8] fits the samples (${fit.reason}); no extrapolated value is reported`,
+          remediation: 'observed order outside [0.05, 8]: add levels, or use 3 levels (Celik triplet)',
+        },
+      ],
     };
   return fitted(samples, base, fit, safetyFactor);
 }
@@ -100,6 +107,13 @@ function fitted(samples: readonly ConvergenceSample[], base: TripletReport, fit:
       severity: 'warning',
       message: `poor least-squares fit: ${POOR_FIT_NOTE} (${fit.standardDeviation.toPrecision(3)} > ${Math.abs(finest.value - fit.f0).toPrecision(3)})`,
       remediation: 'add finer levels or study a smoother quantity',
+    });
+  if (fit.degreesOfFreedom < 2)
+    findings.push({
+      code: 'VNV_LSQ_FEW_DOF',
+      severity: 'warning',
+      message: `the fit has ${fit.degreesOfFreedom} degree of freedom (4 levels, 3 fitted parameters): its standard errors and uncertainty are weak`,
+      remediation: 'add a fifth level before relying on the fit',
     });
   return { status: 'monotone', summaryReport, lsq, findings };
 }
