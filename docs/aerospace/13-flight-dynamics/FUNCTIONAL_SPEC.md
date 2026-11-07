@@ -1,6 +1,7 @@
 # Gap 13 FLT — Flight dynamics and flight simulation (6-DOF, rotors, controller in the loop)
 
-Status: **specification only** (2026-11-02). No implementation. Follows [`../TEMPLATE.md`](../TEMPLATE.md) and
+Status: specification 2026-11-02; **FLT-M1 built** 2026-11-07 (body-frame rotors `add_rotor`, body drag `set_body_drag`, body state in the
+physics port; TECHNICAL_SPEC §13). Follows [`../TEMPLATE.md`](../TEMPLATE.md) and
 [`../AGENT_FIRST.md`](../AGENT_FIRST.md). Companion pack: [14 FLL](../14-flight-loads-aeroelasticity/FUNCTIONAL_SPEC.md)
 (flight loads into structural analysis).
 

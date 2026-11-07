@@ -19,6 +19,7 @@ import { driveReport } from '../sim/driveReport';
 import { errorMessage } from '@lib/errorMessage';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
+import { flightData, flightSummary } from '../flight/flightReport';
 
 /** Default samples per turn of the fastest announced joint (10 deg), and the floor below which a warning says the motion aliases. */
 const SAMPLES_PER_TURN = 36;
@@ -84,6 +85,8 @@ export const simulateMotion = defineCommand({
     'heat release was calibrated at is "calibrated", not validation evidence); plausibility[] (FPR_UNREALISTIC: peak-pressure angle and CA50 vs MBT, ' +
     'mechanical efficiency, Rotax-class propeller inertia / torque, reciprocating mass on the default density). A gear with efficiency (add_transmission) ' +
     'loses (1 - efficiency) of its torque on the driven shaft; a propeller with a Ct / Cp table and airspeed follows J = V/(nD). ' +
+    'Free flight (13 FLT): rotors fixed to a body (add_rotor) thrust along the body axis with J from the body state, reaction and gyroscopic torques, and body drag (set_body_drag) turns with the body; ' +
+    'data.flight gives per rotor the final thrust N, torque N·m, power W and J range (FLT_OUTSIDE_VALIDATED_RANGE when J leaves the validated range of its coefficients), per drag body the speed and drag force, and with detail "series" their per-sample series. ' +
     'Datasheet motors (add_motor kind "dc", "pmsm", "stepper" or "induction" + set_motor_drive): data.drives gives per motor the peak and final current (A: dc winding current, pmsm phase-current amplitude, stepper phase current, induction load current I2 RMS), voltage (V: terminal, stator amplitude, phase R*I, phase RMS), joint torque ' +
     '(N·m) and shaft speed (rpm), RMS values, the number of samples where the current limit clipped the command, the tracking error of a prescribed / ' +
     'closed-loop drive and whether the datasheet was verified; detail "drives" adds the per-sample series (voltage, current, shaft and joint torque, shaft speed, ' +
@@ -252,7 +255,11 @@ export const simulateMotion = defineCommand({
       const residual = trace.loopResidual ?? 0;
       const tier = residualTier(residual, settings.loopResidualPassM, settings.loopResidualFailM);
       const ledger = driven === null ? ledgerOf([], trace, base.energy) : driven.ledger;
-      const warnings = [...base.warnings, ...(driven?.warnings ?? []), ...built.notes];
+      const flight =
+        built.flight === undefined
+          ? null
+          : flightData(built.flight, trace, { series: (params.detail ?? 'summary') !== 'summary', energy: withEnergy });
+      const warnings = [...base.warnings, ...(driven?.warnings ?? []), ...built.notes, ...(flight?.warnings ?? [])];
       if (halvings > 0)
         warnings.push(
           `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s failed the loop residual gate or was too coarse for a stop / backlash, ${timestep} s is used`,
@@ -326,6 +333,7 @@ export const simulateMotion = defineCommand({
             }
           : {}),
         ...(driven === null ? {} : { drives: driven.drives }),
+        ...(flight === null ? {} : { flight: flight.data }),
         ...(ledger === null ? {} : { ledger }),
         ...(trace.stops === undefined ? {} : { stops: stopsData(trace.stops, built) }),
         ...(reactions !== null ? { reactions } : {}),
@@ -340,7 +348,8 @@ export const simulateMotion = defineCommand({
         engineReport?.meanTorqueNm != null
           ? ` Engine ${engineReport.crankJoint}: mean torque ${engineReport.meanTorqueNm.toFixed(2)} N·m, indicated ${(engineReport.indicatedPowerKW ?? 0).toFixed(2)} kW at ${(engineReport.lastCycle?.meanRpm ?? 0).toFixed(0)} rpm, energy closure ${engineReport.energyClosure?.ratio == null ? 'not evaluated' : `${(engineReport.energyClosure.ratio * 100).toFixed(3)} %`}, speed ripple ${((engineReport.speedRipple?.measured ?? 0) * 100).toFixed(3)} %.`
           : '';
-      return report(doc, simulationSummary(data) + loopText + engineText + brakeText, data);
+      const flightText = flight === null ? '' : ` ${flightSummary(flight.data)}`;
+      return report(doc, simulationSummary(data) + loopText + engineText + brakeText + flightText, data);
     } catch (error) {
       return fail(`the physics engine rejected the model: ${errorMessage(error)}`);
     }

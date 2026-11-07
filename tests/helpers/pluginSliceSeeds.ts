@@ -28,6 +28,7 @@ import { barModel } from '../unit/cae/explicit/support';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
+import { airframe, rotorParams } from '../unit/flight/flightFixture';
 import {
   bemNozzles,
   bemParams,
@@ -482,6 +483,35 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     build: plmDocument,
     query: { name: 'plm_status', params: constant({}) },
     mutate: { name: 'submit_for_review', params: constant({ comment: 'fuzz', at: '2026-11-02T10:00:00Z', by: 'u-0007' }) },
+  },
+  dynamics: {
+    roots: ['flight'],
+    build: () => {
+      const table = {
+        points: [
+          [0, 0.1, 0.05],
+          [0.4, 0.06, 0.04],
+        ],
+        source: 'fuzz table',
+        grade: 'B',
+      };
+      const steps: [string, Record<string, unknown>][] = [
+        ['add_rotor', rotorParams({ id: 'r-static', hub: [10, 0, 0], spinInertiaKgM2: 1e-5 })],
+        [
+          'add_rotor',
+          {
+            ...rotorParams({ id: 'r-table', spin: 'cw', table }),
+            thrustCoefficient: undefined,
+            powerCoefficient: undefined,
+            source: undefined,
+          },
+        ],
+        ['set_body_drag', { body: 'frame', cdaM2: [0.01, 0.02, 0.05] }],
+      ];
+      return steps.reduce((doc, [name, params]) => execute(doc, name, params).document, airframe(1, [0.01, 0.01, 0.01], [0, 0, -9.81]));
+    },
+    query: { name: 'inspect_dynamics', params: constant({}) },
+    mutate: { name: 'set_body_drag', params: constant({ body: 'frame', cdaM2: [0.1, 0.1, 0.1] }) },
   },
 };
 

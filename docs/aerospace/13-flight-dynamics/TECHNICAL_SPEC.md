@@ -1,6 +1,6 @@
 # Gap 13 FLT — Technical specification
 
-Specification only (2026-11-02). Ids `TR-FLT-nn`. Validation cases in [validation/README.md](validation/README.md).
+Specification 2026-11-02; FLT-M1 built 2026-11-07 (§13). Ids `TR-FLT-nn`. Validation cases in [validation/README.md](validation/README.md).
 
 ## 1. Current state in llull (audit 2026-11-02, source read, nothing executed)
 
@@ -200,8 +200,60 @@ exchange (VC-FLT-10, no network beyond localhost).
 
 - FLT-D1: keep the controller in TS inside the engine adapter, or a Rust crate from the start? Default: TS (C7, measure first).
 - FLT-D2: bundle ArduPilot SITL binaries (GPL-3.0) or detect a user install? Default: detect, never bundle (legal check).
-- FLT-D3: default rotor table for unknown props: none (refuse) vs a generic APC-like table flagged grade C. Default: refuse.
+- FLT-D3: default rotor table for unknown props: none (refuse) vs a generic APC-like table flagged grade C. **Decided: refuse** (§13).
+- FLT-D4..D8 decided with FLT-M1 (§13): world wrenches from the laws, plugin slice `flight`, world twist in the port, constant rotor speed
+  until M2, validated J ranges.
 
 ## 12. References
 
 See [FUNCTIONAL_SPEC.md §11](FUNCTIONAL_SPEC.md#11-references) and [validation/sources.md](validation/sources.md).
+
+## 13. Implementation status — FLT-M1 (2026-11-07)
+
+**Audit re-verified against main 5a15f6378 (after DRV-M1..M4).** The §1 rows hold for propellers (`thrustDirection` is a world vector,
+`airspeedMps` a constant, `SimulationState` had joint state only), rigid bodies and aero. Two rows were out of date: motors now have
+datasheet DC / PMSM / stepper / induction models with current, voltage, thermal and an energy ledger (DRV-M1..M4: `add_motor`,
+`set_motor_drive`), still no battery; and `add_load_schedule` already applied a world force at a body's centre of mass (no moment). The
+load callbacks are composed by wrappers (`withCylinderForces`, `withInstalledLosses`, `withLoadSchedules`) that rebuild
+`{ jointForces, bodyForces }`, so the flight wrapper is the outermost one (it is the only one that adds moments).
+
+**Built (TR-FLT-01, TR-FLT-02, the drag part of TR-FLT-03).**
+
+| Item                                                                                                                                                                                                                                                                                                                                                                            | Where                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Port: `BodyKinematics` (world COM position, rotation from t = 0, COM velocity, angular velocity), `SimulationState.bodies` for the bodies of `SimulationModel.bodyStates`, `AppliedLoads.bodyMoments` (world N·m about the COM), `SimulationTrace.bodyVelocity`                                                                                                                 | `packages/core/src/dynamics/physicsEngine.ts`                       |
+| MuJoCo: a kinematics pass (`mj_kinematics` + `mj_comPos` + `mj_comVel`) before the loads, COM velocity from `cvel` shifted from the root subtree COM, the step-midpoint rule of the joint state (position + h/2·v, orientation advanced by ω·h/2, velocities extrapolated from the last step), moments into `xfrc_applied[3..5]`; nothing extra runs when `bodyStates` is empty | `packages/physics-mujoco/src/bodyKinematics.ts`, `mujocoPhysics.ts` |
+| Slice `doc.flight` `{ rotors, bodyDrag }` (plugin `dynamics`), validated on load by a zod schema plus key / id / body cross-checks                                                                                                                                                                                                                                              | `packages/domain-dynamics/src/flight/{model,document}.ts`           |
+| Rotor law: v_hub = v + ω × r, J = (v_hub · a)/(nD), Ct / Cp static or PCHIP table (slopes compiled once per run), T along a at the hub (r × F), reaction -s·Q·a, gyroscopic -ω × (I_s·2πn·s·a); body drag -½ρ·CdA_i·\|v\|·v_i in the body axes                                                                                                                                  | `flight/rotorLaw.ts`, `flight/frames.ts`, `flight/flightLoads.ts`   |
+| `add_rotor`, `set_body_drag`; `delete_dynamics_item` removes a rotor by id and cascades a body's rotors and drag                                                                                                                                                                                                                                                                | `commands/flight.ts`, `commands/bodies.ts`                          |
+| `simulate_motion` `data.flight` (per rotor: final thrust / torque / power, J min / max / final, samples outside the validated range; per drag body: speed and force; series with detail "series"), the laws re-evaluated on the recorded states; warnings `FLT_OUTSIDE_VALIDATED_RANGE`, `FLT_ENERGY_UNCOUNTED`                                                                 | `flight/flightReport.ts`, `commands/simulate.ts`                    |
+
+**Validation (`tests/unit/flight/`).** VC-FLT-01 (z = -g t²/2 at 2 s, < 1e-6 rel, at engine level and with an idle rotor so the body-state
+pass is active), VC-FLT-03 (four rotors tilted 20°: horizontal acceleration g·tan 20° = 3.5693 m/s² within 0.1 %, vertical < 1e-3 m/s²,
+attitude held), VC-FLT-04 (7.8404 N, 88.570 W within 0.5 %), VC-FLT-05 (J = 0.267 from a body held at 6.8078 m/s, T = 4.5420 N within
+0.5 %, no range warning), VC-FLT-08 (yaw acceleration 0.83333 rad/s² within 1e-6 rel, through the port and through a rotor's reaction
+torque). Added closed forms: body-frame thrust of an off-centre rotor (pitch θ = -F r t²/(2 I_yy), position = double integral of
+F·R(θ(t))·ẑ, < 1e-5 rel); gyroscopic precession of a gyrostat under a body torque τ (ω_x = (τ/h) sin Ωt, ω_y = (τ/h)(1 - cos Ωt), Ω = h/I,
+orientation integrated from the closed form, < 1e-5 per quaternion component; mean precession rate τ/h); terminal velocity under body
+drag (z = -(v_t²/g) ln cosh(g t/v_t), < 1e-5 rel); midpoint twist of a jointed body (v = ω × r). A model with no rotor or drag gives
+byte-identical `simulate_motion` data (`flightBaseline.test.ts`, hash taken before the change; the FR-FPR-19 legacy hashes are unchanged).
+Not in M1: VC-FLT-02 (needs an initial body twist: the scenario of FLT-M2), VC-FLT-06 / 09 (`flight_report` / trim, FLT-M2 / M5).
+
+**Decisions.**
+
+- **FLT-D3 (default rotor table)**: refuse, as proposed. `add_rotor` has no default coefficients; a static pair or a table without a
+  source is `FLT_TABLE_SOURCE_MISSING`. Rejected: a generic grade-C APC-like table (it would silently stand in for data nobody measured).
+- **FLT-D4 (frame of a law's wrench)**: the engine gives the laws the midpoint pose; the laws rotate their own body-fixed vectors and return
+  WORLD forces and moments. Rejected: a `frame: 'world' | 'body'` tag in `AppliedLoads` (every engine would implement the rotation and the
+  midpoint pose a second time; one pure-TS place is enough and is testable without an engine).
+- **FLT-D5 (where rotors live)**: a plugin slice `doc.flight` owned by the dynamics plugin (L10), referencing `doc.dynamics` bodies by id.
+  Rejected: new fields on core `DynamicsModel` / `PropellerLoad` (a core model change for a plugin capability). Cost: rotor ids are checked
+  against both id spaces when created; a later explicit dynamics id equal to a rotor id makes `delete_dynamics_item` remove both.
+- **FLT-D6 (twist frames in the port)**: world angular and linear velocity plus the orientation only; body-frame values are one rotation in
+  the law (`flight/frames.ts`). Rejected: both frames in the port (redundant data every engine must keep consistent).
+- **FLT-D7 (rotor speed in M1)**: a constant `rpm` per rotor (no spin-up torque, dΩ/dt = 0); the controller (M2) and the motor chain (M3)
+  will command it. Rejected: driving it from a motion profile now (a second speed source the controller would have to replace).
+- **FLT-D8 (validated range)**: a static pair is validated at |J| <= 0.05; a table over its J span (J below the first row, e.g. descent, is
+  held at the first row and flagged). Air density is a per-record constant (default ISA sea level), not yet `standard_atmosphere` at altitude.
+- **Energy**: rotor and drag work on the bodies is not integrated into the balance (the engine reports joint work only); a run with energy
+  on says so (`FLT_ENERGY_UNCOUNTED`) instead of leaving it unexplained in `balanceErrorJ`.

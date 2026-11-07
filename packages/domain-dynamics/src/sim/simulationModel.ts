@@ -32,6 +32,7 @@ import { announcedSpeed } from './timestep';
 import type { CurveCode } from './pressureCurve';
 import { buildTopology, isRefusal, type Topology, type TopologyRefusal } from './topology';
 import { scale3 } from '@lib/vec3';
+import { compileFlight, withFlightLoads, type FlightRuntime } from '../flight/flightLoads';
 
 function unitAxis(axis: Vec3): Vec3 {
   const length = Math.hypot(axis[0], axis[1], axis[2]);
@@ -122,6 +123,8 @@ export interface BuiltSimulation {
   readonly settings: DynamicsSolverSettings;
   /** Assumptions the build made that the report states (e.g. DRV_MESH_STIFFNESS_ASSUMED). */
   readonly notes: readonly string[];
+  /** Rotors and body drag of the run (13 FLT); absent when the document has none. */
+  readonly flight?: FlightRuntime;
 }
 
 export interface BuildRefusal {
@@ -255,8 +258,12 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   const losses = withInstalledLosses(gasLoads, Object.values(dynamics.losses ?? {}), cylinders);
   if ('error' in losses) return losses;
   const signOf = (jointId: string): number => (topology.tree.find((entry) => entry.joint.id === jointId)?.flipped === true ? -1 : 1);
-  const loads = withLoadSchedules(losses, dynamics, signOf);
-  if ('error' in loads) return loads;
+  const scheduled = withLoadSchedules(losses, dynamics, signOf);
+  if ('error' in scheduled) return scheduled;
+  const centers = Object.fromEntries(Object.entries(mass).map(([id, props]) => [id, props.centerOfMass]));
+  const flight = compileFlight(doc, centers, metres);
+  if (flight !== null && 'error' in flight) return flight;
+  const loads = flight === null ? scheduled : withFlightLoads(scheduled, flight);
   const ownInertia = (jointId: string): number | undefined => {
     const joint = simulated.get(jointId);
     return joint === undefined ? undefined : inertiaAboutJoint(bodies, joint) + armatureOf(joint);
@@ -299,11 +306,13 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
       ...(jointPhysics === null ? {} : { jointPhysics: jointPhysics.block }),
       ...(actuators === null ? {} : { actuators: actuators.block }),
       loads,
+      ...(flight === null ? {} : { bodyStates: flight.bodies }),
     },
     mass,
     topology,
     settings,
     notes: [...compiled.warnings, ...(jointPhysics?.notes ?? [])],
+    ...(flight === null ? {} : { flight }),
   };
 }
 

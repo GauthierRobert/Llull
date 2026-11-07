@@ -27,6 +27,8 @@ export interface MjData {
   readonly xfrc_applied: Float64Array;
   readonly xpos: Float64Array;
   readonly xquat: Float64Array;
+  /** Spatial velocity of each body, 6 per body: [angular, linear at the subtree centre of mass of its root], world axes (after mj_comVel). */
+  readonly cvel: Float64Array;
   /** World position of each joint anchor, 3 per joint. */
   readonly xanchor: Float64Array;
   /** World axis of each joint (unit vector), 3 per joint, after the last forward pass. */
@@ -59,6 +61,9 @@ export interface MujocoModule {
   mj_step(model: MjModel, data: MjData): void;
   mj_forward(model: MjModel, data: MjData): void;
   mj_rnePostConstraint(model: MjModel, data: MjData): void;
+  mj_kinematics(model: MjModel, data: MjData): void;
+  mj_comPos(model: MjModel, data: MjData): void;
+  mj_comVel(model: MjModel, data: MjData): void;
   mj_versionString(): string;
 }
 

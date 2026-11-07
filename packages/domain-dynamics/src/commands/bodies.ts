@@ -13,6 +13,7 @@ import { formatLength } from '@core/model/units';
 import { toMetres } from '@core/model/units';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { symmetricEigen, type Symmetric3 } from '@lib/symmetricEigen';
+import { flightRecordCount, flightWithout } from '../flight/model';
 
 /** The document's dynamics model (empty when absent). */
 export function dynamicsOf(doc: CadDocument): DynamicsModel {
@@ -142,22 +143,23 @@ export const setGravity = defineCommand({
 });
 
 /**
- * @affects removes 1 dynamics record; removing a body also removes its joints and springs, and removing a joint its transmissions, joint physics, load schedules, motors and propellers
+ * @affects removes 1 dynamics record (or rotor of doc.flight); removing a body also removes its joints, springs, rotors and body drag, and removing a joint its transmissions, joint physics, load schedules, motors and propellers
  * @failure unknown id -> no-op
  */
 export const deleteDynamicsItem = defineCommand({
   name: 'delete_dynamics_item',
   annotations: { destructive: true },
   description:
-    'Remove a rigid body, joint, transmission (add_transmission), joint physics (set_joint_physics, by its joint id), load schedule (add_load_schedule), motor, propeller, cylinder pressure, point spring (add_spring) motion profile (add_motion_profile) or time-series reference (add_reference_data with series) from the physics model by id. Cascades: a body ' +
-    'takes its joints and springs with it; a joint takes the transmissions, its joint physics, load schedules, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
+    'Remove a rigid body, joint, transmission (add_transmission), joint physics (set_joint_physics, by its joint id), load schedule (add_load_schedule), motor, propeller, cylinder pressure, point spring (add_spring), motion profile (add_motion_profile), rotor (add_rotor) or time-series reference (add_reference_data with series) from the physics model by id. Cascades: a body ' +
+    'takes its joints, springs, rotors and body drag (set_body_drag) with it; a joint takes the transmissions, its joint physics, load schedules, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
     'A time-series reference goes with the joint or motor it measures. A profile that a motor drive or a load schedule still uses is refused (the users are listed): change the drive first. Entities (geometry) are never deleted.',
   params: z.object({
     id: z.string().describe('Id of the body / joint / transmission / load schedule / motor / propeller / cylinder / spring to remove.'),
   }),
   run: (doc, { id }): CommandResult => {
     const dynamics = dynamicsOf(doc);
-    if (!dynamicsIdTaken(dynamics, id)) return failer(doc, 'delete_dynamics_item')(`no dynamics record '${id}'`);
+    const rotor = doc.flight !== undefined && Object.hasOwn(doc.flight.rotors, id);
+    if (!dynamicsIdTaken(dynamics, id) && !rotor) return failer(doc, 'delete_dynamics_item')(`no dynamics record '${id}'`);
     const users = Object.values(dynamics.drives ?? {}).filter((drive) => drive.profile === id);
     if (users.length > 0)
       return failer(
@@ -245,9 +247,9 @@ export const deleteDynamicsItem = defineCommand({
     )
       .map((table) => Object.keys(dynamics[table] ?? {}).length - Object.keys(withDrives[table] ?? {}).length)
       .reduce((a, b) => a + b, 0);
-    return report(
-      withDynamics(doc, withDrives),
-      `delete_dynamics_item: removed '${id}'${removed > 1 ? ` and ${removed - 1} dependent record(s)` : ''}.`,
-    );
+    const flight = doc.flight === undefined ? null : flightWithout(doc.flight, id, withDrives.bodies);
+    const updated = withDynamics(flight === null ? doc : { ...doc, flight }, withDrives);
+    const total = removed + (flight === null ? 0 : flightRecordCount(doc.flight) - flightRecordCount(flight));
+    return report(updated, `delete_dynamics_item: removed '${id}'${total > 1 ? ` and ${total - 1} dependent record(s)` : ''}.`);
   },
 });

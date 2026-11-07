@@ -22,6 +22,18 @@ The same commands run in the desktop app (WASM loaded on the first Simulate), in
 | `engine_quick_check`                                      | analytic slider-crank kinematics, torque, rod force, side thrust and MEP / torque / power without simulating                                                                                                                                                                                                                            |
 | `simulate_motion`                                         | read-only run: final rpm per joint, settle time, engine torque/power, propeller thrust/torque/power/tip Mach, measured gear ratios, warnings; `detail: "series"` adds time series, `"poses"` adds body poses for playback. With loops or cylinders also `data.loops` (residual, tier, solver), `data.reactions` and `data.engineReport` |
 
+### Free flight: rotors and body drag (13 FLT M1, [spec](aerospace/13-flight-dynamics/TECHNICAL_SPEC.md) section 13)
+
+`add_rotor` fixes a rotor to a body (slice `doc.flight`): thrust T = Ct·ρ·n²·D⁴ along the body-fixed axis at the hub (so it tilts with the
+airframe and an off-centre rotor adds r × F), J = V_axial/(nD) from the hub velocity v + ω × r, reaction torque Q = Cp·ρ·n²·D⁵/(2π) about
+-spin·axis and gyroscopic torque -ω × H of the spinning parts. Coefficients are a sourced static pair (validated at |J| <= 0.05) or a [J, Ct, Cp]
+table (PCHIP, held and flagged outside it, FLT_OUTSIDE_VALIDATED_RANGE); no default coefficients (FLT_TABLE_SOURCE_MISSING). The rotor speed is a
+constant `rpm` until the flight controller (FLT-M2). `set_body_drag` gives a body quadratic drag -½·ρ·CdA_i·|v|·v_i in its own axes. The load
+callback receives the pose and twist of the bodies the laws read (`SimulationModel.bodyStates` → `SimulationState.bodies`, step midpoint) and
+returns moments as well as forces (`AppliedLoads.bodyMoments`); a model with no rotor or drag lists no body and runs bit-identically.
+`simulate_motion` reports `data.flight` (rotor thrust / torque / power / J range, drag speed and force, series with detail "series"). The work
+of rotors and drag is not in the energy balance (FLT_ENERGY_UNCOUNTED).
+
 UI: **Mechanisms › Physics** lists the bodies, runs _Simulate_, shows the operating point and an rpm chart, and replays
 the motion in the 3D view (play / scrub / slow motion down to 1/100).
 
@@ -192,7 +204,7 @@ against the analytic ΔE/(I·ω²) and the peak wrist-pin, rod, side-thrust, cra
 
 ## Limits (by design, for now)
 
-- Propeller: static (no forward speed), coefficients supplied by the user (published data or a test); no blade-element model yet.
+- Propeller (`add_propeller`): a fixed world thrust direction and a constant airspeed; for free flight use `add_rotor` (body frame, J from the state). Coefficients supplied by the user (published data or a test); no blade-element model yet. Rotors: constant speed, no wind, no motor / battery chain, no ground effect yet (13 FLT M2..M7).
 - Engine: a mean torque curve (`add_motor`) or, with `add_cylinder_pressure`, individual cylinder gas pulses on a slider-crank. No engine friction (FMEP), gear efficiency, tabulated propeller coefficients or calibration to a brake torque yet: indicated, not brake, values. The crank must turn in the positive sense of its joint axis.
 - No contacts / collisions (pure multibody dynamics). Loop closures are soft constraints, gated against the pin clearance (see above); a spherical joint cannot carry a body on its own.
 - Spin-up time depends on rotating inertia that is modelled: parts absent from the CAD (a crankshaft) are absent from it.

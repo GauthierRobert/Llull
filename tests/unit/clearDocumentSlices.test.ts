@@ -15,6 +15,7 @@ const SLICE_PROBES: Record<Exclude<OptionalKey, KeptKey>, unknown> = {
   drawings: {},
   pmi: {},
   dynamics: {},
+  flight: { rotors: {}, bodyDrag: {} },
   prototype: {},
   review: {},
   display: {},
