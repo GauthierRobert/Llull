@@ -15,6 +15,7 @@ import { bodyFocus } from '@ui/panels/mechanismFocus';
 import { parseNumber } from '@ui/numberText';
 import { SeriesChart } from './SeriesChart';
 import { TimelineDock } from '@ui/components/TimelineDock';
+import { ExportAnimationButton } from '@ui/components/ExportAnimationButton';
 
 const RPM_PER_RAD_S = 60 / (2 * Math.PI);
 /** Samples per simulated second for playback: ≥ 4 per turn up to 15 000 rpm on short runs; capped by the command's 6001 samples. */
@@ -183,6 +184,7 @@ export function PhysicsSection(): React.ReactElement {
         >
           {busy ? 'Simulating…' : 'Simulate'}
         </button>
+        {result === null && <ExportAnimationButton testId="physics-export" />}
       </div>
       {status !== '' && result === null && <StatusLine text={status} testId="physics-status" />}
       {result !== null && (
