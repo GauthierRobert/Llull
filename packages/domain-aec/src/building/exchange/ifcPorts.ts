@@ -189,9 +189,10 @@ export function exportPipeProducts(
 }
 
 /** Inferred nozzle ports of the equipment (IfcRelNests) and their connections to the pipe ends; call once after every element is exported. */
-export function finishNozzles(context: Context, doc: CadDocument, state: PortState): void {
+export function finishNozzles(context: Context, doc: CadDocument, state: PortState, lineInScope?: (lineObjectId: string) => boolean): void {
   const byEquipment = new Map<string, ReturnType<typeof inferredNozzles>>();
   for (const nozzle of inferredNozzles(doc)) {
+    if (lineInScope?.(nozzle.line.id) === false) continue;
     byEquipment.set(nozzle.equipment.id, [...(byEquipment.get(nozzle.equipment.id) ?? []), nozzle]);
   }
   for (const [equipmentId, nozzles] of byEquipment) {
@@ -227,6 +228,6 @@ export function finishNozzles(context: Context, doc: CadDocument, state: PortSta
       if (nozzle.end === 'from') connect(context, state, port, pipeEnd);
       else connect(context, state, pipeEnd, port);
     }
-    nest(context, `${equipmentId}:nozzles`, target.ref, ports);
+    if (ports.length > 0) nest(context, `${equipmentId}:nozzles`, target.ref, ports);
   }
 }

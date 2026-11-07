@@ -165,3 +165,35 @@ export const simulate = (doc: CadDocument, params: Record<string, unknown>): Ret
   execute(doc, 'simulate_motion', params);
 
 export const RPM = 60 / (2 * Math.PI);
+
+/** Steps for a disc of axial inertia `inertia` kg*m^2 on a revolute joint `j_<id>` about Z at `anchor` (mm), body `b_<id>`. */
+export function spinner(id: string, inertia: number, anchor: [number, number, number] = [0, 0, 0]): PlanStep[] {
+  return [
+    { command: 'add_cylinder', params: { radius: 50, height: 10, position: anchor, axis: [0, 0, 1] }, as: `geo_${id}` },
+    {
+      command: 'add_rigid_body',
+      params: { entityIds: [`$geo_${id}`], id: `b_${id}`, massKg: 1, inertiaKgM2: [inertia / 2, inertia / 2, inertia, 0, 0, 0] },
+    },
+    { command: 'add_body_joint', params: { kind: 'revolute', child: `b_${id}`, parent: 'ground', anchor, axis: [0, 0, 1], id: `j_${id}` } },
+  ];
+}
+
+/** A mass `kg` on a prismatic joint `j_<id>` along X (body `b_<id>`). */
+export function slider(id: string, kg: number, parent = 'ground'): PlanStep[] {
+  return [
+    { command: 'add_box', params: { size: [20, 20, 20], position: [0, 0, 10], anchor: 'center' }, as: `geo_${id}` },
+    { command: 'add_rigid_body', params: { entityIds: [`$geo_${id}`], id: `b_${id}`, massKg: kg } },
+    {
+      command: 'add_body_joint',
+      params: { kind: 'prismatic', child: `b_${id}`, parent, anchor: [0, 0, 10], axis: [1, 0, 0], id: `j_${id}` },
+    },
+  ];
+}
+
+export const noGravity: PlanStep = { command: 'set_gravity', params: { gravity: [0, 0, 0] } };
+
+/** The simulate_motion series `key` of `joint` (empty when absent). */
+export const seriesOf = (result: ReturnType<typeof execute>, key: string, joint: string): number[] =>
+  ((result.data as { series?: Record<string, Record<string, number[]>> }).series?.[key] ?? {})[joint] ?? [];
+
+export const SOURCE_A = { name: 'PHY-23 validation (synthetic)', grade: 'A' };

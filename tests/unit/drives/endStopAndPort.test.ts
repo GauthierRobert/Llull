@@ -8,7 +8,7 @@ import {
   type SimulationBody,
   type SimulationModel,
 } from '@core/dynamics/physicsEngine';
-import { dampingRatioForRestitution, restitutionOfDamping } from '@dynamics/sim/endStop';
+import { dampingRatioForRestitution, restitutionOfDamping } from '@lib/stopRestitution';
 import { unboundedEffort } from '@dynamics/sim/driveReport';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { expectedResults, inertiaBench, rotorBench, section } from './fixtures';
@@ -58,7 +58,7 @@ const hinge = (id: string, inertia: number): SimulationBody => ({
 });
 const base = {
   gravity: [0, 0, 0] as [number, number, number],
-  gears: [],
+  transmissions: [],
   loops: [],
   servos: [],
   solver: { integrator: 'rk4' as const, loopTimeConstant: 0.002, loopImpedance: 0.9999 },

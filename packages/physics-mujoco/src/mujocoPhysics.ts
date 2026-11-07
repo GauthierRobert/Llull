@@ -1,6 +1,6 @@
 /**
  * MuJoCo (Google DeepMind, C, official WASM build `@mujoco/mujoco`) behind the core `PhysicsEngine` interface. Generalised-coordinate
- * multibody dynamics: joints are exact (no drift between linked parts), gear couplings are equality constraints.
+ * multibody dynamics: joints are exact (no drift between linked parts), transmissions are equality constraints (limited tendons with backlash).
  */
 
 import type {
@@ -14,7 +14,7 @@ import type {
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { OBJECT_BODY, OBJECT_JOINT, OBJECT_TENDON, type MjData, type MjModel, type MujocoModule } from './bindings';
 import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './constraintForces';
-import { addGearLoss, gearLossSlots } from './gearLoss';
+import { createConstraintPhysics } from './constraintPhysics';
 import { springTendonName, toMjcf } from './mjcf';
 import { createServoSchedule } from './servoSchedule';
 
@@ -92,7 +92,17 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     const springTrace: Record<string, { length: number[]; velocity: number[]; force: number[] }> = Object.fromEntries(
       springs.map(({ spring }) => [spring.id, { length: [], velocity: [], force: [] }]),
     );
-    const gearLoss = gearLossSlots(mujoco, mjModel, model, (id) => joints.find((slot) => slot.id === id)?.dof);
+    const initialPosition = new Map(joints.map((joint) => [joint.id, data.qpos[joint.qpos] ?? 0]));
+    const constraint = createConstraintPhysics(
+      mujoco,
+      mjModel,
+      model,
+      joints,
+      new Map(model.bodies.flatMap((body, i) => (body.joint === null ? [] : [[body.joint.id, bodies[i]?.index ?? 0] as const]))),
+      initialPosition,
+      options.energy === true,
+    );
+    const heatTrace: number[][] = Array.from({ length: constraint?.layout.length ?? 0 }, () => []);
     const servoJoints = model.servos.map((servo) => joints.find((slot) => slot.id === servo.joint));
     const schedule = createServoSchedule(
       mujoco,
@@ -102,6 +112,13 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       servoJoints.map((joint) => joint?.dof),
     );
     let appliedWork = 0;
+    // with joint physics / transmissions the servo work of a step is settled after the next forward pass (the force at the END state, not the last RK4 stage)
+    let pendingServo: { before: StepWorkBasis; position: number[] } | null = null;
+    const settleServo = (): void => {
+      if (pendingServo === null) return;
+      appliedWork += servoWork(data, servoJoints, pendingServo.before, pendingServo.position);
+      pendingServo = null;
+    };
     const block = model.actuators;
     let aux: Float64Array = block === undefined ? new Float64Array(0) : block.aux0.slice();
     const auxTrace: number[][] = Array.from({ length: block?.size ?? 0 }, () => []);
@@ -111,7 +128,6 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     const actuatorForce = new Float64Array(actuatorJoints.length);
     const actuatorWorkTrace: number[] = [];
     let actuatorWork = 0;
-    const initialPosition = new Map(joints.map((joint) => [joint.id, data.qpos[joint.qpos] ?? 0]));
     model.servos.forEach((servo, i) => {
       data.ctrl[i] = servo.targetVelocity;
       // the set-point starts where the servo force is zero at the joint's start state: q + damping · v / stiffness, which is q + 2 v / wn
@@ -171,6 +187,8 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       if ((model.servos.length > 0 || options.energy === true) && read === undefined) mujoco.mj_forward(mjModel, data);
       model.servos.forEach((servo, i) => trace.servoForce[servo.id]?.push(data.actuator_force[i] ?? 0));
       if (options.energy === true) {
+        settleServo();
+        constraint?.sample(data).forEach((joules, k) => heatTrace[k]?.push(joules));
         energy.potential.push(data.energy[0] ?? 0);
         energy.kinetic.push(data.energy[1] ?? 0);
         energy.appliedWork.push(appliedWork);
@@ -198,7 +216,6 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     record();
     let previousVelocity = joints.map((joint) => data.qvel[joint.dof] ?? 0);
     for (let step = 1; step <= steps; step++) {
-      if (gearLoss.length > 0) mujoco.mj_forward(mjModel, data); // constraint forces of the current state
       const applied = applyLoads(model, data, { joints, bodies, initialPosition, previousVelocity, timestep: options.timestep });
       previousVelocity = applied.velocity;
       if (block !== undefined) {
@@ -219,12 +236,16 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
               data.xfrc_applied[6 * index + axis] = (data.xfrc_applied[6 * index + axis] ?? 0) + (force[axis] ?? 0);
         }
       }
-      if (gearLoss.length > 0) addGearLoss(mjModel, data, gearLoss);
       schedule.update();
+      constraint?.prepare(data);
+      settleServo();
       const before = options.energy === true ? stepWorkBasis(data, joints, servoJoints) : null;
       mujoco.mj_step(mjModel, data);
+      constraint?.finish(data);
       if (before !== null) {
-        appliedWork += stepWork(data, joints, servoJoints, before);
+        appliedWork += stepWork(data, joints, before, constraint === null ? servoJoints : []);
+        if (constraint !== null)
+          pendingServo = { before, position: servoJoints.map((joint) => (joint === undefined ? 0 : (data.qpos[joint.qpos] ?? 0))) };
         actuatorJoints.forEach((slot, k) => {
           actuatorWork += (actuatorForce[k] ?? 0) * ((data.qpos[joints[slot]?.qpos ?? 0] ?? 0) - (before.position[slot] ?? 0));
         });
@@ -258,6 +279,7 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
               appliedWork: energy.appliedWork,
             },
             ...(springs.length > 0 ? { springs: springTrace } : {}),
+            ...(constraint === null ? {} : { heat: { layout: constraint.layout, joules: heatTrace }, stops: constraint.stops() }),
           }
         : {}),
       ...(block === undefined
@@ -296,8 +318,8 @@ function stepWorkBasis(data: MjData, joints: readonly JointSlot[], servoJoints: 
 function stepWork(
   data: MjData,
   joints: readonly JointSlot[],
-  servoJoints: readonly (JointSlot | undefined)[],
   before: StepWorkBasis,
+  servoJoints: readonly (JointSlot | undefined)[],
 ): number {
   let work = 0;
   joints.forEach((joint, i) => {
@@ -307,6 +329,21 @@ function stepWork(
     if (joint === undefined) return;
     const mean = 0.5 * ((before.servoForce[i] ?? 0) + (data.actuator_force[i] ?? 0));
     work += mean * ((data.qpos[joint.qpos] ?? 0) - (before.servoPosition[i] ?? 0));
+  });
+  return work;
+}
+
+/** Work of the servos over a step whose end state was evaluated by a forward pass: the mean of the force before and at the end times the displacement. */
+function servoWork(
+  data: MjData,
+  servoJoints: readonly (JointSlot | undefined)[],
+  before: StepWorkBasis,
+  position: readonly number[],
+): number {
+  let work = 0;
+  servoJoints.forEach((joint, i) => {
+    if (joint === undefined) return;
+    work += 0.5 * ((before.servoForce[i] ?? 0) + (data.actuator_force[i] ?? 0)) * ((position[i] ?? 0) - (before.servoPosition[i] ?? 0));
   });
   return work;
 }

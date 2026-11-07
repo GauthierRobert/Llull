@@ -1,8 +1,11 @@
-/** Rigid-body dynamics: bodies, joints, gears, motors, propellers and the physics simulation. */
+/** Rigid-body dynamics: bodies, joints, transmissions, joint physics, motors, propellers and the physics simulation. */
 
 import { commandCatalog } from '@core/commands/schema';
 import { addRigidBody, deleteDynamicsItem, setGravity } from './bodies';
-import { addBodyJoint, addGearCoupling } from './connections';
+import { addBodyJoint } from './connections';
+import { addTransmission } from './transmissions';
+import { setJointPhysics } from './jointPhysics';
+import { addLoadSchedule } from './loadSchedules';
 import { checkDynamics } from './checkDynamics';
 import { checkMotionClearance } from './checkMotionClearance';
 import { checkPrototype } from './checkPrototype';
@@ -29,7 +32,9 @@ installEngineLaws();
 export const dynamicsCommands = commandCatalog(
   addRigidBody,
   addBodyJoint,
-  addGearCoupling,
+  addTransmission,
+  setJointPhysics,
+  addLoadSchedule,
   addSpring,
   addMotor,
   checkMotorDataCommand,

@@ -90,11 +90,11 @@ pass band is a target).
 | File                                                                   | Runs today                                                          | Purpose                                |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------- |
 | [`plans/drv_maxon_step.plan.json`](plans/drv_maxon_step.plan.json)     | no: `add_motor kind dc`, `set_motor_drive`, `check_motor_data` (M1) | UC-1, VC-DRV-01, 03–05, 06             |
-| [`plans/drv_lead_screw.plan.json`](plans/drv_lead_screw.plan.json)     | no: `add_transmission` (M2)                                         | UC-3, VC-DRV-13; μ 0.35 variant for 14 |
-| [`plans/drv_stick_slip.plan.json`](plans/drv_stick_slip.plan.json)     | no: `set_joint_physics`, prismatic `speed` motor (M1–M2)            | UC-4, VC-DRV-18                        |
-| [`plans/drv_servo_sizing.plan.json`](plans/drv_servo_sizing.plan.json) | no (M1–M3)                                                          | UC-2, VC-DRV-34, 37, 38                |
+| [`plans/drv_lead_screw.plan.json`](plans/drv_lead_screw.plan.json)     | yes (M2: `add_transmission`)                                        | UC-3, VC-DRV-13; μ 0.35 variant for 14 |
+| [`plans/drv_stick_slip.plan.json`](plans/drv_stick_slip.plan.json)     | yes (M2: `set_joint_physics`, prismatic `speed` motor)              | UC-4, VC-DRV-18                        |
+| [`plans/drv_servo_sizing.plan.json`](plans/drv_servo_sizing.plan.json) | no: `size_drive`, `check_motion_truth` (M3)                         | UC-2, VC-DRV-34, 37, 38                |
 
-The four plans are listed in `tests/unit/contract/blockedPlanCommands.json` until their commands exist. Small cases (VC-DRV-10,
+`drv_servo_sizing` is listed in `tests/unit/contract/blockedPlanCommands.json` until `size_drive` and `check_motion_truth` exist (M3). Small cases (VC-DRV-10,
 16, 17, 19–27, 29) are built as unit-test fixtures from the `drv_reference.json` inputs, not as plan files.
 
 Expected values: [`expected_results.json`](expected_results.json) (88 values) and [`drv_reference.json`](drv_reference.json).

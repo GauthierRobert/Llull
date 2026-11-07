@@ -44,7 +44,7 @@ describe('MuJoCo physics engine', () => {
     const model: SimulationModel = {
       gravity: [0, 0, -9.81],
       bodies: [rotor('wheel', [0, 0, 1], 10, 0.5)],
-      gears: [],
+      transmissions: [],
       ...tree,
       ...tree,
       servos: [],
@@ -66,7 +66,7 @@ describe('MuJoCo physics engine', () => {
     const model: SimulationModel = {
       gravity: [0, 0, 0],
       bodies: [rotor('pinion', [0, 0, 0], 1, 0.02), rotor('wheel', [0.4, 0, 0], 5, 0.9)],
-      gears: [{ id: 'mesh', driver: 'pinion-hinge', driven: 'wheel-hinge', ratio }],
+      transmissions: [{ id: 'mesh', a: 'pinion-hinge', b: 'wheel-hinge', ratio }],
       ...tree,
       servos: [],
       loads: () => ({ jointForces: { 'pinion-hinge': 1 }, bodyForces: {} }),
@@ -90,7 +90,7 @@ describe('MuJoCo physics engine', () => {
       joint: { id: 'pivot', kind: 'revolute', anchor: [0, 0, 0], axis: [0, 1, 0], damping: 0, friction: 0, initialVelocity: 0.05 },
     };
     const trace = engine.simulate(
-      { gravity: [0, 0, -9.81], bodies: [pendulum], gears: [], ...tree, servos: [], loads: noLoads },
+      { gravity: [0, 0, -9.81], bodies: [pendulum], transmissions: [], ...tree, servos: [], loads: noLoads },
       { duration: 4, timestep: 0.0005, sampleInterval: 0.0005 },
     );
     const velocity = trace.jointVelocity['pivot'] ?? [];
@@ -120,7 +120,7 @@ describe('MuJoCo physics engine', () => {
       {
         gravity: [0, 0, 0],
         bodies: [block],
-        gears: [],
+        transmissions: [],
         ...tree,
         servos: [],
         loads: () => ({ jointForces: {}, bodyForces: { block: [8, 0, 0] } }),
@@ -137,7 +137,7 @@ describe('MuJoCo physics engine', () => {
     const model: SimulationModel = {
       gravity: [0, 0, 0],
       bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
-      gears: [],
+      transmissions: [],
       ...tree,
       servos: [
         { id: 'drive', joint: 'wheel-hinge', targetVelocity: 10, stiffness: inertia * 250 ** 2, damping: 2 * inertia * 250, maxForce: 1e9 },
@@ -159,7 +159,7 @@ describe('MuJoCo physics engine', () => {
     const model: SimulationModel = {
       gravity: [0, 0, 0],
       bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
-      gears: [],
+      transmissions: [],
       ...tree,
       servos: [{ id: 'drive', joint: 'wheel-hinge', targetVelocity: target, ...speedServoGains(inertia, timestep), maxForce: 2 }],
       loads: noLoads,
@@ -176,7 +176,7 @@ describe('MuJoCo physics engine', () => {
     const model: SimulationModel = {
       gravity: [0, 0, 0],
       bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
-      gears: [],
+      transmissions: [],
       ...tree,
       servos: [{ id: 'drive', joint: 'wheel-hinge', targetVelocity: target, ...speedServoGains(inertia, timestep), maxForce: 2 }],
       loads: noLoads,
@@ -191,7 +191,7 @@ describe('MuJoCo physics engine', () => {
     const model: SimulationModel = {
       gravity: [0, 0, 0],
       bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
-      gears: [],
+      transmissions: [],
       ...tree,
       servos: [
         { id: 'drive', joint: 'wheel-hinge', targetVelocity: 10, stiffness: 1e12, damping: 1e6, naturalFrequency: 500, maxForce: 1e9 },
@@ -207,7 +207,7 @@ describe('MuJoCo physics engine', () => {
     const broken: SimulationBody = { ...rotor('bad', [0, 0, 0], -1, 0.1) };
     expect(() =>
       engine.simulate(
-        { gravity: [0, 0, 0], bodies: [broken], gears: [], ...tree, servos: [], loads: noLoads },
+        { gravity: [0, 0, 0], bodies: [broken], transmissions: [], ...tree, servos: [], loads: noLoads },
         { duration: 0.1, timestep: 0.001, sampleInterval: 0.1 },
       ),
     ).toThrow();

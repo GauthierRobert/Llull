@@ -13,7 +13,8 @@ import { analyseMobility } from '../sim/mobility';
 import { reactionsData, residualTier, type ReactionMode } from '../sim/reactions';
 import { cycleAngleSeries, engineData } from '../sim/engineReport';
 import { realismOf } from './realismHook';
-import { idealGearWarnings } from '../sim/gearLoss';
+import { idealGearWarnings } from '../sim/transmissionReport';
+import { ledgerOf } from '../sim/ledger';
 import { driveReport } from '../sim/driveReport';
 import { errorMessage } from '@lib/errorMessage';
 import { dynamicsOf } from './bodies';
@@ -42,6 +43,18 @@ type Attempt =
  *          FPR_LOOP_PRISMATIC / FPR_SPHERICAL_TREE (topology), FPR_LOOP_OPEN (a loop is open at the start pose) -> rejected, nothing run
  * @invariant kernel-optional: body mass properties (buildSimulationModel) are exact with a kernel, mesh integration otherwise
  */
+/** Stop peaks with the static inertia (kg·m² or kg) the stop's damping was scaled to (constant-inertia approximation, spec 13.15). */
+function stopsData(
+  stops: NonNullable<SimulationTrace['stops']>,
+  built: BuiltSimulation,
+): Record<string, { peakPenetration: number; peakForce: number; effectiveInertia: number }> {
+  const inertiaOf = (key: string): number =>
+    built.model.jointPhysics?.limits.find((limit) => limit.joint === key)?.effectiveInertia ??
+    built.model.transmissions.find((coupling) => coupling.id === key)?.backlash?.effectiveInertia ??
+    Number.NaN;
+  return Object.fromEntries(Object.entries(stops).map(([key, stop]) => [key, { ...stop, effectiveInertia: inertiaOf(key) }]));
+}
+
 export const simulateMotion = defineCommand({
   name: 'simulate_motion',
   annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
@@ -69,7 +82,7 @@ export const simulateMotion = defineCommand({
     'reciprocating mass and primary / secondary inertia-force amplitudes against the gas peak (reciprocating[]); an accuracy{} statement for every ' +
     'scalar (band or null = "± ?", basis, origin input / calibrated / predicted / verification, validationLevel 0-4, warnings; a value at a speed the ' +
     'heat release was calibrated at is "calibrated", not validation evidence); plausibility[] (FPR_UNREALISTIC: peak-pressure angle and CA50 vs MBT, ' +
-    'mechanical efficiency, Rotax-class propeller inertia / torque, reciprocating mass on the default density). A gear with efficiency (add_gear_coupling) ' +
+    'mechanical efficiency, Rotax-class propeller inertia / torque, reciprocating mass on the default density). A gear with efficiency (add_transmission) ' +
     'loses (1 - efficiency) of its torque on the driven shaft; a propeller with a Ct / Cp table and airspeed follows J = V/(nD). ' +
     'Datasheet DC motors (add_motor kind "dc" + set_motor_drive): data.drives gives per motor the peak and final current (A), terminal voltage (V), joint torque ' +
     '(N·m) and shaft speed (rpm), RMS values, the number of samples where the current limit clipped the command, the tracking error of a prescribed / ' +
@@ -201,11 +214,13 @@ export const simulateMotion = defineCommand({
       }
     };
     // the auto rule only sees speed and geometry: a light slow loop can still miss the residual gate, so halve the step and retry
-    const adaptive = params.timestep === undefined && structured && settings.timestepS === 'auto';
     const failsGate = (attempt: Attempt): boolean =>
       'error' in attempt ||
       residualTier(attempt.trace.loopResidual ?? 0, settings.loopResidualPassM, settings.loopResidualFailM) === 'fail';
     let attempt = attemptAt(resolved.timestep);
+    // a stop or backlash stiffer than the auto step can integrate (DRV_STEP_TOO_COARSE) halves the step the same way
+    const coarse = 'error' in attempt && attempt.error.includes('DRV_STEP_TOO_COARSE');
+    const adaptive = params.timestep === undefined && settings.timestepS === 'auto' && (structured || coarse);
     let halvings = 0;
     while (adaptive && failsGate(attempt) && halvings < MAX_HALVINGS && attempt.timestep / 2 >= MIN_STEP) {
       const next = attemptAt(attempt.timestep / 2);
@@ -217,7 +232,9 @@ export const simulateMotion = defineCommand({
     try {
       const { trace, built, timestep } = attempt;
       const basis =
-        halvings > 0 ? `${resolved.basis}; halved ${halvings}x from ${resolved.timestep} s after the loop residual failed` : resolved.basis;
+        halvings > 0
+          ? `${resolved.basis}; halved ${halvings}x from ${resolved.timestep} s by the auto rule (loop residual gate, or a stop / backlash too stiff for the step)`
+          : resolved.basis;
       const base = simulationData(dynamics, built.mass, trace, {
         engine: engine.name,
         duration,
@@ -232,10 +249,11 @@ export const simulateMotion = defineCommand({
           : null;
       const residual = trace.loopResidual ?? 0;
       const tier = residualTier(residual, settings.loopResidualPassM, settings.loopResidualFailM);
-      const warnings = [...base.warnings, ...(driven?.warnings ?? [])];
+      const ledger = driven === null ? ledgerOf([], trace, base.energy) : driven.ledger;
+      const warnings = [...base.warnings, ...(driven?.warnings ?? []), ...built.notes];
       if (halvings > 0)
         warnings.push(
-          `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s left the loop residual above the fail tier, ${timestep} s is used`,
+          `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s failed the loop residual gate or was too coarse for a stop / backlash, ${timestep} s is used`,
         );
       if (params.sampleRate !== undefined && attempt.sampleInterval > 1 / params.sampleRate + 1e-12)
         warnings.push(
@@ -305,7 +323,9 @@ export const simulateMotion = defineCommand({
               },
             }
           : {}),
-        ...(driven === null ? {} : { drives: driven.drives, ...(driven.ledger === null ? {} : { ledger: driven.ledger }) }),
+        ...(driven === null ? {} : { drives: driven.drives }),
+        ...(ledger === null ? {} : { ledger }),
+        ...(trace.stops === undefined ? {} : { stops: stopsData(trace.stops, built) }),
         ...(reactions !== null ? { reactions } : {}),
         ...(engineReport !== null ? { engineReport: { ...engineReport, ...(realism !== null ? { realism } : {}) } } : {}),
       };

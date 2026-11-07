@@ -990,7 +990,7 @@ Decisions:
 - **Imported comments** keep the BCF Author as `importedAuthor` (unverified label, `author` stays `agent`; `export_bcf` writes it back); comments dedupe on author + text. One import creates at most 20 000 records (`VIS_BCF_LIMIT`) and an entry may inflate at most 200 times its size.
 - **VC-VIS-15 runs only when `xmllint` and `LLULL_BCF_XSD_DIR` are present**; elsewhere only the structural unit test covers it.
 
-Built later (§12.19): BCF 2.1 export, `VIS_BCF_COLOURING_LARGE`, viewpoint colouring. Not built: per-component `IfcGuid` mapping (needs the 08-DAT IFC export), import of
+Built later (§12.19): BCF 2.1 export, `VIS_BCF_COLOURING_LARGE`, viewpoint colouring. Not built: per-component `IfcGuid` mapping (the 08-DAT IFC export exists, the id mapping into BCF does not), import of
 snapshots, section boxes and markups from a BCF viewpoint (`Lines`, `ClippingPlanes` are ignored), the vendored XSDs for the server test, and the UI for any of it.
 
 ### 12.10 As built — VIS-M4b profile, section box, review highlight, visible entities, 2026-11-03

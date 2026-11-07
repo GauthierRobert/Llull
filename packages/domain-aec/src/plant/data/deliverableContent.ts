@@ -39,6 +39,15 @@ export const deliverableIds = (doc: CadDocument): string[] => [
   ),
 ];
 
+const unknownScope = (reference: string, fixed: boolean): Outcome<never> =>
+  failure(
+    'DAT_HIERARCHY_UNKNOWN',
+    fixed
+      ? `the scope "${reference}" of this revision no longer exists in the hierarchy (a regenerate or a hierarchy replace dropped it)`
+      : `no (or an ambiguous) hierarchy node "${reference}"`,
+    ['hierarchy'],
+  );
+
 /**
  * The content of `id` in a scope. `scope.fixed` (an existing revision): `scope.hierarchy` is its stored node id (or undefined = the whole plant) and nothing else
  * decides the scope, a saved definition's own hierarchy included; otherwise (a new revision) `scope.hierarchy` or else the definition's hierarchy is the scope.
@@ -53,15 +62,28 @@ export function deliverableContent(
   const data = getPlantData(doc);
   const hierarchy = scope.hierarchy;
   if (id === IFC_DELIVERABLE) {
-    if (hierarchy !== undefined)
-      return failure('DAT_PARAM_INVALID', 'the ifc deliverable is the whole plant: omit hierarchy', ['hierarchy']);
-    const exported = execute(doc, 'export_ifc', { schema: 'IFC4X3_ADD2', confirmExportControlled }, ctx);
+    const node = hierarchy === undefined ? undefined : resolveNode(data, hierarchy);
+    if (node === null || node === 'ambiguous') return unknownScope(hierarchy ?? '', scope.fixed);
+    const exported = execute(
+      doc,
+      'export_ifc',
+      { schema: 'IFC4X3_ADD2', confirmExportControlled, ...(node === undefined ? {} : { plant: { scope: node.id } }) },
+      ctx,
+    );
     const text = (exported.data as { ifc?: unknown } | undefined)?.ifc;
     if (exported.rejected === true || typeof text !== 'string')
       return failure(exported.error?.code ?? 'DAT_PARAM_INVALID', `the IFC export of the deliverable failed: ${exported.summary}`, [
         'deliverable',
       ]);
-    return { ok: true, content: { sha256: sha256Hex(text) } };
+    const scoped = node === undefined ? null : objectsInScope(doc, node.id);
+    return {
+      ok: true,
+      content: {
+        sha256: sha256Hex(text),
+        ...(node === undefined ? {} : { hierarchyId: node.id }),
+        ...(scoped?.ok === true ? { objects: new Set(scoped.objects.map((object) => object.id)) } : {}),
+      },
+    };
   }
   const definition = own(data.reports, id);
   const builtin = (REPORT_DELIVERABLES as readonly string[]).includes(id);
@@ -69,14 +91,7 @@ export function deliverableContent(
     return failure('DAT_PARAM_INVALID', `no deliverable "${id}": use ${deliverableIds(doc).join(', ')}`, ['deliverable']);
   const wanted = scope.fixed ? hierarchy : (hierarchy ?? definition?.hierarchy);
   const node = wanted === undefined ? null : resolveNode(data, wanted);
-  if (wanted !== undefined && (node === null || node === 'ambiguous'))
-    return failure(
-      'DAT_HIERARCHY_UNKNOWN',
-      scope.fixed
-        ? `the scope "${wanted}" of this revision no longer exists in the hierarchy (a regenerate or a hierarchy replace dropped it)`
-        : `no (or an ambiguous) hierarchy node "${wanted}"`,
-      ['hierarchy'],
-    );
+  if (wanted !== undefined && (node === null || node === 'ambiguous')) return unknownScope(wanted, scope.fixed);
   const built = buildReport(doc, {
     kind: (builtin ? id : definition?.kind) as ReportKind,
     hierarchy: wanted,

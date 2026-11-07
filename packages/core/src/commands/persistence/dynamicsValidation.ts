@@ -1,11 +1,12 @@
-/** Load-time validation of the optional `dynamics` field (rigid bodies, joints, gears, motors, propellers). */
+/** Load-time validation of the optional `dynamics` field (rigid bodies, joints, transmissions, motors, propellers). */
 
 import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
 import { dcMotorProblem, driveProblem, driveReferenceProblems, profileProblem } from './drivesValidation';
-import { gearExtrasProblem, lossesProblem, propellerExtrasProblem } from './engineValidation';
+import { lossesProblem, propellerExtrasProblem } from './engineValidation';
+import { jointPhysicsProblem, loadScheduleProblem, transmissionProblem, transmissionReferenceProblems } from './transmissionsValidation';
 
 const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
 const isNonNegative = (value: unknown): boolean => isFiniteNumber(value) && value >= 0;
@@ -42,13 +43,6 @@ const jointProblem: Check = (joint) =>
               ? 'a spherical joint has damping = friction = initialVelocity = 0 and no spring'
               : null;
 
-const gearProblem: Check = (gear) =>
-  typeof gear['driver'] !== 'string' || typeof gear['driven'] !== 'string'
-    ? 'driver and driven must be joint ids'
-    : !isFiniteNumber(gear['ratio']) || gear['ratio'] === 0
-      ? 'ratio must be a finite non-zero number'
-      : gearExtrasProblem(gear);
-
 const isCurve = (value: unknown): boolean =>
   Array.isArray(value) &&
   value.length > 0 &&
@@ -60,8 +54,10 @@ const motorProblem: Check = (motor) => {
     return isCurve(motor['curve']) && isFiniteNumber(motor['throttle']) ? null : 'torque_curve needs curve [[rpm, N·m], …] and throttle';
   if (motor['kind'] === 'speed')
     return isFiniteNumber(motor['rpm']) && isPositive(motor['maxTorque']) ? null : 'speed needs rpm and maxTorque > 0';
+  if (motor['kind'] === 'linear_speed')
+    return isFiniteNumber(motor['speedMps']) && isPositive(motor['maxForceN']) ? null : 'linear_speed needs speedMps and maxForceN > 0';
   if (motor['kind'] === 'dc') return dcMotorProblem(motor);
-  return "kind must be 'torque_curve', 'speed' or 'dc'";
+  return "kind must be 'torque_curve', 'speed', 'linear_speed' or 'dc'";
 };
 
 const propellerProblem: Check = (propeller) =>
@@ -168,7 +164,6 @@ const solverProblem = (solver: unknown): string | null => {
 const TABLES: ReadonlyArray<readonly [string, Check]> = [
   ['bodies', bodyProblem],
   ['joints', jointProblem],
-  ['gears', gearProblem],
   ['motors', motorProblem],
   ['propellers', propellerProblem],
 ];
@@ -176,8 +171,7 @@ const TABLES: ReadonlyArray<readonly [string, Check]> = [
 /** Problems of the optional `dynamics` field of a raw document (absent is valid). */
 export function dynamicsProblems(value: unknown): string[] {
   if (value === undefined) return [];
-  if (!isRecord(value) || !isVec3(value['gravity']))
-    return ['dynamics must be { gravity: [x, y, z], bodies, joints, gears, motors, propellers }'];
+  if (!isRecord(value) || !isVec3(value['gravity'])) return ['dynamics must be { gravity: [x, y, z], bodies, joints, motors, propellers }'];
   const errors: string[] = [];
   const solverError = solverProblem(value['solver']);
   if (solverError !== null) errors.push(`dynamics.solver: ${solverError}`);
@@ -188,6 +182,9 @@ export function dynamicsProblems(value: unknown): string[] {
     ...(value['springs'] === undefined ? [] : [['springs', springProblem] as const]),
     ...(value['profiles'] === undefined ? [] : [['profiles', profileProblem] as const]),
     ...(value['drives'] === undefined ? [] : [['drives', driveProblem] as const]),
+    ...(value['transmissions'] === undefined ? [] : [['transmissions', transmissionProblem] as const]),
+    ...(value['jointPhysics'] === undefined ? [] : [['jointPhysics', jointPhysicsProblem] as const]),
+    ...(value['loadSchedules'] === undefined ? [] : [['loadSchedules', loadScheduleProblem] as const]),
   ];
   for (const [table, check] of tables) {
     const records = value[table];
@@ -204,6 +201,6 @@ export function dynamicsProblems(value: unknown): string[] {
       }
     }
   }
-  errors.push(...driveReferenceProblems(value));
+  errors.push(...driveReferenceProblems(value), ...transmissionReferenceProblems(value));
   return errors;
 }

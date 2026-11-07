@@ -80,8 +80,12 @@ describe('dynamics persistence', () => {
     expect(broken('propellers', 'prop', { thrustDirection: 'up' })[0]).toMatch(/thrustDirection/);
     expect(broken('propellers', 'prop', { joint: null })[0]).toMatch(/joint/);
     expect(broken('bodies', 'rotor', { id: 'other' })[0]).toMatch(/whose id is 'rotor'/);
-    expect(dynamicsProblems({ ...dynamics, gears: { g: { id: 'g', driver: 'a', driven: 'b', ratio: 0 } } })[0]).toMatch(/ratio/);
-    expect(dynamicsProblems({ ...dynamics, gears: { g: { id: 'g', driver: 1, driven: 'b', ratio: 1 } } })[0]).toMatch(/driver/);
+    expect(
+      dynamicsProblems({ ...dynamics, transmissions: { g: { kind: 'gear', id: 'g', driver: 'a', driven: 'b', ratio: 0 } } })[0],
+    ).toMatch(/ratio/);
+    expect(dynamicsProblems({ ...dynamics, transmissions: { g: { kind: 'gear', id: 'g', driver: 1, driven: 'b', ratio: 1 } } })[0]).toMatch(
+      /driver/,
+    );
     expect(dynamicsProblems({ ...dynamics, joints: 'none' })[0]).toMatch(/dynamics\.joints must be an object/);
     expect(dynamicsProblems({ ...dynamics, bodies: JSON.parse('{"__proto__": {}}') as unknown })).toEqual(
       expect.arrayContaining([expect.stringMatching(/reserved/)]),

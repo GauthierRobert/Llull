@@ -68,7 +68,7 @@ function staticRun(torque: number, ratio: number, propeller: { diameter: number;
     }).document;
   } else {
     doc = execute(doc, 'add_body_joint', { id: 'prop_j', kind: 'revolute', child: 'prop', anchor: [0, 300, 0], axis: [0, 1, 0] }).document;
-    doc = execute(doc, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', ratio }).document;
+    doc = execute(doc, 'add_transmission', { kind: 'gear', driver: 'crank_j', driven: 'prop_j', ratio }).document;
     doc = execute(doc, 'add_motor', { joint: 'crank_j', kind: 'torque_curve', torque }).document;
     doc = execute(doc, 'add_propeller', {
       joint: 'prop_j',

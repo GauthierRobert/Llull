@@ -7,10 +7,10 @@ description: Make parts move in llull (local CAD) through the `llull` CLI — ki
 
 llull has two motion models. Pick one per question:
 
-| Question | Model | Commands |
-| -------- | ----- | -------- |
-| "Where is part B when the hinge is at 30°?" (poses, no forces) | kinematic joints between component instances | `add_joint` `set_joint_value` `add_drive_relation` `evaluate_motion` |
-| "How fast does it spin / how long does it take / what forces?" | rigid-body dynamics (MuJoCo) | `add_rigid_body` `add_body_joint` `add_spring` `add_motor` `add_gear_coupling` `add_propeller` `set_gravity` `simulate_motion` |
+| Question                                                       | Model                                        | Commands                                                                                                                                                              |
+| -------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Where is part B when the hinge is at 30°?" (poses, no forces) | kinematic joints between component instances | `add_joint` `set_joint_value` `add_drive_relation` `evaluate_motion`                                                                                                  |
+| "How fast does it spin / how long does it take / what forces?" | rigid-body dynamics (MuJoCo)                 | `add_rigid_body` `add_body_joint` `add_spring` `add_motor` `add_transmission` `set_joint_physics` `add_load_schedule` `add_propeller` `set_gravity` `simulate_motion` |
 
 Discover details with `llull describe <command>`; list them with `llull list assembly`. Units: document lengths (mm) for anchors and
 positions, SI for dynamics (kg, N·m, rad/s, rpm, s). Angles in RADIANS.
@@ -39,7 +39,11 @@ Plan the numbers first. Worked example — a steel flywheel R50 x 20 mm on a dam
   { "command": "set_units", "params": { "units": "mm" } },
   { "command": "add_cylinder", "params": { "radius": 50, "height": 20, "position": [0, 0, 0] }, "as": "disc" },
   { "command": "add_rigid_body", "params": { "entityIds": ["$disc"], "name": "flywheel", "density": 7850 }, "as": "wheel" },
-  { "command": "add_body_joint", "params": { "kind": "revolute", "child": "$wheel", "anchor": [0, 0, 0], "axis": [0, 0, 1], "damping": 0.01 }, "as": "shaft" },
+  {
+    "command": "add_body_joint",
+    "params": { "kind": "revolute", "child": "$wheel", "anchor": [0, 0, 0], "axis": [0, 0, 1], "damping": 0.01 },
+    "as": "shaft"
+  },
   { "command": "add_motor", "params": { "joint": "$shaft", "kind": "torque_curve", "torque": 1 } }
 ]
 ```
