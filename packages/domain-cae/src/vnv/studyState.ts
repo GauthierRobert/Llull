@@ -1,13 +1,14 @@
 /** Derived state of a recorded convergence study: staleness, report, review reasons. Nothing here is stored in the document (L8). */
 
-import type { AnalysisCase, MeshControls } from '@core/model/analysis';
-import type { ConvergenceStudy, StudyExceptionRecord } from '@core/model/convergenceStudy';
+import type { AnalysisCase, MeshControls, ThermalStep } from '@core/model/analysis';
+import type { ConvergenceStudy, StudyExceptionRecord, StudyRefinement } from '@core/model/convergenceStudy';
 import type { CadDocument } from '@core/model/types';
 import type { ConvergenceSample } from '@lib/convergence';
 import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../decks/elastic';
 import { analysisInputHash } from '../hash/inputHash';
 import { analysisOf, withCase } from '../shared/access';
 import { analyseSamples, type AnalysisOutcome } from './convergenceAnalysis';
+import { analyseOrderPair } from './orderPairAnalysis';
 
 export type CaseStudy = ConvergenceStudy<MeshControls>;
 
@@ -46,9 +47,28 @@ export function withoutStudy(doc: CadDocument, analysisCase: AnalysisCase, study
   );
 }
 
-/** The case as it was when level `controls` were meshed: the hash of this equals the level's recorded input hash while nothing else changed. */
-export const levelDocument = (doc: CadDocument, analysisCase: AnalysisCase, controls: MeshControls): CadDocument =>
-  withCase(doc, { ...analysisCase, mesh: controls });
+/** The transient step of a time-step level: constant increments of `incrementS` to the case's end time, every increment written (the exclusive limits of an adaptive step dropped). */
+export const dtStep = (step: ThermalStep, incrementS: number): ThermalStep => ({
+  ...(step.endTimeS !== undefined ? { endTimeS: step.endTimeS } : {}),
+  initialIncrementS: incrementS,
+  fixedIncrements: true,
+});
+
+/** What a level changes in the case: its mesh controls, and for a time-step study its transient step (the level's `h` is the increment, in seconds). */
+export interface LevelSpec {
+  readonly controls: MeshControls;
+  readonly h: number;
+}
+
+/** The case as it was when `level` was run: the hash of this equals the level's recorded input hash while nothing else changed. */
+export const levelDocument = (doc: CadDocument, analysisCase: AnalysisCase, refinement: StudyRefinement, level: LevelSpec): CadDocument =>
+  withCase(doc, {
+    ...analysisCase,
+    mesh: level.controls,
+    ...(refinement === 'dt' && analysisCase.thermal !== undefined
+      ? { thermal: { ...analysisCase.thermal, step: dtStep(analysisCase.thermal.step, level.h) } }
+      : {}),
+  });
 
 /**
  * Why `study` no longer matches the analysis: levels whose input hash (05 TR-FEA-06, with the level's own mesh controls) is not the current
@@ -58,13 +78,14 @@ export const levelDocument = (doc: CadDocument, analysisCase: AnalysisCase, cont
 export function staleReasons(doc: CadDocument, analysisCase: AnalysisCase, study: CaseStudy): string[] {
   const reasons: string[] = [];
   const stale = study.levels.filter(
-    (level) => analysisInputHash(levelDocument(doc, analysisCase, level.controls), analysisCase.id, 'full') !== level.inputHash,
+    (level) => analysisInputHash(levelDocument(doc, analysisCase, study.refinement, level), analysisCase.id, 'full') !== level.inputHash,
   );
   if (stale.length > 0)
     reasons.push(`level ${stale.map((level) => level.index).join(', ')}: the analysis inputs differ from the ones it was run with`);
   const finest = study.levels[0]?.controls;
   const now = analysisCase.mesh;
-  if (finest !== undefined && (finest.order !== now.order || finest.elementFamily !== now.elementFamily || finest.bonding !== now.bonding))
+  const orderMoved = study.refinement !== 'p' && finest?.order !== now.order;
+  if (finest !== undefined && (orderMoved || finest.elementFamily !== now.elementFamily || finest.bonding !== now.bonding))
     reasons.push(
       `the case now meshes with ${now.elementFamily} order ${now.order}${now.bonding === undefined ? '' : ` ${now.bonding}`}, the study with ${finest.elementFamily} order ${finest.order}${finest.bonding === undefined ? '' : ` ${finest.bonding}`}`,
     );
@@ -75,10 +96,17 @@ const samplesOf = (study: CaseStudy): ConvergenceSample[] => study.levels.map((l
 
 /**
  * The GCI analysis of a study's levels (finest first).
- * @invariant Fs and the formal order are the study's NAMED values (source and `defaulted` kept)
+ * @invariant Fs and the formal order are the study's NAMED values (source and `defaulted` kept); 4 or more levels of an h / dt study use the least-squares
+ *   fit (method named in the report), exactly 3 the Celik triplet; an order (p) study gives the two-order difference indicator only
  */
 export function analyseStudy(study: CaseStudy, gciTarget?: number): AnalysisOutcome {
+  const [fine, coarse] = study.levels;
+  if (study.refinement === 'p')
+    return fine === undefined || coarse === undefined
+      ? { ok: false, code: 'VNV_LEVELS_INVALID', message: 'an order study needs 2 levels', path: 'levels' }
+      : analyseOrderPair(fine.value, coarse.value, gciTarget);
   const outcome = analyseSamples(samplesOf(study), {
+    ...(study.levels.length >= 4 ? { method: 'least_squares' as const } : {}),
     ...(study.safetyFactor.defaulted ? {} : { safetyFactor: study.safetyFactor.value }),
     ...(study.formalOrder !== undefined ? { formalOrder: study.formalOrder.value } : {}),
     ...(gciTarget !== undefined ? { gciTarget } : {}),

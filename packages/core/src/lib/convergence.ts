@@ -8,7 +8,7 @@ export interface ConvergenceSample {
   readonly value: number;
 }
 
-export type ConvergenceStatus = 'monotone' | 'oscillatory' | 'divergent' | 'converged_exactly' | 'two_level';
+export type ConvergenceStatus = 'monotone' | 'oscillatory' | 'divergent' | 'converged_exactly' | 'two_level' | 'order_pair';
 
 export interface TripletReport {
   readonly levels: readonly [number, number, number];
@@ -130,4 +130,271 @@ export function requiredSpacing(gciTarget: number, gci21: number, p: number, h1:
 /** Representative spacing h = (measure / elements)^(1/dimension) of an unstructured mesh. */
 export function representativeSpacing(measure: number, elements: number, dimension: 1 | 2 | 3): number {
   return (measure / elements) ** (1 / dimension);
+}
+
+/** Search range of the fitted order: the lower bound excludes a vanishing order (a plateau), the upper one a numerically meaningless fit. */
+const LSQ_P_MIN = 0.05;
+const LSQ_P_MAX = 8;
+const LSQ_P_GRID_STEP = 0.05;
+const LSQ_GOLDEN_ITERATIONS = 80;
+const LSQ_NEWTON_ITERATIONS = 100;
+
+export interface LeastSquaresFit {
+  readonly converged: true;
+  /** Fitted order of f = f0 + alpha h^p. */
+  readonly p: number;
+  /** Fitted value at h = 0 (the extrapolated value). */
+  readonly f0: number;
+  readonly alpha: number;
+  /** Weighted sum of squared residuals. */
+  readonly rss: number;
+  /** sqrt(sum r^2 / n) of the plain residuals r = f - fit, in the unit of f. */
+  readonly residualRms: number;
+  /** sqrt(sum r^2 / (n - 3)): the standard deviation of the fit (3 fitted parameters), in the unit of f. */
+  readonly standardDeviation: number;
+  readonly degreesOfFreedom: number;
+  /** Asymptotic standard errors from s^2 (J^T W J)^-1 at the optimum; absent when that matrix is singular. */
+  readonly standardError?: { readonly p: number; readonly f0: number; readonly alpha: number };
+  readonly iterations: number;
+}
+
+export type LeastSquaresResult = LeastSquaresFit | { readonly converged: false; readonly reason: string };
+
+interface LinearFit {
+  readonly f0: number;
+  readonly alpha: number;
+  readonly rss: number;
+}
+
+const at = (values: readonly number[], index: number): number => values[index] as number;
+
+/** Weighted straight-line fit of f against x = h^p (centred form: no cancellation when the x are close). */
+function linearFit(h: readonly number[], f: readonly number[], w: readonly number[], p: number): LinearFit {
+  let sw = 0;
+  let sx = 0;
+  let sf = 0;
+  h.forEach((hi, i) => {
+    sw += at(w, i);
+    sx += at(w, i) * hi ** p;
+    sf += at(w, i) * at(f, i);
+  });
+  const xMean = sx / sw;
+  const fMean = sf / sw;
+  let sxx = 0;
+  let sxf = 0;
+  h.forEach((hi, i) => {
+    const dx = hi ** p - xMean;
+    sxx += at(w, i) * dx * dx;
+    sxf += at(w, i) * dx * (at(f, i) - fMean);
+  });
+  const alpha = sxf / sxx;
+  const f0 = fMean - alpha * xMean;
+  let rss = 0;
+  h.forEach((hi, i) => {
+    const r = at(f, i) - f0 - alpha * hi ** p;
+    rss += at(w, i) * r * r;
+  });
+  return { f0, alpha, rss };
+}
+
+/** Solve the 3 x 3 system `a x = b` by Gaussian elimination with partial pivoting; null when singular. */
+function solve3(a: readonly (readonly number[])[], b: readonly number[]): number[] | null {
+  const m = a.map((row, i) => [...row, at(b, i)]);
+  for (let col = 0; col < 3; col += 1) {
+    let pivot = col;
+    for (let row = col + 1; row < 3; row += 1)
+      if (Math.abs(at(m[row] as number[], col)) > Math.abs(at(m[pivot] as number[], col))) pivot = row;
+    const top = m[pivot] as number[];
+    if (!(Math.abs(at(top, col)) > 1e-300)) return null;
+    m[pivot] = m[col] as number[];
+    m[col] = top;
+    for (let row = col + 1; row < 3; row += 1) {
+      const line = m[row] as number[];
+      const factor = at(line, col) / at(top, col);
+      for (let k = col; k < 4; k += 1) line[k] = at(line, k) - factor * at(top, k);
+    }
+  }
+  const x = [0, 0, 0];
+  for (let row = 2; row >= 0; row -= 1) {
+    const line = m[row] as number[];
+    let sum = at(line, 3);
+    for (let k = row + 1; k < 3; k += 1) sum -= at(line, k) * at(x, k);
+    x[row] = sum / at(line, row);
+  }
+  return x.every(Number.isFinite) ? x : null;
+}
+
+interface Parameters3 {
+  readonly f0: number;
+  readonly alpha: number;
+  readonly p: number;
+}
+
+/** J^T W J, J^T W r and the weighted residual sum of f - f0 - alpha h^p at `parameters`, for the Gauss-Newton step and the covariance. */
+function normalEquations(
+  h: readonly number[],
+  f: readonly number[],
+  w: readonly number[],
+  parameters: Parameters3,
+): { readonly jtj: number[][]; readonly jtr: number[]; readonly rss: number } {
+  const jtj = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ];
+  const jtr = [0, 0, 0];
+  let rss = 0;
+  h.forEach((hi, i) => {
+    const wi = at(w, i);
+    const x = hi ** parameters.p;
+    const r = at(f, i) - parameters.f0 - parameters.alpha * x;
+    const j = [-1, -x, -parameters.alpha * x * Math.log(hi)];
+    rss += wi * r * r;
+    for (let a = 0; a < 3; a += 1) {
+      jtr[a] = at(jtr, a) + wi * at(j, a) * r;
+      const row = jtj[a] as number[];
+      for (let b = 0; b < 3; b += 1) row[b] = at(row, b) + wi * at(j, a) * at(j, b);
+    }
+  });
+  return { jtj, jtr, rss };
+}
+
+/** Minimise `objective` over [lo, hi] by golden-section search (the objective is the variable-projection residual: f0 and alpha are solved for each p). */
+function goldenMinimum(objective: (p: number) => number, lo: number, hi: number): number {
+  const ratio = (Math.sqrt(5) - 1) / 2;
+  let a = lo;
+  let b = hi;
+  let c = b - ratio * (b - a);
+  let d = a + ratio * (b - a);
+  let fc = objective(c);
+  let fd = objective(d);
+  for (let iteration = 0; iteration < LSQ_GOLDEN_ITERATIONS; iteration += 1) {
+    if (fc < fd) {
+      b = d;
+      d = c;
+      fd = fc;
+      c = b - ratio * (b - a);
+      fc = objective(c);
+    } else {
+      a = c;
+      c = d;
+      fc = fd;
+      d = a + ratio * (b - a);
+      fd = objective(d);
+    }
+  }
+  return (a + b) / 2;
+}
+
+/** Gauss-Newton polish of all three parameters from `start` (backtracking; exact data converge quadratically to rounding). */
+function polish(
+  h: readonly number[],
+  f: readonly number[],
+  w: readonly number[],
+  start: Parameters3,
+): { readonly parameters: Parameters3; readonly iterations: number } {
+  let current = start;
+  let iterations = 0;
+  for (; iterations < LSQ_NEWTON_ITERATIONS; iterations += 1) {
+    const { jtj, jtr, rss } = normalEquations(h, f, w, current);
+    if (rss === 0) break;
+    const step = solve3(
+      jtj,
+      jtr.map((value) => -value),
+    );
+    if (step === null) break;
+    let scale = 1;
+    let accepted = false;
+    for (let halving = 0; halving < 30 && !accepted; halving += 1) {
+      const next = { f0: current.f0 + scale * at(step, 0), alpha: current.alpha + scale * at(step, 1), p: current.p + scale * at(step, 2) };
+      if (next.p > LSQ_P_MIN && next.p < LSQ_P_MAX && normalEquations(h, f, w, next).rss <= rss) {
+        current = next;
+        accepted = true;
+      } else scale /= 2;
+    }
+    if (!accepted || Math.abs(scale * at(step, 2)) < 1e-15 * Math.max(1, Math.abs(current.p))) break;
+  }
+  return { parameters: current, iterations };
+}
+
+/**
+ * Least-squares fit of f = f0 + alpha h^p to 4 or more samples (the model of Eca & Hoekstra 2014, JCP 262, for noisy refinement studies): for each p
+ * the linear parameters follow from a weighted straight-line fit, p minimises the residual over [0.05, 8] (grid, golden section), and a
+ * Gauss-Newton polish on all three parameters restores full precision (exact data are recovered to rounding). Weights default to 1.
+ * @invariant pure, IEEE double; a data set of the exact law gives rss ~0 and p to ~1e-12
+ * @failure fewer than 4 samples, non-positive h, non-finite values, bad weights -> `{ converged: false }`; the minimum on the search boundary
+ *   (no finite order in range: a plateau or divergence) -> `{ converged: false }`
+ */
+export function leastSquaresOrder(samples: readonly ConvergenceSample[], weights?: readonly number[]): LeastSquaresResult {
+  const n = samples.length;
+  if (n < 4) return { converged: false, reason: 'at least 4 samples are needed' };
+  const h = samples.map((sample) => sample.h);
+  const f = samples.map((sample) => sample.value);
+  if (!h.every((value) => Number.isFinite(value) && value > 0) || !f.every(Number.isFinite))
+    return { converged: false, reason: 'spacings must be finite and positive, values finite' };
+  const w = weights ?? h.map(() => 1);
+  if (w.length !== n || !w.every((value) => Number.isFinite(value) && value > 0))
+    return { converged: false, reason: 'weights must be one positive finite number per sample' };
+  const rssAt = (p: number): number => linearFit(h, f, w, p).rss;
+  let best = LSQ_P_MIN;
+  let bestRss = rssAt(LSQ_P_MIN);
+  const steps = Math.round((LSQ_P_MAX - LSQ_P_MIN) / LSQ_P_GRID_STEP);
+  for (let k = 1; k <= steps; k += 1) {
+    const p = LSQ_P_MIN + k * LSQ_P_GRID_STEP;
+    const value = rssAt(p);
+    if (value < bestRss) {
+      best = p;
+      bestRss = value;
+    }
+  }
+  if (best <= LSQ_P_MIN || best >= LSQ_P_MAX - LSQ_P_GRID_STEP / 2)
+    return { converged: false, reason: `no order in [${LSQ_P_MIN}, ${LSQ_P_MAX}] fits the samples (the best fit sits on the boundary)` };
+  const p0 = goldenMinimum(rssAt, best - LSQ_P_GRID_STEP, best + LSQ_P_GRID_STEP);
+  const { f0: f00, alpha: alpha0 } = linearFit(h, f, w, p0);
+  const { parameters, iterations } = polish(h, f, w, { f0: f00, alpha: alpha0, p: p0 });
+  const { f0, alpha, p } = parameters;
+  const final = normalEquations(h, f, w, parameters);
+  let plainSquares = 0;
+  h.forEach((hi, i) => {
+    const r = at(f, i) - f0 - alpha * hi ** p;
+    plainSquares += r * r;
+  });
+  const degreesOfFreedom = n - 3;
+  const weightedVariance = final.rss / degreesOfFreedom;
+  const diagonal = [0, 1, 2].map((index) => {
+    const column = solve3(
+      final.jtj,
+      [0, 1, 2].map((row) => (row === index ? 1 : 0)),
+    );
+    return column === null ? Number.NaN : at(column, index) * weightedVariance;
+  });
+  const standardError = diagonal.every((value) => Number.isFinite(value) && value >= 0)
+    ? { f0: Math.sqrt(at(diagonal, 0)), alpha: Math.sqrt(at(diagonal, 1)), p: Math.sqrt(at(diagonal, 2)) }
+    : undefined;
+  return {
+    converged: true,
+    p,
+    f0,
+    alpha,
+    rss: final.rss,
+    residualRms: Math.sqrt(plainSquares / n),
+    standardDeviation: Math.sqrt(plainSquares / degreesOfFreedom),
+    degreesOfFreedom,
+    ...(standardError !== undefined ? { standardError } : {}),
+    iterations,
+  };
+}
+
+/**
+ * Uncertainty of the finest sample from a least-squares fit, after Eca & Hoekstra 2014: `fs` times the extrapolation distance |f1 - f0| plus the standard
+ * deviation of the fit (the weighting of the published procedure is reviewer-confirmable, TECHNICAL_SPEC 11).
+ * @invariant absolute, in the unit of f; `relative` (a fraction of |f1|) is absent when f1 = 0
+ */
+export function leastSquaresUncertainty(
+  fit: LeastSquaresFit,
+  finest: ConvergenceSample,
+  fs: number,
+): { readonly absolute: number; readonly relative?: number } {
+  const absolute = fs * Math.abs(finest.value - fit.f0) + fit.standardDeviation;
+  return { absolute, ...(finest.value !== 0 ? { relative: absolute / Math.abs(finest.value) } : {}) };
 }

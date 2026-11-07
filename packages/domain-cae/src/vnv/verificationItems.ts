@@ -21,6 +21,8 @@ type StudyState = 'current' | 'stale' | 'unverifiable' | 'untrusted';
 
 export interface StudyEntry {
   readonly id: string;
+  /** What the study refines: h mesh size, dt time step, p element order. */
+  readonly refinement: CaseStudy['refinement'];
   readonly quantity: CaseStudy['quantity'];
   readonly unit: string;
   readonly state: StudyState;
@@ -70,6 +72,7 @@ export function studyEntry(
   ];
   const base = {
     id: study.id,
+    refinement: study.refinement,
     quantity: study.quantity,
     unit: study.unit,
     levels: study.levels.length,
@@ -122,7 +125,7 @@ export function studyEntry(
         : {}),
     });
   }
-  const { summaryReport: report } = analysis;
+  const { summaryReport: report, lsq, orderPair } = analysis;
   const extrapolates = report.status === 'monotone' || report.status === 'two_level';
   return {
     entry: {
@@ -133,6 +136,8 @@ export function studyEntry(
         status: report.status,
         ...(extrapolates && report.p !== undefined ? { p: report.p } : {}),
         ...(extrapolates && report.extrapolated !== undefined ? { extrapolated: report.extrapolated } : {}),
+        ...(lsq !== undefined ? { lsq } : {}),
+        ...(orderPair !== undefined ? { orderPair } : {}),
         ...(extrapolates && report.gci21Fine !== undefined
           ? { gci21: { fine: report.gci21Fine, coarse: report.gci21Coarse ?? report.gci21Fine } }
           : {}),
@@ -145,7 +150,8 @@ export function studyEntry(
         triplets: analysis.triplets,
         fractionUnit: 'fraction (gci21, gci32Fine, ea21; 0.01 = 1 %)',
         provenance: {
-          procedure: 'celik2008-gci',
+          procedure: analysis.method,
+          refinement: study.refinement,
           samples: study.levels.map((level) => ({ h: level.h, value: level.value, elements: level.elements })),
           safetyFactor: analysis.safetyFactor.value,
         },

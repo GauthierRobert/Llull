@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { dtStudyBar, orderStudyBar, recordKind } from './kindFixtures';
 import { recordedStudy, studyBar } from './studyFixtures';
 
 const bar = studyBar();
@@ -49,7 +50,7 @@ describe('studies in a saved document', () => {
       (study: Record<string, unknown>, analysisCase: Record<string, unknown>, analysis: Record<string, unknown>) => void,
       RegExp,
     ][] = [
-      ['two levels', (study) => (study['levels'] = (study['levels'] as unknown[]).slice(0, 2)), /levels must hold 3 to 6/],
+      ['two levels', (study) => (study['levels'] = (study['levels'] as unknown[]).slice(0, 2)), /levels must hold 3 to 6 levels/],
       ['h not increasing', (study) => ((study['levels'] as Record<string, unknown>[])[1]!['h'] = 0), /levels\[1\]\.h/],
       ['level index', (study) => ((study['levels'] as Record<string, unknown>[])[2]!['index'] = 7), /levels\[2\]\.index/],
       ['hash', (study) => ((study['levels'] as Record<string, unknown>[])[0]!['meshHash'] = 'xyz'), /meshHash/],
@@ -60,7 +61,9 @@ describe('studies in a saved document', () => {
       ['quantity kind', (study) => (study['quantity'] = { kind: 'torque' }), /quantity has an unknown kind/],
       ['quantity fields', (study) => (study['quantity'] = { kind: 'frequency', mode: 0 }), /needs a mode/],
       ['unit', (study) => (study['unit'] = ''), /unit must be text/],
-      ['refinement', (study) => (study['refinement'] = 'p'), /refinement/],
+      ['refinement', (study) => (study['refinement'] = 'x'), /refinement must be one of/],
+      ['order study with 3 levels', (study) => (study['refinement'] = 'p'), /levels must hold 2 levels/],
+      ['dt study with a measure', (study) => (study['refinement'] = 'dt'), /measure is only for an 'h' study/],
       ['ratio', (study) => (study['ratio'] = 1), /ratio must be > 1/],
       ['measure', (study) => (study['measure'] = { value: 0, dimension: 3 }), /measure is malformed/],
       ['safety factor', (study) => (study['safetyFactor'] = { value: -1, source: 's', defaulted: true }), /safetyFactor/],
@@ -170,5 +173,47 @@ describe('studies and replay (L8)', () => {
       studies: { id: string; state: string }[];
     };
     expect(data.studies.map((entry) => entry.state)).toEqual(['stale']);
+  });
+});
+
+describe('dt and p studies in a saved document (PHY-00 VNV-M4)', () => {
+  const kinds = [
+    ['dt', dtStudyBar()],
+    ['p', orderStudyBar()],
+  ] as const;
+
+  for (const [kind, kindBar] of kinds) {
+    const recorded = recordKind(kindBar);
+
+    it(`${kind}: round-trips, still verifies after a load and replays to the identical study`, () => {
+      const loaded = deserializeDocument(serializeDocument(recorded.doc));
+      expect(serializeDocument(loaded)).toBe(serializeDocument(recorded.doc));
+      const checked = execute(loaded, 'check_verification', { analysisId: kindBar.analysisId }, kindBar.ctx).data as {
+        studies: { state: string; refinement: string }[];
+      };
+      expect(checked.studies.map((entry) => [entry.refinement, entry.state])).toEqual([[kind, 'current']]);
+      const replayed = execute(recorded.doc, 'replay_history', {}, kindBar.ctx).document;
+      expect(JSON.stringify(replayed.analysis)).toBe(JSON.stringify(recorded.doc.analysis));
+    });
+
+    it(`${kind}: load_document refuses mixed kinds, a wrong level count and a stray measure by name`, () => {
+      const loadKind = (edit: (study: Record<string, unknown>) => void): string => {
+        const file = JSON.parse(serializeDocument(recorded.doc)) as {
+          document: { analysis: { cases: Record<string, { studies: Record<string, Record<string, unknown>> }> } };
+        };
+        edit(file.document.analysis.cases[kindBar.analysisId]?.studies[recorded.studyId] as Record<string, unknown>);
+        return execute(createEmptyDocument(), 'load_document', { json: JSON.stringify(file) }).summary;
+      };
+      const controlsOf = (study: Record<string, unknown>, level: number): Record<string, unknown> =>
+        (study['levels'] as { controls: Record<string, unknown> }[])[level]?.controls as Record<string, unknown>;
+      expect(loadKind((study) => (controlsOf(study, 1)['optimize'] = 'none'))).toMatch(/may differ only in/);
+      expect(loadKind((study) => (study['levels'] = (study['levels'] as unknown[]).slice(0, 1)))).toMatch(/levels must hold/);
+      expect(loadKind((study) => (study['measure'] = { value: 2, dimension: 3 }))).toMatch(/measure is only for an 'h' study/);
+      expect(loadKind(() => undefined)).toMatch(/^Loaded document/);
+    });
+  }
+
+  it('an h study loaded without its measure is refused by name', () => {
+    expect(loadEdited((study) => delete study['measure'])).toMatchObject({ summary: expect.stringMatching(/measure is malformed/) });
   });
 });

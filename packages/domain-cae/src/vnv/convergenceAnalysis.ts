@@ -9,13 +9,8 @@ import {
   type TripletReport,
 } from '@lib/convergence';
 import type { NamedValue } from '@core/model/topology';
-
-interface Finding {
-  readonly code: string;
-  readonly severity: 'warning' | 'fail';
-  readonly message: string;
-  readonly remediation: string;
-}
+import { LSQ_METHOD, percent, type Finding, type LeastSquaresSummary, type OrderPairSummary } from './analysisShared';
+import { fitOutcome } from './leastSquaresAnalysis';
 
 export const FS_THREE = { value: 1.25, source: 'Roache 1994; Celik et al. 2008' };
 const FS_TWO = { value: 3, source: "Roache's two-grid recommendation (as reported in arXiv 2103.14559)" };
@@ -23,8 +18,6 @@ const ORDER_TOLERANCE = 0.5;
 const ASYMPTOTIC_BAND: readonly [number, number] = [0.95, 1.05];
 const RATIO_WARN = 1.3;
 const RATIO_REFUSE = 1.1;
-
-export const percent = (fraction: number): string => `${(fraction * 100).toPrecision(3)} %`;
 
 const STATUS_CODES: Partial<Record<ConvergenceStatus, Finding>> = {
   oscillatory: {
@@ -47,6 +40,8 @@ export interface AnalysisOptions {
   readonly formalOrder?: number | undefined;
   readonly orderTolerance?: number | undefined;
   readonly gciTarget?: number | undefined;
+  /** `least_squares`: fit f = f0 + alpha h^p to 4 or more samples (Eca & Hoekstra model) instead of the Celik triplet of the finest three. */
+  readonly method?: 'gci' | 'least_squares' | undefined;
 }
 
 interface ConvergenceAnalysis {
@@ -58,6 +53,9 @@ interface ConvergenceAnalysis {
   readonly defaults: readonly NamedValue[];
   readonly required?: number;
   readonly twoLevel: boolean;
+  readonly method: 'celik2008-gci' | typeof LSQ_METHOD | 'order-difference';
+  readonly lsq?: LeastSquaresSummary;
+  readonly orderPair?: OrderPairSummary;
 }
 
 export type AnalysisOutcome =
@@ -69,8 +67,8 @@ const refused = (code: string, message: string, path: string): AnalysisOutcome =
 /**
  * Report of `samples` (sorted finest first, distinct positive h, finite values).
  * @invariant a ratio between 1.1 and 1.3 is a warning; the Fs default is named; non-monotone triplets carry no extrapolation
- * @failure ratio < 1.1 -> VNV_RATIO_TOO_SMALL; two samples without assumedOrder -> VNV_SAMPLES_INVALID; order iteration not converged ->
- *   VNV_ORDER_NOT_CONVERGED
+ * @failure ratio < 1.1 -> VNV_RATIO_TOO_SMALL; two samples without assumedOrder, or least_squares with fewer than 4 samples -> VNV_SAMPLES_INVALID;
+ *   order iteration not converged -> VNV_ORDER_NOT_CONVERGED (the least-squares path never refuses on the fit: it reports a status)
  */
 export function analyseSamples(samples: readonly ConvergenceSample[], options: AnalysisOptions): AnalysisOutcome {
   const findings: Finding[] = [];
@@ -94,6 +92,8 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
       });
     }
   }
+  const fitted = options.method === 'least_squares';
+  if (fitted && samples.length < 4) return refused('VNV_SAMPLES_INVALID', 'a least-squares fit needs at least 4 samples', 'samples');
   const twoLevel = samples.length === 2;
   const fsDefault = twoLevel ? FS_TWO : FS_THREE;
   const safetyFactor: NamedValue =
@@ -105,6 +105,7 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
 
   const triplets: TripletReport[] = [];
   let summaryReport: TripletReport;
+  let lsq: LeastSquaresSummary | undefined;
   if (twoLevel) {
     const [s1, s2] = samples as [ConvergenceSample, ConvergenceSample];
     const p = options.assumedOrder;
@@ -132,16 +133,25 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
         safetyFactor.value,
         [k, k + 1, k + 2],
       );
-      if ('orderNotConverged' in triplet || (triplet.p !== undefined && !(triplet.p > 0 && Number.isFinite(triplet.p))))
+      const unusable = 'orderNotConverged' in triplet || (triplet.p !== undefined && !(triplet.p > 0 && Number.isFinite(triplet.p)));
+      if (unusable && fitted) continue;
+      if (unusable)
         return refused('VNV_ORDER_NOT_CONVERGED', `the observed-order iteration did not converge for levels ${k}..${k + 2}`, 'samples');
-      triplets.push(triplet);
+      if (!('orderNotConverged' in triplet)) triplets.push(triplet);
     }
-    summaryReport = triplets[0] as TripletReport;
-    const statusFinding = STATUS_CODES[summaryReport.status];
-    if (statusFinding !== undefined) findings.push(statusFinding);
+    if (fitted) {
+      const outcome = fitOutcome(samples, triplets, safetyFactor.value);
+      ({ summaryReport, lsq } = outcome);
+      findings.push(...outcome.findings);
+    } else {
+      summaryReport = triplets[0] as TripletReport;
+      const statusFinding = STATUS_CODES[summaryReport.status];
+      if (statusFinding !== undefined) findings.push(statusFinding);
+    }
   }
 
-  const { p, gci21Fine, asymptoticRatio, status } = summaryReport;
+  const { p, asymptoticRatio, status } = summaryReport;
+  const gci21Fine = lsq !== undefined ? lsq.uncertainty.relative : summaryReport.gci21Fine;
   let formalOrder: NamedValue | undefined;
   if (options.formalOrder !== undefined) {
     formalOrder = { value: options.formalOrder, source: 'caller', defaulted: false };
@@ -183,7 +193,7 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
       findings.push({
         code: 'VNV_GCI_ABOVE_TARGET',
         severity: 'fail',
-        message: `GCI21 ${percent(gci21Fine)} is above the target ${percent(options.gciTarget)}`,
+        message: `${lsq !== undefined ? 'least-squares uncertainty' : 'GCI21'} ${percent(gci21Fine)} is above the target ${percent(options.gciTarget)}`,
         remediation: `refine: the target needs h ≈ ${required.toPrecision(4)}`,
       });
     }
@@ -199,6 +209,8 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
       defaults,
       ...(required !== undefined ? { required } : {}),
       twoLevel,
+      method: lsq !== undefined ? LSQ_METHOD : 'celik2008-gci',
+      ...(lsq !== undefined ? { lsq } : {}),
     },
   };
 }

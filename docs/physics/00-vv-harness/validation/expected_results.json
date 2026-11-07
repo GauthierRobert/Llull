@@ -715,6 +715,104 @@
    "proves": [
     "FR-VNV-16"
    ]
+  },
+  {
+   "id": "VC-VNV-22.a",
+   "quantity": "least-squares order of f = 10 + 0.5 h^2 at h = 0.1, 0.2, 0.4, 0.8 (exact law)",
+   "value": 2.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "model law (hand-derived: the data ARE the law, residual 0)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-19"
+   ]
+  },
+  {
+   "id": "VC-VNV-22.b",
+   "quantity": "least-squares extrapolated value f0 of the same data",
+   "value": 10.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "model law (f0 = 10)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-19"
+   ]
+  },
+  {
+   "id": "VC-VNV-22.c",
+   "quantity": "least-squares order of noisy f = 10 + 0.5 h^1.5 + e at h = 0.1 .. 1.6 (5 levels, e = +-0.0003..0.0005)",
+   "value": 1.50192765189,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-08
+   },
+   "source": "independent fit: scipy.optimize.least_squares (xtol = ftol = gtol = 1e-15)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-19"
+   ]
+  },
+  {
+   "id": "VC-VNV-22.d",
+   "quantity": "least-squares standard error of p for the same noisy data",
+   "value": 0.00277387475274,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-08
+   },
+   "source": "independent: s^2 (J^T J)^-1 at the scipy optimum, s^2 = RSS / (n - 3)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-19"
+   ]
+  },
+  {
+   "id": "VC-VNV-23.a",
+   "quantity": "time-step study (heat_transient, fixed increments dt = 1, 2, 4 s) of T(dt) = 20 + 0.5 dt: observed order",
+   "value": 1.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "model law (first order in dt, hand-derived)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-07"
+   ]
+  },
+  {
+   "id": "VC-VNV-23.b",
+   "quantity": "the same time-step study: extrapolated end temperature (dt -> 0)",
+   "value": 20.0,
+   "unit": "degC",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "model law (T0 = 20)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-07"
+   ]
+  },
+  {
+   "id": "VC-VNV-24",
+   "quantity": "element-order study (order 2 value 40 MPa, order 1 value 43 MPa): relative order difference",
+   "value": 0.075,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "hand: |43 - 40| / 40",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-07"
+   ]
   }
  ]
 }

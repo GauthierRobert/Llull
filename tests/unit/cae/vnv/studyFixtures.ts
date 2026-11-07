@@ -18,10 +18,8 @@ import { gridMesh } from '../gridMesh';
 /** Law of the synthetic solution: f(h) = F0 + C h^2. */
 export const F0 = 100;
 export const C = 2;
-/** Cells (n x 2n x 2n... see `LEVELS`) of the finest, middle and coarsest level. */
+/** Cells n of the (2n x n x n)-cell grid of the finest, middle and coarsest level; the nominal global size of a level is 1 / n mm. */
 const LEVELS: readonly number[] = [4, 2, 1];
-/** Nominal global sizes (mm) of the levels, finest first. */
-const SIZES: readonly number[] = [0.25, 0.5, 1];
 
 export interface StudyBar {
   readonly doc: CadDocument;
@@ -66,7 +64,7 @@ function levelArtifacts(
 ): { mesh: FeMeshArtifact; results: FeResultsArtifact; h: number } {
   const analysisCase = doc.analysis?.cases[analysisId];
   if (analysisCase === undefined) throw new Error('no case');
-  const levelDoc = levelDocument(doc, analysisCase, controls);
+  const levelDoc = levelDocument(doc, analysisCase, 'h', { controls, h: controls.globalSize });
   const grid = gridMesh({ cells: [2 * cells, cells, cells], size: [2, 1, 1] });
   const mesh: FeMeshArtifact = {
     kind: 'fe_mesh',
@@ -98,6 +96,8 @@ function levelArtifacts(
 export interface StudyBarOptions {
   /** The bar's material: 'models' gives property models of basis typical (unverified, PHY-01). */
   readonly material?: 'set' | 'models';
+  /** Grid cells n of each level, finest first (default 4, 2, 1; 4 or more levels are fitted by least squares). */
+  readonly cells?: readonly number[];
   /** Value of level `h` (default the power law F0 + C h^2). */
   readonly value?: (h: number, level: number) => number;
 }
@@ -116,8 +116,8 @@ export function studyBar(options: StudyBarOptions = {}): StudyBar {
   const base = doc.analysis?.cases[bar.analysisId]?.mesh;
   if (base === undefined) throw new Error('no mesh controls');
   const volume = { current: 0 };
-  const levels = LEVELS.map((cells, index) => {
-    const controls: MeshControls = { ...base, globalSize: SIZES[index] ?? 1 };
+  const levels = (options.cells ?? LEVELS).map((cells, index) => {
+    const controls: MeshControls = { ...base, globalSize: 1 / cells };
     const value = (h: number): number => (options.value ?? ((x: number) => F0 + C * x * x))(h, index);
     return { controls, ...levelArtifacts(doc, bar.analysisId, bar.boxId, controls, cells, value, volume) };
   });
@@ -125,6 +125,7 @@ export function studyBar(options: StudyBarOptions = {}): StudyBar {
   const byHash = new Map<string, FeMeshArtifact | FeResultsArtifact>(artifacts.map((artifact) => [hashOf(artifact), artifact]));
   const port: FeArtifactPort = { get: (hash) => byHash.get(hash) ?? null };
   const study = {
+    refinement: 'h',
     quantity: { kind: 'field_max', field: 'von_mises', loadCase: 'LC1' },
     unit: 'MPa',
     ratio: 2,

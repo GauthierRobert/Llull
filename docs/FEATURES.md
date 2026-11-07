@@ -374,7 +374,7 @@
 | `check_thermo_mechanical` | Check a thermo_static or coupled_temperature_displacement analysis before meshing or solving: the stress-free reference temperature, the temperature field (uni… | read-only |
 | `check_timestep_convergence` | Solution verification of an engine run (FR-FPR-79): runs the engine governed at one speed at the solver timestep dt and again at dt/2, and reports the relative… | read-only |
 | `check_topology` | Readiness and review check of a topology study; call it last. | read-only |
-| `check_verification` | Readiness check of the SOLUTION VERIFICATION (mesh convergence) of an analysis: run it at the end of every analysis job. | read-only |
+| `check_verification` | Readiness check of the SOLUTION VERIFICATION (mesh, time-step and element-order convergence) of an analysis: run it at the end of every analysis job. | read-only |
 | `compare_to_expected` | Judge one measured value against one validation case of a physics pack (the `expected_results.json` schema: id, quantity, value, unit, tolerance { rel?, abs?, … | read-only |
 | `compare_to_reference` | Validate the engine model against reference data (add_reference_data) by running it at each operating point and comparing: for every point S (simulated), D (re… | read-only |
 | `compare_to_topology` | Compare a rebuilt solid with the optimum of a solved topology study: both are voxelised on the study grid; iou = shared voxels / union voxels of the rebuilt so… | read-only |
@@ -427,7 +427,7 @@
 | `probe_history` | Read how result probes change over time: for every stored increment of a solved analysis (heat_transient: each written time; a static or steady case has one) r… | read-only |
 | `propagate_uncertainty` | Propagate the scatter of the random variables through ALL (or one) limit states to get the distribution of g itself (not a design point; for one limit state wi… | read-only |
 | `psd_rms` | Overall rms of an acceleration spectral density: spectrum (name) or points [[fHz, g2/Hz], ...], optionally within bandHz. | read-only |
-| `record_convergence_study` | Record a mesh-convergence study of one analysis result, as produced by the host transport run_convergence_study (it re-meshes and re-solves the analysis at 3 t… |  |
+| `record_convergence_study` | Record a convergence study of one analysis result (refinement h = mesh size, dt = transient time step, p = element order), as produced by the host transport ru… |  |
 | `record_explicit_results` | Record the result of an explicit dynamics run made by the host (explicit_run transport) on an explicit_dynamics case. |  |
 | `record_fe_mesh` | Record the summary of a finite-element mesh built by the host (fea_mesh transport) on an analysis. |  |
 | `record_fea_results` | Record the summary of solver results produced by the host (fea_solve transport) on an analysis that has a recorded mesh. |  |

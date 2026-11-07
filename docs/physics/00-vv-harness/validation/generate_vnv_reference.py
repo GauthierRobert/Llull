@@ -278,6 +278,24 @@ def main() -> None:
                        {"input": "MPa expected, mm measured", "code": "VNV_UNIT_MISMATCH", "path": "measured.unit"}],
                       "-", {"exact": True}, "TECHNICAL_SPEC 7.1", "A", ["FR-VNV-16"]))
 
+    # VC-VNV-22..24 (M4, V1): least-squares order, time-step and element-order studies
+    cases.append(case("VC-VNV-22.a", "least-squares order of f = 10 + 0.5 h^2 at h = 0.1, 0.2, 0.4, 0.8 (exact law)",
+                      2.0, "1", {"abs": 1e-9}, "model law (hand-derived: the data ARE the law, residual 0)", "A", ["FR-VNV-19"]))
+    cases.append(case("VC-VNV-22.b", "least-squares extrapolated value f0 of the same data",
+                      10.0, "1", {"abs": 1e-9}, "model law (f0 = 10)", "A", ["FR-VNV-19"]))
+    cases.append(case("VC-VNV-22.c", "least-squares order of noisy f = 10 + 0.5 h^1.5 + e at h = 0.1 .. 1.6 (5 levels, e = +-0.0003..0.0005)",
+                      1.501927651893835, "1", {"abs": 1e-8}, "independent fit: scipy.optimize.least_squares (xtol = ftol = gtol = 1e-15)", "A",
+                      ["FR-VNV-19"]))
+    cases.append(case("VC-VNV-22.d", "least-squares standard error of p for the same noisy data",
+                      0.0027738747527433056, "1", {"abs": 1e-8}, "independent: s^2 (J^T J)^-1 at the scipy optimum, s^2 = RSS / (n - 3)", "A",
+                      ["FR-VNV-19"]))
+    cases.append(case("VC-VNV-23.a", "time-step study (heat_transient, fixed increments dt = 1, 2, 4 s) of T(dt) = 20 + 0.5 dt: observed order",
+                      1.0, "1", {"abs": 1e-9}, "model law (first order in dt, hand-derived)", "A", ["FR-VNV-07"]))
+    cases.append(case("VC-VNV-23.b", "the same time-step study: extrapolated end temperature (dt -> 0)",
+                      20.0, "degC", {"abs": 1e-9}, "model law (T0 = 20)", "A", ["FR-VNV-07"]))
+    cases.append(case("VC-VNV-24", "element-order study (order 2 value 40 MPa, order 1 value 43 MPa): relative order difference",
+                      0.075, "1", {"rel": 1e-12}, "hand: |43 - 40| / 40", "A", ["FR-VNV-07"]))
+
     doc = {
         "pack": "00-vv-harness",
         "generatedBy": "generate_vnv_reference.py",

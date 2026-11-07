@@ -64,7 +64,7 @@ export async function runConvergenceStudy(
   const solveOptions = options.timeoutS === undefined ? {} : { timeoutS: options.timeoutS };
   const runs = new Map<number, { mesh: FeMeshArtifact; meshHash: string; results: FeResultsArtifact; resultsHash: string }>();
   for (const level of [...plan.levels].reverse()) {
-    const sandbox = levelHost(deps.hooks.levelDocumentOf(doc, analysisId, level.controls), deps.store);
+    const sandbox = levelHost(deps.hooks.levelDocumentOf(doc, analysisId, plan.refinement, level), deps.store);
     const meshed = await deps.mesh(analysisId, sandbox);
     if (meshed.isError) return levelFailure(analysisId, level.index, 'meshing', meshed);
     const meshSummary = sandbox.getDoc().analysis?.cases[analysisId]?.meshSummary;
@@ -91,7 +91,7 @@ export async function runConvergenceStudy(
   }
   const ordered = plan.levels.flatMap((level) => {
     const run = runs.get(level.index);
-    return run === undefined ? [] : [{ index: level.index, controls: level.controls, ...run }];
+    return run === undefined ? [] : [{ index: level.index, controls: level.controls, h: level.h, ...run }];
   });
   const study = deps.hooks.studyParams(doc, analysisId, plan, ordered, options);
   if (deps.hooks.isStudyRefusal(study)) return feaFailure(TOOL, study.code, study.message, [analysisId]);

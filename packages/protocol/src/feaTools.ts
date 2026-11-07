@@ -50,6 +50,8 @@ export interface ResultsFileInput {
 /** Parameters of `run_convergence_study`: the flat quantity object is validated by the host (@cae `planStudy`). */
 export interface ConvergenceStudyOptions {
   readonly quantity: Readonly<Record<string, unknown>>;
+  /** 'h' mesh size (default), 'dt' transient time step, 'p' element order; validated by the host. */
+  readonly refinement?: string;
   readonly levels?: number;
   readonly ratio?: number;
   readonly finest?: number;
@@ -181,8 +183,10 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
     {
       name: 'run_convergence_study',
       description:
-        'Mesh-convergence (solution verification) study of ONE result of a finite-element analysis: re-meshes and re-solves the analysis at 3 to 6 ' +
-        'mesh sizes (finest globalSize x ratio^k; the analysis own mesh controls are NOT changed), reads the quantity at every level, and records the ' +
+        'Convergence (solution verification) study of ONE result of a finite-element analysis: re-meshes and re-solves the analysis at 3 to 6 ' +
+        'levels of ONE refinement kind: refinement h (default) mesh sizes (finest globalSize x ratio^k), dt the transient time step of a heat_transient analysis ' +
+        '(fixed increments, finest in seconds, every increment must divide the end time), p the element order (2 levels: order 2 then 1, an indicator only, no observed order); ' +
+        'kinds are never mixed. The analysis own mesh controls and step are NOT changed. Reads the quantity at every level, and records the ' +
         'study with record_convergence_study (which re-derives every number from the stored artifacts). Then run check_verification: observed order, ' +
         'Richardson value and the Grid Convergence Index (a fraction: 0.01 = 1 %). The quantity is { kind: probe, probeId, loadCase? } | { kind: field_max, ' +
         'field: von_mises | u_mag, loadCase } | { kind: frequency, mode } | { kind: buckling_factor, mode }; prefer a probe away from singular spots ' +
@@ -198,14 +202,21 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
             description:
               'The result to follow: kind probe | field_max | frequency | buckling_factor, with probeId / loadCase / field / mode as the kind needs.',
           },
-          levels: { type: 'integer', minimum: 3, maximum: 6, description: 'Number of mesh levels, 3 to 6 (default 3).' },
+          refinement: {
+            type: 'string',
+            enum: ['h', 'dt', 'p'],
+            description:
+              "What the levels refine: 'h' mesh size (default), 'dt' transient time step (heat_transient), 'p' element order (2 levels).",
+          },
+          levels: { type: 'integer', minimum: 2, maximum: 6, description: 'Number of levels: 3 to 6 for h and dt (default 3), 2 for p.' },
           ratio: {
             type: 'number',
             description: 'Size ratio between consecutive levels, > 1.1, recommended >= 1.3 (default 2, an llull choice).',
           },
           finest: {
             type: 'number',
-            description: 'globalSize of the finest level in document units (default: the analysis own globalSize).',
+            description:
+              'Size of the finest level: globalSize in document units for h (default the analysis own), the increment in seconds for dt (default endTime / (8 x ratio^(levels-1))); ignored by p.',
           },
           formalOrder: {
             type: 'number',
@@ -253,7 +264,9 @@ function studyOptions(args: Record<string, unknown>, timeoutS: number | undefine
     if (typeof value !== 'number' || !Number.isFinite(value)) return `${key} must be a finite number`;
     numbers[key] = value;
   }
-  return { quantity, ...numbers, ...(timeoutS === undefined ? {} : { timeoutS }) };
+  const refinement = args['refinement'];
+  if (refinement !== undefined && typeof refinement !== 'string') return 'refinement must be h, dt or p';
+  return { quantity, ...numbers, ...(refinement === undefined ? {} : { refinement }), ...(timeoutS === undefined ? {} : { timeoutS }) };
 }
 
 /** The CSV of a fea_import_field call: inline `csv`, else the exchange-directory file `path`. */

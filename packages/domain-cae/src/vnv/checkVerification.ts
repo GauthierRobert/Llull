@@ -30,13 +30,15 @@ export const checkVerification = defineCommand({
   name: NAME,
   annotations: { readOnly: true },
   description:
-    'Readiness check of the SOLUTION VERIFICATION (mesh convergence) of an analysis: run it at the end of every analysis job. Reads the convergence ' +
+    'Readiness check of the SOLUTION VERIFICATION (mesh, time-step and element-order convergence) of an analysis: run it at the end of every analysis job. Reads the convergence ' +
     'studies recorded by run_convergence_study, re-derives each from the artifact store, and returns status pass | warn | fail with items ' +
-    '[{ code, severity, ids, message, remediation }] and studies [{ id, state current | stale | unverifiable | untrusted, report { p, extrapolated, ' +
-    'gci21 { fine, coarse } as a FRACTION (0.01 = 1 %), asymptoticRatio, safetyFactor, triplets }, reviewRequired }]. Codes: VNV_NO_CONVERGENCE_STUDY ' +
+    '[{ code, severity, ids, message, remediation }] and studies [{ id, refinement h | dt | p, state current | stale | unverifiable | untrusted, report { p, extrapolated, ' +
+    'gci21 { fine, coarse } as a FRACTION (0.01 = 1 %), asymptoticRatio, safetyFactor, triplets, provenance.procedure }, reviewRequired }]. A study of 4 or more levels is FITTED by ' +
+    'least squares (procedure eca-hoekstra-lsq; report.lsq { p, f0, standardError, residual, uncertainty { absolute, relative } }), exactly 3 levels use the Celik GCI triplet, ' +
+    'a dt study follows the transient time step, a p study (orders 2 and 1) gives only an order-difference indicator (report.orderPair), never an order or extrapolation. Codes: VNV_NO_CONVERGENCE_STUDY ' +
     '(no study for a governing quantity), VNV_STUDY_STALE (the analysis changed after the study: re-run it), VNV_GCI_ABOVE_TARGET, VNV_GCI_TARGET_UNSET ' +
     '(no target given: ask the owner, there is no default), VNV_OSCILLATORY / VNV_DIVERGENT / VNV_ORDER_MISMATCH / VNV_NOT_ASYMPTOTIC / ' +
-    'VNV_RATIO_TOO_SMALL, VNV_INPUT_UNVERIFIED (unverified material data), VNV_ARTIFACT_NOT_FOUND / VNV_SUMMARY_MISMATCH. A study that feeds a margin or ' +
+    'VNV_RATIO_TOO_SMALL / VNV_LSQ_POOR_FIT / VNV_P_TWO_LEVEL / VNV_P_DIFFERENCE_ABOVE_TARGET, VNV_INPUT_UNVERIFIED (unverified material data), VNV_ARTIFACT_NOT_FOUND / VNV_SUMMARY_MISMATCH. A study that feeds a margin or ' +
     'rests on unverified data is reviewRequired. A finding a qualified reviewer accepted (accept_verification_exception) is listed as accepted. ' +
     'Read-only; next: run_convergence_study to add or refresh a study.',
   params: z.object({
@@ -112,10 +114,13 @@ export const checkVerification = defineCommand({
     const first = studyEntries.find((entry) => entry.state === 'current');
     const numbers = first?.report;
     const gci = (numbers?.['gci21'] as { fine?: number } | undefined)?.fine;
+    const lsq = numbers?.['lsq'] as { p: number; uncertainty: { relative?: number } } | undefined;
     const lead =
-      numbers !== undefined && typeof numbers['p'] === 'number' && gci !== undefined
-        ? ` ${first?.id}: observed order ${numbers['p'].toPrecision(4)}, estimated discretisation error (GCI) ${(gci * 100).toPrecision(3)} % of the finest value.`
-        : '';
+      lsq?.uncertainty.relative !== undefined
+        ? ` ${first?.id}: least-squares observed order ${lsq.p.toPrecision(4)}, estimated uncertainty ${(lsq.uncertainty.relative * 100).toPrecision(3)} % of the finest value.`
+        : numbers !== undefined && typeof numbers['p'] === 'number' && gci !== undefined
+          ? ` ${first?.id}: observed order ${numbers['p'].toPrecision(4)}, estimated discretisation error (GCI) ${(gci * 100).toPrecision(3)} % of the finest value.`
+          : '';
     return report(
       doc,
       `check_verification '${analysisId}': ${status} — ${studies.length} study(ies), ${current} current; ${standing.length} item(s) standing${standing.length > 0 ? ` (${[...new Set(standing.map((found) => found.code))].join(', ')})` : ''}.${lead}${reviewRequired ? ' Human review required (computed by llull, not approved).' : ''}`,
