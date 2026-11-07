@@ -2,6 +2,7 @@
 
 import type { CadDocument } from '../../model/types';
 import { GROUND } from '../../model/dynamics';
+import { couplingsOf } from '../../model/transmissions';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
@@ -61,8 +62,8 @@ function dynamicsCount(doc: CadDocument): Count | null {
   const removed = joints
     .filter((joint) => isMovable(joint.child) || isMovable(joint.parent))
     .reduce((sum, joint) => sum + REMOVED_BY_DYNAMIC_JOINT[joint.kind], 0);
-  const gears = Object.values(dynamics.gears).filter(
-    (gear) => dynamics.joints[gear.driver] !== undefined && dynamics.joints[gear.driven] !== undefined,
+  const gears = couplingsOf(dynamics).filter(
+    (coupling) => dynamics.joints[coupling.driver] !== undefined && dynamics.joints[coupling.driven] !== undefined,
   ).length;
   return {
     source: 'dynamics',

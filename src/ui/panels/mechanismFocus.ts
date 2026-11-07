@@ -3,6 +3,7 @@
 
 import type { CadDocument, Constraint, DriveRelation, Joint, Vec3 } from '@core/model/types';
 import { GROUND, type DynamicsModel } from '@core/model/dynamics';
+import { transmissionJoints } from '@core/model/transmissions';
 import type { PanelFocus } from '@ui/store/focusStore';
 import type { LoadItem } from '@dynamics/index';
 import { LOAD_COLORS } from '@ui/dynamicsLoads';
@@ -26,8 +27,8 @@ function loadEntityIds(dynamics: DynamicsModel, item: LoadItem): string[] {
     const joint = dynamics.joints[jointId];
     return joint === undefined ? [] : [...bodyEntities(dynamics, joint.child), ...bodyEntities(dynamics, joint.parent)];
   };
-  const gear = dynamics.gears[item.id];
-  if (gear !== undefined) return unique([...jointBodies(gear.driver), ...jointBodies(gear.driven)]);
+  const transmission = dynamics.transmissions?.[item.id];
+  if (transmission !== undefined) return unique(Object.values(transmissionJoints(transmission)).flatMap(jointBodies));
   const motor = dynamics.motors[item.id];
   if (motor !== undefined) return unique(jointBodies(motor.joint));
   const propeller = dynamics.propellers[item.id];

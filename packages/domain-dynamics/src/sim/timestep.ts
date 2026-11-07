@@ -21,7 +21,11 @@ export const PILOT_TIMESTEP = 1e-4;
 /** Highest shaft speed (rad/s) the drives and initial speeds of `dynamics` announce; 0 when none does (a datasheet motor's speed depends on its load: the pilot run finds it). */
 export function announcedSpeed(dynamics: DynamicsModel): number {
   const rpms = Object.values(dynamics.motors).map((motor) =>
-    motor.kind === 'speed' ? motor.rpm : motor.kind === 'dc' ? 0 : Math.max(...motor.curve.map((p) => p[0])),
+    motor.kind === 'speed'
+      ? motor.rpm
+      : motor.kind === 'dc' || motor.kind === 'linear_speed'
+        ? 0
+        : Math.max(...motor.curve.map((p) => p[0])),
   );
   const initial = Object.values(dynamics.joints).flatMap((joint) => (joint.kind === 'revolute' ? [Math.abs(joint.initialVelocity)] : []));
   return Math.max(0, ...rpms.map((rpm) => Math.abs(rpm) * RAD_PER_S_PER_RPM), ...initial);

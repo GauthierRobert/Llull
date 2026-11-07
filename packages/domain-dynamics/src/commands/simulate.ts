@@ -13,7 +13,8 @@ import { analyseMobility } from '../sim/mobility';
 import { reactionsData, residualTier, type ReactionMode } from '../sim/reactions';
 import { cycleAngleSeries, engineData } from '../sim/engineReport';
 import { realismOf } from './realismHook';
-import { idealGearWarnings } from '../sim/gearLoss';
+import { idealGearWarnings } from '../sim/transmissionReport';
+import { ledgerOf } from '../sim/ledger';
 import { driveReport } from '../sim/driveReport';
 import { errorMessage } from '@lib/errorMessage';
 import { dynamicsOf } from './bodies';
@@ -69,7 +70,7 @@ export const simulateMotion = defineCommand({
     'reciprocating mass and primary / secondary inertia-force amplitudes against the gas peak (reciprocating[]); an accuracy{} statement for every ' +
     'scalar (band or null = "± ?", basis, origin input / calibrated / predicted / verification, validationLevel 0-4, warnings; a value at a speed the ' +
     'heat release was calibrated at is "calibrated", not validation evidence); plausibility[] (FPR_UNREALISTIC: peak-pressure angle and CA50 vs MBT, ' +
-    'mechanical efficiency, Rotax-class propeller inertia / torque, reciprocating mass on the default density). A gear with efficiency (add_gear_coupling) ' +
+    'mechanical efficiency, Rotax-class propeller inertia / torque, reciprocating mass on the default density). A gear with efficiency (add_transmission) ' +
     'loses (1 - efficiency) of its torque on the driven shaft; a propeller with a Ct / Cp table and airspeed follows J = V/(nD). ' +
     'Datasheet DC motors (add_motor kind "dc" + set_motor_drive): data.drives gives per motor the peak and final current (A), terminal voltage (V), joint torque ' +
     '(N·m) and shaft speed (rpm), RMS values, the number of samples where the current limit clipped the command, the tracking error of a prescribed / ' +
@@ -232,7 +233,8 @@ export const simulateMotion = defineCommand({
           : null;
       const residual = trace.loopResidual ?? 0;
       const tier = residualTier(residual, settings.loopResidualPassM, settings.loopResidualFailM);
-      const warnings = [...base.warnings, ...(driven?.warnings ?? [])];
+      const ledger = driven === null ? ledgerOf([], trace, base.energy) : driven.ledger;
+      const warnings = [...base.warnings, ...(driven?.warnings ?? []), ...built.notes];
       if (halvings > 0)
         warnings.push(
           `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s left the loop residual above the fail tier, ${timestep} s is used`,
@@ -305,7 +307,9 @@ export const simulateMotion = defineCommand({
               },
             }
           : {}),
-        ...(driven === null ? {} : { drives: driven.drives, ...(driven.ledger === null ? {} : { ledger: driven.ledger }) }),
+        ...(driven === null ? {} : { drives: driven.drives }),
+        ...(ledger === null ? {} : { ledger }),
+        ...(trace.stops === undefined ? {} : { stops: trace.stops }),
         ...(reactions !== null ? { reactions } : {}),
         ...(engineReport !== null ? { engineReport: { ...engineReport, ...(realism !== null ? { realism } : {}) } } : {}),
       };

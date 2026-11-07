@@ -36,7 +36,7 @@ export const addJoint = defineCommand({
     'Closed loops (four-bar, slider-crank): add every joint, mark the joints whose value should be SOLVED passive:true, drive the others with set_joint_value; ' +
     'evaluate_motion then solves the loop (Levenberg-Marquardt) and refuse when it cannot close. ' +
     '"values" are initial DOF values (default 0; for passive joints the initial guess, which picks the assembly branch); "limits" one {min,max} per DOF. ' +
-    'Use set_joint_value to drive the joint; evaluate_motion (apply=true to move the instances) applies it. For gear/belt ratios between kinematic joints use add_drive_relation (add_gear_coupling is the physics equivalent). Returns the new joint id in affected[0].',
+    'Use set_joint_value to drive the joint; evaluate_motion (apply=true to move the instances) applies it. For gear/belt ratios between kinematic joints use add_drive_relation (add_transmission is the physics equivalent). Returns the new joint id in affected[0].',
   params: z.object({
     kind: z
       .enum(['revolute', 'prismatic', 'rigid', 'cylindrical', 'pin_slot', 'planar', 'ball', 'cam'])

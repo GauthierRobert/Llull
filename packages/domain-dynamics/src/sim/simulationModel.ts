@@ -5,6 +5,7 @@
 
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { DEFAULT_SOLVER_SETTINGS, GROUND, type DynamicsModel, type DynamicsSolverSettings, type RigidBody } from '@core/model/dynamics';
+import { transmissionJoints, transmissionRatio } from '@core/model/transmissions';
 import { toMetres } from '@core/model/units';
 import { entityBoundsInDoc } from '@core/geometry/bounds';
 import type { GeometryKernel } from '@core/geometry/kernel';
@@ -19,6 +20,10 @@ import type {
   SimulationSpring,
 } from '@core/dynamics/physicsEngine';
 import { buildActuators, type ActuatorRefusal, type DriveRuntime } from './actuators/block';
+import { buildJointPhysics, effectiveFriction, type JointPhysicsRefusal } from './jointPhysics';
+import { withLoadSchedules } from './loadSchedules';
+import { reflectedInertia } from './reflectedInertia';
+import { compileCouplings, rigidLinks, type CouplingRefusal } from './transmissions';
 import { dcParameters } from './actuators/dcMotor';
 import { prepareCylinders, withCylinderForces, type CylinderRuntime } from './cylinderLoads';
 import { withInstalledLosses } from './engineLossHook';
@@ -33,14 +38,15 @@ function unitAxis(axis: Vec3): Vec3 {
   return [axis[0] / length, axis[1] / length, axis[2] / length];
 }
 
-/** Joint speeds at t = 0: each driven joint left at 0 starts at ratio × its driver (else the gear constraint would jerk it). */
+/** Joint speeds at t = 0: each driven joint left at 0 starts at ratio × its driver (else the transmission constraint would jerk it). */
 function initialVelocities(dynamics: DynamicsModel): Record<string, number> {
   const speeds: Record<string, number> = Object.fromEntries(Object.values(dynamics.joints).map((j) => [j.id, j.initialVelocity]));
-  const gears = Object.values(dynamics.gears);
-  for (let pass = 0; pass < gears.length; pass++)
-    for (const gear of gears) {
-      const driver = speeds[gear.driver] ?? 0;
-      if (dynamics.joints[gear.driven]?.initialVelocity === 0 && driver !== 0) speeds[gear.driven] = gear.ratio * driver;
+  const transmissions = Object.values(dynamics.transmissions ?? {});
+  for (let pass = 0; pass < transmissions.length; pass++)
+    for (const transmission of transmissions) {
+      const { driver, driven } = transmissionJoints(transmission);
+      const speed = speeds[driver] ?? 0;
+      if (dynamics.joints[driven]?.initialVelocity === 0 && speed !== 0) speeds[driven] = transmissionRatio(transmission) * speed;
     }
   return speeds;
 }
@@ -56,23 +62,30 @@ export function inertiaAboutAxis(body: BodyMassDistribution, anchor: Vec3, axis:
   return own + body.mass * Math.max(0, offsetSquared);
 }
 
-/** Moment of inertia (kg·m²) about `joint`'s axis of every body carried by it (its child and that child's descendants). */
+/** Moment of inertia (kg·m²) about `joint`'s axis of every body carried by it (its child and that child's descendants); the carried mass (kg) for a prismatic joint. */
 function inertiaAboutJoint(bodies: readonly SimulationBody[], joint: SimulationJoint): number {
   const carried = new Set<string>();
   for (const body of bodies)
     if (body.joint?.id === joint.id || (body.parentId !== null && carried.has(body.parentId))) carried.add(body.id);
-  return bodies.filter((body) => carried.has(body.id)).reduce((total, body) => total + inertiaAboutAxis(body, joint.anchor, joint.axis), 0);
+  const mine = bodies.filter((body) => carried.has(body.id));
+  if (joint.kind === 'prismatic') return mine.reduce((total, body) => total + body.mass, 0);
+  return mine.reduce((total, body) => total + inertiaAboutAxis(body, joint.anchor, joint.axis), 0);
 }
 
-/** First reference from a gear / motor / propeller to a joint that cannot move (missing, or on a fixed body). */
+/** First reference from a transmission / joint physics / load schedule / motor / propeller to a joint that cannot move (missing, or on a fixed body). */
 function danglingReference(dynamics: DynamicsModel, movable: ReadonlySet<string>, closing: ReadonlySet<string>): string | null {
   const why = (joint: string): string =>
     closing.has(joint) ? 'which closes a loop and has no coordinate of its own (use a tree joint of the loop)' : 'which cannot move';
-  for (const gear of Object.values(dynamics.gears))
-    for (const joint of [gear.driver, gear.driven])
-      if (!movable.has(joint)) return `gear '${gear.id}' uses joint '${joint}', ${why(joint)}`;
+  for (const transmission of Object.values(dynamics.transmissions ?? {}))
+    for (const joint of Object.values(transmissionJoints(transmission)))
+      if (!movable.has(joint)) return `transmission '${transmission.id}' uses joint '${joint}', ${why(joint)}`;
   for (const load of [...Object.values(dynamics.motors), ...Object.values(dynamics.propellers)])
     if (!movable.has(load.joint)) return `'${load.id}' acts on joint '${load.joint}', ${why(load.joint)}`;
+  for (const physics of Object.values(dynamics.jointPhysics ?? {}))
+    if (!movable.has(physics.id)) return `joint physics of '${physics.id}': the joint ${why(physics.id)}`;
+  for (const schedule of Object.values(dynamics.loadSchedules ?? {}))
+    if ('joint' in schedule.target && !movable.has(schedule.target.joint))
+      return `load schedule '${schedule.id}' acts on joint '${schedule.target.joint}', ${why(schedule.target.joint)}`;
   return null;
 }
 
@@ -82,7 +95,7 @@ const MIN_HALF_SPAN = 0.005;
 const NO_EXTRA = { armature: 0, friction: 0 };
 const armatureOf = (joint: SimulationJoint): number => (joint.armature === undefined ? 0 : joint.armature);
 
-/** Inertia and friction a datasheet motor adds to its joint (rotor behind the gearhead, no-load friction), by joint id. */
+/** Inertia and friction a datasheet motor adds to its joint (rotor behind the gearhead, no-load friction) and the armature of its joint physics, by joint id. */
 function motorJointExtras(dynamics: DynamicsModel): Record<string, { armature: number; friction: number }> {
   const extras: Record<string, { armature: number; friction: number }> = {};
   for (const motor of Object.values(dynamics.motors)) {
@@ -91,6 +104,11 @@ function motorJointExtras(dynamics: DynamicsModel): Record<string, { armature: n
     const held = extras[motor.joint] ?? NO_EXTRA;
     extras[motor.joint] = { armature: held.armature + p.armatureKgM2, friction: held.friction + p.frictionNm };
   }
+  for (const physics of Object.values(dynamics.jointPhysics ?? {}))
+    if (physics.armatureKgM2 !== undefined) {
+      const held = extras[physics.id] ?? NO_EXTRA;
+      extras[physics.id] = { ...held, armature: held.armature + physics.armatureKgM2 };
+    }
   return extras;
 }
 
@@ -102,12 +120,14 @@ export interface BuiltSimulation {
   readonly mass: Record<string, BodyMassProperties>;
   readonly topology: Topology;
   readonly settings: DynamicsSolverSettings;
+  /** Assumptions the build made that the report states (e.g. DRV_MESH_STIFFNESS_ASSUMED). */
+  readonly notes: readonly string[];
 }
 
 export interface BuildRefusal {
   readonly error: string;
   /** FPR_* code when the refusal has one. */
-  readonly code?: TopologyRefusal['code'] | CurveCode | ActuatorRefusal['code'];
+  readonly code?: TopologyRefusal['code'] | CurveCode | ActuatorRefusal['code'] | CouplingRefusal['code'] | JointPhysicsRefusal['code'];
   readonly ids?: readonly string[];
 }
 
@@ -155,13 +175,14 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
     if (entry !== undefined && entry.joint.kind !== 'spherical') {
       const axis = unitAxis(entry.joint.axis);
       const motorExtra = extras[entry.joint.id] ?? NO_EXTRA;
+      const friction = effectiveFriction(dynamics, entry.joint);
       simulationJoint = {
         id: entry.joint.id,
         kind: entry.joint.kind,
         anchor: scale3(entry.joint.anchor, metres),
         axis: entry.flipped ? [-axis[0], -axis[1], -axis[2]] : axis,
-        damping: entry.joint.damping,
-        friction: entry.joint.friction + motorExtra.friction,
+        damping: friction.damping,
+        friction: friction.dry + motorExtra.friction,
         ...(motorExtra.armature > 0 ? { armature: motorExtra.armature } : {}),
         ...(entry.joint.stiffness !== undefined
           ? { stiffness: entry.joint.stiffness, springReference: (entry.flipped ? -1 : 1) * (entry.joint.springReference ?? 0) }
@@ -190,9 +211,11 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
     };
   const servos: SimulationServo[] = Object.values(dynamics.motors).flatMap((motor) => {
     const joint = simulated.get(motor.joint);
-    if (motor.kind !== 'speed' || joint === undefined) return [];
+    if ((motor.kind !== 'speed' && motor.kind !== 'linear_speed') || joint === undefined) return [];
     const gains = speedServoGains(inertiaAboutJoint(bodies, joint), timestep);
-    return [{ id: motor.id, joint: motor.joint, targetVelocity: motor.rpm * RAD_PER_S_PER_RPM, ...gains, maxForce: motor.maxTorque }];
+    return motor.kind === 'speed'
+      ? [{ id: motor.id, joint: motor.joint, targetVelocity: motor.rpm * RAD_PER_S_PER_RPM, ...gains, maxForce: motor.maxTorque }]
+      : [{ id: motor.id, joint: motor.joint, targetVelocity: motor.speedMps, ...gains, maxForce: motor.maxForceN }];
   });
   const loops: SimulationLoop[] = topology.loops.flatMap((loop) => {
     if (loop.kind === 'prismatic') return [];
@@ -229,8 +252,25 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   const cylinders = prepareCylinders(dynamics, topology, metres, announcedRpm > 0 ? announcedRpm : undefined);
   if ('error' in cylinders) return cylinders;
   const gasLoads = cylinders.length > 0 ? withCylinderForces(baseLoads, cylinders) : baseLoads;
-  const loads = withInstalledLosses(gasLoads, Object.values(dynamics.losses ?? {}), cylinders);
+  const losses = withInstalledLosses(gasLoads, Object.values(dynamics.losses ?? {}), cylinders);
+  if ('error' in losses) return losses;
+  const signOf = (jointId: string): number => (topology.tree.find((entry) => entry.joint.id === jointId)?.flipped === true ? -1 : 1);
+  const loads = withLoadSchedules(losses, dynamics, signOf);
   if ('error' in loads) return loads;
+  const ownInertia = (jointId: string): number | undefined => {
+    const joint = simulated.get(jointId);
+    return joint === undefined ? undefined : inertiaAboutJoint(bodies, joint) + armatureOf(joint);
+  };
+  const compiled = compileCouplings(dynamics, { sign: signOf, own: ownInertia, timestep });
+  if ('error' in compiled) return { error: `${compiled.code} — ${compiled.error}`, code: compiled.code };
+  const links = rigidLinks(dynamics, signOf);
+  const jointPhysics = buildJointPhysics(dynamics, {
+    timestep,
+    sign: signOf,
+    inertiaOf: (jointId) => reflectedInertia(jointId, links, ownInertia),
+  });
+  if (jointPhysics !== null && 'error' in jointPhysics)
+    return { error: `${jointPhysics.code} — ${jointPhysics.error}`, code: jointPhysics.code };
   const actuators = buildActuators(dynamics, {
     timestep,
     inertiaOf: (jointId) => {
@@ -250,17 +290,19 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
     model: {
       gravity: dynamics.gravity,
       bodies,
-      gears: Object.values(dynamics.gears),
+      transmissions: compiled.couplings,
       loops,
       solver,
       servos,
       ...(springs.length > 0 ? { springs } : {}),
+      ...(jointPhysics === null ? {} : { jointPhysics }),
       ...(actuators === null ? {} : { actuators: actuators.block }),
       loads,
     },
     mass,
     topology,
     settings,
+    notes: compiled.warnings,
   };
 }
 

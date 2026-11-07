@@ -31,7 +31,7 @@ export const inspectDynamics = defineCommand({
   annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
     'List the physics model: every rigid body with its computed mass (kg), centre of mass (document units) and moment of inertia about ' +
-    'its joint axis (kg·m², revolute joints; a prismatic joint reports translatingMassKg instead: the body plus the bodies it carries) and the densities used (densitySources, densityDefaulted: true when the steel default filled in, with a DYN_DENSITY_DEFAULTED warning; unverified), plus joints, gear couplings (ratio, teeth, efficiency), motors, propellers (with their Ct / Cp table), cylinder pressures and engine losses (losses, only when set), and any problem that would stop ' +
+    'its joint axis (kg·m², revolute joints; a prismatic joint reports translatingMassKg instead: the body plus the bodies it carries) and the densities used (densitySources, densityDefaulted: true when the steel default filled in, with a DYN_DENSITY_DEFAULTED warning; unverified), plus joints, transmissions (kind, ratio, efficiencies), joint physics, load schedules, motors, propellers (with their Ct / Cp table), cylinder pressures and engine losses (losses, only when set), and any problem that would stop ' +
     'simulate_motion. With mobility true (default) it also reports the closed-loop structure: data.topology { tree: spanning-tree ' +
     'joints rooted at the ground, loops: joints that close loops, flipped: tree joints whose declared parent/child sense is reversed }, ' +
     'data.mobility { gruebler: 6·bodies − joint constraints; rank: numerical rank of the loop-constraint Jacobian at the start pose; ' +
@@ -96,7 +96,7 @@ export const inspectDynamics = defineCommand({
       for (const row of mobility.redundant) warnings.push(`FPR_REDUNDANT_CONSTRAINT: ${row.message}`);
       for (const gear of mobility.skippedGears)
         warnings.push(
-          `FPR_GEAR_ON_LOOP_JOINT: gear coupling '${gear}' has a loop-closing joint on one side, so the mobility count does not include it`,
+          `FPR_GEAR_ON_LOOP_JOINT: transmission '${gear}' has a loop-closing joint on one side, so the mobility count does not include it`,
         );
       for (const suggestion of mobility.suggestions) warnings.push(`FPR_REDUNDANT_CONSTRAINT: suggestion — ${suggestion}`);
       for (const [id, gap] of Object.entries(openLoopGaps(mobility)))
@@ -122,7 +122,9 @@ export const inspectDynamics = defineCommand({
     const data = {
       bodies,
       joints: dynamics.joints,
-      gears: dynamics.gears,
+      transmissions: dynamics.transmissions ?? {},
+      jointPhysics: dynamics.jointPhysics ?? {},
+      loadSchedules: dynamics.loadSchedules ?? {},
       motors: dynamics.motors,
       propellers: dynamics.propellers,
       cylinders: dynamics.cylinders ?? {},
@@ -142,7 +144,7 @@ export const inspectDynamics = defineCommand({
         (body.fixed ? ', fixed' : ''),
     );
     const counts =
-      `${Object.keys(dynamics.joints).length} joint(s), ${Object.keys(dynamics.gears).length} gear(s), ` +
+      `${Object.keys(dynamics.joints).length} joint(s), ${Object.keys(dynamics.transmissions ?? {}).length} transmission(s), ` +
       `${Object.keys(dynamics.motors).length} motor(s), ${Object.keys(dynamics.propellers).length} propeller(s)` +
       `${Object.keys(dynamics.cylinders ?? {}).length > 0 ? `, ${Object.keys(dynamics.cylinders ?? {}).length} cylinder(s)` : ''}`;
     const mobilityText =
