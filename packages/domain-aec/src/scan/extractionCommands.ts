@@ -12,9 +12,11 @@ import { execute } from '@core/commands/registry';
 import { fromMm } from '@core/model/units';
 import { canonicalJson } from '@lib/canonicalJson';
 import { nextId } from '@lib/id';
+import { withDocumentUid } from '@core/model/documentUid';
 import { sha256Hex } from '@lib/sha256';
 import { getBuilding, resolveLevel } from '../building/model';
 import { levelIdParam } from '../building/levelParams';
+import { gateAcceptance, refused } from './acceptanceGate';
 import { refuseScan } from './codes';
 import { extractionHash, unverifiedReasons, type PendingExtraction } from './extraction';
 import { sameTransform } from './mat4';
@@ -163,13 +165,25 @@ export const commitAsbuiltExtraction = defineCommand({
   },
 });
 
-/** The payload a reviewer signs to accept an extraction. */
-export const extractionPayload = (record: ExtractionRecord): string =>
-  sha256Hex(canonicalJson({ act: 'accept_asbuilt_extraction', extractionId: record.id, extractionHash: record.extractionHash }));
+/** The payload a reviewer signs to accept an extraction in the document `documentUid`. */
+export const extractionPayload = (record: ExtractionRecord, documentUid: string, nonce: string): string =>
+  sha256Hex(
+    canonicalJson(
+      withDocumentUid(
+        { act: 'accept_asbuilt_extraction', extractionId: record.id, extractionHash: record.extractionHash, nonce },
+        documentUid,
+      ),
+    ),
+  );
 
 /**
- * @affects 1 extraction record: status accepted with the verified signer (affected: [extractionId])
- * @failure no port / agent caller / bad signature -> SCN_HUMAN_GATE; unknown id -> SCN_EXTRACTION_NOT_FOUND
+ * @affects 1 extraction record: status accepted with the verified signer (affected: [extractionId]) and 1 entry in scan.acceptanceLedger
+ * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); accepted only with a signature verified by the port over
+ *   sha256 of canonical { act, documentUid, extractionId, extractionHash, nonce } (the nonce is chosen by the signer, so an act can be signed again after an undo), spent once (a retry is SCN_HUMAN_GATE); a replay honours a recorded step only from
+ *   `scan.acceptanceLedger` (kept by replaySeed; same extraction, payload and this document's uid, re-verified when a port is installed), spends nothing,
+ *   and a document with another uid loses the acceptance
+ * @failure no port / no confirmation / bad or used signature -> SCN_HUMAN_GATE (an agent always lands here); a document without uid -> SCN_DOCUMENT_UNIDENTIFIED;
+ *   unknown id -> SCN_EXTRACTION_NOT_FOUND (refusals, document unchanged)
  */
 export const acceptAsbuiltExtraction = defineCommand({
   name: 'accept_asbuilt_extraction',
@@ -178,27 +192,30 @@ export const acceptAsbuiltExtraction = defineCommand({
     'against the signing port. HUMAN-ONLY. An agent always gets SCN_HUMAN_GATE with the document unchanged: hand it to the reviewer.',
   params: z.object({
     extractionId: z.string().describe('Extraction id (affected[0] of commit_asbuilt_extraction).'),
-    signature: z.unknown().describe('Human signature object over the extraction payload; agents cannot produce one.'),
+    confirmation: z
+      .unknown()
+      .optional()
+      .describe('Human signature object over the extraction payload; agents cannot produce one. Never written to the history.'),
   }),
-  run: (doc, { extractionId, signature }, ctx): CommandResult => {
+  run: (doc, { extractionId, confirmation }, ctx): CommandResult => {
     const command = 'accept_asbuilt_extraction';
     const scan = scanOf(doc);
     const record = Object.hasOwn(scan.extractions, extractionId) ? scan.extractions[extractionId] : undefined;
     if (record === undefined)
       return refuseScan(doc, command, 'SCN_EXTRACTION_NOT_FOUND', `no extraction '${extractionId}'`, [extractionId], ['extractionId']);
-    const port = ctx?.humanSignature ?? null;
-    if (port === null)
-      return refuseScan(doc, command, 'SCN_HUMAN_GATE', 'no signing port: only a human reviewer can accept', [extractionId]);
-    const signer = port.verify(signature, extractionPayload(record));
-    if (signer === null)
-      return refuseScan(doc, command, 'SCN_HUMAN_GATE', 'the signature did not verify for this extraction', [extractionId], ['signature']);
+    const signer = gateAcceptance(doc, ctx, confirmation, {
+      command,
+      targetId: extractionId,
+      payloadFor: (documentUid, nonce) => extractionPayload(record, documentUid, nonce),
+    });
+    if (refused(signer)) return signer;
     const accepted: ExtractionRecord = {
       ...record,
       status: 'accepted',
       acceptedBy: { signer: signer.signer, signatureId: signer.signatureId },
     };
     return changed(
-      withScan(doc, { ...scan, extractions: { ...scan.extractions, [extractionId]: accepted } }),
+      withScan(doc, signer.ledgered({ ...scan, extractions: { ...scan.extractions, [extractionId]: accepted } })),
       `Extraction ${extractionId} accepted by ${signer.signer}.`,
       [extractionId],
     );

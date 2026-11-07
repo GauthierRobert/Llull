@@ -89,7 +89,7 @@ describe('compute_margins on an inadequate mesh', () => {
     const refused = execute(
       bar.recorded,
       'dispose_margin',
-      { analysisId: bar.analysisId, rowId: 'r1', decision: 'accepted', justification: 'ok', signature: {} },
+      { analysisId: bar.analysisId, rowId: 'r1', decision: 'accepted', justification: 'ok', confirmation: {} },
       { ...bar.ctx, humanSignature: { verify: () => ({ signer: 'Dr. Reviewer', signatureId: 'sig' }) } },
     );
     expect(refused.rejected).toBe(true);

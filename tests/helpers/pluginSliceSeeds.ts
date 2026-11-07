@@ -207,6 +207,26 @@ function scanDocument(): CadDocument {
   return execute(attached.document, 'set_scan_crop', { name: 'crop', min: [-1, -1, -1], max: [1, 1, 1] }, ctx).document;
 }
 
+/** The scan document with a valid acceptance ledger entry per act and one bound to another document uid. */
+function scanWithLedger(): CadDocument {
+  const doc = scanDocument();
+  const entry = {
+    act: 'accept_registration' as const,
+    targetId: 'reg-1.1',
+    payload: 'a'.repeat(64),
+    signer: 's',
+    signatureId: 'id',
+    signature: { alg: 'Ed25519', keyId: 'k-1', publicKey: 'a'.repeat(64), signature: 'b'.repeat(128), nonce: 'n-1' },
+    documentUid: doc.uid ?? '',
+  };
+  const acceptanceLedger = [
+    entry,
+    { ...entry, act: 'accept_asbuilt_extraction' as const, targetId: 'ext-1.1' },
+    { ...entry, documentUid: 'e'.repeat(32) },
+  ];
+  return { ...doc, scan: { ...(doc.scan as NonNullable<CadDocument['scan']>), acceptanceLedger } };
+}
+
 function cfdDocument(): CadDocument {
   const body = addBody(metreDocument(), 'add_box', { size: [1, 1, 1], position: [0, 0, 0], anchor: 'min' });
   return ok(body.doc, 'create_cfd_case', caseParams([body.id])).document;
@@ -221,7 +241,9 @@ const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc
 
 /** `doc` with a valid human-act ledger entry and a copy bound to another document uid, in both ledgers, plus the matching fit dispositions. */
 function withLedgers(doc: CadDocument): CadDocument {
-  const signature = { nonce: 'n-1', payload: 'a'.repeat(64) };
+  // the shape a real key produces: the exception kind carries a signer-chosen nonce, the payload kind (fit, margin) none
+  const keyed = { alg: 'Ed25519', keyId: 'k-1', publicKey: 'a'.repeat(64), signature: 'b'.repeat(128) };
+  const signature = { ...keyed, nonce: 'n-1' };
   const exception = {
     analysisId: analysisId(doc),
     studyId: 'cs-1.1',
@@ -239,7 +261,19 @@ function withLedgers(doc: CadDocument): CadDocument {
     inputsHash: 'h',
     signer: 's',
     signatureId: 'id',
-    signature,
+    signature: keyed,
+    documentUid: doc.uid ?? '',
+  };
+  const margin = {
+    act: 'dispose_margin',
+    analysisId: analysisId(doc),
+    rowKey: 'k1',
+    decision: 'accepted',
+    justification: 'j',
+    resultsHash: 'a'.repeat(64),
+    signer: 's',
+    signatureId: 'id',
+    signature: keyed,
     documentUid: doc.uid ?? '',
   };
   const analysis = {
@@ -249,6 +283,11 @@ function withLedgers(doc: CadDocument): CadDocument {
     fitLedger: [
       { ...fit, rowKey: 'row 1' },
       { ...fit, rowKey: 'row 1', documentUid: 'e'.repeat(32) },
+    ],
+    dispositionLedger: [
+      margin,
+      { ...margin, act: 'dispose_thermal_limit', rowKey: 'lim-1:max' },
+      { ...margin, documentUid: 'e'.repeat(32) },
     ],
   };
   return { ...doc, analysis } as CadDocument;
@@ -310,6 +349,14 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     query: { name: 'check_point_clouds', params: constant({}) },
     mutate: { name: 'set_scan_crop', params: constant({ name: 'fuzz', min: [0, 0, 0], max: [1, 1, 1] }) },
   },
+  // the acceptance ledger replays keep (accept_registration / accept_asbuilt_extraction)
+  'scan#ledger': {
+    roots: ['scan'],
+    build: scanWithLedger,
+    ctx: scanContext,
+    query: { name: 'check_point_clouds', params: constant({}) },
+    mutate: { name: 'set_scan_crop', params: constant({ name: 'fuzz', min: [0, 0, 0], max: [1, 1, 1] }) },
+  },
   cfd: {
     roots: ['cfd'],
     build: cfdDocument,
@@ -358,7 +405,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
       }),
     },
   },
-  // the human-act ledgers replays keep (exceptionLedger, fitLedger) and the fit dispositions: a valid entry and one signed for another document uid
+  // the human-act ledgers replays keep (exceptionLedger, fitLedger, dispositionLedger) and the fit dispositions: a valid entry and one signed for another document uid
   'cae#ledgers': {
     roots: ['analysis'],
     build: () => withLedgers(recordedStudy(studyFixture()).doc),

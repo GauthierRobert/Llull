@@ -17,6 +17,8 @@ import { exportStepAp242 } from './exportStepAp242';
 import { exportIges, importIges } from './igesExchange';
 import { verifyExchangeFile } from './verifyExchangeFile';
 import { geometricValidationProperties } from './gvp';
+import { exportDxf } from './exportDxf';
+import { exportSvg } from './exportSvg';
 import { exportBcf } from './bcf/exportBcf';
 import { importBcf } from './bcf/importBcf';
 import { exportBcfViewpoint, importBcfViewpoint } from './bcf/bcfViewpoint';
@@ -33,6 +35,8 @@ export const exchangeCommands = commandCatalog(
   importMesh,
   importGltf,
   importDxf,
+  exportDxf,
+  exportSvg,
   importStepExact,
   exportStepAp242,
   exportIges,

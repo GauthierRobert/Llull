@@ -6,6 +6,7 @@ import type { SimulationData } from '@dynamics/sim/simulationReport';
 import { ExportAnimationDialog } from '@ui/components/ExportAnimationDialog';
 import { ExportAnimationButton } from '@ui/components/ExportAnimationButton';
 import { TimelineDock } from '@ui/components/TimelineDock';
+import { renderAnimation, videoFileOf } from '@ui/services/animationExport';
 import { animationParams, defaultAnimationForm, videoLengthOf } from '@ui/services/animationExportModel';
 import { useStore } from '@ui/store';
 import { useAnimationExportStore } from '@ui/store/animationExportStore';
@@ -28,16 +29,36 @@ const originalCreateObjectUrl = URL.createObjectURL;
 const originalRevokeObjectUrl = URL.revokeObjectURL;
 const originalDispatch = useStore.getState().dispatch;
 
+/** A 1x1 PNG: the dialog only base64-decodes and displays files; the real render is exercised once, tiny, in the last describe. */
+const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const TEXT_WARNING = { code: 'MOV_OVERLAY_TEXT_SKIPPED', message: 'the time label needs a font' };
+
+/** Answers like render_animation does (same `data` shape, asserted against the real command below) without rendering frames. */
+function cannedRender(
+  params: Record<string, unknown>,
+  options: { onResult?: (r: { summary: string; changed: boolean }) => void } | undefined,
+): void {
+  const format = params['format'];
+  if (format === 'mp4') {
+    options?.onResult?.({ summary: 'render_animation refused: NATIVE_TOOL_MISSING — no video encoder (ffmpeg) found', changed: false });
+    return;
+  }
+  const fileName = format === 'frames' ? 'sheet.png' : `animation.${String(format)}`;
+  useStore.setState({
+    lastMeasure: { command: 'render_animation', data: { files: [{ fileName, base64: PIXEL }], warnings: [TEXT_WARNING] } },
+  });
+  options?.onResult?.({ summary: 'rendered', changed: false });
+}
+
 beforeEach(() => {
   dispatched = [];
   downloads = [];
-  const original = originalDispatch;
   useStore.setState({
     document: spinningBox(),
     liveStatus: 'disconnected',
     dispatch: (name, params, options) => {
       dispatched.push({ name, params: params as Record<string, unknown> });
-      original(name, params, options);
+      cannedRender(params as Record<string, unknown>, options);
     },
   });
   Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:animation'), revokeObjectURL: vi.fn() });
@@ -327,5 +348,22 @@ describe('other sources and entry points', () => {
     fireEvent.click(field('export-animation-orbit'));
     fireEvent.click(field('export-animation-save'));
     expect(field('export-animation-error')).toHaveTextContent('needs the orbit camera');
+  });
+});
+
+describe('the real command behind the canned dispatch', () => {
+  it('render_animation renders a tiny film and returns the files and warnings the dialog reads', async () => {
+    useStore.setState({ dispatch: originalDispatch });
+    const preview = await renderAnimation({
+      source: { kind: 'clips', duration: 0.2 },
+      fps: 5,
+      width: 64,
+      height: 64,
+      format: 'frames',
+      sheet: { every: 1 },
+    });
+    expect(preview.ok && preview.files.map((file) => file.fileName)).toContain('sheet.png');
+    const film = await renderAnimation({ source: { kind: 'clips', duration: 0.2 }, fps: 5, width: 64, height: 64, format: 'apng' });
+    expect(film.ok && videoFileOf(film.files)?.fileName).toBe('animation.apng');
   });
 });

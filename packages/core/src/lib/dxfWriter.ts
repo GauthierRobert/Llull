@@ -16,11 +16,13 @@ export function dxfLayerName(name: string): string {
   return cleaned === '' ? '0' : cleaned;
 }
 
-/** Encodes non-ASCII characters as AutoCAD \U+XXXX escapes. */
+/** Encodes non-ASCII characters as AutoCAD \U+XXXX escapes (four hex digits per UTF-16 code unit). */
 export function dxfText(content: string): string {
-  return [...content.replace(/[\r\n]+/g, ' ')]
+  return content
+    .replace(/[\r\n]+/g, ' ')
+    .split('')
     .map((character) => {
-      const code = character.codePointAt(0) ?? 63;
+      const code = character.charCodeAt(0);
       return code < 128 ? character : `\\U+${code.toString(16).toUpperCase().padStart(4, '0')}`;
     })
     .join('');

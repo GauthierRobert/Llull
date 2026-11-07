@@ -269,7 +269,7 @@ describe('dispositions are re-verified through the signing port (review finding 
     const recorded = execute(
       doc,
       'dispose_thermal_limit',
-      { analysisId: wall.analysisId, rowId, decision: 'accepted', justification, signature: 'good' },
+      { analysisId: wall.analysisId, rowId, decision: 'accepted', justification, confirmation: 'good' },
       withSigner,
     );
     expect(recorded.rejected).toBeUndefined();

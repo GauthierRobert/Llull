@@ -203,7 +203,7 @@ describe('dispose_thermal_limit (human gate)', () => {
     expect(result.error?.code).toBe('THM_HUMAN_GATE');
     expect(JSON.stringify(result.document)).toBe(JSON.stringify(doc));
     expect(analysisInputHash(result.document, wall.analysisId, 'full')).toBe(analysisInputHash(doc, wall.analysisId, 'full'));
-    const forged = run(doc, 'dispose_thermal_limit', { ...params, signature: 'forged' }, withPorts(wall, signer()));
+    const forged = run(doc, 'dispose_thermal_limit', { ...params, confirmation: 'forged' }, withPorts(wall, signer()));
     expectNoOp(forged, doc);
     expect(forged.error?.code).toBe('THM_HUMAN_GATE');
   });
@@ -212,7 +212,7 @@ describe('dispose_thermal_limit (human gate)', () => {
     const { wall, doc, limitId } = limited();
     const rowId = `${limitId}:max`;
     const seen: string[] = [];
-    const params = { analysisId: wall.analysisId, rowId, decision: 'accepted', justification, signature: 'good' };
+    const params = { analysisId: wall.analysisId, rowId, decision: 'accepted', justification, confirmation: 'good' };
     const result = run(doc, 'dispose_thermal_limit', params, withPorts(wall, signer(seen)));
     expect(result.rejected).toBeUndefined();
     expect(seen).toEqual([payload(wall, rowId, 'accepted', justification)]);
@@ -258,7 +258,7 @@ describe('dispose_thermal_limit (human gate)', () => {
 
   it('refuses unknown rows, empty justifications, stale or missing results and unknown analyses', () => {
     const { wall, doc, limitId } = limited();
-    const base = { analysisId: wall.analysisId, rowId: `${limitId}:max`, decision: 'rejected', justification, signature: 'good' };
+    const base = { analysisId: wall.analysisId, rowId: `${limitId}:max`, decision: 'rejected', justification, confirmation: 'good' };
     const ctx = withPorts(wall, signer());
     expect(run(doc, 'dispose_thermal_limit', { ...base, rowId: `${limitId}:nope` }, ctx).error?.code).toBe('THM_LIMIT_NOT_FOUND');
     expect(run(doc, 'dispose_thermal_limit', { ...base, rowId: 'ghost:max' }, ctx).error?.code).toBe('THM_LIMIT_NOT_FOUND');
@@ -304,7 +304,7 @@ describe('dispose_thermal_limit: the signature is bound to the document (GATE-UI
     const { wall, doc, limitId } = limited();
     const rowId = `${limitId}:max`;
     const signature = { payload: payload(wall, rowId, 'accepted', justification) };
-    const params = { analysisId: wall.analysisId, rowId, decision: 'accepted', justification, signature };
+    const params = { analysisId: wall.analysisId, rowId, decision: 'accepted', justification, confirmation: signature };
     return { wall, doc, rowId, params, disposed: run(doc, 'dispose_thermal_limit', params, withPorts(wall, pinned())) };
   };
   const codes = (wall: SolvedWall, doc: CadDocument): Record<string, unknown>[] =>
@@ -332,7 +332,7 @@ describe('dispose_thermal_limit: the signature is bound to the document (GATE-UI
     expectRefusesWithoutUid(
       doc,
       (document, signature, ctx) =>
-        run(document, 'dispose_thermal_limit', { ...params, signature }, withPorts(wall, ctx.humanSignature ?? undefined)),
+        run(document, 'dispose_thermal_limit', { ...params, confirmation: signature }, withPorts(wall, ctx.humanSignature ?? undefined)),
       'THM_DOCUMENT_UNIDENTIFIED',
       'THM_HUMAN_GATE',
     );

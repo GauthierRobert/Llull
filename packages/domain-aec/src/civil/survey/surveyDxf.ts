@@ -38,6 +38,9 @@ function samples(primitive: DxfPrimitive, sources: ReadonlySet<Source>): Vec3[] 
       return [[primitive.at[0], primitive.at[1], Number((match[1] as string).replace(',', '.'))]];
     }
     case 'arc':
+    case 'ellipse':
+    case 'spline':
+    case 'hatch':
     case 'circle':
       return [];
   }

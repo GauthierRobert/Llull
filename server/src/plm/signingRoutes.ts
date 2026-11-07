@@ -10,6 +10,8 @@
  *                        { kind: 'payload', keyId, passphrase, act, payloadSha256 }   the dispose_* acts of other gaps, whose payload the client computed from the
  *                        row it shows (the server cannot recompute analysis rows): `act` must be one of DISPOSE_ACTS, and every such signature is written to
  *                        the audit chain; the signed bytes are context-prefixed (`llull-gate-v1:`), so they cannot be replayed as a manifest
+ *                        the scan acceptance acts (accept_registration, accept_asbuilt_extraction) also go through kind 'payload' but REQUIRE a `nonce`, which is
+ *                        returned inside the signature object (the payload from scan_acceptance_payload binds it)
  * Wrong passphrases are counted per key and persisted (signingLock): after four, each further one doubles the lock (429), surviving restarts.
  */
 
@@ -33,6 +35,9 @@ const DISPOSE_ACTS: ReadonlySet<string> = new Set([
   'dispose_fit_result',
   'set_review_disposition',
 ]);
+
+/** The scan acceptance acts (kind 'payload' WITH a nonce): their payload (scan_acceptance_payload) binds the nonce, so the signer can sign an undone act again. */
+const NONCE_ACTS: ReadonlySet<string> = new Set(['accept_registration', 'accept_asbuilt_extraction']);
 
 export function buildSigningRouter(restLimiter: RequestHandler): Router {
   const router = Router();
@@ -96,7 +101,7 @@ export function buildSigningRouter(restLimiter: RequestHandler): Router {
     } else if (
       kind === 'payload' &&
       typeof body['act'] === 'string' &&
-      DISPOSE_ACTS.has(body['act']) &&
+      (DISPOSE_ACTS.has(body['act']) || (NONCE_ACTS.has(body['act']) && typeof body['nonce'] === 'string' && body['nonce'] !== '')) &&
       typeof body['payloadSha256'] === 'string' &&
       /^[0-9a-f]{64}$/.test(body['payloadSha256'])
     ) {
@@ -113,7 +118,8 @@ export function buildSigningRouter(restLimiter: RequestHandler): Router {
           rejected: false,
           affectedCount: 0,
         });
-      reply = (signature) => ({ signature: { alg: 'Ed25519', keyId: key.keyId, publicKey: key.publicKey, signature } });
+      const nonce = typeof body['nonce'] === 'string' && body['nonce'] !== '' ? { nonce: body['nonce'] } : {};
+      reply = (signature) => ({ signature: { alg: 'Ed25519', keyId: key.keyId, publicKey: key.publicKey, signature, ...nonce } });
     }
     if (text === null) return void res.status(400).json({ error: 'Unknown or malformed request kind.' });
     const now = Date.now();

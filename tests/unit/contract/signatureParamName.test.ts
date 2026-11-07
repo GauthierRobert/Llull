@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { toToolSchemas } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
 
-/** Commands that still take the signature under another name; each is asserted to STILL offend (ratchet): fix it, then delete the line. */
-const KNOWN_OFFENDERS: readonly string[] = ['accept_asbuilt_extraction', 'accept_registration', 'dispose_margin', 'dispose_thermal_limit'];
+/** Commands that still take the signature under another name (none since FIX-SIG-REST); each listed one is asserted to STILL offend (ratchet): fix it, then delete it. */
+const KNOWN_OFFENDERS: readonly string[] = [];
 
 const SIGNATURE_PARAM = /human signature object/i;
 

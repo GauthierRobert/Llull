@@ -82,14 +82,14 @@ describe('dispose_margin: the human gate (VC-FEA-63)', () => {
 
   it('a port without a signature, or a signature that does not verify, is refused the same way', () => {
     expect(dispose(humanContext()).error?.code).toBe('FEA_HUMAN_GATE');
-    expect(dispose(humanContext(), { signature: { payload: 'forged' } }).error?.code).toBe('FEA_HUMAN_GATE');
+    expect(dispose(humanContext(), { confirmation: { payload: 'forged' } }).error?.code).toBe('FEA_HUMAN_GATE');
     const other = signatureFor(bar, failRow, 'rejected', 'tested to 1.8 x limit');
-    expect(dispose(humanContext(), { signature: other }).error?.code).toBe('FEA_HUMAN_GATE');
+    expect(dispose(humanContext(), { confirmation: other }).error?.code).toBe('FEA_HUMAN_GATE');
   });
 
   it('is pure', () => {
     const snapshot = structuredClone(bar.recorded);
-    dispose(humanContext(), { signature: signatureFor(bar, failRow, 'accepted', 'tested to 1.8 x limit') });
+    dispose(humanContext(), { confirmation: signatureFor(bar, failRow, 'accepted', 'tested to 1.8 x limit') });
     expect(bar.recorded).toEqual(snapshot);
   });
 });
@@ -106,7 +106,7 @@ describe('dispose_margin: a valid human signature', () => {
       rowId: failRow.rowId,
       decision: 'accepted',
       justification,
-      signature: signatureFor(bar, failRow, 'accepted', justification),
+      confirmation: signatureFor(bar, failRow, 'accepted', justification),
     },
     humanContext(),
   );
@@ -164,7 +164,7 @@ describe('dispose_margin: a valid human signature', () => {
 
 describe('dispose_margin: refusals and row selection', () => {
   const human = humanContext();
-  const base = { analysisId: bar.analysisId, ...STAND_IN_MESH, decision: 'redesign', justification: 'thicken the web', signature: {} };
+  const base = { analysisId: bar.analysisId, ...STAND_IN_MESH, decision: 'redesign', justification: 'thicken the web', confirmation: {} };
   const refusal = (params: Record<string, unknown>, doc = bar.recorded): string | undefined =>
     execute(doc, 'dispose_margin', { ...base, ...params }, human).error?.code;
 
@@ -201,7 +201,7 @@ describe('dispose_margin: refusals and row selection', () => {
         rowId: marginal.rowId,
         decision: 'accepted',
         justification: 'band agreed with the owner',
-        signature: signatureFor(bar, marginal, 'accepted', 'band agreed with the owner'),
+        confirmation: signatureFor(bar, marginal, 'accepted', 'band agreed with the owner'),
         ...query,
       },
       human,
@@ -265,7 +265,7 @@ describe('the signed payload names the model set-up', () => {
         rowId: failRow.rowId,
         decision: 'accepted',
         justification,
-        signature: { payload: foreign },
+        confirmation: { payload: foreign },
       },
       humanContext(),
     );
@@ -281,7 +281,7 @@ describe('dispose_margin: the signature is bound to the document (GATE-UID)', ()
   const accepted = execute(
     bar.recorded,
     'dispose_margin',
-    { ...params, signature: signatureFor(bar, failRow, 'accepted', justification) },
+    { ...params, confirmation: signatureFor(bar, failRow, 'accepted', justification) },
     humanContext(),
   );
   const withStored = (patch: Partial<Disposition>, uid: string | undefined = accepted.document.uid): CadDocument => {
@@ -327,7 +327,7 @@ describe('dispose_margin: the signature is bound to the document (GATE-UID)', ()
     const { uid, ...unidentified } = bar.recorded;
     void uid;
     for (const name of ['dispose_margin', 'margin_disposition_payload']) {
-      const extra = name === 'dispose_margin' ? { signature: { payload: 'x' } } : {};
+      const extra = name === 'dispose_margin' ? { confirmation: { payload: 'x' } } : {};
       const result = execute(unidentified, name, { ...params, ...extra }, humanContext());
       expect(result.error?.code, name).toBe('FEA_DOCUMENT_UNIDENTIFIED');
       expect(result.document).toBe(unidentified);
@@ -338,7 +338,12 @@ describe('dispose_margin: the signature is bound to the document (GATE-UID)', ()
     expectRefusesWithoutUid(
       bar.recorded,
       (document, signature, ctx) =>
-        execute(document, 'dispose_margin', { ...params, signature }, { ...bar.ctx, humanSignature: ctx.humanSignature ?? null }),
+        execute(
+          document,
+          'dispose_margin',
+          { ...params, confirmation: signature },
+          { ...bar.ctx, humanSignature: ctx.humanSignature ?? null },
+        ),
       'FEA_DOCUMENT_UNIDENTIFIED',
       'FEA_HUMAN_GATE',
     );
@@ -349,7 +354,7 @@ describe('dispose_margin: the signature is bound to the document (GATE-UID)', ()
     const result = execute(
       copy,
       'dispose_margin',
-      { ...params, signature: signatureFor(bar, failRow, 'accepted', justification) },
+      { ...params, confirmation: signatureFor(bar, failRow, 'accepted', justification) },
       humanContext(),
     );
     expect(result.error?.code).toBe('FEA_HUMAN_GATE');

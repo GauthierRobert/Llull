@@ -150,7 +150,7 @@ describe('dispose_fit_result: the signature stays out of the record', () => {
     expect(load((analysis) => (analysis['fitLedger'] = 'x'))).toMatch(/fitLedger must be a list/);
     expect(load((analysis) => delete ledger(analysis)[0]!['rowKey'])).toMatch(/fitLedger\[0\].rowKey must be text/);
     expect(load((analysis) => (ledger(analysis)[0]!['decision'] = 'maybe'))).toMatch(/decision must be one of/);
-    expect(load((analysis) => (ledger(analysis)[0]!['signature'] = 'raw'))).toMatch(/signature object with a nonce/);
+    expect(load((analysis) => (ledger(analysis)[0]!['signature'] = 'raw'))).toMatch(/signature must be a signature object/);
     expect(load((analysis) => (ledger(analysis)[0]!['documentUid'] = 3))).toMatch(/documentUid must be text/);
     expect(load((analysis) => (analysis['fitDispositions'] = []))).toMatch(/fitDispositions must be a record/);
     expect(load((analysis) => (analysis['fitDispositions'] = { [ROW]: 'x' }))).toMatch(/fitDispositions\['.*'\] is malformed/);
