@@ -7,7 +7,7 @@ import { idOrNext } from '@lib/explicitId';
 import { changed, codedRejection, failer } from '@core/commands/noop';
 import { dynamicsIdTaken } from '@core/model/dynamics';
 import { dynamicsOf, withDynamics } from './bodies';
-import { buildDatasheetMotor, datasheetDescription } from './motorBuild';
+import { buildDatasheetMotor, datasheetDescription, foreignField } from './motorBuild';
 import { inductionSheetSchema, pmsmSheetSchema, stepperSheetSchema } from './machineSchemas';
 import { datasheetSchema, gearheadSchema, sourceSchema, toSource } from './motorSchemas';
 
@@ -15,7 +15,7 @@ import { datasheetSchema, gearheadSchema, sourceSchema, toSource } from './motor
  * @affects adds 1 motor to doc.dynamics (affected: [motorId])
  * @invariant joint exists; torque_curve: >= 1 point, strictly increasing rpm, throttle in [0, 1]; speed: maxTorque > 0 (revolute) or speedMps + maxForceN > 0 (prismatic);
  *   dc / pmsm / stepper / induction: datasheet passes its consistency checks (check_motor_data) or carries acceptInconsistent, gearhead efficiencies in (0, 1]
- * @failure unknown joint, prismatic joint for a non-speed kind, missing / unsorted curve, bad throttle, missing rpm / maxTorque, taken id -> no-op;
+ * @failure a sheet, gearhead or acceptInconsistent that the kind does not use -> no-op naming the field; unknown joint, prismatic joint for a non-speed kind, missing / unsorted curve, bad throttle, missing rpm / maxTorque, taken id -> no-op;
  *   a datasheet kind without its sheet / source, a pmsm sheet with neither flux linkage nor torque constant, a stepper pull-out curve out of order -> no-op;
  *   inconsistent datasheet -> DRV_MOTOR_DATA_INCONSISTENT (checks listed in the error detail)
  */
@@ -88,6 +88,8 @@ export const addMotor = defineCommand({
         'Drive a revolute joint and couple it to the prismatic one with add_transmission (screw, rack), or use kind "speed" with speedMps / maxForceN on the prismatic joint.',
         [params.joint],
       );
+    const foreign = foreignField(params.kind, params);
+    if (foreign !== null) return fail(`${foreign} does not apply to a ${params.kind} motor`);
     const motorId = idOrNext(params.id, 'motor');
     if (dynamicsIdTaken(dynamics, motorId)) return fail(`id '${motorId}' is already used`);
     let motor: Motor;

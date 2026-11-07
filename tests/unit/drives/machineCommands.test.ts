@@ -113,6 +113,56 @@ describe('add_motor kind pmsm | stepper | induction', () => {
   });
 });
 
+describe('add_motor refuses the sheets and extras of another kind', () => {
+  const sheets: Record<string, unknown> = {
+    datasheet: { nominalVoltageV: 48, terminalResistanceOhm: 1.13, torqueConstantNmPerA: 0.0603, rotorInertiaKgM2: 1e-5 },
+    pmsmDatasheet: PMSM_SHEET,
+    stepperDatasheet: STEPPER_SHEET,
+    inductionDatasheet: INDUCTION_SHEET,
+  };
+  const own: Record<string, string> = {
+    dc: 'datasheet',
+    pmsm: 'pmsmDatasheet',
+    stepper: 'stepperDatasheet',
+    induction: 'inductionDatasheet',
+  };
+
+  for (const kind of Object.keys(own))
+    for (const field of Object.keys(sheets).filter((name) => name !== own[kind])) {
+      it(`${kind} with a ${field} is refused, naming it; the document is unchanged`, () => {
+        const doc = bench();
+        const result = add(doc, { kind, [own[kind] as string]: sheets[own[kind] as string], [field]: sheets[field] });
+        expect(result.summary).toContain(`${field} does not apply to a ${kind} motor`);
+        expect(result.document).toBe(doc);
+        expect(result.affected).toEqual([]);
+      });
+    }
+
+  it('a torque_curve or speed motor takes no sheet, no gearhead and no acceptInconsistent; a speed motor still takes its source', () => {
+    const doc = bench();
+    for (const extra of [
+      { pmsmDatasheet: PMSM_SHEET },
+      { datasheet: sheets['datasheet'] },
+      { gearhead: { ratio: 2, efficiency: 0.9 } },
+      { acceptInconsistent: 'x' },
+    ]) {
+      const curve = add(doc, { kind: 'torque_curve', torque: 1, ...extra });
+      expect(curve.summary).toContain('does not apply to a torque_curve motor');
+      expect(curve.document).toBe(doc);
+      expect(add(doc, { kind: 'speed', rpm: 100, maxTorque: 1, ...extra }).document).toBe(doc);
+    }
+    expect(add(doc, { kind: 'speed', rpm: 100, maxTorque: 1 }).affected).toEqual(['mm']);
+    expect(add(doc, { kind: 'speed', rpm: 100, maxTorque: 1, source: MACHINE_SOURCE }).affected).toEqual(['mm']);
+  });
+
+  it('a gearhead and acceptInconsistent stay valid on every datasheet kind', () => {
+    for (const params of Object.values(KINDS))
+      expect(add(bench(), { ...params, gearhead: { ratio: 3, efficiency: 0.9 }, acceptInconsistent: 'unused reason' }).affected).toEqual([
+        'mm',
+      ]);
+  });
+});
+
 describe('check_motor_data of the machine kinds (hand values)', () => {
   const checks = (params: Record<string, unknown>): Record<string, { derived: number; status: string }> => {
     const doc = add(bench(), params).document;

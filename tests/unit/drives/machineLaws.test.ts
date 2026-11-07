@@ -159,6 +159,13 @@ describe('induction equivalent circuit (VC-DRV-26, TR-DRV-08)', () => {
     }
   });
 
+  it('the stator copper carries the magnetising current too: at synchronous speed (no load current) it is 3 R1 (V / Xm)^2 = 3 x 0.5 x (230 / 40)^2 = 49.6 W, and it scales with the frequency', () => {
+    const sync = synchronousSpeed(p, 50);
+    expect(inductionPoint(p, 230, 50, sync).statorCopperW).toBeCloseTo(3 * 0.5 * (230 / 40) ** 2, 9);
+    // Xm follows the frequency: at 25 Hz and 115 V the ratio V / Xm(f) is the same
+    expect(inductionPoint(p, 115, 25, synchronousSpeed(p, 25)).statorCopperW).toBeCloseTo(3 * 0.5 * (230 / 40) ** 2, 9);
+  });
+
   it('generating above synchronous speed: negative torque and negative slip; at synchronous speed the torque is nil', () => {
     const sync = synchronousSpeed(p, 50);
     expect(inductionPoint(p, 230, 50, sync * 1.03).torqueNm).toBeLessThan(0);

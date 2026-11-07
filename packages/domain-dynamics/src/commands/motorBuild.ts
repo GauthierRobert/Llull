@@ -32,6 +32,16 @@ export interface DatasheetParams {
 
 const SHEET_FIELD = { dc: 'datasheet', pmsm: 'pmsmDatasheet', stepper: 'stepperDatasheet', induction: 'inductionDatasheet' } as const;
 
+/** The datasheet-side fields of add_motor, named as the caller wrote them. */
+const DATASHEET_SIDE = ['datasheet', 'pmsmDatasheet', 'stepperDatasheet', 'inductionDatasheet', 'gearhead', 'acceptInconsistent'] as const;
+
+/** The first datasheet-side field of `params` that motor kind `kind` does not use (a sheet of another kind, any sheet / gearhead on torque_curve / speed), or null. */
+export function foreignField(kind: string, params: Partial<Record<(typeof DATASHEET_SIDE)[number], unknown>>): string | null {
+  const own = (SHEET_FIELD as Record<string, string | undefined>)[kind];
+  const shared = own === undefined ? [] : ['gearhead', 'acceptInconsistent'];
+  return DATASHEET_SIDE.find((field) => params[field] !== undefined && field !== own && !shared.includes(field)) ?? null;
+}
+
 /** The motor of `params` with its consistency verdict text, or the refusal (missing sheet / source, an inconsistent sheet, a malformed pull-out curve). */
 export function buildDatasheetMotor(
   doc: CadDocument,

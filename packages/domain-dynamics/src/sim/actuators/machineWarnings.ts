@@ -37,7 +37,7 @@ export function stepperRunData(run: DriveRuntime, trace: SimulationTrace): Stepp
   };
 }
 
-/** The warnings of a motor's run that belong to its kind (stepper steps lost, PMSM voltage over the bus limit, the induction steady-state form). */
+/** The warnings of a motor's run that belong to its kind (stepper steps lost or recovered overshoot, PMSM voltage over the bus limit, the induction steady-state form). */
 export function machineWarnings(run: DriveRuntime, trace: SimulationTrace, peakVoltageV: number, timestep: number): string[] {
   const { machine, motor } = run;
   if (machine.kind === 'stepper' && motor.kind === 'stepper') {
@@ -47,11 +47,17 @@ export function machineWarnings(run: DriveRuntime, trace: SimulationTrace, peakV
     const coarse = natural * timestep > STEPPER_STEP_LIMIT || (machine.params.dampingNmsPerRad * timestep) / rotor > STEPPER_STEP_LIMIT;
     const timestepWarning = coarse
       ? [
-          `DRV_STEPPER_TIMESTEP: stepper '${motor.id}' rings at up to ${(natural / (2 * Math.PI)).toPrecision(4)} Hz and the step is ${timestep} s: the field torque and the damping are applied explicitly per step, ` +
+          `DRV_STEPPER_TIMESTEP: stepper '${motor.id}' rings at up to ${(natural / (2 * Math.PI)).toPrecision(4)} Hz (conservative estimate: rotor inertia only, holding torque, so a loaded rotor rings lower) and the step is ${timestep} s: the field torque and the damping are applied explicitly per step, ` +
             `keep omega_n x dt and c x dt / J below ${STEPPER_STEP_LIMIT} (timestep <= ${(STEPPER_STEP_LIMIT / natural).toPrecision(2)} s)`,
         ]
       : [];
     if (data === null || data.peakLostSteps === 0) return timestepWarning;
+    if (data.lostSteps === 0)
+      return [
+        ...timestepWarning,
+        `DRV_STEPPER_OVERSHOOT: stepper '${motor.id}' fell behind its field by more than half an electrical period (largest ${data.peakLostSteps} steps, first at t = ${data.firstLostS?.toPrecision(4)} s) and recovered: ` +
+          'no step is lost at the end, but the load or the step rate is at the pull-out limit (the transient is not a stable operating point)',
+      ];
     return [
       ...timestepWarning,
       `DRV_STEPS_LOST: stepper '${motor.id}' lost ${data.lostSteps} full steps by the end (first at t = ${data.firstLostS?.toPrecision(4)} s, largest ${data.peakLostSteps}): ` +

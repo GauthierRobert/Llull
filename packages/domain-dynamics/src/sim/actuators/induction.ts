@@ -3,7 +3,7 @@
  * circuit, Fitzgerald, Kingsley and Umans, Electric Machinery, 6th ed., sec. 6.6; Chapman, Electric Machinery Fundamentals, 5th ed., ch. 6).
  * T(s) = 3·V²·R2·s / (ω_s·((R1·s + R2)² + (s·X)²)), X = (X1 + X2)·f/f_rated, s = (ω_s − ω)/ω_s, ω_s = 2π·f/p. Breakdown at s_b = R2/√(R1² + X²),
  * T_b = 3·V² / (2·ω_s·(R1 + √(R1² + X²))). Torque is the steady-state value at the instantaneous slip (no flux transients: model form, stated).
- * Power flow: P_ag = T·ω_s; rotor copper s·P_ag = 3·I2²·R2; stator copper 3·I2²·R1; iron 3·V²/R_c; electrical input = P_ag + stator copper + iron.
+ * Power flow: P_ag = T·ω_s; rotor copper s·P_ag = 3·I2²·R2; stator copper 3·R1·(I2² + Im²), Im = V/Xm(f); iron 3·V²/R_c; electrical input = P_ag + stator copper + iron.
  */
 
 import type { InductionMotor } from '@core/model/drives';
@@ -79,7 +79,9 @@ export function inductionPoint(p: InductionParameters, volts: number, frequencyH
   const denominator = (p.r1 * slip + p.r2) ** 2 + (slip * x) ** 2;
   const current2 = (volts * volts * slip * slip) / denominator;
   const torque = (3 * volts * volts * p.r2 * slip) / (omegaSync * denominator);
-  const stator = 3 * p.r1 * current2;
+  // the magnetising current V / Xm(f) also flows through the stator resistance (added as 3·R1·Im², the cross term with I2 is neglected: it is the lower-order part of the no-load copper loss)
+  const magnetising = volts / ((p.magnetisingReactanceOhm * Math.abs(frequencyHz)) / p.ratedFrequencyHz);
+  const stator = 3 * p.r1 * (current2 + magnetising * magnetising);
   const iron = p.ironLossResistanceOhm > 0 ? (3 * volts * volts) / p.ironLossResistanceOhm : 0;
   const rotor = 3 * current2 * p.r2;
   // P_ag = T·ω_s, so rotor copper = s·P_ag and the shaft power T·ω = P_ag − rotor copper; the input is the air-gap power plus stator copper and iron

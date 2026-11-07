@@ -153,7 +153,7 @@ export const sizeDrive = defineCommand({
   name: NAME,
   annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
-    'Size a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction" with set_motor_drive) for its duty cycle: "current" is the one each kind records (dc winding current, pmsm phase-current amplitude with copper 1.5*R*i^2, stepper phase current with 2*R*i^2, induction load current I2 RMS with copper 3*(R1+R2)*I2^2), and a factor the sheet has no value for (an induction sheet without a peak current) is listed in notEvaluated;  simulates the drive over whole repeats of its profile ' +
+    'Size a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction" with set_motor_drive) for its duty cycle: "current" is the one each kind records (dc winding current, pmsm phase-current amplitude with copper 1.5*R*i^2, stepper phase current with 2*R*i^2, induction load current I2 RMS with copper 3*(R1+R2)*I2^2: ONE lumped winding node that the rotor copper also heats, the magnetising copper is not in it), and a factor the sheet has no value for (an induction sheet without a peak current) is listed in notEvaluated; simulates the drive over whole repeats of its profile ' +
     '(or `duration`) and reports, against the datasheet, the PEAK current / shaft torque / speed / voltage, the RMS current and shaft torque over the window ' +
     '(trapezoid-weighted, TR-DRV-21), the winding temperature from the 2-node thermal network (steady value at the RMS current, peak and end of the run; ' +
     'runaway above the current where copper loss feeds itself), the margin of each factor (capacity / demand - 1: peak_current vs the peak or stall current, ' +
