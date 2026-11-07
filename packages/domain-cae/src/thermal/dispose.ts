@@ -22,7 +22,8 @@ const ROW_PATTERN = /^(.+):(max|min)$/;
  *   used one is THM_HUMAN_GATE); the disposition binds to the current results hash and to this document (its uid, recorded with it and re-verified by
  *   check_temperature_limits); a replay honours a recorded step only from `analysis.dispositionLedger` (kept by replaySeed; same case, row, decision,
  *   justification, results and this document's uid, its signature re-verified when a port is installed), spends nothing, and a document with another uid loses it
- * @failure no port, no confirmation or one that does not verify -> THM_HUMAN_GATE (an agent always lands here); a document without a uid (checked after the port) -> THM_DOCUMENT_UNIDENTIFIED; unknown row -> THM_LIMIT_NOT_FOUND; stale results -> FEA_RESULTS_STALE;
+ * @failure a signature is single-use and its payload has no nonce (signing kind `payload`): once the act is undone, the same signature cannot be spent again, so the reviewer re-signs with the justification reworded;
+ *   with NO port a replay trusts the ledger (the record of an act a verified human made here); no port, no confirmation or one that does not verify -> THM_HUMAN_GATE (an agent always lands here); a document without a uid (checked after the port) -> THM_DOCUMENT_UNIDENTIFIED; unknown row -> THM_LIMIT_NOT_FOUND; stale results -> FEA_RESULTS_STALE;
  *   no results -> FEA_RESULTS_MISSING; empty justification -> THM_LIMIT_INVALID (all refusals, unchanged doc)
  */
 export const disposeThermalLimit = defineCommand({

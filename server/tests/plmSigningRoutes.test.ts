@@ -89,6 +89,27 @@ describe('/signing', () => {
     expect((await request(app).post('/signing/sign').send({ keyId: 5 })).status).toBe(400);
   });
 
+  it('a scan acceptance is signed through kind payload only with a nonce, which comes back inside the signature (so an undone act can be signed again)', async () => {
+    const key = await trustedKey(home, 'u-1');
+    const sign = (body: Record<string, unknown>): request.Test =>
+      request(app)
+        .post('/signing/sign')
+        .send({ kind: 'payload', keyId: key.record.keyId, passphrase: PASSPHRASE, payloadSha256: 'b'.repeat(64), ...body });
+    for (const act of ['accept_registration', 'accept_asbuilt_extraction']) {
+      expect((await sign({ act })).status).toBe(400);
+      expect((await sign({ act, nonce: '' })).status).toBe(400);
+      const first = await sign({ act, nonce: 'n-one' });
+      expect(first.status).toBe(200);
+      expect(first.body.signature).toMatchObject({ alg: 'Ed25519', keyId: key.record.keyId, nonce: 'n-one' });
+      const port = createSignaturePort(createTrustStore(home.trust));
+      expect(port.verify(first.body.signature, 'b'.repeat(64))?.signer).toBe('u-1');
+    }
+    // the other dispose acts keep their nonce-free signature
+    const margin = await sign({ act: 'dispose_margin' });
+    expect(margin.status).toBe(200);
+    expect(margin.body.signature).not.toHaveProperty('nonce');
+  });
+
   it('a PMI review signature is computed by the server from the live document and binds the reviewed items', async () => {
     const key = await trustedKey(home, 'u-1');
     const datum = execute(createEmptyDocument(), 'add_pmi_note', { text: 'BREAK ALL SHARP EDGES' });

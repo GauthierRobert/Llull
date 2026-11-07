@@ -10,6 +10,7 @@ import type { CloudOp, CloudOpResult } from '@core/model/pointCloud';
 import type { ExecutionContext } from '@core/commands/types';
 import { defaultContext } from '@core/commands/context';
 import { registrationPayload } from '@aec/scan/registrationCommands';
+import { isRecord } from '@lib/isRecord';
 import { expectPure } from '../../helpers/expectNoOp';
 import { fixturePort, KEY_A, KEY_B, opOk } from './fixturePort';
 
@@ -178,7 +179,10 @@ describe('apply / supplied / accept', () => {
       ...defaultContext(),
       humanSignature: {
         verify: (signature, payload) =>
-          signature === 'ok' && record !== undefined && payload === registrationPayload(record, supplied.document.uid ?? '')
+          isRecord(signature) &&
+          signature['ok'] === true &&
+          record !== undefined &&
+          payload === registrationPayload(record, supplied.document.uid ?? '', 'n1')
             ? { signer: 'pat', signatureId: 's1' }
             : null,
       },
@@ -186,10 +190,16 @@ describe('apply / supplied / accept', () => {
     expect(execute(supplied.document, 'accept_registration', { registrationId: id, confirmation: 'forged' }, signing).error?.code).toBe(
       'SCN_HUMAN_GATE',
     );
-    expect(execute(supplied.document, 'accept_registration', { registrationId: 'reg-0.0', confirmation: 'ok' }, signing).error?.code).toBe(
-      'SCN_REG_NOT_FOUND',
+    expect(
+      execute(supplied.document, 'accept_registration', { registrationId: 'reg-0.0', confirmation: { nonce: 'n1', ok: true } }, signing)
+        .error?.code,
+    ).toBe('SCN_REG_NOT_FOUND');
+    const accepted = execute(
+      supplied.document,
+      'accept_registration',
+      { registrationId: id, confirmation: { nonce: 'n1', ok: true } },
+      signing,
     );
-    const accepted = execute(supplied.document, 'accept_registration', { registrationId: id, confirmation: 'ok' }, signing);
     expect(accepted.document.scan?.registrations[id]).toMatchObject({
       status: 'accepted',
       acceptedBy: { signer: 'pat', signatureId: 's1' },

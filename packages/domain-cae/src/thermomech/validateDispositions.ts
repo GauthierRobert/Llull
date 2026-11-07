@@ -14,6 +14,7 @@ function dispositionProblems(entry: unknown, at: string, withRowKey: boolean): s
   for (const key of ['justification', 'inputsHash', 'signer', 'signatureId'])
     if (!text(entry[key])) problems.push(`${at}.${key} must be text`);
   if (typeof entry['documentUid'] !== 'string') problems.push(`${at}.documentUid must be text`);
+  // no nonce check: a margin / thermal / fit signature is made over a payload the client computed (signing kind `payload`), which carries no nonce
   const signature = entry['signature'];
   if (!isRecord(signature) || Object.keys(signature).length === 0) problems.push(`${at}.signature must be a signature object`);
   return problems;

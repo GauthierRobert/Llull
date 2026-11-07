@@ -166,17 +166,20 @@ export const commitAsbuiltExtraction = defineCommand({
 });
 
 /** The payload a reviewer signs to accept an extraction in the document `documentUid`. */
-export const extractionPayload = (record: ExtractionRecord, documentUid: string): string =>
+export const extractionPayload = (record: ExtractionRecord, documentUid: string, nonce: string): string =>
   sha256Hex(
     canonicalJson(
-      withDocumentUid({ act: 'accept_asbuilt_extraction', extractionId: record.id, extractionHash: record.extractionHash }, documentUid),
+      withDocumentUid(
+        { act: 'accept_asbuilt_extraction', extractionId: record.id, extractionHash: record.extractionHash, nonce },
+        documentUid,
+      ),
     ),
   );
 
 /**
  * @affects 1 extraction record: status accepted with the verified signer (affected: [extractionId]) and 1 entry in scan.acceptanceLedger
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); accepted only with a signature verified by the port over
- *   sha256 of canonical { act, documentUid, extractionId, extractionHash }, spent once (a retry is SCN_HUMAN_GATE); a replay honours a recorded step only from
+ *   sha256 of canonical { act, documentUid, extractionId, extractionHash, nonce } (the nonce is chosen by the signer, so an act can be signed again after an undo), spent once (a retry is SCN_HUMAN_GATE); a replay honours a recorded step only from
  *   `scan.acceptanceLedger` (kept by replaySeed; same extraction, payload and this document's uid, re-verified when a port is installed), spends nothing,
  *   and a document with another uid loses the acceptance
  * @failure no port / no confirmation / bad or used signature -> SCN_HUMAN_GATE (an agent always lands here); a document without uid -> SCN_DOCUMENT_UNIDENTIFIED;
@@ -203,7 +206,7 @@ export const acceptAsbuiltExtraction = defineCommand({
     const signer = gateAcceptance(doc, ctx, confirmation, {
       command,
       targetId: extractionId,
-      payloadFor: (documentUid) => extractionPayload(record, documentUid),
+      payloadFor: (documentUid, nonce) => extractionPayload(record, documentUid, nonce),
     });
     if (refused(signer)) return signer;
     const accepted: ExtractionRecord = {

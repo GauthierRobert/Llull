@@ -1,6 +1,5 @@
 /** dispose_margin: the human gate on a FAIL / MARGINAL margin row (05 §4, §5.8; FR-FEA-33, AF-34, TR-FEA-91). */
 
-import type { Disposition } from '@core/model/analysis';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
@@ -23,7 +22,8 @@ import { refuseMarginsAs } from './refusal';
  *   (its uid, recorded with the disposition and re-verified by compute_margins), and ends when the case is solved again; a replay honours a recorded step
  *   only from `analysis.dispositionLedger` (kept by replaySeed; same case, row, decision, justification, results and this document's uid, its signature
  *   re-verified when a port is installed), spends nothing, and a document with another uid loses it
- * @failure no signing port, no signature or a signature that does not verify -> FEA_HUMAN_GATE (an agent caller always lands here); unknown analysis
+ * @failure a signature is single-use and its payload has no nonce (signing kind `payload`): once the act is undone, the same signature cannot be spent again, so the reviewer re-signs with the justification reworded;
+ *   with NO port a replay trusts the ledger (the record of an act a verified human made here); no signing port, no signature or a signature that does not verify -> FEA_HUMAN_GATE (an agent caller always lands here); unknown analysis
  *   -> FEA_ANALYSIS_NOT_FOUND; a document without a uid (checked after the port and signature) -> FEA_DOCUMENT_UNIDENTIFIED; empty justification -> FEA_PARAM_INVALID; stale / missing results -> FEA_RESULTS_STALE / FEA_RESULTS_MISSING; unknown
  *   rowId -> FEA_MARGIN_ROW_NOT_FOUND; a PASS row -> FEA_MARGIN_PARAM_INVALID (all refusals, unchanged doc)
  */
@@ -93,26 +93,20 @@ export const disposeMargin = defineCommand({
         'FEA_HUMAN_GATE',
         'the signature does not verify for this disposition (already used): hand over to the qualified reviewer',
       );
-    const disposition: Disposition = {
+    const signature = kept === undefined ? confirmation : kept.signature;
+    const disposition = {
       decision,
       justification,
       resultsHash,
       signer: signed.signer,
       signatureId: signed.signatureId,
-      signature: kept === undefined ? confirmation : kept.signature,
+      signature,
       documentUid: documentIdentity(doc),
     };
     const next = { ...table.analysis, dispositions: { ...table.analysis.dispositions, [rowKey]: disposition } };
     return changed(
       kept === undefined
-        ? withDispositionLedgered(withCase(doc, next), {
-            ...disposition,
-            act: 'dispose_margin',
-            analysisId,
-            rowKey,
-            signature: disposition.signature,
-            documentUid: documentIdentity(doc),
-          })
+        ? withDispositionLedgered(withCase(doc, next), { ...disposition, act: 'dispose_margin', analysisId, rowKey, signature })
         : withCase(doc, next),
       `dispose_margin: '${rowId}' (${rowKey}) ${row.status} ${decision} by ${signed.signer} (signature ${signed.signatureId}) on results ${resultsHash.slice(0, 12)}; the status stays ${row.status}.`,
       [analysisId],

@@ -35,7 +35,7 @@ function port(): HumanSignaturePort & { readonly spentCount: () => number } {
   };
 }
 const withPort = (signing: HumanSignaturePort | null): ExecutionContext => ({ ...defaultContext(), humanSignature: signing });
-const signedFor = (payload: string): Record<string, unknown> => ({ nonce: 'n1', secret: SECRET, payload });
+const signedFor = (payload: string, nonce = 'n1'): Record<string, unknown> => ({ nonce, secret: SECRET, payload });
 
 interface Gate {
   readonly command: string;
@@ -44,7 +44,7 @@ interface Gate {
   readonly table: 'registrations' | 'extractions';
   readonly document: CadDocument;
   readonly id: string;
-  readonly payload: (document: CadDocument) => string;
+  readonly payload: (document: CadDocument, nonce?: string) => string;
 }
 
 const shift = (x: number): number[] => [1, 0, 0, x, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
@@ -68,7 +68,7 @@ function registrationGate(): Gate {
     table: 'registrations',
     document: supplied.document,
     id,
-    payload: (document) => registrationPayload(document.scan?.registrations[id] as never, document.uid ?? ''),
+    payload: (document, nonce = 'n1') => registrationPayload(document.scan?.registrations[id] as never, document.uid ?? '', nonce),
   };
 }
 
@@ -107,7 +107,7 @@ function extractionGate(): Gate {
     table: 'extractions',
     document: committed.document,
     id,
-    payload: (document) => extractionPayload(document.scan?.extractions[id] as never, document.uid ?? ''),
+    payload: (document, nonce = 'n1') => extractionPayload(document.scan?.extractions[id] as never, document.uid ?? '', nonce),
   };
 }
 
@@ -170,6 +170,56 @@ describe.each([
     expect(signing.spentCount()).toBe(0);
     expect(run(doc, { confirmation }, signing).rejected).not.toBe(true);
     expect(signing.spentCount()).toBe(1);
+  });
+
+  it('binds a signer-chosen nonce: no nonce is refused, and after an undo the act is signed again with a new nonce (the same bytes stay spent)', () => {
+    const signing = port();
+    const noNonce = { secret: SECRET, payload: gate.payload(doc, '') };
+    expect(run(doc, { confirmation: noNonce }, signing).error?.code).toBe('SCN_HUMAN_GATE');
+    expect(signing.spentCount()).toBe(0);
+    expect(run(doc, { confirmation }, signing).rejected).not.toBe(true);
+    // undo: the document before the acceptance; the identical signature is dead, a new nonce is a new signature
+    expect(run(doc, { confirmation }, signing).error?.code).toBe('SCN_HUMAN_GATE');
+    const again = run(doc, { confirmation: signedFor(gate.payload(doc, 'n2'), 'n2') }, signing);
+    expect(again.rejected, again.summary).not.toBe(true);
+    expect(status(again.document)).toBe('accepted');
+    expect(signing.spentCount()).toBe(2);
+  });
+
+  it('scan_acceptance_payload returns exactly the payload the gate verifies, and refuses an unknown id', () => {
+    const asked = execute(doc, 'scan_acceptance_payload', { act: command, id, nonce: 'n7' });
+    expect((asked.data as { payloadSha256: string }).payloadSha256).toBe(gate.payload(doc, 'n7'));
+    expect(execute(doc, 'scan_acceptance_payload', { act: command, id: 'nope-1.1', nonce: 'n7' }).error?.code).toBe(gate.notFound);
+    const { uid, ...bare } = doc;
+    void uid;
+    expect(execute(bare, 'scan_acceptance_payload', { act: command, id, nonce: 'n7' }).error?.code).toBe('SCN_DOCUMENT_UNIDENTIFIED');
+  });
+
+  it('check_point_clouds re-verifies an accepted status: a planted one is a fail item, no port is a warning, a signed one is clean', () => {
+    const codes = (document: CadDocument, signing: HumanSignaturePort | null): { severity: string; code: string }[] =>
+      (execute(document, 'check_point_clouds', {}, withPort(signing)).data as { items: { severity: string; code: string }[] }).items
+        .filter((entry) => /^SCN_(ACCEPTANCE|REGISTRATION_UNVERIFIED|REVIEW_REQUIRED)/.test(entry.code))
+        .map(({ severity, code }) => ({ severity, code }));
+    const pending = ['SCN_REGISTRATION_UNVERIFIED', 'SCN_REVIEW_REQUIRED'];
+    expect(
+      codes(doc, port())
+        .map((entry) => entry.code)
+        .some((code) => pending.includes(code)),
+    ).toBe(true);
+    expect(codes(signed, port()).map((entry) => entry.code)).toEqual([]);
+    expect(codes(signed, null)).toEqual([{ severity: 'warn', code: 'SCN_ACCEPTANCE_UNVERIFIABLE' }]);
+    const planted = {
+      ...doc,
+      scan: { ...doc.scan, [gate.table]: { ...doc.scan?.[gate.table], [id]: { ...doc.scan?.[gate.table][id], status: 'accepted' } } },
+    } as CadDocument;
+    const found = codes(planted, port());
+    expect(found).toContainEqual({ severity: 'fail', code: 'SCN_ACCEPTANCE_UNBACKED' });
+    expect(found.some((entry) => pending.includes(entry.code))).toBe(true);
+    const forged = {
+      ...signed,
+      scan: { ...signed.scan, acceptanceLedger: [{ ...signed.scan?.acceptanceLedger?.[0], signature: signedFor('0'.repeat(64)) }] },
+    } as unknown as CadDocument;
+    expect(codes(forged, port())).toContainEqual({ severity: 'fail', code: 'SCN_ACCEPTANCE_UNBACKED' });
   });
 
   it('an agent without a signature is refused, with or without a port, and a recorded confirmation outside a replay is no signature', () => {
@@ -249,6 +299,7 @@ describe.each([
     expect(load((scan) => (ledger(scan)[0]!['act'] = 'accept_anything'))).toMatch(/act must be/);
     expect(load((scan) => delete ledger(scan)[0]!['targetId'])).toMatch(/targetId must be text/);
     expect(load((scan) => (ledger(scan)[0]!['documentUid'] = 3))).toMatch(/documentUid must be text/);
-    expect(load((scan) => (ledger(scan)[0]!['signature'] = 'raw'))).toMatch(/signature must be a signature object/);
+    expect(load((scan) => (ledger(scan)[0]!['signature'] = 'raw'))).toMatch(/signature must be a signature object with a nonce/);
+    expect(load((scan) => delete (ledger(scan)[0]!['signature'] as Record<string, unknown>)['nonce'])).toMatch(/with a nonce/);
   });
 });

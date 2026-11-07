@@ -146,11 +146,11 @@ export const markRegistrationSupplied = defineCommand({
 });
 
 /** The payload a reviewer signs to accept a registration in the document `documentUid`: its id, transform and quality. */
-export const registrationPayload = (record: RegistrationRecord, documentUid: string): string =>
+export const registrationPayload = (record: RegistrationRecord, documentUid: string, nonce: string): string =>
   sha256Hex(
     canonicalJson(
       withDocumentUid(
-        { act: 'accept_registration', registrationId: record.id, transform: record.transform, quality: record.quality },
+        { act: 'accept_registration', registrationId: record.id, transform: record.transform, quality: record.quality, nonce },
         documentUid,
       ),
     ),
@@ -159,7 +159,7 @@ export const registrationPayload = (record: RegistrationRecord, documentUid: str
 /**
  * @affects 1 record: status accepted with the verified signer (affected: [registrationId]) and 1 entry in scan.acceptanceLedger
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); only a signature verified by the host's signing port over
- *   sha256(canonical { act, documentUid, registrationId, transform, quality }) accepts, spent once (a retry is SCN_HUMAN_GATE); a replay honours a recorded step
+ *   sha256(canonical { act, documentUid, registrationId, transform, quality, nonce }) (the nonce is chosen by the signer, so an act can be signed again after an undo) accepts, spent once (a retry is SCN_HUMAN_GATE); a replay honours a recorded step
  *   only from `scan.acceptanceLedger` (kept by replaySeed; same registration, payload and this document's uid, re-verified when a port is installed), spends
  *   nothing, and a document with another uid loses the acceptance
  * @failure no port / no confirmation / bad or used signature -> SCN_HUMAN_GATE (an agent always lands here); a document without uid -> SCN_DOCUMENT_UNIDENTIFIED;
@@ -188,7 +188,7 @@ export const acceptRegistration = defineCommand({
     const signer = gateAcceptance(doc, ctx, confirmation, {
       command,
       targetId: registrationId,
-      payloadFor: (documentUid) => registrationPayload(record, documentUid),
+      payloadFor: (documentUid, nonce) => registrationPayload(record, documentUid, nonce),
     });
     if (refused(signer)) return signer;
     const accepted: RegistrationRecord = {

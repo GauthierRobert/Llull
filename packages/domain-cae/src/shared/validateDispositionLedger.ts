@@ -20,6 +20,7 @@ export function dispositionLedgerErrors(analysis: Record<string, unknown>): stri
     for (const key of ['analysisId', 'rowKey', 'justification', 'resultsHash', 'signer', 'signatureId'])
       if (!text(entry[key])) problems.push(`${at}.${key} must be text`);
     if (typeof entry['documentUid'] !== 'string') problems.push(`${at}.documentUid must be text`);
+    // no nonce check: a payload-kind signature (margin, thermal) carries none; the replay re-verifies it through the port anyway
     const signature = entry['signature'];
     if (!isRecord(signature) || Object.keys(signature).length === 0) problems.push(`${at}.signature must be a signature object`);
     return problems;

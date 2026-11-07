@@ -76,7 +76,8 @@ function ledgerErrors(raw: Record<string, unknown>): string[] {
       if (typeof entry[key] !== 'string' || entry[key] === '') problems.push(`${at}.${key} must be text`);
     if (typeof entry['documentUid'] !== 'string') problems.push(`${at}.documentUid must be text`);
     const signature = entry['signature'];
-    if (!isRecord(signature) || Object.keys(signature).length === 0) problems.push(`${at}.signature must be a signature object`);
+    if (!isRecord(signature) || typeof signature['nonce'] !== 'string' || signature['nonce'] === '')
+      problems.push(`${at}.signature must be a signature object with a nonce (the nonce is part of the signed payload)`);
     return problems;
   });
 }

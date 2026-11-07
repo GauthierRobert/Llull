@@ -216,7 +216,7 @@ function scanWithLedger(): CadDocument {
     payload: 'a'.repeat(64),
     signer: 's',
     signatureId: 'id',
-    signature: { nonce: 'n-1', payload: 'a'.repeat(64) },
+    signature: { alg: 'Ed25519', keyId: 'k-1', publicKey: 'a'.repeat(64), signature: 'b'.repeat(128), nonce: 'n-1' },
     documentUid: doc.uid ?? '',
   };
   const acceptanceLedger = [
@@ -241,7 +241,9 @@ const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc
 
 /** `doc` with a valid human-act ledger entry and a copy bound to another document uid, in both ledgers, plus the matching fit dispositions. */
 function withLedgers(doc: CadDocument): CadDocument {
-  const signature = { nonce: 'n-1', payload: 'a'.repeat(64) };
+  // the shape a real key produces: the exception kind carries a signer-chosen nonce, the payload kind (fit, margin) none
+  const keyed = { alg: 'Ed25519', keyId: 'k-1', publicKey: 'a'.repeat(64), signature: 'b'.repeat(128) };
+  const signature = { ...keyed, nonce: 'n-1' };
   const exception = {
     analysisId: analysisId(doc),
     studyId: 'cs-1.1',
@@ -259,7 +261,7 @@ function withLedgers(doc: CadDocument): CadDocument {
     inputsHash: 'h',
     signer: 's',
     signatureId: 'id',
-    signature,
+    signature: keyed,
     documentUid: doc.uid ?? '',
   };
   const margin = {
@@ -271,7 +273,7 @@ function withLedgers(doc: CadDocument): CadDocument {
     resultsHash: 'a'.repeat(64),
     signer: 's',
     signatureId: 'id',
-    signature,
+    signature: keyed,
     documentUid: doc.uid ?? '',
   };
   const analysis = {
