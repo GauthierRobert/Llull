@@ -245,6 +245,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
 - `[WIP]` **FIX-SIG-DFR** `dispose_fit_result` (cae thermomech `dispose.ts`) names its gate param `signature`, so `withoutConfirmations` does not strip it and the whole signature lands in `featureHistory` / command log / live sync; rename to `confirmation` + replay ledger like VNV-M3 `accept_verification_exception`, drop it from `KNOWN_SIGNATURE_IN_HISTORY` (tests/helpers/documentBinding.ts). _Lane 1_ _deps: VNV-M3_
+- `[TODO]` **FIX-JOBDIR** `server/tests/{spatialIndexNative,scanNative}.test.ts` count every `llull-compute-*` folder in tmpdir, so a job folder of another process (parallel lane / session) fails "the job folder is removed" (seen 2026-11-07 on the ENG-10b server run; passes alone). Give compute jobs a per-process prefix (`llull-compute-<pid>-`, `server/src/native/computeJob.ts`) and filter by it in the tests. _Lane 4_
 - `[TODO]` **ENG-4** Blocked validation plans in `tests/unit/contract/blockedPlanCommands.json`; next: pack 09 frequency response, 11 creep, 19 impact, 17 topology, aero 06/03/09/02.
 - `[TODO]` **ENG-5** Fatigue/fracture: FE hot-spot stress (`FAT_RESULTS_MISSING`), `fe_seam` cracks + interaction integral, `compute_k_from_fe`, retardation, surface cracks.
 - `[WIP]` **ENG-10b** Natural-frequency search finds few candidates (no modal-specific command): make modal analysis discoverable.
