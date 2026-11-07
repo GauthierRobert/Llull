@@ -65,3 +65,17 @@ export function insUnitsMillimetres(code: number | null): number | null {
       return null;
   }
 }
+
+/** The AutoCAD Color Index (1-255) nearest to a `#rrggbb` colour (exact for the table's own colours). */
+export function hexToAci(hex: string): number {
+  const channels = (value: string): number[] => [1, 3, 5].map((at) => Number.parseInt(value.slice(at, at + 2), 16));
+  const target = channels(hex);
+  let best = 7;
+  let bestDistance = Infinity;
+  for (let aci = 1; aci <= 255; aci++) {
+    const candidate = channels(aciToHex(aci));
+    const distance = candidate.reduce((sum, value, axis) => sum + (value - (target[axis] as number)) ** 2, 0);
+    if (distance < bestDistance) [best, bestDistance] = [aci, distance];
+  }
+  return best;
+}
