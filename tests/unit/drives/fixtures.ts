@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import type { LedgerData } from '@dynamics/sim/ledger';
 import type { SimulationData } from '@dynamics/sim/simulationReport';
 
 const VALIDATION = 'docs/physics/23-drives-physical-truth/validation';
@@ -101,7 +102,7 @@ interface DriveData {
 /** simulate_motion data of a run with datasheet motors (motors "m" or "m_re40"). */
 export interface RunData extends SimulationData {
   drives: Record<'m' | 'm_re40', DriveData>;
-  ledger: { entries: { element: string; kind: string; joules: number }[]; closureRelative: number; closure: string };
+  ledger: LedgerData;
 }
 
 export const dataOf = (result: ReturnType<typeof execute>): RunData => result.data as RunData;

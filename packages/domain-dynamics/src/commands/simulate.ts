@@ -87,7 +87,7 @@ export const simulateMotion = defineCommand({
     'Datasheet DC motors (add_motor kind "dc" + set_motor_drive): data.drives gives per motor the peak and final current (A), terminal voltage (V), joint torque ' +
     '(N·m) and shaft speed (rpm), RMS values, the number of samples where the current limit clipped the command, the tracking error of a prescribed / ' +
     'closed-loop drive and whether the datasheet was verified; detail "drives" adds the per-sample series (voltage, current, shaft and joint torque, shaft speed, ' +
-    'electrical and mechanical power) and turns the energy ledger on. data.ledger (with `energy`, or detail "drives") lists the joules of every element ' +
+    'electrical and mechanical power) and turns the energy ledger on (the joint series of detail "series" are included too). data.ledger (with `energy`, or detail "drives") lists the joules of every element ' +
     '(electrical input net of regeneration, copper loss, magnetic energy, gearhead loss, friction and damping, propellers, kinetic, potential, external work) ' +
     'and how well input - dissipated - stored closes (pass <= 1e-3, warn <= 1e-2 of the largest term). Warnings: DRV_ELECTRICAL_QUASI_STATIC (info), ' +
     'DRV_TRACKING_ERROR, DRV_CONTROL_RATE / DRV_PROFILE_INVALID / DRV_TUNE_NO_INERTIA (refuse the run, nothing simulated). ' +
@@ -113,7 +113,7 @@ export const simulateMotion = defineCommand({
       .enum(['summary', 'series', 'poses', 'drives'])
       .optional()
       .describe(
-        '"summary" (default), "series", "poses", or "drives" (summary + per-sample series of every datasheet motor + the energy ledger).',
+        '"summary" (default), "series", "poses", or "drives" (everything of "series" + per-sample series of every datasheet motor + the energy ledger).',
       ),
     reactions: z
       .enum(['off', 'peaks', 'series'])
@@ -239,7 +239,7 @@ export const simulateMotion = defineCommand({
         engine: engine.name,
         duration,
         timestep,
-        detail: params.detail === 'drives' ? 'summary' : (params.detail ?? 'summary'),
+        detail: params.detail === 'drives' ? 'series' : (params.detail ?? 'summary'),
         metresPerUnit: metres,
         drives: built.drives,
       });
