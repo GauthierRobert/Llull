@@ -235,23 +235,25 @@ describe('commit_asbuilt_extraction / accept_asbuilt_extraction', () => {
     expect(
       (committed.document.building?.elements[pipeId ?? ''] as unknown as { asBuilt: { unverified: boolean } }).asBuilt.unverified,
     ).toBe(true);
-    const agent = execute(committed.document, 'accept_asbuilt_extraction', { extractionId, signature: true });
+    const agent = execute(committed.document, 'accept_asbuilt_extraction', { extractionId, confirmation: true });
     expect(agent.error?.code).toBe('SCN_HUMAN_GATE');
     const record = committed.document.scan?.extractions[extractionId ?? ''];
     const signing: ExecutionContext = {
       ...defaultContext(),
       humanSignature: {
         verify: (s, payload) =>
-          s === 'ok' && record !== undefined && payload === extractionPayload(record) ? { signer: 'pe', signatureId: 'x1' } : null,
+          s === 'ok' && record !== undefined && payload === extractionPayload(record, committed.document.uid ?? '')
+            ? { signer: 'pe', signatureId: 'x1' }
+            : null,
       },
     };
-    expect(execute(committed.document, 'accept_asbuilt_extraction', { extractionId, signature: 'no' }, signing).error?.code).toBe(
+    expect(execute(committed.document, 'accept_asbuilt_extraction', { extractionId, confirmation: 'no' }, signing).error?.code).toBe(
       'SCN_HUMAN_GATE',
     );
     expect(
-      execute(committed.document, 'accept_asbuilt_extraction', { extractionId: 'ext-0.0', signature: 'ok' }, signing).error?.code,
+      execute(committed.document, 'accept_asbuilt_extraction', { extractionId: 'ext-0.0', confirmation: 'ok' }, signing).error?.code,
     ).toBe('SCN_EXTRACTION_NOT_FOUND');
-    const accepted = execute(committed.document, 'accept_asbuilt_extraction', { extractionId, signature: 'ok' }, signing);
+    const accepted = execute(committed.document, 'accept_asbuilt_extraction', { extractionId, confirmation: 'ok' }, signing);
     expect(accepted.document.scan?.extractions[extractionId ?? '']).toMatchObject({ status: 'accepted', acceptedBy: { signer: 'pe' } });
   });
 });

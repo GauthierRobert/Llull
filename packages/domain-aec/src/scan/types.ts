@@ -96,6 +96,20 @@ export interface CropBox {
   readonly keep: 'inside' | 'outside';
 }
 
+/** A human acceptance kept in `ScanModel.acceptanceLedger` across replay (the recorded step carries no signature): what was signed and the proof to re-verify it. */
+export interface AcceptanceLedgerEntry {
+  readonly act: 'accept_asbuilt_extraction' | 'accept_registration';
+  /** Extraction id or registration id (step-scoped, so a replay re-mints the same). */
+  readonly targetId: string;
+  /** sha256 the human signed (binds the record content and the document uid). */
+  readonly payload: string;
+  readonly signer: string;
+  readonly signatureId: string;
+  /** The signature object the port verified (kept for re-verification). */
+  readonly signature: unknown;
+  readonly documentUid: string;
+}
+
 /** `CadDocument.scan`: absent until the first scan command. */
 export interface ScanModel {
   readonly clouds: Readonly<Record<string, CloudReference>>;
@@ -103,6 +117,8 @@ export interface ScanModel {
   readonly registrations: Readonly<Record<string, RegistrationRecord>>;
   readonly extractions: Readonly<Record<string, ExtractionRecord>>;
   readonly crops: Readonly<Record<string, CropBox>>;
+  /** Acceptances a human really signed, kept by the scan `replaySeed` so a recorded accept_* step re-applies its verified act. */
+  readonly acceptanceLedger?: readonly AcceptanceLedgerEntry[];
 }
 
 declare module '@core/model/documentExtensions' {

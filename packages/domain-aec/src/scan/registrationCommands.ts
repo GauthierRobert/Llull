@@ -6,7 +6,9 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import { canonicalJson } from '@lib/canonicalJson';
 import { nextId } from '@lib/id';
+import { withDocumentUid } from '@core/model/documentUid';
 import { sha256Hex } from '@lib/sha256';
+import { gateAcceptance, refused } from './acceptanceGate';
 import { refuseScan } from './codes';
 import { isRigid, multiply } from './mat4';
 import { findCloud, scanOf, withScan } from './model';
@@ -143,14 +145,25 @@ export const markRegistrationSupplied = defineCommand({
   },
 });
 
-/** The payload a reviewer signs to accept a registration: its id, transform and quality. */
-export const registrationPayload = (record: RegistrationRecord): string =>
-  sha256Hex(canonicalJson({ act: 'accept_registration', registrationId: record.id, transform: record.transform, quality: record.quality }));
+/** The payload a reviewer signs to accept a registration in the document `documentUid`: its id, transform and quality. */
+export const registrationPayload = (record: RegistrationRecord, documentUid: string): string =>
+  sha256Hex(
+    canonicalJson(
+      withDocumentUid(
+        { act: 'accept_registration', registrationId: record.id, transform: record.transform, quality: record.quality },
+        documentUid,
+      ),
+    ),
+  );
 
 /**
- * @affects 1 record: status accepted with the verified signer (affected: [registrationId])
- * @invariant only a signature verified by the host's signing port over sha256(canonical { act, registrationId, transform, quality }) accepts
- * @failure no port / agent caller / bad signature -> SCN_HUMAN_GATE; unknown record -> SCN_REG_NOT_FOUND
+ * @affects 1 record: status accepted with the verified signer (affected: [registrationId]) and 1 entry in scan.acceptanceLedger
+ * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); only a signature verified by the host's signing port over
+ *   sha256(canonical { act, documentUid, registrationId, transform, quality }) accepts, spent once (a retry is SCN_HUMAN_GATE); a replay honours a recorded step
+ *   only from `scan.acceptanceLedger` (kept by replaySeed; same registration, payload and this document's uid, re-verified when a port is installed), spends
+ *   nothing, and a document with another uid loses the acceptance
+ * @failure no port / no confirmation / bad or used signature -> SCN_HUMAN_GATE (an agent always lands here); a document without uid -> SCN_DOCUMENT_UNIDENTIFIED;
+ *   unknown record -> SCN_REG_NOT_FOUND (refusals, document unchanged)
  */
 export const acceptRegistration = defineCommand({
   name: 'accept_registration',
@@ -159,34 +172,32 @@ export const acceptRegistration = defineCommand({
     'HUMAN-ONLY. An agent has no signature and always gets SCN_HUMAN_GATE with the document unchanged: hand the record to a reviewer.',
   params: z.object({
     registrationId: z.string().describe('Registration record id (affected[0] of apply_registration).'),
-    signature: z.unknown().describe('Human signature object from the signing system over the record payload; agents cannot produce one.'),
+    confirmation: z
+      .unknown()
+      .optional()
+      .describe(
+        'Human signature object from the signing system over the record payload; agents cannot produce one. Never written to the history.',
+      ),
   }),
-  run: (doc, { registrationId, signature }, ctx): CommandResult => {
+  run: (doc, { registrationId, confirmation }, ctx): CommandResult => {
     const command = 'accept_registration';
     const scan = scanOf(doc);
     const record = Object.hasOwn(scan.registrations, registrationId) ? scan.registrations[registrationId] : undefined;
     if (record === undefined)
       return refuseScan(doc, command, 'SCN_REG_NOT_FOUND', `no registration '${registrationId}'`, [registrationId], ['registrationId']);
-    const port = ctx?.humanSignature ?? null;
-    if (port === null)
-      return refuseScan(doc, command, 'SCN_HUMAN_GATE', 'no signing port: only a human reviewer can accept', [registrationId]);
-    const signer = port.verify(signature, registrationPayload(record));
-    if (signer === null)
-      return refuseScan(
-        doc,
-        command,
-        'SCN_HUMAN_GATE',
-        'the signature did not verify for this registration',
-        [registrationId],
-        ['signature'],
-      );
+    const signer = gateAcceptance(doc, ctx, confirmation, {
+      command,
+      targetId: registrationId,
+      payloadFor: (documentUid) => registrationPayload(record, documentUid),
+    });
+    if (refused(signer)) return signer;
     const accepted: RegistrationRecord = {
       ...record,
       status: 'accepted',
       acceptedBy: { signer: signer.signer, signatureId: signer.signatureId },
     };
     return changed(
-      withScan(doc, { ...scan, registrations: { ...scan.registrations, [registrationId]: accepted } }),
+      withScan(doc, signer.ledgered({ ...scan, registrations: { ...scan.registrations, [registrationId]: accepted } })),
       `Registration ${registrationId} accepted by ${signer.signer} (signature ${signer.signatureId}).`,
       [registrationId],
     );

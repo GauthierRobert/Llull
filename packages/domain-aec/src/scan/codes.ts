@@ -27,6 +27,7 @@ export const SCAN_REMEDIATION: Readonly<Record<string, string>> = {
   SCN_EXTRACTION_NOT_FOUND: 'List extractions with check_point_clouds.',
   SCN_EXTRACTION_DUPLICATE: 'This extraction is already committed; use the existing pipe run.',
   SCN_HUMAN_GATE: 'A qualified reviewer must sign in the desktop app; an agent cannot accept.',
+  SCN_DOCUMENT_UNIDENTIFIED: 'Run any document-changing command first (the document then gets a uid), and sign again.',
   SCN_ENTITY_UNSUPPORTED: 'Pass pipe runs, boxes, cylinders, spheres or meshed solids.',
   SCN_ENTITY_NOT_FOUND: 'Pass entity ids from describe_scene or pipe-run ids (affected[0] of add_pipe_run).',
   SCN_REGISTRATION_UNVERIFIED: 'Ask a reviewer to accept_registration, or register with targets / ICP.',

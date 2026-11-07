@@ -2,6 +2,7 @@
 
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { isRecord } from '@lib/isRecord';
+import { EMPTY_SCAN } from './model';
 
 const isMat4 = (value: unknown): boolean =>
   Array.isArray(value) && value.length === 16 && value.every((v) => typeof v === 'number' && Number.isFinite(v));
@@ -59,4 +60,34 @@ export function scanErrors(raw: Record<string, unknown>): string[] {
   return errors;
 }
 
-export const scanDocument: DocumentExtension = { validate: scanErrors, derivedEntityIds: () => new Set(), restore: (raw) => raw };
+/** Errors of `scan.acceptanceLedger` (absent: none): acceptances a replay re-applies, each with the signature object that proves it. */
+function ledgerErrors(raw: Record<string, unknown>): string[] {
+  const scan = raw['scan'];
+  const ledger = isRecord(scan) ? scan['acceptanceLedger'] : undefined;
+  if (ledger === undefined) return [];
+  if (!Array.isArray(ledger)) return ['scan.acceptanceLedger must be a list'];
+  return ledger.flatMap((entry, index) => {
+    const at = `scan.acceptanceLedger[${index}]`;
+    if (!isRecord(entry)) return [`${at} is malformed`];
+    const problems: string[] = [];
+    if (entry['act'] !== 'accept_asbuilt_extraction' && entry['act'] !== 'accept_registration')
+      problems.push(`${at}.act must be accept_asbuilt_extraction or accept_registration`);
+    for (const key of ['targetId', 'payload', 'signer', 'signatureId'])
+      if (typeof entry[key] !== 'string' || entry[key] === '') problems.push(`${at}.${key} must be text`);
+    if (typeof entry['documentUid'] !== 'string') problems.push(`${at}.documentUid must be text`);
+    const signature = entry['signature'];
+    if (!isRecord(signature) || Object.keys(signature).length === 0) problems.push(`${at}.signature must be a signature object`);
+    return problems;
+  });
+}
+
+export const scanDocument: DocumentExtension = {
+  validate: (raw) => [...scanErrors(raw), ...ledgerErrors(raw)],
+  derivedEntityIds: () => new Set(),
+  restore: (raw) => raw,
+  // Replay regenerates clouds, registrations and extractions from their steps: the acceptance ledger is kept so a recorded accept_* step re-applies its verified act.
+  replaySeed: (base) => {
+    const acceptanceLedger = base.scan?.acceptanceLedger;
+    return acceptanceLedger === undefined || acceptanceLedger.length === 0 ? {} : { scan: { ...EMPTY_SCAN, acceptanceLedger } };
+  },
+};

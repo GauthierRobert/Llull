@@ -207,6 +207,26 @@ function scanDocument(): CadDocument {
   return execute(attached.document, 'set_scan_crop', { name: 'crop', min: [-1, -1, -1], max: [1, 1, 1] }, ctx).document;
 }
 
+/** The scan document with a valid acceptance ledger entry per act and one bound to another document uid. */
+function scanWithLedger(): CadDocument {
+  const doc = scanDocument();
+  const entry = {
+    act: 'accept_registration' as const,
+    targetId: 'reg-1.1',
+    payload: 'a'.repeat(64),
+    signer: 's',
+    signatureId: 'id',
+    signature: { nonce: 'n-1', payload: 'a'.repeat(64) },
+    documentUid: doc.uid ?? '',
+  };
+  const acceptanceLedger = [
+    entry,
+    { ...entry, act: 'accept_asbuilt_extraction' as const, targetId: 'ext-1.1' },
+    { ...entry, documentUid: 'e'.repeat(32) },
+  ];
+  return { ...doc, scan: { ...(doc.scan as NonNullable<CadDocument['scan']>), acceptanceLedger } };
+}
+
 function cfdDocument(): CadDocument {
   const body = addBody(metreDocument(), 'add_box', { size: [1, 1, 1], position: [0, 0, 0], anchor: 'min' });
   return ok(body.doc, 'create_cfd_case', caseParams([body.id])).document;
@@ -323,6 +343,14 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   scan: {
     roots: ['scan'],
     build: scanDocument,
+    ctx: scanContext,
+    query: { name: 'check_point_clouds', params: constant({}) },
+    mutate: { name: 'set_scan_crop', params: constant({ name: 'fuzz', min: [0, 0, 0], max: [1, 1, 1] }) },
+  },
+  // the acceptance ledger replays keep (accept_registration / accept_asbuilt_extraction)
+  'scan#ledger': {
+    roots: ['scan'],
+    build: scanWithLedger,
     ctx: scanContext,
     query: { name: 'check_point_clouds', params: constant({}) },
     mutate: { name: 'set_scan_crop', params: constant({ name: 'fuzz', min: [0, 0, 0], max: [1, 1, 1] }) },

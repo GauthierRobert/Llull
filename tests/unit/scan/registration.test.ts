@@ -170,7 +170,7 @@ describe('apply / supplied / accept', () => {
       fixed: 'document',
     });
     expect(execute(supplied.document, 'mark_registration_supplied', { cloudId: 'x' }).error?.code).toBe('SCN_CLOUD_NOT_FOUND');
-    const agent = execute(supplied.document, 'accept_registration', { registrationId: id, signature: true });
+    const agent = execute(supplied.document, 'accept_registration', { registrationId: id, confirmation: true });
     expect(agent.error?.code).toBe('SCN_HUMAN_GATE');
     expect(agent.document).toBe(supplied.document);
     const record = supplied.document.scan?.registrations[id];
@@ -178,18 +178,18 @@ describe('apply / supplied / accept', () => {
       ...defaultContext(),
       humanSignature: {
         verify: (signature, payload) =>
-          signature === 'ok' && record !== undefined && payload === registrationPayload(record)
+          signature === 'ok' && record !== undefined && payload === registrationPayload(record, supplied.document.uid ?? '')
             ? { signer: 'pat', signatureId: 's1' }
             : null,
       },
     };
-    expect(execute(supplied.document, 'accept_registration', { registrationId: id, signature: 'forged' }, signing).error?.code).toBe(
+    expect(execute(supplied.document, 'accept_registration', { registrationId: id, confirmation: 'forged' }, signing).error?.code).toBe(
       'SCN_HUMAN_GATE',
     );
-    expect(execute(supplied.document, 'accept_registration', { registrationId: 'reg-0.0', signature: 'ok' }, signing).error?.code).toBe(
+    expect(execute(supplied.document, 'accept_registration', { registrationId: 'reg-0.0', confirmation: 'ok' }, signing).error?.code).toBe(
       'SCN_REG_NOT_FOUND',
     );
-    const accepted = execute(supplied.document, 'accept_registration', { registrationId: id, signature: 'ok' }, signing);
+    const accepted = execute(supplied.document, 'accept_registration', { registrationId: id, confirmation: 'ok' }, signing);
     expect(accepted.document.scan?.registrations[id]).toMatchObject({
       status: 'accepted',
       acceptedBy: { signer: 'pat', signatureId: 's1' },
