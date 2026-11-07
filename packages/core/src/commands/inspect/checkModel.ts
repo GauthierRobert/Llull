@@ -4,6 +4,7 @@ import type { CadDocument, Entity } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { boundsCenter, entityBoundsInDoc } from '../../geometry/bounds';
+import { regionNetArea } from '../../geometry/region';
 import { len3 } from '../../lib/vec3';
 import { isPositiveNumber } from '../../lib/isFiniteNumber';
 import { POSITIVE_FIELDS } from '../../model/positiveFields';
@@ -55,6 +56,8 @@ function checkDegenerateGeometry(e: Entity): Issue[] {
       issues.push(degenerate(`has section radius ${e.section.radius}; it must be finite and > 0`));
   } else if (e.kind === 'text' && e.content.trim().length === 0)
     issues.push(degenerate('has empty content; content must be a non-empty string'));
+  else if (e.kind === 'region' && !(regionNetArea(e) > 0))
+    issues.push(degenerate(`has net area ${regionNetArea(e)}; its outer loop must enclose the hole loops`));
   return issues;
 }
 
@@ -217,7 +220,7 @@ export const checkModel = defineCommand({
     'Returns a structured issue list in `data` ({ ok: boolean, issues: Issue[] }) — ' +
     '`ok` is true when there are no error-severity issues. ' +
     'Does NOT mutate the document. Useful as a lint pass before or after build_project. ' +
-    'Issue codes: degenerate_size (zero/negative box/cylinder/sphere/extrusion/circle/arc/ellipse/cone/torus/wedge/pyramid dimension), ' +
+    'Issue codes: degenerate_size (zero/negative box/cylinder/sphere/extrusion/circle/arc/ellipse/cone/torus/wedge/pyramid dimension, region with no net area), ' +
     'open_profile (polyline not closed), insufficient_points (polyline/spline < 2 points), ' +
     'far_from_origin (entity center > farThreshold units from world origin), ' +
     'empty_layer (layer with no entities), orphaned_group_member (group references missing entity id), ' +

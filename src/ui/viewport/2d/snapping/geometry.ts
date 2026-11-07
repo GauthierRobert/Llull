@@ -28,7 +28,7 @@ export function localToWorld2D(entity: Entity, lx: number, ly: number): [number,
   return [x, y];
 }
 
-/** World-space segments of a line / polyline / rectangle. */
+/** World-space segments of a line / polyline / rectangle / region (every loop edge, curved loops as their tessellation). */
 export function entityToSegments(entity: Entity): Segment[] {
   const segmentBetween = (a: Vec2, b: Vec2): Segment => [...localToWorld2D(entity, a[0], a[1]), ...localToWorld2D(entity, b[0], b[1])];
   const chain = (points: ReadonlyArray<Vec2>, closed: boolean): Segment[] => {
@@ -46,6 +46,8 @@ export function entityToSegments(entity: Entity): Segment[] {
       return chain(entity.points, entity.closed);
     case 'rectangle':
       return chain(rectangleCorners(entity.width, entity.height), true);
+    case 'region':
+      return entity.loops.flatMap((loop) => chain(loop, true));
     default:
       return [];
   }

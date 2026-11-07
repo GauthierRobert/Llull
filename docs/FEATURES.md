@@ -8,7 +8,7 @@
 | Toolset | Commands |
 | ------- | -------- |
 | [core](#core) | 36 |
-| [2d](#2d) | 33 |
+| [2d](#2d) | 34 |
 | [3d](#3d) | 96 |
 | [measure](#measure) | 8 |
 | [parametric](#parametric) | 15 |
@@ -109,6 +109,7 @@
 | `export_sheet_svg` | Export a drawing sheet as a self-contained SVG string (paper frame, title block, every view with ISO line weights, hatched sections, clipped details). | read-only |
 | `extend` | Lengthen a line entity so one of its endpoints meets the infinite extension of a boundary line. |  |
 | `fillet_2d` | Round a single vertex of a polyline with a tangent arc of the given radius. |  |
+| `hatch_region` | Create a hatched planar region (entity kind "region") from closed 2D shapes: the AutoCAD HATCH / BHATCH of llull. |  |
 | `image_to_world` | Convert points read off an image underlay (pixel coordinates) into model coordinates. | read-only |
 | `offset_2d` | Create a parallel-offset copy of a 2D shape at the given distance. |  |
 | `place_on_sketch_plane` | Put 2D entities (sketches drawn in local coordinates) on a sketch plane: each entity's local plane becomes the sketch plane, its local origin at the plane orig… |  |

@@ -57,6 +57,17 @@ export function dimensionRows(entity: Entity): React.ReactElement | null {
           </span>
         </PropRow>
       );
+    case 'region':
+      return (
+        <>
+          <PropRow label="Loops">
+            <span className="props-number">{entity.loops.length}</span>
+          </PropRow>
+          <PropRow label="Hatch">
+            <span className="props-number">{entity.hatch?.pattern ?? 'none'}</span>
+          </PropRow>
+        </>
+      );
     default:
       return null;
   }

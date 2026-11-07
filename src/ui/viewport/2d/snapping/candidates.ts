@@ -119,6 +119,22 @@ export function collectSnapCandidates(
         break;
       }
 
+      case 'region': {
+        // Corners and joints of the exact loops (a tessellated circle snaps at its quadrants, not at every sample); straight edges also at midpoints.
+        entity.loops.forEach((loop, index) => {
+          const chain = entity.curves?.[index];
+          const joints = chain === undefined ? loop : chain.map((segment) => segment.points[0]);
+          if (doEndpoints) for (const [px, py] of joints) add('endpoint', ...world(px, py));
+          const edges =
+            chain === undefined
+              ? loop.map((p, i) => [p, loop[(i + 1) % loop.length] as Vec2] as const)
+              : chain.flatMap((segment) => (segment.type === 'line' ? [[segment.points[0], segment.points[1]] as const] : []));
+          if (doMidpoints) for (const [a, b] of edges) add('midpoint', ...mid(...world(a[0], a[1]), ...world(b[0], b[1])));
+        });
+        addSegmentSnaps(entityToSegments(entity));
+        break;
+      }
+
       case 'arc': {
         const [cx, cy] = world(entity.center[0], entity.center[1]);
         const { radius: r } = entity;

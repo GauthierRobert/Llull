@@ -3,6 +3,7 @@
 import { commandCatalog } from '../schema';
 import { drawPolyline, drawArc, drawRectangle, drawPoint } from './basic';
 import { drawEllipse, drawSpline, drawInvolute } from './curves';
+import { hatchRegion } from './hatchRegion';
 import { addText, addDimension } from './annotate';
 import { drawBeltAround } from './belt';
 import { addImageUnderlay, calibrateUnderlayCommand, setUnderlay, imageToWorld } from './underlay';
@@ -16,6 +17,7 @@ export const draw2dCommands = commandCatalog(
   drawPoint,
   drawEllipse,
   drawSpline,
+  hatchRegion,
   addText,
   addDimension,
   drawInvolute,

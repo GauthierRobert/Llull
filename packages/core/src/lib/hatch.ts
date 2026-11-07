@@ -5,12 +5,14 @@ import { pointsDiagonal } from './extent';
 
 /**
  * Segments of lines at `angle` (radians), `spacing` apart, inside the region bounded by `loops` (outer boundary + holes, even-odd). Empty
- * for degenerate input or spacing <= 0.
+ * for degenerate input or spacing <= 0. With `skipEdgeLines`, a pattern line lying along a boundary edge is dropped, so no hatch line is
+ * drawn over an outline.
  */
 export function hatchSegments(
   loops: ReadonlyArray<ReadonlyArray<Point>>,
   angle: number,
   spacing: number,
+  skipEdgeLines = false,
 ): Array<[[number, number], [number, number]]> {
   if (!(spacing > 0) || loops.every((loop) => loop.length < 3)) return [];
   const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
@@ -21,7 +23,16 @@ export function hatchSegments(
   const vs = local.flatMap((loop) => loop.map(([, v]) => v));
   const [low, high] = [Math.min(...vs), Math.max(...vs)];
   const segments: Array<[[number, number], [number, number]]> = [];
+  const epsilon = 1e-9 * (high - low) + 1e-12;
+  const onEdge = (v: number): boolean =>
+    skipEdgeLines &&
+    local.some((loop) =>
+      loop.some(
+        (a, index) => Math.abs(a[1] - v) <= epsilon && Math.abs((loop[(index + 1) % loop.length] as [number, number])[1] - v) <= epsilon,
+      ),
+    );
   for (let v = Math.ceil(low / spacing) * spacing; v <= high; v += spacing) {
+    if (onEdge(v)) continue;
     const crossings: number[] = [];
     for (const loop of local)
       loop.forEach((a, index) => {
@@ -37,13 +48,19 @@ export function hatchSegments(
   return segments;
 }
 
-/** Hatch lines across a region's diagonal at most: coarser spacing for very large regions. */
 const MAX_HATCH_LINES_ACROSS = 300;
 
-/**
- * ANSI31 section hatching (45° lines, `spacing` apart, never more than 300 across the region) of the even-odd region bounded by `loops` —
- * the hatch every drawing output shares.
- */
+/** Pattern lines at `angle` (radians) of the even-odd region bounded by `loops`, never more than 300 across it (coarser spacing for very large regions). */
+export function cappedHatch(
+  loops: ReadonlyArray<ReadonlyArray<Point>>,
+  angle: number,
+  spacing: number,
+  skipEdgeLines = false,
+): Array<[[number, number], [number, number]]> {
+  return hatchSegments(loops, angle, Math.max(spacing, pointsDiagonal(loops.flat()) / MAX_HATCH_LINES_ACROSS), skipEdgeLines);
+}
+
+/** ANSI31 section hatching (45° lines, `spacing` apart) of the even-odd region bounded by `loops` — the hatch every drawing output shares. */
 export function ansi31Hatch(loops: ReadonlyArray<ReadonlyArray<Point>>, spacing: number): Array<[[number, number], [number, number]]> {
-  return hatchSegments(loops, Math.PI / 4, Math.max(spacing, pointsDiagonal(loops.flat()) / MAX_HATCH_LINES_ACROSS));
+  return cappedHatch(loops, Math.PI / 4, spacing);
 }

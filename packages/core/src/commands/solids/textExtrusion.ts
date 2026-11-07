@@ -21,7 +21,7 @@ import { isOutlineFailure, outlineOfText } from '../wrap/textPath';
 import { wrapData } from '../wrap/conventions';
 
 /** Balanced union of `parts` (a text of hundreds of regions stays far below the recipe depth limit). */
-function unionOf(parts: readonly ShapeRecipe[]): ShapeRecipe {
+export function unionOf(parts: readonly ShapeRecipe[]): ShapeRecipe {
   if (parts.length === 1) return parts[0] as ShapeRecipe;
   const half = Math.ceil(parts.length / 2);
   return { op: 'boolean', boolean: 'union', a: unionOf(parts.slice(0, half)), b: unionOf(parts.slice(half)) };
