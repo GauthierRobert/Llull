@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
+import { analyseOrderPair } from '@cae/vnv/orderPairAnalysis';
 import { planStudy, studyParams, type LevelRun } from '@cae/vnv/studyRun';
 import { expectCase } from '../../physics/benchmarkCases';
 import { mustRun } from '../deckFixtures';
@@ -345,5 +346,15 @@ describe('mixed-kind and malformed studies are refused', () => {
     const { doc, studyId } = recordKind(bar);
     const removed = execute(doc, 'delete_convergence_study', { analysisId: bar.analysisId, studyId });
     expect(removed.document.analysis?.cases[bar.analysisId]?.studies).toBeUndefined();
+  });
+});
+
+describe('analyseOrderPair', () => {
+  it('has no relative difference when the order-2 value is 0 and then judges no target', () => {
+    const outcome = analyseOrderPair(0, 3, 0.1);
+    if (!outcome.ok) throw new Error(outcome.message);
+    expect(outcome.analysis.orderPair?.difference).toEqual({ absolute: 3 });
+    expect(outcome.analysis.findings.map((finding) => finding.code)).toEqual(['VNV_P_TWO_LEVEL']);
+    expect(outcome.analysis.summaryReport.status).toBe('order_pair');
   });
 });

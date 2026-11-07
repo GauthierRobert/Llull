@@ -1,6 +1,8 @@
 /** PHY-00 FR-VNV-19 / VC-VNV-22: least-squares observed order (f = f0 + alpha h^p, Eca & Hoekstra model) against exact laws and an independent scipy fit. */
 import { describe, expect, it } from 'vitest';
 import { expectCase } from './benchmarkCases';
+import { execute } from '@core/commands/registry';
+import { createEmptyDocument } from '@core/model/types';
 import { leastSquaresOrder, leastSquaresUncertainty, type LeastSquaresFit } from '@lib/convergence';
 
 const law = (f0: number, alpha: number, p: number, h: readonly number[]): { h: number; value: number }[] =>
@@ -86,5 +88,45 @@ describe('leastSquaresUncertainty', () => {
     expect(u.absolute).toBeCloseTo(1.25 * 0.5 * 0.1 ** 1.5, 9);
     expect(u.relative).toBeCloseTo(u.absolute / finest.value, 12);
     expect(leastSquaresUncertainty(fit, { h: 0.1, value: 0 }, 1.25).relative).toBeUndefined();
+  });
+});
+
+describe('check_convergence method least_squares: statuses and findings', () => {
+  const doc = createEmptyDocument();
+  const run = (
+    values: readonly number[],
+    extra: Record<string, unknown> = {},
+  ): { status: string; codes: string[]; data: Record<string, unknown> } => {
+    const samples = values.map((value, index) => ({ h: 0.1 * 2 ** index, value }));
+    const result = execute(doc, 'check_convergence', { quantity: 'q', unit: '1', samples, method: 'least_squares', ...extra });
+    expect(result.document).toBe(doc);
+    const data = result.data as { status: string; codes: string[] } & Record<string, unknown>;
+    return { status: data.status, codes: data.codes, data };
+  };
+
+  it('classifies before fitting: oscillating, diverging and exactly converged sets carry no fit or extrapolation', () => {
+    const oscillating = run([1, 1.1, 1.0, 1.1]);
+    expect([oscillating.status, oscillating.codes]).toEqual(['oscillatory', ['VNV_OSCILLATORY']]);
+    const diverging = run([1, 1.5, 1.7, 1.75]);
+    expect([diverging.status, diverging.codes]).toEqual(['divergent', ['VNV_DIVERGENT']]);
+    const exact = run([2, 2, 2, 2]);
+    expect([exact.status, exact.codes]).toEqual(['converged_exactly', []]);
+    for (const outcome of [oscillating, diverging, exact]) expect(outcome.data['extrapolated']).toBeUndefined();
+  });
+
+  it('a monotone set no order fits (a plateau after a jump) is reported divergent, never refused', () => {
+    const plateau = run([1, 1.1, 1.3, 1.31]);
+    expect(plateau.status).toBe('divergent');
+    expect(plateau.data['p']).toBeUndefined();
+  });
+
+  it('judges the owner target against the fit uncertainty, flags a formal-order mismatch and a finest value of 0', () => {
+    const law = [0, 1, 2, 3].map((k) => 10 + 0.5 * (0.1 * 2 ** k) ** 2);
+    const tight = run(law, { gciTarget: 1e-9, formalOrder: 4 });
+    expect(tight.codes).toEqual(expect.arrayContaining(['VNV_GCI_ABOVE_TARGET', 'VNV_ORDER_MISMATCH']));
+    expect(tight.data['requiredSpacing']).toBeGreaterThan(0);
+    const zero = run([0, 0.3, 1.2, 4.8]);
+    expect(zero.codes).toContain('VNV_RELATIVE_UNDEFINED');
+    expect(zero.data['gciAbs']).toBeGreaterThan(0);
   });
 });
