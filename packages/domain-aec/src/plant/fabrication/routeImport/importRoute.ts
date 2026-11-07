@@ -13,6 +13,7 @@ import { isLineRead, loadLine } from '../lineNetwork';
 import type { IsoIssue, NetworkComponent, PcfLineData } from '../model';
 import { summarise } from '../pcf/pcfMap';
 import { composeRoute, isComposed } from './compose';
+import type { FlatSide } from './eccentric';
 import { planRoute } from './plan';
 
 export interface RouteImportArgs {
@@ -24,13 +25,15 @@ export interface RouteImportArgs {
   readonly service: string;
   readonly supports: boolean;
   readonly valveType: string;
+  /** Flat side of the eccentric reducers whose end points are on one axis. */
+  readonly eccentricFlat: FlatSide | undefined;
   /** Data of the file (counts, pipe lengths, BOM) the import reports for every mode. */
   readonly base: Record<string, unknown>;
   readonly warnings: readonly IsoIssue[];
 }
 
 /** Types whose count the comparison reports; gaskets and bolt sets are rebuilt by the spec with each flange. */
-const COMPARED = ['PIPE', 'ELBOW', 'BEND', 'TEE', 'OLET', 'REDUCER-CONCENTRIC', 'FLANGE', 'VALVE'] as const;
+const COMPARED = ['PIPE', 'ELBOW', 'BEND', 'TEE', 'OLET', 'REDUCER-CONCENTRIC', 'REDUCER-ECCENTRIC', 'FLANGE', 'VALVE', 'CAP'] as const;
 
 function comparison(imported: readonly NetworkComponent[], routed: readonly NetworkComponent[]): Record<string, unknown> {
   const [before, after] = [summarise(imported), summarise(routed)];
@@ -64,7 +67,7 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
       [],
       ['spec'],
     );
-  const plan = planRoute(file.components);
+  const plan = planRoute(file.components, { eccentricFlat: args.eccentricFlat });
   if (!plan.ok) return refuseIso(doc, 'import_pcf', plan.code, `as route: ${plan.message}`, plan.ids, ['as']);
   if (args.supports && plan.supports.length > 0 && Object.keys(getBuilding(doc).levels).length === 0)
     return refuseIso(
@@ -81,6 +84,7 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
     ctx,
   );
   if (!isComposed(composed)) return composed;
+  const { plan: built } = composed;
   const read = loadLine(composed.document, 'import_pcf', composed.lineId);
   const compared = isLineRead(read) ? comparison(file.components, read.network.components) : null;
   const warnings: IsoIssue[] = [...args.warnings];
@@ -109,7 +113,7 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
     service: args.service,
     lineId: composed.lineId,
     lineNumber: args.lineNumber,
-    runs: plan.runs.map((run) => ({
+    runs: built.runs.map((run) => ({
       key: run.key,
       runId: composed.runIds[run.key] ?? null,
       dn: run.dn,
@@ -117,7 +121,12 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
       points: run.points,
       startPort: run.startPort !== undefined,
       endPort: run.endPort !== undefined,
-      inline: run.inline.map((item) => ({ type: item.type, componentId: item.componentId })),
+      inline: run.inline.map((item) => ({
+        type: item.type,
+        componentId: item.componentId,
+        ...(item.flat === undefined ? {} : { eccentric: true }),
+      })),
+      capped: run.cap !== undefined,
     })),
     portIds: composed.portIds,
     fieldWelds: plan.welds.map((weld, at) => ({ componentId: weld.componentId, kind: weld.kind, weldId: composed.weldIds[at] ?? null })),

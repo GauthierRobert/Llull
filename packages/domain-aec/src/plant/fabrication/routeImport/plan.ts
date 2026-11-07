@@ -7,9 +7,10 @@
  */
 
 import type { Vec3 } from '@core/model/vectors';
-import { distance3, normalize3, sub3 } from '@lib/vec3';
+import { add3, distance3, normalize3, sub3 } from '@lib/vec3';
 import { nodeKey } from '../joints';
 import type { NetworkComponent, NetworkPoint, WeldKind } from '../model';
+import { eccentricStep, isShifted, storedCorner, ZERO, type FlatSide, type PlannedFlat } from './eccentric';
 
 /** Most components a line may have in route mode: every part is derived from the spec by a command, and the re-derivation grows with the line. */
 export const MAX_ROUTE_COMPONENTS = 400;
@@ -29,6 +30,8 @@ export interface PlannedInline {
   readonly dn2?: number;
   /** Valves: direction from the centre toward the handwheel, when the file gives a spindle direction. */
   readonly stem?: Vec3;
+  /** Eccentric reducers (`type` reducer): the flat side; absent = concentric. */
+  readonly flat?: PlannedFlat;
 }
 
 export interface PlannedRun {
@@ -39,6 +42,8 @@ export interface PlannedRun {
   readonly startPort?: PlannedPort;
   readonly endPort?: PlannedPort;
   readonly inline: readonly PlannedInline[];
+  /** The run ends in a cap: the pipe joins it at `mouth`; `tip` is the cap's closed end when the file gives it (a CAP with two END-POINTs). */
+  readonly cap?: { readonly mouth: Vec3; readonly tip?: Vec3 };
   /** The run this one branches off (absent for the main run). */
   readonly parent?: string;
   readonly consumed: readonly string[];
@@ -70,17 +75,12 @@ export interface RoutePlan {
 
 export interface RouteRefusal {
   readonly ok: false;
-  readonly code: 'ISO_ROUTE_UNSUPPORTED' | 'ISO_ROUTE_TOO_LARGE';
+  readonly code: 'ISO_ROUTE_UNSUPPORTED' | 'ISO_ROUTE_TOO_LARGE' | 'ISO_ROUTE_FLAT_MISSING' | 'ISO_PARAM_INVALID';
   readonly message: string;
   readonly ids: readonly string[];
 }
 
-const UNSUPPORTED: Readonly<Record<string, string>> = {
-  CAP: 'a cap',
-  'FLANGE-BLIND': 'a blind flange',
-  INSTRUMENT: 'an instrument',
-  'REDUCER-ECCENTRIC': 'an eccentric reducer (its flat side is not in the file)',
-};
+const UNSUPPORTED: Readonly<Record<string, string>> = { 'FLANGE-BLIND': 'a blind flange', INSTRUMENT: 'an instrument' };
 
 const SPINDLE: Readonly<Record<string, Vec3>> = {
   UP: [0, 0, 1],
@@ -124,7 +124,12 @@ const stemOf = (component: NetworkComponent): { stem?: Vec3 } => {
   return stem === undefined ? {} : { stem };
 };
 
-export function planRoute(components: readonly NetworkComponent[]): RoutePlan | RouteRefusal {
+export interface PlanOptions {
+  /** Flat side of the eccentric reducers whose END-POINTs lie on one axis (the file does not say). */
+  readonly eccentricFlat?: FlatSide | undefined;
+}
+
+export function planRoute(components: readonly NetworkComponent[], options: PlanOptions = {}): RoutePlan | RouteRefusal {
   if (components.length > MAX_ROUTE_COMPONENTS)
     return refuse(
       'ISO_ROUTE_TOO_LARGE',
@@ -225,6 +230,9 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
     let endPort: PlannedPort | undefined;
     let key = seed.startKey;
     let end = seed.start;
+    /** Offset of the actual axis from the stored one (an eccentric reducer upstream on this leg). */
+    let shift: Vec3 = ZERO;
+    let cap: { mouth: Vec3; tip?: Vec3 } | undefined;
 
     // A flange set at the free start (an optional gasket on the face, then the flange entered by its flanged face) is the start port.
     if (seed.parent === undefined) {
@@ -249,11 +257,18 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
       }
     }
 
-    for (let guard = 0; guard <= components.length + 2 && endPort === undefined; guard++) {
+    for (let guard = 0; guard <= components.length + 2 && endPort === undefined && cap === undefined; guard++) {
       arrive(key);
       const i = free(key)[0];
       if (i === undefined) break;
       const component = at(i);
+      if (component.type === 'CAP') {
+        take(i);
+        consumed.push(component.id);
+        const tip = otherEnd(component, key)?.xyz;
+        cap = { mouth: sub3(end, shift), ...(tip === undefined ? {} : { tip: sub3(tip, shift) }) };
+        break;
+      }
       const exit = otherEnd(component, key);
       if (exit === undefined)
         return refuse('ISO_ROUTE_UNSUPPORTED', `${component.type} ${component.id} has no second end point`, [component.id]);
@@ -267,12 +282,21 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
           const [a, b] = [component.ends[0]?.xyz, component.ends[1]?.xyz];
           if (a === undefined || b === undefined)
             return refuse('ISO_ROUTE_UNSUPPORTED', `${component.id} has no end points`, [component.id]);
-          points.push(component.centre ?? cornerOf(a, b));
+          const centre = component.centre ?? cornerOf(a, b);
+          const next = sub3(exit.xyz, centre);
+          points.push(isShifted(shift) && distance3(exit.xyz, centre) > 1e-6 ? storedCorner(centre, shift, normalize3(next)) : centre);
+          shift = ZERO;
           break;
         }
         case 'TEE': {
           const [a, b] = [component.ends[0]?.xyz, component.ends[1]?.xyz];
           const centre = component.centre ?? (a !== undefined && b !== undefined ? midpoint(a, b) : undefined);
+          if (isShifted(shift))
+            return refuse(
+              'ISO_ROUTE_UNSUPPORTED',
+              `tee ${component.id} lies downstream of an eccentric reducer on the same leg, where the axis is off the stored line: the RTE cannot branch there`,
+              [component.id],
+            );
           if (component.branch === undefined || centre === undefined)
             return refuse('ISO_ROUTE_UNSUPPORTED', `tee ${component.id} has no branch point`, [component.id]);
           addBranch(seed.key, centre, component.branch);
@@ -282,17 +306,34 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
           inline.push({
             type: 'reducer',
             componentId: component.id,
-            centre: midpoint(component.ends[0]?.xyz ?? end, component.ends[1]?.xyz ?? end),
+            centre: sub3(midpoint(component.ends[0]?.xyz ?? end, component.ends[1]?.xyz ?? end), shift),
             dn2: exit.boreMm,
           });
           break;
+        case 'REDUCER-ECCENTRIC': {
+          const entry = component.ends.find((reducerEnd) => nodeKey(reducerEnd.xyz) === key) ?? exit;
+          const stored = sub3(entry.xyz, shift);
+          const before = points[points.length - 1] as Vec3;
+          const step = eccentricStep(
+            component,
+            entry,
+            exit,
+            distance3(stored, before) > 1e-6 ? normalize3(sub3(stored, before)) : undefined,
+            options.eccentricFlat,
+          );
+          if ('message' in step) return refuse(step.code, step.message, [component.id]);
+          const centre = sub3(midpoint(entry.xyz, exit.xyz), add3(shift, [step.offset[0] / 2, step.offset[1] / 2, step.offset[2] / 2]));
+          inline.push({ type: 'reducer', componentId: component.id, centre, dn2: exit.boreMm, flat: step.flat });
+          shift = add3(shift, step.offset);
+          break;
+        }
         case 'VALVE':
           if (component.ends.some((valveEnd) => valveEnd.endType === 'FL'))
             return refuse('ISO_ROUTE_UNSUPPORTED', `flanged valve ${component.id} is not between two flanges with gaskets`, [component.id]);
           inline.push({
             type: 'valve',
             componentId: component.id,
-            centre: midpoint(component.ends[0]?.xyz ?? end, component.ends[1]?.xyz ?? end),
+            centre: sub3(midpoint(component.ends[0]?.xyz ?? end, component.ends[1]?.xyz ?? end), shift),
             ...stemOf(component),
           });
           break;
@@ -334,7 +375,7 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
               );
             const through = valveSet(component, gasket, valve, farKey);
             if ('ok' in through) return through;
-            inline.push(through.valve);
+            inline.push({ ...through.valve, centre: sub3(through.valve.centre, shift) });
             consumed.push(...through.consumed);
             end = through.out.xyz;
             key = nodeKey(through.out.xyz);
@@ -353,7 +394,7 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
       key = nodeKey(exit.xyz);
     }
     arrive(key);
-    points.push(end);
+    points.push(cap?.tip ?? sub3(end, shift));
     const line = dedupe(points);
     if (line.length < 2)
       return refuse('ISO_ROUTE_UNSUPPORTED', `run ${seed.key} has no length (it starts and ends at one point)`, consumed);
@@ -363,6 +404,7 @@ export function planRoute(components: readonly NetworkComponent[]): RoutePlan | 
       points: line,
       ...(startPort === undefined ? {} : { startPort }),
       ...(endPort === undefined ? {} : { endPort }),
+      ...(cap === undefined ? {} : { cap }),
       inline,
       ...(seed.parent === undefined ? {} : { parent: seed.parent }),
       consumed,

@@ -309,12 +309,10 @@ describe('refusals leave the document unchanged', () => {
     expect((renamed.data as RouteData).lineNumber).toBe('L-102');
   });
 
-  it('components route mode cannot rebuild are named: cap, blind flange, instrument, eccentric reducer', () => {
+  it('components route mode cannot rebuild are named: blind flange, instrument', () => {
     for (const [type, words] of [
-      ['CAP', 'a cap'],
       ['FLANGE-BLIND', 'a blind flange'],
       ['INSTRUMENT', 'an instrument'],
-      ['REDUCER-ECCENTRIC', 'an eccentric reducer'],
     ] as const) {
       const text = fixturePcf().replace(
         'MATERIALS\n',

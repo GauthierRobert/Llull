@@ -67,6 +67,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   ISO_GA_OVERFLOW: 'Use a smaller scale (a larger number) or a larger paper, or draw fewer lines (lineIds).',
   ISO_ROUTE_UNSUPPORTED:
     'Import the line as pcf_line (as omitted), or edit the PCF: route mode rebuilds a line from its centreline with the spec, so it takes pipes, elbows, bends, tees, olets, reducers, valves, end flanges, field welds and supports only.',
+  ISO_ROUTE_FLAT_MISSING:
+    'Pass eccentricFlat ("top" or "bottom"): the file has an eccentric reducer whose two end points lie on one axis, so it does not say which side is flat.',
   ISO_ROUTE_NO_LEVEL:
     'Add a building level (add_level) so the supports can be placed, or import with supports false (they are then not created).',
   ISO_ROUTE_TOO_LARGE: 'Split the PCF: route mode rebuilds at most 400 components per line (every component is derived from the spec).',

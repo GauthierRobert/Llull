@@ -58,13 +58,19 @@ export const importPcf = defineCommand({
       .describe(
         'as route: create the supports of the file (SUPPORT records) with add_pipe_support, which needs a building level (ISO_ROUTE_NO_LEVEL without). Default true; false drops them with a warning.',
       ),
+    eccentricFlat: z
+      .enum(['top', 'bottom'])
+      .optional()
+      .describe(
+        'as route: flat side ("top" = FOT, +Z; "bottom" = FOB, -Z) given to the REDUCER-ECCENTRIC records whose two END-POINTs lie on one axis. A file whose reducer ends are offset (an ISOGEN file) carries the side in that offset and needs no value (a value that disagrees is refused, ISO_PARAM_INVALID); without either the import is refused (ISO_ROUTE_FLAT_MISSING). The RTE refuses top / bottom on a vertical pipe.',
+      ),
     valveType: z
       .enum(['valveGate', 'valveGlobe', 'valveCheck', 'valveBall', 'valveButterfly', 'valvePlug'])
       .optional()
       .describe('as route: catalogue type given to every VALVE of the file (a PCF VALVE does not say which). Default valveGate.'),
   }),
   run: (doc, params, ctx): CommandResult => {
-    const routeOnly = (['spec', 'service', 'supports', 'valveType'] as const).filter((key) => params[key] !== undefined);
+    const routeOnly = (['spec', 'service', 'supports', 'valveType', 'eccentricFlat'] as const).filter((key) => params[key] !== undefined);
     if (params.as !== 'route' && routeOnly.length > 0)
       return refuseIso(doc, 'import_pcf', 'ISO_PARAM_INVALID', `${routeOnly.join(', ')} apply to as route only`, [], routeOnly.slice());
     const read = readPcf(params.text);
@@ -112,6 +118,7 @@ export const importPcf = defineCommand({
           service: params.service ?? 'PCF',
           supports: params.supports ?? true,
           valveType: params.valveType ?? 'valveGate',
+          eccentricFlat: params.eccentricFlat,
           base: data,
           warnings,
         },
