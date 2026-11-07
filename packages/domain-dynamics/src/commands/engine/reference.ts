@@ -6,6 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { idOrNext, idTaken } from '@lib/explicitId';
 import { changed, failer } from '@core/commands/noop';
+import { addSeriesReference, seriesSchema } from './referenceSeries';
 
 const pointSchema = z.object({
   rpm: z.number().positive().optional().describe('Crank speed of the point, rpm (omit for a quantity that does not depend on speed).'),
@@ -20,9 +21,11 @@ const pointSchema = z.object({
 });
 
 /**
- * @affects adds 1 reference record to doc.prototype.references (affected: [referenceId]); created with the preset name as id when a preset is used
+ * @affects adds 1 reference record to doc.prototype.references (affected: [referenceId]); created with the preset name as id when a preset is used;
+ *   with `series`: adds 1 record to doc.dynamics.referenceSeries instead
  * @invariant points non-empty with finite values; source non-empty; bandRel > 0; calibrationRpm only lists point speeds; one record per id
- * @failure no points / no source / band <= 0 / unknown preset / calibration speed that is not a point / taken id -> no-op
+ * @failure no points / no source / band <= 0 / unknown preset / calibration speed that is not a point / taken id -> no-op; series: unknown joint or motor,
+ *   times not increasing, lengths differ, ledger series with more than one point, mixed with engine fields -> no-op
  */
 export const addReferenceData = defineCommand({
   name: 'add_reference_data',
@@ -35,7 +38,11 @@ export const addReferenceData = defineCommand({
     '`quantity` (brake_torque_Nm, brake_power_kW, bmep_bar, static_rpm, propeller_rpm, bsfc_g_per_kWh), `points`, `source` (required), `grade`. ' +
     '`calibrationRpm` lists the points you calibrate the model on (default practice: the rated point only; presets name theirs): those get ' +
     'origin "calibrated", are shown as information and never count as pass evidence; every other point is a hold-out prediction. `bandRel` ' +
-    'is the relative pass band, default 0.05 [GT-Power calibration practice]. Returns the reference id in affected[0].',
+    'is the relative pass band, default 0.05 [GT-Power calibration practice]. Returns the reference id in affected[0]. ' +
+    'DRIVES (PHY-23): give `series` instead of preset / quantity / points to store a measured TIME SERIES of a joint position or velocity, a datasheet motor current, voltage, ' +
+    'torque or shaft speed, or an end-of-run ledger energy (copper, electrical_input, transmission_loss, ...); `source` is required, `grade` (A measured, B datasheet, C assumed; ' +
+    'default C) and `bandRel` (RMS error over the largest value, default 0.05) apply; compare_to_reference <id> and check_motion_truth compare the model with it, and ' +
+    'fit_drive_parameters can fit from it. Stored in the dynamics model; delete_dynamics_item removes it.',
   params: z.object({
     preset: z.enum(REFERENCE_PRESET_NAMES).optional().describe('Shipped public data set; its id is the preset name unless `id` is given.'),
     quantity: z
@@ -66,10 +73,26 @@ export const addReferenceData = defineCommand({
       .optional()
       .describe('Speeds (rpm) of the points the model is calibrated on; they must be point speeds.'),
     bandRel: z.number().positive().optional().describe('Relative band of a pass, > 0 (default 0.05).'),
+    series: seriesSchema
+      .optional()
+      .describe(
+        'A measured / datasheet time series of a joint or drive quantity (stored in the dynamics model). Not together with preset, quantity or points.',
+      ),
     id: z.string().optional().describe('Optional explicit reference id.'),
   }),
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'add_reference_data');
+    if (params.series !== undefined) {
+      if (params.preset !== undefined || params.quantity !== undefined || params.points !== undefined)
+        return fail('`series` is a time series: do not combine it with preset, quantity or points (engine curves)');
+      return addSeriesReference(doc, {
+        series: params.series,
+        source: params.source,
+        grade: params.grade,
+        bandRel: params.bandRel,
+        id: params.id,
+      });
+    }
     const preset = params.preset === undefined ? undefined : REFERENCE_PRESETS[params.preset];
     const quantity = params.quantity ?? preset?.quantity;
     const points = params.points ?? preset?.points;

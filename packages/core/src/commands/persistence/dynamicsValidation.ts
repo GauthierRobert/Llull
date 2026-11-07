@@ -6,6 +6,7 @@ import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
 import { dcMotorProblem, driveProblem, driveReferenceProblems, profileProblem } from './drivesValidation';
 import { lossesProblem, propellerExtrasProblem } from './engineValidation';
+import { referenceSeriesProblem } from './referenceSeriesValidation';
 import { jointPhysicsProblem, loadScheduleProblem, transmissionProblem, transmissionReferenceProblems } from './transmissionsValidation';
 
 const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
@@ -185,6 +186,7 @@ export function dynamicsProblems(value: unknown): string[] {
     ...(value['transmissions'] === undefined ? [] : [['transmissions', transmissionProblem] as const]),
     ...(value['jointPhysics'] === undefined ? [] : [['jointPhysics', jointPhysicsProblem] as const]),
     ...(value['loadSchedules'] === undefined ? [] : [['loadSchedules', loadScheduleProblem] as const]),
+    ...(value['referenceSeries'] === undefined ? [] : [['referenceSeries', referenceSeriesProblem] as const]),
   ];
   for (const [table, check] of tables) {
     const records = value[table];

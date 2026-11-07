@@ -392,10 +392,74 @@ export function driveMutations(raw: Record<string, unknown>): SliceMutation[] {
     edit('target number', (dynamics) => void (drive(dynamics)['target'] = 5)),
     edit('feedforward string', (dynamics) => void (drive(dynamics)['feedforward'] = 'yes')),
     ...mechanismMutations(edit),
+    ...referenceMutations(edit),
   ];
 }
 
 type Edit = (label: string, change: (dynamics: Record<string, unknown>) => void) => SliceMutation;
+
+/** Targeted hostile edits of the datasheet thermal block and of the reference series (PHY-23 DRV-M3). */
+function referenceMutations(edit: Edit): SliceMutation[] {
+  const found = (dynamics: Record<string, unknown>, table: string, id: string): Record<string, unknown> => {
+    const records = dynamics[table];
+    const record = isObject(records) ? records[id] : undefined;
+    if (!isObject(record)) throw new Error(`referenceMutations: the seed has no ${table}.${id}`);
+    return record;
+  };
+  const sheet = (dynamics: Record<string, unknown>): Record<string, unknown> => {
+    const datasheet = found(dynamics, 'motors', 'm')['datasheet'];
+    if (!isObject(datasheet)) throw new Error('referenceMutations: the motor has no datasheet');
+    return datasheet;
+  };
+  const series =
+    (key: string, value: unknown) =>
+    (dynamics: Record<string, unknown>): void =>
+      void (found(dynamics, 'referenceSeries', 'rs')[key] = value);
+  const thermal =
+    (value: unknown) =>
+    (dynamics: Record<string, unknown>): void =>
+      void (sheet(dynamics)['thermal'] = value);
+  return [
+    edit('thermal string', thermal('hot')),
+    edit('thermal array', thermal([1, 2])),
+    edit('thermal empty', thermal({})),
+    edit(
+      'thermal negative resistance',
+      thermal({ rthWindingHousingKPerW: -1, rthHousingAmbientKPerW: 4.7, tauWindingS: 41.5, tauMotorS: 809, maxWindingC: 155 }),
+    ),
+    edit(
+      'thermal tau string',
+      thermal({ rthWindingHousingKPerW: 1.9, rthHousingAmbientKPerW: 4.7, tauWindingS: 'x', tauMotorS: 809, maxWindingC: 155 }),
+    ),
+    edit(
+      'thermal alpha null',
+      thermal({
+        rthWindingHousingKPerW: 1.9,
+        rthHousingAmbientKPerW: 4.7,
+        tauWindingS: 41.5,
+        tauMotorS: 809,
+        maxWindingC: 155,
+        alphaPerK: null,
+      }),
+    ),
+    edit('series quantity foo', series('quantity', 'foo')),
+    edit('series quantity __proto__', series('quantity', '__proto__')),
+    edit('series target number', series('target', 7)),
+    edit('series target empty', series('target', '')),
+    edit('series times string', series('times', 'abc')),
+    edit('series times decreasing', series('times', [2, 1, 0])),
+    edit('series times negative', series('times', [-1, 0, 1])),
+    edit('series times too short', series('times', [0, 1])),
+    edit('series values nulls', series('values', [null, null, null])),
+    edit('series values object', series('values', { length: 3 })),
+    edit('series source grade Z', series('source', { name: 's', grade: 'Z' })),
+    edit('series source string', series('source', 'bench')),
+    edit('series uncertainty negative', series('uncertainty', -1)),
+    edit('series bandRel zero', series('bandRel', 0)),
+    edit('series quantity ledger with three points', series('quantity', 'ledger_energy')),
+    edit('series id mismatch', series('id', 'other')),
+  ];
+}
 
 /** Targeted hostile edits of the PHY-23 transmissions, joint physics and load schedules of `dynamics`. */
 function mechanismMutations(edit: Edit): SliceMutation[] {

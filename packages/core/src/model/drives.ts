@@ -122,3 +122,33 @@ export interface MotorDrive {
   /** prescribed: largest torque, N·m at the joint; default the motor's peak. */
   readonly effortLimit?: number;
 }
+
+/** What a stored reference series measures; the target is a joint id, a motor id or (ledger_energy) a ledger element name. */
+export const SERIES_QUANTITIES = [
+  'joint_position',
+  'joint_velocity',
+  'motor_current',
+  'motor_voltage',
+  'motor_torque',
+  'motor_speed',
+  'ledger_energy',
+] as const;
+export type SeriesQuantity = (typeof SERIES_QUANTITIES)[number];
+
+/**
+ * Measured or datasheet time series a run is compared with (`add_reference_data` with `series`, `compare_to_reference`, `check_motion_truth`).
+ * SI units: rad, m, rad/s, m/s, A, V, N·m (joint torque), rad/s (motor shaft speed), J (cumulative energy of a ledger element at the end of the run).
+ * @invariant times strictly increasing and >= 0, same length as values, 1..100000 points; a ledger_energy series has exactly one point
+ */
+export interface ReferenceSeries {
+  readonly id: string;
+  readonly quantity: SeriesQuantity;
+  readonly target: string;
+  readonly times: readonly number[];
+  readonly values: readonly number[];
+  readonly source: ParameterSource;
+  /** 1 sigma of one reading, same unit as the values; absent = unknown (listed, never taken as 0). */
+  readonly uncertainty?: number;
+  /** Relative pass band of the RMS error against the largest |value|; default 0.05. */
+  readonly bandRel?: number;
+}

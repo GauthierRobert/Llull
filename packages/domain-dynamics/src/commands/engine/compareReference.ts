@@ -11,6 +11,7 @@ import { codedRejection, failer, report } from '@core/commands/noop';
 import { type ReviewItem, reviewItem, reviewResult } from '@core/model/reviewEnvelope';
 import { dynamicsOf } from '../bodies';
 import { crankOf, runOperatingPoint, type PointRun } from './operatingPoint';
+import { compareSeriesReferences } from './referenceSeries';
 
 const NAME = 'compare_to_reference';
 /** Operating points per call (TECHNICAL_SPEC 8 budget: Rotax curve of 9 points in under 30 s). */
@@ -64,7 +65,11 @@ export const compareToReference = defineCommand({
     'breathing model: the torque-curve shape comes only from friction, heat loss and burn scaling. Needs the physics engine. Read-only. ' +
     'At most 12 points per call. Computed by llull, not approved: a qualified engineer must review.',
   params: z.object({
-    reference: z.string().describe('Reference id (add_reference_data), or "all" for every stored reference.'),
+    reference: z
+      .string()
+      .describe(
+        'Reference id (add_reference_data), "all" for every stored ENGINE reference, or "all_series" for every stored TIME-SERIES reference. A time-series id (add_reference_data with `series`) simulates the model over its time span and reports the RMS and peak error of the joint / drive quantity against it.',
+      ),
     points: z
       .array(z.number().positive())
       .max(MAX_POINTS)
@@ -89,6 +94,8 @@ export const compareToReference = defineCommand({
   }),
   run: (doc, params, ctx): CommandResult => {
     const fail = failer(doc, NAME);
+    if (params.reference === 'all_series' || dynamicsOf(doc).referenceSeries?.[params.reference] !== undefined)
+      return compareSeriesReferences(doc, params.reference, ctx);
     const references = doc.prototype?.references ?? {};
     const selected =
       params.reference === 'all' ? Object.values(references) : [references[params.reference]].flatMap((r) => (r === undefined ? [] : [r]));
