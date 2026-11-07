@@ -171,7 +171,7 @@ export const IFC_PREDEFINED_TYPES: Readonly<Record<string, readonly string[]>> =
 
 /** Why `mapping` is not an IFC4X3_ADD2 product / system class and type, or null. */
 export function ifcMappingProblem(mapping: IfcMapping): string | null {
-  const types = IFC_PREDEFINED_TYPES[mapping.entity];
+  const types = Object.hasOwn(IFC_PREDEFINED_TYPES, mapping.entity) ? IFC_PREDEFINED_TYPES[mapping.entity] : undefined;
   if (types === undefined)
     return `${mapping.entity} is not an IFC4X3_ADD2 class a plant class may map to (${Object.keys(IFC_PREDEFINED_TYPES).join(', ')})`;
   if (mapping.predefinedType !== undefined && !types.includes(mapping.predefinedType))
