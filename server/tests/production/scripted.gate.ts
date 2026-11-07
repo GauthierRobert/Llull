@@ -18,6 +18,7 @@ import { gradeContext, gradeScenario } from '../../../tests/production/grade';
 import { formatReport, resetReports, writeReport } from '../../../tests/production/report';
 import { SCENARIOS, chainOf } from '../../../tests/production/scenarios';
 import { estimateUsd, runAgent, type SendTurn } from './agentLoop';
+import { feaToolsMissing } from '../feaTestSupport';
 import { callTool, liveDocument, resetDocument, startServer, stopServer } from './cliHarness';
 
 beforeAll(async () => {
@@ -56,7 +57,8 @@ describe('each job fits the default REST rate limit', () => {
 
 describe('production scenarios — scripted driver through the CLI backend', () => {
   for (const scenario of SCENARIOS) {
-    it(scenario.id, async () => {
+    // a scenario that calls the FE transports needs the real Netgen mesher and CalculiX: skipped (and recorded) where they are absent
+    it.skipIf(scenario.hostTools !== undefined && feaToolsMissing())(scenario.id, async () => {
       resetDocument(createEmptyDocument());
       let baseline: CadDocument = createEmptyDocument();
       let run = { calls: 0, ms: 0 };

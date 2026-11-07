@@ -433,4 +433,22 @@ Process equipment is parametric: you give dimensions, llull derives the bodies, 
 Smallest plan (SC-EQP-01, a 1.5 m x 4 m separator on a 2 m skirt): \`set_units\` mm, \`add_vessel\` (insideDiameter 1500, tangentLength 4000, heads top / bottom { type: "ellipsoidal", ratio: 2 }, shellThickness 10,
 headThickness 10, corrosionAllowance 3, support { type: "skirt", height: 2000 }, design { pressure { value: 1, unit: "MPa" }, allowableStress { value: 137.9, unit: "MPa", source: "..." }, jointEfficiency { shell: 1, heads: 1 } }),
 four \`add_nozzle\` calls, then \`vessel_thickness\`, \`check_equipment\`, \`equipment_datasheet\`.
+
+---
+
+## 18. Solution verification: convergence studies (toolset analysis, PHY-00 V&V)
+
+A number from a finite-element run is only as good as its discretisation. Prove it with a convergence study, then report the estimated error (never "the exact value").
+
+1. Run: \`llull run_convergence_study analysisId=ID quantity='{"kind":"probe","probeId":"p-1","loadCase":"LC1"}' refinement=h levels=3 ratio=2\` re-meshes and re-solves the case at 3 to 6 levels and records the
+   study (it needs the mesher and CalculiX; the case's own mesh controls are not changed). \`refinement\` picks the ONE thing refined: h mesh size (default), dt the transient time step of a
+   heat_transient case (fixed increments that divide the end time, finest increment in seconds), p the element order (2 levels, order 2 then 1). Kinds are never mixed in one study. Prefer a probe away from
+   singular spots (point loads, sharp corners): a maximum there does not converge.
+2. Read: \`check_verification\` (with the owner's gciTarget, no default: ask) lists each study with its state (current, stale, unverifiable, untrusted) and, for a current one, the observed order, the
+   extrapolated value and the error estimate. Exactly 3 levels use the Celik GCI triplet; 4 or more are fitted by least squares f = f0 + a h^p (report.lsq: p with its standard error, f0, the fit residual and an
+   uncertainty = Fs |f1 - f0| + fit standard deviation; the method is named in provenance.procedure). A p study gives only the order-1 / order-2 difference, an indicator: no observed order, no extrapolation.
+   \`check_convergence\` does the same arithmetic on samples you already have (method least_squares for 4 or more).
+3. Report only estimated values ("estimated discretisation error 0.8 % of the finest value"). Oscillating or diverging studies (VNV_OSCILLATORY, VNV_DIVERGENT) carry NO extrapolated value: say so.
+   A stale study (VNV_STUDY_STALE) means the analysis changed after it: re-run it; \`delete_convergence_study\` drops one.
+4. Human gate: accepting a non-converged finding (\`accept_verification_exception\`) is a signed act of a qualified reviewer. An agent always gets VNV_HUMAN_GATE: hand the study over, do not retry.
 `;

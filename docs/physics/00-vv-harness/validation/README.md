@@ -59,6 +59,9 @@ Status **P** (proposed). Values: `expected_results.json` (12 significant digits)
 | VC-VNV-16 | TR-VNV-09 | `record_convergence_study` with (i) a hash absent from the store, (ii) an edited value, (iii) genuine | (i) `VNV_ARTIFACT_NOT_FOUND`, (ii) `VNV_SUMMARY_MISMATCH`, (iii) accepted | exact | — | A | unit (fake port) |
 | VC-VNV-17 | TR-VNV-10 | run VC-VNV-10 twice | identical study JSON and report hash | exact | — | A | integration |
 | VC-VNV-18 | FR-VNV-16 | deliberately wrong inputs: 1 sample; duplicate h; h = 0; NaN value; 2 samples without `assumedOrder`; malformed expected case; unit mismatch | each returns the §7.1 code, path and remediation | exact | TECHNICAL_SPEC §7.1 | A | unit + CLI |
+| VC-VNV-22 | FR-VNV-19 | `check_convergence method=least_squares` / `check_verification` on f = 10 + 0.5 h² at h = 0.1, 0.2, 0.4, 0.8 (a, b), and noisy f = 10 + 0.5 h^1.5 + e at 5 levels (c, d) | (a) p = 2, (b) f0 = 10; (c) p = 1.501927651893835, (d) standard error of p 2.7738747527433056e-3 (scipy `least_squares`, xtol = ftol = gtol = 1e-15) | 1e-9 abs; 1e-8 abs | model law; independent fit | A | unit |
+| VC-VNV-23 | FR-VNV-07 | `dt` study: T(dt) = 20 + 0.5 dt at dt = 1, 2, 4 s (fixed increments, end 8 s), temperature read at the end of the step | (a) p = 1, (b) extrapolated 20 degC | 1e-9 abs | model law | A | unit |
+| VC-VNV-24 | FR-VNV-07 | `p` study: von Mises 40 MPa at order 2, 43 MPa at order 1 | relative order difference 0.075 (an indicator; no p, no extrapolation) | 1e-12 rel | hand | A | unit |
 
 ## Requirement coverage supplement
 
@@ -72,7 +75,8 @@ checks without a physics value).
 | FR-VNV-15 (units + provenance) | VC-VNV-01 / 06 (`data.unit`, `data.provenance.procedure = "celik2008-gci"`, inputs echoed) |
 | FR-VNV-17 (owner summary) | **VC-VNV-21**: `summary` of AC-1 states quantity, status and GCI in one sentence and "estimated" wording |
 | FR-VNV-18 (plot / render) | VC-VNV-10 (UI review only; `render_view` per level, manual) |
-| FR-VNV-19 (least squares, V1) | **VC-VNV-22**: 4 samples of f = 10 + 0.5 h² (h = 0.1, 0.2, 0.4, 0.8) → fitted p = 2, f0 = 10 (exact law, abs 1e-9) |
+| FR-VNV-19 (least squares, V1) | **VC-VNV-22**: 4 samples of f = 10 + 0.5 h² (h = 0.1, 0.2, 0.4, 0.8) → fitted p = 2, f0 = 10 (exact law, abs 1e-9): cases 22.a / 22.b of `expected_results.json`; 22.c / 22.d pin a noisy 5-level fit (p and its standard error) to an independent `scipy.optimize.least_squares` solution; the same recovery at 4, 5 and 6 levels, in `check_convergence method=least_squares` and in `check_verification` (`tests/unit/physics/vnvLeastSquares.test.ts`, `tests/unit/cae/vnv/studyKinds.test.ts`) |
+| FR-VNV-07 (time step, element order; V1) | **VC-VNV-23**: a `dt` study of a transient case with T(dt) = 20 + 0.5 dt at dt = 1, 2, 4 s → p = 1, extrapolated 20 (23.a / 23.b); **VC-VNV-24**: an order study with order-2 value 40 and order-1 value 43 → relative difference 0.075, no observed order, no extrapolation |
 | FR-VNV-20 (V&V 20, V2) | deferred; no VC until the formula is confirmed (TECHNICAL_SPEC §11 Q2) |
 | TR-VNV-01 (lib functions) | VC-VNV-01…09 |
 | TR-VNV-05 (triplets for > 3 samples) | VC-VNV-22 (three triplets reported) |
