@@ -46,7 +46,7 @@ describe('RegionRenderer', () => {
     expect(outline?.positions).toHaveLength(8 * 2 * 3);
     // y = 2, 4 (touches the hole edge: skipped by the half-open rule), 6, 8; 0 too: every line has an even number of crossings
     expect(hatch?.positions.length).toBeGreaterThan(0);
-    expect(hatch?.positions.length % 6).toBe(0);
+    expect((hatch?.positions.length ?? 0) % 6).toBe(0);
   });
 
   it('draws no hatch lines for none and solid (solid is a filled mesh)', () => {
