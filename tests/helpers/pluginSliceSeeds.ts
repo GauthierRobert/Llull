@@ -14,6 +14,7 @@ import { runPlan } from '../golden/runPlan';
 import { plans, type GoldenAction } from '../golden/plans';
 import { plmPlans } from '../golden/plmPlans';
 import { implicitPlans } from '../golden/implicitPlans';
+import { blindRunSteps } from '../golden/pipingPlansBlind';
 import { cappedRunSteps } from '../golden/pipingPlansCap';
 import { rteJson } from '../unit/plant/piping/rteFixtures';
 import { recordedModel } from '../unit/plant/stress/m3Fixtures';
@@ -159,9 +160,9 @@ function buildingWithEquipment(): CadDocument {
   return run(doc, 'add_pump', { ...pumpParams, location: [30000, 20000] });
 }
 
-/** Pump-to-vessel plus a capped run, plus a run that continues from the open end of another (a `runEnd` ref: a capped end must never be one). */
+/** Pump-to-vessel plus a capped run and a blind-flanged line with a flanged joint and an instrument, plus a run that continues from the open end of another (a `runEnd` ref: a capped end must never be one). */
 function pipingSeedDocument(): CadDocument {
-  const base = planDocument([...(plans['piping_pump_to_vessel'] as GoldenAction[]), ...cappedRunSteps], 'piping seed');
+  const base = planDocument([...(plans['piping_pump_to_vessel'] as GoldenAction[]), ...cappedRunSteps, ...blindRunSteps], 'piping seed');
   const piping = base.plant?.piping;
   const capped = piping?.runOrder.at(-1);
   const line = capped === undefined ? undefined : piping?.runs[capped]?.lineId;
@@ -329,14 +330,14 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
 };
 
 /**
- * The drive data of `doc.dynamics` (PHY-23: datasheet motors, profiles, drives). Dynamics is a core slice, not a plugin extension, so it has no row in
+ * The drive data of `doc.dynamics` (PHY-23: datasheet motors, profiles, drives, transmissions, joint physics, load schedules). Dynamics is a core slice, not a plugin extension, so it has no row in
  * SLICE_SEEDS; tests/unit/contract/pluginSliceFuzz.test.ts runs it with the targeted `driveMutations` as well.
  */
 export const DYNAMICS_SEED: PluginSliceSeed = {
   roots: ['dynamics'],
   build: () => {
-    const steps: { name: string; params: Record<string, unknown> }[] = [
-      { name: 'add_cylinder', params: { radius: 5, height: 5, position: [0, 0, 0], axis: [0, 0, 1] } },
+    const steps: { name: string; params: Record<string, unknown>; as?: string }[] = [
+      { name: 'add_cylinder', params: { radius: 5, height: 5, position: [0, 0, 0], axis: [0, 0, 1] }, as: 'cylinder' },
       { name: 'add_rigid_body', params: { entityIds: ['$cylinder'], id: 'rotor', massKg: 0.001 } },
       {
         name: 'add_body_joint',
@@ -388,14 +389,53 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
         name: 'set_motor_drive',
         params: { motor: 'm', mode: 'velocity', profile: 'w', gains: { kp: 0.1, ki: 1 }, sampleHz: 1000, target: 'j', feedforward: true },
       },
+      { name: 'add_cylinder', params: { radius: 5, height: 5, position: [50, 0, 0], axis: [0, 0, 1] }, as: 'second' },
+      { name: 'add_rigid_body', params: { entityIds: ['$second'], id: 'wheel', massKg: 0.01 } },
+      {
+        name: 'add_body_joint',
+        params: { kind: 'revolute', child: 'wheel', parent: 'ground', anchor: [50, 0, 0], axis: [0, 0, 1], id: 'j2' },
+      },
+      { name: 'add_box', params: { size: [10, 10, 10], position: [0, 100, 0] }, as: 'third' },
+      { name: 'add_rigid_body', params: { entityIds: ['$third'], id: 'nut', massKg: 0.1 } },
+      {
+        name: 'add_body_joint',
+        params: { kind: 'prismatic', child: 'nut', parent: 'ground', anchor: [0, 100, 0], axis: [0, 0, 1], id: 'jn' },
+      },
+      {
+        name: 'add_transmission',
+        params: { kind: 'gear', driver: 'j', driven: 'j2', ratio: 2, efficiency: 0.95, efficiencyBack: 0.9, backlashDeg: 0.5, id: 'tg' },
+      },
+      { name: 'add_transmission', params: { kind: 'lead_screw', screw: 'j', nut: 'jn', leadMm: 5, meanDiameterMm: 10, mu: 0.1, id: 'ts' } },
+      {
+        name: 'set_joint_physics',
+        params: {
+          joint: 'j2',
+          friction: {
+            model: 'stribeck',
+            staticNm: 0.02,
+            coulombNm: 0.01,
+            stribeckVelocity: 0.5,
+            viscousNmsPerRad: 0.001,
+            source: { name: 'seed', grade: 'C' },
+          },
+          limits: { min: -2, max: 2, stiffness: 10, restitution: 0.5 },
+          armatureKgM2: 1e-6,
+        },
+      },
+      {
+        name: 'add_motion_profile',
+        params: { id: 'tq', quantity: 'torque', unit: 'N*m', segments: [{ kind: 'sine', amplitude: 0.01, frequencyHz: 2, cycles: 2 }] },
+      },
+      { name: 'add_load_schedule', params: { joint: 'j', kind: 'torque', profile: 'tq', id: 'ls' } },
     ];
     let doc = createEmptyDocument();
-    let cylinder = '';
+    const ids = new Map<string, string>();
     for (const step of steps) {
-      const params = JSON.parse(JSON.stringify(step.params).replace('$cylinder', cylinder)) as Record<string, unknown>;
-      const result = execute(doc, step.name, params);
+      let text = JSON.stringify(step.params);
+      for (const [name, id] of ids) text = text.split(`$${name}`).join(id);
+      const result = execute(doc, step.name, JSON.parse(text) as Record<string, unknown>);
       if (result.document === doc) throw new Error(`DYNAMICS_SEED: ${step.name}: ${result.summary}`);
-      if (cylinder === '') cylinder = result.affected[0] ?? '';
+      if (step.as !== undefined) ids.set(step.as, result.affected[0] ?? '');
       doc = result.document;
     }
     return doc;

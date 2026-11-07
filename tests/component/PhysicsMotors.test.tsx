@@ -107,6 +107,19 @@ describe('Physics panel: motors, drives and profiles', () => {
     expect(screen.getByTestId('physics-profiles')).toHaveTextContent('idle');
   });
 
+  it('labels a linear speed governor on a prismatic joint in m/s and N', () => {
+    const block = localDispatch('add_box', { size: [20, 20, 20], position: [0, 0, 10], anchor: 'center' }).affected[0]!;
+    const body = localDispatch('add_rigid_body', { entityIds: [block], name: 'slider', massKg: 1 }).affected[0]!;
+    const joint = localDispatch('add_body_joint', { kind: 'prismatic', child: body, anchor: [0, 0, 10], axis: [1, 0, 0] }).affected[0]!;
+    const governor = localDispatch('add_motor', { joint, kind: 'speed', speedMps: 0.1, maxForceN: 50 }).affected[0]!;
+    render(<PhysicsSection />);
+    expect(screen.getByTestId(`physics-motor-row-${governor}`)).toHaveTextContent('governor · 0.1 m/s ≤ 50 N');
+    const facts = screen.getByTestId(`motor-facts-${governor}`);
+    expect(facts).toHaveTextContent('Kindlinear speed governor');
+    expect(facts).toHaveTextContent('Held speed0.1 m/s');
+    expect(facts).toHaveTextContent('Force bound50 N');
+  });
+
   it('a torque-curve motor keeps its curve summary', () => {
     const motor = localDispatch('add_motor', { joint: buildShaft(), kind: 'torque_curve', torque: 20 }).affected[0]!;
     render(<PhysicsSection />);

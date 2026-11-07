@@ -50,10 +50,10 @@ describe('replay of an index-pair loop cut (review 1)', () => {
 });
 
 describe('semi-sharp creases on the exact paths (review 2, 3, 4)', () => {
-  it('settles after ceil(max finite sharpness) steps, capped', () => {
+  it('settles after ceil(max finite sharpness) steps, uncapped (budget: settleUncapped.test.ts)', () => {
     expect(settleLevels(semiSharp(1.5))).toBe(2);
     expect(settleLevels(boxCage([2, 2, 2], [1, 1, 1]))).toBe(0);
-    expect(settleLevels({ vertexSharpness: [{ v: 0, s: 9 }] })).toBe(3);
+    expect(settleLevels({ ...boxCage([2, 2, 2], [1, 1, 1]), vertexSharpness: [{ v: 0, s: 9 }] })).toBe(7); // 9 levels exceed the quad budget of a cube: clamped to 7
     expect(settledCage(boxCage([2, 2, 2], [1, 1, 1])).levels).toBe(0);
     expect(settledCage(semiSharp(1)).cage.faces).toHaveLength(24);
   });

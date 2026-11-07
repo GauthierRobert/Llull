@@ -46,14 +46,73 @@ export interface SimulationBody {
   readonly fixed: boolean;
 }
 
-/** velocity(driven) = ratio × velocity(driver), as a constraint. */
-interface SimulationGear {
+/**
+ * A kinematic coupling between two joints (PHY-23 TR-DRV-03): q_b = ratio · q_a, as a constraint (both inertias interact). `a` is the INPUT
+ * (driver) joint: the power the coupling loses is a friction level on it, scheduled every step from the force the coupling transmits.
+ * - Forward (the input drives: the coupling force opposes the input velocity, or at rest the applied input torque exceeds the coupling's):
+ *   level = |T_c| (1 - η_f) / η_f, T_c the ideal coupling torque on the input joint.
+ * - Back-drive (the driven side drives the input): level = |T_c| (1 - η_b); η_b <= 0 therefore holds the joint (self-locking).
+ * - With `backlash` the coupling is free inside a gap of total width `gap` (driven units) and transmits through a one-sided spring-damper
+ *   of stiffness K / damping B at each edge; it then carries force only while a gap edge is engaged.
+ * @invariant the coupling has no loss and no gap when `efficiency` and `backlash` are absent
+ */
+export interface TransmissionCoupling {
   readonly id: string;
-  readonly driver: string;
-  readonly driven: string;
+  readonly a: string;
+  readonly b: string;
+  /** q_b per q_a (rad/rad, or m/rad for a screw or rack). */
   readonly ratio: number;
-  /** Mesh efficiency in (0, 1]: (1 - efficiency) of the transmitted torque is lost on the driven joint. Absent = ideal. */
-  readonly efficiency?: number;
+  readonly efficiency?: { readonly forward: number; readonly backward: number };
+  readonly backlash?: {
+    /** Total gap in the driven joint's units (rad or m). */
+    readonly gap: number;
+    /** N·m/rad or N/m at the driven joint. */
+    readonly stiffness: number;
+    /** N·m·s/rad or N·s/m at the driven joint. */
+    readonly damping: number;
+    /** kg·m² or kg at the driven joint: the engine divides K and B by it where its constraint law is an acceleration law. */
+    readonly effectiveInertia: number;
+  };
+}
+
+/** What the engine observed in the last forward pass of the step about one friction joint (see `JointPhysicsBlock`). */
+export interface FrictionObservation {
+  /** Radial load N on the joint (reaction force perpendicular to the axis); zero unless `needsLoad`. */
+  readonly radialLoad: Float64Array;
+  /** Bending moment N·m on the joint (reaction moment perpendicular to the axis); zero unless `needsLoad`. */
+  readonly bendingMoment: Float64Array;
+  /** 1 when the friction constraint of the joint was at its limit (it is slipping or about to), else 0. */
+  readonly saturated: Uint8Array;
+}
+
+/**
+ * Joint physics (PHY-23 TR-DRV-02, 15-17): state-dependent friction levels and end stops. The engine owns the friction constraint (dry friction
+ * as a box on the constraint force, holding a joint at rest exactly); this block only decides the level before every step.
+ * @invariant `frictionLevel` is pure and total (finite output for finite input, never NaN at zero speed)
+ */
+export interface JointPhysicsBlock {
+  /** Joints `frictionLevel` is indexed by. */
+  readonly frictionJoints: readonly string[];
+  /**
+   * Per friction joint: true = Karnopp dead band. While the joint is at rest and its friction constraint is inside its limit, the engine sets
+   * its velocity to zero after the step, which removes the creep of a soft friction row (a held load leaks about 1e-4 · Δt · its free acceleration).
+   * The plugin switches it off (false) for joints a transmission, a loop or a servo / drive touches, and reports it (DRV_STICTION_NOT_LATCHED).
+   */
+  readonly restLatch: readonly boolean[];
+  /** True when a level reads `radialLoad` / `bendingMoment` (the engine then reads the joint reactions every step). */
+  readonly needsLoad: boolean;
+  /** Level N·m or N of each friction joint for the step, from the start-of-step state and the observation of the last forward pass. */
+  frictionLevel(state: SimulationState, observed: FrictionObservation): Float64Array;
+  /** End stops: a one-sided spring-damper at each of `min`, `max` (joint coordinate from the start pose). */
+  readonly limits: readonly {
+    readonly joint: string;
+    readonly min: number;
+    readonly max: number;
+    readonly stiffness: number;
+    readonly damping: number;
+    /** kg·m² or kg of the joint coordinate (see `TransmissionCoupling.backlash.effectiveInertia`). */
+    readonly effectiveInertia: number;
+  }[];
 }
 
 /**
@@ -187,7 +246,8 @@ interface SimulationSolver {
 export interface SimulationModel {
   readonly gravity: Vec3;
   readonly bodies: readonly SimulationBody[];
-  readonly gears: readonly SimulationGear[];
+  /** Kinematic couplings between joints (gears, belts, screws, racks); empty = none. */
+  readonly transmissions: readonly TransmissionCoupling[];
   readonly loops: readonly SimulationLoop[];
   readonly solver: SimulationSolver;
   readonly servos: readonly SimulationServo[];
@@ -195,6 +255,8 @@ export interface SimulationModel {
   readonly springs?: readonly SimulationSpring[];
   /** Actuators with state (datasheet motors and their controllers); absent = none. */
   readonly actuators?: ActuatorBlock;
+  /** Friction models and end stops (PHY-23); absent = joints keep their constant `friction`. */
+  readonly jointPhysics?: JointPhysicsBlock;
   /** Force laws, evaluated by the engine at every step (at the step midpoint) from the state. Must be pure. */
   readonly loads: (state: SimulationState) => AppliedLoads;
 }
@@ -256,6 +318,17 @@ export interface SimulationTrace {
   readonly ledger?: number[][];
   /** Cumulative work J of the actuator joint forces on the joints (needs `options.energy`), part of `energy.appliedWork`. */
   readonly actuatorWork?: number[];
+  /**
+   * Heat J of every `dissipation` entry at every sample, cumulative (needs `options.energy`, present when the model has transmissions, joint physics or
+   * stops): friction of joint physics (kind 'friction'), power a transmission lost (kind 'transmission_loss'), what an end stop or a backlash edge
+   * absorbed (kind 'stop': minus the work of its force, minus the spring energy still stored).
+   */
+  readonly heat?: {
+    readonly layout: readonly { readonly element: string; readonly kind: 'friction' | 'transmission_loss' | 'stop' }[];
+    readonly joules: number[][];
+  };
+  /** Per joint with an end stop (needs `options.energy`): largest penetration (rad or m) and largest stop force (N·m or N) of the run. */
+  readonly stops?: Record<string, { readonly peakPenetration: number; readonly peakForce: number }>;
   /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
   readonly loopResidual?: number;
 }

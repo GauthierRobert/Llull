@@ -8,11 +8,11 @@ import { importAsRoute } from '../routeImport/importRoute';
 import { getFabrication, lineIdsInUse, withFabrication } from '../state';
 
 /**
- * @affects plant.fabrication.pcfLines[lineId] (one imported line, read-only data in millimetres); with `as route` instead a routed line: tie-ins for the flanged ends, 1 pipe line, its runs and branch runs, inline valves / reducers, field welds and supports, all created by the RTE commands; nothing with `preview`
+ * @affects plant.fabrication.pcfLines[lineId] (one imported line, read-only data in millimetres); with `as route` instead a routed line: tie-ins for the flanged ends, 1 pipe line, its runs and branch runs, inline valves / reducers / flanged joints / instruments, run end caps / blind flanges, field welds and supports, all created by the RTE commands; nothing with `preview`
  * @invariant coordinates and bores are scaled by the file's UNITS-* to mm; the stored line writes back to the same bytes (export_pcf) on the MVP subset; unknown records and attributes are kept verbatim;
  *   one pipeline per file; units are never assumed
  * @failure TAB / line over 1024 characters / missing ISOGEN-FILES / file over 16 MB or 200000 lines -> ISO_PCF_TAB, ISO_PCF_LINE_TOO_LONG, ISO_PCF_HEADER, ISO_PCF_TOO_LARGE (path "line N");
- *   as route: no spec -> ISO_ROUTE_SPEC_MISSING; a line the plan cannot rebuild -> ISO_ROUTE_UNSUPPORTED / ISO_ROUTE_TOO_LARGE; supports without a level -> ISO_ROUTE_NO_LEVEL; any RTE refusal passes through with its own code and the document is unchanged;
+ *   as route: no spec -> ISO_ROUTE_SPEC_MISSING; a line the plan cannot rebuild -> ISO_ROUTE_UNSUPPORTED / ISO_ROUTE_TOO_LARGE; an eccentric reducer whose end points are on one axis without eccentricFlat -> ISO_ROUTE_FLAT_MISSING, an eccentricFlat against the offset in the file -> ISO_PARAM_INVALID; supports without a level -> ISO_ROUTE_NO_LEVEL; any RTE refusal passes through with its own code and the document is unchanged;
  *   missing UNITS-BORE / UNITS-CO-ORDS -> ISO_PCF_UNITS_MISSING; unreadable point or record -> ISO_PCF_RECORD_INVALID (path "line N"); line id in use -> ISO_PCF_LINE_EXISTS; the document is unchanged
  */
 export const importPcf = defineCommand({
@@ -26,7 +26,7 @@ export const importPcf = defineCommand({
     'bom: [{ itemCode, description, count, lengthMm? }], withoutItemCode, unknownRecords: [{ type, line }], warnings: [{ code, severity, message, ids, paths, remediation }], stored }. ' +
     'preview true only reports (document unchanged). Refusals (document unchanged, path "line N"): ISO_PCF_TAB, ISO_PCF_LINE_TOO_LONG, ISO_PCF_HEADER (first line must be ISOGEN-FILES), ISO_PCF_TOO_LARGE, ' +
     'ISO_PCF_UNITS_MISSING, ISO_PCF_RECORD_INVALID, ISO_PCF_LINE_EXISTS (pass lineIdOverride or delete_pcf_line). ' +
-    'as route rebuilds the line as a routed, editable line (create_pipeline, route_pipe, add_branch ... from the spec; data.route lists runs, ports, welds, supports and the comparison with the file; data.lineId is then the routed line id, data.lineNumber the PIPELINE-REFERENCE) and adds the refusals ISO_ROUTE_SPEC_MISSING, ISO_ROUTE_UNSUPPORTED, ISO_ROUTE_TOO_LARGE, ISO_ROUTE_NO_LEVEL and every RTE_* code of the nested commands. ' +
+    'as route rebuilds the line as a routed, editable line (create_pipeline, route_pipe, add_branch ... from the spec; data.route lists runs, ports, welds, supports and the comparison with the file; data.lineId is then the routed line id, data.lineNumber the PIPELINE-REFERENCE) and adds the refusals ISO_ROUTE_SPEC_MISSING, ISO_ROUTE_UNSUPPORTED, ISO_ROUTE_TOO_LARGE, ISO_ROUTE_NO_LEVEL, ISO_ROUTE_FLAT_MISSING and every RTE_* code of the nested commands. ' +
     'Next: export_pcf writes it back; delete_pcf_line removes it (a routed line: delete_pipe_run).',
   params: z.object({
     text: z.string().describe('The PCF file content (text). CLI: file=<path> fills it.'),
@@ -41,7 +41,7 @@ export const importPcf = defineCommand({
       .enum(['pcf_line', 'route'])
       .optional()
       .describe(
-        'How the line enters the document. pcf_line (default) = the lossless read-only copy that exports back to the same bytes. route = a routed, editable line: the centreline of the file is rebuilt with the 02 RTE commands (create_pipeline, route_pipe, add_branch, insert_inline_component, add_field_weld, add_pipe_support) from the spec, so the fittings, flange sets with gaskets and cut lengths are the spec ones and can differ from the file (reported in data.route.comparison and ISO_ROUTE_DIMENSIONS_CHANGED). Route mode takes pipes, elbows, bends, tees, olets, concentric reducers, valves, end flanges and valve sets, welds and supports; anything else is refused with the components named.',
+        'How the line enters the document. pcf_line (default) = the lossless read-only copy that exports back to the same bytes. route = a routed, editable line: the centreline of the file is rebuilt with the 02 RTE commands (create_pipeline, route_pipe, add_branch, insert_inline_component, add_field_weld, add_pipe_support) from the spec, so the fittings, flange sets with gaskets and cut lengths are the spec ones and can differ from the file (reported in data.route.comparison and ISO_ROUTE_DIMENSIONS_CHANGED). Route mode takes pipes, elbows, bends, tees, olets, concentric and eccentric reducers (the axis offset (OD big - OD small) / 2 is carried through the plan; the flat side is read from the offset between the two END-POINTs of the reducer, or eccentricFlat when they are on one axis), valves, instruments, end flanges and valve / instrument sets, mid-line flanged joints (flange - gasket - flange), caps and blind flanges closing the end of a run (the cap / blind rows of the spec; the RTE refuses a spec without them), welds and supports; anything else is refused with the components named.',
       ),
     spec: z
       .string()
@@ -58,13 +58,19 @@ export const importPcf = defineCommand({
       .describe(
         'as route: create the supports of the file (SUPPORT records) with add_pipe_support, which needs a building level (ISO_ROUTE_NO_LEVEL without). Default true; false drops them with a warning.',
       ),
+    eccentricFlat: z
+      .enum(['top', 'bottom'])
+      .optional()
+      .describe(
+        'as route: flat side ("top" = FOT, +Z; "bottom" = FOB, -Z) given to the REDUCER-ECCENTRIC records whose two END-POINTs lie on one axis. A file whose reducer ends are offset (an ISOGEN file) carries the side in that offset and needs no value (a value that disagrees is refused, ISO_PARAM_INVALID); without either the import is refused (ISO_ROUTE_FLAT_MISSING). The RTE refuses top / bottom on a vertical pipe.',
+      ),
     valveType: z
       .enum(['valveGate', 'valveGlobe', 'valveCheck', 'valveBall', 'valveButterfly', 'valvePlug'])
       .optional()
       .describe('as route: catalogue type given to every VALVE of the file (a PCF VALVE does not say which). Default valveGate.'),
   }),
   run: (doc, params, ctx): CommandResult => {
-    const routeOnly = (['spec', 'service', 'supports', 'valveType'] as const).filter((key) => params[key] !== undefined);
+    const routeOnly = (['spec', 'service', 'supports', 'valveType', 'eccentricFlat'] as const).filter((key) => params[key] !== undefined);
     if (params.as !== 'route' && routeOnly.length > 0)
       return refuseIso(doc, 'import_pcf', 'ISO_PARAM_INVALID', `${routeOnly.join(', ')} apply to as route only`, [], routeOnly.slice());
     const read = readPcf(params.text);
@@ -112,6 +118,7 @@ export const importPcf = defineCommand({
           service: params.service ?? 'PCF',
           supports: params.supports ?? true,
           valveType: params.valveType ?? 'valveGate',
+          eccentricFlat: params.eccentricFlat,
           base: data,
           warnings,
         },

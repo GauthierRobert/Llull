@@ -391,5 +391,78 @@ export function driveMutations(raw: Record<string, unknown>): SliceMutation[] {
     edit('tune bandwidth string', (dynamics) => void (drive(dynamics)['tune'] = { bandwidthHz: 'x', dampingRatio: 1 })),
     edit('target number', (dynamics) => void (drive(dynamics)['target'] = 5)),
     edit('feedforward string', (dynamics) => void (drive(dynamics)['feedforward'] = 'yes')),
+    ...mechanismMutations(edit),
+  ];
+}
+
+type Edit = (label: string, change: (dynamics: Record<string, unknown>) => void) => SliceMutation;
+
+/** Targeted hostile edits of the PHY-23 transmissions, joint physics and load schedules of `dynamics`. */
+function mechanismMutations(edit: Edit): SliceMutation[] {
+  const record =
+    (table: string, id: string) =>
+    (dynamics: Record<string, unknown>): Record<string, unknown> => {
+      const records = dynamics[table];
+      const found = isObject(records) ? records[id] : undefined;
+      if (!isObject(found)) throw new Error(`mechanismMutations: the seed has no ${table}.${id}`);
+      return found;
+    };
+  const table = (dynamics: Record<string, unknown>, name: string): Record<string, unknown> => {
+    const found = dynamics[name];
+    if (!isObject(found)) throw new Error(`mechanismMutations: no ${name}`);
+    return found;
+  };
+  const gear = record('transmissions', 'tg');
+  const screw = record('transmissions', 'ts');
+  const physics = record('jointPhysics', 'j2');
+  const load = record('loadSchedules', 'ls');
+  const set =
+    (target: (dynamics: Record<string, unknown>) => Record<string, unknown>, key: string, value: unknown) =>
+    (dynamics: Record<string, unknown>): void =>
+      void (target(dynamics)[key] = value);
+  const friction = (dynamics: Record<string, unknown>): Record<string, unknown> => {
+    const found = physics(dynamics)['friction'];
+    if (!isObject(found)) throw new Error('mechanismMutations: no friction');
+    return found;
+  };
+  return [
+    edit('transmission kind foo', set(gear, 'kind', 'foo')),
+    edit('transmission kind __proto__', set(gear, 'kind', '__proto__')),
+    edit('transmission ratio zero', set(gear, 'ratio', 0)),
+    edit('transmission ratio string', set(gear, 'ratio', '2')),
+    edit('transmission efficiency 2', set(gear, 'efficiency', 2)),
+    edit('transmission efficiencyBack null', set(gear, 'efficiencyBack', null)),
+    edit('transmission backlash negative', set(gear, 'backlashDeg', -1)),
+    edit('transmission teeth strings', set(gear, 'teeth', ['a', 'b'])),
+    edit('transmission driver number', set(gear, 'driver', 7)),
+    edit('transmission driven ghost', set(gear, 'driven', 'ghost')),
+    edit('transmission driven twice', set(gear, 'driven', 'jn')),
+    edit('transmission source grade Z', set(gear, 'source', { name: 's', grade: 'Z' })),
+    edit('screw lead zero', set(screw, 'leadMm', 0)),
+    edit('screw mu negative', set(screw, 'mu', -1)),
+    edit('screw flank 90', set(screw, 'flankAngleDeg', 90)),
+    edit('screw nut ghost joint', set(screw, 'nut', 'ghost')),
+    edit('joint physics friction model foo', set(friction, 'model', 'foo')),
+    edit('joint physics stribeck velocity zero', set(friction, 'stribeckVelocity', 0)),
+    edit('joint physics static below coulomb', set(friction, 'static', 0.001)),
+    edit('joint physics friction array', set(physics, 'friction', [1, 2])),
+    edit('joint physics limits reversed', set(physics, 'limits', { min: 2, max: -2, stiffness: 10 })),
+    edit('joint physics limits stiffness zero', set(physics, 'limits', { min: -1, max: 1, stiffness: 0 })),
+    edit('joint physics limits restitution 5', set(physics, 'limits', { min: -1, max: 1, stiffness: 1, restitution: 5 })),
+    edit('joint physics armature negative', set(physics, 'armatureKgM2', -1)),
+    edit('joint physics id mismatch', set(physics, 'id', 'other')),
+    edit('load target neither', set(load, 'target', {})),
+    edit('load target both', set(load, 'target', { body: 'rotor', joint: 'j' })),
+    edit('load target ghost joint', set(load, 'target', { joint: 'ghost' })),
+    edit(
+      'transmission circle',
+      (dynamics) => void (table(dynamics, 'transmissions')['back'] = { kind: 'gear', id: 'back', driver: 'j2', driven: 'j', ratio: 2 }),
+    ),
+    edit('joint physics restitution unreachable', set(physics, 'limits', { min: -1, max: 1, stiffness: 1, restitution: 1e-9 })),
+    edit('load kind foo', set(load, 'kind', 'foo')),
+    edit('load direction short', set(load, 'direction', [1, 2])),
+    edit('load profile number', set(load, 'profile', 3)),
+    edit('load profile ghost', set(load, 'profile', 'ghost')),
+    edit('load without profile or constant', (dynamics) => void delete load(dynamics)['profile']),
   ];
 }

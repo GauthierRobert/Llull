@@ -11,9 +11,10 @@ The same commands run in the desktop app (WASM loaded on the first Simulate), in
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `add_rigid_body`                                          | entities that move as one part; mass / centre of mass / full inertia tensor from their geometry (material density, else `density` kg/m³, default steel); `massKg` rescales; `fixed` welds to ground                                                                                                                                     |
 | `add_body_joint`                                          | revolute (shaft, hinge, crank pin), prismatic (piston) or spherical (ball pin, loop closure only) joint to `ground` or a parent body, anchor in document units, damping, dry friction, initial speed. A body may be the child of several joints: closed loops (see below)                                                               |
-| `add_gear_coupling`                                       | rigid ratio between two joints (spur, belt, planetary), enforced as a near-rigid constraint                                                                                                                                                                                                                                             |
+| `add_transmission`                                        | gear / belt / lead screw / ball screw / rack and pinion between two joints: a near-rigid ratio constraint that loses power as friction on the driver (forward η_f, back-drive η_b, a thread from its geometry, self-locking when η_b <= 0) and can have backlash                                                                        |
 | `add_spring`                                              | point-to-point spring-damper between two bodies (or a body and the ground): world attachment points, stiffness N/m, damping N·s/m, free length (default the distance at the modelled pose) or preload; a MuJoCo spatial tendon                                                                                                          |
-| `add_motor`                                               | `torque_curve` engine (N·m vs rpm × throttle) or `speed` governor (holds rpm, max torque)                                                                                                                                                                                                                                               |
+| `set_joint_physics`                                       | friction model of a joint (coulomb, stiction, Stribeck, load-dependent), end stops (stiffness, damping ratio or restitution) and armature; `add_load_schedule` applies a force / torque profile to a body or joint                                                                                                                      |
+| `add_motor`                                               | `torque_curve` engine (N·m vs rpm × throttle) or `speed` governor (holds rpm, max torque; on a prismatic joint m/s and N)                                                                                                                                                                                                               |
 | `add_propeller`                                           | static-thrust propeller: T = Ct·ρ·n²·D⁴, P = Cp·ρ·n³·D⁵, Q = P/(2πn)                                                                                                                                                                                                                                                                    |
 | `add_cylinder_pressure`                                   | gas pressure on a piston (prismatic joint) driven by a crank: `table`, `wiebe` (exact IMEP calibration) or `single_zone` (Woschni heat loss) model, four- or two-stroke; crank radius, rod length and TDC read from the joints                                                                                                          |
 | `set_dynamics_solver`                                     | timestep (`auto` = 0.5 deg of crank), integrator, loop constraint stiffness and the residual tiers                                                                                                                                                                                                                                      |
@@ -38,7 +39,18 @@ tuned from a bandwidth and the reflected inertia, zero-order hold at `sampleHz`)
 The law runs in the per-step `ActuatorBlock` of the physics port, so any engine integrates it; MuJoCo carries the rotor as joint `armature` (eta N^2 J) and the
 no-load friction as a friction level. `simulate_motion detail "drives"` returns per motor the voltage, current, shaft / joint torque, speed and powers, and the
 energy ledger (electrical input, copper, magnetic, gearhead loss, friction, kinetic, closure). A speed motor with no sourced torque bound is flagged
-`DRV_EFFORT_UNBOUNDED` by `check_dynamics`. Not yet: thermal model, transmissions with efficiency / locking / backlash, joint friction models (DRV-M2 and later).
+`DRV_EFFORT_UNBOUNDED` by `check_dynamics`. Not yet: thermal model (DRV-M3 and later).
+
+### Transmissions, joint physics and loads (PHY-23 DRV-M2, [spec](physics/23-drives-physical-truth/TECHNICAL_SPEC.md) section 13.14)
+
+`add_transmission` replaces the old gear coupling (no compatibility kept): `gear` (ratio or tooth counts, η_f / η_b, `backlashDeg` with a mesh stiffness), `belt` (pulley diameters),
+`lead_screw` (lead, mean diameter, μ, flank angle: η_f = tan λ / tan(λ + φ'), η_b = tan(λ - φ') / tan λ, a negative η_b locks the screw), `ball_screw` and `rack_pinion`.
+The loss is a friction level on the driver joint, rewritten every step from the force the coupling transmits (forward |T|(1-η_f)/η_f, back-driven |T|(1-η_b)), so a joint at rest is held
+exactly and there is no sign smoothing; backlash is a limited fixed tendon (free inside the gap, a one-sided spring-damper at each edge). `set_joint_physics` friction models
+replace the joint's `friction` / `damping`: `stiction` (breakaway detected on the friction constraint, a Karnopp dead band holds the joint at rest), `stribeck`, `load_dependent`
+(μ·r·(radial load + preload + moment / arm) read from the joint reaction). End stops are `range` rows with the acceleration-law `solreflimit` scaled by the inertia the joint pushes.
+`simulate_motion` with `energy` lists every friction, transmission and stop loss in `data.ledger` (stops: minus the work of the stop minus the spring energy it still holds) and
+`data.stops` gives the peak penetration and force. A given `timestep` with ω_n·Δt > 0.1 for a stop or backlash is refused (`DRV_STEP_TOO_COARSE`); the auto timestep is halved until it fits.
 
 ### Springs, energy and unsettled-run warnings
 
@@ -83,7 +95,10 @@ the work of propeller thrust on a body that translates.
       "params": { "id": "prop_j", "kind": "revolute", "child": "prop", "anchor": [0, 200, 800], "axis": [0, 1, 0] },
     },
     // planetary, ring fixed, sun 21 / ring 51: carrier = 21 / 72 of the sun speed
-    { "command": "add_gear_coupling", "params": { "driver": "crank_j", "driven": "prop_j", "ratio": 0.2917 } },
+    {
+      "command": "add_transmission",
+      "params": { "kind": "gear", "driver": "crank_j", "driven": "prop_j", "ratio": 0.2917, "efficiency": 0.99 },
+    },
     {
       "command": "add_motor",
       "params": {

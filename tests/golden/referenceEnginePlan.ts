@@ -95,7 +95,10 @@ export const referenceEnginePlan: PlanAction[] = [
       initialRpm: (5800 * 21) / 51,
     },
   },
-  { command: 'add_gear_coupling', params: { id: 'reduction', driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 } },
+  {
+    command: 'add_transmission',
+    params: { kind: 'gear', id: 'reduction', driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 },
+  },
   { command: 'add_motor', params: { joint: 'crank_j', kind: 'speed', rpm: 5800, maxTorque: 1e6 } },
   // pins in bores: the faceted tessellation of a 0.02 mm fit overlaps, so each fit is declared
   {

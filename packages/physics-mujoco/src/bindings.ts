@@ -29,6 +29,10 @@ export interface MjData {
   readonly xquat: Float64Array;
   /** World position of each joint anchor, 3 per joint. */
   readonly xanchor: Float64Array;
+  /** World axis of each joint (unit vector), 3 per joint, after the last forward pass. */
+  readonly xaxis: Float64Array;
+  /** Generalised force of the actuators (servos) of the last forward pass. */
+  readonly qfrc_actuator: Float64Array;
   /** World centre of mass of each body's subtree, 3 per body. */
   readonly subtree_com: Float64Array;
   /** Interaction force of each body with its parent after `mj_rnePostConstraint`: [torque(3), force(3)] about the root subtree COM. */
@@ -65,3 +69,7 @@ export const OBJECT_TENDON = 18;
 export const OBJECT_EQUALITY = 17;
 /** mjtConstraint: equality rows (connect / joint equalities). */
 export const CONSTRAINT_EQUALITY = 0;
+/** mjtConstraint: dry friction of a DOF, joint limit, tendon limit rows. */
+export const CONSTRAINT_FRICTION_DOF = 1;
+export const CONSTRAINT_LIMIT_JOINT = 3;
+export const CONSTRAINT_LIMIT_TENDON = 4;

@@ -23,6 +23,8 @@ function motorKindLabel(motor: Motor): string {
       return 'torque curve';
     case 'speed':
       return 'speed governor';
+    case 'linear_speed':
+      return 'linear speed governor';
     case 'dc':
       return 'datasheet DC motor';
   }
@@ -82,6 +84,12 @@ function kindFacts(motor: Motor): Fact[] {
         fact('Torque bound', `${q(motor.maxTorque)} N·m`),
         motor.source === undefined ? fact('Source', 'none: the bound is a guess') : sourceFact(motor.source),
       ];
+    case 'linear_speed':
+      return [
+        fact('Held speed', `${q(motor.speedMps)} m/s`),
+        fact('Force bound', `${q(motor.maxForceN)} N`),
+        motor.source === undefined ? fact('Source', 'none: the bound is a guess') : sourceFact(motor.source),
+      ];
     case 'dc':
       return dcFacts(motor);
   }
@@ -94,6 +102,8 @@ export function motorHeadline(motor: Motor): string {
       return `curve · ${motor.curve.length} pt`;
     case 'speed':
       return `governor · ${q(motor.rpm)} rpm ≤ ${q(motor.maxTorque)} N·m`;
+    case 'linear_speed':
+      return `governor · ${q(motor.speedMps)} m/s ≤ ${q(motor.maxForceN)} N`;
     case 'dc':
       return `DC · ${q(motor.datasheet.nominalVoltageV)} V${motor.gearhead === undefined ? '' : ` · ${q(motor.gearhead.ratio)}:1`}`;
   }

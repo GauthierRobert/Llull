@@ -61,7 +61,8 @@ describe('gear mesh efficiency (VC-FPR-27, 16)', () => {
       initialRpm: 5800,
     }).doc;
     doc = step(doc, 'add_body_joint', { kind: 'revolute', child: 'prop', anchor: [0, 300, 0], axis: [0, 0, 1], id: 'prop_j' }).doc;
-    doc = step(doc, 'add_gear_coupling', {
+    doc = step(doc, 'add_transmission', {
+      kind: 'gear',
       driver: 'crank_j',
       driven: 'prop_j',
       teeth: [21, 51],
@@ -285,7 +286,7 @@ describe('plausibility findings on a run (FR-FPR-76)', () => {
     const disc = step(d, 'add_cylinder', { radius: 100, height: 10, axis: [0, 0, 1], position: [0, 300, 0] });
     d = step(disc.doc, 'add_rigid_body', { entityIds: [disc.id], massKg: 1, id: 'prop' }).doc;
     d = step(d, 'add_body_joint', { kind: 'revolute', child: 'prop', anchor: [0, 300, 0], axis: [0, 0, 1], id: 'prop_j' }).doc;
-    d = step(d, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 }).doc;
+    d = step(d, 'add_transmission', { kind: 'gear', driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 }).doc;
     d = step(d, 'add_propeller', { joint: 'prop_j', diameter: 1.7, thrustCoefficient: 0.1, powerCoefficient: 0.001, inertiaKgM2: 1.2 }).doc;
     d = step(d, 'add_motor', { joint: 'crank_j', kind: 'speed', rpm: RATED_RPM, maxTorque: 1e6 }).doc;
     const run = simulate(d, { duration: 0.07 });
@@ -343,7 +344,7 @@ describe('timestep halving of an engine run (FR-FPR-79, VC-FPR-33)', () => {
     const stripped: CadDocument = {
       ...noSpeed.doc,
       dynamics: {
-        ...(noSpeed.doc.dynamics ?? { gravity: [0, 0, 0], bodies: {}, joints: {}, gears: {}, motors: {}, propellers: {} }),
+        ...(noSpeed.doc.dynamics ?? { gravity: [0, 0, 0], bodies: {}, joints: {}, motors: {}, propellers: {} }),
         cylinders: Object.fromEntries(
           Object.entries(noSpeed.doc.dynamics?.cylinders ?? {}).map(([id, cylinder]) => [
             id,
@@ -520,10 +521,7 @@ describe('compare_to_reference on the Rotax ULS set (VC-FPR-31, 34)', () => {
   it('refuses brake references without engine losses (FPR_NO_LOSSES), unknown ids, an empty store, too many points and no cylinder', () => {
     const noLoss: CadDocument = {
       ...withRef,
-      dynamics: {
-        ...(withRef.dynamics ?? { gravity: [0, 0, 0], bodies: {}, joints: {}, gears: {}, motors: {}, propellers: {} }),
-        losses: {},
-      },
+      dynamics: { ...(withRef.dynamics ?? { gravity: [0, 0, 0], bodies: {}, joints: {}, motors: {}, propellers: {} }), losses: {} },
     };
     const refused = execute(noLoss, 'compare_to_reference', { reference: 'rotax_912uls_full_throttle' });
     expect(refused.affected).toEqual([]);
@@ -606,7 +604,7 @@ describe('free equilibrium against a propeller (static_rpm, propeller_rpm; VC-FP
     const disc = step(d, 'add_cylinder', { radius: 100, height: 10, axis: [0, 0, 1], position: [0, 300, 0] });
     d = step(disc.doc, 'add_rigid_body', { entityIds: [disc.id], massKg: 0.5, id: 'prop' }).doc;
     d = step(d, 'add_body_joint', { kind: 'revolute', child: 'prop', anchor: [0, 300, 0], axis: [0, 0, 1], id: 'prop_j' }).doc;
-    d = step(d, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 }).doc;
+    d = step(d, 'add_transmission', { kind: 'gear', driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 }).doc;
     return step(d, 'add_propeller', { joint: 'prop_j', diameter: 1.36, thrustCoefficient: 0.1, powerCoefficient: 0.06 }).doc;
   }
 

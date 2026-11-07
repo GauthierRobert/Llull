@@ -309,37 +309,6 @@ describe('refusals leave the document unchanged', () => {
     expect((renamed.data as RouteData).lineNumber).toBe('L-102');
   });
 
-  it('components route mode cannot rebuild are named: cap, blind flange, instrument, eccentric reducer', () => {
-    for (const [type, words] of [
-      ['CAP', 'a cap'],
-      ['FLANGE-BLIND', 'a blind flange'],
-      ['INSTRUMENT', 'an instrument'],
-      ['REDUCER-ECCENTRIC', 'an eccentric reducer'],
-    ] as const) {
-      const text = fixturePcf().replace(
-        'MATERIALS\n',
-        `${type}\n    COMPONENT-IDENTIFIER 16\n    END-POINT 8000.0 4000.0 1000.0 100 FL\n    END-POINT 8100.0 4000.0 1000.0 100 FL\nMATERIALS\n`,
-      );
-      const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED', 'as');
-      expect(result.summary).toContain(words);
-      expect(result.error?.ids).toEqual(['pcf:L-101:16']);
-    }
-  });
-
-  it('a flanged joint that is not a valve set is refused with the flange named', () => {
-    const text = fixturePcf()
-      .replace(
-        'PIPE\n    COMPONENT-IDENTIFIER 4\n',
-        'FLANGE\n    COMPONENT-IDENTIFIER 90\n    END-POINT 2500.0 0.0 3000.0 100 BW\n    END-POINT 2576.0 0.0 3000.0 100 FL\n    SKEY FLWN\n    ITEM-CODE FLWN-100-150\nFLANGE\n    COMPONENT-IDENTIFIER 91\n    END-POINT 2576.0 0.0 3000.0 100 FL\n    END-POINT 2652.0 0.0 3000.0 100 BW\n    SKEY FLWN\n    ITEM-CODE FLWN-100-150\nPIPE\n    COMPONENT-IDENTIFIER 4\n',
-      )
-      .replace(
-        '    END-POINT 2500.0 0.0 3000.0 100 BW\n    END-POINT 4848.0',
-        '    END-POINT 2652.0 0.0 3000.0 100 BW\n    END-POINT 4848.0',
-      );
-    const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
-    expect(result.summary).toContain('flange');
-  });
-
   it('components not connected to the line start, and a closed loop, are refused', () => {
     const stray = fixturePcf().replace(
       'MATERIALS\n',

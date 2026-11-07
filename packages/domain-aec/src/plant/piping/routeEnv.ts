@@ -44,6 +44,8 @@ export interface EndSetup {
   readonly fittingId?: string;
   /** Open end closed by a cap: the catalogue row (one port, length = the interval occupied). */
   readonly cap?: CatalogueRow;
+  /** Open end closed by a blind flange: the blind row and its thickness (the flange set and gasket are `set`; `length` = thickness + set length). */
+  readonly blind?: { readonly row: CatalogueRow; readonly thickness: number };
   /** Branch start on a stub-in: the first piece is not butt welded to the part (the set-on branch weld is the one weld). */
   readonly weldless?: boolean;
 }

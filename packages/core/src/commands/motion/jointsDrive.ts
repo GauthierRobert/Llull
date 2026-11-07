@@ -20,7 +20,7 @@ export const addDriveRelation = defineCommand({
     '"driven" is the target joint id (its value is computed from the driver). ' +
     '"ratio" is the multiplication factor (may be negative for direction reversal). ' +
     '"offset" is an optional additive phase or position offset (default 0). ' +
-    'For gears/belts between physics-engine joints (add_body_joint, simulate_motion) with inertia and load use add_gear_coupling instead. Cyclic couplings (A→B→A) are rejected with an explanatory summary. Returns the new drive relation id in affected[0].',
+    'For gears/belts between physics-engine joints (add_body_joint, simulate_motion) with inertia and load use add_transmission instead. Cyclic couplings (A→B→A) are rejected with an explanatory summary. Returns the new drive relation id in affected[0].',
   params: z.object({
     driver: z.string().describe('Id of the driving joint (source of motion). Must exist in doc.joints.'),
     driven: z.string().describe('Id of the driven joint (receives motion). Must exist in doc.joints.'),

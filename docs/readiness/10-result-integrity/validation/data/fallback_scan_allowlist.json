@@ -430,6 +430,71 @@
       "file": "domain-dynamics/src/commands/quickCheck.ts",
       "match": "? `Mean torque ${(mean['meanTorqueNm'] ?? 0).toPrecision(5)} N·m at MEP ${(mean['mepBar'] ?? 0).toPrecision(5)} bar.`",
       "reason": "summary text of an optional mean value; display only"
+    },
+    {
+      "file": "domain-dynamics/src/commands/jointPhysics.ts",
+      "match": "return ok(s) && ok(c) && s >= c && (params.stribeckVelocity ?? 0) > 0",
+      "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input"
+    },
+    {
+      "file": "domain-dynamics/src/commands/jointPhysics.ts",
+      "match": "? { model: 'stribeck', static: s, coulomb: c, stribeckVelocity: params.stribeckVelocity ?? 0, ...common }",
+      "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input (the branch is reached only when stribeckVelocity > 0)"
+    },
+    {
+      "file": "domain-dynamics/src/commands/jointPhysics.ts",
+      "match": "(pinRadiusMm ?? 0) > 0 &&",
+      "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input"
+    },
+    {
+      "file": "domain-dynamics/src/commands/jointPhysics.ts",
+      "match": "pinRadiusMm: pinRadiusMm ?? 0,",
+      "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input (the branch is reached only when pinRadiusMm > 0)"
+    },
+    {
+      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "match": "const ratio = params.ratio ?? fromTeeth ?? 0;",
+      "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input (a missing ratio and tooth count is refused before this line)"
+    },
+    {
+      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "match": "if (!positive(params.meshStiffnessNmPerRad ?? 1) || !positive(params.meshDampingRatio ?? 1))",
+      "reason": "validation of optional mesh numbers: absent passes (1 is any positive stand-in), the stored value is the given one or absent (the engine then states DRV_MESH_STIFFNESS_ASSUMED)"
+    },
+    {
+      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "match": "if (!positive(params.meshStiffnessNPerM ?? 1) || !positive(params.meshDampingRatio ?? 1))",
+      "reason": "validation of optional mesh numbers: absent passes (1 is any positive stand-in), the stored value is the given one or absent (the engine then states DRV_MESH_STIFFNESS_ASSUMED)"
+    },
+    {
+      "file": "domain-dynamics/src/sim/jointPhysics.ts",
+      "match": "const normal = (observed.radialLoad[k] ?? 0) + (friction.preloadN ?? 0) + bending;",
+      "reason": "array index guard of the measured load, and an absent preload is no preload (set_joint_physics describes it as added to the radial load when given)"
+    },
+    {
+      "file": "domain-dynamics/src/sim/jointPhysics.ts",
+      "match": "return (friction.base ?? 0) + friction.mu * radius * normal;",
+      "reason": "an absent load-independent friction is none (set_joint_physics: base is optional); the load-dependent term is read from the joint reaction"
+    },
+    {
+      "file": "domain-dynamics/src/sim/loadSchedules.ts",
+      "match": "if (schedule.profile === undefined) return () => schedule.constant ?? 0;",
+      "reason": "add_load_schedule refuses a load with neither profile nor constant (and the loader validates it): the 0 is unreachable"
+    },
+    {
+      "file": "domain-dynamics/src/sim/transmissions.ts",
+      "match": "const friction = Math.atan(screw.mu / Math.cos(((screw.flankAngleDeg ?? 0) * Math.PI) / 180));",
+      "reason": "documented default of add_transmission: flankAngleDeg 0 is a square thread; source of the thread (Shigley) carried by the transmission"
+    },
+    {
+      "file": "domain-dynamics/src/sim/transmissions.ts",
+      "match": "const forward = t.efficiency ?? 1;",
+      "reason": "documented in add_transmission: no efficiency is an ideal coupling; the simulation states it (idealGearWarnings, DRV note) and the ledger shows no loss"
+    },
+    {
+      "file": "domain-dynamics/src/sim/transmissions.ts",
+      "match": "return dampingRatio ?? dampingRatioForRestitution(restitution ?? 0.5) ?? 0.999;",
+      "reason": "documented in set_joint_physics: no damping ratio and no restitution means restitution 0.5; 0.999 is the largest ratio of the closed form and is unreachable: the command refuses and the loader rejects a restitution with no damping ratio (dampingRatioForRestitution null)"
     }
   ]
 }

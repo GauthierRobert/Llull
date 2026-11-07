@@ -5,6 +5,7 @@
  */
 
 import type { DynamicsModel } from '@core/model/dynamics';
+import { couplingsOf } from '@core/model/transmissions';
 import type { Vec3 } from '@core/model/vectors';
 import { cylinderState, type CylinderRuntime } from './cylinderLoads';
 import { cycleLength } from './pressureCurve';
@@ -367,7 +368,7 @@ function onlyGovernorLoads(dynamics: DynamicsModel, governorId: string | undefin
   return (
     Object.values(dynamics.motors).every((motor) => motor.id === governorId) &&
     Object.keys(dynamics.propellers).length === 0 &&
-    Object.keys(dynamics.gears).length === 0 &&
+    Object.keys(dynamics.transmissions ?? {}).length === 0 &&
     Object.keys(dynamics.losses ?? {}).length === 0 &&
     Object.values(dynamics.joints).every((joint) => joint.damping === 0 && joint.friction === 0)
   );
@@ -375,7 +376,7 @@ function onlyGovernorLoads(dynamics: DynamicsModel, governorId: string | undefin
 
 /** Inertia (kg·m²) the gear-coupled joints driven by `jointId` add at that joint speed: the sum of I * (ratio chain)^2. */
 function reflectedInertia(input: EngineInput, jointId: string, factor: number): number {
-  return Object.values(input.dynamics.gears)
+  return couplingsOf(input.dynamics)
     .filter((gear) => gear.driver === jointId)
     .reduce((total, gear) => {
       const driven = input.dynamics.joints[gear.driven];

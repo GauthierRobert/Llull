@@ -36,8 +36,10 @@ const isRef = (ref: unknown, branchAllowed: boolean): boolean =>
 const endErrors = (path: string, end: unknown, branchAllowed: boolean): string[] => {
   if (!isRecord(end) || !isVec3(end['point']) || (end['direction'] !== undefined && !isVec3(end['direction'])))
     return [`${path} needs a finite point`];
-  if (end['cap'] !== undefined && (end['cap'] !== true || end['ref'] !== undefined))
-    return [`${path}.cap must be true on an open end (an end with a port ref cannot be capped)`];
+  if (end['cap'] !== undefined && (end['cap'] !== true || end['ref'] !== undefined || end['blind'] !== undefined))
+    return [`${path}.cap must be true on an open end (an end with a port ref or a blind flange cannot be capped)`];
+  if (end['blind'] !== undefined && (end['blind'] !== true || end['ref'] !== undefined))
+    return [`${path}.blind must be true on an open end (an end with a port ref cannot take a blind flange)`];
   return end['ref'] === undefined || isRef(end['ref'], branchAllowed)
     ? []
     : [`${path}.ref must be a ${branchAllowed ? 'tieIn, nozzle, runEnd or branch' : 'tieIn, nozzle or runEnd'} reference`];
@@ -139,10 +141,12 @@ function runSizeErrors(id: string, run: Record<string, unknown>, runs: Record<st
         isPositive(item['centreDistance']) &&
         (item['dn2'] === undefined || isPositive(item['dn2'])) &&
         (item['stemDirection'] === undefined || isVec3(item['stemDirection'])) &&
-        (item['flatDirection'] === undefined || isFlatDirection(item['flatDirection'], item['type']));
+        (item['flatDirection'] === undefined || isFlatDirection(item['flatDirection'], item['type'])) &&
+        (item['lengthMm'] === undefined || (item['type'] === 'instrument' && isPositive(item['lengthMm']))) &&
+        (item['endType'] === undefined || (item['type'] === 'instrument' && (item['endType'] === 'FL' || item['endType'] === 'BW')));
       if (!ok)
         errors.push(
-          `${path}.inline.${index} needs an id, a type, an integer leg and a positive centreDistance (a flatDirection only on a reducerEccentric, non-zero)`,
+          `${path}.inline.${index} needs an id, a type, an integer leg and a positive centreDistance (a flatDirection only on a reducerEccentric, non-zero; lengthMm and endType FL | BW only on an instrument)`,
         );
     });
   const slopes = run['legSlopes'];
@@ -199,8 +203,10 @@ function cappedEndRefErrors(runs: unknown): string[] {
       if (!isRecord(ref) || ref['kind'] !== 'runEnd' || typeof ref['runId'] !== 'string') return [];
       const target = runs[ref['runId']];
       const targetEnd = isRecord(target) ? target[String(ref['end'])] : undefined;
-      return isRecord(targetEnd) && targetEnd['cap'] !== undefined
-        ? [`plant.piping.runs.${id}.${side}.ref continues from the capped end ${ref['runId']}:${String(ref['end'])}`]
+      return isRecord(targetEnd) && (targetEnd['cap'] !== undefined || targetEnd['blind'] !== undefined)
+        ? [
+            `plant.piping.runs.${id}.${side}.ref continues from the ${targetEnd['blind'] === undefined ? 'capped' : 'blind-flanged'} end ${ref['runId']}:${String(ref['end'])}`,
+          ]
         : [];
     }),
   );
