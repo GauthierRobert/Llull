@@ -13,6 +13,7 @@ describe('modal analysis discoverability', () => {
     'resonance',
     'mode shapes',
     'vibration modes',
+    'vibration mode',
   ])('"%s" ranks create_analysis (analysisType modal) in the top 3', (query) => {
     expect(top(query, 3)).toContain('create_analysis');
   });
@@ -34,6 +35,8 @@ describe('modal analysis discoverability', () => {
     ['how heavy is it', 'mass_properties'],
     ['round the edges', 'fillet_edge'],
     ['take a picture', 'render_view'],
+    ['random vibration PSD', 'define_vibration_spectrum'],
+    ['harmonic response', 'sdof_response'],
   ])('control "%s" still ranks %s in the top 3', (query, expected) => {
     expect(top(query, 3)).toContain(expected);
   });

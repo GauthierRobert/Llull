@@ -258,7 +258,7 @@ llull sets up, meshes and solves (CalculiX) and reports numbers; it never approv
 - **Shells.** \`set_part_idealization\` with idealization=shell, thickness=… (default: the wall thickness found), offset=mid|top|bottom; preview the surface with
   \`extract_midsurface\`; mesh with \`set_mesh_controls\` elementFamily=shell_tri or shell_quad.
 - **Natural frequencies (modal analysis).** \`create_analysis\` analysisType=modal with \`modes\` (optionally \`frequencyRangeHz\`) → \`set_part_idealization\` → a material WITH density
-  → \`add_fea_constraint\` for the supports (none = free-free: six rigid-body modes near 0 Hz, flagged by \`check_analysis\`; loads are ignored) → \`set_mesh_controls\` → \`llull fea_mesh\`
+  → \`add_fea_constraint\` for the supports (none = free-free: six rigid-body modes expected near 0 Hz (ccx handling of the -1 Hz bound unverified), flagged by \`check_analysis\`; loads are ignored) → \`set_mesh_controls\` → \`llull fea_mesh\`
   and \`llull fea_solve\` → \`analysis_report\` (data.eigen: frequencyHz, mass participation per mode) → \`fea_result_field\` with \`mode\` for a mode shape (arbitrary amplitude) and
   \`render_fea_results\` to see it; \`check_analysis\` last. Resonance against a forcing band: compare data.eigen frequencies with it yourself; harmonic or random response needs
   analysisType frequency_response / random_response (section 13).
