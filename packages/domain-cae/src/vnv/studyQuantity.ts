@@ -72,7 +72,7 @@ const finite = (value: number | null | undefined, what: string): Reading['value'
   value !== null && value !== undefined && Number.isFinite(value) ? value : unavailable(`${what} has no finite value in the results`);
 
 /**
- * The value and unit of `quantity` in verified results.
+ * The value and unit of `quantity` in verified results. Not a hostile-input reader: it reads typed, hash-verified artifacts, never external text or bytes.
  * @invariant pure; the unit is the analysis unit of the quantity (stress, length, 'Hz', '1' for a buckling factor); a probe is read at the node
  *   the results artifact holds (05 evaluateProbes)
  * @failure unknown probe / load case / mode, ambiguous probe load case, non-finite value -> VNV_QUANTITY_UNAVAILABLE

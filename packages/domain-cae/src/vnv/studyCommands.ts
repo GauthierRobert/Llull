@@ -5,12 +5,19 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/documentUid';
 import { humanGate } from '@core/model/humanGate';
-import { caseOf } from '../shared/access';
+import type { StudyException } from '@core/model/convergenceStudy';
+import { isRecord } from '@lib/isRecord';
+import { analysisOf, caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
-import { analyseStudy, staleReasons, withStudy, withoutStudy } from './studyState';
+import { analyseStudy, staleReasons, withLedgerEntry, withStudy, withoutStudy } from './studyState';
+import { verifyStudy } from './studyVerify';
 import { refuseVnv } from './studyCodes';
 import { ACCEPTABLE_CODES, EXCEPTION_ACT, exceptionDetails, levelHashes } from './studyException';
+
+/** The recorded form of a confirmation (`withoutConfirmations`): exactly { verified: true }. */
+const isRecorded = (confirmation: unknown): boolean =>
+  isRecord(confirmation) && Object.keys(confirmation).length === 1 && confirmation['verified'] === true;
 
 const studyIdSchema = z
   .string()
@@ -48,7 +55,7 @@ export const deleteConvergenceStudy = defineCommand({
 
 /**
  * @affects doc.analysis.cases[analysisId].studies[studyId].exception (code, justification, signer, signatureId, signature, level hashes, document uid)
- * @invariant recorded only with a signature verified (and spent) by `ctx.humanSignature` over sha256 of (act, study, analysis, code, justification, level
+ * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); a replay honours a recorded step only from `analysis.exceptionLedger` (kept by replaySeed); recorded only with a signature verified (and spent) by `ctx.humanSignature` over sha256 of (act, study, analysis, code, justification, level
  *   result hashes, document uid, nonce); re-verified by check_verification, so a changed study or a copied document voids it; never changes the numbers
  * @failure no signing port / no signature / a signature that does not verify -> VNV_HUMAN_GATE (an agent always lands here); unknown analysis / study
  *   -> FEA_ANALYSIS_NOT_FOUND / VNV_STUDY_NOT_FOUND; a document without uid -> FEA_DOCUMENT_UNIDENTIFIED; empty justification -> VNV_PARAM_INVALID;
@@ -67,12 +74,14 @@ export const acceptVerificationException = defineCommand({
     studyId: studyIdSchema,
     code: z.enum(ACCEPTABLE_CODES).describe('The finding accepted (as listed by check_verification).'),
     justification: z.string().describe('Mandatory engineering justification (non-empty).'),
-    signature: z
+    confirmation: z
       .unknown()
       .optional()
-      .describe('Human signature object (with a nonce field) from the signing port. Agents cannot produce one.'),
+      .describe(
+        'Human signature object (with a nonce field) from the signing port. Agents cannot produce one. Never written to the history.',
+      ),
   }),
-  run: (doc, { analysisId, studyId, code, justification, signature }, ctx): CommandResult => {
+  run: (doc, { analysisId, studyId, code, justification, confirmation }, ctx): CommandResult => {
     const fail = (why: string, message: string, ids: readonly string[] = [analysisId, studyId]): CommandResult =>
       refuseVnv(doc, 'accept_verification_exception', why, message, ids);
     const analysisCase = caseOf(doc, analysisId);
@@ -81,8 +90,21 @@ export const acceptVerificationException = defineCommand({
     const study =
       analysisCase.studies !== undefined && Object.hasOwn(analysisCase.studies, studyId) ? analysisCase.studies[studyId] : undefined;
     if (study === undefined) return fail('VNV_STUDY_NOT_FOUND', `no study '${studyId}' in '${analysisId}'`);
+    // a REPLAY of a recorded step (its confirmation is { verified: true }) is honoured only from the ledger of acceptances a human really signed
+    const kept =
+      ctx?.replaying === true && isRecorded(confirmation)
+        ? (analysisOf(doc).exceptionLedger ?? []).find(
+            (entry) =>
+              entry.analysisId === analysisId &&
+              entry.studyId === studyId &&
+              entry.code === code &&
+              entry.justification === justification &&
+              entry.documentUid === documentIdentity(doc) &&
+              entry.levelHashes.join() === levelHashes(study).join(),
+          )
+        : undefined;
     const port = ctx?.humanSignature ?? null;
-    if (port === null || typeof signature !== 'object' || signature === null)
+    if (kept === undefined && (port === null || typeof confirmation !== 'object' || confirmation === null))
       return fail(
         'VNV_HUMAN_GATE',
         'accepting an exception needs a human-held signature: hand the study to the qualified reviewer, do not retry',
@@ -90,8 +112,18 @@ export const acceptVerificationException = defineCommand({
     if (doc.uid === undefined)
       return refuseFe(doc, 'accept_verification_exception', 'FEA_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [analysisId]);
     if (justification.trim() === '') return fail('VNV_PARAM_INVALID', 'an exception needs a justification');
-    const stale = staleReasons(doc, analysisCase, study);
-    if (stale.length > 0) return fail('VNV_STUDY_STALE', `${study.id} is stale (${stale.join('; ')}): an exception cannot cover it`);
+    if (kept === undefined) {
+      const stale = staleReasons(doc, analysisCase, study);
+      if (stale.length > 0) return fail('VNV_STUDY_STALE', `${study.id} is stale (${stale.join('; ')}): an exception cannot cover it`);
+      if (study.verified === false)
+        return fail(
+          'VNV_STUDY_UNVERIFIED',
+          `${study.id} was recorded without its artifacts: an exception cannot cover numbers nobody verified`,
+        );
+      const store = ctx?.feaArtifacts ?? null;
+      const problem = store === null ? null : verifyStudy(doc, analysisCase, study, store, true);
+      if (problem !== null) return fail(problem.code, problem.message, problem.ids);
+    }
     const outcome = analyseStudy(study);
     if (!outcome.ok) return fail(outcome.code, outcome.message);
     if (!outcome.analysis.findings.some((finding) => finding.code === code))
@@ -99,22 +131,24 @@ export const acceptVerificationException = defineCommand({
         'VNV_EXCEPTION_NOT_APPLICABLE',
         `${study.id} shows no ${code} finding to accept (findings: ${outcome.analysis.findings.map((finding) => finding.code).join(', ') || 'none'})`,
       );
-    const gate = humanGate(port, EXCEPTION_ACT, [study.id], signature, exceptionDetails(study, code, justification, documentIdentity(doc)));
+    const gate =
+      kept !== undefined
+        ? ({ cleared: true, signer: kept.signer, signatureId: kept.signatureId } as const)
+        : humanGate(port, EXCEPTION_ACT, [study.id], confirmation, exceptionDetails(study, code, justification, documentIdentity(doc)));
     if (!gate.cleared) return fail('VNV_HUMAN_GATE', gate.reason);
-    const accepted = {
-      ...study,
-      exception: {
-        code,
-        justification,
-        signer: gate.signer,
-        signatureId: gate.signatureId,
-        signature,
-        levelHashes: levelHashes(study),
-        documentUid: documentIdentity(doc),
-      },
+    const exception: StudyException = {
+      code,
+      justification,
+      signer: gate.signer,
+      signatureId: gate.signatureId,
+      signature: kept === undefined ? confirmation : kept.signature,
+      levelHashes: levelHashes(study),
+      documentUid: documentIdentity(doc),
     };
+    const withException = withStudy(doc, analysisCase, { ...study, exception });
+    const accepted = kept !== undefined ? withException : withLedgerEntry(withException, { ...exception, analysisId, studyId });
     return changed(
-      withStudy(doc, analysisCase, accepted),
+      accepted,
       `accept_verification_exception: ${code} of '${study.id}' accepted by ${gate.signer} (signature ${gate.signatureId}); the numbers are unchanged.`,
       [study.id],
     );

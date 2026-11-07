@@ -1,12 +1,12 @@
 /** Derived state of a recorded convergence study: staleness, report, review reasons. Nothing here is stored in the document (L8). */
 
 import type { AnalysisCase, MeshControls } from '@core/model/analysis';
-import type { ConvergenceStudy } from '@core/model/convergenceStudy';
+import type { ConvergenceStudy, StudyExceptionRecord } from '@core/model/convergenceStudy';
 import type { CadDocument } from '@core/model/types';
 import type { ConvergenceSample } from '@lib/convergence';
 import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../decks/elastic';
 import { analysisInputHash } from '../hash/inputHash';
-import { withCase } from '../shared/access';
+import { analysisOf, withCase } from '../shared/access';
 import { analyseSamples, type AnalysisOutcome } from './convergenceAnalysis';
 
 export type CaseStudy = ConvergenceStudy<MeshControls>;
@@ -27,6 +27,12 @@ export function withStudy(doc: CadDocument, analysisCase: AnalysisCase, study: C
     studyOrder: order.includes(study.id) ? order : [...order, study.id],
   });
 }
+
+/** `doc` with an acceptance appended to the ledger replays keep. */
+export const withLedgerEntry = (doc: CadDocument, entry: StudyExceptionRecord): CadDocument => ({
+  ...doc,
+  analysis: { ...analysisOf(doc), exceptionLedger: [...(analysisOf(doc).exceptionLedger ?? []), entry] },
+});
 
 /** `doc` without the study `studyId` (the maps are dropped when it was the last one). */
 export function withoutStudy(doc: CadDocument, analysisCase: AnalysisCase, studyId: string): CadDocument {

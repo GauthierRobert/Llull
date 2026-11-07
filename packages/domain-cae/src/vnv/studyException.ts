@@ -25,17 +25,23 @@ const nonceOf = (signature: unknown): string =>
 
 /**
  * How the exception stored on `study` stands now: `ok` only when its signature verifies (pure, nothing spent) over the study as it is now, for this document.
+ * `signed` is the signer the PORT returns for the stored signature: that name, never the stored text, is what readers show.
  * @invariant 'invalid' also covers a study whose level hashes changed since the acceptance
  */
-export function exceptionVerdict(port: HumanSignaturePort, doc: CadDocument, study: CaseStudy): BoundVerdict | 'absent' {
+export function exceptionVerdict(
+  port: HumanSignaturePort,
+  doc: CadDocument,
+  study: CaseStudy,
+): { readonly verdict: BoundVerdict | 'absent'; readonly signed: { readonly signer: string; readonly signatureId: string } | null } {
   const { exception } = study;
-  if (exception === undefined) return 'absent';
-  return boundVerdict(port, exception.signature, exception.documentUid, documentIdentity(doc), (uid) =>
+  if (exception === undefined) return { verdict: 'absent', signed: null };
+  const { verdict, signed } = boundVerdict(port, exception.signature, exception.documentUid, documentIdentity(doc), (uid) =>
     humanGatePayload(
       EXCEPTION_ACT,
       [study.id],
       exceptionDetails(study, exception.code, exception.justification, uid),
       nonceOf(exception.signature),
     ),
-  ).verdict;
+  );
+  return { verdict, signed };
 }

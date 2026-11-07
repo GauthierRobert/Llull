@@ -103,8 +103,11 @@ export function studyEntry(
   const outcome = analyseStudy(study, gciTarget);
   if (!outcome.ok) return withheld('untrusted', item(outcome.code, 'error', `${study.id}: ${outcome.message}`, [study.id]));
   const { analysis } = outcome;
-  const verdict = signatures === null ? 'absent' : exceptionVerdict(signatures, doc, study);
-  const exception = verdict === 'ok' ? study.exception : undefined;
+  const { verdict, signed } = signatures === null ? { verdict: 'absent' as const, signed: null } : exceptionVerdict(signatures, doc, study);
+  const exception =
+    verdict === 'ok' && signed !== null && study.exception !== undefined
+      ? { code: study.exception.code, justification: study.exception.justification, signer: signed.signer, signatureId: signed.signatureId }
+      : undefined;
   if (study.exception !== undefined && exception === undefined)
     items.push(
       item('VNV_HUMAN_GATE', 'error', `the exception recorded on ${study.id} does not verify now (${verdict}); it is ignored`, [study.id]),

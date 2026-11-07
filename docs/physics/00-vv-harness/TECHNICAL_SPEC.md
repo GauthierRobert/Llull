@@ -447,8 +447,10 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 ## 13. Implementation status (2026-11-07)
 
 **Built: M1 + M2 + M3.** `npm run quality:physics` judges the VC-VNV cases measured by `tests/unit/physics/` and `tests/unit/cae/vnv/`: VC-VNV-01…09, 12,
-13…16, 17 (at the level of fake tools, see below) and 18 pass; VC-VNV-10 and 11 stay `TBD` (skip): they need the real Netgen + CalculiX pipeline, which is not
-installed on the build machine (`server/tests/feaConvergence.test.ts` runs VC-VNV-10 / 13 / 17 on a machine that has it and is skipped otherwise). VC-VNV-19
+13…16 and 18 pass; VC-VNV-10 and 11 stay `TBD` (skip) and VC-VNV-17 is **partial**: they need the real Netgen + CalculiX pipeline, which is not installed on the build
+machine. VC-VNV-17 is judged ONLY from `server/tests/feaConvergence.test.ts` (it appends its measurement when the tools exist; the fake-artifact determinism test in
+`tests/unit/cae/vnv/studies.test.ts` proves the property at unit level but is deliberately not a benchmark measurement). On this machine `quality:physics` therefore
+shows 10, 11 and 17 as skipped. VC-VNV-19
 (two-level study) and VC-VNV-20 (gate exit code) are unit / server tests.
 
 | Item | Where |
@@ -485,13 +487,17 @@ are core. The transport is in `server/` and forwards: it holds no V&V arithmetic
 - **Levels 3 to 6 only** (no two-level study through the commands; `check_convergence` keeps the two-sample path, VC-VNV-19). Refinement is `'h'` only (time step / order: M4).
 - **Fs and the formal order are named values** stored on the study: Fs 1.25 (caller or default), formal order from the textbook table of §5.4 (displacement 2 / 3,
   stress 1 / 2, frequency and buckling factor 2 / 4 for linear / quadratic; reviewer-confirmable, open question 3) unless the caller gives one.
-- **Trust at record time.** With an artifact port: a hash absent from the store is `VNV_ARTIFACT_NOT_FOUND`, any recorded number that differs from the re-derived one is
-  `VNV_SUMMARY_MISMATCH` (VC-VNV-16); a study run for an older set-up is recorded STALE as given (the 05 `record_fea_results` convention, so a replay after a change keeps
-  it). WITHOUT a port (replay where no store is injected) it is kept flagged `verified: false` (state `unverifiable`, no number used). Open point: a replay on a machine
-  whose injected store is empty refuses the step (`VNV_ARTIFACT_NOT_FOUND`) where 05 keeps an unverified summary.
+- **Trust at record time (decision: absent is not disproved).** The artifact store is an evictable cache, so a replay on a machine with a cleared cache is the normal case.
+  With a port: a recorded number that differs from the re-derived one is a refusal (`VNV_SUMMARY_MISMATCH`, VC-VNV-16), and so is a hash absent from the store in a LIVE call
+  (`VNV_ARTIFACT_NOT_FOUND`); but during a REPLAY (`ctx.replaying`) an absent artifact keeps the study flagged `verified: false` with the named warning in the summary
+  (state `unverifiable`, no number used). A study run for an older set-up is recorded STALE as given (the 05 convention). WITHOUT a port it is kept `verified: false`.
+  Known: the shared replay cache key says whether a store is injected, not which one.
 - **New codes** beyond §7.1: `VNV_LEVELS_INVALID`, `VNV_QUANTITY_UNAVAILABLE`, `VNV_CASE_UNSUPPORTED`, `VNV_STUDY_NOT_FOUND`, `VNV_STUDY_UNVERIFIED`,
   `VNV_EXCEPTION_NOT_APPLICABLE`, `VNV_PARAM_INVALID`; `check_verification` study states are `current | stale | unverifiable | untrusted`.
-- **Human gate.** `accept_verification_exception` takes one `code` of `VNV_NOT_ASYMPTOTIC | VNV_OSCILLATORY | VNV_DIVERGENT | VNV_ORDER_MISMATCH` (a GCI above the owner's
+- **Human gate.** The param is `confirmation` (so `withoutConfirmations` strips it: the history and command log hold `{ verified: true }`). The verified acceptance is kept in the study
+  (`exception`, re-verified on read; the signer shown is the one the PORT returns for the stored signature) and in `analysis.exceptionLedger`, which `replaySeed` carries so a
+  recorded step is honoured on replay only when the ledger holds the matching acceptance (same study, code, justification, level hashes, document). It refuses an unverified
+  study (`VNV_STUDY_UNVERIFIED`) and, with a store, re-verifies the study before the gate. `accept_verification_exception` takes one `code` of `VNV_NOT_ASYMPTOTIC | VNV_OSCILLATORY | VNV_DIVERGENT | VNV_ORDER_MISMATCH` (a GCI above the owner's
   target is never accepted away) and a signature over sha256 of (act, study, analysis, code, justification, result hashes of the levels, document uid, nonce), verified
   and spent through `ctx.humanSignature`; `check_verification` re-verifies it (a re-run or a copied document voids it); an agent always gets `VNV_HUMAN_GATE`.
   `VNV_INPUT_UNVERIFIED` can never be accepted away.
@@ -502,5 +508,7 @@ are core. The transport is in `server/` and forwards: it holds no V&V arithmetic
 - **Earlier deviations** (M1 / M2): refusals carry the code in `error { code, ids, paths, remediation }`; `compare_to_expected` verdicts are results with `data.code`;
   harness recipes run in-process without a kernel (a `$alias` needs AF-14 `aliases`: `VNV_HARNESS_UNSUPPORTED`; no pack ships a recipe yet); unit measurements are recorded
   by `tests/unit/physics/benchmarkCases.ts` (`LLULL_PHYSICS_MEASUREMENTS`) instead of a Vitest reporter; a non-finite sample can only come from TypeScript.
+
+`quantityValue` (value of a quantity from artifacts) is not a hostile-input reader despite its former `read*` name: it reads typed, hash-verified artifacts, never external text or bytes.
 
 M4 (V1) not started, including FR-VNV-19 / VC-VNV-22 (least-squares order).

@@ -17,7 +17,7 @@ interface Finding {
   readonly remediation: string;
 }
 
-const FS_THREE = { value: 1.25, source: 'Roache 1994; Celik et al. 2008' };
+export const FS_THREE = { value: 1.25, source: 'Roache 1994; Celik et al. 2008' };
 const FS_TWO = { value: 3, source: "Roache's two-grid recommendation (as reported in arXiv 2103.14559)" };
 const ORDER_TOLERANCE = 0.5;
 const ASYMPTOTIC_BAND: readonly [number, number] = [0.95, 1.05];

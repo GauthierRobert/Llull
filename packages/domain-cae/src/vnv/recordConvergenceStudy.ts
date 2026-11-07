@@ -8,14 +8,12 @@ import type { NamedValue } from '@core/model/topology';
 import { caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
-import { percent } from './convergenceAnalysis';
+import { FS_THREE, percent } from './convergenceAnalysis';
 import { formalOrderDefault, isQuantityProblem, studyQuantityShape, toStudyQuantity } from './studyQuantity';
 import { toStudyLevel, studyLevelShape } from './studySchemas';
 import { analyseStudy, staleReasons, withStudy, type CaseStudy } from './studyState';
 import { refuseVnv } from './studyCodes';
 import { verifyStudy } from './studyVerify';
-
-const FS_THREE = { value: 1.25, source: 'Roache 1994; Celik et al. 2008' };
 
 /** Same text for every refusal: the studies are produced by the transport, never typed. */
 const NOTE =
@@ -27,7 +25,7 @@ const NOTE =
  *   study is current each level's element count, h, value and unit equal the ones re-derived from the artifacts and the measure is the finest mesh volume;
  *   a study of an older set-up is recorded STALE as given; WITHOUT a store (replay on another machine) it is kept flagged `verified: false`;
  *   the report is never taken from params (it is recomputed from the levels on every read); Fs and the formal order are named values
- * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; a hash absent from the store -> VNV_ARTIFACT_NOT_FOUND; any recorded number differing from the
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; a hash absent from the store -> VNV_ARTIFACT_NOT_FOUND (live; during a replay the study is kept `verified: false`); any recorded number differing from the
  *   artifacts -> VNV_SUMMARY_MISMATCH; malformed levels -> VNV_LEVELS_INVALID; spacing ratio < 1.1 -> VNV_RATIO_TOO_SMALL; order iteration not
  *   converged -> VNV_ORDER_NOT_CONVERGED; unreadable quantity -> VNV_QUANTITY_UNAVAILABLE (all refusals, unchanged doc)
  */
@@ -112,16 +110,19 @@ export const recordConvergenceStudy = defineCommand({
     if (!outcome.ok) return fail(outcome.code, outcome.message, [analysisId], [`study.levels`]);
     const stale = staleReasons(doc, analysisCase, draft);
     const problem = port === null ? null : verifyStudy(doc, analysisCase, draft, port, stale.length === 0);
-    if (problem !== null) return fail(problem.code, problem.message, problem.ids, ['study']);
-    const recorded: CaseStudy = { ...draft, id: nextId('cs') };
+    // an absent artifact is not a disproved one: the store is an evictable cache, so a REPLAY keeps the study unverified (named below); a live call refuses
+    const evicted = problem !== null && problem.code === 'VNV_ARTIFACT_NOT_FOUND' && ctx?.replaying === true;
+    if (problem !== null && !evicted) return fail(problem.code, problem.message, problem.ids, ['study']);
+    const recorded: CaseStudy = { ...draft, id: nextId('cs'), ...(evicted ? { verified: false as const } : {}) };
     const { summaryReport: report } = outcome.analysis;
     const head = `record_convergence_study: '${recorded.id}' on '${analysisId}' — ${levels.length} levels, h ${levels.map((level) => level.h.toPrecision(4)).join(' / ')}`;
     const numbers =
       report.status === 'monotone' && report.p !== undefined && report.gci21Fine !== undefined && report.extrapolated !== undefined
         ? `${report.status}, observed order ${report.p.toPrecision(4)}, extrapolated ${report.extrapolated.toPrecision(6)} ${recorded.unit}, estimated discretisation error (GCI, Fs ${safetyFactor.value}) ${percent(report.gci21Fine)}`
         : `${report.status}, no extrapolated value (${outcome.analysis.findings.map((finding) => finding.code).join(', ') || 'none'})`;
-    const state =
-      port === null
+    const state = evicted
+      ? ` Recorded UNVERIFIED (VNV_ARTIFACT_NOT_FOUND on replay: ${problem?.message}): no number is used until run_convergence_study is run on this machine.`
+      : port === null
         ? ' Recorded UNVERIFIED (no artifact store here): no number is used until run_convergence_study is run on this machine.'
         : stale.length > 0
           ? ` Recorded STALE (${stale.join('; ')}): re-run run_convergence_study.`

@@ -34,9 +34,11 @@ const EXEMPT: Readonly<Record<string, string>> = {
   'explicit/record.ts': 'records an explicit-dynamics artifact summary after re-hashing it; no verdict',
   'explicit/trust.ts': 'verifier of explicit-dynamics artifacts (fe_explicit), not fe_results',
   'vnv/checkVerification.ts':
-    'solution-verification readiness (PHY-00): measures the discretisation error of a quantity across mesh levels, i.e. the resolution itself; it issues no stress margin (compute_margins, gated, does)',
+    'solution-verification readiness (PHY-00): measures the discretisation error of a quantity across mesh levels, i.e. the resolution itself; it issues no stress margin (compute_margins, gated, does). VALID ONLY WHILE no margin or release verdict consults it: the day one does, it moves to GATED',
   'vnv/recordConvergenceStudy.ts':
     'records a convergence study after re-deriving every level from its mesh and results artifacts (like record.ts); no engineering verdict',
+  'vnv/studyCommands.ts':
+    'delete_convergence_study and the human gate accept_verification_exception (re-verifies the study through studyVerify before the gate); it records an acceptance, no stress verdict',
   'vnv/studyVerify.ts':
     're-derives the levels of a convergence study from the artifact store for the study commands; a trust check, no stress verdict',
   'thermal/check.ts':

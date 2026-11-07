@@ -1,6 +1,7 @@
 /** Value validation of the convergence studies of a raw analysis case (load path): ids, order, levels, hashes, named values, exception. */
 
 import { isRecord } from '@lib/isRecord';
+import { ACCEPTABLE_CODES } from './studyException';
 
 const HASH = /^[0-9a-f]{64}$/;
 const RESERVED = ['__proto__', 'constructor', 'prototype'];
@@ -55,18 +56,22 @@ function levelProblems(level: unknown, index: number, previousH: number, where: 
   return problems;
 }
 
-function exceptionProblems(exception: unknown, where: string): string[] {
-  if (!isRecord(exception)) return [`${where}.exception is malformed`];
-  const ok =
-    text(exception['code']) &&
-    text(exception['justification']) &&
-    text(exception['signer']) &&
-    text(exception['signatureId']) &&
-    isRecord(exception['signature']) &&
-    Array.isArray(exception['levelHashes']) &&
-    exception['levelHashes'].every((hash) => typeof hash === 'string' && HASH.test(hash)) &&
-    typeof exception['documentUid'] === 'string';
-  return ok ? [] : [`${where}.exception needs code, justification, signer, signatureId, signature, levelHashes and documentUid`];
+/** Errors of one acceptance (on a study, or in the ledger); `levelCount` is the number of levels it covers (undefined: not checked). */
+function exceptionProblems(exception: unknown, at: string, levelCount: number | undefined): string[] {
+  if (!isRecord(exception)) return [`${at} is malformed`];
+  const problems: string[] = [];
+  if (!ACCEPTABLE_CODES.some((code) => code === exception['code']))
+    problems.push(`${at}.code must be one of ${ACCEPTABLE_CODES.join(', ')}`);
+  for (const key of ['justification', 'signer', 'signatureId']) if (!text(exception[key])) problems.push(`${at}.${key} must be text`);
+  const signature = exception['signature'];
+  if (!isRecord(signature) || !text(signature['nonce'])) problems.push(`${at}.signature must be a signature object with a nonce`);
+  const hashes = exception['levelHashes'];
+  if (!Array.isArray(hashes) || !hashes.every((hash) => typeof hash === 'string' && HASH.test(hash)))
+    problems.push(`${at}.levelHashes must be sha256 hex hashes`);
+  else if (levelCount !== undefined && hashes.length !== levelCount)
+    problems.push(`${at}.levelHashes must list one hash per level (${levelCount})`);
+  if (typeof exception['documentUid'] !== 'string') problems.push(`${at}.documentUid must be text`);
+  return problems;
 }
 
 /** Errors of one study record. */
@@ -79,8 +84,7 @@ function studyProblems(study: unknown, id: string, analysisId: string, where: st
   if (study['refinement'] !== 'h') problems.push(`${where}.refinement must be 'h'`);
   if (!(finite(study['ratio']) && study['ratio'] > 1)) problems.push(`${where}.ratio must be > 1`);
   const measure = study['measure'];
-  if (!isRecord(measure) || !positive(measure['value']) || ![1, 2, 3].includes(measure['dimension'] as number))
-    problems.push(`${where}.measure is malformed`);
+  if (!isRecord(measure) || !positive(measure['value']) || measure['dimension'] !== 3) problems.push(`${where}.measure is malformed`);
   problems.push(...namedProblem(study['safetyFactor'], `${where}.safetyFactor`));
   if (study['formalOrder'] !== undefined) problems.push(...namedProblem(study['formalOrder'], `${where}.formalOrder`));
   if (study['verified'] !== undefined && study['verified'] !== false) problems.push(`${where}.verified must be false when present`);
@@ -93,7 +97,8 @@ function studyProblems(study: unknown, id: string, analysisId: string, where: st
       if (isRecord(level) && positive(level['h'])) previousH = level['h'];
     });
   }
-  if (study['exception'] !== undefined) problems.push(...exceptionProblems(study['exception'], where));
+  if (study['exception'] !== undefined)
+    problems.push(...exceptionProblems(study['exception'], `${where}.exception`, Array.isArray(levels) ? levels.length : undefined));
   return problems;
 }
 
@@ -113,4 +118,16 @@ export function studyErrors(analysisCase: Record<string, unknown>, analysisId: s
     problems.push(...studyProblems(study, id, analysisId, `${where}.studies['${id}']`));
   }
   return problems;
+}
+
+/** Errors of `analysis.exceptionLedger` (absent: none): acceptances kept across replay, each naming its analysis and study. */
+export function ledgerErrors(analysis: Record<string, unknown>): string[] {
+  const ledger = analysis['exceptionLedger'];
+  if (ledger === undefined) return [];
+  if (!Array.isArray(ledger)) return ['analysis.exceptionLedger must be a list'];
+  return ledger.flatMap((entry, index) => {
+    const where = `analysis.exceptionLedger[${index}]`;
+    if (!isRecord(entry) || !text(entry['analysisId']) || !text(entry['studyId'])) return [`${where} needs analysisId and studyId`];
+    return exceptionProblems(entry, where, undefined);
+  });
 }

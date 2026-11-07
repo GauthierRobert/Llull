@@ -76,12 +76,10 @@ describe('record_convergence_study (VC-VNV-10 at the level of artifacts, VC-VNV-
     expect(study?.reviewReasons).toEqual(['the quantity feeds a margin of safety']);
   });
 
-  it('is deterministic: the same inputs give the same study (VC-VNV-17 at the level of artifacts)', () => {
+  it('is deterministic: the same inputs give the same study (a unit property only: VC-VNV-17 is judged from the real-pipeline server test)', () => {
     const first = recordedStudy(studyBar());
     const second = recordedStudy(studyBar());
-    const same = JSON.stringify(first.doc.analysis) === JSON.stringify(second.doc.analysis);
-    expectCase(PACK, 'VC-VNV-17', same ? 'identical study JSON' : 'different study JSON');
-    expect(same).toBe(true);
+    expect(JSON.stringify(first.doc.analysis)).toBe(JSON.stringify(second.doc.analysis));
   });
 
   it('refuses a hash absent from the store, an edited value and an edited spacing; accepts the genuine one (VC-VNV-16)', () => {
@@ -203,6 +201,27 @@ describe('record_convergence_study (VC-VNV-10 at the level of artifacts, VC-VNV-
     expect(record({ kind: 'probe', probeId: bar.probeId }).rejected).not.toBe(true);
     expect(record({ kind: 'probe', probeId: bar.probeId, loadCase: 'LC1' }).rejected).not.toBe(true);
     expect(record({ kind: 'probe', probeId: bar.probeId, loadCase: 'LC2' }).error?.code).toBe('VNV_QUANTITY_UNAVAILABLE');
+  });
+
+  it('separates an ABSENT artifact from a DISPROVED one: a replay keeps the study unverified (named), a live call refuses', () => {
+    const bar = studyBar();
+    const levels = bar.study['levels'] as Record<string, unknown>[];
+    const params = (changed: Record<string, unknown>[]): Record<string, unknown> => ({
+      analysisId: bar.analysisId,
+      study: { ...bar.study, levels: changed },
+    });
+    const absent = levels.map((level, index) => (index === 1 ? { ...level, resultsHash: 'a'.repeat(64) } : level));
+    const edited = levels.map((level, index) => (index === 2 ? { ...level, value: 99 } : level));
+    const replaying = { ...bar.ctx, replaying: true as const };
+    expect(execute(bar.doc, 'record_convergence_study', params(absent), bar.ctx).error?.code).toBe('VNV_ARTIFACT_NOT_FOUND');
+    const kept = execute(bar.doc, 'record_convergence_study', params(absent), replaying);
+    expect(kept.rejected).not.toBe(true);
+    expect(kept.summary).toMatch(/UNVERIFIED [(]VNV_ARTIFACT_NOT_FOUND on replay/);
+    expect(Object.values(kept.document.analysis?.cases[bar.analysisId]?.studies ?? {})[0]?.verified).toBe(false);
+    expect(check(bar, kept.document).data.studies[0]?.state).toBe('unverifiable');
+    const disproved = execute(bar.doc, 'record_convergence_study', params(edited), replaying);
+    expect(disproved.error?.code).toBe('VNV_SUMMARY_MISMATCH');
+    expect(disproved.document).toBe(bar.doc);
   });
 
   it('records WITHOUT a store as UNVERIFIED and check_verification then withholds every number', () => {

@@ -107,7 +107,7 @@ describe('plugin document slices under hostile files', () => {
   it('every plugin with a document extension has a seed', () => {
     const missing = pluginsWithSlice.filter((name) => SLICE_SEEDS[name] === undefined);
     expect(missing, `add a seed row in tests/helpers/pluginSliceSeeds.ts for: ${missing.join(', ')}`).toEqual([]);
-    const stale = Object.keys(SLICE_SEEDS).filter((name) => !pluginsWithSlice.includes(name));
+    const stale = Object.keys(SLICE_SEEDS).filter((name) => !pluginsWithSlice.includes(name.split('#')[0] ?? name));
     expect(stale, 'seed rows of plugins that are not installed or have no document extension').toEqual([]);
   });
 

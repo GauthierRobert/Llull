@@ -5,7 +5,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
@@ -105,9 +105,18 @@ describe.skipIf(feaToolsMissing())('run_convergence_study (netgen + ccx)', () =>
     expect(second.code, String(second.json['summary'])).toBe(EXIT_OK);
     const secondStudies = JSON.parse(studiesOf()) as Record<string, unknown>;
     const firstParsed = JSON.parse(firstStudies) as Record<string, unknown>;
-    expect(Object.values(secondStudies).map((study) => JSON.stringify({ ...(study as object), id: 'x' }))).toEqual(
-      Object.values(firstParsed).map((study) => JSON.stringify({ ...(study as object), id: 'x' })),
-    );
+    const strip = (studies: Record<string, unknown>): string[] =>
+      Object.values(studies).map((study) => JSON.stringify({ ...(study as object), id: 'x' }));
+    const identical = JSON.stringify(strip(secondStudies)) === JSON.stringify(strip(firstParsed));
+    expect(identical).toBe(true);
+    // VC-VNV-17 is judged ONLY from this real-pipeline run (quality:physics reads the measurement file); a machine without the tools skips it
+    const target = process.env['LLULL_PHYSICS_MEASUREMENTS'];
+    if (target !== undefined && target !== '')
+      appendFileSync(
+        target,
+        `${JSON.stringify({ pack: '00-vv-harness', caseId: 'VC-VNV-17', measured: { value: identical ? 'identical study JSON' : 'different study JSON', unit: '-' } })}
+`,
+      );
 
     const changed = await cli('scale_entity', `id=${currentDoc().order[0]}`, 'factor=1.5');
     expect(changed.code, String(changed.json['summary'])).toBe(EXIT_OK);

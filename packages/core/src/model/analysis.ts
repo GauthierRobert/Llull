@@ -12,6 +12,7 @@ import type { DurabilityModel } from './durability';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
+import type { CaseStudies } from './convergenceStudy';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -490,7 +491,8 @@ interface FitDisposition extends Pick<Disposition, 'decision' | 'justification' 
 }
 export type FitDispositions = Readonly<Record<string, FitDisposition>>;
 
-export interface AnalysisCase {
+/** Carries the PHY-00 convergence `studies` / `studyOrder` of the case (see convergenceStudy.ts). */
+export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly id: string;
   readonly name: string;
   readonly type: AnalysisType;
@@ -521,9 +523,6 @@ export interface AnalysisCase {
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];
-  /** PHY-00 convergence studies of this case (`record_convergence_study`); absent until the first one. */
-  readonly studies?: Readonly<Record<string, import('./convergenceStudy').ConvergenceStudy<MeshControls>>>;
-  readonly studyOrder?: readonly string[];
   /** PHY-09 dynamic set-up: present iff the case type is frequency_response or random_response. */
   readonly dynamics?: CaseDynamics;
   /** PHY-19 explicit dynamics set-up (plugin `explicit`); absent until `set_explicit_controls`. */
@@ -546,6 +545,7 @@ export interface AnalysisModel {
   readonly durability?: DurabilityModel;
   /** PHY-09 spectrum / time-history library and equivalent-load provenance; absent until the first spectrum or history command. */
   readonly vibration?: DynamicsLibrary;
+  readonly exceptionLedger?: readonly import('./convergenceStudy').StudyExceptionRecord[];
 }
 
 /** Mesh artifact (JSON, no typed arrays); stored by the host under `sha256Hex(canonicalJson(artifact))`. */

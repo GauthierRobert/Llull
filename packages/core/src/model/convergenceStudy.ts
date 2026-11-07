@@ -36,7 +36,7 @@ export interface StudyLevel<C> {
 }
 
 /** A human acceptance of a non-asymptotic or non-monotone study (signed through the signing port). */
-interface StudyException {
+export interface StudyException {
   readonly code: string;
   readonly justification: string;
   readonly signer: string;
@@ -45,6 +45,12 @@ interface StudyException {
   /** Result hashes of the levels the acceptance covers (it ends when a level changes). */
   readonly levelHashes: readonly string[];
   readonly documentUid: string;
+}
+
+/** An acceptance kept in `AnalysisModel.exceptionLedger` across replay (the recorded step carries no signature): the exception plus where it belongs. */
+export interface StudyExceptionRecord extends StudyException {
+  readonly analysisId: string;
+  readonly studyId: string;
 }
 
 export interface ConvergenceStudy<C> {
@@ -65,4 +71,10 @@ export interface ConvergenceStudy<C> {
   /** `false` = recorded WITHOUT its artifacts (replay on a machine lacking the store): the numbers are a claim, never trusted. */
   readonly verified?: false;
   readonly exception?: StudyException;
+}
+
+/** The study fields of an analysis case (`record_convergence_study`); both absent until the first study. */
+export interface CaseStudies<C> {
+  readonly studies?: Readonly<Record<string, ConvergenceStudy<C>>>;
+  readonly studyOrder?: readonly string[];
 }

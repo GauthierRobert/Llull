@@ -23,6 +23,11 @@ const analysisDocument: DocumentExtension = {
   validate: (raw) => [...analysisErrors(raw), ...reliabilityErrors(raw), ...dynamicsErrors(raw)],
   derivedEntityIds: () => new Set<string>(),
   restore: (raw) => raw,
+  // Replay regenerates the cases from their steps: the ledger of human acceptances is kept so a recorded accept_verification_exception re-applies its verified act.
+  replaySeed: (base) => {
+    const exceptionLedger = base.analysis?.exceptionLedger;
+    return exceptionLedger === undefined || exceptionLedger.length === 0 ? {} : { analysis: { cases: {}, caseOrder: [], exceptionLedger } };
+  },
 };
 
 export const caePlugin: CadPlugin = {

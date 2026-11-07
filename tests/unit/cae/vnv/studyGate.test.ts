@@ -8,6 +8,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { humanGatePayload } from '@core/model/humanGate';
 import { EXCEPTION_ACT, exceptionDetails } from '@cae/vnv/studyException';
 import type { CaseStudy } from '@cae/vnv/studyState';
@@ -56,13 +57,22 @@ const accept = (
   id: string,
   ctx: ExecutionContext,
   extra: Record<string, unknown> = {},
-): ReturnType<typeof execute> =>
-  execute(
+): ReturnType<typeof execute> => {
+  const { signature, ...rest } = extra;
+  return execute(
     doc,
     'accept_verification_exception',
-    { analysisId: bar.analysisId, studyId: id, code: 'VNV_NOT_ASYMPTOTIC', justification: JUSTIFICATION, ...extra },
+    {
+      analysisId: bar.analysisId,
+      studyId: id,
+      code: 'VNV_NOT_ASYMPTOTIC',
+      justification: JUSTIFICATION,
+      ...rest,
+      ...(signature === undefined ? {} : { confirmation: signature }),
+    },
     ctx,
   );
+};
 
 describe('accept_verification_exception: the human gate (VC-VNV-14)', () => {
   const bar = lawBar();
@@ -187,6 +197,8 @@ describe('accept_verification_exception: the human gate (VC-VNV-14)', () => {
       doc,
       (document, confirmation, context) => accept(document, bar, studyId, context, { signature: confirmation }),
       'VNV_HUMAN_GATE',
+      'n1',
+      (replayed) => study(replayed, bar, studyId).exception?.signer === 'alice',
     );
   });
 
@@ -203,5 +215,106 @@ describe('accept_verification_exception: the human gate (VC-VNV-14)', () => {
       'VNV_HUMAN_GATE',
     );
     expect(port.spentCount()).toBe(0);
+  });
+});
+
+describe('accept_verification_exception: history, replay and what is shown', () => {
+  const bar = lawBar();
+  const { doc, studyId } = recordedStudy(bar);
+  const port = signingPort();
+  const ctx = humanContext(bar, port);
+  const accepted = accept(doc, bar, studyId, ctx, { signature: signatureFor(doc, bar, studyId, 'VNV_NOT_ASYMPTOTIC') }).document;
+  const checked = (document: CadDocument, context: ExecutionContext = ctx): { items: { code: string; accepted?: { signer: string } }[] } =>
+    execute(document, 'check_verification', { analysisId: bar.analysisId, gciTarget: 0.5 }, context).data as never;
+
+  it('the saved history and command log hold no signature object, only { verified: true }', () => {
+    const step = accepted.featureHistory.find((entry) => entry.name === 'accept_verification_exception');
+    expect(step?.params).toMatchObject({ confirmation: { verified: true } });
+    expect(JSON.stringify(accepted.featureHistory)).not.toContain('payload');
+    expect(JSON.stringify(accepted.featureHistory)).not.toContain('"nonce"');
+    expect(JSON.stringify(deserializeDocument(serializeDocument(accepted)).featureHistory)).not.toContain('nonce');
+  });
+
+  it('replay_history keeps the acceptance: with the store, and with an evicted store (study unverified, acceptance kept)', () => {
+    const replayed = execute(accepted, 'replay_history', {}, ctx).document;
+    expect(study(replayed, bar, studyId).exception).toMatchObject({ signer: SIGNER, code: 'VNV_NOT_ASYMPTOTIC' });
+    expect(checked(replayed).items.find((item) => item.code === 'VNV_NOT_ASYMPTOTIC')?.accepted?.signer).toBe(SIGNER);
+    // no shared replay cache: its key knows whether a store is injected, not which one
+    const evicted: ExecutionContext = { ...ctx, feaArtifacts: { get: () => null }, replayCache: null };
+    const bare = execute(accepted, 'replay_history', {}, evicted).document;
+    expect(study(bare, bar, studyId)).toMatchObject({ verified: false, exception: { signer: SIGNER } });
+    expect(port.spentCount()).toBe(1);
+  });
+
+  it('a replay of a step nobody signed (no ledger entry, other justification) does not invent an acceptance', () => {
+    const forged: CadDocument = {
+      ...accepted,
+      featureHistory: accepted.featureHistory.map((step) =>
+        step.name === 'accept_verification_exception' ? { ...step, params: { ...(step.params as object), justification: 'other' } } : step,
+      ),
+    };
+    expect(study(execute(forged, 'replay_history', {}, ctx).document, bar, studyId).exception).toBeUndefined();
+    const { exceptionLedger, ...analysis } = accepted.analysis ?? { cases: {}, caseOrder: [] };
+    void exceptionLedger;
+    expect(study(execute({ ...accepted, analysis }, 'replay_history', {}, ctx).document, bar, studyId).exception).toBeUndefined();
+  });
+
+  it('refuses an unverified study, and a study whose artifacts the store disproves, before the gate', () => {
+    const unverified = recordedStudy(lawBar()).doc;
+    const flagged: CadDocument = {
+      ...unverified,
+      analysis: {
+        ...unverified.analysis,
+        cases: {
+          ...unverified.analysis?.cases,
+          [bar.analysisId]: {
+            ...(unverified.analysis?.cases[bar.analysisId] as object),
+            studies: Object.fromEntries(
+              Object.entries(unverified.analysis?.cases[bar.analysisId]?.studies ?? {}).map(([id, entry]) => [
+                id,
+                { ...entry, verified: false },
+              ]),
+            ),
+          },
+        } as never,
+        caseOrder: unverified.analysis?.caseOrder ?? [],
+      },
+    };
+    const fresh = lawBar();
+    const id = Object.keys(flagged.analysis?.cases[fresh.analysisId]?.studies ?? {})[0] ?? '';
+    const port2 = signingPort();
+    const refused = accept(flagged, fresh, id, humanContext(fresh, port2), { signature: { nonce: 'n-1', payload: 'x' } });
+    expect(refused.error?.code).toBe('VNV_STUDY_UNVERIFIED');
+    expect(port2.spentCount()).toBe(0);
+    const empty = accept(
+      doc,
+      bar,
+      studyId,
+      { ...ctx, feaArtifacts: { get: () => null } },
+      { signature: signatureFor(doc, bar, studyId, 'VNV_NOT_ASYMPTOTIC', 'n-2') },
+    );
+    expect(empty.error?.code).toBe('VNV_ARTIFACT_NOT_FOUND');
+  });
+
+  it('shows the signer the PORT returns, not the stored name (a hand-edited signer is ignored)', () => {
+    const analysisCase = accepted.analysis?.cases[bar.analysisId];
+    const stored = study(accepted, bar, studyId);
+    if (analysisCase === undefined || stored.exception === undefined) throw new Error('no exception');
+    const edited: CadDocument = {
+      ...accepted,
+      analysis: {
+        ...accepted.analysis,
+        cases: {
+          ...accepted.analysis?.cases,
+          [bar.analysisId]: {
+            ...analysisCase,
+            studies: { [studyId]: { ...stored, exception: { ...stored.exception, signer: 'Somebody Else' } } },
+          },
+        },
+        caseOrder: accepted.analysis?.caseOrder ?? [],
+      },
+    };
+    const found = checked(edited).items.find((item) => item.code === 'VNV_NOT_ASYMPTOTIC');
+    expect(found?.accepted?.signer).toBe(SIGNER);
   });
 });

@@ -306,10 +306,22 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   cae: {
     roots: ['analysis'],
+    build: planOf(plans, 'fea_modal_cantilever'),
+    mutate: { name: 'create_analysis', params: constant({ name: 'fuzz analysis', analysisType: 'static' }) },
+  },
+  // a second seed of the same plugin (`<plugin>#<variant>`): the analysis slice with a verified convergence study (PHY-00 VNV-M3)
+  'cae#studies': {
+    roots: ['analysis'],
     build: () => recordedStudy(studyFixture()).doc,
     ctx: () => studyFixture().ctx,
     query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
-    mutate: { name: 'create_analysis', params: constant({ name: 'fuzz analysis', analysisType: 'static' }) },
+    mutate: {
+      name: 'delete_convergence_study',
+      params: (doc) => ({
+        analysisId: analysisId(doc),
+        studyId: Object.keys(doc.analysis?.cases[analysisId(doc)]?.studies ?? {})[0] ?? 'missing',
+      }),
+    },
   },
   topology: {
     roots: ['analysis'],

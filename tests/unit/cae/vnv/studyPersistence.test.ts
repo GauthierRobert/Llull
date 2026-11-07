@@ -8,12 +8,27 @@ import { recordedStudy, studyBar } from './studyFixtures';
 const bar = studyBar();
 const { doc, studyId } = recordedStudy(bar);
 
+const exception = (over: Record<string, unknown>): Record<string, unknown> => ({
+  code: 'VNV_NOT_ASYMPTOTIC',
+  justification: 'j',
+  signer: 's',
+  signatureId: 'id',
+  signature: { nonce: 'n' },
+  levelHashes: ['a'.repeat(64), 'b'.repeat(64), 'c'.repeat(64)],
+  documentUid: 'u',
+  ...over,
+});
+
 /** The saved document with `edit` applied to its (raw JSON) study, loaded through load_document. */
-function loadEdited(edit: (study: Record<string, unknown>, analysisCase: Record<string, unknown>) => void): ReturnType<typeof execute> {
-  const file = JSON.parse(serializeDocument(doc)) as { document: { analysis: { cases: Record<string, Record<string, unknown>> } } };
+function loadEdited(
+  edit: (study: Record<string, unknown>, analysisCase: Record<string, unknown>, analysis: Record<string, unknown>) => void,
+): ReturnType<typeof execute> {
+  const file = JSON.parse(serializeDocument(doc)) as {
+    document: { analysis: { cases: Record<string, Record<string, unknown>> } & Record<string, unknown> };
+  };
   const analysisCase = file.document.analysis.cases[bar.analysisId] as Record<string, unknown>;
   const studies = analysisCase['studies'] as Record<string, Record<string, unknown>>;
-  edit(studies[studyId] as Record<string, unknown>, analysisCase);
+  edit(studies[studyId] as Record<string, unknown>, analysisCase, file.document.analysis);
   return execute(createEmptyDocument(), 'load_document', { json: JSON.stringify(file) });
 }
 
@@ -29,7 +44,11 @@ describe('studies in a saved document', () => {
   });
 
   it('load_document refuses malformed studies by name', () => {
-    const cases: [string, (study: Record<string, unknown>, analysisCase: Record<string, unknown>) => void, RegExp][] = [
+    const cases: [
+      string,
+      (study: Record<string, unknown>, analysisCase: Record<string, unknown>, analysis: Record<string, unknown>) => void,
+      RegExp,
+    ][] = [
       ['two levels', (study) => (study['levels'] = (study['levels'] as unknown[]).slice(0, 2)), /levels must hold 3 to 6/],
       ['h not increasing', (study) => ((study['levels'] as Record<string, unknown>[])[1]!['h'] = 0), /levels\[1\]\.h/],
       ['level index', (study) => ((study['levels'] as Record<string, unknown>[])[2]!['index'] = 7), /levels\[2\]\.index/],
@@ -47,7 +66,7 @@ describe('studies in a saved document', () => {
       ['safety factor', (study) => (study['safetyFactor'] = { value: -1, source: 's', defaulted: true }), /safetyFactor/],
       ['formal order', (study) => (study['formalOrder'] = { value: 2 }), /formalOrder/],
       ['verified flag', (study) => (study['verified'] = true), /verified must be false/],
-      ['exception', (study) => (study['exception'] = { code: 'VNV_NOT_ASYMPTOTIC' }), /exception needs/],
+      ['exception', (study) => (study['exception'] = { code: 'VNV_NOT_ASYMPTOTIC' }), /exception.justification must be text/],
       ['exception shape', (study) => (study['exception'] = 'accepted'), /exception is malformed/],
       ['order list', (_study, analysisCase) => (analysisCase['studyOrder'] = []), /missing from studyOrder/],
       ['dangling order', (_study, analysisCase) => (analysisCase['studyOrder'] = [studyId, 'cs-9.9']), /listed but missing/],
@@ -57,6 +76,53 @@ describe('studies in a saved document', () => {
         'reserved id',
         (_study, analysisCase) => ((analysisCase['studies'] as Record<string, unknown>)['constructor'] = {}),
         /reserved name/,
+      ],
+      [
+        'element family',
+        (study) => (((study['levels'] as Record<string, unknown>[])[0]!['controls'] as Record<string, unknown>)['elementFamily'] = 'blob'),
+        /elementFamily is unknown/,
+      ],
+      [
+        'bonding',
+        (study) => (((study['levels'] as Record<string, unknown>[])[0]!['controls'] as Record<string, unknown>)['bonding'] = 'glued'),
+        /bonding/,
+      ],
+      [
+        'minSize',
+        (study) => (((study['levels'] as Record<string, unknown>[])[0]!['controls'] as Record<string, unknown>)['minSize'] = -1),
+        /minSize/,
+      ],
+      [
+        'refinements',
+        (study) =>
+          (((study['levels'] as Record<string, unknown>[])[0]!['controls'] as Record<string, unknown>)['refinements'] = [{ size: 0 }]),
+        /refinements[0]|mesh.refinements/,
+      ],
+      ['probe load case', (study) => (study['quantity'] = { kind: 'probe', probeId: 'p', loadCase: 4 }), /needs a probeId/],
+      ['measure dimension', (study) => (study['measure'] = { value: 2, dimension: 2 }), /measure is malformed/],
+      ['exception code', (study) => (study['exception'] = exception({ code: 'VNV_GCI_ABOVE_TARGET' })), /exception.code must be one of/],
+      [
+        'exception signature',
+        (study) => (study['exception'] = exception({ signature: { payload: 'x' } })),
+        /signature must be a signature object with a nonce/,
+      ],
+      [
+        'exception signature type',
+        (study) => (study['exception'] = exception({ signature: 'signed' })),
+        /signature must be a signature object/,
+      ],
+      ['exception hashes', (study) => (study['exception'] = exception({ levelHashes: ['a'.repeat(64)] })), /one hash per level [(]3[)]/],
+      ['exception hash text', (study) => (study['exception'] = exception({ levelHashes: ['x', 'y', 'z'] })), /levelHashes must be sha256/],
+      ['ledger type', (_study, _case, analysis) => (analysis['exceptionLedger'] = 'x'), /exceptionLedger must be a list/],
+      [
+        'ledger entry',
+        (_study, _case, analysis) => (analysis['exceptionLedger'] = [{ ...exception({}), analysisId: 3 }]),
+        /needs analysisId and studyId/,
+      ],
+      [
+        'ledger code',
+        (_study, _case, analysis) => (analysis['exceptionLedger'] = [{ ...exception({ code: 'x' }), analysisId: 'a', studyId: 's' }]),
+        /exceptionLedger.*code must be one of/,
       ],
       ['not a record', (_study, analysisCase) => (analysisCase['studies'] = []), /studyOrder id list/],
     ];
@@ -70,6 +136,11 @@ describe('studies in a saved document', () => {
   it('load_document accepts an unedited study and a flagged-unverified one', () => {
     expect(loadEdited(() => undefined).summary).toMatch(/^Loaded document/);
     expect(loadEdited((study) => (study['verified'] = false)).summary).toMatch(/^Loaded document/);
+    expect(loadEdited((study) => (study['exception'] = exception({}))).summary).toMatch(/^Loaded document/);
+    expect(
+      loadEdited((_study, _case, analysis) => (analysis['exceptionLedger'] = [{ ...exception({}), analysisId: 'a', studyId: 's' }]))
+        .summary,
+    ).toMatch(/^Loaded document/);
   });
 });
 
