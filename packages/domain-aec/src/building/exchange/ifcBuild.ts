@@ -19,6 +19,8 @@ import { exportPipeSupport } from './ifcSupportExport';
 import { type PipingIfc, exportPipingProducts } from './ifcPipingExport';
 import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
 import { plantIfcView, type PlantIfcView } from '../../plant/data/view';
+import { type IfcScope, ifcScopeOf } from './ifcScope';
+import { refuseDat } from '../../plant/data/codes';
 import {
   type ExportProxy,
   type ExportWarning,
@@ -62,6 +64,8 @@ export interface IfcExport {
   /** Equipment exported as IfcBuildingElementProxy (IFC4X3_ADD2) and why. */
   readonly proxies: readonly ExportProxy[];
   readonly warnings: readonly ExportWarning[];
+  /** Id of the hierarchy node the export is limited to (plant.scope), null for the whole document. */
+  readonly scope: string | null;
 }
 
 /** Everything one export run threads through the element exporters. */
@@ -213,9 +217,9 @@ function exportPipe(
   });
 }
 
-function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, options: PlantIfcOptions): IfcExport {
+function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, options: PlantIfcOptions, scope: IfcScope | null): IfcExport {
   const building = getBuilding(doc);
-  const view = plantIfcView(doc);
+  const view = scope?.view ?? plantIfcView(doc);
   const run = newRun(schema, options, view);
   const ports = newPortState();
   const writer = new StepWriter();
@@ -274,6 +278,7 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
     const productOf = new Map<string, string>();
     for (const element of orderedElements(building)) {
       if (!('levelId' in element) || element.levelId !== level.id) continue;
+      if (scope !== null && !scope.hasElement(element.id)) continue;
       const exportedProducts = exportElement(context, doc, element, level, storeyPlacement, plant);
       if (exportedProducts.length > 0) elementCount += 1;
       const first = exportedProducts[0];
@@ -312,7 +317,7 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
     connectRealNozzles(context, doc, ports);
   }
   if (run.x3 && options.systems === 'line') writeSystems(context, run);
-  const piping = exportPipingProducts(context, doc, buildingPlacement, ports);
+  const piping = exportPipingProducts(context, doc, buildingPlacement, ports, scope?.hasRoutedLine);
   if (piping.products.length > 0) {
     writer.add(
       `IFCRELCONTAINEDINSPATIALSTRUCTURE('${context.guid('rel:contains:piping')}',$,$,$,(${piping.products.join(',')}),${buildingRef})`,
@@ -357,6 +362,7 @@ function buildIfc(doc: CadDocument, timestamp: string, schema: IfcSchema, option
     openPorts: ports.portCount - ports.connected.size,
     proxies: run.proxies,
     warnings: run.warnings,
+    scope: scope?.nodeId ?? null,
   };
 }
 
@@ -377,9 +383,9 @@ function plantNote(result: IfcExport): string {
 }
 
 /**
- * @affects none; data = { filename, ifc, entityCount, productCount, elementCount, piping, schema, counts, predefinedTypes, ports, connections, openPorts, proxies, warnings }
+ * @affects none; data = { filename, ifc, entityCount, productCount, elementCount, piping, schema, counts, predefinedTypes, ports, connections, openPorts, proxies, warnings, scope }
  * @invariant IFC4 (default) is unchanged except the Tag of classified equipment and pipes; IFC4X3_ADD2 adds the plant hierarchy, class mapping, pipe decomposition, ports, systems, SI units and property sets
- * @failure no levels and no pipe runs -> no data; export-controlled document without confirmExportControlled -> refused
+ * @failure no levels and no pipe runs -> no data; plant.scope naming no (or an ambiguous) hierarchy node -> DAT_HIERARCHY_UNKNOWN; export-controlled document without confirmExportControlled -> refused
  */
 export const exportIfc = defineCommand({
   name: 'export_ifc',
@@ -393,7 +399,9 @@ export const exportIfc = defineCommand({
     'the pipe products, ports, connections and systems and lists the runs that do not derive (not exported). With schema "IFC4X3_ADD2" the plant data (define_plant_hierarchy, assign_plant_object) is exported too: hierarchy as IfcSite / IfcFacility ' +
     '/ IfcFacilityPartCommon, classified equipment as the IFC class and PredefinedType of its plant class (IfcTank, IfcPump, ... ; unmapped = IfcBuildingElementProxy listed in data.proxies), pipes split into IfcPipeSegment per straight and ' +
     'IfcPipeFitting BEND per vertex with IfcDistributionPort (SINK in, SOURCE out), IfcRelNests and one IfcRelConnectsPorts per connection (RelatingPort = SOURCE), nozzle ports inferred where a line from/to meets its equipment, one ' +
-    'IfcDistributionSystem per process line, SI units (Pa, K, kg, m3/s) and Pset_llullPlant. Tag = plant tag in both schemas. data.counts, predefinedTypes, ports, connections, openPorts, proxies and warnings describe the result.',
+    'IfcDistributionSystem per process line, SI units (Pa, K, kg, m3/s) and Pset_llullPlant. Tag = plant tag in both schemas. data.counts, predefinedTypes, ports, connections, openPorts, proxies and warnings describe the result. ' +
+    'plant.scope limits the file to one hierarchy node: only the building elements and routed lines whose plant object sits at that node or below are written (anything without a plant object is left out), ' +
+    'under the spatial nodes from the root down to it; a port whose partner is outside the scope stays open (data.openPorts); data.scope is the node id. Unknown node: DAT_HIERARCHY_UNKNOWN.',
   params: z.object({
     confirmExportControlled,
     timestamp: z
@@ -418,6 +426,12 @@ export const exportIfc = defineCommand({
           .enum(['line', 'none'])
           .optional()
           .describe('IFC4X3_ADD2: "line" writes one IfcDistributionSystem per process line (default); "none" writes none.'),
+        scope: z
+          .string()
+          .optional()
+          .describe(
+            'Hierarchy node (code, path S1/P1/U10 or id) to limit the export to: its plant objects and everything below it, with the nodes above it as the spatial structure. Elements and routed lines with no plant object are left out. Omit for the whole document.',
+          ),
         hierarchy: z
           .boolean()
           .optional()
@@ -439,18 +453,22 @@ export const exportIfc = defineCommand({
     const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(building.project.date);
     const stamp = timestamp ?? (isoDate ? `${building.project.date}T00:00:00` : '1970-01-01T00:00:00');
     const schema = requested ?? 'IFC4';
-    const result = buildIfc(doc, stamp, schema, {
-      ports: plant?.ports ?? true,
-      systems: plant?.systems ?? 'line',
-      hierarchy: plant?.hierarchy ?? true,
-    });
+    const scoped = plant?.scope === undefined ? null : ifcScopeOf(doc, plant.scope);
+    if (scoped?.ok === false) return refuseDat(doc, 'export_ifc', 'DAT_HIERARCHY_UNKNOWN', scoped.message, [], ['plant.scope']);
+    const result = buildIfc(
+      doc,
+      stamp,
+      schema,
+      { ports: plant?.ports ?? true, systems: plant?.systems ?? 'line', hierarchy: plant?.hierarchy ?? true },
+      scoped?.scope ?? null,
+    );
     const dateNote =
       timestamp === undefined && building.project.date !== '' && !isoDate
         ? ` Project date "${building.project.date}" is not YYYY-MM-DD, so the header uses ${stamp}.`
         : '';
     return report(
       doc,
-      `${schema} ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${pipingNote(result.piping)}${plantNote(result)}${dateNote}`,
+      `${schema} ${result.filename}: ${result.elementCount} building element(s) as ${result.productCount} IFC product(s) on ${building.levelOrder.length} storey(s), ${result.entityCount} STEP entities.${pipingNote(result.piping)}${plantNote(result)}${result.scope === null ? '' : ` Scope: hierarchy node ${result.scope}.`}${dateNote}`,
       result,
     );
   },

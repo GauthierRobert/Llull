@@ -53,15 +53,35 @@ export function deliverableContent(
   const data = getPlantData(doc);
   const hierarchy = scope.hierarchy;
   if (id === IFC_DELIVERABLE) {
-    if (hierarchy !== undefined)
-      return failure('DAT_PARAM_INVALID', 'the ifc deliverable is the whole plant: omit hierarchy', ['hierarchy']);
-    const exported = execute(doc, 'export_ifc', { schema: 'IFC4X3_ADD2', confirmExportControlled }, ctx);
+    const node = hierarchy === undefined ? null : resolveNode(data, hierarchy);
+    if (hierarchy !== undefined && (node === null || node === 'ambiguous'))
+      return failure(
+        'DAT_HIERARCHY_UNKNOWN',
+        scope.fixed
+          ? `the scope "${hierarchy}" of this revision no longer exists in the hierarchy (a regenerate or a hierarchy replace dropped it)`
+          : `no (or an ambiguous) hierarchy node "${hierarchy}"`,
+        ['hierarchy'],
+      );
+    const exported = execute(
+      doc,
+      'export_ifc',
+      { schema: 'IFC4X3_ADD2', confirmExportControlled, ...(node === null ? {} : { plant: { scope: (node as { id: string }).id } }) },
+      ctx,
+    );
     const text = (exported.data as { ifc?: unknown } | undefined)?.ifc;
     if (exported.rejected === true || typeof text !== 'string')
       return failure(exported.error?.code ?? 'DAT_PARAM_INVALID', `the IFC export of the deliverable failed: ${exported.summary}`, [
         'deliverable',
       ]);
-    return { ok: true, content: { sha256: sha256Hex(text) } };
+    const scoped = node === null ? null : objectsInScope(doc, (node as { id: string }).id);
+    return {
+      ok: true,
+      content: {
+        sha256: sha256Hex(text),
+        ...(node === null ? {} : { hierarchyId: (node as { id: string }).id }),
+        ...(scoped?.ok === true ? { objects: new Set(scoped.objects.map((object) => object.id)) } : {}),
+      },
+    };
   }
   const definition = own(data.reports, id);
   const builtin = (REPORT_DELIVERABLES as readonly string[]).includes(id);
