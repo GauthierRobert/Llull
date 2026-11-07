@@ -23,7 +23,7 @@ export const marginDispositionPayloadQuery = defineCommand({
   description:
     'The SHA-256 a human signs to authorize dispose_margin on one FAIL or MARGINAL row of compute_margins: pass the same analysisId / rowId / ' +
     'decision / justification and the same criterion / allowable / groupBy / loadCases / marginalBand you will send to dispose_margin. The signature ' +
-    '(Ed25519 over the UTF-8 hex hash) goes in dispose_margin as signature. Valid only for the current results and this document (bound to its uid). An agent cannot sign. Read-only.',
+    '(Ed25519 over the UTF-8 hex hash) goes in dispose_margin as confirmation. Valid only for the current results and this document (bound to its uid). An agent cannot sign. Read-only.',
   params: z.object({
     analysisId: analysisIdSchema,
     rowId: z.string().describe('Row id of compute_margins, e.g. "r4" (a FAIL or MARGINAL row).'),

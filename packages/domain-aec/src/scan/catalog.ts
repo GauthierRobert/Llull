@@ -12,6 +12,7 @@ import { tracePipeCentreline } from './traceCommand';
 import { acceptAsbuiltExtraction, commitAsbuiltExtraction } from './extractionCommands';
 import { checkAsbuiltClash, cloudToModelDeviation } from './compareCommands';
 import { checkPointClouds } from './checkCommand';
+import { scanAcceptancePayload } from './acceptancePayloadCommand';
 
 export const scanCommands = commandCatalog(
   attachPointCloud,
@@ -36,4 +37,5 @@ export const scanCommands = commandCatalog(
   cloudToModelDeviation,
   checkAsbuiltClash,
   checkPointClouds,
+  scanAcceptancePayload,
 );

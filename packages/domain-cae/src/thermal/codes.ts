@@ -51,7 +51,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'discard the copied disposition; a qualified reviewer of THIS document dispositions the row again (dispose_thermal_limit signs the document uid)',
   THM_DISPOSITION_UNBOUND:
     'the disposition was signed before signatures were bound to their document: the qualified reviewer records it again with dispose_thermal_limit',
-  THM_DISPOSITION_PENDING: 'a qualified reviewer dispositions the row in the desktop app (dispose_thermal_limit with a signature)',
+  THM_DISPOSITION_PENDING:
+    'a qualified reviewer dispositions the row in the desktop app (dispose_thermal_limit with a signature as its confirmation)',
   THM_HUMAN_GATE: 'hand over to the qualified reviewer: the disposition needs a human-held signature (09 PLM)',
   THM_TABLE_POINTS: 'narrow the temperature range or use a smoother property model: the solver table would exceed 500 points',
   FEA_RESULTS_STALE: 'the analysis inputs changed after the solve: run fea_mesh and fea_solve again',

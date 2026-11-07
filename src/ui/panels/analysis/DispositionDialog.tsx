@@ -53,7 +53,7 @@ export function DispositionDialog({ analysisCase, onClose }: Props): React.React
       rowId: row.rowId,
       decision,
       justification,
-      signature: signed.signature,
+      confirmation: signed.signature,
       ...(marginalBand === undefined ? {} : { marginalBand }),
     });
     onClose();

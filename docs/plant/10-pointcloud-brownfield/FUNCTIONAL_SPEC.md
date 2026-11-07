@@ -154,7 +154,7 @@ cloud is never returned whole (AF-12).
 - The snap marker shows "scan point", with the cloud name and point index.
 - The Scan panel lists clouds, registrations (residual table), extractions (fit quality, `unverified` badge) and
   deviation / clash runs. A row click zooms to the region.
-- Human gates: `accept_registration` and `accept_asbuilt_extraction` (reviewer signature, AF-34a). The agent can prepare
+- Human gates: `accept_registration` and `accept_asbuilt_extraction` (reviewer signature as `confirmation` with a signer-chosen nonce, AF-34a; bound to the document uid, single-use, kept across replay by `scan.acceptanceLedger`). The agent can prepare
   them but cannot complete them.
 
 ## 7. Acceptance criteria
