@@ -29,7 +29,7 @@ import { getPiping, runPoints } from './model';
 import { legShifts } from './legShifts';
 import { isSloped, legFall } from './slope';
 import { derivedBranch, layoutBranches, oletPart, teeSlot } from './routeBranch';
-import { capPart, flangeParts, mintSet, setupEnd } from './routeEnds';
+import { blindParts, capPart, flangeParts, mintSet, setupEnd } from './routeEnds';
 import { at, makeEnv, partOf, type Mint, type Slot } from './routeEnv';
 import { layoutInline } from './routeInline';
 import { chooseTurns, turnPartFields } from './routeTurns';
@@ -130,10 +130,12 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
   const mint: Mint = (kind) => `${run.id}/${kind}-${(counters[kind] = (counters[kind] ?? 0) + 1)}`;
   const startIds = start.set === null ? null : mintSet(mint);
   const startCapId = start.cap === undefined ? null : mint('cap');
+  const startBlindId = start.blind === undefined ? null : mint('flange');
   const inlineSlots = layoutInline(env, lengths, dirs, mint);
   if (isFailure(inlineSlots)) return inlineSlots;
   const endIds = end.set === null ? null : mintSet(mint);
   const endCapId = end.cap === undefined ? null : mint('cap');
+  const endBlindId = end.blind === undefined ? null : mint('flange');
   const fits = layoutBranches(env);
   if (isFailure(fits)) return fits;
   const shifts = legShifts(env, inlineSlots, fits, dirs, eps);
@@ -164,6 +166,18 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
       parts: [startIds.flange, start.portId as string],
       position: first,
       gapMm: start.set.gasketThickness,
+      accessories: [startIds.gasket, startIds.bolts],
+    });
+  }
+  const startBlind =
+    startIds === null || startBlindId === null ? null : blindParts(run.id, startIds, startBlindId, start, first, dirs[0] as Vec3, od);
+  if (startBlind !== null && startIds !== null) {
+    parts.push(...startBlind.parts);
+    addJoint({
+      kind: flangedRule?.joint ?? 'flanged',
+      parts: [startIds.flange, startBlindId as string],
+      position: startBlind.mating,
+      gapMm: startBlind.gapMm,
       accessories: [startIds.gasket, startIds.bolts],
     });
   }
@@ -340,6 +354,21 @@ function derive(doc: CadDocument, run: PipeRun, path: readonly string[]): Derive
       gapMm: end.set.gasketThickness,
       accessories: [endIds.gasket, endIds.bolts],
     });
+  }
+  if (endIds !== null && endBlindId !== null) {
+    const endPipe = env.pipeAt(dnEnd);
+    if (isFailure(endPipe)) return endPipe;
+    const blind = blindParts(run.id, endIds, endBlindId, end, last, scale3(dirs[legCount - 1] as Vec3, -1), endPipe.od);
+    if (blind !== null) {
+      parts.push(...blind.parts);
+      addJoint({
+        kind: flangedRule?.joint ?? 'flanged',
+        parts: [endIds.flange, endBlindId],
+        position: blind.mating,
+        gapMm: blind.gapMm,
+        accessories: [endIds.gasket, endIds.bolts],
+      });
+    }
   }
   if (endCapId !== null) {
     const endPipe = env.pipeAt(dnEnd);

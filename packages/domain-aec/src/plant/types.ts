@@ -108,6 +108,8 @@ export interface RunEnd {
   readonly direction?: Vec3;
   /** An open end closed by a cap of the line spec (`set_run_end_cap`): the cap row is read at derivation; never together with `ref`. */
   readonly cap?: true;
+  /** An open end closed by a blind flange of the line spec (`set_run_end_cap` closure blindFlange): flange set + gasket + blind row read at derivation; never with `ref` or `cap`. */
+  readonly blind?: true;
 }
 
 /** How an auto-routed run was found (`auto_route_pipe`): the validated solution's numbers and the engine that produced them. */
@@ -139,6 +141,10 @@ export interface InlineComponent {
   readonly stemDirection?: Vec3;
   /** Eccentric reducers: unit vector from the axis toward the flat side (the side where the outer surfaces of the two pipes line up). */
   readonly flatDirection?: Vec3;
+  /** Instruments: face-to-face length of the body, mm (project data, not a spec row). */
+  readonly lengthMm?: number;
+  /** Instruments: `FL` (flanged: a flange set from the spec on each face) or `BW`; absent = `FL`. */
+  readonly endType?: 'FL' | 'BW';
 }
 
 /** A branch off a header run: the branch run `branchRunId` starts at the point `distance` along leg `leg` of the header centreline. */

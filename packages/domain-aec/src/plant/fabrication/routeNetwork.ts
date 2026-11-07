@@ -81,7 +81,7 @@ function typeOf(part: RoutedPart): PcfComponentType | { readonly skip: string } 
     case 'reducer':
       return part.typeKey === 'reducerEccentric' ? 'REDUCER-ECCENTRIC' : 'REDUCER-CONCENTRIC';
     case 'flange':
-      return 'FLANGE';
+      return part.typeKey === 'flangeBlind' ? 'FLANGE-BLIND' : 'FLANGE';
     case 'gasket':
       return 'GASKET';
     case 'boltSet':
@@ -93,7 +93,7 @@ function typeOf(part: RoutedPart): PcfComponentType | { readonly skip: string } 
     case 'stubIn':
       return { skip: 'a stub-in has no PCF component: the branch pipe is welded to the header' };
     case 'inline':
-      return { skip: 'a generic inline part has no PCF component' };
+      return part.typeKey === 'instrument' ? 'INSTRUMENT' : { skip: 'a generic inline part has no PCF component' };
   }
 }
 

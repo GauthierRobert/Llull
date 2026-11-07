@@ -3,7 +3,7 @@
 import { inverseEulerXYZ } from '../../lib/eulerRotation';
 import { sub3 } from '../../lib/vec3';
 import { type Cage, cageProblem } from '../../geometry/subdivision';
-import { fullSettleLevels } from '../../geometry/subd/settle';
+import { fullSettleLevels, settleBudgetProblem } from '../../geometry/subd/settle';
 import { type FitStop, type SubdFitFailure, type SubdFitResult, WORK_PER_QUERY, fitSubdivision } from '../../geometry/mesh/subdFit';
 import type { MeshData, SubdivisionEntity, Vec3 } from '../../model/types';
 import { changed } from '../noop';
@@ -146,13 +146,15 @@ export const fitSubdivisionToMesh = defineCommand({
     const size = sizeProblem(cage, params.levels ?? entity.levels);
     if (size !== null) return fail(size.code === 'DIR_LEVELS_RANGE' ? 'MESH_PARAM_INVALID' : 'MESH_FIT_TOO_LARGE', size.message, 'levels');
     const settle = fullSettleLevels(cage);
+    const settleBudget = settleBudgetProblem(cage);
+    if (settleBudget !== null) return fail('MESH_FIT_TOO_LARGE', settleBudget, 'levels');
     const floorLevel = Math.max(1, settle);
     let fitLevel = Math.max(params.levels ?? (entity.levels >= 1 ? entity.levels : DEFAULT_LEVELS), floorLevel);
     while (fitLevel > floorLevel && quadsAt(cage, fitLevel) > MAX_FIT_SAMPLES) fitLevel--;
     if (quadsAt(cage, fitLevel) > MAX_FIT_SAMPLES)
       return fail(
         'MESH_FIT_TOO_LARGE',
-        `${cage.faces.length} cage faces need ${quadsAt(cage, fitLevel)} limit samples at level ${fitLevel}${settle > 0 ? ` (its largest edge or vertex sharpness, ${[...(cage.edgeSharpness ?? []), ...(cage.vertexSharpness ?? [])].reduce((m, e) => Math.max(m, e.s), 0)}, needs ${settle} levels to decay; lower the sharpness or use a cage with fewer faces)` : ''} (max ${MAX_FIT_SAMPLES})`,
+        `${cage.faces.length} cage faces need ${quadsAt(cage, fitLevel)} limit samples at level ${fitLevel} (max ${MAX_FIT_SAMPLES})`,
       );
     const loaded = loadSolidMesh(doc, targetId, undefined, contextOf(ctx).meshAssets);
     if (isLoadFailure(loaded)) return meshRejection(doc, 'fit_subdivision_to_mesh', loaded.code, loaded.message, loaded.ids);

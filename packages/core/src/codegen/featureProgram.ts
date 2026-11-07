@@ -6,7 +6,7 @@
 // @invariant display-mesh: a mesh-leaf fallback of the generated program reads the stored triangles of its source entity (chord error at most max(0.1, 1e-3 x bounding-box diagonal) document units); the exact recipe is what the program normally writes
 import { type CadDocument, type Entity, type FeatureStep, type Vec3, is2D, is3D } from '../model/types';
 import { subdivide } from '../geometry/subdivision';
-import { settleLevels } from '../geometry/subd/settle';
+import { settleBudgetProblem, settleLevels } from '../geometry/subd/settle';
 import { isCurve3D, isSheet } from '../model/curveKinds';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/history/replay';
@@ -475,6 +475,17 @@ function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null
 }
 
 /** Curves and surface sheets have no solid to rebuild: say so instead of dropping them silently. */
+/** One note per subdivision solid whose semi-sharp settling was clamped to the quad budget (its leftover sharpness is exported as infinite). */
+function settleClampNotes(doc: CadDocument): string[] {
+  return doc.order.flatMap((id) => {
+    const entity = doc.entities[id];
+    const problem = entity?.kind === 'subdivision' ? settleBudgetProblem(entity) : null;
+    return problem === null
+      ? []
+      : [`subdivision '${id}': DIR_SHARPNESS_BUDGET, ${problem}; exported with the leftover sharpness read as infinite.`];
+  });
+}
+
 function skippedSurfaceNote(doc: CadDocument): string[] {
   const skipped = doc.order.filter((id) => {
     const entity = doc.entities[id];
@@ -509,7 +520,7 @@ function buildProgram(
   const namer = new Namer();
   const { parameters, identifiers } = lowerParameters(doc, namer);
   const ctx: LowerContext = { identifiers, env: buildParamEnv(doc.parameters), kernel, chamferLegs };
-  const notes: string[] = skippedSurfaceNote(doc);
+  const notes: string[] = [...skippedSurfaceNote(doc), ...settleClampNotes(doc)];
   const activeSteps: FeatureStep[] = doc.featureHistory.filter((s) => s.suppressed !== true);
   if (activeSteps.length === 0) return lowerSnapshot(doc, parameters, ctx, namer, notes);
   const features: Feature[] = [];

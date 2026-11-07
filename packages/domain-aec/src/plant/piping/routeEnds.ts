@@ -71,14 +71,55 @@ function capSetup(env: Env, side: 'start' | 'end', dn: number): EndSetup | Deriv
 }
 
 /**
+ * The setup of an open end closed by a blind flange of the spec: the weld-neck / socket / threaded flange the pipe end asks for, its gasket and bolts (a flange set), and
+ * the spec's `flangeBlind` row of the same rating and facing with its `thickness`. The run end point is the outer face of the blind.
+ * @failure no flange set -> its code; no blind row (RTE_SPEC_NO_COMPONENT / PSC_*), no `thickness`, FL-FL rule missing -> RTE_NO_CONNECTION_RULE
+ */
+function blindSetup(env: Env, side: 'start' | 'end', dn: number): EndSetup | DerivationFailure {
+  const { lookup } = env;
+  if (lookup.connection('FL', 'FL') === null)
+    return fail(
+      'RTE_NO_CONNECTION_RULE',
+      `spec ${lookup.id} has no FL-FL connection rule for the blind flange of run ${env.run.id}`,
+      [env.run.id],
+      [side],
+    );
+  const pipe = env.pipeAt(dn);
+  if (isFailure(pipe)) return pipe;
+  const set = resolveFlangeSet(lookup, {}, dn, pipe.row.pipeEnd ?? 'BW');
+  if ('code' in set) return fail(set.code, set.message, [...set.ids, env.run.id], [side], set.detail);
+  const row = lookup.component({
+    types: ['flangeBlind'],
+    dn,
+    ...(set.flange.rating === undefined ? {} : { rating: set.flange.rating }),
+    ...(set.flange.facing === undefined ? {} : { facing: set.flange.facing }),
+  });
+  if (isMiss(row)) return fail(row.miss, row.detail, [...row.ids, env.run.id], [side], { dn });
+  const thickness = row.dims['thickness'];
+  if (thickness === undefined || !(thickness > 0))
+    return fail('RTE_SPEC_NO_COMPONENT', `blind flange row ${row.key} has no thickness dimension (${row.source})`, [row.key], [side]);
+  return { length: thickness + set.length, gap: set.join.gapMm, set, join: set.join, port: null, portId: null, blind: { row, thickness } };
+}
+
+/**
  * The setup of the port at one run end; `dn` is the run size there.
  * @failure port gone / wrong size / moved / turned away, no connection rule, flange set problems -> the RTE_* failure
  */
 export function setupEnd(env: Env, end: RunEnd, side: 'start' | 'end', dn: number): EndSetup | DerivationFailure {
   const { doc, line, lookup, weld } = env;
-  if (end.ref === undefined) return end.cap === true ? capSetup(env, side, dn) : { length: 0, gap: 0, set: null, port: null, portId: null };
-  if (end.cap === true)
-    return fail('RTE_CAP_INVALID', `the ${side} of run ${env.run.id} is connected to a port and also capped`, [env.run.id], [side]);
+  if (end.ref === undefined) {
+    if (end.cap === true && end.blind === true)
+      return fail('RTE_CAP_INVALID', `the ${side} of run ${env.run.id} is both capped and closed by a blind flange`, [env.run.id], [side]);
+    if (end.blind === true) return blindSetup(env, side, dn);
+    return end.cap === true ? capSetup(env, side, dn) : { length: 0, gap: 0, set: null, port: null, portId: null };
+  }
+  if (end.cap === true || end.blind === true)
+    return fail(
+      'RTE_CAP_INVALID',
+      `the ${side} of run ${env.run.id} is connected to a port and also closed by a ${end.cap === true ? 'cap' : 'blind flange'}`,
+      [env.run.id],
+      [side],
+    );
   const port = portOfRef(doc, end.ref);
   const portId = portIdOf(doc, end.ref);
   if (port === null) return fail('RTE_UNKNOWN_PORT', `the ${side} port ${portId} no longer exists`, [portId], [side]);
@@ -184,4 +225,36 @@ export function capPart(runId: string, id: string, setup: EndSetup, face: Vec3, 
   if (setup.cap === undefined || setup.join === undefined) return null;
   const mouth: PartPort = { position: at(face, into, setup.length), direction: into, dn, endType: setup.join.end };
   return partOf(runId, id, 'cap', setup.cap, [mouth], { centre: face, dims: { ...setup.cap.dims, outsideDiameter: pipeOd } });
+}
+
+/**
+ * The parts of a blind flange closing a run end: the blind (outer face at `face`, the run end point, its centre; one port: the mating face; `into` is the unit direction from the face toward the pipe) and
+ * the flange set behind it (gasket against the blind's inner face, bolts, the flange the pipe welds to), in route order away from the closed end.
+ * `mating` is the face the gasket sits on (the joint position).
+ */
+export function blindParts(
+  runId: string,
+  ids: FlangeSetIds,
+  blindId: string,
+  setup: EndSetup,
+  face: Vec3,
+  into: Vec3,
+  pipeOd: number,
+): { parts: RoutedPart[]; mating: Vec3; gapMm: number } | null {
+  if (setup.blind === undefined || setup.set === null) return null;
+  const { row, thickness } = setup.blind;
+  const mating = at(face, into, thickness);
+  const { rating, facing } = setup.set.flange;
+  const faceSpec: FlangeFace = { ...(rating === undefined ? {} : { rating }), ...(facing === undefined ? {} : { facing }) };
+  const fl = (position: Vec3, direction: Vec3): PartPort => ({ position, direction, dn: row.dn, endType: 'FL', ...faceSpec });
+  // One port, the mating face (as a cap's mouth): the outer face is closed, not a connection.
+  const blind = partOf(runId, blindId, 'flange', row, [fl(mating, into)], {
+    centre: face,
+    dims: { ...row.dims, pipeOutsideDiameter: pipeOd },
+  });
+  return {
+    parts: [...flangeParts(runId, ids, setup.set, faceSpec, mating, into, pipeOd, false), blind],
+    mating,
+    gapMm: setup.set.gasketThickness,
+  };
 }
