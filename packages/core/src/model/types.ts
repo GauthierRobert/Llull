@@ -24,6 +24,7 @@ import type { PrototypeModel } from './prototype';
 import type { ReviewModel } from './review';
 import type { DisplayModel } from './display';
 import type { CurveSegment } from './curve';
+import type { RegionHatch } from './regionHatch';
 import type { CompositesModel } from './composites';
 import type { DocumentExtensions } from './documentExtensions';
 import type { DocumentKernelSettings } from './documentKernelSettings';
@@ -79,6 +80,7 @@ export const SHAPE2D_KINDS = [
   'point',
   'ellipse',
   'spline',
+  'region',
   'text',
   'dimension',
   'image',
@@ -341,6 +343,21 @@ export interface SplineEntity extends BaseEntity {
 }
 
 /**
+ * Planar area bounded by closed loops (outline + optional hatch), local to the entity plane. Fill rule is even-odd: `loops[0]` is the
+ * outer boundary, a loop inside it is a hole, a loop inside that hole is an island (filled again), and so on.
+ * @invariant >= 1 loop, each >= 3 points, implicitly closed; loops neither touch, cross nor self-intersect
+ * @invariant `curves`, when present, holds one closed exact chain per loop (same order) and `loops` is its tessellation; a command
+ *   rewriting one rewrites both (same convention as `ExtrusionEntity.curves`)
+ * @see hatch_region
+ */
+export interface RegionEntity extends BaseEntity {
+  readonly kind: 'region';
+  loops: ReadonlyArray<ReadonlyArray<Vec2>>;
+  curves?: ReadonlyArray<ReadonlyArray<CurveSegment<Vec2>>>;
+  hatch?: RegionHatch;
+}
+
+/**
  * Clamped NURBS curve in 3D; poles are local to `position` / `rotation`.
  * @invariant `nurbsViolation(curve) === null`
  * @see create_nurbs_curve, interpolate_curve, create_conic, edit_nurbs
@@ -450,6 +467,7 @@ export type Entity =
   | PointEntity
   | EllipseEntity
   | SplineEntity
+  | RegionEntity
   | NurbsCurveEntity
   | NurbsSurfaceEntity
   | TextEntity

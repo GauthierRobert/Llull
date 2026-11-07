@@ -32,6 +32,7 @@ function entityCategory(e: Entity): EntityCategory {
     case 'rectangle':
     case 'ellipse':
     case 'spline':
+    case 'region':
       return 'curve2d';
     case 'text':
     case 'dimension':
@@ -66,6 +67,8 @@ function entityKeyPoints(e: Entity): Vec3[] {
     case 'polyline':
     case 'spline':
       return evenlySampled(e.points.map(([x, y]) => lift(x, y)));
+    case 'region':
+      return evenlySampled((e.loops[0] ?? []).map(([x, y]) => lift(x, y)));
     case 'arc': {
       // Centre + a radius handle at the mid-sweep angle, so the marker sits ON the curve.
       const mid = (e.startAngle + e.endAngle) / 2;

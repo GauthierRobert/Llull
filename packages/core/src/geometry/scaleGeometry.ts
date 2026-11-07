@@ -1,7 +1,7 @@
 /** Uniform scaling of an entity's kind-specific geometry about its local origin (scale_entity, instance expansion). */
 
 import { withCurve } from '../model/curveEntity';
-import type { Entity, MeshSolidEntity, Vec2, Vec3 } from '../model/types';
+import type { Entity, MeshSolidEntity, RegionEntity, Vec2, Vec3 } from '../model/types';
 import type { SweepSection } from '../model/sweepOrientation';
 import type { CurveSegment } from '../model/curve';
 import { mapSegment } from './curveSegments';
@@ -11,6 +11,13 @@ import { scaledSweepDesign } from './sweepEval/scaleDesign';
 import { scaledDecals } from './decal';
 import { scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
+
+/** `{ curves }` of a region (one chain per loop) scaled by `f` when the entity carries them. */
+function scaledLoopCurves(e: RegionEntity, f: number): { curves?: ReadonlyArray<ReadonlyArray<CurveSegment<Vec2>>> } {
+  return e.curves === undefined
+    ? {}
+    : { curves: e.curves.map((chain) => chain.map((segment) => mapSegment(segment, (p: Vec2) => scale2(p, f)))) };
+}
 
 /** `{ curves }` scaled by `f` when the entity carries exact curves. */
 function scaledCurves(e: { curves?: ReadonlyArray<CurveSegment<Vec2>> }, f: number): { curves?: ReadonlyArray<CurveSegment<Vec2>> } {
@@ -68,6 +75,13 @@ function scaleKindGeometry(e: Entity, f: number): { scaled: Entity; dims: string
     case 'polyline':
     case 'spline':
       return { scaled: { ...e, points: e.points.map((p) => scale2(p, f)) }, dims: `scaled ${e.points.length} points` };
+    case 'region': {
+      const hatch = e.hatch === undefined ? {} : { hatch: { ...e.hatch, spacing: e.hatch.spacing * f } };
+      return {
+        scaled: { ...e, loops: e.loops.map((loop) => loop.map((p) => scale2(p, f))), ...scaledLoopCurves(e, f), ...hatch },
+        dims: `scaled ${e.loops.length} loop(s)`,
+      };
+    }
     case 'arc':
     case 'circle': {
       const center = scale2(e.center, f);

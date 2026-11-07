@@ -37,13 +37,18 @@ export function hatchSegments(
   return segments;
 }
 
-/** Hatch lines across a region's diagonal at most: coarser spacing for very large regions. */
 const MAX_HATCH_LINES_ACROSS = 300;
 
-/**
- * ANSI31 section hatching (45° lines, `spacing` apart, never more than 300 across the region) of the even-odd region bounded by `loops` —
- * the hatch every drawing output shares.
- */
+/** Pattern lines at `angle` (radians) of the even-odd region bounded by `loops`, never more than 300 across it (coarser spacing for very large regions). */
+export function cappedHatch(
+  loops: ReadonlyArray<ReadonlyArray<Point>>,
+  angle: number,
+  spacing: number,
+): Array<[[number, number], [number, number]]> {
+  return hatchSegments(loops, angle, Math.max(spacing, pointsDiagonal(loops.flat()) / MAX_HATCH_LINES_ACROSS));
+}
+
+/** ANSI31 section hatching (45° lines, `spacing` apart) of the even-odd region bounded by `loops` — the hatch every drawing output shares. */
 export function ansi31Hatch(loops: ReadonlyArray<ReadonlyArray<Point>>, spacing: number): Array<[[number, number], [number, number]]> {
-  return hatchSegments(loops, Math.PI / 4, Math.max(spacing, pointsDiagonal(loops.flat()) / MAX_HATCH_LINES_ACROSS));
+  return cappedHatch(loops, Math.PI / 4, spacing);
 }

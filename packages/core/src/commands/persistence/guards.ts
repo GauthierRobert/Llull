@@ -35,10 +35,13 @@ import {
   MAX_IMAGE_DATA_URL_LENGTH,
   MAX_IMPORT_TRIANGLES,
   MAX_STORED_PROFILE_POINTS,
+  MAX_REGION_LOOPS,
+  MAX_REGION_POINTS,
   MAX_REVOLVE_SEGMENTS,
   MAX_SPLINE_CONTROL_POINTS,
 } from '../limits';
 import { POSITIVE_FIELDS } from '../../model/positiveFields';
+import { REGION_HATCH_PATTERNS } from '../../model/regionHatch';
 
 /** First problem of a saved image underlay's raster fields, or null (the payload is not decoded). */
 function imageProblem(v: Record<string, unknown>): string | null {
@@ -158,6 +161,25 @@ function curvesProblem(curves: unknown): string | null {
     return 'curves must be line/arc/bezier/ellipse segments with [x, y] points';
   const issue = chainIssue(curves as CurveSegment<Vec2>[], true);
   return issue === null ? null : `curves must form one closed loop — ${issue}`;
+}
+
+/** A region entity: loops of >= 3 finite points, one closed exact chain per loop when `curves` is stored, a valid hatch. */
+function regionProblem(v: Record<string, unknown>): string | null {
+  const { loops, curves, hatch } = v;
+  if (!Array.isArray(loops) || loops.length < 1 || loops.length > MAX_REGION_LOOPS)
+    return `loops must be 1..${MAX_REGION_LOOPS} point lists`;
+  if (!loops.every((loop) => Array.isArray(loop) && loop.length >= 3 && loop.every(isVec2)))
+    return 'every loop must be >= 3 [x, y] points of finite numbers';
+  if (loops.reduce((sum: number, loop: unknown[]) => sum + loop.length, 0) > MAX_REGION_POINTS)
+    return `loops hold more than ${MAX_REGION_POINTS} points in total`;
+  if (curves !== undefined && !(Array.isArray(curves) && curves.length === loops.length))
+    return 'curves must hold one closed chain per loop';
+  const chainIssue = Array.isArray(curves) ? firstProblem(...curves.map(curvesProblem)) : null;
+  if (chainIssue !== null) return chainIssue;
+  if (hatch === undefined) return null;
+  if (!isRecord(hatch) || !(REGION_HATCH_PATTERNS as readonly unknown[]).includes(hatch['pattern']))
+    return `hatch.pattern must be one of ${REGION_HATCH_PATTERNS.join(', ')}`;
+  return isFiniteNumber(hatch['angle']) && isPositiveNumber(hatch['spacing']) ? null : 'hatch.angle must be finite and hatch.spacing > 0';
 }
 
 function isCurveSegment(s: unknown, dims: number): boolean {
@@ -439,6 +461,7 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   // uncapped: DXF import and offset_2d write polylines of any length (the file size already bounds a document)
   polyline: (v) => firstProblem(pointListProblem(v, 'points', 2, Number.POSITIVE_INFINITY), closedFlagProblem(v)),
   spline: (v) => firstProblem(pointListProblem(v, 'points', 2, MAX_SPLINE_CONTROL_POINTS), closedFlagProblem(v)),
+  region: regionProblem,
   arc: (v) => firstProblem(vec2Problem(v, 'center'), finiteField('startAngle')(v), finiteField('endAngle')(v)),
   circle: (v) => vec2Problem(v, 'center'),
   ellipse: (v) => vec2Problem(v, 'center'),
