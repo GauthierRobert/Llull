@@ -37,6 +37,11 @@ export const withoutSpectrum = (doc: CadDocument, name: string): CadDocument => 
 /** Name rule shared by the commands and the slice schema: a letter first (`__proto__`, `constructor`, `prototype` refused), then letters, digits, `_`, `.`, `-`. */
 export const NAME_PATTERN = /^(?!(?:constructor|prototype)$)[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
 
+/** Bands per spectrum (the third-octave table has 30), faces per exposure (the export budget of TECHNICAL_SPEC §8) and the entity-id shape (`box-2.1`). */
+export const MAX_BANDS = 30;
+const MAX_FACES = 1000;
+const ENTITY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
+
 const nameSchema = z.string().regex(NAME_PATTERN);
 const levelSchema = z.number().min(LEVEL_DB_MIN).max(LEVEL_DB_MAX);
 
@@ -44,7 +49,10 @@ const spectrumSchema = z.strictObject({
   name: nameSchema,
   bandwidth: z.enum(['octave', 'third_octave']),
   reference: z.literal('20uPa'),
-  bands: z.array(z.strictObject({ nominalHz: z.number(), exactMidHz: z.number(), splDb: levelSchema })).min(1),
+  bands: z
+    .array(z.strictObject({ nominalHz: z.number(), exactMidHz: z.number(), splDb: levelSchema }))
+    .min(1)
+    .max(MAX_BANDS),
   source: z.strictObject({ citation: z.string().min(1), grade: z.enum(['A', 'B', 'C']).optional(), url: z.string().optional() }),
   unverified: z.boolean(),
 });
@@ -52,9 +60,15 @@ const spectrumSchema = z.strictObject({
 const exposureSchema = z.strictObject({
   name: nameSchema,
   spectrum: nameSchema,
-  target: z.strictObject({ entityId: z.string(), facesNear: z.array(z.tuple([z.number(), z.number(), z.number()])) }),
+  target: z.strictObject({
+    entityId: z.string().regex(ENTITY_ID_PATTERN),
+    facesNear: z
+      .array(z.tuple([z.number(), z.number(), z.number()]))
+      .min(1)
+      .max(MAX_FACES),
+  }),
   field: z.enum(['diffuse', 'progressive']),
-  incidenceDeg: z.number().optional(),
+  incidenceDeg: z.number().min(0).max(90).optional(),
   notes: z.string().optional(),
 });
 
@@ -78,7 +92,7 @@ const sliceSchema = z
       spectrum.bands.forEach((band, index) => {
         const geometry = bandByNominal(spectrum.bandwidth, band.nominalHz);
         if (geometry === undefined) bad(['spectra', key, 'bands', index, 'nominalHz'], 'is not a nominal label of the band system');
-        else if (geometry.exactMidHz !== band.exactMidHz)
+        else if (Math.abs(geometry.exactMidHz - band.exactMidHz) > 1e-12 * geometry.exactMidHz)
           bad(['spectra', key, 'bands', index, 'exactMidHz'], 'does not match its nominal label');
         if (band.exactMidHz <= previous) bad(['spectra', key, 'bands', index, 'exactMidHz'], 'bands must be sorted and unique');
         previous = band.exactMidHz;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { execute } from '@core/commands/registry';
+import { execute, toToolSchemas } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { AcousticExposure } from '@cae/vibroacoustics/types';
 import { csvRows, expectedNumbers, flatDocument, flatParams, run, THIRD_NOMINAL_27, withinCase } from './fixtures';
@@ -264,6 +264,13 @@ describe('acoustic_level', () => {
       expect(refusal(execute(empty, 'acoustic_level', params))).toBe('VAC_PARAMS_INVALID');
     for (const params of [{ pRmsPa: 0 }, { pRmsPa: -1 }, { splDb: Number.POSITIVE_INFINITY }, { levelsDb: [] }, { levelsDb: [1e9] }])
       expect(execute(empty, 'acoustic_level', params).rejected).toBe(true);
+  });
+
+  it('bounds pRmsPa by the pressure of the largest accepted level, and describes the name rule', () => {
+    expect(execute(empty, 'acoustic_level', { pRmsPa: 2.5e10 }).rejected).toBe(true);
+    expect(execute(empty, 'acoustic_level', { pRmsPa: 1.9e10 }).rejected).not.toBe(true);
+    const description = toToolSchemas().find((tool) => tool.name === 'define_acoustic_spectrum')?.input_schema;
+    expect(JSON.stringify(description)).toContain('[A-Za-z][A-Za-z0-9_.-]{0,63}');
   });
 });
 

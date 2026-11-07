@@ -6,12 +6,14 @@ import type { CommandResult } from '@core/commands/types';
 import { refuseVac, unverifiedItem } from './codes';
 import { bandByNominal, type Bandwidth } from './math/bands';
 import { LEVEL_DB_MAX, LEVEL_DB_MIN } from './math/levels';
-import { NAME_PATTERN, spectrumOf, vibroacousticsOf, withSpectrum, withoutSpectrum } from './model';
+import { MAX_BANDS, NAME_PATTERN, spectrumOf, vibroacousticsOf, withSpectrum, withoutSpectrum } from './model';
 import type { AcousticBand, AcousticSpectrum } from './types';
 
 export const spectrumName = z
   .string()
-  .describe('Spectrum name: a letter first, then letters, digits, "_", "." or "-" (max 64 characters). It is the spectrum key.');
+  .describe(
+    'Spectrum name: a letter first, then letters, digits, "_", "." or "-" (max 64 characters; "constructor" and "prototype" are refused), i.e. /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/. It is the spectrum key.',
+  );
 
 const bandwidthSchema = z
   .enum(['octave', 'third_octave'])
@@ -52,7 +54,7 @@ export const defineAcousticSpectrum = defineCommand({
         }),
       )
       .min(1)
-      .max(30)
+      .max(MAX_BANDS)
       .describe('The bands of the spectrum, any order, at most one per nominal label.'),
     source: z
       .object({

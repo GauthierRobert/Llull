@@ -84,6 +84,40 @@ describe('plugin physics-vibroacoustics (TR-VAC-01, VC-VAC-35)', () => {
     expect(withExposure({ target: { entityId: 'b', facesNear: [[0, 0]] } })[0]).toContain('facesNear');
   });
 
+  it('accepts an exactMidHz that differs by one ulp (relative 1e-12) and refuses a larger drift', () => {
+    const mid =
+      (rawSlice()['spectra'] as Record<string, { bands: { exactMidHz: number }[] }>)['flat130']?.bands[0]?.exactMidHz ?? Number.NaN;
+    const ulp = mid * (1 + Number.EPSILON);
+    expect(ulp).not.toBe(mid);
+    expect(errorsAfter(['spectra.flat130.bands.0.exactMidHz', set(ulp)])).toEqual([]);
+    expect(errorsAfter(['spectra.flat130.bands.0.exactMidHz', set(mid * (1 + 1e-9))])[0]).toContain('does not match its nominal label');
+  });
+
+  it('bounds the slice: bands, incidence angle, face count and entity id shape', () => {
+    const exposure = { name: 'skin', spectrum: 'flat130', target: { entityId: 'box-2.1', facesNear: [[0, 0, 0]] }, field: 'progressive' };
+    const withExposure = (patch: Record<string, unknown>, facesNear?: unknown): string[] =>
+      errorsAfter(
+        [
+          'exposures',
+          set({ skin: { ...exposure, ...patch, ...(facesNear === undefined ? {} : { target: { entityId: 'box-2.1', facesNear } }) } }),
+        ],
+        ['exposureOrder', set(['skin'])],
+      );
+    expect(withExposure({ incidenceDeg: 45 })).toEqual([]);
+    expect(withExposure({ incidenceDeg: 91 })[0]).toContain('incidenceDeg');
+    expect(withExposure({ incidenceDeg: -1 })[0]).toContain('incidenceDeg');
+    expect(withExposure({}, [])[0]).toContain('facesNear');
+    expect(
+      withExposure(
+        {},
+        Array.from({ length: 1001 }, () => [0, 0, 0]),
+      )[0],
+    ).toContain('facesNear');
+    expect(withExposure({ target: { entityId: 'a b', facesNear: [[0, 0, 0]] } })[0]).toContain('entityId');
+    const bands = Array.from({ length: 31 }, (_, i) => ({ nominalHz: 25, exactMidHz: 25.1188643151 + i, splDb: 100 }));
+    expect(errorsAfter(['spectra.flat130.bands', set(bands)]).join('|')).toContain('bands');
+  });
+
   it('validate never throws on hostile shapes', () => {
     for (const bad of [
       null,

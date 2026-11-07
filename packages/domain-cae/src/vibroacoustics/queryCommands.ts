@@ -27,7 +27,7 @@ export const acousticLevel = defineCommand({
     'Example: splDb 140 gives pRmsPa 200. Pure arithmetic: no document data is read or written.',
   params: z.object({
     splDb: levelDb.optional().describe('A sound pressure level, dB re 20 micropascal (-100 to 300).'),
-    pRmsPa: z.number().positive().max(1e12).optional().describe('An rms sound pressure, Pa (> 0).'),
+    pRmsPa: z.number().positive().max(splToPressure(LEVEL_DB_MAX)).optional().describe('An rms sound pressure, Pa (> 0).'),
     levelsDb: z.array(levelDb).min(1).max(10000).optional().describe('Band levels to add by energy, dB re 20 micropascal.'),
   }),
   run: (doc, params): CommandResult => {
