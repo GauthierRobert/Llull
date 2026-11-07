@@ -6,7 +6,8 @@
  * joint), the limit rows (penetration, force). It then writes the friction level of each friction DOF (`dof_frictionloss`, DRV-M0 13.1) as
  *   constant + level of the joint physics + sum over transmissions of the loss level of that transmission (port: `TransmissionCoupling`).
  * Heat: friction does `level · |Δq|` of work per step (the part above the constant, which the report integrates itself); an end stop or a
- * backlash edge does work `Σ f · J Δq` through its rows, of which the spring keeps ½ K x² (`stop` heat = minus the work minus that spring energy).
+ * backlash edge does work `f · Δ(penetration)` through its row (trapezoid of the start and end forces), of which the spring keeps ½ K x²
+ * (`stop` heat = minus the work minus that spring energy).
  */
 
 import type {

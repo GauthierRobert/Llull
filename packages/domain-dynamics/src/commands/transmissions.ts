@@ -29,7 +29,7 @@ const FIELDS: Readonly<Record<Transmission['kind'], readonly string[]>> = {
 const positive = (value: number | undefined): value is number => value !== undefined && Number.isFinite(value) && value > 0;
 const efficient = (value: number | undefined): boolean => value === undefined || (Number.isFinite(value) && value > 0 && value <= 1);
 
-/** The joint a transmission drives, in the chain `driven -> driver`, and whether `start` is reached from it (circular coupling). */
+/** True when `driver` is already driven, directly or through other transmissions, by `driven` (the new coupling would close a circle). */
 function circular(dynamics: DynamicsModel, driver: string, driven: string): boolean {
   const driverOf = new Map(
     Object.values(dynamics.transmissions ?? {}).map((t) => [transmissionJoints(t).driven, transmissionJoints(t).driver]),
