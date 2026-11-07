@@ -7,6 +7,7 @@ import { cageVertexLimits, surfaceEvaluator } from '@core/geometry/subd/limit';
 import { fullSettleLevels, settleBudgetProblem, settleLevels } from '@core/geometry/subd/settle';
 import { sampleLevel } from '@core/geometry/subd/fitOperator';
 import { cageToNurbs } from '@core/geometry/subd/toNurbs';
+import { validateEntityValue } from '@core/commands/persistence/guards';
 import { evaluateSurface } from '@lib/nurbs/surface';
 import { len3, sub3 } from '@lib/vec3';
 
@@ -80,6 +81,7 @@ describe('semi-sharp creases above 3 levels: one surface for every path (SHP1)',
   });
 
   it.each([5, 7])('the evaluator reaches the closed-form edge midpoint at sharpness %d', (sharp) => {
+    // only s = 7 guards the old cap (the evaluator's depth max(4, capped + 2) = 5 was enough for s = 5); s = 5 is the closed-form baseline
     // regular vertex mid-edge at level s (sharpness 0 there, h = 2 / 2^s): (16 P + 4 sum e + sum d) / 36 = P + (h / 6) (1, 0, -1) for P = (-1, 0, 1)
     const sample = surfaceEvaluator(sharpCube(sharp))(0, 0, 0.5);
     const offset = 2 ** -sharp / 3;
@@ -159,4 +161,37 @@ describe('sharpness budget at the commands (SHP1)', () => {
     expect(finding).toMatchObject({ value: 9, limit: 3 });
     expect(settleLevels(entityOf(loaded, id))).toBe(3);
   });
+
+  it('refuses vertexSharpness 9 on a cube in add_subdivision_solid and set_cage_crease', () => {
+    const added = execute(createEmptyDocument(), 'add_subdivision_solid', { box: { size: [2, 2, 2] }, vertexSharpness: [{ v: 0, s: 9 }] });
+    expect(added.error?.code).toBe('DIR_SHARPNESS_BUDGET');
+    expect(added.affected).toEqual([]);
+    const { doc, id } = grid(1);
+    const set = execute(doc, 'set_cage_crease', { id, vertices: [0], sharpness: 9 });
+    expect(set.error?.code).toBe('DIR_SHARPNESS_BUDGET');
+    expect(set.document).toBe(doc);
+  });
+
+  it('a loaded cage over the budget is refused by the load guard, named; and the readers stay bounded and report the clamp', () => {
+    const { doc, id } = grid(10);
+    const hostile = { ...entityOf(doc, id), edgeSharpness: [{ a: 0, b: 1, s: 9 }] };
+    expect(validateEntityValue(hostile)).toContain('DIR_SHARPNESS_BUDGET');
+    const loaded: CadDocument = { ...doc, entities: { ...doc.entities, [id]: hostile } };
+    const started = Date.now();
+    const code = execute(loaded, 'export_code', { language: 'cadquery' });
+    expect(code.summary).toContain('DIR_SHARPNESS_BUDGET');
+    expect(Date.now() - started).toBeLessThan(20_000);
+    const limits = cageVertexLimits(hostile, [0]);
+    expect(limits).toHaveLength(1);
+  }, 60_000);
+
+  it('export_code and subdivision_to_nurbs name the clamp (data.warnings) on a hand-edited cage', () => {
+    const { doc, id } = grid(10);
+    const loaded: CadDocument = {
+      ...doc,
+      entities: { ...doc.entities, [id]: { ...entityOf(doc, id), edgeSharpness: [{ a: 0, b: 1, s: 9 }] } },
+    };
+    const nurbs = execute(loaded, 'subdivision_to_nurbs', { id, output: 'sheets' });
+    expect((nurbs.data as { warnings: string[] }).warnings).toContain('DIR_SHARPNESS_BUDGET');
+  }, 120_000);
 });

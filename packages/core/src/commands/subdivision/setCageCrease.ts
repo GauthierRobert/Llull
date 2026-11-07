@@ -42,7 +42,11 @@ export const setCageCrease = defineCommand({
       .array(vertexRefField)
       .describe('Cage vertices whose corner sharpness is set (they stay point-like for about that many levels).')
       .optional(),
-    sharpness: z.number().describe('Sharpness 0..10: 0 smooth, 1 one level crisp, 10 infinitely sharp.'),
+    sharpness: z
+      .number()
+      .describe(
+        'Sharpness 0..10: 0 smooth, 1 one level crisp, 10 infinitely sharp. Below 10 it needs ceil(sharpness) settling levels: the settled cage may have at most 100000 quads: a cube allows up to 7, a 400-face cage about 4; 10 is always allowed (refused with DIR_SHARPNESS_BUDGET otherwise).',
+      ),
     method: z.enum(['uniform', 'chaikin']).describe('Decay of sharpness per level (entity-wide): uniform (default) or chaikin.').optional(),
   }),
   run: (doc: CadDocument, params): CommandResult => {

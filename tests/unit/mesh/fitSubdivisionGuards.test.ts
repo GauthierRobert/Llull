@@ -222,6 +222,14 @@ describe('fit_subdivision_to_mesh semi-sharp cages', () => {
     expect(result.summary).toMatch(/sharpness 5 needs 5 settling levels.*lower the sharpness to at most [0-9]+, use fewer cage faces/);
   }, 120_000);
 
+  it('refuses a loaded cage over the settle budget by name, before any fitting', () => {
+    const scene = withSharpness(setup(tessellatedBox(2, 6), boxCage([4, 4, 4], [10, 10, 10]), { levels: 1 }), [{ a: 0, b: 1, s: 9 }]);
+    const result = execute(scene.doc, 'fit_subdivision_to_mesh', { cageId: scene.cageId, targetId: scene.targetId, maxDeviation: 0.1 });
+    expectNoOp(result, scene.doc);
+    expect(codeOf(result)).toBe('MESH_FIT_TOO_LARGE');
+    expect(result.summary).toContain('sharpness 9 needs 9 settling levels');
+  });
+
   it('refuses by name when the settle level alone exceeds the sample cap', () => {
     const big = boxCage([20, 20, 20], [18, 18, 18]);
     const { doc, cageId, targetId } = withSharpness(setup(tessellatedBox(10, 4), big, { levels: 1 }), [{ a: 0, b: 1, s: 3 }]);

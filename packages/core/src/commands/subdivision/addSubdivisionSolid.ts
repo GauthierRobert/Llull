@@ -81,6 +81,9 @@ function sharpnessOf(
   return partitionSharpness(entries);
 }
 
+const SETTLE_NOTE =
+  'The cage must stay within the settle budget (DIR_SHARPNESS_BUDGET otherwise): the settled cage may have at most 100000 quads: a cube allows up to 7, a 400-face cage about 4; 10 is always allowed.';
+
 const rangeProblem = (entries: ReadonlyArray<{ s: number }>): string | null => {
   const bad = entries.find(({ s }) => !(s > 0 && s <= SHARP_MAX));
   return bad === undefined ? null : `sharpness ${bad.s} is outside (0, ${SHARP_MAX}]`;
@@ -139,14 +142,19 @@ export const addSubdivisionSolid = defineCommand({
           b: z.number().int().describe('Cage vertex index of the other end.'),
           s: z
             .number()
-            .describe(`Sharpness 0 < s <= ${SHARP_MAX}: the edge stays crisp for about s subdivision levels (${SHARP_MAX} = infinite).`),
+            .describe(
+              `Sharpness 0 < s <= ${SHARP_MAX}: the edge stays crisp for about s subdivision levels (${SHARP_MAX} = infinite). ${SETTLE_NOTE}`,
+            ),
         }),
       )
       .describe('Semi-sharp cage edges (OpenSubdiv creases). Use creases for infinitely sharp ones.')
       .optional(),
     vertexSharpness: z
       .array(
-        z.object({ v: z.number().int().describe('Cage vertex index.'), s: z.number().describe(`Corner sharpness 0 < s <= ${SHARP_MAX}.`) }),
+        z.object({
+          v: z.number().int().describe('Cage vertex index.'),
+          s: z.number().describe(`Corner sharpness 0 < s <= ${SHARP_MAX}. ${SETTLE_NOTE}`),
+        }),
       )
       .describe('Semi-sharp cage corners: the vertex stays a point for about s levels.')
       .optional(),
