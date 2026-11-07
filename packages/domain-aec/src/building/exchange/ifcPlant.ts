@@ -34,7 +34,7 @@ export interface ExportProxy {
 }
 
 export interface ExportWarning {
-  readonly code: 'DAT_IFC_MAPPING_MISSING' | 'EQP_IFC_PART_SKIPPED';
+  readonly code: 'DAT_IFC_MAPPING_MISSING' | 'DAT_IFC_SCOPE_OMITTED' | 'EQP_IFC_PART_SKIPPED';
   readonly id: string;
   readonly message: string;
 }

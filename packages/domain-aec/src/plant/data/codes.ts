@@ -63,6 +63,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DAT_OPEN_PORT:
     'Name the end (from / to = an equipment tag, a nozzle <tag>:<mark> or a BL-... battery limit) or attach the pipe end to a nozzle, tie-in or run.',
   DAT_INFERRED_NOZZLE: 'Model the nozzle on the equipment (03 EQP add_nozzle) so the nozzle schedule and the IFC ports carry real data.',
+  DAT_IFC_SCOPE_OMITTED:
+    'Expected for a scoped export_ifc: classify the omitted elements (assign_plant_object) into the scope node, or export the whole document or a higher node.',
   DAT_LINE_SIZE_MISMATCH: 'Make the line nominalSize equal to the DN of its pipe, or re-size the pipe.',
   DAT_OBJECT_ORPHAN:
     'unassign_plant_object removes it; or model the element again and assign_plant_object it with the same tag (class and fields): the orphan is re-bound to the new element.',

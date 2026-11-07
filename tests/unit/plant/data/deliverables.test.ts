@@ -145,7 +145,7 @@ describe('status machine (agent steps)', () => {
     expect(result.document).toBe(doc);
   });
 
-  it('refuses an unknown deliverable, an unknown hierarchy, a scope on ifc and a scope change', () => {
+  it('refuses an unknown deliverable, an unknown hierarchy and a scope change', () => {
     const doc = pumpDocument();
     expectRefusal(
       doc,
@@ -159,13 +159,6 @@ describe('status machine (agent steps)', () => {
       'set_deliverable_status',
       { at: AT, deliverable: 'mto', revision: 'A', status: 'in_work', hierarchy: 'ZZ' },
       'DAT_HIERARCHY_UNKNOWN',
-    );
-    expectRefusal(
-      doc,
-      'set_deliverable_status',
-      { at: AT, deliverable: 'ifc', revision: 'A', status: 'in_work', hierarchy: 'U10' },
-      'DAT_PARAM_INVALID',
-      'hierarchy',
     );
     const scoped = level(doc, 'tag_register', 'A', 'in_work', { hierarchy: 'S1/P1/U10' });
     expect((scoped.data as { hierarchy: string }).hierarchy).toBe('S1/P1/U10');
