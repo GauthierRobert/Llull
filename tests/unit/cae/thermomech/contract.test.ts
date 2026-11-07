@@ -49,7 +49,7 @@ describe('PHY-04 agent-first contract (VC-TMC)', () => {
     const gate = execute(
       base.doc,
       'dispose_fit_result',
-      { rowKey: 'r', decision: 'accepted', justification: 'j', inputsHash: 'h', signature: 's' },
+      { rowKey: 'r', decision: 'accepted', justification: 'j', inputsHash: 'h', confirmation: { nonce: 's' } },
       defaultContext(),
     );
     const first = (fixture: typeof base, doc = fixture.doc): string =>
@@ -83,7 +83,7 @@ describe('PHY-04 agent-first contract (VC-TMC)', () => {
       decision: 'accepted',
       justification: 'j',
       inputsHash: 'h',
-      signature: 's',
+      confirmation: { nonce: 's' },
     });
     expectCase(PACK, 'VC-TMC-63', {
       'dispose_fit_result(agent).code': result.error?.code ?? null,

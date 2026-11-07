@@ -6,7 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/documentUid';
 import { humanGate } from '@core/model/humanGate';
 import type { StudyException } from '@core/model/convergenceStudy';
-import { isRecord } from '@lib/isRecord';
+import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { analysisOf, caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
@@ -14,10 +14,6 @@ import { analyseStudy, staleReasons, withLedgerEntry, withStudy, withoutStudy } 
 import { verifyStudy } from './studyVerify';
 import { refuseVnv } from './studyCodes';
 import { ACCEPTABLE_CODES, EXCEPTION_ACT, exceptionDetails, levelHashes } from './studyException';
-
-/** The recorded form of a confirmation (`withoutConfirmations`): exactly { verified: true }. */
-const isRecorded = (confirmation: unknown): boolean =>
-  isRecord(confirmation) && Object.keys(confirmation).length === 1 && confirmation['verified'] === true;
 
 const studyIdSchema = z
   .string()
@@ -92,7 +88,7 @@ export const acceptVerificationException = defineCommand({
     if (study === undefined) return fail('VNV_STUDY_NOT_FOUND', `no study '${studyId}' in '${analysisId}'`);
     // a REPLAY of a recorded step (its confirmation is { verified: true }) is honoured only from the ledger of acceptances a human really signed
     const kept =
-      ctx?.replaying === true && isRecorded(confirmation)
+      ctx?.replaying === true && isRecordedConfirmation(confirmation)
         ? (analysisOf(doc).exceptionLedger ?? []).find(
             (entry) =>
               entry.analysisId === analysisId &&
