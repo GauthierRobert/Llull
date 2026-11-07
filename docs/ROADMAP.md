@@ -95,6 +95,7 @@ AI control — there is no in-app AI bridge): the `llull` CLI since LC1 (the MCP
 - [x] Slab openings (stair wells, shafts)
 - [x] Sections / elevations (`export_elevation_sheet`)
 - [x] DXF hatches (R12 LINE / SOLID pattern layers)
+- [x] Hatched regions (`hatch_region`, entity `region`: holes, islands, net area, extrude; `docs/decisions/S3-hatch-region.md`)
 - [x] Curved walls (`add_curved_wall`)
 - [x] Wall build-ups (`set_wall_layers`)
 - [x] Openings in curved walls

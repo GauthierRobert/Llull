@@ -63,6 +63,60 @@ describe('load_document: per-kind entity checks', () => {
     ['arc non-finite angle', { kind: 'arc', center: [0, 0], radius: 1, startAngle: 'a', endAngle: 1 }, 'startAngle'],
     ['circle bad center', { kind: 'circle', center: [0], radius: 1 }, 'center'],
     ['ellipse bad center', { kind: 'ellipse', center: 5, radiusX: 1, radiusY: 1 }, 'center'],
+    ['region missing loops', { kind: 'region' }, 'loops'],
+    ['region no loop', { kind: 'region', loops: [] }, 'loops'],
+    [
+      'region loop of 2 points',
+      {
+        kind: 'region',
+        loops: [
+          [
+            [0, 0],
+            [1, 1],
+          ],
+        ],
+      },
+      'loop',
+    ],
+    [
+      'region non-finite point',
+      {
+        kind: 'region',
+        loops: [
+          [
+            [0, 0],
+            [1, 0],
+            [1, 'x'],
+          ],
+        ],
+      },
+      'loop',
+    ],
+    ['region too many loops', { kind: 'region', loops: Array.from({ length: 300 }, () => SQUARE) }, 'loops'],
+    ['region too many points', { kind: 'region', loops: [Array.from({ length: 5000 }, (_, k) => [k, (k * k) % 7])] }, 'points in total'],
+    ['region curves of another length', { kind: 'region', loops: [SQUARE], curves: [] }, 'curves'],
+    [
+      'region open curve chain',
+      {
+        kind: 'region',
+        loops: [SQUARE],
+        curves: [
+          [
+            {
+              type: 'line',
+              points: [
+                [0, 0],
+                [1, 0],
+              ],
+            },
+          ],
+        ],
+      },
+      'curves',
+    ],
+    ['region unknown pattern', { kind: 'region', loops: [SQUARE], hatch: { pattern: 'dots', angle: 0, spacing: 1 } }, 'hatch.pattern'],
+    ['region hatch spacing 0', { kind: 'region', loops: [SQUARE], hatch: { pattern: 'lines', angle: 0, spacing: 0 } }, 'hatch.spacing'],
+    ['region hatch not an object', { kind: 'region', loops: [SQUARE], hatch: 'lines' }, 'hatch.pattern'],
     ['text numeric content', { kind: 'text', content: 5, height: 1 }, 'content'],
     ['text empty content', { kind: 'text', content: '', height: 1 }, 'content'],
     ['text bad anchor', { kind: 'text', content: 'a', height: 1, anchor: 'top' }, 'anchor'],
@@ -84,10 +138,11 @@ describe('load_document: per-kind entity checks', () => {
       withEntity('txt', { kind: 'text', content: 'hi', height: 2, anchor: 'center' })(raw);
       withEntity('pl', { kind: 'polyline', points: SQUARE, closed: true })(raw);
       withEntity('pt', { kind: 'point' })(raw);
+      withEntity('rg', { kind: 'region', loops: [SQUARE, SQUARE], hatch: { pattern: 'cross', angle: 0.5, spacing: 2 } })(raw);
       withEntity('ms', { kind: 'mesh', mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] } })(raw);
       withEntity('dm', { kind: 'dimension', dimensionKind: 'radial', entityIds: ['rev'] })(raw);
     });
-    expect(Object.keys(deserializeDocument(json).entities)).toContain('rev');
+    expect(Object.keys(deserializeDocument(json).entities)).toEqual(expect.arrayContaining(['rev', 'rg']));
   });
 });
 
