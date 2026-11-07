@@ -149,9 +149,9 @@ export const deleteDynamicsItem = defineCommand({
   name: 'delete_dynamics_item',
   annotations: { destructive: true },
   description:
-    'Remove a rigid body, joint, transmission (add_transmission), joint physics (set_joint_physics, by its joint id), load schedule (add_load_schedule), motor, propeller, cylinder pressure, point spring (add_spring) or motion profile (add_motion_profile) from the physics model by id. Cascades: a body ' +
+    'Remove a rigid body, joint, transmission (add_transmission), joint physics (set_joint_physics, by its joint id), load schedule (add_load_schedule), motor, propeller, cylinder pressure, point spring (add_spring) motion profile (add_motion_profile) or time-series reference (add_reference_data with series) from the physics model by id. Cascades: a body ' +
     'takes its joints and springs with it; a joint takes the transmissions, its joint physics, load schedules, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
-    'A profile that a motor drive or a load schedule still uses is refused (the users are listed): change the drive first. Entities (geometry) are never deleted.',
+    'A time-series reference goes with the joint or motor it measures. A profile that a motor drive or a load schedule still uses is refused (the users are listed): change the drive first. Entities (geometry) are never deleted.',
   params: z.object({
     id: z.string().describe('Id of the body / joint / transmission / load schedule / motor / propeller / cylinder / spring to remove.'),
   }),
@@ -176,11 +176,12 @@ export const deleteDynamicsItem = defineCommand({
       Object.fromEntries(Object.entries(table).filter(([key, value]) => !drop(key, value)));
     const joints = keep(dynamics.joints, (key, joint) => key === id || joint.parent === id || joint.child === id);
     const goneJoint = (joint: string): boolean => joints[joint] === undefined;
+    const motors = keep(dynamics.motors, (key, motor) => key === id || goneJoint(motor.joint));
     const next: DynamicsModel = {
       ...dynamics,
       bodies: keep(dynamics.bodies, (key) => key === id),
       joints,
-      motors: keep(dynamics.motors, (key, motor) => key === id || goneJoint(motor.joint)),
+      motors,
       propellers: keep(dynamics.propellers, (key, propeller) => key === id || goneJoint(propeller.joint)),
       ...(dynamics.cylinders === undefined
         ? {}
@@ -190,6 +191,17 @@ export const deleteDynamicsItem = defineCommand({
         ? {}
         : { springs: keep(dynamics.springs, (key, spring) => key === id || spring.bodyA === id || spring.bodyB === id) }),
       ...(dynamics.profiles === undefined ? {} : { profiles: keep(dynamics.profiles, (key) => key === id) }),
+      ...(dynamics.referenceSeries === undefined
+        ? {}
+        : {
+            referenceSeries: keep(
+              dynamics.referenceSeries,
+              (key, series) =>
+                key === id ||
+                (series.quantity.startsWith('joint_') && goneJoint(series.target)) ||
+                (series.quantity.startsWith('motor_') && motors[series.target] === undefined),
+            ),
+          }),
       ...(dynamics.transmissions === undefined
         ? {}
         : {
@@ -212,7 +224,6 @@ export const deleteDynamicsItem = defineCommand({
             ),
           }),
     };
-    const motors = next.motors;
     const withDrives: DynamicsModel =
       dynamics.drives === undefined ? next : { ...next, drives: keep(dynamics.drives, (key) => motors[key] === undefined) };
     const removed = (
@@ -229,6 +240,7 @@ export const deleteDynamicsItem = defineCommand({
         'springs',
         'profiles',
         'drives',
+        'referenceSeries',
       ] as const
     )
       .map((table) => Object.keys(dynamics[table] ?? {}).length - Object.keys(withDrives[table] ?? {}).length)

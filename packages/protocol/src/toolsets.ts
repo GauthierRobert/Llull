@@ -54,7 +54,7 @@ const REVIEW_CORE_TOOLS = words(
 );
 
 const ANALYSIS_CORE_TOOLS = words(
-  'check_prototype check_assembly check_mechanism check_motion_clearance check_dynamics engine_quick_check compare_to_reference check_timestep_convergence fea_mesh fea_solve fea_export fea_import_field fea_import_results',
+  'check_prototype check_assembly check_mechanism check_motion_clearance check_dynamics engine_quick_check compare_to_reference check_timestep_convergence fea_mesh fea_solve fea_export fea_import_field fea_import_results run_convergence_study',
 );
 
 /** Core part-modelling features (07 FTR §4.1); the sheet-metal plugin adds its commands to the same toolset. */
@@ -100,7 +100,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   ),
   assembly: words(
     'create_component insert_instance add_instance_array explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion motion_study create_contact_set delete_contact_set drive_joint_to create_exploded_view set_active_exploded_view delete_exploded_view animate stop_animation ' +
-      'add_rigid_body add_body_joint add_transmission set_joint_physics add_load_schedule add_spring add_motor add_propeller add_cylinder_pressure set_engine_losses add_reference_data set_gravity add_motion_profile evaluate_motion_profile check_motor_data set_motor_drive delete_dynamics_item set_dynamics_solver inspect_dynamics list_dynamics_loads simulate_motion plot_simulation render_motion render_animation',
+      'add_rigid_body add_body_joint add_transmission set_joint_physics add_load_schedule add_spring add_motor add_propeller add_cylinder_pressure set_engine_losses add_reference_data set_gravity add_motion_profile evaluate_motion_profile check_motor_data set_motor_drive size_drive check_motion_truth fit_drive_parameters delete_dynamics_item set_dynamics_solver inspect_dynamics list_dynamics_loads simulate_motion plot_simulation render_motion render_animation',
   ),
   materials: words(
     'create_material assign_material define_material_record set_material_property get_material get_material_allowable convert_quantity import_material_library delete_material_library resolve_material_libraries diff_material_libraries set_export_marking check_materials register_material_library ' +

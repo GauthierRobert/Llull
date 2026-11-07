@@ -23,6 +23,10 @@ const fake: FeaToolsPort = {
   },
   exportDeck: (id) => Promise.reject(new Error(`no deck for ${id}`)),
   importField: (id) => Promise.resolve(ok(`imported ${id}`)),
+  convergenceStudy: (id, options) => {
+    calls.push(`study ${id} ${JSON.stringify(options)}`);
+    return Promise.resolve(ok(`studied ${id}`));
+  },
   importResults: (id) => Promise.resolve(ok(`results imported ${id}`)),
 };
 const host = { port: null, allowCodeExecution: false, getDoc: createEmptyDocument, applyCommand: (): FeaToolResult => ok('') };
@@ -30,10 +34,18 @@ const host = { port: null, allowCodeExecution: false, getDoc: createEmptyDocumen
 describe('FE tool dispatch', () => {
   it('defines fea_mesh / fea_solve / fea_export / fea_import_results / fea_import_field with a required analysisId', () => {
     const tools = buildFeaToolDefinitions();
-    expect(tools.map((tool) => tool.name)).toEqual(['fea_mesh', 'fea_solve', 'fea_export', 'fea_import_results', 'fea_import_field']);
+    expect(tools.map((tool) => tool.name)).toEqual([
+      'fea_mesh',
+      'fea_solve',
+      'fea_export',
+      'fea_import_results',
+      'fea_import_field',
+      'run_convergence_study',
+    ]);
     for (const tool of tools.slice(0, 3)) expect(tool.inputSchema.required).toEqual(['analysisId']);
     expect(tools[3]?.inputSchema.required).toEqual(['analysisId', 'format']);
     expect(tools[4]?.inputSchema.required).toEqual(['analysisId', 'coordinatesUnit', 'temperatureUnit']);
+    expect(tools[5]?.inputSchema.required).toEqual(['analysisId', 'quantity']);
   });
 
   it('routes calls to the port, passes timeoutS and turns throws into error results', async () => {
@@ -44,6 +56,20 @@ describe('FE tool dispatch', () => {
     const failed = await applyExchangeToolCall('fea_export', { analysisId: 'a' }, deps);
     expect(failed).toMatchObject({ isError: true });
     expect(failed?.content[0]?.text).toContain('no deck for a');
+  });
+
+  it('routes run_convergence_study with its parsed options and refuses a malformed quantity or number', async () => {
+    const deps = { ...host, fea: fake };
+    calls.length = 0;
+    const quantity = { kind: 'probe', probeId: 'p-1' };
+    await applyExchangeToolCall('run_convergence_study', { analysisId: 'a', quantity, levels: 4, ratio: 1.5, timeoutS: 30 }, deps);
+    expect(calls).toEqual([`study a ${JSON.stringify({ quantity, levels: 4, ratio: 1.5, timeoutS: 30 })}`]);
+    const noQuantity = await applyExchangeToolCall('run_convergence_study', { analysisId: 'a' }, deps);
+    expect(noQuantity?.isError).toBe(true);
+    expect(noQuantity?.content[0]?.text).toContain('quantity is required');
+    const badNumber = await applyExchangeToolCall('run_convergence_study', { analysisId: 'a', quantity, levels: 'three' }, deps);
+    expect(badNumber?.content[0]?.text).toContain('levels must be a finite number');
+    expect(calls).toHaveLength(1);
   });
 
   it('refuses a missing analysisId or port and ignores other tools', async () => {

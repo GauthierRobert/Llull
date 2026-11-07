@@ -7,6 +7,7 @@
  *   fea_export  the solver deck or a VTU of the mesh (+ results): CalculiX .inp (default), Nastran .bdf or .vtu; text + sha256, nothing run
  *   fea_import_results  an external CalculiX .frd or Nastran .op2 of the current mesh -> results artifact -> record_fea_results
  *   fea_import_field  a CSV `x,y,z,T` -> table artifact -> set_temperature_field (PHY-04 TR-TMC-14)
+ *   run_convergence_study  fea_mesh + fea_solve of one analysis at 3 to 6 mesh sizes -> record_convergence_study (PHY-00 VNV-M3)
  */
 import { base64ToUint8Array } from '@lib/base64';
 import { errorMessage } from '@lib/errorMessage';
@@ -46,6 +47,17 @@ export interface ResultsFileInput {
   readonly bytes: Uint8Array;
 }
 
+/** Parameters of `run_convergence_study`: the flat quantity object is validated by the host (@cae `planStudy`). */
+export interface ConvergenceStudyOptions {
+  readonly quantity: Readonly<Record<string, unknown>>;
+  readonly levels?: number;
+  readonly ratio?: number;
+  readonly finest?: number;
+  readonly formalOrder?: number;
+  readonly safetyFactor?: number;
+  readonly timeoutS?: number;
+}
+
 /** Port to the FE transports (implemented in `server/`). Failures are results (`isError`, summary starts `<tool> <CODE>`), not throws. */
 export interface FeaToolsPort {
   mesh(analysisId: string, host: FeaHost): Promise<FeaToolResult>;
@@ -57,6 +69,7 @@ export interface FeaToolsPort {
   ): Promise<FeaToolResult>;
   importResults(analysisId: string, file: ResultsFileInput, host: FeaHost): Promise<FeaToolResult>;
   importField(analysisId: string, table: FieldTableInput, host: FeaHost): Promise<FeaToolResult>;
+  convergenceStudy(analysisId: string, options: ConvergenceStudyOptions, host: FeaHost): Promise<FeaToolResult>;
 }
 
 /** Bounds of the solver wall-clock limit (seconds): schema `minimum` / `maximum`, enforced again by the transport. */
@@ -64,7 +77,7 @@ export const FEA_SOLVE_TIMEOUT_S = { min: 1, max: 86400 } as const;
 
 const ANALYSIS_ID = { type: 'string' as const, description: 'Id of the analysis case (create_analysis).' };
 
-const FEA_TOOL_NAMES = ['fea_mesh', 'fea_solve', 'fea_export', 'fea_import_field', 'fea_import_results'] as const;
+const FEA_TOOL_NAMES = ['fea_mesh', 'fea_solve', 'fea_export', 'fea_import_field', 'fea_import_results', 'run_convergence_study'] as const;
 
 export function buildFeaToolDefinitions(): ToolDefinition[] {
   return [
@@ -83,6 +96,7 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
       description:
         'Solve a meshed analysis with CalculiX (ccx): writes the input deck from the document, runs the solver, reads the results into ' +
         'a content-addressed artifact and records their summary with record_fea_results (then use analysis_report / check_analysis). ' +
+        'A modal analysis returns the natural frequencies (eigenfrequencies, Hz) and mode shapes: read them with analysis_report (eigen) and fea_result_field (mode). ' +
         'Refuses a missing or stale mesh (run fea_mesh). Needs ccx on the server (LLULL_CCX).',
       inputSchema: {
         type: 'object',
@@ -164,6 +178,51 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
       },
       annotations: { idempotentHint: true },
     },
+    {
+      name: 'run_convergence_study',
+      description:
+        'Mesh-convergence (solution verification) study of ONE result of a finite-element analysis: re-meshes and re-solves the analysis at 3 to 6 ' +
+        'mesh sizes (finest globalSize x ratio^k; the analysis own mesh controls are NOT changed), reads the quantity at every level, and records the ' +
+        'study with record_convergence_study (which re-derives every number from the stored artifacts). Then run check_verification: observed order, ' +
+        'Richardson value and the Grid Convergence Index (a fraction: 0.01 = 1 %). The quantity is { kind: probe, probeId, loadCase? } | { kind: field_max, ' +
+        'field: von_mises | u_mag, loadCase } | { kind: frequency, mode } | { kind: buckling_factor, mode }; prefer a probe away from singular spots ' +
+        '(point loads, sharp corners): a maximum there does not converge. Solid (tetrahedral) analyses; every level costs a mesh and a solve. A level ' +
+        'that fails to mesh or solve stops the study (VNV_LEVEL_FAILED with the 05 code); a level above 2 million elements is VNV_LEVEL_TOO_LARGE. ' +
+        'Needs the llull-mesh sidecar (Netgen) and ccx on the server.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          analysisId: ANALYSIS_ID,
+          quantity: {
+            type: 'object',
+            description:
+              'The result to follow: kind probe | field_max | frequency | buckling_factor, with probeId / loadCase / field / mode as the kind needs.',
+          },
+          levels: { type: 'integer', minimum: 3, maximum: 6, description: 'Number of mesh levels, 3 to 6 (default 3).' },
+          ratio: {
+            type: 'number',
+            description: 'Size ratio between consecutive levels, > 1.1, recommended >= 1.3 (default 2, an llull choice).',
+          },
+          finest: {
+            type: 'number',
+            description: 'globalSize of the finest level in document units (default: the analysis own globalSize).',
+          },
+          formalOrder: {
+            type: 'number',
+            description: 'Formal order of the method for the quantity (default: the textbook table of the element order, named).',
+          },
+          safetyFactor: { type: 'number', description: 'GCI safety factor Fs (default 1.25, named).' },
+          timeoutS: {
+            type: 'number',
+            minimum: FEA_SOLVE_TIMEOUT_S.min,
+            maximum: FEA_SOLVE_TIMEOUT_S.max,
+            description: `Solver wall-clock limit per level in seconds (default 600); values outside ${FEA_SOLVE_TIMEOUT_S.min} to ${FEA_SOLVE_TIMEOUT_S.max} are clamped.`,
+          },
+        },
+        required: ['analysisId', 'quantity'],
+      },
+      annotations: { idempotentHint: true },
+    },
   ];
 }
 
@@ -181,6 +240,20 @@ function exportOptions(args: Record<string, unknown>): { format?: FeaExportForma
   const format = (FEA_EXPORT_FORMATS as readonly string[]).find((candidate) => candidate === args['format']);
   const encoding = args['encoding'] === 'base64' ? 'base64' : args['encoding'] === 'ascii' ? 'ascii' : undefined;
   return { ...(format !== undefined ? { format: format as FeaExportFormat } : {}), ...(encoding !== undefined ? { encoding } : {}) };
+}
+
+/** Options of a run_convergence_study call; a string is the problem. Numbers are passed as given (the host validates their ranges). */
+function studyOptions(args: Record<string, unknown>, timeoutS: number | undefined): ConvergenceStudyOptions | string {
+  const { quantity } = args;
+  if (!isRecord(quantity)) return 'quantity is required: { kind: probe | field_max | frequency | buckling_factor, ... }';
+  const numbers: Record<string, number> = {};
+  for (const key of ['levels', 'ratio', 'finest', 'formalOrder', 'safetyFactor']) {
+    const value = args[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value)) return `${key} must be a finite number`;
+    numbers[key] = value;
+  }
+  return { quantity, ...numbers, ...(timeoutS === undefined ? {} : { timeoutS }) };
 }
 
 /** The CSV of a fea_import_field call: inline `csv`, else the exchange-directory file `path`. */
@@ -248,6 +321,12 @@ export async function applyFeaToolCall(toolName: string, rawArgs: unknown, deps:
       return typeof table === 'string'
         ? failure(`${toolName}: ${table}.`)
         : shapeToolCallContent(await deps.fea.importField(analysisId, table, deps));
+    }
+    if (toolName === 'run_convergence_study') {
+      const options = studyOptions(args, timeoutS);
+      return typeof options === 'string'
+        ? failure(`${toolName}: ${options}.`)
+        : shapeToolCallContent(await deps.fea.convergenceStudy(analysisId, options, deps));
     }
     const result =
       toolName === 'fea_mesh'

@@ -91,7 +91,7 @@ export function loopDriftItem(run: SimulationRun): ReviewItem[] {
 /** DRV_EFFORT_UNBOUNDED for sourced speed motors whose bound is more than 10x the peak effort the run used (the unsourced ones are static items). */
 export function usedEffortItems(motors: readonly Motor[], run: SimulationRun): ReviewItem[] {
   return motors.flatMap((motor): ReviewItem[] => {
-    if (motor.kind !== 'speed' || motor.source === undefined) return [];
+    if ((motor.kind !== 'speed' && motor.kind !== 'linear_speed') || motor.source === undefined) return [];
     const peak = (run.series?.motorTorque[motor.id] ?? []).reduce((largest, value) => Math.max(largest, Math.abs(value)), 0);
     const why = unboundedEffort(motor, peak);
     return why === null

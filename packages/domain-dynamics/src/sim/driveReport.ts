@@ -18,7 +18,10 @@ const rms = (values: readonly number[]): number =>
 const TRACKING_FRACTION = 0.01;
 const TRACKING_FLOOR_RAD = (0.5 * Math.PI) / 180;
 
-interface DriveRunData {
+/** Largest tracking error that still reads as following the profile: 1 % of the move, 0.5 deg when the reference does not move. */
+export const trackingLimit = (tracking: Tracking): number => (tracking.range > 0 ? TRACKING_FRACTION * tracking.range : TRACKING_FLOOR_RAD);
+
+export interface DriveRunData {
   readonly joint: string;
   readonly mode: string;
   readonly profile: string | null;
@@ -47,13 +50,15 @@ export interface DriveReport {
   readonly warnings: string[];
 }
 
-/** Why the effort bound of a speed motor is not credible, or null: no source, or more than 10x the peak effort used by the run. */
+/** Why the effort bound of a governor (speed / linear_speed motor) is not credible, or null: no source, or more than 10x the peak effort used by the run. */
 export function unboundedEffort(motor: Motor, peakUsed: number | null): string | null {
-  if (motor.kind !== 'speed') return null;
+  if (motor.kind !== 'speed' && motor.kind !== 'linear_speed') return null;
+  const [bound, unit, noun] = motor.kind === 'speed' ? [motor.maxTorque, 'N·m', 'torque'] : [motor.maxForceN, 'N', 'force'];
+  const label = motor.kind === 'speed' ? 'speed motor' : 'linear speed motor';
   if (motor.source === undefined)
-    return `DRV_EFFORT_UNBOUNDED: speed motor '${motor.id}' limits its torque to ${motor.maxTorque} N·m with no motor model and no source; use add_motor kind "dc" or give a sourced limit`;
-  if (peakUsed !== null && peakUsed > 0 && motor.maxTorque > 10 * peakUsed)
-    return `DRV_EFFORT_UNBOUNDED: speed motor '${motor.id}' bound ${motor.maxTorque} N·m is more than 10x the peak effort used (${peakUsed.toPrecision(3)} N·m)`;
+    return `DRV_EFFORT_UNBOUNDED: ${label} '${motor.id}' limits its ${noun} to ${bound} ${unit} with no motor model and no source; use add_motor kind "dc" or give a sourced limit`;
+  if (peakUsed !== null && peakUsed > 0 && bound > 10 * peakUsed)
+    return `DRV_EFFORT_UNBOUNDED: ${label} '${motor.id}' bound ${bound} ${unit} is more than 10x the peak effort used (${peakUsed.toPrecision(3)} ${unit})`;
   return null;
 }
 
@@ -106,7 +111,7 @@ export function driveReport(
         `DRV_ELECTRICAL_QUASI_STATIC: motor '${run.motor.id}' electrical time constant ${(electricalTimeConstant(run.params) * 1e6).toPrecision(3)} us is below timestep/50 (${timestep} s): the current is treated as quasi-static`,
       );
     if (tracking !== null && run.drive.mode === 'prescribed') {
-      const threshold = tracking.range > 0 ? TRACKING_FRACTION * tracking.range : TRACKING_FLOOR_RAD;
+      const threshold = trackingLimit(tracking);
       if (tracking.peakError > threshold)
         warnings.push(
           `DRV_TRACKING_ERROR: prescribed drive of '${run.motor.id}' lagged its profile by up to ${tracking.peakError.toPrecision(3)} ${tracking.unit} (limit ${threshold.toPrecision(3)}): the effort is not the inverse dynamics (raise effortLimit or the current limit)`,

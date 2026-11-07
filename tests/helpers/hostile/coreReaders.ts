@@ -103,7 +103,7 @@ const driveDynamics = (records: number, segment: unknown = { kind: 'dwell', dura
 
 const isRecordLike = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
-/** A `dynamics` record with `records` gear transmissions, joint physics and load schedules (PHY-23 DRV-M2) between the joints it declares, `tamper` applied to each. */
+/** A `dynamics` record with `records` gear transmissions, joint physics, load schedules (PHY-23 DRV-M2) and reference series (DRV-M3) between the joints it declares, `tamper` applied to each. */
 const mechanismDynamics = (records: number, tamper: (record: Record<string, unknown>) => void = () => undefined): string => {
   const ids = Array.from({ length: records }, (_, k) => k);
   const joint = (id: string): Record<string, unknown> => ({
@@ -141,7 +141,23 @@ const mechanismDynamics = (records: number, tamper: (record: Record<string, unkn
   const loadSchedules = Object.fromEntries(
     ids.map((k) => [`l${k}`, { id: `l${k}`, target: { joint: `a${k}` }, kind: 'torque', constant: 1 }]),
   );
-  for (const table of [transmissions, jointPhysics, loadSchedules]) for (const record of Object.values(table)) tamper(record);
+  const referenceSeries = Object.fromEntries(
+    ids.map((k) => [
+      `r${k}`,
+      {
+        id: `r${k}`,
+        quantity: 'joint_velocity',
+        target: `a${k}`,
+        times: [0, 1, 2],
+        values: [0, 1, 2],
+        source,
+        uncertainty: 0.1,
+        bandRel: 0.05,
+      },
+    ]),
+  );
+  for (const table of [transmissions, jointPhysics, loadSchedules, referenceSeries])
+    for (const record of Object.values(table)) tamper(record);
   return JSON.stringify({
     gravity: [0, 0, -9.81],
     bodies: {},
@@ -151,17 +167,20 @@ const mechanismDynamics = (records: number, tamper: (record: Record<string, unkn
     transmissions,
     jointPhysics,
     loadSchedules,
+    referenceSeries,
   });
 };
 
 export const CORE_READERS: readonly HostileReader[] = [
   {
-    name: 'core: dynamics transmissions, joint physics and load schedules (load-time validation of a saved document)',
+    name: 'core: dynamics transmissions, joint physics, load schedules and reference series (load-time validation of a saved document)',
     covers: [
       'core/src/commands/persistence/transmissionsValidation.ts:transmissionProblem',
       'core/src/commands/persistence/transmissionsValidation.ts:jointPhysicsProblem',
       'core/src/commands/persistence/transmissionsValidation.ts:loadScheduleProblem',
       'core/src/commands/persistence/transmissionsValidation.ts:transmissionReferenceProblems',
+      'core/src/commands/persistence/referenceSeriesValidation.ts:referenceSeriesProblem',
+      'core/src/commands/persistence/referenceSeriesValidation.ts:referenceSeriesReferenceProblems',
     ],
     input: 'text',
     build: (records) => mechanismDynamics(records),
@@ -185,6 +204,44 @@ export const CORE_READERS: readonly HostileReader[] = [
       {
         name: 'load target that is not an object',
         input: () => mechanismDynamics(3, (record) => void ('target' in record && (record['target'] = 7))),
+      },
+      {
+        name: 'series times that do not increase',
+        input: () => mechanismDynamics(3, (record) => void ('times' in record && (record['times'] = [2, 1, 0]))),
+      },
+      {
+        name: 'series values as a string',
+        input: () => mechanismDynamics(3, (record) => void ('times' in record && (record['values'] = 'abc'))),
+      },
+      {
+        name: 'series quantity named after a prototype member',
+        input: () => mechanismDynamics(3, (record) => void ('times' in record && (record['quantity'] = '__proto__'))),
+      },
+      {
+        name: 'a ledger series with several points',
+        input: () => mechanismDynamics(3, (record) => void ('times' in record && (record['quantity'] = 'ledger_energy'))),
+      },
+      {
+        name: 'six series of 100000 points exceed the document budget',
+        input: () =>
+          mechanismDynamics(6, (record) => {
+            if ('times' in record)
+              [record['times'], record['values']] = [
+                Array.from({ length: 100_000 }, (_, k) => k),
+                Array.from({ length: 100_000 }, () => 0),
+              ];
+          }),
+      },
+      {
+        name: 'series with 200000 points',
+        input: () =>
+          mechanismDynamics(1, (record) => {
+            if ('times' in record)
+              [record['times'], record['values']] = [
+                Array.from({ length: 200_000 }, (_, k) => k),
+                Array.from({ length: 200_000 }, () => 0),
+              ];
+          }),
       },
       {
         name: 'transmissions that drive each other in a circle',

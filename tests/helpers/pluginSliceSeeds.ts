@@ -25,6 +25,7 @@ import { docWith, sampleCatalogFile } from '../unit/aero/fasteners/fixtures';
 import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
 import { barModel } from '../unit/cae/explicit/support';
+import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import {
   bemNozzles,
@@ -211,6 +212,10 @@ function cfdDocument(): CadDocument {
   return ok(body.doc, 'create_cfd_case', caseParams([body.id])).document;
 }
 
+/** The 05 bar with a verified convergence study (PHY-00 VNV-M3): the cae slice with its studies, behind an in-memory artifact port. */
+let studySeed: ReturnType<typeof studyBar> | undefined;
+const studyFixture = (): ReturnType<typeof studyBar> => (studySeed ??= studyBar());
+
 const analysisId = (doc: CadDocument): string => doc.analysis?.caseOrder[0] ?? 'missing';
 const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc)]?.topologyOrder?.[0] ?? 'missing';
 
@@ -304,6 +309,20 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     build: planOf(plans, 'fea_modal_cantilever'),
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz analysis', analysisType: 'static' }) },
   },
+  // a second seed of the same plugin (`<plugin>#<variant>`): the analysis slice with a verified convergence study (PHY-00 VNV-M3)
+  'cae#studies': {
+    roots: ['analysis'],
+    build: () => recordedStudy(studyFixture()).doc,
+    ctx: () => studyFixture().ctx,
+    query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
+    mutate: {
+      name: 'delete_convergence_study',
+      params: (doc) => ({
+        analysisId: analysisId(doc),
+        studyId: Object.keys(doc.analysis?.cases[analysisId(doc)]?.studies ?? {})[0] ?? 'missing',
+      }),
+    },
+  },
   topology: {
     roots: ['analysis'],
     build: () => mbbModel().doc,
@@ -330,7 +349,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
 };
 
 /**
- * The drive data of `doc.dynamics` (PHY-23: datasheet motors, profiles, drives, transmissions, joint physics, load schedules). Dynamics is a core slice, not a plugin extension, so it has no row in
+ * The drive data of `doc.dynamics` (PHY-23: datasheet motors with thermal data, profiles, drives, transmissions, joint physics, load schedules, reference series). Dynamics is a core slice, not a plugin extension, so it has no row in
  * SLICE_SEEDS; tests/unit/contract/pluginSliceFuzz.test.ts runs it with the targeted `driveMutations` as well.
  */
 export const DYNAMICS_SEED: PluginSliceSeed = {
@@ -349,7 +368,20 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
           joint: 'j',
           kind: 'dc',
           id: 'm',
-          datasheet: { nominalVoltageV: 48, terminalResistanceOhm: 1.13, torqueConstantNmPerA: 0.0603, rotorInertiaKgM2: 1e-5 },
+          datasheet: {
+            nominalVoltageV: 48,
+            terminalResistanceOhm: 1.13,
+            torqueConstantNmPerA: 0.0603,
+            rotorInertiaKgM2: 1e-5,
+            thermal: {
+              rthWindingHousingKPerW: 1.9,
+              rthHousingAmbientKPerW: 4.7,
+              tauWindingS: 41.5,
+              tauMotorS: 809,
+              maxWindingC: 155,
+              alphaPerK: 0.0039,
+            },
+          },
           gearhead: { ratio: 5, efficiency: 0.9 },
           source: { name: 'seed sheet', grade: 'C' },
         },
@@ -427,6 +459,16 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
         params: { id: 'tq', quantity: 'torque', unit: 'N*m', segments: [{ kind: 'sine', amplitude: 0.01, frequencyHz: 2, cycles: 2 }] },
       },
       { name: 'add_load_schedule', params: { joint: 'j', kind: 'torque', profile: 'tq', id: 'ls' } },
+      {
+        name: 'add_reference_data',
+        params: {
+          id: 'rs',
+          series: { quantity: 'joint_velocity', target: 'j', times: [0, 0.5, 1], values: [0, 1, 2], uncertainty: 0.1 },
+          source: 'seed bench log',
+          grade: 'B',
+          bandRel: 0.1,
+        },
+      },
     ];
     let doc = createEmptyDocument();
     const ids = new Map<string, string>();

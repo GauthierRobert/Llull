@@ -40,6 +40,15 @@ import {
   inadequacyReasons,
   parseFieldTable,
   type TableImport,
+  isStudyRefusal,
+  levelDocumentOf,
+  planStudy,
+  studyParams,
+  STUDY_MAX_ELEMENTS,
+  type LevelRun,
+  type StudyOptions,
+  type StudyPlan,
+  type StudyRefusal,
 } from '@cae/index';
 
 export interface CaeCode {
@@ -96,6 +105,19 @@ export interface CaeHooks {
   /** Why each non-adequate part is non-adequate (empty when adequate). */
   inadequacyReasons(adequacy: FeMeshAdequacy): string[];
   meshSummary(mesh: FeMeshArtifact, meshHash: string): MeshSummary;
+  /** PHY-00 convergence study: the levels to run (planStudy), the document as a level meshes it, the record params from the level runs. */
+  planStudy(doc: CadDocument, analysisId: string, options: StudyOptions): StudyPlan | StudyRefusal;
+  isStudyRefusal(value: object): value is StudyRefusal;
+  levelDocumentOf: typeof levelDocumentOf;
+  studyParams(
+    doc: CadDocument,
+    analysisId: string,
+    plan: StudyPlan,
+    runs: readonly LevelRun[],
+    extra: { readonly formalOrder?: number | undefined; readonly safetyFactor?: number | undefined },
+  ): Record<string, unknown> | StudyRefusal;
+  /** Largest level mesh a study runs (tetrahedra). */
+  readonly maxStudyElements: number;
   resultsSummary(
     doc: CadDocument,
     analysisId: string,
@@ -125,4 +147,9 @@ export const caeHooks: CaeHooks = {
   resultsSummary,
   meshAdequacy,
   inadequacyReasons,
+  planStudy,
+  isStudyRefusal,
+  levelDocumentOf,
+  studyParams,
+  maxStudyElements: STUDY_MAX_ELEMENTS,
 };

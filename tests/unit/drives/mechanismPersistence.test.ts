@@ -138,3 +138,65 @@ describe('dynamics transmissions, joint physics and load schedules survive a sav
     expect(accepted).toEqual([]);
   });
 });
+
+describe('reference series and the datasheet thermal block (DRV-M3) survive a save and a load', () => {
+  const series = (dynamics: Record<string, unknown>): Record<string, unknown> => table(dynamics, 'referenceSeries')['rs'] ?? {};
+  const sheet = (dynamics: Record<string, unknown>): Record<string, unknown> =>
+    (table(dynamics, 'motors')['m']?.['datasheet'] ?? {}) as Record<string, unknown>;
+
+  it('the seed carries a series and a thermal sheet, both valid, and the series round-trips', () => {
+    const dynamics = raw();
+    expect(table(dynamics, 'referenceSeries')['rs']?.['quantity']).toBe('joint_velocity');
+    expect(sheet(dynamics)['thermal']).toBeDefined();
+    expect(dynamicsProblems(dynamics)).toEqual([]);
+  });
+
+  it('names the path of each malformed series or thermal block', () => {
+    const bad = (label: string, change: (dynamics: Record<string, unknown>) => void, expected: RegExp): void => {
+      const problems = problemsAfter(change);
+      expect(problems.length, label).toBeGreaterThan(0);
+      expect(problems.join(' | '), label).toMatch(expected);
+    };
+    bad('quantity', (d) => void (series(d)['quantity'] = 'foo'), /referenceSeries\['rs'\]: quantity must be one of/);
+    bad('target', (d) => void (series(d)['target'] = ''), /referenceSeries\['rs'\]: target/);
+    bad('times order', (d) => void (series(d)['times'] = [0, 0, 1]), /times must be >= 0 and strictly increasing/);
+    bad('lengths', (d) => void (series(d)['times'] = [0, 1]), /same length/);
+    bad('ledger', (d) => void (series(d)['quantity'] = 'ledger_energy'), /exactly one point/);
+    bad('ghost joint', (d) => void (series(d)['target'] = 'ghost'), /referenceSeries\['rs'\]: joint 'ghost' does not exist/);
+    bad(
+      'motor series on a joint id',
+      (d) => void (series(d)['quantity'] = 'motor_current'),
+      /referenceSeries\['rs'\]: no datasheet \(dc\) motor 'j'/,
+    );
+    bad('source', (d) => void (series(d)['source'] = { name: 'x', grade: 'D' }), /source must be/);
+    bad('uncertainty', (d) => void (series(d)['uncertainty'] = -1), /uncertainty must be >= 0/);
+    bad('band', (d) => void (series(d)['bandRel'] = 0), /bandRel must be > 0/);
+    bad('id', (d) => void (series(d)['id'] = 'other'), /referenceSeries\['rs'\] must be an object whose id is 'rs'/);
+    bad('thermal', (d) => void (sheet(d)['thermal'] = { rthWindingHousingKPerW: 0 }), /motors\['m'\]: datasheet thermal needs positive/);
+    bad('thermal alpha', (d) => void (sheet(d)['thermal'] = { ...(sheet(d)['thermal'] as object), alphaPerK: -1 }), /alphaPerK >= 0/);
+  });
+
+  it('names the document budget when the series together exceed 500000 points', () => {
+    const problems = problemsAfter((d) => {
+      const stored = table(d, 'referenceSeries');
+      for (let k = 0; k < 6; k++)
+        stored['b' + k] = {
+          ...(stored['rs'] ?? {}),
+          id: 'b' + k,
+          times: Array.from({ length: 100_000 }, (_, i) => i),
+          values: Array.from({ length: 100_000 }, () => 0),
+        };
+    });
+    expect(problems.join(' | ')).toMatch(/dynamics\.referenceSeries: 600003 points in all exceed the document budget of 500000/);
+  });
+
+  it('a document with a refused series is rejected as a whole by load_document, with the path', () => {
+    const saved = JSON.parse(serializeDocument(DYNAMICS_SEED.build())) as {
+      document: { dynamics: { referenceSeries: Record<string, Record<string, unknown>> } };
+    };
+    const record = saved.document.dynamics.referenceSeries['rs'];
+    if (record !== undefined) record['values'] = [0, 'x', 2];
+    const result = execute(createEmptyDocument(), 'load_document', { json: JSON.stringify(saved) });
+    expect(result.summary).toMatch(/referenceSeries\['rs'\]/);
+  });
+});

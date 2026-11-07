@@ -21,6 +21,17 @@ export { buildExplicitArtifact, explicitSummary } from './explicit/artifact';
 // V// vnvV benchmark judging (CLI benchmarks)
 export { adaptLegacyCase, expectedResultsFileSchema, normaliseGrade, type ExpectedCase, type JsonValue } from './vnv/expected';
 export { judgeCase, type Measured, type Verdict } from './vnv/judge';
+export {
+  isStudyRefusal,
+  levelDocumentOf,
+  planStudy,
+  studyParams,
+  STUDY_MAX_ELEMENTS,
+  type LevelRun,
+  type StudyOptions,
+  type StudyPlan,
+  type StudyRefusal,
+} from './vnv/studyRun';
 
 // shell midsurface geometry and shell result mapping
 export { partMidsurfaceGeometry, type MidsurfaceGeometry } from './shell/meshGeometry';
