@@ -28,6 +28,7 @@ import { barModel } from '../unit/cae/explicit/support';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
+import { flatDocument } from '../unit/vibroacoustics/fixtures';
 import {
   bemNozzles,
   bemParams,
@@ -301,6 +302,12 @@ function withLedgers(doc: CadDocument): CadDocument {
 }
 
 export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
+  'physics-vibroacoustics': {
+    roots: ['vibroacoustics'],
+    build: flatDocument,
+    query: { name: 'acoustic_spectrum_report', params: constant({ spectrum: 'flat130' }) },
+    mutate: { name: 'convert_acoustic_spectrum', params: constant({ spectrum: 'flat130', to: 'octave', name: 'fuzz_octave' }) },
+  },
   building: {
     roots: ['building'],
     build: buildingWithEquipment,

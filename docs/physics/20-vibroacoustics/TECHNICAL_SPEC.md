@@ -1,6 +1,6 @@
 # PHY-20: Vibro-acoustics (hand-off) — technical specification
 
-Gap id **VAC** · status: specification · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
+Gap id **VAC** · status: M1 built (§13) · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
 · validation: [`validation/README.md`](validation/README.md) · sources: [`validation/sources.md`](validation/sources.md)
 
 ## 1. Current state in llull
@@ -14,7 +14,7 @@ Gap id **VAC** · status: specification · written 2026-10-15 · functional spec
 ## 2. Target architecture
 
 ```
-packages/domain-physics/src/vibroacoustics  (@phys/vibroacoustics)   CadPlugin "physics-vibroacoustics", toolset "analysis"
+packages/domain-cae/src/vibroacoustics  (@cae, as built, see §13)   CadPlugin "physics-vibroacoustics", toolset "analysis"
    commands/: define_acoustic_spectrum, delete_acoustic_spectrum, convert_acoustic_spectrum, define_acoustic_exposure,
               acoustic_level, acoustic_spectrum_report, export_acoustic_load, check_acoustic_handoff
    math/:     levels.ts (SPL <-> p, energy sums), bands.ts (IEC 61260-1 base-10 bands, nominal table), psd.ts (band PSD)
@@ -166,3 +166,30 @@ All commands ≤ 20 ms except `export_acoustic_load` (face areas from the kernel
 - [R5] NASA-STD-7001 — https://standards.nasa.gov/standard/NASA/NASA-STD-7001 (accessed 2026-10, search)
 - [R6] GSFC-STD-7000B — https://standards.nasa.gov/standard/GSFC/GSFC-STD-7000 (accessed 2026-10, search)
 - llull: `.claude/rules/architecture.md`, `../09-structural-dynamics/TECHNICAL_SPEC.md`, `../../aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`
+
+## 13. As built (M1, 2026-11-07)
+
+**Placement decision.** The plugin is `packages/domain-cae/src/vibroacoustics` (`vibroacousticsPlugin`, `CadPlugin` `physics-vibroacoustics`, toolset
+`analysis`), exported by `packages/domain-cae/src/index.ts` and installed in `src/app/plugins.ts`. The `packages/domain-physics` (`@phys`) package named
+in §2 was **not** created: the other physics packs (fatigue, fracture, reliability, nonlinear, explicit, ...) landed as plugins inside `domain-cae`,
+which already has the alias, the `analysis` toolset, the coverage gate and the host-facing `index.ts`. A new package would add a workspace, an alias, a
+tsconfig / vitest / dependency-cruiser entry, a coverage-gate row and a second composition-root import for one pack, and would split the physics packs
+across two packages with no import path between them (a `@phys` package cannot import `@cae`, README §8.1). Reconsider only when a shared physics
+package is created for several packs at once.
+
+**Slice key.** `CadDocument.vibroacoustics` (top level, like `probabilistic`), not `CadDocument.physics.vibroacoustics`. A shared `physics` member
+cannot be declared by several plugins through module augmentation (each declares the member's whole type), and no pack owns that namespace.
+Validated by a zod schema (`model.ts`): names, nominal labels against the base-10 tables, `exactMidHz` against its label, sorted unique bands,
+`unverified` = grade is not `A`, order lists equal the keys, exposure spectra resolve. `restore` is the identity (pure definition data).
+
+**Commands (M1).** `define_acoustic_spectrum`, `delete_acoustic_spectrum`, `convert_acoustic_spectrum` (third octave to octave, new spectrum; `to`
+other than `octave`, an octave source, or no complete octave refuse with `VAC_CONVERSION_UNSUPPORTED`), `acoustic_level`
+(`splDb` | `pRmsPa` | `levelsDb`), `acoustic_spectrum_report` (OASPL, overall pressure, per-band edges / bandwidth / pressure / band-averaged PSD, octave
+regrouping, items). Added code `VAC_PARAMS_INVALID` (not exactly one input of `acoustic_level`; invalid name). `reference` is an optional string in
+the schema so that its absence is the coded refusal `VAC_REFERENCE_UNSET`. Levels are bounded to [-100, 300] dB so 10^(L/20) stays finite. Octave
+labels go to 16 kHz (the §2 table), third labels to 20 kHz. Not built (M2): exposures, export package, `check_acoustic_handoff`, `VAC_OUT_OF_SCOPE`,
+guide section. The slice already carries `exposures` / `exposureOrder` so M2 adds no slice change; `delete_acoustic_spectrum` already refuses a
+spectrum an exposure uses. The plan `vac_flat_spectrum_handoff.plan.json` stays blocked only on `define_acoustic_exposure` and `check_acoustic_handoff`.
+
+**Validation.** VC-VAC-01..12 and the rows of `third_octave_bands.csv` / `example_spectrum.csv` run in `tests/unit/vibroacoustics/` (pins have 12
+significant digits, so comparisons use max(case tolerance, 1e-11) relative); VC-VAC-30 / 31 / 35 as behaviour cases; VC-VAC-32 / 33 wait for M2.
