@@ -356,7 +356,7 @@ describe('AnalysisPanel FEA-REST UI', () => {
     vi.unstubAllGlobals();
   });
 
-  it('signs a FAIL row with a local key and dispatches dispose_margin with that signature, never a bare confirmation', async () => {
+  it('signs a FAIL row with a local key and dispatches dispose_margin with that signature as its confirmation param', async () => {
     const id = seedAnalysis();
     mocks.margins = {
       isError: false,
@@ -420,7 +420,8 @@ describe('AnalysisPanel FEA-REST UI', () => {
     await vi.waitFor(() => expect(dispatched.some((call) => call.name === 'dispose_margin')).toBe(true));
     const call = dispatched.find((entry) => entry.name === 'dispose_margin');
     expect(call?.params).toMatchObject({ analysisId: id, rowId: 'r1', decision: 'accepted', justification: 'tested at 1.5 limit' });
-    expect(call?.params['signature']).toMatchObject({ alg: 'Ed25519', keyId: 'k-1' });
+    expect(call?.params['confirmation']).toMatchObject({ alg: 'Ed25519', keyId: 'k-1' });
+    expect(call?.params).not.toHaveProperty('signature');
     expect(sent[0]?.body).toMatchObject({ keyId: 'k-1', passphrase: 'pw' });
     expect(String((sent[0]?.body as { payloadSha256: string }).payloadSha256)).toMatch(/^[0-9a-f]{64}$/);
     vi.unstubAllGlobals();

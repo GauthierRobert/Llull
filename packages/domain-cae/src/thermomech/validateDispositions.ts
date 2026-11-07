@@ -15,7 +15,7 @@ function dispositionProblems(entry: unknown, at: string, withRowKey: boolean): s
     if (!text(entry[key])) problems.push(`${at}.${key} must be text`);
   if (typeof entry['documentUid'] !== 'string') problems.push(`${at}.documentUid must be text`);
   const signature = entry['signature'];
-  if (!isRecord(signature) || !text(signature['nonce'])) problems.push(`${at}.signature must be a signature object with a nonce`);
+  if (!isRecord(signature) || Object.keys(signature).length === 0) problems.push(`${at}.signature must be a signature object`);
   return problems;
 }
 

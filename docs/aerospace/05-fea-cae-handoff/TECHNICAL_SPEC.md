@@ -5,19 +5,19 @@ Gap id **FEA** · status: specification · written 2026-10-15 · functional spec
 
 ## 1. Current state in llull
 
-| Area | What exists | Path | Limit for FEA |
-| ---- | ----------- | ---- | ------------- |
-| Structural solver | 2D frame analysis with the direct stiffness method (3 DOF per node), hinges and uniform member loads | `packages/core/src/lib/frame2d.ts` | Beams only, 2D, linear. No continuum, plate or shell elements and no eigen solver |
-| Steel design checks | EN 1993 frame, beam, column and bracing checks, ULS 1.35G + 1.5Q, Horne αcr | `packages/domain-aec/src/industrial/{frames,steelDesign,purlins}/*.ts` (≈4.9k lines) | AEC-specific. Members come from a frame definition, not from solid geometry |
-| Materials | `Material { name, density, color, metalness, roughness, finish? }`, `create_material`, `assign_material` | `packages/core/src/model/types.ts` (`Material`), `packages/core/src/commands/document/materials.ts` | No E, ν or allowables. Density is in g/(doc unit)³, used by `mass_properties` |
-| Exact geometry | `GeometryKernel` with `evaluate`, `tessellate`, `topology` (faces with surface type and area, edges with mid points and samples) and `exportStep` | `packages/core/src/geometry/kernel.ts`, `packages/kernel-occt/src/*` | No face normals or centroids in `ShapeFace`, and no midsurface or defeature recipe nodes |
-| Topological targeting | `edgesNear` points re-resolved per replay (KI5) | `packages/core/src/commands/brep/edgeSelection.ts` | Edges only. No `facesNear` |
-| Python bridge | One short-lived CPython process per request (CadQuery), hard timeout (default 120 s), at most 2 concurrent runs, environment allow-list | `server/src/pythonExchange.ts`, `server/python/llull_bridge.py` | No mesh op |
-| Child processes | `trackChild()` registry with SIGKILL on shutdown | `server/src/childProcesses.ts` | Ready to reuse for `ccx` |
-| Exchange transport | `CadExchangePort` and hand-written MCP exchange tools that apply document changes through the command bus | `packages/mcp/src/exchangeTools.ts`, `server/src/exchangeRoutes.ts`, `server/src/cli/exchange.ts` | A pattern to copy for `fea_mesh` / `fea_solve` / `fea_import_results` |
-| Desktop | Electron runs the unchanged server, and relocatable CPython plus CadQuery are staged by `desktop/scripts/prepare-python.mjs` (KI6) | `desktop/` | No `ccx` binary and no mesher |
-| MCP toolsets | `TOOLSET_NAMES = core, 2d, 3d, measure, parametric, assembly, exchange, building, civil` | `packages/mcp/src/toolsets.ts` | No `analysis` toolset. `TOOLSET_NAMES` must gain `'analysis'` plus a getter returning `pluginToolNames('analysis')` and the ✱ transport names (invariant: every registered command and exchange tool belongs to exactly one toolset) |
-| Plugins | `CadPlugin { name, toolset, commands, guards?, document? }`. `installDefaultPlugins()` installs building, industrial and civil | `packages/core/src/plugins/plugin.ts`, `src/app/plugins.ts` | — |
+| Area                  | What exists                                                                                                                                       | Path                                                                                                | Limit for FEA                                                                                                                                                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Structural solver     | 2D frame analysis with the direct stiffness method (3 DOF per node), hinges and uniform member loads                                              | `packages/core/src/lib/frame2d.ts`                                                                  | Beams only, 2D, linear. No continuum, plate or shell elements and no eigen solver                                                                                                                                                    |
+| Steel design checks   | EN 1993 frame, beam, column and bracing checks, ULS 1.35G + 1.5Q, Horne αcr                                                                       | `packages/domain-aec/src/industrial/{frames,steelDesign,purlins}/*.ts` (≈4.9k lines)                | AEC-specific. Members come from a frame definition, not from solid geometry                                                                                                                                                          |
+| Materials             | `Material { name, density, color, metalness, roughness, finish? }`, `create_material`, `assign_material`                                          | `packages/core/src/model/types.ts` (`Material`), `packages/core/src/commands/document/materials.ts` | No E, ν or allowables. Density is in g/(doc unit)³, used by `mass_properties`                                                                                                                                                        |
+| Exact geometry        | `GeometryKernel` with `evaluate`, `tessellate`, `topology` (faces with surface type and area, edges with mid points and samples) and `exportStep` | `packages/core/src/geometry/kernel.ts`, `packages/kernel-occt/src/*`                                | No face normals or centroids in `ShapeFace`, and no midsurface or defeature recipe nodes                                                                                                                                             |
+| Topological targeting | `edgesNear` points re-resolved per replay (KI5)                                                                                                   | `packages/core/src/commands/brep/edgeSelection.ts`                                                  | Edges only. No `facesNear`                                                                                                                                                                                                           |
+| Python bridge         | One short-lived CPython process per request (CadQuery), hard timeout (default 120 s), at most 2 concurrent runs, environment allow-list           | `server/src/pythonExchange.ts`, `server/python/llull_bridge.py`                                     | No mesh op                                                                                                                                                                                                                           |
+| Child processes       | `trackChild()` registry with SIGKILL on shutdown                                                                                                  | `server/src/childProcesses.ts`                                                                      | Ready to reuse for `ccx`                                                                                                                                                                                                             |
+| Exchange transport    | `CadExchangePort` and hand-written MCP exchange tools that apply document changes through the command bus                                         | `packages/mcp/src/exchangeTools.ts`, `server/src/exchangeRoutes.ts`, `server/src/cli/exchange.ts`   | A pattern to copy for `fea_mesh` / `fea_solve` / `fea_import_results`                                                                                                                                                                |
+| Desktop               | Electron runs the unchanged server, and relocatable CPython plus CadQuery are staged by `desktop/scripts/prepare-python.mjs` (KI6)                | `desktop/`                                                                                          | No `ccx` binary and no mesher                                                                                                                                                                                                        |
+| MCP toolsets          | `TOOLSET_NAMES = core, 2d, 3d, measure, parametric, assembly, exchange, building, civil`                                                          | `packages/mcp/src/toolsets.ts`                                                                      | No `analysis` toolset. `TOOLSET_NAMES` must gain `'analysis'` plus a getter returning `pluginToolNames('analysis')` and the ✱ transport names (invariant: every registered command and exchange tool belongs to exactly one toolset) |
+| Plugins               | `CadPlugin { name, toolset, commands, guards?, document? }`. `installDefaultPlugins()` installs building, industrial and civil                    | `packages/core/src/plugins/plugin.ts`, `src/app/plugins.ts`                                         | —                                                                                                                                                                                                                                    |
 
 A `grep` of `packages/`, `server/src` and `server/python` for `nastran|calculix|mesher|von mises|finite element`
 finds nothing outside the AEC frame code: there is no FE capability today.
@@ -50,7 +50,7 @@ packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face 
 
 **Laws respected:**
 
-- **L1.** Every document change is a command. Meshing and solving are *transports* outside the document, like
+- **L1.** Every document change is a command. Meshing and solving are _transports_ outside the document, like
   `import_step` today. They feed results back through the pure commands `record_fe_mesh` and `record_fea_results` on the command
   bus (undo and broadcast), which check the artifact store through an injected read-only port (§4.1).
 - **L2.** `@cae` imports only core's public API. Processes, files and the network live in `server/` and `desktop/`.
@@ -69,42 +69,42 @@ packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face 
 
 **Requirements (technical)**
 
-| Id | Pri | Requirement |
-| -- | --- | ----------- |
-| TR-FEA-01 | MUST | New workspace `packages/domain-cae` with a `CadPlugin { name: 'cae', toolset: 'analysis', commands, guards, document }`. `document.validate`, `restore` and `derivedEntityIds` handle the `analysis` slice. |
-| TR-FEA-02 | MUST | `CadDocument.analysis?: AnalysisModel` stays absent until the first analysis command. A document version bump with migration is not needed because the field is optional. The persistence validation (`commands/persistence/validation.ts`) delegates to the plugin `validate`. |
-| TR-FEA-03 | MUST | `FeaTarget` resolution: `facesNear` picks the face whose surface (sampled tessellation) is nearest to each point. `edgesNear` reuses `edgeSelection.ts`. `pointsNear` picks the nearest B-rep vertex, or a mesh node when no vertex is within tolerance. Ties within 1e-6 × model size are an error. |
-| TR-FEA-04 | MUST | FEA defines **no material fields of its own**. It consumes the gap 08 MAT material record (`../08-materials-standards-libraries/TECHNICAL_SPEC.md` TR-MAT-11 record / `PropertyValue` / `Provenance`, TR-MAT-01 units, TR-MAT-10 density resolution, TR-MAT-12 allowable query with no basis substitution). FEA only **reads** a resolved view per part (§3 `FeaMaterialView`): `E`, `nu`, optional `G`, `density`, and for margins `Ftu`/`Fty` (optionally `Fsu`/`Fcy`) with their `basis` and `provenance`. Materials are created and edited only with the gap 08 commands. |
-| TR-FEA-05 | MUST | The FE mesh and results are stored in `FeArtifactStore` (server/desktop: `~/.llull/cache/fea/<sha256>.{mesh,res}.json.gz`, web: IndexedDB) under a `meshHash`/`resultsHash`. The document stores only summaries plus hashes. A missing artifact gives the state `missing` and asks for a re-mesh or re-solve, with no silent recompute. |
-| TR-FEA-06 | MUST | Staleness is computed, never stored: `analysisInputHash = sha256(canonical JSON of {geometry recipeKeys of the analysed entities, idealization, materials used, constraints, loads, mesh controls})`. A mesh is valid iff its `inputHash` equals the current hash minus the loads and BCs. Results are valid iff their `inputHash` equals the full current hash. |
-| TR-FEA-07 | MUST | Units: `unitSystem` is fixed at `create_analysis` from the document unit (mm → `N-mm-t-s`, m → `N-m-kg-s`, in → `lbf-in-slinch-s`). The writers convert the gap 08 record quantities (any unit `@lib/quantity` parses, TR-MAT-01) into the analysis system once, in `@cae/units.ts`. |
-| TR-FEA-20 | SHOULD | Midsurface as a `ShapeRecipe` node `midsurface`, evaluated by OCC: a recipe fast path, then face-pairing (§5.2). Manifold returns null. |
-| TR-FEA-21 | SHOULD | Defeature as a recipe node `defeature` (OCC `BRepAlgoAPI_Defeaturing`, applied by `llull-mesh` on STEP parts) (§5.3). |
-| TR-FEA-30 | MUST | Meshing in the `llull-mesh` sidecar (Netgen, one JSON request / response), deterministic (one Netgen thread). `meshHash` = sha256 of the canonical node and element arrays (§5.4). |
-| TR-FEA-31 | MUST | `@lib/meshQuality.ts` is a pure port of the Verdict metrics (§5.5). |
-| TR-FEA-32 | MUST | llull face to mesher (Netgen B-rep) face mapping by area and centroid. Ambiguity is an error (§5.1). |
-| TR-FEA-33 | MUST | `record_fe_mesh` / `record_fea_results` stay registry commands (undo, replay, broadcast) but are **validated against the artifact store** (§4.1 trust model): the referenced artifact must exist in `FeArtifactStore` under `meshHash`/`resultsHash`, its content sha256 must equal that hash, and the summary must equal the one recomputed from the artifact. Otherwise the command is a no-op with a reason. |
-| TR-FEA-40 | MUST | `@cae/decks/inpWriter.ts`: pure and deterministic. Output is byte-identical for identical inputs (§5.6). |
-| TR-FEA-41 | MUST (V1) | `@cae/decks/bdfWriter.ts`: small-field fixed format, verified by pyNastran `read_bdf(xref=True)` (§5.6). |
-| TR-FEA-50 | MUST | `@cae/results/{frdReader,datReader}.ts`: streaming, fixed-column parse (§5.7). |
-| TR-FEA-60 | MUST | `@cae/results/margins.ts` implements §5.8. There is no averaging across parts, and singular zones are reported separately. |
-| TR-FEA-70 | MUST | `server/src/feaSolve.ts` spawns `ccx` with `trackChild`, a timeout, cancel, and log capture (§5.9). |
-| TR-FEA-80 | SHOULD | Performance budgets in §8 are enforced by the production-gate scenario VC-FEA-53. |
-| TR-FEA-90 | MUST | Agent-first result contract (AF-10/11/31–35): `compute_margins`, `check_analysis` and `analysis_report` follow §5.8/§7.1; factors carry `source`/`defaulted`; `unverified` is the OR of all gap 08 inputs' flags; `reviewRequired` is always true on margins. |
-| TR-FEA-91 | MUST | `dispose_margin` verifies a human-held signature through the gap 09 signing port; the CLI/MCP agent path cannot supply one (AF-34). |
-| TR-FEA-92 | SHOULD (V1, RS-5) | Headless field plots (`render_fea_results … --save plot.png`) get a GPU raster path through `llull-compute raster` (crate `llull-raster`, wgpu offscreen) per §2.1. The TS z-buffer `packages/domain-cae/src/results/fieldRaster.ts` stays the reference, the hash path and the small-case path. Native vs TS pixel agreement: VC-FEA-29. |
+| Id        | Pri               | Requirement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TR-FEA-01 | MUST              | New workspace `packages/domain-cae` with a `CadPlugin { name: 'cae', toolset: 'analysis', commands, guards, document }`. `document.validate`, `restore` and `derivedEntityIds` handle the `analysis` slice.                                                                                                                                                                                                                                                                                                                                                                   |
+| TR-FEA-02 | MUST              | `CadDocument.analysis?: AnalysisModel` stays absent until the first analysis command. A document version bump with migration is not needed because the field is optional. The persistence validation (`commands/persistence/validation.ts`) delegates to the plugin `validate`.                                                                                                                                                                                                                                                                                               |
+| TR-FEA-03 | MUST              | `FeaTarget` resolution: `facesNear` picks the face whose surface (sampled tessellation) is nearest to each point. `edgesNear` reuses `edgeSelection.ts`. `pointsNear` picks the nearest B-rep vertex, or a mesh node when no vertex is within tolerance. Ties within 1e-6 × model size are an error.                                                                                                                                                                                                                                                                          |
+| TR-FEA-04 | MUST              | FEA defines **no material fields of its own**. It consumes the gap 08 MAT material record (`../08-materials-standards-libraries/TECHNICAL_SPEC.md` TR-MAT-11 record / `PropertyValue` / `Provenance`, TR-MAT-01 units, TR-MAT-10 density resolution, TR-MAT-12 allowable query with no basis substitution). FEA only **reads** a resolved view per part (§3 `FeaMaterialView`): `E`, `nu`, optional `G`, `density`, and for margins `Ftu`/`Fty` (optionally `Fsu`/`Fcy`) with their `basis` and `provenance`. Materials are created and edited only with the gap 08 commands. |
+| TR-FEA-05 | MUST              | The FE mesh and results are stored in `FeArtifactStore` (server/desktop: `~/.llull/cache/fea/<sha256>.{mesh,res}.json.gz`, web: IndexedDB) under a `meshHash`/`resultsHash`. The document stores only summaries plus hashes. A missing artifact gives the state `missing` and asks for a re-mesh or re-solve, with no silent recompute.                                                                                                                                                                                                                                       |
+| TR-FEA-06 | MUST              | Staleness is computed, never stored: `analysisInputHash = sha256(canonical JSON of {geometry recipeKeys of the analysed entities, idealization, materials used, constraints, loads, mesh controls})`. A mesh is valid iff its `inputHash` equals the current hash minus the loads and BCs. Results are valid iff their `inputHash` equals the full current hash.                                                                                                                                                                                                              |
+| TR-FEA-07 | MUST              | Units: `unitSystem` is fixed at `create_analysis` from the document unit (mm → `N-mm-t-s`, m → `N-m-kg-s`, in → `lbf-in-slinch-s`). The writers convert the gap 08 record quantities (any unit `@lib/quantity` parses, TR-MAT-01) into the analysis system once, in `@cae/units.ts`.                                                                                                                                                                                                                                                                                          |
+| TR-FEA-20 | SHOULD            | Midsurface as a `ShapeRecipe` node `midsurface`, evaluated by OCC: a recipe fast path, then face-pairing (§5.2). Manifold returns null.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| TR-FEA-21 | SHOULD            | Defeature as a recipe node `defeature` (OCC `BRepAlgoAPI_Defeaturing`, applied by `llull-mesh` on STEP parts) (§5.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| TR-FEA-30 | MUST              | Meshing in the `llull-mesh` sidecar (Netgen, one JSON request / response), deterministic (one Netgen thread). `meshHash` = sha256 of the canonical node and element arrays (§5.4).                                                                                                                                                                                                                                                                                                                                                                                            |
+| TR-FEA-31 | MUST              | `@lib/meshQuality.ts` is a pure port of the Verdict metrics (§5.5).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| TR-FEA-32 | MUST              | llull face to mesher (Netgen B-rep) face mapping by area and centroid. Ambiguity is an error (§5.1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| TR-FEA-33 | MUST              | `record_fe_mesh` / `record_fea_results` stay registry commands (undo, replay, broadcast) but are **validated against the artifact store** (§4.1 trust model): the referenced artifact must exist in `FeArtifactStore` under `meshHash`/`resultsHash`, its content sha256 must equal that hash, and the summary must equal the one recomputed from the artifact. Otherwise the command is a no-op with a reason.                                                                                                                                                               |
+| TR-FEA-40 | MUST              | `@cae/decks/inpWriter.ts`: pure and deterministic. Output is byte-identical for identical inputs (§5.6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| TR-FEA-41 | MUST (V1)         | `@cae/decks/bdfWriter.ts`: small-field fixed format, verified by pyNastran `read_bdf(xref=True)` (§5.6).                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| TR-FEA-50 | MUST              | `@cae/results/{frdReader,datReader}.ts`: streaming, fixed-column parse (§5.7).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| TR-FEA-60 | MUST              | `@cae/results/margins.ts` implements §5.8. There is no averaging across parts, and singular zones are reported separately.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| TR-FEA-70 | MUST              | `server/src/feaSolve.ts` spawns `ccx` with `trackChild`, a timeout, cancel, and log capture (§5.9).                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| TR-FEA-80 | SHOULD            | Performance budgets in §8 are enforced by the production-gate scenario VC-FEA-53.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| TR-FEA-90 | MUST              | Agent-first result contract (AF-10/11/31–35): `compute_margins`, `check_analysis` and `analysis_report` follow §5.8/§7.1; factors carry `source`/`defaulted`; `unverified` is the OR of all gap 08 inputs' flags; `reviewRequired` is always true on margins.                                                                                                                                                                                                                                                                                                                 |
+| TR-FEA-91 | MUST              | `dispose_margin` verifies a human-held signature through the gap 09 signing port; the CLI/MCP agent path cannot supply one (AF-34).                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| TR-FEA-92 | SHOULD (V1, RS-5) | Headless field plots (`render_fea_results … --save plot.png`) get a GPU raster path through `llull-compute raster` (crate `llull-raster`, wgpu offscreen) per §2.1. The TS z-buffer `packages/domain-cae/src/results/fieldRaster.ts` stays the reference, the hash path and the small-case path. Native vs TS pixel agreement: VC-FEA-29.                                                                                                                                                                                                                                     |
 
 ### 2.1 Stack amendment (RS1, 2026-10-18)
 
 Decided by the owner in [RS1](../../decisions/RS1-native-compute.md) (programme step **RS-5**, shared with plant 09 VIS).
 
-| Item | Before | Now |
-| ---- | ------ | --- |
-| Field-plot raster (`render_fea_results` → `fieldPlotSvg.ts` → `fieldRaster.ts`) | CPU z-buffer in TS (2× supersampling, PNG embedded in the SVG) | unchanged as the default, the reference and the hash path; small plots always use it |
-| Headless CLI renders of large plots | same TS raster | host path in `server/`: the CLI writes the same `RasterInput` (faces, view, levels, area) to a job folder and runs `llull-compute raster` (crate `llull-raster`, wgpu offscreen, CPU twin per RS1 §2 rule 6); the returned PNG goes into the same SVG frame (legend, markers, title still from `fieldPlotSvg.ts`) |
-| Selection | — | TS below a triangle threshold (TBD — measure the crossover on the reference machine), or when `--raster ts` is given; native above it or with `--raster gpu`; missing binary or no adapter → TS with a logged reason (`NATIVE_TOOL_MISSING`) |
-| Provenance | — | `data.raster = { engine: 'ts' \| 'native-gpu' \| 'native-cpu', device?, deterministic }`; a GPU raster is a picture (`deterministic: false`); any image hash that a test or report pins comes from the TS raster |
-| Viewport result colouring | WebGL (three.js, GPU attribute swap) | unchanged: the viewport stays WebGL; RS-5 is headless only |
+| Item                                                                            | Before                                                         | Now                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field-plot raster (`render_fea_results` → `fieldPlotSvg.ts` → `fieldRaster.ts`) | CPU z-buffer in TS (2× supersampling, PNG embedded in the SVG) | unchanged as the default, the reference and the hash path; small plots always use it                                                                                                                                                                                                                              |
+| Headless CLI renders of large plots                                             | same TS raster                                                 | host path in `server/`: the CLI writes the same `RasterInput` (faces, view, levels, area) to a job folder and runs `llull-compute raster` (crate `llull-raster`, wgpu offscreen, CPU twin per RS1 §2 rule 6); the returned PNG goes into the same SVG frame (legend, markers, title still from `fieldPlotSvg.ts`) |
+| Selection                                                                       | —                                                              | TS below a triangle threshold (TBD — measure the crossover on the reference machine), or when `--raster ts` is given; native above it or with `--raster gpu`; missing binary or no adapter → TS with a logged reason (`NATIVE_TOOL_MISSING`)                                                                      |
+| Provenance                                                                      | —                                                              | `data.raster = { engine: 'ts' \| 'native-gpu' \| 'native-cpu', device?, deterministic }`; a GPU raster is a picture (`deterministic: false`); any image hash that a test or report pins comes from the TS raster                                                                                                  |
+| Viewport result colouring                                                       | WebGL (three.js, GPU attribute swap)                           | unchanged: the viewport stays WebGL; RS-5 is headless only                                                                                                                                                                                                                                                        |
 
 The registry command stays pure and writes nothing to the document (L1); `packages/domain-cae` does not import native code (L2).
 
@@ -114,13 +114,19 @@ The registry command stays pure and writes nothing to the document (L1); `packag
 // Materials: NO new core material fields (TR-FEA-04). Gap 08 owns MaterialRecord / PropertyValue / Provenance.
 // @cae/materials.ts builds this read-only view per analysed part from the gap 08 record (Material.recordId):
 export interface FeaMaterialView {
-  readonly materialName: string; readonly recordId: string;
+  readonly materialName: string;
+  readonly recordId: string;
   /** Preferred PropertyValues, converted to the analysis unit system (TR-FEA-07). G absent = E / (2 (1 + nu)). */
-  readonly E: number; readonly nu: number; readonly G?: number; readonly density: number;
+  readonly E: number;
+  readonly nu: number;
+  readonly G?: number;
+  readonly density: number;
   /** For compute_margins only; each carries the gap 08 basis + provenance unchanged (shown in MS reports). */
   readonly allowables: Partial<Record<'Ftu' | 'Fty' | 'Fsu' | 'Fcy', { value: number; basis: string; provenance: string }>>;
 }
-export interface CadDocument { /* existing fields */ analysis?: AnalysisModel }
+export interface CadDocument {
+  /* existing fields */ analysis?: AnalysisModel;
+}
 
 // packages/core/src/model/analysis.ts (new)
 export type AnalysisType = 'static' | 'modal' | 'buckling';
@@ -129,9 +135,13 @@ export type UnitSystem = 'N-mm-t-s' | 'N-m-kg-s' | 'lbf-in-slinch-s';
 export type Idealization =
   | { readonly kind: 'solid' }
   | { readonly kind: 'plane_stress'; readonly thickness: number; readonly sourceFacesNear: readonly Vec3[] }
-  | { readonly kind: 'shell'; readonly thickness: number | 'auto'; readonly offset: 'mid' | 'top' | 'bottom';
-      readonly midsurface: { readonly maxThickness: number; readonly angularTolDeg: number } }
-  | { readonly kind: 'beam'; readonly section: string };            // V2
+  | {
+      readonly kind: 'shell';
+      readonly thickness: number | 'auto';
+      readonly offset: 'mid' | 'top' | 'bottom';
+      readonly midsurface: { readonly maxThickness: number; readonly angularTolDeg: number };
+    }
+  | { readonly kind: 'beam'; readonly section: string }; // V2
 
 export interface FeaTarget {
   readonly entityId: EntityId;
@@ -142,25 +152,33 @@ export interface FeaTarget {
   readonly intersectPlane?: { readonly point: Vec3; readonly normal: Vec3 };
 }
 export interface FeaConstraint {
-  readonly id: string; name: string; kind: 'fixed' | 'pinned' | 'symmetry' | 'displacement';
+  readonly id: string;
+  name: string;
+  kind: 'fixed' | 'pinned' | 'symmetry' | 'displacement';
   /** displacement only; absent DOF = free. Values in analysis length unit (0 = fixed). */
   dofs?: Partial<Record<'ux' | 'uy' | 'uz' | 'rx' | 'ry' | 'rz', number>>;
   target: FeaTarget;
 }
 export type LoadCategory = 'limit' | 'ultimate';
 export interface FeaLoad {
-  readonly id: string; name: string; loadCase: string; category: LoadCategory;
+  readonly id: string;
+  name: string;
+  loadCase: string;
+  category: LoadCategory;
   kind: 'force' | 'pressure' | 'gravity' | 'moment';
-  target?: FeaTarget;                 // absent for gravity
-  vector?: Vec3;                      // force N / moment N·mm (analysis units) / gravity accel
-  magnitude?: number;                 // pressure, + = compressive (into the material)
+  target?: FeaTarget; // absent for gravity
+  vector?: Vec3; // force N / moment N·mm (analysis units) / gravity accel
+  magnitude?: number; // pressure, + = compressive (into the material)
   distribution?: 'total' | 'per_node';
   /** moment / remote force: distributing coupling reference point (RBE3 / *DISTRIBUTING COUPLING). */
   referencePoint?: Vec3;
 }
 export interface MeshControls {
-  mesher: 'netgen'; elementFamily: 'tet' | 'tri' | 'quad' | 'shell_quad' | 'shell_tri' | 'hex_dominant';
-  order: 1 | 2; globalSize: number; minSize?: number;
+  mesher: 'netgen';
+  elementFamily: 'tet' | 'tri' | 'quad' | 'shell_quad' | 'shell_tri' | 'hex_dominant';
+  order: 1 | 2;
+  globalSize: number;
+  minSize?: number;
   refinements: { target: FeaTarget; size: number }[];
   optimize: 'default' | 'netgen' | 'high_order' | 'none';
 }
@@ -173,9 +191,14 @@ export interface FactorSet {
   extra: { name: string; value: number; justification: string }[];
 }
 export interface MeshSummary {
-  readonly meshHash: string; readonly inputHash: string; readonly mesher: string; readonly mesherVersion: string;
-  readonly nodes: number; readonly elements: Record<string, number>;     // e.g. { C3D10: 41233 }
-  readonly quality: QualitySummary; readonly warnings: readonly string[];
+  readonly meshHash: string;
+  readonly inputHash: string;
+  readonly mesher: string;
+  readonly mesherVersion: string;
+  readonly nodes: number;
+  readonly elements: Record<string, number>; // e.g. { C3D10: 41233 }
+  readonly quality: QualitySummary;
+  readonly warnings: readonly string[];
   /** llull face index -> mesher surface tag, with match residuals (TR-FEA-32). */
   readonly faceMap: readonly { entityId: EntityId; faceIndex: number; tag: number; residual: number }[];
 }
@@ -184,33 +207,55 @@ export interface QualitySummary {
   readonly inverted: number;
 }
 export interface ResultsSummary {
-  readonly resultsHash: string; readonly inputHash: string; readonly solver: string; readonly solverVersion: string;
+  readonly resultsHash: string;
+  readonly inputHash: string;
+  readonly solver: string;
+  readonly solverVersion: string;
   readonly loadCases: readonly {
-    name: string; category: LoadCategory;
+    name: string;
+    category: LoadCategory;
     maxVonMises: { value: number; at: Vec3; entityId: EntityId };
     maxDisplacement: { value: number; at: Vec3 };
   }[];
-  readonly frequenciesHz?: readonly number[]; readonly bucklingFactors?: readonly number[];
+  readonly frequenciesHz?: readonly number[];
+  readonly bucklingFactors?: readonly number[];
   readonly units: UnitSystem;
 }
 export interface AnalysisCase {
-  readonly id: string; name: string; type: AnalysisType; solver: FeSolver; unitSystem: UnitSystem;
-  modes?: number; factors: FactorSet;
+  readonly id: string;
+  name: string;
+  type: AnalysisType;
+  solver: FeSolver;
+  unitSystem: UnitSystem;
+  modes?: number;
+  factors: FactorSet;
   parts: Record<EntityId, Idealization>;
-  constraints: Record<string, FeaConstraint>; constraintOrder: string[];
-  loads: Record<string, FeaLoad>; loadOrder: string[];
-  mesh: MeshControls; meshSummary?: MeshSummary; results?: ResultsSummary;
+  constraints: Record<string, FeaConstraint>;
+  constraintOrder: string[];
+  loads: Record<string, FeaLoad>;
+  loadOrder: string[];
+  mesh: MeshControls;
+  meshSummary?: MeshSummary;
+  results?: ResultsSummary;
   probes: Record<string, { name: string; point: Vec3; quantity: string }>;
-  view?: { field: 'von_mises' | 'u_mag' | 'u_x' | 'u_y' | 'u_z' | 's_xx' | 's_yy' | 's_zz' | 'mode';
-           loadCase?: string; mode?: number; deformationScale: number };
+  view?: {
+    field: 'von_mises' | 'u_mag' | 'u_x' | 'u_y' | 'u_z' | 's_xx' | 's_yy' | 's_zz' | 'mode';
+    loadCase?: string;
+    mode?: number;
+    deformationScale: number;
+  };
 }
-export interface AnalysisModel { cases: Record<string, AnalysisCase>; caseOrder: string[] }
+export interface AnalysisModel {
+  cases: Record<string, AnalysisCase>;
+  caseOrder: string[];
+}
 
 // Cache artifacts (not in the document) — @cae/artifacts.ts
 export interface FeMesh {
-  readonly nodes: Float64Array;                        // xyz, analysis units
+  readonly nodes: Float64Array; // xyz, analysis units
   readonly blocks: readonly { type: FeElementType; partEntityId: EntityId; conn: Uint32Array }[];
-  readonly nodeSets: Record<string, Uint32Array>; readonly faceSets: Record<string, Uint32Array>; // per target id
+  readonly nodeSets: Record<string, Uint32Array>;
+  readonly faceSets: Record<string, Uint32Array>; // per target id
 }
 export type FeElementType = 'C3D4' | 'C3D10' | 'CPS3' | 'CPS6' | 'CPS4' | 'CPS8' | 'S3' | 'S6' | 'S4' | 'S8';
 ```
@@ -225,32 +270,32 @@ The plugin `cae` uses toolset `analysis`. ✱ marks a transport tool (MCP/CLI/RE
 `exchangeTools`. It is not a registry command, because it runs external processes, and it applies its result through the
 pure commands in the table.
 
-| Name | Kind | Params sketch | Tags |
-| ---- | ---- | ------------- | ---- |
-| (gap 08) `define_material_record`, `set_material_property`, `create_material` + `recordId` | mutating, core (owned by gap 08) | see gap 08 TECHNICAL_SPEC §4.1 | FEA adds only a validation rule on `set_material_property`: `E` > 0, `G` > 0, −1 < `nu` < 0.5 → otherwise no-op |
-| `create_analysis` | mutating | `{ name, analysisType, solver?='calculix', unitSystem?, modes?=10, factors?: { ultimate?=1.5, yield?=1.0, extra? } }` | @affects analysis.cases · @invariant unitSystem matches doc units unless explicit · @failure modes ∉ [1, 200] |
-| `delete_analysis` | mutating | `{ analysisId }` | @affects analysis |
-| `set_part_idealization` | mutating | `{ analysisId, entityId, idealization: 'solid'\|'plane_stress'\|'shell', thickness?, sourceFacesNear?, offset?, midsurface? }` | @affects case.parts · @failure non-3D entity, plane_stress source face not planar, shell on Manifold |
-| `extract_midsurface` | query (requiresKernel) | `{ entityId, maxThickness, angularTolDeg?=1 }` → `data { faces, coverage, unpairedFaces[], thicknesses[] }` | preview for UI/agents. The geometry is derived when idealization = shell |
-| `defeature_for_analysis` | mutating (requiresKernel) | `{ analysisId, entityId, maxFeatureSize?, facesNear? }` | @affects case.parts[e].defeature (recipe node) · @invariant design entity untouched · @failure OCC Defeaturing refused → summary names the faces |
-| `add_fea_constraint` / `update_fea_constraint` / `delete_analysis_item` | mutating | `{ analysisId, name, kind, dofs?, target }` | @affects case.constraints · @failure target unresolved / ambiguous |
-| `add_fea_load` / `update_fea_load` / `delete_analysis_item` | mutating | `{ analysisId, name, kind, loadCase, category, target?, vector?, magnitude?, distribution?, referencePoint? }` | @failure vector missing for force/gravity, magnitude missing for pressure |
-| `set_analysis_factors` | mutating | `{ analysisId, ultimate?, yield?, extra? }` | @invariant every factor ≥ 1, extra needs a justification |
-| `set_mesh_controls` | mutating | `{ analysisId, mesher?, elementFamily, order, globalSize, minSize?, refinements?, optimize? }` | @invariant globalSize > 0, refinement size ≤ globalSize |
-| `record_fe_mesh` | mutating (registry; validated, §4.1) | `{ analysisId, summary: MeshSummary }` | @affects case.meshSummary, clears results · @invariant artifact for `meshHash` exists in the store, its sha256 = `meshHash`, summary = recomputed summary · @failure artifact missing / hash or summary mismatch / inputHash ≠ current → no-op |
-| `record_fea_results` | mutating (registry; validated, §4.1) | `{ analysisId, summary: ResultsSummary }` | @invariant as `record_fe_mesh` for `resultsHash` · @failure no mesh, meshHash mismatch, artifact missing, hash or summary mismatch → no-op |
-| `set_result_view` | mutating (presentation, like `set_camera`) | `{ analysisId, field, loadCase?, mode?, deformationScale? }` | — |
-| `add_result_probe` / `delete_analysis_item` | mutating | `{ analysisId, name, point, quantity }` | — |
-| `analysis_report` | query | `{ analysisId }` (all values with units, AF-10) → `data { state: 'unmeshed'\|'meshed'\|'solved'\|'stale'\|'missing', mesh, quality, results, probes }` | read-only |
-| `compute_margins` | query | `{ analysisId, criterion?='von_mises', allowable?: 'ftu'\|'fty'\|{ value, unit }, groupBy?: 'part'\|'target', loadCases?, marginalBand?: number (MS units, no default) }` → `data` shape §5.8 | @invariant every factor named with `source` + `defaulted` (AF-31); every row `reviewRequired: true` (AF-33); `unverified` propagated from gap 08 inputs (AF-32) · @failure `FEA_RESULTS_STALE`, `FEA_RESULTS_MISSING`, `FEA_MATERIAL_NO_ALLOWABLE` (unless an explicit allowable is given) |
-| `check_analysis` | query | `{ analysisId }` → `data { status: 'pass'\|'warn'\|'fail', items: [{ code, severity, ids[], path?, message, remediation }], reviewRequired: true }` | read-only readiness check (AF-20) over set-up, mesh, results and margins; codes §7.1. The agent ends every FEA job with it |
-| `dispose_margin` | mutating, **human gate** | `{ analysisId, rowId, decision: 'accepted'\|'rejected'\|'redesign', justification, signature }` | @affects case.dispositions · @invariant `signature` must verify against a human-held key through the gap 09 signing port (`humanSignatureRequired`); the disposition records rowId, the results hash and the signer · @failure agent caller or no valid human signature → `FEA_HUMAN_GATE`, doc unchanged; stale results → `FEA_RESULTS_STALE` |
-| `hand_check` | query | `{ check: 'cantilever'\|'ss_beam'\|'ss_plate_buckling'\|'kirsch_kt', inputs }` → value + formula | pure. Matches `generate_fea_analytic.py` |
-| ✱ `fea_mesh` | transport | `{ analysisId }` | runs `llull-mesh` (Netgen), stores the artifact, dispatches `record_fe_mesh` |
-| ✱ `fea_solve` | transport | `{ analysisId, timeoutS?=600, threads? }` | writes the INP, runs `ccx`, parses FRD/DAT, stores the artifact, dispatches `record_fea_results` |
-| ✱ `fea_import_results` | transport | `{ analysisId, path, format: 'frd'\|'op2' }` | external results. They must match `meshHash`, or they are imported as a review-only `foreign` mesh |
-| ✱ `fea_export` | transport | `{ analysisId, format: 'calculix_inp'\|'nastran_bdf'\|'vtu', path? }` → `{ text \| path, sha256 }` | the **only** solver-deck export (no registry command: a deck needs the mesh artifact, which is not document data). Pure writers in `@cae/decks` plus a file write. Refuses stale or missing meshes, materials without E/ν, and inverted elements |
-| ✱ `fea_result_field` | transport (read) | `{ analysisId, field, loadCase?, mode? }` → per-vertex scalars of the skin mesh | for UI/MCP rendering. Nothing is stored |
+| Name                                                                                       | Kind                                       | Params sketch                                                                                                                                                                                 | Tags                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (gap 08) `define_material_record`, `set_material_property`, `create_material` + `recordId` | mutating, core (owned by gap 08)           | see gap 08 TECHNICAL_SPEC §4.1                                                                                                                                                                | FEA adds only a validation rule on `set_material_property`: `E` > 0, `G` > 0, −1 < `nu` < 0.5 → otherwise no-op                                                                                                                                                                                                                                                                                                                                                                                                |
+| `create_analysis`                                                                          | mutating                                   | `{ name, analysisType, solver?='calculix', unitSystem?, modes?=10, factors?: { ultimate?=1.5, yield?=1.0, extra? } }`                                                                         | @affects analysis.cases · @invariant unitSystem matches doc units unless explicit · @failure modes ∉ [1, 200]                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `delete_analysis`                                                                          | mutating                                   | `{ analysisId }`                                                                                                                                                                              | @affects analysis                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `set_part_idealization`                                                                    | mutating                                   | `{ analysisId, entityId, idealization: 'solid'\|'plane_stress'\|'shell', thickness?, sourceFacesNear?, offset?, midsurface? }`                                                                | @affects case.parts · @failure non-3D entity, plane_stress source face not planar, shell on Manifold                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `extract_midsurface`                                                                       | query (requiresKernel)                     | `{ entityId, maxThickness, angularTolDeg?=1 }` → `data { faces, coverage, unpairedFaces[], thicknesses[] }`                                                                                   | preview for UI/agents. The geometry is derived when idealization = shell                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `defeature_for_analysis`                                                                   | mutating (requiresKernel)                  | `{ analysisId, entityId, maxFeatureSize?, facesNear? }`                                                                                                                                       | @affects case.parts[e].defeature (recipe node) · @invariant design entity untouched · @failure OCC Defeaturing refused → summary names the faces                                                                                                                                                                                                                                                                                                                                                               |
+| `add_fea_constraint` / `update_fea_constraint` / `delete_analysis_item`                    | mutating                                   | `{ analysisId, name, kind, dofs?, target }`                                                                                                                                                   | @affects case.constraints · @failure target unresolved / ambiguous                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `add_fea_load` / `update_fea_load` / `delete_analysis_item`                                | mutating                                   | `{ analysisId, name, kind, loadCase, category, target?, vector?, magnitude?, distribution?, referencePoint? }`                                                                                | @failure vector missing for force/gravity, magnitude missing for pressure                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `set_analysis_factors`                                                                     | mutating                                   | `{ analysisId, ultimate?, yield?, extra? }`                                                                                                                                                   | @invariant every factor ≥ 1, extra needs a justification                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `set_mesh_controls`                                                                        | mutating                                   | `{ analysisId, mesher?, elementFamily, order, globalSize, minSize?, refinements?, optimize? }`                                                                                                | @invariant globalSize > 0, refinement size ≤ globalSize                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `record_fe_mesh`                                                                           | mutating (registry; validated, §4.1)       | `{ analysisId, summary: MeshSummary }`                                                                                                                                                        | @affects case.meshSummary, clears results · @invariant artifact for `meshHash` exists in the store, its sha256 = `meshHash`, summary = recomputed summary · @failure artifact missing / hash or summary mismatch / inputHash ≠ current → no-op                                                                                                                                                                                                                                                                 |
+| `record_fea_results`                                                                       | mutating (registry; validated, §4.1)       | `{ analysisId, summary: ResultsSummary }`                                                                                                                                                     | @invariant as `record_fe_mesh` for `resultsHash` · @failure no mesh, meshHash mismatch, artifact missing, hash or summary mismatch → no-op                                                                                                                                                                                                                                                                                                                                                                     |
+| `set_result_view`                                                                          | mutating (presentation, like `set_camera`) | `{ analysisId, field, loadCase?, mode?, deformationScale? }`                                                                                                                                  | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `add_result_probe` / `delete_analysis_item`                                                | mutating                                   | `{ analysisId, name, point, quantity }`                                                                                                                                                       | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `analysis_report`                                                                          | query                                      | `{ analysisId }` (all values with units, AF-10) → `data { state: 'unmeshed'\|'meshed'\|'solved'\|'stale'\|'missing', mesh, quality, results, probes }`                                        | read-only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `compute_margins`                                                                          | query                                      | `{ analysisId, criterion?='von_mises', allowable?: 'ftu'\|'fty'\|{ value, unit }, groupBy?: 'part'\|'target', loadCases?, marginalBand?: number (MS units, no default) }` → `data` shape §5.8 | @invariant every factor named with `source` + `defaulted` (AF-31); every row `reviewRequired: true` (AF-33); `unverified` propagated from gap 08 inputs (AF-32) · @failure `FEA_RESULTS_STALE`, `FEA_RESULTS_MISSING`, `FEA_MATERIAL_NO_ALLOWABLE` (unless an explicit allowable is given)                                                                                                                                                                                                                     |
+| `check_analysis`                                                                           | query                                      | `{ analysisId }` → `data { status: 'pass'\|'warn'\|'fail', items: [{ code, severity, ids[], path?, message, remediation }], reviewRequired: true }`                                           | read-only readiness check (AF-20) over set-up, mesh, results and margins; codes §7.1. The agent ends every FEA job with it                                                                                                                                                                                                                                                                                                                                                                                     |
+| `dispose_margin`                                                                           | mutating, **human gate**                   | `{ analysisId, rowId, decision: 'accepted'\|'rejected'\|'redesign', justification, confirmation }`                                                                                            | @affects case.dispositions, analysis.dispositionLedger · @invariant `confirmation` (the human signature; never written to the history, spent last and once, replay re-applies it from `analysis.dispositionLedger`) must verify against a human-held key through the gap 09 signing port (`humanSignatureRequired`); the disposition records rowId, the results hash and the signer · @failure agent caller or no valid human signature → `FEA_HUMAN_GATE`, doc unchanged; stale results → `FEA_RESULTS_STALE` |
+| `hand_check`                                                                               | query                                      | `{ check: 'cantilever'\|'ss_beam'\|'ss_plate_buckling'\|'kirsch_kt', inputs }` → value + formula                                                                                              | pure. Matches `generate_fea_analytic.py`                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ✱ `fea_mesh`                                                                               | transport                                  | `{ analysisId }`                                                                                                                                                                              | runs `llull-mesh` (Netgen), stores the artifact, dispatches `record_fe_mesh`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ✱ `fea_solve`                                                                              | transport                                  | `{ analysisId, timeoutS?=600, threads? }`                                                                                                                                                     | writes the INP, runs `ccx`, parses FRD/DAT, stores the artifact, dispatches `record_fea_results`                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ✱ `fea_import_results`                                                                     | transport                                  | `{ analysisId, path, format: 'frd'\|'op2' }`                                                                                                                                                  | external results. They must match `meshHash`, or they are imported as a review-only `foreign` mesh                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ✱ `fea_export`                                                                             | transport                                  | `{ analysisId, format: 'calculix_inp'\|'nastran_bdf'\|'vtu', path? }` → `{ text \| path, sha256 }`                                                                                            | the **only** solver-deck export (no registry command: a deck needs the mesh artifact, which is not document data). Pure writers in `@cae/decks` plus a file write. Refuses stale or missing meshes, materials without E/ν, and inverted elements                                                                                                                                                                                                                                                               |
+| ✱ `fea_result_field`                                                                       | transport (read)                           | `{ analysisId, field, loadCase?, mode? }` → per-vertex scalars of the skin mesh                                                                                                               | for UI/MCP rendering. Nothing is stored                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ### 4.1 Trust model for `record_fe_mesh` / `record_fea_results` (TR-FEA-33)
 
@@ -394,8 +439,8 @@ ENDDATA
 - **FRD** (`@cae/results/frdReader.ts`). The fixed-column ASCII format follows the reader in FreeCAD [R15]: `2C` node block,
   `3C` element block, `-4  DISP` / `STRESS` / `TOSTRAIN` blocks, `-1` record = node id in cols 4–13 then 12-character values.
   The stress order is Sxx, Syy, Szz, Sxy, Syz, Szx. `PMODE` and `1PSTEP` mark eigenmodes and steps. CalculiX writes nodal
-  values that are extrapolated and averaged [R30]. Buckling factors come from the `.dat` file ("B U C K L I N G   F A C T O R   O U T P U T").
-  Frequencies come from the `.dat` "E I G E N V A L U E   O U T P U T" table (cycles/time column). Both layouts were checked in `beamb.dat.ref` / `beamf.dat.ref`.
+  values that are extrapolated and averaged [R30]. Buckling factors come from the `.dat` file ("B U C K L I N G F A C T O R O U T P U T").
+  Frequencies come from the `.dat` "E I G E N V A L U E O U T P U T" table (cycles/time column). Both layouts were checked in `beamb.dat.ref` / `beamf.dat.ref`.
 - **OP2** (V1) uses pyNastran in the bundled Python (`op2 = OP2(); op2.read_op2(path)`), reduced to the same JSON artifact.
 - **Shell expansion.** CalculiX expands S4/S8 shells into C3D8I/C3D20R volumes [R30]. FRD output for shells is therefore 3D
   (`*NODE FILE, OUTPUT=3D` as in `shell1.inp`) or 2D (`OUTPUT=2D`). The reader requests `OUTPUT=2D` for shells and maps the
@@ -429,21 +474,43 @@ otherwise `PASS`. `FAIL` and `MARGINAL` rows get `disposition: "pending_human"` 
 
 ```json
 {
-  "analysisId": "an-5.1", "unitSystem": "N-mm-t-s", "resultsHash": "…", "minMs": -0.0666667,
+  "analysisId": "an-5.1",
+  "unitSystem": "N-mm-t-s",
+  "resultsHash": "…",
+  "minMs": -0.0666667,
   "factors": {
     "ultimate": { "value": 1.5, "source": "14 CFR 25.303", "defaulted": true },
-    "yield":    { "value": 1.0, "source": "derived from 14 CFR 25.305(a) (limit load, no detrimental permanent deformation)", "defaulted": true },
+    "yield": {
+      "value": 1.0,
+      "source": "derived from 14 CFR 25.305(a) (limit load, no detrimental permanent deformation)",
+      "defaulted": true
+    },
     "extra": []
   },
-  "rows": [{
-    "rowId": "r4", "part": "box-3.1", "region": "part", "loadCase": "LC1", "category": "limit", "criterion": "von_mises",
-    "appliedMPa": 200, "allowableMPa": 280, "allowable": { "property": "Ftu", "basis": "B", "provenance": "MAT:<id> Table …" },
-    "ms": -0.0666667, "status": "FAIL", "code": "FEA_MS_NEGATIVE", "atMm": [0, 10, 0], "singular": false,
-    "provenance": { "formula": "MS = allowable / (applied × FoS × Π extra) − 1", "standard": ["NASA-STD-5001B", "14 CFR 25.303"] },
-    "unverified": false, "unverifiedReasons": [],
-    "reviewRequired": true, "reviewReason": "margin of safety supports a structural substantiation decision",
-    "disposition": "pending_human"
-  }],
+  "rows": [
+    {
+      "rowId": "r4",
+      "part": "box-3.1",
+      "region": "part",
+      "loadCase": "LC1",
+      "category": "limit",
+      "criterion": "von_mises",
+      "appliedMPa": 200,
+      "allowableMPa": 280,
+      "allowable": { "property": "Ftu", "basis": "B", "provenance": "MAT:<id> Table …" },
+      "ms": -0.0666667,
+      "status": "FAIL",
+      "code": "FEA_MS_NEGATIVE",
+      "atMm": [0, 10, 0],
+      "singular": false,
+      "provenance": { "formula": "MS = allowable / (applied × FoS × Π extra) − 1", "standard": ["NASA-STD-5001B", "14 CFR 25.303"] },
+      "unverified": false,
+      "unverifiedReasons": [],
+      "reviewRequired": true,
+      "reviewReason": "margin of safety supports a structural substantiation decision",
+      "disposition": "pending_human"
+    }
+  ],
   "reviewRequired": true,
   "summary": "4 rows, min MS −0.067 (FAIL, LC1). Computed by llull, not approved — needs a qualified engineer."
 }
@@ -461,26 +528,26 @@ last 64 KB of log. On success it parses `job.frd` and `job.dat`, then stores the
 
 ### 5.10 Numerical tolerances
 
-| Item | Value |
-| ---- | ----- |
-| Face-map area / centroid match | 1e-6 relative to the area / model diagonal |
-| Unit conversion round-trip | 1e-12 relative |
-| FRD parse | exact string-to-float (IEEE double) |
-| Midsurface sewing tolerance | 0.5 × min thickness |
-| Benchmarks | see validation README (1–8 %, each justified) |
+| Item                           | Value                                         |
+| ------------------------------ | --------------------------------------------- |
+| Face-map area / centroid match | 1e-6 relative to the area / model diagonal    |
+| Unit conversion round-trip     | 1e-12 relative                                |
+| FRD parse                      | exact string-to-float (IEEE double)           |
+| Midsurface sewing tolerance    | 0.5 × min thickness                           |
+| Benchmarks                     | see validation README (1–8 %, each justified) |
 
 ## 6. Interop & persistence
 
-| Format | Direction | Implementation | Licence of the dependency |
-| ------ | --------- | -------------- | ------------------------- |
-| STEP AP214 (geometry → mesher) | out | existing `exportStep` (KI5) | — |
-| Netgen mesh (inside `llull-mesh`) | internal | Netgen 6.2.2604 nglib + ngcore, shared libraries linked dynamically [R11] | LGPL-2.1 |
-| CalculiX/Abaqus INP | out | `@cae/decks/inpWriter.ts` (pure TS) | — |
-| Nastran BDF | out | `@cae/decks/bdfWriter.ts` (pure TS), checked with pyNastran [R14] | pyNastran BSD-3 (test/import only) |
-| CalculiX FRD + DAT | in | `@cae/results/frdReader.ts`, `datReader.ts` (pure TS) | — |
-| Nastran OP2 | in | pyNastran in the bridge [R14] | BSD-3 |
-| VTU | out | meshio in the bridge [R13], or a TS writer | MIT |
-| Document | persist | `analysis` slice in `.llull` JSON. The artifacts sit in the cache (TR-FEA-05) and can be bundled into a `.llullz` package on "Save with results" (V1) | — |
+| Format                            | Direction | Implementation                                                                                                                                        | Licence of the dependency          |
+| --------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| STEP AP214 (geometry → mesher)    | out       | existing `exportStep` (KI5)                                                                                                                           | —                                  |
+| Netgen mesh (inside `llull-mesh`) | internal  | Netgen 6.2.2604 nglib + ngcore, shared libraries linked dynamically [R11]                                                                             | LGPL-2.1                           |
+| CalculiX/Abaqus INP               | out       | `@cae/decks/inpWriter.ts` (pure TS)                                                                                                                   | —                                  |
+| Nastran BDF                       | out       | `@cae/decks/bdfWriter.ts` (pure TS), checked with pyNastran [R14]                                                                                     | pyNastran BSD-3 (test/import only) |
+| CalculiX FRD + DAT                | in        | `@cae/results/frdReader.ts`, `datReader.ts` (pure TS)                                                                                                 | —                                  |
+| Nastran OP2                       | in        | pyNastran in the bridge [R14]                                                                                                                         | BSD-3                              |
+| VTU                               | out       | meshio in the bridge [R13], or a TS writer                                                                                                            | MIT                                |
+| Document                          | persist   | `analysis` slice in `.llull` JSON. The artifacts sit in the cache (TR-FEA-05) and can be bundled into a `.llullz` package on "Save with results" (V1) | —                                  |
 
 **Document validation** (plugin `validate`): ids unique, targets reference existing entities, every number finite, factors ≥ 1,
 summaries well formed. Recipes inside `midsurface`/`defeature` nodes are checked like other recipes (KI5).
@@ -493,7 +560,7 @@ summaries well formed. Recipes inside `midsurface`/`defeature` nodes are checked
   The 2D view shows plane-stress parts. UI work goes through the `viewport-feature` skill and is verified with Playwright (VC-FEA-17).
 - **CLI** (primary operator surface, AF-01). **No `fea` subcommand group**: registry commands run as `llull <command> …` and the ✱
   transports run like the existing exchange tools (`llull fea_mesh analysisId=… --progress --timeout 300`, `llull fea_import_results
-  file=run.frd …`, `llull fea_export … --save out/x.bdf`), in-process for `--doc` and over REST (`POST /fea/<op>`) for
+file=run.frd …`, `llull fea_export … --save out/x.bdf`), in-process for `--doc` and over REST (`POST /fea/<op>`) for
   `--app`/`--server`, mirroring `cli/exchange.ts`. Long transports stream progress and respect `--timeout` (AF-40). `llull guide` gains an
   FEA section: analysis unit systems, FoS defaults and their sources, the minimal static plan, the end-of-job `check_analysis` (AF-03).
 - **render_view.** Proposed optional params `analysisId`, `field`, `loadCase`, `mode` so `llull render_view … --save vm.png` draws the
@@ -508,110 +575,110 @@ summaries well formed. Recipes inside `midsurface`/`defeature` nodes are checked
 Exit code 1 on every refusal; `data.code`, `data.ids` (or `data.path` for plan validation) and `data.remediation` are always set.
 Check items from `check_analysis` use the same codes with a severity.
 
-| Code | Severity | When | Offending ids / path | Remediation |
-| ---- | -------- | ---- | -------------------- | ----------- |
-| `FEA_TARGET_UNRESOLVED` | error | a `facesNear`/`edgesNear`/`pointsNear` point matches no face/edge/vertex (also after a parametric edit) | constraint/load id, point | move the point onto the intended face, then re-run |
-| `FEA_TARGET_AMBIGUOUS` | error | two candidates within 1e-6 × model size | constraint/load id, candidate face indices | pick a point farther from the shared edge |
-| `FEA_MATERIAL_MISSING` | error | an analysed part has no material | entity id | `assign_material` with a gap 08 record |
-| `FEA_MATERIAL_NO_ELASTIC` | error | the record has no E or ν | material name, record id | `set_material_property property=E …` / `nu` |
-| `FEA_MATERIAL_NO_ALLOWABLE` | error | margins need Ftu/Fty and none is given | material name | `set_material_property property=Ftu …` or pass `allowable={value,unit}` |
-| `FEA_MATERIAL_UNVERIFIED` | warning (not suppressible) | a used property is gap 08 `unverified` | material, property ids | replace with a verified, sourced value (gap 08) |
-| `FEA_PROPERTY_INVALID` | error | E ≤ 0, G ≤ 0, ν ∉ (−1, 0.5) | material, property | correct the value |
-| `FEA_UNITS_MISMATCH` | error | explicit `unitSystem` disagrees with the document unit, or a `{value, unit}` has the wrong dimension | param path | drop `unitSystem` or fix the unit |
-| `FEA_UNDERCONSTRAINED` | warning | < 6 independent restrained DOFs per connected part | part id | add constraints |
-| `FEA_POINT_LOAD_SINGULAR` | warning | force on a single node / re-entrant sharp edge | load id | distribute over a face; singular zone excluded from MS |
-| `FEA_KERNEL_OCC_REQUIRED` | error | midsurface, defeature or face targeting on Manifold | command | `--kernel occt` (desktop default) |
-| `FEA_MIDSURFACE_COVERAGE` | error | shell export with coverage < 0.98 | entity id, unpaired face indices | fix geometry or use solid idealization |
-| `FEA_TOOL_MISSING` | error | `llull-mesh` missing or its Netgen / OCCT libraries do not load, or ccx not found | tool name | install hint (desktop bundle / `LLULL_MESH_BIN` / `LLULL_CCX`) (AF-41) |
-| `FEA_FACE_MAP_AMBIGUOUS` | error | llull face → mesher face not unique | face indices | heal geometry and re-mesh |
-| `FEA_MESH_INVERTED` | error | any element with scaled Jacobian ≤ 0 | element ids | refine, or change `order`/`optimize` |
-| `FEA_MESH_INADEQUATE` | error | 5th percentile of the element layers (hit distance over the local element size) of rays through a wall below the budget (C3D4 4, C3D10 2; 10-result-integrity TR-INT-07, pending VNV-M3) | part id | reduce `globalSize` or add a refinement |
-| `FEA_MESH_MARGINAL` | warning | 5th percentile meets the budget, the thinnest sampled spot is under 75 % of it | part id | refine the thin wall |
-| `FEA_MESH_STALE` | error | mesh `inputHash` ≠ current | analysis id | `fea_mesh` |
-| `FEA_RESULTS_MISSING` | error | no results, or artifact absent on this machine | analysis id | `fea_solve` |
-| `FEA_RESULTS_STALE` | error | results `inputHash` ≠ current | analysis id, changed inputs | `fea_mesh` then `fea_solve` |
-| `FEA_ARTIFACT_NOT_FOUND` | error | `record_*` hash not in the store | hash | run the transport; never hand-write summaries |
-| `FEA_SUMMARY_MISMATCH` | error | `record_*` summary ≠ recomputed | hash, differing fields | same |
-| `FEA_FOREIGN_RESULTS` | warning | imported results do not match the mesh | analysis id | review-only; not used for margins |
-| `FEA_SOLVER_FAILED` | error | ccx exit ≠ 0 or `*ERROR` | `data.logTail` | read the log tail; usually constraints or material |
-| `FEA_SOLVER_TIMEOUT` | error | `--timeout` / `timeoutS` reached | analysis id | coarser mesh or longer timeout |
-| `FEA_FACTOR_INVALID` | error | a factor < 1, or an extra factor without justification | param path | correct the factor |
-| `FEA_MS_NEGATIVE` | fail | a margin row with MS < 0 | row id, part, load case | redesign; only a qualified reviewer can disposition it |
-| `FEA_MS_MARGINAL` | warning | 0 ≤ MS < `marginalBand` | row id | same |
-| `FEA_MARGINAL_BAND_UNSET` | warning | `marginalBand` not given | analysis id | ask the owner / company rule for a band |
-| `FEA_DISPOSITION_PENDING` | warning | FAIL/MARGINAL row without a human disposition | row ids | qualified reviewer: `dispose_margin` in the desktop app |
-| `FEA_HUMAN_GATE` | error | `dispose_margin` by an agent or without a valid human signature | row id | hand over to the qualified reviewer |
+| Code                        | Severity                   | When                                                                                                                                                                                     | Offending ids / path                       | Remediation                                                             |
+| --------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------- |
+| `FEA_TARGET_UNRESOLVED`     | error                      | a `facesNear`/`edgesNear`/`pointsNear` point matches no face/edge/vertex (also after a parametric edit)                                                                                  | constraint/load id, point                  | move the point onto the intended face, then re-run                      |
+| `FEA_TARGET_AMBIGUOUS`      | error                      | two candidates within 1e-6 × model size                                                                                                                                                  | constraint/load id, candidate face indices | pick a point farther from the shared edge                               |
+| `FEA_MATERIAL_MISSING`      | error                      | an analysed part has no material                                                                                                                                                         | entity id                                  | `assign_material` with a gap 08 record                                  |
+| `FEA_MATERIAL_NO_ELASTIC`   | error                      | the record has no E or ν                                                                                                                                                                 | material name, record id                   | `set_material_property property=E …` / `nu`                             |
+| `FEA_MATERIAL_NO_ALLOWABLE` | error                      | margins need Ftu/Fty and none is given                                                                                                                                                   | material name                              | `set_material_property property=Ftu …` or pass `allowable={value,unit}` |
+| `FEA_MATERIAL_UNVERIFIED`   | warning (not suppressible) | a used property is gap 08 `unverified`                                                                                                                                                   | material, property ids                     | replace with a verified, sourced value (gap 08)                         |
+| `FEA_PROPERTY_INVALID`      | error                      | E ≤ 0, G ≤ 0, ν ∉ (−1, 0.5)                                                                                                                                                              | material, property                         | correct the value                                                       |
+| `FEA_UNITS_MISMATCH`        | error                      | explicit `unitSystem` disagrees with the document unit, or a `{value, unit}` has the wrong dimension                                                                                     | param path                                 | drop `unitSystem` or fix the unit                                       |
+| `FEA_UNDERCONSTRAINED`      | warning                    | < 6 independent restrained DOFs per connected part                                                                                                                                       | part id                                    | add constraints                                                         |
+| `FEA_POINT_LOAD_SINGULAR`   | warning                    | force on a single node / re-entrant sharp edge                                                                                                                                           | load id                                    | distribute over a face; singular zone excluded from MS                  |
+| `FEA_KERNEL_OCC_REQUIRED`   | error                      | midsurface, defeature or face targeting on Manifold                                                                                                                                      | command                                    | `--kernel occt` (desktop default)                                       |
+| `FEA_MIDSURFACE_COVERAGE`   | error                      | shell export with coverage < 0.98                                                                                                                                                        | entity id, unpaired face indices           | fix geometry or use solid idealization                                  |
+| `FEA_TOOL_MISSING`          | error                      | `llull-mesh` missing or its Netgen / OCCT libraries do not load, or ccx not found                                                                                                        | tool name                                  | install hint (desktop bundle / `LLULL_MESH_BIN` / `LLULL_CCX`) (AF-41)  |
+| `FEA_FACE_MAP_AMBIGUOUS`    | error                      | llull face → mesher face not unique                                                                                                                                                      | face indices                               | heal geometry and re-mesh                                               |
+| `FEA_MESH_INVERTED`         | error                      | any element with scaled Jacobian ≤ 0                                                                                                                                                     | element ids                                | refine, or change `order`/`optimize`                                    |
+| `FEA_MESH_INADEQUATE`       | error                      | 5th percentile of the element layers (hit distance over the local element size) of rays through a wall below the budget (C3D4 4, C3D10 2; 10-result-integrity TR-INT-07, pending VNV-M3) | part id                                    | reduce `globalSize` or add a refinement                                 |
+| `FEA_MESH_MARGINAL`         | warning                    | 5th percentile meets the budget, the thinnest sampled spot is under 75 % of it                                                                                                           | part id                                    | refine the thin wall                                                    |
+| `FEA_MESH_STALE`            | error                      | mesh `inputHash` ≠ current                                                                                                                                                               | analysis id                                | `fea_mesh`                                                              |
+| `FEA_RESULTS_MISSING`       | error                      | no results, or artifact absent on this machine                                                                                                                                           | analysis id                                | `fea_solve`                                                             |
+| `FEA_RESULTS_STALE`         | error                      | results `inputHash` ≠ current                                                                                                                                                            | analysis id, changed inputs                | `fea_mesh` then `fea_solve`                                             |
+| `FEA_ARTIFACT_NOT_FOUND`    | error                      | `record_*` hash not in the store                                                                                                                                                         | hash                                       | run the transport; never hand-write summaries                           |
+| `FEA_SUMMARY_MISMATCH`      | error                      | `record_*` summary ≠ recomputed                                                                                                                                                          | hash, differing fields                     | same                                                                    |
+| `FEA_FOREIGN_RESULTS`       | warning                    | imported results do not match the mesh                                                                                                                                                   | analysis id                                | review-only; not used for margins                                       |
+| `FEA_SOLVER_FAILED`         | error                      | ccx exit ≠ 0 or `*ERROR`                                                                                                                                                                 | `data.logTail`                             | read the log tail; usually constraints or material                      |
+| `FEA_SOLVER_TIMEOUT`        | error                      | `--timeout` / `timeoutS` reached                                                                                                                                                         | analysis id                                | coarser mesh or longer timeout                                          |
+| `FEA_FACTOR_INVALID`        | error                      | a factor < 1, or an extra factor without justification                                                                                                                                   | param path                                 | correct the factor                                                      |
+| `FEA_MS_NEGATIVE`           | fail                       | a margin row with MS < 0                                                                                                                                                                 | row id, part, load case                    | redesign; only a qualified reviewer can disposition it                  |
+| `FEA_MS_MARGINAL`           | warning                    | 0 ≤ MS < `marginalBand`                                                                                                                                                                  | row id                                     | same                                                                    |
+| `FEA_MARGINAL_BAND_UNSET`   | warning                    | `marginalBand` not given                                                                                                                                                                 | analysis id                                | ask the owner / company rule for a band                                 |
+| `FEA_DISPOSITION_PENDING`   | warning                    | FAIL/MARGINAL row without a human disposition                                                                                                                                            | row ids                                    | qualified reviewer: `dispose_margin` in the desktop app                 |
+| `FEA_HUMAN_GATE`            | error                      | `dispose_margin` by an agent or without a valid human signature                                                                                                                          | row id                                     | hand over to the qualified reviewer                                     |
 
 ### 7.2 Agent-first compliance (`../AGENT_FIRST.md`)
 
-| AF | Where satisfied |
-| -- | --------------- |
-| AF-01 | set-up and query capabilities are registry commands (§4); transports run like exchange tools, no CLI subcommand group (§7) |
-| AF-02, AF-03 | command descriptions state units and the next command; `llull guide` FEA section (§7) |
-| AF-04 | FR-FEA-37; analysis unit system fixed at `create_analysis` (TR-FEA-07); `{value, unit}` for explicit allowables |
-| AF-05 | all set-up in one plan (`validation/plans/*`), `llull run --validate` |
-| AF-10 | `analysis_report`, `compute_margins` (§5.8 shape), `check_analysis`: unit-suffixed fields |
-| AF-11 | §7.1 codes (FR-FEA-36; VC-FEA-65) |
-| AF-12 | decks and meshes only via `fea_export --save` / the artifact store |
-| AF-13 | TR-FEA-30/40 determinism (VC-FEA-06, 51) |
-| AF-20 | `check_analysis` (FR-FEA-35) |
-| AF-21 | FR-FEA-17 numbers first; overlays FR-FEA-17b SHOULD |
-| AF-22 | `render_view` with `analysisId` / `field` (§7) |
-| AF-23 | validation README "CLI harness" |
-| AF-30 | Verdict ranges, FoS rule, adequacy rule held as data with sources (§5.5, §5.8) |
-| AF-31 | FR-FEA-31; named factors in §5.8 (VC-FEA-60) |
-| AF-32 | FR-FEA-34 (VC-FEA-64) |
-| AF-33 | FR-FEA-32 (VC-FEA-61) |
-| AF-34 | FR-FEA-33, `dispose_margin`, TR-FEA-91 (VC-FEA-62, 63) |
-| AF-35 | `provenance` in every margin row (§5.8); method and inputs in `hand_check` |
-| AF-36 | `compute_margins.summary`: done, passed, needs a human |
-| AF-40 | `fea_mesh` / `fea_solve` progress, `--timeout`, content-hash cache (TR-FEA-05) |
-| AF-41 | bundled ccx / llull-mesh (Netgen); `FEA_TOOL_MISSING` |
-| AF-42 | `--dry-run` on every set-up command (pure) |
+| AF           | Where satisfied                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| AF-01        | set-up and query capabilities are registry commands (§4); transports run like exchange tools, no CLI subcommand group (§7) |
+| AF-02, AF-03 | command descriptions state units and the next command; `llull guide` FEA section (§7)                                      |
+| AF-04        | FR-FEA-37; analysis unit system fixed at `create_analysis` (TR-FEA-07); `{value, unit}` for explicit allowables            |
+| AF-05        | all set-up in one plan (`validation/plans/*`), `llull run --validate`                                                      |
+| AF-10        | `analysis_report`, `compute_margins` (§5.8 shape), `check_analysis`: unit-suffixed fields                                  |
+| AF-11        | §7.1 codes (FR-FEA-36; VC-FEA-65)                                                                                          |
+| AF-12        | decks and meshes only via `fea_export --save` / the artifact store                                                         |
+| AF-13        | TR-FEA-30/40 determinism (VC-FEA-06, 51)                                                                                   |
+| AF-20        | `check_analysis` (FR-FEA-35)                                                                                               |
+| AF-21        | FR-FEA-17 numbers first; overlays FR-FEA-17b SHOULD                                                                        |
+| AF-22        | `render_view` with `analysisId` / `field` (§7)                                                                             |
+| AF-23        | validation README "CLI harness"                                                                                            |
+| AF-30        | Verdict ranges, FoS rule, adequacy rule held as data with sources (§5.5, §5.8)                                             |
+| AF-31        | FR-FEA-31; named factors in §5.8 (VC-FEA-60)                                                                               |
+| AF-32        | FR-FEA-34 (VC-FEA-64)                                                                                                      |
+| AF-33        | FR-FEA-32 (VC-FEA-61)                                                                                                      |
+| AF-34        | FR-FEA-33, `dispose_margin`, TR-FEA-91 (VC-FEA-62, 63)                                                                     |
+| AF-35        | `provenance` in every margin row (§5.8); method and inputs in `hand_check`                                                 |
+| AF-36        | `compute_margins.summary`: done, passed, needs a human                                                                     |
+| AF-40        | `fea_mesh` / `fea_solve` progress, `--timeout`, content-hash cache (TR-FEA-05)                                             |
+| AF-41        | bundled ccx / llull-mesh (Netgen); `FEA_TOOL_MISSING`                                                                      |
+| AF-42        | `--dry-run` on every set-up command (pure)                                                                                 |
 
 ## 8. Performance & robustness budgets
 
-| Budget | Target |
-| ------ | ------ |
-| Mesh of a 20k-node tet10 bracket | ≤ 15 s (Netgen, 1 thread) |
-| Solve (CalculiX, static, 50k nodes, SPOOLES/PARDISO) | ≤ 30 s. TBD: measure (VC-FEA-53) |
-| FRD parse | ≥ 50 MB/s in TS, streaming line reader, no full-file string when > 64 MB |
-| Skin colour update when the field changes | ≤ 50 ms for 200k skin triangles (pre-computed per field, GPU attribute swap; viewport WebGL, unchanged by RS1) |
-| Headless field-plot raster (`render_fea_results --save`) | TS raster below the crossover; native `llull-compute raster` above it (§2.1). Crossover and native time: TBD — measure on the reference machine |
-| Artifact size | gzip JSON. Cap 512 MB per artifact, refuse above with advice to coarsen |
-| Process safety | Every child is tracked and killed on shutdown. Timeouts on mesh (120 s default, configurable) and solve (600 s). No shell interpolation of paths |
-| Determinism | One Netgen thread for meshing. The hash covers canonical sorted sets |
+| Budget                                                   | Target                                                                                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Mesh of a 20k-node tet10 bracket                         | ≤ 15 s (Netgen, 1 thread)                                                                                                                        |
+| Solve (CalculiX, static, 50k nodes, SPOOLES/PARDISO)     | ≤ 30 s. TBD: measure (VC-FEA-53)                                                                                                                 |
+| FRD parse                                                | ≥ 50 MB/s in TS, streaming line reader, no full-file string when > 64 MB                                                                         |
+| Skin colour update when the field changes                | ≤ 50 ms for 200k skin triangles (pre-computed per field, GPU attribute swap; viewport WebGL, unchanged by RS1)                                   |
+| Headless field-plot raster (`render_fea_results --save`) | TS raster below the crossover; native `llull-compute raster` above it (§2.1). Crossover and native time: TBD — measure on the reference machine  |
+| Artifact size                                            | gzip JSON. Cap 512 MB per artifact, refuse above with advice to coarsen                                                                          |
+| Process safety                                           | Every child is tracked and killed on shutdown. Timeouts on mesh (120 s default, configurable) and solve (600 s). No shell interpolation of paths |
+| Determinism                                              | One Netgen thread for meshing. The hash covers canonical sorted sets                                                                             |
 
 ## 9. Test strategy (VC mapping)
 
-| Layer | Tests | VC |
-| ----- | ----- | -- |
-| Unit (`tests/unit/cae/*`) | every command happy, failure and `is pure`. Units, von Mises, principal stresses, MS, Verdict port, FRD/DAT readers on pinned fixtures (download by hash), INP/BDF writers on a tiny hand-built mesh (golden text) | 01, 02, 07, 08, 09, 16, 20, 21, 22 |
-| Contract | `toToolSchemas()` snapshot gains the `analysis` toolset. Plugin `validate`/`restore`. Toolset membership invariant | 01 |
-| Golden (`tests/golden/plans.ts`) | the five draft plans in `validation/plans/` once their commands exist. Id-normalised snapshots plus replay equality | 01, 05, 50 |
-| Kernel (OCC, `server/tests`) | midsurface fast path and face-pairing, defeature, face centroids, face map against the Netgen mesh | 03, 04 |
-| Integration (`server/tests`, needs llull-mesh + ccx (BDF / VTU: Python); skipped otherwise with a reason) | mesh determinism, solve loop, analytic benchmarks, CalculiX reference decks, BDF with pyNastran, VTU with meshio | 06, 10–15, 19, 40–44, 51 |
-| Quality gate (`npm run quality:fea`) | NAFEMS LE1/LE10, analytic table, report markdown | 30, 31 |
-| E2E (Playwright) | result overlay screenshot, margins table | 17 |
-| Desktop (`npm --prefix desktop test`) | bundled `ccx --version`, `llull-mesh --version` (Netgen, OCCT), licence files | 52 |
-| Agent-first (`tests/unit/cae/agentFirst.test.ts` + CLI harness) | named factors, `reviewRequired`, human gate, unverified propagation, error codes, driven by `fea_analytic_expected.json` | 28, 60–65 |
-| Native (`npm run native:check` + `server/tests`, skipped with a logged reason without the binary or a GPU adapter; the CPU twin always runs) | `llull-raster` on the VC-FEA-17 plot and a large plot: native PNG vs TS PNG | 29 |
-| Production gate | LE10 timing scenario; the agent driver runs the whole CLI scenario unattended except the human gate (AF-23) | 53 |
+| Layer                                                                                                                                        | Tests                                                                                                                                                                                                              | VC                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| Unit (`tests/unit/cae/*`)                                                                                                                    | every command happy, failure and `is pure`. Units, von Mises, principal stresses, MS, Verdict port, FRD/DAT readers on pinned fixtures (download by hash), INP/BDF writers on a tiny hand-built mesh (golden text) | 01, 02, 07, 08, 09, 16, 20, 21, 22 |
+| Contract                                                                                                                                     | `toToolSchemas()` snapshot gains the `analysis` toolset. Plugin `validate`/`restore`. Toolset membership invariant                                                                                                 | 01                                 |
+| Golden (`tests/golden/plans.ts`)                                                                                                             | the five draft plans in `validation/plans/` once their commands exist. Id-normalised snapshots plus replay equality                                                                                                | 01, 05, 50                         |
+| Kernel (OCC, `server/tests`)                                                                                                                 | midsurface fast path and face-pairing, defeature, face centroids, face map against the Netgen mesh                                                                                                                 | 03, 04                             |
+| Integration (`server/tests`, needs llull-mesh + ccx (BDF / VTU: Python); skipped otherwise with a reason)                                    | mesh determinism, solve loop, analytic benchmarks, CalculiX reference decks, BDF with pyNastran, VTU with meshio                                                                                                   | 06, 10–15, 19, 40–44, 51           |
+| Quality gate (`npm run quality:fea`)                                                                                                         | NAFEMS LE1/LE10, analytic table, report markdown                                                                                                                                                                   | 30, 31                             |
+| E2E (Playwright)                                                                                                                             | result overlay screenshot, margins table                                                                                                                                                                           | 17                                 |
+| Desktop (`npm --prefix desktop test`)                                                                                                        | bundled `ccx --version`, `llull-mesh --version` (Netgen, OCCT), licence files                                                                                                                                      | 52                                 |
+| Agent-first (`tests/unit/cae/agentFirst.test.ts` + CLI harness)                                                                              | named factors, `reviewRequired`, human gate, unverified propagation, error codes, driven by `fea_analytic_expected.json`                                                                                           | 28, 60–65                          |
+| Native (`npm run native:check` + `server/tests`, skipped with a logged reason without the binary or a GPU adapter; the CPU twin always runs) | `llull-raster` on the VC-FEA-17 plot and a large plot: native PNG vs TS PNG                                                                                                                                        | 29                                 |
+| Production gate                                                                                                                              | LE10 timing scenario; the agent driver runs the whole CLI scenario unattended except the human gate (AF-23)                                                                                                        | 53                                 |
 
 Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-negotiable 3).
 
 ## 10. Delivery plan
 
-| M | Content | Depends on | Effort |
-| - | ------- | ---------- | ------ |
-| M1 | Data model (`CadDocument.analysis`, `FeaMaterialView` over gap 08 records), plugin skeleton, commands create/idealize(solid, plane_stress)/constraint/load/mesh controls/factors, `facesNear`, face centroid/normal in OCC topology, staleness hashes, unit tests | 01 KRN (exact faces on desktop) | 3 w |
-| M2 | Bridge op `mesh`, face map, artifact store, `record_fe_mesh`, Verdict port + quality gate, CLI `fea mesh/quality`, desktop wheel staging | M1 | 3 w |
-| M3 | INP writer, bundled `ccx` (`desktop/scripts/prepare-ccx.mjs`), `fea_solve`, FRD/DAT readers, `record_fea_results`, result overlay, probes, margins, analytic checks, VC-10…14, 20–22, 30, 31, 40–44 | M2 | 4 w |
-| M4 | MCP toolset and prompt, REST routes, golden plans, quality:fea, production-gate scenario, licence packaging | M3 | 2 w |
-| M5 (V1) | BDF writer + pyNastran check, OP2 import, VTU export, RBE3/distributing coupling, Netgen option | M4 | 3 w |
-| M6 (V1) | Shell idealization: midsurface (fast path, then face-pairing), defeaturing, shell decks (S8/CQUAD8), shell result mapping | M4, 07 FTR (sheet metal recipes help the fast path) | 4 w |
-| M7 (V1, RS-5) | `llull-compute raster` field-plot job (crate `llull-raster`, shared with plant 09 VIS), CLI selection + provenance, VC-FEA-29 | M3; RS-0 (`solver/` workspace); RS-5 renderer | 1 w (the renderer itself is costed in RS-5) |
-| V2 | beams (CBAR/B32), composites (06 CMP → PCOMP / `*SHELL SECTION, COMPOSITE`), tied contact, user Nastran/MYSTRAN runner | 06 CMP, 08 MAT | — |
+| M             | Content                                                                                                                                                                                                                                                           | Depends on                                          | Effort                                      |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------- |
+| M1            | Data model (`CadDocument.analysis`, `FeaMaterialView` over gap 08 records), plugin skeleton, commands create/idealize(solid, plane_stress)/constraint/load/mesh controls/factors, `facesNear`, face centroid/normal in OCC topology, staleness hashes, unit tests | 01 KRN (exact faces on desktop)                     | 3 w                                         |
+| M2            | Bridge op `mesh`, face map, artifact store, `record_fe_mesh`, Verdict port + quality gate, CLI `fea mesh/quality`, desktop wheel staging                                                                                                                          | M1                                                  | 3 w                                         |
+| M3            | INP writer, bundled `ccx` (`desktop/scripts/prepare-ccx.mjs`), `fea_solve`, FRD/DAT readers, `record_fea_results`, result overlay, probes, margins, analytic checks, VC-10…14, 20–22, 30, 31, 40–44                                                               | M2                                                  | 4 w                                         |
+| M4            | MCP toolset and prompt, REST routes, golden plans, quality:fea, production-gate scenario, licence packaging                                                                                                                                                       | M3                                                  | 2 w                                         |
+| M5 (V1)       | BDF writer + pyNastran check, OP2 import, VTU export, RBE3/distributing coupling, Netgen option                                                                                                                                                                   | M4                                                  | 3 w                                         |
+| M6 (V1)       | Shell idealization: midsurface (fast path, then face-pairing), defeaturing, shell decks (S8/CQUAD8), shell result mapping                                                                                                                                         | M4, 07 FTR (sheet metal recipes help the fast path) | 4 w                                         |
+| M7 (V1, RS-5) | `llull-compute raster` field-plot job (crate `llull-raster`, shared with plant 09 VIS), CLI selection + provenance, VC-FEA-29                                                                                                                                     | M3; RS-0 (`solver/` workspace); RS-5 renderer       | 1 w (the renderer itself is costed in RS-5) |
+| V2            | beams (CBAR/B32), composites (06 CMP → PCOMP / `*SHELL SECTION, COMPOSITE`), tied contact, user Nastran/MYSTRAN runner                                                                                                                                            | 06 CMP, 08 MAT                                      | —                                           |
 
 **Status (2026-10-17):** the static-solid part of M1–M3 is built (§13) as the minimal slice for PHY-03 / PHY-04: data model, plugin `cae`, mesh op, artifact store, INP writer, ccx solve, FRD/DAT readers, record commands, margins. The remaining items (face map, M4 prompt + golden plans, M5, M6) form **FEA-REST** (part 1, 2026-10-19: modal / buckling hardening, `dispose_margin`, `hand_check`, moment loads, consistent forces and a Verdict subset (the metrics listed in §13), see §13), in step **AERO-5** of the aerospace story (`../README.md`). The face map needs the 01 `FaceQueryPort` (AERO-2). The `FeaMaterialView` over 08 records needs 08 M2 (AERO-3); until then the decks read PHY-01 / PHY-02 models on `Material`.
 
@@ -635,7 +702,7 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 9. **Search-verified sources** (eCFR, NASA-STD-5001B, the NAFEMS vendor manuals) must be re-checked by a human with direct page access
    before the MS report wording is frozen (sources.md marks each one).
 10. **Verdict warpage range**: the manual's acceptable range [0.3, 1] contradicts the metric (flat quad = 0). Decide a llull threshold
-   (with a cited source) or keep warpage informational only (current proposal, §5.5).
+    (with a cited source) or keep warpage informational only (current proposal, §5.5).
 
 ## 12. References
 
@@ -660,12 +727,12 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 
 **Built: a minimal slice**, driven by physics packs PHY-03 / PHY-04 (owner decision; design `docs/physics/FE_PIPELINE_DESIGN.md`).
 
-| Item | Where |
-| ---- | ----- |
-| Analysis types, artifacts, ports (`feaArtifacts`, `humanSignature` on `ExecutionContext`) | `packages/core/src/model/analysis.ts`, `commands/types.ts` |
-| Plugin `cae` (toolset `analysis`): `create_analysis` (static, heat_*, thermo_static), `delete_analysis`, `describe_analysis`, `set_part_idealization` (solid), constraints, loads (force, pressure, gravity), `set_mesh_controls` (tet 1/2), probes, `record_fe_mesh` / `record_fea_results` (§4.1 trust model), `analysis_report`, `check_analysis` | `packages/domain-cae/src/commands/` |
-| INP writer §5.6 (model block, mechanical cards, `*STATIC` per load case), FRD / DAT readers §5.7, summaries, staleness TR-FEA-06 | `packages/domain-cae/src/{decks,results,hash}/` |
-| Transports `fea_mesh` (`llull-mesh` sidecar: Netgen 6.2.2604), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore` | `server/src/fea/`, `solver/bins/llull-mesh/`, `packages/mcp/src/feaTools.ts` |
+| Item                                                                                                                                                                                                                                                                                                                                                   | Where                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Analysis types, artifacts, ports (`feaArtifacts`, `humanSignature` on `ExecutionContext`)                                                                                                                                                                                                                                                              | `packages/core/src/model/analysis.ts`, `commands/types.ts`                   |
+| Plugin `cae` (toolset `analysis`): `create_analysis` (static, heat\_\*, thermo_static), `delete_analysis`, `describe_analysis`, `set_part_idealization` (solid), constraints, loads (force, pressure, gravity), `set_mesh_controls` (tet 1/2), probes, `record_fe_mesh` / `record_fea_results` (§4.1 trust model), `analysis_report`, `check_analysis` | `packages/domain-cae/src/commands/`                                          |
+| INP writer §5.6 (model block, mechanical cards, `*STATIC` per load case), FRD / DAT readers §5.7, summaries, staleness TR-FEA-06                                                                                                                                                                                                                       | `packages/domain-cae/src/{decks,results,hash}/`                              |
+| Transports `fea_mesh` (`llull-mesh` sidecar: Netgen 6.2.2604), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore`                                                                                                                                                                                                                    | `server/src/fea/`, `solver/bins/llull-mesh/`, `packages/mcp/src/feaTools.ts` |
 
 Verified end to end with the previous mesher + ccx 2.21 (axial bar σ = F/A within 1 %, pressure sign, load-case reset) and by the PHY-03 / PHY-04
 benchmarks.
@@ -699,7 +766,7 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
 - **Buckling** (`analysisType: 'buckling'`). One `*BUCKLE` step with the constraints and the loads of the FIRST load case as the reference (deviation from "after a static
   preload": no `*STATIC` pre-stress step is written; a second load case is ignored and flagged `FEA_BUCKLING_LOAD_CASE_IGNORED`). Factors come from the `.dat`
   (`bucklingFactors`, multiples of the applied load); `data.eigen { kind: 'buckling', factors, criticalFactor (smallest factor above 1e-3), criticalMode, negativeFactors,
-  nearZeroFactors }`. Guards in `check_analysis`: `FEA_NO_CONSTRAINTS` / `FEA_NO_LOADS`, `FEA_BUCKLING_NEAR_ZERO` and `FEA_BUCKLING_NO_POSITIVE` (errors),
+nearZeroFactors }`. Guards in `check_analysis`: `FEA_NO_CONSTRAINTS` / `FEA_NO_LOADS`, `FEA_BUCKLING_NEAR_ZERO` and `FEA_BUCKLING_NO_POSITIVE` (errors),
   `FEA_BUCKLING_NEGATIVE_FACTOR` and `FEA_BUCKLING_BELOW_APPLIED` (factor < 1: the applied load exceeds the linear buckling load; warnings). Linear buckling is an upper bound
   (no imperfections): the summary says so and `reviewRequired` is always true.
 - **`check_analysis` additions.** `FEA_UNDERCONSTRAINED` from the mesh artifact: the restrained (node, dof) rows of every support are projected on the six rigid-body motions of each part
@@ -708,8 +775,8 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
   a disposition: a FAIL never becomes a pass), `FEA_MARGINAL_BAND_UNSET` (warning, VC-FEA-62) and `FEA_DISPOSITION_PENDING` (the check runs the default query without a band, so
   `FEA_MS_MARGINAL` stays a code of `compute_margins` rows). Because of the last two a solved
   case with allowables reads `warn` at best until a band is stated.
-- **`dispose_margin`** (registry command, human gate, `margins/disposeMargin.ts`). `{ analysisId, rowId, decision: accepted | rejected | redesign, justification, signature?, + the
-  compute_margins query (criterion, allowable, groupBy, loadCases, marginalBand) }`: the query reproduces the table the reviewer saw, because `rN` depends on it. Every
+- **`dispose_margin`** (registry command, human gate, `margins/disposeMargin.ts`). `{ analysisId, rowId, decision: accepted | rejected | redesign, justification, confirmation?, + the
+compute_margins query (criterion, allowable, groupBy, loadCases, marginalBand) }`: the query reproduces the table the reviewer saw, because `rN` depends on it. Every
   row carries a stable `rowKey` = `loadCase|part|region|check|criterion`; the disposition is stored under it in `AnalysisCase.dispositions` with decision,
   justification, `resultsHash`, signer, signatureId and the verified signature. The signature is verified through `ctx.humanSignature` over
   sha256 of the canonical JSON of `{ kind: 'margin_disposition', analysisId, rowKey, status, ms, decision, justification, resultsHash }`. No port, no signature or a signature
@@ -740,7 +807,7 @@ composite shells and the UI panels are built in FEA-REST part 3; BDF, OP2, VTU, 
 **Review fixes (2026-10-17), documented behaviour changes:**
 
 - **Trust model §4.1 completed on the read side.** A recorded summary in the document (also one that arrived through `load_document` or a
-  live snapshot) is a *claim*. `analysis_report`, `check_analysis`, `describe_analysis` and the thermal / thermo-mechanical read paths call
+  live snapshot) is a _claim_. `analysis_report`, `check_analysis`, `describe_analysis` and the thermal / thermo-mechanical read paths call
   `trustedRecord` (`domain-cae/src/shared/trust.ts`): the summary is recomputed from the artifact in `ctx.feaArtifacts` with the same
   summariser the record commands use. State `solved` / `meshed` only when it matches; a difference gives state **`untrusted`** with
   `FEA_SUMMARY_MISMATCH` (`data.problem`), no port / artifact absent / recorded without it gives **`missing`**. In both cases the mesh and
@@ -860,7 +927,7 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
   minCoverage -> `FEA_MIDSURFACE_COVERAGE` at set time and at `fea_mesh`. Not built: cylinder pairs (curved walls stay unpaired, warning), step 4 extension / sewing
   (warning: mid faces join only where their edges coincide, so the two mid faces of a face-paired L-bracket do NOT meet; the sheet-metal path has no such gap),
   `BRepAlgoAPI_Common` overlap regions. No kernel -> `FEA_KERNEL_OCC_REQUIRED`. `extract_midsurface` (read-only) previews it: `data { method, faces [{ source,
-  thickness, normal, area, outer, holes }], thicknesses, coverage, unpairedFaces, warnings }`. The sheet-metal part and its rule are in the mesh input hash.
+thickness, normal, area, outer, holes }], thicknesses, coverage, unpairedFaces, warnings }`. The sheet-metal part and its rule are in the mesh input hash.
 - **Plane stress** (`idealization=plane_stress`, `thickness`, `sourceFacesNear`): the faces near the points (boxes analytically, other solids through `faceQuery`) must
   lie in z = 0 with normal +-Z (CalculiX plane elements live in the global x-y plane; `FEA_PLANE_STRESS_NOT_XY`), meshed CPS3 / CPS6 / CPS4 / CPS8 oriented +Z,
   `*SOLID SECTION` with the thickness line; fixed / pinned write dofs 1-2. Pressure on a plane-stress part is refused (`FEA_LOAD_INVALID`: edge labels are not built;
@@ -927,11 +994,10 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
 - **Part-2 review fixes.** `Math.max(...array)` replaced by loops (BDF ids, OP2). Preloaded `*BUCKLE`: the reference step writes preload + reference summed per node /
   dof, element / face and GRAV (a modifying `*CLOAD` / `*DLOAD` replaces the earlier value); measured with ccx 2.21: the factor multiplies the WHOLE *BUCKLE step load (preload + reference), see SOLVER-VERIFY.
   A supportless modal case writes a lower bound of -1 Hz; measured with ccx 2.21: accepted, six rigid-body modes at about 0 Hz then the free-free modes. Decks carry `llull inputHash <16 hex>`
-  (INP `*HEADING`, BDF `SUBTITLE`); import refuses a different marker (`FEA_RESULTS_INPUT_MISMATCH`), a file without one is `binding: 'imported-unbound'` with
-  `FEA_RESULTS_UNBOUND` (import and `check_analysis` warnings); measured: ccx 2.21 copies `*HEADING` into the .frd header (`1U` record), so a re-import of its own .frd binds; unverified: where Nastran puts SUBTITLE in the OP2.
-  Plugin validation of `preloadLoadCase`, `marginalBand` and `view`. RBE3 needs >= 3 nodes that carry the moment (`FEA_LOAD_INVALID`). OP2: at most 1e6 records,
-  text decoded only from records <= 128 bytes. The VTU export applies the deck export-control gate (`MAT_EXPORT_CONTROLLED`). The face map raises
-  `AMBIGUOUS_FACE_MAP` only for a target that names the ambiguous face. Adding inputHash to the `dispose_margin` payload (part 2) makes dispositions signed before it
+  (INP `*HEADING`, BDF `SUBTITLE`); import refuses a different marker (`FEA_RESULTS_INPUT_MISMATCH`), a file without one is `binding: 'imported-unbound'`with`FEA_RESULTS_UNBOUND`(import and`check_analysis`warnings); measured: ccx 2.21 copies`\*HEADING` into the .frd header (`1U`record), so a re-import of its own .frd binds; unverified: where Nastran puts SUBTITLE in the OP2.
+Plugin validation of`preloadLoadCase`, `marginalBand`and`view`. RBE3 needs >= 3 nodes that carry the moment (`FEA_LOAD_INVALID`). OP2: at most 1e6 records,
+text decoded only from records <= 128 bytes. The VTU export applies the deck export-control gate (`MAT_EXPORT_CONTROLLED`). The face map raises
+`AMBIGUOUS_FACE_MAP`only for a target that names the ambiguous face. Adding inputHash to the`dispose_margin` payload (part 2) makes dispositions signed before it
   fail verification on replay.
 - **Tests.** `tests/unit/cae/{shellSetup,shellDeck,shellTransports,marginsSingularity,reviewFixesPart2}.test.ts`, `tests/golden/feaExports.test.ts`,
   `tests/component/AnalysisRest.test.tsx`. Not run anywhere: a real shell / plane-stress / composite solve, the shell pressure signs, the expansion mapping on a real
@@ -943,13 +1009,14 @@ changes) was **not run or even compiled**. Real-tool tests skip with a logged re
 laminate (`packages/domain-cae/src/margins/plyMargins.ts`), per load case and node group it gives ONE ROW PER PLY (criterion `ply_failure`, rowKey
 `<case>|<entity>|<region>|ultimate|ply_failure|<plyId>`), each with `reviewRequired: true`, `unverified` from the lamina basis, the standard disposition flow
 (`pending_human` for FAIL / MARGINAL) and the singular split.
+
 - **Recovery.** The laminate is read from core data (`laminateOf`, `CadDocument.composites`; no import of the composites plugin). The pure math moved to `@lib/laminate`
   (`clt.ts`, `failure.ts`, `provenance.ts`, new `recover.ts`; `@aero` and `@cae` both import it). From the global `STRESS_TOP` / `STRESS_BOT` of the shell nodes
   (components [xx, yy, zz, xy, yz, zx], analysis stress unit) the in-plane stress is rotated into the ply frame (rosette 0-degree axis projected on the planar shell,
   `compositePlane`), converted to MPa, and mapped to strains at z = +-h/2 through the Qbar of the top and bottom plies; strain is linear through the thickness
   (Kirchhoff-Love), so every ply stress at its two surfaces follows from CLT (`recoverPlyStresses`, verified to reproduce a CLT solution to round-off). Plies are
   taken bottom to top along the shell element normal (reversed when the laminate stacks the other way), as in the deck writers.
-- **Margin.** R = the lower of the max-stress and Tsai-Wu strength ratios (both reported, plus `plyCriterion`, `failureMode`, the ply stresses, F12* with its default
+- **Margin.** R = the lower of the max-stress and Tsai-Wu strength ratios (both reported, plus `plyCriterion`, `failureMode`, the ply stresses, F12\* with its default
   flag) over the group's nodes and the ply's two surfaces; MS = R / (FoS x extras) - 1 with the ULTIMATE factor of the case category (strengths are failure strengths:
   there is no yield check, and the `allowable` / `criterion` params do not apply to these rows). No stress in a ply gives `ms: null`.
 - **Still refused.** A laminate whose lamina lacks any of Xt, Xc, Yt, Yc, S (no default exists), a non-planar shell, a rosette normal to the shell, a zoned laminate
@@ -966,20 +1033,20 @@ laminate (`packages/domain-cae/src/margins/plyMargins.ts`), per load case and no
 (install record `docs/decisions/SV1-solver-toolchain-windows.md`). Every FE suite in `server/tests/` that needs only the mesher + ccx now runs (the native-kernel ones: see
 that record). Findings, each with a test that runs when the tools are present:
 
-| Item (was unverified) | Measured | Consequence |
-| --- | --- | --- |
-| `.dat` participation / effective-mass layout | six components per row (x, y, z, rx, ry, rz), mode number first; the effective-mass table ends with a `TOTAL` row; parsed as built | fixture `ccx221_modal_cantilever.dat`, `tests/unit/cae/eigenChecks.test.ts` |
-| `TOTAL EFFECTIVE MASS` | it is the MODEL mass (rho V: 1.555e-4 t for a 200 x 10 x 10 steel bar), not the sum over the extracted modes | **defect fixed**: the per-mode share is `fractionOfModelMass` (was `fractionOfExtractedSum`), summary "of the model mass" |
-| `*FREQUENCY n, -1` (supportless modal) | accepted; 6 rigid-body modes (<= 0.004 Hz), then the free-free bending pair at 1321.7 Hz (Euler-Bernoulli 1333 Hz, -0.8 %) | `server/tests/feaBucklingPreload.test.ts` |
-| Cantilever modal / Euler column | f1 209.73 Hz (EB 209.5), P_cr factor 4.8025 x 1000 N (pi^2 E I / 4 L^2 = 4797.8 N) | as `feaEigen` (that suite also needs the native kernel) |
-| Buckling preload + `*BUCKLE` | 2000 N preload + 1000 N reference: factor 1.6008 = P_cr / 3000 N. The factor scales the WHOLE `*BUCKLE` step load; the preceding `*STATIC` stress is not a base state (same with NLGEOM, and a reference-only `*BUCKLE` load gives 4.80, ignoring the preload) | **defect fixed (semantics)**: `data.eigen.factorsMultiply = preload_and_reference`, summary "x (preload + reference)", `set_buckling_preload` description; a constant preload is NOT expressible with ccx `*BUCKLE` |
-| Shell expansion mapping | ccx writes the .frd on the expanded nodes only (none of the 2D ids); the geometric top / bottom mapping finds them for S8 and composite S8R; plate cantilever tip 3.503 mm between plate and beam bounds (beam 3.571), top fibre +, bottom -, membrane about 0 | `server/tests/feaShellSolve.test.ts` |
-| Shell pressure sign | a positive `P` moves the shell ALONG its element normal | **defect fixed**: label 1 (load from the +normal side) writes -p, label 2 +p (`decks/mechanical.ts`) |
-| `*HEADING` in the .frd | copied as the `1U` header record; `fea_import_results` of the solver's own .frd binds (no `FEA_RESULTS_UNBOUND`) | `feaShellSolve` |
-| Composite S8R section | `*SHELL SECTION, COMPOSITE` with `*ELASTIC, TYPE=ENGINEERING CONSTANTS` and per-ply `*ORIENTATION` runs; [90/0/0/90] strip (E1 140, E2 10, G12 5 GPa, ply 0.25 mm), 1 N tip load, at x = 50: top sigma_x 5.6964 (CLT 5.694), sigma_y -0.2234 (CLT -0.226), u_z -2.3647 mm (CLT -2.371); stresses are in the GLOBAL frame (the 90-degree outer ply shows its transverse stress as sigma_x), one node layer per ply | the ply-failure margin assumption above holds |
-| Thermal suites (PHY-03), restrained / coupled thermo-mechanical (PHY-04) | pass unchanged | `server/tests/feaThermal*.test.ts`, `feaThermomech*.test.ts` |
-| pyNastran `read_bdf(xref=True)` round trip | passes (pyNastran 1.4.1) | `tests/unit/cae/bdfWriter.test.ts` |
-| Harness / host on Windows | the child-process environment allowlist was case-sensitive, so ccx ran without `Path` (DLLs not found) and Python without `SystemRoot`; the FE suites ran a bare `python3` / `ccx` instead of the probed tools | **defects fixed** (`server/src/pythonExchange.ts`, `server/tests/feaTestSupport.ts`) |
+| Item (was unverified)                                                    | Measured                                                                                                                                                                                                                                                                                                                                                                                                          | Consequence                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.dat` participation / effective-mass layout                             | six components per row (x, y, z, rx, ry, rz), mode number first; the effective-mass table ends with a `TOTAL` row; parsed as built                                                                                                                                                                                                                                                                                | fixture `ccx221_modal_cantilever.dat`, `tests/unit/cae/eigenChecks.test.ts`                                                                                                                                         |
+| `TOTAL EFFECTIVE MASS`                                                   | it is the MODEL mass (rho V: 1.555e-4 t for a 200 x 10 x 10 steel bar), not the sum over the extracted modes                                                                                                                                                                                                                                                                                                      | **defect fixed**: the per-mode share is `fractionOfModelMass` (was `fractionOfExtractedSum`), summary "of the model mass"                                                                                           |
+| `*FREQUENCY n, -1` (supportless modal)                                   | accepted; 6 rigid-body modes (<= 0.004 Hz), then the free-free bending pair at 1321.7 Hz (Euler-Bernoulli 1333 Hz, -0.8 %)                                                                                                                                                                                                                                                                                        | `server/tests/feaBucklingPreload.test.ts`                                                                                                                                                                           |
+| Cantilever modal / Euler column                                          | f1 209.73 Hz (EB 209.5), P_cr factor 4.8025 x 1000 N (pi^2 E I / 4 L^2 = 4797.8 N)                                                                                                                                                                                                                                                                                                                                | as `feaEigen` (that suite also needs the native kernel)                                                                                                                                                             |
+| Buckling preload + `*BUCKLE`                                             | 2000 N preload + 1000 N reference: factor 1.6008 = P_cr / 3000 N. The factor scales the WHOLE `*BUCKLE` step load; the preceding `*STATIC` stress is not a base state (same with NLGEOM, and a reference-only `*BUCKLE` load gives 4.80, ignoring the preload)                                                                                                                                                    | **defect fixed (semantics)**: `data.eigen.factorsMultiply = preload_and_reference`, summary "x (preload + reference)", `set_buckling_preload` description; a constant preload is NOT expressible with ccx `*BUCKLE` |
+| Shell expansion mapping                                                  | ccx writes the .frd on the expanded nodes only (none of the 2D ids); the geometric top / bottom mapping finds them for S8 and composite S8R; plate cantilever tip 3.503 mm between plate and beam bounds (beam 3.571), top fibre +, bottom -, membrane about 0                                                                                                                                                    | `server/tests/feaShellSolve.test.ts`                                                                                                                                                                                |
+| Shell pressure sign                                                      | a positive `P` moves the shell ALONG its element normal                                                                                                                                                                                                                                                                                                                                                           | **defect fixed**: label 1 (load from the +normal side) writes -p, label 2 +p (`decks/mechanical.ts`)                                                                                                                |
+| `*HEADING` in the .frd                                                   | copied as the `1U` header record; `fea_import_results` of the solver's own .frd binds (no `FEA_RESULTS_UNBOUND`)                                                                                                                                                                                                                                                                                                  | `feaShellSolve`                                                                                                                                                                                                     |
+| Composite S8R section                                                    | `*SHELL SECTION, COMPOSITE` with `*ELASTIC, TYPE=ENGINEERING CONSTANTS` and per-ply `*ORIENTATION` runs; [90/0/0/90] strip (E1 140, E2 10, G12 5 GPa, ply 0.25 mm), 1 N tip load, at x = 50: top sigma_x 5.6964 (CLT 5.694), sigma_y -0.2234 (CLT -0.226), u_z -2.3647 mm (CLT -2.371); stresses are in the GLOBAL frame (the 90-degree outer ply shows its transverse stress as sigma_x), one node layer per ply | the ply-failure margin assumption above holds                                                                                                                                                                       |
+| Thermal suites (PHY-03), restrained / coupled thermo-mechanical (PHY-04) | pass unchanged                                                                                                                                                                                                                                                                                                                                                                                                    | `server/tests/feaThermal*.test.ts`, `feaThermomech*.test.ts`                                                                                                                                                        |
+| pyNastran `read_bdf(xref=True)` round trip                               | passes (pyNastran 1.4.1)                                                                                                                                                                                                                                                                                                                                                                                          | `tests/unit/cae/bdfWriter.test.ts`                                                                                                                                                                                  |
+| Harness / host on Windows                                                | the child-process environment allowlist was case-sensitive, so ccx ran without `Path` (DLLs not found) and Python without `SystemRoot`; the FE suites ran a bare `python3` / `ccx` instead of the probed tools                                                                                                                                                                                                    | **defects fixed** (`server/src/pythonExchange.ts`, `server/tests/feaTestSupport.ts`)                                                                                                                                |
 
 With the native kernel (MinGW build, see the record): `feaEigen`, conformal bonding (`feaMeshBridge`, bimetal, NAFEMS T1) pass. Still not run here: Nastran itself
 (PLOAD4 sign, PCOMP / MAT8 / CORD2R, OP2 from a real solver), ParaView on the VTU, defeaturing, and the face map (TR-FEA-32): its `faceQuery.distance` call

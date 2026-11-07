@@ -242,6 +242,18 @@ function withLedgers(doc: CadDocument): CadDocument {
     signature,
     documentUid: doc.uid ?? '',
   };
+  const margin = {
+    act: 'dispose_margin',
+    analysisId: analysisId(doc),
+    rowKey: 'k1',
+    decision: 'accepted',
+    justification: 'j',
+    resultsHash: 'a'.repeat(64),
+    signer: 's',
+    signatureId: 'id',
+    signature,
+    documentUid: doc.uid ?? '',
+  };
   const analysis = {
     ...doc.analysis,
     exceptionLedger: [exception, { ...exception, documentUid: 'e'.repeat(32) }],
@@ -249,6 +261,11 @@ function withLedgers(doc: CadDocument): CadDocument {
     fitLedger: [
       { ...fit, rowKey: 'row 1' },
       { ...fit, rowKey: 'row 1', documentUid: 'e'.repeat(32) },
+    ],
+    dispositionLedger: [
+      margin,
+      { ...margin, act: 'dispose_thermal_limit', rowKey: 'lim-1:max' },
+      { ...margin, documentUid: 'e'.repeat(32) },
     ],
   };
   return { ...doc, analysis } as CadDocument;
@@ -358,7 +375,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
       }),
     },
   },
-  // the human-act ledgers replays keep (exceptionLedger, fitLedger) and the fit dispositions: a valid entry and one signed for another document uid
+  // the human-act ledgers replays keep (exceptionLedger, fitLedger, dispositionLedger) and the fit dispositions: a valid entry and one signed for another document uid
   'cae#ledgers': {
     roots: ['analysis'],
     build: () => withLedgers(recordedStudy(studyFixture()).doc),
