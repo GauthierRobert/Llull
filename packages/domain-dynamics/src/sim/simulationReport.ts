@@ -13,6 +13,7 @@ import type { BodyMassDistribution } from '@core/geometry/bodyMassProperties';
 import { warnJams } from './jamDetection';
 import { findPeriod, tailMean, type Period } from './periodicity';
 import type { DriveRuntime } from './actuators/block';
+import { isDatasheetMotor } from './actuators/machine';
 import { driveSeries } from './actuators/series';
 import { energyOf, type EnergyData, type EnergySeries } from './energyReport';
 import type { LedgerData } from './ledger';
@@ -216,7 +217,7 @@ export function simulationData(
       m.id,
       m.kind === 'speed' || m.kind === 'linear_speed'
         ? seriesOf(trace.servoForce, m.id)
-        : m.kind === 'dc'
+        : isDatasheetMotor(m)
           ? datasheetTorque(m.id, run.drives, trace)
           : velocityOf(m.joint).map((v) => motorForce(m, v)),
     ]),

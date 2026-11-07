@@ -2,8 +2,10 @@
 
 import type { DynamicsModel } from '@core/model/dynamics';
 import type { PlotPanel } from '@lib/timeSeriesSvg';
-import { windingTemperatureSeries, thermalParams } from '../sim/actuators/thermal';
+import { isDatasheetMotor, thermalOf } from '../sim/actuators/machine';
+import { windingTemperatureSeries } from '../sim/actuators/thermal';
 import { barChart, xyChart, type Chart, type XySeries } from '../sim/driveCharts';
+import { inductionCurve, pmsmCurve, stepperCurve } from '../sim/actuators/curves';
 import type { RunData } from '../sim/runData';
 
 export const DRIVE_PANEL_QUANTITIES = ['motor_current', 'motor_voltage', 'winding_temperature'] as const;
@@ -39,7 +41,7 @@ export function drivePanels(
   if (quantity === 'winding_temperature') {
     const series = motors.flatMap(([id, drive]) => {
       const motor = dynamics.motors[id];
-      const network = motor?.kind === 'dc' ? thermalParams(motor.datasheet) : null;
+      const network = motor !== undefined && isDatasheetMotor(motor) ? thermalOf(motor) : null;
       if (drive.series === undefined || network === null) return [];
       return [{ label: id, values: windingTemperatureSeries(network, drive.series.times, drive.series.currentA, ambientC).windingC }];
     });
@@ -75,7 +77,14 @@ export function driveChart(
   const series: XySeries[] = [];
   for (const [id, drive] of motors) {
     const motor = dynamics.motors[id];
-    if (drive.series === undefined || motor?.kind !== 'dc') continue;
+    if (drive.series === undefined || motor === undefined || !isDatasheetMotor(motor)) continue;
+    if (motor.kind !== 'dc') {
+      series.push({ label: `${id} operating points`, xs: drive.series.shaftSpeedRpm, ys: drive.series.shaftTorqueNm, style: 'dots' });
+      series.push(
+        motor.kind === 'pmsm' ? pmsmCurve(motor, id) : motor.kind === 'stepper' ? stepperCurve(motor, id) : inductionCurve(motor, id),
+      );
+      continue;
+    }
     series.push({ label: `${id} operating points`, xs: drive.series.shaftSpeedRpm, ys: drive.series.shaftTorqueNm, style: 'dots' });
     const sheet = motor.datasheet;
     const noLoadRpm = (sheet.nominalVoltageV / sheet.torqueConstantNmPerA) * (30 / Math.PI);

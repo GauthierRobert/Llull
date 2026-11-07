@@ -4,7 +4,8 @@ import type { SimulationTrace } from '@core/dynamics/physicsEngine';
 import type { Motor } from '@core/model/dynamics';
 import type { DriveRuntime } from './actuators/block';
 import { electricalTimeConstant, isQuasiStatic } from './actuators/dcMotor';
-import { checkMotorData } from './actuators/motorData';
+import { checkDatasheet } from './actuators/motorData';
+import { machineWarnings, stepperRunData, type StepperRunData } from './actuators/machineWarnings';
 import { driveSeries, trackingOf, type DriveSeries, type Tracking } from './actuators/series';
 import type { EnergyData } from './energyReport';
 import { ledgerOf, type LedgerData } from './ledger';
@@ -38,6 +39,8 @@ export interface DriveRunData {
   /** Samples where the current limit or the bus voltage clipped the command. */
   readonly limitedSamples: number;
   readonly tracking?: Tracking;
+  /** Stepper only: steps lost, first loss time and peak electrical lag. */
+  readonly stepper?: StepperRunData;
   /** True when the datasheet passed check_motor_data and carries no acceptInconsistent. */
   readonly verified: boolean;
   readonly sourceGrade: string;
@@ -75,7 +78,8 @@ export function driveReport(
   for (const run of runs) {
     const series = driveSeries(run, trace);
     const tracking = trackingOf(run, trace);
-    const check = checkMotorData(run.motor.datasheet);
+    const stepper = stepperRunData(run, trace);
+    const check = checkDatasheet(run.motor);
     const unverified = !check.consistent || run.motor.acceptInconsistent !== undefined;
     drives[run.motor.id] = {
       joint: run.motor.joint,
@@ -98,6 +102,7 @@ export function driveReport(
       rms: { currentA: rms(series.currentA), jointTorqueNm: rms(series.jointTorqueNm) },
       limitedSamples: series.limited.filter((flag) => flag > 0).length,
       ...(tracking === null ? {} : { tracking }),
+      ...(stepper === null ? {} : { stepper }),
       verified: !unverified,
       sourceGrade: run.motor.source.grade,
       ...(withSeries ? { series } : {}),
@@ -106,10 +111,11 @@ export function driveReport(
       warnings.push(
         `motor '${run.motor.id}': datasheet checks failed and were accepted (${run.motor.acceptInconsistent ?? 'no reason'}); results are unverified`,
       );
-    if (run.params.inductanceH > 0 && isQuasiStatic(run.params, timestep))
+    if (run.machine.kind === 'dc' && run.machine.params.inductanceH > 0 && isQuasiStatic(run.machine.params, timestep))
       warnings.push(
-        `DRV_ELECTRICAL_QUASI_STATIC: motor '${run.motor.id}' electrical time constant ${(electricalTimeConstant(run.params) * 1e6).toPrecision(3)} us is below timestep/50 (${timestep} s): the current is treated as quasi-static`,
+        `DRV_ELECTRICAL_QUASI_STATIC: motor '${run.motor.id}' electrical time constant ${(electricalTimeConstant(run.machine.params) * 1e6).toPrecision(3)} us is below timestep/50 (${timestep} s): the current is treated as quasi-static`,
       );
+    warnings.push(...machineWarnings(run, trace, peak(series.voltageV), timestep));
     if (tracking !== null && run.drive.mode === 'prescribed') {
       const threshold = trackingLimit(tracking);
       if (tracking.peakError > threshold)

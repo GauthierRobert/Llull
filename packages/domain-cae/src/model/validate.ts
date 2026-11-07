@@ -8,6 +8,7 @@ import { settingsErrors } from './validateSettings';
 import { defeatureErrors, idealizationErrors } from './validateIdealization';
 import { ledgerErrors, studyErrors } from '../vnv/validateStudies';
 import { fitDispositionErrors } from '../thermomech/validateDispositions';
+import { dispositionLedgerErrors } from '../shared/validateDispositionLedger';
 
 const TYPES = [
   'static',
@@ -256,5 +257,11 @@ export function analysisErrors(raw: Record<string, unknown>): string[] {
   scope.errors.push(...paths.map((path) => `${path} is not a finite number`));
   const order = analysis['caseOrder'] as unknown[];
   checkBag(scope, 'analysis.cases', analysis['cases'], order, (id, analysisCase) => checkCase(scope, id, analysisCase));
-  return [...scope.errors, ...ledgerErrors(analysis), ...fitDispositionErrors(analysis), ...durabilityErrors(raw)];
+  return [
+    ...scope.errors,
+    ...ledgerErrors(analysis),
+    ...fitDispositionErrors(analysis),
+    ...dispositionLedgerErrors(analysis),
+    ...durabilityErrors(raw),
+  ];
 }

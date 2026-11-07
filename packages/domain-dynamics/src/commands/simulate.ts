@@ -84,13 +84,15 @@ export const simulateMotion = defineCommand({
     'heat release was calibrated at is "calibrated", not validation evidence); plausibility[] (FPR_UNREALISTIC: peak-pressure angle and CA50 vs MBT, ' +
     'mechanical efficiency, Rotax-class propeller inertia / torque, reciprocating mass on the default density). A gear with efficiency (add_transmission) ' +
     'loses (1 - efficiency) of its torque on the driven shaft; a propeller with a Ct / Cp table and airspeed follows J = V/(nD). ' +
-    'Datasheet DC motors (add_motor kind "dc" + set_motor_drive): data.drives gives per motor the peak and final current (A), terminal voltage (V), joint torque ' +
+    'Datasheet motors (add_motor kind "dc", "pmsm", "stepper" or "induction" + set_motor_drive): data.drives gives per motor the peak and final current (A: dc winding current, pmsm phase-current amplitude, stepper phase current, induction load current I2 RMS), voltage (V: terminal, stator amplitude, phase R*I, phase RMS), joint torque ' +
     '(N·m) and shaft speed (rpm), RMS values, the number of samples where the current limit clipped the command, the tracking error of a prescribed / ' +
     'closed-loop drive and whether the datasheet was verified; detail "drives" adds the per-sample series (voltage, current, shaft and joint torque, shaft speed, ' +
     'electrical and mechanical power) and turns the energy ledger on (the joint series of detail "series" are included too). data.ledger (with `energy`, or detail "drives") lists the joules of every element ' +
-    '(electrical input net of regeneration, copper loss, magnetic energy, gearhead loss, friction and damping, propellers, kinetic, potential, external work) ' +
+    '(electrical input net of regeneration, copper loss, magnetic energy, iron and rotor loss of an induction motor or the damping loss of a stepper, gearhead loss, friction and damping, propellers, kinetic, potential, external work) ' +
     'and how well input - dissipated - stored closes (pass <= 1e-3, warn <= 1e-2 of the largest term). Warnings: DRV_ELECTRICAL_QUASI_STATIC (info), ' +
-    'DRV_TRACKING_ERROR, DRV_CONTROL_RATE / DRV_PROFILE_INVALID / DRV_TUNE_NO_INERTIA (refuse the run, nothing simulated). ' +
+    'DRV_TRACKING_ERROR, DRV_STEPS_LOST (stepper: steps lost, with the time of the first; data.drives[id].stepper holds lostSteps, firstLostS, peakLagDeg), DRV_STEPPER_TIMESTEP (the step is too coarse for the stepper ringing), ' +
+    'DRV_PMSM_VOLTAGE_OVER (the stator voltage exceeds V_bus/sqrt(3): the envelope neglects the winding resistance), DRV_INDUCTION_QUASI_STEADY (steady-state torque at the instantaneous slip, info), ' +
+    'DRV_CONTROL_RATE / DRV_PROFILE_INVALID / DRV_TUNE_NO_INERTIA / DRV_MODE_UNSUPPORTED (refuse the run, nothing simulated). ' +
     'Next: read data.loops.tier first, then data.engineReport and data.reactions.',
   params: z.object({
     duration: z.number().positive().max(600).optional().describe('Simulated seconds. Default 5.'),

@@ -15,6 +15,7 @@ import { studyItems, studyRows, type StudyRow } from '../sim/truth/studyItems';
 import { ledgerItems, ledgerOrderItems } from '../sim/truth/ledgerItems';
 import { inertiaVariationItems, stopPenetrationItems } from '../sim/truth/softnessItems';
 import { effortItems, provenanceItem, truthVerdict } from '../sim/truth/verdictItems';
+import { warningItems } from '../sim/truth/warningItems';
 import { loopDriftItem } from './dynamicsSimChecks';
 import { dynamicsOf } from './bodies';
 import { compareSeriesRun, referenceItems } from './engine/referenceSeries';
@@ -91,6 +92,7 @@ export const checkMotionTruth = defineCommand({
   description:
     'Can this motion simulation be trusted? Runs the model and returns the review envelope with ONE verdict: "trusted" (no failing, warning or skipped item and ' +
     'every input grade A / B), "plausible" (no fail, but a warning, a skipped item or an input of grade C / without a source) or "not_trusted" (any fail). ' +
+    'Run warnings reach the verdict: DRV_STEPS_LOST (stepper ended with steps lost) is a fail; DRV_STEPPER_OVERSHOOT, DRV_STEPPER_TIMESTEP, DRV_INDUCTION_QUASI_STEADY (steady-state torque, no flux transients), DRV_PMSM_VOLTAGE_OVER (the envelope neglects R), DRV_TRACKING_ERROR and any other coded run warning are warns; DRV_ELECTRICAL_QUASI_STATIC and DRV_MESH_STIFFNESS_ASSUMED are info. A stepper-only ledger closes by construction and is reported as info, not as evidence. ' +
     'Items: (a) DRV_LEDGER_CLOSURE: input - dissipated - stored over the largest term, pass <= 1e-3, warn <= 1e-2; a closure that fails because a velocity ' +
     'servo jump-starts a mass from rest names its cause (DRV_LEDGER_SERVO_JUMP: an impulse of 1/2 J v² the servo work estimate cannot resolve) and DRV_LEDGER_ORDER ' +
     'states the order in which the closure error of a run with end stops / backlash shrinks with the step (first order in dt). (b) DRV_TIMESTEP_STUDY per output: the ' +
@@ -174,6 +176,7 @@ export const checkMotionTruth = defineCommand({
       study = { level, steps: refined.steps, rows };
       items.push(
         ...ledgerItems(base, dynamics, inertiaOf),
+        ...warningItems(base),
         ...(refined.stopped === null
           ? [...studyItems(rows), ...ledgerOrderItems(base, rows)]
           : [notRun('DRV_TIMESTEP_STUDY', refined.stopped, 'Start from a larger timestep, or study a model whose step can be halved.')]),

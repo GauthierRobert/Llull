@@ -4,7 +4,10 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
+import { acceptanceStanding } from './acceptanceGate';
 import { refuseScan, SCAN_REMEDIATION } from './codes';
+import { extractionPayload } from './extractionCommands';
+import { registrationPayload } from './registrationCommands';
 import { sameTransform } from './mat4';
 import { cloudsOf, findCloud, scanOf } from './model';
 import { portOf } from './region';
@@ -42,7 +45,8 @@ export const checkPointClouds = defineCommand({
   description:
     'Read-only check of the scan workspace (end every scan job with it): missing assets (SCN_ASSET_MISSING), unregistered stations, ' +
     'unverified or unaccepted registrations (SCN_REGISTRATION_UNVERIFIED, listing the as-built runs derived from the cloud), extractions made ' +
-    'before the cloud moved (SCN_EXTRACTION_STALE), unverified extractions and those awaiting a reviewer (SCN_REVIEW_REQUIRED). data: ' +
+    'before the cloud moved (SCN_EXTRACTION_STALE), unverified extractions and those awaiting a reviewer (SCN_REVIEW_REQUIRED). An accepted status is ' +
+    're-verified against the signed acceptance through the signing port: SCN_ACCEPTANCE_UNBACKED (fail) when nothing verified backs it, SCN_ACCEPTANCE_UNVERIFIABLE (warn) with no port. data: ' +
     '{ status pass | warn | fail, items [{ severity, code, ids, message, remediation }] }.',
   annotations: { readOnly: true },
   params: z.object({ cloudIds: z.array(z.string()).optional().describe('Clouds to check (default all attached clouds).') }),
@@ -71,7 +75,35 @@ export const checkPointClouds = defineCommand({
       if (registration === undefined) {
         if (cloudsOf(doc).length > 1 && !fixedIds.has(cloud.id))
           items.push(item('warn', 'SCN_CLOUD_UNREGISTERED', [cloud.id], `${cloud.id} is not registered to the other clouds`));
-      } else if (registration.status !== 'accepted') {
+      } else if (registration.status === 'accepted') {
+        const standing = acceptanceStanding(doc, ctx, 'accept_registration', registration.id, (uid, nonce) =>
+          registrationPayload(registration, uid, nonce),
+        );
+        if (standing === 'unverifiable')
+          items.push(
+            item(
+              'warn',
+              'SCN_ACCEPTANCE_UNVERIFIABLE',
+              [cloud.id, registration.id],
+              `acceptance of ${registration.id} is not verifiable here (no signing port)`,
+            ),
+          );
+        if (standing === 'unbacked')
+          items.push(
+            item(
+              'fail',
+              'SCN_ACCEPTANCE_UNBACKED',
+              [cloud.id, registration.id],
+              `${registration.id} is marked accepted but no verified human signature backs it; treated as unaccepted`,
+            ),
+            item(
+              'warn',
+              'SCN_REGISTRATION_UNVERIFIED',
+              [cloud.id, registration.id, ...derivedOf(doc, cloud.id)],
+              `registration ${registration.id} of ${cloud.id} is unaccepted (${registration.method}); everything derived from it is unverified`,
+            ),
+          );
+      } else {
         items.push(
           item(
             'warn',
@@ -92,7 +124,26 @@ export const checkPointClouds = defineCommand({
         items.push(
           item('warn', 'SCN_EXTRACTION_UNVERIFIED', ids, `${extraction.id} is unverified: ${extraction.unverifiedReasons.join('; ')}`),
         );
-      if (extraction.status !== 'accepted')
+      const standing =
+        extraction.status === 'accepted'
+          ? acceptanceStanding(doc, ctx, 'accept_asbuilt_extraction', extraction.id, (uid, nonce) =>
+              extractionPayload(extraction, uid, nonce),
+            )
+          : 'unbacked';
+      if (extraction.status === 'accepted' && standing === 'unverifiable')
+        items.push(
+          item('warn', 'SCN_ACCEPTANCE_UNVERIFIABLE', ids, `acceptance of ${extraction.id} is not verifiable here (no signing port)`),
+        );
+      if (extraction.status === 'accepted' && standing === 'unbacked')
+        items.push(
+          item(
+            'fail',
+            'SCN_ACCEPTANCE_UNBACKED',
+            ids,
+            `${extraction.id} is marked accepted but no verified human signature backs it; treated as unaccepted`,
+          ),
+        );
+      if (standing === 'unbacked')
         items.push(item('info', 'SCN_REVIEW_REQUIRED', ids, `${extraction.id} awaits a reviewer before fabrication use`));
     }
     const status = items.some((i) => i.severity === 'fail') ? 'fail' : items.some((i) => i.severity === 'warn') ? 'warn' : 'pass';

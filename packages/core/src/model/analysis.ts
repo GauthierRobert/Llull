@@ -6,6 +6,7 @@
  */
 
 import type { Vec3 } from './vectors';
+import type { DispositionLedgerEntry } from './dispositionLedger';
 import type { FitDispositions, FitLedgerEntry } from './fitDisposition';
 import type { Quantity } from './quantity';
 import type { FeMeshAdequacy } from './meshAdequacy';
@@ -538,6 +539,8 @@ export interface AnalysisModel {
   readonly fitDispositions?: FitDispositions;
   /** Dispositions a human really signed (appended by dispose_fit_result), kept by the cae `replaySeed` so a recorded step re-applies its verified act. */
   readonly fitLedger?: readonly FitLedgerEntry[];
+  /** Margin / thermal-limit dispositions a human really signed (appended by dispose_margin / dispose_thermal_limit), kept by the cae `replaySeed` so a recorded step re-applies its verified act. */
+  readonly dispositionLedger?: readonly DispositionLedgerEntry[];
   /** Absent until the first durability command (`define_load_history`, `define_crack`; plugin `cae`, PHY-07 / PHY-08). */
   readonly durability?: DurabilityModel;
   /** PHY-09 spectrum / time-history library and equivalent-load provenance; absent until the first spectrum or history command. */

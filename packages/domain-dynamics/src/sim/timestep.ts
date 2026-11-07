@@ -4,6 +4,7 @@
  */
 
 import type { DynamicsModel, DynamicsSolverSettings } from '@core/model/dynamics';
+import { isDatasheetMotor } from './actuators/machine';
 import { RAD_PER_S_PER_RPM } from './forceLaws';
 
 /** Legacy default step, s. */
@@ -23,7 +24,7 @@ export function announcedSpeed(dynamics: DynamicsModel): number {
   const rpms = Object.values(dynamics.motors).map((motor) =>
     motor.kind === 'speed'
       ? motor.rpm
-      : motor.kind === 'dc' || motor.kind === 'linear_speed'
+      : isDatasheetMotor(motor) || motor.kind === 'linear_speed'
         ? 0
         : Math.max(...motor.curve.map((p) => p[0])),
   );

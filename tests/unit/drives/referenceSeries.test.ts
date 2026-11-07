@@ -88,7 +88,7 @@ describe('add_reference_data with a time series', () => {
     const refusals: [Record<string, unknown>, RegExp][] = [
       [{ series }, /needs a source/],
       [{ series: { ...series, target: 'ghost' }, source: SOURCE }, /no joint 'ghost'/],
-      [{ series: { ...series, quantity: 'motor_current', target: 'ghost' }, source: SOURCE }, /no datasheet \(dc\) motor 'ghost'/],
+      [{ series: { ...series, quantity: 'motor_current', target: 'ghost' }, source: SOURCE }, /no datasheet motor 'ghost'/],
       [{ series: { ...series, times: [1, 1] }, source: SOURCE }, /strictly increasing/],
       [{ series: { ...series, times: [-1, 1] }, source: SOURCE }, /strictly increasing/],
       [{ series: { ...series, values: [1] }, source: SOURCE }, /same length/],

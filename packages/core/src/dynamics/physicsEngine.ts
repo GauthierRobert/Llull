@@ -164,7 +164,7 @@ interface BodyForce {
   readonly force: Vec3;
 }
 
-export type LedgerKind = 'electrical_input' | 'copper' | 'magnetic' | 'transmission_loss' | 'regeneration';
+export type LedgerKind = 'electrical_input' | 'copper' | 'magnetic' | 'iron' | 'rotor' | 'transmission_loss' | 'regeneration';
 
 /**
  * Actuators with internal state (PHY-23 TR-DRV-01): electrical current, controller integrators, held commands. The engine calls `advance` exactly

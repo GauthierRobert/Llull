@@ -602,7 +602,7 @@ cases; a signing implementation (09 PLM); the `llull guide` thermal section.
   artifact (`trustedRecord`): state `untrusted` + `FEA_SUMMARY_MISMATCH` when the recorded one differs, `missing` without an artifact store /
   artifact; numbers are returned only for `solved`. `check_thermal` now reports `state`; post-solve items (`THM_HEAT_BALANCE`,
   `THM_PROPERTY_OUT_OF_RANGE`) come only from a verified summary.
-- **Dispositions are claims.** `dispose_thermal_limit` stores the verified `signature` next to the decision; `check_temperature_limits` counts a
+- **Dispositions are claims.** `dispose_thermal_limit` takes the signature as `confirmation` (stripped from the history; verified first, spent last and once, re-applied on replay from `analysis.dispositionLedger`) and stores the verified signature next to the decision; `check_temperature_limits` counts a
   stored disposition only if it is on the current results AND re-verifies through `ctx.humanSignature` against the payload
   (`sha256(canonicalJson({ kind, analysisId, rowId, decision, justification, resultsHash }))`). Otherwise the row stays `pending_human`, carries
   `unverifiedDisposition { decision, signer, reason }` and `THM_DISPOSITION_UNVERIFIED` (warning) is added.

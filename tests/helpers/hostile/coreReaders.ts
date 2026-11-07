@@ -98,7 +98,101 @@ const driveDynamics = (records: number, segment: unknown = { kind: 'dwell', dura
   const drives = Object.fromEntries(
     ids.map((id) => [id, { id, mode: 'velocity', profile: id, gains: { kp: 1, ki: 0, kpPosition: 0 }, sampleHz: 1000 }]),
   );
-  return JSON.stringify({ gravity: [0, 0, -9.81], bodies: {}, joints: {}, motors: {}, propellers: {}, profiles, drives });
+  // one PMSM, stepper or induction motor per record (DRV-M4) with a drive of a mode its kind takes, so the large-record cases reach their readers
+  const source = { name: 'hostile sample', grade: 'C' };
+  const machines = Object.fromEntries(
+    ids.map((id, k) => {
+      const base = { id: `m${id}`, joint: `j${id}`, source };
+      const kind = k % 3;
+      return [
+        base.id,
+        kind === 0
+          ? {
+              ...base,
+              kind: 'pmsm',
+              datasheet: {
+                polePairs: 4,
+                phaseResistanceOhm: 0.05,
+                inductanceH: 0.0002,
+                fluxLinkageWb: 0.01,
+                rotorInertiaKgM2: 1e-5,
+                busVoltageV: 24,
+                peakCurrentA: 20,
+              },
+            }
+          : kind === 1
+            ? {
+                ...base,
+                kind: 'stepper',
+                datasheet: {
+                  stepsPerRev: 200,
+                  holdingTorqueNm: 0.5,
+                  ratedCurrentA: 2,
+                  phaseResistanceOhm: 1.5,
+                  phaseInductanceH: 0.003,
+                  rotorInertiaKgM2: 1e-5,
+                  pullOutCurve: [
+                    [0, 0.5],
+                    [600, 0.2],
+                  ],
+                },
+              }
+            : {
+                ...base,
+                kind: 'induction',
+                datasheet: {
+                  polePairs: 2,
+                  ratedVoltageV: 230,
+                  ratedFrequencyHz: 50,
+                  statorResistanceOhm: 0.5,
+                  rotorResistanceOhm: 0.4,
+                  statorLeakageReactanceOhm: 1,
+                  rotorLeakageReactanceOhm: 1,
+                  magnetisingReactanceOhm: 40,
+                  rotorInertiaKgM2: 0.2,
+                },
+              },
+      ];
+    }),
+  );
+  const machineJoints = Object.fromEntries(
+    ids.map((id) => [
+      `j${id}`,
+      {
+        id: `j${id}`,
+        kind: 'revolute',
+        parent: 'ground',
+        child: `bm${id}`,
+        anchor: [0, 0, 0],
+        axis: [0, 0, 1],
+        damping: 0,
+        friction: 0,
+        initialVelocity: 0,
+      },
+    ]),
+  );
+  const machineDrives = Object.fromEntries(
+    ids.map((id, k) => [
+      `m${id}`,
+      k % 3 === 0
+        ? { id: `m${id}`, mode: 'torque', profile: `t${id}` }
+        : k % 3 === 1
+          ? { id: `m${id}`, mode: 'velocity', profile: id, stepDivision: 4 }
+          : { id: `m${id}`, mode: 'voltage', volts: 230, frequencyHz: 50 },
+    ]),
+  );
+  const torqueProfiles = Object.fromEntries(
+    ids.map((id) => [`t${id}`, { id: `t${id}`, quantity: 'torque', unit: 'N*m', segments: [segment] }]),
+  );
+  return JSON.stringify({
+    gravity: [0, 0, -9.81],
+    bodies: {},
+    joints: machineJoints,
+    motors: machines,
+    propellers: {},
+    profiles: { ...profiles, ...torqueProfiles },
+    drives: { ...drives, ...machineDrives },
+  });
 };
 
 const isRecordLike = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -262,11 +356,14 @@ export const CORE_READERS: readonly HostileReader[] = [
     covers: [
       'core/src/commands/persistence/drivesValidation.ts:profileProblem',
       'core/src/commands/persistence/drivesValidation.ts:driveProblem',
+      'core/src/commands/persistence/machinesValidation.ts:pmsmMotorProblem',
+      'core/src/commands/persistence/machinesValidation.ts:stepperMotorProblem',
+      'core/src/commands/persistence/machinesValidation.ts:inductionMotorProblem',
     ],
     input: 'text',
     build: (records) => driveDynamics(records),
     read: (input) => dynamicsProblems(parsedJson(asText(input))),
-    accepts: (result) => Array.isArray(result) && result.every((problem) => String(problem).includes('no datasheet (dc) motor')),
+    accepts: (result) => Array.isArray(result) && result.every((problem) => String(problem).includes('no datasheet motor')),
     maxRecords: 20000,
     extra: [
       { name: 'segment of an unknown kind', input: () => driveDynamics(3, { kind: 'foo' }) },

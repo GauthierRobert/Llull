@@ -11,9 +11,20 @@ export const sourceSchema = z.object({
     .describe('A = primary source read or exact derivation; B = one secondary source; C = assumed or unchecked.'),
 });
 
-const positive = (text: string): z.ZodNumber => z.number().positive().describe(text);
-const nonNegative = (text: string): z.ZodOptional<z.ZodNumber> => z.number().min(0).optional().describe(text);
-const optionalPositive = (text: string): z.ZodOptional<z.ZodNumber> => z.number().positive().optional().describe(text);
+export const positive = (text: string): z.ZodNumber => z.number().positive().describe(text);
+export const nonNegative = (text: string): z.ZodOptional<z.ZodNumber> => z.number().min(0).optional().describe(text);
+export const optionalPositive = (text: string): z.ZodOptional<z.ZodNumber> => z.number().positive().optional().describe(text);
+
+export const thermalSchema = z
+  .object({
+    rthWindingHousingKPerW: positive('Thermal resistance winding-housing, K/W.'),
+    rthHousingAmbientKPerW: positive('Thermal resistance housing-ambient, K/W.'),
+    tauWindingS: positive('Thermal time constant of the winding, s.'),
+    tauMotorS: positive('Thermal time constant of the motor, s.'),
+    maxWindingC: positive('Maximum winding temperature, C.'),
+    alphaPerK: optionalPositive('Copper temperature coefficient, 1/K. Default 0.0039.'),
+  })
+  .describe('Thermal data of the winding (size_drive: 2-node network, steady and peak winding temperature, runaway).');
 
 export const datasheetSchema = z.object({
   nominalVoltageV: positive('Nominal terminal voltage U, V.'),
@@ -31,17 +42,7 @@ export const datasheetSchema = z.object({
   mechanicalTimeConstantS: optionalPositive('Mechanical time constant, s: checked against J*R/kt^2.'),
   maxSpeedRpm: optionalPositive('Maximum permissible speed, rpm. Reported by checks; not used by the law.'),
   peakCurrentA: optionalPositive('Largest current the drive may command, A. Default U / R (stall).'),
-  thermal: z
-    .object({
-      rthWindingHousingKPerW: positive('Thermal resistance winding-housing, K/W.'),
-      rthHousingAmbientKPerW: positive('Thermal resistance housing-ambient, K/W.'),
-      tauWindingS: positive('Thermal time constant of the winding, s.'),
-      tauMotorS: positive('Thermal time constant of the motor, s.'),
-      maxWindingC: positive('Maximum winding temperature, C.'),
-      alphaPerK: optionalPositive('Copper temperature coefficient, 1/K. Default 0.0039.'),
-    })
-    .optional()
-    .describe('Thermal data (stored; the thermal model comes with size_drive).'),
+  thermal: thermalSchema.optional(),
 });
 
 export const gearheadSchema = z.object({
@@ -56,7 +57,7 @@ export const gearheadSchema = z.object({
   inertiaKgM2: nonNegative('Gearhead inertia about its input shaft, kg*m^2 (added to the rotor, seen through N^2).'),
 });
 
-const withoutUndefined = <T extends Record<string, unknown>>(value: T): T =>
+export const withoutUndefined = <T extends Record<string, unknown>>(value: T): T =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 
 /** Zod's parsed datasheet as the model type (no `undefined` members: exactOptionalPropertyTypes). */

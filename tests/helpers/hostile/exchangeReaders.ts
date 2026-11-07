@@ -43,6 +43,72 @@ const dxfLines = (records: number): string =>
     '0\nENDSEC\n0\nEOF\n',
     records,
   );
+/** DXF text from flat `code, value, code, value…` arguments. */
+const groups = (...flat: Array<string | number>): string => flat.join('\n') + '\n';
+const inEntities = (...flat: Array<string | number>): string => groups(0, 'SECTION', 2, 'ENTITIES', ...flat, 0, 'ENDSEC', 0, 'EOF');
+/** A HATCH (square), a SPLINE (fit points) and a full ELLIPSE per record: the readers of dxfReadShapes. */
+// prettier-ignore
+const dxfShapes = (records: number): string =>
+  repeated(
+    groups(0, 'SECTION', 2, 'ENTITIES'),
+    (k) =>
+      groups(0, 'HATCH', 8, 'H', 10, 0, 20, 0, 30, 0, 70, 1, 91, 1, 92, 3, 72, 0, 73, 1, 93, 4, 10, k, 20, 0, 10, k + 1, 20, 0, 10, k + 1, 20, 1, 10, k, 20, 1, 97, 0, 75, 0, 76, 1, 98, 0) +
+      groups(0, 'SPLINE', 8, 'S', 70, 0, 11, k, 21, 0, 11, k, 21, 3, 11, k + 2, 21, 3) +
+      groups(0, 'ELLIPSE', 8, 'E', 10, k, 20, 0, 11, 2, 21, 0, 40, 0.5, 41, 0, 42, 6.283185307179586),
+    groups(0, 'ENDSEC', 0, 'EOF'),
+    records,
+  );
+const dxfShapeExtras = [
+  { name: 'HATCH with astronomical path / vertex counts', input: () => inEntities(0, 'HATCH', 91, 99999999999, 92, 2, 93, 99999999999) },
+  {
+    name: 'HATCH with thousands of empty paths',
+    input: () =>
+      groups(0, 'SECTION', 2, 'ENTITIES', 0, 'HATCH', 91, 4999) + groups(92, 3, 72, 0, 93, 2).repeat(4999) + groups(0, 'ENDSEC', 0, 'EOF'),
+  },
+  { name: 'SPLINE with absurd degree and knot counts', input: () => inEntities(0, 'SPLINE', 71, 99999999, 72, 99999999, 73, 3) },
+  {
+    name: 'SPLINE with 200k control points',
+    input: () => groups(0, 'SECTION', 2, 'ENTITIES', 0, 'SPLINE', 71, 3) + '10\n0\n20\n0\n'.repeat(200_000) + groups(0, 'ENDSEC', 0, 'EOF'),
+  },
+  {
+    name: 'SPLINE with NaN knots',
+    input: () => inEntities(0, 'SPLINE', 71, 1, 40, 'NaN', 40, 0, 40, 1, 40, 1, 10, 0, 20, 0, 10, 1, 20, 1),
+  },
+  {
+    name: 'SPLINE with a zero weight, decreasing knots and +-1e308 knots',
+    input: () =>
+      inEntities(
+        ...[0, 'SPLINE', 71, 1, 40, 0, 40, 0, 40, 1, 40, 1, 10, 0, 20, 0, 10, 1, 20, 1, 41, 1, 41, 0],
+        ...[0, 'SPLINE', 71, 1, 40, 1, 40, 0, 40, 1, 40, 1, 10, 0, 20, 0, 10, 1, 20, 1],
+        ...[0, 'SPLINE', 71, 1, 40, -1e308, 40, -1e308, 40, 1e308, 40, 1e308, 10, 0, 20, 0, 10, 1, 20, 1],
+      ),
+  },
+  {
+    name: 'a self-referencing block of 50 empty INSERTs',
+    input: () =>
+      groups(
+        0,
+        'SECTION',
+        2,
+        'BLOCKS',
+        0,
+        'BLOCK',
+        2,
+        'B',
+        10,
+        0,
+        20,
+        0,
+        30,
+        0,
+        ...Array.from({ length: 50 }, () => [0, 'INSERT', 2, 'B', 8, '0']).flat(),
+      ) + groups(0, 'ENDBLK', 0, 'ENDSEC', 0, 'SECTION', 2, 'ENTITIES', 0, 'INSERT', 2, 'B', 8, '0', 0, 'ENDSEC', 0, 'EOF'),
+  },
+  {
+    name: 'ELLIPSE with zero / negative / NaN ratio',
+    input: () => inEntities(0, 'ELLIPSE', 11, 1, 40, 0, 0, 'ELLIPSE', 11, 1, 40, -3, 0, 'ELLIPSE', 11, 'NaN', 40, 'NaN'),
+  },
+];
 const dxfExtras = [
   { name: 'odd number of lines (code without value)', input: () => dxfBuild(50) + '0' },
   { name: 'codes that are not integers', input: () => 'abc\nvalue\n'.repeat(200_000) },
@@ -126,6 +192,15 @@ export const EXCHANGE_READERS: readonly HostileReader[] = [
     extra: dxfExtras,
     read: (input) => parseDxf(asText(input)),
     accepts: (result) => result !== null,
+  },
+  {
+    name: 'dxf: import_dxf (HATCH, SPLINE, ELLIPSE)',
+    covers: ['core/src/lib/dxfReadShapes.ts:readHatch', 'core/src/lib/dxfReadShapes.ts:readSpline'],
+    input: 'text',
+    build: dxfShapes,
+    extra: [...dxfExtras, ...dxfShapeExtras],
+    read: (input) => execute(createEmptyDocument(), 'import_dxf', { text: asText(input) }),
+    accepts: created,
   },
   {
     name: 'dxf: import_dxf (execute)',

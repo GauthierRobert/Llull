@@ -94,6 +94,6 @@ export function dispositionOf(
   return {
     disposition: stored.decision,
     statusLabel: `${subject.status} (${stored.decision})`,
-    record: { decision: stored.decision, justification: stored.justification, signer: stored.signer, signatureId: stored.signatureId },
+    record: { decision: stored.decision, justification: stored.justification, signer: signed.signer, signatureId: signed.signatureId },
   };
 }
