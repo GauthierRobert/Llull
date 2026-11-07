@@ -8,8 +8,7 @@ import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
 import type { EquipmentElement } from '@aec/building/types';
 import { resolveExchanger } from '../geometry/exchangerFrame';
 import { exchangerMass } from '../geometry/exchangerMass';
-import { neckMassParts } from '../geometry/nozzleMass';
-import { thicknessAt } from '../geometry/tankFrame';
+import { exchangerWallOf, neckMassParts, tankWallOf } from '../geometry/nozzleMass';
 import { tankMass } from '../geometry/tankMass';
 import { TEST_WATER_KG_PER_M3, type MassPart } from '../geometry/vesselMass';
 import { refuse } from '../model';
@@ -56,12 +55,7 @@ function exchangerBody(scale: number, element: EquipmentElement): Body | null {
       'saddle plates, insulation',
       'operating weight assumes both sides full',
     ],
-    wallOf: (nozzle) =>
-      nozzle.location.on === 'shell'
-        ? geometry.radius + geometry.shellThickness
-        : nozzle.location.on === 'channel'
-          ? geometry.radius + (nozzle.location.channel === 'front' ? geometry.front : geometry.rear).channelThickness
-          : 0,
+    wallOf: exchangerWallOf(geometry),
   };
 }
 
@@ -80,10 +74,7 @@ function tankBody(scale: number, element: EquipmentElement): Body | null {
             `course thicknesses are the API 650 ${template.thicknessSource === 'one_foot' ? 'one-foot governing' : 'minimum'} values, not an input`,
           ],
     notIncluded: ['rim angle, stiffeners, roof framing', 'appurtenances, insulation'],
-    wallOf: (nozzle) =>
-      nozzle.location.on === 'shell' && 'elevation' in nozzle.location
-        ? template.diameter / 2 + thicknessAt(template, nozzle.location.elevation)
-        : 0,
+    wallOf: tankWallOf(template),
   };
 }
 

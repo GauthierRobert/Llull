@@ -2,6 +2,7 @@
 import { execute } from '@core/commands/registry';
 import { parseMaterialLibrary } from '@core/commands/materials/libraryFormat';
 import { serializeDocument } from '@core/commands/persistence/serialization';
+import { dynamicsProblems } from '@core/commands/persistence/dynamicsValidation';
 import { createEmptyDocument } from '@core/model/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { evaluateExpression } from '@lib/expression';
@@ -90,7 +91,41 @@ const png1x1 = (): Uint8Array =>
     Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64'),
   );
 
+/** A `dynamics` record with `records` motion profiles and motor drives (PHY-23), with `segment` as the one segment of every profile. */
+const driveDynamics = (records: number, segment: unknown = { kind: 'dwell', duration: 1 }): string => {
+  const ids = Array.from({ length: records }, (_, k) => `p${k}`);
+  const profiles = Object.fromEntries(ids.map((id) => [id, { id, quantity: 'velocity', unit: 'rad/s', segments: [segment] }]));
+  const drives = Object.fromEntries(
+    ids.map((id) => [id, { id, mode: 'velocity', profile: id, gains: { kp: 1, ki: 0, kpPosition: 0 }, sampleHz: 1000 }]),
+  );
+  return JSON.stringify({ gravity: [0, 0, -9.81], bodies: {}, joints: {}, gears: {}, motors: {}, propellers: {}, profiles, drives });
+};
+
 export const CORE_READERS: readonly HostileReader[] = [
+  {
+    name: 'core: dynamics profiles and drives (load-time validation of a saved document)',
+    covers: [
+      'core/src/commands/persistence/drivesValidation.ts:profileProblem',
+      'core/src/commands/persistence/drivesValidation.ts:driveProblem',
+    ],
+    input: 'text',
+    build: (records) => driveDynamics(records),
+    read: (input) => dynamicsProblems(parsedJson(asText(input))),
+    accepts: (result) => Array.isArray(result) && result.every((problem) => String(problem).includes('no datasheet (dc) motor')),
+    maxRecords: 20000,
+    extra: [
+      { name: 'segment of an unknown kind', input: () => driveDynamics(3, { kind: 'foo' }) },
+      { name: 'segment that is null', input: () => driveDynamics(3, null) },
+      { name: 'move with an unknown law', input: () => driveDynamics(3, { kind: 'move', law: 'bogus', to: 1, duration: 1 }) },
+      {
+        name: 'move law named after a prototype member',
+        input: () => driveDynamics(3, { kind: 'move', law: 'constructor', to: 1, duration: 1 }),
+      },
+      { name: 'table with points as a string', input: () => driveDynamics(3, { kind: 'table', points: 'abc', interpolation: 'linear' }) },
+      { name: 'table with null points', input: () => driveDynamics(3, { kind: 'table', points: [null, null], interpolation: 'linear' }) },
+      { name: 'table without points', input: () => driveDynamics(3, { kind: 'table', interpolation: 'linear' }) },
+    ],
+  },
   {
     name: 'core: parseFont (TrueType / OpenType)',
     covers: [

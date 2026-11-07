@@ -14,6 +14,7 @@ import { runPlan } from '../golden/runPlan';
 import { plans, type GoldenAction } from '../golden/plans';
 import { plmPlans } from '../golden/plmPlans';
 import { implicitPlans } from '../golden/implicitPlans';
+import { cappedRunSteps } from '../golden/pipingPlansCap';
 import { rteJson } from '../unit/plant/piping/rteFixtures';
 import { recordedModel } from '../unit/plant/stress/m3Fixtures';
 import { libraryDocument } from '../unit/plant/data/dataFixtures';
@@ -158,6 +159,29 @@ function buildingWithEquipment(): CadDocument {
   return run(doc, 'add_pump', { ...pumpParams, location: [30000, 20000] });
 }
 
+/** Pump-to-vessel plus a capped run, plus a run that continues from the open end of another (a `runEnd` ref: a capped end must never be one). */
+function pipingSeedDocument(): CadDocument {
+  const base = planDocument([...(plans['piping_pump_to_vessel'] as GoldenAction[]), ...cappedRunSteps], 'piping seed');
+  const piping = base.plant?.piping;
+  const capped = piping?.runOrder.at(-1);
+  const line = capped === undefined ? undefined : piping?.runs[capped]?.lineId;
+  if (piping === undefined || capped === undefined || line === undefined) return base;
+  const open = execute(base, 'route_pipe', {
+    lineId: line,
+    from: { point: [3000, 0, 0], direction: [1, 0, 0] },
+    legs: [{ direction: '+X', length: 500 }],
+  });
+  const openRun = open.affected[0];
+  if (openRun === undefined) throw new Error(`pluginSliceSeeds: piping seed route refused: ${open.summary}`);
+  const next = execute(open.document, 'route_pipe', {
+    lineId: line,
+    from: { portId: `${openRun}:end` },
+    legs: [{ direction: '+X', length: 400 }],
+  });
+  if (next.rejected === true) throw new Error(`pluginSliceSeeds: piping seed continuation refused: ${next.summary}`);
+  return next.document;
+}
+
 const planOf = (table: Record<string, GoldenAction[]>, name: string) => (): CadDocument => planDocument(table[name], name);
 
 /** The golden PLM plan needs a signature port that accepts a confirmation naming its signer (as tests/golden/golden.test.ts does). */
@@ -204,7 +228,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   piping: {
     roots: ['plant.piping'],
-    build: planOf(plans, 'piping_pump_to_vessel'),
+    build: pipingSeedDocument,
     query: { name: 'piping_takeoff', params: constant({}) },
     mutate: { name: 'set_piping_settings', params: constant({ lineNumberTemplate: '{dn}-{fluid}-{seq}-{class}' }) },
   },
@@ -302,4 +326,80 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     query: { name: 'plm_status', params: constant({}) },
     mutate: { name: 'submit_for_review', params: constant({ comment: 'fuzz', at: '2026-11-02T10:00:00Z', by: 'u-0007' }) },
   },
+};
+
+/**
+ * The drive data of `doc.dynamics` (PHY-23: datasheet motors, profiles, drives). Dynamics is a core slice, not a plugin extension, so it has no row in
+ * SLICE_SEEDS; tests/unit/contract/pluginSliceFuzz.test.ts runs it with the targeted `driveMutations` as well.
+ */
+export const DYNAMICS_SEED: PluginSliceSeed = {
+  roots: ['dynamics'],
+  build: () => {
+    const steps: { name: string; params: Record<string, unknown> }[] = [
+      { name: 'add_cylinder', params: { radius: 5, height: 5, position: [0, 0, 0], axis: [0, 0, 1] } },
+      { name: 'add_rigid_body', params: { entityIds: ['$cylinder'], id: 'rotor', massKg: 0.001 } },
+      {
+        name: 'add_body_joint',
+        params: { kind: 'revolute', child: 'rotor', parent: 'ground', anchor: [0, 0, 0], axis: [0, 0, 1], id: 'j' },
+      },
+      {
+        name: 'add_motor',
+        params: {
+          joint: 'j',
+          kind: 'dc',
+          id: 'm',
+          datasheet: { nominalVoltageV: 48, terminalResistanceOhm: 1.13, torqueConstantNmPerA: 0.0603, rotorInertiaKgM2: 1e-5 },
+          gearhead: { ratio: 5, efficiency: 0.9 },
+          source: { name: 'seed sheet', grade: 'C' },
+        },
+      },
+      {
+        name: 'add_motion_profile',
+        params: {
+          id: 'w',
+          quantity: 'velocity',
+          unit: 'rad/s',
+          start: 1,
+          segments: [
+            { kind: 'move', law: 'cycloidal', to: 3, duration: 1 },
+            { kind: 'dwell', duration: 1 },
+          ],
+        },
+      },
+      {
+        name: 'add_motion_profile',
+        params: {
+          id: 'v',
+          quantity: 'voltage',
+          unit: 'V',
+          segments: [
+            {
+              kind: 'table',
+              points: [
+                [0, 0],
+                [1, 5],
+              ],
+              interpolation: 'monotone_cubic',
+            },
+          ],
+        },
+      },
+      {
+        name: 'set_motor_drive',
+        params: { motor: 'm', mode: 'velocity', profile: 'w', gains: { kp: 0.1, ki: 1 }, sampleHz: 1000, target: 'j', feedforward: true },
+      },
+    ];
+    let doc = createEmptyDocument();
+    let cylinder = '';
+    for (const step of steps) {
+      const params = JSON.parse(JSON.stringify(step.params).replace('$cylinder', cylinder)) as Record<string, unknown>;
+      const result = execute(doc, step.name, params);
+      if (result.document === doc) throw new Error(`DYNAMICS_SEED: ${step.name}: ${result.summary}`);
+      if (cylinder === '') cylinder = result.affected[0] ?? '';
+      doc = result.document;
+    }
+    return doc;
+  },
+  query: { name: 'check_motor_data', params: constant({ motor: 'm' }) },
+  mutate: { name: 'set_motor_drive', params: constant({ motor: 'm', mode: 'voltage', volts: 5 }) },
 };

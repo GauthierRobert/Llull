@@ -87,7 +87,7 @@ function bodyXml(
   const { joint } = body;
   const jointXml =
     joint !== null
-      ? `<joint name="${escapeXml(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(sub3(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"${joint.stiffness !== undefined && joint.stiffness > 0 ? ` stiffness="${joint.stiffness}" springref="${joint.springReference ?? 0}"` : ''}${joint.friction > 0 ? ` solreffriction="${2 * timestep} 1" solimpfriction="${FRICTION_IMPEDANCE}"` : ''}/>`
+      ? `<joint name="${escapeXml(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(sub3(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"${joint.armature !== undefined && joint.armature > 0 ? ` armature="${joint.armature}"` : ''}${joint.stiffness !== undefined && joint.stiffness > 0 ? ` stiffness="${joint.stiffness}" springref="${joint.springReference ?? 0}"` : ''}${joint.friction > 0 ? ` solreffriction="${2 * timestep} 1" solimpfriction="${FRICTION_IMPEDANCE}"` : ''}/>`
       : body.fixed
         ? ''
         : '<freejoint/>';

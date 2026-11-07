@@ -186,7 +186,7 @@ export function resolveEndpoint(
     return { end: { point: endpoint.point, direction: unitVector(endpoint.direction) } };
   }
   const resolved = resolvePortId(doc, endpoint.portId);
-  if (!resolved.ok) return refuse(doc, command, 'RTE_UNKNOWN_PORT', resolved.message, [], [`${side}.portId`]);
+  if (!resolved.ok) return refuse(doc, command, resolved.code ?? 'RTE_UNKNOWN_PORT', resolved.message, [], [`${side}.portId`]);
   const { port } = resolved;
   const occupant = portOccupant(doc, port.ref);
   if (occupant !== undefined)

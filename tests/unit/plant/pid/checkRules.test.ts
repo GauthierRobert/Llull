@@ -60,7 +60,7 @@ const rulesFile = JSON.parse(readFileSync(path.join(PID_PACK, 'data/pid_validati
 
 describe('rule table', () => {
   it('runs the 13 rules of the pack plus the 3 of the spec table: 16 codes, severities as in pid_validation_rules.json', () => {
-    expect(PID_RULES).toHaveLength(16);
+    expect(PID_RULES).toHaveLength(17);
     const clean = check(feedPump());
     expect(Object.keys(clean.countsByCode)).toEqual([...PID_RULES]);
     for (const rule of rulesFile.pidRules) {

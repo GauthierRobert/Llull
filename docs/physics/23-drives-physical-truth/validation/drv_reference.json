@@ -363,8 +363,10 @@
   "stopStiffnessNmPerRad": 1000.0,
   "dampingRatio": 0.2,
   "impactSpeedRadS": 1.0,
-  "restitution": 0.52662059933,
-  "contactTimeS": 0.0101394466899,
+  "restitution": 0.571740027585,
+  "restitutionBilateral": 0.52662059933,
+  "releaseTimeS": 0.00883968690019,
+  "contactTimeS": 0.0101045979643,
   "peakPenetrationRad": 0.00239110858721,
   "peakPenetrationTimeS": 0.00441984345009
  },

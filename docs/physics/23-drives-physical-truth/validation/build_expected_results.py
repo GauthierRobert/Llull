@@ -59,8 +59,9 @@ add("VC-DRV-18", "stick phase duration", ss["stickTimeS"], "s", {"rel": 0.02}, G
 pf = ref["pinFriction"]
 add("VC-DRV-19", "angular acceleration with load-dependent pin friction mu W r", pf["accelerationRadS2"], "rad/s^2", {"rel": 0.01}, GEN, "A", ["FR-DRV-08", "TR-DRV-16"])
 es = ref["endStop"]
-add("VC-DRV-20", "restitution of a spring-damper end stop, zeta 0.2", es["restitution"], "1", {"rel": 0.03}, GEN, "A", ["FR-DRV-09", "TR-DRV-17"])
+add("VC-DRV-20", "restitution of a one-sided spring-damper end stop, zeta 0.2", es["restitution"], "1", {"rel": 0.03}, GEN, "A", ["FR-DRV-09", "TR-DRV-17"])
 add("VC-DRV-20", "peak penetration, 1 rad/s into 1000 N m/rad, J 0.01", es["peakPenetrationRad"], "rad", {"rel": 0.05}, GEN, "A", ["FR-DRV-09", "TR-DRV-17"])
+add("VC-DRV-20", "contact time of the one-sided stop (release at zero force plus the travel to zero penetration)", es["contactTimeS"], "s", {"rel": 0.05}, GEN, "A", ["FR-DRV-09", "TR-DRV-17"])
 p = ref["profiles"]
 add("VC-DRV-21", "trapezoid move duration, 0.1 m, vmax 0.5, amax 5", p["trapezoid"]["durationS"], "s", {"rel": 1e-9}, GEN, "A", ["FR-DRV-10", "TR-DRV-18"])
 add("VC-DRV-21", "7-segment S-curve duration, jerk 100", p["sCurve"]["durationS"], "s", {"rel": 1e-9}, GEN, "A", ["FR-DRV-10", "TR-DRV-18"])

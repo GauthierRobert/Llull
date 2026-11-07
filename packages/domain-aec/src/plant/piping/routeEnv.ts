@@ -42,6 +42,8 @@ export interface EndSetup {
   readonly portId: string | null;
   /** Branch start: the header fitting part the first pipe piece welds to. */
   readonly fittingId?: string;
+  /** Open end closed by a cap: the catalogue row (one port, length = the interval occupied). */
+  readonly cap?: CatalogueRow;
   /** Branch start on a stub-in: the first piece is not butt welded to the part (the set-on branch weld is the one weld). */
   readonly weldless?: boolean;
 }

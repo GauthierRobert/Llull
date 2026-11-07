@@ -1,11 +1,11 @@
 /** Rigid bodies of the dynamics model, gravity, and removal of any dynamics record. */
 
 import type { CadDocument } from '@core/model/types';
-import { createDynamicsModel, type DynamicsModel } from '@core/model/dynamics';
+import { createDynamicsModel, dynamicsIdTaken, type DynamicsModel } from '@core/model/dynamics';
 import { is3D } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
-import { idOrNext, idTaken } from '@lib/explicitId';
+import { idOrNext } from '@lib/explicitId';
 import { changed, failer, report } from '@core/commands/noop';
 import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import { formatLength } from '@core/model/units';
@@ -20,20 +20,6 @@ export function dynamicsOf(doc: CadDocument): DynamicsModel {
 
 export function withDynamics(doc: CadDocument, dynamics: DynamicsModel): CadDocument {
   return { ...doc, dynamics };
-}
-
-/** Every id used by any dynamics record (bodies, joints, gears, motors, propellers, cylinders share one id space). */
-export function dynamicsIdTaken(dynamics: DynamicsModel, id: string): boolean {
-  return [
-    dynamics.bodies,
-    dynamics.joints,
-    dynamics.gears,
-    dynamics.motors,
-    dynamics.propellers,
-    dynamics.cylinders ?? {},
-    dynamics.losses ?? {},
-    dynamics.springs ?? {},
-  ].some((table) => idTaken(table, id));
 }
 
 /** Relative slack on the triangle inequality of the principal moments (a thin rod or plate sits on the bound). */
@@ -162,12 +148,21 @@ export const deleteDynamicsItem = defineCommand({
   name: 'delete_dynamics_item',
   annotations: { destructive: true },
   description:
-    'Remove a rigid body, joint, gear coupling, motor, propeller, cylinder pressure or point spring (add_spring) from the physics model by id. Cascades: a body ' +
-    'takes its joints and springs with it; a joint takes the gears, motors, propellers, cylinder pressures and engine losses (set_engine_losses) on it. Entities (geometry) are never deleted.',
+    'Remove a rigid body, joint, gear coupling, motor, propeller, cylinder pressure, point spring (add_spring) or motion profile (add_motion_profile) from the physics model by id. Cascades: a body ' +
+    'takes its joints and springs with it; a joint takes the gears, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
+    'A profile that a motor drive still uses is refused (the users are listed): change the drive first. Entities (geometry) are never deleted.',
   params: z.object({ id: z.string().describe('Id of the body / joint / gear / motor / propeller / cylinder / spring to remove.') }),
   run: (doc, { id }): CommandResult => {
     const dynamics = dynamicsOf(doc);
     if (!dynamicsIdTaken(dynamics, id)) return failer(doc, 'delete_dynamics_item')(`no dynamics record '${id}'`);
+    const users = Object.values(dynamics.drives ?? {}).filter((drive) => drive.profile === id);
+    if (users.length > 0)
+      return failer(
+        doc,
+        'delete_dynamics_item',
+      )(
+        `profile '${id}' is used by the drive of motor(s) ${users.map((drive) => `'${drive.id}'`).join(', ')}; set_motor_drive another profile first`,
+      );
     const keep = <T>(table: Record<string, T>, drop: (key: string, value: T) => boolean): Record<string, T> =>
       Object.fromEntries(Object.entries(table).filter(([key, value]) => !drop(key, value)));
     const joints = keep(dynamics.joints, (key, joint) => key === id || joint.parent === id || joint.child === id);
@@ -186,12 +181,16 @@ export const deleteDynamicsItem = defineCommand({
       ...(dynamics.springs === undefined
         ? {}
         : { springs: keep(dynamics.springs, (key, spring) => key === id || spring.bodyA === id || spring.bodyB === id) }),
+      ...(dynamics.profiles === undefined ? {} : { profiles: keep(dynamics.profiles, (key) => key === id) }),
     };
-    const removed = (['bodies', 'joints', 'gears', 'motors', 'propellers', 'cylinders', 'losses', 'springs'] as const)
-      .map((table) => Object.keys(dynamics[table] ?? {}).length - Object.keys(next[table] ?? {}).length)
+    const motors = next.motors;
+    const withDrives: DynamicsModel =
+      dynamics.drives === undefined ? next : { ...next, drives: keep(dynamics.drives, (key) => motors[key] === undefined) };
+    const removed = (['bodies', 'joints', 'gears', 'motors', 'propellers', 'cylinders', 'losses', 'springs', 'profiles', 'drives'] as const)
+      .map((table) => Object.keys(dynamics[table] ?? {}).length - Object.keys(withDrives[table] ?? {}).length)
       .reduce((a, b) => a + b, 0);
     return report(
-      withDynamics(doc, next),
+      withDynamics(doc, withDrives),
       `delete_dynamics_item: removed '${id}'${removed > 1 ? ` and ${removed - 1} dependent record(s)` : ''}.`,
     );
   },

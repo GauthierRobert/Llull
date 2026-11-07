@@ -10,7 +10,7 @@ import type { CadDocument } from '@core/model/types';
 import { headFillCentroid, headMetalCentroid } from '@aec/plant/equipment/geometry/headCentroid';
 import type { HeadShape } from '@aec/plant/equipment/geometry/heads';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
-import { bemDocument, mmDocument } from './equipmentFixtures';
+import { mmDocument } from './equipmentFixtures';
 
 const hemisphere = (radius: number): HeadShape => ({ kind: 'spherical', depth: radius });
 
@@ -250,7 +250,13 @@ describe('equipment_cog: horizontal vessels', () => {
 describe('equipment_cog: refusals and purity', () => {
   it('refuses an unknown equipment and a non-vessel, leaving the document unchanged', () => {
     expectRefusal(vessel(), 'equipment_cog', { equipment: 'V-9' }, 'EQP_NOT_FOUND', 'equipment');
-    expectRefusal(bemDocument(false), 'equipment_cog', { equipment: 'E-301' }, 'EQP_NOT_PARAMETRIC', 'equipment');
+    expectRefusal(
+      apply(mmDocument(), 'add_equipment', { name: 'Skid', mark: 'S-1', location: [0, 0], size: [1000, 1000, 1000] }),
+      'equipment_cog',
+      { equipment: 'S-1' },
+      'EQP_NOT_PARAMETRIC',
+      'equipment',
+    );
   });
 
   it('is a query: the document is returned unchanged', () => {

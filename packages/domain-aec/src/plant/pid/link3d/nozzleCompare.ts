@@ -22,6 +22,25 @@ export interface NozzleComparison {
 const same = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
 
 /**
+ * Canonical form of a flange rating, read as a token: class (CL150, Class 150, ASME 150, 150#, 150 lb) -> CL150, PN (PN16, PN 16, PN-16, PN2.5) -> PN16 /
+ * PN2.5 (the decimal is kept: PN2.5 differs from PN25); a trailing facing token (RF, FF, RTJ) is ignored. Anything else compares as written (upper case, no spaces).
+ */
+const FACING_SUFFIX = '(?:\\s*[,/ ]\\s*(?:RF|FF|RTJ|RJ))?$';
+const PN_RATING = new RegExp(`^PN\\s*-?\\s*(\\d+(?:\\.\\d+)?)${FACING_SUFFIX}`);
+const CLASS_RATING = new RegExp(`^(?:CL|CLASS)?\\s*(\\d+)\\s*(?:#|LBS?)?${FACING_SUFFIX}`);
+
+function normaliseRating(text: string): string {
+  const upper = text
+    .trim()
+    .toUpperCase()
+    .replace(/^ASME\s*/, '');
+  const pn = PN_RATING.exec(upper);
+  if (pn !== null) return `PN${Number(pn[1])}`;
+  const cls = CLASS_RATING.exec(upper);
+  return cls === null ? upper.replace(/\s+/g, '') : `CL${Number(cls[1])}`;
+}
+
+/**
  * @param connected normalised `TAG:MARK` of every nozzle a 3D line starts or ends on
  * @invariant an equipment without nozzle records (a legacy block) gives one coded skip, never a finding per nozzle
  */
@@ -85,6 +104,18 @@ export function compareNozzles(
           item: label,
           message: `nozzle ${label}: P&ID DN ${nozzle.dn} but the 3D nozzle ${record.mark} is DN ${record.dn}`,
           values: { pidDn: nozzle.dn, modelDn: record.dn },
+        }),
+      );
+    const rating = nozzle.attributes['rating'];
+    if (rating !== undefined && rating.kind !== 'quantity' && normaliseRating(rating.value) !== normaliseRating(record.rating))
+      out.findings.push(
+        makeFinding3d({
+          code: 'P3D_CLASS_MISMATCH',
+          pidIds: [nozzle.id],
+          elementIds: [element.id],
+          item: label,
+          message: `nozzle ${label}: P&ID rating ${rating.value} but the 3D nozzle ${record.mark} is ${record.rating}`,
+          values: { pidRating: rating.value, modelRating: record.rating },
         }),
       );
   }
