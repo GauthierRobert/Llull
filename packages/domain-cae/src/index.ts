@@ -3,6 +3,9 @@
 // analysis plugin
 export { caePlugin } from './plugin';
 
+// vibro-acoustics hand-off (PHY-20): plugin
+export { vibroacousticsPlugin } from './vibroacoustics/plugin';
+
 // topology optimisation: plugin, job and artifact builders, study lookup
 export { topologyPlugin } from './topology/plugin';
 export { buildTopologyJob, type TopologyJob, type TopologyJobResult } from './topology/job';
