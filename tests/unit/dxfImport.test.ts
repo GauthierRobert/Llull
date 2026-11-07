@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { flattenDxf, parseDxf, codeNumber } from '@lib/dxfRead';
+import { flattenDxf, parseDxf } from '@lib/dxfRead';
+import { codeNumber } from '@lib/dxfRecord';
 import { aciToHex, insUnitsMillimetres } from '@lib/dxfUnits';
 import { expectPure } from '../helpers/expectNoOp';
 
@@ -196,7 +197,7 @@ describe('dxf reader', () => {
     expect(primitives.some((p) => p.kind === 'circle' && p.layer === 'MARKS')).toBe(true);
     // Non-uniform insert turns the circle into a closed polyline.
     expect(primitives.some((p) => p.kind === 'polyline' && p.layer === 'MARKS' && p.closed)).toBe(true);
-    expect(skipped.get('HATCH')).toBe(1);
+    expect(skipped.get('HATCH (unreadable boundary)')).toBe(1);
     expect(skipped.get('INSERT')).toBe(1);
   });
   it('maps colours and units', () => {

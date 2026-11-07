@@ -1,25 +1,17 @@
 /**
- * @affects creates the drawing's entities (lines, polylines, arcs, circles, points, texts; 3D faces as one mesh per layer) and any missing
- *   layers
+ * @affects creates the drawing's entities (lines, polylines, rectangles, arcs, circles, ellipses, splines, points, texts, hatch regions; 3D faces
+ *   as one mesh per layer) and any missing layers (name, colour, hidden / locked state)
  * @failure not an ASCII DXF / nothing importable -> no-op, affected:[]
  */
 
-import {
-  type BaseEntity,
-  type CadDocument,
-  type Entity,
-  type Layer,
-  type Vec2,
-  type Vec3,
-  DEFAULT_LAYER_ID,
-  DOCUMENT_UNITS,
-} from '../../model/types';
+import { type CadDocument, type Entity, type Layer, type Vec2, type Vec3, DEFAULT_LAYER_ID, DOCUMENT_UNITS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { noop } from '../noop';
 import { nextId } from '../../lib/id';
 import { newEntity } from '../entity/newEntity';
-import { flattenDxf, parseDxf, type DxfPrimitive } from '../../lib/dxfRead';
+import { flattenDxf, parseDxf, type DxfLayerStyle } from '../../lib/dxfRead';
+import { makeRegion, regionGeometry, scalePrimitive, toEntities } from './dxfToEntities';
 import { aciToHex, insUnitsMillimetres } from '../../lib/dxfUnits';
 import { MAX_IMPORT_TRIANGLES } from '../limits';
 import { MM_PER_UNIT } from '../../model/units';
@@ -31,7 +23,7 @@ interface LayerResolver {
   readonly layers: Record<string, Layer>;
   readonly layerOrder: string[];
   readonly created: string[];
-  idFor(name: string, aci: number): string;
+  idFor(name: string, aci: number, style: DxfLayerStyle | undefined): string;
 }
 
 function layerResolver(doc: CadDocument): LayerResolver {
@@ -43,12 +35,12 @@ function layerResolver(doc: CadDocument): LayerResolver {
     layers,
     layerOrder,
     created,
-    idFor(name, aci) {
+    idFor(name, aci, style) {
       if (name === '0' && layers[DEFAULT_LAYER_ID]) return DEFAULT_LAYER_ID;
       const existing = byName.get(name.toLowerCase());
       if (existing !== undefined) return existing;
       const id = nextId('layer');
-      layers[id] = { id, name, visible: true, locked: false, color: aciToHex(aci) };
+      layers[id] = { id, name, visible: style?.hidden !== true, locked: style?.locked === true, color: style?.trueColor ?? aciToHex(aci) };
       layerOrder.push(id);
       byName.set(name.toLowerCase(), id);
       created.push(name);
@@ -57,82 +49,15 @@ function layerResolver(doc: CadDocument): LayerResolver {
   };
 }
 
-function isFlat(points: readonly Vec3[]): boolean {
-  const z = points[0]?.[2] ?? 0;
-  return points.every((point) => Math.abs(point[2] - z) < 1e-9);
-}
-
-/**
- * Converts one primitive (already in document units) to an entity; faces are collected apart.
- * @returns the entity, or null for faces / degenerate input; `flattened` when 3D data was lost
- */
-function toEntity(primitive: DxfPrimitive, layerId: string, color: string): { entity: Entity | null; flattened: boolean } {
-  const make = <K extends Entity['kind']>(
-    kind: K,
-    geometry: Omit<Extract<Entity, { kind: K }>, keyof BaseEntity>,
-    at: Vec3,
-    rotation?: Vec3,
-  ): Entity => newEntity(kind, nextId(kind), geometry, at, color, { layerId, ...(rotation ? { rotation } : {}) });
-  const flat = (entity: Entity): { entity: Entity; flattened: boolean } => ({ entity, flattened: false });
-  switch (primitive.kind) {
-    case 'line': {
-      const { a, b } = primitive;
-      return { entity: make('line', { start: [a[0], a[1]], end: [b[0], b[1]] }, [0, 0, a[2]]), flattened: !isFlat([a, b]) };
-    }
-    case 'polyline': {
-      let points = primitive.points.map((point): Vec2 => [point[0], point[1]]);
-      const first = points[0] as Vec2;
-      const last = points[points.length - 1] as Vec2;
-      const closed = primitive.closed || (points.length > 3 && first[0] === last[0] && first[1] === last[1]);
-      if (closed && points.length > 3 && first[0] === last[0] && first[1] === last[1]) points = points.slice(0, -1);
-      const entity = make('polyline', { points, closed }, [0, 0, primitive.points[0]?.[2] ?? 0]);
-      return { entity, flattened: !isFlat(primitive.points) };
-    }
-    case 'arc': {
-      const { center, radius, start, end } = primitive;
-      return flat(make('arc', { center: [center[0], center[1]], radius, startAngle: start, endAngle: end }, [0, 0, center[2]]));
-    }
-    case 'circle':
-      return flat(
-        make('circle', { center: [primitive.center[0], primitive.center[1]], radius: primitive.radius }, [0, 0, primitive.center[2]]),
-      );
-    case 'point':
-      return flat(make('point', {}, primitive.at));
-    case 'text':
-      return flat(
-        make('text', { content: primitive.content, height: primitive.height, anchor: 'left' }, primitive.at, [0, 0, primitive.rotation]),
-      );
-    case 'face':
-      return { entity: null, flattened: false };
-  }
-}
-
-function scalePrimitive(primitive: DxfPrimitive, factor: number): DxfPrimitive {
-  const s = (point: Vec3): Vec3 => [point[0] * factor, point[1] * factor, point[2] * factor];
-  switch (primitive.kind) {
-    case 'line':
-      return { ...primitive, a: s(primitive.a), b: s(primitive.b) };
-    case 'polyline':
-      return { ...primitive, points: primitive.points.map(s) };
-    case 'arc':
-    case 'circle':
-      return { ...primitive, center: s(primitive.center), radius: primitive.radius * factor };
-    case 'point':
-      return { ...primitive, at: s(primitive.at) };
-    case 'text':
-      return { ...primitive, at: s(primitive.at), height: primitive.height * factor };
-    case 'face':
-      return { ...primitive, corners: primitive.corners.map(s) };
-  }
-}
-
 export const importDxf = defineCommand({
   name: 'import_dxf',
   description:
     'Import an ASCII DXF drawing (AutoCAD, Civil 3D, BricsCAD, QCAD, survey software exports) as ' +
     'editable 2D entities on their DXF layers: LINE, LWPOLYLINE (bulges as arcs), POLYLINE, ARC, ' +
-    'CIRCLE, POINT, TEXT, MTEXT, block INSERTs (exploded) and 3DFACE (one mesh per layer). Elevations ' +
-    'are kept as the entity plane height. Units come from $INSUNITS unless `sourceUnit` is given. ' +
+    'CIRCLE, ELLIPSE (a full one; an elliptical arc becomes a polyline), SPLINE (its fit points, else the NURBS sampled), HATCH (a region with ' +
+    'its pattern), POINT, TEXT, MTEXT, block INSERTs (exploded) and 3DFACE (one mesh per layer). Reads back what export_dxf writes: ' +
+    'rectangles, splines and unhatched regions are restored from its LLULL extended data, true colours and layer visibility / lock are kept. ' +
+    'Elevations are kept as the entity plane height. Units come from $INSUNITS unless `sourceUnit` is given. ' +
     'Binary DXF and DWG are not supported (save as ASCII DXF). For terrain from survey DXFs use import_survey_dxf.',
   params: z.object({
     text: z.string().describe('DXF file content (ASCII).'),
@@ -157,6 +82,7 @@ export const importDxf = defineCommand({
     const order = [...doc.order];
     const affected: string[] = [];
     const counts = new Map<string, number>();
+    const regionLoops = new Map<number, { loops: Vec2[][]; z: number; layerId: string; color: string }>();
     const faces = new Map<string, { positions: number[]; indices: number[]; color: string }>();
     let flattened = 0;
     let truncated = 0;
@@ -164,8 +90,10 @@ export const importDxf = defineCommand({
     for (const raw of selected) {
       const primitive = scalePrimitive(raw, factor);
       const layerAci = drawing.layers.get(primitive.layer) ?? 7;
-      const layerId = resolver.idFor(primitive.layer, layerAci);
-      const color = aciToHex(primitive.color === 256 || primitive.color === 0 ? layerAci : primitive.color);
+      const layerStyle = drawing.layerStyles.get(primitive.layer);
+      const layerId = resolver.idFor(primitive.layer, layerAci, layerStyle);
+      const byLayer = primitive.color === 256 || primitive.color === 0;
+      const color = primitive.trueColor ?? (byLayer ? (layerStyle?.trueColor ?? aciToHex(layerAci)) : aciToHex(primitive.color));
       if (primitive.kind === 'face') {
         const triangles = primitive.corners.length === 4 ? 2 : 1;
         if (faceTriangles + triangles > MAX_IMPORT_TRIANGLES) {
@@ -185,13 +113,35 @@ export const importDxf = defineCommand({
         truncated += 1;
         continue;
       }
-      const converted = toEntity(primitive, layerId, color);
-      if (converted.entity === null) continue;
+      if (primitive.kind === 'polyline' && primitive.mark?.kind === 'region') {
+        const group = regionLoops.get(primitive.mark.ordinal) ?? { loops: [], z: (primitive.points[0] as Vec3)[2], layerId, color };
+        group.loops.push(primitive.points.map((point): Vec2 => [point[0], point[1]]));
+        regionLoops.set(primitive.mark.ordinal, group);
+        continue;
+      }
+      const converted = toEntities(primitive, layerId, color);
       if (converted.flattened) flattened += 1;
-      entities[converted.entity.id] = converted.entity;
-      order.push(converted.entity.id);
-      affected.push(converted.entity.id);
-      counts.set(primitive.kind, (counts.get(primitive.kind) ?? 0) + 1);
+      converted.entities.forEach((entity, index) => {
+        entities[entity.id] = entity;
+        order.push(entity.id);
+        affected.push(entity.id);
+        const label = converted.labels[index] ?? entity.kind;
+        counts.set(label, (counts.get(label) ?? 0) + 1);
+      });
+    }
+    for (const { loops, z, layerId, color } of regionLoops.values()) {
+      const region = regionGeometry(loops);
+      const made: Entity[] =
+        region === null
+          ? loops.map((points) => newEntity('polyline', nextId('polyline'), { points, closed: true }, [0, 0, z], color, { layerId }))
+          : [makeRegion(region, z, layerId, color, null)];
+      for (const entity of made) {
+        entities[entity.id] = entity;
+        order.push(entity.id);
+        affected.push(entity.id);
+        const label = region === null ? 'polyline (region loop)' : 'region';
+        counts.set(label, (counts.get(label) ?? 0) + 1);
+      }
     }
     for (const [layerId, mesh] of faces) {
       const id = nextId('mesh');

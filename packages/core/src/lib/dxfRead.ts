@@ -6,13 +6,8 @@
 import type { Vec3 } from '../model/vectors';
 import { positiveSweep, toRadians } from './angle';
 import { arcPolyline } from './arc';
-
-export interface DxfRecord {
-  readonly type: string;
-  readonly codes: ReadonlyArray<readonly [number, string]>;
-  /** VERTEX records of a POLYLINE. */
-  readonly vertices?: readonly DxfRecord[];
-}
+import { type DxfRecord, codeNumber, codeValue, decodeDxfText, point } from './dxfRecord';
+import { llullXdata, readHatch, readSpline } from './dxfReadShapes';
 
 interface DxfBlock {
   readonly base: Vec3;
@@ -24,20 +19,33 @@ export interface DxfDrawing {
   readonly insUnits: number | null;
   /** Layer name -> ACI colour. */
   readonly layers: ReadonlyMap<string, number>;
+  /** Layer name -> true colour (hex, code 420), hidden (negative colour or frozen) and locked flags. */
+  readonly layerStyles: ReadonlyMap<string, DxfLayerStyle>;
   readonly blocks: ReadonlyMap<string, DxfBlock>;
   readonly entities: readonly DxfRecord[];
+}
+
+export interface DxfLayerStyle {
+  readonly trueColor: string | null;
+  readonly hidden: boolean;
+  readonly locked: boolean;
 }
 
 interface Common {
   readonly layer: string;
   /** ACI colour (256 = BYLAYER). */
   readonly color: number;
+  /** True colour (hex, code 420), or null. */
+  readonly trueColor: string | null;
 }
+
+/** What an exported polyline stands for: a rectangle, or one loop of the region with that ordinal. */
+type DxfPolylineMark = { readonly kind: 'rectangle' } | { readonly kind: 'region'; readonly ordinal: number };
 
 export type DxfPrimitive = Common &
   (
     | { readonly kind: 'line'; readonly a: Vec3; readonly b: Vec3 }
-    | { readonly kind: 'polyline'; readonly points: readonly Vec3[]; readonly closed: boolean }
+    | { readonly kind: 'polyline'; readonly points: readonly Vec3[]; readonly closed: boolean; readonly mark: DxfPolylineMark | null }
     | {
         readonly kind: 'arc';
         readonly center: Vec3;
@@ -48,9 +56,33 @@ export type DxfPrimitive = Common &
       }
     | { readonly kind: 'circle'; readonly center: Vec3; readonly radius: number }
     | { readonly kind: 'point'; readonly at: Vec3 }
-    | { readonly kind: 'text'; readonly at: Vec3; readonly height: number; readonly rotation: number; readonly content: string }
+    | {
+        readonly kind: 'text';
+        readonly at: Vec3;
+        readonly height: number;
+        readonly rotation: number;
+        readonly content: string;
+        readonly anchor: 'left' | 'center' | 'right';
+      }
+    /** Complete ellipse (an elliptical arc is a polyline); `major` is the semi-major vector from the centre, `ratio` minor / major. */
+    | { readonly kind: 'ellipse'; readonly center: Vec3; readonly major: Vec3; readonly ratio: number }
+    | { readonly kind: 'spline'; readonly points: readonly Vec3[]; readonly closed: boolean; readonly exact: boolean }
+    | {
+        readonly kind: 'hatch';
+        readonly loops: readonly Vec3[][];
+        readonly solid: boolean;
+        readonly angle: number;
+        readonly spacing: number;
+        readonly cross: boolean;
+      }
     | { readonly kind: 'face'; readonly corners: readonly Vec3[] }
   );
+
+/** True colour (code 420, 24-bit RGB) of a record as hex, or null. */
+function trueColorOf(record: DxfRecord): string | null {
+  const value = codeNumber(record, 420, -1);
+  return value >= 0 && value <= 0xffffff ? `#${value.toString(16).padStart(6, '0')}` : null;
+}
 
 function pairs(text: string): Array<[number, string]> {
   const lines = text.split(/\r?\n/);
@@ -99,15 +131,6 @@ function groupPolylines(raw: readonly DxfRecord[]): DxfRecord[] {
   return result;
 }
 
-function codeValue(record: DxfRecord, code: number): string | undefined {
-  return record.codes.find(([candidate]) => candidate === code)?.[1];
-}
-
-export function codeNumber(record: DxfRecord, code: number, fallback: number): number {
-  const value = Number(codeValue(record, code));
-  return codeValue(record, code) !== undefined && Number.isFinite(value) ? value : fallback;
-}
-
 /** Parse ASCII DXF text; null when it has no ENTITIES section. */
 export function parseDxf(text: string): DxfDrawing | null {
   const stream = pairs(text);
@@ -129,10 +152,19 @@ export function parseDxf(text: string): DxfDrawing | null {
   const unitsAt = header.findIndex(([code, value]) => code === 9 && value === '$INSUNITS');
   const insUnits = unitsAt >= 0 ? Number(header[unitsAt + 1]?.[1]) : null;
   const layers = new Map<string, number>();
+  const layerStyles = new Map<string, DxfLayerStyle>();
   for (const record of records(sections.get('TABLES') ?? [])) {
     if (record.type !== 'LAYER') continue;
-    const name = codeValue(record, 2);
-    if (name !== undefined) layers.set(name, Math.abs(codeNumber(record, 62, 7)));
+    const rawName = codeValue(record, 2);
+    if (rawName === undefined) continue;
+    const name = decodeDxfText(rawName);
+    const colour = codeNumber(record, 62, 7);
+    layers.set(name, Math.abs(colour));
+    layerStyles.set(name, {
+      trueColor: trueColorOf(record),
+      hidden: colour < 0 || (codeNumber(record, 70, 0) & 1) === 1,
+      locked: (codeNumber(record, 70, 0) & 4) === 4,
+    });
   }
   const blocks = new Map<string, DxfBlock>();
   let block: { name: string; base: Vec3; entities: DxfRecord[] } | null = null;
@@ -151,6 +183,7 @@ export function parseDxf(text: string): DxfDrawing | null {
   return {
     insUnits: insUnits !== null && Number.isFinite(insUnits) ? insUnits : null,
     layers,
+    layerStyles,
     blocks,
     entities: groupPolylines(records(entitiesSection)),
   };
@@ -167,8 +200,27 @@ interface Transform {
 
 const IDENTITY: Transform = { apply: (point) => point, rotation: 0, scale: 1 };
 
-function point(record: DxfRecord, offset = 0): Vec3 {
-  return [codeNumber(record, 10 + offset, 0), codeNumber(record, 20 + offset, 0), codeNumber(record, 30 + offset, 0)];
+/** Polyline mark of an LWPOLYLINE written by `export_dxf` (extended data), or null. */
+function polylineMark(record: DxfRecord, vertices: number, closed: boolean): DxfPolylineMark | null {
+  const xdata = llullXdata(record);
+  if (xdata?.tag === 'rectangle' && vertices === 4 && closed) return { kind: 'rectangle' };
+  if (xdata?.tag === 'region' && closed && xdata.ints[0] !== undefined) return { kind: 'region', ordinal: xdata.ints[0] };
+  return null;
+}
+
+/** Points of an ellipse (or elliptical arc) from parameter `start` to `end`, 48 segments per turn at least. */
+function ellipsePoints(center: Vec3, major: Vec3, ratio: number, start: number, end: number): Vec3[] {
+  const sweep = positiveSweep(end - start);
+  const minor: Vec3 = [-major[1] * ratio, major[0] * ratio, 0];
+  const segments = Math.max(8, Math.ceil(sweep / (Math.PI / 24)));
+  return Array.from({ length: segments + 1 }, (_, i): Vec3 => {
+    const t = start + (sweep * i) / segments;
+    return [
+      center[0] + major[0] * Math.cos(t) + minor[0] * Math.sin(t),
+      center[1] + major[1] * Math.cos(t) + minor[1] * Math.sin(t),
+      center[2] + major[2] * Math.cos(t),
+    ];
+  });
 }
 
 /** Arc points from `start` to `end` (radians, CCW) around `center`. */
@@ -255,7 +307,7 @@ function ocs(record: DxfRecord, local: Vec3): Vec3 {
 
 export interface FlattenResult {
   readonly primitives: DxfPrimitive[];
-  /** Entity types that were skipped (e.g. HATCH, DIMENSION, SPLINE), with counts. */
+  /** Entity types that were skipped (e.g. DIMENSION, IMAGE, a SPLINE or HATCH that cannot be read), with counts. */
   readonly skipped: ReadonlyMap<string, number>;
 }
 
@@ -275,11 +327,11 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
         skipped.set('over limit', (skipped.get('over limit') ?? 0) + 1);
         continue;
       }
-      const rawLayer = codeValue(record, 8) ?? '0';
+      const rawLayer = decodeDxfText(codeValue(record, 8) ?? '0');
       const layer = inherited && rawLayer === '0' ? inherited.layer : rawLayer;
       const rawColor = codeNumber(record, 62, 256);
       const color = inherited && rawColor === 0 ? inherited.color : rawColor;
-      const common: Common = { layer, color };
+      const common: Common = { layer, color, trueColor: trueColorOf(record) ?? inherited?.trueColor ?? null };
       const world = (local: Vec3): Vec3 => transform.apply(ocs(record, local));
       switch (record.type) {
         case 'LINE':
@@ -291,7 +343,8 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
         case 'LWPOLYLINE': {
           const closed = (codeNumber(record, 70, 0) & 1) === 1;
           const points = lwPolylinePoints(record, closed).map(world);
-          if (points.length >= 2) primitives.push({ ...common, kind: 'polyline', points, closed });
+          const mark = polylineMark(record, points.length, closed);
+          if (points.length >= 2) primitives.push({ ...common, kind: 'polyline', points, closed, mark });
           break;
         }
         case 'POLYLINE': {
@@ -305,7 +358,7 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
             const local = point(vertex);
             return world((flags & 8) === 8 ? local : [local[0], local[1], elevation]);
           });
-          if (points.length >= 2) primitives.push({ ...common, kind: 'polyline', points, closed: (flags & 1) === 1 });
+          if (points.length >= 2) primitives.push({ ...common, kind: 'polyline', points, closed: (flags & 1) === 1, mark: null });
           break;
         }
         case 'ARC':
@@ -321,7 +374,7 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
             const points = arcPoints(ocs(record, local), radius, start, record.type === 'ARC' ? end : Math.PI * 2).map((p) =>
               transform.apply(p),
             );
-            primitives.push({ ...common, kind: 'polyline', points, closed: record.type === 'CIRCLE' });
+            primitives.push({ ...common, kind: 'polyline', points, closed: record.type === 'CIRCLE', mark: null });
           } else if (record.type === 'CIRCLE') primitives.push({ ...common, kind: 'circle', center, radius: radius * transform.scale });
           else
             primitives.push({
@@ -344,17 +397,66 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
                     .map(([, value]) => value)
                     .join(''),
                 )
-              : (codeValue(record, 1) ?? '').trim();
+              : decodeDxfText(codeValue(record, 1) ?? '').trim();
           if (raw === '') break;
           const height = codeNumber(record, 40, 1) * (transform.scale ?? 1);
+          const alignment = record.type === 'TEXT' ? codeNumber(record, 72, 0) : 0;
+          const anchor = alignment === 1 ? 'center' : alignment === 2 ? 'right' : 'left';
           primitives.push({
             ...common,
             kind: 'text',
-            at: world(point(record)),
+            anchor,
+            at: world(point(record, anchor === 'left' ? 0 : 1)),
             height: height > 0 ? height : 1,
             rotation: toRadians(codeNumber(record, 50, 0)) + transform.rotation,
             content: raw,
           });
+          break;
+        }
+        case 'ELLIPSE': {
+          const [center, major] = [point(record), point(record, 1)];
+          const ratio = codeNumber(record, 40, 1);
+          const [start, end] = [codeNumber(record, 41, 0), codeNumber(record, 42, Math.PI * 2)];
+          if (!(ratio > 0 && ratio <= 1) || !(Math.hypot(...major) > 0)) break;
+          if (transform.scale === null || Math.abs(positiveSweep(end - start) - Math.PI * 2) > 1e-9) {
+            const points = ellipsePoints(center, major, ratio, start, end).map((p) => transform.apply(p));
+            primitives.push({
+              ...common,
+              kind: 'polyline',
+              points,
+              closed: Math.abs(positiveSweep(end - start) - Math.PI * 2) < 1e-9,
+              mark: null,
+            });
+            break;
+          }
+          const worldCenter = transform.apply(center);
+          const tip = transform.apply([center[0] + major[0], center[1] + major[1], center[2] + major[2]]);
+          primitives.push({
+            ...common,
+            kind: 'ellipse',
+            center: worldCenter,
+            major: [tip[0] - worldCenter[0], tip[1] - worldCenter[1], tip[2] - worldCenter[2]],
+            ratio,
+          });
+          break;
+        }
+        case 'SPLINE': {
+          const spline = readSpline(record);
+          if (spline === null) skipped.set('SPLINE (malformed)', (skipped.get('SPLINE (malformed)') ?? 0) + 1);
+          else primitives.push({ ...common, kind: 'spline', ...spline, points: spline.points.map(transform.apply) });
+          break;
+        }
+        case 'HATCH': {
+          const hatch = readHatch(record);
+          const elevation = codeNumber(record, 30, 0);
+          if (hatch === null) skipped.set('HATCH (unreadable boundary)', (skipped.get('HATCH (unreadable boundary)') ?? 0) + 1);
+          else
+            primitives.push({
+              ...common,
+              kind: 'hatch',
+              ...hatch,
+              loops: hatch.loops.map((loop) => loop.map(([x, y]) => world([x, y, elevation]))),
+            });
           break;
         }
         case '3DFACE': {
