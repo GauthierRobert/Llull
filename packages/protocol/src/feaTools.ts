@@ -96,6 +96,7 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
       description:
         'Solve a meshed analysis with CalculiX (ccx): writes the input deck from the document, runs the solver, reads the results into ' +
         'a content-addressed artifact and records their summary with record_fea_results (then use analysis_report / check_analysis). ' +
+        'A modal analysis returns the natural frequencies (eigenfrequencies, Hz) and mode shapes: read them with analysis_report (eigen) and fea_result_field (mode). ' +
         'Refuses a missing or stale mesh (run fea_mesh). Needs ccx on the server (LLULL_CCX).',
       inputSchema: {
         type: 'object',
