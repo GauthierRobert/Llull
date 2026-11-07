@@ -1,44 +1,26 @@
 /**
- * The `ActuatorBlock` of a document's datasheet motors (PHY-23 TR-DRV-01): every DC motor that has a drive becomes one electrical + controller
- * state in `aux`, advanced once per physics step with the exact winding law, and a per-motor energy ledger.
+ * The `ActuatorBlock` of a document's datasheet motors (PHY-23 TR-DRV-01): every motor that has a drive (dc, pmsm, stepper, induction) becomes one electrical +
+ * controller state in `aux`, advanced once per physics step with its kind's law (`machineStep.ts`), and a per-motor energy ledger.
  */
 
-import type { ActuatorBlock, LedgerKind } from '@core/dynamics/physicsEngine';
-import { compileProfile, isProfileRefusal, profileUnitScale, type CompiledProfile } from '@core/geometry/motionProfile';
-import type { DcMotor, MotorDrive } from '@core/model/drives';
+import type { ActuatorBlock } from '@core/dynamics/physicsEngine';
+import { compileProfile, isProfileRefusal, profileUnitScale } from '@core/geometry/motionProfile';
+import { DRIVE_MODES_BY_KIND, type DatasheetMotor, type MotorDrive } from '@core/model/drives';
 import type { DynamicsModel } from '@core/model/dynamics';
 import { AUX, AUX_SIZE, MAX_BANDWIDTH_PER_RATE, tunedGains, updateLoop, type LoopGains, type LoopSpec } from './controller';
-import { dcParameters, electricalStep, jointTorque, shaftTorqueFor, type DcParameters } from './dcMotor';
+import { dcParameters } from './dcMotor';
+import type { DriveRuntime, MachineRuntime, ResolvedProfile } from './driveRuntime';
+import { jointTorque } from './drivetrain';
+import { inductionParameters } from './induction';
+import { isDatasheetMotor, ledgerKindsOf, peakJointTorque } from './machine';
+import { stepMachine } from './machineStep';
+import { pmsmParameters } from './pmsm';
+import { stepperParameters } from './stepper';
 
-/** A profile resolved for a run: compiled, with its unit scale to SI. */
-interface ResolvedProfile {
-  readonly profile: CompiledProfile;
-  readonly scale: number;
-  readonly quantity: string;
-}
-
-/** A motor with a drive, ready to run. */
-export interface DriveRuntime {
-  readonly motor: DcMotor;
-  readonly drive: MotorDrive;
-  readonly params: DcParameters;
-  /** Index of the motor's first slot in `aux`. */
-  readonly base: number;
-  /** Index of the motor's first entry in the ledger. */
-  readonly ledgerBase: number;
-  /** Joint the controller measures. */
-  readonly target: string;
-  readonly currentLimitA: number;
-  readonly busVoltageV: number;
-  /** Constant terminal voltage (voltage mode without a profile), V. */
-  readonly constantVolts: number;
-  /** The profile the drive follows (any mode), null for a constant voltage. */
-  readonly resolved: ResolvedProfile | null;
-  readonly loop: LoopSpec | null;
-}
+export type { DriveRuntime } from './driveRuntime';
 
 export interface ActuatorRefusal {
-  readonly code: 'DRV_PROFILE_INVALID' | 'DRV_CONTROL_RATE' | 'DRV_TUNE_NO_INERTIA' | 'DRV_JOINT_INVALID';
+  readonly code: 'DRV_PROFILE_INVALID' | 'DRV_CONTROL_RATE' | 'DRV_TUNE_NO_INERTIA' | 'DRV_JOINT_INVALID' | 'DRV_MODE_UNSUPPORTED';
   readonly error: string;
 }
 
@@ -53,14 +35,13 @@ export interface ActuatorContext {
   readonly inertiaOf: (joint: string) => number | undefined;
 }
 
-const LEDGER_KINDS: readonly LedgerKind[] = ['electrical_input', 'copper', 'magnetic', 'transmission_loss', 'regeneration'];
-
 const MODE_QUANTITY: Readonly<Record<MotorDrive['mode'], readonly string[]>> = {
   voltage: ['voltage'],
   torque: ['torque'],
   velocity: ['velocity'],
   position: ['position'],
   prescribed: ['position', 'velocity'],
+  frequency: ['frequency'],
 };
 
 const refusal = (code: ActuatorRefusal['code'], error: string): ActuatorRefusal => ({ code, error });
@@ -87,7 +68,7 @@ function resolveProfile(dynamics: DynamicsModel, drive: MotorDrive): ResolvedPro
 /** The controller of a velocity / position / prescribed drive, or why it cannot run at `context.timestep`. */
 function loopOf(
   drive: MotorDrive,
-  params: DcParameters,
+  peakTorque: number,
   context: ActuatorContext,
   resolved: ResolvedProfile,
   inertia: number,
@@ -118,11 +99,6 @@ function loopOf(
       return refusal('DRV_TUNE_NO_INERTIA', `position drive of '${drive.id}' needs gains.kpPosition or tune`);
   } else if (!(inertia > 0))
     return refusal('DRV_TUNE_NO_INERTIA', `prescribed drive of '${drive.id}' needs bodies with mass on the driven joint`);
-  const peakTorque =
-    params.gearRatio *
-    params.efficiencyForward *
-    params.torqueConstant *
-    (drive.currentLimitA === undefined ? params.currentLimitA : drive.currentLimitA);
   return {
     mode,
     profile: resolved.profile,
@@ -136,13 +112,60 @@ function loopOf(
   };
 }
 
-/** Runtimes of the document's driven DC motors, or why not. */
+/** The kind's electrical law with this drive's limits, or why the drive cannot run on it. */
+function machineOf(motor: DatasheetMotor, drive: MotorDrive): MachineRuntime | ActuatorRefusal {
+  switch (motor.kind) {
+    case 'dc':
+      return { kind: 'dc', params: dcParameters(motor) };
+    case 'pmsm': {
+      const params = pmsmParameters(motor);
+      return {
+        kind: 'pmsm',
+        params,
+        limits: {
+          currentA: drive.currentLimitA === undefined ? params.currentLimitA : drive.currentLimitA,
+          busVoltageV: drive.busVoltageV === undefined ? params.busVoltageV : drive.busVoltageV,
+        },
+      };
+    }
+    case 'stepper': {
+      const params = stepperParameters(motor);
+      return {
+        kind: 'stepper',
+        params,
+        division: drive.stepDivision === undefined ? 1 : drive.stepDivision,
+        setCurrentA: drive.currentLimitA === undefined ? params.ratedCurrentA : drive.currentLimitA,
+      };
+    }
+    case 'induction': {
+      if (drive.mode === 'voltage' && !(drive.frequencyHz !== undefined && drive.frequencyHz > 0))
+        return refusal(
+          'DRV_PROFILE_INVALID',
+          `drive of '${motor.id}' (voltage on an induction motor) needs frequencyHz > 0 (the supply frequency)`,
+        );
+      return {
+        kind: 'induction',
+        params: inductionParameters(motor),
+        frequencyHz: drive.mode === 'voltage' ? (drive.frequencyHz ?? null) : null,
+      };
+    }
+  }
+}
+
+/** Runtimes of the document's driven datasheet motors, or why not. */
 function runtimes(dynamics: DynamicsModel, context: ActuatorContext): DriveRuntime[] | ActuatorRefusal {
   const out: DriveRuntime[] = [];
+  let ledgerBase = 0;
   for (const motor of Object.values(dynamics.motors)) {
     const drive = dynamics.drives?.[motor.id];
-    if (motor.kind !== 'dc' || drive === undefined) continue;
-    const params = dcParameters(motor);
+    if (!isDatasheetMotor(motor) || drive === undefined) continue;
+    if (!DRIVE_MODES_BY_KIND[motor.kind].includes(drive.mode))
+      return refusal(
+        'DRV_MODE_UNSUPPORTED',
+        `drive of '${motor.id}': a ${motor.kind} motor takes ${DRIVE_MODES_BY_KIND[motor.kind].join(', ')}, not '${drive.mode}'`,
+      );
+    const machine = machineOf(motor, drive);
+    if (isRefusal(machine)) return machine;
     const target = drive.target === undefined ? motor.joint : drive.target;
     const inertia = context.inertiaOf(target);
     if (inertia === undefined) return refusal('DRV_JOINT_INVALID', `drive of '${motor.id}' measures joint '${target}', which cannot move`);
@@ -152,34 +175,29 @@ function runtimes(dynamics: DynamicsModel, context: ActuatorContext): DriveRunti
       return refusal('DRV_PROFILE_INVALID', `drive of '${motor.id}' (${drive.mode}) needs a profile`);
     if (resolved === null && drive.volts === undefined)
       return refusal('DRV_PROFILE_INVALID', `drive of '${motor.id}' (voltage) needs volts or a profile`);
-    const closed = drive.mode === 'velocity' || drive.mode === 'position' || drive.mode === 'prescribed';
-    const loop = closed && resolved !== null ? loopOf(drive, params, context, resolved, inertia) : null;
+    const closed =
+      (drive.mode === 'velocity' || drive.mode === 'position' || drive.mode === 'prescribed') &&
+      (motor.kind === 'dc' || motor.kind === 'pmsm');
+    const loop =
+      closed && resolved !== null ? loopOf(drive, peakJointTorque(motor, drive.currentLimitA), context, resolved, inertia) : null;
     if (isRefusal(loop)) return loop;
     out.push({
       motor,
       drive,
-      params,
+      machine,
+      params: machine.params,
       base: out.length * AUX_SIZE,
-      ledgerBase: out.length * LEDGER_KINDS.length,
+      ledgerBase,
       target,
-      currentLimitA: drive.currentLimitA === undefined ? params.currentLimitA : drive.currentLimitA,
-      busVoltageV: drive.busVoltageV === undefined ? Infinity : drive.busVoltageV,
+      currentLimitA: drive.currentLimitA === undefined ? machine.params.currentLimitA : drive.currentLimitA,
+      busVoltageV: machine.kind === 'pmsm' ? machine.limits.busVoltageV : drive.busVoltageV === undefined ? Infinity : drive.busVoltageV,
       constantVolts: drive.volts === undefined ? 0 : drive.volts,
       resolved,
       loop,
     });
+    ledgerBase += ledgerKindsOf(motor.kind).length;
   }
   return out;
-}
-
-/** Terminal voltage commanded by a voltage-mode drive at `time`. */
-function commandedVolts(run: DriveRuntime, time: number): number {
-  return run.resolved === null ? run.constantVolts : run.resolved.profile.evaluate(time).value * run.resolved.scale;
-}
-
-/** Motor shaft torque (N·m) a torque-mode drive commands at `time`. */
-function commandedShaftTorque(run: DriveRuntime, time: number): number {
-  return run.resolved === null ? 0 : run.resolved.profile.evaluate(time).value * run.resolved.scale;
 }
 
 /** The actuator block of the document at step `timestep`, null when no motor is driven, or the reason it cannot be built. */
@@ -188,70 +206,49 @@ export function buildActuators(dynamics: DynamicsModel, context: ActuatorContext
   if (isRefusal(drives)) return drives;
   if (drives.length === 0) return null;
   const joints = [...new Set(drives.map((run) => run.motor.joint))];
+  const ledgerSize = drives.reduce((sum, run) => sum + ledgerKindsOf(run.motor.kind).length, 0);
+  const aux0 = new Float64Array(drives.length * AUX_SIZE);
+  for (const run of drives) if (run.machine.kind === 'stepper') aux0[run.base + AUX.lostTime] = -1;
   const block: ActuatorBlock = {
     size: drives.length * AUX_SIZE,
-    aux0: new Float64Array(drives.length * AUX_SIZE),
+    aux0,
     joints,
-    ledgerLayout: drives.flatMap((run) => LEDGER_KINDS.map((kind) => ({ element: run.motor.id, kind }))),
+    ledgerLayout: drives.flatMap((run) => ledgerKindsOf(run.motor.kind).map((kind) => ({ element: run.motor.id, kind }))),
     advance: (state, previous, dt) => {
       const aux = previous.slice();
       const jointForces = new Float64Array(joints.length);
-      const ledger = new Float64Array(drives.length * LEDGER_KINDS.length);
+      const ledger = new Float64Array(ledgerSize);
       for (const run of drives) {
         const { params, base } = run;
         const omegaMotor = params.gearRatio * (state.jointVelocity[run.motor.joint] ?? Number.NaN);
+        const thetaMotor = params.gearRatio * (state.jointPosition[run.motor.joint] ?? Number.NaN);
         if (run.loop !== null) {
           const position = state.jointPosition[run.target];
           const velocity = state.jointVelocity[run.target];
           if (position !== undefined && velocity !== undefined) updateLoop(run.loop, aux, base, state.time, position, velocity, dt);
         }
-        const i0 = aux[base + AUX.current];
-        const ke = params.torqueConstant;
-        let volts = 0;
-        let limited = 0;
-        let clipped = 0;
-        let step;
-        if (run.drive.mode === 'voltage') {
-          volts = commandedVolts(run, state.time);
-          const steady = (volts - ke * omegaMotor) / params.resistanceOhm;
-          if (Math.abs(steady) > run.currentLimitA) {
-            volts = ke * omegaMotor + params.resistanceOhm * Math.sign(steady) * run.currentLimitA;
-            limited = 1;
-          }
-          step = electricalStep(params, volts, omegaMotor, i0 === undefined ? 0 : i0, dt);
-        } else {
-          const held = aux[base + AUX.heldTorque];
-          const wanted =
-            run.drive.mode === 'torque'
-              ? commandedShaftTorque(run, state.time) / ke
-              : shaftTorqueFor(params, held === undefined ? 0 : held, omegaMotor) / ke;
-          const upper = Math.min(run.currentLimitA, (run.busVoltageV - ke * omegaMotor) / params.resistanceOhm);
-          const lower = Math.max(-run.currentLimitA, (-run.busVoltageV - ke * omegaMotor) / params.resistanceOhm);
-          const current = Math.min(upper, Math.max(lower, wanted));
-          const saturated = run.loop !== null && Math.abs(held === undefined ? 0 : held) >= run.loop.torqueLimit * (1 - 1e-12);
-          clipped = current === wanted ? 0 : 1;
-          limited = clipped === 0 && !saturated ? 0 : 1;
-          volts = params.resistanceOhm * current + ke * omegaMotor;
-          step = { current, meanCurrent: current, copperJ: params.resistanceOhm * current * current * dt, magneticJ: 0 };
-        }
-        const shaftTorque = ke * step.meanCurrent;
-        const joint = jointTorque(params, shaftTorque, omegaMotor, dt);
-        const electrical = volts * step.meanCurrent * dt;
+        const step = stepMachine({ run, time: state.time, omegaMotor, thetaMotor, aux, dt });
+        const joint = jointTorque(params, step.shaftTorque, omegaMotor, dt);
+        const electrical = step.powerW * dt;
         const slot = joints.indexOf(run.motor.joint);
         jointForces[slot] = (jointForces[slot] ?? 0) + joint.torque;
         aux[base + AUX.current] = step.current;
-        aux[base + AUX.voltage] = volts;
+        aux[base + AUX.voltage] = step.volts;
         aux[base + AUX.meanCurrent] = step.meanCurrent;
-        aux[base + AUX.shaftTorque] = shaftTorque;
+        aux[base + AUX.shaftTorque] = step.shaftTorque;
         aux[base + AUX.jointTorque] = joint.torque;
-        aux[base + AUX.limited] = limited;
-        aux[base + AUX.clipped] = clipped;
+        aux[base + AUX.limited] = step.limited;
+        aux[base + AUX.clipped] = step.clipped;
+        aux[base + AUX.power] = step.powerW;
         aux[base + AUX.steps] = (aux[base + AUX.steps] ?? 0) + 1;
         ledger[run.ledgerBase] = electrical;
         ledger[run.ledgerBase + 1] = step.copperJ;
         ledger[run.ledgerBase + 2] = step.magneticJ;
         ledger[run.ledgerBase + 3] = joint.gearLossJ;
         ledger[run.ledgerBase + 4] = Math.min(electrical, 0);
+        step.extraJ.forEach((joules, k) => {
+          ledger[run.ledgerBase + 5 + k] = joules;
+        });
       }
       return { aux, jointForces, bodyForces: [], ledger };
     },

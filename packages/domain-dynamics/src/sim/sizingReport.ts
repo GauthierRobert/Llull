@@ -3,15 +3,15 @@
  * (datasheet limits and the thermal network), the margin of each against the other, the limiting factor and the coded findings.
  */
 
-import type { DcMotor } from '@core/model/drives';
+import type { DatasheetMotor } from '@core/model/drives';
 import type { DriveRunData } from './driveReport';
-import { checkMotorData } from './actuators/motorData';
+import { checkDatasheet } from './actuators/motorData';
+import { motorCapacity, thermalOf, type Capacity } from './actuators/machine';
 import {
   continuousCurrentAtLimit,
   networkTimeConstants,
   runawayCurrent,
   steadyWindingC,
-  thermalParams,
   windingTemperatureSeries,
 } from './actuators/thermal';
 import { marginOf, peakAbs, rmsOver } from './sizing';
@@ -29,13 +29,6 @@ export interface SizingFinding {
 }
 
 export type Factor = 'peak_current' | 'rms_current' | 'speed' | 'thermal';
-
-interface Capacity {
-  readonly peakCurrentA: { readonly value: number; readonly basis: string };
-  readonly continuousCurrentA: { readonly value: number; readonly basis: string } | null;
-  readonly maxSpeedRpm: number | null;
-  readonly windingMaxC: number | null;
-}
 
 interface MotorDemand {
   readonly peakCurrentA: number;
@@ -97,20 +90,9 @@ function demandOf(run: DriveRunData): MotorDemand | null {
   };
 }
 
-function capacityOf(motor: DcMotor): Capacity {
-  const sheet = motor.datasheet;
-  const thermal = thermalParams(sheet);
-  const stall = sheet.nominalVoltageV / sheet.terminalResistanceOhm;
-  return {
-    peakCurrentA:
-      sheet.peakCurrentA === undefined
-        ? { value: stall, basis: 'stall current U / R (the sheet gives no peak current)' }
-        : { value: sheet.peakCurrentA, basis: 'datasheet peak current' },
-    continuousCurrentA:
-      sheet.nominalCurrentA === undefined ? null : { value: sheet.nominalCurrentA, basis: 'datasheet nominal (continuous) current' },
-    maxSpeedRpm: sheet.maxSpeedRpm === undefined ? null : sheet.maxSpeedRpm,
-    windingMaxC: thermal === null ? null : thermal.maxWindingC,
-  };
+function capacityOf(motor: DatasheetMotor): Capacity {
+  const thermal = thermalOf(motor);
+  return { ...motorCapacity(motor), windingMaxC: thermal === null ? null : thermal.maxWindingC };
 }
 
 /** The fix text of each over-limit code. */
@@ -137,11 +119,11 @@ const FIX = {
  * The sizing of `motor` for the run `run` (its drive data with the series): margins, thermal state, findings.
  * @invariant a factor without a datasheet value is listed in `notEvaluated`, never passed; margins are capacity / demand - 1
  */
-export function sizingOf(motor: DcMotor, run: DriveRunData, ambientC: number, requestedMargin: number): SizingReport | null {
+export function sizingOf(motor: DatasheetMotor, run: DriveRunData, ambientC: number, requestedMargin: number): SizingReport | null {
   const demand = demandOf(run);
   if (demand === null) return null;
   const capacity = capacityOf(motor);
-  const thermal = thermalParams(motor.datasheet);
+  const thermal = thermalOf(motor);
   const id = motor.id;
   const findings: SizingFinding[] = [];
   const notEvaluated: string[] = [];
@@ -150,7 +132,8 @@ export function sizingOf(motor: DcMotor, run: DriveRunData, ambientC: number, re
     if (margin !== null) margins[factor] = margin;
   };
 
-  record('peak_current', marginOf(capacity.peakCurrentA.value, demand.peakCurrentA));
+  if (capacity.peakCurrentA === null) notEvaluated.push('peak_current: the sheet gives no peak current');
+  else record('peak_current', marginOf(capacity.peakCurrentA.value, demand.peakCurrentA));
   if (capacity.continuousCurrentA === null) notEvaluated.push('rms_current: the sheet gives no nominal current');
   else record('rms_current', marginOf(capacity.continuousCurrentA.value, demand.rmsCurrentA));
   if (capacity.maxSpeedRpm === null) notEvaluated.push('speed: the sheet gives no maximum speed');
@@ -180,7 +163,7 @@ export function sizingOf(motor: DcMotor, run: DriveRunData, ambientC: number, re
     const margin = margins[factor];
     if (margin !== undefined && margin < 0) findings.push(finding(code, 'fail', [id], FIX[code], { value, limit }));
   };
-  over('peak_current', 'DRV_PEAK_OVER', demand.peakCurrentA, capacity.peakCurrentA.value);
+  if (capacity.peakCurrentA !== null) over('peak_current', 'DRV_PEAK_OVER', demand.peakCurrentA, capacity.peakCurrentA.value);
   if (capacity.continuousCurrentA !== null) over('rms_current', 'DRV_RMS_OVER', demand.rmsCurrentA, capacity.continuousCurrentA.value);
   if (capacity.maxSpeedRpm !== null) over('speed', 'DRV_SPEED_OVER', demand.peakSpeedRpm, capacity.maxSpeedRpm);
   if (thermalReport !== null && thermal !== null) {
@@ -228,7 +211,7 @@ export function sizingOf(motor: DcMotor, run: DriveRunData, ambientC: number, re
         'warn',
         [id],
         'The datasheet was accepted although it disagrees with itself: re-read it; the sizing is unverified.',
-        { value: checkMotorData(motor.datasheet).maxGap },
+        { value: checkDatasheet(motor).maxGap },
       ),
     );
 

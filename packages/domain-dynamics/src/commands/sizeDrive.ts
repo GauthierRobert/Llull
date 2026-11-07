@@ -4,8 +4,9 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { codedRejection, failer, report } from '@core/commands/noop';
-import type { DcMotor } from '@core/model/drives';
+import type { DatasheetMotor } from '@core/model/drives';
 import { transmissionRatio } from '@core/model/transmissions';
+import { isDatasheetMotor } from '../sim/actuators/machine';
 import { buildSimulationModel, jointInertiaOf } from '../sim/simulationModel';
 import { provenanceOf, weakInputs, type ProvenanceInput } from '../sim/provenance';
 import { inertiaMatchedRatio } from '../sim/sizing';
@@ -46,7 +47,7 @@ interface Sweep {
 /** The load and motor inertias (kg·m²) the matching ratio needs, or null when a joint has no inertia of its own. */
 function inertiasOf(
   doc: CadDocument,
-  motor: DcMotor,
+  motor: DatasheetMotor,
   driven: string,
   timestep: number,
   ctx: ExecutionContext | undefined,
@@ -72,7 +73,7 @@ const pct = (margin: number): string => `${(margin * 100).toFixed(0)} %`;
 
 function sweepOf(
   doc: CadDocument,
-  motor: DcMotor,
+  motor: DatasheetMotor,
   gear: NonNullable<ReturnType<typeof gearOf>>,
   reductions: readonly number[],
   options: SizingRunOptions,
@@ -152,7 +153,7 @@ export const sizeDrive = defineCommand({
   name: NAME,
   annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
   description:
-    'Size a datasheet DC motor (add_motor kind "dc" with set_motor_drive) for its duty cycle: simulates the drive over whole repeats of its profile ' +
+    'Size a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction" with set_motor_drive) for its duty cycle: "current" is the one each kind records (dc winding current, pmsm phase-current amplitude with copper 1.5*R*i^2, stepper phase current with 2*R*i^2, induction load current I2 RMS with copper 3*(R1+R2)*I2^2), and a factor the sheet has no value for (an induction sheet without a peak current) is listed in notEvaluated;  simulates the drive over whole repeats of its profile ' +
     '(or `duration`) and reports, against the datasheet, the PEAK current / shaft torque / speed / voltage, the RMS current and shaft torque over the window ' +
     '(trapezoid-weighted, TR-DRV-21), the winding temperature from the 2-node thermal network (steady value at the RMS current, peak and end of the run; ' +
     'runaway above the current where copper loss feeds itself), the margin of each factor (capacity / demand - 1: peak_current vs the peak or stall current, ' +
@@ -166,7 +167,9 @@ export const sizeDrive = defineCommand({
     'closure, the regenerated energy and the transmission loss of the run. Cost: one simulation, plus one per sweep entry. Read-only. Next: fix the limiting ' +
     'factor (motor, ratio, profile) or check_motion_truth.',
   params: z.object({
-    motor: z.string().describe('Id of a datasheet motor (add_motor kind "dc") that has a drive (set_motor_drive).'),
+    motor: z
+      .string()
+      .describe('Id of a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction") that has a drive (set_motor_drive).'),
     duration: z
       .number()
       .positive()
@@ -207,8 +210,10 @@ export const sizeDrive = defineCommand({
     const dynamics = dynamicsOf(doc);
     const motor = dynamics.motors[params.motor];
     if (motor === undefined) return fail(`no motor '${params.motor}'`);
-    if (motor.kind !== 'dc')
-      return fail(`motor '${params.motor}' is a ${motor.kind} motor: size_drive needs a datasheet motor (add_motor kind "dc")`);
+    if (!isDatasheetMotor(motor))
+      return fail(
+        `motor '${params.motor}' is a ${motor.kind} motor: size_drive needs a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction")`,
+      );
     const reject = (code: string, why: string, fix: string): CommandResult => codedRejection(doc, NAME, code, why, fix, [motor.id]);
     const drive = dynamics.drives?.[motor.id];
     if (drive === undefined)

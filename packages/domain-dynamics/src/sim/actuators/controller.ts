@@ -21,8 +21,22 @@ export const AUX = {
   measured: 10,
   /** 1 when the realized current was clipped by the current limit or the bus voltage in the last step. */
   clipped: 11,
+  /** W: electrical input power of the step (all phases). */
+  power: 12,
+  /** stepper: continuous commanded motor-shaft angle (position profile or the integral of the step rate), rad. */
+  command: 13,
+  /** stepper: angle offset that aligns the first step with the rotor, rad. */
+  offset: 14,
+  /** stepper: electrical lag N_r·(θ_cmd − θ), rad. */
+  lag: 15,
+  /** stepper: net full steps lost so far (whole electrical periods of 4 steps). */
+  lostSteps: 16,
+  /** stepper: time of the first lost step, s; −1 while none. */
+  lostTime: 17,
+  /** induction: supply frequency of the step, Hz. */
+  frequency: 18,
 } as const;
-export const AUX_SIZE = 12;
+export const AUX_SIZE = 19;
 
 export interface LoopGains {
   /** N·m per rad/s (or N per m/s). */

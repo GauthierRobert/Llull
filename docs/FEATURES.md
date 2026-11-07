@@ -272,7 +272,7 @@
 | `animate` | Attach a motion clip to an entity or group. |  |
 | `bill_of_materials` | Generate a bill of materials (BOM) from all InstanceEntity objects in the document. | read-only |
 | `check_motion_truth` | Can this motion simulation be trusted? | read-only |
-| `check_motor_data` | Check that the numbers of a DC motor datasheet agree with each other (catalogue sheets are redundant, and a unit slip or a mistyped constant shows up here befo… | read-only |
+| `check_motor_data` | Check that the numbers of a motor datasheet agree with each other (catalogue sheets are redundant, and a unit slip or a mistyped constant shows up here before … | read-only |
 | `create_component` | Promote a set of existing entities into a reusable Component definition. |  |
 | `create_contact_set` | Define a contact set: pairs of instances that must not touch while a mechanism moves. |  |
 | `create_exploded_view` | Create a named exploded view: display-only offsets that pull parts apart for inspection and drawings. |  |
@@ -299,9 +299,9 @@
 | `set_gravity` | Set the gravity vector of the physics simulation in m/s², world axes. |  |
 | `set_joint_physics` | Give a physics joint (add_body_joint) a friction model, end stops and an armature for simulate_motion; given parts REPLACE the stored ones, null clears a part,… |  |
 | `set_joint_value` | Set the current value of a kinematic joint. |  |
-| `set_motor_drive` | Command a datasheet DC motor (add_motor kind "dc") for simulate_motion; replaces the motor's previous drive, a motor without a drive is an open circuit. |  |
+| `set_motor_drive` | Command a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction") for simulate_motion; replaces the motor's previous drive, a motor without a d… |  |
 | `simulate_motion` | Run the rigid-body physics of the mechanism (bodies, joints, gears, motors, propellers) forward in time with a real physics engine (MuJoCo) and report what hap… | read-only |
-| `size_drive` | Size a datasheet DC motor (add_motor kind "dc" with set_motor_drive) for its duty cycle: simulates the drive over whole repeats of its profile (or `duration`) … | read-only |
+| `size_drive` | Size a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction" with set_motor_drive) for its duty cycle: "current" is the one each kind records … | read-only |
 | `stop_animation` | Remove one or more animations from the document. |  |
 
 ## materials

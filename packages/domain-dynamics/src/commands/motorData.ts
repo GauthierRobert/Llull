@@ -4,8 +4,8 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { codedRejection, failer, report } from '@core/commands/noop';
-import type { DcMotorDatasheet } from '@core/model/drives';
-import { DATA_TOLERANCE, checkMotorData, type MotorDataResult } from '../sim/actuators/motorData';
+import { DATA_TOLERANCE, checkDatasheet, checkMotorData, type MotorDataResult } from '../sim/actuators/motorData';
+import { isDatasheetMotor } from '../sim/actuators/machine';
 import { dynamicsOf } from './bodies';
 import { datasheetSchema, toDatasheet } from './motorSchemas';
 
@@ -38,35 +38,36 @@ export function inconsistentSheet(doc: CadDocument, command: string, result: Mot
 /**
  * @affects nothing — read-only; returns { checks, maxGap, consistent, notGiven } in data
  * @invariant input document deep-equal before and after; no FeatureStep; a check without a datasheet value is notGiven, never failed
- * @failure unknown motor, a motor that is not a datasheet DC motor, neither or both of `motor` / `datasheet` -> no-op with the reason
+ * @failure unknown motor, a motor that is not a datasheet motor, neither or both of `motor` / `datasheet` -> no-op with the reason
  */
 export const checkMotorDataCommand = defineCommand({
   name: 'check_motor_data',
   annotations: { readOnly: true },
   description:
-    'Check that the numbers of a DC motor datasheet agree with each other (catalogue sheets are redundant, and a unit slip or a mistyped constant shows up ' +
+    'Check that the numbers of a motor datasheet agree with each other (catalogue sheets are redundant, and a unit slip or a mistyped constant shows up ' +
     'here before it spoils a simulation). Six checks, each a relative gap (derived - sheet) / sheet, pass when within 2 %: stall current U/R; stall torque ' +
     'kt*U/R; the back-EMF constant 1/(speed constant) against kt; the no-load speed (U - R*I0)/kt; the mechanical time constant J*R/kt^2; the speed/torque ' +
-    'gradient (no-load speed / stall torque). A check whose sheet value is absent is listed in notGiven, not failed. Give `motor` (a stored dc motor, ' +
-    'add_motor) or an inline `datasheet`. Returns data.checks[] { quantity, derived, datasheet, relativeGap, status }, data.maxGap, data.consistent. Read-only.',
+    'gradient (no-load speed / stall torque). Other kinds (stored motors only): pmsm = kt against 1.5*p*lambda, peak torque kt*I_max, ideal no-load speed V_bus/sqrt(3)/(p*lambda); ' +
+    'stepper = step angle 360/steps, rated voltage R*I; induction = breakdown torque, breakdown slip and starting torque of the circuit at the rated voltage and frequency. ' +
+    'A check whose sheet value is absent is listed in notGiven, not failed. Give `motor` (a stored datasheet motor, ' +
+    'add_motor) or an inline dc `datasheet`. Returns data.checks[] { quantity, derived, datasheet, relativeGap, status }, data.maxGap, data.consistent. Read-only.',
   params: z.object({
-    motor: z.string().optional().describe('Id of a stored datasheet motor (add_motor kind "dc").'),
-    datasheet: datasheetSchema.optional().describe('An inline datasheet to check without storing it.'),
+    motor: z.string().optional().describe('Id of a stored datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction").'),
+    datasheet: datasheetSchema.optional().describe('An inline dc datasheet to check without storing it.'),
   }),
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'check_motor_data');
     if ((params.motor === undefined) === (params.datasheet === undefined)) return fail('give exactly one of `motor` and `datasheet`');
-    let sheet: DcMotorDatasheet;
+    let result: MotorDataResult;
     let label = 'inline datasheet';
     if (params.motor !== undefined) {
       const motor = dynamicsOf(doc).motors[params.motor];
       if (motor === undefined) return fail(`motor '${params.motor}' not found (add_motor first)`);
-      if (motor.kind !== 'dc') return fail(`motor '${params.motor}' is a ${motor.kind} motor without a datasheet`);
-      sheet = motor.datasheet;
+      if (!isDatasheetMotor(motor)) return fail(`motor '${params.motor}' is a ${motor.kind} motor without a datasheet`);
+      result = checkDatasheet(motor);
       label = `motor '${motor.id}'`;
-    } else if (params.datasheet !== undefined) sheet = toDatasheet(params.datasheet);
+    } else if (params.datasheet !== undefined) result = checkMotorData(toDatasheet(params.datasheet));
     else return fail('no datasheet');
-    const result = checkMotorData(sheet);
     const made = result.checks.length - result.notGiven.length;
     return report(
       doc,

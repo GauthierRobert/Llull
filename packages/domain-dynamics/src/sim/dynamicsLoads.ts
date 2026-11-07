@@ -10,7 +10,7 @@ import { toMetres } from '@core/model/units';
 import { normalize3 } from '@lib/vec3';
 import { formatSi } from '@lib/siText';
 import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
-import { dcParameters, peakJointTorque } from './actuators/dcMotor';
+import { drivetrainOfMotor, isDatasheetMotor, peakJointTorque } from './actuators/machine';
 import { RAD_PER_S_PER_RPM, propellerOutput } from './forceLaws';
 import type { SimulationData } from './simulationReport';
 import { pointAtPose } from '@core/geometry/bodyPose';
@@ -192,13 +192,18 @@ function motorDesign(motor: Motor): { value: string; detail: string; magnitude: 
       detail: `linear speed governor: holds ${formatQuantity(motor.speedMps)} m/s with at most ${formatQuantity(motor.maxForceN)} N`,
       magnitude: motor.maxForceN,
     };
-  if (motor.kind === 'dc') {
-    const p = dcParameters(motor);
-    return {
-      value: `≤ ${formatSi(peakJointTorque(motor), 'N·m')}`,
-      detail: `datasheet DC motor ${motor.source.name}: ${formatQuantity(motor.datasheet.nominalVoltageV)} V, kt ${formatQuantity(p.torqueConstant)} N·m/A, R ${formatQuantity(p.resistanceOhm)} Ω, gearhead ${formatQuantity(p.gearRatio)}:1`,
-      magnitude: peakJointTorque(motor),
-    };
+  if (isDatasheetMotor(motor)) {
+    const train = drivetrainOfMotor(motor);
+    const gearhead = `gearhead ${formatQuantity(train.gearRatio)}:1`;
+    const detail =
+      motor.kind === 'dc'
+        ? `datasheet DC motor ${motor.source.name}: ${formatQuantity(motor.datasheet.nominalVoltageV)} V, kt ${formatQuantity(motor.datasheet.torqueConstantNmPerA)} N·m/A, R ${formatQuantity(motor.datasheet.terminalResistanceOhm)} Ω, ${gearhead}`
+        : motor.kind === 'pmsm'
+          ? `datasheet PMSM ${motor.source.name}: ${formatQuantity(motor.datasheet.polePairs)} pole pairs, ${formatQuantity(motor.datasheet.busVoltageV)} V bus, ≤ ${formatQuantity(motor.datasheet.peakCurrentA)} A, ${gearhead}`
+          : motor.kind === 'stepper'
+            ? `datasheet stepper ${motor.source.name}: ${formatQuantity(motor.datasheet.stepsPerRev)} steps/rev, holding ${formatQuantity(motor.datasheet.holdingTorqueNm)} N·m, ${gearhead}`
+            : `datasheet induction motor ${motor.source.name}: ${formatQuantity(motor.datasheet.ratedVoltageV)} V / ${formatQuantity(motor.datasheet.ratedFrequencyHz)} Hz, ${formatQuantity(motor.datasheet.polePairs)} pole pairs, ${gearhead}`;
+    return { value: `≤ ${formatSi(peakJointTorque(motor), 'N·m')}`, detail, magnitude: peakJointTorque(motor) };
   }
   const peak = motor.curve.reduce((best, point) => (point[1] > best[1] ? point : best), motor.curve[0] ?? [0, 0]);
   const rpms = motor.curve.map((point) => point[0]);

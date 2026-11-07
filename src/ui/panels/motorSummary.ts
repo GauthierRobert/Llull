@@ -3,7 +3,17 @@
 // here instead of rendering nothing.
 
 import type { Motor } from '@core/model/dynamics';
-import type { DcMotor, MotionProfile, MotorDrive, ParameterSource, ProfileSegment } from '@core/model/drives';
+import type {
+  DcMotor,
+  Gearhead,
+  InductionMotor,
+  MotionProfile,
+  MotorDrive,
+  ParameterSource,
+  PmsmMotor,
+  ProfileSegment,
+  StepperMotor,
+} from '@core/model/drives';
 import { formatQuantity } from '@dynamics/index';
 
 export interface Fact {
@@ -27,7 +37,85 @@ function motorKindLabel(motor: Motor): string {
       return 'linear speed governor';
     case 'dc':
       return 'datasheet DC motor';
+    case 'pmsm':
+      return 'datasheet PMSM / BLDC motor (field-oriented)';
+    case 'stepper':
+      return 'datasheet hybrid stepper';
+    case 'induction':
+      return 'datasheet induction motor';
   }
+}
+
+const gearheadFacts = (gearhead: Gearhead | undefined): Fact[] =>
+  gearhead === undefined
+    ? []
+    : [
+        fact(
+          'Gearhead',
+          `${q(gearhead.ratio)}:1, efficiency ${q(gearhead.efficiency)}${gearhead.efficiencyBack === undefined ? '' : ` (back ${q(gearhead.efficiencyBack)})`}`,
+        ),
+      ];
+
+const trustFacts = (motor: { readonly source: ParameterSource; readonly acceptInconsistent?: string }): Fact[] => [
+  sourceFact(motor.source),
+  ...(motor.acceptInconsistent === undefined
+    ? []
+    : [fact('Unverified', `datasheet accepted as inconsistent: ${motor.acceptInconsistent}`)]),
+];
+
+function pmsmFacts(motor: PmsmMotor): Fact[] {
+  const sheet = motor.datasheet;
+  return [
+    fact('Pole pairs', String(sheet.polePairs)),
+    fact('Phase resistance', `${q(sheet.phaseResistanceOhm)} Ω`),
+    fact('Phase inductance', `${q(sheet.inductanceH)} H`),
+    ...present('Flux linkage', sheet.fluxLinkageWb, 'Wb'),
+    ...present('Torque constant Kt', sheet.torqueConstantNmPerA, 'N·m/A'),
+    fact('Rotor inertia', `${q(sheet.rotorInertiaKgM2)} kg·m²`),
+    fact('Bus voltage', `${q(sheet.busVoltageV)} V`),
+    fact('Peak current', `${q(sheet.peakCurrentA)} A`),
+    ...present('Nominal current', sheet.nominalCurrentA, 'A'),
+    ...present('Max speed', sheet.maxSpeedRpm, 'rpm'),
+    ...present('Rotor friction', sheet.frictionNm, 'N·m'),
+    ...gearheadFacts(motor.gearhead),
+    ...trustFacts(motor),
+  ];
+}
+
+function stepperFacts(motor: StepperMotor): Fact[] {
+  const sheet = motor.datasheet;
+  return [
+    fact('Steps per revolution', String(sheet.stepsPerRev)),
+    fact('Holding torque', `${q(sheet.holdingTorqueNm)} N·m`),
+    fact('Rated current', `${q(sheet.ratedCurrentA)} A per phase`),
+    fact('Phase resistance', `${q(sheet.phaseResistanceOhm)} Ω`),
+    fact('Phase inductance', `${q(sheet.phaseInductanceH)} H`),
+    fact('Rotor inertia', `${q(sheet.rotorInertiaKgM2)} kg·m²`),
+    ...present('Detent torque', sheet.detentTorqueNm, 'N·m'),
+    fact('Pull-out torque', sheet.pullOutCurve === undefined ? 'L/R roll-off' : `datasheet curve, ${sheet.pullOutCurve.length} points`),
+    ...present('Damping', sheet.dampingNmsPerRad, 'N·m·s/rad'),
+    ...present('Max speed', sheet.maxSpeedRpm, 'rpm'),
+    ...gearheadFacts(motor.gearhead),
+    ...trustFacts(motor),
+  ];
+}
+
+function inductionFacts(motor: InductionMotor): Fact[] {
+  const sheet = motor.datasheet;
+  return [
+    fact('Pole pairs', String(sheet.polePairs)),
+    fact('Rated supply', `${q(sheet.ratedVoltageV)} V per phase, ${q(sheet.ratedFrequencyHz)} Hz`),
+    fact('Stator R1 / X1', `${q(sheet.statorResistanceOhm)} Ω / ${q(sheet.statorLeakageReactanceOhm)} Ω`),
+    fact('Rotor R2 / X2 (referred)', `${q(sheet.rotorResistanceOhm)} Ω / ${q(sheet.rotorLeakageReactanceOhm)} Ω`),
+    fact('Magnetising Xm', `${q(sheet.magnetisingReactanceOhm)} Ω`),
+    ...present('Iron-loss Rc', sheet.ironLossResistanceOhm, 'Ω'),
+    fact('Rotor inertia', `${q(sheet.rotorInertiaKgM2)} kg·m²`),
+    ...present('Rated load current', sheet.nominalCurrentA, 'A'),
+    ...present('Breakdown torque (sheet)', sheet.breakdownTorqueNm, 'N·m'),
+    ...present('Max speed', sheet.maxSpeedRpm, 'rpm'),
+    ...gearheadFacts(motor.gearhead),
+    ...trustFacts(motor),
+  ];
 }
 
 function dcFacts(motor: DcMotor): Fact[] {
@@ -92,8 +180,16 @@ function kindFacts(motor: Motor): Fact[] {
       ];
     case 'dc':
       return dcFacts(motor);
+    case 'pmsm':
+      return pmsmFacts(motor);
+    case 'stepper':
+      return stepperFacts(motor);
+    case 'induction':
+      return inductionFacts(motor);
   }
 }
+
+const gearSuffix = (gearhead: Gearhead | undefined): string => (gearhead === undefined ? '' : ` · ${q(gearhead.ratio)}:1`);
 
 /** Short headline of a motor row (the kind, then its key figures). */
 export function motorHeadline(motor: Motor): string {
@@ -105,7 +201,13 @@ export function motorHeadline(motor: Motor): string {
     case 'linear_speed':
       return `governor · ${q(motor.speedMps)} m/s ≤ ${q(motor.maxForceN)} N`;
     case 'dc':
-      return `DC · ${q(motor.datasheet.nominalVoltageV)} V${motor.gearhead === undefined ? '' : ` · ${q(motor.gearhead.ratio)}:1`}`;
+      return `DC · ${q(motor.datasheet.nominalVoltageV)} V${gearSuffix(motor.gearhead)}`;
+    case 'pmsm':
+      return `PMSM · ${q(motor.datasheet.busVoltageV)} V bus · ${q(motor.datasheet.peakCurrentA)} A${gearSuffix(motor.gearhead)}`;
+    case 'stepper':
+      return `stepper · ${motor.datasheet.stepsPerRev} steps · ${q(motor.datasheet.holdingTorqueNm)} N·m holding${gearSuffix(motor.gearhead)}`;
+    case 'induction':
+      return `induction · ${q(motor.datasheet.ratedVoltageV)} V / ${q(motor.datasheet.ratedFrequencyHz)} Hz${gearSuffix(motor.gearhead)}`;
   }
 }
 
@@ -121,6 +223,8 @@ function driveModeLabel(mode: MotorDrive['mode']): string {
       return 'position loop';
     case 'prescribed':
       return 'prescribed motion';
+    case 'frequency':
+      return 'V/f supply';
   }
 }
 
@@ -129,6 +233,8 @@ export function driveFacts(drive: MotorDrive): Fact[] {
   return [
     fact('Mode', driveModeLabel(drive.mode)),
     ...(drive.volts === undefined ? [] : [fact('Terminal voltage', `${q(drive.volts)} V`)]),
+    ...present('Supply frequency', drive.frequencyHz, 'Hz'),
+    ...(drive.stepDivision === undefined ? [] : [fact('Step division', `1/${drive.stepDivision}`)]),
     ...(drive.profile === undefined ? [] : [fact('Profile', drive.profile)]),
     ...present('Current limit', drive.currentLimitA, 'A'),
     ...present('Bus voltage', drive.busVoltageV, 'V'),

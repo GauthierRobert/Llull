@@ -1,10 +1,11 @@
-/** set_motor_drive: how a datasheet DC motor is commanded (voltage, torque, velocity, position or prescribed motion). */
+/** set_motor_drive: how a datasheet motor is commanded (dc: voltage, torque, velocity, position, prescribed; pmsm: torque, velocity, position, prescribed; stepper: step position / rate; induction: supply voltage and frequency). */
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, codedRejection, failer } from '@core/commands/noop';
 import { compileProfile, isAngularUnit, isProfileRefusal } from '@core/geometry/motionProfile';
-import type { MotorDrive } from '@core/model/drives';
+import { DRIVE_MODES_BY_KIND, type DatasheetMotor, type MotorDrive } from '@core/model/drives';
+import { isDatasheetMotor } from '../sim/actuators/machine';
 import { MAX_BANDWIDTH_PER_RATE } from '../sim/actuators/controller';
 import { buildSimulationModel, jointInertiaOf } from '../sim/simulationModel';
 import { dynamicsOf, withDynamics } from './bodies';
@@ -17,8 +18,32 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   DRV_TUNE_NO_INERTIA: 'Add rigid bodies with mass on the driven joint (add_rigid_body), or give explicit `gains` instead of `tune`.',
   DRV_JOINT_INVALID: 'Use a revolute joint of the model as `target`.',
   DRV_MOTOR_KIND_UNSUPPORTED:
-    'Only datasheet DC motors (add_motor kind "dc") take a drive; torque_curve and speed motors are set by add_motor.',
+    'Only datasheet motors (add_motor kind "dc", "pmsm", "stepper" or "induction") take a drive; torque_curve and speed motors are set by add_motor.',
+  DRV_MODE_UNSUPPORTED:
+    'dc: voltage, torque, velocity, position, prescribed. pmsm: torque, velocity, position, prescribed (it is torque-commanded, there is no terminal voltage to give). stepper: position, velocity (open-loop step command). induction: voltage (volts + frequencyHz), frequency (V/f profile).',
 };
+
+/** Fields of set_motor_drive that a motor kind has no use for: giving one is refused rather than silently ignored. */
+const NOT_APPLICABLE: Readonly<Record<DatasheetMotor['kind'], readonly (keyof MotorDriveParams)[]>> = {
+  dc: ['frequencyHz', 'stepDivision'],
+  pmsm: ['volts', 'frequencyHz', 'stepDivision'],
+  stepper: ['volts', 'frequencyHz', 'busVoltageV', 'sampleHz', 'gains', 'tune', 'feedforward', 'effortLimit', 'target'],
+  induction: ['currentLimitA', 'busVoltageV', 'sampleHz', 'gains', 'tune', 'feedforward', 'effortLimit', 'target', 'stepDivision'],
+};
+
+interface MotorDriveParams {
+  volts?: number | undefined;
+  frequencyHz?: number | undefined;
+  stepDivision?: number | undefined;
+  currentLimitA?: number | undefined;
+  busVoltageV?: number | undefined;
+  sampleHz?: number | undefined;
+  gains?: unknown;
+  tune?: unknown;
+  feedforward?: boolean | undefined;
+  effortLimit?: number | undefined;
+  target?: string | undefined;
+}
 
 const QUANTITY: Readonly<Record<MotorDrive['mode'], readonly string[]>> = {
   voltage: ['voltage'],
@@ -26,12 +51,14 @@ const QUANTITY: Readonly<Record<MotorDrive['mode'], readonly string[]>> = {
   velocity: ['velocity'],
   position: ['position'],
   prescribed: ['position', 'velocity'],
+  frequency: ['frequency'],
 };
 
 /**
  * @affects sets doc.dynamics.drives[motor] (affected: [motorId])
- * @invariant the drive's profile exists, compiles and has the quantity the mode needs; a closed loop has gains or a tuning, a sample rate and ω_c·T_s <= 0.2
- * @failure unknown motor -> no-op; not a dc motor -> DRV_MOTOR_KIND_UNSUPPORTED; missing / wrong profile -> DRV_PROFILE_INVALID; bad sample rate or bandwidth
+ * @invariant the drive's profile exists, compiles and has the quantity the mode needs; the mode is one the motor kind takes (DRIVE_MODES_BY_KIND); a closed loop (dc / pmsm velocity, position)
+ *   has gains or a tuning, a sample rate and ω_c·T_s <= 0.2; an induction voltage drive has volts or a profile and frequencyHz; fields a kind does not use are refused
+ * @failure unknown motor -> no-op; not a datasheet motor -> DRV_MOTOR_KIND_UNSUPPORTED; mode the kind does not take -> DRV_MODE_UNSUPPORTED; a field the kind does not use -> no-op; missing / wrong profile -> DRV_PROFILE_INVALID; bad sample rate or bandwidth
  *   -> DRV_CONTROL_RATE; tune without inertia on the joint -> DRV_TUNE_NO_INERTIA; unknown / non-revolute target -> DRV_JOINT_INVALID
  * @invariant kernel-optional: the tuning inertia reads body mass properties through the kernel when present, mesh integration otherwise
  */
@@ -39,7 +66,13 @@ export const setMotorDrive = defineCommand({
   name: 'set_motor_drive',
   annotations: { kernelOptional: true, readsMeshTriangles: true },
   description:
-    'Command a datasheet DC motor (add_motor kind "dc") for simulate_motion; replaces the motor\'s previous drive, a motor without a drive is an open circuit. ' +
+    'Command a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction") for simulate_motion; replaces the motor\'s previous drive, a motor without a drive is an open circuit. ' +
+    'Modes by kind: dc = voltage, torque, velocity, position, prescribed; pmsm = torque, velocity, position, prescribed (field-oriented, the torque command is cut to the voltage / current ' +
+    'envelope: constant torque to the base speed, field weakening above; `currentLimitA` and `busVoltageV` override the datasheet limits); stepper = position or velocity: an OPEN-LOOP step ' +
+    'command (position profile = commanded shaft position, velocity profile = step rate), `stepDivision` 1 full / 2 half / n micro steps, `currentLimitA` = the chopper setpoint; the ' +
+    'rotor loses steps when the load exceeds the pull-out torque at that speed (DRV_STEPS_LOST in the run); induction = voltage (`volts` phase RMS or a voltage profile at the fixed supply ' +
+    '`frequencyHz`: direct-on-line) or frequency (a frequency profile in Hz with constant V/f up to the rated frequency). A mode the kind does not take is refused (DRV_MODE_UNSUPPORTED). ' +
+    'The text below is for dc and pmsm unless a kind is named. ' +
     'mode "voltage": terminal voltage `volts` (constant) or a voltage `profile`; the current follows the exact winding law (back-EMF, inductance) and is clamped ' +
     'to `currentLimitA` (default the motor peak current, else U/R). mode "torque": a torque `profile` (N*m at the motor SHAFT, before the gearhead) through an ' +
     'ideal current loop. mode "velocity" / "position": a discrete cascade controller (velocity PI, plus a position P loop for position) following a velocity / ' +
@@ -51,13 +84,34 @@ export const setMotorDrive = defineCommand({
     '(sizing), and a tracking error above 1 % of the move warns DRV_TRACKING_ERROR. Profiles come from add_motion_profile (velocity / position units are angular). ' +
     'Returns the motor id in affected[0].',
   params: z.object({
-    motor: z.string().describe('Id of a datasheet DC motor (add_motor kind "dc").'),
-    mode: z.enum(['voltage', 'torque', 'velocity', 'position', 'prescribed']).describe('How the motor is commanded.'),
-    volts: z.number().optional().describe('voltage: constant terminal voltage in V (negative reverses). Instead of `profile`.'),
+    motor: z.string().describe('Id of a datasheet motor (add_motor kind "dc", "pmsm", "stepper" or "induction").'),
+    mode: z
+      .enum(['voltage', 'torque', 'velocity', 'position', 'prescribed', 'frequency'])
+      .describe(
+        'How the motor is commanded; the modes each kind takes are listed in the tool description. "frequency" = induction V/f supply.',
+      ),
+    volts: z
+      .number()
+      .optional()
+      .describe('voltage: constant terminal voltage in V (dc: negative reverses; induction: phase RMS voltage). Instead of `profile`.'),
+    frequencyHz: z
+      .number()
+      .positive()
+      .optional()
+      .describe('induction voltage mode: the fixed supply frequency in Hz (50 or 60 for a direct-on-line start).'),
+    stepDivision: z
+      .number()
+      .int()
+      .min(1)
+      .max(256)
+      .optional()
+      .describe('stepper: steps per full step (1 full, 2 half, n micro-stepping). Default 1.'),
     profile: z
       .string()
       .optional()
-      .describe('Profile id (add_motion_profile): voltage V, torque N*m, velocity, position, or the prescribed motion.'),
+      .describe(
+        'Profile id (add_motion_profile): voltage V, torque N*m, velocity, position, or the prescribed motion; frequency Hz for induction mode "frequency"; stepper: the position or step-rate profile.',
+      ),
     currentLimitA: z.number().positive().optional().describe('Current limit in A. Default the motor peak current, else U/R.'),
     target: z
       .string()
@@ -102,14 +156,25 @@ export const setMotorDrive = defineCommand({
     const dynamics = dynamicsOf(doc);
     const motor = dynamics.motors[params.motor];
     if (motor === undefined) return fail(`motor '${params.motor}' not found (add_motor first)`);
-    if (motor.kind !== 'dc') return refuse('DRV_MOTOR_KIND_UNSUPPORTED', `motor '${motor.id}' is a ${motor.kind} motor`, [motor.id]);
+    if (!isDatasheetMotor(motor)) return refuse('DRV_MOTOR_KIND_UNSUPPORTED', `motor '${motor.id}' is a ${motor.kind} motor`, [motor.id]);
     const { mode } = params;
+    if (!DRIVE_MODES_BY_KIND[motor.kind].includes(mode))
+      return refuse('DRV_MODE_UNSUPPORTED', `a ${motor.kind} motor takes ${DRIVE_MODES_BY_KIND[motor.kind].join(', ')}, not '${mode}'`, [
+        motor.id,
+      ]);
+    const unused = NOT_APPLICABLE[motor.kind].find((field) => params[field] !== undefined);
+    if (unused !== undefined) return fail(`'${unused}' does not apply to a ${motor.kind} motor`);
+    const closedLoop = (motor.kind === 'dc' || motor.kind === 'pmsm') && (mode === 'velocity' || mode === 'position');
     const target = params.target ?? motor.joint;
     const targetJoint = dynamics.joints[target];
     if (targetJoint === undefined || targetJoint.kind !== 'revolute')
       return refuse('DRV_JOINT_INVALID', `target joint '${target}' is missing or not revolute`, [target]);
     if (mode === 'voltage' && params.volts === undefined && params.profile === undefined)
       return fail('voltage mode needs `volts` or a voltage `profile`');
+    if (mode === 'frequency' && (params.volts !== undefined || params.frequencyHz !== undefined))
+      return fail('frequency mode follows a frequency profile at constant V/f: volts and frequencyHz do not apply');
+    if (mode === 'voltage' && motor.kind === 'induction' && params.frequencyHz === undefined)
+      return fail('induction voltage mode needs `frequencyHz` (the supply frequency)');
     if (mode === 'voltage' && params.volts !== undefined && params.profile !== undefined)
       return fail('give `volts` or `profile`, not both');
     if (mode !== 'voltage' && params.profile === undefined) return refuse('DRV_PROFILE_INVALID', `${mode} mode needs a profile`);
@@ -129,7 +194,7 @@ export const setMotorDrive = defineCommand({
       const compiled = compileProfile(profile);
       if (isProfileRefusal(compiled)) return refuse(compiled.code, `profile '${profile.id}': ${compiled.error}`);
     }
-    if (mode === 'velocity' || mode === 'position') {
+    if (closedLoop) {
       if (params.sampleHz === undefined) return refuse('DRV_CONTROL_RATE', `${mode} mode needs sampleHz`);
       if ((params.gains === undefined) === (params.tune === undefined)) return fail('give exactly one of `gains` and `tune`');
       if (mode === 'position' && params.gains !== undefined && params.gains.kpPosition === undefined)
@@ -157,6 +222,8 @@ export const setMotorDrive = defineCommand({
       id: motor.id,
       mode,
       ...(params.volts === undefined ? {} : { volts: params.volts }),
+      ...(params.frequencyHz === undefined ? {} : { frequencyHz: params.frequencyHz }),
+      ...(params.stepDivision === undefined ? {} : { stepDivision: params.stepDivision }),
       ...(params.profile === undefined ? {} : { profile: params.profile }),
       ...(params.currentLimitA === undefined ? {} : { currentLimitA: params.currentLimitA }),
       ...(params.target === undefined ? {} : { target: params.target }),
@@ -179,7 +246,7 @@ export const setMotorDrive = defineCommand({
       mode === 'voltage'
         ? params.volts === undefined
           ? `profile '${params.profile}'`
-          : `${params.volts} V`
+          : `${params.volts} V${params.frequencyHz === undefined ? '' : ` at ${params.frequencyHz} Hz`}`
         : `profile '${params.profile}'`;
     return changed(
       withDynamics(doc, { ...dynamics, drives: { ...dynamics.drives, [motor.id]: drive } }),

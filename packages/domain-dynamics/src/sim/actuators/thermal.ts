@@ -5,7 +5,7 @@
  * start-of-step temperature (alpha enters through the step's resistance, not inside the exponential).
  */
 
-import type { DcMotorDatasheet } from '@core/model/drives';
+import type { DcMotorDatasheet, ThermalSheet } from '@core/model/drives';
 import { elementAt } from '@lib/elementAt';
 
 /** Default copper temperature coefficient, 1/K (maxon catalogue convention, D-DRV-05). */
@@ -29,16 +29,21 @@ export interface ThermalParams {
 /** Rises above the ambient, K: [winding, housing]. */
 type ThermalState = readonly [number, number];
 
-/** The network of a datasheet, or null when it carries no thermal data. */
-export function thermalParams(sheet: DcMotorDatasheet): ThermalParams | null {
-  const thermal = sheet.thermal;
+/** The network of a DC datasheet, or null when it carries no thermal data. */
+export const thermalParams = (sheet: DcMotorDatasheet): ThermalParams | null => thermalNetwork(sheet.thermal, sheet.terminalResistanceOhm);
+
+/**
+ * The network of a thermal block, or null when there is none. `r25` is the effective copper resistance, ohm: copper power = r25 · current² with the
+ * current the motor kind records (dc R; pmsm 1.5·R at the phase amplitude; stepper 2·R per phase current; induction 3·(R1 + R2) at the load current I2).
+ */
+export function thermalNetwork(thermal: ThermalSheet | undefined, r25: number): ThermalParams | null {
   if (thermal === undefined) return null;
   return {
     rWindingHousing: thermal.rthWindingHousingKPerW,
     rHousingAmbient: thermal.rthHousingAmbientKPerW,
     cWinding: thermal.tauWindingS / thermal.rthWindingHousingKPerW,
     cHousing: thermal.tauMotorS / thermal.rthHousingAmbientKPerW,
-    r25: sheet.terminalResistanceOhm,
+    r25,
     alpha: thermal.alphaPerK === undefined ? DEFAULT_ALPHA_PER_K : thermal.alphaPerK,
     maxWindingC: thermal.maxWindingC,
     datasheetTaus: [thermal.tauWindingS, thermal.tauMotorS],
