@@ -98,10 +98,100 @@ const driveDynamics = (records: number, segment: unknown = { kind: 'dwell', dura
   const drives = Object.fromEntries(
     ids.map((id) => [id, { id, mode: 'velocity', profile: id, gains: { kp: 1, ki: 0, kpPosition: 0 }, sampleHz: 1000 }]),
   );
-  return JSON.stringify({ gravity: [0, 0, -9.81], bodies: {}, joints: {}, gears: {}, motors: {}, propellers: {}, profiles, drives });
+  return JSON.stringify({ gravity: [0, 0, -9.81], bodies: {}, joints: {}, motors: {}, propellers: {}, profiles, drives });
+};
+
+const isRecordLike = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+/** A `dynamics` record with `records` gear transmissions, joint physics and load schedules (PHY-23 DRV-M2) between the joints it declares, `tamper` applied to each. */
+const mechanismDynamics = (records: number, tamper: (record: Record<string, unknown>) => void = () => undefined): string => {
+  const ids = Array.from({ length: records }, (_, k) => k);
+  const joint = (id: string): Record<string, unknown> => ({
+    id,
+    kind: 'revolute',
+    parent: 'ground',
+    child: `b-${id}`,
+    anchor: [0, 0, 0],
+    axis: [0, 0, 1],
+    damping: 0,
+    friction: 0,
+    initialVelocity: 0,
+  });
+  const joints = Object.fromEntries(
+    ids.flatMap((k) => [
+      [`a${k}`, joint(`a${k}`)],
+      [`b${k}`, joint(`b${k}`)],
+    ]),
+  );
+  const source = { name: 's', grade: 'C' };
+  const transmissions = Object.fromEntries(
+    ids.map((k) => [`t${k}`, { kind: 'gear', id: `t${k}`, driver: `a${k}`, driven: `b${k}`, ratio: 2, efficiency: 0.9, backlashDeg: 0.5 }]),
+  );
+  const jointPhysics = Object.fromEntries(
+    ids.map((k) => [
+      `a${k}`,
+      {
+        id: `a${k}`,
+        friction: { model: 'stiction', static: 2, kinetic: 1, source },
+        limits: { min: -1, max: 1, stiffness: 10 },
+        armatureKgM2: 0.1,
+      },
+    ]),
+  );
+  const loadSchedules = Object.fromEntries(
+    ids.map((k) => [`l${k}`, { id: `l${k}`, target: { joint: `a${k}` }, kind: 'torque', constant: 1 }]),
+  );
+  for (const table of [transmissions, jointPhysics, loadSchedules]) for (const record of Object.values(table)) tamper(record);
+  return JSON.stringify({
+    gravity: [0, 0, -9.81],
+    bodies: {},
+    joints,
+    motors: {},
+    propellers: {},
+    transmissions,
+    jointPhysics,
+    loadSchedules,
+  });
 };
 
 export const CORE_READERS: readonly HostileReader[] = [
+  {
+    name: 'core: dynamics transmissions, joint physics and load schedules (load-time validation of a saved document)',
+    covers: [
+      'core/src/commands/persistence/transmissionsValidation.ts:transmissionProblem',
+      'core/src/commands/persistence/transmissionsValidation.ts:jointPhysicsProblem',
+      'core/src/commands/persistence/transmissionsValidation.ts:loadScheduleProblem',
+      'core/src/commands/persistence/transmissionsValidation.ts:transmissionReferenceProblems',
+    ],
+    input: 'text',
+    build: (records) => mechanismDynamics(records),
+    read: (input) => dynamicsProblems(parsedJson(asText(input))),
+    accepts: (result) => Array.isArray(result) && result.length === 0,
+    maxRecords: 5000,
+    extra: [
+      {
+        name: 'unknown transmission kind',
+        input: () => mechanismDynamics(3, (record) => void ('driver' in record && (record['kind'] = 'foo'))),
+      },
+      {
+        name: 'friction model named after a prototype member',
+        input: () =>
+          mechanismDynamics(3, (record) => void (isRecordLike(record['friction']) && (record['friction']['model'] = '__proto__'))),
+      },
+      {
+        name: 'limits that are not an object',
+        input: () => mechanismDynamics(3, (record) => void ('limits' in record && (record['limits'] = 'abc'))),
+      },
+      {
+        name: 'load target that is not an object',
+        input: () => mechanismDynamics(3, (record) => void ('target' in record && (record['target'] = 7))),
+      },
+      {
+        name: 'every transmission drives the same joint',
+        input: () => mechanismDynamics(3, (record) => void ('driven' in record && (record['driven'] = 'b0'))),
+      },
+    ],
+  },
   {
     name: 'core: dynamics profiles and drives (load-time validation of a saved document)',
     covers: [

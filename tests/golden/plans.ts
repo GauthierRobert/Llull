@@ -1250,7 +1250,10 @@ export const kernelPlans: Record<string, GoldenAction[]> = {
     { command: 'add_body_joint', params: { id: 'wrist_j', kind: 'spherical', child: 'piston', parent: 'rod', anchor: [160.5, 0, 0] } },
     { command: 'add_body_joint', params: { id: 'slide_j', kind: 'prismatic', child: 'piston', anchor: [160.5, 0, 0], axis: [1, 0, 0] } },
     { command: 'add_body_joint', params: { id: 'prop_j', kind: 'revolute', child: 'prop', anchor: [0, 300, 0], axis: [0, 0, 1] } },
-    { command: 'add_gear_coupling', params: { id: 'reduction', driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 } },
+    {
+      command: 'add_transmission',
+      params: { kind: 'gear', id: 'reduction', driver: 'crank_j', driven: 'prop_j', teeth: [21, 51], efficiency: 0.99 },
+    },
     {
       command: 'set_engine_losses',
       params: {

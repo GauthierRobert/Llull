@@ -104,7 +104,7 @@ describe('simulate_motion — closed-form checks through the CAD model', () => {
       axis: [0, 1, 0],
     });
     const ratio = 21 / 72;
-    const gear = run(propJoint.doc, 'add_gear_coupling', { driver: crankJoint.id, driven: propJoint.id, ratio });
+    const gear = run(propJoint.doc, 'add_transmission', { kind: 'gear', driver: crankJoint.id, driven: propJoint.id, ratio });
     const motor = run(gear.doc, 'add_motor', { joint: crankJoint.id, kind: 'torque_curve', torque: 40 });
     const prop = run(motor.doc, 'add_propeller', { joint: propJoint.id, diameter: 1.2, thrustCoefficient: 0.1, powerCoefficient: 0.05 });
     doc = prop.doc;
@@ -112,7 +112,7 @@ describe('simulate_motion — closed-form checks through the CAD model', () => {
     const crankRpm = data.joints[crankJoint.id]?.finalRpm ?? 0;
     const propRpm = data.joints[propJoint.id]?.finalRpm ?? 0;
     expect(propRpm / crankRpm).toBeCloseTo(ratio, 4);
-    expect(data.gears[gear.id]?.maxRatioError).toBeLessThan(1e-3);
+    expect(data.transmissions[gear.id]?.maxRatioError).toBeLessThan(1e-3);
     // power balance: τ_crank·ω_crank = Q_prop·ω_prop  →  Q_prop = τ / ratio
     expect(data.propellers[prop.id]?.torque ?? 0).toBeCloseTo(40 / ratio, 0);
     expect(data.motors[motor.id]?.power ?? 0).toBeCloseTo(data.propellers[prop.id]?.power ?? -1, -1);
@@ -202,19 +202,23 @@ describe('dynamics commands — validation and bookkeeping', () => {
     expect(joint).toMatch(/^bjoint/);
   });
 
-  it('add_gear_coupling rejects bad joints, ratios, double drives and circles', () => {
+  it('add_transmission rejects bad joints, ratios, double drives and circles', () => {
     const { doc, joint } = discOnShaft();
     const other = run(doc, 'add_box', { size: [10, 10, 10] });
     const body = run(other.doc, 'add_rigid_body', { entityIds: [other.id] });
     const second = run(body.doc, 'add_body_joint', { kind: 'revolute', child: body.id, anchor: [0, 0, 0], axis: [0, 0, 1] });
     const d = second.doc;
-    expect(execute(d, 'add_gear_coupling', { driver: 'x', driven: second.id, ratio: 1 }).summary).toMatch(/not found/);
-    expect(execute(d, 'add_gear_coupling', { driver: joint, driven: 'x', ratio: 1 }).summary).toMatch(/not found/);
-    expect(execute(d, 'add_gear_coupling', { driver: joint, driven: joint, ratio: 1 }).summary).toMatch(/itself/);
-    expect(execute(d, 'add_gear_coupling', { driver: joint, driven: second.id, ratio: 0 }).summary).toMatch(/non-zero/);
-    const geared = run(d, 'add_gear_coupling', { driver: joint, driven: second.id, ratio: 2 });
-    expect(execute(geared.doc, 'add_gear_coupling', { driver: joint, driven: second.id, ratio: 3 }).summary).toMatch(/already driven/);
-    expect(execute(geared.doc, 'add_gear_coupling', { driver: second.id, driven: joint, ratio: 3 }).summary).toMatch(/circular/);
+    expect(execute(d, 'add_transmission', { kind: 'gear', driver: 'x', driven: second.id, ratio: 1 }).summary).toMatch(/not found/);
+    expect(execute(d, 'add_transmission', { kind: 'gear', driver: joint, driven: 'x', ratio: 1 }).summary).toMatch(/not found/);
+    expect(execute(d, 'add_transmission', { kind: 'gear', driver: joint, driven: joint, ratio: 1 }).summary).toMatch(/itself/);
+    expect(execute(d, 'add_transmission', { kind: 'gear', driver: joint, driven: second.id, ratio: 0 }).summary).toMatch(/non-zero/);
+    const geared = run(d, 'add_transmission', { kind: 'gear', driver: joint, driven: second.id, ratio: 2 });
+    expect(execute(geared.doc, 'add_transmission', { kind: 'gear', driver: joint, driven: second.id, ratio: 3 }).summary).toMatch(
+      /already driven/,
+    );
+    expect(execute(geared.doc, 'add_transmission', { kind: 'gear', driver: second.id, driven: joint, ratio: 3 }).summary).toMatch(
+      /circular/,
+    );
   });
 
   it('add_motor and add_propeller validate their inputs', () => {
@@ -257,9 +261,11 @@ describe('dynamics commands — validation and bookkeeping', () => {
       execute(prismatic.doc, 'add_propeller', { joint: prismatic.id, diameter: 1, thrustCoefficient: 0.1, powerCoefficient: 0.05 }).summary,
     ).toMatch(/prismatic/);
     // motors speak rpm / N·m: a slide cannot take one
-    expect(execute(prismatic.doc, 'add_motor', { joint: prismatic.id, kind: 'speed', rpm: 100, maxTorque: 5 }).summary).toMatch(
-      /prismatic; motors .* drive revolute joints/,
+    expect(execute(prismatic.doc, 'add_motor', { joint: prismatic.id, kind: 'torque_curve', torque: 5 }).summary).toMatch(
+      /prismatic; torque_curve and dc motors .* revolute joints/,
     );
+    // a speed motor on a slide speaks m/s and N
+    expect(execute(prismatic.doc, 'add_motor', { joint: prismatic.id, kind: 'speed', rpm: 100, maxTorque: 5 }).summary).toMatch(/speedMps/);
   });
 
   it('delete_dynamics_item cascades from a body to its joint and loads; commands are pure', () => {
@@ -297,7 +303,7 @@ describe('dynamics commands — validation and bookkeeping', () => {
     ).bodies;
     expect(bodies[fixed.id]).toMatchObject({ fixed: true, joint: null, inertiaAboutJointAxis: null, name: null });
     expect(bodies[free.id]).toMatchObject({ fixed: false, joint: null, name: 'loose' });
-    expect(result.summary).toMatch(/fixed.*1 joint\(s\), 0 gear\(s\), 0 motor\(s\), 0 propeller\(s\)/);
+    expect(result.summary).toMatch(/fixed.*1 joint\(s\), 0 transmission\(s\), 0 motor\(s\), 0 propeller\(s\)/);
   });
 
   it('deleting a joint takes its gears and loads; deleting a lone motor removes only it', () => {
@@ -305,10 +311,10 @@ describe('dynamics commands — validation and bookkeeping', () => {
     const other = run(doc, 'add_box', { size: [10, 10, 10] });
     const body = run(other.doc, 'add_rigid_body', { entityIds: [other.id] });
     const second = run(body.doc, 'add_body_joint', { kind: 'revolute', child: body.id, anchor: [0, 0, 0], axis: [0, 0, 1] });
-    const gear = run(second.doc, 'add_gear_coupling', { driver: joint, driven: second.id, ratio: 2 });
+    const gear = run(second.doc, 'add_transmission', { kind: 'gear', driver: joint, driven: second.id, ratio: 2 });
     const motor = run(gear.doc, 'add_motor', { joint, kind: 'torque_curve', torque: 1 });
     const noJoint = execute(motor.doc, 'delete_dynamics_item', { id: second.id });
-    expect(noJoint.document.dynamics?.gears).toEqual({});
+    expect(noJoint.document.dynamics?.transmissions).toEqual({});
     expect(noJoint.document.dynamics?.motors[motor.id]).toBeDefined();
     const noMotor = execute(motor.doc, 'delete_dynamics_item', { id: motor.id });
     expect(noMotor.summary).toBe(`delete_dynamics_item: removed '${motor.id}'.`);

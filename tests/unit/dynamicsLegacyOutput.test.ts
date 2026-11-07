@@ -8,6 +8,9 @@
  * than maxTorque allows (anti-windup). Hash cd62962de5d04058 -> dbc21a98e45a07af (the gains are now scheduled on the measured effective inertia; for this lone disc it equals the locked one, so against the previous rebaseline a2e9a2593ea063b7 only the last digits move, ~1e-13). Spin-up at 50 samples/s: speed at the first sample
  * 111.95 -> 149.83 rad/s, first torque sample 99.37 -> 68.57 N m (the governor leaves saturation sooner), peak speed 157.0796 -> 157.0796
  * rad/s (no overshoot), final position 154.566 -> 155.501 rad (the speed is reached earlier); the final speed 157.0796 rad/s is unchanged.
+ * Accepted rebaseline (all four hashes, DRV-M2, owner rule: no backward compatibility): add_gear_coupling became add_transmission, so data.gears is data.transmissions (the flywheel run: every number
+ * is bit-identical, only the key name moved: 0b199e614413c6c3 -> 3c4d1be4b52abb36, checked by renaming the key back); the geared run also has the transmission id prefix
+ * (trans-) and its equality row written with the larger coefficient as the dependent joint (4a46aecb5515a636 -> 58888c9268d1cd15).
  * Accepted rebaseline (all four hashes, FPR-MJ, MuJoCo 3.14.0 -> 3.16.0, owner decision 2026-10-16): every number of the four runs is
  * bit-identical between the two versions; only data.engine changed. The hashes now leave the engine label out (checked on its own).
  */
@@ -48,7 +51,7 @@ function geared(): CadDocument {
     damping: 2,
     initialVelocity: 0.1,
   });
-  const gear = step(slideJoint.doc, 'add_gear_coupling', { driver: crankJoint.id, driven: propJoint.id, ratio: 21 / 72 });
+  const gear = step(slideJoint.doc, 'add_transmission', { kind: 'gear', driver: crankJoint.id, driven: propJoint.id, ratio: 21 / 72 });
   const motor = step(gear.doc, 'add_motor', { joint: crankJoint.id, kind: 'torque_curve', torque: 40 });
   return step(motor.doc, 'add_propeller', { joint: propJoint.id, diameter: 1.2, thrustCoefficient: 0.1, powerCoefficient: 0.05 }).doc;
 }
@@ -77,11 +80,11 @@ describe('simulate_motion output of models without loops or cylinders (FR-FPR-19
       hashOf(doc, { duration: 2 }),
       hashOf(doc, { duration: 2, detail: 'series', sampleRate: 20 }),
       hashOf(doc, { duration: 1, detail: 'poses', sampleRate: 10, timestep: 0.0005 }),
-    ]).toEqual(['4a46aecb5515a636', 'f7de17dc61a16a2a', '0968e683fe0a5d61']);
+    ]).toEqual(['58888c9268d1cd15', 'd400ee1825e44386', '4c78b36c08c37a37']);
   });
 
   it('speed-governed flywheel', () => {
-    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('0b199e614413c6c3');
+    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('3c4d1be4b52abb36');
   });
 
   it('is deterministic run to run', () => {

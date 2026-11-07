@@ -58,7 +58,7 @@ const hinge = (id: string, inertia: number): SimulationBody => ({
 });
 const base = {
   gravity: [0, 0, 0] as [number, number, number],
-  gears: [],
+  transmissions: [],
   loops: [],
   servos: [],
   solver: { integrator: 'rk4' as const, loopTimeConstant: 0.002, loopImpedance: 0.9999 },
