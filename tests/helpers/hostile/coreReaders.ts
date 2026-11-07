@@ -180,6 +180,7 @@ export const CORE_READERS: readonly HostileReader[] = [
       'core/src/commands/persistence/transmissionsValidation.ts:loadScheduleProblem',
       'core/src/commands/persistence/transmissionsValidation.ts:transmissionReferenceProblems',
       'core/src/commands/persistence/referenceSeriesValidation.ts:referenceSeriesProblem',
+      'core/src/commands/persistence/referenceSeriesValidation.ts:referenceSeriesReferenceProblems',
     ],
     input: 'text',
     build: (records) => mechanismDynamics(records),

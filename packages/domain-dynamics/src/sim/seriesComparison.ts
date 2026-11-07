@@ -5,6 +5,7 @@
 
 import type { ReferenceSeries } from '@core/model/drives';
 import { RAD_PER_S_PER_RPM } from './forceLaws';
+import { peakAbs } from './sizing';
 import type { RunData } from './runData';
 import { elementAt } from '@lib/elementAt';
 
@@ -67,13 +68,18 @@ function simulatedOf(
   }
 }
 
-/** Linear interpolation of `values` (at increasing `times`) at `at`; the caller keeps `at` inside the recorded span. */
-function interpolate(times: readonly number[], values: readonly number[], at: number): number {
-  let high = times.findIndex((time) => time >= at);
-  if (high <= 0) high = high < 0 ? times.length - 1 : 1;
-  const low = Math.max(0, high - 1);
-  const [t0, t1, v0, v1] = [elementAt(times, low), elementAt(times, high), elementAt(values, low), elementAt(values, high)];
-  return t1 === t0 ? v1 : v0 + ((v1 - v0) * (at - t0)) / (t1 - t0);
+/**
+ * `values` (at increasing `times`) interpolated linearly at the increasing instants `at`, in one pass over both (linear in their lengths, however many
+ * points a stored reference has); the caller keeps every instant inside the recorded span.
+ */
+function interpolateAll(times: readonly number[], values: readonly number[], at: readonly number[]): number[] {
+  let high = 1;
+  return at.map((instant) => {
+    while (high < times.length - 1 && elementAt(times, high) < instant) high++;
+    const low = Math.max(0, high - 1);
+    const [t0, t1, v0, v1] = [elementAt(times, low), elementAt(times, high), elementAt(values, low), elementAt(values, high)];
+    return t1 === t0 ? v1 : v0 + ((v1 - v0) * (instant - t0)) / (t1 - t0);
+  });
 }
 
 /** The comparison of `reference` with `run`, or the reason it cannot be made (target missing, reference longer than the run). */
@@ -82,17 +88,19 @@ export function compareSeries(reference: ReferenceSeries, run: RunData): SeriesC
   if ('refusal' in simulated) return simulated;
   const last = reference.times[reference.times.length - 1] ?? 0;
   const recordedEnd = simulated.times[simulated.times.length - 1] ?? 0;
+  if (reference.quantity !== 'ledger_energy' && simulated.times.length < 2)
+    return { refusal: 'the run recorded fewer than two samples: simulate longer or sample faster' };
   if (reference.quantity !== 'ledger_energy' && last > recordedEnd + 1e-9)
     return { refusal: `the reference runs to ${last} s, the run only to ${recordedEnd} s: simulate longer` };
-  const errors = reference.times.map((time, k) => {
-    const modelled =
-      reference.quantity === 'ledger_energy' ? (simulated.values[0] ?? Number.NaN) : interpolate(simulated.times, simulated.values, time);
-    return modelled - (reference.values[k] ?? Number.NaN);
-  });
-  const scaleOfReference = Math.max(...reference.values.map(Math.abs));
-  const scale = scaleOfReference > 0 ? scaleOfReference : Math.max(...simulated.values.map(Math.abs));
+  const modelled =
+    reference.quantity === 'ledger_energy'
+      ? reference.times.map(() => elementAt(simulated.values, 0))
+      : interpolateAll(simulated.times, simulated.values, reference.times);
+  const errors = modelled.map((value, k) => value - elementAt(reference.values, k));
+  const scaleOfReference = peakAbs(reference.values);
+  const scale = scaleOfReference > 0 ? scaleOfReference : peakAbs(simulated.values);
   const rmsError = Math.sqrt(errors.reduce((sum, e) => sum + e * e, 0) / errors.length);
-  const peakError = Math.max(...errors.map(Math.abs));
+  const peakError = peakAbs(errors);
   const band = reference.bandRel === undefined ? DEFAULT_BAND : reference.bandRel;
   const relativeRms = scale > 0 ? rmsError / scale : rmsError;
   const uncertainty = reference.uncertainty === undefined ? null : reference.uncertainty;

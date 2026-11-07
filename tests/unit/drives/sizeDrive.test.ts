@@ -237,6 +237,23 @@ describe('size_drive thermal and limit findings', () => {
     expect(data.thermal).toBeNull();
   });
 
+  it('an accepted inconsistent datasheet is unverified: DRV_MOTOR_DATA_INCONSISTENT warns and the sheet is a grade C input', () => {
+    const doc = inertiaBench(
+      1e-3,
+      { sheet: { ...sheet, torqueConstantNmPerA: 0.0663 }, acceptInconsistent: 'sheet typo kept for the test' },
+      [
+        {
+          command: 'add_motion_profile',
+          params: { id: 'hold', quantity: 'torque', unit: 'N*m', start: 0.1, segments: [{ kind: 'dwell', duration: 0.1 }] },
+        },
+        { command: 'set_motor_drive', params: { motor: 'm', mode: 'torque', profile: 'hold' } },
+      ],
+    );
+    const data = dataOf(execute(doc, 'size_drive', { motor: 'm' }));
+    expect(codes(data)).toContain('DRV_MOTOR_DATA_INCONSISTENT');
+    expect(data.provenance.inputs.find((input) => input.id === 'm.datasheet')?.grade).toBe('C');
+  });
+
   it('a voltage-limited command is reported (DRV_VOLTAGE_LIMITED) with the clipped sample count', () => {
     const doc = inertiaBench(1e-3, { sheet }, [
       {

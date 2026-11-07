@@ -124,7 +124,7 @@ export function fitMechanical(channels: Channels, unknowns: readonly string[], k
       'with the inertia unknown and no measured torque the spin-down equation is homogeneous: every parameter can be scaled together (J and the friction are confounded)',
       ['inertia', unknowns.find((name) => name !== 'inertia') ?? 'inertia'],
     );
-  const floor = MOVING_FRACTION * Math.max(...omega.map(Math.abs));
+  const floor = MOVING_FRACTION * omega.reduce((largest, value) => Math.max(largest, Math.abs(value)), 0);
   const rows: number[][] = [];
   const y: number[] = [];
   for (let k = 1; k < t.length - 1; k++) {

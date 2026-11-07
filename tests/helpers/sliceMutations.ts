@@ -446,6 +446,8 @@ function referenceMutations(edit: Edit): SliceMutation[] {
     edit('series quantity __proto__', series('quantity', '__proto__')),
     edit('series target number', series('target', 7)),
     edit('series target empty', series('target', '')),
+    edit('series target ghost joint', series('target', 'ghost')),
+    edit('series motor quantity on a joint', series('quantity', 'motor_current')),
     edit('series times string', series('times', 'abc')),
     edit('series times decreasing', series('times', [2, 1, 0])),
     edit('series times negative', series('times', [-1, 0, 1])),

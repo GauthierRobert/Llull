@@ -221,6 +221,45 @@ describe('DRV-M2 leftovers: ledger cause, stop order, stop inertia', () => {
     expect(order.values['observedOrder']).toBeCloseTo(row?.order ?? Number.NaN, 8);
   }, 300_000);
 
+  it('backlash: the gear gap is the travel of its penetration item (1 % gate), the cluster it couples carries no inertia warning', () => {
+    const doc = runSteps([
+      ...spinner('in', 1e-4),
+      ...spinner('out', 1e-3, [100, 0, 0]),
+      noGravity,
+      {
+        command: 'add_transmission',
+        params: {
+          kind: 'gear',
+          driver: 'j_in',
+          driven: 'j_out',
+          ratio: 1,
+          backlashDeg: 0.5,
+          meshStiffnessNmPerRad: 2000,
+          id: 'g',
+          source: { name: 'bench', grade: 'A' },
+        },
+      },
+      {
+        command: 'set_joint_physics',
+        params: {
+          joint: 'j_out',
+          friction: { model: 'coulomb', kineticNm: 0, viscousNmsPerRad: 0.01, source: { name: 'bench', grade: 'A' } },
+        },
+      },
+      {
+        command: 'add_motion_profile',
+        params: { id: 'p', quantity: 'torque', unit: 'N*m', segments: [{ kind: 'sine', amplitude: 0.01, frequencyHz: 1, cycles: 1 }] },
+      },
+      { command: 'add_load_schedule', params: { joint: 'j_in', kind: 'torque', profile: 'p' } },
+    ]).doc;
+    const truth = truthOf(execute(doc, 'check_motion_truth', { duration: 1.2, timestep: 2e-5 }));
+    const penetration = only(truth, 'DRV_STOP_PENETRATION', 'g');
+    // the gap is 0.5 deg = 0.0087266 rad
+    expect(penetration.values['travel']).toBeCloseTo((0.5 * Math.PI) / 180, 9);
+    expect(penetration.values['penetrationRatio']).toBeLessThan(0.01);
+    expect(itemsOf(truth, 'DRV_STOP_INERTIA_VARIES')).toHaveLength(0);
+  }, 300_000);
+
   it('a stop that carries another moving joint: DRV_STOP_INERTIA_VARIES warns (the inertia changed during the run); with the joint below it still, it passes', () => {
     const chain = (below: number, speed = 1): CadDocument => {
       const doc = runSteps([

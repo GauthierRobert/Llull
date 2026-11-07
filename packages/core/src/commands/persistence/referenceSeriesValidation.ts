@@ -30,3 +30,18 @@ export function referenceSeriesProblem(series: Record<string, unknown>): string 
   if (band !== undefined && !(isFiniteNumber(band) && band > 0)) return 'bandRel must be > 0';
   return null;
 }
+
+/** Cross references of the series: a `joint_*` series names a joint, a `motor_*` series a datasheet (dc) motor of the same dynamics record; as problems with their paths. */
+export function referenceSeriesReferenceProblems(dynamics: Record<string, unknown>): string[] {
+  const [series, joints, motors] = [dynamics['referenceSeries'], dynamics['joints'], dynamics['motors']];
+  if (!isRecord(series) || !isRecord(joints) || !isRecord(motors)) return [];
+  return Object.entries(series).flatMap(([id, record]): string[] => {
+    if (!isRecord(record) || typeof record['quantity'] !== 'string' || typeof record['target'] !== 'string') return [];
+    const [quantity, target] = [record['quantity'], record['target']];
+    if (quantity.startsWith('joint_') && !isRecord(joints[target]))
+      return [`dynamics.referenceSeries['${id}']: joint '${target}' does not exist`];
+    if (quantity.startsWith('motor_') && !(isRecord(motors[target]) && motors[target]['kind'] === 'dc'))
+      return [`dynamics.referenceSeries['${id}']: no datasheet (dc) motor '${target}'`];
+    return [];
+  });
+}

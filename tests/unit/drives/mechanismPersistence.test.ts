@@ -162,6 +162,12 @@ describe('reference series and the datasheet thermal block (DRV-M3) survive a sa
     bad('times order', (d) => void (series(d)['times'] = [0, 0, 1]), /times must be >= 0 and strictly increasing/);
     bad('lengths', (d) => void (series(d)['times'] = [0, 1]), /same length/);
     bad('ledger', (d) => void (series(d)['quantity'] = 'ledger_energy'), /exactly one point/);
+    bad('ghost joint', (d) => void (series(d)['target'] = 'ghost'), /referenceSeries\['rs'\]: joint 'ghost' does not exist/);
+    bad(
+      'motor series on a joint id',
+      (d) => void (series(d)['quantity'] = 'motor_current'),
+      /referenceSeries\['rs'\]: no datasheet \(dc\) motor 'j'/,
+    );
     bad('source', (d) => void (series(d)['source'] = { name: 'x', grade: 'D' }), /source must be/);
     bad('uncertainty', (d) => void (series(d)['uncertainty'] = -1), /uncertainty must be >= 0/);
     bad('band', (d) => void (series(d)['bandRel'] = 0), /bandRel must be > 0/);

@@ -133,7 +133,7 @@ export const IDEAL_SHEET = { nominalVoltageV: 48, terminalResistanceOhm: 1.13, t
  */
 export function inertiaBench(
   inertia: number,
-  motor: { sheet?: Record<string, unknown>; gearhead?: Record<string, unknown> } = {},
+  motor: { sheet?: Record<string, unknown>; gearhead?: Record<string, unknown>; acceptInconsistent?: string } = {},
   after: PlanStep[] = [],
 ): CadDocument {
   return runSteps([
@@ -156,6 +156,7 @@ export function inertiaBench(
         datasheet: motor.sheet ?? IDEAL_SHEET,
         source: MAXON_SOURCE,
         ...(motor.gearhead === undefined ? {} : { gearhead: motor.gearhead }),
+        ...(motor.acceptInconsistent === undefined ? {} : { acceptInconsistent: motor.acceptInconsistent }),
       },
     },
     ...after,

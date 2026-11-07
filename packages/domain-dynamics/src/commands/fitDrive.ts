@@ -18,6 +18,8 @@ import {
 import { dynamicsOf } from './bodies';
 
 const NAME = 'fit_drive_parameters';
+/** Most samples of one inline channel (a 100 kHz recording of one second). */
+const MAX_SAMPLES = 100_000;
 const UNKNOWNS = [...MECHANICAL, ...ELECTRICAL] as const satisfies readonly Unknown[];
 
 const UNIT: Readonly<Record<Unknown, string>> = {
@@ -29,11 +31,15 @@ const UNIT: Readonly<Record<Unknown, string>> = {
 };
 
 const inline = z.object({
-  t: z.array(z.number()).min(3).max(100_000).describe('Sample times, s, strictly increasing.'),
-  omega: z.array(z.number()).describe('Shaft speed, rad/s, one per time.'),
-  current: z.array(z.number()).optional().describe('Motor current, A, one per time (electrical fit).'),
-  voltage: z.array(z.number()).optional().describe('Terminal voltage, V, one per time (electrical fit).'),
-  torque: z.array(z.number()).optional().describe('Measured torque on the shaft, N*m, one per time (mechanical fit with a known input).'),
+  t: z.array(z.number()).min(3).max(MAX_SAMPLES).describe('Sample times, s, strictly increasing.'),
+  omega: z.array(z.number()).max(MAX_SAMPLES).describe('Shaft speed, rad/s, one per time.'),
+  current: z.array(z.number()).max(MAX_SAMPLES).optional().describe('Motor current, A, one per time (electrical fit).'),
+  voltage: z.array(z.number()).max(MAX_SAMPLES).optional().describe('Terminal voltage, V, one per time (electrical fit).'),
+  torque: z
+    .array(z.number())
+    .max(MAX_SAMPLES)
+    .optional()
+    .describe('Measured torque on the shaft, N*m, one per time (mechanical fit with a known input).'),
 });
 const byId = z.object({
   omega: z.string().describe('Id of a joint_velocity or motor_speed reference series (add_reference_data).'),
