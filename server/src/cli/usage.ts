@@ -73,6 +73,8 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
   fea_import_results analysisId=ID format=frd|op2 file=R.op2   external results of the current mesh -> record_fea_results
   fea_import_field analysisId=ID file=T.csv coordinatesUnit=mm temperatureUnit=degC   temperature table x,y,z,T -> thermo_static field
                               (works locally and with --app / --server; artifacts: $LLULL_FEA_CACHE)
+  run_convergence_study analysisId=ID quantity='{"kind":"probe","probeId":"p-1"}' [levels=3 ratio=2 finest=SIZE]   mesh-convergence study (re-mesh + re-solve at 3-6 sizes);
+                              then: check_verification analysisId=ID gciTarget=0.02  (GCI = estimated discretisation error)
   fatigue_field caseId=ID     native llull-compute: rainflow + Miner damage on every FE node, then compute_fatigue
                               [timeoutS=600]  (--doc, --app, --server: runs where the document lives; $LLULL_COMPUTE)
   fea_map_field analysisId=ID native llull-compute: interpolate the thermal result onto the mechanical mesh
