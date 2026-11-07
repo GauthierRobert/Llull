@@ -50,7 +50,7 @@ exactly and there is no sign smoothing; backlash is a limited fixed tendon (free
 replace the joint's `friction` / `damping`: `stiction` (breakaway detected on the friction constraint, a Karnopp dead band holds the joint at rest), `stribeck`, `load_dependent`
 (μ·r·(radial load + preload + moment / arm) read from the joint reaction). End stops are `range` rows with the acceleration-law `solreflimit` scaled by the inertia the joint pushes.
 `simulate_motion` with `energy` lists every friction, transmission and stop loss in `data.ledger` (stops: minus the work of the stop minus the spring energy it still holds) and
-`data.stops` gives the peak penetration and force. Limits and backlash refuse a timestep with ω_n·Δt > 0.1 (`DRV_STEP_TOO_COARSE`).
+`data.stops` gives the peak penetration and force. A given `timestep` with ω_n·Δt > 0.1 for a stop or backlash is refused (`DRV_STEP_TOO_COARSE`); the auto timestep is halved until it fits.
 
 ### Springs, energy and unsettled-run warnings
 
