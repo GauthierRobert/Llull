@@ -8,7 +8,7 @@ import {
   type SimulationBody,
   type SimulationModel,
 } from '@core/dynamics/physicsEngine';
-import { dampingRatioForRestitution, restitutionOfDamping } from '@dynamics/sim/endStop';
+import { dampingRatioForRestitution, restitutionOfDamping } from '@lib/stopRestitution';
 import { unboundedEffort } from '@dynamics/sim/driveReport';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { expectedResults, inertiaBench, rotorBench, section } from './fixtures';

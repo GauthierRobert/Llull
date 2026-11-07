@@ -107,6 +107,16 @@ describe('dynamics transmissions, joint physics and load schedules survive a sav
         }),
       /spherical joint has no coordinate/,
     );
+    bad(
+      'circle',
+      (d) => void (table(d, 'transmissions')['back'] = { kind: 'gear', id: 'back', driver: 'j2', driven: 'j', ratio: 0.5 }),
+      /drives itself through a circle/,
+    );
+    bad(
+      'restitution unreachable',
+      (d) => void (physics(d)['limits'] = { min: -1, max: 1, stiffness: 1, restitution: 1e-9 }),
+      /reachable by a one-sided stop/,
+    );
     bad('table not an object', (d) => void (d['transmissions'] = 5), /transmissions must be an object/);
     bad(
       'linear motor',

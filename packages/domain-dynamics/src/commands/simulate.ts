@@ -43,6 +43,18 @@ type Attempt =
  *          FPR_LOOP_PRISMATIC / FPR_SPHERICAL_TREE (topology), FPR_LOOP_OPEN (a loop is open at the start pose) -> rejected, nothing run
  * @invariant kernel-optional: body mass properties (buildSimulationModel) are exact with a kernel, mesh integration otherwise
  */
+/** Stop peaks with the static inertia (kg·m² or kg) the stop's damping was scaled to (constant-inertia approximation, spec 13.15). */
+function stopsData(
+  stops: NonNullable<SimulationTrace['stops']>,
+  built: BuiltSimulation,
+): Record<string, { peakPenetration: number; peakForce: number; effectiveInertia: number }> {
+  const inertiaOf = (key: string): number =>
+    built.model.jointPhysics?.limits.find((limit) => limit.joint === key)?.effectiveInertia ??
+    built.model.transmissions.find((coupling) => coupling.id === key)?.backlash?.effectiveInertia ??
+    Number.NaN;
+  return Object.fromEntries(Object.entries(stops).map(([key, stop]) => [key, { ...stop, effectiveInertia: inertiaOf(key) }]));
+}
+
 export const simulateMotion = defineCommand({
   name: 'simulate_motion',
   annotations: { kernelOptional: true, readsMeshTriangles: true, readOnly: true },
@@ -313,7 +325,7 @@ export const simulateMotion = defineCommand({
           : {}),
         ...(driven === null ? {} : { drives: driven.drives }),
         ...(ledger === null ? {} : { ledger }),
-        ...(trace.stops === undefined ? {} : { stops: trace.stops }),
+        ...(trace.stops === undefined ? {} : { stops: stopsData(trace.stops, built) }),
         ...(reactions !== null ? { reactions } : {}),
         ...(engineReport !== null ? { engineReport: { ...engineReport, ...(realism !== null ? { realism } : {}) } } : {}),
       };

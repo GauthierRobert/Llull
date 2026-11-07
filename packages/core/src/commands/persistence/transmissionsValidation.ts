@@ -2,6 +2,7 @@
 
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
+import { dampingRatioForRestitution } from '../../lib/stopRestitution';
 
 type Check = (record: Record<string, unknown>) => string | null;
 
@@ -101,7 +102,8 @@ export const jointPhysicsProblem: Check = (physics) => {
       return 'limits need finite min < max';
     if (!isPositive(limits['stiffness']) || !optional(limits['dampingRatio'], isPositive))
       return 'limits.stiffness and dampingRatio must be > 0';
-    if (!optional(limits['restitution'], (v) => isFiniteNumber(v) && v > 0 && v <= 1)) return 'limits.restitution must be in (0, 1]';
+    if (!optional(limits['restitution'], (v) => isFiniteNumber(v) && v > 0 && v <= 1 && dampingRatioForRestitution(v) !== null))
+      return 'limits.restitution must be reachable by a one-sided stop (0.0002 < e <= 1)';
   }
   if (friction !== undefined) {
     const problem = frictionProblem(friction);
@@ -154,6 +156,21 @@ export function transmissionReferenceProblems(dynamics: Record<string, unknown>)
       problems.push(
         `dynamics.transmissions['${id}']: a ${String(t['kind'])} couples a revolute driver with a ${linear ? 'prismatic' : 'revolute'} joint`,
       );
+  }
+  const driverOf = new Map<string, string>();
+  for (const t of Object.values(table(dynamics, 'transmissions'))) {
+    const ends = isRecord(t) ? endsOf(t) : [];
+    if (ends.length >= 2 && ends[0] !== undefined && ends[1] !== undefined) driverOf.set(ends[1], ends[0]);
+  }
+  for (const start of driverOf.keys()) {
+    const seen = new Set<string>([start]);
+    for (let current = driverOf.get(start); current !== undefined; current = driverOf.get(current)) {
+      if (seen.has(current)) {
+        if (current === start) problems.push(`dynamics.transmissions: joint '${start}' drives itself through a circle of transmissions`);
+        break;
+      }
+      seen.add(current);
+    }
   }
   for (const id of Object.keys(table(dynamics, 'jointPhysics'))) {
     if (!Object.hasOwn(known, id)) problems.push(`dynamics.jointPhysics['${id}']: no joint '${id}'`);

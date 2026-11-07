@@ -10,7 +10,10 @@
  * rad/s (no overshoot), final position 154.566 -> 155.501 rad (the speed is reached earlier); the final speed 157.0796 rad/s is unchanged.
  * Accepted rebaseline (all four hashes, DRV-M2, owner rule: no backward compatibility): add_gear_coupling became add_transmission, so data.gears is data.transmissions (the flywheel run: every number
  * is bit-identical, only the key name moved: 0b199e614413c6c3 -> 3c4d1be4b52abb36, checked by renaming the key back); the geared run also has the transmission id prefix
- * (trans-) and its equality row written with the larger coefficient as the dependent joint (4a46aecb5515a636 -> 58888c9268d1cd15).
+ * (trans-) and its equality row written with the larger coefficient as the dependent joint (4a46aecb5515a636 -> 58888c9268d1cd15). Verified numerically (scratch toggle of the
+ * swap, same model and explicit ids, 2 s at 20 Hz and 1 s at dt 5e-4, energy on): max relative deviation of every series and total against the old orientation 1.0e-5
+ * (propeller power, first sample after the start transient), 3.4e-6 on joint speeds, 1.9e-6 on propeller work, 0 elsewhere to 1e-6; steady state below 3e-6; energy balance
+ * error 2.286e-2 (2 s, start transient) both; data.transmissions maxRatioError 3.4e-7 (new) against 3.9e-6 (old) at 20 Hz, 1.1e-7 against 1.3e-6 at dt 5e-4; the warnings are identical.
  * Accepted rebaseline (all four hashes, FPR-MJ, MuJoCo 3.14.0 -> 3.16.0, owner decision 2026-10-16): every number of the four runs is
  * bit-identical between the two versions; only data.engine changed. The hashes now leave the engine label out (checked on its own).
  */

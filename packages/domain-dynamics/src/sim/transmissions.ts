@@ -6,7 +6,7 @@
 import type { TransmissionCoupling } from '@core/dynamics/physicsEngine';
 import type { DynamicsModel } from '@core/model/dynamics';
 import { transmissionJoints, transmissionRatio, type Transmission } from '@core/model/transmissions';
-import { dampingRatioForRestitution } from './endStop';
+import { dampingRatioForRestitution } from '@lib/stopRestitution';
 import { reflectedInertia, type RigidLink } from './reflectedInertia';
 
 type LeadScrew = Extract<Transmission, { kind: 'lead_screw' }>;

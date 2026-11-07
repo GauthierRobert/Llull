@@ -96,7 +96,7 @@ export interface JointPhysicsBlock {
   /**
    * Per friction joint: true = Karnopp dead band. While the joint is at rest and its friction constraint is inside its limit, the engine sets
    * its velocity to zero after the step, which removes the creep of a soft friction row (a held load leaks about 1e-4 · Δt · its free acceleration).
-   * The engine ignores it for a joint that a transmission or a loop couples to others.
+   * The plugin switches it off (false) for joints a transmission, a loop or a servo / drive touches, and reports it (DRV_STICTION_NOT_LATCHED).
    */
   readonly restLatch: readonly boolean[];
   /** True when a level reads `radialLoad` / `bendingMoment` (the engine then reads the joint reactions every step). */

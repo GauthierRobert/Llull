@@ -494,7 +494,7 @@
     {
       "file": "domain-dynamics/src/sim/transmissions.ts",
       "match": "return dampingRatio ?? dampingRatioForRestitution(restitution ?? 0.5) ?? 0.999;",
-      "reason": "documented in set_joint_physics: no damping ratio and no restitution means restitution 0.5; 0.999 is the largest ratio of the closed form for an unreachable restitution, which the command refuses"
+      "reason": "documented in set_joint_physics: no damping ratio and no restitution means restitution 0.5; 0.999 is the largest ratio of the closed form and is unreachable: the command refuses and the loader rejects a restitution with no damping ratio (dampingRatioForRestitution null)"
     }
   ]
 }

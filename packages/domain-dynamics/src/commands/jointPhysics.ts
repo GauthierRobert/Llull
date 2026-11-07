@@ -5,7 +5,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed, codedRejection, failer } from '@core/commands/noop';
 import type { DynamicJoint } from '@core/model/dynamics';
 import type { JointFriction, JointLimits, JointPhysics } from '@core/model/transmissions';
-import { dampingRatioForRestitution } from '../sim/endStop';
+import { dampingRatioForRestitution } from '@lib/stopRestitution';
 import { dynamicsOf, withDynamics } from './bodies';
 import { sourceSchema, toSource } from './motorSchemas';
 
@@ -152,7 +152,7 @@ export const setJointPhysics = defineCommand({
     "use the Nm / Nms/rad names on a revolute joint and the N / Ns/m names on a prismatic one; the model REPLACES the joint's `friction` / `damping` numbers and its `source` " +
     "(grade C = assumed) is carried to the results; a datasheet motor's no-load friction still adds on top. `limits`: end stops min..max (rad or m from the modelled pose) as a " +
     'one-sided spring-damper of `stiffness` with damping from `dampingRatio` or `restitution` on the inertia the joint pushes (reported peak penetration and force in simulate_motion data.stops; ' +
-    'the timestep must satisfy ω_n·Δt <= 0.1 with ω_n = sqrt(stiffness / inertia) or simulate_motion refuses with DRV_STEP_TOO_COARSE). `armatureKgM2`: inertia on the joint ' +
+    'the damping is scaled to the inertia of the joint (bodies it carries, armature and rigidly coupled joints) taken as CONSTANT in the configuration: exact for a single hinge or a fixed chain, an approximation when the effective inertia changes, and data.stops reports it as effectiveInertia; the timestep must satisfy ω_n·Δt <= 0.1 with ω_n = sqrt(stiffness / inertia) or simulate_motion refuses with DRV_STEP_TOO_COARSE). `armatureKgM2`: inertia on the joint ' +
     'coordinate that belongs to no body (a rotor, a flywheel). Returns the joint id in affected[0].',
   params: z.object({
     joint: z.string().describe('Revolute or prismatic joint id.'),

@@ -22,7 +22,7 @@ export function openLoopGaps(mobility: MobilityResult): Record<string, number> {
 }
 
 /**
- * @affects nothing — read-only; data { bodies, joints, gears, motors, propellers, problems, warnings, topology?, mobility?, loopGapsM? }
+ * @affects nothing — read-only; data { bodies, joints, transmissions, jointPhysics, loadSchedules, motors, propellers, problems, warnings, topology?, mobility?, loopGapsM? }
  * @failure none: an empty model reports empty tables and the problem "no rigid bodies"; a refused topology or an open loop is a problem
  * @invariant kernel-optional: body mass properties (buildSimulationModel) are exact with a kernel, mesh integration otherwise
  */

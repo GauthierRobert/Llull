@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { setPhysicsEngine, type FrictionObservation } from '@core/dynamics/physicsEngine';
 import type { CadDocument } from '@core/model/types';
-import { buildJointPhysics, effectiveFriction } from '@dynamics/sim/jointPhysics';
+import { buildJointPhysics, effectiveFriction, latchBlockers } from '@dynamics/sim/jointPhysics';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { loadPlan, noGravity, runSteps, section, seriesOf, slider, spinner, SOURCE_A } from './fixtures';
 
@@ -186,6 +186,7 @@ describe('end stops (VC-DRV-20)', () => {
     const stats = dataOf(run).stops?.['j_s'];
     expect(Math.abs((stats?.peakPenetration ?? 0) / reference.peakPenetrationRad - 1)).toBeLessThan(0.05);
     expect(stats?.peakForce).toBeGreaterThan(0);
+    expect((stats as { effectiveInertia?: number }).effectiveInertia).toBeCloseTo(0.01, 12);
     const contact = q.filter((angle) => angle > 0.01).length / 20000;
     expect(Math.abs(contact / reference.contactTimeS - 1)).toBeLessThan(0.05);
     expect(dataOf(run).ledger?.closureRelative).toBeLessThan(1e-3);
@@ -215,6 +216,69 @@ describe('end stops (VC-DRV-20)', () => {
   });
 });
 
+describe('rest latch and its exclusions (DRV_STICTION_NOT_LATCHED)', () => {
+  const stiction = { model: 'stiction', staticN: 2, kineticN: 1, source: SOURCE_A };
+  const notes = (doc: CadDocument): string[] =>
+    (execute(doc, 'simulate_motion', { duration: 0.01, timestep: 1e-4, sampleRate: 100 }).data as RunData).warnings.filter((w) =>
+      w.startsWith('DRV_STICTION_NOT_LATCHED'),
+    );
+
+  it('a free stiction joint is latched and silent', () => {
+    const doc = runSteps([
+      ...slider('s', 1),
+      noGravity,
+      { command: 'set_joint_physics', params: { joint: 'j_s', friction: stiction } },
+    ]).doc;
+    expect(notes(doc)).toEqual([]);
+  });
+
+  it('a stiction joint a transmission couples is not latched and the run says why', () => {
+    const doc = runSteps([
+      ...slider('s', 1),
+      ...spinner('r', 1e-3),
+      noGravity,
+      { command: 'add_transmission', params: { kind: 'rack_pinion', pinion: 'j_r', rack: 'j_s', pitchRadiusMm: 10, id: 'rk' } },
+      { command: 'set_joint_physics', params: { joint: 'j_s', friction: stiction } },
+    ]).doc;
+    const [note] = notes(doc);
+    expect(note).toMatch(/joint 'j_s' is coupled by transmission 'rk'.*rest latch is off/);
+    expect(notes(doc)).toHaveLength(1);
+  });
+
+  it('a joint with a speed governor is not latched: the set-point cannot wind up, and the governed run holds its speed', () => {
+    const doc = runSteps([
+      ...slider('s', 1),
+      noGravity,
+      { command: 'set_joint_physics', params: { joint: 'j_s', friction: stiction } },
+      { command: 'add_motor', params: { joint: 'j_s', kind: 'speed', speedMps: 0.1, maxForceN: 50, id: 'gov' } },
+    ]).doc;
+    expect(notes(doc)[0]).toMatch(/acted on by linear_speed motor 'gov'/);
+    const run = execute(doc, 'simulate_motion', { duration: 1, timestep: 1e-4, sampleRate: 100, detail: 'series' });
+    const v = seriesOf(run, 'jointVelocity', 'j_s');
+    expect(v[100]).toBeCloseTo(0.1, 3);
+  });
+
+  it('a model with kinematic loops latches nothing', () => {
+    const doc = runSteps([
+      ...spinner('r', 1e-3),
+      ...slider('s', 1),
+      noGravity,
+      { command: 'set_joint_physics', params: { joint: 'j_s', friction: stiction } },
+    ]).doc;
+    const dynamics = doc.dynamics;
+    if (dynamics === undefined) throw new Error('no dynamics');
+    const built = buildJointPhysics(dynamics, {
+      timestep: 1e-4,
+      sign: () => 1,
+      inertiaOf: () => 1,
+      unlatched: latchBlockers(dynamics, true),
+    });
+    if (built === null || 'error' in built) throw new Error('no block');
+    expect(built.block.restLatch).toEqual([false]);
+    expect(built.notes[0]).toMatch(/kinematic loops/);
+  });
+});
+
 describe('armature and Stribeck friction', () => {
   it('an armature adds inertia to the joint coordinate: alpha = T / (J + armature)', () => {
     const doc = runSteps([
@@ -240,8 +304,9 @@ describe('armature and Stribeck friction', () => {
     ]).doc;
     const dynamics = doc.dynamics;
     if (dynamics === undefined) throw new Error('no dynamics');
-    const block = buildJointPhysics(dynamics, { timestep: 1e-4, sign: () => 1, inertiaOf: () => 1 });
-    if (block === null || 'error' in block) throw new Error('no block');
+    const built = buildJointPhysics(dynamics, { timestep: 1e-4, sign: () => 1, inertiaOf: () => 1, unlatched: new Map() });
+    if (built === null || 'error' in built) throw new Error('no block');
+    const { block } = built;
     const observed: FrictionObservation = {
       radialLoad: new Float64Array(1),
       bendingMoment: new Float64Array(1),

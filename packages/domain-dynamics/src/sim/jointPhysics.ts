@@ -8,7 +8,7 @@
 
 import type { FrictionObservation, JointPhysicsBlock, SimulationState } from '@core/dynamics/physicsEngine';
 import type { DynamicJoint, DynamicsModel } from '@core/model/dynamics';
-import type { JointFriction } from '@core/model/transmissions';
+import { transmissionJoints, type JointFriction } from '@core/model/transmissions';
 import { coarseStepProblem, stopDampingRatio } from './transmissions';
 
 /** Speed (rad/s or m/s) below which a stiction joint counts as at rest (TR-DRV-15 `v_tol`). */
@@ -60,6 +60,14 @@ export interface JointPhysicsContext {
   readonly sign: (jointId: string) => number;
   /** kg·m² (kg) the joint's coordinate pushes, couplings and armature included. */
   readonly inertiaOf: (jointId: string) => number | undefined;
+  /** Joints whose rest latch is switched off, with the reason (see `latchBlockers`). */
+  readonly unlatched: ReadonlyMap<string, string>;
+}
+
+export interface BuiltJointPhysics {
+  readonly block: JointPhysicsBlock;
+  /** Notes the report states (DRV_STICTION_NOT_LATCHED). */
+  readonly notes: readonly string[];
 }
 
 export interface JointPhysicsRefusal {
@@ -68,7 +76,7 @@ export interface JointPhysicsRefusal {
 }
 
 /** The engine block of the document's joint physics (state-dependent friction levels, end stops), null when it has none. */
-export function buildJointPhysics(dynamics: DynamicsModel, context: JointPhysicsContext): JointPhysicsBlock | null | JointPhysicsRefusal {
+export function buildJointPhysics(dynamics: DynamicsModel, context: JointPhysicsContext): BuiltJointPhysics | null | JointPhysicsRefusal {
   const entries = Object.values(dynamics.jointPhysics ?? {}).filter((physics) => dynamics.joints[physics.id] !== undefined);
   const dynamicFriction = entries.flatMap((physics) => {
     const { dynamic } = effectiveFriction(dynamics, dynamics.joints[physics.id] as DynamicJoint);
@@ -95,9 +103,18 @@ export function buildJointPhysics(dynamics: DynamicsModel, context: JointPhysics
     });
   }
   if (dynamicFriction.length === 0 && limits.length === 0) return null;
-  return {
+  const latching = dynamicFriction.filter((entry) => entry.friction.model === 'stiction' || entry.friction.model === 'stribeck');
+  const notes = latching.flatMap((entry) => {
+    const reason = context.unlatched.get(entry.joint.id);
+    return reason === undefined
+      ? []
+      : [
+          `DRV_STICTION_NOT_LATCHED: joint '${entry.joint.id}' ${reason}, so its rest latch is off: the soft friction row lets a held load creep at about 1e-4 · Δt · its free acceleration (use a smaller timestep for a tight hold)`,
+        ];
+  });
+  const block: JointPhysicsBlock = {
     frictionJoints: dynamicFriction.map((entry) => entry.joint.id),
-    restLatch: dynamicFriction.map((entry) => entry.friction.model === 'stiction' || entry.friction.model === 'stribeck'),
+    restLatch: dynamicFriction.map((entry) => latching.includes(entry) && !context.unlatched.has(entry.joint.id)),
     needsLoad: dynamicFriction.some((entry) => entry.friction.model === 'load_dependent'),
     frictionLevel: (state: SimulationState, observed: FrictionObservation): Float64Array =>
       Float64Array.from(dynamicFriction, (entry, k) =>
@@ -105,4 +122,24 @@ export function buildJointPhysics(dynamics: DynamicsModel, context: JointPhysics
       ),
     limits,
   };
+  return { block, notes };
+}
+
+/**
+ * Joints whose Karnopp rest latch must stay off, with why: a coupled joint (transmission), any joint of a model with loops, and a joint a servo,
+ * a speed governor or a datasheet drive acts on (restoring its position would wind up their set-point or integrator).
+ */
+export function latchBlockers(dynamics: DynamicsModel, hasLoops: boolean): Map<string, string> {
+  const reasons = new Map<string, string>();
+  const block = (joint: string, reason: string): void => void (reasons.has(joint) ? undefined : reasons.set(joint, reason));
+  if (hasLoops) for (const joint of Object.keys(dynamics.joints)) block(joint, 'is in a model with kinematic loops');
+  for (const t of Object.values(dynamics.transmissions ?? {}))
+    for (const joint of Object.values(transmissionJoints(t))) block(joint, `is coupled by transmission '${t.id}'`);
+  for (const motor of Object.values(dynamics.motors)) {
+    if (motor.kind === 'torque_curve') continue;
+    block(motor.joint, `is acted on by ${motor.kind} motor '${motor.id}' (its set-point or controller would wind up)`);
+    const target = dynamics.drives?.[motor.id]?.target;
+    if (target !== undefined) block(target, `is the target of the drive of motor '${motor.id}'`);
+  }
+  return reasons;
 }

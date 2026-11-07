@@ -20,7 +20,7 @@ import type {
   SimulationSpring,
 } from '@core/dynamics/physicsEngine';
 import { buildActuators, type ActuatorRefusal, type DriveRuntime } from './actuators/block';
-import { buildJointPhysics, effectiveFriction, type JointPhysicsRefusal } from './jointPhysics';
+import { buildJointPhysics, effectiveFriction, latchBlockers, type JointPhysicsRefusal } from './jointPhysics';
 import { withLoadSchedules } from './loadSchedules';
 import { reflectedInertia } from './reflectedInertia';
 import { compileCouplings, rigidLinks, type CouplingRefusal } from './transmissions';
@@ -268,6 +268,7 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
     timestep,
     sign: signOf,
     inertiaOf: (jointId) => reflectedInertia(jointId, links, ownInertia),
+    unlatched: latchBlockers(dynamics, topology.loops.length > 0),
   });
   if (jointPhysics !== null && 'error' in jointPhysics)
     return { error: `${jointPhysics.code} — ${jointPhysics.error}`, code: jointPhysics.code };
@@ -295,14 +296,14 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
       solver,
       servos,
       ...(springs.length > 0 ? { springs } : {}),
-      ...(jointPhysics === null ? {} : { jointPhysics }),
+      ...(jointPhysics === null ? {} : { jointPhysics: jointPhysics.block }),
       ...(actuators === null ? {} : { actuators: actuators.block }),
       loads,
     },
     mass,
     topology,
     settings,
-    notes: compiled.warnings,
+    notes: [...compiled.warnings, ...(jointPhysics?.notes ?? [])],
   };
 }
 

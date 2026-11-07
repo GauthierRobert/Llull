@@ -190,10 +190,7 @@ export function createConstraintPhysics(
   let stopWork = new Float64Array(stopElements.length);
   const peaks = stopElements.map(() => ({ peakPenetration: 0, peakForce: 0 }));
   const levelsOfStep = frictionDofs.map(() => ({ dynamic: 0, transmissions: [] as number[] }));
-  const coupled = new Set(model.transmissions.flatMap((coupling) => [coupling.a, coupling.b]));
-  const latchable = frictionDofs.map(
-    (fd) => fd.physicsIndex >= 0 && physics?.restLatch[fd.physicsIndex] === true && !coupled.has(fd.joint.id) && model.loops.length === 0,
-  );
+  const latchable = frictionDofs.map((fd) => fd.physicsIndex >= 0 && physics?.restLatch[fd.physicsIndex] === true);
   const stuck = new Uint8Array(frictionDofs.length);
   /** State of the stops at the start of the last step, until the state at its end is read. */
   let pendingStop: StopState | null = null;

@@ -187,6 +187,14 @@ export const CORE_READERS: readonly HostileReader[] = [
         input: () => mechanismDynamics(3, (record) => void ('target' in record && (record['target'] = 7))),
       },
       {
+        name: 'transmissions that drive each other in a circle',
+        input: () => {
+          const dynamics = JSON.parse(mechanismDynamics(3)) as { transmissions: Record<string, unknown> };
+          dynamics.transmissions['back'] = { kind: 'gear', id: 'back', driver: 'b0', driven: 'a0', ratio: 2 };
+          return JSON.stringify(dynamics);
+        },
+      },
+      {
         name: 'every transmission drives the same joint',
         input: () => mechanismDynamics(3, (record) => void ('driven' in record && (record['driven'] = 'b0'))),
       },

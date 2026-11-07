@@ -407,6 +407,11 @@ function mechanismMutations(edit: Edit): SliceMutation[] {
       if (!isObject(found)) throw new Error(`mechanismMutations: the seed has no ${table}.${id}`);
       return found;
     };
+  const table = (dynamics: Record<string, unknown>, name: string): Record<string, unknown> => {
+    const found = dynamics[name];
+    if (!isObject(found)) throw new Error(`mechanismMutations: no ${name}`);
+    return found;
+  };
   const gear = record('transmissions', 'tg');
   const screw = record('transmissions', 'ts');
   const physics = record('jointPhysics', 'j2');
@@ -449,6 +454,11 @@ function mechanismMutations(edit: Edit): SliceMutation[] {
     edit('load target neither', set(load, 'target', {})),
     edit('load target both', set(load, 'target', { body: 'rotor', joint: 'j' })),
     edit('load target ghost joint', set(load, 'target', { joint: 'ghost' })),
+    edit(
+      'transmission circle',
+      (dynamics) => void (table(dynamics, 'transmissions')['back'] = { kind: 'gear', id: 'back', driver: 'j2', driven: 'j', ratio: 2 }),
+    ),
+    edit('joint physics restitution unreachable', set(physics, 'limits', { min: -1, max: 1, stiffness: 1, restitution: 1e-9 })),
     edit('load kind foo', set(load, 'kind', 'foo')),
     edit('load direction short', set(load, 'direction', [1, 2])),
     edit('load profile number', set(load, 'profile', 3)),

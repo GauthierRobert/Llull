@@ -286,7 +286,7 @@
 | `explode_instance` | Replace an InstanceEntity with concrete copies of its component's entities baked into world space. |  |
 | `insert_instance` | Place a new InstanceEntity referencing an existing Component definition. |  |
 | `inspect_dynamics` | List the physics model: every rigid body with its computed mass (kg), centre of mass (document units) and moment of inertia about its joint axis (kg·m², revolu… | read-only |
-| `list_dynamics_loads` | List every load of the physics model at its design values: each body weight at its centre of mass (gravity layer), every joint axis and gear coupling (joints),… | read-only |
+| `list_dynamics_loads` | List every load of the physics model at its design values: each body weight at its centre of mass (gravity layer), every joint axis and transmission (joints), … | read-only |
 | `motion_study` | Evaluate the mechanism across a value sweep and return per-step instance transforms plus interference flags. | read-only |
 | `plot_simulation` | Run the physics simulation (same engine and parameters as simulate_motion) and draw the result as an SVG time-series chart, so a motion can be inspected withou… | read-only |
 | `render_animation` | RENDER A MOVING MECHANISM as a time-exact frame sequence, a timeline of the numbers behind each frame and a contact sheet. | read-only |
