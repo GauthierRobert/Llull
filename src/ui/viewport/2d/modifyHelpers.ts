@@ -78,6 +78,8 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
     }
     case 'rectangle':
       return chainDistSq(pick, rectangleCorners(entity.width, entity.height), true);
+    case 'region':
+      return Math.min(...entity.loops.map((loop) => chainDistSq(pick, loop, true)));
     case 'point':
       return distance(pick, [0, 0]) ** 2;
     case 'text': {
@@ -213,7 +215,7 @@ export function nearestEntityId(
   );
 }
 
-/** Area of a closed 2D entity (rectangle/circle/ellipse/closed polyline) containing `worldPick`, else null. */
+/** Area of a closed 2D entity (rectangle/circle/ellipse/closed polyline/region) containing `worldPick`, else null. */
 export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
   const pick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
   switch (entity.kind) {
@@ -237,6 +239,10 @@ export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
       if (!entity.closed || entity.points.length < 3 || !pointInPolygon(pick, entity.points)) {
         return null;
       }
+      break;
+    case 'region':
+      // Even-odd: inside when an odd number of loops contain the point (outside the outer loop or inside a hole is a miss).
+      if (entity.loops.filter((loop) => pointInPolygon(pick, loop)).length % 2 === 0) return null;
       break;
     default:
       return null;

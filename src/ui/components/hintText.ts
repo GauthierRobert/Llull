@@ -20,6 +20,7 @@ const DRAW_TOOL_HINTS: Readonly<Record<Exclude<DrawToolKind, 'none' | 'move'>, s
   point: 'Point: click to place.',
   ellipse: 'Ellipse: click the center, then a corner of its bounding box.',
   spline: 'Spline: click through-points · Enter or double-click to finish.',
+  hatch: 'Hatch: click inside a closed shape; shapes inside it become holes.',
 };
 
 const GIZMO_HINTS: Readonly<Record<GizmoMode, string>> = {
