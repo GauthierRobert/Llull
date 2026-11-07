@@ -60,8 +60,10 @@ const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   picture: ['render'],
   image: ['render'],
   screenshot: ['render'],
-  vibration: ['modal', 'frequency'],
-  eigenfrequency: ['modal', 'frequency'],
+  vibration: ['modal', 'frequency', 'analysis'],
+  eigenfrequency: ['modal', 'frequency', 'analysis'],
+  resonance: ['modal', 'frequency', 'analysis'],
+  eigenmode: ['modal', 'frequency', 'analysis'],
   stiffness: ['fea', 'solve'],
   pattern: ['array'],
   circular: ['polar'],
@@ -86,7 +88,9 @@ const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
 
 /** Engineering phrases (stemmed, in order) -> tool vocabulary; the phrase's words lose their single-word synonyms. */
 const PHRASES: readonly { readonly words: readonly string[]; readonly expansion: readonly string[] }[] = [
-  { words: ['natural', 'frequency'], expansion: ['modal', 'eigen'] },
+  { words: ['natural', 'frequency'], expansion: ['modal', 'eigen', 'analysis'] },
+  { words: ['mode', 'shape'], expansion: ['modal', 'eigen', 'analysis', 'results'] },
+  { words: ['vibration', 'mode'], expansion: ['modal', 'frequency', 'analysis'] },
   { words: ['cut', 'fill'], expansion: ['earthworks', 'platform', 'volume'] },
   { words: ['pressure', 'drop'], expansion: ['hydraulics', 'pipe'] },
   { words: ['stress', 'plot'], expansion: ['render', 'fea', 'results'] },
