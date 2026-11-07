@@ -19,6 +19,7 @@ import { getSpatialIndex, setSpatialIndex } from '@core/geometry/spatialIndex';
 import type { Vec3 } from '@core/model/types';
 import { clashStressDocument } from '../../tests/helpers/clashStress';
 import { SYN_RACK_BAYS, synRackDocument } from '../../tests/helpers/synRack';
+import { jobFolderPrefix } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { NATIVE_MIN_BOXES, createNativeSpatialIndex, installSpatialIndex } from '../src/native/spatialIndexPort';
 import { requireTool } from '../../tests/requireTool';
@@ -44,7 +45,7 @@ function randomBoxes(count: number, seed: number, degenerate = 0): PackedBoxes {
   return packBoxes(boxes);
 }
 
-const jobFolders = (): string[] => readdirSync(tmpdir()).filter((name) => name.startsWith('llull-compute-'));
+const jobFolders = (): string[] => readdirSync(tmpdir()).filter((name) => name.startsWith(jobFolderPrefix()));
 const newSince = (before: readonly string[]): string[] => jobFolders().filter((name) => !before.includes(name));
 const removeNew = (before: readonly string[]): void =>
   newSince(before).forEach((name) => rmSync(path.join(tmpdir(), name), { recursive: true, force: true }));
