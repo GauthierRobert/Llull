@@ -1,10 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { PhysicsSection } from '@ui/panels/PhysicsSection';
 import { useStore } from '@ui/store';
 import { useFocusStore } from '@ui/store/focusStore';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
-import { crankJointOf } from '@ui/panels/review/reviewTimelineModel';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { resetStore } from '../helpers/componentEntities';
@@ -168,6 +167,72 @@ describe('Physics panel: motors, drives and profiles', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('set_motor_drive rejected: boom');
   });
 
+  it('a velocity-loop drive is not replaced silently: a note names it and Replace asks first', () => {
+    const motor = addDcMotor(buildShaft());
+    localDispatch('add_motion_profile', {
+      id: 'spin',
+      quantity: 'velocity',
+      unit: 'rpm',
+      start: 100,
+      segments: [{ kind: 'dwell', duration: 1 }],
+    });
+    localDispatch('set_motor_drive', {
+      motor,
+      mode: 'velocity',
+      profile: 'spin',
+      tune: { bandwidthHz: 5, dampingRatio: 1 },
+      sampleHz: 1000,
+    });
+    const spy = spyDispatch();
+    render(<PhysicsSection />);
+    expect(screen.getByTestId(`motor-replace-note-${motor}`)).toHaveTextContent('velocity loop drive (profile spin)');
+    expect(screen.queryByTestId(`motor-volts-${motor}`)).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId(`motor-replace-${motor}`));
+    fireEvent.change(screen.getByTestId(`motor-volts-${motor}`), { target: { value: '12' } });
+    fireEvent.click(screen.getByTestId(`motor-volts-apply-${motor}`));
+    expect(spy).toHaveBeenCalledWith('set_motor_drive', { motor, mode: 'voltage', volts: 12 }, expect.anything());
+  });
+
+  it('a voltage-profile drive also asks before it is replaced, and a plain voltage drive does not', () => {
+    const motor = addDcMotor(buildShaft());
+    localDispatch('add_motion_profile', {
+      id: 'ramp',
+      quantity: 'voltage',
+      unit: 'V',
+      segments: [{ kind: 'move', law: 'linear', to: 24, duration: 0.5 }],
+    });
+    localDispatch('set_motor_drive', { motor, mode: 'voltage', profile: 'ramp' });
+    render(<PhysicsSection />);
+    expect(screen.getByTestId(`motor-replace-note-${motor}`)).toHaveTextContent('voltage drive (profile ramp)');
+    act(() => void localDispatch('set_motor_drive', { motor, mode: 'voltage', volts: 9 }));
+    expect(screen.queryByTestId(`motor-replace-note-${motor}`)).toBeNull();
+  });
+
+  it('the voltage input follows the drive when it changes elsewhere (undo, live sync, CLI)', () => {
+    const motor = addDcMotor(buildShaft());
+    localDispatch('set_motor_drive', { motor, mode: 'voltage', volts: 12 });
+    render(<PhysicsSection />);
+    expect(screen.getByTestId(`motor-volts-${motor}`)).toHaveValue(12);
+    act(() => void localDispatch('set_motor_drive', { motor, mode: 'voltage', volts: 30 }));
+    expect(screen.getByTestId(`motor-volts-${motor}`)).toHaveValue(30);
+  });
+
+  it('a loaded geared motor reports a real torque at the end of the run', async () => {
+    const disc = localDispatch('add_cylinder', { radius: 20, height: 10, axis: [0, 1, 0] }).affected[0]!;
+    const body = localDispatch('add_rigid_body', { entityIds: [disc], name: 'rotor' }).affected[0]!;
+    const joint = localDispatch('add_body_joint', { kind: 'revolute', child: body, anchor: [0, 0, 0], axis: [0, 1, 0], damping: 0.05 })
+      .affected[0]!;
+    localDispatch('set_gravity', { gravity: [0, 0, 0] });
+    const motor = addDcMotor(joint, { gearhead: { ratio: 4, efficiency: 0.9 } });
+    localDispatch('set_motor_drive', { motor, mode: 'voltage', volts: 24 });
+    render(<PhysicsSection />);
+    fireEvent.change(screen.getByTestId('physics-duration'), { target: { value: '0.5' } });
+    fireEvent.click(screen.getByTestId('physics-simulate'));
+    await waitFor(() => expect(screen.getByTestId('physics-results')).toHaveTextContent(new RegExp(`${motor}`)), { timeout: 30_000 });
+    expect(screen.getByTestId('physics-results')).toHaveTextContent(new RegExp(motor + '[ ]*[1-9][0-9.]* N·m at end'));
+  }, 40_000);
+
   it('a simulated run with a voltage-driven dc motor shows its torque row and the read-only energy ledger', async () => {
     const motor = addDcMotor(buildShaft());
     localDispatch('set_motor_drive', { motor, mode: 'voltage', volts: 48 });
@@ -193,14 +258,4 @@ describe('Physics panel: motors, drives and profiles', () => {
     await waitFor(() => expect(screen.getByTestId('physics-results')).toBeInTheDocument(), { timeout: 30_000 });
     expect(screen.queryByTestId('physics-ledger')).toBeNull();
   }, 40_000);
-});
-
-describe('review timeline crank', () => {
-  beforeEach(resetStore);
-
-  it('takes the revolute joint of a datasheet dc motor as the crank', () => {
-    const joint = buildShaft();
-    addDcMotor(joint);
-    expect(crankJointOf(useStore.getState().document.dynamics)).toBe(joint);
-  });
 });

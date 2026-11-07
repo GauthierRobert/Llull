@@ -57,8 +57,16 @@ function ResultTable({ result }: { result: SimulationData }): React.ReactElement
         {Object.entries(result.motors).map(([id, motor]) => (
           <tr key={id}>
             <th scope="row">{id}</th>
-            <td>{format(motor.torque)} N·m</td>
-            <td className="physics-results__meta">{format(motor.power / 1000, 2)} kW</td>
+            <td>
+              {motor.cycleMeanTorque !== undefined
+                ? `${format(motor.cycleMeanTorque)} N·m cycle mean`
+                : `${format(motor.torque)} N·m at end`}
+            </td>
+            <td className="physics-results__meta">
+              {motor.cycleMeanPower !== undefined
+                ? `${format(motor.cycleMeanPower / 1000, 2)} kW cycle mean`
+                : `${format(motor.power / 1000, 2)} kW at end`}
+            </td>
           </tr>
         ))}
         {Object.entries(result.propellers).map(([id, prop]) => (
@@ -164,7 +172,7 @@ export function PhysicsSection(): React.ReactElement {
           </ListRow>
         ))}
       </ul>
-      <PhysicsMotors document={document} />
+      <PhysicsMotors dynamics={dynamics} />
       {problems.length > 0 && <StatusLine text={problems.join('; ')} testId="physics-problems" />}
       <div className="physics-run">
         <label className="panel__row-meta" htmlFor="physics-duration">

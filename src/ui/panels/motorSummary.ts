@@ -133,6 +133,11 @@ export function driveFacts(drive: MotorDrive): Fact[] {
   ];
 }
 
+/** One-line name of a drive: its mode and profile, for the note before it is replaced. */
+export function driveHeadline(drive: MotorDrive): string {
+  return `${driveModeLabel(drive.mode)} drive${drive.profile === undefined ? '' : ` (profile ${drive.profile})`}`;
+}
+
 /** Duration of a segment in s, or null when it follows from vmax / amax (known only to the compiled profile). */
 function segmentSeconds(segment: ProfileSegment): number | null {
   switch (segment.kind) {
@@ -147,12 +152,22 @@ function segmentSeconds(segment: ProfileSegment): number | null {
   }
 }
 
+function moveLimits(segment: Extract<ProfileSegment, { kind: 'move' }>): string[] {
+  return [
+    ...(segment.duration === undefined ? [] : [`${q(segment.duration)} s`]),
+    ...(segment.vmax === undefined ? [] : [`vmax ${q(segment.vmax)}`]),
+    ...(segment.amax === undefined ? [] : [`amax ${q(segment.amax)}`]),
+    ...(segment.jerk === undefined ? [] : [`jerk ${q(segment.jerk)}`]),
+    ...(segment.accelFraction === undefined ? [] : [`accel fraction ${q(segment.accelFraction)}`]),
+  ];
+}
+
 function segmentText(segment: ProfileSegment, unit: string): string {
   switch (segment.kind) {
     case 'dwell':
       return `dwell ${q(segment.duration)} s`;
     case 'move':
-      return `move to ${q(segment.to)} ${unit} (${segment.law.replace('_', ' ')}${segment.duration === undefined ? '' : `, ${q(segment.duration)} s`})`;
+      return `move to ${q(segment.to)} ${unit} (${[segment.law.replace('_', ' '), ...moveLimits(segment)].join(', ')})`;
     case 'sine':
       return `sine ±${q(segment.amplitude)} ${unit} at ${q(segment.frequencyHz)} Hz × ${q(segment.cycles)}`;
     case 'table':
