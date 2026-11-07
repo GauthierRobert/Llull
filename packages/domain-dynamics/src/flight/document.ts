@@ -87,7 +87,11 @@ export const flightDocument: DocumentExtension = {
     // zod rebuilds records by assignment, so an own "__proto__" key would vanish from the parsed copy: read the keys on the raw value
     const reserved = (['rotors', 'bodyDrag'] as const).flatMap((table) => {
       const records = isRecord(slice) ? slice[table] : undefined;
-      return isRecord(records) ? Object.keys(records).filter((key) => RESERVED_KEYS.has(key)).map((key) => `flight.${table}.${key}: reserved key`) : [];
+      return isRecord(records)
+        ? Object.keys(records)
+            .filter((key) => RESERVED_KEYS.has(key))
+            .map((key) => `flight.${table}.${key}: reserved key`)
+        : [];
     });
     if (reserved.length > 0) return reserved;
     const errors = sliceSchemaErrors(flightSchema, slice, 'flight');
