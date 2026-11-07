@@ -14,7 +14,7 @@ import { SHARP_MAX } from './sharpness';
 type SettleSource = Pick<Cage, 'edgeSharpness' | 'vertexSharpness'>;
 
 /** Most quads the settled cage may have (the evaluator's per-level quad budget is above it). A cube: sharpness up to 7; a 400-face cage: about 4. */
-export const SETTLE_QUAD_BUDGET = 100_000;
+const SETTLE_QUAD_BUDGET = 100_000;
 
 /** Refinement steps after which every finite sharpness of `cage` has decayed (0 when there is none). */
 export function fullSettleLevels(cage: SettleSource): number {
