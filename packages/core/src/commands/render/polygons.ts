@@ -27,6 +27,7 @@ import {
   wedgeFaces,
 } from '../../geometry/tessellation';
 import type { PreDepthPolygon } from './types';
+import { regionPolygons } from './regionPolygons';
 import { positiveSweep } from '../../lib/angle';
 import { arcPolyline } from '../../lib/arc';
 import { catmullRomBeziers, segmentPoint } from '../../geometry/curveSegments';
@@ -172,6 +173,8 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
       return strokeEllipseArc(e, e.radiusX, e.radiusY, 0, 2 * Math.PI);
     case 'spline':
       return tessellate2DSpline(e);
+    case 'region':
+      return regionPolygons(e);
     case 'nurbs_surface':
       return rotated(surfaceTriangles(e.surface, e.position, 4, e.trims));
     case 'nurbs_curve':

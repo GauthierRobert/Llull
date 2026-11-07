@@ -5,7 +5,7 @@
  */
 
 import { idTaken } from '../lib/explicitId';
-import type { DcMotor, MotionProfile, MotorDrive, ParameterSource } from './drives';
+import type { DcMotor, MotionProfile, MotorDrive, ParameterSource, ReferenceSeries } from './drives';
 import type { JointPhysics, LoadSchedule, Transmission } from './transmissions';
 import type { Vec3 } from './vectors';
 
@@ -243,6 +243,8 @@ export interface DynamicsModel {
   jointPhysics?: Record<string, JointPhysics>;
   /** Profiles applied as forces (PHY-23). */
   loadSchedules?: Record<string, LoadSchedule>;
+  /** Measured / datasheet time series the model is compared with (PHY-23 DRV-M3); absent until the first `add_reference_data` with `series`. */
+  referenceSeries?: Record<string, ReferenceSeries>;
 }
 
 /** Every id used by any dynamics record (bodies, joints, transmissions, motors, propellers, cylinders, losses, springs, profiles, load schedules share one id space). */
@@ -258,6 +260,7 @@ export function dynamicsIdTaken(dynamics: DynamicsModel, id: string): boolean {
     dynamics.springs ?? {},
     dynamics.profiles ?? {},
     dynamics.loadSchedules ?? {},
+    dynamics.referenceSeries ?? {},
   ].some((table) => idTaken(table, id));
 }
 

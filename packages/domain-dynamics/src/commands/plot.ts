@@ -8,14 +8,21 @@ import { timeSeriesSvg, type PlotPanel, type PlotSeries } from '@lib/timeSeriesS
 import type { SimulationData } from '../sim/simulationReport';
 import type { ReactionsData } from '../sim/reactions';
 import { simulateMotion } from './simulate';
+import { dynamicsOf } from './bodies';
+import { DRIVE_CHART_QUANTITIES, DRIVE_PANEL_QUANTITIES, driveChart, drivePanels, isDriveChart, isDrivePanel } from './plotDrives';
+import { stackCharts } from '../sim/driveCharts';
+import type { RunData as DriveRunData } from '../sim/runData';
 
-const QUANTITIES = ['joint_angle', 'joint_velocity', 'motor_torque', 'motor_power', 'reaction_force', 'energy'] as const;
-type Quantity = (typeof QUANTITIES)[number];
+const MOTION_QUANTITIES = ['joint_angle', 'joint_velocity', 'motor_torque', 'motor_power', 'reaction_force', 'energy'] as const;
+const QUANTITIES = [...MOTION_QUANTITIES, ...DRIVE_PANEL_QUANTITIES, ...DRIVE_CHART_QUANTITIES] as const;
+type MotionQuantity = (typeof MOTION_QUANTITIES)[number];
 
 /** Points a plot asks for when sampleRate is not given. */
 const DEFAULT_POINTS = 600;
 const MIN_SAMPLE_RATE = 50;
 const MAX_JOINT_SERIES = 12;
+/** Ambient of the winding-temperature panel when the call gives none, C. */
+const DEFAULT_AMBIENT_C = 25;
 
 type RunData = SimulationData & { reactions?: ReactionsData };
 
@@ -25,7 +32,7 @@ const scaled = (values: readonly number[], factor: number): number[] => values.m
 const limitSeries = (panel: PlotPanel): PlotPanel => ({ ...panel, series: panel.series.slice(0, MAX_JOINT_SERIES) });
 
 /** One panel per (quantity, unit); a quantity with no data yields none. */
-function panelsOf(quantity: Quantity, data: RunData, wanted: ReadonlySet<string> | null): PlotPanel[] {
+function panelsOf(quantity: MotionQuantity, data: RunData, wanted: ReadonlySet<string> | null): PlotPanel[] {
   const series = data.series;
   if (series === undefined) return [];
   const keep = (id: string): boolean => wanted === null || wanted.has(id);
@@ -121,14 +128,18 @@ export const plotSimulation = defineCommand({
     'runs the reaction pass, slower), "energy" (J: kinetic, potential = gravity + joint springs relative to the start pose, total, and ' +
     'cumulative energy dissipated by damping / friction: a flat total = conservation, a falling one = decay). `joints` restricts the series to those joint (or motor) ids. Default: joint_velocity of every ' +
     'joint. Closed loops and cylinders use the same timestep rules as simulate_motion. With the CLI, `llull plot_simulation … --save plot.png` ' +
-    'rasterizes data.svg. Read-only; needs the physics engine like simulate_motion.',
+    'rasterizes data.svg. DRIVES (PHY-23): "motor_current" (A) and "motor_voltage" (V) of every datasheet motor with a drive, "winding_temperature" (C, from the 2-node ' +
+    'thermal network of the datasheet at `ambientC`, motors with thermal data only), "operating_points" (a torque-speed chart: shaft torque against shaft speed of every sample ' +
+    'with the motor\'s torque-speed line at nominal voltage, peak and continuous torque limits) and "energy_ledger" (bars of the joules of every ledger element: input, ' +
+    'copper, transmission loss, friction, regeneration negative, stored); operating_points and energy_ledger are drawn under the time panels in the same data.svg. ' +
+    'Read-only; needs the physics engine like simulate_motion.',
   params: z.object({
     quantities: z
       .array(z.enum(QUANTITIES))
       .min(1)
       .optional()
       .describe(
-        'Panels to draw: joint_angle, joint_velocity, motor_torque, motor_power, reaction_force, energy. Default ["joint_velocity"].',
+        'Panels to draw: joint_angle, joint_velocity, motor_torque, motor_power, reaction_force, energy, and for datasheet motors motor_current, motor_voltage, winding_temperature, operating_points, energy_ledger. Default ["joint_velocity"].',
       ),
     joints: z
       .array(z.string())
@@ -141,6 +152,7 @@ export const plotSimulation = defineCommand({
       .positive()
       .optional()
       .describe('Samples per second drawn. Default about 600 points over the run (never below 50 Hz).'),
+    ambientC: z.number().min(-60).max(150).optional().describe('Ambient temperature for winding_temperature, C. Default 25.'),
     title: z.string().max(120).optional().describe('Chart title. Default "Simulation: <duration> s".'),
     width: z.number().int().min(320).max(3000).optional().describe('Chart width in px. Default 900.'),
   }),
@@ -158,21 +170,35 @@ export const plotSimulation = defineCommand({
       {
         duration,
         sampleRate,
-        detail: 'series',
+        detail: quantities.some((quantity) => isDrivePanel(quantity) || isDriveChart(quantity)) ? 'drives' : 'series',
         reactions: quantities.includes('reaction_force') ? 'series' : 'off',
-        ...(quantities.includes('energy') ? { energy: true } : {}),
+        ...(quantities.includes('energy') || quantities.includes('energy_ledger') ? { energy: true } : {}),
         ...(params.timestep !== undefined ? { timestep: params.timestep } : {}),
       },
       ctx,
     );
     if (run.data === undefined) return fail(run.summary.replace(/^simulate_motion:\s*/, 'the simulation did not run — '));
-    const data = run.data as RunData;
-    const panels = quantities.flatMap((quantity) => panelsOf(quantity, data, wanted)).map(limitSeries);
-    if (panels.length === 0)
-      return fail(`nothing to plot for ${quantities.join(', ')} (no matching joints, motors or reactions in this model)`);
+    const data = run.data as RunData & DriveRunData;
+    const dynamics = dynamicsOf(doc);
     const width = params.width ?? 900;
+    const panels = quantities
+      .flatMap((quantity) =>
+        isDrivePanel(quantity)
+          ? drivePanels(quantity, data, dynamics, wanted, params.ambientC === undefined ? DEFAULT_AMBIENT_C : params.ambientC)
+          : isDriveChart(quantity)
+            ? []
+            : panelsOf(quantity, data, wanted),
+      )
+      .map(limitSeries);
+    const charts = quantities.flatMap((quantity) => {
+      const chart = isDriveChart(quantity) ? driveChart(quantity, data, dynamics, wanted, width) : null;
+      return chart === null ? [] : [chart];
+    });
+    if (panels.length === 0 && charts.length === 0)
+      return fail(`nothing to plot for ${quantities.join(', ')} (no matching joints, motors, drives or reactions in this model)`);
     const title = params.title ?? `Simulation: ${duration} s`;
-    const { svg, height } = timeSeriesSvg(panels, { title, width, panelHeight: 230, times: data.series?.times ?? [] });
+    const drawn = panels.length === 0 ? null : timeSeriesSvg(panels, { title, width, panelHeight: 230, times: data.series?.times ?? [] });
+    const { svg, height } = stackCharts([...(drawn === null ? [] : [drawn]), ...charts], width);
     const stats = panels.map((panel) => ({
       title: panel.title,
       unit: panel.unit,
@@ -190,8 +216,8 @@ export const plotSimulation = defineCommand({
     );
     return report(
       doc,
-      `plot_simulation: ${panels.length} panel(s), ${data.samples} samples over ${duration} s. ${lines.join('; ')}. The chart is in data.svg.`,
-      { svg, width, height, title, duration, samples: data.samples, panels: stats },
+      `plot_simulation: ${panels.length} panel(s)${charts.length > 0 ? ` and ${charts.length} chart(s)` : ''}, ${data.samples} samples over ${duration} s. ${lines.join('; ')}. The chart is in data.svg.`,
+      { svg, width, height, title, duration, samples: data.samples, panels: stats, charts: charts.length },
     );
   },
 });

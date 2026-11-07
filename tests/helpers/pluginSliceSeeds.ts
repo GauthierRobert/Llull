@@ -219,6 +219,41 @@ const studyFixture = (): ReturnType<typeof studyBar> => (studySeed ??= studyBar(
 const analysisId = (doc: CadDocument): string => doc.analysis?.caseOrder[0] ?? 'missing';
 const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc)]?.topologyOrder?.[0] ?? 'missing';
 
+/** `doc` with a valid human-act ledger entry and a copy bound to another document uid, in both ledgers, plus the matching fit dispositions. */
+function withLedgers(doc: CadDocument): CadDocument {
+  const signature = { nonce: 'n-1', payload: 'a'.repeat(64) };
+  const exception = {
+    analysisId: analysisId(doc),
+    studyId: 'cs-1.1',
+    code: 'VNV_NOT_ASYMPTOTIC',
+    justification: 'j',
+    signer: 's',
+    signatureId: 'id',
+    signature,
+    levelHashes: ['a'.repeat(64), 'b'.repeat(64), 'c'.repeat(64)],
+    documentUid: doc.uid ?? '',
+  };
+  const fit = {
+    decision: 'accepted',
+    justification: 'j',
+    inputsHash: 'h',
+    signer: 's',
+    signatureId: 'id',
+    signature,
+    documentUid: doc.uid ?? '',
+  };
+  const analysis = {
+    ...doc.analysis,
+    exceptionLedger: [exception, { ...exception, documentUid: 'e'.repeat(32) }],
+    fitDispositions: { 'row 1': fit },
+    fitLedger: [
+      { ...fit, rowKey: 'row 1' },
+      { ...fit, rowKey: 'row 1', documentUid: 'e'.repeat(32) },
+    ],
+  };
+  return { ...doc, analysis } as CadDocument;
+}
+
 export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   building: {
     roots: ['building'],
@@ -323,6 +358,14 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
       }),
     },
   },
+  // the human-act ledgers replays keep (exceptionLedger, fitLedger) and the fit dispositions: a valid entry and one signed for another document uid
+  'cae#ledgers': {
+    roots: ['analysis'],
+    build: () => withLedgers(recordedStudy(studyFixture()).doc),
+    ctx: () => studyFixture().ctx,
+    query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
+    mutate: { name: 'create_analysis', params: constant({ name: 'fuzz ledger analysis', analysisType: 'static' }) },
+  },
   topology: {
     roots: ['analysis'],
     build: () => mbbModel().doc,
@@ -349,7 +392,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
 };
 
 /**
- * The drive data of `doc.dynamics` (PHY-23: datasheet motors, profiles, drives, transmissions, joint physics, load schedules). Dynamics is a core slice, not a plugin extension, so it has no row in
+ * The drive data of `doc.dynamics` (PHY-23: datasheet motors with thermal data, profiles, drives, transmissions, joint physics, load schedules, reference series). Dynamics is a core slice, not a plugin extension, so it has no row in
  * SLICE_SEEDS; tests/unit/contract/pluginSliceFuzz.test.ts runs it with the targeted `driveMutations` as well.
  */
 export const DYNAMICS_SEED: PluginSliceSeed = {
@@ -368,7 +411,20 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
           joint: 'j',
           kind: 'dc',
           id: 'm',
-          datasheet: { nominalVoltageV: 48, terminalResistanceOhm: 1.13, torqueConstantNmPerA: 0.0603, rotorInertiaKgM2: 1e-5 },
+          datasheet: {
+            nominalVoltageV: 48,
+            terminalResistanceOhm: 1.13,
+            torqueConstantNmPerA: 0.0603,
+            rotorInertiaKgM2: 1e-5,
+            thermal: {
+              rthWindingHousingKPerW: 1.9,
+              rthHousingAmbientKPerW: 4.7,
+              tauWindingS: 41.5,
+              tauMotorS: 809,
+              maxWindingC: 155,
+              alphaPerK: 0.0039,
+            },
+          },
           gearhead: { ratio: 5, efficiency: 0.9 },
           source: { name: 'seed sheet', grade: 'C' },
         },
@@ -446,6 +502,16 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
         params: { id: 'tq', quantity: 'torque', unit: 'N*m', segments: [{ kind: 'sine', amplitude: 0.01, frequencyHz: 2, cycles: 2 }] },
       },
       { name: 'add_load_schedule', params: { joint: 'j', kind: 'torque', profile: 'tq', id: 'ls' } },
+      {
+        name: 'add_reference_data',
+        params: {
+          id: 'rs',
+          series: { quantity: 'joint_velocity', target: 'j', times: [0, 0.5, 1], values: [0, 1, 2], uncertainty: 0.1 },
+          source: 'seed bench log',
+          grade: 'B',
+          bandRel: 0.1,
+        },
+      },
     ];
     let doc = createEmptyDocument();
     const ids = new Map<string, string>();

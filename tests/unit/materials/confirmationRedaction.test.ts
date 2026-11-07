@@ -1,6 +1,6 @@
 /** TR-MAT-51: a human signature (`confirmation`) is checked by the command and never stored, at any depth of the params. */
 import { describe, expect, it } from 'vitest';
-import { withoutConfirmations } from '@lib/withoutConfirmations';
+import { isRecordedConfirmation, withoutConfirmations } from '@lib/withoutConfirmations';
 import { call, mmDocument } from './support';
 
 const SIGNATURE = { signatureId: 'sig-1', nonce: 'n-1', signature: 'SECRET-SIGNATURE-BYTES' };
@@ -71,5 +71,20 @@ describe('execute stores no signature in the feature history', () => {
     });
     expect(result.document.featureHistory.length).toBeGreaterThan(base.featureHistory.length);
     expect(JSON.stringify(result.document.featureHistory)).not.toContain('SECRET-SIGNATURE-BYTES');
+  });
+});
+
+describe('isRecordedConfirmation', () => {
+  it('is true only for exactly { verified: true } (what withoutConfirmations leaves in a history step)', () => {
+    expect(isRecordedConfirmation((withoutConfirmations({ confirmation: SIGNATURE }) as { confirmation: unknown }).confirmation)).toBe(
+      true,
+    );
+    expect(isRecordedConfirmation({ verified: true, nonce: 'n-1' })).toBe(false);
+    expect(isRecordedConfirmation({ verified: false })).toBe(false);
+    expect(isRecordedConfirmation({})).toBe(false);
+    expect(isRecordedConfirmation(SIGNATURE)).toBe(false);
+    expect(isRecordedConfirmation(true)).toBe(false);
+    expect(isRecordedConfirmation(null)).toBe(false);
+    expect(isRecordedConfirmation(undefined)).toBe(false);
   });
 });

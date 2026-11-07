@@ -52,6 +52,17 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'draw_spline', params: { points: xy(0, 0, 3, 0, 3, 3, 0, 3), closed: true } },
     { command: 'draw_ellipse', params: { center: [0, 0], radiusX: 6, radiusY: 3 } },
   ],
+  '2d_hatch_region': [
+    { command: 'draw_rectangle', params: { width: 100, height: 60 }, as: 'plate' },
+    { command: 'draw_arc', params: { center: [50, 30], radius: 10 }, as: 'hole' },
+    { command: 'hatch_region', params: { ids: ['$plate', '$hole'], pattern: 'lines', angle: 0, spacing: 5 }, as: 'slab' },
+    { command: 'measure_area', params: { entityId: '$slab' } },
+    { command: 'draw_rectangle', params: { width: 20, height: 20, position: [120, 0, 0] } },
+    { command: 'hatch_region', params: { point: [130, 10], pattern: 'cross', angle: 0.7853981633974483, spacing: 4 } },
+    { command: 'draw_polyline', params: { points: xy(0, 80, 40, 80, 40, 90, 10, 90, 10, 110, 0, 110), closed: true }, as: 'ell' },
+    { command: 'hatch_region', params: { ids: ['$ell'], pattern: 'solid' } },
+    { command: 'scale_entity', params: { id: '$slab', factor: 0.5 } },
+  ],
   '2d_image_underlay': [
     { command: 'add_image_underlay', params: { dataUrl: pngDataUrl(400, 300) }, as: 'scan' },
     {

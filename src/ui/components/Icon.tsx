@@ -61,6 +61,7 @@ const ICON_PATHS = {
   drawRectangle: 'M3 6h18v12H3z',
   drawEllipse: 'M12 18c5 0 9-2.7 9-6s-4-6-9-6-9 2.7-9 6 4 6 9 6Z',
   drawSpline: 'M3 17C7 17 7 7 12 7s5 10 9 10',
+  drawHatch: 'M4 4h16v16H4ZM4 11l7-7M4 17 17 4M9 20 20 9M15 20l5-5',
   drawPoint: 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM12 3v4M12 17v4M3 12h4M17 12h4',
   modifyOffset: 'M3 21V10a7 7 0 0 1 7-7h11M9 21v-8a4 4 0 0 1 4-4h8',
   modifyFillet: 'M4 20V12a8 8 0 0 1 8-8h8',

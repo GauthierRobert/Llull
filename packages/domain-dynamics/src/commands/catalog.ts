@@ -22,6 +22,9 @@ import { listDynamicsLoads } from './loads';
 import { plotSimulation } from './plot';
 import { engineQuickCheck } from './quickCheck';
 import { simulateMotion } from './simulate';
+import { sizeDrive } from './sizeDrive';
+import { fitDriveParameters } from './fitDrive';
+import { checkMotionTruth } from './motionTruth';
 import { addSpring } from './springs';
 import { setDynamicsSolver } from './solver';
 import { installEngineLaws } from './engine/hooks';
@@ -52,6 +55,9 @@ export const dynamicsCommands = commandCatalog(
   compareToReference,
   checkTimestepConvergence,
   simulateMotion,
+  sizeDrive,
+  fitDriveParameters,
+  checkMotionTruth,
   checkDynamics,
   checkMotionClearance,
   checkPrototype,

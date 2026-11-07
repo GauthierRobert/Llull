@@ -28,6 +28,7 @@ import { exactCurves, extrusionResult } from './extrusionResult';
 import { thinExtrude, thinSchema } from './thinExtrude';
 import { mapSegment } from '../../geometry/curveSegments';
 import { extrudeText } from './textExtrusion';
+import { extrudeRegion } from './regionExtrusion';
 
 /**
  * @affects creates 1 extrusion entity; sources (id/ids) are kept
@@ -37,7 +38,7 @@ import { extrudeText } from './textExtrusion';
  * @failure no/ambiguous source, profile < 3 points or non-finite, open/unsupported sketch, pieces that do not close, depth <= 0,
  *   zero-length axis -> no-op, affected:[]
  * @failure malformed rotation -> entity still created with rotation [0,0,0]
- * @invariant kernel-optional: a thin (offset band) profile needs the kernel; a plain profile and text extrude without one
+ * @invariant kernel-optional: a thin (offset band) profile and a region with holes / islands need the kernel; a plain profile, a region without holes and text extrude without one
  */
 export const extrudeProfile = defineCommand({
   name: 'extrude_profile',
@@ -46,7 +47,7 @@ export const extrudeProfile = defineCommand({
     'Extrude a closed 2D profile along +Z into an extrusion solid. Right-handed world frame, +Z up. ' +
     'Give EXACTLY ONE source: `profile` (inline array of [x, y] points, at least 3, implicitly closed, ' +
     'placed at `position`, default [0,0,0]); OR `id` of one closed drawn shape (circle, rectangle, ellipse, ' +
-    'closed polyline, closed spline); OR `ids` of several coplanar open pieces (line, arc, open polyline, ' +
+    'closed polyline, closed spline, or a region from hatch_region: holes and islands are subtracted / united by the kernel, a region without holes needs none); OR `ids` of several coplanar open pieces (line, arc, open polyline, ' +
     'open spline) that join end to end into one closed loop, in any order and direction. A drawn sketch ' +
     'keeps its curved boundaries exact (true arcs and Bézier splines for the exact kernel and STEP export; ' +
     'the polygon is only the display tessellation), is placed at the (first) source entity position ' +
@@ -129,6 +130,7 @@ export const extrudeProfile = defineCommand({
     const only = sourceIds.length === 1 ? doc.entities[sourceIds[0] as string] : undefined;
     if (only?.kind === 'text' && only.font !== undefined)
       return extrudeText(doc, ctx, { text: only, depth, position, rotation, axis, color });
+    if (only?.kind === 'region') return extrudeRegion(doc, ctx, { region: only, depth, position, rotation, axis, color });
     if (sourceIds.length === 1) {
       const single = singleSourceIssue(doc, sourceIds[0] as string);
       if (single !== null) return noop(doc, `extrude_profile: ${single}`);

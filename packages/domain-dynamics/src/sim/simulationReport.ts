@@ -15,6 +15,7 @@ import { findPeriod, tailMean, type Period } from './periodicity';
 import type { DriveRuntime } from './actuators/block';
 import { driveSeries } from './actuators/series';
 import { energyOf, type EnergyData, type EnergySeries } from './energyReport';
+import type { LedgerData } from './ledger';
 import { speedTrend, trendWarning } from './speedTrend';
 
 export type SimulationDetail = 'summary' | 'series' | 'poses';
@@ -84,6 +85,8 @@ export interface SimulationData {
   readonly warnings: string[];
   /** Energy balance in J, present when the run recorded energy (simulate_motion `energy: true`, or the model has a joint spring). */
   readonly energy?: EnergyData;
+  /** Where every joule went (with `energy`, or detail "drives"); attached by simulate_motion, absent without energy recording or actuators. */
+  readonly ledger?: LedgerData;
   /** Point springs (add_spring) of the run: lengths in m, forces in N (positive = pulling the bodies together). */
   readonly springs?: Record<
     string,

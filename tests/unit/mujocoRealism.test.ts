@@ -643,9 +643,9 @@ describe('free equilibrium against a propeller (static_rpm, propeller_rpm; VC-FP
       quantity: 'propeller_rpm',
       points: [{ value: 2300 }],
       source: 'synthetic',
-      id: 'prop',
+      id: 'prop_rpm',
     }).document;
-    const run = execute(geared, 'compare_to_reference', { reference: 'prop', durationS: 0.8 });
+    const run = execute(geared, 'compare_to_reference', { reference: 'prop_rpm', durationS: 0.8 });
     const point = (run.data as { points: { simulated: number }[] }).points[0];
     expect(point?.simulated ?? 0).toBeGreaterThan(1800);
     expect(point?.simulated ?? 0).toBeLessThan(2600);
@@ -656,9 +656,9 @@ describe('free equilibrium against a propeller (static_rpm, propeller_rpm; VC-FP
       quantity: 'propeller_rpm',
       points: [{ value: 2300 }],
       source: 'synthetic',
-      id: 'loose',
+      id: 'loose_rpm',
     }).document;
-    const direct = execute(loose, 'compare_to_reference', { reference: 'loose', durationS: 0.5 });
+    const direct = execute(loose, 'compare_to_reference', { reference: 'loose_rpm', durationS: 0.5 });
     expect((direct.data as { points: { simulated: number }[] }).points[0]?.simulated ?? 0).toBeGreaterThan(4000);
   });
 });

@@ -31,6 +31,11 @@ function sourceProblem(source: unknown): string | null {
     : 'source must be { name, grade: A | B | C }';
 }
 
+const THERMAL_REQUIRED = ['rthWindingHousingKPerW', 'rthHousingAmbientKPerW', 'tauWindingS', 'tauMotorS', 'maxWindingC'] as const;
+
+const thermalSheetOk = (thermal: unknown): boolean =>
+  isRecord(thermal) && THERMAL_REQUIRED.every((key) => isPositive(thermal[key])) && isOptionalNonNegative(thermal['alphaPerK']);
+
 /** Problem of a `kind: 'dc'` motor record (the common `joint` is checked by the caller), or null. */
 export const dcMotorProblem: Check = (motor) => {
   const sheet = motor['datasheet'];
@@ -39,6 +44,9 @@ export const dcMotorProblem: Check = (motor) => {
   if (!isOptionalNonNegative(sheet['terminalInductanceH']) || !isOptionalNonNegative(sheet['noLoadCurrentA']))
     return 'datasheet terminalInductanceH and noLoadCurrentA must be >= 0';
   if (!SHEET_OPTIONAL_POSITIVE.every((key) => isOptionalPositive(sheet[key]))) return 'optional datasheet values must be positive numbers';
+  const thermal = sheet['thermal'];
+  if (thermal !== undefined && !thermalSheetOk(thermal))
+    return 'datasheet thermal needs positive rthWindingHousingKPerW, rthHousingAmbientKPerW, tauWindingS, tauMotorS, maxWindingC and alphaPerK >= 0';
   const gearhead = motor['gearhead'];
   if (gearhead !== undefined) {
     if (!isRecord(gearhead) || !isPositive(gearhead['ratio'])) return 'gearhead.ratio must be > 0';

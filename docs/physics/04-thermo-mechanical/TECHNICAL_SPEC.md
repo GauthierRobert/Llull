@@ -148,7 +148,7 @@ Plugin `thermomech`, toolset `analysis`.
 | `thermal_stress_check` | query | `{ check: 'restrained' \| 'inclusion' \| 'bimetal' \| 'thick_cylinder' \| 'gradient_beam' \| 'shrink_fit' \| 'cte_secant', inputs }` → `{ value(s), unit, formula, inputs }` | pure; equals `generate_thermomech_reference.py` to 1e-12 relative |
 | `thermal_distortion_report` | query | `{ analysisId, faces?: [{ name, target: FeaTarget, pmiId? }], points?: [{ name, point }], loadCase? }` → `data { maxDisplacement, faces[{ name, flatnessBefore, flatnessAfter, change, tolerance?, withinTolerance?, reviewRequired }], points[{ name, displacement }], unit }` | @failure `FEA_RESULTS_STALE` / `_MISSING` |
 | `check_thermo_mechanical` | query | `{ analysisId }` → pass/warn/fail items (§7.1) + `reviewRequired: true` | 05 `check_analysis` delegates to it for these types |
-| `dispose_fit_result` | mutating, **human gate** | `{ rowKey, decision, justification, signature }` | @affects analysis.fitDispositions · @failure `TMC_HUMAN_GATE`; `TMC_FIT_INPUTS_CHANGED` when the inputs hash moved |
+| `dispose_fit_result` | mutating, **human gate** | `{ rowKey, decision, justification, inputsHash, confirmation }` | @affects analysis.fitDispositions · @failure `TMC_HUMAN_GATE`; `TMC_FIT_INPUTS_CHANGED` when the inputs hash moved |
 | (05 ✱) `fea_mesh`, `fea_solve`, `fea_export` | transport | unchanged | dispatch on the extension; `fea_solve` refuses a stale thermal source |
 
 Description sketch, `fit_at_temperature` (AF-02): *"Compute hole/shaft clearance at one or more temperatures from 03 GDT
@@ -400,8 +400,14 @@ key is closed by §14.
   validity is refused with `TMC_PROPERTY_OUT_OF_RANGE`, never sampled) and tabulates at most 1000 intervals (a wider range gets a coarser step).
 - **Deck text.** Material ids, model sources, conversions and unverified reasons in the `*EXPANSION` comments pass through `commentText`;
   `loadCaseName` of `create_analysis` must match `[A-Za-z0-9_]{1,40}` (`FEA_LOAD_INVALID`).
-- **Fit dispositions.** `dispose_fit_result` stores the verified `signature` with the decision so a reader can re-verify it; no read path counts
-  `fitDispositions` yet (rows are always `pending_human`), so nothing trusts them.
+- **Fit dispositions (FIX-SIG-DFR, 2026-11-07).** The gate param is `confirmation` (like every other human gate): `withoutConfirmations` records `{ verified: true }`
+  in the history, the command log and live sync, never the signature. `dispose_fit_result` stores the verified signature, the signer and the document uid in
+  `fitDispositions[rowKey]` and appends the same record to `analysis.fitLedger`. **Replay choice:** a recorded step is honoured on `ctx.replaying` only from a
+  `fitLedger` entry matching row, decision, justification, inputsHash and this document's uid (the cae `replaySeed` carries the ledger, as for `exceptionLedger`
+  of VNV-M3); a replay therefore cannot invent a disposition, a document with another uid loses it (a byte copy keeps its uid by design, so it keeps the disposition), and the signature is never spent again. When a signing port is installed the kept signature is re-verified (nothing spent) over the payload bound to the entry's uid, so a hand-planted ledger entry fails with `TMC_HUMAN_GATE`; `accept_verification_exception` does the same for `exceptionLedger`. The signature is spent LAST, after every other refusal (uid, justification, inputs hash, `fitParams`), so a refused call never burns the human's signature.
+  Rejected alternative: seeding `fitDispositions` itself (a suppressed or edited step would leave an orphan disposition). Load validation checks both
+  records (`validateDispositions.ts`). A document without uid is refused `FEA_DOCUMENT_UNIDENTIFIED` after the gate. No read path counts `fitDispositions`
+  yet (rows are always `pending_human`), so there is no reader to re-verify them or to show the signer; when one is added it re-verifies with `boundVerdict` over the stored uid.
 
 ## 14. PHY-04 closure (2026-10-17)
 

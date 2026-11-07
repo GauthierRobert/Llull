@@ -17,6 +17,7 @@ export const DRAW_TOOLS: readonly DrawToolSpec[] = [
   { tool: 'circle', label: 'Circle', icon: 'drawCircle', tip: 'click center, then a rim point' },
   { tool: 'ellipse', label: 'Ellipse', icon: 'drawEllipse', tip: 'click center, then a bounding-box corner' },
   { tool: 'spline', label: 'Spline', icon: 'drawSpline', tip: 'click through-points, Enter to finish' },
+  { tool: 'hatch', label: 'Hatch', icon: 'drawHatch', tip: 'click inside a closed shape to hatch it' },
   { tool: 'point', label: 'Point', icon: 'drawPoint', tip: 'click to place a point' },
   { tool: 'wall', label: 'Wall', icon: 'wall', tip: 'click wall centerline points, Enter to finish' },
 ];

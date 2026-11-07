@@ -75,6 +75,8 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
       return lines(entity.closed ? closeLoop(entity.points) : [...entity.points]);
     case 'rectangle':
       return lines(closeLoop(rectangleCorners(entity.width, entity.height)));
+    case 'region':
+      return lines(...entity.loops.map((loop) => closeLoop(loop)));
     case 'circle':
       return lines(arcPolyline(entity.center, entity.radius, 0, 2 * Math.PI, CURVE_SAMPLES));
     case 'ellipse':
