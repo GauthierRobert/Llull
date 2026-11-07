@@ -42,6 +42,15 @@ function setup(
 const target = icosphere(10, 4);
 const options = { level: 2, maxDeviation: 0.05, iterations: 10, interpolate: false, smoothing: 1e-3, targetClosed: true };
 
+/** The set-up with semi-sharp edges written straight into the cage (a hand-edited or loaded document: the commands refuse such a cage). */
+const withSharpness = (
+  scene: { doc: CadDocument; cageId: string; targetId: string },
+  edgeSharpness: Array<{ a: number; b: number; s: number }>,
+): { doc: CadDocument; cageId: string; targetId: string } => ({
+  ...scene,
+  doc: { ...scene.doc, entities: { ...scene.doc.entities, [scene.cageId]: { ...entityOf(scene.doc, scene.cageId), edgeSharpness } } },
+});
+
 describe('fit_subdivision_to_mesh stop reasons', () => {
   it('reports met, rounds, stalled and met_on_samples from what actually ended the rounds', () => {
     const cage = sphereCage(10, 4);
@@ -202,7 +211,7 @@ describe('fit_subdivision_to_mesh semi-sharp cages', () => {
     expect(fitted.error, fitted.summary).toBeUndefined();
     expect(dataOf(fitted)).toMatchObject({ fitLevel: 5, verifyLevel: 6 });
     const big = boxCage([12, 12, 12], [12, 12, 12]);
-    const refused = setup(tessellatedBox(6, 4), { ...big, edgeSharpness: [{ a: 0, b: 1, s: 5 }] }, { levels: 1 });
+    const refused = withSharpness(setup(tessellatedBox(6, 4), big, { levels: 1 }), [{ a: 0, b: 1, s: 5 }]);
     const result = execute(refused.doc, 'fit_subdivision_to_mesh', {
       cageId: refused.cageId,
       targetId: refused.targetId,
@@ -210,16 +219,24 @@ describe('fit_subdivision_to_mesh semi-sharp cages', () => {
     });
     expectNoOp(result, refused.doc);
     expect(codeOf(result)).toBe('MESH_FIT_TOO_LARGE');
-    expect(result.summary).toMatch(/sharpness, 5, needs 5 levels.*lower the sharpness or use a cage with fewer faces/);
+    expect(result.summary).toMatch(/sharpness 5 needs 5 settling levels.*lower the sharpness to at most [0-9]+, use fewer cage faces/);
   }, 120_000);
+
+  it('refuses a loaded cage over the settle budget by name, before any fitting', () => {
+    const scene = withSharpness(setup(tessellatedBox(2, 6), boxCage([4, 4, 4], [10, 10, 10]), { levels: 1 }), [{ a: 0, b: 1, s: 9 }]);
+    const result = execute(scene.doc, 'fit_subdivision_to_mesh', { cageId: scene.cageId, targetId: scene.targetId, maxDeviation: 0.1 });
+    expectNoOp(result, scene.doc);
+    expect(codeOf(result)).toBe('MESH_FIT_TOO_LARGE');
+    expect(result.summary).toContain('sharpness 9 needs 9 settling levels');
+  });
 
   it('refuses by name when the settle level alone exceeds the sample cap', () => {
     const big = boxCage([20, 20, 20], [18, 18, 18]);
-    const { doc, cageId, targetId } = setup(tessellatedBox(10, 4), { ...big, edgeSharpness: [{ a: 0, b: 1, s: 3 }] }, { levels: 1 });
+    const { doc, cageId, targetId } = withSharpness(setup(tessellatedBox(10, 4), big, { levels: 1 }), [{ a: 0, b: 1, s: 3 }]);
     const result = execute(doc, 'fit_subdivision_to_mesh', { cageId, targetId, maxDeviation: 0.1 });
     expectNoOp(result, doc);
     expect(codeOf(result)).toBe('MESH_FIT_TOO_LARGE');
-    expect(result.summary).toContain('sharpness, 3, needs 3 levels');
+    expect(result.summary).toContain('sharpness 3 needs 3 settling levels');
   });
 });
 

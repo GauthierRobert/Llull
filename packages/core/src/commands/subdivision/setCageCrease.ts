@@ -6,6 +6,7 @@ import { replaceEntity } from '../entity/entityOps';
 import { type EdgeRef, edgeIdOf, isRefProblem, resolveEdges, resolveVertices } from '../../geometry/subd/elements';
 import { edgeKey } from '../../geometry/subd/edgeKey';
 import { edgeLoop } from '../../geometry/subd/loops';
+import { settleBudgetProblem } from '../../geometry/subd/settle';
 import { SHARP_MAX, edgeSharpnessMap, partitionSharpness } from '../../geometry/subd/sharpness';
 import { closeVerticesUnderSymmetry, mirrorGroup } from '../../geometry/subd/symmetry';
 import { buildTopology } from '../../geometry/subd/topology';
@@ -17,7 +18,7 @@ const COMMAND = 'set_cage_crease';
 /**
  * @affects modifies 1 subdivision entity (edge sharpness, corner sharpness, crease method)
  * @invariant sharpness is stored exactly (0 removes, 10 is infinite); on a symmetric cage the mirror images of the edges / vertices get the same value
- * @failure missing id (DIR_ENTITY_NOT_FOUND), sharpness outside 0..10 (DIR_SHARPNESS_RANGE), unknown element (DIR_REF_LOST), id of the wrong kind (DIR_ELEMENT_KIND), no edge / vertex / method given -> no-op
+ * @failure missing id (DIR_ENTITY_NOT_FOUND), sharpness outside 0..10 (DIR_SHARPNESS_RANGE), settling over budget (DIR_SHARPNESS_BUDGET), unknown element (DIR_REF_LOST), id of the wrong kind (DIR_ELEMENT_KIND), no edge / vertex / method given -> no-op
  */
 export const setCageCrease = defineCommand({
   name: COMMAND,
@@ -41,7 +42,11 @@ export const setCageCrease = defineCommand({
       .array(vertexRefField)
       .describe('Cage vertices whose corner sharpness is set (they stay point-like for about that many levels).')
       .optional(),
-    sharpness: z.number().describe('Sharpness 0..10: 0 smooth, 1 one level crisp, 10 infinitely sharp.'),
+    sharpness: z
+      .number()
+      .describe(
+        'Sharpness 0..10: 0 smooth, 1 one level crisp, 10 infinitely sharp. Below 10 it needs ceil(sharpness) settling levels: the settled cage may have at most 100000 quads: a cube allows up to 7, a 400-face cage about 4; 10 is always allowed (refused with DIR_SHARPNESS_BUDGET otherwise).',
+      ),
     method: z.enum(['uniform', 'chaikin']).describe('Decay of sharpness per level (entity-wide): uniform (default) or chaikin.').optional(),
   }),
   run: (doc: CadDocument, params): CommandResult => {
@@ -100,6 +105,8 @@ export const setCageCrease = defineCommand({
     if (vertexSharpness.length > 0) updated.vertexSharpness = vertexSharpness;
     else delete updated.vertexSharpness;
     if (params.method !== undefined) updated.creaseMethod = params.method;
+    const budget = settleBudgetProblem(updated);
+    if (budget !== null) return reject('DIR_SHARPNESS_BUDGET', budget, ['params.sharpness']);
     const data = {
       sharpness,
       edges: [...touched],

@@ -35,8 +35,8 @@ function quadIndices(faces: ReadonlyArray<ReadonlyArray<number>>): Int32Array {
 }
 
 /**
- * Refinement steps that make the limit masks valid: at least 1 (every face a quad) and `fullSettleLevels(cage)`, the exact count with no cap (below
- * it a finite sharpness is still left on some edge and the crease mask would be applied to an edge `refineOnce` makes smooth later).
+ * Refinement steps that make the limit masks valid: at least 1 (every face a quad) and `fullSettleLevels(cage)`, the exact count (below it a finite
+ * sharpness is still left on some edge and the crease mask would be applied to an edge `refineOnce` makes smooth later); equals `settleLevels` for a cage within the settle budget.
  */
 export const sampleLevel = (cage: Cage, level: number): number => Math.max(level, 1, fullSettleLevels(cage));
 
