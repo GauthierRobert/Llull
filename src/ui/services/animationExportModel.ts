@@ -11,7 +11,7 @@ export type AnimationQuality = 'draft' | 'standard' | 'high';
 export type AnimationView = 'iso' | 'front' | 'top' | 'right' | 'left' | 'back' | 'bottom';
 
 export const SIZE_PRESETS = ['640x360', '1280x720', '1920x1080'] as const;
-export type AnimationSize = (typeof SIZE_PRESETS)[number];
+type AnimationSize = (typeof SIZE_PRESETS)[number];
 
 /** Every field is the text or choice the user sees; `animationParams` turns it into render_animation params. */
 export interface AnimationForm {
@@ -50,7 +50,7 @@ const DEFAULT_FPS = '30';
 
 const round = (value: number): string => String(Number(value.toPrecision(3)));
 
-export function sizeOf(size: AnimationSize): { width: number; height: number } {
+function sizeOf(size: AnimationSize): { width: number; height: number } {
   const [width, height] = size.split('x').map(Number);
   return { width: width ?? 1280, height: height ?? 720 };
 }

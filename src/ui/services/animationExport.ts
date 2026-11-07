@@ -61,11 +61,11 @@ const MIME: Readonly<Record<string, string>> = {
   json: 'application/json',
 };
 
-export function bytesOfBase64(base64: string): Uint8Array<ArrayBuffer> {
+function bytesOfBase64(base64: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 }
 
-export const mimeOfFile = (fileName: string): string => MIME[fileName.slice(fileName.lastIndexOf('.') + 1)] ?? 'application/octet-stream';
+const mimeOfFile = (fileName: string): string => MIME[fileName.slice(fileName.lastIndexOf('.') + 1)] ?? 'application/octet-stream';
 
 /** The one video file of a render (animation.mp4 / .gif / .apng), or undefined. */
 export const videoFileOf = (files: readonly AnimationFile[]): AnimationFile | undefined =>
