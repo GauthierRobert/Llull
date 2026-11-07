@@ -6,6 +6,7 @@
 import type { DynamicsModel } from '@core/model/dynamics';
 import type { ParameterSource } from '@core/model/drives';
 import type { Transmission } from '@core/model/transmissions';
+import { isDatasheetMotor } from './actuators/machine';
 
 type InputGrade = 'A' | 'B' | 'C' | 'unsourced';
 
@@ -39,7 +40,7 @@ function transmissionInput(transmission: Transmission): ProvenanceInput | null {
 export function provenanceOf(dynamics: DynamicsModel): ProvenanceInput[] {
   const inputs: ProvenanceInput[] = [];
   for (const motor of Object.values(dynamics.motors)) {
-    if (motor.kind === 'dc') {
+    if (isDatasheetMotor(motor)) {
       const accepted = motor.acceptInconsistent !== undefined;
       inputs.push(
         accepted

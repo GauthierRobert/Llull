@@ -48,7 +48,7 @@ export function ledgerOf(layout: ActuatorBlock['ledgerLayout'], trace: Simulatio
   const sum = (kind: LedgerKind): number =>
     entries.filter((entry) => entry.kind === kind).reduce((total, entry) => total + entry.joules, 0);
   const externalWork = inputWorkJ - last(trace.actuatorWork);
-  const dissipated = sum('copper') + sum('transmission_loss') + energy.dissipatedJ + propellerWorkJ;
+  const dissipated = sum('copper') + sum('iron') + sum('rotor') + sum('transmission_loss') + energy.dissipatedJ + propellerWorkJ;
   const stored = energy.finalTotalJ - energy.initialTotalJ + sum('magnetic');
   const input = sum('electrical_input') + externalWork;
   const error = input - dissipated - stored;

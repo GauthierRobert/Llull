@@ -66,14 +66,21 @@ export function ledgerItems(run: RunData, dynamics: DynamicsModel, inertiaOf: (j
         { unverified: true, note: 'the run recorded neither a ledger nor an energy balance' },
       ),
     ];
-  const status: ReviewItem['status'] = relative <= PASS_GATE ? 'pass' : relative <= WARN_GATE ? 'warn' : 'fail';
+  const closes = relative <= PASS_GATE ? 'pass' : relative <= WARN_GATE ? 'warn' : 'fail';
+  // a run whose only datasheet motors are steppers: their electrical input is derived from copper + field work, so a closing ledger is no independent evidence
+  const drives = Object.values(run.drives ?? {});
+  const byConstruction = closes === 'pass' && drives.length > 0 && drives.every((drive) => drive.stepper !== undefined);
+  const status: ReviewItem['status'] = byConstruction ? 'info' : closes;
   const basis = ledger === undefined ? 'energy balance (no actuator ledger)' : 'energy ledger';
+  const construction = byConstruction
+    ? ' (closes by construction for a stepper, not independent evidence: the field energy is not tracked)'
+    : '';
   const closure = reviewItem(
     'dynamics',
     'DRV_LEDGER_CLOSURE',
     status,
     [],
-    status === 'pass'
+    status === 'pass' || status === 'info'
       ? 'None.'
       : 'Energy does not close: refine the timestep, or see the named cause below; do not size from a ledger that does not close.',
     {
@@ -89,11 +96,11 @@ export function ledgerItems(run: RunData, dynamics: DynamicsModel, inertiaOf: (j
             }),
       },
       threshold,
-      note: `${basis}: closure ${relative.toExponential(2)} of the largest term`,
-      ...(status === 'pass' ? {} : { unverified: true }),
+      note: `${basis}: closure ${relative.toExponential(2)} of the largest term${construction}`,
+      ...(status === 'pass' || status === 'info' ? {} : { unverified: true }),
     },
   );
-  if (status === 'pass' || ledger === undefined) return [closure];
+  if (closes === 'pass' || ledger === undefined) return [closure];
   const jumps = jumpEnergies(dynamics, inertiaOf, run);
   const jump = jumps.reduce((sum, entry) => sum + entry.joules, 0);
   const error = Math.abs(ledger.closureErrorJ);

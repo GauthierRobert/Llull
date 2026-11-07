@@ -307,9 +307,11 @@ describe('delete_dynamics_item and persistence of drive data', () => {
     expect(broken(['profiles', 'v', 'segments'], [{ kind: 'dwell', duration: -1 }])[0]).toContain('DRV_PROFILE_INVALID');
     expect(broken(['drives', 'm', 'mode'], 'warp')[0]).toContain('mode must be');
     expect(broken(['drives', 'm', 'tune'], { bandwidthHz: 0, dampingRatio: 1 })[0]).toContain('tune must be');
-    expect(broken(['motors', 'm', 'kind'], 'ac')[0]).toContain("'torque_curve', 'speed', 'linear_speed' or 'dc'");
+    expect(broken(['motors', 'm', 'kind'], 'ac')[0]).toContain(
+      "'torque_curve', 'speed', 'linear_speed', 'dc', 'pmsm', 'stepper' or 'induction'",
+    );
     expect(broken(['drives', 'm', 'profile'], 'ghost')[0]).toContain("profile 'ghost' does not exist");
-    expect(broken(['drives', 'orphan'], { id: 'orphan', mode: 'voltage', volts: 1 })[0]).toContain("no datasheet (dc) motor 'orphan'");
+    expect(broken(['drives', 'orphan'], { id: 'orphan', mode: 'voltage', volts: 1 })[0]).toContain("no datasheet motor 'orphan'");
     expect(
       broken(
         ['profiles', 'v', 'segments'],

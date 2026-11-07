@@ -1,30 +1,23 @@
 /** Drives (engines / motors) and loads (propellers) acting on joints. */
 
 import type { Motor, PropellerLoad, TorquePoint } from '@core/model/dynamics';
-import type { DcMotor } from '@core/model/drives';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
 import { changed, codedRejection, failer } from '@core/commands/noop';
 import { dynamicsIdTaken } from '@core/model/dynamics';
 import { dynamicsOf, withDynamics } from './bodies';
-import { checkMotorData } from '../sim/actuators/motorData';
-import { dcParameters } from '../sim/actuators/dcMotor';
-import { inconsistentSheet } from './motorData';
-import { datasheetSchema, gearheadSchema, sourceSchema, toDatasheet, toGearhead, toSource } from './motorSchemas';
-
-/** One-line electrical summary of a datasheet motor. */
-function dcDescription(motor: DcMotor): string {
-  const p = dcParameters(motor);
-  return `R ${p.resistanceOhm} Ω, kt ${p.torqueConstant} N·m/A, gear ${p.gearRatio}:1 (η ${p.efficiencyForward}), armature ${p.armatureKgM2.toExponential(3)} kg·m², stall ${(motor.datasheet.nominalVoltageV / p.resistanceOhm).toFixed(2)} A`;
-}
+import { buildDatasheetMotor, datasheetDescription, foreignField } from './motorBuild';
+import { inductionSheetSchema, pmsmSheetSchema, stepperSheetSchema } from './machineSchemas';
+import { datasheetSchema, gearheadSchema, sourceSchema, toSource } from './motorSchemas';
 
 /**
  * @affects adds 1 motor to doc.dynamics (affected: [motorId])
  * @invariant joint exists; torque_curve: >= 1 point, strictly increasing rpm, throttle in [0, 1]; speed: maxTorque > 0 (revolute) or speedMps + maxForceN > 0 (prismatic);
- *   dc: datasheet passes check_motor_data or carries acceptInconsistent, gearhead efficiencies in (0, 1]
- * @failure unknown joint, prismatic joint for a non-speed kind, missing / unsorted curve, bad throttle, missing rpm / maxTorque, taken id -> no-op;
- *   dc without datasheet / source -> no-op; inconsistent dc datasheet -> DRV_MOTOR_DATA_INCONSISTENT (checks listed in the error detail)
+ *   dc / pmsm / stepper / induction: datasheet passes its consistency checks (check_motor_data) or carries acceptInconsistent, gearhead efficiencies in (0, 1]
+ * @failure a sheet, gearhead or acceptInconsistent that the kind does not use -> no-op naming the field; unknown joint, prismatic joint for a non-speed kind, missing / unsorted curve, bad throttle, missing rpm / maxTorque, taken id -> no-op;
+ *   a datasheet kind without its sheet / source, a pmsm sheet with neither flux linkage nor torque constant, a stepper pull-out curve out of order -> no-op;
+ *   inconsistent datasheet -> DRV_MOTOR_DATA_INCONSISTENT (checks listed in the error detail)
  */
 export const addMotor = defineCommand({
   name: 'add_motor',
@@ -38,13 +31,21 @@ export const addMotor = defineCommand({
     '`source` (where the numbers come from) and optionally `gearhead`; the sheet is checked for consistency first (check_motor_data, DRV_MOTOR_DATA_INCONSISTENT ' +
     'unless `acceptInconsistent` gives a reason, and the motor is then unverified); the motor is commanded by set_motor_drive (voltage, torque, velocity, ' +
     'position or prescribed motion) and its rotor inertia, friction and gearhead enter the simulation; read the electrical results with simulate_motion detail "drives". ' +
+    'kind "pmsm" = a permanent-magnet synchronous / BLDC motor with ideal field-oriented control (give `pmsmDatasheet`: pole pairs, R, L, flux linkage or torque constant Kt = 1.5*p*lambda, ' +
+    'bus voltage, peak current): torque-commanded (set_motor_drive modes torque, velocity, position, prescribed), constant torque to the base speed then field weakening inside the voltage / ' +
+    'current envelope. kind "stepper" = a two-phase hybrid stepper (give `stepperDatasheet`: steps per revolution, holding torque, rated current, phase R and L, rotor inertia, optional detent ' +
+    'torque and pull-out curve): driven open loop by a step profile (modes position, velocity); lost steps are detected and reported (DRV_STEPS_LOST), never silently passed. ' +
+    'kind "induction" = an induction motor as its per-phase equivalent circuit (give `inductionDatasheet`: R1, R2, X1, X2, Xm at the rated frequency, rated phase voltage): supplied by ' +
+    'set_motor_drive mode voltage (direct-on-line: volts + frequencyHz) or frequency (V/f profile), steady-state torque at the instantaneous slip. ' +
     'A `speed` motor accepts a `source` for its maxTorque; without one the bound is a guess and checks warn DRV_EFFORT_UNBOUNDED. ' +
     'Returns the motor id in affected[0].',
   params: z.object({
     joint: z.string().describe('Joint id to drive (e.g. the crankshaft joint).'),
     kind: z
-      .enum(['torque_curve', 'speed', 'dc'])
-      .describe('"torque_curve" = engine (torque vs rpm); "speed" = holds a set rpm; "dc" = datasheet DC motor.'),
+      .enum(['torque_curve', 'speed', 'dc', 'pmsm', 'stepper', 'induction'])
+      .describe(
+        '"torque_curve" = engine (torque vs rpm); "speed" = holds a set rpm; "dc" = datasheet DC motor; "pmsm" = PMSM / BLDC with field-oriented control; "stepper" = hybrid stepper; "induction" = induction motor.',
+      ),
     curve: z
       .array(z.tuple([z.number(), z.number()]))
       .optional()
@@ -56,15 +57,20 @@ export const addMotor = defineCommand({
     speedMps: z.number().optional().describe('speed on a PRISMATIC joint: target speed in m/s.'),
     maxForceN: z.number().positive().optional().describe('speed on a prismatic joint: force limit in N.'),
     datasheet: datasheetSchema.optional().describe('dc: the motor datasheet (SI units).'),
-    gearhead: gearheadSchema.optional().describe('dc: gearhead between the motor shaft and the joint. Default none (direct drive).'),
+    pmsmDatasheet: pmsmSheetSchema.optional().describe('pmsm: the motor datasheet (SI units).'),
+    stepperDatasheet: stepperSheetSchema.optional().describe('stepper: the motor datasheet (SI units).'),
+    inductionDatasheet: inductionSheetSchema.optional().describe('induction: the per-phase equivalent circuit and ratings (SI units).'),
+    gearhead: gearheadSchema
+      .optional()
+      .describe('dc, pmsm, stepper, induction: gearhead between the motor shaft and the joint. Default none (direct drive).'),
     source: sourceSchema
       .optional()
-      .describe('dc: where the datasheet comes from (required). speed: where maxTorque comes from (optional).'),
+      .describe('dc, pmsm, stepper, induction: where the datasheet comes from (required). speed: where maxTorque comes from (optional).'),
     acceptInconsistent: z
       .string()
       .min(1)
       .optional()
-      .describe('dc: reason for keeping a datasheet that fails check_motor_data; the motor is then unverified.'),
+      .describe('dc, pmsm, stepper, induction: reason for keeping a datasheet that fails check_motor_data; the motor is then unverified.'),
     id: z.string().optional().describe('Optional explicit motor id.'),
   }),
   run: (doc, params): CommandResult => {
@@ -78,31 +84,21 @@ export const addMotor = defineCommand({
         doc,
         'add_motor',
         'DRV_JOINT_INVALID',
-        `joint '${params.joint}' is ${joint.kind}; torque_curve and dc motors (rpm, N·m) drive revolute joints`,
+        `joint '${params.joint}' is ${joint.kind}; torque_curve and datasheet motors (rpm, N·m) drive revolute joints`,
         'Drive a revolute joint and couple it to the prismatic one with add_transmission (screw, rack), or use kind "speed" with speedMps / maxForceN on the prismatic joint.',
         [params.joint],
       );
+    const foreign = foreignField(params.kind, params);
+    if (foreign !== null) return fail(`${foreign} does not apply to a ${params.kind} motor`);
     const motorId = idOrNext(params.id, 'motor');
     if (dynamicsIdTaken(dynamics, motorId)) return fail(`id '${motorId}' is already used`);
     let motor: Motor;
     let verdict = '';
-    if (params.kind === 'dc') {
-      if (params.datasheet === undefined || params.source === undefined) return fail('dc motor needs `datasheet` and `source`');
-      const datasheet = toDatasheet(params.datasheet);
-      const checks = checkMotorData(datasheet);
-      if (!checks.consistent && params.acceptInconsistent === undefined) return inconsistentSheet(doc, 'add_motor', checks);
-      motor = {
-        id: motorId,
-        kind: 'dc',
-        joint: params.joint,
-        datasheet,
-        ...(params.gearhead === undefined ? {} : { gearhead: toGearhead(params.gearhead) }),
-        source: toSource(params.source),
-        ...(params.acceptInconsistent === undefined ? {} : { acceptInconsistent: params.acceptInconsistent }),
-      };
-      verdict = checks.consistent
-        ? `datasheet consistent (${checks.checks.length - checks.notGiven.length} checks, largest gap ${(checks.maxGap * 100).toFixed(2)} %)`
-        : `datasheet INCONSISTENT (accepted: ${params.acceptInconsistent}), results unverified`;
+    if (params.kind === 'dc' || params.kind === 'pmsm' || params.kind === 'stepper' || params.kind === 'induction') {
+      const built = buildDatasheetMotor(doc, { ...params, kind: params.kind }, motorId, params.joint);
+      if (!('motor' in built)) return built;
+      motor = built.motor;
+      verdict = built.verdict;
     } else if (params.kind === 'torque_curve') {
       const curve: TorquePoint[] = params.curve ?? (params.torque !== undefined ? [[0, params.torque]] : []);
       if (curve.length === 0) return fail('torque_curve needs `curve` or `torque`');
@@ -136,8 +132,8 @@ export const addMotor = defineCommand({
         ? `holds ${motor.speedMps} m/s (≤ ${motor.maxForceN} N${motor.source === undefined ? ', bound unsourced' : `, source ${motor.source.name} grade ${motor.source.grade}`})`
         : motor.kind === 'speed'
           ? `holds ${motor.rpm} rpm (≤ ${motor.maxTorque} N·m${motor.source === undefined ? ', bound unsourced' : `, source ${motor.source.name} grade ${motor.source.grade}`})`
-          : motor.kind === 'dc'
-            ? `DC motor ${motor.source.name}: ${verdict}; ${dcDescription(motor)}; commanded by set_motor_drive`
+          : motor.kind === 'dc' || motor.kind === 'pmsm' || motor.kind === 'stepper' || motor.kind === 'induction'
+            ? `${motor.kind === 'dc' ? 'DC' : motor.kind} motor ${motor.source.name}: ${verdict}; ${datasheetDescription(motor)}; commanded by set_motor_drive`
             : `torque curve of ${motor.curve.length} point(s), peak ${Math.max(...motor.curve.map(([, t]) => t))} N·m, throttle ${motor.throttle}`;
     return changed(
       withDynamics(doc, { ...dynamics, motors: { ...dynamics.motors, [motorId]: motor } }),

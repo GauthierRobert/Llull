@@ -41,6 +41,13 @@ no-load friction as a friction level. `simulate_motion detail "drives"` returns 
 energy ledger (electrical input, copper, magnetic, gearhead loss, friction, kinetic, closure). A speed motor with no sourced torque bound is flagged
 `DRV_EFFORT_UNBOUNDED` by `check_dynamics`.
 
+Three more kinds go through the same pipeline (add_motor, check_motor_data, set_motor_drive, ledger, size_drive, thermal, check_motion_truth, plots; spec section 13.25):
+`pmsm` (amplitude-invariant dq model with ideal field-oriented control: T = 1.5 p lambda i_q, constant torque to the base speed then field weakening inside V_bus/sqrt(3) and the
+current limit; modes torque, velocity, position, prescribed), `stepper` (hybrid: T = T_h(w) sin(N_r (theta_cmd - theta)) - detent - damping, pull-out from the datasheet curve or L/R;
+open-loop modes position and velocity with full / half / micro steps; lost steps are counted in whole electrical periods and reported as `DRV_STEPS_LOST` with their time, never
+silently passed) and `induction` (per-phase steady-state equivalent circuit, torque at the instantaneous slip, breakdown torque from the circuit; modes voltage = direct on line
+with `frequencyHz`, frequency = V/f profile; rotor, stator and iron losses in the ledger). A mode a kind does not take is refused by name (`DRV_MODE_UNSUPPORTED`).
+
 ### Transmissions, joint physics and loads (PHY-23 DRV-M2, [spec](physics/23-drives-physical-truth/TECHNICAL_SPEC.md) section 13.14)
 
 `add_transmission` replaces the old gear coupling (no compatibility kept): `gear` (ratio or tooth counts, η_f / η_b, `backlashDeg` with a mesh stiffness), `belt` (pulley diameters),

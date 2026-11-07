@@ -9,6 +9,7 @@ import { MAX_TOTAL_POINTS, SERIES_QUANTITIES, type ReferenceSeries } from '@core
 import { elementAt } from '@lib/elementAt';
 import { idOrNext, idTaken } from '@lib/explicitId';
 import { type ReviewItem, reviewItem, reviewResult, reviewSummary } from '@core/model/reviewEnvelope';
+import { isDatasheetMotor } from '../../sim/actuators/machine';
 import { compareSeries, type SeriesComparison } from '../../sim/seriesComparison';
 import { refusalText, type RunData } from '../../sim/runData';
 import { dynamicsOf, withDynamics } from '../bodies';
@@ -51,8 +52,9 @@ function seriesProblem(doc: CadDocument, series: z.infer<typeof seriesSchema>): 
   if (series.quantity === 'ledger_energy' && series.times.length !== 1)
     return 'a ledger_energy series has exactly one point (the end of the run)';
   if (series.quantity.startsWith('joint_') && dynamics.joints[series.target] === undefined) return `no joint '${series.target}'`;
-  if (series.quantity.startsWith('motor_') && dynamics.motors[series.target]?.kind !== 'dc')
-    return `no datasheet (dc) motor '${series.target}': drive series exist only for add_motor kind "dc"`;
+  const motor = dynamics.motors[series.target];
+  if (series.quantity.startsWith('motor_') && (motor === undefined || !isDatasheetMotor(motor)))
+    return `no datasheet motor '${series.target}': drive series exist only for add_motor kinds "dc", "pmsm", "stepper" and "induction"`;
   return null;
 }
 

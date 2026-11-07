@@ -262,7 +262,7 @@ describe('dynamics commands — validation and bookkeeping', () => {
     ).toMatch(/prismatic/);
     // motors speak rpm / N·m: a slide cannot take one
     expect(execute(prismatic.doc, 'add_motor', { joint: prismatic.id, kind: 'torque_curve', torque: 5 }).summary).toMatch(
-      /prismatic; torque_curve and dc motors .* revolute joints/,
+      /prismatic; torque_curve and datasheet motors .* revolute joints/,
     );
     // a speed motor on a slide speaks m/s and N
     expect(execute(prismatic.doc, 'add_motor', { joint: prismatic.id, kind: 'speed', rpm: 100, maxTorque: 5 }).summary).toMatch(/speedMps/);

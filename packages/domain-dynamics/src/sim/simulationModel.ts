@@ -24,7 +24,7 @@ import { buildJointPhysics, effectiveFriction, latchBlockers, type JointPhysicsR
 import { withLoadSchedules } from './loadSchedules';
 import { reflectedInertia } from './reflectedInertia';
 import { compileCouplings, rigidLinks, type CouplingRefusal } from './transmissions';
-import { dcParameters } from './actuators/dcMotor';
+import { drivetrainOfMotor, isDatasheetMotor } from './actuators/machine';
 import { prepareCylinders, withCylinderForces, type CylinderRuntime } from './cylinderLoads';
 import { withInstalledLosses } from './engineLossHook';
 import { consistentSpeeds } from './mobility';
@@ -99,8 +99,8 @@ const armatureOf = (joint: SimulationJoint): number => (joint.armature === undef
 function motorJointExtras(dynamics: DynamicsModel): Record<string, { armature: number; friction: number }> {
   const extras: Record<string, { armature: number; friction: number }> = {};
   for (const motor of Object.values(dynamics.motors)) {
-    if (motor.kind !== 'dc') continue;
-    const p = dcParameters(motor);
+    if (!isDatasheetMotor(motor)) continue;
+    const p = drivetrainOfMotor(motor);
     const held = extras[motor.joint] ?? NO_EXTRA;
     extras[motor.joint] = { armature: held.armature + p.armatureKgM2, friction: held.friction + p.frictionNm };
   }

@@ -5,7 +5,7 @@
  */
 
 import { idTaken } from '../lib/explicitId';
-import type { DcMotor, MotionProfile, MotorDrive, ParameterSource, ReferenceSeries } from './drives';
+import type { DatasheetMotor, MotionProfile, MotorDrive, ParameterSource, ReferenceSeries } from './drives';
 import type { JointPhysics, LoadSchedule, Transmission } from './transmissions';
 import type { Vec3 } from './vectors';
 
@@ -88,13 +88,13 @@ export type TorquePoint = readonly [rpm: number, torque: number];
 /**
  * Drive on a joint. 'torque_curve': an engine — torque(rpm) × throttle, linear between points, held at the end values outside them.
  * 'speed': a governed drive holding `rpm` with at most `maxTorque` (N·m); `source` says where that bound comes from (absent: the bound is a
- * guess, DRV_EFFORT_UNBOUNDED). 'linear_speed': the same governor on a prismatic joint (m/s, N). 'dc': a datasheet DC motor with an optional gearhead, commanded by a `MotorDrive` (`DynamicsModel.drives`).
+ * guess, DRV_EFFORT_UNBOUNDED). 'linear_speed': the same governor on a prismatic joint (m/s, N). 'dc' | 'pmsm' | 'stepper' | 'induction': a datasheet motor with an optional gearhead, commanded by a `MotorDrive` (`DynamicsModel.drives`).
  */
 export type Motor =
   | { readonly id: string; readonly kind: 'torque_curve'; joint: string; curve: TorquePoint[]; throttle: number }
   | { readonly id: string; readonly kind: 'speed'; joint: string; rpm: number; maxTorque: number; source?: ParameterSource }
   | { readonly id: string; readonly kind: 'linear_speed'; joint: string; speedMps: number; maxForceN: number; source?: ParameterSource }
-  | DcMotor;
+  | DatasheetMotor;
 
 /**
  * Propeller on a revolute joint, static-thrust model from the propeller's measured coefficients (n = rev/s, D = diameter):

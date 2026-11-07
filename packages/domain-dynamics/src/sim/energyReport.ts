@@ -4,7 +4,7 @@
  */
 
 import type { DynamicsModel } from '@core/model/dynamics';
-import { motorFrictionOn } from './actuators/dcMotor';
+import { motorFrictionOn } from './actuators/machine';
 import { effectiveFriction } from './jointPhysics';
 import { heatSeries } from './transmissionReport';
 import { propellerOutput } from './forceLaws';

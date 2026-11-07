@@ -9,7 +9,7 @@ export interface DriveSeries {
   readonly times: number[];
   readonly voltageV: number[];
   readonly currentA: number[];
-  /** N·m at the motor shaft (kt · mean current). */
+  /** N·m at the motor shaft (kt · mean current for dc; the machine torque otherwise). */
   readonly shaftTorqueNm: number[];
   /** N·m on the driven joint. */
   readonly jointTorqueNm: number[];
@@ -25,9 +25,9 @@ const slot = (trace: SimulationTrace, run: DriveRuntime, offset: number): number
 /** The recorded series of one driven motor. Slot values at a sample are the outputs of the step that ended there (zero at t = 0). */
 export function driveSeries(run: DriveRuntime, trace: SimulationTrace): DriveSeries {
   const speed = (trace.jointVelocity[run.motor.joint] ?? []).map((v) => v * run.params.gearRatio);
-  const [voltage, mean, shaft, joint, limited, current] = [
+  const [voltage, power, shaft, joint, limited, current] = [
     AUX.voltage,
-    AUX.meanCurrent,
+    AUX.power,
     AUX.shaftTorque,
     AUX.jointTorque,
     AUX.limited,
@@ -41,7 +41,7 @@ export function driveSeries(run: DriveRuntime, trace: SimulationTrace): DriveSer
     shaftTorqueNm: shaft ?? [],
     jointTorqueNm: joint ?? [],
     shaftSpeedRpm: speed.map((w) => w / RAD_PER_S_PER_RPM),
-    electricalPowerW: trace.times.map((_, i) => at(voltage, i) * at(mean, i)),
+    electricalPowerW: trace.times.map((_, i) => at(power, i)),
     mechanicalPowerW: trace.times.map((_, i) => at(shaft, i) * (speed[i] ?? 0)),
     limited: limited ?? [],
   };

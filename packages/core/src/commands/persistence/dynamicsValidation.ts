@@ -4,6 +4,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
+import { inductionMotorProblem, pmsmMotorProblem, stepperMotorProblem } from './machinesValidation';
 import { dcMotorProblem, driveProblem, driveReferenceProblems, profileProblem } from './drivesValidation';
 import { lossesProblem, propellerExtrasProblem } from './engineValidation';
 import { referenceSeriesBudgetProblems, referenceSeriesProblem, referenceSeriesReferenceProblems } from './referenceSeriesValidation';
@@ -58,7 +59,10 @@ const motorProblem: Check = (motor) => {
   if (motor['kind'] === 'linear_speed')
     return isFiniteNumber(motor['speedMps']) && isPositive(motor['maxForceN']) ? null : 'linear_speed needs speedMps and maxForceN > 0';
   if (motor['kind'] === 'dc') return dcMotorProblem(motor);
-  return "kind must be 'torque_curve', 'speed', 'linear_speed' or 'dc'";
+  if (motor['kind'] === 'pmsm') return pmsmMotorProblem(motor);
+  if (motor['kind'] === 'stepper') return stepperMotorProblem(motor);
+  if (motor['kind'] === 'induction') return inductionMotorProblem(motor);
+  return "kind must be 'torque_curve', 'speed', 'linear_speed', 'dc', 'pmsm', 'stepper' or 'induction'";
 };
 
 const propellerProblem: Check = (propeller) =>
