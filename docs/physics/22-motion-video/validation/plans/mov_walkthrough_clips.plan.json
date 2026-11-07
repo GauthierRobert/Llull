@@ -1,0 +1,32 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [100, 20, 10], "position": [50, 0, 0], "anchor": "center" }, "as": "arm" },
+  { "command": "animate", "params": { "targetId": "$arm", "mode": "spin", "speed": 3.14159265359, "axis": [0, 0, 1], "pivot": [0, 0, 0] } },
+  {
+    "command": "save_viewpoint",
+    "params": { "name": "south", "camera": { "projection": "perspective", "eye": [0, -300, 120], "direction": [0, 1, -0.4], "up": [0, 0, 1], "fovDeg": 50 } },
+    "as": "south"
+  },
+  {
+    "command": "save_viewpoint",
+    "params": { "name": "above", "camera": { "projection": "perspective", "eye": [0, -40, 320], "direction": [0, 0.1, -1], "up": [0, 1, 0], "fovDeg": 50 } },
+    "as": "above"
+  },
+  {
+    "command": "create_walkthrough",
+    "params": { "name": "dive", "keys": [{ "viewpointId": "$south", "seconds": 2 }, { "viewpointId": "$above", "seconds": 1 }] },
+    "as": "dive"
+  },
+  {
+    "command": "render_animation",
+    "params": {
+      "source": { "kind": "clips", "duration": 2 },
+      "fps": 10,
+      "width": 240,
+      "height": 135,
+      "camera": { "walkthroughId": "wt-3" },
+      "overlays": { "trace": ["box-2.1"], "time": true, "highlight": "moving" },
+      "format": "apng"
+    }
+  }
+]

@@ -3,13 +3,13 @@
 import type { ViewpointCamera } from '../../../model/review';
 import { boundsCenter, type Bounds } from '../../../geometry/bounds';
 import { encodePng } from '../../../lib/png';
-import { makeProjector } from '../camera';
 import { renderCameraRgba } from '../frames';
 import { rasterScenePixels } from '../raster';
 import { viewpointView } from '../viewSetup';
+import { viewProjection } from './viewProjector';
 import type { PixelStage, SurfaceShading } from '../types';
 import { appendOverlay } from './rasterOverlay';
-import { frameOverlayOf } from './overlays';
+import { frameOverlayOf, type FrameOverlay } from './overlays';
 import { cellSize, downscale, type SheetCell } from './sheet';
 import type { ParsedFont } from '../../../lib/font/font';
 import type { MotionFrames } from './types';
@@ -19,7 +19,10 @@ export interface FrameLoopInput {
   readonly frames: number;
   readonly width: number;
   readonly height: number;
-  readonly camera: ViewpointCamera;
+  /** The camera of a frame. */
+  readonly cameraAt: (frame: number) => ViewpointCamera;
+  /** False: one camera for all frames, so the overlay layout is built once. */
+  readonly cameraMoves: boolean;
   readonly bounds: Bounds;
   readonly background: readonly [number, number, number];
   readonly pixels?: PixelStage | undefined;
@@ -36,24 +39,28 @@ export interface FrameLoopOutput {
   readonly cells: SheetCell[];
 }
 
-/** Draws every frame. @invariant the camera, the colours and the overlay layout are the same in every frame */
+/** Draws every frame. @invariant with a fixed camera the colours and the overlay layout are the same in every frame; the overlay is projected through the camera of its own frame */
 export function renderAllFrames(input: FrameLoopInput): FrameLoopOutput {
-  const { width, height, camera, motion } = input;
-  const view = viewpointView(camera, width, height, boundsCenter(input.bounds));
-  const overlay = frameOverlayOf({
-    width,
-    height,
-    project: makeProjector(view.camera, view.orthoHalf, width, height),
-    font: input.font,
-    traces: motion.traces,
-    time: input.time,
-  });
+  const { width, height, motion } = input;
+  const centre = boundsCenter(input.bounds);
+  const overlayOf = (camera: ViewpointCamera): FrameOverlay =>
+    frameOverlayOf({
+      width,
+      height,
+      ...viewProjection(viewpointView(camera, width, height, centre), width, height),
+      font: input.font,
+      traces: motion.traces,
+      time: input.time,
+    });
+  let overlay = overlayOf(input.cameraAt(0));
   const cell = cellSize(width, height);
   const pngs: Uint8Array[] = [];
   const cells: SheetCell[] = [];
   for (let k = 0; k < input.frames; k += 1) {
     const entry = motion.timeline[k];
     if (entry === undefined) break;
+    const camera = input.cameraAt(k);
+    if (input.cameraMoves && k > 0) overlay = overlayOf(camera);
     const primitives = overlay(k, entry);
     const rgba = renderCameraRgba(
       motion.documentAt(k),
@@ -61,7 +68,7 @@ export function renderAllFrames(input: FrameLoopInput): FrameLoopOutput {
       width,
       height,
       input.background,
-      boundsCenter(input.bounds),
+      centre,
       input.pixels ?? rasterScenePixels,
       {
         augment: (scene) => appendOverlay(scene, primitives),

@@ -2,7 +2,7 @@
 
 import type { Vec3 } from '../../../model/vectors';
 import type { ViewpointCamera } from '../../../model/review';
-import { boundsCenter, boundsCorners, boundsRadius, type Bounds } from '../../../geometry/bounds';
+import { boundsCenter, boundsCorners, boundsDiagonalRadius, boundsRadius, type Bounds } from '../../../geometry/bounds';
 import { add3, dot3, normalize3, scale3, sub3 } from '../../../lib/vec3';
 import { cameraBasis, cameraForView, type ViewName } from '../camera';
 
@@ -36,6 +36,32 @@ export function framedCamera(view: ViewName, direction: Vec3 | undefined, bounds
     projection: 'orthographic',
     eye: sub3(target, scale3(forward, radius * 2.5)),
     direction: forward,
+    up: basis.up,
+    viewHeight: height / pixelsPerUnit,
+  };
+}
+
+/**
+ * Orthographic camera for an orbit: looks at the centre of `bounds` along a named view (or `direction`) and is scaled so the sphere around `bounds` fits `FILL`
+ * of the tighter image axis, so the scene stays inside the picture whatever the turn angle.
+ * @invariant every corner of `bounds` projects inside the image for every rotation of the camera about an axis through the centre of `bounds`
+ */
+export function orbitFramedCamera(
+  view: ViewName,
+  direction: Vec3 | undefined,
+  bounds: Bounds,
+  width: number,
+  height: number,
+): ViewpointCamera {
+  const centre = boundsCenter(bounds);
+  const sphere = Math.max(boundsDiagonalRadius(bounds), 1e-9);
+  const framed = cameraForView(view, centre, boundsRadius(bounds), direction);
+  const basis = cameraBasis(framed);
+  const pixelsPerUnit = (FILL * Math.min(width, height)) / (2 * sphere);
+  return {
+    projection: 'orthographic',
+    eye: sub3(centre, scale3(basis.fwd, sphere * 2.5)),
+    direction: basis.fwd,
     up: basis.up,
     viewHeight: height / pixelsPerUnit,
   };

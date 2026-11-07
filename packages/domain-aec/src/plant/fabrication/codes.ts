@@ -66,7 +66,11 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   ISO_STOCK_TOO_SHORT: 'Add a longer stock length (stockLengthsMm), or add a weld so that no cut piece is longer than the longest bar.',
   ISO_GA_OVERFLOW: 'Use a smaller scale (a larger number) or a larger paper, or draw fewer lines (lineIds).',
   ISO_ROUTE_UNSUPPORTED:
-    'Import the line as pcf_line (as omitted), or edit the PCF: route mode rebuilds a line from its centreline with the spec, so it takes pipes, elbows, bends, tees, olets, reducers, valves, end flanges, field welds and supports only.',
+    'Import the line as pcf_line (as omitted), or edit the PCF: route mode rebuilds a line from its centreline with the spec, so it takes pipes, elbows, bends, tees, olets, concentric and eccentric reducers, valves, instruments, end flanges and flanged valve / instrument sets, mid-line flanged joints, caps and blind flanges at the end of a run, field welds and supports only (a flanged instrument needs its two flanges, a socket-weld or threaded instrument is not rebuilt).',
+  ISO_ROUTE_FLAT_MISSING:
+    'Pass eccentricFlat ("top" or "bottom"): the file has an eccentric reducer whose two end points lie on one axis, so it does not say which side is flat.',
+  ISO_ROUTE_GASKET_ADDED:
+    'Informational: the file draws these flanged joints without a gasket; the spec adds its own (thickness and bolt set), so the routed line is longer by the gasket thickness per joint. Add the GASKET records to the file to compare like with like.',
   ISO_ROUTE_NO_LEVEL:
     'Add a building level (add_level) so the supports can be placed, or import with supports false (they are then not created).',
   ISO_ROUTE_TOO_LARGE: 'Split the PCF: route mode rebuilds at most 400 components per line (every component is derived from the spec).',

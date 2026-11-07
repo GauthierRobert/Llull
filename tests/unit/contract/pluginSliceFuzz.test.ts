@@ -14,8 +14,8 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { derivedEntityIds, documentExtensions, onPluginInstalled } from '@core/plugins/host';
-import { hasRoot, NON_JSON_KINDS, sampleMutations, type SliceMutation } from '../../helpers/sliceMutations';
-import { SLICE_SEEDS, type PluginSliceSeed } from '../../helpers/pluginSliceSeeds';
+import { driveMutations, hasRoot, NON_JSON_KINDS, sampleMutations, type SliceMutation } from '../../helpers/sliceMutations';
+import { DYNAMICS_SEED, SLICE_SEEDS, type PluginSliceSeed } from '../../helpers/pluginSliceSeeds';
 
 const CASES_PER_PLUGIN = Number(process.env['FUZZ_CASES'] ?? 36);
 const CASE_BUDGET_MS = 3_000;
@@ -134,4 +134,15 @@ describe('plugin document slices under hostile files', () => {
       });
     },
   );
+});
+
+describe('core dynamics slice (datasheet motors, profiles, drives) under hostile files', () => {
+  it('keeps load_document total over targeted and sampled mutations', { timeout: 120_000 }, () => {
+    const document = DYNAMICS_SEED.build();
+    const raw = (JSON.parse(serializeDocument(document)) as { document: Record<string, unknown> }).document;
+    expect(execute(createEmptyDocument(), 'load_document', { json: serializeDocument(document) }).summary).toMatch(/^Loaded document/);
+    const mutations = [...driveMutations(raw), ...sampleMutations(raw, DYNAMICS_SEED.roots, 'dynamics', CASES_PER_PLUGIN)];
+    expect(mutations.length).toBeGreaterThan(20);
+    expect(mutations.flatMap((mutation) => runMutation('dynamics', DYNAMICS_SEED, raw, mutation))).toEqual([]);
+  });
 });

@@ -17,6 +17,7 @@ import {
   timestepFloorItem,
   timestepItem,
   tipMachItems,
+  usedEffortItems,
 } from './dynamicsSimChecks';
 
 const NAME = 'check_dynamics';
@@ -143,6 +144,7 @@ export function dynamicsCheck(
           ? timestepFloorItem(run.timestep, MIN_TIMESTEP)
           : timestepItem(run, fine, second !== null && fine === null ? reasonOf(second.summary) : null),
         ...tipMachItems(run),
+        ...usedEffortItems(Object.values(dynamics.motors), run),
       );
     }
   }

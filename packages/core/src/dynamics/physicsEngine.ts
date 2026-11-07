@@ -23,6 +23,8 @@ export interface SimulationJoint {
   /** Joint coordinate (rad or m, from the start pose) where the spring is relaxed. */
   readonly springReference?: number;
   readonly initialVelocity: number;
+  /** kg·m² (or kg) of extra inertia on the joint coordinate that belongs to no body (a motor rotor seen through its gearhead); absent = none. */
+  readonly armature?: number;
 }
 
 /**
@@ -97,6 +99,38 @@ export interface SimulationState {
   readonly jointVelocity: Readonly<Record<string, number>>;
 }
 
+/** A force at a body's centre of mass produced by an actuator, world axes, N. */
+interface BodyForce {
+  readonly body: string;
+  readonly force: Vec3;
+}
+
+export type LedgerKind = 'electrical_input' | 'copper' | 'magnetic' | 'transmission_loss' | 'regeneration';
+
+/**
+ * Actuators with internal state (PHY-23 TR-DRV-01): electrical current, controller integrators, held commands. The engine calls `advance` exactly
+ * once per physics step with the same midpoint state it gives `loads`, applies the returned forces for the whole step, and stores the new `aux`.
+ * @invariant `advance` is deterministic and pure (no closure state); `aux` is the whole state, `aux0` its value at t = 0
+ * @invariant jointForces[k] acts on joint `joints[k]`; ledger[k] is the energy (J) of `ledgerLayout[k]` over this step
+ */
+export interface ActuatorBlock {
+  readonly size: number;
+  readonly aux0: Float64Array;
+  /** Joint ids the returned `jointForces` are indexed by. */
+  readonly joints: readonly string[];
+  advance(
+    state: SimulationState,
+    aux: Float64Array,
+    dt: number,
+  ): {
+    readonly aux: Float64Array;
+    readonly jointForces: Float64Array;
+    readonly bodyForces: readonly BodyForce[];
+    readonly ledger: Float64Array;
+  };
+  readonly ledgerLayout: readonly { readonly element: string; readonly kind: LedgerKind }[];
+}
+
 export interface AppliedLoads {
   /** Generalised force along each joint: N·m (revolute) or N (prismatic). */
   readonly jointForces: Readonly<Record<string, number>>;
@@ -159,6 +193,8 @@ export interface SimulationModel {
   readonly servos: readonly SimulationServo[];
   /** Point springs; absent = none. */
   readonly springs?: readonly SimulationSpring[];
+  /** Actuators with state (datasheet motors and their controllers); absent = none. */
+  readonly actuators?: ActuatorBlock;
   /** Force laws, evaluated by the engine at every step (at the step midpoint) from the state. Must be pure. */
   readonly loads: (state: SimulationState) => AppliedLoads;
 }
@@ -214,6 +250,12 @@ export interface SimulationTrace {
   readonly energy?: { readonly kinetic: number[]; readonly potential: number[]; readonly appliedWork?: number[] };
   /** Per point spring (needs `options.energy`): length m, rate of change m/s and force N (positive = pulling together), per sample. */
   readonly springs?: Record<string, { length: number[]; velocity: number[]; force: number[] }>;
+  /** Per aux slot of `model.actuators`, the value at every sample (the last step's outputs for the slots that hold them). */
+  readonly aux?: number[][];
+  /** Cumulative energy J of every `ledgerLayout` entry at every sample (zero at the first). */
+  readonly ledger?: number[][];
+  /** Cumulative work J of the actuator joint forces on the joints (needs `options.energy`), part of `energy.appliedWork`. */
+  readonly actuatorWork?: number[];
   /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
   readonly loopResidual?: number;
 }

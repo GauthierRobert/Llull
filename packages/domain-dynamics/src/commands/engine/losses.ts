@@ -7,7 +7,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
 import { changed, codedRejection, failer } from '@core/commands/noop';
-import { dynamicsIdTaken, dynamicsOf, withDynamics } from '../bodies';
+import { dynamicsIdTaken } from '@core/model/dynamics';
+import { dynamicsOf, withDynamics } from '../bodies';
 
 /** Absolute peak pressure of a motored cylinder at rest (1 bar): the Chen-Flynn constants must give FMEP >= 0 there. */
 const MOTORED_PEAK_PA = 1e5;

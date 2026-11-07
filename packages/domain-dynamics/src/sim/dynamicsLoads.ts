@@ -9,6 +9,7 @@ import { toMetres } from '@core/model/units';
 import { normalize3 } from '@lib/vec3';
 import { formatSi } from '@lib/siText';
 import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
+import { dcParameters, peakJointTorque } from './actuators/dcMotor';
 import { RAD_PER_S_PER_RPM, propellerOutput } from './forceLaws';
 import type { SimulationData } from './simulationReport';
 import { pointAtPose } from '@core/geometry/bodyPose';
@@ -184,6 +185,14 @@ function motorDesign(motor: Motor): { value: string; detail: string; magnitude: 
       detail: `speed governor: holds ${formatQuantity(motor.rpm)} rpm with at most ${formatQuantity(motor.maxTorque)} N·m`,
       magnitude: motor.maxTorque,
     };
+  if (motor.kind === 'dc') {
+    const p = dcParameters(motor);
+    return {
+      value: `≤ ${formatSi(peakJointTorque(motor), 'N·m')}`,
+      detail: `datasheet DC motor ${motor.source.name}: ${formatQuantity(motor.datasheet.nominalVoltageV)} V, kt ${formatQuantity(p.torqueConstant)} N·m/A, R ${formatQuantity(p.resistanceOhm)} Ω, gearhead ${formatQuantity(p.gearRatio)}:1`,
+      magnitude: peakJointTorque(motor),
+    };
+  }
   const peak = motor.curve.reduce((best, point) => (point[1] > best[1] ? point : best), motor.curve[0] ?? [0, 0]);
   const rpms = motor.curve.map((point) => point[0]);
   return {

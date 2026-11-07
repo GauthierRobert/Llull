@@ -51,6 +51,17 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
    (`export_flat_pattern_dxf --save part.dxf`), IFC and `.glb` (binary chosen from the extension) all work.
    `run --validate` warns when a plan uses fillet/chamfer/shell and the active kernel is Manifold (the native `llull-kernel` was not found:
    build it in `solver/` or set `LLULL_NATIVE_DIR`; `llull kernel_info` shows the active kernel and why).
+   **Motion video** (`render_animation`: a simulation, a joint / parameter sweep, the `animate` clips, or a camera-only `still`
+   film): never encode blind, review first. The loop is **sheet → fix → encode**:
+   1. `llull render_animation 'source={"kind":"sweep","mode":"joint","target":"jt-3","start":0,"end":6.2832,"duration":4}' format=frames 'sheet={"every":12}' 'overlays={"time":true,"trace":["box-2"],"highlight":"moving"}' --save review/ --app`
+      writes `frame-0001.png …`, `timeline.json` and `sheet.png` (every 12th frame, labelled `#k t = … s`). Use a small size (`width=640 height=360`) while reviewing.
+   2. Read `review/sheet.png`: is the part framed, does the motion look right, are overlays legible, does the camera path go where intended
+      (`data.timeline[k].camera` has the camera of every frame of a walkthrough or orbit)?
+   3. Fix with commands, then re-render the sheet: wrong framing → `camera` (`view`, `direction`, `viewpointId` from `save_viewpoint`,
+      `walkthroughId` from `create_walkthrough`, `orbit` `{"turns":1}`); too fast or slow → `playbackRate` (simulation) or `duration`;
+      MOV\_\* warnings in `data.warnings` (read the summary) name what to change. A turntable of a static part: `source={"kind":"still","duration":6}` + `camera={"orbit":{"turns":1}}`.
+   4. Encode the keeper at full size: `… format=mp4 quality=standard --save out/robot.mp4` (also `.gif`, `.apng`; `--save out/` keeps every file).
+      Without the native encoder the default `mp4` is refused (NATIVE_TOOL_MISSING): use `format=apng`.
 6. **Exchange (Python/CadQuery bundled in the desktop app)**: `llull import_step file=supplier.step --app`,
    `llull export_step --save out/part.step --app` (exact B-rep), `llull import_dwg file=site.dwg
 target=drawing` (needs a DWG converter). `llull list exchange` shows them all.

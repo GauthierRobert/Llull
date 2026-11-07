@@ -741,8 +741,8 @@
     },
     {
       "id": "VC-DRV-20",
-      "quantity": "restitution of a spring-damper end stop, zeta 0.2",
-      "value": 0.52662059933,
+      "quantity": "restitution of a one-sided spring-damper end stop, zeta 0.2",
+      "value": 0.571740027585,
       "unit": "1",
       "tolerance": {
         "rel": 0.03
@@ -759,6 +759,21 @@
       "quantity": "peak penetration, 1 rad/s into 1000 N m/rad, J 0.01",
       "value": 0.00239110858721,
       "unit": "rad",
+      "tolerance": {
+        "rel": 0.05
+      },
+      "source": "generate_drv_reference.py",
+      "grade": "A",
+      "proves": [
+        "FR-DRV-09",
+        "TR-DRV-17"
+      ]
+    },
+    {
+      "id": "VC-DRV-20",
+      "quantity": "contact time of the one-sided stop (release at zero force plus the travel to zero penetration)",
+      "value": 0.0101045979643,
+      "unit": "s",
       "tolerance": {
         "rel": 0.05
       },

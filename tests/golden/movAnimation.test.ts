@@ -40,3 +40,23 @@ describe('render_animation golden digests', () => {
     expect(pin(data)).toMatchSnapshot();
   });
 });
+
+describe('render_animation camera-path golden digests (MOV-M3)', () => {
+  it('mov_orbit_still: 13 frames of a turntable round a static plate; frame 12 is frame 0 turned once', () => {
+    const { document, render } = planDocument('mov_orbit_still.plan.json');
+    const data = execute(document, 'render_animation', render.params).data as AnimationData;
+    expect(data.frames).toBe(13);
+    expect(data.cameraMode).toBe('orbit');
+    expect(pin(data)).toMatchSnapshot();
+  });
+
+  it('mov_walkthrough_clips: a spinning arm seen through a walkthrough, with trace, time and highlight', () => {
+    const { document, render } = planDocument('mov_walkthrough_clips.plan.json');
+    const result = execute(document, 'render_animation', render.params);
+    expect(result.error).toBeUndefined();
+    const data = result.data as AnimationData;
+    expect(data.frames).toBe(21);
+    expect(data.cameraMode).toBe('walkthrough');
+    expect(pin(data)).toMatchSnapshot();
+  });
+});

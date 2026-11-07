@@ -4,6 +4,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isStringArray } from '../../lib/isStringArray';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isReservedKey } from '../../lib/reservedKey';
+import { dcMotorProblem, driveProblem, driveReferenceProblems, profileProblem } from './drivesValidation';
 import { gearExtrasProblem, lossesProblem, propellerExtrasProblem } from './engineValidation';
 
 const isVec3 = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
@@ -59,7 +60,8 @@ const motorProblem: Check = (motor) => {
     return isCurve(motor['curve']) && isFiniteNumber(motor['throttle']) ? null : 'torque_curve needs curve [[rpm, N·m], …] and throttle';
   if (motor['kind'] === 'speed')
     return isFiniteNumber(motor['rpm']) && isPositive(motor['maxTorque']) ? null : 'speed needs rpm and maxTorque > 0';
-  return "kind must be 'torque_curve' or 'speed'";
+  if (motor['kind'] === 'dc') return dcMotorProblem(motor);
+  return "kind must be 'torque_curve', 'speed' or 'dc'";
 };
 
 const propellerProblem: Check = (propeller) =>
@@ -184,6 +186,8 @@ export function dynamicsProblems(value: unknown): string[] {
     ...(value['cylinders'] === undefined ? [] : [['cylinders', cylinderProblem] as const]),
     ...(value['losses'] === undefined ? [] : [['losses', lossesProblem] as const]),
     ...(value['springs'] === undefined ? [] : [['springs', springProblem] as const]),
+    ...(value['profiles'] === undefined ? [] : [['profiles', profileProblem] as const]),
+    ...(value['drives'] === undefined ? [] : [['drives', driveProblem] as const]),
   ];
   for (const [table, check] of tables) {
     const records = value[table];
@@ -200,5 +204,6 @@ export function dynamicsProblems(value: unknown): string[] {
       }
     }
   }
+  errors.push(...driveReferenceProblems(value));
   return errors;
 }

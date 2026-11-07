@@ -10,6 +10,7 @@ import { toMetres } from '@core/model/units';
 import { type ReviewItem, reviewItem } from '@core/model/reviewEnvelope';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
+import { unboundedEffort } from '../sim/driveReport';
 
 /** No real static propeller exceeds a figure of merit of ~0.75 (NACA TR-684); above 0.8 the Ct / Cp pair is not physical (named default). */
 const MAX_FIGURE_OF_MERIT: CheckThreshold = {
@@ -99,6 +100,24 @@ function lossItems(doc: CadDocument): ReviewItem[] {
   ];
 }
 
+/** DRV_EFFORT_UNBOUNDED (TR-DRV-24): a speed motor whose torque bound comes from no motor model and no source. Only raised, never a pass item. */
+function effortItems(doc: CadDocument): ReviewItem[] {
+  return Object.values(dynamicsOf(doc).motors).flatMap((motor): ReviewItem[] => {
+    const why = unboundedEffort(motor, null);
+    return why === null
+      ? []
+      : [
+          item(
+            'DRV_EFFORT_UNBOUNDED',
+            'warn',
+            [motor.id],
+            'Use a motor model (add_motor kind "dc") or give the sourced torque limit (add_motor source): an unsourced bound can supply any torque the motion needs.',
+            { unverified: true, note: why },
+          ),
+        ];
+  });
+}
+
 function propellerItems(doc: CadDocument): ReviewItem[] {
   return Object.values(dynamicsOf(doc).propellers).map((propeller): ReviewItem => {
     const merit =
@@ -183,5 +202,8 @@ function loopItems(doc: CadDocument): { items: ReviewItem[]; simulatable: Simula
 /** Static items of the document's dynamics model, and whether the simulation can start. */
 export function staticChecks(doc: CadDocument, kernel: GeometryKernel | null): StaticOutcome {
   const loops = loopItems(doc);
-  return { items: [...massItems(doc, kernel), ...propellerItems(doc), ...lossItems(doc), ...loops.items], simulatable: loops.simulatable };
+  return {
+    items: [...massItems(doc, kernel), ...propellerItems(doc), ...effortItems(doc), ...lossItems(doc), ...loops.items],
+    simulatable: loops.simulatable,
+  };
 }

@@ -14,6 +14,7 @@ import {
   axisOf,
   entityOf,
   FITTING_LAYER_ID,
+  FLANGE_LAYER_ID,
   partEntity,
   RADIAL_SEGMENTS,
   rotationToward,
@@ -142,6 +143,20 @@ function capEntities(part: RoutedPart, line: PipeLine): Entity[] {
   return [cylinder(part, line, FITTING_LAYER_ID, 'Cap', part.centre, mouth.direction, length, od / 2)];
 }
 
+/** A blind flange: a disc of the flange OD from the closed face (`centre`) over its thickness toward the mating face. */
+function blindEntities(part: RoutedPart, line: PipeLine): Entity[] {
+  const mating = part.ports[0];
+  const od = part.dims['outsideDiameter'];
+  const thickness = part.dims['thickness'];
+  if (mating === undefined || part.centre === undefined || od === undefined || thickness === undefined) return [];
+  return [cylinder(part, line, FLANGE_LAYER_ID, 'Blind flange', part.centre, mating.direction, thickness, od / 2)];
+}
+
+const singleEntity = (part: RoutedPart, line: PipeLine): Entity[] => {
+  const entity = partEntity(part, line);
+  return entity === null ? [] : [entity];
+};
+
 /** The display entities of `part` (none for a bolt set or a stub-in; valves, tees: more than one). */
 export function partEntities(part: RoutedPart, line: PipeLine): Entity[] {
   switch (part.kind) {
@@ -155,9 +170,9 @@ export function partEntities(part: RoutedPart, line: PipeLine): Entity[] {
       return oletEntities(part, line);
     case 'cap':
       return capEntities(part, line);
-    default: {
-      const entity = partEntity(part, line);
-      return entity === null ? [] : [entity];
-    }
+    case 'flange':
+      return part.typeKey === 'flangeBlind' ? blindEntities(part, line) : singleEntity(part, line);
+    default:
+      return singleEntity(part, line);
   }
 }

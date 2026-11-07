@@ -5,7 +5,6 @@
  */
 
 import type { ViewpointCamera } from '../../model/review';
-import { interpolateViewpointCamera, interpolateViewpointCameraSmooth } from '../../geometry/viewpointCamera';
 import { withMaterialClassColours } from '../../geometry/materialClasses';
 import { sha256Hex } from '../../lib/sha256';
 import { uint8ArrayToBase64 } from '../../lib/base64';
@@ -18,30 +17,11 @@ import { FRAME_BACKGROUND, hexRgb, renderCameraPng, sceneCenter } from './frames
 import { surfaceShadingOf } from './surfaceShading';
 import { nativeRun, REFERENCE_RENDERER_VERSION } from './rendererProvenance';
 import { rasterScenePixels } from './raster';
+import { walkthroughCameraAt } from './walkthroughCamera';
 
 const MAX_FRAMES = 600;
 /** Named guard: frames × width × height above this is refused (VIS_RENDER_BUDGET). */
 const MAX_TOTAL_PIXELS = 100_000_000;
-
-type CameraPath = 'linear' | 'smooth';
-
-/** Camera at time `t` (seconds) of a walkthrough whose key k lasts `seconds[k]`; `smooth` bends the eye path through the keys. */
-function cameraAt(cameras: readonly ViewpointCamera[], seconds: readonly number[], t: number, path: CameraPath): ViewpointCamera {
-  let start = 0;
-  for (let k = 0; k + 1 < cameras.length; k += 1) {
-    const span = seconds[k] ?? 0;
-    const a = cameras[k];
-    const b = cameras[k + 1];
-    if (a !== undefined && b !== undefined && (t <= start + span || k + 2 === cameras.length)) {
-      const u = clamp((t - start) / span, 0, 1);
-      return path === 'smooth'
-        ? interpolateViewpointCameraSmooth(cameras[k - 1], a, b, cameras[k + 2], u)
-        : interpolateViewpointCamera(a, b, u);
-    }
-    start += span;
-  }
-  return cameras[0] as ViewpointCamera;
-}
 
 /**
  * @affects nothing — read-only; data.files are the PNG frames (`--save dir/`)
@@ -106,7 +86,7 @@ export const renderWalkthrough = defineCommand({
     const files: { fileName: string; base64: string }[] = [];
     const digests: string[] = [];
     for (let i = 0; i < frames; i += 1) {
-      const camera = cameraAt(keyCameras, seconds, i / fps, params.path ?? 'linear');
+      const camera = walkthroughCameraAt(keyCameras, seconds, i / fps, params.path ?? 'linear');
       const png = renderCameraPng(scene, camera, width, height, background, center, run?.pixels ?? rasterScenePixels, shading);
       files.push({ fileName: `frame-${String(i + 1).padStart(4, '0')}.png`, base64: uint8ArrayToBase64(png) });
       if (run === null) digests.push(sha256Hex(png));
