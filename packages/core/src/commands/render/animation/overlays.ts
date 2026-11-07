@@ -2,7 +2,7 @@
 
 import type { ParsedFont } from '../../../lib/font/font';
 import { clamp } from '../../../lib/clamp';
-import type { Vec2 } from '../../../model/vectors';
+import type { Vec2, Vec3 } from '../../../model/vectors';
 import type { Projector } from '../camera';
 import { OVERLAY_Z, type OverlayFill, type OverlayPrimitives, type OverlayStroke, type Rgb } from './rasterOverlay';
 import { placeText } from './overlayText';
@@ -42,6 +42,10 @@ export interface OverlayRequest {
   readonly width: number;
   readonly height: number;
   readonly project: Projector;
+  /** Visible runs of a path in pixels (a perspective camera clips at its near plane and breaks the polyline there); default: the whole path. */
+  readonly runs?: ((path: readonly Vec3[]) => Vec2[][]) | undefined;
+  /** False for a point the camera cannot see (behind a perspective eye): its dot is not drawn. */
+  readonly visible?: ((point: Vec3) => boolean) | undefined;
   readonly font: ParsedFont | null;
   readonly traces: readonly TraceTrack[];
   readonly time: boolean;
@@ -56,16 +60,18 @@ export function frameOverlayOf(request: OverlayRequest): FrameOverlay {
   const cap = clamp(Math.round(height / 36), 8, 30);
   const margin = Math.round(cap * 0.9);
   const pitch = Math.round(cap * 1.7);
-  const screenPaths = request.traces.map((trace) => trace.path.map((point) => request.project(point)));
+  const runsOf = request.runs ?? ((path: readonly Vec3[]): Vec2[][] => [path.map((point) => request.project(point))]);
+  const screenPaths = request.traces.map((trace) => runsOf(trace.path));
   return (frame, entry) => {
     const fills: OverlayFill[] = [];
     const strokes: OverlayStroke[] = [];
-    screenPaths.forEach((path, i) => {
-      if (path.length >= 2) strokes.push({ color: traceColor(i), z: OVERLAY_Z.trace, halfWidth: 1.1, points: path });
+    screenPaths.forEach((runs, i) => {
+      for (const path of runs)
+        if (path.length >= 2) strokes.push({ color: traceColor(i), z: OVERLAY_Z.trace, halfWidth: 1.1, points: path });
     });
     request.traces.forEach((trace, i) => {
       const here = trace.at[frame];
-      if (here === undefined) return;
+      if (here === undefined || request.visible?.(here) === false) return;
       const centre = request.project(here);
       fills.push({ color: RING, z: OVERLAY_Z.ring, loops: [circle(centre, 6)] });
       fills.push({ color: traceColor(i), z: OVERLAY_Z.dot, loops: [circle(centre, 4.2)] });
