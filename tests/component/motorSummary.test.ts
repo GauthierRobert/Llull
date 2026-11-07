@@ -84,9 +84,8 @@ describe('motor facts and headlines of the machine kinds', () => {
     expect(value(facts, 'Pull-out torque')).toBe('datasheet curve, 2 points');
     expect(value(facts, 'Unverified')).toBe('datasheet accepted as inconsistent: misprint');
     expect(motorHeadline(stepper)).toBe('stepper · 200 steps · 0.5 N·m holding');
-    expect(value(motorFacts({ ...stepper, datasheet: { ...stepper.datasheet, pullOutCurve: undefined } }), 'Pull-out torque')).toBe(
-      'L/R roll-off',
-    );
+    const { pullOutCurve: _curve, ...withoutCurve } = stepper.datasheet;
+    expect(value(motorFacts({ ...stepper, datasheet: withoutCurve }), 'Pull-out torque')).toBe('L/R roll-off');
   });
 
   it('induction: the supply, both resistances and reactances, the optional iron-loss resistance', () => {
