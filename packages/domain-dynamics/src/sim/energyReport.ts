@@ -4,6 +4,7 @@
  */
 
 import type { DynamicsModel } from '@core/model/dynamics';
+import { motorFrictionOn } from './actuators/dcMotor';
 import { propellerOutput } from './forceLaws';
 import type { SimulationTrace } from '@core/dynamics/physicsEngine';
 
@@ -60,7 +61,7 @@ function dissipatedSeries(dynamics: DynamicsModel, trace: SimulationTrace): numb
   const power = trace.times.map((_, i) => {
     const joints = Object.values(dynamics.joints).reduce((sum, joint) => {
       const v = trace.jointVelocity[joint.id]?.[i] ?? 0;
-      return sum + joint.damping * v * v + joint.friction * Math.abs(v);
+      return sum + joint.damping * v * v + (joint.friction + motorFrictionOn(dynamics, joint.id)) * Math.abs(v);
     }, 0);
     return Object.values(dynamics.springs ?? {}).reduce((sum, spring) => {
       const v = trace.springs?.[spring.id]?.velocity[i] ?? 0;

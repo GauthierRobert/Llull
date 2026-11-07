@@ -9,7 +9,8 @@ import { changed, failer } from '@core/commands/noop';
 import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { dynamicsIdTaken, dynamicsOf, withDynamics } from './bodies';
+import { dynamicsIdTaken } from '@core/model/dynamics';
+import { dynamicsOf, withDynamics } from './bodies';
 
 /** Attachment points closer than this (m) have no direction for the spring force. */
 const MIN_LENGTH_M = 1e-6;

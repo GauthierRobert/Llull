@@ -12,6 +12,8 @@ import { addReferenceData } from './engine/reference';
 import { compareToReference } from './engine/compareReference';
 import { checkTimestepConvergence } from './engine/timestepConvergence';
 import { addMotor, addPropeller } from './drives';
+import { checkMotorDataCommand } from './motorData';
+import { setMotorDrive } from './motorDrive';
 import { inspectDynamics } from './inspect';
 import { listDynamicsLoads } from './loads';
 import { plotSimulation } from './plot';
@@ -30,6 +32,8 @@ export const dynamicsCommands = commandCatalog(
   addGearCoupling,
   addSpring,
   addMotor,
+  checkMotorDataCommand,
+  setMotorDrive,
   addPropeller,
   addCylinderPressure,
   setEngineLosses,

@@ -10,7 +10,8 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
 import { changed, commandError, failer, rejection } from '@core/commands/noop';
-import { dynamicsIdTaken, dynamicsOf, withDynamics } from './bodies';
+import { dynamicsIdTaken } from '@core/model/dynamics';
+import { dynamicsOf, withDynamics } from './bodies';
 import { calibrateCylinder } from './engine/calibrateCylinder';
 
 /** ISA sea-level pressure, Pa (named default of ambientPressurePa). */

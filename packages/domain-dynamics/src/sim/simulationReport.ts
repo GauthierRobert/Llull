@@ -11,6 +11,8 @@ import type { Quaternion } from '@core/model/vectors';
 import type { BodyMassDistribution } from '@core/geometry/bodyMassProperties';
 import { warnJams } from './jamDetection';
 import { findPeriod, tailMean, type Period } from './periodicity';
+import type { DriveRuntime } from './actuators/block';
+import { driveSeries } from './actuators/series';
 import { energyOf, type EnergyData, type EnergySeries } from './energyReport';
 import { speedTrend, trendWarning } from './speedTrend';
 
@@ -102,6 +104,12 @@ export interface SimulationData {
 
 const last = (values: readonly number[]): number => values[values.length - 1] ?? 0;
 
+/** Joint torque of a datasheet motor per sample (zeros when it has no drive: open circuit). */
+function datasheetTorque(motorId: string, drives: readonly DriveRuntime[] | undefined, trace: SimulationTrace): number[] {
+  const run = drives?.find((entry) => entry.motor.id === motorId);
+  return run === undefined ? trace.times.map(() => 0) : driveSeries(run, trace).jointTorqueNm;
+}
+
 /** A recorded series by id (every joint / body / servo of the model has one; absent ids read as empty). */
 const seriesOf = <T>(record: Readonly<Record<string, T[]>>, id: string): T[] => record[id] ?? [];
 
@@ -179,7 +187,14 @@ export function simulationData(
   dynamics: DynamicsModel,
   mass: Readonly<Record<string, BodyMassDistribution>>,
   trace: SimulationTrace,
-  run: { engine: string; duration: number; timestep: number; detail: SimulationDetail; metresPerUnit: number },
+  run: {
+    engine: string;
+    duration: number;
+    timestep: number;
+    detail: SimulationDetail;
+    metresPerUnit: number;
+    drives?: readonly DriveRuntime[];
+  },
 ): SimulationData {
   const velocityOf = (joint: string): number[] => seriesOf(trace.jointVelocity, joint);
   const warnings: string[] = [];
@@ -195,7 +210,11 @@ export function simulationData(
   const motorTorque = Object.fromEntries(
     Object.values(dynamics.motors).map((m) => [
       m.id,
-      m.kind === 'speed' ? seriesOf(trace.servoForce, m.id) : velocityOf(m.joint).map((v) => motorForce(m, v)),
+      m.kind === 'speed'
+        ? seriesOf(trace.servoForce, m.id)
+        : m.kind === 'dc'
+          ? datasheetTorque(m.id, run.drives, trace)
+          : velocityOf(m.joint).map((v) => motorForce(m, v)),
     ]),
   );
   const motors = Object.fromEntries(

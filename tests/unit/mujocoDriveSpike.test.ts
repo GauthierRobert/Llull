@@ -156,7 +156,9 @@ describe('OQ-DRV-02: joint limit with solreflimit direct form (VC-DRV-20)', () =
     }
   }
 
-  const reference = JSON.parse(readFileSync(referencePath, 'utf8')) as { endStop: { restitution: number; peakPenetrationRad: number } };
+  const reference = JSON.parse(readFileSync(referencePath, 'utf8')) as {
+    endStop: { restitution: number; restitutionBilateral: number; peakPenetrationRad: number };
+  };
 
   it('with a flat impedance the impact is a one-sided linear spring-damper (0.04 % restitution, 0.01 % peak)', () => {
     const measured = impact(inertia, [accelerationK, accelerationB], flat);
@@ -183,9 +185,10 @@ describe('OQ-DRV-02: joint limit with solreflimit direct form (VC-DRV-20)', () =
     expect(asForce.peak).toBeGreaterThan(2.5 * light.peak);
   });
 
-  it('the bilateral restitution of the reference (0.5266) is not reachable by a one-sided stop (8.6 % apart); the peak agrees', () => {
+  it('the pack reference is the one-sided restitution (0.5717, regenerated in DRV-M1); the bilateral 0.5266 is 8.6 % away from a stop', () => {
     const measured = impact(inertia, [accelerationK, accelerationB], flat).restitution;
-    expect(Math.abs(measured / reference.endStop.restitution - 1)).toBeGreaterThan(0.05);
+    expect(Math.abs(measured / reference.endStop.restitution - 1)).toBeLessThan(0.001);
+    expect(Math.abs(measured / reference.endStop.restitutionBilateral - 1)).toBeGreaterThan(0.05);
     expect(reference.endStop.peakPenetrationRad).toBeCloseTo(oneSided(stiffness, damping, inertia).peak, 5);
   });
 
