@@ -242,6 +242,10 @@ report" until a customer qualifies the toolchain.
 | `*BASE MOTION` applies to all homogeneously constrained nodes of a DOF [R1] | Unintended base nodes | `check_dynamics` lists the nodes/targets that will move |
 | Structural damping semantics (complex stiffness iηK) differ from viscous ζ | Misread damping | The report shows both η and the equivalent ζ = η/2 at resonance |
 
+## 10b. Decision ENG-10b: modal analysis is discoverable, not a new command
+
+"Natural frequency" searches ranked few useful tools. Modal analysis is not a missing capability: `create_analysis analysisType=modal`, `fea_mesh`, `fea_solve`, `analysis_report` (data.eigen), `fea_result_field mode=N` and `render_fea_results` already cover it. A one-call `run_modal_analysis` would duplicate the set-up commands and could not run the mesher / solver (CLI transports, not commands). Fix = discoverability: `fea_solve` states that modal cases return natural frequencies and mode shapes; `llull guide` section 11 has a modal workflow; search ranking has generic vocabulary entries (resonance, eigenmode, vibration, "mode shape", "vibration mode" map onto modal / frequency / analysis). Locked by `tests/unit/modalDiscovery.test.ts`.
+
 ## 11. References
 
 - [R1] CalculiX CrunchiX User's Manual (`doc/CalculiX.tex`: *FREQUENCY, *STEADY STATE DYNAMICS, *MODAL DYNAMIC, *DYNAMIC, *MODAL DAMPING, *DAMPING, *BASE MOTION, *AMPLITUDE, frequency analysis participation factors) — G. Dhondt, GPL-2.0 — https://github.com/Dhondtguido/CalculiX/tree/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c (accessed 2026-10)
