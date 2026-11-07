@@ -18,7 +18,7 @@ export interface VerificationItemView {
   readonly accepted: { readonly signer: string; readonly signatureId: string; readonly justification: string } | null;
 }
 
-export interface LsqView {
+interface LsqView {
   readonly method: string;
   readonly p: number;
   readonly f0: number;

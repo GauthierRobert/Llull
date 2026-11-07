@@ -48,7 +48,7 @@ export function withoutStudy(doc: CadDocument, analysisCase: AnalysisCase, study
 }
 
 /** The transient step of a time-step level: constant increments of `incrementS` to the case's end time, every increment written (the exclusive limits of an adaptive step dropped). */
-export const dtStep = (step: ThermalStep, incrementS: number): ThermalStep => ({
+const dtStep = (step: ThermalStep, incrementS: number): ThermalStep => ({
   ...(step.endTimeS !== undefined ? { endTimeS: step.endTimeS } : {}),
   initialIncrementS: incrementS,
   fixedIncrements: true,

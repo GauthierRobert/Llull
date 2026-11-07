@@ -18,7 +18,7 @@ import { thermalFixture } from '../thermal/fixtures';
 /** The dt law: T(dt) = T0 + K dt; the order law: value(order 1) = value(order 2) + OFFSET. */
 export const T0 = 20;
 export const K = 0.5;
-export const END_S = 8;
+const END_S = 8;
 export const OFFSET = 3;
 export const QUADRATIC = 40;
 

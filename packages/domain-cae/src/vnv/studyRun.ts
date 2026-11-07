@@ -31,7 +31,7 @@ export interface StudyRefusal {
 
 export const isStudyRefusal = (value: object): value is StudyRefusal => 'code' in value && 'message' in value;
 
-export interface PlannedLevel extends LevelSpec {
+interface PlannedLevel extends LevelSpec {
   readonly index: number;
 }
 
