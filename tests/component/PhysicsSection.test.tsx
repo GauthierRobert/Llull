@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { PhysicsSection } from '@ui/panels/PhysicsSection';
 import { useStore } from '@ui/store';
+import { useAnimationExportStore } from '@ui/store/animationExportStore';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { execute } from '@core/commands/registry';
 import { getPhysicsEngine, setPhysicsEngine } from '@core/dynamics/physicsEngine';
@@ -34,6 +35,13 @@ describe('PhysicsSection', () => {
   it('explains how to start when the document has no rigid bodies', () => {
     render(<PhysicsSection />);
     expect(screen.getByText('No rigid bodies yet.')).toBeInTheDocument();
+  });
+
+  it('offers Export animation before any run and opens the dialog flag', () => {
+    buildRotor();
+    render(<PhysicsSection />);
+    fireEvent.click(screen.getByTestId('physics-export'));
+    expect(useAnimationExportStore.getState().open).toBe(true);
   });
 
   it('lists bodies with their computed mass', () => {

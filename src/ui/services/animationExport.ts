@@ -47,6 +47,8 @@ export function renderAnimation(params: Record<string, unknown>): Promise<Animat
       onResult: ({ summary }) => {
         const measured = useStore.getState().lastMeasure;
         const parsed = measured?.command === 'render_animation' ? parseRender(measured.data) : null;
+        // the base64 result is large: it lives in the returned files only, not in the store
+        if (measured?.command === 'render_animation') useStore.getState().clearLastMeasure();
         resolve(parsed === null ? { ok: false, summary } : { ok: true, summary, ...parsed });
       },
     });

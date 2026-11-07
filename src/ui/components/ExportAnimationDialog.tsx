@@ -1,12 +1,18 @@
 // "Export animation…" (PHY-22 MOV-M4): gathers the parameters of render_animation, shows its contact sheet as a preview and saves the video through
 // the native File dialog. It dispatches the command and nothing else: no frame is drawn, no file encoded and no document edited here.
 
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { useStore } from '@ui/store';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { useAnimationExportStore } from '@ui/store/animationExportStore';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
-import { type AnimationForm, animationParams, defaultAnimationForm, videoLengthOf } from '@ui/services/animationExportModel';
+import {
+  type AnimationForm,
+  animationParams,
+  defaultAnimationForm,
+  limitProblemOf,
+  videoLengthOf,
+} from '@ui/services/animationExportModel';
 import { type AnimationWarning, renderAnimation, saveAnimationFile, videoFileOf } from '@ui/services/animationExport';
 import { Icon } from './Icon';
 import { ModalDialog } from './ModalDialog';
@@ -43,8 +49,19 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const length = videoLengthOf(form);
+  const problem = limitProblemOf(form);
+  /** Bumped by every edit and on unmount: a render that finishes under an older token is ignored. */
+  const token = useRef(0);
+  useEffect(
+    () => () => {
+      token.current += 1;
+    },
+    [],
+  );
 
   const update = (patch: Partial<AnimationForm>): void => {
+    token.current += 1;
+    setBusy(null);
     setForm((previous) => ({ ...previous, ...patch }));
     setSheetSrc(null);
     setWarnings([]);
@@ -59,8 +76,10 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
       setError(gathered.message);
       return;
     }
+    const mine = ++token.current;
     setBusy(purpose);
     const outcome = await renderAnimation(gathered.params);
+    if (mine !== token.current) return;
     setBusy(null);
     if (!outcome.ok) {
       setError(outcome.summary);
@@ -79,7 +98,7 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
     }
     saveAnimationFile(video);
     setWarnings(outcome.warnings);
-    setNotice(`${video.fileName} is ready: choose where to save it in the file dialog.`);
+    setNotice(`${video.fileName} was sent to the Save dialog: choose where to keep it.`);
   };
 
   return (
@@ -134,7 +153,11 @@ function ExportAnimationForm({ onClose }: { onClose: () => void }): React.ReactE
       </div>
       <div className="export-animation__actions">
         <span className="export-animation__length" data-testid="export-animation-length">
-          {length === null ? 'Check the numbers' : `${length.frames} frames · ${formatSeconds(length.seconds)} of video`}
+          {problem !== null
+            ? problem
+            : length === null
+              ? 'Check the numbers'
+              : `${length.frames} frames · ${formatSeconds(length.seconds)} of video`}
         </span>
         <button
           type="button"

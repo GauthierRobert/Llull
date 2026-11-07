@@ -100,6 +100,23 @@ export type ParamsOutcome =
   | { readonly ok: true; readonly params: Record<string, unknown> }
   | { readonly ok: false; readonly message: string };
 
+/** render_animation limits (schema of packages/core/src/commands/render/renderAnimation.ts: maxFrames 1800, duration max 600, orbit.turns at most 100). */
+const MAX_FRAMES = 1800;
+const MAX_DURATION_S = 600;
+const MAX_ORBIT_TURNS = 100;
+
+/** What the command would refuse for the numbers on the form (MOV_FRAME_BUDGET, schema maxima); null when none. */
+export function limitProblemOf(form: AnimationForm): string | null {
+  const duration = parseNumber(form.duration);
+  if (duration !== undefined && duration > MAX_DURATION_S) return `Duration is at most ${MAX_DURATION_S} s.`;
+  const turns = parseNumber(form.turns);
+  if (form.orbit && turns !== undefined && Math.abs(turns) > MAX_ORBIT_TURNS) return `Orbit turns are at most ${MAX_ORBIT_TURNS}.`;
+  const length = videoLengthOf(form);
+  if (length !== null && length.frames > MAX_FRAMES)
+    return `${length.frames} frames: at most ${MAX_FRAMES} (lower fps or duration, raise the rate).`;
+  return null;
+}
+
 /** Revolute sweeps are typed in degrees (the command takes radians). */
 function sweepSource(
   form: AnimationForm,
@@ -108,20 +125,13 @@ function sweepSource(
 ): { source: Record<string, unknown> } | { message: string } {
   const start = parseNumber(form.start);
   const end = parseNumber(form.end);
-  if (form.target.trim() === '') return { message: 'Name the joint or parameter to sweep.' };
+  const target = form.target.trim();
+  if (target === '') return { message: 'Name the joint or parameter to sweep.' };
   if (start === undefined || end === undefined) return { message: 'Start and end must be numbers.' };
-  const degrees = form.sweepMode === 'joint' && document.joints[form.target]?.kind === 'revolute';
+  const degrees = form.sweepMode === 'joint' && document.joints[target]?.kind === 'revolute';
   const scale = degrees ? Math.PI / 180 : 1;
   return {
-    source: {
-      kind: 'sweep',
-      mode: form.sweepMode,
-      target: form.target.trim(),
-      start: start * scale,
-      end: end * scale,
-      duration,
-      pingPong: form.pingPong,
-    },
+    source: { kind: 'sweep', mode: form.sweepMode, target, start: start * scale, end: end * scale, duration, pingPong: form.pingPong },
   };
 }
 
@@ -130,6 +140,8 @@ function sweepSource(
  * format at the chosen size, nothing else.
  */
 export function animationParams(form: AnimationForm, document: CadDocument, purpose: 'preview' | 'save'): ParamsOutcome {
+  const limit = limitProblemOf(form);
+  if (limit !== null) return { ok: false, message: limit };
   const duration = parseNumber(form.duration);
   const fps = parseNumber(form.fps);
   if (duration === undefined || duration <= 0) return { ok: false, message: 'Duration must be a positive number of seconds.' };
