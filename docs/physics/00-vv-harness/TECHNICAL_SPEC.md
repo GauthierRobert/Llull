@@ -444,36 +444,63 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 - [R10] arXiv 2103.14559 — https://arxiv.org/abs/2103.14559 (search extract)
 - llull: `.claude/rules/architecture.md`, `.claude/context/command-layer.md`, `docs/QUALITY_GATES.md`, `docs/PRODUCTION_GATE.md`, `packages/core/src/commands/project/types.ts`, 05 FEA TECHNICAL_SPEC.
 
-## 13. Implementation status (2026-10-16)
+## 13. Implementation status (2026-11-07)
 
-**Built: M1 + M2.** `npm run quality:physics` judges 26 VC-VNV cases (VC-VNV-01…09, 12, 18, measured by `tests/unit/physics/`):
-all pass; VC-VNV-19 (two-level study) and VC-VNV-20 (gate exit code) are unit / server tests. The 7 skipped cases are TBD (10, 11) or
-wait for M3 (13–17).
+**Built: M1 + M2 + M3.** `npm run quality:physics` judges the VC-VNV cases measured by `tests/unit/physics/` and `tests/unit/cae/vnv/`: VC-VNV-01…09, 12,
+13…16, 17 (at the level of fake tools, see below) and 18 pass; VC-VNV-10 and 11 stay `TBD` (skip): they need the real Netgen + CalculiX pipeline, which is not
+installed on the build machine (`server/tests/feaConvergence.test.ts` runs VC-VNV-10 / 13 / 17 on a machine that has it and is skipped otherwise). VC-VNV-19
+(two-level study) and VC-VNV-20 (gate exit code) are unit / server tests.
 
 | Item | Where |
 | ---- | ----- |
 | GCI arithmetic (TR-VNV-01…05) | `packages/core/src/lib/convergence.ts` |
 | Unit grammar used by the judge | `packages/core/src/lib/quantity.ts` (minimal version of 08 TR-MAT-01; 08 MAT owns it once built) |
-| `check_convergence`, `compare_to_expected`, schema + 05 adapter, judge | `packages/core/src/commands/vnv/` (toolset `analysis`) |
+| `check_convergence`, `compare_to_expected`, schema + 05 adapter, judge | `packages/domain-cae/src/vnv/` (plugin `cae`, toolset `analysis`) |
+| Shared analysis (findings, named defaults) of samples and studies | `vnv/convergenceAnalysis.ts` |
+| Study data model | core `model/convergenceStudy.ts`; `AnalysisCase.studies` / `studyOrder` (`model/analysis.ts`) |
+| `record_convergence_study`, `delete_convergence_study`, `accept_verification_exception` | `vnv/recordConvergenceStudy.ts`, `vnv/studyCommands.ts` |
+| `check_verification` | `vnv/checkVerification.ts`, `vnv/verificationItems.ts` |
+| Trust (artifact re-derivation), staleness, quantity reading, load validation | `vnv/studyVerify.ts`, `vnv/studyState.ts`, `vnv/studyQuantity.ts`, `vnv/validateStudies.ts` |
+| Human gate payload and re-verification | `vnv/studyException.ts` (core `humanGate`, `ctx.humanSignature`: the 09 PLM signing port) |
+| `run_convergence_study` transport | pure plan + params `vnv/studyRun.ts`; loop `server/src/fea/feaConvergence.ts`; tool schema `packages/protocol/src/feaTools.ts` (`FeaToolsPort.convergenceStudy`) |
 | `run_benchmarks` host transport (FR-VNV-11) | `server/src/cli/benchmarks.ts`, `llull run_benchmarks` |
 | `npm run quality:physics` (FR-VNV-12, TR-VNV-13) | `quality/physicsBenchmarks.mjs`, `quality/physics-benchmarks.json` (05 FEA legacy file via the §6.1 adapter) |
 
+**Placement (decision, replaces §2 / README §5.1 "pending").** There is no `packages/domain-physics`. The pure judge, the study commands and the shared analysis live
+in the existing CAE plugin (`packages/domain-cae/src/vnv/`; step 5A moved them out of core): they read the 05 analysis slice, `analysisInputHash` and the trust model
+(`@cae` internals), and an L10 plugin cannot import another plugin. Only the GCI arithmetic (`lib/convergence.ts`) and the data types (`model/convergenceStudy.ts`)
+are core. The transport is in `server/` and forwards: it holds no V&V arithmetic (L6). Moving the commands into a package of their own later is a file move.
+
 **Deviations from this spec (recorded, not silent):**
 
-- **Placement.** README §5.1 / §8.3 is undecided and `packages/domain-physics` does not exist, so the two pure commands live in a core
-  feature catalog (`commands/vnv/`) — the answer to open question 1 "pure judge and GCI in core, transport in `server/`". Moving them to
-  a plugin later is a file move plus registration.
-- **Unit measurements.** Instead of a Vitest reporter, the packs' unit tests judge through `tests/unit/physics/benchmarkCases.ts`, which
-  appends `{ pack, caseId, measured }` lines when `LLULL_PHYSICS_MEASUREMENTS` is set; `quality:physics` sets it.
-- **Refusals** carry the code in the registry's `error { code, ids, paths, remediation }` (exit 1 on the CLI), not in `data.code`.
-  `compare_to_expected` verdict errors (`VNV_UNIT_MISMATCH`, `VNV_RESULT_MISSING`) are valid results (exit 0) with `data.code`,
-  `data.path`, `data.remediation`. `check_convergence` reports `data.codes[]` plus `data.findings[]` (severity, message, remediation).
-- **Harness recipes** run in-process without a kernel; a `$alias` in a call needs AF-14 `aliases`, not built yet, and reports
-  `VNV_HARNESS_UNSUPPORTED`. No pack ships a harness recipe yet. The report's toolchain holds the Node version only.
-- **A non-finite sample** can only reach the command from TypeScript (JSON has no NaN): NaN gives `VNV_SAMPLES_INVALID`, ±∞ the
-  schema-level `CMD_INVALID_PARAMS`.
+- **A study stores only what was measured.** `report` and `triplets` are NOT stored (a converged-exactly triplet carries `Infinity`, a two-level one `NaN`, neither
+  survives JSON): `check_verification` recomputes them from the levels on every read, so a hand-edited value cannot survive. Levels carry their own mesh `controls`
+  (not `globalSize` alone), which is what makes staleness a pure recomputation: a level is current while the full input hash (05 TR-FEA-06) of the case with that
+  level's controls equals the level's recorded `inputHash`. `unverified` / `reviewRequired` are likewise derived (from the materials and the quantity), never stored.
+  A change of the case's own `globalSize` does NOT stale a study (a study carries its own sizes); a change of geometry, material, loads, supports or probes, or of the
+  element family / order / bonding, does.
+- **Quantity.** `StudyQuantity` is `probe { probeId, loadCase? }` (the component is the probe's own quantity), `field_max { field, loadCase }`, `frequency { mode }`,
+  `buckling_factor { mode }`; params are one flat object validated by `toStudyQuantity`. Unit and `h` base come from the artifacts: `h = (V / N)^(1/3)` with V the volume
+  of the FINEST mesh and N each level's tetrahedron count (solid C3D4 / C3D10 only; shell and plane-stress parts are `VNV_CASE_UNSUPPORTED`, a V1 item).
+- **Levels 3 to 6 only** (no two-level study through the commands; `check_convergence` keeps the two-sample path, VC-VNV-19). Refinement is `'h'` only (time step / order: M4).
+- **Fs and the formal order are named values** stored on the study: Fs 1.25 (caller or default), formal order from the textbook table of §5.4 (displacement 2 / 3,
+  stress 1 / 2, frequency and buckling factor 2 / 4 for linear / quadratic; reviewer-confirmable, open question 3) unless the caller gives one.
+- **Trust at record time.** With an artifact port: a hash absent from the store is `VNV_ARTIFACT_NOT_FOUND`, any recorded number that differs from the re-derived one is
+  `VNV_SUMMARY_MISMATCH` (VC-VNV-16); a study run for an older set-up is recorded STALE as given (the 05 `record_fea_results` convention, so a replay after a change keeps
+  it). WITHOUT a port (replay where no store is injected) it is kept flagged `verified: false` (state `unverifiable`, no number used). Open point: a replay on a machine
+  whose injected store is empty refuses the step (`VNV_ARTIFACT_NOT_FOUND`) where 05 keeps an unverified summary.
+- **New codes** beyond §7.1: `VNV_LEVELS_INVALID`, `VNV_QUANTITY_UNAVAILABLE`, `VNV_CASE_UNSUPPORTED`, `VNV_STUDY_NOT_FOUND`, `VNV_STUDY_UNVERIFIED`,
+  `VNV_EXCEPTION_NOT_APPLICABLE`, `VNV_PARAM_INVALID`; `check_verification` study states are `current | stale | unverifiable | untrusted`.
+- **Human gate.** `accept_verification_exception` takes one `code` of `VNV_NOT_ASYMPTOTIC | VNV_OSCILLATORY | VNV_DIVERGENT | VNV_ORDER_MISMATCH` (a GCI above the owner's
+  target is never accepted away) and a signature over sha256 of (act, study, analysis, code, justification, result hashes of the levels, document uid, nonce), verified
+  and spent through `ctx.humanSignature`; `check_verification` re-verifies it (a re-run or a copied document voids it); an agent always gets `VNV_HUMAN_GATE`.
+  `VNV_INPUT_UNVERIFIED` can never be accepted away.
+- **Not built:** the "benchmark regressions of the solver in use" item of FR-VNV-09 (it needs a `run_benchmarks` report, a host artifact, not document data); VC-VNV-11
+  (LE10 with tet10 needs the native kernel and CalculiX); progress lines per level (AF-40: the FE port has no progress channel); the `VerificationPanel` UI (§7, review
+  only); the `llull guide` V&V section; the golden plan of VC-VNV-13 (needs the real pipeline: covered by `tests/unit/cae/vnv/studies.test.ts` with fake artifacts and by
+  `server/tests/feaConvergence.test.ts`).
+- **Earlier deviations** (M1 / M2): refusals carry the code in `error { code, ids, paths, remediation }`; `compare_to_expected` verdicts are results with `data.code`;
+  harness recipes run in-process without a kernel (a `$alias` needs AF-14 `aliases`: `VNV_HARNESS_UNSUPPORTED`; no pack ships a recipe yet); unit measurements are recorded
+  by `tests/unit/physics/benchmarkCases.ts` (`LLULL_PHYSICS_MEASUREMENTS`) instead of a Vitest reporter; a non-finite sample can only come from TypeScript.
 
-**Not built (blocked on dependencies that do not exist yet):** M3 — `run_convergence_study`, `record_convergence_study`,
-`delete_convergence_study`, `check_verification`, `accept_verification_exception` need the 05 FEA analysis slice, `FeArtifactStore`
-and solver transports, and the 09 PLM signing port. VC-VNV-10, 11, 13–17 stay open with them. M4 (V1) not started, including
-FR-VNV-19 / VC-VNV-22 (least-squares order).
+M4 (V1) not started, including FR-VNV-19 / VC-VNV-22 (least-squares order).
