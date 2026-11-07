@@ -7,12 +7,12 @@
 
 | Toolset | Commands |
 | ------- | -------- |
-| [core](#core) | 39 |
+| [core](#core) | 36 |
 | [2d](#2d) | 33 |
 | [3d](#3d) | 96 |
 | [measure](#measure) | 8 |
 | [parametric](#parametric) | 15 |
-| [assembly](#assembly) | 44 |
+| [assembly](#assembly) | 47 |
 | [materials](#materials) | 23 |
 | [material-lab](#material-lab) | 3 |
 | [analysis](#analysis) | 129 |
@@ -49,7 +49,6 @@
 | `array_polar` | Duplicate an entity into a polar (circular) pattern about an axis line through center. |  |
 | `build_project` | Apply an ordered list of command actions as one project. |  |
 | `check_model` | Scan the document for geometry defects, structural issues, and parameter errors. | read-only |
-| `check_motion_truth` | Can this motion simulation be trusted? | read-only |
 | `clear_document` | Reset the working document to an empty state, removing all entities, groups, animations, parameters, configurations, materials, recipes, components, constraint… |  |
 | `delete_entities` | Permanently remove several entities in one step (one undo). |  |
 | `delete_layer` | Delete a layer by id. |  |
@@ -59,7 +58,6 @@
 | `document_content_hash` | Compute the content hash of the document definition: SHA-256 (lowercase hex) of its canonical JSON (RFC 8785 key order) after dropping view state (selection, c… | read-only |
 | `duplicate_entities` | Clone several entities in one step (one undo), placing each copy at original.position + offset. |  |
 | `find_entities` | Filter entities by any combination of: kind, layerId, name (exact or substring), tag (exact), bboxMin/bboxMax (legacy overlap), nearPoint (centroid within radi… | read-only |
-| `fit_drive_parameters` | Identify drive parameters from a measured series by linear least squares, with the 1-sigma of each value and the residual RMS. | read-only |
 | `fit_view` | Frame the entire document in the camera so all entities are visible. |  |
 | `group_entities` | Create a named group containing >= 2 existing entities. |  |
 | `kernel_info` | Report which geometry kernel is active for this session: "occt" (exact B-rep: STEP import, fillets, exact volumes) or "manifold" (mesh booleans only), its OCCT… | read-only |
@@ -78,7 +76,6 @@
 | `set_parameter` | Create or update a named numeric parameter in the document. |  |
 | `set_selection` | Change which entities are selected (the selection that selection-based tools use). |  |
 | `set_units` | Set the document unit of length and/or the display precision (decimal places). |  |
-| `size_drive` | Size a datasheet DC motor (add_motor kind "dc" with set_motor_drive) for its duty cycle: simulates the drive over whole repeats of its profile (or `duration`) … | read-only |
 | `stack_on` | Translate movingId so that its bounding-box minimum face along axis exactly meets the bounding-box maximum face of baseId. |  |
 | `ungroup_entities` | Dissolve a group, removing it from the document. |  |
 | `update_layer` | Change one or more properties of a layer: rename it (name), show or hide it (visible; hidden layers are not rendered), lock or unlock it (locked; every command… |  |
@@ -274,6 +271,7 @@
 | `add_transmission` | Couple two physics joints (add_body_joint) through a transmission for simulate_motion; the coupling is a rigid constraint (both inertias interact) that LOSES P… |  |
 | `animate` | Attach a motion clip to an entity or group. |  |
 | `bill_of_materials` | Generate a bill of materials (BOM) from all InstanceEntity objects in the document. | read-only |
+| `check_motion_truth` | Can this motion simulation be trusted? | read-only |
 | `check_motor_data` | Check that the numbers of a DC motor datasheet agree with each other (catalogue sheets are redundant, and a unit slip or a mistyped constant shows up here befo… | read-only |
 | `create_component` | Promote a set of existing entities into a reusable Component definition. |  |
 | `create_contact_set` | Define a contact set: pairs of instances that must not touch while a mechanism moves. |  |
@@ -287,6 +285,7 @@
 | `evaluate_motion` | Compute the result of applying all kinematic joints (add_joint, set_joint_value) and drive relations (add_drive_relation) between component instances. |  |
 | `evaluate_motion_profile` | Evaluate a motion profile (add_motion_profile) at uniform samples or at given times: value, velocity (first derivative) and acceleration (second derivative) in… | read-only |
 | `explode_instance` | Replace an InstanceEntity with concrete copies of its component's entities baked into world space. |  |
+| `fit_drive_parameters` | Identify drive parameters from a measured series by linear least squares, with the 1-sigma of each value and the residual RMS. | read-only |
 | `insert_instance` | Place a new InstanceEntity referencing an existing Component definition. |  |
 | `inspect_dynamics` | List the physics model: every rigid body with its computed mass (kg), centre of mass (document units) and moment of inertia about its joint axis (kg·m², revolu… | read-only |
 | `list_dynamics_loads` | List every load of the physics model at its design values: each body weight at its centre of mass (gravity layer), every joint axis and transmission (joints), … | read-only |
@@ -302,6 +301,7 @@
 | `set_joint_value` | Set the current value of a kinematic joint. |  |
 | `set_motor_drive` | Command a datasheet DC motor (add_motor kind "dc") for simulate_motion; replaces the motor's previous drive, a motor without a drive is an open circuit. |  |
 | `simulate_motion` | Run the rigid-body physics of the mechanism (bodies, joints, gears, motors, propellers) forward in time with a real physics engine (MuJoCo) and report what hap… | read-only |
+| `size_drive` | Size a datasheet DC motor (add_motor kind "dc" with set_motor_drive) for its duty cycle: simulates the drive over whole repeats of its profile (or `duration`) … | read-only |
 | `stop_animation` | Remove one or more animations from the document. |  |
 
 ## materials
