@@ -20,7 +20,7 @@ const bare = (text: string): string => text.replace(/^ {4}UNIQUE-COMPONENT-IDENT
 
 interface RouteData {
   lineId: string;
-  warnings: Array<{ code: string }>;
+  warnings: Array<{ code: string; ids?: string[] }>;
   route: {
     runs: Array<{ points: number[][]; capped: boolean; closure?: string; inline: Array<{ type: string; eccentric?: boolean }> }>;
     comparison: { pipeLengthDeltaMm: number; countDelta: Record<string, number> };
@@ -435,7 +435,7 @@ describe('review follow-ups of ISO M6c', () => {
       '1152.0',
     );
     const paired = routeData(route(pair));
-    const added = paired.warnings.find((warning) => warning.code === 'ISO_ROUTE_GASKET_ADDED') as { ids: string[] } | undefined;
+    const added = paired.warnings.find((warning) => warning.code === 'ISO_ROUTE_GASKET_ADDED');
     expect(added?.ids).toEqual(['pcf:E-1:2', 'pcf:E-1:3']);
     const instrumentSet = hand100(
       record('FLANGE', 2, ['1000.0 0.0 0.0 100 BW', '1076.0 0.0 0.0 100 FL']) +
@@ -445,7 +445,7 @@ describe('review follow-ups of ISO M6c', () => {
     );
     const result = route(instrumentSet);
     expect(result.rejected, result.summary).toBeUndefined();
-    const ids = (routeData(result).warnings.find((warning) => warning.code === 'ISO_ROUTE_GASKET_ADDED') as { ids: string[] }).ids;
+    const ids = routeData(result).warnings.find((warning) => warning.code === 'ISO_ROUTE_GASKET_ADDED')?.ids;
     expect(ids).toEqual(['pcf:E-1:2', 'pcf:E-1:3', 'pcf:E-1:4']);
   });
 
