@@ -7,6 +7,7 @@ import { report } from '../noop';
 import { recipeOf } from '../../geometry/shapeRecipe';
 import { findSelfIntersections } from '../../geometry/mesh/selfIntersection';
 import { subdivide } from '../../geometry/subdivision';
+import { fullSettleLevels, settleBudgetProblem, settleLevels } from '../../geometry/subd/settle';
 import { edgeSharpnessMap } from '../../geometry/subd/sharpness';
 import { symmetryDeviation } from '../../geometry/subd/symmetry';
 import { buildTopology, faceArea } from '../../geometry/subd/topology';
@@ -225,6 +226,18 @@ export const checkSubdivision = defineCommand({
         unit: 'elements',
         message: `${extraordinary.length} extraordinary vertex(es), ${ngons.length} n-gon face(s): the limit surface is only G1 there`,
         remediation: 'none needed; a regular quad cage is C2 everywhere',
+      });
+    const budget = settleBudgetProblem(entity);
+    if (budget !== null)
+      findings.push({
+        code: 'DIR_SHARPNESS_BUDGET',
+        severity: 'warn',
+        ids: [entity.id],
+        value: fullSettleLevels(entity),
+        limit: settleLevels(entity),
+        unit: 'levels',
+        message: `${budget}: the exact paths (patches, B-spline export, evaluator, code export) read the sharpness left after the budgeted settling as infinite`,
+        remediation: 'set_cage_crease with a lower sharpness (or 10 for infinite) so every path describes the level mesh',
       });
     const euler = entity.vertices.length - topology.edges.length + entity.faces.length;
     const parents = entity.vertices.map((_, v) => v);

@@ -20,6 +20,7 @@ import {
 } from '../solids/shared';
 import { type Cage, boxCage, cageProblem, cylinderCage } from '../../geometry/subdivision';
 import { edgeKey } from '../../geometry/subd/edgeKey';
+import { settleBudgetProblem } from '../../geometry/subd/settle';
 import { SHARP_MAX, edgeSharpnessMap, partitionSharpness } from '../../geometry/subd/sharpness';
 import { initialElementIds } from '../../geometry/subd/elements';
 import { dirRejection } from './codes';
@@ -88,7 +89,7 @@ const rangeProblem = (entries: ReadonlyArray<{ s: number }>): string | null => {
 /**
  * @affects creates 1 subdivision entity at `position`
  * @invariant cage is a closed, consistently wound 2-manifold; creases are cage edges; every vertex and face gets a stable element id minted by this step
- * @failure no / several cage sources, bad sizes, open or mis-wound cage (DIR_CAGE_OPEN), bad levels (DIR_LEVELS_RANGE), too many vertices (DIR_CAGE_TOO_LARGE), sharpness out of range (DIR_SHARPNESS_RANGE), duplicate id -> no-op
+ * @failure no / several cage sources, bad sizes, open or mis-wound cage (DIR_CAGE_OPEN), bad levels (DIR_LEVELS_RANGE), too many vertices (DIR_CAGE_TOO_LARGE), sharpness out of range (DIR_SHARPNESS_RANGE) or settling over budget (DIR_SHARPNESS_BUDGET), duplicate id -> no-op
  */
 export const addSubdivisionSolid = defineCommand({
   name: 'add_subdivision_solid',
@@ -187,6 +188,8 @@ export const addSubdivisionSolid = defineCommand({
     const problem = cageProblem(cage);
     if (problem?.includes('must be closed')) return dirRejection(doc, 'add_subdivision_solid', 'DIR_CAGE_OPEN', problem);
     if (problem !== null) return fail(problem);
+    const budget = settleBudgetProblem(cage);
+    if (budget !== null) return dirRejection(doc, 'add_subdivision_solid', 'DIR_SHARPNESS_BUDGET', budget, [], ['params.edgeSharpness']);
     const id = idOrNext(explicitId, 'subd');
     const entity: SubdivisionEntity = newEntity(
       'subdivision',
