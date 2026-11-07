@@ -91,7 +91,7 @@ describe('dispose_fit_result: the signature stays out of the record', () => {
     expect(agent.document).toBe(doc);
   });
 
-  it('a copy of the document (another uid) loses the disposition on replay: the ledger entry names its document', () => {
+  it('a document with another uid loses the disposition on replay (a byte copy keeps its uid by design): the ledger entry names its document', () => {
     const copy: CadDocument = { ...signed, uid: 'f'.repeat(32) };
     expect(disposed(execute(copy, 'replay_history', {}, withPort(port())).document)).toBeUndefined();
   });
@@ -103,6 +103,40 @@ describe('dispose_fit_result: the signature stays out of the record', () => {
       'FEA_DOCUMENT_UNIDENTIFIED',
     );
     expect(execute(bare, 'dispose_fit_result', { ...params, confirmation }, withPort(null)).error?.code).toBe('TMC_HUMAN_GATE');
+  });
+
+  it('every refusal leaves the signature unspent (the spend comes last)', () => {
+    const signing = port();
+    const ctx = withPort(signing);
+    const { uid, ...bare } = doc;
+    void uid;
+    const refusals = [
+      execute(bare, 'dispose_fit_result', { ...params, confirmation }, ctx),
+      execute(doc, 'dispose_fit_result', { ...params, justification: '  ', confirmation }, ctx),
+      execute(doc, 'dispose_fit_result', { ...params, currentInputsHash: 'h2', confirmation }, ctx),
+      execute(doc, 'dispose_fit_result', { ...params, fitParams: { hole: 'x' }, confirmation }, ctx),
+    ];
+    expect(refusals.map((result) => result.rejected)).toEqual([true, true, true, true]);
+    expect(signing.spentCount()).toBe(0);
+    expect(execute(doc, 'dispose_fit_result', { ...params, confirmation }, ctx).rejected).not.toBe(true);
+    expect(signing.spentCount()).toBe(1);
+    expect(execute(doc, 'dispose_fit_result', { ...params, confirmation }, ctx).error?.code).toBe('TMC_HUMAN_GATE');
+  });
+
+  it('a hand-planted or altered ledger entry does not make a recorded step stick (port installed)', () => {
+    const ledger = signed.analysis?.fitLedger ?? [];
+    const replayWith = (entry: Record<string, unknown>): unknown =>
+      disposed(
+        execute(
+          { ...signed, analysis: { ...signed.analysis, fitLedger: [{ ...ledger[0], ...entry }] } } as CadDocument,
+          'replay_history',
+          {},
+          withPort(port()),
+        ).document,
+      );
+    expect(replayWith({})).toBeDefined();
+    expect(replayWith({ signature: { nonce: 'n1', signature: 'forged' } })).toBeUndefined();
+    expect(replayWith({ signature: 'raw' })).toBeUndefined();
   });
 
   it('load validation rejects malformed dispositions and ledger entries', () => {

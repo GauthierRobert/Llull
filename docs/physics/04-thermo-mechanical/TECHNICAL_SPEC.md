@@ -404,7 +404,7 @@ key is closed by §14.
   in the history, the command log and live sync, never the signature. `dispose_fit_result` stores the verified signature, the signer and the document uid in
   `fitDispositions[rowKey]` and appends the same record to `analysis.fitLedger`. **Replay choice:** a recorded step is honoured on `ctx.replaying` only from a
   `fitLedger` entry matching row, decision, justification, inputsHash and this document's uid (the cae `replaySeed` carries the ledger, as for `exceptionLedger`
-  of VNV-M3); a replay therefore cannot invent a disposition, a copy of the document (another uid) loses it, and the signature is never spent again.
+  of VNV-M3); a replay therefore cannot invent a disposition, a document with another uid loses it (a byte copy keeps its uid by design, so it keeps the disposition), and the signature is never spent again. When a signing port is installed the kept signature is re-verified (nothing spent) over the payload bound to the entry's uid, so a hand-planted ledger entry fails with `TMC_HUMAN_GATE`; `accept_verification_exception` does the same for `exceptionLedger`. The signature is spent LAST, after every other refusal (uid, justification, inputs hash, `fitParams`), so a refused call never burns the human's signature.
   Rejected alternative: seeding `fitDispositions` itself (a suppressed or edited step would leave an orphan disposition). Load validation checks both
   records (`validateDispositions.ts`). A document without uid is refused `FEA_DOCUMENT_UNIDENTIFIED` after the gate. No read path counts `fitDispositions`
   yet (rows are always `pending_human`), so there is no reader to re-verify them or to show the signer; when one is added it re-verifies with `boundVerdict` over the stored uid.

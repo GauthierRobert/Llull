@@ -4,7 +4,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity } from '@core/model/documentUid';
-import { humanGate } from '@core/model/humanGate';
+import { humanGate, humanGatePayload } from '@core/model/humanGate';
 import type { StudyException } from '@core/model/convergenceStudy';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { analysisOf, caseOf } from '../shared/access';
@@ -13,7 +13,7 @@ import { analysisIdSchema } from '../shared/schemas';
 import { analyseStudy, staleReasons, withLedgerEntry, withStudy, withoutStudy } from './studyState';
 import { verifyStudy } from './studyVerify';
 import { refuseVnv } from './studyCodes';
-import { ACCEPTABLE_CODES, EXCEPTION_ACT, exceptionDetails, levelHashes } from './studyException';
+import { ACCEPTABLE_CODES, EXCEPTION_ACT, exceptionDetails, levelHashes, nonceOf } from './studyException';
 
 const studyIdSchema = z
   .string()
@@ -100,6 +100,17 @@ export const acceptVerificationException = defineCommand({
           )
         : undefined;
     const port = ctx?.humanSignature ?? null;
+    // a ledger entry is only as good as its signature: with a port installed it is re-verified (nothing spent), so a planted entry fails
+    if (kept !== undefined && port !== null) {
+      const payload = humanGatePayload(
+        EXCEPTION_ACT,
+        [study.id],
+        exceptionDetails(study, code, justification, kept.documentUid),
+        nonceOf(kept.signature),
+      );
+      if (port.verify(kept.signature, payload) === null)
+        return fail('VNV_HUMAN_GATE', 'the kept signature of this acceptance does not verify');
+    }
     if (kept === undefined && (port === null || typeof confirmation !== 'object' || confirmation === null))
       return fail(
         'VNV_HUMAN_GATE',

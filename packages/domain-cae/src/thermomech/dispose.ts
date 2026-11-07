@@ -8,7 +8,6 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
 import { execute } from '@core/commands/registry';
-import { verifyAndSpend } from '@core/model/humanGate';
 import { DOCUMENT_UNIDENTIFIED_TEXT, documentIdentity, withDocumentUid } from '@core/model/documentUid';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { analysisOf } from '../shared/access';
@@ -18,7 +17,7 @@ import { refuseTmc } from './refusal';
 /**
  * @affects doc.analysis.fitDispositions[rowKey] (affected: [rowKey]) and doc.analysis.fitLedger; stores the verified signature and the document uid next to the decision so a reader can re-verify it
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); a replay honours a recorded step only from `analysis.fitLedger` (kept by replaySeed; same row, decision,
- *   justification, inputsHash and this document's uid), so a replay never invents a disposition; recorded only with a signature verified (and spent) over sha256 of canonical JSON
+ *   justification, inputsHash and this document's uid, its signature re-verified when a port is installed), so a replay never invents a disposition and a document with another uid loses it (a byte copy keeps its uid by design); recorded only with a signature verified, then spent last (a refusal never burns it), over sha256 of canonical JSON
  *   { act, documentUid, rowKey, decision, justification, inputsHash }; with `fitParams` the command re-runs fit_at_temperature itself (also on replay) and the row must hash to `inputsHash`
  *   (a client-given `currentInputsHash` is only a hint)
  * @failure no signing port, no confirmation or one that does not verify -> TMC_HUMAN_GATE (an agent always lands here); a document without uid -> FEA_DOCUMENT_UNIDENTIFIED; currentInputsHash != inputsHash -> TMC_FIT_INPUTS_CHANGED; empty
@@ -70,21 +69,22 @@ export const disposeFitResult = defineCommand({
           )
         : undefined;
     const port = ctx?.humanSignature ?? null;
+    const payloadFor = (documentUid: string): string =>
+      sha256Hex(canonicalJson(withDocumentUid({ act: 'dispose_fit_result', rowKey, decision, justification, inputsHash }, documentUid)));
     if (kept === undefined && port === null)
       return fail(
         'TMC_HUMAN_GATE',
         'no signing port is installed; only a human signature verified by the signing port can disposition a fit',
       );
+    // verify only (nothing spent): the signature is spent last, once no other refusal can follow
     const signer =
       kept !== undefined
-        ? { signer: kept.signer, signatureId: kept.signatureId }
+        ? port === null || port.verify(kept.signature, payloadFor(kept.documentUid)) !== null
+          ? { signer: kept.signer, signatureId: kept.signatureId }
+          : null
         : port === null
           ? null
-          : verifyAndSpend(
-              port,
-              confirmation,
-              sha256Hex(canonicalJson(withDocumentUid({ act: 'dispose_fit_result', rowKey, decision, justification, inputsHash }, doc))),
-            );
+          : port.verify(confirmation, payloadFor(documentIdentity(doc)));
     if (signer === null) return fail('TMC_HUMAN_GATE', 'the signature did not verify for this disposition');
     if (doc.uid === undefined)
       return refuseFe(doc, 'dispose_fit_result', 'FEA_DOCUMENT_UNIDENTIFIED', DOCUMENT_UNIDENTIFIED_TEXT, [rowKey]);
@@ -103,6 +103,8 @@ export const disposeFitResult = defineCommand({
           `the fit row changed since review (${inputsHash} -> ${recomputed}); inputsHash is sha256 of the JCS row`,
         );
     }
+    if (kept === undefined && port?.spend?.(confirmation, payloadFor(documentIdentity(doc))) === false)
+      return fail('TMC_HUMAN_GATE', 'the signature did not verify for this disposition (already used)');
     const record = {
       decision,
       justification,

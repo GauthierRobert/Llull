@@ -18,7 +18,7 @@ export const levelHashes = (study: CaseStudy): string[] => study.levels.map((lev
 export const exceptionDetails = (study: CaseStudy, code: string, justification: string, documentUid: string): Record<string, unknown> =>
   withDocumentUid({ analysisId: study.analysisId, studyId: study.id, code, justification, levelHashes: levelHashes(study) }, documentUid);
 
-const nonceOf = (signature: unknown): string =>
+export const nonceOf = (signature: unknown): string =>
   typeof signature === 'object' && signature !== null && typeof (signature as { nonce?: unknown }).nonce === 'string'
     ? (signature as { nonce: string }).nonce
     : '';
