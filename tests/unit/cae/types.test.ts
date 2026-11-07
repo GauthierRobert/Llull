@@ -8,7 +8,6 @@ import type {
   FeMeshArtifact,
   FeResultsArtifact,
   FeSolver,
-  FitDispositions,
   Idealization,
   MeshSummary,
   Named,
@@ -23,6 +22,7 @@ import type {
   ThermalResultsSummary,
   ThermalStep,
 } from '@core/model/analysis';
+import type { FitDispositions } from '@core/model/fitDisposition';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 
@@ -160,7 +160,15 @@ describe('analysis data shapes', () => {
       { kind: 'beam', section: 'I' },
     ];
     const fits: FitDispositions = {
-      'pmi-1|20': { decision: 'rejected', justification: 'j', inputsHash: 'h', signer: 's', signatureId: 'i' },
+      'pmi-1|20': {
+        decision: 'rejected',
+        justification: 'j',
+        inputsHash: 'h',
+        signer: 's',
+        signatureId: 'i',
+        signature: { nonce: 'n' },
+        documentUid: 'u',
+      },
     };
     expect(JSON.parse(JSON.stringify({ sources, idealizations, fits }))).toEqual({ sources, idealizations, fits });
   });

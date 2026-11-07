@@ -19,3 +19,7 @@ export function withoutConfirmations(value: unknown): unknown {
   });
   return changed ? Object.fromEntries(entries) : value;
 }
+
+/** Whether `confirmation` is the recorded form `withoutConfirmations` leaves in a history step: exactly `{ verified: true }` (no signature left). */
+export const isRecordedConfirmation = (confirmation: unknown): boolean =>
+  isRecord(confirmation) && Object.keys(confirmation).length === 1 && confirmation['verified'] === true;
