@@ -60,6 +60,8 @@ export interface PlantIfcView {
   readonly nodes: readonly HierarchyNode[];
   /** Plant object that stands for the building element `id`, when classified. */
   forElement(id: string): PlantIfcObject | undefined;
+  /** Plant object that stands for the model object `id` of `provider` (`buildingElement`, `pipeLine`, ...). */
+  forTarget(provider: string, id: string): PlantIfcObject | undefined;
   /** Plant object by id. */
   forObject(id: string): PlantIfcObject | undefined;
   /** True when the document carries plant objects or a hierarchy. */
@@ -90,13 +92,15 @@ export function plantIfcView(doc: CadDocument): PlantIfcView {
     if (described === undefined) cache.set(id, (described = describe(data, object)));
     return described;
   };
+  const forTarget = (provider: string, id: string): PlantIfcObject | undefined => {
+    const objectId = byTarget.get(`${provider}:${id}`);
+    return objectId === undefined ? undefined : forObject(objectId);
+  };
   return {
     data,
     nodes: data.hierarchyOrder.flatMap((id) => data.hierarchy[id] ?? []),
-    forElement: (id) => {
-      const objectId = byTarget.get(`buildingElement:${id}`);
-      return objectId === undefined ? undefined : forObject(objectId);
-    },
+    forElement: (id) => forTarget('buildingElement', id),
+    forTarget,
     forObject,
     active: data.objectOrder.length > 0 || data.hierarchyOrder.length > 0,
   };
