@@ -2,10 +2,11 @@
 // involved are selected; beacons sit at the joint, constraint or load origin with the value as label.
 
 import type { CadDocument, Constraint, DriveRelation, Joint, Vec3 } from '@core/model/types';
-import { GROUND, type DynamicsModel } from '@core/model/dynamics';
+import { GROUND, type DynamicsModel, type Motor } from '@core/model/dynamics';
 import type { PanelFocus } from '@ui/store/focusStore';
 import type { LoadItem } from '@dynamics/index';
 import { LOAD_COLORS } from '@ui/dynamicsLoads';
+import { motorHeadline } from '@ui/panels/motorSummary';
 
 export const CONSTRAINT_COLOR = '#ffd740';
 export const REVOLUTE_COLOR = '#00e5ff';
@@ -54,6 +55,24 @@ export function bodyFocus(doc: CadDocument, bodyId: string, label: string): Pane
     key: `mechanisms:body:${bodyId}`,
     label,
     color: BODY_COLOR,
+    entityIds,
+    markers: first === undefined ? [] : [{ position: positionOf(doc, first), label }],
+  };
+}
+
+/** A motor row: the bodies of its joint, and a beacon at the first one naming the motor kind (datasheet voltage and gearhead for a dc motor). */
+export function motorFocus(doc: CadDocument, motor: Motor): PanelFocus {
+  const joint = doc.dynamics?.joints[motor.joint];
+  const entityIds =
+    doc.dynamics === undefined || joint === undefined
+      ? []
+      : unique([...bodyEntities(doc.dynamics, joint.child), ...bodyEntities(doc.dynamics, joint.parent)]);
+  const first = entityIds[0];
+  const label = `${motor.id} · ${motorHeadline(motor)}`;
+  return {
+    key: `mechanisms:motor:${motor.id}`,
+    label,
+    color: LOAD_COLORS.drives,
     entityIds,
     markers: first === undefined ? [] : [{ position: positionOf(doc, first), label }],
   };

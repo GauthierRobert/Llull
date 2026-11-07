@@ -197,6 +197,44 @@
   color: var(--fg-muted);
 }
 
+.physics-motor__details {
+  margin: 0 var(--space-3) var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.physics-motor__details > summary {
+  cursor: pointer;
+  color: var(--fg-muted);
+}
+
+.physics-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--space-3);
+  margin: var(--space-1) 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.physics-facts dt {
+  color: var(--fg-muted);
+}
+
+.physics-facts dd {
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+.physics-profile__segments {
+  margin: 0 0 var(--space-1);
+  padding-left: var(--space-4);
+  font-family: var(--font-mono);
+}
+
+.physics-ledger [data-closure='warn'] td,
+.physics-ledger [data-closure='fail'] td {
+  color: var(--warn, var(--fg-muted));
+}
+
 /* Loads & forces — review list of what acts on the rigid-body model + the viewport overlay switches */
 
 .loads-switches {
