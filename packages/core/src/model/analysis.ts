@@ -521,6 +521,9 @@ export interface AnalysisCase {
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];
+  /** PHY-00 convergence studies of this case (`record_convergence_study`); absent until the first one. */
+  readonly studies?: Readonly<Record<string, import('./convergenceStudy').ConvergenceStudy<MeshControls>>>;
+  readonly studyOrder?: readonly string[];
   /** PHY-09 dynamic set-up: present iff the case type is frequency_response or random_response. */
   readonly dynamics?: CaseDynamics;
   /** PHY-19 explicit dynamics set-up (plugin `explicit`); absent until `set_explicit_controls`. */

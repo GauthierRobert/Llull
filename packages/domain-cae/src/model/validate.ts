@@ -6,6 +6,7 @@ import { orientationErrors } from '../thermomech/validateOrientations';
 import { durabilityErrors } from './validateDurability';
 import { settingsErrors } from './validateSettings';
 import { defeatureErrors, idealizationErrors } from './validateIdealization';
+import { studyErrors } from '../vnv/validateStudies';
 
 const TYPES = [
   'static',
@@ -215,6 +216,7 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
   }
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
   errors.push(...settingsErrors(analysisCase, where));
+  errors.push(...studyErrors(analysisCase, id, where));
   for (const summary of ['meshSummary', 'results'])
     if (
       analysisCase[summary] !== undefined &&

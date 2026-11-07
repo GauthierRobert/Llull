@@ -33,6 +33,12 @@ const EXEMPT: Readonly<Record<string, string>> = {
   'explicit/queries.ts': 'explicit-dynamics artifacts (fe_explicit), not fe_results; energy and contact read-outs',
   'explicit/record.ts': 'records an explicit-dynamics artifact summary after re-hashing it; no verdict',
   'explicit/trust.ts': 'verifier of explicit-dynamics artifacts (fe_explicit), not fe_results',
+  'vnv/checkVerification.ts':
+    'solution-verification readiness (PHY-00): measures the discretisation error of a quantity across mesh levels, i.e. the resolution itself; it issues no stress margin (compute_margins, gated, does)',
+  'vnv/recordConvergenceStudy.ts':
+    'records a convergence study after re-deriving every level from its mesh and results artifacts (like record.ts); no engineering verdict',
+  'vnv/studyVerify.ts':
+    're-derives the levels of a convergence study from the artifact store for the study commands; a trust check, no stress verdict',
   'thermal/check.ts':
     'heat-transfer set-up and results checks: temperatures, no through-thickness bending budget (TR-INT-07 is a structural budget)',
   'thermal/dispose.ts': 'records a human disposition of a thermal limit row; it reads the rows the thermal check computed',

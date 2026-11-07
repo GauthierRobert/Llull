@@ -208,6 +208,7 @@ describe('the protocol tools', () => {
       return Promise.resolve({ summary: 'ok', affected: [], isError: false });
     },
     importField: () => Promise.reject(new Error('unused')),
+    convergenceStudy: () => Promise.reject(new Error('unused')),
     importResults: (id, file) => {
       calls.push(`import ${id} ${file.format} ${file.bytes.byteLength}`);
       return Promise.resolve({ summary: 'ok', affected: [], isError: false });

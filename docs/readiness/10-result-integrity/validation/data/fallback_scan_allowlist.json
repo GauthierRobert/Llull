@@ -357,26 +357,6 @@
       "reason": "row count of an optional output table; text only"
     },
     {
-      "file": "domain-cae/src/vnv/checkConvergence.ts",
-      "match": "const ratio = (samples[k]?.h ?? 0) / (samples[k - 1]?.h ?? 1);",
-      "reason": "index guard: samples has >= 2 entries, validated before the loop"
-    },
-    {
-      "file": "domain-cae/src/vnv/checkConvergence.ts",
-      "match": "const p = params.assumedOrder ?? 0;",
-      "reason": "two-level study: 0 is the unset marker of an optional assumedOrder (checkConvergence.ts)"
-    },
-    {
-      "file": "domain-cae/src/vnv/checkConvergence.ts",
-      "match": "required = requiredSpacing(params.gciTarget, gci21Fine, p, samples[0]?.h ?? 0);",
-      "reason": "index guard: samples has >= 2 entries, validated above"
-    },
-    {
-      "file": "domain-cae/src/vnv/checkConvergence.ts",
-      "match": "? `${head}, observed order ${p.toPrecision(4)}, extrapolated ${(summaryReport.extrapolated ?? 0).toPrecision(6)} ${params.unit}; ` +",
-      "reason": "summary text of an optional extrapolated value; display only"
-    },
-    {
       "file": "domain-dynamics/src/commands/checkMotionClearance.ts",
       "match": "clearance: (params.clearanceMm ?? 0) / mmPerUnit,",
       "reason": "documented param default (no extra clearance); echoed in data.tolerances"

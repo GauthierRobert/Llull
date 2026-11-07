@@ -25,6 +25,7 @@ import { docWith, sampleCatalogFile } from '../unit/aero/fasteners/fixtures';
 import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
 import { barModel } from '../unit/cae/explicit/support';
+import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import {
   bemNozzles,
@@ -211,6 +212,10 @@ function cfdDocument(): CadDocument {
   return ok(body.doc, 'create_cfd_case', caseParams([body.id])).document;
 }
 
+/** The 05 bar with a verified convergence study (PHY-00 VNV-M3): the cae slice with its studies, behind an in-memory artifact port. */
+let studySeed: ReturnType<typeof studyBar> | undefined;
+const studyFixture = (): ReturnType<typeof studyBar> => (studySeed ??= studyBar());
+
 const analysisId = (doc: CadDocument): string => doc.analysis?.caseOrder[0] ?? 'missing';
 const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc)]?.topologyOrder?.[0] ?? 'missing';
 
@@ -301,7 +306,9 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   cae: {
     roots: ['analysis'],
-    build: planOf(plans, 'fea_modal_cantilever'),
+    build: () => recordedStudy(studyFixture()).doc,
+    ctx: () => studyFixture().ctx,
+    query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz analysis', analysisType: 'static' }) },
   },
   topology: {
