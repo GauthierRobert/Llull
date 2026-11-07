@@ -13,7 +13,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
-- 2026-11-07 — owner goal: execute all eligible tasks, merge into main, workers + reviewers on sonnet. Merged this run: PST-M5a, MOV-M2, CAT-FU, EQP-PID-FU, DRV-M1, MOV-M3, MOV-M4 (Export animation dialog; VC-MOV-10 playback in Media Player / PowerPoint is the owner's check), ISO-M6c (rest → ISO-M6d), SHP1 (uncapped settle + 100k-quad budget; subdivision_to_nurbs 6 s at the edge, accepted), DRV-M2 (transmissions, joint physics, load schedules; add_gear_coupling removed), DRV-UI (motors / drives / profiles / ledger in the Physics panel)., DAT-VIS-FU (scoped IFC; rest → DAT-VIS-FU2). WIP: ENG-10b (lane1), DRV-M3 (lane3), VNV-M3 (lane2). Next: DRV-M4, VIS-M8 rest, ENG-4/5, 2D backlog.
+- 2026-11-07 — owner goal: execute all eligible tasks, merge into main, workers + reviewers on sonnet. Merged this run: PST-M5a, MOV-M2, CAT-FU, EQP-PID-FU, DRV-M1, MOV-M3, MOV-M4 (Export animation dialog; VC-MOV-10 playback in Media Player / PowerPoint is the owner's check), ISO-M6c (rest → ISO-M6d), SHP1 (uncapped settle + 100k-quad budget; subdivision_to_nurbs 6 s at the edge, accepted), DRV-M2 (transmissions, joint physics, load schedules; add_gear_coupling removed), DRV-UI (motors / drives / profiles / ledger in the Physics panel)., DAT-VIS-FU (scoped IFC; rest → DAT-VIS-FU2)., FIX-FUZZ-PD (all plugins pass the slice fuzz at 120 cases). WIP: ENG-10b (lane1, gate), S3 (lane6), DRV-M3 (lane3), VNV-M3 (lane2, gate). Next: DRV-M4, VIS-M8 rest, ENG-4/5, 2D backlog.
 
 - 2026-11-06 — merged MOV-M0 (`ae1edd05b`, cad-reviewer APPROVE + 4 fixes): `posesAtTime` (core `geometry/bodyPose.ts`), `render_motion` exact instants (VC-MOV-03); rav1e spike: deterministic at a fixed 4×2 tile layout, 14.2 fps at speed 10 without NASM (asm optional), all-permissive licences, AV1 MP4 plays via Media Foundation (owner: PowerPoint check in 22 `validation/playback.md`). Gate: full suite 25230 pass, 3 load timeouts (pass alone). Then MOV-M1 (`089b7f629`, cad-reviewer APPROVE + 5 fixes): `render_animation` (frames / APNG / timeline / sheet; mp4 / gif refuse until M2), clip math in core `geometry/animationPose.ts` (spec 22 §13.5). Gate `npm run check`: 25307 pass, 1 load timeout (passes alone). Then DISP1 (`608ae6c23`, cad-reviewer 3 rounds): native display deflection max(f, f·D/100) (20 m blend 253k tri / 4.0 s → 644 / 23 ms), `tessellate(shape, options)` port + `tessellateOptions` capability, `chordTolerance` on `export_stl` / `export_3mf` / `export_obj` (default = previous accuracy, budget refusals), CFD / codegen / check_machining / deform / FEA fallback on stated accuracy, `@invariant display-mesh` contract (06 DES §13.15.3). Gate on main: check:static + coverage 97.42 / 89.79 / 98.94 / 98.94, 25327 pass, 0 fail. KRN-MSVC verified (MSVC host, fresh binaries): server suite 2591 pass / 0 fail with LLULL_REQUIRE_NATIVE_KERNEL=1, mesher files native 0 skips with Netgen bin on PATH, TR-FEA-32 12/12 (`llull-mesh` mesh_requests); CalculiX (25) / Python (19) suites not run here (tools absent). Not pushed: local main ahead of origin.
 
@@ -244,13 +244,14 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 ## Engineering-audit follow-ups (detail in each line; lists kept here because they have no spec of their own)
 
+- `[TODO]` **FIX-SIG-DFR** `dispose_fit_result` (cae thermomech `dispose.ts`) names its gate param `signature`, so `withoutConfirmations` does not strip it and the whole signature lands in `featureHistory` / command log / live sync; rename to `confirmation` + replay ledger like VNV-M3 `accept_verification_exception`, drop it from `KNOWN_SIGNATURE_IN_HISTORY` (tests/helpers/documentBinding.ts). _Lane 1_ _deps: VNV-M3_
 - `[TODO]` **ENG-4** Blocked validation plans in `tests/unit/contract/blockedPlanCommands.json`; next: pack 09 frequency response, 11 creep, 19 impact, 17 topology, aero 06/03/09/02.
 - `[TODO]` **ENG-5** Fatigue/fracture: FE hot-spot stress (`FAT_RESULTS_MISSING`), `fe_seam` cracks + interaction integral, `compute_k_from_fe`, retardation, surface cracks.
 - `[WIP]` **ENG-10b** Natural-frequency search finds few candidates (no modal-specific command): make modal analysis discoverable.
 
 ## Product backlog (no spec yet — write one before starting)
 
-- `[TODO]` **S3** `hatch_region` + `region` entity. _Lane 1+3_
+- `[WIP]` **S3** `hatch_region` + `region` entity. _Lane 1+3_
 - `[TODO]` **X3** 2D export DXF + SVG from 2D entities. _Lane 1/3_
 - `[TODO]` **X4** Import SVG path → 2D profile, STL → `mesh`. _deps: X3_
 - `[TODO]` **EN5** Associative dimensions + dimension styles. _Lane 1+3_
