@@ -97,6 +97,15 @@ describe('add_rotor', () => {
         'strictly increase',
       ],
       [doc, rotorParams({ id: 'frame' }), "id 'frame' is already used"],
+      [
+        doc,
+        {
+          ...rotorParams({ table: { ...table, points: Array.from({ length: 201 }, (_, i) => [i, 0.1, 0.05]) } }),
+          thrustCoefficient: undefined,
+          powerCoefficient: undefined,
+        },
+        'invalid params',
+      ],
     ];
     for (const [base, params, why] of cases) expectNoOp(execute(base, 'add_rotor', params), base, why);
     const once = step(doc, 'add_rotor', rotorParams({ id: 'r1' })).doc;
@@ -177,6 +186,13 @@ describe('flight slice lifecycle', () => {
     expectNoOp(execute(doc, 'delete_dynamics_item', { id: 'r2' }), doc, "no dynamics record 'r2'");
   });
 
+  it('inspect_dynamics lists the rotors and body drag', () => {
+    const result = execute(withFlight(), 'inspect_dynamics', {});
+    expect((result.data as { flight?: unknown }).flight).toEqual(withFlight().flight);
+    expect(result.summary).toContain('1 rotor(s), 1 body drag(s)');
+    expect(execute(frame(), 'inspect_dynamics', {}).summary).not.toContain('rotor(s)');
+  });
+
   it('saves and loads; history replay re-mints the same slice', () => {
     const doc = withFlight();
     const loaded = deserializeDocument(serializeDocument(doc));
@@ -236,7 +252,13 @@ describe('flight slice lifecycle', () => {
       "flight.bodyDrag.frame.bodyId: 'frame' is fixed to the ground",
     ]);
     expect(bad({ extra: 1 })[0]).toMatch(/^flight: /);
-    expect(flightDocument.validate({ ...raw, flight: { rotors: { __proto__: rotor }, bodyDrag: {} } })).toEqual([]);
+    const hostile = JSON.parse(`{"rotors": {"__proto__": ${JSON.stringify(rotor)}}, "bodyDrag": {}}`) as unknown;
+    expect(flightDocument.validate({ ...raw, flight: hostile })).toEqual(['flight.rotors.__proto__: reserved key']);
+    const long = {
+      ...rotor,
+      coefficients: { kind: 'table', points: Array.from({ length: 201 }, (_, i) => [i, 0.1, 0.05]), source: 's', grade: 'A' },
+    };
+    expect(bad({ rotors: { r1: long } })).toEqual([expect.stringMatching(/^flight.rotors.r1.coefficients.points: /)]);
     expect(flightDocument.derivedEntityIds(doc).size).toBe(0);
     expect(flightDocument.restore(raw)).toBe(raw);
   });

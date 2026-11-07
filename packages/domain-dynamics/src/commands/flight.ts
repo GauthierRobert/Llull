@@ -8,6 +8,7 @@ import { dynamicsIdTaken } from '@core/model/dynamics';
 import { idOrNext, idTaken } from '@lib/explicitId';
 import { flightOf, ISA_SEA_LEVEL_DENSITY, type Rotor, type RotorCoefficients } from '../flight/model';
 import { dynamicsOf } from './bodies';
+import { compileRotor, rotorOutput } from '../flight/rotorLaw';
 
 /** Why `bodyId` cannot carry a flight load (missing or fixed), or null. */
 function bodyProblem(doc: CadDocument, bodyId: string): string | null {
@@ -19,12 +20,18 @@ function bodyProblem(doc: CadDocument, bodyId: string): string | null {
 
 const format = (value: number): string => value.toPrecision(4);
 
+/** Rows of a rotor table (a UIUC data file has about 20; the lookup is evaluated every step). */
+const MAX_TABLE_POINTS = 200;
+
 const tableSchema = z
   .object({
     points: z
       .array(z.tuple([z.number(), z.number().min(0), z.number().min(0)]))
       .min(2)
-      .describe('[[J, Ct, Cp], ...]: advance ratio J = V_axial / (n·D) strictly increasing (it may start below 0 for descent data).'),
+      .max(MAX_TABLE_POINTS)
+      .describe(
+        '[[J, Ct, Cp], ...] (2 to 200 rows): advance ratio J = V_axial / (n·D) strictly increasing (it may start below 0 for descent data).',
+      ),
     source: z.string().describe('Where the table comes from (report, data file, test); required, non-empty (FLT_TABLE_SOURCE_MISSING).'),
     grade: z
       .enum(['A', 'B', 'C'])
@@ -72,12 +79,12 @@ export const addRotor = defineCommand({
       .number()
       .min(0)
       .optional()
-      .describe('Static thrust coefficient Ct (J = 0), e.g. 0.1158; with powerCoefficient + source.'),
+      .describe('Static thrust coefficient Ct (advance ratio 0), e.g. 0.1158; with powerCoefficient + source.'),
     powerCoefficient: z
       .number()
       .min(0)
       .optional()
-      .describe('Static power coefficient Cp (J = 0), e.g. 0.0466; with thrustCoefficient + source.'),
+      .describe('Static power coefficient Cp (advance ratio 0), e.g. 0.0466; with thrustCoefficient + source.'),
     source: z.string().optional().describe('Where the static pair comes from (data file, test); required with the static pair.'),
     table: tableSchema.optional(),
     airDensity: z.number().positive().optional().describe('kg/m³; default 1.225 (ISA sea level).'),
@@ -96,11 +103,17 @@ export const addRotor = defineCommand({
     if (problem !== null) return fail(problem);
     if (Math.hypot(...params.axis) < 1e-12) return fail('axis must be non-zero');
     const { table, thrustCoefficient: ct, powerCoefficient: cp } = params;
-    const hasPair = ct !== undefined || cp !== undefined;
-    if (table !== undefined && hasPair) return fail('give the static pair (thrustCoefficient + powerCoefficient) OR table, not both');
-    if (table === undefined && (ct === undefined || cp === undefined))
-      return fail('give thrustCoefficient + powerCoefficient (static, with source) or a [J, Ct, Cp] table: no default coefficients exist');
+    if (table !== undefined && (ct !== undefined || cp !== undefined))
+      return fail('give the static pair (thrustCoefficient + powerCoefficient) OR table, not both');
     const source = (table?.source ?? params.source ?? '').trim();
+    const coefficients: RotorCoefficients | null =
+      table !== undefined
+        ? { kind: 'table', points: table.points, source, grade: table.grade ?? 'C' }
+        : ct !== undefined && cp !== undefined
+          ? { kind: 'static', thrustCoefficient: ct, powerCoefficient: cp, source }
+          : null;
+    if (coefficients === null)
+      return fail('give thrustCoefficient + powerCoefficient (static, with source) or a [J, Ct, Cp] table: no default coefficients exist');
     if (source === '')
       return codedRejection(
         doc,
@@ -114,10 +127,6 @@ export const addRotor = defineCommand({
     const rotorId = idOrNext(params.id, 'rotor');
     const flight = flightOf(doc);
     if (dynamicsIdTaken(dynamicsOf(doc), rotorId) || idTaken(flight.rotors, rotorId)) return fail(`id '${rotorId}' is already used`);
-    const coefficients: RotorCoefficients =
-      table !== undefined
-        ? { kind: 'table', points: table.points, source, grade: table.grade ?? 'C' }
-        : { kind: 'static', thrustCoefficient: ct ?? 0, powerCoefficient: cp ?? 0, source };
     const rotor: Rotor = {
       id: rotorId,
       bodyId: params.body,
@@ -130,21 +139,25 @@ export const addRotor = defineCommand({
       airDensity: params.airDensity ?? ISA_SEA_LEVEL_DENSITY,
       spinInertiaKgM2: params.spinInertiaKgM2 ?? 0,
     };
-    const n = rotor.rpm / 60;
-    const [ct0, cp0] =
-      coefficients.kind === 'static'
-        ? [coefficients.thrustCoefficient, coefficients.powerCoefficient]
-        : [coefficients.points[0]?.[1] ?? 0, coefficients.points[0]?.[2] ?? 0];
-    const thrust = ct0 * rotor.airDensity * n * n * rotor.diameter ** 4;
-    const torque = (cp0 * rotor.airDensity * n * n * rotor.diameter ** 5) / (2 * Math.PI);
+    const atRest = rotorOutput(compileRotor(rotor, [0, 0, 0], 1), {
+      position: [0, 0, 0],
+      orientation: [1, 0, 0, 0],
+      linearVelocity: [0, 0, 0],
+      angularVelocity: [0, 0, 0],
+    });
+    const js = coefficients.kind === 'table' ? coefficients.points.map((point) => point[0]) : [];
     const law =
       coefficients.kind === 'static'
-        ? `static Ct ${format(ct0)} / Cp ${format(cp0)}`
-        : `table of ${coefficients.points.length} points (grade ${coefficients.grade}), first row J ${format(coefficients.points[0]?.[0] ?? 0)}`;
+        ? `static Ct ${format(coefficients.thrustCoefficient)} / Cp ${format(coefficients.powerCoefficient)}`
+        : `table of ${js.length} points (grade ${coefficients.grade}), J ${format(Math.min(...js))} to ${format(Math.max(...js))}`;
+    const gyro =
+      rotor.spinInertiaKgM2 > 0
+        ? `spinning inertia ${format(rotor.spinInertiaKgM2)} kg·m²`
+        : 'no gyroscopic torque (spinInertiaKgM2 not given)';
     return changed(
       { ...doc, flight: { ...flight, rotors: { ...flight.rotors, [rotorId]: rotor } } },
       `add_rotor: '${rotorId}' on body '${rotor.bodyId}' — D ${format(rotor.diameter)} m at ${format(rotor.rpm)} rpm, ${rotor.spin}, axis [${rotor.axis.join(', ')}], ` +
-        `${law} (${source}); at the first coefficients thrust ${format(thrust)} N, torque ${format(torque)} N·m, power ${format(torque * 2 * Math.PI * n)} W.`,
+        `${law} (${source}), ${gyro}; at rest thrust ${format(atRest.thrust)} N, torque ${format(atRest.torque)} N·m, power ${format(atRest.power)} W.`,
       [rotorId],
     );
   },

@@ -16,7 +16,10 @@ const coefficients = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('static'), thrustCoefficient: nonNegative, powerCoefficient: nonNegative, source: text }),
   z.strictObject({
     kind: z.literal('table'),
-    points: z.array(z.tuple([finite, nonNegative, nonNegative])).min(2),
+    points: z
+      .array(z.tuple([finite, nonNegative, nonNegative]))
+      .min(2)
+      .max(200),
     source: text,
     grade: z.enum(['A', 'B', 'C']),
   }),
@@ -60,7 +63,6 @@ function referenceErrors(slice: z.infer<typeof flightSchema>, bodies: ReadonlyMa
   };
   for (const [key, entry] of Object.entries(slice.rotors)) {
     const at = `flight.rotors.${key}`;
-    if (RESERVED_KEYS.has(key)) errors.push(`${at}: reserved key`);
     if (entry.id !== key) errors.push(`${at}.id must equal its key`);
     if (Math.hypot(...entry.axis) < 1e-12) errors.push(`${at}.axis must be non-zero`);
     const points = entry.coefficients.kind === 'table' ? entry.coefficients.points : [];
@@ -70,7 +72,6 @@ function referenceErrors(slice: z.infer<typeof flightSchema>, bodies: ReadonlyMa
   }
   for (const [key, entry] of Object.entries(slice.bodyDrag)) {
     const at = `flight.bodyDrag.${key}`;
-    if (RESERVED_KEYS.has(key)) errors.push(`${at}: reserved key`);
     if (entry.bodyId !== key) errors.push(`${at}.bodyId must equal its key`);
     if (entry.cdaM2.every((value) => value === 0)) errors.push(`${at}.cdaM2 must have a component > 0`);
     body(at, entry.bodyId);
@@ -83,6 +84,12 @@ export const flightDocument: DocumentExtension = {
   validate(raw) {
     const slice = raw['flight'];
     if (slice === undefined) return [];
+    // zod rebuilds records by assignment, so an own "__proto__" key would vanish from the parsed copy: read the keys on the raw value
+    const reserved = (['rotors', 'bodyDrag'] as const).flatMap((table) => {
+      const records = isRecord(slice) ? slice[table] : undefined;
+      return isRecord(records) ? Object.keys(records).filter((key) => RESERVED_KEYS.has(key)).map((key) => `flight.${table}.${key}: reserved key`) : [];
+    });
+    if (reserved.length > 0) return reserved;
     const errors = sliceSchemaErrors(flightSchema, slice, 'flight');
     if (errors.length > 0) return errors;
     return referenceErrors(flightSchema.parse(slice), bodiesOf(raw));

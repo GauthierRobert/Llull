@@ -475,6 +475,11 @@
       "file": "domain-dynamics/src/sim/transmissions.ts",
       "match": "return dampingRatio ?? dampingRatioForRestitution(restitution ?? 0.5) ?? 0.999;",
       "reason": "documented in set_joint_physics: no damping ratio and no restitution means restitution 0.5; 0.999 is the largest ratio of the closed form and is unreachable: the command refuses and the loader rejects a restitution with no damping ratio (dampingRatioForRestitution null)"
+    },
+    {
+      "file": "domain-dynamics/src/commands/flight.ts",
+      "match": "spinInertiaKgM2: params.spinInertiaKgM2 ?? 0,",
+      "reason": "add_rotor: omitted spinInertiaKgM2 means \"no gyroscopic torque\", stated in the param description and in the summary"
     }
   ]
 }

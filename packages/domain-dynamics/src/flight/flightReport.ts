@@ -90,7 +90,7 @@ export function flightData(
       const validated =
         coefficients.kind === 'static'
           ? `a static pair is valid at |J| <= ${STATIC_ADVANCE_RATIO_LIMIT}`
-          : `its table covers J ${coefficients.points[0]?.[0] ?? 0} to ${last(coefficients.points)?.[0] ?? 0}, the end values are held`;
+          : `its table covers J ${Math.min(...coefficients.points.map((point) => point[0]))} to ${Math.max(...coefficients.points.map((point) => point[0]))}, the end values are held`;
       warnings.push(
         `FLT_OUTSIDE_VALIDATED_RANGE: rotor '${rotor.rotor.id}' runs at J ${range.min.toFixed(3)} to ${range.max.toFixed(3)} (${outside} of ${series.length} samples outside: ${validated})`,
       );
@@ -104,7 +104,7 @@ export function flightData(
     const forces = samples.map((state) => len3(bodyDragForce(drag, state)));
     const speed = len3(last(samples)?.linearVelocity ?? ([0, 0, 0] as Vec3));
     dragSeries[drag.bodyId] = forces;
-    bodyDrag[drag.bodyId] = { finalSpeedMps: speed, finalForceN: last(forces) ?? 0, peakForceN: Math.max(0, ...forces) };
+    bodyDrag[drag.bodyId] = { finalSpeedMps: speed, finalForceN: forces.at(-1) ?? 0, peakForceN: Math.max(0, ...forces) };
   }
   if (options.energy)
     warnings.push(

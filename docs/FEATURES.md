@@ -7,12 +7,12 @@
 
 | Toolset | Commands |
 | ------- | -------- |
-| [core](#core) | 38 |
+| [core](#core) | 36 |
 | [2d](#2d) | 34 |
 | [3d](#3d) | 96 |
 | [measure](#measure) | 8 |
 | [parametric](#parametric) | 15 |
-| [assembly](#assembly) | 47 |
+| [assembly](#assembly) | 49 |
 | [materials](#materials) | 23 |
 | [material-lab](#material-lab) | 3 |
 | [analysis](#analysis) | 133 |
@@ -44,7 +44,6 @@
 | Command | Description | Flags |
 | ------- | ----------- | ----- |
 | `add_layer` | Create a new layer with the given name and append it to the layer order. |  |
-| `add_rotor` | Fix a rotor (propeller + motor of a drone, a VTOL lift fan) to a rigid body for free flight in simulate_motion (13 FLT). |  |
 | `align` | Move every entity in targetIds so that its bounding-box edge (or center) along the specified axis matches the reference entity's. |  |
 | `array_linear` | Duplicate an entity into a linear pattern. |  |
 | `array_polar` | Duplicate an entity into a polar (circular) pattern about an axis line through center. |  |
@@ -68,7 +67,6 @@
 | `render_view` | Render the document to a self-contained SVG image string so an AI agent can SEE the scene and self-correct. | read-only |
 | `rotate_entity` | Rotate an entity. |  |
 | `scale_entity` | Uniformly scale an entity by a positive factor. |  |
-| `set_body_drag` | Give a rigid body quadratic air drag for simulate_motion (13 FLT): in the body axes, F_i = -½·ρ·CdA_i·\|v\|·v_i at the centre of mass, v the velocity of the cent… |  |
 | `set_camera` | Set one or more camera fields (target, azimuth, polar, distance). |  |
 | `set_entity_color` | Set the display colour of one or more entities (2D or 3D). |  |
 | `set_entity_layer` | Move an entity to a different layer by updating its layerId. |  |
@@ -270,6 +268,7 @@
 | `add_propeller` | Load a revolute joint with a propeller's aerodynamics for simulate_motion (static / take-off condition by default). |  |
 | `add_reference_data` | Store measured or datasheet data an engine model is validated against (FR-FPR-77); compare_to_reference runs the model at each point and reports S (simulated),… |  |
 | `add_rigid_body` | Make a set of 3D entities move together as ONE rigid body for physics simulation (simulate_motion). |  |
+| `add_rotor` | Fix a rotor (propeller + motor of a drone, a VTOL lift fan) to a rigid body for free flight in simulate_motion (13 FLT). |  |
 | `add_spring` | Add a spring-damper force element (physics, for simulate_motion; NOT the add_coil solid geometry) between a point on one rigid body and a point on another body… |  |
 | `add_transmission` | Couple two physics joints (add_body_joint) through a transmission for simulate_motion; the coupling is a rigid constraint (both inertias interact) that LOSES P… |  |
 | `animate` | Attach a motion clip to an entity or group. |  |
@@ -297,6 +296,7 @@
 | `render_animation` | RENDER A MOVING MECHANISM as a time-exact frame sequence, a timeline of the numbers behind each frame and a contact sheet. | read-only |
 | `render_motion` | SEE a simulated mechanism: runs the physics simulation (same engine and parameters as simulate_motion / plot_simulation) and renders the rigid bodies at chosen… | read-only |
 | `set_active_exploded_view` | Show an exploded view in the viewport (and exploded drawings), or none. |  |
+| `set_body_drag` | Give a rigid body quadratic air drag for simulate_motion (13 FLT): in the body axes, F_i = -½·ρ·CdA_i·\|v\|·v_i at the centre of mass, v the velocity of the cent… |  |
 | `set_dynamics_solver` | Tune how simulate_motion integrates a loop-closed mechanism (slider-crank, four-bar, engine). |  |
 | `set_engine_losses` | Mechanical losses of an engine (friction, FR-FPR-71): a torque on the crank opposite to its rotation, smoothed near zero speed, whose cycle average is FMEP·V_d… |  |
 | `set_gravity` | Set the gravity vector of the physics simulation in m/s², world axes. |  |
