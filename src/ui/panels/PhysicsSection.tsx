@@ -16,6 +16,9 @@ import { parseNumber } from '@ui/numberText';
 import { SeriesChart } from './SeriesChart';
 import { TimelineDock } from '@ui/components/TimelineDock';
 import { ExportAnimationButton } from '@ui/components/ExportAnimationButton';
+import { PhysicsMotors } from './PhysicsMotors';
+import { PhysicsLedger } from './PhysicsLedger';
+import { readLedger } from './motorSummary';
 
 const RPM_PER_RAD_S = 60 / (2 * Math.PI);
 /** Samples per simulated second for playback: ≥ 4 per turn up to 15 000 rpm on short runs; capped by the command's 6001 samples. */
@@ -54,8 +57,16 @@ function ResultTable({ result }: { result: SimulationData }): React.ReactElement
         {Object.entries(result.motors).map(([id, motor]) => (
           <tr key={id}>
             <th scope="row">{id}</th>
-            <td>{format(motor.torque)} N·m</td>
-            <td className="physics-results__meta">{format(motor.power / 1000, 2)} kW</td>
+            <td>
+              {motor.cycleMeanTorque !== undefined
+                ? `${format(motor.cycleMeanTorque)} N·m cycle mean`
+                : `${format(motor.torque)} N·m at end`}
+            </td>
+            <td className="physics-results__meta">
+              {motor.cycleMeanPower !== undefined
+                ? `${format(motor.cycleMeanPower / 1000, 2)} kW cycle mean`
+                : `${format(motor.power / 1000, 2)} kW at end`}
+            </td>
           </tr>
         ))}
         {Object.entries(result.propellers).map(([id, prop]) => (
@@ -102,6 +113,7 @@ export function PhysicsSection(): React.ReactElement {
       result === null ? [] : [...Object.values(result.motors).map((m) => m.joint), ...Object.values(result.propellers).map((p) => p.joint)],
     [result],
   );
+  const ledger = useMemo(() => readLedger(result), [result]);
   const [duration, setDuration] = useState('5');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -160,6 +172,7 @@ export function PhysicsSection(): React.ReactElement {
           </ListRow>
         ))}
       </ul>
+      <PhysicsMotors dynamics={dynamics} />
       {problems.length > 0 && <StatusLine text={problems.join('; ')} testId="physics-problems" />}
       <div className="physics-run">
         <label className="panel__row-meta" htmlFor="physics-duration">
@@ -196,6 +209,7 @@ export function PhysicsSection(): React.ReactElement {
               {format(result.energy.dissipatedJ, 3)} J · {energyCheck(result.energy)}
             </p>
           )}
+          {ledger !== null && <PhysicsLedger ledger={ledger} />}
           {result.warnings.length > 0 && <StatusLine text={`⚠ ${result.warnings.join('; ')}`} testId="physics-warnings" />}
           <TimelineDock times={result.series?.times ?? []} idPrefix="physics">
             {(view) => (
