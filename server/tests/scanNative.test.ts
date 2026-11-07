@@ -12,7 +12,7 @@ import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { ExecutionContext } from '@core/commands/types';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { createComputeRunner } from '../src/native/computeJob';
+import { createComputeRunner, jobFolderPrefix } from '../src/native/computeJob';
 import { nativeBinaryPath } from '../src/native/nativeBinary';
 import { runScanImport } from '../src/scan/scanImport';
 import { DEFAULT_IMPORT_OPTIONS } from '../src/scan/scanStore';
@@ -161,7 +161,7 @@ describe('scan centreline trace on llull-compute', () => {
 
   native('a trace that outlives the host timeout kills its child, commits nothing and leaves no job folder', async () => {
     const { doc, cloudId } = await attach(metres(), 'synthetic/elb-a.csv');
-    const folders = (): string[] => readdirSync(tmpdir()).filter((name) => name.startsWith('llull-compute-'));
+    const folders = (): string[] => readdirSync(tmpdir()).filter((name) => name.startsWith(jobFolderPrefix()));
     const before = new Set(folders());
     const impatient = createPointCloudPort({ store, env: { ...process.env, LLULL_SCAN_OP_TIMEOUT_S: '0.001' }, binary: BINARY });
     const result = execute(doc, 'trace_pipe_centreline', { cloudId, seed: [0.5, 0, 1] }, { ...ctx, pointClouds: impatient });
