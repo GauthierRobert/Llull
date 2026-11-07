@@ -103,6 +103,12 @@ export interface CfdResultArtifact {
   readonly surfaceBase64: string;
   /** `slice-<k>.bin` files (`LLSL` header), base64. */
   readonly slices: readonly { readonly name: string; readonly base64: string }[];
+  /**
+   * `field.bin` (`LLFD`: time-averaged velocity and pressure per cell, fluid mask, symmetry planes), kept by the host beside the bundle
+   * content-addressed (too large for the bundle JSON) and bound here by its hash: a probe, slice or streamline query reads the field of
+   * exactly this result (12 CFD M3a).
+   */
+  readonly field: { readonly sha256: string; readonly bytes: number };
 }
 
 /** Read-only result store injected by the host (`ExecutionContext.cfdResults`): the record command re-verifies results through it. */

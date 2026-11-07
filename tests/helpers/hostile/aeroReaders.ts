@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { parseFlowResult } from '@aero/cfd/flowResult';
+import { parseFlowQueryAnswer } from '@aero/cfd/queryOutput';
 import { readComposite } from '@aero/composites/ap242/reader';
 import { readStandard } from '@aero/composites/ap242/standardReader';
 import { parseNotation } from '@aero/composites/notation';
@@ -64,6 +65,17 @@ const bendCsv = (records: number): string =>
 
 const flowJson = (records: number): string =>
   JSON.stringify({ version: 1, caseId: 'c', history: Array.from({ length: records }, (_, k) => ({ step: k, timeS: k, dragN: 1, cd: 1 })) });
+
+const probeJson = (records: number): string =>
+  JSON.stringify({
+    probes: Array.from({ length: records }, (_, k) => ({
+      pointM: [k, 0, 0],
+      velocityMS: [1, 0, 0],
+      speedMS: 1,
+      pressurePa: 0,
+      miss: null,
+    })),
+  });
 
 export const AERO_READERS: readonly HostileReader[] = [
   {
@@ -141,6 +153,15 @@ export const AERO_READERS: readonly HostileReader[] = [
     nest: (depth) => '['.repeat(depth) + ']'.repeat(depth),
     read: (input) => parseFlowResult(asText(input)),
     accepts: (result) => typeof result === 'string' && result.includes('result.json'),
+  },
+  {
+    name: 'aero: parseFlowQueryAnswer (CFD flow-query query.json)',
+    covers: ['domain-aero/src/cfd/queryOutput.ts:parseFlowQueryAnswer'],
+    input: 'text',
+    build: probeJson,
+    nest: (depth) => '['.repeat(depth) + ']'.repeat(depth),
+    read: (input) => parseFlowQueryAnswer('probe', asText(input), new Uint8Array()),
+    accepts: (result) => typeof result === 'object' && result !== null && (result as { op: string }).op === 'probe',
   },
   {
     name: 'aero: parseNotation (stacking string)',

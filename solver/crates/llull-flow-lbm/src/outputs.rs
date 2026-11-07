@@ -8,13 +8,12 @@ use crate::job::spec::{SliceField, SliceSpec};
 use crate::job::JobError;
 use crate::solver::{Phase, RunOutcome};
 use crate::units::Lattice;
+use llull_flow_core::field::FlowField;
 use llull_flow_core::reduce::extrema;
 use llull_flow_core::sample::{surface_values, trilinear};
+use llull_flow_core::slice::square_plane;
 use llull_flow_core::stl::Triangle;
 use serde::Serialize;
-
-/// Largest slice resolution per axis.
-const MAX_SLICE_SAMPLES: usize = 512;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct WarningEntry {
@@ -241,7 +240,7 @@ fn push_f32s(bytes: &mut Vec<u8>, values: impl IntoIterator<Item = f32>) {
 
 /// A symmetry plane of a half model: the axis it is normal to, its coordinate, and whether the kept fluid lies below it
 /// (`high`: the plane is the box's max face, the dropped half is above).
-pub type Mirror = (usize, f64, bool);
+pub use llull_flow_core::field::Mirror;
 
 /// Triangles reflected across the symmetry planes when their centroid lies in the dropped half (which samples its mirror
 /// image); two vertices are swapped so the winding stays outward.
@@ -297,15 +296,10 @@ pub fn surface_file(
 /// `slice-<k>.bin`: the field sampled on a square patch of the plane, centred on the slice origin, as wide as the grid, one
 /// sample per cell.
 pub fn slice_file(domain: &Domain, fields: &Fields, slice: &SliceSpec) -> Result<Vec<u8>, JobError> {
-    let normal =
-        unit(slice.normal).ok_or_else(|| JobError { code: "NATIVE_JOB_INPUT", message: "a slice normal must be non-zero".into() })?;
-    let helper = if normal[0].abs() < 0.9 { [1.0, 0.0, 0.0] } else { [0.0, 1.0, 0.0] };
-    let axis_u = unit(cross(normal, helper)).unwrap_or([0.0, 1.0, 0.0]);
-    let axis_v = cross(normal, axis_u);
     let grid = &domain.grid;
     let extent = (grid.nx.max(grid.ny).max(grid.nz) as f64) * grid.h;
-    let samples = ((extent / grid.h).ceil() as usize + 1).min(MAX_SLICE_SAMPLES);
-    let spacing = extent / (samples.max(2) - 1) as f64;
+    let plane =
+        square_plane(slice.origin_m, slice.normal, grid.h, extent).map_err(|message| JobError { code: "NATIVE_JOB_INPUT", message })?;
     let values: Vec<f32> = match slice.field {
         SliceField::Speed => fields.speed_ms.clone(),
         SliceField::P => fields.pressure_pa.clone(),
@@ -313,18 +307,6 @@ pub fn slice_file(domain: &Domain, fields: &Fields, slice: &SliceSpec) -> Result
         SliceField::Uy => fields.velocity_ms.iter().map(|u| u[1]).collect(),
         SliceField::Uz => fields.velocity_ms.iter().map(|u| u[2]).collect(),
     };
-    let mut bytes = b"LLSL".to_vec();
-    bytes.extend_from_slice(&1u32.to_le_bytes());
-    bytes.extend_from_slice(&(samples as u32).to_le_bytes());
-    bytes.extend_from_slice(&(samples as u32).to_le_bytes());
-    let half = extent / 2.0;
-    let origin = [
-        slice.origin_m[0] - half * (axis_u[0] + axis_v[0]),
-        slice.origin_m[1] - half * (axis_u[1] + axis_v[1]),
-        slice.origin_m[2] - half * (axis_u[2] + axis_v[2]),
-    ];
-    push_f32s(&mut bytes, origin.iter().chain(axis_u.iter()).chain(axis_v.iter()).map(|v| *v as f32));
-    bytes.extend_from_slice(&(spacing as f32).to_le_bytes());
     let name = match slice.field {
         SliceField::Speed => "speed",
         SliceField::P => "p",
@@ -332,18 +314,21 @@ pub fn slice_file(domain: &Domain, fields: &Fields, slice: &SliceSpec) -> Result
         SliceField::Uy => "uy",
         SliceField::Uz => "uz",
     };
-    push_name(&mut bytes, name);
-    for iv in 0..samples {
-        for iu in 0..samples {
-            let (su, sv) = (iu as f64 * spacing, iv as f64 * spacing);
-            let point = [
-                origin[0] + su * axis_u[0] + sv * axis_v[0],
-                origin[1] + su * axis_u[1] + sv * axis_v[1],
-                origin[2] + su * axis_u[2] + sv * axis_v[2],
-            ];
-            let value = trilinear(grid, &values, &fields.valid, point).map_or(f32::NAN, |v| v as f32);
-            bytes.extend_from_slice(&value.to_le_bytes());
-        }
+    let sampled = plane.sample(|point| trilinear(grid, &values, &fields.valid, point));
+    Ok(plane.encode(name, &sampled))
+}
+
+/// `field.bin`: the time-averaged field on the solver grid with the fluid mask and the symmetry planes (M3a post-processing).
+pub fn field_file(domain: &Domain, fields: &Fields, mirrors: &[Mirror]) -> Vec<u8> {
+    let component = |axis: usize| -> Vec<f32> { fields.velocity_ms.iter().map(|u| u[axis]).collect() };
+    FlowField {
+        grid: domain.grid.clone(),
+        mirrors: mirrors.to_vec(),
+        ux: component(0),
+        uy: component(1),
+        uz: component(2),
+        p: fields.pressure_pa.clone(),
+        valid: fields.valid.clone(),
     }
-    Ok(bytes)
+    .to_bytes()
 }

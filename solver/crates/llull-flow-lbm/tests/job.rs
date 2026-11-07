@@ -4,6 +4,7 @@
 mod common;
 
 use common::{cube_job_in, result_json, run_job, sphere_job};
+use llull_flow_core::field::FlowField;
 use llull_protocol::sha256_hex;
 use std::fs;
 
@@ -20,7 +21,7 @@ fn a_step_limited_run_writes_every_output_hashed_and_reports_not_converged() {
     let (events, result) = run_job(&job.dir);
     let outputs = result.unwrap();
     let names: Vec<&str> = outputs.iter().map(|o| o.path.as_str()).collect();
-    assert_eq!(names, ["surface.bin", "slice-0.bin", "result.json"]);
+    assert_eq!(names, ["surface.bin", "slice-0.bin", "field.bin", "result.json"]);
     for output in &outputs {
         let bytes = fs::read(job.dir.join(&output.path)).unwrap();
         assert_eq!(sha256_hex(&bytes), output.sha256, "{}", output.path);
@@ -50,6 +51,45 @@ fn a_step_limited_run_writes_every_output_hashed_and_reports_not_converged() {
     assert_eq!(fields, 3);
     let slice = fs::read(job.dir.join("slice-0.bin")).unwrap();
     assert_eq!(&slice[..4], b"LLSL");
+    assert_eq!(json["field"], "field.bin");
+}
+
+#[test]
+fn the_recorded_field_answers_a_flow_query_probe_with_the_solve_s_own_probe_values() {
+    // M3a: field.bin holds the same time-averaged field the solve sampled, so a later query probe equals the solve's probe
+    // bit for bit (identity frame), and the field's grid is the solver's.
+    let points = "[[1.0, 0.1, -0.2], [-0.9, 0.3, 0.0], [0, 0, 0]]";
+    let job = sphere_job(
+        "job-field",
+        6,
+        20.0,
+        [1.2, 2.5, 1.2],
+        r#"{ "maxSteps": 40, "sampleEvery": 10 }"#,
+        &format!(r#"{{ "probesM": {points} }}"#),
+    );
+    let outputs = run_job(&job.dir).1.unwrap();
+    let json = result_json(&job.dir);
+    let bytes = fs::read(job.dir.join("field.bin")).unwrap();
+    let field = FlowField::from_bytes(&bytes).unwrap();
+    assert_eq!(field.grid.nx as u64, json["grid"]["nx"].as_u64().unwrap());
+    assert_eq!(field.grid.cells() as u64, json["grid"]["cells"].as_u64().unwrap());
+    assert!(field.mirrors.is_empty());
+    let sha = outputs.iter().find(|o| o.path == "field.bin").unwrap().sha256.clone();
+    let query = format!(
+        r#"{{ "version": 1, "field": "field.bin", "fieldSha256": "{sha}", "frame": {{ "x": [1,0,0], "y": [0,1,0], "z": [0,0,1] }},
+            "op": "probe", "probe": {{ "pointsM": {points} }} }}"#
+    );
+    fs::write(job.dir.join("job.json"), query).unwrap();
+    let mut sink = Vec::new();
+    llull_flow_core::query::run(&job.dir, &mut sink).unwrap();
+    let answer: serde_json::Value = serde_json::from_slice(&fs::read(job.dir.join("query.json")).unwrap()).unwrap();
+    for k in 0..2 {
+        let (solve, query) = (&json["probes"][k], &answer["probes"][k]);
+        assert!(solve["pressurePa"].is_number(), "probe {k} samples fluid");
+        assert_eq!(solve["pressurePa"], query["pressurePa"], "probe {k}");
+        assert_eq!(solve["velocityMS"], query["velocityMS"], "probe {k}");
+    }
+    assert_eq!(answer["probes"][2]["miss"], "solid");
 }
 
 #[test]

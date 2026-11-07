@@ -556,3 +556,70 @@ Delivered as two Rust crates in `solver/` (workspace default-members, so `npm ru
   near ½ (only the < 0.501 rule applies; a candidate for raising `latticeMach` in M3); the transports `cfd_streamlines`, `cfd_slice`, `cfd_probe`,
   `cfd_stop` and the `gridStudy` option are not built (slices and probes come out of the solve itself); no VTK export; no overlay / Flow panel (M3).
   The `job` module keeps its serde shapes in `job/spec.rs`.
+
+### M3a (result queries `cfd_probe`, `cfd_slice`, `cfd_streamlines`, and `cfd_stop`) — 2026-11-07
+
+First slice of M3: the result-query side of the native solve. Not built here (later M3 slices): the overlay / legend, the `render_view`
+overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `heightAboveGroundM` / an ABL reference profile.
+
+- **The field is recorded.** `llull-compute flow` writes one more output, `field.bin` (`LLFD`, `llull_flow_core::field`: u32 version 1,
+  grid nx ny nz, h, origin, the symmetry planes, then f32 ux, uy, uz, p per cell and a u8 fluid mask; the same time-averaged f32 fields the
+  solve samples its own probes, slices and surface from). `cfd_solve` checks its header against the grid of `result.json`
+  (`CFD_SOLVER_FAILED` otherwise), keeps it raw and content-addressed beside the bundle (`server/src/cfd/fileStore.ts`:
+  `<FE store>/cfd-files/<sha256>.bin`, re-hashed on read: a damaged file reads as absent) and binds it in the bundle by hash:
+  `CfdResultArtifact.field = { sha256, bytes }` (core `model/cfdResult.ts`). The field is not inside the bundle JSON (a 2e7-cell grid is
+  340 MB); the bundle hash covers the field hash, so a query reads the field of exactly the recorded result. M2 bundles without a field
+  are not read (no backward compatibility).
+- **Queries are host transports, not registry commands** (as §4 lists them): they run a native job, which a pure command cannot. Their
+  params are zod schemas of the plugin (`packages/domain-aero/src/cfd/queryParams.ts`); the protocol, which may not import a plugin,
+  publishes the same JSON Schema in `packages/protocol/src/cfdTools.ts`, pinned equal by `tests/unit/aero/cfd/query.test.ts`.
+  `flowQueryInput` (pure, @aero) refuses unless the recorded result is **trusted** (recorded with its bundle; the bundle in this machine's
+  store, hashing to the recorded hash; the recorded summary equal to the one recomputed from it: `CFD_RESULT_MISSING` /
+  `CFD_RESULT_HASH_MISMATCH`) and **current** (`CFD_RESULT_STALE` when the case or the flow surface changed). Unlike `cfd_report`, which
+  warns, a query refuses: it would read the field in a case frame and around a geometry that no longer exist (the FEA result queries
+  refuse the same way). The queries never change the document; slices and streamlines are stored content-addressed in the same file store
+  and returned by hash (`data.file`) for the overlay. The "adds … under a new hash, re-records" of §4 is not done: nothing is recorded, so
+  a query needs no undo or history step.
+- **Numerics in Rust (`llull-compute flow-query`, crate `llull-flow-core`).** `job.json` carries the case frame (the world axes of the
+  case x / y / z), so every point, normal, velocity and output is in world metres / m/s. `field::FlowField::sample` is the trilinear rule
+  of `sample::trilinear` (now one `Stencil` shared by probes, slices, surface sampling and streamlines, with the M2 sums kept in the same order),
+  with the half-model mirror (a point in the dropped half samples its image, the normal velocity reversed). Probes: velocity, speed, p,
+  and in the report cp and the speed ratio U / U∞ (uniform inflow, so the reference is the free stream; a height-dependent reference waits
+  for the ABL inlet, V1); `miss` `solid` / `outside` per point. Slices: `slice::square_plane` (the M2 `slice-<k>.bin` uses it too), fields
+  speed, p, cp, ux / uy / uz (world components), defaults spacing = h and extent = the largest grid extent, at most 512 samples per side.
+  Streamlines (`streamline.rs`): classical **RK4 on the unit direction u / |u| with a fixed arc-length step** (default h / 2, at most h).
+  §5.5 names Dormand-Prince RK45; a fixed step gives evenly spaced points, an exact length limit and one code path the GPU mirrors, and
+  step control buys little at a step of at most one cell on a field that is trilinear inside each cell. Both directions by default; stops
+  `left_domain` (the fluid box or its face layer), `wall` (the point enters a solid cell), `stagnation` (|u| < 1e-4 U∞), `max_length`
+  (default 3 domain lengths), `max_steps` (default length / step, at most 20000); polylines Douglas-Peucker-decimated at h / 4; seeds
+  from a line, plane (nu × nv), sphere (Fibonacci) or explicit rake, at most 4096. Output `streamlines.bin` (`LLST`: u32 version, lines,
+  points, offsets, then f32 xyz and f32 speed).
+- **GPU (§5.6).** `streamline.wgsl` (feature `gpu`, `gpu_streamline.rs`): one invocation per (seed, direction), the same RK4 and velocity
+  rule in f32 on positions relative to the grid origin, the fluid mask as a bitset, tasks batched so the point buffer stays at most 64 MB,
+  lengths re-summed in f64 on the host. Default device `auto` (a visual product that is not recorded, so device dependence harms no
+  replay); `cpu` is the f64 path and **deterministic** (one independent integration per seed: bit-identical output for any thread count,
+  tested; the native server test traces twice and compares the file hash); `gpu` / `auto` without an adapter trace on the CPU (warning
+  `CFD_GPU_UNAVAILABLE` for `gpu`, the reason in `gpuFallback` for `auto`). VC-CFD-42 (`tests/gpu_streamlines.rs`): on an analytic helix
+  field with a solid block, GPU and CPU agree point for point to **2.3e-5 m** on a 4 m domain (gate 4e-4 m) with the same stop reasons
+  (RTX 4080 Laptop, Vulkan).
+- **`cfd_stop` and the solve lifecycle** (`server/src/cfd/solveRegistry.ts`). Identical concurrent solves (same case and job bytes) share
+  one native run; each caller joins with its own signal (CLI Ctrl-C, or the closing `POST /exchange` request: `ExchangeHost.signal`, set
+  by the CLI local backend and the exchange route) and its own progress sink. A caller whose signal aborts stops waiting at once
+  (`CFD_CANCELLED`, nothing recorded); the run is killed (the runner's process-tree kill) when its last waiter leaves. `cfd_stop caseId`
+  kills every run of the case in this host process (the backend with `--app`), answers every waiter `CFD_CANCELLED` and records nothing,
+  also when the run finished in the same tick (the stopped flag wins). The "partial result is recorded `converged: false`" of §4 is not
+  built: the solver writes no checkpoint, and a stop commits nothing (host-lifecycle rule); a graceful stop with a partial record needs a
+  checkpointing solver (later). Nothing running gives `CFD_NOT_RUNNING` with the running cases. The second caller of a shared run finds it
+  recorded and does not record it again (no duplicate history step).
+- **Codes.** New: `CFD_CANCELLED`, `CFD_NOT_RUNNING`. The queries also answer `CFD_PARAM_INVALID`, `CFD_NO_RESULT`, `CFD_RESULT_MISSING`,
+  `CFD_RESULT_HASH_MISMATCH`, `CFD_RESULT_STALE`, `CFD_SOLVER_MISSING`, `CFD_TIMEOUT`, `CFD_SOLVER_FAILED` (`data.nativeCode`).
+- **Validation.** Rust: `llull-flow-core` unit tests (field round trip and damage, half-model mirror, strict velocity, rotation circles,
+  stop reasons, thread independence, decimation, plane patch) and `tests/query.rs` (world-frame probes in a rotated case frame, slice
+  ranges and cp, stop reasons, bit-reproducible CPU file, half-model mirror symmetry, refusals for the field hash, the frame, a missing
+  section, the seed cap and unknown fields, the auto device); `tests/gpu_streamlines.rs` (VC-CFD-42); `llull-flow-lbm/tests/job.rs` (the
+  solve writes `field.bin` on its grid, and a `flow-query` probe reproduces the solve's own probes bit for bit). TypeScript:
+  `tests/unit/aero/cfd/query.test.ts` (params, rakes, trust ladder, staleness, job defaults, answer cross-checks, field header, reports,
+  schema pin); server `cfdQuery.test.ts` and `cfdStop.test.ts` (fake runner: stop, same-tick stop, per-caller signals, the last waiter
+  kills the run, a shared run recorded once, wiring) and `cfdQueryNative.test.ts` (real binary: the probe equals the solve probe, slice,
+  reproducible CPU streamlines, `cfd_stop` of a long solve). VC-CFD-40 (overlay legend) and 43 (GPU budget, 4096 seeds in at most 2 s)
+  stay open.

@@ -138,7 +138,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   get fluids(): readonly string[] {
     return pluginToolNames('fluids');
   },
-  /** Contributed by the installed cfd plugin (flow cases, geometry preparation, checks, records) + the native `cfd_solve` transport; palette group "Flow". */
+  /** Contributed by the installed cfd plugin (flow cases, geometry preparation, checks, records) + the native transports `cfd_solve`, `cfd_stop`, `cfd_probe`, `cfd_slice`, `cfd_streamlines`; palette group "Flow". */
   get flow(): readonly string[] {
     return [...pluginToolNames('flow'), ...nativeToolNames('flow')];
   },

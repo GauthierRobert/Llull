@@ -141,7 +141,7 @@ describe('registration', () => {
   ];
 
   it('lists the eight commands and the native cfd_solve in the flow toolset, 1:1 with the tool schemas', () => {
-    expect([...TOOLSETS.flow].sort()).toEqual([...names, 'cfd_solve'].sort());
+    expect([...TOOLSETS.flow].sort()).toEqual([...names, 'cfd_solve', 'cfd_stop', 'cfd_probe', 'cfd_slice', 'cfd_streamlines'].sort());
     for (const name of names) {
       expect(getCommand(name), name).toBeDefined();
       expect(toolsetOf(name)).toBe('flow');

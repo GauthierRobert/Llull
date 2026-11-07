@@ -20,6 +20,8 @@ export const EXCLUDED_FUNCTIONS: Readonly<Record<string, string>> = {
   'core/src/commands/brep/blendJoints.ts:parsePickRefusal':
     'parses the refusal text of the in-process kernel (blendReport), not external input',
   'core/src/commands/features/threads.ts:parseThread': 'takes the already zod-validated command params, not text',
+  'domain-aero/src/cfd/queryInput.ts:parseFlowQuery':
+    'zod-validates the already JSON-parsed params object of a cfd query transport (CLI / REST body), not text; tested in tests/unit/aero/cfd/query.test.ts',
   'core/src/commands/solids/loftAdvanced.ts:parseEnd': 'takes the already zod-validated command params, not text',
   'core/src/commands/solids/sweepLaws.ts:parseLaws': 'takes the already zod-validated command params, not text',
   'core/src/commands/solids/sweepOrientation.ts:parseOrientation': 'takes the already zod-validated command params, not text',

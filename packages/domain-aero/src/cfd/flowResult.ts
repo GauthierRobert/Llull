@@ -84,6 +84,7 @@ const resultSchema = z.object({
   warnings: z.array(z.object({ code: z.string(), message: z.string() })),
   notModelled: z.array(z.string()),
   slices: z.array(z.string()),
+  field: z.literal('field.bin'),
 });
 
 export type FlowResultJson = z.infer<typeof resultSchema>;
@@ -113,7 +114,12 @@ const dot = (a: readonly number[], b: readonly number[]): number =>
 export function flowResultArtifact(
   result: FlowResultJson,
   job: FlowJob,
-  files: { readonly surface: Uint8Array; readonly slices: readonly { readonly name: string; readonly bytes: Uint8Array }[] },
+  files: {
+    readonly surface: Uint8Array;
+    readonly slices: readonly { readonly name: string; readonly bytes: Uint8Array }[];
+    /** Hash and size of `field.bin` (the host stores the file itself). */
+    readonly field: { readonly sha256: string; readonly bytes: number };
+  },
   solverVersion: string,
 ): CfdResultArtifact | string {
   if (result.caseId !== job.caseJson.caseId) return `result.json is for case '${result.caseId}', the job was '${job.caseJson.caseId}'`;
@@ -168,5 +174,6 @@ export function flowResultArtifact(
     defaults: job.defaults,
     surfaceBase64: uint8ArrayToBase64(files.surface),
     slices: files.slices.map((slice) => ({ name: slice.name, base64: uint8ArrayToBase64(slice.bytes) })),
+    field: files.field,
   };
 }

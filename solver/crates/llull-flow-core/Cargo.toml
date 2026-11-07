@@ -1,14 +1,22 @@
 [package]
 name = "llull-flow-core"
-description = "12 CFD flow grid shared by the llull solvers: uniform grid, binary STL, parity voxeliser with body attribution, fixed-order per-body force reduction, field sampling (CPU reference, RS1 §2)"
+description = "12 CFD flow grid shared by the llull solvers: uniform grid, binary STL, parity voxeliser with body attribution, fixed-order per-body force reduction, field sampling, the recorded field file, slices and streamlines (CPU reference + wgpu twin), the `llull-compute flow-query` job (RS1 §2)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+# wgpu streamline kernel (`flow-query` device "gpu" / "auto"): f32 mirror of the CPU integrator. Without it a GPU request traces on the CPU with a warning.
+gpu = ["llull-gpu/wgpu"]
+
 [dependencies]
 llull-gpu = { path = "../llull-gpu" }
+llull-protocol = { path = "../llull-protocol" }
 rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

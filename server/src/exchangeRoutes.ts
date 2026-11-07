@@ -21,7 +21,12 @@ export function buildExchangeRouter(restLimiter: RequestHandler, exchange: Excha
       return;
     }
     const source = isRecord(body) && body['client'] === 'cli' ? 'cli' : 'rest';
-    runLiveExchangeTool(name, isRecord(body) ? body['params'] : undefined, exchange, source)
+    // A client that goes away (Ctrl-C of `llull --app`) cancels its own wait: a native transport kills its job unless another caller waits for it.
+    const cancel = new AbortController();
+    res.on('close', () => {
+      if (!res.writableFinished) cancel.abort();
+    });
+    runLiveExchangeTool(name, isRecord(body) ? body['params'] : undefined, exchange, source, cancel.signal)
       .then((outcome) => {
         if (outcome === null) {
           res.status(404).json({ error: `"${name}" is not an exchange tool; use POST /command.` });

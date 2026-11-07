@@ -32,6 +32,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'blendStepIssue',
   'buildSurface', // domain-aero cfd
   'prepareSurface', // domain-aero cfd
+  'flowQueryInput', // domain-aero cfd result queries (staleness re-prepares through the kernel)
   'recognitionOf',
   'machinedPart',
   'resolveFace',

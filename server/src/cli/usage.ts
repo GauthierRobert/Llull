@@ -88,6 +88,11 @@ const NATIVE = `Native solvers and file tools (run where the document lives: --d
   cfd_solve caseId=ID         native llull-compute lattice-Boltzmann flow solve of a low-speed case (create_cfd_case, Mach < 0.3), recorded
                               with record_cfd_results  [timeoutS=3600 device=cpu|gpu|auto maxSteps=200000 latticeMach=0.1 deviceMemoryBytes=N les=true];
                               --progress prints one line per drag sample; without llull-compute: CFD_SOLVER_MISSING; then: cfd_report caseId=ID
+  cfd_stop caseId=ID          kill the running cfd_solve of the case in this host (use --app for the desktop backend); nothing is recorded
+  cfd_probe caseId=ID points='[[x,y,z]]'      velocity / speed / p / cp / U/U∞ at world points (metres) on the recorded field
+  cfd_slice caseId=ID origin='[x,y,z]' normal='[0,1,0]'   [field=speed|p|cp|ux|uy|uz spacingM=… extentM=…] plane patch -> LLSL file
+  cfd_streamlines caseId=ID rake='{"kind":"line","start":[…],"end":[…],"count":32}'   [direction=both device=auto|gpu|cpu stepM maxLengthM
+                              maxSteps] RK4 streamlines (GPU f32 or CPU f64 deterministic) -> LLST file; queries refuse stale / untrusted results
   mtest_run mtest=SCRIPT      OPTIONAL MFront / MTest (user-installed, never bundled: $LLULL_MTEST, $LLULL_MFRONT; needs LLULL_ALLOW_CODE_EXECUTION=1):
                               run an MTest script [mfront={name,source} timeoutS=120 probe=true]; absent tools -> MFRONT_TOOL_MISSING with the reason
   auto_route lineId=ID from='{"portId":"tie-1.1"}' to='{"portId":"tie-2.1"}' [route_problem params]

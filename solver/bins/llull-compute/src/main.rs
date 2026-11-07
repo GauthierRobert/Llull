@@ -5,7 +5,7 @@
 //! GDT stack-up Monte Carlo, contract in `llull_stats`), `panel <folder>` (crate `llull-panel`, AER vortex-lattice influence + LU, faer),
 //! `explicit <folder>` (crate `llull-explicit`, PHY-19 RS-8a; contract in `llull_explicit::job`), `geomq <folder>` (crate `llull-geomq`,
 //! RS-6 clearance / thickness / view-factor batches; contract in `llull_geomq`), `bvh <folder>` (crate `llull-bvh`, plant 09 VIS-M8e instance BVH build; contract in `llull_bvh::job`), `media <folder>` (crate `llull-media`, PHY-22 MOV M2 GIF / AV1-in-MP4 encoder; one `progress` event per frame, contract in `llull_media::job`), `meshops <folder>` (crate `llull-meshops`, 07 MSH M3 decimate / smooth, bit-identical to the TypeScript mesh engine, and M6 `quad_remesh` by the vendored QuadriFlow), `flow <folder>` (crate `llull-flow-lbm`, 12 CFD M2
-//! lattice-Boltzmann steady flow; one `progress` event per drag sample, contract in `llull_flow_lbm::job`), `field <folder>` (crate `llull-field`, 05 IMP M4 voxel meshing / measures of a FieldProgram tape, bit-identical to the TypeScript engine; contract in `llull_field`).
+//! lattice-Boltzmann steady flow; one `progress` event per drag sample, contract in `llull_flow_lbm::job`), `flow-query <folder>` (crate `llull-flow-core`, 12 CFD M3a probes / slices / streamlines on a recorded field; contract in `llull_flow_core::query`), `field <folder>` (crate `llull-field`, 05 IMP M4 voxel meshing / measures of a FieldProgram tape, bit-identical to the TypeScript engine; contract in `llull_field`).
 //! An unknown job ends with an `error`
 //! event and exit code 2. `cloud import|op <folder>`: crate `llull-cloud` (plant 10 point clouds, RS-3 / RS-4). The raster job reports a `warning` event when it was asked for the GPU but drew with the CPU twin.
 
@@ -16,7 +16,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute homogenize <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder> | llull-compute cloud <import|op> <job-folder> | llull-compute geomq <job-folder> | llull-compute bvh <job-folder> | llull-compute media <job-folder> | llull-compute meshops <job-folder> | llull-compute flow <job-folder> | llull-compute field <job-folder>";
+    "usage: llull-compute post <fatigue|map|random> <job-folder> | llull-compute raster <job-folder> | llull-compute topopt <job-folder> | llull-compute homogenize <job-folder> | llull-compute stats <job-folder> | llull-compute panel <job-folder> | llull-compute route <job-folder> | llull-compute explicit <job-folder> | llull-compute cloud <import|op> <job-folder> | llull-compute geomq <job-folder> | llull-compute bvh <job-folder> | llull-compute media <job-folder> | llull-compute meshops <job-folder> | llull-compute flow <job-folder> | llull-compute flow-query <job-folder> | llull-compute field <job-folder>";
 
 fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Output>, (String, String)> {
     match (job, rest) {
@@ -56,9 +56,12 @@ fn run_job(job: &str, rest: &[String], out: &mut impl Write) -> Result<Vec<Outpu
         ("meshops", [folder, ..]) => llull_meshops::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("field", [folder, ..]) => llull_field::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
         ("flow", [folder, ..]) => llull_flow_lbm::job::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message)),
+        ("flow-query", [folder, ..]) => {
+            llull_flow_core::query::run(Path::new(folder), out).map_err(|error| (error.code.to_string(), error.message))
+        }
         (
             "post" | "raster" | "topopt" | "homogenize" | "route" | "stats" | "panel" | "explicit" | "cloud" | "geomq" | "bvh" | "media"
-            | "meshops" | "flow" | "field",
+            | "meshops" | "flow" | "flow-query" | "field",
             _,
         ) => Err(("NATIVE_USAGE".to_string(), USAGE.to_string())),
         _ => Err(("NATIVE_JOB_UNKNOWN".to_string(), format!("unknown job '{job}'"))),

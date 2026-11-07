@@ -113,7 +113,7 @@ llull create_cfd_case '{"id":"m2","entityIds":["body"],"regime":"auto","freestre
 llull prepare_cfd_case caseId=m2 --json --file model.llull      # pass / warn / fail list, memory estimate; nothing is solved
 llull cfd_solve caseId=m2 --progress --timeout 1800 --file model.llull
 llull cfd_report caseId=m2 --json --file model.llull       # forces, coefficients, peaks, convergence, provenance
-llull cfd_streamlines caseId=m2 rake='{"kind":"plane","origin":[-1,0,-1],"u":[0,4,0],"v":[0,0,2],"count":[24,8]}' --file model.llull
+llull cfd_streamlines caseId=m2 rake='{"kind":"plane","centre":[-1,2,0],"uAxis":[0,2,0],"vAxis":[0,0,1],"nu":24,"nv":8}' --file model.llull
 llull render_view overlay=cfd:m2:mach --save m2.png --file model.llull
 ```
 

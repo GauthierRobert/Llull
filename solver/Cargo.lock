@@ -1257,6 +1257,7 @@ dependencies = [
  "llull-cloud",
  "llull-explicit",
  "llull-field",
+ "llull-flow-core",
  "llull-flow-lbm",
  "llull-geomq",
  "llull-media",
@@ -1300,7 +1301,10 @@ name = "llull-flow-core"
 version = "0.1.0"
 dependencies = [
  "llull-gpu",
+ "llull-protocol",
  "rayon",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

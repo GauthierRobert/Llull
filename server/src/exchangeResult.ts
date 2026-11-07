@@ -62,6 +62,8 @@ export interface ExchangeHost {
   readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult;
   /** One line per solver iteration of a native job (the CLI's `--progress`); absent on the server. */
   readonly onProgress?: (line: string) => void;
+  /** The caller's cancellation (CLI Ctrl-C, a closed REST request): long native transports (cfd_solve, cfd queries) stop waiting on it. */
+  readonly signal?: AbortSignal;
 }
 
 /**

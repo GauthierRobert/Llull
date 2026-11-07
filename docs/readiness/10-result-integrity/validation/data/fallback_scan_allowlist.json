@@ -262,6 +262,11 @@
       "reason": "level elevation datum: geometry datum, not an engineering input"
     },
     {
+      "file": "domain-aero/src/cfd/queryInput.ts",
+      "match": "const maxLengthM = params.maxLengthM ?? 3 * artifact.grid.nx * h;",
+      "reason": "cfd_streamlines named default (TECHNICAL_SPEC §5.5: 3 domain lengths), reported in data.defaults (AF-31); a visual query, not a check input"
+    },
+    {
       "file": "domain-aero/src/composites/analysis.ts",
       "match": "const load: Load6 = [loads?.Nx ?? 0, loads?.Ny ?? 0, loads?.Nxy ?? 0, loads?.Mx ?? 0, loads?.My ?? 0, loads?.Mxy ?? 0];",
       "reason": "an omitted load component is zero load (physical meaning of absence)"
