@@ -4,7 +4,9 @@
  * deducted (named in the method). Flanges that are placeholders or unverified make the caller report it.
  */
 
-import type { NozzleRecord } from '../plantData';
+import type { NozzleRecord, TankTemplate } from '../plantData';
+import type { ExchangerGeometry } from './exchangerFrame';
+import { thicknessAt } from './tankFrame';
 import type { MassPart } from './vesselMass';
 import { headSurfaceHeight, type VesselGeometry } from './vesselFrame';
 
@@ -49,3 +51,21 @@ export function neckMassParts(
 /** Nozzle parts of a vessel. */
 export const nozzleMassParts = (scale: number, geometry: VesselGeometry, nozzles: readonly NozzleRecord[], density: number): MassPart[] =>
   neckMassParts(scale, (nozzle) => vesselWall(geometry, nozzle), nozzles, density);
+
+/** Wall distance of an exchanger nozzle (shell: shell outside radius; channel: channel outside radius; free: 0). */
+export const exchangerWallOf =
+  (geometry: ExchangerGeometry) =>
+  (nozzle: NozzleRecord): number =>
+    nozzle.location.on === 'shell'
+      ? geometry.radius + geometry.shellThickness
+      : nozzle.location.on === 'channel'
+        ? geometry.radius + (nozzle.location.channel === 'front' ? geometry.front : geometry.rear).channelThickness
+        : 0;
+
+/** Wall distance of a tank nozzle (shell by elevation: outside radius of the course at that elevation; roof / free: 0). */
+export const tankWallOf =
+  (template: TankTemplate) =>
+  (nozzle: NozzleRecord): number =>
+    nozzle.location.on === 'shell' && 'elevation' in nozzle.location
+      ? template.diameter / 2 + thicknessAt(template, nozzle.location.elevation)
+      : 0;

@@ -847,11 +847,11 @@
 | `add_vessel` | Create a parametric pressure vessel (equipment element with a tag): cylindrical shell with two formed heads (ellipsoidal 2:1, torispherical by standard or radi… |  |
 | `check_equipment` | Query: design review of parametric equipment - vessels, exchangers, tanks, pumps (all, or the listed tags / ids): ASME VIII-1 shell and head under-thickness (E… | read-only |
 | `delete_nozzle` | Delete a nozzle of an equipment by mark. |  |
-| `equipment_cog` | Query: centre of gravity of a parametric vessel (tag or id) for the empty, operating and hydrotest states, with the mass of each state (the same masses as equi… | read-only |
+| `equipment_cog` | Query: centre of gravity of a parametric vessel, heat exchanger, storage tank or pump (tag or id) for the empty, operating and hydrotest states, with the mass … | read-only |
 | `equipment_datasheet` | Query: the data sheet of one parametric equipment (tag or id of a vessel, process column, heat exchanger, storage tank or pump) as JSON (llull-equipment-datash… | read-only |
 | `equipment_ports` | Query: the connection ports of one equipment (tag or id) or of all equipment: for every nozzle, id "<tag>:<mark>", world position of the flange face centre and… | read-only |
 | `equipment_weights` | Query: empty, operating and hydrotest weights of a parametric vessel, exchanger, tank or pump (tag or id; exchangers: shell, channels, bonnets, tubesheets, tub… | read-only |
-| `nozzle_reinforcement` | Query: ASME VIII-1 UG-37 opening reinforcement (area replacement) of the shell and head nozzles of a parametric vessel (tag or id). | read-only |
+| `nozzle_reinforcement` | Query: ASME VIII-1 UG-37 opening reinforcement (area replacement) of the shell and head nozzles of a parametric vessel, or of the shell and channel nozzles of … | read-only |
 | `rename_element_tag` | Rename the tag (mark) of cable trays, pipe supports and steel members, so that assign_plant_object can classify them with a plant tag (plant data writes the ta… |  |
 | `rename_equipment_tag` | Rename the tag (mark) of equipment and keep every reference to it consistent: a legacy pipe from / to naming the tag or a port "<tag>:<nozzle>" and the from / … |  |
 | `tank_shell_thickness` | Query: API 650 one-foot-method shell thickness, course by course, of a vertical atmospheric storage tank. | read-only |

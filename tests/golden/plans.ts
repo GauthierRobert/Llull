@@ -1081,6 +1081,63 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'update_equipment_parameters', params: { equipment: 'P-101', pump: { driver: { length: 1000 } } } },
     { command: 'equipment_ports', params: {} },
   ],
+  // 03 EQP-PID-FU: centre of gravity of an exchanger and a tank, UG-37 on an exchanger shell nozzle, a skid in the bundle-pull zone of a BEU
+  plant_equipment_cog_bundle_pull: [
+    { command: 'set_units', params: { units: 'mm' } },
+    {
+      command: 'add_heat_exchanger',
+      params: {
+        tag: 'E-301',
+        temaType: 'BEU',
+        location: [0, 8000],
+        shellInsideDiameter: 600,
+        shellThickness: 8,
+        corrosionAllowance: 3,
+        tubes: { outsideDiameter: 19.05, wallThickness: 1.651, count: 300, length: 4877, passes: 2, pitch: 23.8125, layoutAngleDeg: 30 },
+        tubesheetThickness: 50,
+        frontChannel: { length: 300 },
+        support: { type: 'saddles', stations: [800, 4077], width: 200, axisElevation: 1000 },
+        design: {
+          shellSide: {
+            pressure: { value: 1.5, unit: 'MPa' },
+            allowableStress: { value: 138, unit: 'MPa', source: 'hand example' },
+            specificGravity: 0.85,
+          },
+          tubeSide: { pressure: { value: 0.6, unit: 'MPa' }, allowableStress: { value: 138, unit: 'MPa', source: 'hand example' } },
+        },
+        clearance: 0,
+      },
+    },
+    {
+      command: 'add_nozzle',
+      params: {
+        equipment: 'E-301',
+        mark: 'S1',
+        dn: 150,
+        rating: 'CL150',
+        facing: 'RF',
+        location: { on: 'shell', station: 400, orientationDeg: 0 },
+        projection: 600,
+      },
+    },
+    { command: 'equipment_cog', params: { equipment: 'E-301', include: ['body', 'nozzles'] } },
+    { command: 'nozzle_reinforcement', params: { equipment: 'E-301' } },
+    { command: 'add_equipment', params: { name: 'Skid', mark: 'S-1', location: [-5000, 8000], size: [500, 500, 1200], clearance: 0 } },
+    { command: 'check_clashes', params: {} },
+    {
+      command: 'add_storage_tank',
+      params: {
+        tag: 'T-401',
+        location: [30000, 0],
+        diameter: 20000,
+        shellHeight: 12000,
+        courses: [2000, 2000, 2000, 2000, 2000, 2000],
+        roof: { type: 'cone', slopeRatio: '1:12' },
+        design: { specificGravity: 1, designLiquidLevel: 12000, material: 'A36M', corrosionAllowance: 1.5 },
+      },
+    },
+    { command: 'equipment_cog', params: { equipment: 'T-401' } },
+  ],
   // VIS1 / VIS-M8j: one packed instance array of a component (no Entity per member)
   instance_array_grid: [
     ...CUBE_COMPONENT,

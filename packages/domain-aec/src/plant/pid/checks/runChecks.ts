@@ -11,6 +11,7 @@ import {
   opcUnresolved,
   segmentInvalid,
 } from './ruleConnection';
+import { stampStale } from './ruleStamp';
 import { flowConflict, sizeMismatch, specMismatch } from './ruleConsistency';
 import {
   controlValveNoActuator,
@@ -38,6 +39,7 @@ const RUNNERS: ReadonlyArray<{ readonly codes: readonly PidRule[]; readonly run:
   { codes: ['PID_LINE_NUMBER_MISSING'], run: lineNumberMissing },
   { codes: ['PID_INSTRUMENT_UNCONNECTED'], run: instrumentUnconnected },
   { codes: ['PID_TAG_NONSTANDARD'], run: tagNonstandard },
+  { codes: ['PID_STAMP_STALE'], run: stampStale },
 ];
 
 export interface CheckRun {

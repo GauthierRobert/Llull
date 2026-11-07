@@ -10,8 +10,11 @@ import type { OrientedBox } from './clashBoxes';
 export interface ExternalBody {
   /** Id reported in `Clash.a` / `Clash.b` (a pipe part id such as `run-4/pipe-2`). */
   readonly id: string;
-  /** `solid`: the body itself, a hit is a hard clash. `envelope`: insulation around it, a hit is an `insulation` clash (unless the solid already clashes). */
-  readonly kind: 'solid' | 'envelope';
+  /**
+   * `solid`: the body itself, a hit is a hard clash. `envelope`: insulation around it, a hit is an `insulation` clash (unless the solid already clashes).
+   * `clearance`: a keep-clear zone (a maintenance space such as a tube-bundle pull), a hit by any other body is a `clearance` clash.
+   */
+  readonly kind: 'solid' | 'envelope' | 'clearance';
   readonly box: OrientedBox;
   /** Bodies of one group (a run) never clash with each other. */
   readonly group: string;
