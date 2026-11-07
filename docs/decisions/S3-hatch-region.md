@@ -42,8 +42,19 @@ Exactly one of:
 
 Refusals are coded (`codedRejection`, with remediation): `REGION_EMPTY_SELECTION`, `REGION_ENTITY_NOT_FOUND`, `REGION_UNSUPPORTED_KIND`,
 `REGION_OPEN_BOUNDARY`, `REGION_PLANE_MISMATCH`, `REGION_DEGENERATE_LOOP`, `REGION_SELF_INTERSECTING`, `REGION_LOOPS_CROSS`,
-`REGION_POINT_NOT_ENCLOSED`, `REGION_TOO_LARGE` (> 256 loops / 4000 tessellated points), `REGION_BAD_PARAM`. Loops that touch without
-crossing are not detected (only proper crossings are); the even-odd result there is still well defined.
+`REGION_LOOPS_TOUCH`, `REGION_POINT_NOT_ENCLOSED`, `REGION_POINT_ON_BOUNDARY`, `REGION_TOO_LARGE` (> 256 loops / 4000 tessellated points / 256 shapes around a
+pick), `REGION_BAD_PARAM`.
+
+**Contact rule.** The selected loops must neither cross nor touch (`geometry/region.ts`, `loopContact` / `selfContact`, a new helper: `lib/polygon`'s
+strict `segmentsIntersect` is unchanged for its other callers). Two edges closer than a tolerance are a contact: a T-touch, a shared vertex, a collinear
+overlap, a coincident outline, a tangent circle. The tolerance is 1e-6 for straight loops and 0.2 % of the bounding-box diagonal for a loop tessellated from
+exact curves (the 32-sample sagitta), so a circle tangent between two tessellation vertices is still caught, and a curved loop closer than that to
+another is refused as touching. A loop touches itself when a vertex lies on another edge or two edges fold back (a spike). Shapes in one call that merely
+share an edge are refused too: hatch them in two calls. The pick point is refused when it lies within the same tolerance of any outline
+(`REGION_POINT_ON_BOUNDARY`). Nesting probes the midpoint of an inner loop edge, never a vertex; `ids` are de-duplicated; a pick only tessellates shapes whose box
+overlaps the pick (then the chosen boundary), so its cost follows the neighbourhood, not the document.
+
+**Hatch lines** skip any offset that lies along a boundary edge (region hatches only; `@lib/hatch` default output, used by the DXF ANSI31 fills, is unchanged).
 
 ### Other layers
 
@@ -59,7 +70,7 @@ crossing are not detected (only proper crossings are); the even-odd result there
   3D solids only (`create_sheet` refuses 2D ids): regions are not sheet content. Code export (CadQuery, build123d, OpenSCAD, FreeCAD)
   emits solids; 2D drafting, `region` included, adds none (an extruded region is exported as the extrusion / mesh it produced).
 - **Persistence.** `KIND_PROBLEMS.region` validates loops (count, points, caps), curves (parallel closed chains), hatch (pattern, finite angle,
-  spacing > 0).
+  spacing > 0), that each exact chain is the loop's source (bounds match), and for regions up to 1000 points the same contact rule (larger ones are only size-bounded: the check is quadratic).
 - **UI.** `RegionRenderer` (both views, via `Shape2DRenderer`), snapping (exact joints + straight-edge midpoints + every edge as a segment),
   box select, outline / interior picking (even-odd), property rows, and a one-click **Hatch** draw tool dispatching `hatch_region point`.
 

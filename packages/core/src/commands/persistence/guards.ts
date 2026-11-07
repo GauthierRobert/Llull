@@ -4,16 +4,7 @@ import type { MeshAssetRef } from '../../model/meshProvenance';
 import { storedModelsProblem } from '../document/propertyModelSchema';
 import { formHash } from '../document/propertyModels';
 import { recordProblem } from './materialRecordValidation';
-import {
-  type Layer,
-  type CameraState,
-  type EntityKind,
-  type Vec2,
-  type Vec3,
-  SHAPE2D_KINDS,
-  SOLID_KINDS,
-  FINISH_PATTERNS,
-} from '../../model/types';
+import { type Layer, type CameraState, type EntityKind, type Vec3, SHAPE2D_KINDS, SOLID_KINDS, FINISH_PATTERNS } from '../../model/types';
 import { decalWrapFieldsProblem } from './decalGuard';
 import { helixProblem, sweepDesignProblem } from './sweepGuard';
 import { exactSectionsProblem, nurbsCurveProblem, nurbsSurfaceProblem, surfaceTrimsProblem } from './nurbsGuard';
@@ -25,6 +16,8 @@ import { isVec3 } from '../../lib/vec3';
 import { isHexColor } from '../../lib/isHexColor';
 import { validateShapeRecipe } from '../../geometry/shapeRecipe';
 import { chainIssue } from '../../geometry/curveSegments';
+import { curvesProblem, isCurveSegment } from './curvesGuard';
+import { regionProblem } from './regionGuard';
 import { MAX_SUBDIVISION_LEVELS, type Cage, cageProblem } from '../../geometry/subdivision';
 import { settleBudgetProblem } from '../../geometry/subd/settle';
 import { subdivisionFieldsProblem } from '../../geometry/subd/validate';
@@ -35,13 +28,10 @@ import {
   MAX_IMAGE_DATA_URL_LENGTH,
   MAX_IMPORT_TRIANGLES,
   MAX_STORED_PROFILE_POINTS,
-  MAX_REGION_LOOPS,
-  MAX_REGION_POINTS,
   MAX_REVOLVE_SEGMENTS,
   MAX_SPLINE_CONTROL_POINTS,
 } from '../limits';
 import { POSITIVE_FIELDS } from '../../model/positiveFields';
-import { REGION_HATCH_PATTERNS } from '../../model/regionHatch';
 
 /** First problem of a saved image underlay's raster fields, or null (the payload is not decoded). */
 function imageProblem(v: Record<string, unknown>): string | null {
@@ -153,46 +143,6 @@ function stationsProblem(stations: unknown): string | null {
   );
   return problem === null ? null : `stations ${problem}`;
 }
-
-/** Optional exact 2D boundary (`curves`) problem, or null. */
-function curvesProblem(curves: unknown): string | null {
-  if (curves === undefined) return null;
-  if (!(Array.isArray(curves) && curves.every((s) => isCurveSegment(s, 2))))
-    return 'curves must be line/arc/bezier/ellipse segments with [x, y] points';
-  const issue = chainIssue(curves as CurveSegment<Vec2>[], true);
-  return issue === null ? null : `curves must form one closed loop — ${issue}`;
-}
-
-/** A region entity: loops of >= 3 finite points, one closed exact chain per loop when `curves` is stored, a valid hatch. */
-function regionProblem(v: Record<string, unknown>): string | null {
-  const { loops, curves, hatch } = v;
-  if (!Array.isArray(loops) || loops.length < 1 || loops.length > MAX_REGION_LOOPS)
-    return `loops must be 1..${MAX_REGION_LOOPS} point lists`;
-  if (!loops.every((loop) => Array.isArray(loop) && loop.length >= 3 && loop.every(isVec2)))
-    return 'every loop must be >= 3 [x, y] points of finite numbers';
-  if (loops.reduce((sum: number, loop: unknown[]) => sum + loop.length, 0) > MAX_REGION_POINTS)
-    return `loops hold more than ${MAX_REGION_POINTS} points in total`;
-  if (curves !== undefined && !(Array.isArray(curves) && curves.length === loops.length))
-    return 'curves must hold one closed chain per loop';
-  const chainIssue = Array.isArray(curves) ? firstProblem(...curves.map(curvesProblem)) : null;
-  if (chainIssue !== null) return chainIssue;
-  if (hatch === undefined) return null;
-  if (!isRecord(hatch) || !(REGION_HATCH_PATTERNS as readonly unknown[]).includes(hatch['pattern']))
-    return `hatch.pattern must be one of ${REGION_HATCH_PATTERNS.join(', ')}`;
-  return isFiniteNumber(hatch['angle']) && isPositiveNumber(hatch['spacing']) ? null : 'hatch.angle must be finite and hatch.spacing > 0';
-}
-
-function isCurveSegment(s: unknown, dims: number): boolean {
-  return (
-    isRecord(s) &&
-    Array.isArray(s['points']) &&
-    s['points'].length === SEGMENT_POINT_COUNT[String(s['type'])] &&
-    s['points'].every((p: unknown) => Array.isArray(p) && p.length === dims && p.every(isFiniteNumber))
-  );
-}
-
-/** Points per curve segment type (`CurveSegment`). */
-const SEGMENT_POINT_COUNT: Readonly<Record<string, number>> = { line: 2, arc: 3, bezier: 4, ellipse: 3 };
 
 const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, ...SHEET_KINDS, 'instance']);
 

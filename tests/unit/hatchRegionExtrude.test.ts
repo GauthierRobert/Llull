@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
 import { type ExtrusionEntity, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { expectNoOp } from '../helpers/expectNoOp';
 import { docWith, volumeOf as massVolume } from '../helpers/fixtureDocument';
-import { manifoldSuite, meshOf, volumeOf } from '../helpers/featureSupport';
+import { ctxWith, manifoldSuite, meshOf, volumeOf } from '../helpers/featureSupport';
 
 const plate = { id: 'plate', kind: 'rectangle', width: 100, height: 60 };
 const hole = { id: 'hole', kind: 'circle', center: [50, 30], radius: 10 };
@@ -80,5 +81,94 @@ describe('extrude_profile of a region with a kernel', () => {
   it('empty document stays empty without a region id', () => {
     const empty = createEmptyDocument();
     expectNoOp(execute(empty, 'extrude_profile', { id: 'nope', depth: 1 }), empty);
+  });
+});
+
+/** A kernel that answers however the test says; never a real shape. */
+const stubKernel = (evaluate: GeometryKernel['evaluate'], tessellate: GeometryKernel['tessellate'] = () => null): GeometryKernel => ({
+  supports: () => true,
+  evaluate,
+  tessellate,
+  topology: () => null,
+  exportStep: () => null,
+});
+
+/** A region built by hand (no exact curves): a 10 x 10 outer loop with a 2 x 2 hole. */
+const HAND_BUILT = docWith({
+  id: 'r',
+  kind: 'region',
+  loops: [
+    [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+    ],
+    [
+      [4, 4],
+      [6, 4],
+      [6, 6],
+      [4, 6],
+    ],
+  ],
+});
+
+describe('extrude_profile of a region: kernel failures and odd inputs', () => {
+  it('a kernel that cannot build the prisms: REGION_KERNEL_BUILD_FAILED, unchanged document', () => {
+    const result = execute(HAND_BUILT, 'extrude_profile', { id: 'r', depth: 3 }, ctxWith(stubKernel(() => null)));
+    expectNoOp(result, HAND_BUILT, 'REGION_KERNEL_BUILD_FAILED');
+    expect(result.error?.code).toBe('REGION_KERNEL_BUILD_FAILED');
+    expect(result.summary).toContain('refused');
+  });
+
+  it('a kernel whose shape tessellates to nothing is the same refusal (empty)', () => {
+    const empty = stubKernel(
+      () => ({}) as ShapeHandle,
+      () => ({ positions: [], indices: [] }),
+    );
+    const result = execute(HAND_BUILT, 'extrude_profile', { id: 'r', depth: 3 }, ctxWith(empty));
+    expectNoOp(result, HAND_BUILT, 'REGION_KERNEL_BUILD_FAILED');
+    expect(result.summary).toContain('empty');
+  });
+
+  it('a zero-length axis on a holed region is refused before the kernel is asked', () => {
+    const evaluate = vi.fn(() => null);
+    const result = execute(HAND_BUILT, 'extrude_profile', { id: 'r', depth: 3, axis: [0, 0, 0] }, ctxWith(stubKernel(evaluate)));
+    expectNoOp(result, HAND_BUILT, 'axis must be 3 finite numbers');
+    expect(evaluate).not.toHaveBeenCalled();
+  });
+
+  it('a hand-built region without curves extrudes without a kernel (no exact copy stored)', () => {
+    const plain = docWith({
+      id: 'p',
+      kind: 'region',
+      loops: [
+        [
+          [0, 0],
+          [10, 0],
+          [10, 5],
+          [0, 5],
+        ],
+      ],
+    });
+    const result = execute(plain, 'extrude_profile', { id: 'p', depth: 2 });
+    const extrusion = result.document.entities[result.affected[0] as string] as ExtrusionEntity;
+    expect(extrusion.curves).toBeUndefined();
+    expect(extrusion.profile).toHaveLength(4);
+    expect(massVolume(result.document, extrusion.id)).toBeCloseTo(100, 9);
+  });
+
+  it('a hand-built holed region without a kernel needs one (REGION_NEEDS_KERNEL)', () => {
+    expectNoOp(execute(HAND_BUILT, 'extrude_profile', { id: 'r', depth: 3 }), HAND_BUILT, 'REGION_NEEDS_KERNEL');
+  });
+});
+
+describe('extrude_profile of a hand-built holed region with a kernel', () => {
+  manifoldSuite();
+
+  it('polygon loops only: (10 x 10 - 2 x 2) x 3 = 288 exactly', () => {
+    const result = execute(HAND_BUILT, 'extrude_profile', { id: 'r', depth: 3 });
+    expect(result.affected, result.summary).toHaveLength(1);
+    expect(volumeOf(result.document, result.affected[0] as string)).toBeCloseTo(288, 6);
   });
 });

@@ -14,7 +14,7 @@ import { MAX_REGION_LOOPS, MAX_REGION_POINTS } from '../limits';
 import { existingLayerOrDefault } from '../solids/shared';
 import { placementOf } from './sketchPlanes';
 import { DEFAULT_DRAW_COLOR } from './shared';
-import { type FrameLoop, type WorkPlane, boundaryLoops, groupByOutermost, isRefusal, loopsAtPoint, planeClosedLoops } from './regionLoops';
+import { type FrameLoop, type WorkPlane, boundaryLoops, groupByOutermost, isCurved, isRefusal, loopsAtPoint } from './regionLoops';
 
 const COMMAND = 'hatch_region';
 
@@ -30,8 +30,12 @@ const LOOP_ISSUES = {
     'Remove the zero-area shape (collapsed polyline, collinear points) from the boundary.',
   ],
   REGION_SELF_INTERSECTING: [
-    'a boundary loop crosses itself',
-    'Redraw it without self-crossing (a figure-eight is two loops: split it into two closed shapes).',
+    'a boundary loop crosses or touches itself (self-crossing, a vertex on another edge, a spike that doubles back)',
+    'Redraw it as a simple outline (a figure-eight is two loops: split it into two closed shapes; remove the spike).',
+  ],
+  REGION_LOOPS_TOUCH: [
+    'two boundary loops touch (shared vertex, T-contact, collinear overlap, tangency or coincident outlines)',
+    'Separate the shapes by a visible gap or nest them clearly (a hole must not touch the outer edge, a circle must not be tangent to an edge).',
   ],
   REGION_LOOPS_CROSS: [
     'two boundary loops cross each other',
@@ -50,11 +54,11 @@ function planeOf(doc: CadDocument, plane: string | undefined): WorkPlane | strin
 /**
  * @affects creates 1 region entity per outermost boundary (loops nested inside it become holes / islands, even-odd); sources are kept
  * @invariant exactly one of ids (closed shapes, or open pieces that join into one loop) or point (pick point inside closed shapes on a plane);
- *   loops neither cross nor self-intersect; all shapes share one work plane; the region keeps exact curves (circle area is exactly πr²)
+ *   loops neither cross, touch nor self-intersect; all shapes share one work plane; the region keeps exact curves (circle area is exactly πr²)
  * @invariant region sits at the first shape's position / rotation (ids) or at the plane origin (point); ids are step-scoped
  * @failure empty / missing input -> REGION_EMPTY_SELECTION; unknown id -> REGION_ENTITY_NOT_FOUND; text / solids -> REGION_UNSUPPORTED_KIND;
  *   open boundary -> REGION_OPEN_BOUNDARY; other plane -> REGION_PLANE_MISMATCH; self-crossing -> REGION_SELF_INTERSECTING; crossing loops ->
- *   REGION_LOOPS_CROSS; pick point outside every shape -> REGION_POINT_NOT_ENCLOSED; too large -> REGION_TOO_LARGE; ids with point, spacing <= 0 -> REGION_BAD_PARAM -> no-op, affected:[]
+ *   REGION_LOOPS_CROSS; pick point outside every shape -> REGION_POINT_NOT_ENCLOSED; touching loops -> REGION_LOOPS_TOUCH; pick point on an outline -> REGION_POINT_ON_BOUNDARY; too large -> REGION_TOO_LARGE; ids with point, spacing <= 0 -> REGION_BAD_PARAM -> no-op, affected:[]
  */
 export const hatchRegion = defineCommand({
   name: 'hatch_region',
@@ -71,7 +75,8 @@ export const hatchRegion = defineCommand({
     'none (outline only). `angle` is in radians (45° = 0.7854), `spacing` the distance between pattern lines in document units (default ' +
     'about 1/40 of the region diagonal, rounded to 1-2-5). Net area (outer minus holes) = measure_area on the region; extrude_profile ' +
     'extrudes a region without holes. Refusals carry a code: REGION_EMPTY_SELECTION, REGION_ENTITY_NOT_FOUND, REGION_UNSUPPORTED_KIND, ' +
-    'REGION_OPEN_BOUNDARY, REGION_PLANE_MISMATCH, REGION_SELF_INTERSECTING, REGION_LOOPS_CROSS, REGION_POINT_NOT_ENCLOSED, REGION_TOO_LARGE, REGION_BAD_PARAM.',
+    'REGION_OPEN_BOUNDARY, REGION_PLANE_MISMATCH, REGION_SELF_INTERSECTING, REGION_LOOPS_CROSS, REGION_POINT_NOT_ENCLOSED, REGION_POINT_ON_BOUNDARY, REGION_LOOPS_TOUCH, REGION_TOO_LARGE, REGION_BAD_PARAM. ' +
+    'The region copies the boundary geometry when created: it is NOT associative, editing or moving a source shape afterwards does not update the region (run hatch_region again).',
   params: z.object({
     ids: z
       .array(z.string())
@@ -117,40 +122,48 @@ export const hatchRegion = defineCommand({
     if ((ids?.length ?? 0) > MAX_REGION_LOOPS)
       return refuse('REGION_TOO_LARGE', `${ids?.length} ids exceed ${MAX_REGION_LOOPS}`, 'Hatch fewer shapes per call.');
 
-    let groups: FrameLoop[][];
+    let all: FrameLoop[];
     let frame: WorkPlane;
     if (ids !== undefined) {
       const first = doc.entities[ids[0] as string];
       if (first === undefined)
         return refuse('REGION_ENTITY_NOT_FOUND', `no entity "${ids[0]}"`, 'Pass the ids of existing closed 2D shapes.', [ids[0] as string]);
       frame = { origin: first.position, rotation: first.rotation };
-      const loops = boundaryLoops(doc, ids, frame);
+      const loops = boundaryLoops(doc, [...new Set(ids)], frame);
       if (isRefusal(loops)) return refuse(loops.code, loops.message, loops.remediation, loops.ids);
-      groups = groupByOutermost(loops);
+      all = loops;
     } else {
       const found = planeOf(doc, plane);
       if (typeof found === 'string')
         return refuse('REGION_ENTITY_NOT_FOUND', found, 'Create it first (create_sketch_plane) or omit plane.');
       frame = found;
-      const loops = loopsAtPoint(planeClosedLoops(doc, frame), point as Vec2);
+      const loops = loopsAtPoint(doc, frame, point as Vec2);
       if (isRefusal(loops)) return refuse(loops.code, loops.message, loops.remediation, loops.ids);
-      groups = [loops];
+      all = loops;
     }
 
-    const pointCount = groups.reduce((sum, group) => sum + group.reduce((n, loop) => n + loop.profile.length, 0), 0);
+    const pointCount = all.reduce((sum, loop) => sum + loop.profile.length, 0);
     if (pointCount > MAX_REGION_POINTS)
       return refuse(
         'REGION_TOO_LARGE',
         `the boundaries tessellate to ${pointCount} points (limit ${MAX_REGION_POINTS})`,
         'Hatch fewer or simpler shapes.',
       );
-    for (const group of groups) {
-      const issue = regionLoopsIssue(group.map((loop) => loop.profile));
-      if (issue !== null) {
-        const [message, remediation] = LOOP_ISSUES[issue.code];
-        return refuse(issue.code, message, remediation, (group[issue.index] as FrameLoop).ids);
-      }
+    const issue = regionLoopsIssue(
+      all.map((loop) => loop.profile),
+      all.map(isCurved),
+    );
+    if (issue !== null) {
+      const [message, remediation] = LOOP_ISSUES[issue.code];
+      return refuse(issue.code, message, remediation, (all[issue.index] as FrameLoop).ids);
     }
+    const groups = groupByOutermost(all);
+    if (groups.length === 0)
+      return refuse(
+        'REGION_LOOPS_TOUCH',
+        'no outermost boundary found among the shapes',
+        'Pass at least one closed shape that is not inside another.',
+      );
 
     const layer = existingLayerOrDefault(doc, layerId);
     const regions = groups.map((group) => {

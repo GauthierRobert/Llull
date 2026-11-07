@@ -40,6 +40,16 @@ const withEntity = (id: string, body: Raw): ((raw: Raw) => void) => {
     (raw['order'] as string[]).push(id);
   };
 };
+const BIG = [
+  [0, 0],
+  [10, 0],
+  [10, 10],
+];
+const SMALL = [
+  [4, 2],
+  [8, 2],
+  [8, 6],
+];
 const SQUARE = [
   [0, 0],
   [1, 0],
@@ -114,6 +124,99 @@ describe('load_document: per-kind entity checks', () => {
       },
       'curves',
     ],
+    ['region coincident loops', { kind: 'region', loops: [BIG, BIG] }, 'REGION_LOOPS_TOUCH'],
+    [
+      'region loops sharing a vertex',
+      {
+        kind: 'region',
+        loops: [
+          BIG,
+          [
+            [10, 10],
+            [12, 10],
+            [12, 12],
+          ],
+        ],
+      },
+      'REGION_LOOPS_TOUCH',
+    ],
+    [
+      'region crossing loops',
+      {
+        kind: 'region',
+        loops: [
+          BIG,
+          [
+            [5, -2],
+            [15, -2],
+            [15, 4],
+          ],
+        ],
+      },
+      'REGION_LOOPS_CROSS',
+    ],
+    [
+      'region spike loop',
+      {
+        kind: 'region',
+        loops: [
+          [
+            [0, 0],
+            [10, 0],
+            [5, 0],
+            [5, 5],
+          ],
+        ],
+      },
+      'REGION_SELF_INTERSECTING',
+    ],
+    [
+      'region zero-area loop',
+      {
+        kind: 'region',
+        loops: [
+          [
+            [1, 1],
+            [1, 1],
+            [1, 1],
+          ],
+        ],
+      },
+      'REGION_DEGENERATE_LOOP',
+    ],
+    [
+      'region curves that are not the loop',
+      {
+        kind: 'region',
+        loops: [BIG],
+        curves: [
+          [
+            {
+              type: 'line',
+              points: [
+                [0, 0],
+                [20, 0],
+              ],
+            },
+            {
+              type: 'line',
+              points: [
+                [20, 0],
+                [20, 20],
+              ],
+            },
+            {
+              type: 'line',
+              points: [
+                [20, 20],
+                [0, 0],
+              ],
+            },
+          ],
+        ],
+      },
+      'does not match loops.0',
+    ],
     ['region unknown pattern', { kind: 'region', loops: [SQUARE], hatch: { pattern: 'dots', angle: 0, spacing: 1 } }, 'hatch.pattern'],
     ['region hatch spacing 0', { kind: 'region', loops: [SQUARE], hatch: { pattern: 'lines', angle: 0, spacing: 0 } }, 'hatch.spacing'],
     ['region hatch not an object', { kind: 'region', loops: [SQUARE], hatch: 'lines' }, 'hatch.pattern'],
@@ -138,7 +241,8 @@ describe('load_document: per-kind entity checks', () => {
       withEntity('txt', { kind: 'text', content: 'hi', height: 2, anchor: 'center' })(raw);
       withEntity('pl', { kind: 'polyline', points: SQUARE, closed: true })(raw);
       withEntity('pt', { kind: 'point' })(raw);
-      withEntity('rg', { kind: 'region', loops: [SQUARE, SQUARE], hatch: { pattern: 'cross', angle: 0.5, spacing: 2 } })(raw);
+      withEntity('big', { kind: 'region', loops: [Array.from({ length: 1500 }, (_, k) => [Math.cos(k / 238), Math.sin(k / 238)])] })(raw);
+      withEntity('rg', { kind: 'region', loops: [BIG, SMALL], hatch: { pattern: 'cross', angle: 0.5, spacing: 2 } })(raw);
       withEntity('ms', { kind: 'mesh', mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] } })(raw);
       withEntity('dm', { kind: 'dimension', dimensionKind: 'radial', entityIds: ['rev'] })(raw);
     });

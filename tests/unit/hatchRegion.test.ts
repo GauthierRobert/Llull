@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type CadDocument, type RegionEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { entityBounds } from '@core/geometry/bounds';
-import { loopDepths, regionFaces, regionHatchLines, regionNetArea } from '@core/geometry/region';
+import { loopDepths, regionFaces, regionHatchLines, regionLoopsIssue, regionNetArea } from '@core/geometry/region';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { expectNoOp, expectPure } from '../helpers/expectNoOp';
 import { docWith } from '../helpers/fixtureDocument';
@@ -138,7 +138,7 @@ describe('hatch_region pick point', () => {
   });
 
   it('a point in the hole hatches the hole (its island is a hole again): 100 pi - 16', () => {
-    const result = execute(doc, 'hatch_region', { point: [40, 30] });
+    const result = execute(doc, 'hatch_region', { point: [43, 30] });
     expect(areaOf(result.document, result.affected[0] as string)).toBeCloseTo(100 * Math.PI - 16, 9);
   });
 
@@ -208,7 +208,7 @@ describe('hatch_region refusals', () => {
     expectRefused(docWith(plate, { ...hole, id: 'hole2', rotation: [0.5, 0, 0] }), { ids: ['plate', 'hole2'] }, 'REGION_PLANE_MISMATCH');
   });
 
-  it('refuses a bow-tie, crossing loops and a zero-area loop', () => {
+  it('refuses a bow-tie, crossing loops and a flat (doubled-back) loop', () => {
     expectRefused(
       docWith({ id: 'bow', kind: 'polyline', closed: true, points: xy(0, 0, 10, 10, 10, 0, 0, 10) }),
       { ids: ['bow'] },
@@ -222,7 +222,7 @@ describe('hatch_region refusals', () => {
     expectRefused(
       docWith({ id: 'flat', kind: 'polyline', closed: true, points: xy(0, 0, 5, 0, 10, 0) }),
       { ids: ['flat'] },
-      'REGION_DEGENERATE_LOOP',
+      'REGION_SELF_INTERSECTING',
     );
   });
 
@@ -251,10 +251,11 @@ describe('hatch patterns', () => {
     expect(hatchOf({}).hatch?.spacing).toBe(5);
   });
 
-  it('horizontal lines at spacing 7.5 over a 100x60 rectangle: 8 lines of length 100 (y = 0 .. 52.5)', () => {
+  it('horizontal lines at spacing 7.5 over a 100x60 rectangle: 7 lines of length 100 (y = 7.5 .. 52.5; y = 0 lies on the bottom edge and is skipped)', () => {
     const region = hatchOf({ angle: 0, spacing: 7.5 });
     const lines = regionHatchLines(region);
-    expect(lines).toHaveLength(8);
+    expect(lines).toHaveLength(7);
+    expect(Math.min(...lines.map(([a]) => a[1]))).toBeCloseTo(7.5, 9);
     for (const [a, b] of lines) expect(Math.abs(b[0] - a[0])).toBeCloseTo(100, 9);
   });
 
@@ -269,8 +270,8 @@ describe('hatch patterns', () => {
     const result = execute(docWith(plate, hole), 'hatch_region', { ids: ['plate', 'hole'], angle: 0, spacing: 5 });
     const region = regionsOf(result.document, result.affected)[0] as RegionEntity;
     const total = regionHatchLines(region).reduce((sum, [a, b]) => sum + Math.abs(b[0] - a[0]), 0);
-    // 12 lines (y = 0 .. 55) x 100, minus the circle chords at y = 25, 30 (diameter 20) and 35 (polygon, within 1 %)
-    const plain = 12 * 100;
+    // 11 lines (y = 5 .. 55; y = 0 is the bottom edge) x 100, minus the circle chords at y = 25, 30 (diameter 20) and 35 (polygon, within 1 %)
+    const plain = 11 * 100;
     expect(total).toBeLessThan(plain - 2 * 19);
     expect(total).toBeGreaterThan(plain - 2 * 21 - 20);
   });
@@ -346,5 +347,138 @@ describe('region in the rest of the model', () => {
 
   it('empty document: measure_area of a missing region is a no-op', () => {
     expectNoOp(execute(empty, 'measure_area', { entityId: 'region-1' }), empty, 'not found');
+  });
+});
+
+describe('regionLoopsIssue', () => {
+  it('names a loop with no area or fewer than 3 points as degenerate, with the index of the offending loop', () => {
+    expect(
+      regionLoopsIssue([
+        [
+          [0, 0],
+          [0, 0],
+          [0, 0],
+        ],
+      ]),
+    ).toEqual({ code: 'REGION_DEGENERATE_LOOP', index: 0 });
+    expect(
+      regionLoopsIssue([
+        [
+          [0, 0],
+          [4, 0],
+          [4, 4],
+        ],
+        [
+          [1, 1],
+          [2, 1],
+        ],
+      ]),
+    ).toEqual({ code: 'REGION_DEGENERATE_LOOP', index: 1 });
+    expect(regionLoopsIssue([])).toBeNull();
+  });
+});
+
+describe('touching, tangent and degenerate boundaries are refused (hand-built contacts)', () => {
+  const outer = { id: 'outer', kind: 'rectangle', width: 100, height: 100 };
+  const poly = (id: string, ...points: number[]): Record<string, unknown> => ({
+    id,
+    kind: 'polyline',
+    closed: true,
+    points: xy(...points),
+  });
+
+  it.each<[string, Array<Record<string, unknown>>, string]>([
+    ['a hole vertex on the outer edge (T-touch)', [outer, poly('h', 50, 0, 70, 30, 30, 30)], 'REGION_LOOPS_TOUCH'],
+    [
+      'a hole sharing a stretch of the outer edge (collinear overlap)',
+      [outer, { id: 'h', kind: 'rectangle', width: 20, height: 20, position: [0, 40, 0] }],
+      'REGION_LOOPS_TOUCH',
+    ],
+    [
+      'two rectangles sharing an edge',
+      [
+        { id: 'a', kind: 'rectangle', width: 10, height: 10 },
+        { id: 'b', kind: 'rectangle', width: 10, height: 10, position: [10, 0, 0] },
+      ],
+      'REGION_LOOPS_TOUCH',
+    ],
+    [
+      'two rectangles meeting at one corner',
+      [
+        { id: 'a', kind: 'rectangle', width: 10, height: 10 },
+        { id: 'b', kind: 'rectangle', width: 10, height: 10, position: [10, 10, 0] },
+      ],
+      'REGION_LOOPS_TOUCH',
+    ],
+    [
+      'a circle tangent to a rectangle edge at a quadrant point',
+      [plate, { id: 'c', kind: 'circle', center: [50, 70], radius: 10 }],
+      'REGION_LOOPS_TOUCH',
+    ],
+    [
+      'a circle tangent to a slanted edge between tessellation vertices (exact curve vs polygon, within the sagitta tolerance)',
+      [poly('tri', 0, 0, 100, 50, 0, 50), { id: 'c', kind: 'circle', center: [44.472136, 11.055728], radius: 10 }],
+      'REGION_LOOPS_TOUCH',
+    ],
+    ['the same outline twice (coincident shapes)', [plate, { ...plate, id: 'twin' }], 'REGION_LOOPS_TOUCH'],
+    ['a spike polyline [0,0] [10,0] [5,0] [5,5]', [poly('spike', 0, 0, 10, 0, 5, 0, 5, 5)], 'REGION_SELF_INTERSECTING'],
+    ['a vertex on another edge of the same loop', [poly('pinch', 0, 0, 10, 0, 10, 10, 5, 0, 0, 10)], 'REGION_SELF_INTERSECTING'],
+  ])('%s', (_label, shapes, code) => {
+    expectRefused(docWith(...shapes), { ids: shapes.map((shape) => shape['id']) }, code);
+  });
+
+  it('a visible gap is fine: circle 1 unit above the plate, rectangles 0.001 apart make separate regions', () => {
+    const gap = execute(docWith(plate, { id: 'c', kind: 'circle', center: [50, 71], radius: 10 }), 'hatch_region', { ids: ['plate', 'c'] });
+    expect(gap.affected).toHaveLength(2);
+    const near = docWith(
+      { id: 'a', kind: 'rectangle', width: 10, height: 10 },
+      { id: 'b', kind: 'rectangle', width: 10, height: 10, position: [10.001, 0, 0] },
+    );
+    expect(execute(near, 'hatch_region', { ids: ['a', 'b'] }).affected).toHaveLength(2);
+  });
+
+  it('duplicate ids are one shape: [plate, plate, hole] = [plate, hole]', () => {
+    const doc = docWith(plate, hole);
+    const result = execute(doc, 'hatch_region', { ids: ['plate', 'hole', 'plate', 'hole'] });
+    expect(result.affected).toHaveLength(1);
+    expect(areaOf(result.document, result.affected[0] as string)).toBeCloseTo(PLATE_WITH_HOLE_AREA, 9);
+  });
+
+  it('a hole near but clear of the edge is accepted (gap 1)', () => {
+    const doc = docWith(outer, { id: 'h', kind: 'rectangle', width: 20, height: 20, position: [1, 40, 0] });
+    const result = execute(doc, 'hatch_region', { ids: ['outer', 'h'] });
+    expect(areaOf(result.document, result.affected[0] as string)).toBeCloseTo(10000 - 400, 9);
+  });
+
+  it('a pick point exactly on an outline is refused (REGION_POINT_ON_BOUNDARY), on an edge or on a circle', () => {
+    const doc = docWith(plate, hole);
+    expectRefused(doc, { point: [0, 30] }, 'REGION_POINT_ON_BOUNDARY');
+    expectRefused(doc, { point: [60, 30] }, 'REGION_POINT_ON_BOUNDARY');
+    expectRefused(doc, { point: [50, 60] }, 'REGION_POINT_ON_BOUNDARY');
+  });
+
+  it('a pick refuses a shape touching the chosen boundary', () => {
+    const doc = docWith(plate, { id: 'next', kind: 'rectangle', width: 20, height: 60, position: [100, 0, 0] });
+    expectRefused(doc, { point: [5, 5] }, 'REGION_LOOPS_TOUCH');
+  });
+
+  it('a pick ignores shapes far away: 600 distant rectangles do not matter, and 300 shapes around the point are refused', () => {
+    const far = Array.from({ length: 600 }, (_, k) => ({
+      id: `far${k}`,
+      kind: 'rectangle',
+      width: 5,
+      height: 5,
+      position: [1000 + k * 10, 1000, 0],
+    }));
+    const result = execute(docWith(plate, ...far), 'hatch_region', { point: [5, 5] });
+    expect(areaOf(result.document, result.affected[0] as string)).toBeCloseTo(6000, 9);
+    const nested = Array.from({ length: 300 }, (_, k) => ({
+      id: `n${k}`,
+      kind: 'rectangle',
+      width: 1000 - k,
+      height: 1000 - k,
+      position: [k / 2, k / 2, 0],
+    }));
+    expectRefused(docWith(...nested), { point: [250, 250] }, 'REGION_TOO_LARGE');
   });
 });
