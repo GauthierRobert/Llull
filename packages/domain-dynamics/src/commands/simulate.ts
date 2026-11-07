@@ -202,11 +202,13 @@ export const simulateMotion = defineCommand({
       }
     };
     // the auto rule only sees speed and geometry: a light slow loop can still miss the residual gate, so halve the step and retry
-    const adaptive = params.timestep === undefined && structured && settings.timestepS === 'auto';
     const failsGate = (attempt: Attempt): boolean =>
       'error' in attempt ||
       residualTier(attempt.trace.loopResidual ?? 0, settings.loopResidualPassM, settings.loopResidualFailM) === 'fail';
     let attempt = attemptAt(resolved.timestep);
+    // a stop or backlash stiffer than the auto step can integrate (DRV_STEP_TOO_COARSE) halves the step the same way
+    const coarse = 'error' in attempt && attempt.error.includes('DRV_STEP_TOO_COARSE');
+    const adaptive = params.timestep === undefined && settings.timestepS === 'auto' && (structured || coarse);
     let halvings = 0;
     while (adaptive && failsGate(attempt) && halvings < MAX_HALVINGS && attempt.timestep / 2 >= MIN_STEP) {
       const next = attemptAt(attempt.timestep / 2);
@@ -218,7 +220,9 @@ export const simulateMotion = defineCommand({
     try {
       const { trace, built, timestep } = attempt;
       const basis =
-        halvings > 0 ? `${resolved.basis}; halved ${halvings}x from ${resolved.timestep} s after the loop residual failed` : resolved.basis;
+        halvings > 0
+          ? `${resolved.basis}; halved ${halvings}x from ${resolved.timestep} s by the auto rule (loop residual gate, or a stop / backlash too stiff for the step)`
+          : resolved.basis;
       const base = simulationData(dynamics, built.mass, trace, {
         engine: engine.name,
         duration,
@@ -237,7 +241,7 @@ export const simulateMotion = defineCommand({
       const warnings = [...base.warnings, ...(driven?.warnings ?? []), ...built.notes];
       if (halvings > 0)
         warnings.push(
-          `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s left the loop residual above the fail tier, ${timestep} s is used`,
+          `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s failed the loop residual gate or was too coarse for a stop / backlash, ${timestep} s is used`,
         );
       if (params.sampleRate !== undefined && attempt.sampleInterval > 1 / params.sampleRate + 1e-12)
         warnings.push(

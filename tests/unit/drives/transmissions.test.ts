@@ -255,6 +255,11 @@ describe('backlash (VC-DRV-16)', () => {
   it('a default mesh stiffness is a 100 Hz mode at the reflected inertia and is reported; a too coarse step is refused', () => {
     const run = execute(bench({}), 'simulate_motion', { duration: 0.05, timestep: 2e-5, sampleRate: 1000 });
     expect((run.data as { warnings: string[] }).warnings.some((w) => w.startsWith('DRV_MESH_STIFFNESS_ASSUMED'))).toBe(true);
+    // without a timestep the auto rule halves the step until the contact is integrable and says so
+    const auto = execute(bench({}), 'simulate_motion', { duration: 0.05, sampleRate: 1000 });
+    const warnings = (auto.data as { warnings: string[] }).warnings;
+    expect(warnings.some((w) => /timestep halved [0-9]+x by the auto rule/.test(w))).toBe(true);
+    expect(warnings.some((w) => w.startsWith('DRV_MESH_STIFFNESS_ASSUMED'))).toBe(true);
     const coarse = execute(bench({ meshStiffnessNmPerRad: 1e6 }), 'simulate_motion', { duration: 0.05, timestep: 1e-3 });
     expect(coarse.summary).toMatch(/DRV_STEP_TOO_COARSE/);
     expect(coarse.data).toBeUndefined();
