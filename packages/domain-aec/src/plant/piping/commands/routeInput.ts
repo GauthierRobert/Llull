@@ -10,7 +10,8 @@ import { COMPASS_NAMES, unitVector, type PathEnd } from '../legs';
 import { refuse } from '../model';
 import { portOccupant, resolvePortId } from '../ports';
 import { resolveFlat } from '../eccentric';
-import { defaultStem, INLINE_TYPES } from '../routeInline';
+import { FLANGED_JOINT, INSTRUMENT } from '../routeFlangedInline';
+import { defaultStem, INLINE_COMPONENT_TYPES } from '../routeInline';
 import { isStraight } from '../routeStraight';
 import { isValve } from '../runSizes';
 
@@ -70,11 +71,22 @@ export const viaInput = z
 /** Fields that describe one inline component, shared by `route_pipe.inline` and `insert_inline_component`. */
 export const inlineFields = {
   type: z
-    .enum(INLINE_TYPES)
+    .enum(INLINE_COMPONENT_TYPES)
     .describe(
-      'Catalogue type: a valve (valveGate, valveGlobe, valveCheck, valveBall, valveButterfly, valvePlug), reducerConcentric, reducerEccentric (needs flat or flatDirection), swage (a swage nipple, placed like a concentric reducer; needs dn2), coupling or union (one straight part of the row length; no dn2). Coupling, union and swage need a catalogue row of that type (imported: the bundled catalogue has none).',
+      'Catalogue type: a valve (valveGate, valveGlobe, valveCheck, valveBall, valveButterfly, valvePlug), reducerConcentric, reducerEccentric (needs flat or flatDirection), swage (a swage nipple, placed like a concentric reducer; needs dn2), coupling or union (one straight part of the row length; no dn2), flangedJoint (a mid-line flange - gasket - flange joint from the spec flange set; nothing else to give), instrument (a flow element, orifice assembly or similar body: needs lengthMm; its ends are flanged by default, with a flange set from the spec on each face as a flanged valve). Coupling, union and swage need a catalogue row of that type (imported: the bundled catalogue has none).',
     ),
   tag: z.string().min(1).optional().describe('Instrument / equipment tag, e.g. "XV-1001".'),
+  lengthMm: z
+    .number()
+    .positive()
+    .optional()
+    .describe(
+      'Instruments only (required): face-to-face length of the instrument body, mm (project data from the vendor drawing, not a spec row).',
+    ),
+  endType: z
+    .enum(['FL', 'BW'])
+    .optional()
+    .describe('Instruments only: FL (default) = flanged, a flange set from the spec on each face; BW = butt welded to the pipe.'),
   dn2: z
     .number()
     .int()
@@ -113,7 +125,9 @@ export function buildInline(
   doc: CadDocument,
   command: string,
   fields: {
-    type: (typeof INLINE_TYPES)[number];
+    type: (typeof INLINE_COMPONENT_TYPES)[number];
+    lengthMm?: number | undefined;
+    endType?: 'FL' | 'BW' | undefined;
     tag?: string | undefined;
     dn2?: number | undefined;
     stemDirection?: Vec3 | undefined;
@@ -125,7 +139,20 @@ export function buildInline(
   path: string,
 ): InlineComponent | CommandResult {
   const valve = isValve(fields);
-  const oneSize = valve || isStraight(fields);
+  const joint = fields.type === FLANGED_JOINT;
+  const instrument = fields.type === INSTRUMENT;
+  const oneSize = valve || isStraight(fields) || joint || instrument;
+  if (instrument ? fields.lengthMm === undefined : fields.lengthMm !== undefined || fields.endType !== undefined)
+    return refuse(
+      doc,
+      command,
+      'RTE_SIZE_MISMATCH',
+      instrument
+        ? 'an instrument needs lengthMm (its face-to-face length)'
+        : `${fields.type} has no lengthMm / endType: they are for instruments`,
+      [],
+      [`${path}.lengthMm`],
+    );
   if (oneSize && fields.dn2 !== undefined)
     return refuse(doc, command, 'RTE_SIZE_MISMATCH', `${fields.type} has one size: dn2 is for reducers`, [], [`${path}.dn2`]);
   if (!oneSize && fields.dn2 === undefined)
@@ -146,7 +173,7 @@ export function buildInline(
   const flat = eccentric ? resolveFlat(fields.flat, fields.flatDirection, legDirection) : undefined;
   if (typeof flat === 'string') return refuse(doc, command, 'RTE_ECCENTRIC_INVALID', flat, [], [`${path}.flat`]);
   return {
-    id: nextId(valve ? 'valve' : isStraight(fields) ? 'fitting' : 'reducer'),
+    id: nextId(valve ? 'valve' : oneSize ? 'fitting' : 'reducer'),
     type: fields.type,
     ...(fields.tag === undefined ? {} : { tag: fields.tag }),
     leg: at.leg,
@@ -154,6 +181,7 @@ export function buildInline(
     ...(fields.dn2 === undefined ? {} : { dn2: fields.dn2 }),
     ...(stem === undefined ? {} : { stemDirection: stem }),
     ...(flat === undefined ? {} : { flatDirection: flat }),
+    ...(instrument ? { lengthMm: fields.lengthMm as number, endType: fields.endType ?? 'FL' } : {}),
   };
 }
 

@@ -776,7 +776,7 @@
 | `import_piping_catalog_sheet` | Import a piping component catalogue from a CSV sheet: the text of export_piping_catalog format csv (one row per size) or a sheet of another tool. |  |
 | `import_piping_library` | Reference a private piping catalogue library (a licensed llull-piping-catalog file, e.g. |  |
 | `import_rating_table` | Import a pressure-temperature rating table into the document (ASME B16.5 other material groups, ASME B16.34, EN 1092-1 PN tables, company tables). |  |
-| `insert_inline_component` | Insert a valve, a reducer (concentric or eccentric), a swage, a coupling or a union into a routed pipe run (route_pipe / auto_route_pipe / add_branch), spec-dr… |  |
+| `insert_inline_component` | Insert a valve, a reducer (concentric or eccentric), a swage, a coupling, a union, a mid-line flanged joint (flangedJoint) or an instrument into a routed pipe … |  |
 | `issue_isometric` | Issue the isometric of a pipe line for fabrication or construction: a HUMAN act that an agent cannot perform. |  |
 | `line_heat_loss` | Query: steady-state heat loss per metre of a pipe line (create_pipeline) through its steel wall and its insulation (set by create_pipeline / update_pipeline in… | read-only |
 | `list_pipe_specs` | List the piping specs in the document: id, title, latest revision and status (draft, approved, superseded), every revision, dimensional standard (ASME or EN), … | read-only |
@@ -802,7 +802,7 @@
 | `set_heat_tracing` | Record the heat tracing of a pipe line (create_pipeline): tracer type (electric \| steam \| hot_water \| thermal_fluid), the number of tracers along the pipe (1 t… |  |
 | `set_pipe_line_number` | Set the line number of legacy pipes (add_pipe_run elements; routed lines have update_pipeline). |  |
 | `set_piping_settings` | Set the project settings of the piping plugin. |  |
-| `set_run_end_cap` | Close an open end of a routed pipe run (route_pipe / auto_route_pipe / add_branch) with a cap from the line spec, or take the cap off again. |  |
+| `set_run_end_cap` | Close an open end of a routed pipe run (route_pipe / auto_route_pipe / add_branch) with a cap or a blind flange from the line spec, or take the closure off aga… |  |
 | `set_weld_type` | Change the type of a numbered weld: shop (welded in the shop, inside a spool), site (welded on site, ends a spool) or field_fit (site weld with a cut-to-length… |  |
 | `split_spools` | Split a pipe line into spools (shop-fabricated assemblies) and store the break choice for the line. |  |
 | `spool_list` | List the spools of one pipe line, or of every line when lineId is omitted: name (<line>-SP01 ... | read-only |

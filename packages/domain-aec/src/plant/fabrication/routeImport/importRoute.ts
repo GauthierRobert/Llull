@@ -127,6 +127,7 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
         ...(item.flat === undefined ? {} : { eccentric: true }),
       })),
       capped: run.cap !== undefined,
+      ...(run.cap === undefined ? {} : { closure: run.cap.kind }),
     })),
     portIds: composed.portIds,
     fieldWelds: plan.welds.map((weld, at) => ({ componentId: weld.componentId, kind: weld.kind, weldId: composed.weldIds[at] ?? null })),

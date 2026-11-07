@@ -72,6 +72,13 @@ function step(
 
 const isStep = (value: CommandResult | Applied): value is Applied => 'next' in value;
 
+/** Catalogue type of an inline item: the valve type, a (flat-sided) reducer, or the flanged joint / instrument. */
+function inlineTypeOf(item: PlannedRun['inline'][number], valveType: string): string {
+  if (item.type === 'valve') return valveType;
+  if (item.type === 'reducer') return item.flat === undefined ? 'reducerConcentric' : 'reducerEccentric';
+  return item.type;
+}
+
 /** Compass-or-vector legs along `points`; with an end port the last segment is left to the closing leg. */
 function legsOf(points: readonly Vec3[], closing: boolean): Array<{ direction: unknown; length: number }> {
   const segments = points.slice(1).map((point, k) => ({ from: points[k] as Vec3, to: point }));
@@ -160,7 +167,7 @@ function composeOnce(original: CadDocument, input: ComposeInput, ctx: ExecutionC
   /** A run that ends in a cap: the spec cap on its end (its length is how far the closed end lies beyond the joint). */
   const closeEnd = (planned: PlannedRun, runId: string): CommandResult | undefined => {
     if (planned.cap === undefined) return undefined;
-    const capped = run('set_run_end_cap', { runId, end: 'end', cap: true });
+    const capped = run('set_run_end_cap', { runId, end: 'end', cap: true, closure: planned.cap.kind });
     if (capped.rejected === true) return capped;
     const length = (capped.data as { capLengthMm?: number } | undefined)?.capLengthMm;
     if (length !== undefined) capLengths[planned.key] = length;
@@ -204,7 +211,9 @@ function composeOnce(original: CadDocument, input: ComposeInput, ctx: ExecutionC
         [lost.item.componentId],
       );
     const inlineParams = located.map(({ item, at }) => ({
-      type: item.type === 'valve' ? input.valveType : item.flat === undefined ? 'reducerConcentric' : 'reducerEccentric',
+      type: inlineTypeOf(item, input.valveType),
+      ...(item.lengthMm === undefined ? {} : { lengthMm: item.lengthMm }),
+      ...(item.endType === undefined ? {} : { endType: item.endType }),
       at,
       ...(item.dn2 === undefined ? {} : { dn2: item.dn2 }),
       ...(item.flat === undefined ? {} : 'side' in item.flat ? { flat: item.flat.side } : { flatDirection: item.flat.direction }),

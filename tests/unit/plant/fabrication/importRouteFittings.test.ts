@@ -11,7 +11,7 @@ import type { CommandResult } from '@core/commands/types';
 import { data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { expectPure } from '../../../helpers/expectNoOp';
 import { addTie, cs150Document, cs150Line } from '../piping/rteFixtures';
-import { CAP_LENGTH_MM, extrasDocument } from './routeExtraFixtures';
+import { BLIND_THICKNESS_MM, CAP_LENGTH_MM, extrasDocument } from './routeExtraFixtures';
 
 const exported = (doc: CadDocument, lineId: string): string =>
   (data<{ files: Array<{ content: string }> }>(doc, 'export_pcf', { lineIds: [lineId] }).files[0] as { content: string }).content;
@@ -22,7 +22,7 @@ interface RouteData {
   lineId: string;
   warnings: Array<{ code: string }>;
   route: {
-    runs: Array<{ points: number[][]; capped: boolean; inline: Array<{ type: string; eccentric?: boolean }> }>;
+    runs: Array<{ points: number[][]; capped: boolean; closure?: string; inline: Array<{ type: string; eccentric?: boolean }> }>;
     comparison: { pipeLengthDeltaMm: number; countDelta: Record<string, number> };
   };
 }
@@ -236,5 +236,171 @@ describe('caps in route mode', () => {
     expect(result.rejected, result.summary).toBeUndefined();
     expect(routeData(result).route.runs.map((run) => run.capped)).toEqual([false, true]);
     expect(bare(exported(result.document, routeData(result).lineId))).toBe(bare(text));
+  });
+});
+
+describe('blind flanges in route mode', () => {
+  const extras = extrasDocument();
+  const created = ok(extras, 'create_pipeline', { service: 'P', sequence: '3003', spec: 'CS150', dn: 100 });
+  const lineId = created.affected[0] as string;
+  const routed = ok(created.document, 'route_pipe', {
+    lineId,
+    from: { point: [0, 0, 0] },
+    legs: [
+      { direction: '+X', length: 3000 },
+      { direction: '+Y', length: 2000 },
+    ],
+  });
+  const closed = ok(routed.document, 'set_run_end_cap', { runId: routed.affected[0], end: 'end', closure: 'blindFlange' });
+  const original = exported(closed.document, lineId);
+
+  it('the run ends one blind thickness beyond the file joint: pipe 1746.6 + flange set + blind at the same place, delta 0', () => {
+    expect(original).toContain('FLANGE-BLIND\n');
+    const result = route(original, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const info = routeData(result);
+    expect(info.route.runs[0]).toMatchObject({ capped: true, closure: 'blindFlange' });
+    expect(info.route.runs[0]?.points.at(-1)?.[1]).toBeCloseTo(1977.6 + BLIND_THICKNESS_MM, 9);
+    expect(info.route.comparison.pipeLengthDeltaMm).toBe(0);
+    expect(firstRun(result.document)?.end).toMatchObject({ blind: true });
+    expect(info.route.comparison.countDelta).toEqual({});
+  });
+
+  it('is a fixed point: export, import as route, export again gives the same PCF up to the part ids', () => {
+    const first = route(original, {}, extras);
+    expect(bare(exported(first.document, routeData(first).lineId))).toBe(bare(original));
+  });
+
+  it('a file without the gasket (flange then blind) is rebuilt with the spec gasket: only the count differs', () => {
+    const text = original.replace(/GASKET\n(?: {4}.*\n)+/, '').replaceAll('1977.6', '1974.6');
+    expect(text).not.toContain('GASKET\n');
+    const result = route(text, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    expect(routeData(result).route.runs[0]?.closure).toBe('blindFlange');
+    expect(Object.values(result.document.plant?.piping?.runs ?? {})).toHaveLength(1);
+  });
+
+  it('a FLANGE-BLIND with two END-POINTs gives its outer face itself: the run ends there', () => {
+    const text = original.replace(
+      /(FLANGE-BLIND\n(?: {4}.*\n)*? {4}END-POINT 3000.0 1977.6 0.0 100 FL\n)/,
+      '$1    END-POINT 3000.0 2000.0 0.0 100 FL\n',
+    );
+    const result = route(text, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    expect(routeData(result).route.runs[0]?.points.at(-1)).toEqual([3000, 2000, 0]);
+  });
+
+  it('a file whose first free end is the blind walks from the other end', () => {
+    const text = original.replace(
+      /(FLANGE-BLIND\n(?: {4}.*\n)*? {4}END-POINT 3000.0 1977.6 0.0 100 FL\n)/,
+      '$1    END-POINT 3000.0 2000.0 0.0 100 FL\n',
+    );
+    const blindBlock = /FLANGE-BLIND\n(?: {4}.*\n)+/.exec(text)?.[0] ?? '';
+    const reordered = text.replace(blindBlock, '').replace('PIPE\n', `${blindBlock}PIPE\n`);
+    const result = route(reordered, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    expect(routeData(result).route.runs[0]?.points[0]).toEqual([0, 0, 0]);
+  });
+
+  it('a spec without a blind row is the RTE refusal RTE_SPEC_NO_COMPONENT, document unchanged', () => {
+    const result = expectRefusal(base, 'import_pcf', { text: original, as: 'route', spec: 'CS150' }, 'RTE_SPEC_NO_COMPONENT');
+    expect(result.document).toBe(base);
+  });
+
+  it('closures at both free ends (a two-point CAP at each end) are refused naming both components', () => {
+    const text =
+      HEADER +
+      record('CAP', 1, ['0.0 0.0 0.0 100 BW', '64.0 0.0 0.0 100 BW']) +
+      record('PIPE', 2, ['64.0 0.0 0.0 100 BW', '2000.0 0.0 0.0 100 BW']) +
+      record('CAP', 3, ['2000.0 0.0 0.0 100 BW', '2064.0 0.0 0.0 100 BW']);
+    const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
+    expect(result.error?.ids).toEqual(['pcf:E-1:1', 'pcf:E-1:3']);
+  });
+});
+
+/** DN100 line: pipe 0..1000, then `middle`, then pipe to 3000 (hand-written, butt weld ends). */
+const hand100 = (middle: string, pipeAfterFrom: string): string =>
+  HEADER +
+  record('PIPE', 1, ['0.0 0.0 0.0 100 BW', '1000.0 0.0 0.0 100 BW']) +
+  middle +
+  record('PIPE', 9, [`${pipeAfterFrom} 0.0 0.0 100 BW`, '3000.0 0.0 0.0 100 BW']);
+
+describe('flanged joints and instruments in route mode', () => {
+  const line = cs150Line(100, '3001');
+  const tie = addTie(line.doc, 'A', [0, 0, 0], [1, 0, 0], { dn: 100 });
+  const routed = ok(tie.doc, 'route_pipe', {
+    lineId: line.lineId,
+    from: { portId: tie.id },
+    to: undefined,
+    legs: [{ direction: '+X', length: 4000 }],
+    inline: [
+      { type: 'flangedJoint', at: { leg: 0, centreDistance: 1500 } },
+      { type: 'instrument', lengthMm: 300, at: { leg: 0, centreDistance: 3000 } },
+    ],
+  });
+  const original = exported(routed.document, line.lineId);
+
+  it('a flange - gasket - flange joint and a flanged instrument come back as inline parts: the same file, delta 0, flat counts', () => {
+    const result = route(original);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const info = routeData(result);
+    expect(info.route.runs[0]?.inline.map((item) => item.type)).toEqual(['flangedJoint', 'instrument']);
+    expect(info.route.comparison.pipeLengthDeltaMm).toBe(0);
+    expect(info.route.comparison.countDelta).toEqual({});
+    expect(firstRun(result.document)?.inline).toEqual([
+      expect.objectContaining({ type: 'flangedJoint', centreDistance: 1500 }),
+      expect.objectContaining({ type: 'instrument', centreDistance: 3000, lengthMm: 300, endType: 'FL' }),
+    ]);
+  });
+
+  it('is a fixed point: export, import as route, export again gives the same PCF up to the part ids', () => {
+    const first = route(original);
+    expect(bare(exported(first.document, routeData(first).lineId))).toBe(bare(original));
+  });
+
+  it('a flange pair without a gasket is one joint rebuilt with the spec gasket (3 mm): accepted, the difference reported', () => {
+    const text = hand100(
+      record('FLANGE', 2, ['1000.0 0.0 0.0 100 BW', '1076.0 0.0 0.0 100 FL'], '    SKEY FLWN\n') +
+        record('FLANGE', 3, ['1076.0 0.0 0.0 100 FL', '1152.0 0.0 0.0 100 BW'], '    SKEY FLWN\n'),
+      '1152.0',
+    );
+    const result = route(text);
+    expect(result.rejected, result.summary).toBeUndefined();
+    expect(routeData(result).route.runs[0]?.inline.map((item) => item.type)).toEqual(['flangedJoint']);
+    expect(routeData(result).warnings.map((warning) => warning.code)).toContain('ISO_ROUTE_DIMENSIONS_CHANGED');
+  });
+
+  it('a butt-welded instrument (BW ends) is an inline instrument with endType BW', () => {
+    const text = hand100(record('INSTRUMENT', 2, ['1000.0 0.0 0.0 100 BW', '1300.0 0.0 0.0 100 BW']), '1300.0');
+    const result = route(text);
+    expect(result.rejected, result.summary).toBeUndefined();
+    expect(firstRun(result.document)?.inline[0]).toMatchObject({ type: 'instrument', lengthMm: 300, endType: 'BW' });
+  });
+
+  it('a flanged instrument that is not between two flanges, an instrument with one END-POINT, and a flange joined to an elbow are refused with the component named', () => {
+    const bareFlanged = hand100(record('INSTRUMENT', 2, ['1000.0 0.0 0.0 100 FL', '1300.0 0.0 0.0 100 FL']), '1300.0');
+    const flanged = expectRefusal(base, 'import_pcf', { text: bareFlanged, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
+    expect(flanged.summary).toContain('instrument');
+    expect(flanged.error?.ids).toEqual(['pcf:E-1:2']);
+    const single = hand100(record('INSTRUMENT', 2, ['1000.0 0.0 0.0 100 BW']), '1300.0');
+    expectRefusal(base, 'import_pcf', { text: single, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
+    const toElbow = hand100(
+      record('FLANGE', 2, ['1000.0 0.0 0.0 100 BW', '1076.0 0.0 0.0 100 FL']) +
+        record('GASKET', 3, ['1076.0 0.0 0.0 100 FL', '1079.0 0.0 0.0 100 FL']) +
+        record('ELBOW', 4, ['1079.0 0.0 0.0 100 FL', '1231.0 152.0 0.0 100 BW'], '    CENTRE-POINT 1231.0 0.0 0.0\n'),
+      '1079.0',
+    );
+    const elbow = expectRefusal(base, 'import_pcf', { text: toElbow, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
+    expect(elbow.summary).toContain('neither a flange, a valve nor an instrument');
+  });
+
+  it('a flanged instrument between flange sets whose far flange is missing is refused naming the instrument', () => {
+    const text = hand100(
+      record('FLANGE', 2, ['1000.0 0.0 0.0 100 BW', '1076.0 0.0 0.0 100 FL']) +
+        record('INSTRUMENT', 3, ['1076.0 0.0 0.0 100 FL', '1376.0 0.0 0.0 100 FL']),
+      '1376.0',
+    );
+    const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
+    expect(result.summary).toContain('has no flange on its far side');
   });
 });

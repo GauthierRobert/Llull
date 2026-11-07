@@ -8,6 +8,7 @@ import { deformPlans } from './deformPlans';
 import { implicitPlans } from './implicitPlans';
 import { pipingPlans } from './pipingPlans';
 import { pipingPlansV1 } from './pipingPlansV1';
+import { pipingPlansBlind } from './pipingPlansBlind';
 import { pipingPlansCap } from './pipingPlansCap';
 import { pipingPlansV1b } from './pipingPlansV1b';
 import { structuresPlans } from './structuresPlans';
@@ -39,6 +40,7 @@ describe('golden replay corpus', () =>
     ...pipingPlansV1,
     ...pipingPlansV1b,
     ...pipingPlansCap,
+    ...pipingPlansBlind,
     ...structuresPlans,
   }));
 
