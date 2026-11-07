@@ -4,16 +4,7 @@ import type { MeshAssetRef } from '../../model/meshProvenance';
 import { storedModelsProblem } from '../document/propertyModelSchema';
 import { formHash } from '../document/propertyModels';
 import { recordProblem } from './materialRecordValidation';
-import {
-  type Layer,
-  type CameraState,
-  type EntityKind,
-  type Vec2,
-  type Vec3,
-  SHAPE2D_KINDS,
-  SOLID_KINDS,
-  FINISH_PATTERNS,
-} from '../../model/types';
+import { type Layer, type CameraState, type EntityKind, type Vec3, SHAPE2D_KINDS, SOLID_KINDS, FINISH_PATTERNS } from '../../model/types';
 import { decalWrapFieldsProblem } from './decalGuard';
 import { helixProblem, sweepDesignProblem } from './sweepGuard';
 import { exactSectionsProblem, nurbsCurveProblem, nurbsSurfaceProblem, surfaceTrimsProblem } from './nurbsGuard';
@@ -25,6 +16,8 @@ import { isVec3 } from '../../lib/vec3';
 import { isHexColor } from '../../lib/isHexColor';
 import { validateShapeRecipe } from '../../geometry/shapeRecipe';
 import { chainIssue } from '../../geometry/curveSegments';
+import { curvesProblem, isCurveSegment } from './curvesGuard';
+import { regionProblem } from './regionGuard';
 import { MAX_SUBDIVISION_LEVELS, type Cage, cageProblem } from '../../geometry/subdivision';
 import { settleBudgetProblem } from '../../geometry/subd/settle';
 import { subdivisionFieldsProblem } from '../../geometry/subd/validate';
@@ -150,27 +143,6 @@ function stationsProblem(stations: unknown): string | null {
   );
   return problem === null ? null : `stations ${problem}`;
 }
-
-/** Optional exact 2D boundary (`curves`) problem, or null. */
-function curvesProblem(curves: unknown): string | null {
-  if (curves === undefined) return null;
-  if (!(Array.isArray(curves) && curves.every((s) => isCurveSegment(s, 2))))
-    return 'curves must be line/arc/bezier/ellipse segments with [x, y] points';
-  const issue = chainIssue(curves as CurveSegment<Vec2>[], true);
-  return issue === null ? null : `curves must form one closed loop — ${issue}`;
-}
-
-function isCurveSegment(s: unknown, dims: number): boolean {
-  return (
-    isRecord(s) &&
-    Array.isArray(s['points']) &&
-    s['points'].length === SEGMENT_POINT_COUNT[String(s['type'])] &&
-    s['points'].every((p: unknown) => Array.isArray(p) && p.length === dims && p.every(isFiniteNumber))
-  );
-}
-
-/** Points per curve segment type (`CurveSegment`). */
-const SEGMENT_POINT_COUNT: Readonly<Record<string, number>> = { line: 2, arc: 3, bezier: 4, ellipse: 3 };
 
 const VALID_ENTITY_KINDS: ReadonlySet<string> = new Set([...SOLID_KINDS, ...SHAPE2D_KINDS, ...CURVE_KINDS, ...SHEET_KINDS, 'instance']);
 
@@ -439,6 +411,7 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   // uncapped: DXF import and offset_2d write polylines of any length (the file size already bounds a document)
   polyline: (v) => firstProblem(pointListProblem(v, 'points', 2, Number.POSITIVE_INFINITY), closedFlagProblem(v)),
   spline: (v) => firstProblem(pointListProblem(v, 'points', 2, MAX_SPLINE_CONTROL_POINTS), closedFlagProblem(v)),
+  region: regionProblem,
   arc: (v) => firstProblem(vec2Problem(v, 'center'), finiteField('startAngle')(v), finiteField('endAngle')(v)),
   circle: (v) => vec2Problem(v, 'center'),
   ellipse: (v) => vec2Problem(v, 'center'),

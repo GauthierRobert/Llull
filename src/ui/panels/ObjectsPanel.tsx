@@ -31,6 +31,7 @@ const KIND_ICONS: Readonly<Partial<Record<EntityKind, IconName>>> = {
   rectangle: 'drawRectangle',
   ellipse: 'drawEllipse',
   spline: 'drawSpline',
+  region: 'drawPolyline',
   point: 'drawPoint',
   text: 'text',
   image: 'image',

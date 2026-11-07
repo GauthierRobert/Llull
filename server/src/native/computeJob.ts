@@ -281,13 +281,16 @@ export function f64Values(bytes: Buffer): Float64Array {
 
 const keepFolders = (env: NodeJS.ProcessEnv): boolean => env['LLULL_NATIVE_KEEP'] === '1';
 
+/** Prefix of this process's job folders in tmpdir (per process, so a parallel lane or test worker never counts another one's jobs). */
+export const jobFolderPrefix = (): string => `llull-compute-${process.pid}-`;
+
 /** Runs `body` in a fresh job folder with `files` written into it; the folder is removed afterwards unless LLULL_NATIVE_KEEP=1. */
 export async function withJobFolder<T>(
   files: Readonly<Record<string, Buffer | string>>,
   body: (folder: string) => Promise<T>,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<T> {
-  const folder = await mkdtemp(path.join(tmpdir(), 'llull-compute-'));
+  const folder = await mkdtemp(path.join(tmpdir(), jobFolderPrefix()));
   try {
     for (const [name, content] of Object.entries(files)) await writeFile(path.join(folder, name), content);
     return await body(folder);
@@ -302,7 +305,7 @@ export function withJobFolderSync<T>(
   body: (folder: string) => T,
   env: NodeJS.ProcessEnv = process.env,
 ): T {
-  const folder = mkdtempSync(path.join(tmpdir(), 'llull-compute-'));
+  const folder = mkdtempSync(path.join(tmpdir(), jobFolderPrefix()));
   try {
     for (const [name, content] of Object.entries(files)) writeFileSync(path.join(folder, name), content);
     return body(folder);

@@ -156,6 +156,10 @@ export function localBounds(e: Entity): Bounds {
       const { minX, minY, maxX, maxY } = pointsExtent(e.points);
       return bounds([minX, minY, 0], [maxX, maxY, 0]);
     }
+    case 'region': {
+      const { minX, minY, maxX, maxY } = pointsExtent(e.loops.flat());
+      return bounds([minX, minY, 0], [maxX, maxY, 0]);
+    }
     case 'arc':
     case 'circle':
       // Conservative: full center±radius box (arcs are not angle-trimmed here).

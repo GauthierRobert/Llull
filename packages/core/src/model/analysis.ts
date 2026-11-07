@@ -6,6 +6,7 @@
  */
 
 import type { Vec3 } from './vectors';
+import type { FitDispositions, FitLedgerEntry } from './fitDisposition';
 import type { Quantity } from './quantity';
 import type { FeMeshAdequacy } from './meshAdequacy';
 import type { DurabilityModel } from './durability';
@@ -485,12 +486,6 @@ export interface ThermoMechSetup {
   readonly loadCaseName: string;
 }
 
-/** A fit disposition: the margin disposition fields (the signature is kept so a reader can re-verify it) with the hash of the fit inputs. */
-interface FitDisposition extends Pick<Disposition, 'decision' | 'justification' | 'signer' | 'signatureId' | 'signature'> {
-  readonly inputsHash: string;
-}
-export type FitDispositions = Readonly<Record<string, FitDisposition>>;
-
 /** Carries the PHY-00 convergence `studies` / `studyOrder` of the case (see convergenceStudy.ts). */
 export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly id: string;
@@ -541,6 +536,8 @@ export interface AnalysisModel {
   readonly cases: Readonly<Record<string, AnalysisCase>>;
   readonly caseOrder: readonly string[];
   readonly fitDispositions?: FitDispositions;
+  /** Dispositions a human really signed (appended by dispose_fit_result), kept by the cae `replaySeed` so a recorded step re-applies its verified act. */
+  readonly fitLedger?: readonly FitLedgerEntry[];
   /** Absent until the first durability command (`define_load_history`, `define_crack`; plugin `cae`, PHY-07 / PHY-08). */
   readonly durability?: DurabilityModel;
   /** PHY-09 spectrum / time-history library and equivalent-load provenance; absent until the first spectrum or history command. */

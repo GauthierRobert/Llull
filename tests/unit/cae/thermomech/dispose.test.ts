@@ -5,6 +5,7 @@ import { execute } from '@core/commands/registry';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import { withDocumentUid } from '@core/model/documentUid';
 import type { CadDocument } from '@core/model/types';
+import { isRecord } from '@lib/isRecord';
 import { canonicalJson } from '@lib/canonicalJson';
 import { jcsJson } from '@lib/jcs';
 import { sha256Hex } from '@lib/sha256';
@@ -18,7 +19,7 @@ const params = {
   decision: 'accepted',
   justification: 'checked by hand',
   inputsHash: 'h1',
-  signature: 'good',
+  confirmation: { nonce: 'n1', sig: 'good' },
 };
 const payload = (doc: CadDocument): string =>
   sha256Hex(
@@ -30,12 +31,21 @@ const payload = (doc: CadDocument): string =>
     ),
   );
 
-const port = (seen: string[] = []): HumanSignaturePort => ({
-  verify: (signature, hash) => {
-    seen.push(hash);
-    return signature === 'good' ? { signer: 'alice', signatureId: 'sig-1' } : null;
-  },
-});
+const port = (seen: string[] = []): HumanSignaturePort => {
+  const spent = new Set<string>();
+  return {
+    verify: (confirmation, hash) => {
+      seen.push(hash);
+      return isRecord(confirmation) && confirmation['sig'] === 'good' ? { signer: 'alice', signatureId: 'sig-1' } : null;
+    },
+    spend: (confirmation) => {
+      const key = JSON.stringify(confirmation);
+      if (spent.has(key)) return false;
+      spent.add(key);
+      return true;
+    },
+  };
+};
 const withPort = (seen?: string[]): ExecutionContext => ({ ...defaultContext(), humanSignature: port(seen) });
 
 describe('dispose_fit_result (human gate)', () => {
@@ -52,13 +62,15 @@ describe('dispose_fit_result (human gate)', () => {
   it('a signature made for one document does not verify in a copy of it (GATE-UID)', () => {
     expectBoundToDocument(
       doc,
-      (document, signature, ctx) => execute(document, 'dispose_fit_result', { ...params, signature }, ctx),
+      (document, confirmation, ctx) => execute(document, 'dispose_fit_result', { ...params, confirmation }, ctx),
       'TMC_HUMAN_GATE',
+      'n1',
+      (replayed) => replayed.analysis?.fitDispositions?.[params.rowKey]?.signer === 'alice',
     );
   });
 
   it('refuses a signature that does not verify', () => {
-    const result = execute(doc, 'dispose_fit_result', { ...params, signature: 'forged' }, withPort());
+    const result = execute(doc, 'dispose_fit_result', { ...params, confirmation: { nonce: 'n1', sig: 'forged' } }, withPort());
     expectNoOp(result, doc);
     expect(result.error?.code).toBe('TMC_HUMAN_GATE');
   });
@@ -75,7 +87,8 @@ describe('dispose_fit_result (human gate)', () => {
         inputsHash: 'h1',
         signer: 'alice',
         signatureId: 'sig-1',
-        signature: params.signature,
+        signature: params.confirmation,
+        documentUid: doc.uid,
       },
     });
     expect(result.document.analysis?.cases).toEqual(doc.analysis?.cases);
@@ -91,7 +104,7 @@ describe('dispose_fit_result (human gate)', () => {
     expect(moved.error?.code).toBe('TMC_FIT_INPUTS_CHANGED');
     const same = execute(doc, 'dispose_fit_result', { ...params, currentInputsHash: 'h1' }, withPort());
     expect(same.affected).toEqual([params.rowKey]);
-    const empty = execute(doc, 'dispose_fit_result', { ...params, justification: '  ', signature: 'good' }, withPort());
+    const empty = execute(doc, 'dispose_fit_result', { ...params, justification: '  ' }, withPort());
     expectNoOp(empty, doc);
     expect(empty.error?.code).toBe('FEA_PARAM_INVALID');
   });

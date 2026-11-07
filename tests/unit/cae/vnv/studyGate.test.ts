@@ -318,3 +318,47 @@ describe('accept_verification_exception: history, replay and what is shown', () 
     expect(found?.accepted?.signer).toBe(SIGNER);
   });
 });
+
+describe('accept_verification_exception: spend last, and a kept entry is re-verified (FIX-SIG-DFR)', () => {
+  const bar = lawBar();
+  const { doc, studyId } = recordedStudy(bar);
+
+  it('every refusal leaves the signature unspent', () => {
+    const port = signingPort();
+    const ctx = humanContext(bar, port);
+    const blank = '   ';
+    const blankSignature = {
+      nonce: 'n-2',
+      payload: humanGatePayload(
+        EXCEPTION_ACT,
+        [studyId],
+        exceptionDetails(study(doc, bar, studyId), 'VNV_NOT_ASYMPTOTIC', blank, doc.uid ?? ''),
+        'n-2',
+      ),
+    };
+    expect(accept(doc, bar, studyId, ctx, { signature: blankSignature, justification: blank }).error?.code).toBe('VNV_PARAM_INVALID');
+    const signature = signatureFor(doc, bar, studyId, 'VNV_NOT_ASYMPTOTIC');
+    expect(accept(doc, bar, studyId, ctx, { signature, code: 'VNV_DIVERGENT' }).error?.code).toBeDefined();
+    expect(accept(doc, bar, 'cs-9.9', ctx, { signature }).error?.code).toBe('VNV_STUDY_NOT_FOUND');
+    expect(port.spentCount()).toBe(0);
+  });
+
+  it('a hand-planted or altered ledger entry does not make a recorded step stick (port installed)', () => {
+    const signed = accept(doc, bar, studyId, humanContext(bar, signingPort()), {
+      signature: signatureFor(doc, bar, studyId, 'VNV_NOT_ASYMPTOTIC'),
+    }).document;
+    const ledger = signed.analysis?.exceptionLedger ?? [];
+    expect(ledger).toHaveLength(1);
+    const replayWith = (entry: Record<string, unknown>): CadDocument =>
+      execute(
+        { ...signed, analysis: { ...(signed.analysis as object), exceptionLedger: [{ ...ledger[0], ...entry }] } as never },
+        'replay_history',
+        {},
+        humanContext(bar, signingPort()),
+      ).document;
+    expect(study(replayWith({}), bar, studyId).exception?.signer).toBe(SIGNER);
+    expect(study(replayWith({ signature: { nonce: 'n-1', payload: 'f'.repeat(64) } }), bar, studyId).exception).toBeUndefined();
+    expect(study(replayWith({ signature: 'raw' }), bar, studyId).exception).toBeUndefined();
+    expect(study(replayWith({ documentUid: 'e'.repeat(32) }), bar, studyId).exception).toBeUndefined();
+  });
+});

@@ -25,12 +25,6 @@ function pinnedPort(seen: string[] = []): HumanSignaturePort {
 }
 
 /**
- * Gated commands whose recorded step still holds the signature object (the param is not named `confirmation`, so `withoutConfirmations` keeps it): found by this
- * check on 2026-11-07, reported to the owner of the command; fix = rename the param and keep the proof in the record.
- */
-const KNOWN_SIGNATURE_IN_HISTORY: readonly string[] = ['dispose_fit_result'];
-
-/**
  * Run `attempt` three times: unsigned (to learn the payload the command verifies), signed for `doc` (must clear), the same signature in `doc` copied into
  * another document (must be refused with the gate's own code, document unchanged).
  * @invariant fails when the signed payload does not name the document: the copy would verify
@@ -56,8 +50,7 @@ export function expectBoundToDocument(
   if (signed.document.featureHistory.length > doc.featureHistory.length) {
     const step = signed.document.featureHistory.at(-1);
     const holds = JSON.stringify(step?.params ?? null).includes(confirmation.payload);
-    // ratchet: a known defect must keep failing here until it is fixed and removed from KNOWN_SIGNATURE_IN_HISTORY
-    expect(holds, `the recorded step ${step?.name ?? ''} holds the signature`).toBe(KNOWN_SIGNATURE_IN_HISTORY.includes(step?.name ?? ''));
+    expect(holds, `the recorded step ${step?.name ?? ''} holds the signature`).toBe(false);
   }
   if (keepsAcceptance !== undefined) {
     const replayed = execute(signed.document, 'replay_history', {}, { ...defaultContext(), humanSignature: pinnedPort() }).document;

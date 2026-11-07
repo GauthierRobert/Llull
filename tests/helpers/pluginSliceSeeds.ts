@@ -219,6 +219,41 @@ const studyFixture = (): ReturnType<typeof studyBar> => (studySeed ??= studyBar(
 const analysisId = (doc: CadDocument): string => doc.analysis?.caseOrder[0] ?? 'missing';
 const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc)]?.topologyOrder?.[0] ?? 'missing';
 
+/** `doc` with a valid human-act ledger entry and a copy bound to another document uid, in both ledgers, plus the matching fit dispositions. */
+function withLedgers(doc: CadDocument): CadDocument {
+  const signature = { nonce: 'n-1', payload: 'a'.repeat(64) };
+  const exception = {
+    analysisId: analysisId(doc),
+    studyId: 'cs-1.1',
+    code: 'VNV_NOT_ASYMPTOTIC',
+    justification: 'j',
+    signer: 's',
+    signatureId: 'id',
+    signature,
+    levelHashes: ['a'.repeat(64), 'b'.repeat(64), 'c'.repeat(64)],
+    documentUid: doc.uid ?? '',
+  };
+  const fit = {
+    decision: 'accepted',
+    justification: 'j',
+    inputsHash: 'h',
+    signer: 's',
+    signatureId: 'id',
+    signature,
+    documentUid: doc.uid ?? '',
+  };
+  const analysis = {
+    ...doc.analysis,
+    exceptionLedger: [exception, { ...exception, documentUid: 'e'.repeat(32) }],
+    fitDispositions: { 'row 1': fit },
+    fitLedger: [
+      { ...fit, rowKey: 'row 1' },
+      { ...fit, rowKey: 'row 1', documentUid: 'e'.repeat(32) },
+    ],
+  };
+  return { ...doc, analysis } as CadDocument;
+}
+
 export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   building: {
     roots: ['building'],
@@ -322,6 +357,14 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
         studyId: Object.keys(doc.analysis?.cases[analysisId(doc)]?.studies ?? {})[0] ?? 'missing',
       }),
     },
+  },
+  // the human-act ledgers replays keep (exceptionLedger, fitLedger) and the fit dispositions: a valid entry and one signed for another document uid
+  'cae#ledgers': {
+    roots: ['analysis'],
+    build: () => withLedgers(recordedStudy(studyFixture()).doc),
+    ctx: () => studyFixture().ctx,
+    query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
+    mutate: { name: 'create_analysis', params: constant({ name: 'fuzz ledger analysis', analysisType: 'static' }) },
   },
   topology: {
     roots: ['analysis'],
