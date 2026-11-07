@@ -1,7 +1,7 @@
 /** PHY-04 fit dispositions: the human decision on a fit_at_temperature row, with the proof a reader needs to re-verify it. */
 
 /** A fit disposition: the decision, the verified signature (kept so a reader can re-verify it), the hash of the fit inputs and the document signed for. */
-export interface FitDisposition {
+interface FitDisposition {
   readonly decision: 'accepted' | 'rejected' | 'redesign';
   readonly justification: string;
   readonly inputsHash: string;
