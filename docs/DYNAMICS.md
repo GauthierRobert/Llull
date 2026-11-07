@@ -39,7 +39,7 @@ tuned from a bandwidth and the reflected inertia, zero-order hold at `sampleHz`)
 The law runs in the per-step `ActuatorBlock` of the physics port, so any engine integrates it; MuJoCo carries the rotor as joint `armature` (eta N^2 J) and the
 no-load friction as a friction level. `simulate_motion detail "drives"` returns per motor the voltage, current, shaft / joint torque, speed and powers, and the
 energy ledger (electrical input, copper, magnetic, gearhead loss, friction, kinetic, closure). A speed motor with no sourced torque bound is flagged
-`DRV_EFFORT_UNBOUNDED` by `check_dynamics`. Not yet: thermal model (DRV-M3 and later).
+`DRV_EFFORT_UNBOUNDED` by `check_dynamics`.
 
 ### Transmissions, joint physics and loads (PHY-23 DRV-M2, [spec](physics/23-drives-physical-truth/TECHNICAL_SPEC.md) section 13.14)
 
@@ -51,6 +51,20 @@ replace the joint's `friction` / `damping`: `stiction` (breakaway detected on th
 (μ·r·(radial load + preload + moment / arm) read from the joint reaction). End stops are `range` rows with the acceleration-law `solreflimit` scaled by the inertia the joint pushes.
 `simulate_motion` with `energy` lists every friction, transmission and stop loss in `data.ledger` (stops: minus the work of the stop minus the spring energy it still holds) and
 `data.stops` gives the peak penetration and force. A given `timestep` with ω_n·Δt > 0.1 for a stop or backlash is refused (`DRV_STEP_TOO_COARSE`); the auto timestep is halved until it fits.
+
+### Sizing, trusting and calibrating a drive (PHY-23 DRV-M3, [spec](physics/23-drives-physical-truth/TECHNICAL_SPEC.md) section 13.18)
+
+`size_drive` runs the duty cycle of a driven datasheet motor (whole repeats of its profile) and reports peak and RMS current / shaft torque (trapezoid-weighted), speed, voltage, the winding
+temperature from the 2-node thermal network (exact matrix exponential per step; steady value at the RMS current; runaway above the current where copper loss feeds itself), the margin of each
+factor against the datasheet (capacity / demand - 1), the limiting factor and coded findings (`DRV_PEAK_OVER`, `DRV_RMS_OVER`, `DRV_SPEED_OVER`, `DRV_THERMAL_OVER`, `DRV_THERMAL_RUNAWAY`,
+`DRV_VOLTAGE_LIMITED`, `DRV_MARGIN_LOW`, `DRV_PARAM_UNSOURCED`); `ratioSweep` re-runs copies of the model per gear reduction and names the best one beside the inertia match sqrt(J_load / J_motor).
+`check_motion_truth` gives one verdict (`trusted` / `plausible` / `not_trusted`) from: the energy ledger closure (with the named cause of a servo jump start), a timestep study at dt, dt/2
+(dt/4 with `level "full"`) with the observed order and the GCI of every output, stop / backlash penetration and the configuration-dependent stop inertia, effort bounds, provenance (the
+lowest-grade input is named) and stored time-series references. `add_reference_data` takes a measured `series` (joint position / velocity, motor current / voltage / torque / speed, a ledger
+energy), `compare_to_reference <id>` compares the model with it and `fit_drive_parameters` fits inertia, Coulomb and viscous friction (spin-down / spin-up) or resistance and torque constant
+(step response) by linear least squares with 1-sigma values, refusing data that cannot separate the unknowns (`DRV_FIT_UNIDENTIFIABLE`). `check_prototype` adds `check_motion_truth` to its
+dynamics check when the model has drive physics. `plot_simulation` draws `motor_current`, `motor_voltage`, `winding_temperature`, `operating_points` (torque against speed with the motor limits)
+and `energy_ledger`.
 
 ### Springs, energy and unsettled-run warnings
 

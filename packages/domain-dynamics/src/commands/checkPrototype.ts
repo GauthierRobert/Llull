@@ -10,6 +10,7 @@ import { isRecord } from '@lib/isRecord';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop, report } from '@core/commands/noop';
+import type { DynamicsModel } from '@core/model/dynamics';
 import { dynamicsOf } from './bodies';
 import { simulateMotion } from './simulate';
 import { motionClearanceCheck } from './checkMotionClearance';
@@ -66,8 +67,15 @@ function durationOf(doc: CadDocument, cycles: number, settleS: number | undefine
   return Math.min(MAX_DURATION_S, (settleS ?? SETTLE_CYCLES * cycleS) + cycles * cycleS);
 }
 
-/** check_timestep_convergence / compare_to_reference results become dynamics items, with the accuracy each value carries. */
-function engineParts(context: ExecutionContext, doc: CadDocument): PrototypeCheck[] {
+/** True when the model carries drive physics (PHY-23: drives, transmissions, joint physics, load schedules, reference series): check_motion_truth then joins the dynamics check. */
+function hasDrivePhysics(dynamics: DynamicsModel): boolean {
+  return [dynamics.drives, dynamics.transmissions, dynamics.jointPhysics, dynamics.loadSchedules, dynamics.referenceSeries].some(
+    (table) => table !== undefined && Object.keys(table).length > 0,
+  );
+}
+
+/** check_timestep_convergence / compare_to_reference / check_motion_truth results become dynamics items, with the accuracy each value carries. */
+function engineParts(context: ExecutionContext, doc: CadDocument, durationS: number): PrototypeCheck[] {
   const dynamics = dynamicsOf(doc);
   const parts: PrototypeCheck[] = [];
   if (Object.keys(dynamics.cylinders ?? {}).length > 0) {
@@ -98,6 +106,18 @@ function engineParts(context: ExecutionContext, doc: CadDocument): PrototypeChec
     } else if (compared !== null)
       parts.push(skippedCheck('dynamics', 'FPR_REFERENCE_MISMATCH', reasonOf(compared.result.summary), 'Fix the reason, then re-run.'));
   }
+  if (hasDrivePhysics(dynamics)) {
+    const truth = runSub(context, doc, 'check_motion_truth', { duration: durationS, level: 'quick' });
+    parts.push(
+      truth?.check ??
+        skippedCheck(
+          'dynamics',
+          'DRV_LEDGER_CLOSURE',
+          reasonOf(truth?.result.summary ?? 'check_motion_truth is not registered'),
+          'Fix the reason (see check_motion_truth), then re-run.',
+        ),
+    );
+  }
   return parts;
 }
 
@@ -116,7 +136,7 @@ export const checkPrototype = defineCommand({
     'The functional-prototype review in one call: "is this model ready to build and does it work?". Runs, in order, check_assembly ' +
     '(solids, overlaps, floating parts, walls, joints realised), the mechanism mobility (inspect_dynamics rank DOF; check_mechanism for ' +
     'kinematic joints), check_motion_clearance (one simulated run, collisions while it moves), check_dynamics (realistic inputs, loop drift, ' +
-    'energy, timestep) and, for engines, check_timestep_convergence and compare_to_reference (when reference data is stored). It stops ' +
+    'energy, timestep) and, for engines, check_timestep_convergence and compare_to_reference (when reference data is stored); when the model has drive physics (drives, transmissions, joint physics, load schedules or reference series) check_motion_truth (quick) joins the dynamics check: ledger closure, timestep study, softness, effort, provenance and stored time series. It stops ' +
     'before the motion checks when a part is invalid or floating, or a loop is open (those checks read not_run with the reason). Returns ' +
     'data { verdict: "blocked" | "ready_for_review", ownerSummary (plain language), checks[] (assembly, mechanism, motion_clearance, dynamics: ' +
     'the review envelope each, items with findingKey and the reviewer disposition joined), staleDispositions, durationS, reviewRequired }. ' +
@@ -216,7 +236,7 @@ export const checkPrototype = defineCommand({
       const base =
         dynamicsRun?.check ??
         skippedCheck('dynamics', 'FPR_NO_MOTION', reasonOf(dynamicsRun?.result.summary ?? 'check_dynamics is not registered'), fix);
-      dynamicsCheck = mergeChecks('dynamics', [base, ...engineParts(context, checked)]);
+      dynamicsCheck = mergeChecks('dynamics', [base, ...engineParts(context, checked, durationS)]);
     }
 
     const checks = [assembly, mechanism, motion, dynamicsCheck].map((check) => withDispositions(check, dispositions));

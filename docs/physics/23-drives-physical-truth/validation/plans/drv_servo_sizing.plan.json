@@ -18,9 +18,10 @@
       "kind": "gear",
       "driver": "j_motor",
       "driven": "j_load",
-      "ratio": 10,
+      "ratio": 0.1,
       "efficiency": 0.9,
       "efficiencyBack": 0.88,
+      "source": { "name": "typical one-stage precision planetary gearhead, catalogue range 0.85-0.95", "grade": "B" },
       "id": "tr_gear"
     }
   },

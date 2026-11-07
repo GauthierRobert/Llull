@@ -1,0 +1,2023 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PHY-23 validation plans, golden > drv_lead_screw: the document and the 0.2 s lift (VC-DRV-13) > document 1`] = `
+{
+  "document": {
+    "animations": {},
+    "camera": {
+      "azimuth": 2.35619449,
+      "distance": 12,
+      "polar": 1.04719755,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+    },
+    "components": {},
+    "configurations": {},
+    "constraintOrder": [],
+    "constraints": {},
+    "displayPrecision": 3,
+    "driveRelationOrder": [],
+    "driveRelations": {},
+    "dynamics": {
+      "bodies": {
+        "#10": {
+          "entityIds": [
+            "#3",
+          ],
+          "fixed": false,
+          "id": "#10",
+          "massKg": 10,
+        },
+        "#8": {
+          "entityIds": [
+            "#1",
+          ],
+          "fixed": false,
+          "id": "#8",
+          "massKg": 0.8,
+        },
+      },
+      "gravity": [
+        0,
+        0,
+        -9.81,
+      ],
+      "joints": {
+        "#12": {
+          "anchor": [
+            0,
+            0,
+            0,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#8",
+          "damping": 0,
+          "friction": 0,
+          "id": "#12",
+          "initialVelocity": 0,
+          "kind": "revolute",
+          "parent": "ground",
+        },
+        "#14": {
+          "anchor": [
+            0,
+            0,
+            100,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#10",
+          "damping": 0,
+          "friction": 0,
+          "id": "#14",
+          "initialVelocity": 0,
+          "kind": "prismatic",
+          "parent": "ground",
+        },
+      },
+      "motors": {
+        "#19": {
+          "curve": [
+            [
+              0,
+              0.5,
+            ],
+          ],
+          "id": "#19",
+          "joint": "#12",
+          "kind": "torque_curve",
+          "throttle": 1,
+        },
+      },
+      "propellers": {},
+      "transmissions": {
+        "#16": {
+          "#10": "#14",
+          "#8": "#12",
+          "flankAngleDeg": 0,
+          "id": "#16",
+          "kind": "lead_screw",
+          "leadMm": 10,
+          "meanDiameterMm": 10,
+          "mu": 0.1,
+          "source": {
+            "grade": "A",
+            "name": "PHY-23 VC-DRV-13 (synthetic)",
+          },
+        },
+      },
+    },
+    "entities": {
+      "#1": {
+        "color": "#6b8f9c",
+        "height": 300,
+        "id": "#1",
+        "kind": "cylinder",
+        "layerId": "#2",
+        "position": [
+          0,
+          0,
+          150,
+        ],
+        "radius": 5,
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+      },
+      "#3": {
+        "color": "#6b8f9c",
+        "id": "#3",
+        "kind": "box",
+        "layerId": "#2",
+        "position": [
+          0,
+          0,
+          100,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          40,
+          40,
+          20,
+        ],
+      },
+    },
+    "featureHistory": [
+      {
+        "affected": [],
+        "id": "#4",
+        "name": "set_units",
+        "params": {
+          "units": "mm",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#1",
+        ],
+        "id": "#5",
+        "name": "add_cylinder",
+        "params": {
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "height": 300,
+          "position": [
+            0,
+            0,
+            150,
+          ],
+          "radius": 5,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#3",
+        ],
+        "id": "#6",
+        "name": "add_box",
+        "params": {
+          "anchor": "center",
+          "position": [
+            0,
+            0,
+            100,
+          ],
+          "size": [
+            40,
+            40,
+            20,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#8",
+        ],
+        "id": "#7",
+        "name": "add_rigid_body",
+        "params": {
+          "entityIds": [
+            "#1",
+          ],
+          "id": "#8",
+          "massKg": 0.8,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#10",
+        ],
+        "id": "#9",
+        "name": "add_rigid_body",
+        "params": {
+          "entityIds": [
+            "#3",
+          ],
+          "id": "#10",
+          "massKg": 10,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#12",
+        ],
+        "id": "#11",
+        "name": "add_body_joint",
+        "params": {
+          "anchor": [
+            0,
+            0,
+            0,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#8",
+          "id": "#12",
+          "kind": "revolute",
+          "parent": "ground",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#14",
+        ],
+        "id": "#13",
+        "name": "add_body_joint",
+        "params": {
+          "anchor": [
+            0,
+            0,
+            100,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#10",
+          "id": "#14",
+          "kind": "prismatic",
+          "parent": "ground",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#16",
+        ],
+        "id": "#15",
+        "name": "add_transmission",
+        "params": {
+          "#10": "#14",
+          "#8": "#12",
+          "flankAngleDeg": 0,
+          "id": "#16",
+          "kind": "lead_screw",
+          "leadMm": 10,
+          "meanDiameterMm": 10,
+          "mu": 0.1,
+          "source": {
+            "grade": "A",
+            "name": "PHY-23 VC-DRV-13 (synthetic)",
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#17",
+        "name": "set_gravity",
+        "params": {
+          "gravity": [
+            0,
+            0,
+            -9.81,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#19",
+        ],
+        "id": "#18",
+        "name": "add_motor",
+        "params": {
+          "id": "#19",
+          "joint": "#12",
+          "kind": "torque_curve",
+          "torque": 0.5,
+        },
+        "suppressed": false,
+      },
+    ],
+    "groups": {},
+    "jointOrder": [],
+    "joints": {},
+    "layerOrder": [
+      "#2",
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "locked": false,
+        "name": "Layer 0",
+        "visible": true,
+      },
+    },
+    "materials": {},
+    "nextStepNumber": 11,
+    "order": [
+      "#1",
+      "#3",
+    ],
+    "parameters": {},
+    "recipes": {},
+    "selection": [],
+    "units": "mm",
+  },
+  "format": "llull-document",
+  "version": 3,
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_lead_screw: the document and the 0.2 s lift (VC-DRV-13) > run 1`] = `
+{
+  "engine": "MuJoCo 3.16.0",
+  "ledger": {
+    "closure": "pass",
+    "closureRelative": 6.24582e-10,
+    "entries": [
+      [
+        "transmission:tr_screw",
+        "transmission_loss",
+        14.8688,
+      ],
+      [
+        "joints",
+        "friction_damping",
+        0,
+      ],
+      [
+        "propellers",
+        "propeller",
+        0,
+      ],
+      [
+        "mechanism",
+        "kinetic",
+        29.7657,
+      ],
+      [
+        "mechanism",
+        "potential",
+        20.2659,
+      ],
+      [
+        "loads",
+        "external_work",
+        64.9004,
+      ],
+    ],
+  },
+  "positions": {
+    "j_nut": "176501a6a80931e8",
+    "j_screw": "102f4c2a70c29ec8",
+  },
+  "samples": 201,
+  "timestep": 0.0001,
+  "velocities": {
+    "j_nut": "d2eab6cc0a791054",
+    "j_screw": "85545d3918f7ed4f",
+  },
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_maxon_step: the document and the 30 ms run (VC-DRV-01, 04, 05) > document 1`] = `
+{
+  "document": {
+    "animations": {},
+    "camera": {
+      "azimuth": 2.35619449,
+      "distance": 12,
+      "polar": 1.04719755,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+    },
+    "components": {},
+    "configurations": {},
+    "constraintOrder": [],
+    "constraints": {},
+    "displayPrecision": 3,
+    "driveRelationOrder": [],
+    "driveRelations": {},
+    "dynamics": {
+      "bodies": {
+        "#6": {
+          "entityIds": [
+            "#1",
+          ],
+          "fixed": false,
+          "id": "#6",
+          "massKg": 0.000001,
+        },
+      },
+      "drives": {
+        "#11": {
+          "id": "#11",
+          "mode": "voltage",
+          "volts": 48,
+        },
+      },
+      "gravity": [
+        0,
+        0,
+        0,
+      ],
+      "joints": {
+        "#8": {
+          "anchor": [
+            0,
+            0,
+            0,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#6",
+          "damping": 0,
+          "friction": 0,
+          "id": "#8",
+          "initialVelocity": 0,
+          "kind": "revolute",
+          "parent": "ground",
+        },
+      },
+      "motors": {
+        "#11": {
+          "datasheet": {
+            "maxSpeedRpm": 12000,
+            "mechanicalTimeConstantS": 0.00428,
+            "noLoadCurrentA": 0,
+            "noLoadSpeedRpm": 7590,
+            "nominalCurrentA": 3.17,
+            "nominalVoltageV": 48,
+            "rotorInertiaKgM2": 0.0000137,
+            "speedConstantRpmPerV": 158,
+            "speedTorqueGradientRpmPerMNm": 2.97,
+            "stallCurrentA": 42.4,
+            "stallTorqueNm": 2.56,
+            "terminalInductanceH": 0.00033,
+            "terminalResistanceOhm": 1.13,
+            "thermal": {
+              "maxWindingC": 155,
+              "rthHousingAmbientKPerW": 4.7,
+              "rthWindingHousingKPerW": 1.9,
+              "tauMotorS": 809,
+              "tauWindingS": 41.5,
+            },
+            "torqueConstantNmPerA": 0.0603,
+          },
+          "id": "#11",
+          "joint": "#8",
+          "kind": "dc",
+          "source": {
+            "grade": "A",
+            "name": "maxon RE 40 148877, catalogue page CN-141 (2020-06)",
+          },
+        },
+      },
+      "propellers": {},
+    },
+    "entities": {
+      "#1": {
+        "color": "#6b8f9c",
+        "height": 5,
+        "id": "#1",
+        "kind": "cylinder",
+        "layerId": "#2",
+        "position": [
+          0,
+          0,
+          0,
+        ],
+        "radius": 5,
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+      },
+    },
+    "featureHistory": [
+      {
+        "affected": [],
+        "id": "#3",
+        "name": "set_units",
+        "params": {
+          "units": "mm",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#1",
+        ],
+        "id": "#4",
+        "name": "add_cylinder",
+        "params": {
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "height": 5,
+          "position": [
+            0,
+            0,
+            0,
+          ],
+          "radius": 5,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#6",
+        ],
+        "id": "#5",
+        "name": "add_rigid_body",
+        "params": {
+          "entityIds": [
+            "#1",
+          ],
+          "id": "#6",
+          "massKg": 0.000001,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#8",
+        ],
+        "id": "#7",
+        "name": "add_body_joint",
+        "params": {
+          "anchor": [
+            0,
+            0,
+            0,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#6",
+          "id": "#8",
+          "kind": "revolute",
+          "parent": "ground",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#9",
+        "name": "set_gravity",
+        "params": {
+          "gravity": [
+            0,
+            0,
+            0,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#11",
+        ],
+        "id": "#10",
+        "name": "add_motor",
+        "params": {
+          "datasheet": {
+            "maxSpeedRpm": 12000,
+            "mechanicalTimeConstantS": 0.00428,
+            "noLoadCurrentA": 0,
+            "noLoadSpeedRpm": 7590,
+            "nominalCurrentA": 3.17,
+            "nominalVoltageV": 48,
+            "rotorInertiaKgM2": 0.0000137,
+            "speedConstantRpmPerV": 158,
+            "speedTorqueGradientRpmPerMNm": 2.97,
+            "stallCurrentA": 42.4,
+            "stallTorqueNm": 2.56,
+            "terminalInductanceH": 0.00033,
+            "terminalResistanceOhm": 1.13,
+            "thermal": {
+              "maxWindingC": 155,
+              "rthHousingAmbientKPerW": 4.7,
+              "rthWindingHousingKPerW": 1.9,
+              "tauMotorS": 809,
+              "tauWindingS": 41.5,
+            },
+            "torqueConstantNmPerA": 0.0603,
+          },
+          "id": "#11",
+          "joint": "#8",
+          "kind": "dc",
+          "source": {
+            "grade": "A",
+            "name": "maxon RE 40 148877, catalogue page CN-141 (2020-06)",
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#11",
+        ],
+        "id": "#12",
+        "name": "set_motor_drive",
+        "params": {
+          "mode": "voltage",
+          "motor": "#11",
+          "volts": 48,
+        },
+        "suppressed": false,
+      },
+    ],
+    "groups": {},
+    "jointOrder": [],
+    "joints": {},
+    "layerOrder": [
+      "#2",
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "locked": false,
+        "name": "Layer 0",
+        "visible": true,
+      },
+    },
+    "materials": {},
+    "nextStepNumber": 8,
+    "order": [
+      "#1",
+    ],
+    "parameters": {},
+    "recipes": {},
+    "selection": [],
+    "units": "mm",
+  },
+  "format": "llull-document",
+  "version": 3,
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_maxon_step: the document and the 30 ms run (VC-DRV-01, 04, 05) > run 1`] = `
+{
+  "checks": {
+    "checks": [
+      {
+        "datasheet": 42.4,
+        "derived": 42.47787610619469,
+        "quantity": "stallCurrentA",
+        "relativeGap": 0.0018367006177993812,
+        "status": "pass",
+      },
+      {
+        "datasheet": 2.56,
+        "derived": 2.56141592920354,
+        "quantity": "stallTorqueNm",
+        "relativeGap": 0.0005530973451328344,
+        "status": "pass",
+      },
+      {
+        "datasheet": 0.0603,
+        "derived": 0.06043858598426406,
+        "quantity": "keFromSpeedConstantVsPerRad",
+        "relativeGap": 0.002298275029254771,
+        "status": "pass",
+      },
+      {
+        "datasheet": 7590,
+        "derived": 7601.4301178218675,
+        "quantity": "noLoadSpeedRpm",
+        "relativeGap": 0.0015059443770576413,
+        "status": "pass",
+      },
+      {
+        "datasheet": 0.00428,
+        "derived": 0.004257595384052649,
+        "quantity": "mechanicalTimeConstantS",
+        "relativeGap": -0.005234723352184717,
+        "status": "pass",
+      },
+      {
+        "datasheet": 2.97,
+        "derived": 2.967667230907514,
+        "quantity": "speedTorqueGradientRpmPerMNm",
+        "relativeGap": -0.0007854441388842229,
+        "status": "pass",
+      },
+    ],
+    "consistent": true,
+    "maxGap": 0.005234723352184717,
+    "notGiven": [],
+  },
+  "drives": {
+    "m_re40": {
+      "current": "b296d49d7bfdd51e",
+      "peak": {
+        "currentA": 36.8136,
+        "electricalPowerW": 1767.25,
+        "jointTorqueNm": 2.22011,
+        "shaftSpeedRpm": 7597.34,
+        "voltageV": 48,
+      },
+      "rms": {
+        "currentA": 11.2966,
+        "jointTorqueNm": 0.68119,
+      },
+      "voltage": "4e5dab391aa64f0c",
+    },
+  },
+  "engine": "MuJoCo 3.16.0",
+  "ledger": {
+    "closure": "pass",
+    "closureRelative": 2.32263e-8,
+    "entries": [
+      [
+        "m_re40",
+        "electrical_input",
+        8.67631,
+      ],
+      [
+        "m_re40",
+        "copper",
+        4.34049,
+      ],
+      [
+        "m_re40",
+        "magnetic",
+        1.00734e-7,
+      ],
+      [
+        "m_re40",
+        "transmission_loss",
+        0,
+      ],
+      [
+        "m_re40",
+        "regeneration",
+        0,
+      ],
+      [
+        "joints",
+        "friction_damping",
+        0,
+      ],
+      [
+        "propellers",
+        "propeller",
+        0,
+      ],
+      [
+        "mechanism",
+        "kinetic",
+        4.33582,
+      ],
+      [
+        "mechanism",
+        "potential",
+        0,
+      ],
+      [
+        "loads",
+        "external_work",
+        0,
+      ],
+    ],
+  },
+  "positions": {
+    "j_shaft": "bc55f6e09f1f7e15",
+  },
+  "samples": 301,
+  "timestep": 0.00001,
+  "velocities": {
+    "j_shaft": "4ad4a84119d1eda3",
+  },
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_servo_sizing: the document, the 5 s run, size_drive with its ratio sweep and check_motion_truth (VC-DRV-34, 37, 38) > check_motion_truth 1`] = `
+{
+  "items": [
+    "DRV_LEDGER_CLOSURE:pass:",
+    "DRV_TIMESTEP_STUDY:pass:j_motor.finalPosition",
+    "DRV_TIMESTEP_STUDY:pass:j_motor.finalVelocity",
+    "DRV_TIMESTEP_STUDY:pass:j_load.finalPosition",
+    "DRV_TIMESTEP_STUDY:pass:j_load.finalVelocity",
+    "DRV_TIMESTEP_STUDY:pass:m_re40.rmsJointTorque",
+    "DRV_TIMESTEP_STUDY:pass:m_re40.rmsCurrent",
+    "DRV_TIMESTEP_STUDY:pass:m_re40.peakCurrent",
+    "DRV_TIMESTEP_STUDY:pass:energy.balanceErrorJ",
+    "DRV_TIMESTEP_STUDY:pass:ledger.closureErrorJ",
+    "DRV_PARAM_UNSOURCED:warn:j_load.friction",
+  ],
+  "steps": [
+    0.0001,
+    0.00005,
+    0.000025,
+  ],
+  "verdict": "plausible",
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_servo_sizing: the document, the 5 s run, size_drive with its ratio sweep and check_motion_truth (VC-DRV-34, 37, 38) > document 1`] = `
+{
+  "document": {
+    "animations": {},
+    "camera": {
+      "azimuth": 2.35619449,
+      "distance": 12,
+      "polar": 1.04719755,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+    },
+    "components": {},
+    "configurations": {},
+    "constraintOrder": [],
+    "constraints": {},
+    "displayPrecision": 3,
+    "driveRelationOrder": [],
+    "driveRelations": {},
+    "dynamics": {
+      "bodies": {
+        "#10": {
+          "entityIds": [
+            "#3",
+          ],
+          "fixed": false,
+          "id": "#10",
+          "massKg": 1.096,
+        },
+        "#8": {
+          "entityIds": [
+            "#1",
+          ],
+          "fixed": false,
+          "id": "#8",
+          "massKg": 0.000001,
+        },
+      },
+      "drives": {
+        "#20": {
+          "busVoltageV": 48,
+          "currentLimitA": 10,
+          "feedforward": true,
+          "id": "#20",
+          "mode": "position",
+          "profile": "#22",
+          "sampleHz": 5000,
+          "target": "#14",
+          "tune": {
+            "bandwidthHz": 20,
+            "dampingRatio": 1,
+          },
+        },
+      },
+      "gravity": [
+        0,
+        0,
+        0,
+      ],
+      "jointPhysics": {
+        "#14": {
+          "friction": {
+            "kinetic": 0.02,
+            "model": "coulomb",
+            "source": {
+              "grade": "C",
+              "name": "assumed for the sizing example",
+            },
+            "viscous": 0.001,
+          },
+          "id": "#14",
+        },
+      },
+      "joints": {
+        "#12": {
+          "anchor": [
+            0,
+            0,
+            0,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#8",
+          "damping": 0,
+          "friction": 0,
+          "id": "#12",
+          "initialVelocity": 0,
+          "kind": "revolute",
+          "parent": "ground",
+        },
+        "#14": {
+          "anchor": [
+            120,
+            0,
+            0,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#10",
+          "damping": 0,
+          "friction": 0,
+          "id": "#14",
+          "initialVelocity": 0,
+          "kind": "revolute",
+          "parent": "ground",
+        },
+      },
+      "motors": {
+        "#20": {
+          "datasheet": {
+            "maxSpeedRpm": 12000,
+            "noLoadCurrentA": 0.0686,
+            "noLoadSpeedRpm": 7590,
+            "nominalCurrentA": 3.17,
+            "nominalVoltageV": 48,
+            "rotorInertiaKgM2": 0.0000137,
+            "stallTorqueNm": 2.56,
+            "terminalInductanceH": 0.00033,
+            "terminalResistanceOhm": 1.13,
+            "thermal": {
+              "maxWindingC": 155,
+              "rthHousingAmbientKPerW": 4.7,
+              "rthWindingHousingKPerW": 1.9,
+              "tauMotorS": 809,
+              "tauWindingS": 41.5,
+            },
+            "torqueConstantNmPerA": 0.0603,
+          },
+          "id": "#20",
+          "joint": "#12",
+          "kind": "dc",
+          "source": {
+            "grade": "A",
+            "name": "maxon RE 40 148877, catalogue page CN-141 (2020-06)",
+          },
+        },
+      },
+      "profiles": {
+        "#22": {
+          "id": "#22",
+          "quantity": "position",
+          "repeat": 5,
+          "segments": [
+            {
+              "duration": 0.3,
+              "kind": "move",
+              "law": "s_curve",
+              "to": 90,
+            },
+            {
+              "duration": 0.2,
+              "kind": "dwell",
+            },
+            {
+              "duration": 0.3,
+              "kind": "move",
+              "law": "s_curve",
+              "to": 0,
+            },
+            {
+              "duration": 0.2,
+              "kind": "dwell",
+            },
+          ],
+          "unit": "deg",
+        },
+      },
+      "propellers": {},
+      "transmissions": {
+        "#16": {
+          "driven": "#14",
+          "driver": "#12",
+          "efficiency": 0.9,
+          "efficiencyBack": 0.88,
+          "id": "#16",
+          "kind": "gear",
+          "ratio": 0.1,
+          "source": {
+            "grade": "B",
+            "name": "typical one-stage precision planetary gearhead, catalogue range 0.85-0.95",
+          },
+        },
+      },
+    },
+    "entities": {
+      "#1": {
+        "color": "#6b8f9c",
+        "height": 5,
+        "id": "#1",
+        "kind": "cylinder",
+        "layerId": "#2",
+        "position": [
+          0,
+          0,
+          0,
+        ],
+        "radius": 5,
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+      },
+      "#3": {
+        "color": "#6b8f9c",
+        "height": 10,
+        "id": "#3",
+        "kind": "cylinder",
+        "layerId": "#2",
+        "position": [
+          120,
+          0,
+          0,
+        ],
+        "radius": 50,
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+      },
+    },
+    "featureHistory": [
+      {
+        "affected": [],
+        "id": "#4",
+        "name": "set_units",
+        "params": {
+          "units": "mm",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#1",
+        ],
+        "id": "#5",
+        "name": "add_cylinder",
+        "params": {
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "height": 5,
+          "position": [
+            0,
+            0,
+            0,
+          ],
+          "radius": 5,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#3",
+        ],
+        "id": "#6",
+        "name": "add_cylinder",
+        "params": {
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "height": 10,
+          "position": [
+            120,
+            0,
+            0,
+          ],
+          "radius": 50,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#8",
+        ],
+        "id": "#7",
+        "name": "add_rigid_body",
+        "params": {
+          "entityIds": [
+            "#1",
+          ],
+          "id": "#8",
+          "massKg": 0.000001,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#10",
+        ],
+        "id": "#9",
+        "name": "add_rigid_body",
+        "params": {
+          "entityIds": [
+            "#3",
+          ],
+          "id": "#10",
+          "massKg": 1.096,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#12",
+        ],
+        "id": "#11",
+        "name": "add_body_joint",
+        "params": {
+          "anchor": [
+            0,
+            0,
+            0,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#8",
+          "id": "#12",
+          "kind": "revolute",
+          "parent": "ground",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#14",
+        ],
+        "id": "#13",
+        "name": "add_body_joint",
+        "params": {
+          "anchor": [
+            120,
+            0,
+            0,
+          ],
+          "axis": [
+            0,
+            0,
+            1,
+          ],
+          "child": "#10",
+          "id": "#14",
+          "kind": "revolute",
+          "parent": "ground",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#16",
+        ],
+        "id": "#15",
+        "name": "add_transmission",
+        "params": {
+          "driven": "#14",
+          "driver": "#12",
+          "efficiency": 0.9,
+          "efficiencyBack": 0.88,
+          "id": "#16",
+          "kind": "gear",
+          "ratio": 0.1,
+          "source": {
+            "grade": "B",
+            "name": "typical one-stage precision planetary gearhead, catalogue range 0.85-0.95",
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#14",
+        ],
+        "id": "#17",
+        "name": "set_joint_physics",
+        "params": {
+          "friction": {
+            "kineticNm": 0.02,
+            "model": "coulomb",
+            "source": {
+              "grade": "C",
+              "name": "assumed for the sizing example",
+            },
+            "viscousNmsPerRad": 0.001,
+          },
+          "joint": "#14",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#18",
+        "name": "set_gravity",
+        "params": {
+          "gravity": [
+            0,
+            0,
+            0,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#20",
+        ],
+        "id": "#19",
+        "name": "add_motor",
+        "params": {
+          "datasheet": {
+            "maxSpeedRpm": 12000,
+            "noLoadCurrentA": 0.0686,
+            "noLoadSpeedRpm": 7590,
+            "nominalCurrentA": 3.17,
+            "nominalVoltageV": 48,
+            "rotorInertiaKgM2": 0.0000137,
+            "stallTorqueNm": 2.56,
+            "terminalInductanceH": 0.00033,
+            "terminalResistanceOhm": 1.13,
+            "thermal": {
+              "maxWindingC": 155,
+              "rthHousingAmbientKPerW": 4.7,
+              "rthWindingHousingKPerW": 1.9,
+              "tauMotorS": 809,
+              "tauWindingS": 41.5,
+            },
+            "torqueConstantNmPerA": 0.0603,
+          },
+          "id": "#20",
+          "joint": "#12",
+          "kind": "dc",
+          "source": {
+            "grade": "A",
+            "name": "maxon RE 40 148877, catalogue page CN-141 (2020-06)",
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#22",
+        ],
+        "id": "#21",
+        "name": "add_motion_profile",
+        "params": {
+          "id": "#22",
+          "quantity": "position",
+          "repeat": 5,
+          "segments": [
+            {
+              "duration": 0.3,
+              "kind": "move",
+              "law": "s_curve",
+              "to": 90,
+            },
+            {
+              "duration": 0.2,
+              "kind": "dwell",
+            },
+            {
+              "duration": 0.3,
+              "kind": "move",
+              "law": "s_curve",
+              "to": 0,
+            },
+            {
+              "duration": 0.2,
+              "kind": "dwell",
+            },
+          ],
+          "unit": "deg",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#20",
+        ],
+        "id": "#23",
+        "name": "set_motor_drive",
+        "params": {
+          "busVoltageV": 48,
+          "currentLimitA": 10,
+          "feedforward": true,
+          "mode": "position",
+          "motor": "#20",
+          "profile": "#22",
+          "sampleHz": 5000,
+          "target": "#14",
+          "tune": {
+            "bandwidthHz": 20,
+            "dampingRatio": 1,
+          },
+        },
+        "suppressed": false,
+      },
+    ],
+    "groups": {},
+    "jointOrder": [],
+    "joints": {},
+    "layerOrder": [
+      "#2",
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "locked": false,
+        "name": "Layer 0",
+        "visible": true,
+      },
+    },
+    "materials": {},
+    "nextStepNumber": 14,
+    "order": [
+      "#1",
+      "#3",
+    ],
+    "parameters": {},
+    "recipes": {},
+    "selection": [],
+    "units": "mm",
+  },
+  "format": "llull-document",
+  "version": 3,
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_servo_sizing: the document, the 5 s run, size_drive with its ratio sweep and check_motion_truth (VC-DRV-34, 37, 38) > run 1`] = `
+{
+  "drives": {
+    "m_re40": {
+      "current": "8df0e0d2a8dc20d5",
+      "peak": {
+        "currentA": 0.622804,
+        "electricalPowerW": 2.88169,
+        "jointTorqueNm": 0.0375551,
+        "shaftSpeedRpm": 753.285,
+        "voltageV": 4.89687,
+      },
+      "rms": {
+        "currentA": 0.269209,
+        "jointTorqueNm": 0.0162333,
+      },
+      "voltage": "3c1c4f46ff7b4b28",
+    },
+  },
+  "engine": "MuJoCo 3.16.0",
+  "ledger": {
+    "closure": "pass",
+    "closureRelative": 1.25866e-7,
+    "entries": [
+      [
+        "m_re40",
+        "electrical_input",
+        1.60429,
+      ],
+      [
+        "m_re40",
+        "copper",
+        0.409422,
+      ],
+      [
+        "m_re40",
+        "magnetic",
+        0,
+      ],
+      [
+        "m_re40",
+        "transmission_loss",
+        0,
+      ],
+      [
+        "m_re40",
+        "regeneration",
+        -0.47196,
+      ],
+      [
+        "transmission:tr_gear",
+        "transmission_loss",
+        0.121655,
+      ],
+      [
+        "joints",
+        "friction_damping",
+        1.07321,
+      ],
+      [
+        "propellers",
+        "propeller",
+        0,
+      ],
+      [
+        "mechanism",
+        "kinetic",
+        3.73917e-10,
+      ],
+      [
+        "mechanism",
+        "potential",
+        0,
+      ],
+      [
+        "loads",
+        "external_work",
+        0,
+      ],
+    ],
+  },
+  "positions": {
+    "j_load": "631b948bf40e6574",
+    "j_motor": "d81320184ccd99fd",
+  },
+  "samples": 5001,
+  "timestep": 0.0001,
+  "velocities": {
+    "j_load": "c9dd8938663a8848",
+    "j_motor": "3a448e49651925f9",
+  },
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_servo_sizing: the document, the 5 s run, size_drive with its ratio sweep and check_motion_truth (VC-DRV-34, 37, 38) > size_drive 1`] = `
+{
+  "best": 12,
+  "demand": {
+    "limitedSamples": 0,
+    "peakCurrentA": 0.622804,
+    "peakElectricalPowerW": 2.88169,
+    "peakJointTorqueNm": 0.0375551,
+    "peakShaftTorqueNm": 0.0375551,
+    "peakSpeedRpm": 753.285,
+    "peakVoltageV": 4.89687,
+    "rmsCurrentA": 0.269233,
+    "rmsShaftTorqueNm": 0.0162348,
+  },
+  "findings": [
+    "DRV_THERMAL_MODEL_FORM:info",
+    "DRV_PARAM_UNSOURCED:warn",
+  ],
+  "ledger": {
+    "closure": "pass",
+    "regeneratedJ": -0.47196,
+    "transmissionLossJ": 0.121655,
+  },
+  "limiting": {
+    "factor": "rms_current",
+    "margin": 10.7742,
+  },
+  "matched": 10,
+  "sweep": [
+    [
+      5,
+      0.0493112,
+    ],
+    [
+      8,
+      0.0394131,
+    ],
+    [
+      10,
+      0.0375551,
+    ],
+    [
+      12,
+      0.0372778,
+    ],
+    [
+      15,
+      0.0384426,
+    ],
+    [
+      20,
+      0.0424902,
+    ],
+  ],
+  "verdict": "ok",
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_stick_slip: the document and the 3 s limit cycle (VC-DRV-18) > document 1`] = `
+{
+  "document": {
+    "animations": {},
+    "camera": {
+      "azimuth": 2.35619449,
+      "distance": 12,
+      "polar": 1.04719755,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+    },
+    "components": {},
+    "configurations": {},
+    "constraintOrder": [],
+    "constraints": {},
+    "displayPrecision": 3,
+    "driveRelationOrder": [],
+    "driveRelations": {},
+    "dynamics": {
+      "bodies": {
+        "#10": {
+          "entityIds": [
+            "#3",
+          ],
+          "fixed": false,
+          "id": "#10",
+          "massKg": 1,
+        },
+        "#8": {
+          "entityIds": [
+            "#1",
+          ],
+          "fixed": false,
+          "id": "#8",
+          "massKg": 5,
+        },
+      },
+      "gravity": [
+        0,
+        0,
+        0,
+      ],
+      "jointPhysics": {
+        "#14": {
+          "friction": {
+            "kinetic": 1,
+            "model": "stiction",
+            "source": {
+              "grade": "A",
+              "name": "PHY-23 VC-DRV-18 (synthetic)",
+            },
+            "static": 2,
+          },
+          "id": "#14",
+        },
+      },
+      "joints": {
+        "#12": {
+          "anchor": [
+            0,
+            0,
+            -5,
+          ],
+          "axis": [
+            1,
+            0,
+            0,
+          ],
+          "child": "#8",
+          "damping": 0,
+          "friction": 0,
+          "id": "#12",
+          "initialVelocity": 0,
+          "kind": "prismatic",
+          "parent": "ground",
+        },
+        "#14": {
+          "anchor": [
+            0,
+            0,
+            10,
+          ],
+          "axis": [
+            1,
+            0,
+            0,
+          ],
+          "child": "#10",
+          "damping": 0,
+          "friction": 0,
+          "id": "#14",
+          "initialVelocity": 0,
+          "kind": "prismatic",
+          "parent": "#8",
+        },
+      },
+      "motors": {
+        "#20": {
+          "id": "#20",
+          "joint": "#12",
+          "kind": "linear_speed",
+          "maxForceN": 10000,
+          "speedMps": 0.1,
+        },
+      },
+      "propellers": {},
+      "springs": {
+        "#16": {
+          "bodyA": "#10",
+          "bodyB": "ground",
+          "damping": 0,
+          "freeLengthM": 0.2,
+          "id": "#16",
+          "pointA": [
+            0,
+            0,
+            10,
+          ],
+          "pointB": [
+            -200,
+            0,
+            10,
+          ],
+          "stiffness": 100,
+        },
+      },
+    },
+    "entities": {
+      "#1": {
+        "color": "#6b8f9c",
+        "id": "#1",
+        "kind": "box",
+        "layerId": "#2",
+        "position": [
+          0,
+          0,
+          -5,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          400,
+          60,
+          10,
+        ],
+      },
+      "#3": {
+        "color": "#6b8f9c",
+        "id": "#3",
+        "kind": "box",
+        "layerId": "#2",
+        "position": [
+          0,
+          0,
+          10,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          20,
+          20,
+          20,
+        ],
+      },
+    },
+    "featureHistory": [
+      {
+        "affected": [],
+        "id": "#4",
+        "name": "set_units",
+        "params": {
+          "units": "mm",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#1",
+        ],
+        "id": "#5",
+        "name": "add_box",
+        "params": {
+          "anchor": "center",
+          "position": [
+            0,
+            0,
+            -5,
+          ],
+          "size": [
+            400,
+            60,
+            10,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#3",
+        ],
+        "id": "#6",
+        "name": "add_box",
+        "params": {
+          "anchor": "center",
+          "position": [
+            0,
+            0,
+            10,
+          ],
+          "size": [
+            20,
+            20,
+            20,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#8",
+        ],
+        "id": "#7",
+        "name": "add_rigid_body",
+        "params": {
+          "entityIds": [
+            "#1",
+          ],
+          "id": "#8",
+          "massKg": 5,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#10",
+        ],
+        "id": "#9",
+        "name": "add_rigid_body",
+        "params": {
+          "entityIds": [
+            "#3",
+          ],
+          "id": "#10",
+          "massKg": 1,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#12",
+        ],
+        "id": "#11",
+        "name": "add_body_joint",
+        "params": {
+          "anchor": [
+            0,
+            0,
+            -5,
+          ],
+          "axis": [
+            1,
+            0,
+            0,
+          ],
+          "child": "#8",
+          "id": "#12",
+          "kind": "prismatic",
+          "parent": "ground",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#14",
+        ],
+        "id": "#13",
+        "name": "add_body_joint",
+        "params": {
+          "anchor": [
+            0,
+            0,
+            10,
+          ],
+          "axis": [
+            1,
+            0,
+            0,
+          ],
+          "child": "#10",
+          "id": "#14",
+          "kind": "prismatic",
+          "parent": "#8",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#16",
+        ],
+        "id": "#15",
+        "name": "add_spring",
+        "params": {
+          "bodyA": "#10",
+          "bodyB": "ground",
+          "freeLengthMm": 200,
+          "id": "#16",
+          "pointA": [
+            0,
+            0,
+            10,
+          ],
+          "pointB": [
+            -200,
+            0,
+            10,
+          ],
+          "stiffness": 100,
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#14",
+        ],
+        "id": "#17",
+        "name": "set_joint_physics",
+        "params": {
+          "friction": {
+            "kineticN": 1,
+            "model": "stiction",
+            "source": {
+              "grade": "A",
+              "name": "PHY-23 VC-DRV-18 (synthetic)",
+            },
+            "staticN": 2,
+          },
+          "joint": "#14",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [],
+        "id": "#18",
+        "name": "set_gravity",
+        "params": {
+          "gravity": [
+            0,
+            0,
+            0,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#20",
+        ],
+        "id": "#19",
+        "name": "add_motor",
+        "params": {
+          "id": "#20",
+          "joint": "#12",
+          "kind": "speed",
+          "maxForceN": 10000,
+          "speedMps": 0.1,
+        },
+        "suppressed": false,
+      },
+    ],
+    "groups": {},
+    "jointOrder": [],
+    "joints": {},
+    "layerOrder": [
+      "#2",
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "locked": false,
+        "name": "Layer 0",
+        "visible": true,
+      },
+    },
+    "materials": {},
+    "nextStepNumber": 12,
+    "order": [
+      "#1",
+      "#3",
+    ],
+    "parameters": {},
+    "recipes": {},
+    "selection": [],
+    "units": "mm",
+  },
+  "format": "llull-document",
+  "version": 3,
+}
+`;
+
+exports[`PHY-23 validation plans, golden > drv_stick_slip: the document and the 3 s limit cycle (VC-DRV-18) > run 1`] = `
+{
+  "engine": "MuJoCo 3.16.0",
+  "ledger": {
+    "closure": "fail",
+    "closureRelative": 0.0703927,
+    "entries": [
+      [
+        "friction:j_block",
+        "friction",
+        0.27615,
+      ],
+      [
+        "joints",
+        "friction_damping",
+        0,
+      ],
+      [
+        "propellers",
+        "propeller",
+        0,
+      ],
+      [
+        "mechanism",
+        "kinetic",
+        0.0254221,
+      ],
+      [
+        "mechanism",
+        "potential",
+        0.0284227,
+      ],
+      [
+        "loads",
+        "external_work",
+        0.354983,
+      ],
+    ],
+  },
+  "positions": {
+    "j_belt": "911e5a280ee0ebca",
+    "j_block": "a693ee7435ffd05e",
+  },
+  "samples": 6001,
+  "timestep": 0.00002,
+  "velocities": {
+    "j_belt": "e235727c4af334ef",
+    "j_block": "bb14dbf25505d805",
+  },
+}
+`;
