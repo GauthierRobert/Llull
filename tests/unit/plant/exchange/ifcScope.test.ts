@@ -8,7 +8,7 @@ import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { readStep, stepString, type StepEntity } from '@lib/stepRead';
 import { apply, data as queryData } from '../../../helpers/commandAssertions';
-import { scDat02Document } from '../data/dataFixtures';
+import { scDat02Document, withData } from '../data/dataFixtures';
 import { stamp } from './ifcFixtures';
 
 interface IfcData {
@@ -129,5 +129,24 @@ describe('ifc deliverable scoped to a hierarchy node', () => {
     });
     expect(change.rejected).toBe(true);
     expect(change.error?.code).toBe('DAT_PARAM_INVALID');
+  });
+
+  it('a revision whose stored scope node was dropped names it in the refusal (fixed scope)', () => {
+    const scoped = execute(doc, 'set_deliverable_status', {
+      at: AT,
+      deliverable: 'ifc',
+      revision: 'A',
+      status: 'in_work',
+      hierarchy: 'S1/P2',
+    }).document;
+    const id = Object.values(scoped.plant?.data?.hierarchy ?? {}).find((node) => node.code === 'P2')?.id as string;
+    const dropped = withData(scoped, (current) => {
+      const { [id]: removed, ...hierarchy } = current.hierarchy;
+      void removed;
+      return { ...current, hierarchy, hierarchyOrder: current.hierarchyOrder.filter((entry) => entry !== id) };
+    });
+    const refusal = execute(dropped, 'set_deliverable_status', { at: AT, deliverable: 'ifc', revision: 'A', status: 'issued_for_review' });
+    expect(refusal.error?.code).toBe('DAT_HIERARCHY_UNKNOWN');
+    expect(refusal.summary).toContain('no longer exists');
   });
 });

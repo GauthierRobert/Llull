@@ -301,7 +301,10 @@ export function exportPipingProducts(
   const all = selectRuns(doc);
   const selection = {
     graphRuns: all.graphRuns.filter((entry) => inScope?.(entry.lineId) ?? true),
-    broken: all.broken.filter((entry) => inScope?.(piping.runs[entry.runId]?.lineId ?? '') ?? true),
+    broken: all.broken.filter((entry) => {
+      const lineId = piping.runs[entry.runId]?.lineId;
+      return lineId === undefined || (inScope?.(lineId) ?? true);
+    }),
   };
   const graph = buildGraph(doc, selection.graphRuns);
   const refs = new Map<string, { product: string; ports: string[] }>();
