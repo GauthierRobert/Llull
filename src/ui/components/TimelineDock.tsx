@@ -4,6 +4,7 @@
 import React from 'react';
 import { PLAYBACK_SPEEDS, useDynamicsPlaybackStore, type TimelineAxis } from '@ui/store/dynamicsPlaybackStore';
 import { interpolate } from '@ui/panels/seriesMath';
+import { ExportAnimationButton } from './ExportAnimationButton';
 
 interface TimelineMarker {
   readonly id: string;
@@ -132,6 +133,7 @@ export function TimelineDock({
         <button type="button" className="btn btn--sm btn--ghost" onClick={() => setResult(null)} data-testid={`${idPrefix}-clear`}>
           Back to design pose
         </button>
+        <ExportAnimationButton testId={`${idPrefix}-export`} />
       </div>
     </div>
   );

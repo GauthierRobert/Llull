@@ -12,6 +12,7 @@
 @import './palette.css';
 @import './context-menu.css';
 @import './report.css';
+@import './export-animation.css';
 @import './app-error.css';
 @import './panels/common.css';
 @import './panels/properties.css';
