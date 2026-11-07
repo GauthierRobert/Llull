@@ -39,9 +39,8 @@ const stemOf = (component: NetworkComponent): { stem?: Vec3 } => {
   return stem === undefined ? {} : { stem };
 };
 
-/** The planned inline valve or instrument of `component` (two END-POINTs); `flanged` = it sits between flange sets (an instrument then gets flanged ends). */
-export function bodyOf(component: NetworkComponent, shift: Vec3, flanged: boolean): PlannedInline {
-  const [a, b] = [component.ends[0]?.xyz ?? [0, 0, 0], component.ends[1]?.xyz ?? [0, 0, 0]] as [Vec3, Vec3];
+/** The planned inline valve or instrument of `component` between its END-POINTs `a` and `b`; `flanged` = it sits between flange sets (an instrument then gets flanged ends). */
+export function bodyOf(component: NetworkComponent, a: Vec3, b: Vec3, shift: Vec3, flanged: boolean): PlannedInline {
   const centre = sub3(midpoint(a, b), shift);
   if (component.type === 'INSTRUMENT')
     return { type: 'instrument', componentId: component.id, centre, lengthMm: distance3(a, b), endType: flanged ? 'FL' : 'BW' };

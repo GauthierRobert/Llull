@@ -99,6 +99,15 @@ export function importAsRoute(doc: CadDocument, args: RouteImportArgs, ctx: Exec
         [composed.lineId],
       ),
     );
+  if (plan.gasketless.length > 0)
+    warnings.push(
+      isoIssue(
+        'ISO_ROUTE_GASKET_ADDED',
+        'warning',
+        `the file draws ${plan.gasketless.length} component(s) of flanged joints without a gasket (${plan.gasketless.join(', ')}): the spec adds its own gasket and bolt set at each`,
+        [...plan.gasketless],
+      ),
+    );
   if (composed.droppedSupports > 0)
     warnings.push(
       isoIssue(

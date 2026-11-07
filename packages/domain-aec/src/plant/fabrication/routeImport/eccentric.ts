@@ -9,6 +9,7 @@
 
 import type { Vec3 } from '@core/model/vectors';
 import { dot3, len3, normalize3, scale3, sub3 } from '@lib/vec3';
+import { outsideDiameterMm } from '../../../industrial/piping/pipeSizes';
 import type { NetworkComponent, NetworkPoint } from '../model';
 
 export type FlatSide = 'top' | 'bottom';
@@ -24,6 +25,8 @@ export interface EccentricStep {
 
 export const ZERO: Vec3 = [0, 0, 0];
 const MIN_OFFSET_MM = 0.1;
+/** How far the measured offset may differ from (OD big - OD small) / 2 (mm): the two tabulated ODs of EN 10220 / B36.10M differ by up to 1.5 mm. */
+const OFFSET_TOLERANCE_MM = 1.5;
 const SIDE_VECTOR: Readonly<Record<FlatSide, Vec3>> = { top: [0, 0, 1], bottom: [0, 0, -1] };
 
 export const isShifted = (shift: Vec3): boolean => len3(shift) > 1e-9;
@@ -57,6 +60,13 @@ export function eccentricStep(
       };
     return { offset: ZERO, flat: { side: eccentricFlat } };
   }
+  const [odEntry, odExit] = [outsideDiameterMm(entry.boreMm), outsideDiameterMm(exit.boreMm)];
+  const expected = odEntry === null || odExit === null ? null : Math.abs(odEntry - odExit) / 2;
+  if (expected !== null && Math.abs(len3(offset) - expected) > OFFSET_TOLERANCE_MM)
+    return {
+      message: `eccentric reducer ${component.id}: its end points are ${+len3(offset).toFixed(2)} mm off axis, but DN${entry.boreMm} x DN${exit.boreMm} offsets by (OD big - OD small) / 2 = ${+expected.toFixed(2)} mm (tolerance ${OFFSET_TOLERANCE_MM} mm): the file does not describe an eccentric reducer of these sizes`,
+      code: 'ISO_PARAM_INVALID',
+    };
   const flat = normalize3(reducing ? offset : scale3(offset, -1));
   if (eccentricFlat !== undefined && dot3(flat, SIDE_VECTOR[eccentricFlat]) < 0.5)
     return {

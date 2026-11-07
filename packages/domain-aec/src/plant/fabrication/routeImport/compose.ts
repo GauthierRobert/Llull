@@ -99,6 +99,9 @@ function locate(points: readonly Vec3[], centre: Vec3): { leg: number; centreDis
   return undefined;
 }
 
+/** How far beyond the joint a closure's end is probed when it does not fit at the joint (mm): longer than any cap or blind flange. */
+const CLOSURE_PROBE_MM = 2000;
+
 /** `point` moved `length` further along the last segment of `points`. */
 function beyondEnd(points: readonly Vec3[], length: number): Vec3 {
   const [a, b] = [points[points.length - 2] as Vec3, points[points.length - 1] as Vec3];
@@ -112,7 +115,20 @@ function beyondEnd(points: readonly Vec3[], length: number): Vec3 {
  * where the file has it.
  */
 export function composeRoute(original: CadDocument, input: ComposeInput, ctx: ExecutionContext | undefined): Composed | CommandResult {
-  const first = composeOnce(original, input, ctx);
+  let first = composeOnce(original, input, ctx);
+  if (
+    !isComposed(first) &&
+    first.error?.code === 'RTE_SEGMENT_TOO_SHORT' &&
+    input.plan.runs.some((planned) => planned.cap?.tip === undefined && planned.cap !== undefined)
+  ) {
+    // A closure right after an elbow, or on a last piece shorter than the closure: with the run ending at the joint the closure does not fit. Probe with the end well beyond it to learn the spec length, then place it exactly.
+    const probe = input.plan.runs.map((planned): PlannedRun => {
+      if (planned.cap === undefined || planned.cap.tip !== undefined) return planned;
+      return { ...planned, points: [...planned.points.slice(0, -1), beyondEnd(planned.points, CLOSURE_PROBE_MM)] };
+    });
+    const probed = composeOnce(original, { ...input, plan: { ...input.plan, runs: probe } }, ctx);
+    if (isComposed(probed)) first = probed;
+  }
   if (!isComposed(first)) return first;
   const open = input.plan.runs.filter((planned) => planned.cap !== undefined && planned.cap.tip === undefined);
   if (open.length === 0 || open.every((planned) => first.capLengths[planned.key] === undefined)) return first;

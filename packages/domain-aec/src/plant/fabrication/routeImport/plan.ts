@@ -63,6 +63,8 @@ export interface RoutePlan {
   readonly supports: readonly PlannedSupport[];
   /** Gaskets the spec rebuilds with its flange sets (bolt sets are not counted: they have no position). */
   readonly rebuilt: readonly string[];
+  /** Flanged joints the file draws without a gasket (flange against flange, a flanged body or a blind): the spec adds one (ISO_ROUTE_GASKET_ADDED). */
+  readonly gasketless: readonly string[];
 }
 
 export interface RouteRefusal {
@@ -121,6 +123,7 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
   const visited = new Set<number>();
   const welds: PlannedWeld[] = [];
   const rebuilt: string[] = [];
+  const gasketless: string[] = [];
   let shopWelds = 0;
   const take = (i: number): void => void visited.add(i);
   const free = (key: string, ...except: number[]): number[] =>
@@ -150,7 +153,8 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
   ): { valve: PlannedInline; consumed: string[]; out: NetworkPoint } | RouteRefusal {
     const valve = at(valveIndex);
     const far = otherEnd(valve, valveFaceKey);
-    if (far === undefined || valve.ends.some((valveEnd) => valveEnd.endType !== 'FL'))
+    const near = valve.ends.find((bodyEnd) => bodyEnd !== far);
+    if (far === undefined || near === undefined || valve.ends.some((valveEnd) => valveEnd.endType !== 'FL'))
       return refuse('ISO_ROUTE_UNSUPPORTED', `${valve.type} ${valve.id} is not a flanged body between two flanges`, [valve.id]);
     const farKey = nodeKey(far.xyz);
     const gasket2 = free(farKey, valveIndex).find((j) => at(j).type === 'GASKET');
@@ -163,7 +167,9 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
       return refuse('ISO_ROUTE_UNSUPPORTED', `${valve.type} ${valve.id} has no flange on its far side`, [valve.id, flange.id]);
     for (const j of [gasket, gasket2, valveIndex, flange2]) if (j !== undefined) take(j);
     for (const j of [gasket, gasket2]) if (j !== undefined) rebuilt.push(at(j).id);
-    return { valve: bodyOf(valve, ZERO, true), consumed: [valve.id, at(flange2).id], out };
+    if (gasket === undefined) gasketless.push(flange.id, valve.id);
+    if (gasket2 === undefined) gasketless.push(valve.id, at(flange2).id);
+    return { valve: bodyOf(valve, near.xyz, far.xyz, ZERO, true), consumed: [valve.id, at(flange2).id], out };
   }
 
   const structural = components.filter((component) => !['WELD', 'BOLT', 'SUPPORT', 'OLET'].includes(component.type));
@@ -242,6 +248,7 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
         break;
       }
       const exit = otherEnd(component, key);
+      const entry = component.ends.find((componentEnd) => componentEnd !== exit);
       if (exit === undefined)
         return refuse('ISO_ROUTE_UNSUPPORTED', `${component.type} ${component.id} has no second end point`, [component.id]);
       take(i);
@@ -307,7 +314,15 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
               `flanged ${component.type.toLowerCase()} ${component.id} is not between two flanges with gaskets`,
               [component.id],
             );
-          inline.push(bodyOf(component, shift, false));
+          if (component.type === 'INSTRUMENT' && component.ends.some((bodyEnd) => bodyEnd.endType !== 'BW'))
+            return refuse(
+              'ISO_ROUTE_UNSUPPORTED',
+              `instrument ${component.id} has ${[...new Set(component.ends.map((bodyEnd) => bodyEnd.endType))].join(' / ')} ends: route mode takes an instrument with butt-weld ends, or flanged between flange sets (socket-weld and threaded instruments are not rebuilt)`,
+              [component.id],
+            );
+          if (entry === undefined)
+            return refuse('ISO_ROUTE_UNSUPPORTED', `${component.type} ${component.id} has no first end point`, [component.id]);
+          inline.push(bodyOf(component, entry.xyz, exit.xyz, shift, false));
           break;
         case 'FLANGE': {
           if (exit.endType !== 'FL')
@@ -338,6 +353,7 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
               // A blind flange closes the run: the gasket (when the file has one) and the blind are rebuilt by the spec behind the flange.
               take(blind);
               consumed.push(at(blind).id);
+              if (gasket === undefined) gasketless.push(component.id, at(blind).id);
               if (gasket !== undefined) {
                 take(gasket);
                 rebuilt.push(at(gasket).id);
@@ -372,6 +388,7 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
                 rebuilt.push(at(gasket).id);
               }
               consumed.push(at(mate).id);
+              if (gasket === undefined) gasketless.push(component.id, at(mate).id);
               inline.push({ type: 'flangedJoint', componentId: component.id, centre: sub3(midpoint(exit.xyz, far.xyz), shift) });
               end = outPoint.xyz;
               key = nodeKey(outPoint.xyz);
@@ -446,5 +463,5 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
         ]
       : [],
   );
-  return { ok: true, runs, welds, shopWelds, supports, rebuilt };
+  return { ok: true, runs, welds, shopWelds, supports, rebuilt, gasketless: [...new Set(gasketless)] };
 }

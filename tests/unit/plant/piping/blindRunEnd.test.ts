@@ -161,6 +161,28 @@ describe('set_run_end_cap closure blindFlange', () => {
     expect(derivedOf(loaded, runId).parts.map((part) => part.id)).toEqual(derivedOf(closed, runId).parts.map((part) => part.id));
   });
 
+  it('deleting a run with a blind end removes its flange, gasket, bolts and blind: no entity, part or entity-id list is left', () => {
+    const { doc, runId } = openRun();
+    const closed = apply(doc, 'set_run_end_cap', { ...blindOf, runId });
+    expect(Object.keys(closed.entities).some((id) => id.includes(runId))).toBe(true);
+    const deleted = ok(closed, 'delete_pipe_run', { runId });
+    const piping = deleted.document.plant?.piping as PipingModel;
+    expect(piping.runs[runId]).toBeUndefined();
+    expect(piping.entityIds?.[runId]).toBeUndefined();
+    expect(Object.keys(deleted.document.entities).filter((id) => id.includes(runId))).toEqual([]);
+    expect(Object.keys(deleted.document.entities).length).toBeLessThan(Object.keys(closed.entities).length);
+  });
+
+  it('replay_history re-mints the blind closure identically (parts, ids, entities), and the step before it still gives the open run', () => {
+    const { doc, runId } = openRun();
+    const closed = ok(doc, 'set_run_end_cap', { ...blindOf, runId });
+    const replayed = execute(closed.document, 'replay_history', {}).document;
+    expect(replayed.plant).toEqual(closed.document.plant);
+    expect(Object.keys(replayed.entities).sort()).toEqual(Object.keys(closed.document.entities).sort());
+    expect(runOf(replayed, runId).end.blind).toBe(true);
+    expect(runOf(doc, runId).end.blind).toBeUndefined();
+  });
+
   it('is pure', () => {
     const { doc, runId } = openRun();
     expectPure(doc, () => execute(doc, 'set_run_end_cap', { ...blindOf, runId }));

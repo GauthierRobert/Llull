@@ -404,3 +404,75 @@ describe('flanged joints and instruments in route mode', () => {
     expect(result.summary).toContain('has no flange on its far side');
   });
 });
+
+describe('review follow-ups of ISO M6c', () => {
+  it('an eccentric reducer whose measured offset is not (OD big - OD small) / 2 is refused ISO_PARAM_INVALID naming it (6 x 4 with 40 mm, not 27)', () => {
+    const text =
+      HEADER +
+      record('PIPE', 1, ['0.0 0.0 0.0 150 BW', '1930.0 0.0 0.0 150 BW']) +
+      record('REDUCER-ECCENTRIC', 2, ['1930.0 0.0 0.0 150 BW', '2070.0 0.0 40.0 100 BW']) +
+      record('PIPE', 3, ['2070.0 0.0 40.0 100 BW', '3848.0 0.0 40.0 100 BW']) +
+      record('ELBOW', 4, ['3848.0 0.0 40.0 100 BW', '4000.0 0.0 192.0 100 BW'], '    CENTRE-POINT 4000.0 0.0 40.0\n') +
+      record('PIPE', 5, ['4000.0 0.0 192.0 100 BW', '4000.0 0.0 1000.0 100 BW']);
+    const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_PARAM_INVALID');
+    expect(result.error?.ids).toEqual(['pcf:E-1:2']);
+    expect(result.summary).toContain('27');
+  });
+
+  it('an instrument with socket-weld or threaded ends is refused, not turned into a butt-weld one', () => {
+    for (const end of ['SW', 'THD']) {
+      const text = hand100(record('INSTRUMENT', 2, [`1000.0 0.0 0.0 100 ${end}`, `1300.0 0.0 0.0 100 ${end}`]), '1300.0');
+      const result = expectRefusal(base, 'import_pcf', { text, as: 'route', spec: 'CS150' }, 'ISO_ROUTE_UNSUPPORTED');
+      expect(result.error?.ids).toEqual(['pcf:E-1:2']);
+      expect(result.summary).toContain(end);
+    }
+  });
+
+  it('flanged joints drawn without a gasket give ISO_ROUTE_GASKET_ADDED listing the components (flange pair, flanged instrument)', () => {
+    const pair = hand100(
+      record('FLANGE', 2, ['1000.0 0.0 0.0 100 BW', '1076.0 0.0 0.0 100 FL']) +
+        record('FLANGE', 3, ['1076.0 0.0 0.0 100 FL', '1152.0 0.0 0.0 100 BW']),
+      '1152.0',
+    );
+    const paired = routeData(route(pair));
+    const added = paired.warnings.find((warning) => warning.code === 'ISO_ROUTE_GASKET_ADDED') as { ids: string[] } | undefined;
+    expect(added?.ids).toEqual(['pcf:E-1:2', 'pcf:E-1:3']);
+    const instrumentSet = hand100(
+      record('FLANGE', 2, ['1000.0 0.0 0.0 100 BW', '1076.0 0.0 0.0 100 FL']) +
+        record('INSTRUMENT', 3, ['1076.0 0.0 0.0 100 FL', '1376.0 0.0 0.0 100 FL']) +
+        record('FLANGE', 4, ['1376.0 0.0 0.0 100 FL', '1452.0 0.0 0.0 100 BW']),
+      '1452.0',
+    );
+    const result = route(instrumentSet);
+    expect(result.rejected, result.summary).toBeUndefined();
+    const ids = (routeData(result).warnings.find((warning) => warning.code === 'ISO_ROUTE_GASKET_ADDED') as { ids: string[] }).ids;
+    expect(ids).toEqual(['pcf:E-1:2', 'pcf:E-1:3', 'pcf:E-1:4']);
+  });
+
+  it('a file with its gaskets has no ISO_ROUTE_GASKET_ADDED', () => {
+    const line = cs150Line(100, '3009');
+    const tie = addTie(line.doc, 'A', [0, 0, 0], [1, 0, 0], { dn: 100 });
+    const joined = ok(tie.doc, 'route_pipe', {
+      lineId: line.lineId,
+      from: { portId: tie.id },
+      legs: [{ direction: '+X', length: 4000 }],
+      inline: [{ type: 'flangedJoint', at: { leg: 0, centreDistance: 1500 } }],
+    });
+    expect(routeData(route(exported(joined.document, line.lineId))).warnings.map((warning) => warning.code)).not.toContain(
+      'ISO_ROUTE_GASKET_ADDED',
+    );
+  });
+
+  it('a cap right after an elbow (no pipe between) is still placed: the probe learns the spec length, the cap sits at the file joint', () => {
+    const extras = extrasDocument();
+    const text =
+      HEADER +
+      record('PIPE', 1, ['0.0 0.0 0.0 100 BW', '2848.0 0.0 0.0 100 BW']) +
+      record('ELBOW', 2, ['2848.0 0.0 0.0 100 BW', '3000.0 152.0 0.0 100 BW'], '    CENTRE-POINT 3000.0 0.0 0.0\n    SKEY ELBW\n') +
+      record('CAP', 3, ['3000.0 152.0 0.0 100 BW']);
+    const result = route(text, {}, extras);
+    expect(result.rejected, result.summary).toBeUndefined();
+    expect(routeData(result).route.runs[0]?.points.at(-1)).toEqual([3000, 152 + CAP_LENGTH_MM, 0]);
+    expect(firstRun(result.document)?.end.cap).toBe(true);
+  });
+});
