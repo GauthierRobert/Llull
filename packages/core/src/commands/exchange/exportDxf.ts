@@ -14,10 +14,10 @@ export const exportDxf = defineCommand({
   name: 'export_dxf',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Export 2D drafting entities (all of them, or `ids`) to an AutoCAD R2000 ASCII DXF (opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, ezdxf; ' +
+    'Export 2D drafting entities (all of them, or `ids`) to an R2000 (AC1015) ASCII DXF (AutoCAD-compatible structure; verified with ezdxf, not yet opened in AutoCAD itself; ' +
     'import_dxf reads it back). Mapping: line -> LINE, circle -> CIRCLE, arc -> ARC, polyline -> LWPOLYLINE, rectangle -> closed LWPOLYLINE, ' +
     'ellipse -> ELLIPSE, spline -> SPLINE (the exact Catmull-Rom curve as a degree-3 B-spline), point -> POINT, text -> TEXT (MTEXT when it has ' +
-    'several lines), hatched region -> HATCH (solid, parallel or crossed lines; even-odd loops), unhatched region -> one closed LWPOLYLINE per loop, ' +
+    'several lines, MTEXT keeps rotation and anchor), hatched region -> HATCH (solid, parallel or crossed lines; even-odd loops), unhatched region -> one closed LWPOLYLINE per loop, ' +
     'dimension -> its extension / dimension lines and arrowheads as LINEs plus the value as centred TEXT on the dimension layer (not an ' +
     'associative DIMENSION). Each entity is placed by its position and Z rotation; Z is the plane elevation. Layers keep name, colour, hidden ' +
     'and locked state; an entity colour that differs from its layer is a true colour. $INSUNITS = the document units. Layer names lose the characters ' +

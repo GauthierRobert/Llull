@@ -79,6 +79,8 @@ export interface SplineRead {
   readonly exact: boolean;
 }
 
+const finitePoint = (point: Vec3): boolean => point.every(Number.isFinite);
+
 function codePoints(record: DxfRecord, base: number): Vec3[] {
   const points: Array<[number, number, number]> = [];
   for (const [code, value] of record.codes) {
@@ -97,10 +99,11 @@ function codePoints(record: DxfRecord, base: number): Vec3[] {
 export function readSpline(record: DxfRecord): SplineRead | null {
   const flags = codeNumber(record, 70, 0);
   const xdata = llullXdata(record);
-  if (xdata?.tag === 'spline' && xdata.points.length >= 2) return { points: xdata.points, closed: xdata.ints[0] === 1, exact: true };
+  if (xdata?.tag === 'spline' && xdata.points.length >= 2 && xdata.points.every(finitePoint))
+    return { points: xdata.points, closed: xdata.ints[0] === 1, exact: true };
   const closed = (flags & 1) === 1;
   const fit = codePoints(record, 11);
-  if (fit.length >= 2) return { points: fit, closed, exact: true };
+  if (fit.length >= 2 && fit.every(finitePoint)) return { points: fit, closed, exact: true };
   const degree = codeNumber(record, 71, 3);
   const knots = record.codes.filter(([code]) => code === 40).map(([, value]) => Number(value));
   const weights = record.codes.filter(([code]) => code === 41).map(([, value]) => Number(value));
@@ -111,8 +114,16 @@ export function readSpline(record: DxfRecord): SplineRead | null {
     degree <= MAX_SPLINE_DEGREE &&
     controls.length > degree &&
     controls.length <= MAX_SPLINE_CONTROLS &&
-    knots.length === controls.length + degree + 1;
-  if (!valid || [...knots, ...weights].some((value) => !Number.isFinite(value))) return null;
+    knots.length === controls.length + degree + 1 &&
+    (weights.length === 0 || weights.length === controls.length);
+  if (!valid || !controls.every(finitePoint) || !knots.every(Number.isFinite) || !weights.every((w) => Number.isFinite(w) && w > 0))
+    return null;
+  // knots must not decrease, and their whole range must be finite (a span of 1e308 - -1e308 overflows)
+  if (
+    knots.some((knot, index) => index > 0 && knot < (knots[index - 1] as number)) ||
+    !Number.isFinite((knots.at(-1) as number) - (knots[0] as number))
+  )
+    return null;
   const [low, high] = [knots[degree] as number, knots[controls.length] as number];
   if (!(high > low)) return null;
   const spans = new Set(knots.slice(degree, controls.length + 1)).size - 1;
@@ -120,6 +131,7 @@ export function readSpline(record: DxfRecord): SplineRead | null {
   const points = Array.from({ length: samples + 1 }, (_, i) =>
     deBoor(degree, knots, controls, weights, low + ((high - low) * i) / samples),
   );
+  if (!points.every(finitePoint)) return null;
   return { points: closed ? points.slice(0, -1) : points, closed, exact: false };
 }
 

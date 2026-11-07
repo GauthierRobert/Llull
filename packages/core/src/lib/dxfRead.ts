@@ -6,7 +6,7 @@
 import type { Vec3 } from '../model/vectors';
 import { positiveSweep, toRadians } from './angle';
 import { arcPolyline } from './arc';
-import { type DxfRecord, codeNumber, codeValue, decodeDxfText, point } from './dxfRecord';
+import { type DxfRecord, codeNumber, codeValue, decodeDxfText, decodeTextControls, point } from './dxfRecord';
 import { llullXdata, readHatch, readSpline } from './dxfReadShapes';
 
 interface DxfBlock {
@@ -267,12 +267,16 @@ function lwPolylinePoints(record: DxfRecord, closed: boolean): Vec3[] {
   return result;
 }
 
+const MTEXT_TOKEN = /\\([\\{}])|\\U\+([0-9A-Fa-f]{4})|\\P|\\[A-Za-z][^;\\{}]*;|\\~|[{}]/g;
+
+/** MTEXT contents: `\P` is a line break; `\\`, `\{`, `\}` and `\U+XXXX` are decoded; other formatting codes and unescaped braces are dropped. */
 function stripMText(text: string): string {
   return text
-    .replace(/\\P/g, ' ')
-    .replace(/\\[A-Za-z][^;\\{}]*;/g, '')
-    .replace(/\\[~]/g, ' ')
-    .replace(/[{}]/g, '')
+    .replace(MTEXT_TOKEN, (match, literal?: string, unicode?: string) => {
+      if (literal !== undefined) return literal;
+      if (unicode !== undefined) return String.fromCharCode(Number.parseInt(unicode, 16));
+      return match === '\\P' ? '\n' : match === '\\~' ? ' ' : '';
+    })
     .trim();
 }
 
@@ -311,6 +315,9 @@ export interface FlattenResult {
   readonly skipped: ReadonlyMap<string, number>;
 }
 
+/** Records visited by one flatten at most (empty block inserts nest and fan out without producing primitives). */
+const MAX_DXF_RECORDS = 500000;
+
 /** Primitives produced by one flatten at most (nested block inserts can multiply exponentially). */
 const MAX_DXF_PRIMITIVES = 200000;
 
@@ -321,9 +328,11 @@ const MAX_DXF_PRIMITIVES = 200000;
 export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MAX_DXF_PRIMITIVES): FlattenResult {
   const primitives: DxfPrimitive[] = [];
   const skipped = new Map<string, number>();
+  let visited = 0;
   const visit = (list: readonly DxfRecord[], transform: Transform, depth: number, inherited: Common | null): void => {
     for (const record of list) {
-      if (primitives.length >= maxPrimitives) {
+      visited += 1;
+      if (primitives.length >= maxPrimitives || visited > MAX_DXF_RECORDS) {
         skipped.set('over limit', (skipped.get('over limit') ?? 0) + 1);
         continue;
       }
@@ -397,18 +406,31 @@ export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MA
                     .map(([, value]) => value)
                     .join(''),
                 )
-              : decodeDxfText(codeValue(record, 1) ?? '').trim();
+              : decodeTextControls(decodeDxfText(codeValue(record, 1) ?? '')).trim();
           if (raw === '') break;
-          const height = codeNumber(record, 40, 1) * (transform.scale ?? 1);
-          const alignment = record.type === 'TEXT' ? codeNumber(record, 72, 0) : 0;
-          const anchor = alignment === 1 ? 'center' : alignment === 2 ? 'right' : 'left';
+          const localHeight = codeNumber(record, 40, 1);
+          const height = localHeight * (transform.scale ?? 1);
+          const isMText = record.type === 'MTEXT';
+          const alignment = isMText ? 0 : codeNumber(record, 72, 0);
+          const attachment = isMText ? codeNumber(record, 71, 1) : 0;
+          const column = isMText ? (attachment - 1) % 3 : alignment;
+          const anchor = column === 1 ? 'center' : column === 2 ? 'right' : 'left';
+          const direction =
+            isMText && codeValue(record, 11) !== undefined ? Math.atan2(codeNumber(record, 21, 0), codeNumber(record, 11, 1)) : null;
+          const angle = direction ?? toRadians(codeNumber(record, 50, 0));
+          const anchorPoint = point(record, isMText || anchor === 'left' ? 0 : 1);
+          // an MTEXT inserted at the top of its first line (attachments 1-3) has its baseline one cap height lower
+          const base: Vec3 =
+            isMText && attachment >= 1 && attachment <= 3 && localHeight > 0
+              ? [anchorPoint[0] + Math.sin(angle) * localHeight, anchorPoint[1] - Math.cos(angle) * localHeight, anchorPoint[2]]
+              : anchorPoint;
           primitives.push({
             ...common,
             kind: 'text',
             anchor,
-            at: world(point(record, anchor === 'left' ? 0 : 1)),
+            at: world(base),
             height: height > 0 ? height : 1,
-            rotation: toRadians(codeNumber(record, 50, 0)) + transform.rotation,
+            rotation: angle + transform.rotation,
             content: raw,
           });
           break;

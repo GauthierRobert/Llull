@@ -35,6 +35,7 @@ print(json.dumps({
   'splineControl': len(list(spline.control_points)),
   'layers': sorted(l.dxf.name for l in doc.layers),
   'units': doc.header['$INSUNITS'],
+  'layouts': sorted(doc.layouts.names()),
 }))
 `;
 
@@ -80,6 +81,7 @@ describe.skipIf(python === null)('export_dxf audited by ezdxf', () => {
         splineControl: number;
         layers: string[];
         units: number;
+        layouts: string[];
       };
       expect(report.version).toBe('AC1015');
       expect(report.errors).toEqual([]);
@@ -105,6 +107,7 @@ describe.skipIf(python === null)('export_dxf audited by ezdxf', () => {
       expect(report.splineControl).toBe(13);
       expect(report.layers).toEqual(['0', 'Defpoints', 'Notes & dims', 'WALLS']);
       expect(report.units).toBe(4);
+      expect(report.layouts).toEqual(['Layout1', 'Model']);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

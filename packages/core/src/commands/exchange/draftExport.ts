@@ -105,10 +105,26 @@ const finite = (value: unknown): boolean => {
   return true;
 };
 
-const layerOf = (doc: CadDocument, entity: Entity): Omit<DraftItem, 'id' | 'shape' | 'z' | 'color'> => {
+/** Export names of layers keyed by layer id: layers that share a name keep distinct names (`_2`, `_3`, … by first use). */
+class LayerNames {
+  private readonly byId = new Map<string, string>();
+  private readonly used = new Set<string>();
+
+  of(layerId: string, name: string): string {
+    const known = this.byId.get(layerId);
+    if (known !== undefined) return known;
+    let unique = name;
+    for (let suffix = 2; this.used.has(unique); suffix++) unique = `${name}_${suffix}`;
+    this.used.add(unique);
+    this.byId.set(layerId, unique);
+    return unique;
+  }
+}
+
+const layerOf = (doc: CadDocument, entity: Entity, names: LayerNames): Omit<DraftItem, 'id' | 'shape' | 'z' | 'color'> => {
   const layer = doc.layers[entity.layerId];
   return {
-    layerName: layer?.name ?? '0',
+    layerName: names.of(entity.layerId, layer?.name ?? '0'),
     layerColor: layer?.color ?? null,
     visible: layer?.visible ?? true,
     locked: layer?.locked ?? false,
@@ -220,6 +236,7 @@ export function planDraftExport(doc: CadDocument, command: string, ids: readonly
   const items: DraftItem[] = [];
   const skipped: DraftSkip[] = [];
   const entityIds: string[] = [];
+  const names = new LayerNames();
   let dimensions = 0;
   let ordinal = 0;
   for (const id of doc.order) {
@@ -234,7 +251,7 @@ export function planDraftExport(doc: CadDocument, command: string, ids: readonly
     if (entity.kind === 'region') ordinal += 1;
     if (entity.kind === 'dimension') dimensions += 1;
     entityIds.push(id);
-    const common = { ...layerOf(doc, entity), color: entity.color, z: elevationOf(doc, entity) };
+    const common = { ...layerOf(doc, entity, names), color: entity.color, z: elevationOf(doc, entity) };
     for (const shape of shapes) items.push({ id, ...common, shape });
   }
   if (items.length === 0) {

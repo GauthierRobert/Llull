@@ -168,3 +168,10 @@ export function scalePrimitive(primitive: DxfPrimitive, factor: number): DxfPrim
       return { ...primitive, corners: primitive.corners.map(s) };
   }
 }
+
+/** True when every number of the primitive is finite (unit scaling can overflow a huge coordinate). */
+export function isFinitePrimitive(primitive: DxfPrimitive): boolean {
+  const finite = (value: unknown): boolean =>
+    typeof value === 'number' ? Number.isFinite(value) : Array.isArray(value) ? value.every(finite) : true;
+  return Object.values(primitive).every(finite);
+}

@@ -189,7 +189,7 @@ describe('dxf reader', () => {
     expect(arc?.kind === 'arc' && arc.start).toBeCloseTo(Math.PI / 2, 9);
     expect(arc?.kind === 'arc' && arc.end).toBeCloseTo(Math.PI, 9);
     const text = primitives.find((p) => p.kind === 'text' && p.layer === 'ANNO');
-    expect(text?.kind === 'text' && text.content).toBe('Site plan');
+    expect(text?.kind === 'text' && text.content).toBe('Site' + String.fromCharCode(10) + 'plan');
     // Uniform insert: block line (1,0)->(2,0) relative to base (1,0), scaled 2, rotated 90°.
     const blockLine = primitives.find((p) => p.kind === 'line' && p.layer === 'MARKS');
     expect(blockLine?.kind === 'line' && blockLine.b[0]).toBeCloseTo(20, 9);

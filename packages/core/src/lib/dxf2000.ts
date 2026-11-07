@@ -6,18 +6,11 @@
 
 import { toDegrees } from './angle';
 import { hexToAci } from './dxfUnits';
-import { INSUNITS, dxfText } from './dxfWriter';
+import { type INSUNITS, dxfText } from './dxfWriter';
 import { LLULL_APP } from './dxfReadShapes';
+import { encodeTextLiterals } from './dxfRecord';
 import type { Vec2 } from '../model/vectors';
-
-type Group = readonly [code: number, value: string | number];
-
-/** A number as DXF text: shortest round-trip digits, never an exponent (`1e-7` is `0.0000001`), never `-0`. */
-function dxfNumber(value: number): string {
-  const text = String(value + 0);
-  if (!text.includes('e')) return text;
-  return value.toFixed(20).replace(/0+$/, '').replace(/\.$/, '.0');
-}
+import { type DxfLayerDef, type Group, assembleFile, flatten, hexColor } from './dxf2000File';
 
 const FORBIDDEN_IN_NAMES = '<>/\\":;?*|=`';
 
@@ -26,14 +19,6 @@ function dxfLayerName2000(name: string): string {
   const safe = [...name].map((ch) => (FORBIDDEN_IN_NAMES.includes(ch) || ch.charCodeAt(0) < 32 ? '_' : ch)).join('');
   const cleaned = dxfText(safe.slice(0, 255));
   return cleaned.trim() === '' ? '0' : cleaned;
-}
-
-/** Layer state written to the LAYER table. */
-export interface DxfLayerDef {
-  /** `#rrggbb`, written as ACI + true colour; null = ACI 7 only. */
-  readonly color: string | null;
-  readonly visible: boolean;
-  readonly locked: boolean;
 }
 
 /** Per-entity attributes: the DXF layer name (from `declareLayer`) and a true colour (null = by layer). */
@@ -57,11 +42,6 @@ export type DxfHatchFill =
 /** Mean character width of the STANDARD font in text heights (extents estimate only). */
 const TEXT_WIDTH_PER_HEIGHT = 0.6;
 const ENTITY_HANDLE_BASE = 0x10000;
-
-const flatten = (groups: ReadonlyArray<Group>): string[] =>
-  groups.flatMap(([code, value]) => [String(code), typeof value === 'number' ? dxfNumber(value) : value]);
-
-const hexColor = (hex: string): number => Number.parseInt(hex.slice(1), 16);
 
 export class Dxf2000Writer {
   private readonly lines: string[] = [];
@@ -236,7 +216,7 @@ export class Dxf2000Writer {
       [100, 'AcDbText'],
       ...this.xy(10, at, z),
       [40, height],
-      [1, dxfText(content)],
+      [1, dxfText(encodeTextLiterals(content))],
       ...(rotation === 0 ? [] : ([[50, toDegrees(rotation)]] as Group[])),
       ...(anchor === 'left' ? [] : ([[72, anchor === 'center' ? 1 : 2]] as Group[])),
       ...aligned,
@@ -291,7 +271,13 @@ export class Dxf2000Writer {
   }
 
   /** Even-odd HATCH of closed `loops` (outline polygons, no bulges) at elevation `z`. */
-  hatch(style: DxfStyle, loops: ReadonlyArray<ReadonlyArray<Vec2>>, fill: DxfHatchFill, z: number): void {
+  hatch(
+    style: DxfStyle,
+    loops: ReadonlyArray<ReadonlyArray<Vec2>>,
+    fill: DxfHatchFill,
+    z: number,
+    outermost: ReadonlyArray<boolean>,
+  ): void {
     const pattern: Group[] =
       fill.kind === 'solid'
         ? [[76, 1]]
@@ -325,8 +311,8 @@ export class Dxf2000Writer {
       [70, fill.kind === 'solid' ? 1 : 0],
       [71, 0],
       [91, loops.length],
-      ...loops.flatMap((loop): Group[] => [
-        [92, 3],
+      ...loops.flatMap((loop, index): Group[] => [
+        [92, outermost[index] === true ? 3 : 2],
         [72, 0],
         [73, 1],
         [93, loop.length],
@@ -347,175 +333,12 @@ export class Dxf2000Writer {
 
   /** The complete file text: header ($INSUNITS, extents), symbol tables, model / paper space blocks, entities, objects. */
   assemble(unit: keyof typeof INSUNITS): string {
-    let handle = 0x20;
-    const next = (): string => (handle++).toString(16).toUpperCase();
-    const table = (name: string, count: number, extra: Group[] = []): { head: Group[]; owner: string } => {
-      const owner = next();
-      return { head: [[0, 'TABLE'], [2, name], [5, owner], [330, 0], [100, 'AcDbSymbolTable'], [70, count], ...extra], owner };
-    };
-    const record = (type: string, owner: string, subclass: string, groups: Group[]): Group[] => [
-      [0, type],
-      [5, next()],
-      [330, owner],
-      [100, 'AcDbSymbolTableRecord'],
-      [100, subclass],
-      ...groups,
-    ];
-    const [minX, minY, maxX, maxY] = this.bounds();
-    const header: Group[] = [
-      [0, 'SECTION'],
-      [2, 'HEADER'],
-      [9, '$ACADVER'],
-      [1, 'AC1015'],
-      [9, '$HANDSEED'],
-      [5, (this.handleCounter + 1).toString(16).toUpperCase()],
-      [9, '$INSUNITS'],
-      [70, INSUNITS[unit]],
-      [9, '$PDMODE'],
-      [70, 3],
-      [9, '$EXTMIN'],
-      [10, minX],
-      [20, minY],
-      [30, 0],
-      [9, '$EXTMAX'],
-      [10, maxX],
-      [20, maxY],
-      [30, 0],
-      [0, 'ENDSEC'],
-      [0, 'SECTION'],
-      [2, 'CLASSES'],
-      [0, 'ENDSEC'],
-      [0, 'SECTION'],
-      [2, 'TABLES'],
-    ];
-    const tables: Group[] = [];
-    const addTable = (name: string, entries: ReadonlyArray<(owner: string) => Group[]>, extra: Group[] = []): string => {
-      const { head, owner } = table(name, entries.length, extra);
-      tables.push(...head, ...entries.flatMap((entry) => entry(owner)), [0, 'ENDTAB']);
-      return owner;
-    };
-    addTable('VPORT', []);
-    const lineType =
-      (name: string, description: string) =>
-      (owner: string): Group[] =>
-        record('LTYPE', owner, 'AcDbLinetypeTableRecord', [
-          [2, name],
-          [70, 0],
-          [3, description],
-          [72, 65],
-          [73, 0],
-          [40, 0],
-        ]);
-    addTable('LTYPE', [lineType('ByBlock', ''), lineType('ByLayer', ''), lineType('Continuous', 'Solid line')]);
-    const layerEntry =
-      (name: string, def: DxfLayerDef) =>
-      (owner: string): Group[] =>
-        record('LAYER', owner, 'AcDbLayerTableRecord', [
-          [2, name],
-          [70, def.locked ? 4 : 0],
-          [62, def.color === null ? (def.visible ? 7 : -7) : def.visible ? hexToAci(def.color) : -hexToAci(def.color)],
-          ...(def.color === null ? [] : ([[420, hexColor(def.color)]] as Group[])),
-          [6, 'Continuous'],
-        ]);
-    const zero: DxfLayerDef = { color: null, visible: true, locked: false };
-    addTable('LAYER', [
-      ...(this.layerDefs.has('0') ? [] : [layerEntry('0', zero)]),
-      ...[...this.layerDefs].map(([name, def]) => layerEntry(name, def)),
-    ]);
-    addTable('STYLE', [
-      (owner) =>
-        record('STYLE', owner, 'AcDbTextStyleTableRecord', [
-          [2, 'Standard'],
-          [70, 0],
-          [40, 0],
-          [41, 1],
-          [50, 0],
-          [71, 0],
-          [42, 2.5],
-          [3, 'txt'],
-          [4, ''],
-        ]),
-    ]);
-    addTable('VIEW', []);
-    addTable('UCS', []);
-    const appId =
-      (name: string) =>
-      (owner: string): Group[] =>
-        record('APPID', owner, 'AcDbRegAppTableRecord', [
-          [2, name],
-          [70, 0],
-        ]);
-    addTable('APPID', [appId('ACAD'), appId(LLULL_APP)]);
-    addTable(
-      'DIMSTYLE',
-      [],
-      [
-        [100, 'AcDbDimStyleTable'],
-        [71, 0],
-      ],
-    );
-    const modelSpace = '1F';
-    const blockRecord =
-      (name: string, id: string) =>
-      (owner: string): Group[] => [
-        [0, 'BLOCK_RECORD'],
-        [5, id],
-        [330, owner],
-        [100, 'AcDbSymbolTableRecord'],
-        [100, 'AcDbBlockTableRecord'],
-        [2, name],
-      ];
-    addTable('BLOCK_RECORD', [blockRecord('*Model_Space', modelSpace), blockRecord('*Paper_Space', '1E')]);
-    const block = (name: string, owner: string): Group[] => [
-      [0, 'BLOCK'],
-      [5, next()],
-      [330, owner],
-      [100, 'AcDbEntity'],
-      [8, '0'],
-      [100, 'AcDbBlockBegin'],
-      [2, name],
-      [70, 0],
-      [10, 0],
-      [20, 0],
-      [30, 0],
-      [3, name],
-      [1, ''],
-      [0, 'ENDBLK'],
-      [5, next()],
-      [330, owner],
-      [100, 'AcDbEntity'],
-      [8, '0'],
-      [100, 'AcDbBlockEnd'],
-    ];
-    const blocks: Group[] = [
-      [0, 'ENDSEC'],
-      [0, 'SECTION'],
-      [2, 'BLOCKS'],
-      ...block('*Model_Space', modelSpace),
-      ...block('*Paper_Space', '1E'),
-      [0, 'ENDSEC'],
-    ];
-    const objects: Group[] = [
-      [0, 'SECTION'],
-      [2, 'OBJECTS'],
-      [0, 'DICTIONARY'],
-      [5, next()],
-      [330, 0],
-      [100, 'AcDbDictionary'],
-      [281, 1],
-      [0, 'ENDSEC'],
-      [0, 'EOF'],
-    ];
-    return [
-      ...flatten(header),
-      ...flatten(tables),
-      ...flatten(blocks),
-      ...flatten([
-        [0, 'SECTION'],
-        [2, 'ENTITIES'],
-      ]),
-      ...this.lines,
-      ...flatten([[0, 'ENDSEC'], ...objects]),
-    ].join('\n');
+    return assembleFile({
+      unit,
+      bounds: this.bounds(),
+      handleSeed: this.handleCounter + 1,
+      layers: this.layerDefs,
+      entityLines: this.lines,
+    });
   }
 }

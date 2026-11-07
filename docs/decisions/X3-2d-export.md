@@ -12,10 +12,7 @@ needs R2000. R2000 is the oldest version with every entity this model needs and 
 and ezdxf. Newer versions add nothing for 2D drafting. The R2000 writer is `lib/dxf2000.ts` (core: aec / aero may reuse it, core imports no
 plugin); nothing was duplicated, the R12 writer keeps its callers and its `fmt` / `dxfText` helpers, which the new writer imports.
 
-Verified with ezdxf (`server/tests/exportDxfAudit.test.ts`: `doc.audit()` reports no error and no fix). AutoCAD itself was not available:
-the file has handles, subclass markers, the symbol tables (VPORT, LTYPE, LAYER, STYLE, VIEW, UCS, APPID, DIMSTYLE, BLOCK_RECORD), the
-model / paper space blocks and a root dictionary, but no LAYOUT objects (ezdxf and LibreCAD do not need them; an AutoCAD open check is
-still outstanding).
+Verified with ezdxf (`server/tests/exportDxfAudit.test.ts`: `doc.audit()` reports no error and no fix; the layouts `Model` and `Layout1` exist). The file follows the structure of ezdxf's `new('R2000')`: CLASSES, the symbol tables (an `*Active` VPORT, a Standard DIMSTYLE, BLOCK_RECORDs pointing at their layouts), the model / paper space blocks, and OBJECTS (root dictionary with ACAD_GROUP / ACAD_LAYOUT / ACAD_PLOTSETTINGS / ACAD_PLOTSTYLENAME, the Model and Layout1 LAYOUTs with their plot settings). It has not been opened in AutoCAD / BricsCAD: that check is boarded.
 
 ### Dimension: exploded to geometry + text
 
@@ -75,7 +72,7 @@ origin at 0,0; ids are new.
 Gaps, all asserted or visible in the summary, none silent:
 
 1. Dimension: comes back as lines + text, not an associative dimension.
-2. Multi-line text: exported as MTEXT; `import_dxf` joins the lines with a space and anchors at the insertion point.
+2. Multi-line text: exported as MTEXT (inserted at the top of its first line, attachment 1-3, direction vector for rotation); `import_dxf` restores content (`P` as newline), rotation, anchor and baseline position. Only MTEXT from other CAD with other attachments (middle / bottom) keeps its insertion point as is.
 3. Layer names: forbidden characters become `_` (`A:B` is `A_B`).
 4. Solid hatch: the model's `angle` / `spacing` of a solid region are not in the DXF; import defaults them (45°, 1/40 of the diagonal).
 5. Region with exact `curves`: exported through its `loops` tessellation; the import has `loops` only.

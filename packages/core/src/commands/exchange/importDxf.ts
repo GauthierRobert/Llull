@@ -11,7 +11,7 @@ import { noop } from '../noop';
 import { nextId } from '../../lib/id';
 import { newEntity } from '../entity/newEntity';
 import { flattenDxf, parseDxf, type DxfLayerStyle } from '../../lib/dxfRead';
-import { makeRegion, regionGeometry, scalePrimitive, toEntities } from './dxfToEntities';
+import { isFinitePrimitive, makeRegion, regionGeometry, scalePrimitive, toEntities } from './dxfToEntities';
 import { aciToHex, insUnitsMillimetres } from '../../lib/dxfUnits';
 import { MAX_IMPORT_TRIANGLES } from '../limits';
 import { MM_PER_UNIT } from '../../model/units';
@@ -86,9 +86,14 @@ export const importDxf = defineCommand({
     const faces = new Map<string, { positions: number[]; indices: number[]; color: string }>();
     let flattened = 0;
     let truncated = 0;
+    let nonFinite = 0;
     let faceTriangles = 0;
     for (const raw of selected) {
       const primitive = scalePrimitive(raw, factor);
+      if (!isFinitePrimitive(primitive)) {
+        nonFinite += 1;
+        continue;
+      }
       const layerAci = drawing.layers.get(primitive.layer) ?? 7;
       const layerStyle = drawing.layerStyles.get(primitive.layer);
       const layerId = resolver.idFor(primitive.layer, layerAci, layerStyle);
@@ -161,6 +166,7 @@ export const importDxf = defineCommand({
       resolver.created.length > 0 ? `new layers: ${resolver.created.join(', ')}` : '',
       skipped.size > 0 ? `skipped ${[...skipped].map(([type, count]) => `${count} ${type}`).join(', ')}` : '',
       flattened > 0 ? `${flattened} 3D line(s)/polyline(s) flattened to their first elevation` : '',
+      nonFinite > 0 ? `${nonFinite} entities with non-finite coordinates (after unit scaling) not imported` : '',
       truncated > 0 ? `${truncated} entities beyond the ${MAX_DXF_ENTITIES} limit not imported` : '',
     ].filter((note) => note !== '');
     return {

@@ -1,6 +1,7 @@
 /** Drafting shapes as R2000 DXF entities (the mapping behind `export_dxf`). */
 
 import type { Dxf2000Writer, DxfStyle } from '../../lib/dxf2000';
+import { loopDepths } from '../../geometry/region';
 import type { DraftItem, DraftShape } from './draftExport';
 
 type Spline = Extract<DraftShape, { kind: 'spline' }>;
@@ -59,7 +60,13 @@ export function writeDraftItem(writer: Dxf2000Writer, item: DraftItem): void {
         const { pattern, angle, spacing } = shape.hatch;
         const fill =
           pattern === 'solid' ? ({ kind: 'solid' } as const) : ({ kind: 'lines', angle, spacing, cross: pattern === 'cross' } as const);
-        return writer.hatch(style, shape.loops, fill, z);
+        return writer.hatch(
+          style,
+          shape.loops,
+          fill,
+          z,
+          loopDepths(shape.loops).map((depth) => depth === 0),
+        );
       }
       for (const loop of shape.loops) writer.polyline(style, loop, true, z, { tag: 'region', ints: [shape.ordinal] });
   }

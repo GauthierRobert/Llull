@@ -370,7 +370,7 @@ describe('export_dxf -> import_dxf round trip (golden drawing, every kind)', () 
     expect(parseDxf(data.dxf)?.entities.length).toBe(data.entityCount);
   });
 
-  it('GAPS (listed, asserted): dimension -> lines + text, multi-line text -> one line, forbidden layer characters', () => {
+  it('GAPS (listed, asserted): dimension -> lines + text, multi-line text round-trips (see exportDraftReview), forbidden layer characters', () => {
     // 1. a dimension comes back as plain lines + a text on its layer (not associative)
     const base = withEntities(line('l1'), { ...line('l2'), start: [0, 5], end: [10, 5] } as unknown as Entity);
     const dimension = {
@@ -393,7 +393,7 @@ describe('export_dxf -> import_dxf round trip (golden drawing, every kind)', () 
     expect(kinds).not.toContain('dimension');
     expect(kinds).toContain('text');
     expect(kinds.filter((kind) => kind === 'line').length).toBeGreaterThan(2);
-    // 2. multi-line text is an MTEXT; the importer joins its lines with a space
+    // 2. multi-line text is an MTEXT; the importer restores its lines
     const multi = withEntities({
       id: 't',
       kind: 'text',
@@ -407,7 +407,7 @@ describe('export_dxf -> import_dxf round trip (golden drawing, every kind)', () 
     const mtext = exportDxf(multi).data.dxf;
     expect(section(mtext, 'ENTITIES')).toContainEqual(['1', 'first\\Psecond']);
     const text = Object.values(execute(createEmptyDocument(), 'import_dxf', { text: mtext }).document.entities)[0];
-    expect(text).toMatchObject({ kind: 'text', content: 'first second' });
+    expect(text).toMatchObject({ kind: 'text', content: 'first' + String.fromCharCode(10) + 'second' });
     // 3. forbidden layer characters are replaced and reported in data.layers
     const named = {
       ...withEntities(line('l')),

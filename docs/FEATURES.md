@@ -666,7 +666,7 @@
 | `apply_code_trace` | Rebuild the model from a feature trace (LLULL_TRACE) recorded by running llull-generated CadQuery or build123d code — normally called for you by the import_cod… |  |
 | `export_3mf` | Export the 3D bodies (all, or entityIds) as a 3MF package (.3mf, ZIP with 3D/3dmodel.model), the format slicers and print services read: one object per body ca… | read-only |
 | `export_code` | Export the model as parametric source code: CadQuery or build123d (Python), OpenSCAD, or a FreeCAD macro. | read-only |
-| `export_dxf` | Export 2D drafting entities (all of them, or `ids`) to an AutoCAD R2000 ASCII DXF (opens in AutoCAD, BricsCAD, DraftSight, LibreCAD, ezdxf; import_dxf reads it… | read-only |
+| `export_dxf` | Export 2D drafting entities (all of them, or `ids`) to an R2000 (AC1015) ASCII DXF (AutoCAD-compatible structure; verified with ezdxf, not yet opened in AutoCA… | read-only |
 | `export_gltf` | Export the document (or a subset of entities) to glTF 2.0 format. | read-only |
 | `export_iges` | Export 3D solids to IGES 5.3 from the exact kernel B-rep: mode brep (default) writes manifold solid B-rep objects (types 186 / 514 / 510 / 508 / 504 / 502), mo… | read-only, kernel |
 | `export_obj` | Export the document (or a subset of entities) to Wavefront OBJ text format. | read-only |

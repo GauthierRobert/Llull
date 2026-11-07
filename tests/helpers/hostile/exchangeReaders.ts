@@ -75,6 +75,36 @@ const dxfShapeExtras = [
     input: () => inEntities(0, 'SPLINE', 71, 1, 40, 'NaN', 40, 0, 40, 1, 40, 1, 10, 0, 20, 0, 10, 1, 20, 1),
   },
   {
+    name: 'SPLINE with a zero weight, decreasing knots and +-1e308 knots',
+    input: () =>
+      inEntities(
+        ...[0, 'SPLINE', 71, 1, 40, 0, 40, 0, 40, 1, 40, 1, 10, 0, 20, 0, 10, 1, 20, 1, 41, 1, 41, 0],
+        ...[0, 'SPLINE', 71, 1, 40, 1, 40, 0, 40, 1, 40, 1, 10, 0, 20, 0, 10, 1, 20, 1],
+        ...[0, 'SPLINE', 71, 1, 40, -1e308, 40, -1e308, 40, 1e308, 40, 1e308, 10, 0, 20, 0, 10, 1, 20, 1],
+      ),
+  },
+  {
+    name: 'a self-referencing block of 50 empty INSERTs',
+    input: () =>
+      groups(
+        0,
+        'SECTION',
+        2,
+        'BLOCKS',
+        0,
+        'BLOCK',
+        2,
+        'B',
+        10,
+        0,
+        20,
+        0,
+        30,
+        0,
+        ...Array.from({ length: 50 }, () => [0, 'INSERT', 2, 'B', 8, '0']).flat(),
+      ) + groups(0, 'ENDBLK', 0, 'ENDSEC', 0, 'SECTION', 2, 'ENTITIES', 0, 'INSERT', 2, 'B', 8, '0', 0, 'ENDSEC', 0, 'EOF'),
+  },
+  {
     name: 'ELLIPSE with zero / negative / NaN ratio',
     input: () => inEntities(0, 'ELLIPSE', 11, 1, 40, 0, 0, 'ELLIPSE', 11, 1, 40, -3, 0, 'ELLIPSE', 11, 'NaN', 40, 'NaN'),
   },
