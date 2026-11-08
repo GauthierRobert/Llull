@@ -1,14 +1,14 @@
 /** PHY-06 §5.1 deck sections of the contact pairs of a nonlinear_static case (pure): surfaces, interactions, pairs, per-step switches and output. */
 
 import type { ContactBehaviour, ContactPair, ContactSettings } from '@core/model/contact';
-import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
+import type { DeckContext, DeckRefusal } from '../decks/context';
 import { commentText, row } from '../decks/format';
 import { pairValueProblem } from './pairRules';
 import { pairTargetKey } from '../hash/targets';
 
 /**
  * μ written on the `*FRICTION` card of a tied pair: CalculiX needs μ > 0 on the card and takes the tangential stiffness from the stick slope; a
- * tied pair does not slide. Pending a ccx run (VC-CNT-50).
+ * tied pair does not slide. Accepted and solved by CalculiX 2.21 (TECHNICAL_SPEC §13.2, VC-CNT-50).
  */
 const TIED_FRICTION_COEFFICIENT = 1;
 
@@ -18,10 +18,12 @@ const TYPE: Readonly<Record<ContactSettings['formulation'], string>> = {
   mortar: 'MORTAR',
 };
 
-/** Deck names of a pair: slave / master surfaces and the interaction. */
-function pairNames(pair: ContactPair): { readonly slave: string; readonly master: string; readonly interaction: string } {
-  const base = safeName(pair.id).toUpperCase();
-  return { slave: `CS_${base}_S`, master: `CS_${base}_M`, interaction: `SI_${base}` };
+/**
+ * Deck names of the pair at `index` of pairOrder (1-based in the deck): slave / master surfaces and the interaction. Derived from the position,
+ * never from the id, so two pairs can never collide after sanitising, case folding or CalculiX's 80-character limit.
+ */
+function pairNames(index: number): { readonly slave: string; readonly master: string; readonly interaction: string } {
+  return { slave: `CPS_${index + 1}`, master: `CPM_${index + 1}`, interaction: `CPI_${index + 1}` };
 }
 
 /** Data line of a *SURFACE BEHAVIOR card with trailing absent values dropped (absent inner values left blank = CalculiX default). */
@@ -64,7 +66,7 @@ export function contactModelLines(ctx: DeckContext): string[] | DeckRefusal {
   if (settings === undefined) return [];
   const steps = ctx.analysis.nonlinear?.steps ?? {};
   const lines: string[] = [];
-  for (const pairId of settings.pairOrder) {
+  for (const [index, pairId] of settings.pairOrder.entries()) {
     const pair = settings.pairs[pairId];
     if (pair === undefined) continue;
     const bad = pairValueProblem(pair, settings.formulation);
@@ -72,7 +74,7 @@ export function contactModelLines(ctx: DeckContext): string[] | DeckRefusal {
     const unknown = (pair.activeSteps ?? []).find((stepId) => !Object.hasOwn(steps, stepId));
     if (unknown !== undefined)
       return refuse('CNT_STEP_UNKNOWN', `contact pair '${pair.id}' is active in unknown step '${unknown}'`, [pair.id]);
-    const names = pairNames(pair);
+    const names = pairNames(index);
     lines.push(`** contact pair ${commentText(pair.id)} ${commentText(pair.name)}`);
     for (const [side, surface] of [
       ['S', names.slave],
@@ -122,16 +124,16 @@ export function contactStepLines(
   if (settings === undefined) return { switches: [], output: [] };
   const switches: string[] = [];
   for (const mode of ['REMOVE', 'ADD'] as const) {
-    const changing = settings.pairOrder.flatMap((pairId) => {
+    const changing = settings.pairOrder.flatMap((pairId, index) => {
       const pair = settings.pairs[pairId];
       if (pair === undefined) return [];
       const before = activeIn(pair, previousStepId);
       const now = activeIn(pair, stepId);
-      return before !== now && now === (mode === 'ADD') ? [pair] : [];
+      return before !== now && now === (mode === 'ADD') ? [index] : [];
     });
     if (changing.length === 0) continue;
     switches.push(`*MODEL CHANGE, TYPE=CONTACT PAIR, ${mode}`);
-    for (const pair of changing) switches.push(row(pairNames(pair).slave, pairNames(pair).master));
+    for (const index of changing) switches.push(row(pairNames(index).slave, pairNames(index).master));
   }
   return { switches, output: [`*CONTACT FILE${rate}`, 'CDIS, CSTR'] };
 }

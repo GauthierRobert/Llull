@@ -141,6 +141,8 @@ function jointInput(params: BoltedJointParams): { readonly input: JointInput; re
   const n = params.loadingPlaneFactor.value;
   ensure(n > 0 && n <= 1, 'CNT_INPUT_INVALID', 'loadingPlaneFactor.value must lie in (0, 1]', 'loadingPlaneFactor');
   const limits = params.limitLoads;
+  const allowableTensile = inUnit(params.allowableTensile, 'N', 'allowableTensile');
+  ensure(allowableTensile > 0, 'CNT_INPUT_INVALID', 'allowableTensile must be > 0', 'allowableTensile');
   const tensionPerFastener = inUnit(limits.tensionPerFastener, 'N', 'limitLoads.tensionPerFastener');
   ensure(tensionPerFastener > 0, 'CNT_INPUT_INVALID', 'limitLoads.tensionPerFastener must be > 0', 'limitLoads.tensionPerFastener');
   const mu = params.friction?.mu;
@@ -170,7 +172,7 @@ function jointInput(params: BoltedJointParams): { readonly input: JointInput; re
       thermalDecrease: thermalDecrease ?? 0,
       phi,
       loadingPlaneFactor: n,
-      allowableTensile: inUnit(params.allowableTensile, 'N', 'allowableTensile'),
+      allowableTensile,
       limitLoads: {
         tensionPerFastener,
         ...(shearJoint !== undefined ? { shearJoint } : {}),
@@ -226,7 +228,8 @@ function check(doc: CadDocument, params: BoltedJointParams): CommandResult {
     ...(input.gamma.defaulted ? ['preload variation Gamma from the standard default, not from tests'] : []),
   ];
   const unverified = unverifiedReasons.length > 0;
-  const status = items.some((entry) => entry.severity === 'fail') ? 'fail' : 'pass';
+  const incomplete = result.linearTheory.separationBeforeRupture;
+  const status = items.some((entry) => entry.severity === 'fail') ? 'fail' : incomplete ? 'incomplete' : 'pass';
   const n = (value: number): string => significantNumber(value, 4);
   const margins = result.margins.map((margin) => ({ ...margin, unverified }));
   const text = margins.map((margin) => `${margin.criterion} MS ${n(margin.ms)}`).join(', ');
@@ -265,7 +268,7 @@ function check(doc: CadDocument, params: BoltedJointParams): CommandResult {
 
 /**
  * @invariant read-only and pure; equations identical to the generator to 1e-9 (TR-CNT-20); the edition is in every result (TR-CNT-30);
- *   Γ / relaxation defaults are named with `defaulted: true`; status fail on a negative margin or a friction coefficient above the §6.4 cap
+ *   Γ / relaxation defaults are named with `defaulted: true`; status incomplete (never pass) when separation precedes rupture (eq. 6-6 not implemented); fail on a negative margin or a friction coefficient above the §6.4 cap
  *   without a test record; every result `reviewRequired: true`
  * @failure separation-critical without a 90/95 test Γ -> CNT_GAMMA_TEST_DATA_REQUIRED; torque control without nut factor ->
  *   CNT_NUT_FACTOR_MISSING; no factors -> CNT_FACTORS_UNSET; missing / invalid input or unit -> CNT_INPUT_INVALID (refusals, unchanged doc)
@@ -283,7 +286,7 @@ export const boltedJointCheck = defineCommand({
     'adds the slip margin (A.10-4 with limitLoads.shearJoint + tensionJoint, A.10-5 without tension, A.10-6 per fastener); mu above 0.2 ' +
     '(clean uncoated metal) / 0.1 without testRecord fails. Returns data { standard, preload { nominalN, maxN, minSeparationN, minSlipN, ' +
     'gamma, relaxation }, linearTheory { nPhi, PsepPrimeN, PtuPrimeN, separationBeforeRupture }, margins [{ criterion, ms, equation, ' +
-    'unverified }], status pass | fail, items, assumptions, unverified, reviewRequired }. Next: the FE route (add_contact_pair).',
+    'unverified }], status pass | fail | incomplete (incomplete: the joint separates before rupture and the ultimate margin of eq. 6-6 is not yet implemented), items, assumptions, unverified, reviewRequired }. Next: the FE route (add_contact_pair).',
   annotations: { readOnly: true },
   params: boltedJointParams,
   run: (doc, params): CommandResult => {

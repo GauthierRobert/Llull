@@ -175,7 +175,7 @@ describe('bolted_joint_check', () => {
     expect(ms['fastener_ultimate']).toBeUndefined();
     expect(out.preload.gamma).toEqual({ value: 0.25, source: 'NASA-STD-5020 6.1.d(1)A', defaulted: true });
     expect(out.preload.relaxation).toMatchObject({ kind: 'fraction', value: 0.05, defaulted: true });
-    expect(out.status).toBe('pass');
+    expect(out.status).toBe('incomplete');
     expect(out.items.map((entry) => entry.code)).toEqual(['CNT_DEFAULT_GAMMA_USED', 'CNT_ULTIMATE_MARGIN_PENDING']);
     expect(out.unverified).toBe(true);
     expect(out.unverifiedReasons).toContain('nut factor without test record');
@@ -203,6 +203,7 @@ describe('bolted_joint_check', () => {
       stiffness: { phi: 0.9, source: 'test' },
     }) as { margins: { criterion: string; equation: string }[]; linearTheory: { separationBeforeRupture: boolean } };
     expect(rupture.linearTheory.separationBeforeRupture).toBe(false);
+    expect((rupture as unknown as { status: string }).status).toBe('pass');
     expect(rupture.margins.map((margin) => margin.equation)).toContain('6-11');
     const perFastener = data('bolted_joint_check', {
       ...query,
@@ -243,6 +244,7 @@ describe('bolted_joint_check', () => {
     [{ stiffness: { phi: 1.2, source: 'x' } }, 'CNT_INPUT_INVALID'],
     [{ loadingPlaneFactor: { value: 0, source: 'x' } }, 'CNT_INPUT_INVALID'],
     [{ fastenerCount: 0 }, 'CNT_INPUT_INVALID'],
+    [{ allowableTensile: { value: 0, unit: 'N' } }, 'CNT_INPUT_INVALID'],
     [{ gamma: { value: 1.5, source: 'x' } }, 'CNT_INPUT_INVALID'],
     [{ friction: { mu: -0.1, surface: 'other' } }, 'CNT_INPUT_INVALID'],
   ])('refuses %j with %s (VC-CNT-40.i), leaving the document unchanged', (patch, code) => {

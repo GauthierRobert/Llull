@@ -140,8 +140,10 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
         contact: {
           formulation: analysisCase.contact.formulation,
           pairs: analysisCase.contact.pairOrder.map((id) => {
-            const { name, ...rest } = analysisCase.contact?.pairs[id] ?? { name: '' };
+            // the name is presentation and noSlipRequired a check judgement (like penetrationTolerance): neither changes the solution
+            const { name, noSlipRequired, ...rest } = analysisCase.contact?.pairs[id] ?? { name: '' };
             void name;
+            void noSlipRequired;
             return rest;
           }),
         },

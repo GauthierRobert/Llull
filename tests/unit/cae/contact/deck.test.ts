@@ -23,23 +23,22 @@ describe('contact deck', () => {
   it('writes element-face surfaces, a linear interaction with friction, the pair with ADJUST, and CONTACT FILE in every step (golden)', () => {
     const { b, doc, pairId } = withPair({ friction: { mu: 0.2, stickSlope: 50000 }, adjust: { kind: 'clearance', value: 0.01 } });
     const text = deckOf(b, doc, [pairId]);
-    const base = pairId.toUpperCase().replace(/[^A-Z0-9]/g, '_');
     expect(modelCards(text)).toBe(
       [
         `** contact pair ${pairId} stack`,
-        `*SURFACE, NAME=CS_${base}_S, TYPE=ELEMENT`,
+        '*SURFACE, NAME=CPS_1, TYPE=ELEMENT',
         '7, S1',
         '9, S1',
-        `*SURFACE, NAME=CS_${base}_M, TYPE=ELEMENT`,
+        '*SURFACE, NAME=CPM_1, TYPE=ELEMENT',
         '5, S3',
         '6, S3',
-        `*SURFACE INTERACTION, NAME=SI_${base}`,
+        '*SURFACE INTERACTION, NAME=CPI_1',
         '*SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=LINEAR',
         '1000000',
         '*FRICTION',
         '0.2, 50000',
-        `*CONTACT PAIR, INTERACTION=SI_${base}, TYPE=SURFACE TO SURFACE, ADJUST=0.01`,
-        `CS_${base}_S, CS_${base}_M`,
+        '*CONTACT PAIR, INTERACTION=CPI_1, TYPE=SURFACE TO SURFACE, ADJUST=0.01',
+        'CPS_1, CPM_1',
         '',
       ].join('\n'),
     );
@@ -106,6 +105,29 @@ describe('contact deck', () => {
     expect(writeInp(broken, b.analysisId, blocksMesh(b, broken, [pairId]))).toMatchObject({ code: 'CNT_BEHAVIOUR_FORMULATION_MISMATCH' });
     const stale = withCase(doc, { ...analysis, contact: { ...contact, pairs: { [pairId]: { ...pair, activeSteps: ['gone'] } } } });
     expect(writeInp(stale, b.analysisId, blocksMesh(b, stale, [pairId]))).toMatchObject({ code: 'CNT_STEP_UNKNOWN' });
+  });
+
+  it('names the deck cards by pair position, so ids that sanitise alike never collide', () => {
+    const b = blocks();
+    const one = must(b.doc, 'add_contact_pair', pairParams(b));
+    const two = must(one.doc, 'add_contact_pair', pairParams(b, { name: 'second', formulation: undefined }));
+    const analysis = caseOf(two.doc, b.analysisId);
+    const contact = analysis?.contact;
+    if (analysis === undefined || contact === undefined) throw new Error('no contact');
+    const [first = '', second = ''] = contact.pairOrder;
+    const clash = {
+      'cp-1.1': { ...contact.pairs[first], id: 'cp-1.1' },
+      'cp_1.1': { ...contact.pairs[second], id: 'cp_1.1' },
+    } as typeof contact.pairs;
+    const doc = withCase(two.doc, { ...analysis, contact: { ...contact, pairs: clash, pairOrder: ['cp-1.1', 'cp_1.1'] } });
+    const mesh = blocksMesh(b, doc, ['cp-1.1', 'cp_1.1']);
+    // only the face sets: the node sets of these ids would themselves collide (FEA_DECK_NAME_COLLISION), the surfaces must not
+    const faceOnly = { ...mesh, nodeSets: Object.fromEntries(Object.entries(mesh.nodeSets).filter(([key]) => !key.startsWith('CP_'))) };
+    const written = writeInp(doc, b.analysisId, faceOnly);
+    const cards = modelCards('text' in written ? written.text : written.code);
+    expect(cards).toContain('CPS_1, CPM_1\n');
+    expect(cards).toContain('CPS_2, CPM_2\n');
+    expect(cards.match(/\*SURFACE, NAME=/g)).toHaveLength(4);
   });
 
   it('writes no contact card for a nonlinear case without pairs', () => {

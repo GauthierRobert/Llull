@@ -54,6 +54,8 @@ export function pairValueProblem(pair: Omit<ContactPair, 'id' | 'name'>, formula
     (!positive(pair.friction.mu) || (pair.friction.stickSlope !== undefined && !positive(pair.friction.stickSlope)))
   )
     return problem('CNT_FRICTION_INVALID', 'friction needs mu > 0 (and stickSlope > 0 when given)', 'friction');
+  if (pair.noSlipRequired === true && pair.friction === undefined)
+    return problem('CNT_FRICTION_INVALID', 'noSlipRequired needs friction (a frictionless pair always slides)', 'noSlipRequired');
   if (pair.adjust?.kind === 'clearance' && !positive(pair.adjust.value))
     return problem('CNT_ADJUST_INVALID', 'adjust clearance must be > 0', 'adjust');
   if (

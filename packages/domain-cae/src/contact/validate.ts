@@ -9,7 +9,7 @@ import { adjustSchema, behaviourSchema, formulationSchema, frictionSchema } from
 const point = z.tuple([z.number(), z.number(), z.number()]);
 const targetSchema = z.object({
   entityId: z.string(),
-  facesNear: z.array(point).optional(),
+  facesNear: z.array(point).min(1),
   edgesNear: z.array(point).optional(),
   pointsNear: z.array(point).optional(),
   intersectPlane: z.object({ point, normal: point }).optional(),

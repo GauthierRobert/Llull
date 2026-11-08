@@ -105,6 +105,8 @@ describe('contact_report', () => {
     expect(refuse({}, defaultContext())).toBe('FEA_RESULTS_MISSING');
     const changed = must(doc, 'update_contact_pair', { analysisId: b.analysisId, pair: 'stack', friction: { mu: 0.3 } }).doc;
     expect(refuse({}, ctx, changed)).toBe('FEA_RESULTS_STALE');
+    const judged = must(doc, 'update_contact_pair', { analysisId: b.analysisId, pair: 'stack', noSlipRequired: true }).doc;
+    expect(refuse({}, ctx, judged)).toBeUndefined();
     expect(refuse({}, ctx, blocks().doc)).toBe('CNT_PAIR_NOT_FOUND');
     const other = solvedPair({}, () => frdContact(1, 1, uniform(10, 2), ['COPEN', 'CPRESS']));
     expect(execute(other.doc, 'contact_report', { analysisId: other.b.analysisId }, other.ctx).error?.code).toBe(

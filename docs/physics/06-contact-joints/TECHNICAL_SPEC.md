@@ -379,7 +379,8 @@ Reused: `NLS_*` (PHY-05), `FEA_*` (05), `VNV_NO_CONVERGENCE_STUDY` (PHY-00), `MA
 ## 13. As built (M1 + M2, 2026-11-07)
 
 Placement: Proposal B of §2 (the discipline lives in the 05 package, `packages/domain-cae/src/contact/`, plugin `cae`, toolset `analysis`).
-Types: `packages/core/src/model/contact.ts` (`ContactSettings`, `ContactPair`, `ContactBehaviour`, `ContactFormulation`), `AnalysisCase.contact?`.
+Types: `packages/core/src/model/contact.ts` (`ContactSettings`, `ContactPair`, `ContactBehaviour`, `ContactFormulation`), `AnalysisCase.contact?`;
+the 05 `FeaTarget` moved to `packages/core/src/model/feaTarget.ts` (shared by `analysis.ts` and `contact.ts`).
 Pretension (`add_bolt_pretension`, `BoltPretension`, `PreloadSpec`) is M3 and not built; `ContactSettings` has no pretension fields yet.
 
 | Command | Kind | File |
@@ -390,12 +391,12 @@ Pretension (`add_bolt_pretension`, `BoltPretension`, `PreloadSpec`) is M3 and no
 | `add_contact_pair` / `update_contact_pair` / `delete_contact_pair` | M | `contact/pairCommands.ts` (rules `pairRules.ts`, schema `pairSchema.ts`) |
 | `contact_report` / `check_contact` | Q | `contact/queries.ts` (reader `reader.ts`, items `check.ts`, `overclosure.ts`) |
 
-Deck (`contact/deck.ts`, called by `nonlinear/deck.ts`): model data before the first `*STEP`: per pair `*SURFACE, NAME=CS_<pair>_S|M,
-TYPE=ELEMENT` from the mesh face sets `CP_<pairId>_S|M` (new mesh target keys, `hash/targets.ts`), `*SURFACE INTERACTION, NAME=SI_<pair>`,
+Deck (`contact/deck.ts`, called by `nonlinear/deck.ts`): model data before the first `*STEP`: per pair (n = its 1-based position in `pairOrder`, so deck names can never collide)
+`*SURFACE, NAME=CPS_<n> | CPM_<n>, TYPE=ELEMENT` from the mesh face sets `CP_<pairId>_S|M` (new mesh target keys, `hash/targets.ts`), `*SURFACE INTERACTION, NAME=CPI_<n>`,
 `*SURFACE BEHAVIOR` (HARD / LINEAR `slope[, σ∞][, c0]` / EXPONENTIAL `c0, p0` / TIED `slope`; none for mortar + hard), `*FRICTION mu[, λ]`
 (tied: `1, stickSlope`), `*CONTACT PAIR, INTERACTION=…, TYPE=…[, SMALL SLIDING][, ADJUST=<analysis length>]`. Per step: `*MODEL CHANGE,
 TYPE=CONTACT PAIR, REMOVE | ADD` where `activeSteps` changes (a pair starts active), `*CONTACT FILE[, FREQUENCY=n]` `CDIS, CSTR`. The pair
-set-up is part of the full input hash (pair names excluded), its targets of the mesh hash; the analysis guard keeps referenced entities.
+set-up is part of the full input hash (pair names and `noSlipRequired`, a check judgement, excluded), its targets of the mesh hash; the analysis guard keeps referenced entities.
 Load validation: `contact/validate.ts` (zod shape + ids / order / names / reserved keys / entity refs / steps / pair rules).
 
 Reader (`contact/reader.ts`): the frd `CONTACT` block (COPEN, CSLIP1, CSLIP2, CPRESS, CSHEAR1, CSHEAR2), last stored increment per step (or
@@ -413,9 +414,10 @@ penetration = max(0, −COPEN), normal / shear force = Σ p A / Σ |τ| A, `clos
 | D5 | `penetrationTolerance` is a `check_contact` input, not stored. | `ContactSettings.penetrationTolerance` | It is a reviewer judgement, not a model input: storing it would make it part of the input hash and stale the results. |
 | D6 | `hertz_contact` takes unit-suffixed keys (mm, N, MPa) only; no `units` switch. | `units: 'in-lbf-psi'` | A switch would change the meaning of `R1_mm` etc.; same convention as `hand_check`. |
 | D7 | `bolted_joint_check` uses Ppi-min = (1 − Γ) Tmin/(K D) (A.2-3a) for the separation margin of every joint; (1 − Γ/n_f) only for slip. | (1 − Γ/n_f) for non-critical separation (FR-CNT-05 wording) | VC-CNT-40.a/d bind the conservative form for the worked (non-critical) example; it is stated in `data.assumptions`. |
-| D8 | `bolted_joint_check.status` is pass / fail (fail = a fail item: negative margin, friction above cap); warnings (defaulted Γ, eq. 6-6 pending) are items. | pass / warn / fail | §5.3 shows `status: pass` with a warning item; warnings stay visible in `items`. `check_contact` keeps pass / warn / fail. |
-| D9 | Separation before rupture: no ultimate margin, warning `CNT_ULTIMATE_MARGIN_PENDING` (eq. 6-6 not transcribed, §11 q5). | Compute MS_u from 6-11 anyway | 6-11 is the rupture-first case; using it would state an unsupported margin. |
+| D8 | `bolted_joint_check.status` is pass / fail / incomplete: fail = a fail item (negative margin, friction above cap); incomplete = the check could not be completed (D9); warnings (defaulted Γ) are items. | pass / warn / fail | §5.3 shows `status: pass` with a warning item; warnings stay visible in `items`; an incomplete check must never read as pass. `check_contact` keeps pass / warn / fail. |
+| D9 | Separation before rupture: no ultimate margin, warning `CNT_ULTIMATE_MARGIN_PENDING` and `status: incomplete` (review round 1). Eq. 6-6 is not transcribed: the archived PDF ([R2], sha256 ea1b5b03…) is not in the repo or on this machine, and its text was not captured in the extract (§11 q5). The reviewer's reading (MS_u = Ptu-allow / (FF · FSu · PtL) − 1, preload ignored once separated) is plausible but unverified, so it is not implemented. | Compute MS_u from 6-11, or from the unverified reading | 6-11 is the rupture-first case; implementing an equation from memory would state an unsupported margin. The worked example (VC-CNT-40) separates first, so it reports `incomplete`. |
 | D10 | `noSlipRequired?: boolean` on a pair feeds `CNT_SLIP` (fail). | No slip flag in M2 | §7.1 names `noSlipRequired`; without it CNT_SLIP could never fire. |
+| D12 | `noSlipRequired` needs friction (`CNT_FRICTION_INVALID`); it is excluded from the input hash (toggling it keeps results current). | Hash it with the pair | A frictionless pair always slides; like D5 it is a judgement of the check, not a model input. |
 | D11 | Contact `unverified` flag dropped from `contact_report`: layout and COPEN sign are pinned on ccx 2.21 output. | Keep `unverified` until VC-CNT-50 `.dat.ref` decks | The real runs (§13.2) confirmed the six components and penetration = p / slope = −COPEN for surface_to_surface. |
 
 New codes beyond §7.1: `CNT_FORMULATION_UNSET`, `CNT_BEHAVIOUR_INVALID`, `CNT_ADJUST_INVALID`, `CNT_PAIR_NOT_FOUND`, `CNT_PAIR_NAME_TAKEN`,

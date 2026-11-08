@@ -1,15 +1,6 @@
 /** PHY-06 structural contact set-up of a nonlinear_static case (plugin `cae`, CalculiX `*CONTACT PAIR`). */
 
-import type { Vec3 } from './vectors';
-
-/** Face target of a contact side: structurally the 05 `FeaTarget` of `analysis.ts` (not imported: analysis.ts imports this module). */
-interface ContactTarget {
-  readonly entityId: string;
-  readonly facesNear?: readonly Vec3[];
-  readonly edgesNear?: readonly Vec3[];
-  readonly pointsNear?: readonly Vec3[];
-  readonly intersectPlane?: { readonly point: Vec3; readonly normal: Vec3 };
-}
+import type { FeaTarget } from './feaTarget';
 
 /** CalculiX `*CONTACT PAIR, TYPE=`: one formulation per deck (CalculiX rule). */
 export type ContactFormulation = 'node_to_surface' | 'surface_to_surface' | 'mortar';
@@ -24,8 +15,8 @@ export type ContactBehaviour =
 export interface ContactPair {
   readonly id: string;
   readonly name: string;
-  readonly slave: ContactTarget;
-  readonly master: ContactTarget;
+  readonly slave: FeaTarget;
+  readonly master: FeaTarget;
   readonly behaviour: ContactBehaviour;
   /** Coulomb friction; absent stickSlope = the CalculiX default (first elastic constant / 2), reported as a named default. */
   readonly friction?: { readonly mu: number; readonly stickSlope?: number };

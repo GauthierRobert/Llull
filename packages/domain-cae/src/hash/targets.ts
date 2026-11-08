@@ -1,6 +1,7 @@
 /** Target keys of an analysis case: the names shared by the mesh request, the mesh artifact sets and the deck writers. */
 
-import type { AnalysisCase, FeaTarget } from '@core/model/analysis';
+import type { AnalysisCase } from '@core/model/analysis';
+import type { FeaTarget } from '@core/model/feaTarget';
 import type { Vec3 } from '@core/model/vectors';
 
 /** One resolvable thing in a case. `entityId` null = a probe point, searched in every part. */

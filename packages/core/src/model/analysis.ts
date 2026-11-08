@@ -6,6 +6,8 @@
  */
 
 import type { Vec3 } from './vectors';
+import type { FeaTarget } from './feaTarget';
+import type { DurabilityModel } from './durability';
 import type { DispositionLedgerEntry } from './dispositionLedger';
 import type { FitDispositions, FitLedgerEntry } from './fitDisposition';
 import type { Quantity } from './quantity';
@@ -14,6 +16,7 @@ import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
 import type { CaseStudies } from './convergenceStudy';
+import type { ContactSettings } from './contact';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -97,15 +100,6 @@ export interface DefeatureSpec {
   readonly maxFeatureSize?: number;
   /** Remove the faces nearest to these points. */
   readonly facesNear?: readonly Vec3[];
-}
-
-/** Points that identify faces / edges / vertices of `entityId`; the mesher resolves them to the nearest topology (never ids). */
-export interface FeaTarget {
-  readonly entityId: EntityId;
-  readonly facesNear?: readonly Vec3[];
-  readonly edgesNear?: readonly Vec3[];
-  readonly pointsNear?: readonly Vec3[];
-  readonly intersectPlane?: { readonly point: Vec3; readonly normal: Vec3 };
 }
 
 export interface FeaConstraint {
@@ -516,7 +510,7 @@ export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly thermomech?: ThermoMechSetup;
   readonly nonlinear?: NonlinearSettings;
   /** PHY-06 contact pairs (nonlinear_static only); absent until the first `add_contact_pair`. */
-  readonly contact?: import('./contact').ContactSettings;
+  readonly contact?: ContactSettings;
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];
@@ -543,7 +537,7 @@ export interface AnalysisModel {
   /** Margin / thermal-limit dispositions a human really signed (appended by dispose_margin / dispose_thermal_limit), kept by the cae `replaySeed` so a recorded step re-applies its verified act. */
   readonly dispositionLedger?: readonly DispositionLedgerEntry[];
   /** Absent until the first durability command (`define_load_history`, `define_crack`; plugin `cae`, PHY-07 / PHY-08). */
-  readonly durability?: import('./durability').DurabilityModel;
+  readonly durability?: DurabilityModel;
   /** PHY-09 spectrum / time-history library and equivalent-load provenance; absent until the first spectrum or history command. */
   readonly vibration?: DynamicsLibrary;
   readonly exceptionLedger?: readonly import('./convergenceStudy').StudyExceptionRecord[];

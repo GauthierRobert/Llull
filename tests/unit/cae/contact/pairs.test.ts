@@ -65,6 +65,7 @@ describe('add_contact_pair', () => {
     [{ behaviour: { kind: 'linear', slope: 1, c0: -1 } }, 'CNT_BEHAVIOUR_INVALID'],
     [{ behaviour: { kind: 'exponential', c0: 0.01, p0: 0 } }, 'CNT_BEHAVIOUR_INVALID'],
     [{ adjust: { kind: 'clearance', value: 0 } }, 'CNT_ADJUST_INVALID'],
+    [{ noSlipRequired: true }, 'CNT_FRICTION_INVALID'],
     [{ activeSteps: ['stp-99.1'] }, 'CNT_STEP_UNKNOWN'],
     [{ master: { entityId: 'nope', facesNear: [[0, 0, 0]] } }, 'FEA_TARGET_UNRESOLVED'],
     [{ master: { entityId: 'box-1.1', pointsNear: [[0, 0, 0]] } }, 'FEA_TARGET_UNRESOLVED'],
@@ -108,7 +109,6 @@ describe('update_contact_pair / delete_contact_pair', () => {
       pair: 'stack',
       friction: null,
       activeSteps: null,
-      noSlipRequired: true,
       behaviour: { kind: 'hard' },
       formulation: 'mortar',
     });
@@ -123,7 +123,6 @@ describe('update_contact_pair / delete_contact_pair', () => {
       slave: { entityId: b.upper, facesNear: [[0.5, 0.5, 1]] },
       master: { entityId: b.lower, facesNear: [[0.5, 0.5, 1]] },
       behaviour: { kind: 'hard' },
-      noSlipRequired: true,
     });
     const renamed = must(updated.document, 'update_contact_pair', {
       analysisId: b.analysisId,
@@ -168,10 +167,29 @@ describe('update_contact_pair / delete_contact_pair', () => {
 });
 
 describe('contact slice lifecycle', () => {
+  it('the analysis guard keeps an entity that only a contact pair references (not a part of the case)', () => {
+    const b = blocks();
+    const added = must(b.doc, 'add_contact_pair', pairParams(b));
+    const extra = must(added.doc, 'add_box', { size: [1, 1, 1], position: [5, 0, 0] });
+    const extraId = extra.affected[0] ?? '';
+    const analysis = caseOf(extra.doc, b.analysisId);
+    const contact = analysis?.contact;
+    const pairId = contact?.pairOrder[0] ?? '';
+    const pair = contact?.pairs[pairId];
+    if (analysis === undefined || contact === undefined || pair === undefined) throw new Error('no pair');
+    const pointing = withCase(extra.doc, {
+      ...analysis,
+      contact: { ...contact, pairs: { [pairId]: { ...pair, master: { entityId: extraId, facesNear: [[5, 0, 0.5]] } } } },
+    });
+    const removed = execute(pointing, 'delete_entities', { ids: [extraId] });
+    expect(removed.document.entities[extraId]).toBeDefined();
+    expect(removed.summary).toContain('is used by analysis');
+  });
+
   it('blocks deleting an entity a pair references (analysis guard) and survives history replay with the same ids', () => {
     const b = blocks();
     const added = must(b.doc, 'add_contact_pair', pairParams(b));
-    const removed = execute(added.doc, 'delete_entities', { entityIds: [b.upper] });
+    const removed = execute(added.doc, 'delete_entities', { ids: [b.upper] });
     expect(removed.document.entities[b.upper]).toBeDefined();
     const replayed = execute(added.doc, 'replay_history', {});
     expect(replayed.error).toBeUndefined();
@@ -208,6 +226,12 @@ describe('contact slice lifecycle', () => {
       "entity 'ghost' does not exist",
     );
     expect(errorsWith({ pairs: { [pairId]: { ...pair, friction: { mu: 'x' } } } }).join()).toContain('friction.mu');
+    expect(errorsWith({ pairs: { [pairId]: { ...pair, master: { entityId: b.lower, facesNear: [] } } } }).join()).toContain(
+      'master.facesNear',
+    );
+    expect(errorsWith({ pairs: { [pairId]: { ...pair, slave: { entityId: b.upper, pointsNear: [[0, 0, 1]] } } } }).join()).toContain(
+      'slave.facesNear',
+    );
     const second = { ...pair, id: 'cp-9.1' };
     expect(errorsWith({ pairs: { [pairId]: pair, 'cp-9.1': second }, pairOrder: [pairId, 'cp-9.1'] }).join()).toContain(
       'is used by another pair',

@@ -35,7 +35,7 @@ export interface ContactRow {
   readonly normalForce: number;
   /** Sum of |shear| x tributary area (friction force when the shear has one direction, as on a sliding flat interface). */
   readonly shearForce: number;
-  /** Largest penetration = max(0, -COPEN) (COPEN < 0 read as overclosure, pending VC-CNT-50). */
+  /** Largest penetration = max(0, -COPEN): COPEN < 0 is the overclosure (penetration = pressure / penalty slope on CalculiX 2.21, TECHNICAL_SPEC §13.2). */
   readonly maxPenetration: number;
   readonly maxSlip: number;
   /** Bounding box of the closed slave nodes (analysis length unit), null when the pair is open. */

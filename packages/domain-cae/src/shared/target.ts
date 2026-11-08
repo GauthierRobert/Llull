@@ -1,6 +1,7 @@
 /** Target schema + validation shared by constraints, loads, mesh refinements and thermal BCs. Targets are points; the mesher resolves them. */
 
-import type { AnalysisCase, FeaTarget } from '@core/model/analysis';
+import type { AnalysisCase } from '@core/model/analysis';
+import type { FeaTarget } from '@core/model/feaTarget';
 import { entityBoundsInDoc, boundsExtent } from '@core/geometry/bounds';
 import { is3D, type CadDocument } from '@core/model/types';
 import { vec3, z } from '@core/commands/schema';
