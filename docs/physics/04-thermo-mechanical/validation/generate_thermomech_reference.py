@@ -276,7 +276,7 @@ def main() -> None:
                                 "rows[*].unverified": "OR of the cte inputs' flags", "status of VC-TMC-06.a": "interference_possible"}))
 
     cases.append(case("VC-TMC-50", "staleness chain thermal -> thermo_static", None, "-", {"exact": True}, "05 TR-FEA-06 + PHY-03 TR-THM-32 + TR-TMC-10", "A",
-                      ["FR-TMC-14", "TR-TMC-10"], expected={"fea_report(ms).state": "stale", "compute_margins(ms).code": "FEA_RESULTS_STALE",
+                      ["FR-TMC-14", "TR-TMC-10"], expected={"analysis_report(ms).state": "stale", "compute_margins(ms).code": "FEA_RESULTS_STALE",
                                                             "check_thermo_mechanical(ms).items": ["TMC_THERMAL_RESULT_STALE"]}))
     cases.append(case("VC-TMC-63", "binding fit needs a human disposition", None, "-", {"exact": True}, "AF-34", "A", ["FR-TMC-13", "TR-TMC-32"],
                       expected={"dispose_fit_result(agent).code": "TMC_HUMAN_GATE", "documentHashUnchanged": True}))

@@ -827,7 +827,7 @@
     "TR-TMC-10"
    ],
    "expected": {
-    "fea_report(ms).state": "stale",
+    "analysis_report(ms).state": "stale",
     "compute_margins(ms).code": "FEA_RESULTS_STALE",
     "check_thermo_mechanical(ms).items": [
      "TMC_THERMAL_RESULT_STALE"
