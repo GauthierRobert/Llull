@@ -23,7 +23,7 @@ interface MarginRowData {
   readonly ms: number | null;
   readonly status: string;
   readonly factorApplied: number;
-  readonly allowable?: { readonly property: string; readonly basis: string };
+  readonly allowable?: { readonly property: string; readonly basis: string } | undefined;
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];
 }

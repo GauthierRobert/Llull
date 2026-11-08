@@ -11,6 +11,7 @@ import { dataOf, expectedCase, pinned, withMaterial, withinCase } from './fixtur
 interface Row {
   readonly msFrom: number | null;
   readonly msTo: number | null;
+  readonly statusFrom: string;
   readonly statusTo: string;
   readonly method: string;
   readonly reviewRequired: boolean;
