@@ -6,6 +6,7 @@
 import type { CadDocument } from '@core/model/types';
 import { createDynamicsModel, dynamicsIdTaken } from '@core/model/dynamics';
 import type { Vec3 } from '@core/model/vectors';
+import type { FlightController, FlightScenario } from './controlModel';
 
 /** [advance ratio J, C_T, C_P] with strictly increasing J. */
 type RotorTablePoint = readonly [advanceRatio: number, thrustCoefficient: number, powerCoefficient: number];
@@ -62,6 +63,10 @@ export interface FlightModel {
   readonly rotors: Readonly<Record<string, Rotor>>;
   /** Keyed by body id. */
   readonly bodyDrag: Readonly<Record<string, BodyDrag>>;
+  /** Absent until the first add_flight_controller (13 FLT M2). */
+  readonly controllers?: Readonly<Record<string, FlightController>>;
+  /** Absent until the first define_flight_scenario (13 FLT M2). */
+  readonly scenarios?: Readonly<Record<string, FlightScenario>>;
 }
 
 declare module '@core/model/documentExtensions' {
@@ -80,25 +85,52 @@ export function flightOf(doc: CadDocument): FlightModel {
 }
 
 /**
- * `flight` without the records `delete_dynamics_item` removes with `id`: the rotor of that id, and every rotor / drag of a body that is no
- * longer in `bodies`; null when nothing goes.
+ * `flight` without the records `delete_dynamics_item` removes with `id`: the rotor / controller / scenario of that id, every rotor / drag of a
+ * body that is no longer in `bodies`, every controller that lost its body or one of its rotors, every scenario that lost its body or its
+ * controller; null when nothing goes.
  */
 export function flightWithout(flight: FlightModel, id: string, bodies: Readonly<Record<string, unknown>>): FlightModel | null {
   const gone = (bodyId: string): boolean => !Object.hasOwn(bodies, bodyId);
   const rotors = Object.fromEntries(Object.entries(flight.rotors).filter(([key, rotor]) => key !== id && !gone(rotor.bodyId)));
   const bodyDrag = Object.fromEntries(Object.entries(flight.bodyDrag).filter(([key]) => !gone(key)));
-  const removed =
-    Object.keys(flight.rotors).length - Object.keys(rotors).length + Object.keys(flight.bodyDrag).length - Object.keys(bodyDrag).length;
-  return removed === 0 ? null : { rotors, bodyDrag };
+  const controllers = Object.fromEntries(
+    Object.entries(flight.controllers ?? {}).filter(
+      ([key, controller]) =>
+        key !== id && !gone(controller.bodyId) && controller.rotorIds.every((rotorId) => Object.hasOwn(rotors, rotorId)),
+    ),
+  );
+  const scenarios = Object.fromEntries(
+    Object.entries(flight.scenarios ?? {}).filter(
+      ([key, scenario]) =>
+        key !== id && !gone(scenario.bodyId) && (scenario.controllerId === null || Object.hasOwn(controllers, scenario.controllerId)),
+    ),
+  );
+  const next: FlightModel = {
+    rotors,
+    bodyDrag,
+    ...(flight.controllers === undefined ? {} : { controllers }),
+    ...(flight.scenarios === undefined ? {} : { scenarios }),
+  };
+  return flightRecordCount(next) === flightRecordCount(flight) ? null : next;
 }
 
 /** Number of records in a flight slice. */
-export const flightRecordCount = (flight: FlightModel): number => Object.keys(flight.rotors).length + Object.keys(flight.bodyDrag).length;
+export const flightRecordCount = (flight: FlightModel): number =>
+  Object.keys(flight.rotors).length +
+  Object.keys(flight.bodyDrag).length +
+  Object.keys(flight.controllers ?? {}).length +
+  Object.keys(flight.scenarios ?? {}).length;
+
+/** True when `id` names a rotor, a flight controller or a flight scenario of `flight`. */
+export function flightIdTaken(flight: FlightModel, id: string): boolean {
+  return Object.hasOwn(flight.rotors, id) || Object.hasOwn(flight.controllers ?? {}, id) || Object.hasOwn(flight.scenarios ?? {}, id);
+}
 
 /**
- * True when `id` is taken in the shared id space of the dynamics plugin: any `doc.dynamics` record or a rotor of `doc.flight`. Every plugin
- * command that creates a dynamics record checks it (add_motion_profile, in core, cannot: delete_dynamics_item refuses an id that names both).
+ * True when `id` is taken in the shared id space of the dynamics plugin: any `doc.dynamics` record or a rotor, controller or scenario of
+ * `doc.flight`. Every plugin command that creates a dynamics record checks it (add_motion_profile, in core, cannot: delete_dynamics_item
+ * refuses an id that names both).
  */
 export function idTakenInDynamicsOrFlight(doc: CadDocument, id: string): boolean {
-  return dynamicsIdTaken(doc.dynamics ?? createDynamicsModel(), id) || (doc.flight !== undefined && Object.hasOwn(doc.flight.rotors, id));
+  return dynamicsIdTaken(doc.dynamics ?? createDynamicsModel(), id) || (doc.flight !== undefined && flightIdTaken(doc.flight, id));
 }

@@ -149,7 +149,9 @@ export const inspectDynamics = defineCommand({
       `${Object.keys(dynamics.motors).length} motor(s), ${Object.keys(dynamics.propellers).length} propeller(s)` +
       `${Object.keys(dynamics.cylinders ?? {}).length > 0 ? `, ${Object.keys(dynamics.cylinders ?? {}).length} cylinder(s)` : ''}` +
       (doc.flight !== undefined
-        ? `, ${Object.keys(doc.flight.rotors).length} rotor(s), ${Object.keys(doc.flight.bodyDrag).length} body drag(s)`
+        ? `, ${Object.keys(doc.flight.rotors).length} rotor(s), ${Object.keys(doc.flight.bodyDrag).length} body drag(s)` +
+          `${doc.flight.controllers === undefined ? '' : `, flight controller(s) ${Object.keys(doc.flight.controllers).join(', ') || 'none'}`}` +
+          `${doc.flight.scenarios === undefined ? '' : `, flight scenario(s) ${Object.keys(doc.flight.scenarios).join(', ') || 'none'}`}`
         : '');
     const mobilityText =
       structure !== null

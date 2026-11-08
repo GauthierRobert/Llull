@@ -18,7 +18,7 @@ import { createConstraintPhysics } from './constraintPhysics';
 import { springTendonName, toMjcf } from './mjcf';
 import { createServoSchedule } from './servoSchedule';
 import { createBodyStateReader, type BodyStateReader } from './bodyKinematics';
-import { relativeQuaternion } from './quaternion';
+import { relativeQuaternion } from '@lib/quaternion';
 
 interface JointSlot {
   readonly id: string;
@@ -43,6 +43,7 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     });
     const bodies = model.bodies.map((body) => ({ id: body.id, index: lookup(mujoco, mjModel, OBJECT_BODY, body.id) }));
     for (const body of model.bodies) if (body.joint !== null) data.qvel[jointDof(joints, body.joint.id)] = body.joint.initialVelocity;
+    model.bodies.forEach((body, i) => setInitialTwist(mjModel, data, body, bodies[i]?.index ?? 0));
     mujoco.mj_forward(mjModel, data);
     const initialOrientation = new Map(bodies.map(({ id, index }) => [id, readQuaternion(data, index)]));
     const stateBodies = new Set(model.bodyStates ?? []);
@@ -243,12 +244,8 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
         out.ledger.forEach((energy, k) => {
           ledgerCumulative[k] = (ledgerCumulative[k] ?? 0) + energy;
         });
-        for (const { body, force } of out.bodyForces) {
-          const index = bodies.find((entry) => entry.id === body)?.index;
-          if (index !== undefined)
-            for (let axis = 0; axis < 3; axis++)
-              data.xfrc_applied[6 * index + axis] = (data.xfrc_applied[6 * index + axis] ?? 0) + (force[axis] ?? 0);
-        }
+        for (const { body, force } of out.bodyForces) addBodyWrench(data, bodies, body, 0, force);
+        for (const { body, moment } of out.bodyMoments ?? []) addBodyWrench(data, bodies, body, 3, moment);
       }
       schedule.update();
       constraint?.prepare(data);
@@ -370,6 +367,31 @@ function jointIndex(joints: readonly JointSlot[], id: string): number {
   const index = joints.findIndex((joint) => joint.id === id);
   if (index < 0) throw new Error(`actuator joint '${id}' is not a moving joint of the model`);
   return index;
+}
+
+/** Add `vector` to `xfrc_applied` of body `id` at `offset` (0 = force, 3 = moment); a body outside the model gets nothing. */
+function addBodyWrench(data: MjData, bodies: readonly { id: string; index: number }[], id: string, offset: 0 | 3, vector: Vec3): void {
+  const index = bodies.find((entry) => entry.id === id)?.index;
+  if (index === undefined) return;
+  for (let axis = 0; axis < 3; axis++) {
+    const slot = 6 * index + offset + axis;
+    data.xfrc_applied[slot] = (data.xfrc_applied[slot] ?? 0) + (vector[axis] ?? 0);
+  }
+}
+
+/**
+ * Initial twist of a free body: its freejoint sits at the centre of mass with qvel = [linear (world axes), angular (body axes)], and the body
+ * axes are the world axes at t = 0, so both go in as given.
+ */
+function setInitialTwist(model: MjModel, data: MjData, body: SimulationModel['bodies'][number], index: number): void {
+  const twist = body.initialTwist;
+  if (twist === undefined || body.joint !== null || body.fixed) return;
+  const dof = model.body_dofadr[index] ?? -1;
+  if (dof < 0) return;
+  for (let axis = 0; axis < 3; axis++) {
+    data.qvel[dof + axis] = twist.linear[axis] ?? 0;
+    data.qvel[dof + 3 + axis] = twist.angular[axis] ?? 0;
+  }
 }
 
 function jointDof(joints: readonly JointSlot[], id: string): number {

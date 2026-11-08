@@ -13,7 +13,7 @@ import { formatLength } from '@core/model/units';
 import { toMetres } from '@core/model/units';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { symmetricEigen, type Symmetric3 } from '@lib/symmetricEigen';
-import { flightRecordCount, flightWithout, idTakenInDynamicsOrFlight } from '../flight/model';
+import { flightIdTaken, flightRecordCount, flightWithout, idTakenInDynamicsOrFlight } from '../flight/model';
 
 /** The document's dynamics model (empty when absent). */
 export function dynamicsOf(doc: CadDocument): DynamicsModel {
@@ -143,26 +143,26 @@ export const setGravity = defineCommand({
 });
 
 /**
- * @affects removes 1 dynamics record (or rotor of doc.flight); removing a body also removes its joints, springs, rotors and body drag, and removing a joint its transmissions, joint physics, load schedules, motors and propellers
+ * @affects removes 1 dynamics record (or rotor / flight controller / flight scenario of doc.flight); removing a body also removes its joints, springs, rotors, body drag, flight controllers and scenarios, removing a rotor the controllers that command it (and their scenarios), and removing a joint its transmissions, joint physics, load schedules, motors and propellers
  * @failure unknown id -> no-op
  */
 export const deleteDynamicsItem = defineCommand({
   name: 'delete_dynamics_item',
   annotations: { destructive: true },
   description:
-    'Remove a rigid body, joint, transmission (add_transmission), joint physics (set_joint_physics, by its joint id), load schedule (add_load_schedule), motor, propeller, cylinder pressure, point spring (add_spring), motion profile (add_motion_profile), rotor (add_rotor) or time-series reference (add_reference_data with series) from the physics model by id. Cascades: a body ' +
-    'takes its joints, springs, rotors and body drag (set_body_drag) with it; a joint takes the transmissions, its joint physics, load schedules, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
+    'Remove a rigid body, joint, transmission (add_transmission), joint physics (set_joint_physics, by its joint id), load schedule (add_load_schedule), motor, propeller, cylinder pressure, point spring (add_spring), motion profile (add_motion_profile), rotor (add_rotor), flight controller (add_flight_controller), flight scenario (define_flight_scenario) or time-series reference (add_reference_data with series) from the physics model by id. Cascades: a body ' +
+    'takes its joints, springs, rotors, body drag (set_body_drag), flight controllers and flight scenarios with it; a rotor takes the flight controllers commanding it, a controller the scenarios flown with it; a joint takes the transmissions, its joint physics, load schedules, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
     'A time-series reference goes with the joint or motor it measures. A profile that a motor drive or a load schedule still uses is refused (the users are listed): change the drive first. Entities (geometry) are never deleted.',
   params: z.object({
     id: z
       .string()
       .describe(
-        'Id of the body / joint / transmission / load schedule / motor / propeller / cylinder / spring / motion profile / time-series reference / rotor (add_rotor) to remove.',
+        'Id of the body / joint / transmission / load schedule / motor / propeller / cylinder / spring / motion profile / time-series reference / rotor (add_rotor) / flight controller / flight scenario to remove.',
       ),
   }),
   run: (doc, { id }): CommandResult => {
     const dynamics = dynamicsOf(doc);
-    const rotor = doc.flight !== undefined && Object.hasOwn(doc.flight.rotors, id);
+    const rotor = doc.flight !== undefined && flightIdTaken(doc.flight, id);
     const recorded = dynamicsIdTaken(dynamics, id);
     if (!recorded && !rotor) return failer(doc, 'delete_dynamics_item')(`no dynamics record '${id}'`);
     // add_motion_profile (core) cannot see doc.flight, so a profile may share a rotor's id: refuse rather than remove both
@@ -171,7 +171,7 @@ export const deleteDynamicsItem = defineCommand({
         doc,
         'delete_dynamics_item',
       )(
-        `id '${id}' names both a rotor and another dynamics record; it is ambiguous, nothing was removed (recreate one of them under another id)`,
+        `id '${id}' names both a flight record (rotor, controller or scenario) and another dynamics record; it is ambiguous, nothing was removed (recreate one of them under another id)`,
       );
     const users = Object.values(dynamics.drives ?? {}).filter((drive) => drive.profile === id);
     if (users.length > 0)

@@ -1,6 +1,6 @@
-/** Unit-quaternion algebra of the adapter ([w, x, y, z], MuJoCo's order). */
+/** Unit-quaternion algebra ([w, x, y, z], MuJoCo's order): shared by the physics adapter and the flight laws. */
 
-import type { Quaternion } from '@core/model/vectors';
+import type { Quaternion } from '../model/vectors';
 
 /** Quaternion product a · b. */
 export function multiplyQuaternion(a: Quaternion, b: Quaternion): Quaternion {

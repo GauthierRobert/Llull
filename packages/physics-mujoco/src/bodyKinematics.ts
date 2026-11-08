@@ -6,7 +6,7 @@
 import type { BodyKinematics } from '@core/dynamics/physicsEngine';
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import type { MjData, MjModel, MujocoModule } from './bindings';
-import { multiplyQuaternion, relativeQuaternion } from './quaternion';
+import { multiplyQuaternion, relativeQuaternion } from '@lib/quaternion';
 
 interface BodySlot {
   readonly id: string;

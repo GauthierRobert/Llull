@@ -1,6 +1,6 @@
 # Gap 13 FLT — Technical specification
 
-Specification 2026-11-02; FLT-M1 built 2026-11-07 (§13). Ids `TR-FLT-nn`. Validation cases in [validation/README.md](validation/README.md).
+Specification 2026-11-02; FLT-M1 built 2026-11-07 (§13); FLT-M2 built 2026-11-08 (§14). Ids `TR-FLT-nn`. Validation cases in [validation/README.md](validation/README.md).
 
 ## 1. Current state in llull (audit 2026-11-02, source read, nothing executed)
 
@@ -198,7 +198,8 @@ exchange (VC-FLT-10, no network beyond localhost).
 
 ## 11. Open questions
 
-- FLT-D1: keep the controller in TS inside the engine adapter, or a Rust crate from the start? Default: TS (C7, measure first).
+- FLT-D1: keep the controller in TS inside the engine adapter, or a Rust crate from the start? **Decided: TS** (§14; measured: a 60 s
+  closed-loop flight at 2 kHz runs in 2.6 s, inside the 5 s budget).
 - FLT-D2: bundle ArduPilot SITL binaries (GPL-3.0) or detect a user install? Default: detect, never bundle (legal check).
 - FLT-D3: default rotor table for unknown props: none (refuse) vs a generic APC-like table flagged grade C. **Decided: refuse** (§13).
 - FLT-D4..D8 decided with FLT-M1 (§13): world wrenches from the laws, plugin slice `flight`, world twist in the port, constant rotor speed
@@ -261,3 +262,72 @@ Not in M1: VC-FLT-02 (needs an initial body twist: the scenario of FLT-M2), VC-F
   held at the first row and flagged). Air density is a per-record constant (default ISA sea level), not yet `standard_atmosphere` at altitude.
 - **Energy**: rotor and drag work on the bodies is not integrated into the balance (the engine reports joint work only); a run with energy
   on says so (`FLT_ENERGY_UNCOUNTED`) instead of leaving it unexplained in `balanceErrorJ`.
+
+## 14. Implementation status — FLT-M2 (2026-11-08)
+
+**Built (TR-FLT-05, the steady + gust part of TR-FLT-04, FR-FLT-07 / 08 / 16 for the flight report).**
+
+| Item                                                                                                                                                                                                                                                                                                                                        | Where                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Port: `ActuatorBlock.advance` may return `bodyMoments` (world N·m about the centre of mass); `SimulationBody.initialTwist` (free body: COM velocity + angular velocity at t = 0, world). MuJoCo adds the moments to `xfrc_applied[3..5]` and writes the twist into the freejoint `qvel` (`body_dofadr`)                                     | `packages/core/src/dynamics/physicsEngine.ts`, `packages/physics-mujoco/src/mujocoPhysics.ts` |
+| Quaternion product / relative rotation moved from the adapter to `@lib/quaternion` (shared by the adapter and the controller, not duplicated)                                                                                                                                                                                               | `packages/core/src/lib/quaternion.ts`                                                         |
+| Slice `doc.flight.controllers`, `doc.flight.scenarios` (optional tables), load validation (schema + keys, rotors on the body, set-point order, controller of the scenario's body); `delete_dynamics_item` removes them and cascades body -> rotors -> controllers -> scenarios                                                              | `flight/{controlModel,model,document}.ts`, `commands/bodies.ts`                               |
+| Cascaded PID: position (P, speed limits) -> velocity (PID, m/s² out) -> thrust vector m(a - g) with a tilt limit -> attitude set-point (thrust axis along it, heading) -> quaternion error (P) -> body rate (PID, rad/s² out, rate limits) -> τ = Jα + ω × Jω; derivative on the measurement, conditional integration + clamp (anti-windup) | `flight/controller.ts`                                                                        |
+| Mixer: effectiveness B (4 × N: collective along the mean rotor axis, r × a - s·κ·a with κ = Cp·D / (2π·Ct) at J = 0), pseudo-inverse Bᵀ(BBᵀ)⁻¹ or an explicit matrix, rank of B·M (FLT_MIXER_RANK), allocation giving up yaw first then clamping; thrust -> rpm by the inverse rotor law at J = 0                                           | `flight/mixer.ts`                                                                             |
+| The loop as an engine actuator block: controller every 1/rateHz (whole physics steps, FLT_CONTROL_RATE), first-order rotor lag, every rotor's wrench under the wind, exact per-step peaks / integrals / counts in the aux state; combined with a datasheet-motor block when the model has one                                               | `flight/flightBlock.ts`, `flight/flightRun.ts`                                                |
+| Wind: steady + 1-cosine gusts on the scenario, on rotor inflow and body drag                                                                                                                                                                                                                                                                | `flight/wind.ts`, `flight/flightLoads.ts`                                                     |
+| Metrics (attitude / rate peaks, tracking, events + recovery, saturation, thrust margin, shaft energy / power, per-rotor final state, figure of merit, J validity, `defaulted` -> `unverified`), verdict PASS / MARGINAL / FAIL against named limits, timestep check (GCI of the max tilt over dt, dt/2, dt/4)                               | `flight/{flightMetrics,flightVerdict}.ts`, `commands/flightRun.ts`                            |
+| Commands `add_flight_controller`, `define_flight_scenario` (mutating), `run_flight`, `flight_report` (read-only, kernel-optional)                                                                                                                                                                                                           | `commands/flightControl.ts`, `commands/flightRun.ts`                                          |
+| Validation plans `sc-flt-01-hover`, `sc-flt-02-gust` (golden pins + replay equality)                                                                                                                                                                                                                                                        | `validation/plans/`, `tests/golden/fltPlans.test.ts`                                          |
+
+**Validation (`tests/unit/flight/flightClosedLoop.test.ts`, MuJoCo 3.16, dt 0.5 ms, controller 400 Hz).** VC-FLT-09: the reference quad,
+knocked at t = 0 (0.36 m/s, 0.37 rad/s), returns to a hover at 4082.56 rpm per rotor (expected 4082.5), 2.73364 N and 19.0122 W per rotor,
+76.049 W shaft and 51.31 W ideal in total (gate 0.1 %, spec tolerance 1 %); with the controller update disabled the same test fails (the
+vehicle tumbles: FLT_DIVERGED at 4.53 s). VC-FLT-06: static APC 10x4.7 at 6528 rpm: 7.84039 N, 88.5698 W, ideal 62.3082 W, FM 0.70349 (gate
+0.5 %). VC-FLT-07: 3 m/s 1-cosine gust of 1 s in hover: max tilt, recovery, saturation fraction and verdict present and finite, two runs
+bit-identical (JSON); measured max tilt 0.3967°, the position error stays inside the 0.1 m band (recovery 0 s), saturation 0, verdict
+PASS. VC-FLT-14: the gust's max tilt at 0.5 / 0.25 / 0.125 ms converges monotonically (0.396719 / 0.396723 / 0.396726°, observed order 0.97) with a GCI of 7.9e-6 (gate 1 %). VC-FLT-02:
+torque-free body (I = 0.01 / 0.02 / 0.03 kg·m², 1 rev/s plus 1e-3 rad/s perturbation, 10 s, zero gravity): |H| drift < 1e-6 on all three
+axes, spin about the intermediate axis reverses, the other two stay within 1 %. Also: step response (1.5 m offset + 30° heading: final
+error < 2 cm and < 0.5°), initial twist (x = v t to 1e-9), saturation (maxRpm 4400: thrust-margin and saturation checks FAIL), a
+sign-inverted mixer (run_flight FLT_DIVERGED, flight_report FAIL), refusals (FLT_SCENARIO_UNKNOWN, FLT_CONTROL_RATE, FLT_RUN_TOO_LONG incl.
+the timestep-check budget, FLT_BODY_NOT_FREE, FLT_NO_ENGINE). Pure laws in `flightControlLaws.test.ts` (mixer inverse of a quad X, ranks,
+yaw-first allocation, gust shape, attitude algebra, verdict bands, block composition, controller trim and anti-windup).
+
+**Decisions.**
+
+- **FLT-D9 (flight_report without runId)**: `flight_report` takes the scenario and re-runs it exactly as `run_flight` (deterministic,
+  read-only) instead of reading a stored run by `runId`: `run_flight` records nothing (§4), storing traces would grow the document and a
+  history replay would re-simulate them. `record_flight_run` stays the path for host runs (SITL, M6). Rejected: a mutating `run_flight`
+  that stores its summary.
+- **FLT-D10 (where the loop runs)**: the controller, mixer, lags and every rotor live in an engine `ActuatorBlock` (the existing port for
+  stateful actuators: `advance` once per step at the midpoint state, state in `aux`), which needed `bodyMoments` in its output. The rotors
+  leave the pure `loads` callback during `run_flight` (body drag stays there); `simulate_motion` keeps the M1 path unchanged. Rejected: a
+  stateful `loads` closure (the port requires it pure) and a second engine loop in the adapter.
+- **FLT-D11 (gains)**: normalised gains (the velocity loop outputs m/s², the rate loop rad/s²; the mass and the reference body's inertia
+  come from the model), so the defaults fly any multirotor size; every defaulted input is listed in the record and in the results'
+  `defaulted`, which makes them `unverified` (FR-FLT-08). Rejected: raw N / N·m gains (no default can suit every vehicle).
+- **FLT-D12 (set-points)**: piecewise-constant holds; `position` is the offset of the centre of mass from its start, in metres, world axes
+  (Z up); `yawDeg` the heading about world Z from the start heading; the first set-point is at t = 0. Rejected: absolute document
+  coordinates (an agent does not know the centre of mass) and ramps (a step is the standard response test; a ramp can be a later field).
+- **FLT-D13 (wind in M2)**: steady + 1-cosine gusts on the scenario now, because VC-FLT-07 / 14 need a gust; Dryden turbulence and a
+  document-level `set_wind` stay in M4. The wind acts on rotor inflow and body drag through the air-relative body state.
+- **FLT-D14 (mixer)**: default pseudo-inverse of the geometry; allocation gives up yaw before clamping (roll / pitch / thrust keep
+  priority); `FLT_MIXER_RANK` is checked when the controller is added (arms about the hub centroid, no mass properties needed) and again
+  at run time about the actual centre of mass. Rejected: a fixed quad-X table (no hexa / octo / tilted rotors).
+- **FLT-D15 (thrust margin, verdict bands)**: thrust margin = 1 - weight / Σ T(maxRpm, J = 0) along the thrust axis (share of the maximum
+  thrust left at hover; 0.3 = T/W 1.43). A check passing within 10 % of its limit is MARGINAL. Default limits: margin >= 0.3, saturation
+  <= 5 %, tilt <= 45°, final error <= 0.1 m, recovery <= 5 s; all overridable, `limitsDefaulted` lists the defaults used.
+- **FLT-D16 (start state)**: controlled rotors start at the speed of the first controller update at rest (trimmed), not at 0 rpm, so a run
+  measures the flight, not a spin-up transient. Rotors the controller does not command keep their own `rpm`.
+- **FLT-D17 (divergence)**: `run_flight` refuses a closed loop whose thrust axis passes 90° (FLT_DIVERGED, time and state in the error
+  detail, §4); `flight_report` gives a FAIL verdict with a `diverged` check instead, so an owner still gets "will it fly: no".
+- **FLT-D18 (vehicle)**: no `define_flight_vehicle` yet: the controller and the scenario name one free body (its subtree's mass for the
+  thrust, the body's own inertia for the torque). Multi-body vehicles (servo-pivoted wings) come with FLT-M4.
+- **Budgets**: at most 600 000 physics steps per run (FLT_RUN_TOO_LONG; a timestep check flies its finest run first) and 6001 samples;
+  peaks, integrals and counts are exact per step, recovery uses the samples (50 Hz default). Measured: the 60 s hover at 2 kHz runs in 2.6 s (budget 5 s, §8).
+
+**Not in M2 / remainder.** Host / UI: a `flight` toolset view in `@protocol/toolsets` (the four commands are listed under `assembly`), a
+report panel and a viewport replay of a run (`run_flight` returns the series; `render_motion` does not read them yet). Later milestones:
+motor / ESC / battery chain (M3), aero tables, pivot servos and Dryden turbulence (M4), trim / linearisation and `export_flight_loads`
+(M5), SITL (M6).

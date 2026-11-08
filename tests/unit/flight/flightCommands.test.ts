@@ -211,7 +211,11 @@ describe('flight slice lifecycle', () => {
       segments: [{ kind: 'dwell', duration: 1 }],
     });
     expect(profile.document.dynamics?.profiles?.['r1']).toBeDefined();
-    expectNoOp(execute(profile.document, 'delete_dynamics_item', { id: 'r1' }), profile.document, "id 'r1' names both a rotor");
+    expectNoOp(
+      execute(profile.document, 'delete_dynamics_item', { id: 'r1' }),
+      profile.document,
+      "id 'r1' names both a flight record (rotor, controller or scenario)",
+    );
   });
 
   it('deleting a record that is not a flight record leaves doc.flight as it was', () => {

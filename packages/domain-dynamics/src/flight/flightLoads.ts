@@ -9,6 +9,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { add3 } from '@lib/vec3';
 import type { BodyDrag } from './model';
 import { bodyDragForce, compileRotor, rotorOutput, type RotorRuntime } from './rotorLaw';
+import { airRelative } from './wind';
 
 type Loads = (state: SimulationState) => AppliedLoads;
 
@@ -49,13 +50,20 @@ export function compileFlight(
   };
 }
 
-/** `base` plus the rotor and drag wrenches of `runtime` (a body the engine gave no state for gets none). */
-export function withFlightLoads(base: Loads, runtime: FlightRuntime): Loads {
+/**
+ * `base` plus the rotor and drag wrenches of `runtime` (a body the engine gave no state for gets none); with `wind` (world air velocity, m/s,
+ * at time t) the laws read the body velocity relative to the air.
+ */
+export function withFlightLoads(base: Loads, runtime: FlightRuntime, wind?: (time: number) => Vec3): Loads {
   return (state) => {
     const loads = base(state);
     const bodyForces: Record<string, Vec3> = { ...loads.bodyForces };
     const bodyMoments: Record<string, Vec3> = { ...loads.bodyMoments };
-    const stateOf = (id: string): BodyKinematics | undefined => state.bodies?.[id];
+    const air = wind?.(state.time);
+    const stateOf = (id: string): BodyKinematics | undefined => {
+      const body = state.bodies?.[id];
+      return body === undefined || air === undefined ? body : airRelative(body, air);
+    };
     for (const rotor of runtime.rotors) {
       const body = stateOf(rotor.rotor.bodyId);
       if (body === undefined) continue;

@@ -44,7 +44,94 @@ const bodyDrag = z.strictObject({
   airDensity: z.number().positive(),
 });
 
-const flightSchema = z.strictObject({ rotors: z.record(z.string(), rotor), bodyDrag: z.record(z.string(), bodyDrag) });
+const positive = z.number().positive();
+const nonNegativeVec3 = z.tuple([nonNegative, nonNegative, nonNegative]);
+const pid = z.strictObject({ p: nonNegativeVec3, i: nonNegativeVec3, d: nonNegativeVec3 });
+
+const controller = z.strictObject({
+  id: text,
+  bodyId: text,
+  rotorIds: z.array(text).min(1).max(64),
+  rateHz: z.number().min(1).max(5000),
+  gains: z.strictObject({ position: nonNegativeVec3, velocity: pid, attitude: nonNegativeVec3, rate: pid }),
+  limits: z.strictObject({
+    maxTiltDeg: positive.max(80),
+    maxHorizontalSpeedMps: positive,
+    maxVerticalSpeedMps: positive,
+    maxRateDegS: z.tuple([positive, positive, positive]),
+  }),
+  minRpm: nonNegative,
+  maxRpm: positive.max(200000),
+  motorTimeConstantS: nonNegative.max(2),
+  mixer: z.array(z.tuple([finite, finite, finite, finite])).nullable(),
+  defaulted: z.array(z.string()),
+});
+
+const scenario = z.strictObject({
+  id: text,
+  bodyId: text,
+  controllerId: text.nullable(),
+  durationS: positive.max(600),
+  setpoints: z
+    .array(z.strictObject({ t: nonNegative, position: vec3, yawDeg: finite }))
+    .min(1)
+    .max(1000),
+  initialVelocity: vec3,
+  initialAngularVelocity: vec3,
+  wind: z.strictObject({ steady: vec3, gusts: z.array(z.strictObject({ startS: nonNegative, durationS: positive, peak: vec3 })).max(100) }),
+  settleBandM: positive,
+  defaulted: z.array(z.string()),
+});
+
+const flightSchema = z.strictObject({
+  rotors: z.record(z.string(), rotor),
+  bodyDrag: z.record(z.string(), bodyDrag),
+  controllers: z.record(z.string(), controller).optional(),
+  scenarios: z.record(z.string(), scenario).optional(),
+});
+
+/** Controller and scenario checks the schema cannot express (keys, rotors on the body, set-point order, the controller's body). */
+function controlErrors(
+  slice: z.infer<typeof flightSchema>,
+  dynamicsIds: ReadonlySet<string>,
+  body: (at: string, id: string) => void,
+): string[] {
+  const errors: string[] = [];
+  const controllers = slice.controllers ?? {};
+  const taken = (at: string, key: string): void => {
+    if (dynamicsIds.has(key) || Object.hasOwn(slice.rotors, key)) errors.push(`${at}: id '${key}' is also a dynamics record or a rotor`);
+  };
+  for (const [key, entry] of Object.entries(controllers)) {
+    const at = `flight.controllers.${key}`;
+    if (entry.id !== key) errors.push(`${at}.id must equal its key`);
+    taken(at, key);
+    body(at, entry.bodyId);
+    if (new Set(entry.rotorIds).size !== entry.rotorIds.length) errors.push(`${at}.rotorIds: a rotor is listed twice`);
+    for (const rotorId of entry.rotorIds) {
+      const rotor = Object.hasOwn(slice.rotors, rotorId) ? slice.rotors[rotorId] : undefined;
+      if (rotor === undefined) errors.push(`${at}.rotorIds: '${rotorId}' is not a rotor`);
+      else if (rotor.bodyId !== entry.bodyId) errors.push(`${at}.rotorIds: rotor '${rotorId}' is not on body '${entry.bodyId}'`);
+    }
+    if (!(entry.minRpm < entry.maxRpm)) errors.push(`${at}: minRpm must be below maxRpm`);
+    if (entry.mixer !== null && entry.mixer.length !== entry.rotorIds.length) errors.push(`${at}.mixer: one row per rotor`);
+  }
+  for (const [key, entry] of Object.entries(slice.scenarios ?? {})) {
+    const at = `flight.scenarios.${key}`;
+    if (entry.id !== key) errors.push(`${at}.id must equal its key`);
+    taken(at, key);
+    if (Object.hasOwn(controllers, key)) errors.push(`${at}: id '${key}' is also a flight controller`);
+    body(at, entry.bodyId);
+    const flying =
+      entry.controllerId === null ? undefined : Object.hasOwn(controllers, entry.controllerId) ? controllers[entry.controllerId] : null;
+    if (flying === null) errors.push(`${at}.controllerId: '${entry.controllerId ?? ''}' is not a flight controller`);
+    else if (flying !== undefined && flying.bodyId !== entry.bodyId) errors.push(`${at}.controllerId: it flies another body`);
+    const times = entry.setpoints.map((setpoint) => setpoint.t);
+    if (times[0] !== 0 || times.some((t, i) => i > 0 && t <= (times[i - 1] ?? Infinity)) || times.some((t) => t >= entry.durationS))
+      errors.push(`${at}.setpoints: times must start at 0, strictly increase and stay below durationS`);
+    if (entry.wind.gusts.some((gust) => gust.startS >= entry.durationS)) errors.push(`${at}.wind.gusts: a gust starts after the run`);
+  }
+  return errors;
+}
 
 /** Moving rigid bodies of the raw document: id -> fixed. */
 function bodiesOf(raw: Record<string, unknown>): ReadonlyMap<string, boolean> {
@@ -108,7 +195,7 @@ function referenceErrors(
     if (entry.cdaM2.every((value) => value === 0)) errors.push(`${at}.cdaM2 must have a component > 0`);
     body(at, entry.bodyId);
   }
-  return errors;
+  return [...errors, ...controlErrors(slice, dynamicsIds, body)];
 }
 
 /** `DocumentExtension` for `CadDocument.flight`: input data only (nothing is derived). */
@@ -117,7 +204,7 @@ export const flightDocument: DocumentExtension = {
     const slice = raw['flight'];
     if (slice === undefined) return [];
     // zod rebuilds records by assignment, so an own "__proto__" key would vanish from the parsed copy: read the keys on the raw value
-    const reserved = (['rotors', 'bodyDrag'] as const).flatMap((table) => {
+    const reserved = (['rotors', 'bodyDrag', 'controllers', 'scenarios'] as const).flatMap((table) => {
       const records = isRecord(slice) ? slice[table] : undefined;
       return isRecord(records)
         ? Object.keys(records)

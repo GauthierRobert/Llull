@@ -6,6 +6,8 @@ export interface MjModel {
   readonly jnt_qposadr: Int32Array;
   readonly jnt_dofadr: Int32Array;
   readonly body_rootid: Int32Array;
+  /** First DOF of each body's joints (a free body: 3 linear, world axes, then 3 angular, body axes). */
+  readonly body_dofadr: Int32Array;
   /** Actuator gain / bias parameters, 10 per actuator (intvelocity: gain [kp], bias [0, -kp, -kv]). */
   readonly actuator_gainprm: Float64Array;
   readonly actuator_biasprm: Float64Array;

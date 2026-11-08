@@ -30,7 +30,7 @@ import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtu
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import { flatDocument } from '../unit/vibroacoustics/fixtures';
-import { airframe, rotorParams } from '../unit/flight/flightFixture';
+import { quadDrone, rotorParams } from '../unit/flight/flightFixture';
 import {
   bemNozzles,
   bemParams,
@@ -521,6 +521,19 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
         grade: 'B',
       };
       const steps: [string, Record<string, unknown>][] = [
+        ['add_flight_controller', { body: 'frame', maxRpm: 7000, id: 'fc' }],
+        [
+          'define_flight_scenario',
+          {
+            body: 'frame',
+            controller: 'fc',
+            durationS: 2,
+            id: 'hover',
+            setpoints: [{ t: 0 }, { t: 1, position: [0, 0, 1], yawDeg: 5 }],
+            wind: { steady: [1, 0, 0], gusts: [{ startS: 0.5, durationS: 0.5, peak: [0, 2, 0] }] },
+          },
+        ],
+        ['define_flight_scenario', { body: 'frame', durationS: 1, id: 'tumble', initialAngularVelocity: [0, 1, 0] }],
         ['add_rotor', rotorParams({ id: 'r-static', hub: [10, 0, 0], spinInertiaKgM2: 1e-5 })],
         [
           'add_rotor',
@@ -533,7 +546,7 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
         ],
         ['set_body_drag', { body: 'frame', cdaM2: [0.01, 0.02, 0.05] }],
       ];
-      return steps.reduce((doc, [name, params]) => execute(doc, name, params).document, airframe(1, [0.01, 0.01, 0.01], [0, 0, -9.81]));
+      return steps.reduce((doc, [name, params]) => execute(doc, name, params).document, quadDrone());
     },
     query: { name: 'inspect_dynamics', params: constant({}) },
     mutate: { name: 'set_body_drag', params: constant({ body: 'frame', cdaM2: [0.1, 0.1, 0.1] }) },
