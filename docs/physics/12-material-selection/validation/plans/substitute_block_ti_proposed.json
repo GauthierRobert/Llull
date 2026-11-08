@@ -6,6 +6,6 @@
  {"command": "mass_properties", "params": {"entityId": "$block"}},
  {"command": "substitute_material", "params": {
    "entityIds": ["$block"], "from": "aa7075_t6", "to": "ti6al4v_annealed",
-   "designRule": "same_geometry", "include": ["mass", "stiffness"]
+   "designRule": "same_geometry", "include": ["mass", "stiffness", "margins"]
  }}
 ]

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import { marginBar } from '../cae/marginsFixtures';
 import { dataOf, empty, expectedCase, run, step, syntheticDocument, withBlock, withMaterial, workedDocument } from './fixtures';
 
 interface Item {
@@ -55,6 +56,23 @@ describe('check_material_selection', () => {
     const scoped = run(syn.doc, 'check_material_selection', { entityIds: [syn.id] });
     expect((dataOf(scoped)['materials'] as { material: string }[]).map((row) => row.material)).toEqual(['syn_b']);
     expect((dataOf(run(both.doc, 'check_material_selection', {}))['materials'] as { entityIds: string[] }[])[0]?.entityIds).toHaveLength(2);
+  });
+
+  it('SEL_FEA_STALE_AFTER_SUBSTITUTION: a solved analysis over the checked entities whose inputs changed since the solve (05 staleness hash)', () => {
+    const bar = marginBar();
+    expect(codes(run(bar.recorded, 'check_material_selection', {}))).not.toContain('SEL_FEA_STALE_AFTER_SUBSTITUTION');
+    const edited = execute(bar.recorded, 'add_fea_load', {
+      analysisId: bar.analysisId,
+      name: 'g',
+      kind: 'gravity',
+      vector: [0, 0, -1],
+    }).document;
+    const result = run(edited, 'check_material_selection', {});
+    const stale = items(result).find((item) => item.code === 'SEL_FEA_STALE_AFTER_SUBSTITUTION');
+    expect(stale).toMatchObject({ severity: 'warning', ids: [bar.analysisId, bar.boxId] });
+    expect(dataOf(result)['status']).toBe('warn');
+    const other = withBlock(edited, 'steel');
+    expect(codes(run(other.doc, 'check_material_selection', { entityIds: [other.id] }))).not.toContain('SEL_FEA_STALE_AFTER_SUBSTITUTION');
   });
 
   it('is pure', () => {

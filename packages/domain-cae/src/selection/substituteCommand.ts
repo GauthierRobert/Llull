@@ -9,6 +9,7 @@ import { issue, REVIEW_SENTENCE, refuseSel } from './codes';
 import { DESIGN_RULES, isStrengthRule, ratiosOf, type DesignRule, type Side } from './designRules';
 import { strengthSchema } from './inputs';
 import { resolveProperty } from './properties';
+import { substituteMargins, type MarginsOutcome } from './substituteMargins';
 import type { PropertyUse, StrengthProperty } from './types';
 
 const COMMAND = 'substitute_material';
@@ -79,6 +80,15 @@ function sideOf(
   return { side: { rho, ...(e !== undefined ? { e } : {}), ...(strength !== undefined ? { strength } : {}) }, inputs };
 }
 
+function marginsSummary(margins: MarginsOutcome | undefined): string {
+  if (margins?.kind !== 'data') return '';
+  const data = margins.data as { code?: string; failedConditions?: string[]; minMs?: { from: number | null; to: number | null } };
+  if (data.code === 'SEL_MARGINS_NEED_RESOLVE')
+    return `; margins NOT rescaled (${data.failedConditions?.join(', ') ?? ''} fail): run data.margins.resolvePlan`;
+  if (data.code === 'SEL_NO_ANALYSIS') return '; margins: no analysis (SEL_NO_ANALYSIS)';
+  return `; min MS ${data.minMs?.from ?? 'n/a'} -> ${data.minMs?.to ?? 'n/a'} (rescaled, exact for one material)`;
+}
+
 const percent = (ratio: number): string => `${ratio >= 1 ? '+' : ''}${((ratio - 1) * 100).toFixed(1)} %`;
 
 /**
@@ -98,7 +108,10 @@ export const substituteMaterial = defineCommand({
     'stiffness (or strength, with strengthProperty Fty / Ftu / Fcy) is unchanged: mass ratio (rho2/rho1)(P1/P2)^n with n = 1, 1/2, 1/3 (stiffness) or 1, 2/3, 1/2 (strength), data.resized gives the new size factor; ' +
     'data.mass.method is index_rule: an idealised part, not your geometry (rebuild with parameters for an exact mass). Values come from the stored sourced properties; a missing density / E / strength refuses with SEL_PROPERTY_MISSING (never imputed); ' +
     'typical / supplier / legacy values make the answer unverified. Returns data { entityIds, from, to, designRule, mass: { beforeG, afterG, ratio, method }, stiffness?: { ratio, deflectionRatio, modalFrequencyRatio?, bucklingFactorRatio? }, resized?, inputs, ' +
-    'unverified, unverifiedReasons, reviewRequired: true }. Applying the swap is assign_material (a released part needs a change order first). Read-only.',
+    'unverified, unverifiedReasons, reviewRequired: true, margins? }. include margins (same_geometry only) rescales the compute_margins rows of the current 05 results as MS2 = (1 + MS1) A2/A1 - 1, EXACT only for one material with the same ' +
+    'Poisson ratio (nuTolerance, default 0), no gravity, no thermal load, no non-zero prescribed displacement and current results; data.margins.method is then rescaled with rows { msFrom, msTo, allowable from / to }. If a condition fails data.margins is ' +
+    '{ code SEL_MARGINS_NEED_RESOLVE, failedConditions, conditions, resolvePlan } (run the plan on a copy: assign_material, fea_mesh, fea_solve, compute_margins) and no margin is guessed; no analysis gives SEL_NO_ANALYSIS. ' +
+    'Applying the swap is assign_material (a released part needs a change order first). Read-only.',
   params: z.object({
     entityIds: z.array(z.string()).describe('3D solid entities to re-material, all made of `from`.'),
     from: z.string().describe('Current material id of every entity.'),
@@ -111,9 +124,22 @@ export const substituteMaterial = defineCommand({
       ),
     strengthProperty: strengthSchema.optional(),
     include: z
-      .array(z.enum(['mass', 'stiffness']))
+      .array(z.enum(['mass', 'stiffness', 'margins']))
       .optional()
-      .describe('Parts of the answer: mass, stiffness. Omit for both (stiffness is not defined for the equal_strength rules).'),
+      .describe(
+        'Parts of the answer: mass, stiffness, margins. Omit for mass and stiffness (stiffness is not defined for the equal_strength rules). margins needs designRule same_geometry and an analysis (static / thermo_static) with verified, current results.',
+      ),
+    analysisId: z
+      .string()
+      .optional()
+      .describe('Analysis case whose margins are rescaled (include margins). Omit when exactly one case has the entities as parts.'),
+    nuTolerance: z
+      .number()
+      .min(0)
+      .optional()
+      .describe(
+        'Largest |nu_to - nu_from| accepted for rescaling margins. Omit for the named default 0 (identical Poisson ratios); a band needs a sourced error bound.',
+      ),
   }),
   run: (doc, params, ctx): CommandResult => {
     const { entityIds, from, to, designRule } = params;
@@ -157,6 +183,15 @@ export const substituteMaterial = defineCommand({
         path: 'from',
       });
     const include = params.include ?? ['mass', 'stiffness'];
+    if (include.includes('margins') && rule !== 'same_geometry')
+      return refuseSel(
+        doc,
+        COMMAND,
+        'SEL_PARAMS_INVALID',
+        'margins need designRule same_geometry: the analysed geometry must not change',
+        [],
+        ['include'],
+      );
     const strength = isStrengthRule(rule) ? params.strengthProperty : undefined;
     const needsE = rule !== 'same_geometry' ? !isStrengthRule(rule) : include.includes('stiffness');
     const before = sideOf(doc, from, { e: needsE, strength });
@@ -184,7 +219,15 @@ export const substituteMaterial = defineCommand({
     const unverifiedReasons = [
       ...new Set(weak.map(([material, input]) => `${material} ${input.property}: ${input.unverifiedReasons.join(', ')}`)),
     ];
-    const warnings = weak.length === 0 ? [] : [issue('SEL_VALUE_UNVERIFIED', 'warning', unverifiedReasons.join('; '), [from, to])];
+    const margins = include.includes('margins')
+      ? substituteMargins(doc, { entityIds, from, to, analysisId: params.analysisId, nuTolerance: params.nuTolerance }, ctx)
+      : undefined;
+    if (margins?.kind === 'refused') return refuse({ code: margins.code, message: margins.message, ids: [], path: margins.path });
+    const marginsUnverified = margins?.unverified === true;
+    const warnings = [
+      ...(weak.length === 0 ? [] : [issue('SEL_VALUE_UNVERIFIED', 'warning', unverifiedReasons.join('; '), [from, to])]),
+      ...(margins?.warnings ?? []),
+    ];
     const stiffness = include.includes('stiffness') ? ratios.stiffness : undefined;
     const mass = {
       beforeG: beforeMass.massG,
@@ -201,9 +244,10 @@ export const substituteMaterial = defineCommand({
       ...(include.includes('mass') ? { mass } : {}),
       ...(stiffness !== undefined ? { stiffness } : {}),
       ...(ratios.resized !== undefined ? { resized: ratios.resized } : {}),
+      ...(margins === undefined ? {} : { margins: margins.data }),
       inputs,
       warnings,
-      unverified: weak.length > 0,
+      unverified: weak.length > 0 || marginsUnverified,
       unverifiedReasons,
       reviewRequired: true,
       reviewReasons: beforeMass.reviewReasons,
@@ -214,7 +258,7 @@ export const substituteMaterial = defineCommand({
         `${include.includes('mass') ? `mass ${Number(beforeMass.massG.toPrecision(7))} g -> ${Number(afterG.toPrecision(7))} g (x${Number(massRatio.toPrecision(7))}, ${percent(massRatio)}${rule === 'same_geometry' ? '' : ', idealised part'})` : ''}` +
         `${stiffness === undefined ? '' : `; stiffness x${Number(stiffness.ratio.toPrecision(7))}`}` +
         `${ratios.resized === undefined ? '' : `; ${ratios.resized.dimension} x${Number(ratios.resized.factor.toPrecision(7))}`}` +
-        `${weak.length > 0 ? '; UNVERIFIED inputs (typical / supplier / legacy values)' : ''}; ${REVIEW_SENTENCE}.`,
+        `${marginsSummary(margins)}${weak.length > 0 || marginsUnverified ? '; UNVERIFIED inputs (typical / supplier / legacy values)' : ''}; ${REVIEW_SENTENCE}.`,
       data,
     );
   },
