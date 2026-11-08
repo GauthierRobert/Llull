@@ -31,6 +31,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   IMP_HOMOGENIZATION_TOO_LARGE: 'lower homogenize.resolution (the cap on voxels is in the message)',
   IMP_HOMOGENIZATION_NEEDS_NATIVE: 'install llull-compute (the native field engine; the desktop app and the CLI use it when it is present)',
   IMP_DERIVED_READ_ONLY: 'edit the field nodes and run create_implicit_body again',
+  IMP_MATERIAL_NOT_FOUND: 'create the material first (create_material) and pass its name',
 };
 
 /** `<command>: <code> — <message>; no-op.` with the code's remediation. */

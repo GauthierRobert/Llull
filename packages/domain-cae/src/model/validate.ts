@@ -138,6 +138,8 @@ function checkMesh(scope: Scope, mesh: unknown, where: string): void {
     scope.errors.push(`${where}: mesh.minSize must be > 0 when present`);
   if (mesh['bonding'] !== undefined && mesh['bonding'] !== 'conformal')
     scope.errors.push(`${where}: mesh.bonding must be 'conformal' when present`);
+  if (mesh['source'] !== undefined && mesh['source'] !== 'implicit_field')
+    scope.errors.push(`${where}: mesh.source must be 'implicit_field' when present`);
   const refinements = mesh['refinements'];
   if (!Array.isArray(refinements)) return void scope.errors.push(`${where}: mesh.refinements must be a list`);
   refinements.forEach((refinement, index) => {

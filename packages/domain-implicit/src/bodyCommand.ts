@@ -18,19 +18,25 @@ const IMPLICIT_LAYER_ID = 'layer-implicit';
 const HIDDEN_LAYER_ID = 'layer-implicit-hidden';
 const BODY_COLOR = '#d9b26f';
 
-/** The derived, read-only mesh entity of a body (also rebuilt when a saved file is loaded). */
-export function bodyEntity(id: string, field: string, name: string, color: string, mesh: MeshData, asset?: MeshAssetRef): MeshSolidEntity {
+/** The derived, read-only mesh entity of a body (also rebuilt when a saved file is loaded): presentation and material from the body record. */
+export function bodyEntity(
+  id: string,
+  body: Pick<ImplicitBody, 'field' | 'name' | 'color' | 'materialId'>,
+  mesh: MeshData,
+  asset?: MeshAssetRef,
+): MeshSolidEntity {
   return {
     id,
     kind: 'mesh',
     position: [0, 0, 0],
     rotation: [0, 0, 0],
     layerId: IMPLICIT_LAYER_ID,
-    color,
-    name,
-    tags: [`implicit:${field}`],
+    color: body.color,
+    name: body.name,
+    tags: [`implicit:${body.field}`],
     mesh,
     ...(asset === undefined ? {} : { asset }),
+    ...(body.materialId === undefined ? {} : { materialId: body.materialId }),
   };
 }
 
@@ -48,7 +54,8 @@ function withLayer(doc: CadDocument, id: string, name: string, visible: boolean)
  * @affects creates 1 derived mesh entity `imp-<step>.<k>` (read-only, layer layer-implicit) and the body record doc.implicit.bodies[id]; hideSource entities move to the hidden layer layer-implicit-hidden
  * @invariant closed, oriented, edge-manifold mesh (data.closedManifold); budgets are checked before sampling; the saved file keeps the recipe and contentHash, not the triangles (re-derived on load)
  * @invariant field-engine-optional: reads ctx.fieldEngine when present, else the built-in TS engine (no kernel is needed)
- * @failure unknown field -> IMP_FIELD_NOT_FOUND; unknown hideSource -> IMP_ENTITY_NOT_FOUND; no support and no bounds -> IMP_FIELD_UNBOUNDED; too many samples -> IMP_GRID_BUDGET; too many triangles -> IMP_TRIANGLE_BUDGET; nothing inside -> IMP_BODY_EMPTY; voxel <= 0 -> IMP_PARAM_RANGE
+ * @invariant material: the body record keeps the material id and every rebuilt entity carries it (the entity itself is read-only: assign_material refuses it)
+ * @failure unknown field -> IMP_FIELD_NOT_FOUND; unknown material -> IMP_MATERIAL_NOT_FOUND; unknown hideSource -> IMP_ENTITY_NOT_FOUND; no support and no bounds -> IMP_FIELD_UNBOUNDED; too many samples -> IMP_GRID_BUDGET; too many triangles -> IMP_TRIANGLE_BUDGET; nothing inside -> IMP_BODY_EMPTY; voxel <= 0 -> IMP_PARAM_RANGE
  */
 export const createImplicitBody = defineCommand({
   name: 'create_implicit_body',
@@ -81,6 +88,12 @@ export const createImplicitBody = defineCommand({
       .describe('Ids of solids to move to a hidden layer once the body exists (kept, not deleted).'),
     name: z.string().optional().describe('Optional name of the body.'),
     color: z.string().optional().describe('Optional hex colour of the body, e.g. "#d9b26f".'),
+    material: z
+      .string()
+      .optional()
+      .describe(
+        'Name of a document material (create_material) for the body, e.g. for a finite-element analysis of it; kept with the body when it is re-derived or reloaded. The body is read-only, so assign_material cannot set it later.',
+      ),
   }),
   run: (doc, p, ctx): CommandResult => {
     const fail = (code: string, message: string, ids: readonly string[] = [], path?: string): CommandResult =>
@@ -91,6 +104,8 @@ export const createImplicitBody = defineCommand({
     const unknown = hidden.find((id) => !Object.hasOwn(doc.entities, id));
     if (unknown !== undefined)
       return fail('IMP_ENTITY_NOT_FOUND', `hideSource entity '${unknown}' does not exist`, [unknown], 'hideSource');
+    if (p.material !== undefined && !Object.hasOwn(doc.materials, p.material))
+      return fail('IMP_MATERIAL_NOT_FOUND', `no material '${p.material}' in the document`, [], 'material');
     const engine = resolveFieldEngine(ctx?.fieldEngine);
     const realised = realiseField(
       doc,
@@ -108,7 +123,6 @@ export const createImplicitBody = defineCommand({
     const name = p.name ?? `implicit ${p.field}`;
     const color = p.color ?? BODY_COLOR;
     const stored = storeBodyMesh(realised.mesh, ctx?.meshAssets);
-    const entity = bodyEntity(id, p.field, name, color, stored.mesh, stored.asset);
     const body: ImplicitBody = {
       id,
       field: p.field,
@@ -122,7 +136,9 @@ export const createImplicitBody = defineCommand({
       hiddenSources: hidden,
       ...(p.bounds === undefined ? {} : { explicitBounds: true }),
       ...(stored.asset === undefined ? {} : { asset: stored.asset }),
+      ...(p.material === undefined ? {} : { materialId: p.material }),
     };
+    const entity = bodyEntity(id, body, stored.mesh, stored.asset);
     let next: CadDocument = withLayer(doc, IMPLICIT_LAYER_ID, 'implicit', true);
     if (hidden.length > 0) next = withLayer(next, HIDDEN_LAYER_ID, 'implicit sources (hidden)', false);
     const entities = { ...next.entities, [id]: entity };

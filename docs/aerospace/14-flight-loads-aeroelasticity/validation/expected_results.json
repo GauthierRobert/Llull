@@ -10,7 +10,9 @@
       "tolerance": "2 % rel",
       "source": "Euler-Bernoulli cantilever",
       "grade": "A",
-      "proves": ["FR-FLL-01"]
+      "proves": ["FR-FLL-01"],
+      "plans": ["plans/fll_m1_field_cantilever.plan.json"],
+      "status": "field-mesh stiffness check (FLL-M1): 7.1022 mm vs 7.1191 mm (-0.24 %); export_flight_loads is FLL-M2"
     },
     {
       "id": "VC-FLL-02",
@@ -90,7 +92,9 @@
       "tolerance": "as stated",
       "source": "geometric",
       "grade": "A",
-      "proves": ["FR-FLL-05"]
+      "proves": ["FR-FLL-05"],
+      "plans": ["plans/fll_m1_drone_standin.plan.json"],
+      "status": "stand-in measured 2026-11-08: +0.028 % volume, 889868 C3D10, 28 s, pad face sets 802.4 / 795.6 mm2 vs 804.2; reference body (lite8.lld) not in the repository"
     }
   ]
 }

@@ -224,6 +224,8 @@ export interface ImplicitBody {
   readonly hiddenSources: readonly string[];
   /** True when the caller gave `bounds` to create_implicit_body (kept when the body is re-derived; otherwise the field's own support box is used). */
   readonly explicitBounds?: boolean;
+  /** Material of the derived entity (FE analysis, mass), restored with it on load; absent = none. */
+  readonly materialId?: string;
   /** Full-resolution mesh in the host's mesh asset store (05 IMP D3 host cache); the entity then holds a display level of detail. */
   readonly asset?: MeshAssetRef;
 }

@@ -29,4 +29,16 @@ not by llull. Material inputs in closed-form cases are **test inputs**, not mate
 
 ## Files
 
-`expected_results.json` (index), plans to add with the implementation.
+`expected_results.json` (index); `plans/` (FLL-M1):
+
+- `fll_m1_field_cantilever.plan.json`: the VC-FLL-01 cantilever as an implicit field box meshed from its field (`source=implicit_field`,
+  2 mm, C3D10) and solved by CalculiX: tip deflection **7.1022 mm** vs FL³/(3EI) = 7.1191 mm (−0.24 %, tolerance 2 %) on 2026-11-08. This
+  checks the field mesh against an analytic stiffness only; VC-FLL-01 itself (export_flight_loads) is FLL-M2.
+- `fll_m1_drone_standin.plan.json`: VC-FLL-09 on a **stand-in** of the reference body (lite8.lld is not in the repository): 250 × 250 × 44 mm
+  blended hub, arms, 20 mm motor pads and battery pocket, body at voxel 0.8, meshed at 2 mm: 889 868 C3D10 in 28 s, volume 569 003 mm³ vs
+  the implicit body 568 843 mm³ (+0.028 %, tolerance 0.5 %), dihedral 20.1°-143.1°; the support and load face sets stay on their pad faces
+  (nodes within h of z = ∓10 and r ≤ 16 + h) with areas 802.4 and 795.6 mm² vs π 16² = 804.2 mm² (2026-11-08, review round 1). **The
+  reference body itself stays open** until lite8.lld is added (expected 686 657 mm³).
+
+Run by `server/tests/feaFieldMesh.test.ts` (real llull-compute and CalculiX); analytic-field checks (sphere C3D10 −0.0012 %, box exact,
+determinism over thread counts) in `solver/crates/llull-field/src/tets_tests.rs`.

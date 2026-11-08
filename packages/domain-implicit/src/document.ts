@@ -217,8 +217,14 @@ function implicitErrors(raw: Record<string, unknown>): string[] {
       (body['mesher'] === 'tetra' || body['mesher'] === 'dual_contouring') &&
       typeof body['color'] === 'string' &&
       (body['explicitBounds'] === undefined || typeof body['explicitBounds'] === 'boolean') &&
+      (body['materialId'] === undefined || typeof body['materialId'] === 'string') &&
       (body['asset'] === undefined || isAssetRef(body['asset']));
     if (!valid) errors.push(`implicit body '${key}' is malformed`);
+    // the material is a reference like any other: a dangling one refuses the load (the entity rebuilt from the record would point nowhere)
+    const materialId = isRecord(body) ? body['materialId'] : undefined;
+    const materials = isRecord(raw['materials']) ? raw['materials'] : {};
+    if (valid && typeof materialId === 'string' && !Object.hasOwn(materials, materialId))
+      errors.push(`implicit.bodies.${key}.materialId: '${materialId}' is not a material of the document`);
   }
   return errors;
 }
@@ -308,7 +314,7 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
     }
     const stored = body.asset === undefined ? null : (port?.readMesh(body.asset.key) ?? null);
     if (body.asset !== undefined && stored !== null) {
-      restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, lodMesh(stored, MESH_LOD_TRIANGLES), body.asset);
+      restored[body.id] = bodyEntity(body.id, body, lodMesh(stored, MESH_LOD_TRIANGLES), body.asset);
       continue;
     }
     // A solid node measures its entity's triangles: an asset-backed mesh (also one inside the component of an instance) is read at its stored
@@ -337,13 +343,13 @@ function restore(raw: Record<string, unknown>): Record<string, unknown> {
       const display = body.asset === undefined ? null : coarseDisplay(realiseAt, body.voxel);
       if (display === null || body.asset === undefined) dropped.add(body.id);
       else {
-        restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, lodMesh(display, MESH_LOD_TRIANGLES), body.asset);
+        restored[body.id] = bodyEntity(body.id, body, lodMesh(display, MESH_LOD_TRIANGLES), body.asset);
         proxies.add(body.id);
       }
       continue;
     }
     const again = storeBodyMesh(realised.mesh, port);
-    restored[body.id] = bodyEntity(body.id, body.field, body.name, body.color, again.mesh, again.asset);
+    restored[body.id] = bodyEntity(body.id, body, again.mesh, again.asset);
     const { asset: previousAsset, ...bare } = body;
     void previousAsset;
     if (realised.contentHash !== body.contentHash || again.asset?.key !== body.asset?.key)

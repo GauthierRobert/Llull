@@ -1,0 +1,78 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "create_material", "params": { "name": "petg", "density": 0.00127, "color": "#88aacc", "metalness": 0, "roughness": 0.6 } },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "petg",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 2, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "company",
+      "source": { "citation": "test input of this validation case (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "petg", "set": { "id": "set", "elastic": "elastic" }, "makeDefault": true }
+  },
+  { "command": "add_field_primitive", "params": { "shape": "box", "size": [110, 110, 44], "rounding": 12 }, "as": "hub" },
+  { "command": "add_field_primitive", "params": { "shape": "capsule", "radius": 9, "height": 232, "rotation": [0, 90, 0] }, "as": "armX" },
+  { "command": "add_field_primitive", "params": { "shape": "capsule", "radius": 9, "height": 232, "rotation": [90, 0, 0] }, "as": "armY" },
+  {
+    "command": "add_field_primitive",
+    "params": { "shape": "cylinder", "radius": 16, "height": 20, "position": [116, 0, 0] },
+    "as": "pad0"
+  },
+  {
+    "command": "add_field_primitive",
+    "params": { "shape": "cylinder", "radius": 16, "height": 20, "position": [-116, 0, 0] },
+    "as": "pad1"
+  },
+  {
+    "command": "add_field_primitive",
+    "params": { "shape": "cylinder", "radius": 16, "height": 20, "position": [0, 116, 0] },
+    "as": "pad2"
+  },
+  {
+    "command": "add_field_primitive",
+    "params": { "shape": "cylinder", "radius": 16, "height": 20, "position": [0, -116, 0] },
+    "as": "pad3"
+  },
+  {
+    "command": "combine_fields",
+    "params": {
+      "op": "union",
+      "a": "$hub",
+      "b": ["$armX", "$armY", "$pad0", "$pad1", "$pad2", "$pad3"],
+      "blend": { "kind": "quadratic", "radius": 6 }
+    },
+    "as": "frame"
+  },
+  { "command": "add_field_primitive", "params": { "shape": "box", "size": [70, 40, 30], "position": [0, 0, 10] }, "as": "bay" },
+  { "command": "combine_fields", "params": { "op": "subtract", "a": "$frame", "b": "$bay" }, "as": "shape" },
+  { "command": "create_implicit_body", "params": { "field": "$shape", "voxel": 0.8, "material": "petg" }, "as": "body" },
+  {
+    "command": "create_analysis",
+    "params": { "name": "field", "analysisType": "static", "unitSystem": "N-mm-t-s", "solver": "calculix" },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$body", "idealization": "solid" } },
+  {
+    "command": "add_fea_constraint",
+    "params": { "analysisId": "$an", "name": "root", "kind": "fixed", "target": { "entityId": "$body", "facesNear": [[116, 0, -10]] } }
+  },
+  {
+    "command": "add_fea_load",
+    "params": {
+      "analysisId": "$an",
+      "name": "tip",
+      "kind": "force",
+      "loadCase": "LC1",
+      "category": "limit",
+      "target": { "entityId": "$body", "facesNear": [[-116, 0, 10]] },
+      "vector": [0, 0, -10],
+      "distribution": "total"
+    }
+  },
+  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "source": "implicit_field", "order": 2, "globalSize": 2 } }
+]

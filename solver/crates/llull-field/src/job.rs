@@ -1,4 +1,4 @@
-//! The jobs of `llull-compute field <folder>`: `mesh`, `measure` and `evaluate` (contract in `lib.rs`). A budget refusal is a normal answer
+//! The jobs of `llull-compute field <folder>`: `mesh`, `measure`, `evaluate` and `tets` (`tets_job.rs`) (contract in `lib.rs`). A budget refusal is a normal answer
 //! (`report.json` with a `refusal`), a malformed folder is a `JobError`.
 
 use crate::components::{components, solid_nodes, Component};
@@ -10,6 +10,7 @@ use crate::measure::{quantiles, volume};
 use crate::sampling::{fill_plane, Grid, PlaneStats, Tiles};
 use crate::tape::{Program, ProgramSpec};
 use crate::tetra::{extract, is_closed_manifold, IsoMesh, TriangleBudget};
+use crate::tets_job::tets_job;
 use llull_protocol::{emit, Event, Output};
 use rayon::prelude::*;
 use serde::Deserialize;
@@ -315,6 +316,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
     }
     let body = match job.op.as_str() {
         "evaluate" => evaluate_job(folder, &job, &Evaluator::new(&program), &mut outputs)?,
+        "tets" => tets_job(folder, &text, &Evaluator::new(&program), out, &mut outputs)?,
         "mesh" | "measure" => match grid_of(&job.grid)? {
             Err(refused) => refused,
             Ok(grid) => match over_budget(&job, &grid) {

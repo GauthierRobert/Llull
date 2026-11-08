@@ -51,6 +51,8 @@ function exchangeDepsOf(exchange: ExchangeOptions, host: ExchangeHost): Exchange
     libraries: exchange.libraries ?? null,
     getDoc: host.getDoc,
     applyCommand: host.applyCommand,
+    ...(host.signal !== undefined ? { signal: host.signal } : {}),
+    ...(host.onProgress !== undefined ? { onProgress: host.onProgress } : {}),
     allowCodeExecution: exchange.allowCodeExecution,
     context: () => serverContext(),
   };

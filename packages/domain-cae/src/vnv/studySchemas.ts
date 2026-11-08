@@ -24,6 +24,7 @@ const meshControlsShape = z
       .describe('Local refinements of the level (sizes scaled with the level).'),
     optimize: z.enum(['default', 'netgen', 'high_order', 'none']).describe('Mesh optimisation pass.'),
     bonding: z.literal('conformal').optional().describe('Present only for conformal bonding of touching parts.'),
+    source: z.literal('implicit_field').optional().describe('Present only when implicit bodies were meshed from their field.'),
   })
   .describe('The mesh controls exactly as the level was meshed (the case controls with globalSize and refinement sizes scaled).');
 
@@ -57,6 +58,7 @@ export function toStudyLevel(input: LevelInput, index: number): StudyLevel<MeshC
       optimize: controls.optimize,
       ...(controls.minSize !== undefined ? { minSize: controls.minSize } : {}),
       ...(controls.bonding !== undefined ? { bonding: controls.bonding } : {}),
+      ...(controls.source !== undefined ? { source: controls.source } : {}),
     },
     elements: input.elements,
     h: input.h,

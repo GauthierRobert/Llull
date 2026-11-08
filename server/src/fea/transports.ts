@@ -1,4 +1,4 @@
-/** The `FeaToolsPort` of the server and CLI: Netgen through the llull-mesh sidecar, CalculiX through a tracked child, artifacts in the store. */
+/** The `FeaToolsPort` of the server and CLI: Netgen through the llull-mesh sidecar (implicit fields through llull-compute), CalculiX through a tracked child, artifacts in the store. */
 
 import type { FeaToolsPort } from '@protocol/index';
 import { getGeometryKernel } from '@core/geometry/kernel';
@@ -12,6 +12,7 @@ import { runFeaExport } from './feaExport';
 import { runFeaImportField } from './feaImportField';
 import { runFeaImportResults } from './feaImportResults';
 import { runFeaMesh, type MesherResponse } from './feaMesh';
+import { runFieldMesh } from './fieldMesh';
 import { runFeaSolve } from './feaSolve';
 import { callNativeMesher } from './nativeMesher';
 import { nativeBinaryPath, nativeInstallHint } from '../native/nativeBinary';
@@ -41,7 +42,13 @@ export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToo
     return callNativeMesher(binary, request, timeoutMs, env);
   };
   const mesh: FeaToolsPort['mesh'] = (analysisId, host) =>
-    runFeaMesh(analysisId, host, { mesher, store, hooks: caeHooks, kernel: guardedFeaKernel });
+    runFeaMesh(analysisId, host, {
+      mesher,
+      store,
+      hooks: caeHooks,
+      kernel: guardedFeaKernel,
+      fieldMesh: (request, fieldHost) => runFieldMesh(request, fieldHost, { runner, store, hooks: caeHooks, env }),
+    });
   const solve: FeaToolsPort['solve'] = (analysisId, options, host) =>
     runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs, beforeDeck, randomPost });
   return {

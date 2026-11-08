@@ -9,6 +9,7 @@ import { isRecord } from '@lib/isRecord';
 import type { FeaHost, FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeCode, CaeHooks } from './caeHooks';
+import type { MeshRequest } from '@cae/index';
 import { fullResolutionView } from '@core/commands/meshHostView';
 import { defaultMeshAssetStore } from '../meshAssets/store';
 import { feaFailure, INSTALL_HINT } from './feaCommon';
@@ -28,6 +29,8 @@ export interface FeaMeshDeps {
   readonly store: FeArtifactStore;
   readonly hooks: CaeHooks;
   readonly kernel: () => GeometryKernel | null;
+  /** Mesh source implicit_field (`fieldMesh.ts`); absent = that source answers NATIVE_TOOL_MISSING. */
+  readonly fieldMesh?: (request: MeshRequest, host: FeaHost) => Promise<FeaToolResult>;
 }
 
 const isCode = (value: object): value is CaeCode => 'code' in value && 'message' in value;
@@ -87,13 +90,19 @@ function faceIndicesOf(
 }
 
 /**
- * @failure unknown analysis / no part -> the @cae code; kernel cannot build a part -> FEA_KERNEL_REQUIRED; mesher error -> its code
+ * @failure mesh source implicit_field -> the codes of `fieldMesh.ts`; unknown analysis / no part -> the @cae code; kernel cannot build a part -> FEA_KERNEL_REQUIRED; mesher error -> its code
  *   (FEA_TARGET_UNRESOLVED, FEA_TARGET_AMBIGUOUS, FEA_MESH_FAILED); no llull-mesh, or its libraries do not load -> FEA_TOOL_MISSING
  */
 export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMeshDeps): Promise<FeaToolResult> {
   const doc = host.getDoc();
   const request = deps.hooks.meshRequest(doc, analysisId);
   if (isCode(request)) return feaFailure('fea_mesh', request.code, request.message, [analysisId]);
+  if (request.controls.source === 'implicit_field')
+    return deps.fieldMesh === undefined
+      ? feaFailure('fea_mesh', 'NATIVE_TOOL_MISSING', 'this host cannot mesh implicit fields (no llull-compute field transport)', [
+          analysisId,
+        ])
+      : deps.fieldMesh(request, host);
   // the mesher is a native host path: it reads geometry without `execute`, so the stored meshes of asset-backed parts are handed to it here (or it is refused by name)
   const full = fullResolutionView(doc, request.entityIds, defaultMeshAssetStore());
   if ('code' in full) return feaFailure('fea_mesh', full.code, full.message, [analysisId, ...full.ids]);

@@ -106,7 +106,7 @@ export function rederiveBodies(doc: CadDocument, bodyIds: readonly string[], ctx
     }
     const stored = storeBodyMesh(realised.mesh, ctx?.meshAssets);
     const previous = Object.hasOwn(current.entities, id) ? current.entities[id] : undefined;
-    const base = bodyEntity(id, body.field, body.name, body.color, stored.mesh, stored.asset);
+    const base = bodyEntity(id, body, stored.mesh, stored.asset);
     const entity: MeshSolidEntity =
       previous?.kind === 'mesh'
         ? { ...withoutAsset(previous), mesh: base.mesh, ...(stored.asset === undefined ? {} : { asset: stored.asset }) }
