@@ -11,6 +11,7 @@ import { fitDispositionErrors } from '../thermomech/validateDispositions';
 import { dispositionLedgerErrors } from '../shared/validateDispositionLedger';
 import { contactErrors } from '../contact/validate';
 import { creepErrors } from '../creep/validate';
+import { pretensionErrors } from '../contact/pretensionValidate';
 
 const TYPES = [
   'static',
@@ -240,6 +241,7 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
   errors.push(...contactErrors(analysisCase, where, scope.entities));
   errors.push(...creepErrors(analysisCase, where));
+  errors.push(...pretensionErrors(analysisCase, where, scope.entities));
   errors.push(...settingsErrors(analysisCase, where));
   errors.push(...studyErrors(analysisCase, id, where));
   checkStudyControls(scope, analysisCase, where);

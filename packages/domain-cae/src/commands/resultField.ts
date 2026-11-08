@@ -29,7 +29,7 @@ export const feaResultField = defineCommand({
     'min / max / mean cover every node of the result set. rows are the `limit` (default 20, max 500) nodes with the largest (or smallest, order) value, OR the ' +
     'nodes you name (nodes: mesh node ids), OR the nearest node to each of `points` (document units), OR the nearest node to each result probe (probes: true); ' +
     'give at most one of them. Values are nodal (the solver averages stress at shared nodes) in the analysis unitSystem (N-mm-t-s: MPa, mm); `at` and distance are ' +
-    'in the analysis length unit. Singular spots (point loads, supports, re-entrant corners) read high: judge them. Requires fea_mesh and fea_solve on this machine.',
+    'in the analysis length unit. Singular spots (point loads, supports, re-entrant corners) read high: judge them. A bolt pretension (add_bolt_pretension) duplicates the nodes of its cut in the solver: a mesh node on the cut reads the LOW-side copy (the negative side of the section normal), the high-side copies are not mesh nodes and are left out of count / min / max / mean; read the high face through contact_report bolts. Requires fea_mesh and fea_solve on this machine.',
   annotations: { readOnly: true },
   params: z.object({
     analysisId: analysisIdSchema,

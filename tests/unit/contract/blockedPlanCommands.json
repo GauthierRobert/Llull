@@ -1,7 +1,6 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/physics/06-contact-joints/validation/plans/cnt_pretension_bar.plan.json": ["add_bolt_pretension"],
     "docs/physics/12-material-selection/validation/plans/compare_bracket_materials_proposed.json": [
       "check_material_selection",
       "compare_materials"

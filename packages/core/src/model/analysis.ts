@@ -16,7 +16,7 @@ import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
 import type { CaseStudies } from './convergenceStudy';
-import type { ContactSettings } from './contact';
+import type { ContactSettings, PretensionSettings } from './contact';
 import type { Imperfection, NonlinearResultsSummary } from './nonlinear';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
@@ -498,6 +498,8 @@ export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly contact?: ContactSettings;
   /** PHY-11 hold of a `creep` case; absent until `set_creep_step`. */
   readonly creep?: import('./creep').CreepStepSpec;
+  /** PHY-06 bolt pretension sections (nonlinear_static only); absent until the first `add_bolt_pretension`. */
+  readonly pretension?: PretensionSettings;
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];

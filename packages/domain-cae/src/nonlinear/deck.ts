@@ -10,6 +10,7 @@ import { FIELD_KEYS, TIME_KEYS, nonlinearValueProblems } from './shape';
 import { hyperelasticParts } from './settings';
 import { multiplierHistory } from './history';
 import { contactModelLines, contactStepLines } from '../contact/deck';
+import { pretensionModelLines, pretensionStepLines } from '../contact/pretensionDeck';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
 
@@ -164,7 +165,9 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
   const history = multiplierHistory(nonlinear);
   const contact = contactModelLines(ctx);
   if (!Array.isArray(contact)) return contact;
-  const lines: string[] = [...contact];
+  const pretension = pretensionModelLines(ctx);
+  if (!Array.isArray(pretension)) return pretension;
+  const lines: string[] = [...contact, ...pretension];
   for (const step of steps.filter((entry) => entry.amplitude === 'step'))
     lines.push(`*AMPLITUDE, NAME=${amplitudeName(step)}`, row(0, 1, 1, 1));
   for (const [index, step] of steps.entries()) {
@@ -183,8 +186,11 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
     lines.push('*STATIC', row(control.initialIncrement, 1, control.minIncrement, control.maxIncrement));
     lines.push(...controlLines(nonlinear.convergence));
     const contactStep = contactStepLines(ctx, step.id, steps[index - 1]?.id ?? null, rate);
+    const bolts = pretensionStepLines(ctx, index, step.amplitude === 'step' ? `, AMPLITUDE=${amplitudeName(step)}` : '', rate);
+    if ('code' in bolts) return bolts;
     lines.push(...contactStep.switches);
     lines.push(...mechanical.text.split('\n').filter((line) => line !== ''));
+    lines.push(...bolts.loads);
     if (control.kind === 'displacement') {
       const dof = DOF_NUMBER[control.dof];
       lines.push(`*BOUNDARY${step.amplitude === 'step' ? `, AMPLITUDE=${amplitudeName(step)}` : ''}`);
@@ -197,6 +203,7 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
       'S, E, PEEQ',
       ...printLines(ctx, nonlinear, rate),
       ...contactStep.output,
+      ...bolts.output,
       '*END STEP',
     );
   }

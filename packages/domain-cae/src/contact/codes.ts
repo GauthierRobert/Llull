@@ -14,6 +14,15 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CNT_BEHAVIOUR_INVALID: 'slopes, p0 and c0 must be finite and > 0 (tensionAtLargeClearance > 0 when given)',
   CNT_ADJUST_INVALID: 'adjust clearance must be finite and > 0 (document length units)',
   CNT_STEP_UNKNOWN: 'activeSteps may only name step ids of the case (add_analysis_step; list them with describe_analysis)',
+  CNT_PRELOAD_INVALID: 'preload.value, torque and diameter must be finite and > 0',
+  CNT_PRETENSION_SECTION_INVALID:
+    'move the section plane to a plain shank region that the bolt crosses exactly once and that holds no constraint, load or probe node',
+  CNT_PRETENSION_STEP_ORDER:
+    'the preload belongs to the first step of the case (before it the section is an open cut): add the preload step first, or use that step',
+  CNT_PRETENSION_NOT_FOUND: 'list the bolts with contact_report (bolts) or describe_analysis',
+  CNT_SEPARATED: 'raise the preload or redesign the joint; a reviewer decides',
+  CNT_PRELOAD_MISMATCH:
+    'the section force after the preload step should equal the preload: check the plane (one clean cut), the mesh and that the deck was written by the current llull',
   CNT_PAIR_NOT_FOUND: 'list the pairs with contact_report (no pair) or describe_analysis',
   CNT_PAIR_NAME_TAKEN: 'give the pair a name no other pair of the case uses',
   CNT_NOTHING_TO_UPDATE: 'give at least one field to change',
@@ -30,7 +39,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CNT_LAME_INPUT_INVALID:
     'radii 0 <= inner.innerRadius < inner.outerRadius < outer.outerRadius, moduli > 0, nu in (-1, 0.5), interference > 0',
   CNT_INPUT_INVALID: 'see the bolted_joint_check description for the inputs each control method needs',
-  CNT_NUT_FACTOR_MISSING: 'give the tested nut factor with its source (nutFactor { value, source, tested })',
+  CNT_NUT_FACTOR_MISSING:
+    'give the tested nut factor with its source (bolted_joint_check: nutFactor { value, source, tested }; add_bolt_pretension: nutFactor and nutFactorSource)',
   CNT_GAMMA_TEST_DATA_REQUIRED:
     'separation-critical joints need a test-derived preload variation: gamma { value, source, statisticalBasis "90/95" } (§6.1.b/c)',
   CNT_DEFAULT_GAMMA_USED: 'supply torque-tension test data when available',

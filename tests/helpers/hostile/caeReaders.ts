@@ -1,4 +1,5 @@
 /** Hostile-input table: CAE result readers (CalculiX .dat / .frd / .sta, Nastran OP2, field tables). */
+import { pretensionErrors } from '@cae/contact/pretensionValidate';
 import { parseSta } from '@cae/nonlinear/solverLog';
 import { parseDat } from '@cae/results/datReader';
 import { parseFrd } from '@cae/results/frdReader';
@@ -63,7 +64,48 @@ const op2Build = (records: number): Uint8Array => {
   return builder.build();
 };
 
+const boltJson = (index: number, id = 'b' + index, section = '{"point":[0,0,0],"normal":[0,0,1]}'): string =>
+  '"' +
+  id +
+  '":{"id":"' +
+  id +
+  '","name":"n' +
+  index +
+  '","entityId":"part","section":' +
+  section +
+  ',"preload":{"kind":"force","value":1},"preloadStepId":"s1","lockAfter":true}';
+const pretensionText = (records: number): string => {
+  const ids = Array.from({ length: records }, (_, k) => k);
+  return '{"bolts":{' + ids.map((k) => boltJson(k)).join(',') + '},"order":[' + ids.map((k) => '"b' + k + '"').join(',') + ']}';
+};
+/** The load validation of a pretension slice (a JSON text here): it must report errors, never throw. */
+const readPretension = (text: string): string[] => {
+  try {
+    return pretensionErrors({ type: 'nonlinear_static', pretension: JSON.parse(text), nonlinear: { stepOrder: ['s1'] } }, 'case', {
+      part: {},
+    });
+  } catch {
+    return ['not JSON'];
+  }
+};
+
 export const CAE_READERS: readonly HostileReader[] = [
+  {
+    name: 'cae: pretensionErrors (bolt pretension slice of a loaded case)',
+    covers: ['domain-cae/src/contact/pretensionValidate.ts:pretensionErrors'],
+    input: 'text',
+    build: pretensionText,
+    read: (input) => readPretension(asText(input)),
+    accepts: (result) => (result as string[]).length === 0,
+    extra: [
+      { name: 'order is not an array', input: () => '{"bolts":{},"order":"b0"}' },
+      { name: 'reserved key', input: () => '{"bolts":{' + boltJson(0, '__proto__') + '},"order":["__proto__"]}' },
+      {
+        name: 'infinite section point',
+        input: () => '{"bolts":{' + boltJson(0, 'b0', '{"point":[1e999,0,0],"normal":[0,0,1]}') + '},"order":["b0"]}',
+      },
+    ],
+  },
   {
     name: 'cae: parseDat (eigenvalue and node-print tables)',
     covers: ['domain-cae/src/results/datReader.ts:parseDat'],

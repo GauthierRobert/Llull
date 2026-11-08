@@ -7,6 +7,10 @@ import { checkNonlinearItems } from '../nonlinear/check';
 import { cntRemediation } from './codes';
 import { initialOverclosure } from './overclosure';
 import { pairProblem } from './pairRules';
+import { buildDeckContext } from '../decks/context';
+import { pretensionPlan } from './pretensionDeck';
+import { pretensionProblem } from './pretensionRules';
+import type { BoltReport } from './boltReport';
 import type { ContactRow } from './reader';
 
 export interface ContactItem {
@@ -41,6 +45,12 @@ function restrainedEntities(analysis: AnalysisCase): Set<string> {
  */
 export function setupItems(doc: CadDocument, analysis: AnalysisCase): ContactItem[] {
   const items: ContactItem[] = checkNonlinearItems(doc, analysis).map((entry) => ({ ...entry }));
+  for (const id of analysis.pretension?.order ?? []) {
+    const bolt = analysis.pretension?.bolts[id];
+    const bad = bolt === undefined ? null : pretensionProblem(doc, analysis, bolt);
+    if (bolt !== undefined && bad !== null)
+      items.push(item(bad.code, 'error', `bolt '${bolt.id}' (${bolt.name}): ${bad.message}`, [bolt.id]));
+  }
   const settings = analysis.contact;
   if (settings === undefined) return items;
   const held = restrainedEntities(analysis);
@@ -119,7 +129,7 @@ export function resultItems(
         [incomplete.stepId],
       ),
     );
-  if (tolerance === undefined)
+  if (tolerance === undefined && rows.length > 0)
     items.push(
       item('CNT_PENETRATION_TOLERANCE_UNSET', 'warning', 'no penetrationTolerance given: penetration is not judged', [analysis.id]),
     );
@@ -141,6 +151,64 @@ export function resultItems(
           'fail',
           `pair '${row.pairId}' step '${row.stepId}': ${n(100 * row.slidingAreaFraction)} % of the slave area slides (max slip ${n(row.maxSlip)})`,
           [row.pairId, row.stepId],
+        ),
+      );
+  }
+  return items;
+}
+
+/** The cut of every bolt on the current mesh: the refusal the deck writer would give (plane misses / cuts twice, cut touches a constrained node), as an error item. */
+export function sectionItems(doc: CadDocument, analysis: AnalysisCase, mesh: FeMeshArtifact): ContactItem[] {
+  const ctx = analysis.pretension === undefined ? null : buildDeckContext(doc, analysis.id, mesh);
+  const plan = ctx === null ? null : pretensionPlan(ctx);
+  return plan !== null && 'code' in plan ? [item(plan.code, 'error', plan.message, plan.ids ?? [analysis.id])] : [];
+}
+
+/** Largest relative gap between the section force of the preload step and the preload before CNT_PRELOAD_MISMATCH (llull rule: the nodal-stress integral is good to a few %). */
+const PRELOAD_TOLERANCE = 0.05;
+
+/** Bolt result items: a joint that separates (fail), and a preload step whose section force misses the preload by more than 5 %. */
+export function boltItems(analysis: AnalysisCase, report: BoltReport): ContactItem[] {
+  const items: ContactItem[] = report.separated.map((entry) =>
+    item(
+      'CNT_SEPARATED',
+      'fail',
+      `bolt '${entry.pretensionId}': the clamp zone of pair '${entry.pairId}' has no node in contact (every slave node within the clamp zone, CPRESS = 0) from step '${entry.stepId}' (time ${n(entry.time)}); partial opening is not flagged`,
+      [entry.pretensionId, entry.pairId, entry.stepId],
+    ),
+  );
+  for (const row of report.bolts) {
+    if (row.facesUsed === 0)
+      items.push(
+        item(
+          'CNT_PRELOAD_MISMATCH',
+          'error',
+          `bolt '${row.pretensionId}' step '${row.stepId}': the results carry no stress on any of the ${row.faces} section faces`,
+          [row.pretensionId, row.stepId],
+        ),
+      );
+    else if (row.facesUsed < row.faces)
+      items.push(
+        item(
+          'CNT_PRELOAD_MISMATCH',
+          'warning',
+          `bolt '${row.pretensionId}' step '${row.stepId}': stress found on ${row.facesUsed} of ${row.faces} section faces only; the force is an underestimate`,
+          [row.pretensionId, row.stepId],
+        ),
+      );
+    const bolt = analysis.pretension?.bolts[row.pretensionId];
+    if (
+      row.facesUsed > 0 &&
+      bolt !== undefined &&
+      row.stepId === bolt.preloadStepId &&
+      Math.abs(row.axialForce - row.preload) > PRELOAD_TOLERANCE * Math.abs(row.preload)
+    )
+      items.push(
+        item(
+          'CNT_PRELOAD_MISMATCH',
+          'warning',
+          `bolt '${row.pretensionId}': section force ${n(row.axialForce)} after the preload step differs from the preload ${n(row.preload)} by more than ${100 * PRELOAD_TOLERANCE} %`,
+          [row.pretensionId, row.stepId],
         ),
       );
   }

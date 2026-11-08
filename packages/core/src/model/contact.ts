@@ -1,6 +1,7 @@
 /** PHY-06 structural contact set-up of a nonlinear_static case (plugin `cae`, CalculiX `*CONTACT PAIR`). */
 
 import type { FeaTarget } from './feaTarget';
+import type { Vec3 } from './vectors';
 
 /** CalculiX `*CONTACT PAIR, TYPE=`: one formulation per deck (CalculiX rule). */
 export type ContactFormulation = 'node_to_surface' | 'surface_to_surface' | 'mortar';
@@ -35,4 +36,36 @@ export interface ContactSettings {
   readonly formulation: ContactFormulation;
   readonly pairs: Readonly<Record<string, ContactPair>>;
   readonly pairOrder: readonly string[];
+}
+
+/**
+ * Bolt preload: a force (analysis force unit), or a torque with the nut factor K (T = K D P, NASA-STD-5020 A.2-1) whose force is derived when the deck is
+ * written. `torque` is in analysis force x analysis length, `diameter` in document length units; the nut factor and its source are never defaulted.
+ */
+export type PreloadSpec =
+  | { readonly kind: 'force'; readonly value: number }
+  | {
+      readonly kind: 'torque';
+      readonly torque: number;
+      readonly nutFactor: number;
+      readonly diameter: number;
+      readonly nutFactorSource: string;
+    };
+
+/** One `*PRE-TENSION SECTION` through a bolt part, tightened in the first step and, when `lockAfter`, held at its bolt length in later steps. */
+export interface BoltPretension {
+  readonly id: string;
+  readonly name: string;
+  readonly entityId: string;
+  /** Cut plane through the bolt shank (document units): point on it and the bolt axis direction (need not be unit length). */
+  readonly section: { readonly point: Vec3; readonly normal: Vec3 };
+  readonly preload: PreloadSpec;
+  readonly preloadStepId: string;
+  readonly lockAfter: boolean;
+}
+
+/** PHY-06 M3 bolt pretensions of a nonlinear_static case (independent of contact pairs: a bar with a pretension section needs none). */
+export interface PretensionSettings {
+  readonly bolts: Readonly<Record<string, BoltPretension>>;
+  readonly order: readonly string[];
 }

@@ -5,7 +5,7 @@
  */
 
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
-import { bindingOf, frdBoundHashes, mismatchMessage, UNBOUND_WARNING } from '@cae/index';
+import { bindingOf, frdBoundHashes, mismatchMessage, pretensionExtraNodes, UNBOUND_WARNING } from '@cae/index';
 import type { FeaHost, FeaToolResult, ResultsFileInput } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
@@ -14,11 +14,19 @@ import { currentMesh, feaFailure, isFailure } from './feaCommon';
 /** Named guard: largest results file imported, in bytes (parsed into memory several times over). */
 const MAX_RESULTS_BYTES = 256 * 1024 * 1024;
 
-/** `FEA_RESULTS_MESH_MISMATCH` message when the FRD displacement nodes are not exactly the mesh nodes, else null. */
-function frdMeshProblem(steps: FeResultsArtifact['steps'], mesh: FeMeshArtifact): string | null {
-  const known = new Set(mesh.nodes.map((node) => String(node[0])));
+/**
+ * `FEA_RESULTS_MESH_MISMATCH` message when the FRD displacement nodes are not exactly the mesh nodes plus the duplicate nodes the case's bolt
+ * pretensions add (numbered as the deck does), else null. The reference nodes belong to no element: CalculiX does not write them, but they are accepted.
+ */
+function frdMeshProblem(
+  steps: FeResultsArtifact['steps'],
+  mesh: FeMeshArtifact,
+  extra: { duplicates: number[]; references: number[] },
+): string | null {
+  const known = new Set([...mesh.nodes.map((node) => node[0]), ...extra.duplicates].map(String));
+  const references = new Set(extra.references.map(String));
   for (const step of steps) {
-    const nodes = Object.keys(step.fields['DISP']?.values ?? {});
+    const nodes = Object.keys(step.fields['DISP']?.values ?? {}).filter((node) => !references.has(node));
     if (nodes.length === 0) continue;
     const stray = nodes.find((node) => !known.has(node));
     if (stray !== undefined) return `node ${stray} of the file is not a node of the current mesh`;
@@ -69,7 +77,7 @@ export function runFeaImportResults(
       return feaFailure(tool, 'FEA_SOLVER_FAILED', `the .frd holds non-finite results (${nonFinite}); the solution is not usable`, [
         analysisId,
       ]);
-    const problem = frdMeshProblem(steps, current.mesh);
+    const problem = frdMeshProblem(steps, current.mesh, pretensionExtraNodes(doc, analysisId, current.mesh));
     if (problem !== null)
       return feaFailure(tool, 'FEA_RESULTS_MESH_MISMATCH', `${problem}: the file was computed on another mesh`, [analysisId]);
     results = {

@@ -15,6 +15,7 @@ import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { nonlinearSteps } from '../nonlinear/deck';
 import { imperfectNodes } from '../nonlinear/imperfectionDeck';
 import { creepSteps } from '../creep/deck';
+import { pretensionPlan } from '../contact/pretensionDeck';
 import { deckElementType, isCompositePart, planarSectionCards } from '../shell/shellDeck';
 import { PLANAR_TYPES } from '../shell/shellResults';
 import { isDynamicType } from '../dynamics/quantities';
@@ -147,10 +148,19 @@ export function precheck(
 /** Nodes (the mesh nodes, or the imperfect ones of a nonlinear case), elements, the all-element set and the target node sets. */
 function modelBlock(ctx: DeckContext, nodes: FeMeshArtifact['nodes']): string[] {
   const { mesh } = ctx;
+  const plan = pretensionPlan(ctx);
+  const bolts = 'code' in plan ? null : plan;
   const lines = [`*NODE, NSET=${ALL_NODES}`, ...nodes.map(([id, x, y, z]) => row(id, x, y, z))];
+  // a duplicate sits where its original does (the imperfect position in a nonlinear case with an imperfection)
+  const at = new Map(nodes.map(([id, x, y, z]) => [id, [x, y, z] as const]));
+  const originals = new Map(bolts?.bolts.flatMap((planned) => [...planned.duplicates].map(([node, copy]) => [copy, node] as const)) ?? []);
+  const duplicateRows = (bolts?.duplicateNodes ?? []).map(
+    ([copy, x, y, z]) => [copy, ...(at.get(originals.get(copy) ?? copy) ?? [x, y, z])] as const,
+  );
+  if (duplicateRows.length > 0) lines.push('*NODE', ...duplicateRows.map((node) => row(...node)));
   for (const block of mesh.blocks) {
     lines.push(`*ELEMENT, TYPE=${deckElementType(ctx, block.type, block.entityId)}, ELSET=${ctx.elset(block.entityId)}`);
-    lines.push(...block.elements.map((element) => row(...element)));
+    lines.push(...block.elements.map((element) => row(...(bolts === null ? element : bolts.substitute(element)))));
   }
   const elsets = [...new Set(mesh.blocks.map((block) => ctx.elset(block.entityId)))];
   lines.push(`*ELSET, ELSET=${ALL_ELEMENTS}`);

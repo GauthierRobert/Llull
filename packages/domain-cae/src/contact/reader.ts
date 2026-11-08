@@ -11,8 +11,8 @@ import { faceNodes, indexMesh, type MeshIndex } from '../thermal/meshGeometry';
 import { pairTargetKey } from '../hash/targets';
 
 /** frd block and component names CalculiX writes for CDIS / CSTR. */
-const BLOCK = 'CONTACT';
-const COMPONENTS = ['COPEN', 'CSLIP1', 'CSLIP2', 'CPRESS', 'CSHEAR1', 'CSHEAR2'] as const;
+export const BLOCK = 'CONTACT';
+export const COMPONENTS = ['COPEN', 'CSLIP1', 'CSLIP2', 'CPRESS', 'CSHEAR1', 'CSHEAR2'] as const;
 
 /** A closed slave node slides when its shear reaches this fraction of mu x pressure (llull rule: Coulomb limit within 1 %). */
 export const SLIDING_FRACTION = 0.99;
@@ -45,7 +45,7 @@ export interface ContactRow {
 type Step = FeResultsArtifact['steps'][number];
 
 /** Tributary area of every slave corner node of `pair` (face area / 3 per corner). */
-function slaveAreas(index: MeshIndex, mesh: FeMeshArtifact, pair: ContactPair): Map<number, number> {
+export function slaveAreas(index: MeshIndex, mesh: FeMeshArtifact, pair: ContactPair): Map<number, number> {
   const areas = new Map<number, number>();
   const key = pairTargetKey(pair.id, 'S');
   for (const [elementId, label] of Object.hasOwn(mesh.faceSets, key) ? (mesh.faceSets[key] ?? []) : []) {
