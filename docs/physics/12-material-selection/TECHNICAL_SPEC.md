@@ -1,6 +1,6 @@
 # PHY-12 — Material selection & substitution — Technical spec
 
-Gap id **SEL** · Status: specification (no implementation) · Written 2026-10-15
+Gap id **SEL** · Status: M1-M3 implemented (2026-11-08, `feat/msel`); M4-M6 see §13 · Written 2026-10-15
 Functional: [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md) · Validation: [validation/README.md](validation/README.md)
 
 ---
@@ -325,3 +325,18 @@ See FUNCTIONAL_SPEC §11 [R1]–[R8] and `validation/sources.md` [S1]–[S10]. A
 - [T1] llull architecture laws L1–L10 — `.claude/rules/architecture.md`
 - [T2] Command layer signatures — `.claude/context/command-layer.md`
 - [T3] Physics gap list and pack conventions — `docs/physics/README.md` §6
+
+## 13. Implementation decisions (2026-11-08, owner delegates quality-first)
+
+Where this spec left a choice open, or the repository differs from what §1 assumed, the implementation decided as follows.
+
+| Id | Decision | Why |
+| -- | -------- | --- |
+| D-SEL-01 | The plugin lives in `packages/domain-cae/src/selection/` (`selectionPlugin`, name `physics-selection`), exported from `@cae/index`; there is no `@phys` package. Toolset: the existing `materials`, not a new `selection`. | PHY-03..11 and PHY-20 live in domain-cae; a new package needs an alias, an arch rule and a knip entry for a handful of read-only tools; `materials` is where agents already look for `get_material`. `TOOLSET_NAMES` is unchanged. |
+| D-SEL-02 | Values come from `CadDocument.materials[id].propertyModels` (08 / PHY-01 records); there is no `materialRecords` slice. Resolution (`selection/properties.ts`): an isotropic value answers any direction and an exact-direction value wins; a value with a thickness band needs `thickness` inside it; one `preferred` value or exactly one value, else the new code `SEL_PROPERTY_AMBIGUOUS` (excluded, never a pick). A plain `create_material` density goes through the core `resolveDensity` and is unverified. | one resolver (TR-SEL-02); no silent choice between an A and a B value (AF-31) |
+| D-SEL-03 | Added codes: `SEL_PROPERTY_AMBIGUOUS` (warning exclusion), `SEL_ENTITY_NOT_FOUND` (error: id absent or not measurable by `mass_properties`), `SEL_PARAMS_INVALID` (error: empty list, a quantity of the wrong dimension, a constraint without a bound or on a non-catalogue property). | §7.1 had no code for these refusals |
+| D-SEL-04 | `substitute_material` swaps the material on an in-memory copy by spreading `materialId` (never `assign_material`, never returned) and measures both states with `mass_properties` through `execute`. | a PLM release lock or a layer lock must not block a what-if, no FeatureStep is appended, and the core mass path (exact / closed form / mesh, kernel optional) is the one used. Instances follow `mass_properties`: a component solid with its own material keeps it. |
+| D-SEL-05 | Weights are given for every objective or for none (equal, `defaulted: true`, `source`); a partial set is `SEL_WEIGHT_INVALID`. Score and Pareto exactly as §5.5; the Pareto vector of an index objective is `1 / index` (relative mass); the set is returned in ascending id order. A candidate missing any objective or constraint value is `excluded` (one entry per material, reasons joined); one failing a constraint is `failed` (one entry per failing constraint); neither is ranked. | VC-SEL-04/05/06/14/22 |
+| D-SEL-06 | A constraint is compared in the unit of its lower bound (else the upper bound's); the property must be a catalogue property of that dimension. The `missing: 'report'` param of the proposed plan is dropped: missing data is always reported. | one behaviour, no switch |
+| D-SEL-07 | Worked-example fixtures store the 06 CMP laminate constants (basis `derived`) with basis `unspecified`: `derived` is not a stored 08 basis (`BASES`). | `propertyModel.ts` |
+| D-SEL-08 | `check_material_selection` first checks the materials in use (density, E, unverified values, mixed bases). Staleness and release items follow the milestones that own their data. | each item needs its 05 / 09 data |

@@ -3,6 +3,9 @@
 // analysis plugin
 export { caePlugin } from './plugin';
 
+// material selection and substitution (PHY-12): plugin
+export { selectionPlugin } from './selection/plugin';
+
 // vibro-acoustics hand-off (PHY-20): plugin
 export { vibroacousticsPlugin } from './vibroacoustics/plugin';
 
