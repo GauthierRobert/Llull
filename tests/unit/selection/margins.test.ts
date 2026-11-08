@@ -134,6 +134,17 @@ describe('SEL_MARGINS_NEED_RESOLVE (VC-SEL-09, AC-6)', () => {
     expect(admitted.nuTolerance).toMatchObject({ value: 0.05, defaulted: false });
   });
 
+  it('a candidate without a readable Poisson ratio fails same_poisson with the reason (nothing is assumed)', () => {
+    const noNu = withMaterial(bar.recorded, 'alt', [
+      { property: 'density', value: 7.85, unit: 'g/cm^3', basis: 'company', citation: SOURCE },
+      { property: 'Ftu', value: 600, unit: 'MPa', basis: 'company', citation: SOURCE },
+    ]);
+    const data = marginsOf(swap(noNu));
+    expect(data.code).toBe('SEL_MARGINS_NEED_RESOLVE');
+    expect(data.failedConditions).toEqual(['same_poisson']);
+    expect(data.conditions.find((entry) => entry.condition === 'same_poisson')?.detail).toContain('not readable');
+  });
+
   it('a non-zero prescribed displacement fails no_prescribed_displacement (stress then scales with E)', () => {
     const pulled = marginBar({ category: 'ultimate', lattice });
     const doc = withMaterial(pulled.recorded, 'alt', [
