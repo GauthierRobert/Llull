@@ -57,9 +57,13 @@ function poisson(material: Material, id: string, analysis: AnalysisCase): number
 export function marginConditions(
   doc: CadDocument,
   analysis: AnalysisCase,
-  swap: { readonly from: string; readonly to: string; readonly nuTolerance: number },
+  swap: { readonly from: string; readonly to: string; readonly nuTolerance: number; readonly entityIds: readonly string[] },
 ): ConditionResult[] {
   const used = [...new Set(partMaterials(doc, analysis))].sort();
+  const analysed = Object.keys(analysis.parts).sort();
+  const swapped = [...new Set(swap.entityIds)].sort();
+  const partial = analysed.filter((id) => !swapped.includes(id));
+  const single = used.length === 1 && used[0] === swap.from && partial.length === 0;
   const fromMaterial = Object.hasOwn(doc.materials, swap.from) ? doc.materials[swap.from] : undefined;
   const toMaterial = Object.hasOwn(doc.materials, swap.to) ? doc.materials[swap.to] : undefined;
   const nuFrom = fromMaterial === undefined ? 'no material' : poisson(fromMaterial, swap.from, analysis);
@@ -72,8 +76,8 @@ export function marginConditions(
   return [
     result(
       'single_material',
-      used.length === 1 && used[0] === swap.from,
-      `analysed parts are made of ${used.map((id) => `'${id}'`).join(', ')}${used.length === 1 && used[0] === swap.from ? '' : `; the swap needs every part made of '${swap.from}' (load sharing depends on the stiffness ratio)`}`,
+      single,
+      `analysed parts are made of ${used.map((id) => `'${id}'`).join(', ')}${partial.length === 0 ? '' : `; part(s) ${partial.join(', ')} are not swapped, so the model would mix two materials`}${single ? '' : `; the swap needs every analysed part made of '${swap.from}' and swapped (load sharing depends on the stiffness ratio)`}`,
     ),
     result(
       'same_poisson',

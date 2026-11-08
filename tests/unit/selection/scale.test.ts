@@ -56,6 +56,41 @@ describe('selection scales linearly with the number of materials', () => {
     }
   });
 
+  it('the cap also applies to a { library } resolved to more than 5000 materials', () => {
+    const { doc } = manyMaterials(5001);
+    const materials = Object.fromEntries(
+      Object.entries(doc.materials).map(([id, material]) => [
+        id,
+        id.startsWith('m')
+          ? {
+              ...material,
+              record: {
+                id,
+                designation: id,
+                specs: [],
+                licence: 'legacy',
+                exportMarking: { regime: 'none' },
+                libraryRef: { libraryId: 'big', version: '1', sha256: 'x' },
+              },
+            }
+          : material,
+      ]),
+    );
+    const big = {
+      ...doc,
+      materials,
+      materialLibraries: { big: { libraryId: 'big', version: '1', sha256: 'x' } },
+    } as unknown as CadDocument;
+    for (const [name, params] of [
+      ['compare_materials', { materials: { library: 'big' }, objectives: [{ index: 'tie_stiffness' }] }],
+      ['material_chart_data', { materials: { library: 'big' }, x: { property: 'density' }, y: { property: 'E' } }],
+    ] as const) {
+      const result = run(big, name, params);
+      expect(result.error, name).toMatchObject({ code: 'SEL_PARAMS_INVALID', paths: ['materials'] });
+      expect(result.document).toBe(big);
+    }
+  });
+
   it('material_index over 100 materials x 7 indices answers every row', () => {
     const { doc, ids } = manyMaterials(100);
     const result = run(doc, 'material_index', {

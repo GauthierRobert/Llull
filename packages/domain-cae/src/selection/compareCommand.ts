@@ -3,12 +3,11 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
-import type { CadDocument } from '@core/model/types';
 import { basesOf, mixedBasesWarning, unverifiedSummary } from './bases';
 import { issue, REVIEW_SENTENCE, refuseSel } from './codes';
 import { constraintProblem, evaluateConstraint, type ConstraintFailure } from './constraints';
 import { isExcluded } from './indices';
-import { candidateProblem, layupOf } from './candidates';
+import { candidateList, candidateProblem, layupOf } from './candidates';
 import { layupSchema } from './layups';
 import { evaluateObjective, objectiveProblem, objectiveSchema } from './objectives';
 import {
@@ -25,17 +24,6 @@ import { normaliseWeights, paretoSet, rankScored } from './rank';
 import type { Excluded, IndexResult, SelIssue } from './types';
 
 const COMMAND = 'compare_materials';
-
-/** Material ids of the request: the listed ones, or every material imported from a library (null when the library is not in the document). */
-function candidatesOf(doc: CadDocument, materials: string[] | { readonly library: string }): string[] | null {
-  if (Array.isArray(materials)) return unique(materials);
-  const { library } = materials;
-  if (!Object.hasOwn(doc.materialLibraries ?? {}, library)) return null;
-  return Object.values(doc.materials)
-    .filter((material) => material.record?.libraryRef?.libraryId === library)
-    .map((material) => material.name)
-    .sort();
-}
 
 const constraintSchema = z.object({
   property: z.string().describe('Catalogue property constrained: density, E, G, nu, Ftu, Fty, Fcy, Fsu, cte, k, cp ...'),
@@ -104,16 +92,9 @@ export const compareMaterials = defineCommand({
     if (invalid !== null) return refuseSel(doc, COMMAND, invalid.code, invalid.message, [], [invalid.path]);
     const problem = optionsProblem(params) ?? (constraints ?? []).map(constraintProblem).find((entry) => entry !== null) ?? null;
     if (problem !== null) return refuseSel(doc, COMMAND, 'SEL_PARAMS_INVALID', problem, [], [problem.split(/[:]/)[0] ?? 'params']);
-    const candidates = candidatesOf(doc, params.materials);
-    if (candidates === null)
-      return refuseSel(
-        doc,
-        COMMAND,
-        'SEL_MATERIAL_NOT_FOUND',
-        `no material library '${Array.isArray(params.materials) ? '' : params.materials.library}' in the document`,
-        [],
-        ['materials.library'],
-      );
+    const listed = candidateList(doc, params.materials);
+    if (!Array.isArray(listed)) return refuseSel(doc, COMMAND, listed.code, listed.message, listed.ids, [listed.path]);
+    const candidates = listed;
     const candidateIssue = candidateProblem(doc, candidates, params.layups);
     if (candidateIssue !== null)
       return refuseSel(

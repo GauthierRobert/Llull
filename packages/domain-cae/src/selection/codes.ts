@@ -24,6 +24,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SEL_MARGINS_NEED_RESOLVE: 'run data.margins.resolvePlan on a copy (assign_material, fea_mesh, fea_solve, compute_margins)',
   SEL_NO_ANALYSIS: 'create_analysis with these parts and solve it, or drop margins from include',
   SEL_FEA_STALE_AFTER_SUBSTITUTION: 'fea_solve again (fea_mesh first when the mesh is stale too)',
+  SEL_MARGIN_ROW_UNSUPPORTED:
+    'drop margins from include and read the compute_margins rows of this analysis (composite ply or explicit allowables are not rescaled)',
   SEL_PARAMS_INVALID: 'follow the command description (units of the right dimension, bounds, no empty lists)',
 };
 

@@ -73,7 +73,10 @@ export function evaluateUserIndex(doc: CadDocument, material: string, index: Use
   const density = uses.find((use) => use.property === 'density');
   const numerator = uses
     .filter((use) => use.property !== 'density')
-    .reduce((product, use) => product * Math.pow(use.value, index.exponents[use.property] ?? 0), 1);
+    .reduce((product, use) => {
+      const exponent = index.exponents[use.property];
+      return exponent === undefined ? product : product * Math.pow(use.value, exponent);
+    }, 1);
   const value = density === undefined ? Number.NaN : numerator / density.value;
   if (!Number.isFinite(value) || !(value > 0))
     return {

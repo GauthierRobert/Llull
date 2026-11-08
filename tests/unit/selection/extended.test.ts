@@ -143,7 +143,10 @@ describe('material_chart_data (VC-SEL-18)', () => {
     expect(code({ guides: ['beam_stiffness'], x: { property: 'E' } })).toBe('SEL_PARAMS_INVALID');
     expect(code({ guides: ['beam_strength'], y: { property: 'E' } })).toBe('SEL_PARAMS_INVALID');
     expect(code({ materials: ['nope'] })).toBe('SEL_MATERIAL_NOT_FOUND');
-    expect(chart({ materials: { library: 'absent' } }).rejected).toBeUndefined();
+    expect(chart({ materials: { library: 'absent' } }).error).toMatchObject({
+      code: 'SEL_MATERIAL_NOT_FOUND',
+      paths: ['materials.library'],
+    });
   });
 });
 

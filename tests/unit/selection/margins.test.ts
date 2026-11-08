@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { marginConditions, rescaleMargin } from '@cae/selection/marginRescale';
+import { unsupportedRow } from '@cae/selection/substituteMargins';
 import { caseOf, withCase } from '@cae/shared/access';
 import { blockMesh } from '../cae/adequacyFixtures';
 import { marginBar } from '../cae/marginsFixtures';
@@ -171,7 +172,12 @@ describe('SEL_MARGINS_NEED_RESOLVE (VC-SEL-09, AC-6)', () => {
     expect(gravity.rejected).toBeUndefined();
     const analysis = caseOf(gravity.document, bar.analysisId);
     expect(analysis).toBeDefined();
-    const conditions = marginConditions(gravity.document, analysis ?? ({} as never), { from: 'steel', to: 'alt', nuTolerance: 0 });
+    const conditions = marginConditions(gravity.document, analysis ?? ({} as never), {
+      from: 'steel',
+      to: 'alt',
+      nuTolerance: 0,
+      entityIds: [bar.boxId],
+    });
     const failing = conditions.filter((entry) => !entry.ok).map((entry) => entry.condition);
     expect(failing).toEqual(['no_body_force', 'results_current']);
     expect(conditions.find((entry) => entry.condition === 'results_current')?.detail).toContain('stale');
@@ -191,6 +197,7 @@ describe('SEL_MARGINS_NEED_RESOLVE (VC-SEL-09, AC-6)', () => {
       from: 'steel',
       to: 'alt',
       nuTolerance: 0,
+      entityIds: [bar.boxId, secondId],
     });
     expect(conditions.find((entry) => entry.condition === 'single_material')).toMatchObject({ ok: false, blocking: true });
     expect(conditions.find((entry) => entry.condition === 'single_material')?.detail).toContain("'alt', 'steel'");
@@ -257,5 +264,41 @@ describe('substitute_material margins: no analysis and refusals', () => {
       include: ['margins'],
     });
     expect(marginsOf(result)).toMatchObject({ code: 'SEL_NO_ANALYSIS' });
+  });
+});
+
+describe('review round 1: partial swaps, marginal band, unsupported rows', () => {
+  it('single_material fails when only some analysed parts are swapped, even if all are made of the from material', () => {
+    const base = alloy(0.3);
+    const second = execute(base, 'add_box', { size: [1, 1, 1] });
+    const secondId = second.affected[0] ?? '';
+    const both = execute(second.document, 'assign_material', { materialName: 'steel', entityIds: [secondId] }).document;
+    const analysis = caseOf(both, bar.analysisId) as NonNullable<ReturnType<typeof caseOf>>;
+    const doc = withCase(both, { ...analysis, parts: { ...analysis.parts, [secondId]: { kind: 'solid' } } });
+    const current = caseOf(doc, bar.analysisId) as NonNullable<ReturnType<typeof caseOf>>;
+    const only = marginConditions(doc, current, { from: 'steel', to: 'alt', nuTolerance: 0, entityIds: [bar.boxId] });
+    const single = only.find((entry) => entry.condition === 'single_material');
+    expect(single).toMatchObject({ ok: false, blocking: true });
+    expect(single?.detail).toContain(`part(s) ${secondId} are not swapped`);
+    const all = marginConditions(doc, current, { from: 'steel', to: 'alt', nuTolerance: 0, entityIds: [bar.boxId, secondId] });
+    expect(all.find((entry) => entry.condition === 'single_material')?.ok).toBe(true);
+  });
+
+  it('a MARGINAL source row keeps the band after rescaling (same statusOf as 05); a band the new margin clears gives PASS', () => {
+    const inBand = marginsOf(swap(alloy(0.3), { marginalBand: 2 }));
+    expect(inBand.rows.every((row) => row.statusFrom === 'MARGINAL' && row.statusTo === 'MARGINAL')).toBe(true);
+    expect(inBand.rows[0]?.msTo).toBeCloseTo((300 / 210) * 2 - 1, 9);
+    const cleared = marginsOf(swap(alloy(0.3), { marginalBand: 1 }));
+    expect(cleared.rows.every((row) => row.statusFrom === 'MARGINAL' && row.statusTo === 'PASS')).toBe(true);
+    expect(marginsOf(swap(alloy(0.3))).rows.every((row) => row.statusFrom === 'PASS')).toBe(true);
+  });
+
+  it('a row with a non-material allowable (ply, explicit, none) is refused with SEL_MARGIN_ROW_UNSUPPORTED, not a misleading missing property', () => {
+    for (const allowable of [{ property: 'explicit', basis: 'unspecified' }, undefined]) {
+      const refusal = unsupportedRow({ rowId: 'r7', allowable });
+      expect(refusal).toMatchObject({ kind: 'refused', code: 'SEL_MARGIN_ROW_UNSUPPORTED', path: 'analysisId' });
+      expect(refusal.message).toContain('r7');
+      expect(refusal.message).toContain('rescaling is not defined');
+    }
   });
 });

@@ -37,7 +37,14 @@ export function rankScored<T>(
   candidates: readonly Scored<T>[],
   weights: readonly number[],
 ): { readonly item: T; readonly id: string; readonly rank: number; readonly score: number }[] {
-  const best = weights.map((_, k) => Math.max(...candidates.map((candidate) => candidate.values[k] ?? 0)));
+  const best = weights.map((_, k) =>
+    Math.max(
+      ...candidates.flatMap((candidate) => {
+        const value = candidate.values[k];
+        return value === undefined ? [] : [value];
+      }),
+    ),
+  );
   return candidates
     .map((candidate) => ({
       item: candidate.item,

@@ -130,6 +130,20 @@ describe('substitute_material', () => {
     expect(stiffnessOnly['stiffness']).toBeDefined();
   });
 
+  it('duplicate entity ids count once: the mass is that of the part, not doubled', () => {
+    const once = sub(swap(synBlock, 'syn_b', 'same_geometry'));
+    const twice = sub(
+      run(synBlock.doc, 'substitute_material', {
+        entityIds: [synBlock.id, synBlock.id],
+        from: 'syn_a',
+        to: 'syn_b',
+        designRule: 'same_geometry',
+      }),
+    );
+    expect(twice.mass.beforeG).toBeCloseTo(once.mass.beforeG, 9);
+    expect(twice.mass.afterG).toBeCloseTo(once.mass.afterG, 9);
+  });
+
   it('is pure: the document, its entities and its materials are not touched (the swap is an in-memory copy)', () => {
     const before = structuredClone(worked.doc);
     const result = execute(worked.doc, 'substitute_material', {
@@ -188,6 +202,8 @@ describe('substitute_material', () => {
     const doc = step(line.document, 'assign_material', { materialName: 'syn_a', entityIds: [lineId] });
     const refused = run(doc, 'substitute_material', { entityIds: [lineId], from: 'syn_a', to: 'syn_b', designRule: 'same_geometry' });
     expect(refused.error?.code).toBe('SEL_ENTITY_NOT_FOUND');
+    expect(refused.error?.remediation.length).toBeGreaterThan(0);
+    expect(refused.summary).toContain('not measurable');
     expect(refused.error?.ids).toEqual([lineId]);
   });
 });

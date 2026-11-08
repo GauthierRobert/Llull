@@ -6,7 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { catalogEntry } from '@core/model/propertyCatalog';
 import type { CadDocument } from '@core/model/types';
 import { basesOf, mixedBasesWarning, unverifiedSummary } from './bases';
-import { candidateProblem, layupOf } from './candidates';
+import { candidateList, candidateProblem, layupOf } from './candidates';
 import { issue, REVIEW_SENTENCE, refuseSel } from './codes';
 import { evaluateIndex, isExcluded as isExcludedIndex } from './indices';
 import { BASE_UNITS, exponentValue, ruleOf } from './indexRules';
@@ -158,12 +158,9 @@ export const materialChartData = defineCommand({
           ['guides'],
         );
     }
-    const materials = Array.isArray(params.materials)
-      ? unique(params.materials)
-      : Object.values(doc.materials)
-          .filter((material) => material.record?.libraryRef?.libraryId === (params.materials as { library: string }).library)
-          .map((material) => material.name)
-          .sort();
+    const listed = candidateList(doc, params.materials);
+    if (!Array.isArray(listed)) return refuseSel(doc, COMMAND, listed.code, listed.message, listed.ids, [listed.path]);
+    const materials = listed;
     const candidateIssue = candidateProblem(doc, materials, params.layups);
     if (candidateIssue !== null)
       return refuseSel(

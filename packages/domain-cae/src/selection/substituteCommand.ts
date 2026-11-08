@@ -7,7 +7,7 @@ import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { issue, REVIEW_SENTENCE, refuseSel } from './codes';
 import { DESIGN_RULES, isStrengthRule, ratiosOf, type DesignRule, type Side } from './designRules';
-import { MAX_CANDIDATES, strengthSchema } from './inputs';
+import { MAX_CANDIDATES, strengthSchema, unique } from './inputs';
 import { resolveProperty } from './properties';
 import { substituteMargins, type MarginsOutcome } from './substituteMargins';
 import type { PropertyUse, StrengthProperty } from './types';
@@ -33,7 +33,7 @@ function measureMass(doc: CadDocument, entityIds: readonly string[], ctx: Execut
     if (data?.massG === undefined || !Number.isFinite(data.massG))
       return {
         code: 'SEL_ENTITY_NOT_FOUND',
-        message: `mass_properties could not measure '${entityId}': ${result.summary}`,
+        message: `'${entityId}' is not measurable by mass_properties (${result.summary})`,
         ids: [entityId],
         path: 'entityIds',
       };
@@ -133,6 +133,13 @@ export const substituteMaterial = defineCommand({
       .string()
       .optional()
       .describe('Analysis case whose margins are rescaled (include margins). Omit when exactly one case has the entities as parts.'),
+    marginalBand: z
+      .number()
+      .min(0)
+      .optional()
+      .describe(
+        'Same as compute_margins marginalBand: rows with MS below it are MARGINAL (include margins). Omit for none: no row is MARGINAL.',
+      ),
     nuTolerance: z
       .number()
       .min(0)
@@ -142,7 +149,8 @@ export const substituteMaterial = defineCommand({
       ),
   }),
   run: (doc, params, ctx): CommandResult => {
-    const { entityIds, from, to, designRule } = params;
+    const { from, to, designRule } = params;
+    const entityIds = unique(params.entityIds);
     const refuse = (failure: Failure): CommandResult => refuseSel(doc, COMMAND, failure.code, failure.message, failure.ids, [failure.path]);
     if (designRule === undefined)
       return refuseSel(doc, COMMAND, 'SEL_DESIGN_RULE_UNSET', `name the designRule (${DESIGN_RULES.join(', ')})`, [], ['designRule']);
@@ -220,7 +228,11 @@ export const substituteMaterial = defineCommand({
       ...new Set(weak.map(([material, input]) => `${material} ${input.property}: ${input.unverifiedReasons.join(', ')}`)),
     ];
     const margins = include.includes('margins')
-      ? substituteMargins(doc, { entityIds, from, to, analysisId: params.analysisId, nuTolerance: params.nuTolerance }, ctx)
+      ? substituteMargins(
+          doc,
+          { entityIds, from, to, analysisId: params.analysisId, nuTolerance: params.nuTolerance, marginalBand: params.marginalBand },
+          ctx,
+        )
       : undefined;
     if (margins?.kind === 'refused') return refuse({ code: margins.code, message: margins.message, ids: [], path: margins.path });
     const marginsUnverified = margins?.unverified === true;

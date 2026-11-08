@@ -7,6 +7,7 @@ import { issue } from './codes';
 import { marginConditions, NU_TOLERANCE_DEFAULT, resolvePlan, rescaleMargin, type ConditionResult } from './marginRescale';
 import { isAllowableRefusal, materialAllowable, type AllowableProperty } from '../margins/allowable';
 import { propertyTemperatureK } from '../decks/elastic';
+import { statusOf } from '../margins/marginMath';
 import { analysisOf, caseOf } from '../shared/access';
 import type { SelIssue } from './types';
 
@@ -22,7 +23,7 @@ interface MarginRowData {
   readonly ms: number | null;
   readonly status: string;
   readonly factorApplied: number;
-  readonly allowable: { readonly property: string; readonly basis: string };
+  readonly allowable?: { readonly property: string; readonly basis: string };
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];
 }
@@ -31,6 +32,7 @@ interface MarginsData {
   readonly rows: readonly MarginRowData[];
   readonly resultsHash: string;
   readonly factors: unknown;
+  readonly marginalBand: number | null;
 }
 
 interface RescaledMargin {
@@ -68,6 +70,7 @@ interface Request {
   readonly to: string;
   readonly analysisId: string | undefined;
   readonly nuTolerance: number | undefined;
+  readonly marginalBand: number | undefined;
 }
 
 const noAnalysis = (reason: string, entityIds: readonly string[]): MarginsOutcome => ({
@@ -98,6 +101,22 @@ function pickAnalysis(doc: CadDocument, request: Request): { readonly id: string
   return { id: only };
 }
 
+/** The material strength a row was checked against (Ftu / Fty), else undefined: ply rows and explicit allowables are not rescalable. */
+function materialProperty(row: Pick<MarginRowData, 'allowable'>): AllowableProperty | undefined {
+  const property = row.allowable?.property;
+  return property === 'Ftu' || property === 'Fty' ? property : undefined;
+}
+
+/** The refusal for a row whose allowable is not a material Ftu / Fty (SEL_MARGIN_ROW_UNSUPPORTED). */
+export function unsupportedRow(row: Pick<MarginRowData, 'rowId' | 'allowable'>): Extract<MarginsOutcome, { kind: 'refused' }> {
+  return {
+    kind: 'refused',
+    code: 'SEL_MARGIN_ROW_UNSUPPORTED',
+    message: `row ${row.rowId} uses ${row.allowable === undefined ? 'no material allowable' : `the allowable '${row.allowable.property}'`}, not a material Ftu / Fty: rescaling is not defined`,
+    path: 'analysisId',
+  };
+}
+
 const isOutcome = (value: { readonly id: string } | MarginsOutcome): value is MarginsOutcome => 'kind' in value;
 
 /**
@@ -117,7 +136,12 @@ export function substituteMargins(doc: CadDocument, request: Request, ctx: Execu
     request.nuTolerance === undefined
       ? { ...NU_TOLERANCE_DEFAULT, defaulted: true as const }
       : { value: request.nuTolerance, source: 'given by the caller (nuTolerance)', defaulted: false as const };
-  const conditions = marginConditions(doc, analysis, { from: request.from, to: request.to, nuTolerance: tolerance.value });
+  const conditions = marginConditions(doc, analysis, {
+    from: request.from,
+    to: request.to,
+    nuTolerance: tolerance.value,
+    entityIds: request.entityIds,
+  });
   const failed = conditions.filter((entry) => !entry.ok && entry.blocking);
   if (failed.length > 0) {
     const reason = `exactness condition(s) failed: ${failed.map((entry) => entry.condition).join(', ')}`;
@@ -136,7 +160,12 @@ export function substituteMargins(doc: CadDocument, request: Request, ctx: Execu
       unverified: false,
     };
   }
-  const margins = execute(doc, 'compute_margins', { analysisId: analysis.id }, ctx);
+  const margins = execute(
+    doc,
+    'compute_margins',
+    { analysisId: analysis.id, ...(request.marginalBand === undefined ? {} : { marginalBand: request.marginalBand }) },
+    ctx,
+  );
   const computed = margins.data as MarginsData | undefined;
   if (margins.rejected === true || computed === undefined)
     return noAnalysis(`compute_margins gave no rows for '${analysis.id}': ${margins.summary}`, request.entityIds);
@@ -144,15 +173,10 @@ export function substituteMargins(doc: CadDocument, request: Request, ctx: Execu
   const temperatureK = propertyTemperatureK(analysis);
   const rows: RescaledMargin[] = [];
   for (const row of computed.rows) {
-    const property: AllowableProperty | undefined =
-      row.allowable.property === 'Ftu' || row.allowable.property === 'Fty' ? row.allowable.property : undefined;
-    if (property === undefined || toMaterial === undefined)
-      return {
-        kind: 'refused',
-        code: 'SEL_PROPERTY_MISSING',
-        message: `row ${row.rowId} has no material allowable to rescale`,
-        path: 'analysisId',
-      };
+    const property = materialProperty(row);
+    if (property === undefined) return unsupportedRow(row);
+    if (toMaterial === undefined)
+      return { kind: 'refused', code: 'SEL_MATERIAL_NOT_FOUND', message: `no material '${request.to}'`, path: 'to' };
     const fromMaterial = doc.materials[request.from];
     const allowanceFrom = fromMaterial === undefined ? undefined : materialAllowable(fromMaterial, request.from, property, temperatureK);
     const allowanceTo = materialAllowable(toMaterial, request.to, property, temperatureK);
@@ -184,7 +208,7 @@ export function substituteMargins(doc: CadDocument, request: Request, ctx: Execu
       msFrom: row.ms,
       msTo,
       statusFrom: row.status,
-      statusTo: msTo === null ? row.status : msTo < 0 ? 'FAIL' : 'PASS',
+      statusTo: msTo === null ? row.status : statusOf(msTo, computed.marginalBand ?? undefined),
       method: 'rescaled',
       unverified: reasons.length > 0,
       unverifiedReasons: reasons,
@@ -216,6 +240,7 @@ export function substituteMargins(doc: CadDocument, request: Request, ctx: Execu
       conditions: [...conditions, basisCondition],
       nuTolerance: tolerance,
       factors: computed.factors,
+      marginalBand: computed.marginalBand,
       rows,
       minMs: { from: lowest((row) => row.msFrom), to: lowest((row) => row.msTo) },
       reviewRequired: true,
