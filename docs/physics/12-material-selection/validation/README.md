@@ -13,8 +13,8 @@ How to prove that a future implementation of material selection and substitution
 | `selection_materials.json` | Synthetic materials (labelled, algorithm tests) and the worked-example inputs with source, basis and status | partial (CFRP density, 4130 ν `tbd`) |
 | `generate_selection_reference.py` | Stdlib generator; `python3 -I generate_selection_reference.py` writes the JSON, `--check` fails when stale. Re-runs are byte-identical (checked 2026-10-15) | complete |
 | `expected_results.json` | 39 cases VC-SEL-01…22 | generated |
-| `plans/compare_bracket_materials_proposed.json` | Proposed plan: library import, `compare_materials`, `check_material_selection` | proposed (commands do not exist yet) |
-| `plans/substitute_block_ti_proposed.json` | The 08 7075 block (runs today up to `mass_properties`, 140.5 g) followed by `substitute_material` | first 5 steps run on today's llull |
+| `plans/compare_bracket_materials_proposed.json` | Proposed plan: library import, `compare_materials`, `check_material_selection` | commands built (2026-11-08); `<sha256 ...>` of the library is a placeholder to fill |
+| `plans/substitute_block_ti_proposed.json` | The 08 7075 block (runs today up to `mass_properties`, 140.5 g) followed by `substitute_material` | runs end to end: 140.5 g -> 221.439 g, `margins` answers SEL_NO_ANALYSIS (no 05 analysis in the plan) |
 
 ## Validation cases
 

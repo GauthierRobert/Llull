@@ -268,7 +268,6 @@ function contactDocument(): CadDocument {
   }).doc;
 }
 
-
 /** PHY-05 NLS-M3: the nonlinear bar (first case) with a buckling-mode imperfection pinned to the solved buckling case. */
 let imperfectSeed: { doc: CadDocument; ctx: ExecutionContext } | undefined;
 function imperfectFixture(): { doc: CadDocument; ctx: ExecutionContext } {

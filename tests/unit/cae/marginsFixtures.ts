@@ -40,6 +40,8 @@ export interface MarginBarOptions {
   readonly category?: 'limit' | 'ultimate';
   readonly analysisType?: 'static' | 'thermo_static';
   readonly ftuExtra?: Record<string, unknown>;
+  /** ux of the `pull` displacement constraint, document length units (default 0.002; 0 makes it a zero prescribed displacement). */
+  readonly pullDisplacement?: number;
   /** Mesh globalSize in mm (default 0.1: the singularity radius 0.2 mm reaches only the two point-support nodes). */
   readonly globalSize?: number;
   /** The point supports (nodes 1 and 3) are singular sources (no face in the mesh artifact). Default: false. */
@@ -134,7 +136,7 @@ export function marginBar(options: MarginBarOptions = {}): MarginBar {
     analysisId: bar.analysisId,
     name: 'pull',
     kind: 'displacement',
-    dofs: { ux: 0.002 },
+    dofs: { ux: options.pullDisplacement === undefined ? 0.002 : options.pullDisplacement },
     target: { entityId: bar.boxId, facesNear: [[2, 0.5, 0.5]] },
   });
   doc = pull.document;
