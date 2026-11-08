@@ -5,9 +5,9 @@
  * flow-query`) re-hashes it against the hash the bundle names.
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { copyFile, link, open, rename, rm } from 'node:fs/promises';
+import { copyFile, link, open, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { sha256Hex } from '../sha256';
 
@@ -21,8 +21,11 @@ export interface StoredFile {
 export interface CfdFileStore {
   /** Stores small `bytes` (slices, streamlines) and returns their sha256 (idempotent). */
   put(bytes: Buffer): string;
-  /** Stores the file at `source` (hashed by stream, then copied): its sha256 and size (idempotent). */
-  putFile(source: string): Promise<StoredFile>;
+  /**
+   * Stores the file at `source` whose streamed hash and size the caller already has (`hashFile`, compared with what it expected
+   * first: nothing is copied for a file the caller rejects). Idempotent; concurrent stores of the same content both succeed.
+   */
+  putFile(source: string, known: StoredFile): Promise<StoredFile>;
   /** The verified bytes of a small stored file, or null when absent or damaged. */
   get(hash: string): Buffer | null;
   /** Path of a stored file, or null when absent (its content is checked by whoever reads it). */
@@ -31,7 +34,7 @@ export interface CfdFileStore {
 }
 
 /** sha256 and byte count of a file, read by stream. */
-function hashFile(file: string): Promise<StoredFile> {
+export function hashFile(file: string): Promise<StoredFile> {
   return new Promise((resolve, reject) => {
     const hash = createHash('sha256');
     let bytes = 0;
@@ -83,19 +86,26 @@ export function cfdFileStore(artifactDirectory: string): CfdFileStore {
       renameSync(partial, target);
       return hash;
     },
-    async putFile(source) {
-      const stored = await hashFile(source);
-      const target = fileOf(stored.sha256);
-      if (existsSync(target) && (await hashFile(target)).sha256 === stored.sha256) return stored;
+    async putFile(source, known) {
+      if (!HASH.test(known.sha256)) throw new Error(`not a sha256: '${known.sha256}'`);
+      const target = fileOf(known.sha256);
+      const sizeOf = async (file: string): Promise<number | null> => (await stat(file).catch(() => null))?.size ?? null;
+      // A stored file of the right size is this content (its reader re-hashes it); a damaged one of another size is replaced.
+      if ((await sizeOf(target)) === known.bytes) return known;
       mkdirSync(directory, { recursive: true });
-      const partial = `${target}.${process.pid}.tmp`;
+      // One temp name per call: two solves storing the same field at once must not share (and rename away) one partial file.
+      const partial = `${target}.${randomUUID()}.tmp`;
       try {
         await copyFile(source, partial);
         await rename(partial, target);
+      } catch (error) {
+        // A concurrent store won the rename (Windows refuses to replace a file another handle holds): its file is the success.
+        const winner = (await sizeOf(target)) === known.bytes ? await hashFile(target) : null;
+        if (winner?.sha256 !== known.sha256) throw error;
       } finally {
         await rm(partial, { force: true });
       }
-      return stored;
+      return known;
     },
     get(hash) {
       if (!HASH.test(hash)) return null;

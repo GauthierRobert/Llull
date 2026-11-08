@@ -151,6 +151,32 @@ describe('resolveDeferred', () => {
     expect(failed.starts()).toBe(2);
   });
 
+  it.each([
+    ['without a signal', false],
+    ['with a signal', true],
+  ])('a job whose start rejects is MESH_JOB_FAILED with the reason, %s, and leaves no running job', async (_label, withSignal) => {
+    const key = `rejects-${String(withSignal)}`;
+    const failing: DeferredJob = { key, op: 'quad_remesh', heartbeatMs: 1000, start: () => Promise.reject(new Error('spawn EPERM')) };
+    let seen: JobOutcome | undefined;
+    const attempt = (): string => {
+      const scope = currentScope();
+      if (scope === null) return 'no scope';
+      const held = scope.lookup(key);
+      if (held === undefined) {
+        scope.request(failing);
+        return 'pending';
+      }
+      seen = held;
+      return 'code' in held ? held.code : 'ok';
+    };
+    const options = withSignal ? { signal: new AbortController().signal } : {};
+    expect(await resolveDeferred(attempt, options)).toBe('MESH_JOB_FAILED');
+    expect(seen).toMatchObject({ code: 'MESH_JOB_FAILED' });
+    expect((seen as MeshEngineFailure).message).toContain('spawn EPERM');
+    expect(_runningJobCount()).toBe(0);
+    expect(_resultCacheSize()).toBe(0);
+  });
+
   it('a command that chains more than 16 native jobs still resolves: the bound is on jobs, not on runs', async () => {
     const jobs = Array.from({ length: 20 }, (_, i) => fakeJob(`chain-${i}`, result(3), 1));
     expect(await resolveDeferred(needs(...jobs.map((probe) => probe.job)))).toBe(Array(20).fill('ok').join(','));

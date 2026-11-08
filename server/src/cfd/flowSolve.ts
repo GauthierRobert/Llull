@@ -27,7 +27,7 @@ import {
 import { canonicalJson } from '@lib/canonicalJson';
 import { errorMessage } from '@lib/errorMessage';
 import { sha256Hex } from '../sha256';
-import { cfdFileStore, readHead, type StoredFile } from './fileStore';
+import { cfdFileStore, hashFile, readHead, type StoredFile } from './fileStore';
 import { createSharedRuns, type RunInfo } from '../native/sharedRun';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -104,10 +104,10 @@ async function keepField(folder: string, run: JobRun, resultText: Buffer, storeD
     header.cellM === grid.cellM &&
     header.originM.every((value, axis) => value === grid.originM[axis]);
   if (!onGrid) return `field.bin (${header.nx} x ${header.ny} x ${header.nz}) is not on the grid of result.json`;
-  const files = cfdFileStore(storeDirectory);
-  const stored = await files.putFile(file);
-  if (stored.sha256 !== reported.sha256) return `field.bin hashes to ${stored.sha256}, the job reported ${reported.sha256}`;
-  return stored;
+  // One stream pass: hash, compare with the job's report, and only then copy (a rejected multi-GB field leaves nothing behind).
+  const hashed = await hashFile(file);
+  if (hashed.sha256 !== reported.sha256) return `field.bin hashes to ${hashed.sha256}, the job reported ${reported.sha256}`;
+  return cfdFileStore(storeDirectory).putFile(file, hashed);
 }
 
 /** The native run: job folder, `llull-compute flow`, outputs read back (hash-checked) and turned into the artifact. */

@@ -73,6 +73,8 @@ export interface FakeOptions {
   ) => { readonly json: unknown; readonly file?: Buffer } | { readonly fail: { code: string; message: string } };
   /** Writes a field.bin whose header disagrees with result.json. */
   readonly wrongField?: boolean;
+  /** Reports a sha256 for field.bin that is not the file's (the job and its output disagree). */
+  readonly wrongFieldHash?: boolean;
   /** `version()` rejects (the host's version probe failing after the run). */
   readonly versionFails?: boolean;
 }
@@ -254,7 +256,10 @@ export function fakeRunner(options: FakeOptions = {}): FakeRunner {
       for (const [name, bytes] of Object.entries(outputs)) writeFileSync(path.join(folder, name), bytes);
       return {
         ok: true,
-        outputs: Object.entries(outputs).map(([name, bytes]) => ({ path: name, sha256: sha(bytes) })),
+        outputs: Object.entries(outputs).map(([name, bytes]) => ({
+          path: name,
+          sha256: name === 'field.bin' && options.wrongFieldHash === true ? 'e'.repeat(64) : sha(bytes),
+        })),
         warnings: options.warnings ?? [],
         log: '',
         elapsedMs: 9,

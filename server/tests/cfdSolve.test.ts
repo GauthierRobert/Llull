@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { defaultContext } from '@core/commands/context';
@@ -18,7 +18,7 @@ import { cfdResultPort } from '../src/cfd/resultPort';
 import { _stopAllCfdSolves, DEFAULT_CFD_TIMEOUT_S, runCfdSolve } from '../src/cfd/flowSolve';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import { isNativeTool, runNativeTool } from '../src/native/tools';
-import { cfdFileStore } from '../src/cfd/fileStore';
+import { cfdFileStore, hashFile } from '../src/cfd/fileStore';
 import { fakeField, fakeRunner, hostOf, missingRunner, sha, sphereModel } from './cfdTestSupport';
 
 let dir = '';
@@ -166,6 +166,26 @@ describe('cfd_solve with a fake job runner', () => {
     expect(solved).toMatchObject({ isError: true, data: { code: 'CFD_SOLVER_FAILED' } });
     expect(solved.summary).toContain('not on the grid');
     expect(host.current().cfd?.results['re100']).toBeUndefined();
+  });
+
+  it('keeps nothing when field.bin does not hash to what the job reported (compared before any copy)', async () => {
+    const host = hostOf(sphereModel(), store);
+    const solved = await runCfdSolve('re100', {}, host, { store, runner: fakeRunner({ wrongFieldHash: true }) });
+    expect(solved).toMatchObject({ isError: true, data: { code: 'CFD_SOLVER_FAILED' } });
+    expect(solved.summary).toContain('the job reported');
+    const files = path.join(store.directory, 'cfd-files');
+    expect(existsSync(files) ? readdirSync(files) : []).toEqual([]);
+    expect(host.current().cfd?.results['re100']).toBeUndefined();
+  });
+
+  it('stores the same field from concurrent callers: every store succeeds and one file remains', async () => {
+    const files = cfdFileStore(store.directory);
+    const source = path.join(dir, 'shared-field.bin');
+    writeFileSync(source, Buffer.alloc(4 * 1024 * 1024, 3));
+    const known = await hashFile(source);
+    const stored = await Promise.all(Array.from({ length: 8 }, () => files.putFile(source, known)));
+    expect(stored).toEqual(Array.from({ length: 8 }, () => known));
+    expect(readdirSync(files.directory)).toEqual([`${known.sha256}.bin`]);
   });
 
   it('refuses out-of-range maxSteps and latticeMach before anything runs', async () => {
