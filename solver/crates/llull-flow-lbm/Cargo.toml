@@ -9,7 +9,7 @@ publish.workspace = true
 [features]
 default = ["gpu"]
 # wgpu kernels (device "gpu" / "auto"): f32 compute shaders mirroring the CPU kernel cell for cell. Without them a GPU request runs the CPU twin with a warning.
-gpu = ["llull-gpu/wgpu"]
+gpu = ["llull-gpu/wgpu", "llull-flow-core/gpu"]
 
 [dependencies]
 llull-flow-core = { path = "../llull-flow-core" }

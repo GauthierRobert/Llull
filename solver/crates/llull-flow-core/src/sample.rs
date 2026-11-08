@@ -6,22 +6,36 @@ use crate::grid::Grid;
 use crate::stl::Triangle;
 use rayon::prelude::*;
 
-/// Value of `field` at `point` by trilinear interpolation over valid cells; None outside the grid or with no valid cell around.
-/// @invariant exact for a linear field where every surrounding cell is valid
-pub fn trilinear(grid: &Grid, field: &[f32], valid: &[bool], point: [f64; 3]) -> Option<f64> {
+/// The valid cell centres around a point (at most eight, in corner order) with their trilinear weights, and the weight sum.
+#[derive(Debug, Clone, Copy)]
+pub struct Stencil {
+    pub cells: [usize; 8],
+    pub weights: [f64; 8],
+    pub count: usize,
+    pub weight_sum: f64,
+}
+
+/// Where a point falls for sampling: outside the grid, among cells none of which is valid, or a usable stencil.
+#[derive(Debug, Clone, Copy)]
+pub enum Located {
+    Outside,
+    NoValidCell,
+    Inside(Stencil),
+}
+
+/// The trilinear stencil of `point` over the valid cells (invalid cells drop out and the weights are renormalised by `apply`).
+pub fn locate(grid: &Grid, valid: &[bool], point: [f64; 3]) -> Located {
     let local = |axis: usize| (point[axis] - grid.origin[axis]) / grid.h - 0.5;
-    let (tx, ty, tz) = (local(0), local(1), local(2));
     let n = [grid.nx, grid.ny, grid.nz];
-    let t = [tx, ty, tz];
-    if (0..3).any(|axis| t[axis] < -0.5 || t[axis] > n[axis] as f64 - 0.5) {
-        return None;
+    let t = [local(0), local(1), local(2)];
+    if (0..3).any(|axis| !(t[axis] >= -0.5 && t[axis] <= n[axis] as f64 - 0.5)) {
+        return Located::Outside;
     }
     let base = |axis: usize| t[axis].floor().clamp(0.0, (n[axis] as f64 - 2.0).max(0.0)) as usize;
     let (i0, j0, k0) = (base(0), base(1), base(2));
     let frac = |axis: usize, i: usize| (t[axis] - i as f64).clamp(0.0, 1.0);
     let (fx, fy, fz) = (frac(0, i0), frac(1, j0), frac(2, k0));
-    let mut weight_sum = 0.0;
-    let mut value_sum = 0.0;
+    let mut stencil = Stencil { cells: [0; 8], weights: [0.0; 8], count: 0, weight_sum: 0.0 };
     for dk in 0..2usize {
         for dj in 0..2usize {
             for di in 0..2usize {
@@ -32,12 +46,38 @@ pub fn trilinear(grid: &Grid, field: &[f32], valid: &[bool], point: [f64; 3]) ->
                 }
                 let weight =
                     (if di == 0 { 1.0 - fx } else { fx }) * (if dj == 0 { 1.0 - fy } else { fy }) * (if dk == 0 { 1.0 - fz } else { fz });
-                weight_sum += weight;
-                value_sum += weight * f64::from(field[cell]);
+                stencil.cells[stencil.count] = cell;
+                stencil.weights[stencil.count] = weight;
+                stencil.count += 1;
+                stencil.weight_sum += weight;
             }
         }
     }
-    (weight_sum > 1e-12).then(|| value_sum / weight_sum)
+    if stencil.weight_sum > 1e-12 {
+        Located::Inside(stencil)
+    } else {
+        Located::NoValidCell
+    }
+}
+
+impl Stencil {
+    /// The interpolated value of `field`: the weighted sum in corner order divided by the weight sum.
+    pub fn apply(&self, field: &[f32]) -> f64 {
+        let mut value_sum = 0.0;
+        for slot in 0..self.count {
+            value_sum += self.weights[slot] * f64::from(field[self.cells[slot]]);
+        }
+        value_sum / self.weight_sum
+    }
+}
+
+/// Value of `field` at `point` by trilinear interpolation over valid cells; None outside the grid or with no valid cell around.
+/// @invariant exact for a linear field where every surrounding cell is valid
+pub fn trilinear(grid: &Grid, field: &[f32], valid: &[bool], point: [f64; 3]) -> Option<f64> {
+    match locate(grid, valid, point) {
+        Located::Inside(stencil) => Some(stencil.apply(field)),
+        Located::Outside | Located::NoValidCell => None,
+    }
 }
 
 /// Field value on every triangle: sampled at the centroid pushed `0.5 h, 1 h, …, 3 h` along the outward normal, the first

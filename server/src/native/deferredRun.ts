@@ -17,6 +17,7 @@ import { createResolveMemo, type ResolveMemo } from '@core/commands/resolveMemo'
 import { deferralCount } from '@core/geometry/mesh/engine';
 import type { MeshEngineFailure, MeshOpName, MeshOpResult } from '@core/geometry/mesh/engineTypes';
 import { isRecord } from '@lib/isRecord';
+import { createSharedRuns } from './sharedRun';
 
 /** Named guard: native jobs one resolve may run (a plan of many native steps takes one per step); beyond it MESH_JOB_LIMIT. */
 const MAX_JOBS_PER_RESOLVE = 256;
@@ -169,15 +170,8 @@ export function _resultCacheSize(): number {
 
 type Listener = (event: JobProgress) => void;
 
-interface RunningJob {
-  readonly promise: Promise<JobOutcome>;
-  readonly controller: AbortController;
-  readonly listeners: Set<Listener>;
-  waiters: number;
-  last(): JobProgress | null;
-}
-
-const running = new Map<string, RunningJob>();
+/** One run per content key, shared by every command that waits for it (`sharedRun.ts`: per-caller signals, kill with the last waiter). */
+const running = createSharedRuns<JobOutcome, JobProgress, MeshOpName>({ replayLatest: true });
 
 function progressOf(job: DeferredJob, raw: Readonly<Record<string, unknown>>, startedAt: number, heartbeat: boolean): JobProgress {
   const elapsedMs = Date.now() - startedAt;
@@ -197,69 +191,36 @@ function progressOf(job: DeferredJob, raw: Readonly<Record<string, unknown>>, st
   };
 }
 
-/** Start `job`; `first` hears every report from the very first (the job may report before `start` returns). */
-function launch(job: DeferredJob, first: Listener | undefined): RunningJob {
-  const controller = new AbortController();
-  const listeners = new Set<Listener>(first === undefined ? [] : [first]);
-  const startedAt = Date.now();
-  let last: JobProgress | null = null;
-  const publish = (event: JobProgress): void => {
-    last = event;
-    for (const listener of listeners) listener(event);
+/** The shared run of `job`: a start report, heartbeats of a silent job, every job report, the result kept on success. */
+const startJob =
+  (job: DeferredJob) =>
+  (signal: AbortSignal, publish: (event: JobProgress) => void): Promise<JobOutcome> => {
+    const startedAt = Date.now();
+    let last: JobProgress | null = null;
+    const report = (event: JobProgress): void => {
+      last = event;
+      publish(event);
+    };
+    report(progressOf(job, { stage: 'start', message: `${job.op} starting` }, startedAt, false));
+    const heartbeat = setInterval(() => {
+      if (last !== null) report(progressOf(job, { ...last }, startedAt, true));
+    }, job.heartbeatMs);
+    heartbeat.unref();
+    return job
+      .start(signal, (raw) => report(progressOf(job, raw, startedAt, false)))
+      .then((outcome) => {
+        if (!isFailure(outcome)) resultCache.set(job.key, outcome);
+        return outcome;
+      })
+      .finally(() => clearInterval(heartbeat));
   };
-  publish(progressOf(job, { stage: 'start', message: `${job.op} starting` }, startedAt, false));
-  const heartbeat = setInterval(() => {
-    if (last !== null) publish(progressOf(job, { ...last }, startedAt, true));
-  }, job.heartbeatMs);
-  heartbeat.unref();
-  const promise = job
-    .start(controller.signal, (raw) => publish(progressOf(job, raw, startedAt, false)))
-    .then((outcome) => {
-      if (!isFailure(outcome)) resultCache.set(job.key, outcome);
-      return outcome;
-    })
-    .finally(() => {
-      clearInterval(heartbeat);
-      if (running.get(job.key)?.promise === promise) running.delete(job.key);
-    });
-  return { promise, controller, listeners, waiters: 0, last: () => last };
-}
 
 /** Wait for `job` (started if not running, shared if running). Aborting `signal` stops waiting at once and kills the job when nobody else waits. */
-function acquire(job: DeferredJob, signal: AbortSignal | undefined, onProgress: Listener | undefined): Promise<JobOutcome> {
-  const existing = running.get(job.key);
-  const shared = existing ?? launch(job, onProgress);
-  if (existing === undefined) running.set(job.key, shared);
-  else if (onProgress !== undefined) {
-    shared.listeners.add(onProgress);
-    const latest = shared.last();
-    if (latest !== null) onProgress(latest);
-  }
-  shared.waiters += 1;
-  let released = false;
-  const release = (): void => {
-    if (released) return;
-    released = true;
-    if (onProgress !== undefined) shared.listeners.delete(onProgress);
-    shared.waiters -= 1;
-    if (shared.waiters > 0) return;
-    if (running.get(job.key) === shared) running.delete(job.key);
-    shared.controller.abort();
-  };
-  if (signal === undefined) return shared.promise.finally(release);
-  return new Promise<JobOutcome>((resolve) => {
-    const onAbort = (): void => {
-      release();
-      resolve({ code: 'MESH_CANCELLED', message: `the '${job.op}' job was cancelled` });
-    };
-    if (signal.aborted) return onAbort();
-    signal.addEventListener('abort', onAbort, { once: true });
-    void shared.promise.then((outcome) => {
-      signal.removeEventListener('abort', onAbort);
-      release();
-      resolve(outcome);
-    });
-  });
+async function acquire(job: DeferredJob, signal: AbortSignal | undefined, onProgress: Listener | undefined): Promise<JobOutcome> {
+  const joined = await running.join(job.key, job.op, startJob(job), { signal, onProgress });
+  if (joined.kind === 'done') return joined.value;
+  if (joined.kind === 'failed') return { code: 'MESH_JOB_FAILED', message: `the '${job.op}' job failed: ${joined.error}` };
+  return { code: 'MESH_CANCELLED', message: `the '${job.op}' job was cancelled` };
 }
 
 export interface ResolveOptions<T = unknown> {
@@ -394,5 +355,5 @@ export async function resolveDeferred<T>(attempt: () => T, options: ResolveOptio
 
 /** @internal tests only: native jobs running now. */
 export function _runningJobCount(): number {
-  return running.size;
+  return running.list().length;
 }

@@ -47,13 +47,17 @@
 //!   memory layout (bytes per cell of this run, of the GPU and of the CPU layouts), lattice facts, history (capped to
 //!   `historyCap` rows, always ending with the last sample), device / adapter / deterministic / precision, warnings.
 //! - `surface.bin`: per-triangle surface fields (`LLSF` header, see `outputs.rs`); `slice-<k>.bin` per requested slice (`LLSL`).
+//! - `field.bin`: the time-averaged velocity and pressure per cell, the fluid mask and the symmetry planes (`LLFD`,
+//!   `llull_flow_core::field`), read back by `llull-compute flow-query` (probes, slices, streamlines on the recorded result).
 
 pub mod spec;
 
 use crate::cpu::{bytes_per_cell, CpuSolver};
 use crate::domain::{Domain, MOVING_WALL, SLIP_X, SOLID};
 use crate::kernel::Params;
-use crate::outputs::{coefficients, convert_fields, history_rows, peaks, probes, slice_file, surface_file, Fields, Mirror, WarningEntry};
+use crate::outputs::{
+    coefficients, convert_fields, field_file, history_rows, peaks, probes, slice_file, surface_file, Fields, Mirror, WarningEntry,
+};
 use crate::solver::{run as run_steady, Backend, BackendInfo, Phase, RunOutcome, RunSettings};
 use crate::units::{Lattice, MIN_TAU_MARGIN};
 use llull_flow_core::grid::Grid;
@@ -114,6 +118,16 @@ fn validate(job: &JobFile) -> Result<[f64; 3], JobError> {
 /// The symmetry faces as `(axis, high)`.
 fn symmetry_faces(job: &JobFile) -> Vec<(usize, bool)> {
     job.faces.faces().iter().filter(|(_, _, kind)| *kind == FaceKind::Symmetry).map(|(axis, high, _)| (*axis, *high)).collect()
+}
+
+/// The coordinate of a symmetry face: the box's min face, or for a max face the boundary of the grid's last face layer, which lies at
+/// `min + ceil((max - min) / h) h` (the grid rounds the box up to whole cells), not at `grid.maxM` itself.
+fn symmetry_plane(grid: &Grid, job: &JobFile, axis: usize, high: bool) -> f64 {
+    if !high {
+        return job.grid.min_m[axis];
+    }
+    let n = [grid.nx, grid.ny, grid.nz][axis];
+    grid.origin[axis] + (n - 1) as f64 * grid.h
 }
 
 /// Builds the domain: the fluid box plus one face layer, the voxelised body strictly inside except through symmetry faces,
@@ -395,7 +409,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         if job.outputs.surface_fields.is_empty() { vec!["p".to_string(), "cp".to_string()] } else { job.outputs.surface_fields.clone() };
     // Triangles of the dropped half sample their mirror image: the symmetry plane is the fluid box's face on that side.
     let mirrors: Vec<Mirror> =
-        symmetric.iter().map(|(axis, high)| (*axis, if *high { job.grid.max_m[*axis] } else { job.grid.min_m[*axis] }, *high)).collect();
+        symmetric.iter().map(|(axis, high)| (*axis, symmetry_plane(&domain.grid, &job, *axis, *high), *high)).collect();
     write("surface.bin", &surface_file(&domain, &triangles, &fields, &surface_fields, dynamic_pressure, &mirrors))?;
     let mut slice_names = Vec::new();
     for (k, slice) in job.outputs.slices.iter().enumerate() {
@@ -403,6 +417,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         write(&name, &slice_file(&domain, &fields, slice)?)?;
         slice_names.push(name);
     }
+    write("field.bin", &field_file(&domain, &fields, &mirrors))?;
     let converged = outcome.converged;
     let cells = domain.grid.cells();
     let bytes_used = if info.device == "gpu" { GPU_BYTES_PER_CELL } else { bytes_per_cell::<f64>() };
@@ -462,6 +477,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         settings,
         surface: "surface.bin".to_string(),
         slices: slice_names,
+        field: "field.bin".to_string(),
         not_modelled,
         warnings,
     };

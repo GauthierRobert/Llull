@@ -96,6 +96,7 @@ function fakeResult(job: FlowJob, overrides: Record<string, unknown> = {}): Reco
     history: [{ step: 400, timeS: 1, dragN: 0.6, cd: 1.5, forceN: [0.6, 0, 0], change: null, phase: 'transient' }],
     settings: {},
     surface: 'surface.bin',
+    field: 'field.bin',
     slices: ['slice-0.bin'],
     notModelled: ['wall-resolved boundary layer'],
     warnings: [],
@@ -117,7 +118,11 @@ function bundleOf(doc: CadDocument, overrides: Record<string, unknown> = {}): Bu
   const artifact = flowResultArtifact(
     parsed,
     job,
-    { surface: new Uint8Array([76, 76, 83, 70]), slices: [{ name: 'slice-0.bin', bytes: new Uint8Array(8) }] },
+    {
+      surface: new Uint8Array([76, 76, 83, 70]),
+      slices: [{ name: 'slice-0.bin', bytes: new Uint8Array(8) }],
+      field: { sha256: 'f'.repeat(64), bytes: 56 },
+    },
     '9.9.9',
   );
   if (typeof artifact === 'string') throw new Error(artifact);
@@ -267,7 +272,7 @@ describe('result.json parsing and the artifact', () => {
     const parsed = parseFlowResult(JSON.stringify(fakeResult(job)));
     expect(typeof parsed).toBe('object');
     if (typeof parsed === 'string') throw new Error(parsed);
-    const files = { surface: new Uint8Array(4), slices: [] };
+    const files = { surface: new Uint8Array(4), slices: [], field: { sha256: 'e'.repeat(64), bytes: 9 } };
     expect(flowResultArtifact({ ...parsed, caseId: 'other' }, job, files, '1')).toContain("case 'other'");
     expect(flowResultArtifact({ ...parsed, forces: { ...parsed.forces, cd: 9 } }, job, files, '1')).toContain('disagree');
     expect(flowResultArtifact({ ...parsed, forces: { ...parsed.forces, dynamicPressurePa: 7 } }, job, files, '1')).toContain(
@@ -281,6 +286,7 @@ describe('result.json parsing and the artifact', () => {
       caseHash: job.caseHash,
       geometryHash: job.geometryHash,
       kernel: 'none',
+      field: { sha256: 'e'.repeat(64), bytes: 9 },
     });
   });
 

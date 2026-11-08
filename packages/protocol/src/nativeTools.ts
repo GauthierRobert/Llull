@@ -1,6 +1,7 @@
 /**
  * Native-transport tool definitions (schema only): fatigue_field, fea_map_field, fea_render, topology_solve, explicit_run, mtest_run,
- * auto_route, stackup_monte_carlo, vortex_lattice_solve, scan_import, scan_list, cfd_solve. Like the exchange / FE tools they are not registry
+ * auto_route, stackup_monte_carlo, vortex_lattice_solve, scan_import, scan_list, cfd_solve (+ cfd_stop and the cfd result queries of
+ * `cfdTools.ts`). Like the exchange / FE tools they are not registry
  * commands; the runners (llull-compute jobs, MFront, the cloud store) live in `server/src/native`, `server/src/cfd`, `server/src/mfront` and `server/src/scan`.
  *
  * Schemas come from zod through the registry's own `toParamsSchema`; tools that wrap a command (fea_render, auto_route, stackup_monte_carlo,
@@ -11,6 +12,7 @@ import { getCommand } from '@core/commands/registry';
 import { toParamsSchema, z } from '@core/commands/schema';
 import type { ParamsSchema } from '@core/commands/types';
 import { DOCUMENT_UNITS } from '@core/model/types';
+import { CFD_QUERY_TOOL_BUILDERS } from './cfdTools';
 import type { ToolDefinition } from './tools';
 
 /** Toolsets that own native transports (a subset of `ToolsetName`, declared here so `toolsets.ts` can import this file without a cycle). */
@@ -388,6 +390,7 @@ const NATIVE_TOOL_SPECS: readonly NativeToolSpec[] = [
   { name: 'scan_import', toolset: 'scan', build: scanImport },
   { name: 'scan_list', toolset: 'scan', build: scanList },
   { name: 'cfd_solve', toolset: 'flow', build: cfdSolve },
+  ...CFD_QUERY_TOOL_BUILDERS.map((tool) => ({ ...tool, toolset: 'flow' as const })),
   { name: 'mesh_import', toolset: 'mesh', build: meshImport },
   { name: 'mesh_assets', toolset: 'mesh', build: meshAssets },
 ];

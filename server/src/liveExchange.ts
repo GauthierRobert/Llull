@@ -12,9 +12,10 @@ import type { ExchangeOptions } from './pythonExchange';
 import type { LiveCommandSource } from '@protocol/liveSync';
 
 /** The live document + the command bus (undo, live sync events tagged with `source`). */
-const liveHost = (source: LiveCommandSource): ExchangeHost => ({
+const liveHost = (source: LiveCommandSource, signal: AbortSignal | undefined): ExchangeHost => ({
   getDoc: getLiveDoc,
   applyCommand: (commandName, commandParams) => applyCommand(commandName, commandParams, undefined, source),
+  ...(signal !== undefined ? { signal } : {}),
 });
 
 /** Run an exchange tool against the live document, answered in the command-bus shape (REST `POST /exchange`). */
@@ -23,6 +24,7 @@ export function runLiveExchangeTool(
   params: unknown,
   exchange: ExchangeOptions,
   source: LiveCommandSource,
+  signal?: AbortSignal,
 ): Promise<CommandOutcome | null> {
-  return runExchangeTool(name, params, exchange, liveHost(source));
+  return runExchangeTool(name, params, exchange, liveHost(source, signal));
 }

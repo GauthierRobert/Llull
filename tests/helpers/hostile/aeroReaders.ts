@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { parseFlowResult } from '@aero/cfd/flowResult';
+import { FIELD_HEADER_BYTES, flowFieldHeader, parseFlowQueryAnswer } from '@aero/cfd/queryOutput';
 import { readComposite } from '@aero/composites/ap242/reader';
 import { readStandard } from '@aero/composites/ap242/standardReader';
 import { parseNotation } from '@aero/composites/notation';
@@ -11,7 +12,7 @@ import { parseNaca } from '@aero/aerodynamics/naca';
 import { parseAirfoilText } from '@aero/surfacing/airfoilFormats';
 import { AS4 } from '../../unit/aero/composites/fixtures';
 import { exportOf, panelDoc } from '../../unit/aero/composites/ap242Support';
-import { asText, repeated, type HostileReader } from './types';
+import { asBytes, asText, repeated, type HostileInput, type HostileReader } from './types';
 
 const FASTENER_CATALOG = path.resolve(
   __dirname,
@@ -64,6 +65,83 @@ const bendCsv = (records: number): string =>
 
 const flowJson = (records: number): string =>
   JSON.stringify({ version: 1, caseId: 'c', history: Array.from({ length: records }, (_, k) => ({ step: k, timeS: k, dragN: 1, cd: 1 })) });
+
+const probeJson = (records: number): string =>
+  JSON.stringify({
+    probes: Array.from({ length: records }, (_, k) => ({
+      pointM: [k, 0, 0],
+      velocityMS: [1, 0, 0],
+      speedMS: 1,
+      pressurePa: 0,
+      miss: null,
+    })),
+  });
+
+/** An LLFD field file of 2 x 2 x `cells / 4` cells (at least 2 layers), `mirrors` symmetry planes, cell data zero. */
+function fieldFile(records: number, mirrors = 0, grid?: readonly [number, number, number]): Uint8Array {
+  const [nx, ny, nz] = grid ?? [2, 2, Math.max(2, records)];
+  const cells = nx * ny * nz;
+  const bytes = new Uint8Array(grid === undefined ? 56 + 16 * mirrors + 17 * cells : FIELD_HEADER_BYTES);
+  bytes.set([76, 76, 70, 68]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(4, 1, true);
+  [nx, ny, nz].forEach((n, k) => view.setUint32(8 + 4 * k, n, true));
+  view.setFloat64(20, 0.125, true);
+  view.setUint32(52, mirrors, true);
+  return bytes;
+}
+
+/** The host's view of a field file: its head and its size. */
+const fieldHeaderOf = (input: HostileInput): unknown => {
+  const bytes = asBytes(input);
+  return flowFieldHeader(bytes.subarray(0, FIELD_HEADER_BYTES), bytes.length);
+};
+
+/** An LLST file of `lines` empty lines (what a streamline query.json of zero-point lines describes). */
+function emptyLines(lines: number): Uint8Array {
+  const bytes = new Uint8Array(16 + 4 * (lines + 1));
+  bytes.set([76, 76, 83, 84]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(4, 1, true);
+  view.setUint32(8, lines, true);
+  return bytes;
+}
+
+const sliceAnswer = (records: number): string =>
+  JSON.stringify({
+    slice: {
+      file: 'slice.bin',
+      field: 'speed',
+      samples: 2,
+      spacingM: 1,
+      originM: [0, 0, 0],
+      axisU: [1, 0, 0],
+      axisV: [0, 1, 0],
+      validSamples: 4,
+      min: 0,
+      max: 1,
+    },
+    notes: Array.from({ length: records }, (_, k) => k),
+  });
+
+const SLICE_FILE = ((): Uint8Array => {
+  const bytes = new Uint8Array(72 + 16);
+  bytes.set([76, 76, 83, 76]);
+  new DataView(bytes.buffer).setUint32(8, 2, true);
+  return bytes;
+})();
+
+const streamlineAnswer = (records: number): string =>
+  JSON.stringify({
+    streamlines: {
+      file: 'streamlines.bin',
+      device: 'cpu',
+      deterministic: true,
+      precision: 'f64',
+      points: 0,
+      lines: Array.from({ length: records }, (_, seed) => ({ seed, points: 0, lengthM: 0, stopBackward: 'wall', stopForward: 'wall' })),
+    },
+  });
 
 export const AERO_READERS: readonly HostileReader[] = [
   {
@@ -141,6 +219,51 @@ export const AERO_READERS: readonly HostileReader[] = [
     nest: (depth) => '['.repeat(depth) + ']'.repeat(depth),
     read: (input) => parseFlowResult(asText(input)),
     accepts: (result) => typeof result === 'string' && result.includes('result.json'),
+  },
+  {
+    name: 'aero: parseFlowQueryAnswer (CFD flow-query query.json)',
+    covers: ['domain-aero/src/cfd/queryOutput.ts:parseFlowQueryAnswer'],
+    input: 'text',
+    build: probeJson,
+    nest: (depth) => '['.repeat(depth) + ']'.repeat(depth),
+    read: (input) => parseFlowQueryAnswer('probe', asText(input), new Uint8Array()),
+    accepts: (result) => typeof result === 'object' && result !== null && (result as { op: string }).op === 'probe',
+  },
+  {
+    name: 'aero: parseFlowQueryAnswer (CFD slice query.json + LLSL)',
+    covers: [],
+    input: 'text',
+    build: sliceAnswer,
+    nest: (depth) => '['.repeat(depth) + ']'.repeat(depth),
+    read: (input) => parseFlowQueryAnswer('slice', asText(input), SLICE_FILE),
+    accepts: (result) => typeof result === 'object' && result !== null && (result as { op: string }).op === 'slice',
+  },
+  {
+    name: 'aero: parseFlowQueryAnswer (CFD streamlines query.json + LLST)',
+    covers: [],
+    input: 'text',
+    build: streamlineAnswer,
+    nest: (depth) => '['.repeat(depth) + ']'.repeat(depth),
+    // the file matches the line count the text announces (a count of "seed" keys: linear in the input)
+    read: (input) => {
+      const text = asText(input);
+      return parseFlowQueryAnswer('streamlines', text, emptyLines(text.split('"seed"').length - 1));
+    },
+    accepts: (result) => typeof result === 'object' && result !== null && (result as { op: string }).op === 'streamlines',
+  },
+  {
+    name: 'aero: flowFieldHeader (CFD field.bin head + size)',
+    covers: ['domain-aero/src/cfd/queryOutput.ts:flowFieldHeader'],
+    input: 'bytes',
+    build: (records) => fieldFile(records),
+    read: fieldHeaderOf,
+    accepts: (result) => typeof result === 'object' && result !== null && (result as { nx: number }).nx === 2,
+    extra: [
+      { name: 'truncated header', input: () => fieldFile(4).subarray(0, 40) },
+      { name: 'huge nx * ny * nz in a small file', input: () => fieldFile(0, 0, [4_000_000_000, 4_000_000_000, 4_000_000_000]) },
+      { name: 'more than three symmetry planes', input: () => fieldFile(4, 9) },
+      { name: 'cell data one byte short', input: () => fieldFile(4).subarray(0, fieldFile(4).length - 1) },
+    ],
   },
   {
     name: 'aero: parseNotation (stacking string)',

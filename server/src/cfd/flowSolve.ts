@@ -3,7 +3,9 @@
  * `surface.stl`; `llull-compute flow` runs the lattice-Boltzmann solve (progress per drag sample) and writes `result.json`, `surface.bin` and
  * the slices; the bundle becomes a `cfd_result` artifact in the store and `record_cfd_results` recomputes and records its summary. Without the
  * binary the tool refuses with CFD_SOLVER_MISSING (+ NATIVE_TOOL_MISSING install hint): there is no TypeScript solver.
- * The document is only ever changed by `record_cfd_results`.
+ * The document is only ever changed by `record_cfd_results`. M3a: the run's `field.bin` is kept content-addressed (`fileStore.ts`) and bound by
+ * hash in the bundle (the queries read it); identical concurrent solves share one run (`../native/sharedRun.ts`), each caller keeps its own signal,
+ * and `cfd_stop` kills the runs of a case (process tree) — a cancelled or stopped solve records nothing.
  */
 
 import { defaultContext } from '@core/commands/context';
@@ -11,7 +13,24 @@ import { withFullResolution } from '@core/geometry/entityTriangles';
 import { defaultMeshAssetStore } from '../meshAssets/store';
 import type { CfdResultArtifact } from '@core/model/cfdResult';
 import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
-import { buildFlowJob, cfdCaseOf, cfdSummary, flowResultArtifact, parseFlowResult, type FlowDevice, type FlowJob } from '@aero/index';
+import {
+  buildFlowJob,
+  cfdCaseOf,
+  cfdSummary,
+  FIELD_HEADER_BYTES,
+  flowFieldHeader,
+  flowResultArtifact,
+  parseFlowResult,
+  type FlowDevice,
+  type FlowJob,
+} from '@aero/index';
+import { canonicalJson } from '@lib/canonicalJson';
+import { errorMessage } from '@lib/errorMessage';
+import { sha256Hex } from '../sha256';
+import { cfdFileStore, hashFile, readHead, type StoredFile } from './fileStore';
+import { createSharedRuns, type RunInfo } from '../native/sharedRun';
+import { stat } from 'node:fs/promises';
+import path from 'node:path';
 import { feaFailure } from '../fea/feaCommon';
 import { readOutput, withJobFolder, type JobRun } from '../native/computeJob';
 import type { NativeDeps } from '../native/fatigueField';
@@ -27,6 +46,8 @@ export interface CfdSolveOptions {
   readonly maxSteps?: number;
   readonly latticeMach?: number;
   readonly les?: boolean;
+  /** The caller's own cancellation (CLI Ctrl-C, a closed request): it stops waiting; the run dies when no other caller waits for it. */
+  readonly signal?: AbortSignal;
 }
 
 const failure = (code: string, message: string, ids: readonly string[], extra: Record<string, unknown> = {}): FeaToolResult => ({
@@ -38,6 +59,7 @@ const failure = (code: string, message: string, ids: readonly string[], extra: R
 function cfdCode(run: JobRun): string {
   if (run.code === 'NATIVE_TIMEOUT') return 'CFD_TIMEOUT';
   if (run.code === 'NATIVE_TOOL_MISSING') return 'CFD_SOLVER_MISSING';
+  if (run.code === 'NATIVE_CANCELLED') return 'CFD_CANCELLED';
   return run.code !== undefined && run.code.startsWith('CFD_') ? run.code : 'CFD_SOLVER_FAILED';
 }
 
@@ -62,18 +84,45 @@ interface Solved {
   readonly warnings: readonly { readonly code: string; readonly message: string }[];
 }
 
+/**
+ * Checks `field.bin` of a finished run (reported by the job, its header on the grid of result.json, its size the one the header declares,
+ * its streamed hash the reported one) and keeps it in the CFD file store; a string says what is wrong (nothing is kept then).
+ */
+async function keepField(folder: string, run: JobRun, resultText: Buffer, storeDirectory: string): Promise<StoredFile | string> {
+  const reported = run.outputs.find((entry) => entry.path === 'field.bin');
+  if (reported === undefined) return 'llull-compute did not report output field.bin';
+  const file = path.join(folder, 'field.bin');
+  const header = flowFieldHeader(new Uint8Array(await readHead(file, FIELD_HEADER_BYTES)), (await stat(file)).size);
+  if (typeof header === 'string') return header;
+  const parsed = parseFlowResult(resultText.toString('utf8'));
+  if (typeof parsed === 'string') return parsed;
+  const { grid } = parsed;
+  const onGrid =
+    header.nx === grid.nx &&
+    header.ny === grid.ny &&
+    header.nz === grid.nz &&
+    header.cellM === grid.cellM &&
+    header.originM.every((value, axis) => value === grid.originM[axis]);
+  if (!onGrid) return `field.bin (${header.nx} x ${header.ny} x ${header.nz}) is not on the grid of result.json`;
+  // One stream pass: hash, compare with the job's report, and only then copy (a rejected multi-GB field leaves nothing behind).
+  const hashed = await hashFile(file);
+  if (hashed.sha256 !== reported.sha256) return `field.bin hashes to ${hashed.sha256}, the job reported ${reported.sha256}`;
+  return cfdFileStore(storeDirectory).putFile(file, hashed);
+}
+
 /** The native run: job folder, `llull-compute flow`, outputs read back (hash-checked) and turned into the artifact. */
-async function solveNatively(job: FlowJob, caseId: string, seconds: number, deps: NativeDeps): Promise<Solved | FeaToolResult> {
-  const sink = deps.onProgress;
+async function solveNatively(
+  job: FlowJob,
+  caseId: string,
+  seconds: number,
+  deps: NativeDeps,
+  signal: AbortSignal,
+  sink: (line: string) => void,
+): Promise<Solved | FeaToolResult> {
   const outcome = await withJobFolder(
     { 'case.json': JSON.stringify(job.caseJson), 'surface.stl': Buffer.from(job.stl) },
     async (folder) => {
-      const run = await deps.runner.run(
-        ['flow'],
-        folder,
-        seconds * 1000,
-        sink === undefined ? undefined : (event) => sink(progressLine(event)),
-      );
+      const run = await deps.runner.run(['flow'], folder, seconds * 1000, (event) => sink(progressLine(event)), signal);
       if (!run.ok) return { run, outputs: null };
       const slices = run.outputs.filter((entry) => /^slice-\d+\.bin$/.test(entry.path)).map((entry) => entry.path);
       const [result, surface, ...sliceBytes] = await Promise.all([
@@ -81,9 +130,16 @@ async function solveNatively(job: FlowJob, caseId: string, seconds: number, deps
         readOutput(folder, run, 'surface.bin'),
         ...slices.map((name) => readOutput(folder, run, name)),
       ]);
+      // field.bin can exceed one Buffer: checked by its header and size, hashed by stream while it is stored (never read whole).
+      const field = await keepField(folder, run, result, deps.store.directory);
       return {
         run,
-        outputs: { result, surface, slices: slices.map((name, index) => ({ name, bytes: new Uint8Array(sliceBytes[index] ?? []) })) },
+        outputs: {
+          result,
+          surface,
+          field,
+          slices: slices.map((name, index) => ({ name, bytes: new Uint8Array(sliceBytes[index] ?? []) })),
+        },
       };
     },
     deps.env,
@@ -92,6 +148,8 @@ async function solveNatively(job: FlowJob, caseId: string, seconds: number, deps
   const { run, outputs } = outcome;
   if (outputs === null) {
     const code = cfdCode(run);
+    if (code === 'CFD_CANCELLED')
+      return failure(code, 'the solve was cancelled: the process tree was killed and nothing was recorded', [caseId]);
     if (code === 'CFD_SOLVER_MISSING') return missingTool(caseId);
     const hint =
       code === 'CFD_TIMEOUT'
@@ -102,16 +160,71 @@ async function solveNatively(job: FlowJob, caseId: string, seconds: number, deps
       log: run.log.slice(-4000),
     });
   }
+  if (typeof outputs.field === 'string') return failure('CFD_SOLVER_FAILED', outputs.field, [caseId]);
   const parsed = parseFlowResult(outputs.result.toString('utf8'));
   if (typeof parsed === 'string') return failure('CFD_SOLVER_FAILED', parsed, [caseId]);
   const artifact = flowResultArtifact(
     parsed,
     job,
-    { surface: new Uint8Array(outputs.surface), slices: outputs.slices },
+    { surface: new Uint8Array(outputs.surface), slices: outputs.slices, field: outputs.field },
     await deps.runner.version(),
   );
   if (typeof artifact === 'string') return failure('CFD_SOLVER_FAILED', artifact, [caseId]);
   return { artifact, elapsedMs: run.elapsedMs, warnings: run.warnings };
+}
+
+interface SolveMeta {
+  readonly caseId: string;
+}
+
+interface RunningSolve {
+  readonly caseId: string;
+  readonly key: string;
+  readonly startedAt: number;
+  readonly waiters: number;
+}
+
+const solves = createSharedRuns<Solved | FeaToolResult, string, SolveMeta>();
+
+const runningSolve = (run: RunInfo<SolveMeta>): RunningSolve => ({
+  caseId: run.meta.caseId,
+  key: run.key,
+  startedAt: run.startedAt,
+  waiters: run.waiters,
+});
+
+/** @internal tests only: stop every running solve (a failed test must not leave a run behind for the next one). */
+export function _stopAllCfdSolves(): number {
+  return solves.stop(() => true).length;
+}
+
+/** Key of a native run: the result store it fills and every byte of its job (identical solves into one store share one run). */
+const runKey = (job: FlowJob, store: string): string =>
+  sha256Hex(Buffer.concat([Buffer.from(store), Buffer.from([0]), Buffer.from(canonicalJson(job.caseJson)), Buffer.from(job.stl)]));
+
+/**
+ * `cfd_stop`: kills the running solves of `caseId` in this host process (the backend for `--app`); their callers get CFD_CANCELLED and
+ * nothing is recorded.
+ * @failure no solve of the case is running here -> CFD_NOT_RUNNING (nothing changes)
+ */
+export function runCfdStop(caseId: string): FeaToolResult {
+  const stopped = solves.stop((meta) => meta.caseId === caseId).map(runningSolve);
+  if (stopped.length === 0) {
+    const others = solves.list().map(runningSolve);
+    return failure(
+      'CFD_NOT_RUNNING',
+      `no solve of '${caseId}' is running in this host${others.length === 0 ? '' : ` (running: ${[...new Set(others.map((entry) => entry.caseId))].join(', ')})`}`,
+      [caseId],
+      { running: others },
+    );
+  }
+  const waiters = stopped.reduce((sum, entry) => sum + entry.waiters, 0);
+  return {
+    summary: `cfd_stop: stopped ${stopped.length} running solve(s) of ${caseId} (process tree killed, ${waiters} waiting caller(s) answered CFD_CANCELLED); nothing was recorded.`,
+    affected: [],
+    isError: false,
+    data: { caseId, stopped },
+  };
 }
 
 /**
@@ -140,13 +253,43 @@ export async function runCfdSolve(caseId: string, options: CfdSolveOptions, host
   const { job } = built;
   if (deps.runner.binary === null) return missingTool(caseId);
   const seconds = Math.min(FEA_SOLVE_TIMEOUT_S.max, Math.max(FEA_SOLVE_TIMEOUT_S.min, options.timeoutS ?? DEFAULT_CFD_TIMEOUT_S));
-  const solved = await solveNatively(job, caseId, seconds, deps);
+  const joined = await solves.join(
+    runKey(job, deps.store.directory),
+    { caseId },
+    (signal, progress) => solveNatively(job, caseId, seconds, deps, signal, progress),
+    { signal: options.signal, onProgress: deps.onProgress },
+  );
+  if (joined.kind === 'failed')
+    return failure('CFD_SOLVER_FAILED', `the solve of '${caseId}' failed in the host: ${joined.error}; nothing was recorded`, [caseId]);
+  if (joined.kind !== 'done')
+    return failure(
+      'CFD_CANCELLED',
+      joined.kind === 'stopped'
+        ? `the solve of '${caseId}' was stopped by cfd_stop: the process tree was killed and nothing was recorded`
+        : `this caller stopped waiting for the solve of '${caseId}': nothing was recorded (the run goes on only while another caller waits)`,
+      [caseId],
+    );
+  const solved = joined.value;
   if (!('artifact' in solved)) return solved;
 
   const { artifact } = solved;
-  const resultsHash = deps.store.put(artifact);
+  let resultsHash: string;
+  try {
+    resultsHash = deps.store.put(artifact);
+  } catch (error) {
+    return failure('CFD_SOLVER_FAILED', `the result bundle could not be stored: ${errorMessage(error)}; nothing was recorded`, [caseId]);
+  }
   const summary = cfdSummary(cfdCase, artifact, resultsHash);
-  const recorded = host.applyCommand('record_cfd_results', { caseId, resultsHash, summary });
+  const current = host.getDoc().cfd?.results[caseId];
+  // A concurrent caller of the same run may have recorded it already: recording the same summary again would only add a history step.
+  const recorded =
+    current !== undefined && canonicalJson(current) === canonicalJson(summary)
+      ? {
+          summary: `record_cfd_results: ${caseId} result ${resultsHash.slice(0, 12)} already recorded (a concurrent caller of the same run).`,
+          affected: [caseId],
+          isError: false,
+        }
+      : host.applyCommand('record_cfd_results', { caseId, resultsHash, summary });
   const warnings = [
     ...solved.warnings,
     ...artifact.warnings.filter((entry) => !solved.warnings.some((seen) => seen.code === entry.code)),

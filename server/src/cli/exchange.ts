@@ -118,6 +118,8 @@ interface LocalExchangeContext {
   readonly runCommand: (name: string, params: unknown) => CommandOutcome;
   /** Prints one solver progress line (`--progress`). */
   readonly onProgress?: (line: string) => void;
+  /** Ctrl-C of this CLI process. */
+  readonly signal?: AbortSignal;
 }
 
 /** Run an exchange tool (native transports included) in-process against a local document. */
@@ -126,6 +128,7 @@ export async function runLocalExchange(name: string, params: unknown, context: L
     getDoc: context.getDoc,
     applyCommand: context.runCommand,
     ...(context.onProgress !== undefined ? { onProgress: context.onProgress } : {}),
+    ...(context.signal !== undefined ? { signal: context.signal } : {}),
   });
   if (outcome === null) throw new Error(`${name} is not an exchange tool.`);
   return outcome;

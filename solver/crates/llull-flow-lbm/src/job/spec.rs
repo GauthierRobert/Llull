@@ -256,6 +256,8 @@ pub struct ResultFile {
     pub settings: SettingsSpec,
     pub surface: String,
     pub slices: Vec<String>,
+    /// `field.bin` (the recorded field the post-processing queries read).
+    pub field: String,
     pub not_modelled: Vec<&'static str>,
     pub warnings: Vec<WarningEntry>,
 }

@@ -200,6 +200,7 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
         getDoc: currentDoc,
         runCommand: runFixed,
         ...(options.observer !== undefined ? { onProgress: options.observer.note } : {}),
+        ...(options.signal !== undefined ? { signal: options.signal } : {}),
       }),
     undo: () => swapWithBackup('undo'),
     redo: () => swapWithBackup('redo'),
