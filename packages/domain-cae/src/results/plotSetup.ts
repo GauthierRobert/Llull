@@ -8,6 +8,7 @@ import type { ViewFrame } from '@core/geometry/viewProjection';
 import { significantNumber } from '@lib/compactNumber';
 import { loadCasesOf } from '../decks/context';
 import { stepOfLoadCase, type ResultStep } from './fields';
+import { modeSet } from './modeSets';
 import type { PlotMarker } from './fieldPlotSvg';
 import { faceNodes, indexMesh } from '../thermal/meshGeometry';
 
@@ -48,16 +49,17 @@ export interface Selected {
 
 export const isEigen = (analysis: AnalysisCase): boolean => analysis.type === 'modal' || analysis.type === 'buckling';
 
-/** Result sets of the modes of a modal (all) / buckling (all but the zero-factor reference set) analysis, in mode order. */
-const modeSteps = (analysis: AnalysisCase, results: FeResultsArtifact): ResultStep[] =>
-  analysis.type === 'buckling' ? results.steps.filter((step) => step.time > 0) : [...results.steps];
-
-/** Result set of mode `mode` (1-based, default 1) of a modal / buckling analysis, labelled with its frequency / buckling factor. */
+/**
+ * Result set of mode `mode` (1-based, default 1) of a modal / buckling analysis (results/modeSets: negative buckling factors keep their place;
+ * the recorded factor of the mode must match the set), labelled with its frequency / buckling factor.
+ */
 function selectMode(analysis: AnalysisCase, results: FeResultsArtifact, mode: number | undefined): Selected | string {
-  const steps = modeSteps(analysis, results);
   const index = (mode ?? 1) - 1;
-  const step = steps[index];
-  if (step === undefined) return `no mode ${mode ?? 1} (the results hold ${steps.length} mode(s))`;
+  const type = analysis.type === 'buckling' ? 'buckling' : 'modal';
+  const factor = type === 'buckling' ? analysis.results?.bucklingFactors?.[index] : undefined;
+  const found = modeSet(results, type, index + 1, factor);
+  if (typeof found === 'string') return `no mode ${index + 1}: ${found}`;
+  const step = found.set;
   return {
     step,
     label:

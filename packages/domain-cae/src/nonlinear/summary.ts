@@ -1,6 +1,7 @@
 /** Summary of a nonlinear_static results artifact: per-step convergence bookkeeping, curve summaries, peak plastic strain (PHY-05 §3). */
 
-import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, NonlinearResultsSummary, ResultsSummary } from '@core/model/analysis';
+import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ResultsSummary } from '@core/model/analysis';
+import type { NonlinearResultsSummary } from '@core/model/nonlinear';
 import type { Vec3 } from '@core/model/vectors';
 import { significantNumber } from '@lib/compactNumber';
 import { canonicalJson } from '@lib/canonicalJson';

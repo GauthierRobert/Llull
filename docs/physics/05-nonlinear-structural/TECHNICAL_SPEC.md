@@ -494,3 +494,105 @@ Cross-pack: PHY-06 contact and PHY-16 springback build on `nonlinear_static`, st
 - [R11] Abaqus Benchmarks 3.2.14 Cylinder under internal pressure — https://abaqus-docs.mit.edu/2017/English/SIMACAEBMKRefMap/simabmk-c-cylinderunderpress.htm (search)
 - [R12] Caprani, Plastic Analysis notes — https://www.colincaprani.com/files/notes/SAIII/Plastic%20Analysis%200809%20-%20Update.pdf (search)
 - Repo: `.dependency-cruiser.cjs`, `packages/core/src/lib/frame2d.ts`, `packages/mcp/src/toolsets.ts`, `.claude/rules/architecture.md`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`, `docs/physics/00-vv-harness/TECHNICAL_SPEC.md`.
+
+## 13. As built (NLS-M3, 2026-11-08)
+
+Placement is Proposal B (§2.1): everything lives in `packages/domain-cae/src/nonlinear/` (plugin `cae`, toolset `analysis`). The core data types
+of this milestone are in `packages/core/src/model/nonlinear.ts` (`Imperfection`, and `NonlinearResultsSummary` moved there from `analysis.ts`,
+which was at its 500-code-line limit); `NonlinearSettings` gains `imperfections?` / `imperfectionOrder?`.
+
+### 13.1 Commands
+
+| Name | Kind | File | What it does |
+| ---- | ---- | ---- | ------------ |
+| `add_imperfection` | M | `nonlinear/imperfectionCommand.ts` | Pins a solved buckling case's results (`sourceResultsHash`), stores `modes [{ mode, amplitude, factor }]` and `amplitudeSource`; id `imp-<step>.<k>` |
+| `delete_imperfection` | M | same | Removes one; removing the last drops the bag, so the input hash equals that of a case that never had one |
+| `beam_large_deflection` | Q | `nonlinear/beam/{frameModel,pathFollowing,frameInput,beamCommand}.ts` | §5.8 solver: path, limit points, snap-back flag |
+| `limit_load` | Q | `nonlinear/{limitLoad,limitLoadQuery,limitLoadCommand}.ts` | §5.7 peak / plateau / auto on a curve probe of the trusted results |
+| `compute_margins` `criterion: "limit_load"` | Q | `margins/limitLoadMargins.ts` | One row, `MS = P_limit / (P_design x FoS x prod(extra)) - 1`; `dispose_margin` takes the same params |
+
+Deck hook-up: `decks/deckBuilder.ts` writes `*NODE` from `imperfectNodes(ctx)` (`nonlinear/imperfectionDeck.ts`) for nonlinear_static cases,
+with one `** imperfection ...` comment line per imperfection. Load validation of the bag: `nonlinear/imperfectionShape.ts` (through
+`nonlinearValueProblems`). Guardrail: `check_analysis` warns `NLS_IMPERFECTION_MISSING` on an NLGEOM case without imperfection next to a solved
+buckling case of the same part. Codes added besides §7.1: `NLS_IMPERFECTION_NOT_FOUND`, `NLS_FRAME_INVALID` (beam input).
+
+### 13.2 Decisions (rejected option in brackets)
+
+1. **Imperfection = node-coordinate perturbation in the deck** [CalculiX `*IMPERFECTION`: the keyword does not exist in ccx 2.21; the binary
+   holds the keyword strings `*BUCKLE` and `*STATIC` but no `IMPERFECTION` (Abaqus has it, CalculiX does not)]. Offset of node n:
+   `sum_i amplitude_i x phi_i(n) / max_n |phi_i(n)|`; amplitudes in DOCUMENT length units, like `add_analysis_step` displacement values and probe
+   points, converted with the document-to-analysis factor [analysis units of the §4 sketch: two unit conventions in one command family].
+2. **The buckling results are pinned by hash** when `add_imperfection` runs; the deck reads exactly that artifact and the full input hash covers
+   the pin (the whole `nonlinear` object is hashed). Re-solving or deleting the buckling case later neither changes nor breaks the imperfection
+   while its artifact is in the store; new modes need `delete_imperfection` + `add_imperfection` [a live reference to the source case's current
+   results, as `thermal_result` fields do: a re-solve can flip the eigenvector sign or change the shape without any command in the history].
+3. **Same mesh = node-for-node** (same ids, coordinates within 1e-9 x mesh size, same unit system), checked when the deck is written
+   [equal `meshHash` (TR-NLS-30): the mesh artifact holds the target node sets (curve probe `N_*`, step `S_*`), so two cases with identical
+   geometry and controls never share a hash; interpolating modes between different meshes is V2]. Netgen is deterministic for equal geometry
+   and controls: the real run below matched node-for-node. **Modes are matched by factor** (review round 1): set k of the buckling results (every
+   set but the zero-time one, negative factors included) must carry the pinned factor of mode k + 1 within 1e-5 relative (the .dat table the
+   factor is pinned from prints 7 digits: 4623.062 against the .frd 4623.062281 in the real run), else
+   `NLS_IMPERFECTION_SOURCE_INVALID` [the k-th set with a positive time: a negative factor, which ccx reports for a load reversal, shifted the
+   index and applied the wrong shape]. A mode with a factor <= 0 is refused (it buckles under the reversed load). The amplitude sign is relative to
+   the mode as solved (the eigensolver picks it; `render_fea_results mode N` shows it); the summary and the deck comments name the peak node and
+   its signed offset.
+4. **`add_imperfection` checks amplitude and `amplitudeSource` first** (AF-31: `NLS_IMPERFECTION_AMPLITUDE_UNSET` even before the source is
+   solved, AC-6), then the source: buckling, same parts and idealizations, solved (hash state), enough modes (`NLS_IMPERFECTION_SOURCE_INVALID`).
+5. **`beam_large_deflection` is pure TypeScript** [a Rust crate, the C7 default]: the layer requires TS: a registry query must run in-process
+   through `execute` (plans, golden replay, the desktop app without a backend), and a `solver/` sidecar would make it a host transport with a
+   process lifecycle for no performance need (NL7 at 40 elements per leg: 1298 arc steps in 1.35 s, §8 budget <= 2 s). The query runs
+   synchronously and blocks the host event loop, so its work budget is 3e7 units (steps x free dofs x (bandwidth + 1)^2, about 3 s; review
+   round 1, lowered from 2e8). **Revisit trigger:** 3D corotational beams (V2) or a real need above 3e7 move the solver to a `solver/` crate
+   behind a ctx port, keeping this TypeScript solver as the reference and the fallback without the port.
+6. **Solver deviations from the generator** (none changes the generator cases, which converge on the residual first and match it to 1e-6): a
+   stagnation stop (correction < 1e-12 of the step increment), because on frames of about 1000 elements rounding keeps the residual just above the
+   absolute 1e-9; mechanism detection by the unloaded compliance (`|K^-1 P| x max|K_ii| / |P| > 1e12`), because a rounded rigid-body mode leaves a
+   finite pivot; dofs numbered along the members in input order with the exact bandwidth [reverse Cuthill-McKee: only branched frames would gain,
+   and a work budget (steps x free dofs x (bandwidth + 1)^2 <= 3e7, else `NLS_FRAME_INVALID`) bounds them]; the primary dof (limit-point
+   refinement, snap-back) is `report.dofs[0]` [the dof of largest range: for NL7 `ux` (0.787 L) beats `uy` (0.782 L) and the refinement would
+   no longer be the generator's v-parabola]. The NL7 query now lists `["uy", "ux"]` and lost its `_note` key (the registry refuses unknown params).
+   The parabola refinement is kept only when it is genuine (curvature of the extremum's sign, vertex inside the three samples, refined value
+   beyond the sample), else the sample stands. **Snap-back** = a reversal of the primary dof while the load-factor magnitude keeps falling through
+   it (a displacement limit point on the unloading branch, `data.snapBackPoints`) [any reversal of the primary dof: a cantilever curling under an
+   end moment reverses `ux` under a rising load and is a stable path]. Only an unloaded mechanism is refused; a step that fails (also the first)
+   returns the path so far with `failure` (no_real_root / singular_tangent / singular_corrector / iterations) and a hint (reduce arcLength / raise
+   increments).
+7. **Limit-load margin design load**: `limitLoad.designLoad { value, category, source }`; default for a load probe = that load as defined by
+   `add_fea_load` (multiplier 1) with its category; a reaction probe needs it. A curve that never peaks uses its lower bound as capacity (row
+   `basis: "lower_bound"`, `NLS_LIMIT_NOT_REACHED`, conservative) [refusing the row]. Stress-only params (allowable, groupBy, loadCases,
+   singularity) are refused for this criterion; the mesh adequacy gate applies as for stress rows. The load axis carries its unit
+   (`loadUnit`: force for reactions and force loads, stress for a pressure, force x length for a moment); rows give `capacity` and
+   `designLoad` in it [force units for every probe: a pressure curve was labelled N].
+8. **Column plan = the equivalent fixed-free half column** (L/2 = 250 mm, base face fixed, tip load and tip probe) [the pinned 500 mm draft]: a
+   pinned end of a solid cannot be expressed with today's targets (`edgesNear [10, 5, 0]` ties between the two long edges of the end face;
+   `intersectPlane` is accepted by the target schema but not sent to the mesher, `server/src/fea/feaMesh.ts` maps only facesNear / edgesNear /
+   pointsNear). The half column has the same P_cr = pi^2 E I / L^2 and its tip is the mid-span of the pinned column, so the generator values hold
+   unchanged. The plan gained the 0.8 P_cr step (VC-NLS-50.c).
+
+### 13.3 Validation, measured
+
+| VC | Gate | Measured | Oracle | Deviation (tolerance) |
+| -- | ---- | -------- | ------ | --------------------- |
+| 10.a / b / c, dv/L at lambda 1, 2, 10 | unit, `tests/unit/cae/nonlinear/beamLargeDeflection.test.ts` | 0.301740, 0.493534, 0.810903 (20 el., 400 load increments) | 0.3017208, 0.4934575, 0.8106090 (closed form) | +0.006 %, +0.016 %, +0.036 % (1 %); generator corotational20 equal to 1e-6 |
+| 10.d, dh/L at lambda 2 | unit | 0.160597 | 0.160642 | -0.028 % (2 %); generator equal to 1e-6 |
+| 20, path | unit | every 5th of 918 arc steps | `lee_frame_path.csv` (same algorithm) | < 1e-6 relative |
+| 20.a / b | unit | 18.58247 at v/L 0.406248 (20 el. per leg); mesh study 10 / 20 / 40: 18.658774153 / 18.582467201 / 18.563176374 | 18.55 / 0.407 (NAFEMS via S1); generator meshStudy | +0.18 % (1 %), -0.0008 (0.004); generator equal to 9 digits |
+| 20.c | unit | v/L 0.780957 where P L^2/EI climbs back to 31.89 | 0.781 | -0.00004 (0.004) |
+| 20.d | unit | -9.46528 (20 el. per leg) | -9.42714 (40 el.); generator 20 el. -9.46528 | +0.40 % (3 %); generator equal |
+| 50.a | server, `server/tests/feaNonlinearImperfection.test.ts` (ccx 2.21, Netgen, C3D10 at 4 mm) | buckling factor 4623.06 N | 4605.815 N | +0.37 % (2 %) |
+| 50.b | server, same run | tip w - w0 = 0.49555 mm at 0.5 P_cr | 0.5 mm = w0 r / (1 - r); 0.49628 with the FE P_cr | -0.89 % (5 %); -0.15 % |
+| 50.c | server, same run | 1.96061 mm at 0.8 P_cr | 2.0 mm; 1.96324 with the FE P_cr | -1.97 % (5 %); -0.13 % |
+| 60 (analogue) | unit, `limitLoad.test.ts` | a curve without a maximum gives `lowerBound` and `NLS_LIMIT_NOT_REACHED` | spec | exact |
+| 62 | unit + plan replay | `NLS_IMPERFECTION_AMPLITUDE_UNSET`, document unchanged | spec | exact |
+| 67 / 68 | unit (synthetic curve) | FAIL row `pending_human`, agent `dispose_margin` -> `FEA_HUMAN_GATE`; `VNV_NO_CONVERGENCE_STUDY` | spec | exact |
+
+The real run takes about 190 s (mesh, buckling solve, mesh, two load-controlled NLGEOM steps).
+
+### 13.4 Not built yet
+
+- M4: the `llull guide` nonlinear section lives in `packages/protocol/src/conventions.ts` (CLI lane); the curve panel is UI (desktop lane); the MCP
+  prompt is moot (no MCP server, LC1); the production-gate scenario.
+- From M1 / M2: `update_analysis_step`, `delete_analysis_step`, `delete_curve_probe`, `nonlinear_report`, `check_nonlinear`,
+  `nonlinear_analytic_check`, `NLS_LIMIT_POINT_REACHED` (a stopped run is a solver failure and is never recorded); company-rule amplitude tables
+  (§11 q4: amplitudes stay explicit, no table).
+- `intersectPlane` targets (decision 8) and `hex_dominant` meshing are 05 gaps.

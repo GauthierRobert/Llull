@@ -6,6 +6,9 @@ import type { CadDocument } from '@core/model/types';
 import { nlsRemediation } from './codes';
 import { hyperelasticParts } from './settings';
 import { nonlinearValueProblems } from './shape';
+import { imperfectionsOf } from './imperfectionShape';
+import { analysisOf } from '../shared/access';
+import { stateOf } from '../shared/state';
 
 export interface NonlinearCheckItem {
   readonly code: string;
@@ -15,17 +18,32 @@ export interface NonlinearCheckItem {
   readonly remediation: string;
 }
 
-const item = (code: string, message: string, ids: readonly string[]): NonlinearCheckItem => ({
+const item = (code: string, message: string, ids: readonly string[], severity: 'error' | 'warning' = 'error'): NonlinearCheckItem => ({
   code,
-  severity: 'error',
+  severity,
   ids,
   message,
   remediation: nlsRemediation(code),
 });
 
+/** Solved buckling cases that share at least one part with `analysis` (they hint at buckling-type collapse). */
+function solvedBucklingSharingParts(doc: CadDocument, analysis: AnalysisCase): string[] {
+  const parts = new Set(Object.keys(analysis.parts));
+  return analysisOf(doc)
+    .caseOrder.flatMap((caseId) => {
+      const other = analysisOf(doc).cases[caseId];
+      return other === undefined ? [] : [other];
+    })
+    .filter(
+      (other) => other.type === 'buckling' && Object.keys(other.parts).some((part) => parts.has(part)) && stateOf(doc, other) === 'solved',
+    )
+    .map((other) => other.id);
+}
+
 /**
  * Errors that stop the deck from being written: nlgeom unstated, no step, a part without a resolvable constitutive set, a probe pointing at a
- * deleted load / constraint, an arc-length step.
+ * deleted load / constraint, an arc-length step; warning NLS_IMPERFECTION_MISSING for an NLGEOM case without imperfection next to a solved buckling
+ * case of the same part.
  * @invariant empty for every case that is not nonlinear_static
  */
 export function checkNonlinearItems(doc: CadDocument, analysis: AnalysisCase): NonlinearCheckItem[] {
@@ -60,6 +78,16 @@ export function checkNonlinearItems(doc: CadDocument, analysis: AnalysisCase): N
         id,
         ...hyper,
       ]),
+    );
+  const buckled = nonlinear.nlgeom === true && imperfectionsOf(nonlinear).length === 0 ? solvedBucklingSharingParts(doc, analysis) : [];
+  if (buckled.length > 0)
+    items.push(
+      item(
+        'NLS_IMPERFECTION_MISSING',
+        `solved buckling case(s) ${buckled.join(', ')} analyse the same part(s) and this NLGEOM case has no imperfection: a perfect model does not leave the straight path`,
+        [id, ...buckled],
+        'warning',
+      ),
     );
   for (const probeId of nonlinear.probeOrder) {
     const load = nonlinear.probes[probeId]?.load;

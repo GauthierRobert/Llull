@@ -17,6 +17,7 @@ import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } fro
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
 import type { CaseStudies } from './convergenceStudy';
 import type { ContactSettings } from './contact';
+import type { Imperfection, NonlinearResultsSummary } from './nonlinear';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -292,6 +293,9 @@ export interface NonlinearSettings {
   readonly probes: Readonly<Record<string, CurveProbe>>;
   readonly probeOrder: readonly string[];
   readonly outputIncrements: 'all' | 'last_per_step' | { readonly every: number };
+  /** PHY-05 V1 geometric imperfections (`add_imperfection`); absent = none. */
+  readonly imperfections?: Readonly<Record<string, Imperfection>>;
+  readonly imperfectionOrder?: readonly string[];
 }
 
 /** Convergence bookkeeping of a nonlinear solve (CalculiX `.sta`): one row per increment. */
@@ -301,29 +305,6 @@ export interface FeConvergenceRow {
   readonly attempts: number;
   readonly iterations: number;
   readonly totalTime: number;
-}
-
-export interface NonlinearResultsSummary {
-  readonly nlgeom: boolean;
-  /** Every analysis step reached its end time (a run that stops early is a solver failure and is never recorded). */
-  readonly completed: boolean;
-  readonly steps: ReadonlyArray<{
-    stepId: string;
-    increments: number;
-    cutbacks: number;
-    iterations: number;
-    lastLoadFactor: number;
-    completed: boolean;
-  }>;
-  readonly curves: ReadonlyArray<{
-    probeId: string;
-    name: string;
-    points: number;
-    peakLoad: number;
-    dispRange: readonly [number, number];
-    curveHash: string;
-  }>;
-  readonly maxPeeq?: { value: number; at: Vec3; step: number };
 }
 
 /** PHY-03 §3.1 thermal set-up (present iff the case type is `heat_*`). */

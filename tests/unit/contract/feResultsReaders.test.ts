@@ -43,6 +43,12 @@ const EXEMPT: Readonly<Record<string, string>> = {
     'delete_convergence_study and the human gate accept_verification_exception (re-verifies the study through studyVerify before the gate); it records an acceptance, no stress verdict',
   'vnv/studyVerify.ts':
     're-derives the levels of a convergence study from the artifact store for the study commands; a trust check, no stress verdict',
+  'nonlinear/imperfectionCommand.ts':
+    'add_imperfection reads the pinned buckling results only to name the peak node and offset in its summary; no allowable, no verdict',
+  'nonlinear/imperfectionDeck.ts':
+    'reads the pinned buckling mode shapes to move the deck nodes (an input geometry, not a result verdict); no allowable, no pass / fail',
+  'nonlinear/limitLoadQuery.ts':
+    'limit_load is a read-out of a curve (reviewRequired, VNV_NO_CONVERGENCE_STUDY warning); the limit-load MARGIN verdict is margins/limitLoadMargins.ts, which applies gateRows',
   'thermal/check.ts':
     'heat-transfer set-up and results checks: temperatures, no through-thickness bending budget (TR-INT-07 is a structural budget)',
   'thermal/dispose.ts': 'records a human disposition of a thermal limit row; it reads the rows the thermal check computed',

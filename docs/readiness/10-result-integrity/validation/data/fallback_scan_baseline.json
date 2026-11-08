@@ -1663,7 +1663,7 @@
     },
     {
       "file": "domain-cae/src/results/plotSetup.ts",
-      "hits": 4,
+      "hits": 3,
       "reason": "recorded at the INT-14 scan extension: 2 numeric ?? / || default(s), 2 other fallback-shaped line(s); not line-reviewed, tracked by INT-FB-013"
     },
     {

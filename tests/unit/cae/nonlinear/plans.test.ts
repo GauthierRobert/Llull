@@ -88,3 +88,32 @@ describe('nls_thick_cylinder plan', () => {
     expect(probe?.load).toEqual({ kind: 'load', loadId: Object.keys(analysis?.loads ?? {})[0] });
   });
 });
+
+describe('nls_column_imperfection plan', () => {
+  const built = memo(() => replay('nls_column_imperfection'));
+
+  it('runs every step but add_imperfection, which needs the buckling case solved first (fea_mesh + fea_solve between the two parts)', () => {
+    const failed = built().steps.filter((step) => !step.ok);
+    expect(failed.map((step) => step.command)).toEqual(['add_imperfection']);
+    expect(failed[0]?.summary).toContain('NLS_IMPERFECTION_SOURCE_INVALID');
+    expect(failed[0]?.summary).toContain('not solved');
+    const plan = JSON.parse(readFileSync(`${PLANS}/nls_column_imperfection.plan.json`, 'utf8')) as Action[];
+    const actions = plan.filter((action) => action.command !== 'add_imperfection');
+    const { document } = execute(createEmptyDocument(), 'build_project', { actions }, { ...defaultContext(), kernel });
+    const [bucklingId = '', nonlinearId = ''] = document.analysis?.caseOrder ?? [];
+    expect(caseOf(document, bucklingId)?.type).toBe('buckling');
+    const nonlinear = caseOf(document, nonlinearId)?.nonlinear;
+    expect(nonlinear?.stepOrder.map((id) => nonlinear.steps[id]?.multipliers)).toEqual([{ LC1: 2302.90769359 }, { LC1: 3684.65230974 }]);
+  });
+
+  it('refuses the imperfection without an amplitude before looking at the source (AC-6, VC-NLS-62)', () => {
+    const plan = JSON.parse(readFileSync(`${PLANS}/nls_column_imperfection.plan.json`, 'utf8')) as Action[];
+    const actions = plan.map((action) =>
+      action.command === 'add_imperfection' ? { ...action, params: { ...action.params, modes: [{ mode: 1 }] } } : action,
+    );
+    const result = execute(createEmptyDocument(), 'build_project', { actions }, { ...defaultContext(), kernel });
+    const failed = (result.data as { steps: Report[] }).steps.filter((step) => !step.ok);
+    expect(failed.map((step) => step.command)).toEqual(['add_imperfection']);
+    expect(failed[0]?.summary).toContain('NLS_IMPERFECTION_AMPLITUDE_UNSET');
+  });
+});

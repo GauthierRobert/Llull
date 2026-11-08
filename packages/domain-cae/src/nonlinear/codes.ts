@@ -24,6 +24,20 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   NLS_NLGEOM_UNSET: 'call set_nonlinear_controls with nlgeom true or false',
   NLS_NO_STEPS: 'add at least one step with add_analysis_step',
   NLS_MATERIAL_SET_CONFLICT: 'parts sharing a material must use the same constitutive set (the deck has one material block per material)',
+  NLS_IMPERFECTION_AMPLITUDE_UNSET:
+    'every mode needs an explicit signed amplitude (document length units) and amplitudeSource must name who or which rule set it (no default, AF-31): ask the owner or the company rule',
+  NLS_IMPERFECTION_SOURCE_INVALID:
+    'fromAnalysisId must be a buckling case with the same parts, meshed and solved (fea_mesh + fea_solve) with at least that many modes, on the same mesh as this case',
+  NLS_IMPERFECTION_NOT_FOUND: 'list the imperfections with describe_analysis (nonlinear.imperfectionOrder)',
+  NLS_IMPERFECTION_MISSING:
+    'a solved buckling case shares parts with this NLGEOM case: add_imperfection with an amplitude from the owner or a company rule (a perfect column does not buckle in a nonlinear run)',
+  NLS_FRAME_INVALID:
+    'fix the frame input: unique node ids, every node on a member, members of non-zero length with E, A, I > 0, a non-zero reference load, supports that stop rigid-body motion, a known report node',
+  NLS_PLATEAU_PARAMS_UNSET:
+    'method plateau needs plateau { slopeFraction, window } stated by the engineer (no defaults), or use method peak / auto',
+  NLS_CURVE_STALE: 'the set-up changed after the solve: run fea_mesh and fea_solve again before reading curves or limit loads',
+  NLS_LIMIT_NOT_REACHED: 'the curve is still rising: extend the controlled displacement (displacement control passes the peak)',
+  FEA_RESULTS_MISSING: 'run fea_mesh and fea_solve on the analysis so the results artifact exists in the store',
   FEA_ANALYSIS_NOT_FOUND: 'list the analyses with describe_analysis (no analysisId), or create one with create_analysis',
   FEA_PART_NOT_IN_ANALYSIS: 'add the entity first with set_part_idealization',
   FEA_TARGET_UNRESOLVED:

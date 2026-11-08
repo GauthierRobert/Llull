@@ -11,7 +11,7 @@
    "size": [
     20,
     10,
-    500
+    250
    ],
    "position": [
     0,
@@ -20,7 +20,8 @@
    ],
    "anchor": "min"
   },
-  "as": "col"
+  "as": "col",
+  "_note": "fixed-free column of length L/2 = 250 mm: mechanically half of the pinned 500 mm column of the generator (P_cr = pi^2 E I / (4 (L/2)^2) = pi^2 E I / L^2); a pinned end of a solid is not expressible with face / edge targets"
  },
  {
   "command": "define_material_record",
@@ -39,7 +40,7 @@
   "params": {
    "material": "el_al_E70",
    "property": "E",
-   "value": 70000.0,
+   "value": 70000,
    "unit": "MPa",
    "basis": "company",
    "source": {
@@ -118,43 +119,15 @@
   "command": "add_fea_constraint",
   "params": {
    "analysisId": "$bk",
-   "name": "base_pin",
-   "kind": "displacement",
-   "dofs": {
-    "ux": 0,
-    "uy": 0,
-    "uz": 0
-   },
+   "name": "base_fixed",
+   "kind": "fixed",
    "target": {
     "entityId": "$col",
-    "edgesNear": [
+    "facesNear": [
      [
       10,
       5,
       0
-     ]
-    ]
-   }
-  },
-  "_note": "pinned line at the base centre (draft; final pin idealisation via 05 distributing coupling)"
- },
- {
-  "command": "add_fea_constraint",
-  "params": {
-   "analysisId": "$bk",
-   "name": "top_guide",
-   "kind": "displacement",
-   "dofs": {
-    "ux": 0,
-    "uy": 0
-   },
-   "target": {
-    "entityId": "$col",
-    "edgesNear": [
-     [
-      10,
-      5,
-      500
      ]
     ]
    }
@@ -174,7 +147,7 @@
      [
       10,
       5,
-      500
+      250
      ]
     ]
    },
@@ -190,7 +163,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$bk",
-   "elementFamily": "hex_dominant",
    "order": 2,
    "globalSize": 2.5
   }
@@ -218,42 +190,15 @@
   "command": "add_fea_constraint",
   "params": {
    "analysisId": "$an",
-   "name": "base_pin",
-   "kind": "displacement",
-   "dofs": {
-    "ux": 0,
-    "uy": 0,
-    "uz": 0
-   },
+   "name": "base_fixed",
+   "kind": "fixed",
    "target": {
     "entityId": "$col",
-    "edgesNear": [
+    "facesNear": [
      [
       10,
       5,
       0
-     ]
-    ]
-   }
-  }
- },
- {
-  "command": "add_fea_constraint",
-  "params": {
-   "analysisId": "$an",
-   "name": "top_guide",
-   "kind": "displacement",
-   "dofs": {
-    "ux": 0,
-    "uy": 0
-   },
-   "target": {
-    "entityId": "$col",
-    "edgesNear": [
-     [
-      10,
-      5,
-      500
      ]
     ]
    }
@@ -273,7 +218,7 @@
      [
       10,
       5,
-      500
+      250
      ]
     ]
    },
@@ -289,7 +234,6 @@
   "command": "set_mesh_controls",
   "params": {
    "analysisId": "$an",
-   "elementFamily": "hex_dominant",
    "order": 2,
    "globalSize": 2.5
   }
@@ -318,7 +262,7 @@
    ],
    "amplitudeSource": "validation case VC-NLS-50 test input (not a design rule)"
   },
-  "_note": "requires the buckling case to be meshed and solved first on the same mesh (transport steps between plan runs)"
+  "_note": "the buckling case must be meshed and solved first on the same mesh (fea_mesh + fea_solve between the two parts of this plan); without amplitude it is refused with NLS_IMPERFECTION_AMPLITUDE_UNSET (VC-NLS-62)"
  },
  {
   "command": "add_analysis_step",
@@ -332,7 +276,7 @@
    "control": {
     "kind": "load",
     "initialIncrement": 0.05,
-    "minIncrement": 1e-06,
+    "minIncrement": 0.000001,
     "maxIncrement": 0.1,
     "maxIncrements": 200
    }
@@ -340,10 +284,29 @@
   "_note": "0.5 x P_cr = 0.5 x 4605.81538718 N (generator VC-NLS-50.a)"
  },
  {
+  "command": "add_analysis_step",
+  "params": {
+   "analysisId": "$an",
+   "name": "eight_tenths_pcr",
+   "multipliers": {
+    "LC1": 3684.65230974
+   },
+   "amplitude": "ramp",
+   "control": {
+    "kind": "load",
+    "initialIncrement": 0.05,
+    "minIncrement": 0.000001,
+    "maxIncrement": 0.1,
+    "maxIncrements": 200
+   }
+  },
+  "_note": "0.8 x P_cr (generator VC-NLS-50.c)"
+ },
+ {
   "command": "add_curve_probe",
   "params": {
    "analysisId": "$an",
-   "name": "mid",
+   "name": "tip",
    "load": {
     "kind": "load",
     "loadId": "axial"
@@ -356,6 +319,7 @@
     ],
     "dof": "uy"
    }
-  }
+  },
+  "_note": "the free end of the half column is the mid-span of the pinned column"
  }
 ]

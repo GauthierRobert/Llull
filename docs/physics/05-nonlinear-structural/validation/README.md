@@ -23,8 +23,8 @@ Tolerances are llull acceptance choices, justified per case. No source claims th
 | `moment_curvature_rectangle.csv` | (b) | M/My vs κ/κy, elastic-perfectly plastic rectangle |
 | `plans/nls_cantilever_plastic_collapse.plan.json` | draft plan | Solid cantilever, J2 perfect plasticity, displacement control, tip probe |
 | `plans/nls_thick_cylinder.plan.json` | draft plan | Annulus a = 100, b = 200 mm, plane strain by symmetric ends, ν = 0.49, pressure ramp |
-| `plans/nls_column_imperfection.plan.json` | draft plan | Buckling case → `add_imperfection` (0.5 mm, mode 1) → NLGEOM run to 0.5 P_cr |
-| `plans/nls_lee_frame.query.json` | draft query | `beam_large_deflection` input for NAFEMS NL7 |
+| `plans/nls_column_imperfection.plan.json` | plan | Fixed-free half column (250 mm = half of the pinned 500 mm column): buckling case → `add_imperfection` (0.5 mm, mode 1) → NLGEOM steps to 0.5 and 0.8 P_cr, tip probe |
+| `plans/nls_lee_frame.query.json` | query | `beam_large_deflection` input for NAFEMS NL7 (consistent units, unit-free in the source; 20 elements per leg as the generator; normalised load = loadFactor x 120^2 / (720 x 2); primary dof uy) |
 
 Plans use today's commands for geometry (`set_units`, `add_box`, `add_cylinder`, `boolean {op,a,b}`), aerospace 08
 material commands, the PHY-02 commands `add_material_model` (`elastic_isotropic`, `j2_plasticity`) / `define_constitutive_set`
@@ -94,7 +94,11 @@ registered; `create_analysis` accepts `nonlinear_static`. `nls_cantilever_plasti
 - `nls_thick_cylinder` at the plan's 5 mm mesh does not finish within 15 minutes of ccx time; the replay coarsens to 12 mm and checks
   the 166 MPa load step converges with a bore displacement more than twice the elastic Lame value (0.58 mm against 0.16 mm).
 - `control.kind = arc_length` is refused with `NLS_ARC_LENGTH_UNSUPPORTED` (VC-NLS-63); CalculiX has no Riks procedure.
-- `nls_column_imperfection` still needs `add_imperfection` and the contact plans need the contact commands (not built).
+- NLS-M3 (TECHNICAL_SPEC §13): `add_imperfection` / `delete_imperfection`, `beam_large_deflection`, `limit_load` and `compute_margins criterion=limit_load`.
+  `nls_column_imperfection` runs in two parts around fea_mesh + fea_solve of the buckling case (`server/tests/feaNonlinearImperfection.test.ts`,
+  mesh coarsened to 4 mm): P_cr 4623.06 N (+0.37 %), tip w - w0 0.4956 mm at 0.5 P_cr (-0.9 %) and 1.9606 mm at 0.8 P_cr (-2.0 %). The NL7 query
+  reproduces `lee_frame_path.csv` to 1e-6 and the generator mesh study to 9 digits (`tests/unit/cae/nonlinear/beamLargeDeflection.test.ts`).
+  The column is the fixed-free half of the pinned draft (a solid pinned end is not expressible with today's targets, §13.2 item 8).
 
 ## CLI harness (AF-23)
 
