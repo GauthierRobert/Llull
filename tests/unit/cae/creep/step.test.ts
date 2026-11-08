@@ -1,6 +1,6 @@
 /** PHY-11 M2 set-up (TR-CRP-01, 02, 10, 11; FR-CRP-01, 13): create_analysis creep, set_creep_step / delete_creep_step, load validation, input hash, replay. */
 import { describe, expect, it } from 'vitest';
-import { execute } from '@core/commands/registry';
+import { execute, toToolSchemas } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { analysisErrors } from '@cae/model/validate';
@@ -108,9 +108,7 @@ describe('set_creep_step', () => {
     ],
     ['maximum above the duration', { maxIncrement: { value: 2000, unit: 's' } }, 'CRP_STEP_PARAM_INVALID', 'initialIncrement'],
     ['increment in a bad unit', { initialIncrement: { value: 1, unit: 'kg' } }, 'CRP_STEP_PARAM_INVALID', 'initialIncrement'],
-    ['maxIncrements 0', { maxIncrements: 0 }, 'CRP_STEP_PARAM_INVALID', 'maxIncrements'],
     ['temperature in a bad unit', { temperature: { value: 5, unit: 'MPa' } }, 'CRP_STEP_PARAM_INVALID', 'temperature'],
-    ['one output time', { outputTimes: { kind: 'log', count: 1 } }, 'CRP_STEP_PARAM_INVALID', 'outputTimes'],
     [
       'too many linear output times',
       { outputTimes: { kind: 'linear', every: { value: 1, unit: 's' } } },
@@ -130,6 +128,31 @@ describe('set_creep_step', () => {
     expect(result.error).toMatchObject({ code, paths: [path], ids: [c.analysisId] });
     expect(result.document).toBe(c.doc);
     expect(result.affected).toEqual([]);
+  });
+
+  it('puts the integer ranges in the tool schema and refuses outside them as invalid params', () => {
+    const c = creepCube({ step: null });
+    for (const patch of [
+      { maxIncrements: 0 },
+      { maxIncrements: 2_000_000 },
+      { outputTimes: { kind: 'log', count: 1 } },
+      { outputTimes: { kind: 'log', count: 201 } },
+    ])
+      expect(run(c, { ...MINIMAL, ...patch }).error?.code).toBe('CMD_INVALID_PARAMS');
+    // the tool-schema derivation carries no minimum / maximum (none in the snapshot): the range is validated by zod and stated in the description
+    const schema = JSON.stringify(toToolSchemas().find((tool) => tool.name === 'set_creep_step'));
+    expect(schema).toContain('1 to 1000000');
+  });
+
+  it('refuses a case whose unit system is not N-mm-t-s at the set-up, not only at the deck', () => {
+    const c = creepCube({ step: null });
+    const analysis = caseOf(c.doc, c.analysisId);
+    if (analysis === undefined) throw new Error('no case');
+    const metre = withCase(c.doc, { ...analysis, unitSystem: 'N-m-kg-s' });
+    expect(run(c, MINIMAL, metre).error).toMatchObject({ code: 'CRP_UNIT_SYSTEM', ids: [c.analysisId] });
+    expect(execute(metre, 'check_creep', { analysisId: c.analysisId }).data).toMatchObject({
+      items: expect.arrayContaining([expect.objectContaining({ code: 'CRP_UNIT_SYSTEM' })]),
+    });
   });
 
   it('refuses an unknown case, a case of another type, a case of another solver, a case without part', () => {

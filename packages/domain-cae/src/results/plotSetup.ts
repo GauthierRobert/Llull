@@ -42,7 +42,7 @@ export function frameOf(view: (typeof VIEW_DIRECTIONS)[number], direction: reado
   return { toViewer, project: (p) => [p[0] * right[0] + p[1] * right[1] + p[2] * right[2], p[0] * up[0] + p[1] * up[1] + p[2] * up[2]] };
 }
 
-/** A requested hold time matches a stored result set within this relative tolerance (the frd time column has 10 digits); never the nearest set. */
+/** A requested hold time matches a stored result set within this tolerance relative to the time itself (exact at 0; the frd time column has 10 digits); never the nearest set. */
 const CREEP_TIME_MATCH = 1e-6;
 
 export interface Selected {
@@ -94,7 +94,7 @@ export function selectStep(
     const picked =
       time === undefined
         ? sets.at(-1)
-        : sets.find((candidate) => Math.abs(candidate.holdTimeS - time) <= CREEP_TIME_MATCH * Math.max(1, Math.abs(time)));
+        : sets.find((candidate) => Math.abs(candidate.holdTimeS - time) <= CREEP_TIME_MATCH * Math.abs(time));
     if (picked !== undefined) return { step: picked.step, label: `hold t = ${significantNumber(picked.holdTimeS, 6)} s` };
     return time === undefined
       ? 'the results hold no result set of the creep hold'

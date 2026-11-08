@@ -10,6 +10,9 @@ const refuse = (code: string, message: string, ids: readonly string[] = []): Dec
 
 const TIME_POINTS = 'TP_HOLD';
 
+/** CalculiX default minimum increment of `*VISCO` (1e-5 x the period, never above the initial increment): written when only the maximum is given, so the card never forces another minimum. */
+const MIN_INCREMENT_FRACTION = 1e-5;
+
 /** Refusal when the case cannot be written: no hold, a part without a usable law (all parts without one: CRP_NO_VISCOUS_MATERIAL). */
 function problem(ctx: DeckContext): DeckRefusal | null {
   const id = ctx.analysisId;
@@ -69,7 +72,10 @@ export function creepSteps(ctx: DeckContext): DeckSections {
     creep.initialIncrementS,
     creep.durationS,
     ...(creep.minIncrementS !== undefined || creep.maxIncrementS !== undefined
-      ? [creep.minIncrementS ?? creep.initialIncrementS, creep.maxIncrementS ?? creep.durationS]
+      ? [
+          creep.minIncrementS ?? Math.min(MIN_INCREMENT_FRACTION * creep.durationS, creep.initialIncrementS),
+          creep.maxIncrementS ?? creep.durationS,
+        ]
       : []),
   ];
   lines.push(

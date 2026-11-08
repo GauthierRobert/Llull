@@ -35,7 +35,12 @@ const outputTimesSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('log').describe('Log-spaced output times.'),
-      count: z.number().int().describe('Number of output times between the first increment and the end of the hold, 2 to 200.'),
+      count: z
+        .number()
+        .int()
+        .min(2)
+        .max(200)
+        .describe('Number of output times between the first increment and the end of the hold, 2 to 200.'),
     })
     .describe('Log-spaced times: the right choice for creep, which changes fastest at the start.'),
   z
@@ -90,7 +95,6 @@ function resolve(params: z.output<typeof stepSchema>, refuse: Refuse): Resolved 
       `increments must satisfy 0 < min <= initial (${sig(initialIncrementS)} s) <= max <= duration (${sig(durationS)} s)`,
       'initialIncrement',
     );
-  if (maxIncrements < 1) return refuse('CRP_STEP_PARAM_INVALID', `maxIncrements ${maxIncrements} must be an integer >= 1`, 'maxIncrements');
   const kelvin = temperatureProblem(params.temperature);
   if (kelvin !== null) return refuse('CRP_STEP_PARAM_INVALID', `temperature: ${kelvin}`, 'temperature');
   const temperatureK = convertValue(params.temperature.value, params.temperature.unit, 'K');
@@ -129,10 +133,7 @@ function resolveOutput(
     defaulted.push(`outputTimes log ${CREEP_DEFAULTS.logOutputCount}`);
     return { kind: 'log', count: CREEP_DEFAULTS.logOutputCount };
   }
-  if (input.kind === 'log')
-    return Number.isInteger(input.count) && input.count >= 2 && input.count <= 200
-      ? { kind: 'log', count: input.count }
-      : refuse('CRP_STEP_PARAM_INVALID', `outputTimes.count ${input.count} must be an integer from 2 to 200`, 'outputTimes');
+  if (input.kind === 'log') return { kind: 'log', count: input.count };
   const every = seconds(input.every);
   if (typeof every === 'string') return refuse('CRP_STEP_PARAM_INVALID', `outputTimes.every: ${every}`, 'outputTimes');
   return every > 0 && every <= durationS && durationS / every <= 200
@@ -181,8 +182,10 @@ const stepSchema = z.object({
   maxIncrements: z
     .number()
     .int()
+    .min(1)
+    .max(1_000_000)
     .optional()
-    .describe('Most increments the hold may take (*STEP INC); the run stops with an error when reached. Default 1000.'),
+    .describe('Most increments the hold may take (*STEP INC, 1 to 1000000); the run stops with an error when reached. Default 1000.'),
   cetol: z
     .number()
     .describe(

@@ -76,7 +76,7 @@ describe('creep deck', () => {
         '** step 2: creep hold of 1000 s',
         '*STEP, INC=1000',
         '*VISCO, CETOL=0.001',
-        '0.1, 1000, 0.1, 2',
+        '0.1, 1000, 0.01, 2',
         '*BOUNDARY, OP=NEW',
         'C_fc_9_1, 1, 1',
         'C_fc_10_1, 2, 2',
@@ -105,6 +105,13 @@ describe('creep deck', () => {
     expect(steps.match(/\*STEP/g)).toHaveLength(1);
     expect(text).toContain('*MATERIAL,NAME=M_1\n*ELASTIC\n210000.,0.3\n*CREEP,LAW=NORTON\n1e-10,5.,0.\n*DENSITY');
     expect(text).toContain('unverified=none');
+  });
+
+  it('with only a maximum increment the minimum is the CalculiX default 1e-5 x duration, capped at the initial increment', () => {
+    const only = (initial: number): string =>
+      procedure(deckOf(creepCube({ step: { initialIncrement: { value: initial, unit: 's' }, maxIncrement: { value: 5, unit: 's' } } })));
+    expect(only(0.1)).toContain('*VISCO, CETOL=0.001\n0.1, 1000, 0.01, 5\n');
+    expect(only(0.001)).toContain('*VISCO, CETOL=0.001\n0.001, 1000, 0.001, 5\n');
   });
 
   it('is byte-deterministic and converts A with the stress unit of the law (A in GPa^-5 s^-1 = 1e-10 MPa^-5 s^-1)', () => {

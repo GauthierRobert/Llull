@@ -34,6 +34,13 @@ export const isPartIssue = (value: CreepLaw | PartIssue): value is PartIssue => 
  */
 export function partIssues(doc: CadDocument, analysis: AnalysisCase, temperatureK: number | null): PartIssue[] {
   const issues: PartIssue[] = [];
+  if (analysis.unitSystem !== 'N-mm-t-s')
+    issues.push({
+      code: 'CRP_UNIT_SYSTEM',
+      severity: 'error',
+      message: `unit system ${analysis.unitSystem}: the creep material cards are written in MPa, use N-mm-t-s (document unit mm)`,
+      ids: [analysis.id],
+    });
   for (const entityId of Object.keys(analysis.parts)) {
     const law = partLaw(doc, entityId);
     if (isPartIssue(law)) {

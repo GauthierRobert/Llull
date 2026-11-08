@@ -130,6 +130,24 @@ describe('result fields of a creep case', () => {
     expect((stress.data as { max: { value: number } }).max.value).toBeCloseTo(20, 9);
   });
 
+  it('hold times match relative to the time itself: two sets 5e-7 s apart stay distinguishable, 0 matches exactly', async () => {
+    const { selectStep } = await import('@cae/results/plotSetup');
+    const { doc, c, results } = solved();
+    const analysis = caseOf(doc, c.analysisId);
+    const first = results.steps.find((step) => step.step === 2);
+    if (analysis === undefined || first === undefined) throw new Error('no fixture');
+    const steps = [0, 1e-4, 1.0005e-4, 1e-3].map((hold) => ({ ...first, time: PRELOAD + hold }));
+    const pair = { ...results, steps };
+    const picked = (time: number): number | string => {
+      const found = selectStep(analysis, pair, undefined, time, undefined);
+      return typeof found === 'string' ? found : found.step.time - PRELOAD;
+    };
+    expect(picked(1.0005e-4)).toBeCloseTo(1.0005e-4, 12);
+    expect(picked(1e-4)).toBeCloseTo(1e-4, 12);
+    expect(picked(1.00025e-4)).toContain('no stored result set');
+    expect(picked(0)).toBeCloseTo(0, 12);
+  });
+
   it('the plot selection takes the hold set at a stored time (never the nearest), the last without one, and refuses an unstored time and a case without hold sets', async () => {
     const { selectStep } = await import('@cae/results/plotSetup');
     const { doc, c, results } = solved();
@@ -191,6 +209,15 @@ describe('creep_report', () => {
     ).toEqual([probeId]);
   });
 
+  it('a zero end-of-hold stress gives a null quick-check ratio and no ratio in the text (no NaN)', () => {
+    const frd = creepFrd([{ step: 2, time: PRELOAD + 1000, szz: 0, ceeq: 0 }]);
+    const { doc, c, ctx } = solved({}, frd);
+    const result = execute(doc, 'creep_report', { analysisId: c.analysisId }, ctx);
+    expect(reportOf(result.data).quickCheck).toMatchObject({ value: 0, ratioFeToClosedForm: null });
+    expect(result.summary).not.toContain('quick check ratio');
+    expect(JSON.stringify(result.data)).not.toContain('NaN');
+  });
+
   it('refuses stale results, missing results, unknown probes, a bad maxPoints, another case type, no hold and an unknown case', () => {
     const { doc, c, ctx } = solved();
     const longer = execute(doc, 'set_creep_step', {
@@ -203,8 +230,8 @@ describe('creep_report', () => {
     const fresh = creepCube();
     expect(execute(fresh.doc, 'creep_report', { analysisId: fresh.analysisId }).error?.code).toBe('CRP_RESULTS_MISSING');
     expect(execute(doc, 'creep_report', { analysisId: c.analysisId, probes: ['ghost'] }, ctx).error?.code).toBe('FEA_PROBE_NOT_FOUND');
-    expect(execute(doc, 'creep_report', { analysisId: c.analysisId, maxPoints: 1 }, ctx).error?.code).toBe('CRP_STEP_PARAM_INVALID');
-    expect(execute(doc, 'creep_report', { analysisId: c.analysisId, maxPoints: 500 }, ctx).error?.code).toBe('CRP_STEP_PARAM_INVALID');
+    expect(execute(doc, 'creep_report', { analysisId: c.analysisId, maxPoints: 1 }, ctx).error?.code).toBe('CMD_INVALID_PARAMS');
+    expect(execute(doc, 'creep_report', { analysisId: c.analysisId, maxPoints: 500 }, ctx).error?.code).toBe('CMD_INVALID_PARAMS');
     const stat = creepCube({ type: 'static' });
     expect(execute(stat.doc, 'creep_report', { analysisId: stat.analysisId }).error?.code).toBe('CRP_CASE_TYPE');
     expect(execute(doc, 'creep_report', { analysisId: 'ghost' }).error?.code).toBe('FEA_ANALYSIS_NOT_FOUND');

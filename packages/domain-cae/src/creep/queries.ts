@@ -64,7 +64,7 @@ function quickCheck(
     check: 'norton_constant_stress',
     sigmaMPa: sigma,
     value: expected,
-    ratioFeToClosedForm: creep.maxCeeq.value / expected,
+    ratioFeToClosedForm: expected > 0 ? creep.maxCeeq.value / expected : null,
     note: 'strain of a point held at the end-of-hold maximum von Mises for the whole hold: equal to the FE value for a uniform load-controlled uniaxial case, an indicator elsewhere (stress redistributes)',
   };
 }
@@ -100,8 +100,7 @@ function probeRecords(
  * @invariant read-only; numbers only from results re-verified against the artifact store (trustedRecord), so stale or unverifiable results are refused;
  *   histories at most `maxPoints` points per probe, hold time = CalculiX total time - preload period; `unverified` = the law flags; every result
  *   reviewRequired with a reason and the AF-33 sentence; an incomplete hold is reported in data.hold.complete, not refused
- * @failure unknown / non-creep case -> FEA_ANALYSIS_NOT_FOUND / CRP_CASE_TYPE; unknown probe id -> FEA_PROBE_NOT_FOUND; maxPoints outside 2..200 ->
- *   CRP_STEP_PARAM_INVALID; no hold set -> CRP_STEP_MISSING; stale -> FEA_RESULTS_STALE; no / unverifiable results -> CRP_RESULTS_MISSING /
+ * @failure unknown / non-creep case -> FEA_ANALYSIS_NOT_FOUND / CRP_CASE_TYPE; unknown probe id -> FEA_PROBE_NOT_FOUND; no hold set -> CRP_STEP_MISSING; stale -> FEA_RESULTS_STALE; no / unverifiable results -> CRP_RESULTS_MISSING /
  *   FEA_SUMMARY_MISMATCH (refusals, unchanged doc)
  */
 export const creepReport = defineCommand({
@@ -117,7 +116,7 @@ export const creepReport = defineCommand({
   params: z.object({
     analysisId: analysisIdSchema,
     probes: z.array(z.string()).optional().describe('Only these probe ids (affected[0] of add_result_probe); absent = every probe.'),
-    maxPoints: z.number().int().optional().describe('Most points per probe history, 2 to 200. Default 200.'),
+    maxPoints: z.number().int().min(2).max(MAX_HISTORY_POINTS).optional().describe('Most points per probe history, 2 to 200. Default 200.'),
   }),
   run: (doc, params, ctx?: ExecutionContext): CommandResult => {
     const command = 'creep_report';
@@ -127,8 +126,6 @@ export const creepReport = defineCommand({
     const fail = (code: string, message: string, path: string): CommandResult =>
       refuseCrp(doc, command, code, message, [analysis.id], [path]);
     const maxPoints = params.maxPoints ?? MAX_HISTORY_POINTS;
-    if (!(maxPoints >= 2 && maxPoints <= MAX_HISTORY_POINTS))
-      return fail('CRP_STEP_PARAM_INVALID', `maxPoints ${maxPoints} must be 2..${MAX_HISTORY_POINTS}`, 'maxPoints');
     const unknown = (params.probes ?? []).filter((id) => !Object.hasOwn(analysis.probes, id));
     if (unknown.length > 0) return fail('FEA_PROBE_NOT_FOUND', `no probe ${unknown.map((id) => `'${id}'`).join(', ')}`, 'probes');
     if (analysis.creep === undefined) return fail('CRP_STEP_MISSING', `analysis '${analysis.id}' has no creep step`, 'analysisId');
@@ -149,7 +146,7 @@ export const creepReport = defineCommand({
       `hold ${sig(creep.finalTimeS)} s of ${sig(spec.durationS)} s at ${sig(spec.temperature.valueK)} K${creep.holdComplete ? '' : ' (INCOMPLETE)'}`,
       creep.maxCeeq === undefined ? 'no creep strain block' : `max creep strain ${sig(creep.maxCeeq.value)} in '${creep.maxCeeq.entityId}'`,
       creep.maxVonMisesEndMPa === undefined ? '' : `max von Mises at the end ${sig(creep.maxVonMisesEndMPa.value)} MPa`,
-      quick === null ? '' : `quick check ratio ${sig(quick['ratioFeToClosedForm'] as number)}`,
+      typeof quick?.['ratioFeToClosedForm'] === 'number' ? `quick check ratio ${sig(quick['ratioFeToClosedForm'])}` : '',
       reasons.length > 0 ? `UNVERIFIED law (${reasons.join('; ')})` : '',
     ].filter((part) => part !== '');
     return report(doc, `${command}: '${analysis.id}' ${text.join('; ')}. ${NOT_APPROVED}`, {

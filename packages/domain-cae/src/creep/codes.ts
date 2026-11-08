@@ -13,10 +13,11 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     "give the creep_norton law timeUnit 's' (the CalculiX cards do not convert the time unit of A; convert with creep_closed_form check=convert_norton_a)",
   CRP_LAW_OUT_OF_RANGE: 'change the temperature / load, or supply a law whose validity covers it; llull never extrapolates a creep law',
   CRP_LAW_UNVERIFIED: 'replace the law by a sourced, verified one (basis A, B or S, or company with a stated source)',
-  CRP_DURATION_INVALID: 'give duration { value > 0, unit s | min | h | d | yr }',
+  CRP_DURATION_INVALID: 'give duration { value > 0, unit s | min | h }',
   CRP_CETOL_INVALID: 'give cetol > 0: the creep strain error allowed per increment (a few times the elastic strain, e.g. 1e-4 .. 1e-3)',
   CRP_STEP_PARAM_INVALID: 'increments must be finite and > 0 with min <= initial <= max <= duration; maxIncrements an integer >= 1',
   CRP_NO_VISCOUS_MATERIAL: 'attach a creep law to a part (see CRP_LAW_MISSING) or use analysisType static',
+  CRP_UNIT_SYSTEM: 'set the document unit to mm (unit system N-mm-t-s): the constitutive cards are written in MPa',
   CRP_STEP_MISSING: 'set_creep_step on the case first (the hold has no default)',
   CRP_ORTHOTROPIC_V2:
     'use an isotropic elastic model: CalculiX switches to the infinitesimal-strain creep model for orthotropic elasticity',
