@@ -1,4 +1,4 @@
-/** PHY-06 validation plan cnt_ssnp154_cylinder_block replayed through build_project (VC-CNT-01): every step runs, the pair is recorded. */
+/** PHY-06 validation plans cnt_ssnp154_cylinder_block and cnt_pretension_bar replayed through build_project (VC-CNT-01): every step runs, the pair / bolt is recorded. */
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
@@ -52,5 +52,28 @@ describe('cnt_ssnp154_cylinder_block plan', () => {
   it('fails only at hex_dominant meshing as written (set_mesh_controls builds tet only)', () => {
     const steps = (replay(false).data as { steps: { command: string; ok: boolean }[] }).steps;
     expect(steps.filter((step) => !step.ok).map((step) => step.command)).toEqual(['set_mesh_controls']);
+  });
+});
+
+const BAR_PLAN = 'docs/physics/06-contact-joints/validation/plans/cnt_pretension_bar.plan.json';
+
+describe('cnt_pretension_bar plan', () => {
+  it('runs every step including add_bolt_pretension: one bolt, 10 kN force preload in the first step, locked, no contact pair, two end reaction probes', () => {
+    const actions = JSON.parse(readFileSync(BAR_PLAN, 'utf8')) as Action[];
+    const result = execute(createEmptyDocument(), 'build_project', { actions }, { ...defaultContext(), kernel });
+    const steps = (result.data as { steps: { command: string; ok: boolean; summary: string }[] }).steps;
+    expect(steps.filter((step) => !step.ok).map((step) => `${step.command}: ${step.summary}`)).toEqual([]);
+    const [analysisId = ''] = Object.keys(result.document.analysis?.cases ?? {});
+    const analysis = result.document.analysis?.cases[analysisId];
+    const bolt = Object.values(analysis?.pretension?.bolts ?? {})[0];
+    expect(bolt).toMatchObject({
+      name: 'pt',
+      preload: { kind: 'force', value: 10000 },
+      section: { point: [0, 0, 10], normal: [0, 0, 1] },
+      lockAfter: true,
+      preloadStepId: analysis?.nonlinear?.stepOrder[0],
+    });
+    expect(analysis?.contact).toBeUndefined();
+    expect(Object.values(analysis?.nonlinear?.probes ?? {}).map((probe) => probe.name)).toEqual(['bottom_reaction', 'top_reaction']);
   });
 });

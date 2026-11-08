@@ -11,15 +11,27 @@ import { trustedRecord, type Trust } from '../shared/trust';
 import { isRefusal, nonlinearCase } from '../nonlinear/settings';
 import { lengthUnitName, stressUnitName, toAnalysisLength } from '../decks/units';
 import { NOT_APPROVED, refuseCnt } from './codes';
-import { overclosureItems, resultItems, setupItems, type ContactItem } from './check';
+import { boltItems, overclosureItems, resultItems, sectionItems, setupItems, type ContactItem } from './check';
+import { boltReport } from './boltReport';
 import { defaultStickSlope } from './defaults';
 import { findPair } from './pairRules';
+import { forceUnitName } from './pretensionRules';
+import { CLAMP_ZONE_RADIUS_DIAMETERS, type BoltRow } from './pretensionResults';
 import { SLIDING_FRACTION, contactRows } from './reader';
 
 /** Most rows one contact_report returns (AF-12); narrow with pair / step. */
 const MAX_ROWS = 500;
 
 const n = (value: number): string => significantNumber(value, 4);
+
+/** Summary text of the bolt rows (first 4) and the number of separated joints. */
+function boltText(rows: readonly BoltRow[], separated: number, force: string): string {
+  if (rows.length === 0) return '';
+  const lines = rows
+    .slice(0, 4)
+    .map((row) => `${row.pretensionId}/${row.stepId}: N ${n(row.axialForce)} ${force}, M_bend ${n(row.bendingMoment)}`);
+  return `; bolts ${lines.join('; ')}${separated > 0 ? `; ${separated} joint(s) SEPARATED` : ''}`;
+}
 
 /** Refusal code of a case whose results cannot be read. */
 function unreadable(trust: Trust): readonly [string, string] | null {
@@ -75,7 +87,10 @@ export const contactReport = defineCommand({
     '(contact half-width of a roller = closedBox width / 2). Lengths / stresses in the analysis unit system. Also returns each pair with its ' +
     'friction and the named CalculiX stick-slope default. Forces integrate the nodal (extrapolated) pressures: exact for a uniform pressure, ' +
     'a few % high where the pressure peaks at edges (measured +4 % on a sliding block); every result is reviewRequired. Compare with ' +
-    'hertz_contact; finish with check_contact.',
+    'hertz_contact; finish with check_contact. With bolt pretensions (add_bolt_pretension) it also returns bolts [{ pretensionId, stepId, preload, ' +
+    'axialForce (tension +), shearForce, bendingMoment, torsion, shortening }] from the stress on the section faces, clamp [{ pretensionId, pairId, ' +
+    'stepId, closedFraction }] (contact pairs within 1.5 bolt diameters of the axis) and separated [{ pretensionId, pairId, stepId, time }] (a pair fully ' +
+    'open around a bolt). A case with pretensions and no pair is accepted.',
   annotations: { readOnly: true },
   params: z.object({
     analysisId: analysisIdSchema,
@@ -93,8 +108,12 @@ export const contactReport = defineCommand({
     const { analysis } = found;
     const fail = (code: string, message: string, path: string): CommandResult =>
       refuseCnt(doc, command, code, message, [analysis.id], [path]);
-    if (analysis.contact === undefined)
-      return fail('CNT_PAIR_NOT_FOUND', `analysis '${analysis.id}' has no contact pairs (add_contact_pair)`, 'analysisId');
+    if (analysis.contact === undefined && analysis.pretension === undefined)
+      return fail(
+        'CNT_PAIR_NOT_FOUND',
+        `analysis '${analysis.id}' has no contact pairs or bolt pretensions (add_contact_pair, add_bolt_pretension)`,
+        'analysisId',
+      );
     const pair = params.pair === undefined ? undefined : findPair(analysis.contact, params.pair);
     if (params.pair !== undefined && pair === undefined) return fail('CNT_PAIR_NOT_FOUND', `no contact pair '${params.pair}'`, 'pair');
     const steps = analysis.nonlinear?.steps ?? {};
@@ -109,12 +128,19 @@ export const contactReport = defineCommand({
     const blocked = unreadable(trust);
     if (blocked !== null || trust.meshArtifact === null || trust.resultsArtifact === null)
       return fail(blocked?.[0] ?? 'FEA_RESULTS_MISSING', blocked?.[1] ?? 'no results', 'analysisId');
-    const rows = contactRows(analysis, trust.meshArtifact, trust.resultsArtifact, params.increments ?? 'summary');
+    const rows =
+      analysis.contact === undefined
+        ? []
+        : contactRows(analysis, trust.meshArtifact, trust.resultsArtifact, params.increments ?? 'summary');
     if (!Array.isArray(rows)) return fail(rows.code, rows.message, 'analysisId');
+    const bolts = boltReport(doc, analysis, trust.meshArtifact, trust.resultsArtifact, params.increments ?? 'summary');
+    if ('code' in bolts) return refuseCnt(doc, command, bolts.code, bolts.message, bolts.ids, ['analysisId']);
+    const boltRowsShown = bolts.bolts.filter((row) => stepId === undefined || row.stepId === stepId);
     const wanted = rows.filter((row) => (pair === undefined || row.pairId === pair.id) && (stepId === undefined || row.stepId === stepId));
     const shown = wanted.slice(0, MAX_ROWS);
     const length = lengthUnitName(analysis.unitSystem);
     const stress = stressUnitName(analysis.unitSystem);
+    const forceName = forceUnitName(analysis.unitSystem);
     const lines = shown
       .slice(0, 6)
       .map(
@@ -123,13 +149,16 @@ export const contactReport = defineCommand({
       );
     return report(
       doc,
-      `${command}: '${analysis.id}' ${analysis.contact.formulation}, ${wanted.length} row(s)${wanted.length > shown.length ? ` (first ${MAX_ROWS})` : ''}${lines.length > 0 ? `; ${lines.join('; ')}` : ''}. ${NOT_APPROVED}`,
+      `${command}: '${analysis.id}' ${analysis.contact?.formulation ?? 'no contact pairs'}, ${wanted.length} row(s)${wanted.length > shown.length ? ` (first ${MAX_ROWS})` : ''}${lines.length > 0 ? `; ${lines.join('; ')}` : ''}${boltText(boltRowsShown, bolts.separated.length, forceName)}. ${NOT_APPROVED}`,
       {
         analysisId: analysis.id,
-        formulation: analysis.contact.formulation,
-        units: { length, stress, area: `${length}^2`, force: analysis.unitSystem === 'lbf-in-slinch-s' ? 'lbf' : 'N' },
+        formulation: analysis.contact?.formulation ?? null,
+        units: { length, stress, area: `${length}^2`, force: forceName, moment: `${forceName}*${length}` },
         pairs: pairRecords(doc, analysis),
         rows: shown,
+        bolts: boltRowsShown,
+        clamp: bolts.clamp,
+        separated: bolts.separated,
         truncated: wanted.length > shown.length,
         provenance: {
           resultsHash: analysis.results?.resultsHash ?? null,
@@ -137,6 +166,9 @@ export const contactReport = defineCommand({
           reader: 'frd CONTACT block (COPEN, CSLIP1, CSLIP2, CPRESS, CSHEAR1, CSHEAR2) at the slave nodes',
           area: 'tributary corner areas of the slave faces (face area / 3 per corner); forces integrate the nodal pressures (high where pressure peaks at edges)',
           sliding: `closed node with |shear| >= ${SLIDING_FRACTION} x mu x pressure`,
+          bolts:
+            'force = (nodal stress . area) . n summed over the cut faces of the section (tension positive along its normal); moments about the section centroid; shortening = reference node U1',
+          separation: `a pair is separated when no slave node within ${CLAMP_ZONE_RADIUS_DIAMETERS} bolt diameters of the axis carries contact pressure; increments of the preload step before its last are not judged`,
         },
         reviewRequired: true,
       },
@@ -159,7 +191,9 @@ export const checkContact = defineCommand({
     'nonlinear items, every pair against the case (targets, one formulation, tied / smallSliding rules, values, steps), parts held only by ' +
     'contact (CNT_RIGID_BODY_BY_CONTACT_ONLY). On a current mesh: initial overclosure of the slave nodes beyond adjust ' +
     '(CNT_INITIAL_OVERCLOSURE). On current results: non-convergence (CNT_CONTACT_NOT_CONVERGED), penetration above penetrationTolerance ' +
-    '(CNT_PENETRATION_EXCESSIVE; CNT_PENETRATION_TOLERANCE_UNSET when not given), slip on pairs marked noSlipRequired (CNT_SLIP). Returns ' +
+    '(CNT_PENETRATION_EXCESSIVE; CNT_PENETRATION_TOLERANCE_UNSET when not given), slip on pairs marked noSlipRequired (CNT_SLIP). Bolt pretensions: ' +
+    'each bolt against the case (CNT_PRETENSION_*, CNT_STEP_UNKNOWN), the cut on the mesh (CNT_PRETENSION_SECTION_INVALID), a section force that misses ' +
+    'the preload by > 5 % (CNT_PRELOAD_MISMATCH), a joint that separates (CNT_SEPARATED, fail). Returns ' +
     'data { analysisId, state, status pass | warn | fail, items [{ code, severity, ids, message, remediation }], notes, reviewRequired }.',
   annotations: { readOnly: true },
   params: z.object({
@@ -189,9 +223,12 @@ export const checkContact = defineCommand({
       );
     const items = setupItems(doc, analysis);
     const notes: string[] = [];
-    if (analysis.contact === undefined) notes.push('the case has no contact pairs');
+    if (analysis.contact === undefined && analysis.pretension === undefined)
+      notes.push('the case has no contact pairs or bolt pretensions');
     const trust = trustedRecord(doc, analysis, ctx?.feaArtifacts);
     const scale = toAnalysisLength(doc, analysis.unitSystem, 1);
+    if (analysis.pretension !== undefined && trust.meshArtifact !== null && (trust.state === 'meshed' || trust.state === 'solved'))
+      items.push(...sectionItems(doc, analysis, trust.meshArtifact));
     if (analysis.contact !== undefined && trust.meshArtifact !== null && (trust.state === 'meshed' || trust.state === 'solved')) {
       const overclosure = overclosureItems(analysis, trust.meshArtifact, scale);
       items.push(...overclosure.items);
@@ -207,10 +244,19 @@ export const checkContact = defineCommand({
         message: 'results are stale: re-run fea_mesh and fea_solve',
         remediation: 'run fea_mesh and fea_solve again',
       });
-    if (analysis.contact !== undefined && trust.state === 'solved' && trust.meshArtifact !== null && trust.resultsArtifact !== null) {
-      const rows = contactRows(analysis, trust.meshArtifact, trust.resultsArtifact);
+    if (
+      (analysis.contact !== undefined || analysis.pretension !== undefined) &&
+      trust.state === 'solved' &&
+      trust.meshArtifact !== null &&
+      trust.resultsArtifact !== null
+    ) {
+      const rows = analysis.contact === undefined ? [] : contactRows(analysis, trust.meshArtifact, trust.resultsArtifact);
       if (Array.isArray(rows)) items.push(...resultItems(analysis, trust.results, rows, tolerance, scale));
       else items.push({ code: rows.code, severity: 'error', ids: [analysis.id], message: rows.message, remediation: 'see contact_report' });
+      const bolts = boltReport(doc, analysis, trust.meshArtifact, trust.resultsArtifact, 'summary');
+      if ('code' in bolts)
+        items.push({ code: bolts.code, severity: 'error', ids: bolts.ids, message: bolts.message, remediation: 'see contact_report' });
+      else items.push(...boltItems(analysis, bolts));
     } else notes.push('no current results: result checks skipped');
     const status = statusOf(items);
     return report(

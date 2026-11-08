@@ -16,7 +16,7 @@ import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
 import type { CaseStudies } from './convergenceStudy';
-import type { ContactSettings } from './contact';
+import type { ContactSettings, PretensionSettings } from './contact';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -511,6 +511,8 @@ export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly nonlinear?: NonlinearSettings;
   /** PHY-06 contact pairs (nonlinear_static only); absent until the first `add_contact_pair`. */
   readonly contact?: ContactSettings;
+  /** PHY-06 bolt pretension sections (nonlinear_static only); absent until the first `add_bolt_pretension`. */
+  readonly pretension?: PretensionSettings;
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];

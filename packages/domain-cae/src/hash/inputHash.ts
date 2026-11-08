@@ -1,6 +1,7 @@
 /** Input hash of an analysis (05 TR-FEA-06): equal hashes <=> the same set-up on the same geometry and materials. */
 
 import type { AnalysisCase, NonlinearSettings, ThermalSetup } from '@core/model/analysis';
+import type { BoltPretension } from '@core/model/contact';
 import type { CadDocument, Entity, Material } from '@core/model/types';
 import { geometryKey } from '@core/geometry/shapeRecipe';
 import { canonicalJson } from '@lib/canonicalJson';
@@ -116,6 +117,14 @@ function withoutNames(
   return { ...nonlinear, steps: strip(nonlinear.steps), probes: strip(nonlinear.probes) };
 }
 
+/** A bolt's display name is presentation (like pair names): it never changes the solution. */
+function withoutBoltName(bolt: BoltPretension | undefined): unknown {
+  if (bolt === undefined) return null;
+  const { name, ...rest } = bolt;
+  void name;
+  return rest;
+}
+
 const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string, unknown> => ({
   ...meshInputs(doc, analysisCase),
   type: analysisCase.type,
@@ -148,6 +157,9 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
           }),
         },
       }
+    : {}),
+  ...(analysisCase.pretension !== undefined
+    ? { pretension: analysisCase.pretension.order.map((id) => withoutBoltName(analysisCase.pretension?.bolts[id])) }
     : {}),
   ...laminateInputs(doc, analysisCase),
   ...(analysisCase.dynamics !== undefined ? { dynamics: analysisCase.dynamics, spectrum: baseSpectrum(doc, analysisCase) } : {}),

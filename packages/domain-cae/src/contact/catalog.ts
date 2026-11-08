@@ -5,6 +5,7 @@ import { boltedJointCheck } from './boltedJointCommand';
 import { hertzContact } from './hertzCommand';
 import { interferenceFit } from './interferenceCommand';
 import { addContactPair, deleteContactPair, updateContactPair } from './pairCommands';
+import { addBoltPretension, deleteBoltPretension } from './pretensionCommands';
 import { checkContact, contactReport } from './queries';
 
 export const contactCommands = commandCatalog(
@@ -14,6 +15,8 @@ export const contactCommands = commandCatalog(
   addContactPair,
   updateContactPair,
   deleteContactPair,
+  addBoltPretension,
+  deleteBoltPretension,
   contactReport,
   checkContact,
 );

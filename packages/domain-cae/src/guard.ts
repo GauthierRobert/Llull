@@ -22,6 +22,7 @@ function referencedEntities(analysisCase: AnalysisCase): Set<string> {
     analysisCase.thermomech,
     analysisCase.nonlinear,
     analysisCase.contact,
+    analysisCase.pretension,
   ]);
   return ids;
 }

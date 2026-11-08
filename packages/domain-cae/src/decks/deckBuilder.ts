@@ -13,6 +13,7 @@ import { commentText, idLines, linesText, row } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { nonlinearSteps } from '../nonlinear/deck';
+import { pretensionPlan } from '../contact/pretensionDeck';
 import { deckElementType, isCompositePart, planarSectionCards } from '../shell/shellDeck';
 import { PLANAR_TYPES } from '../shell/shellResults';
 import { isDynamicType } from '../dynamics/quantities';
@@ -144,10 +145,13 @@ export function precheck(
 
 function modelBlock(ctx: DeckContext): string[] {
   const { mesh } = ctx;
+  const plan = pretensionPlan(ctx);
+  const bolts = 'code' in plan ? null : plan;
   const lines = [`*NODE, NSET=${ALL_NODES}`, ...mesh.nodes.map(([id, x, y, z]) => row(id, x, y, z))];
+  if (bolts !== null && bolts.duplicateNodes.length > 0) lines.push('*NODE', ...bolts.duplicateNodes.map((node) => row(...node)));
   for (const block of mesh.blocks) {
     lines.push(`*ELEMENT, TYPE=${deckElementType(ctx, block.type, block.entityId)}, ELSET=${ctx.elset(block.entityId)}`);
-    lines.push(...block.elements.map((element) => row(...element)));
+    lines.push(...block.elements.map((element) => row(...(bolts === null ? element : bolts.substitute(element)))));
   }
   const elsets = [...new Set(mesh.blocks.map((block) => ctx.elset(block.entityId)))];
   lines.push(`*ELSET, ELSET=${ALL_ELEMENTS}`);

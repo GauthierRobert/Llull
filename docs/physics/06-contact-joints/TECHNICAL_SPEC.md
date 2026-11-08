@@ -376,12 +376,12 @@ Reused: `NLS_*` (PHY-05), `FEA_*` (05), `VNV_NO_CONVERGENCE_STUDY` (PHY-00), `MA
 - [R6] K. L. Johnson, Contact Mechanics (1985) — not fetched
 - Repo: `.dependency-cruiser.cjs`, `docs/aerospace/05-fea-cae-handoff/`, `docs/aerospace/08-materials-standards-libraries/`, `docs/physics/05-nonlinear-structural/`, `docs/physics/02-constitutive-models/`.
 
-## 13. As built (M1 + M2, 2026-11-07)
+## 13. As built (M1 + M2, 2026-11-07; M3, 2026-11-08, §13.3)
 
 Placement: Proposal B of §2 (the discipline lives in the 05 package, `packages/domain-cae/src/contact/`, plugin `cae`, toolset `analysis`).
 Types: `packages/core/src/model/contact.ts` (`ContactSettings`, `ContactPair`, `ContactBehaviour`, `ContactFormulation`), `AnalysisCase.contact?`;
 the 05 `FeaTarget` moved to `packages/core/src/model/feaTarget.ts` (shared by `analysis.ts` and `contact.ts`).
-Pretension (`add_bolt_pretension`, `BoltPretension`, `PreloadSpec`) is M3 and not built; `ContactSettings` has no pretension fields yet.
+Pretension (`add_bolt_pretension`, `BoltPretension`, `PreloadSpec`) is M3, built in §13.3; it lives in `AnalysisCase.pretension`, not in `ContactSettings` (D15).
 
 | Command | Kind | File |
 | ------- | ---- | ---- |
@@ -439,7 +439,7 @@ Solver runs: CalculiX 2.21 (Windows build), Netgen 6.2.2604 through `llull-mesh`
 | VC-CNT-30.a | **pass (ccx)** | `server/tests/feaContact.test.ts`: 10 mm steel cube on an equal cube, 10 MPa, μ 0.2, slid 0.05 mm: ground reaction plateau **199.85 N** vs μN = 200 N (−0.07 %); pressing step normal force 1000.16 N (+0.02 %), whole face closed and sticking; sliding step τ/p = 0.2000 at every slave node, sliding fraction 1 |
 | VC-CNT-40.a–i | pass | `analytic.test.ts` (1e-9 vs `bolted_joint_nasa5020.json`, cap, defaults 25 / 35 %, separation-critical refusal) |
 | VC-CNT-50 | partial (ccx) | All deck variants accepted and solved by ccx 2.21 on the block model: surface_to_surface LINEAR / HARD, MORTAR (no behaviour card), NODE TO SURFACE + SMALL SLIDING, TIED with `*FRICTION 1, λ`; EXPONENTIAL and `*MODEL CHANGE … REMOVE` are read without error (the free block then diverges, as expected). frd CONTACT layout pinned. Pending: reproduction of the CalculiX test decks `contact1`, `friction1`, `hueeber1_mortar` against their `.dat.ref` (not available offline). |
-| VC-CNT-51 | M3 | pretension not built |
+| VC-CNT-51 | **pass (ccx)** | M3, §13.3: `server/tests/feaPretension.test.ts`: section force 9974 N (-0.26 %, tolerance 0.5 %), each end reaction exactly 10 000 N |
 | VC-CNT-60 | pass | `CNT_MIXED_CONTACT_TYPES` (`pairs.test.ts`) |
 | VC-CNT-61 | pass | stick slope default reported `{ value: E1/2 = 105000 MPa/mm, source: "CalculiX *FRICTION default …", defaulted: true }` (`add_contact_pair` summary, `contact_report.pairs`) |
 | VC-CNT-62 | pass | `reviewRequired: true` and "not approved" on every contact / joint / Hertz result |
@@ -451,4 +451,55 @@ the pressure peaks at an edge the integral is high: +4.4 % on the sliding cube (
 base. Use reactions (curve probes) for absolute forces.
 
 Not built in M2: `*CONTACT PRINT` parsing, the guide section of `llull guide` (CLI lane), contact overlay fields in the UI, margins
-integration (FR-CNT-12) of `bolted_joint_check`, pretension (M3).
+integration (FR-CNT-12) of `bolted_joint_check`.
+### 13.3 As built, M3: bolt pretension (2026-11-08)
+
+Types: `packages/core/src/model/contact.ts` (`PreloadSpec`, `BoltPretension`, `PretensionSettings`), `AnalysisCase.pretension?: { bolts, order }`.
+
+| Command / piece | Kind | File |
+| --------------- | ---- | ---- |
+| `add_bolt_pretension` / `delete_bolt_pretension` | M | `contact/pretensionCommands.ts` (rules `pretensionRules.ts`, load validation `pretensionValidate.ts`) |
+| mesh cut (section imprint) | pure | `contact/pretensionSection.ts` |
+| deck: duplicate nodes, equations, preload / lock steps | pure | `contact/pretensionDeck.ts` (called by `decks/deckBuilder.ts` and `nonlinear/deck.ts`) |
+| bolt forces, shortening, clamp zone, separation | pure | `contact/pretensionResults.ts`, `contact/boltReport.ts` |
+| `contact_report` (+ `bolts`, `clamp`, `separated`) / `check_contact` (+ bolt items) | Q | `contact/queries.ts`, `contact/check.ts` |
+
+`add_bolt_pretension { analysisId, name, entityId, section { point, normal }, preload, preloadStepId, lockAfter? }`, preload = `{ kind: "force", value }` (analysis force unit)
+or `{ kind: "torque", torque, diameter, nutFactor, nutFactorSource }` with P = T / (K D) (torque in analysis force x analysis length, diameter in document length units;
+nut factor and source required, `CNT_NUT_FACTOR_MISSING` otherwise). Ids `bp-<step>.<k>`; affected `[analysisId, boltId]`.
+
+Deck (`contact/pretensionDeck.ts`): the bolt part's elements are split by the side of the plane their centroid lies on. The nodes shared by both sides are duplicated
+(new ids above the mesh nodes, bolts in order, cut nodes ascending: a `*NODE` card after the mesh nodes), the high-side elements are written with the copies, a reference node
+(`*NODE, NSET=PTN_n`, above the duplicates) carries u, and per cut node and component c an `*EQUATION` `high_c - low_c + n_c u = 0` (n = unit section normal, from the
+low to the high side). u is the shortening of the bolt (positive = tension). Step 1: `*CLOAD` `ref, 1, P`; later steps of a locked bolt: `*CLOAD ref, 1, 0` and `*BOUNDARY, FIXED`
+`ref, 1, 1`; an unlocked bolt keeps the constant `*CLOAD`. Every step: `*NODE PRINT, NSET=PTN_n` `U, RF`.
+
+Results (`contact_report`): per bolt and step `axialForce` (tension +), `shearForce`, `bendingMoment`, `torsion`, `shortening` (reference node U1 from the `.dat` table), `preload`;
+force = sum over the cut faces of (sigma . area vector) . n with the nodal stress (frd `STRESS`) averaged between the low-side node and its duplicate, edge-midpoint rule (exact for a
+linear stress field), moments about the area-weighted centroid. `clamp`: closed fraction of each pair's slave area within 1.5 bolt diameters of the axis, last increment of each step;
+`separated`: first increment in which that zone is fully open (CPRESS = 0 at every node).
+
+New codes: `CNT_PRELOAD_INVALID`, `CNT_PRETENSION_SECTION_INVALID` (plane outside the part, zero normal, one side only, more than one cut, a cut node in a constraint, load or probe
+node set), `CNT_PRETENSION_STEP_ORDER`, `CNT_PRETENSION_NOT_FOUND`, `CNT_SEPARATED` (check_contact, fail), `CNT_PRELOAD_MISMATCH` (warning: section force after the preload step
+differs from the preload by more than 5 %). `CNT_STEP_UNKNOWN` and `CNT_NUT_FACTOR_MISSING` are the §7.1 ones. `bolted_joint_check` is unchanged: D9 stands (no ultimate margin, `status: incomplete`
+when the joint separates first; eq. 6-6 is not transcribed).
+
+#### Decisions (M3)
+
+| # | Decision | Rejected option | Why |
+| - | -------- | --------------- | --- |
+| D13 | The pretension section is written explicitly (duplicate the cut nodes, `*EQUATION`s to a reference node), not with CalculiX `*PRE-TENSION SECTION`. | The keyword (TR-CNT-03 / 04 as drafted) | Measured on CalculiX 2.21 with the exact keyword and a clean planar cut: a 1 x 1 x 2 steel bar of 12 Kuhn tets with a jump of 0.01 mm prescribed on the reference node gave an end reaction of **333.3 N**, a third of E A / L x 0.01 (1000 N); with a force of 10 000 N the 2 x 2 x 20 bar gave 946 N and the 849-node Netgen cylinder 596 N, plus lateral reactions. Cause: ccx renumbers only the elements that own a face of the surface (2 of the 6 tets of a Kuhn cube); the manual's rule that the surface must not touch edges of elements without a face on it cannot hold for a tet mesh, and the others bridge the cut. The same mechanism written explicitly gives the end reaction **10 000.0 N** exactly (the bar and the Netgen cylinder). The keyword stays right for hex meshes (not built). |
+| D14 | The section is cut from the mesh at deck time by element-centroid side (jagged within one element size), with no OCCT imprint and no mesher change; `section` stays a plane (point, normal). | Plane imprint in `llull-mesh` (TR-CNT-03), or snapping nodes onto the plane | `llull-mesh` does not implement `intersectPlane` (the 05 face imprint is not built); with explicit equations a jagged cut is exact: the high side is translated rigidly by -n u. Snapping would distort elements. The cut treats the mid-side nodes of C3D10 elements as shared nodes, so the quadratic-contact restriction of TR-CNT-03 (a ccx keyword rule) is not applied; only first-order (C3D4) meshes are exercised so far (unit tests and VC-CNT-51). |
+| D15 | Bolts live in `AnalysisCase.pretension`, separate from `contact`. | `ContactSettings.pretensions` (§3) | `contact` requires a formulation fixed by its first pair and at least one pair; the validation bar (VC-CNT-51) has no pair. A separate field keeps both slices valid on their own. |
+| D16 | `preloadStepId` must be the first step of the case (`CNT_PRETENSION_STEP_ORDER`); several bolts are tightened together there. | Preload in any step | Before its preload the section is an open cut (u carries no load: a free mechanism), so a later preload would leave the bolt severed in the steps before it. A tightening sequence is V1. |
+| D17 | `lockAfter` absent = true, named in the summary. Locked = `*CLOAD ref, 1, 0` and `*BOUNDARY, FIXED` in every later step (the bolt length is held, external loads add to the preload through the joint stiffness); unlocked = the force stays (`*CLOAD` constant). | Leave the first `*CLOAD` in place under FIXED | The load is zeroed so the fixed degree of freedom does not fight a persistent load. Measured (VC-CNT-51 lock case): stretching the bar by 0.01 mm adds 2773 N when locked (E A delta / L = 2738 N, +1.3 %) and 0 N when unlocked. |
+| D18 | The bolt force is the stress integral over the cut faces; the reaction of the reference node is not read. | RF of the reference node (TR-CNT-10) | CalculiX prints RF = 0 for that degree of freedom whether it is free or fixed (it is an independent term of the equations; verified in a locked step), so it carries no force. The stress integral gives axial force, shear and bending as well; one-sided nodal stress biased the bending (3200 N*mm for a pure axial case), the low / high mean removes it (47 N*mm). |
+| D19 | Separation = the whole clamp zone of a pair (slave nodes within 1.5 bolt diameters of the axis, the diameter from the cut area) is open (CPRESS = 0), first increment recorded; increments of the preload step before its last do not count; `CNT_SEPARATED` is a fail. | Whole-pair closure | A bolted joint opens locally; whole-pair closure would never trigger on a large plate. The preload step is skipped because a gap closes while the preload builds. |
+| D20 | The validation plan `cnt_pretension_bar` has one fixed constraint and one reaction probe per end. | One `ends` constraint | The summed reaction of both ends is 0 (the plan's own note), so it could not show the 10 kN. |
+
+#### VC-CNT-51 measured (CalculiX 2.21, Netgen 6.2.2604, 2026-11-08)
+
+Bar r 3 mm, L 20 mm (faceted cylinder, 849 nodes, 3017 C3D4, cut of 63 faces, projected area 27.38 mm^2), E 200 GPa, P 10 000 N: section force **9974.0 N** (oracle 10 000, -0.26 %, tolerance 0.5 %),
+end reactions **-10 000.0 / +10 000.0 N** (exact), shear 1.4 N, bending 47 N*mm, bolt shortening 0.03596 mm. Lock case (top end driven 0.01 mm in step 2): locked +2773 N (oracle +2738 N), unlocked +0 N
+with the shortening reduced by exactly 0.01 mm. Without `add_bolt_pretension` the same test fails (`CNT_PAIR_NOT_FOUND`, end reactions 0). Not built: the `pret1` to `pret7` decks of the ccx test suite
+(not available offline; they exercise the keyword that D13 replaces), `joint_stiffness_from_fe` and `joint_from_fastener_stack` (M4).

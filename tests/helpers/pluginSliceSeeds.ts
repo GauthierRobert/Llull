@@ -247,14 +247,23 @@ let studySeed: ReturnType<typeof studyBar> | undefined;
 const studyFixture = (): ReturnType<typeof studyBar> => (studySeed ??= studyBar());
 
 const analysisId = (doc: CadDocument): string => doc.analysis?.caseOrder[0] ?? 'missing';
-/** PHY-06: two stacked cubes with a surface_to_surface pair (friction, activeSteps) in a nonlinear_static case. */
+/** PHY-06: two stacked cubes with a surface_to_surface pair (friction, activeSteps) and a torque-preloaded bolt section in a nonlinear_static case. */
 function contactDocument(): CadDocument {
   const b = blocks({ holdUpper: true });
-  return must(
+  const paired = must(
     b.doc,
     'add_contact_pair',
     pairParams(b, { friction: { mu: 0.2 }, activeSteps: [b.stepId], adjust: { kind: 'clearance', value: 0.01 } }),
   ).doc;
+  return must(paired, 'add_bolt_pretension', {
+    analysisId: b.analysisId,
+    name: 'm1',
+    entityId: b.lower,
+    section: { point: [0.5, 0.5, 0.5], normal: [0, 0, 1] },
+    preload: { kind: 'torque', torque: 5, diameter: 0.5, nutFactor: 0.2, nutFactorSource: 'synthetic seed' },
+    preloadStepId: b.stepId,
+    lockAfter: false,
+  }).doc;
 }
 
 const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc)]?.topologyOrder?.[0] ?? 'missing';
