@@ -47,6 +47,9 @@ const PROPERTY_CATALOG: readonly PropertyCatalogEntry[] = [
   row('thermalDiffusivity', 'm^2/s', 'thermal diffusivity', { ownerPack: 'PHY-01' }),
   row('diffusionRate', '1/s', 'thermally activated rate (Arrhenius)', { ownerPack: 'PHY-01' }),
   row('rateFactor', '1', 'dimensionless strain-rate multiplier of a flow stress', { ownerPack: 'PHY-01' }),
+  row('maxServiceTemperature', 'K', 'maximum continuous service temperature: a constraint of material selection, never a model input', {
+    ownerPack: '12 SEL',
+  }),
   row('structuralLossFactor', '1', 'structural (hysteretic) damping loss factor eta, written as *DAMPING,STRUCTURAL', {
     positive: false,
     ownerPack: 'PHY-09',

@@ -43,7 +43,7 @@ export interface PropertyUse {
 
 export interface IndexResult {
   readonly material: string;
-  readonly case: IndexCase;
+  readonly case: IndexCase | 'user';
   readonly value: number;
   readonly unit: string;
   readonly inputs: readonly PropertyUse[];

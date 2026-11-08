@@ -8,6 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import { basesOf, mixedBasesWarning } from './bases';
 import { issue, REVIEW_SENTENCE, refuseSel } from './codes';
 import { resolveProperty } from './properties';
+import { MAX_CANDIDATES } from './inputs';
 import { analysisOf } from '../shared/access';
 import { stateOf } from '../shared/state';
 import type { PropertyUse, SelIssue } from './types';
@@ -63,6 +64,7 @@ export const checkMaterialSelection = defineCommand({
   params: z.object({
     entityIds: z
       .array(z.string())
+      .max(MAX_CANDIDATES)
       .optional()
       .describe('Entities whose materials are checked; omit for every entity of the document (and of its components).'),
   }),

@@ -122,6 +122,13 @@ export function syntheticDocument(): CadDocument {
         { property: 'density', value: material.densityGcm3, unit: 'g/cm^3', basis: 'company', citation: SYNTHETIC_CITATION },
         { property: 'E', value: material.eGPa, unit: 'GPa', basis: 'company', citation: SYNTHETIC_CITATION },
         { property: 'Fty', value: material.strengthMPa, unit: 'MPa', basis: 'company', citation: SYNTHETIC_CITATION },
+        {
+          property: 'maxServiceTemperature',
+          value: material.maxServiceTempC,
+          unit: 'degC',
+          basis: 'company',
+          citation: SYNTHETIC_CITATION,
+        },
       ]),
     empty(),
   );

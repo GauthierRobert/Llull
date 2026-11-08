@@ -9,14 +9,16 @@ import { evaluateIndex, isExcluded } from './indices';
 import { INDEX_RULES, ruleOf } from './indexRules';
 import {
   directionSchema,
+  MAX_CANDIDATES,
   optionsProblem,
   resolveOptionsOf,
   strengthSchema,
   temperatureSchema,
   thicknessSchema,
   unique,
-  unknownMaterials,
 } from './inputs';
+import { candidateProblem, layupOf } from './candidates';
+import { layupSchema } from './layups';
 import { INDEX_CASES, type Excluded, type IndexResult } from './types';
 
 const COMMAND = 'material_index';
@@ -37,10 +39,12 @@ export const materialIndex = defineCommand({
     'Values come from the stored sourced properties (density, E, Fty ...; set_material_property / import_material_library), converted to base units: E in GPa, strength in MPa, density in Mg/m^3, ' +
     'so a result reads e.g. 3.013 GPa^(1/2)/(Mg/m^3). Returns data { results: [{ material, case, value, unit, inputs: [{ property, value, unit, basis, propertyValueId, provenance }], unverified, unverifiedReasons, warnings }], ' +
     'excluded: [{ material, code, reason, missing }], basesUsed, warnings, unverified, reviewRequired }. A material that lacks a required value is listed in excluded (SEL_PROPERTY_MISSING, never imputed); ' +
+    'Composite (06 lamina) candidates need layups (SEL_LAYUP_REQUIRED) and carry SEL_ANISOTROPIC. ' +
     'typical / supplier / legacy inputs make the result unverified (SEL_VALUE_UNVERIFIED), and several bases in one call give SEL_BASIS_MIXED. Read-only. Next: compare_materials to rank with constraints, substitute_material to test a swap.',
   params: z.object({
     materials: z
       .array(z.string())
+      .max(MAX_CANDIDATES)
       .describe(
         'Material ids of the document (get_material lists a material; import_material_library adds library records). Unknown ids are refused.',
       ),
@@ -49,6 +53,12 @@ export const materialIndex = defineCommand({
     direction: directionSchema.optional(),
     thickness: thicknessSchema.optional(),
     temperature: temperatureSchema.optional(),
+    layups: z
+      .record(z.string(), layupSchema)
+      .optional()
+      .describe(
+        'Layup of each composite candidate: { <lamina id>: { laminate: "[0/+-45/90]s" } }. A 06 lamina material is compared through the in-plane membrane Ex of its layup (analyze_laminate), never its fibre E1, with the warning SEL_ANISOTROPIC; without a layup it is refused (SEL_LAYUP_REQUIRED). A laminate has no scalar strength: strength indices exclude it.',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const materials = unique(params.materials);
@@ -64,16 +74,16 @@ export const materialIndex = defineCommand({
       );
     const problem = optionsProblem(params);
     if (problem !== null) return refuseSel(doc, COMMAND, 'SEL_PARAMS_INVALID', problem, [], [problem.split(/[.:]/)[0] ?? 'params']);
-    const unknown = unknownMaterials(doc, materials);
-    if (unknown.length > 0)
+    const candidateIssue = candidateProblem(doc, materials, params.layups);
+    if (candidateIssue !== null)
       return refuseSel(
         doc,
         COMMAND,
-        'SEL_MATERIAL_NOT_FOUND',
-        `no material ${unknown.map((id) => `'${id}'`).join(', ')}`,
-        unknown,
-        ['materials'],
-        { known: Object.keys(doc.materials) },
+        candidateIssue.code,
+        candidateIssue.message,
+        candidateIssue.ids,
+        [candidateIssue.path],
+        candidateIssue.detail,
       );
     const needsStrength = indices.filter((entry) => ruleOf(entry)?.property === 'strength');
     if (needsStrength.length > 0 && params.strengthProperty === undefined)
@@ -92,7 +102,7 @@ export const materialIndex = defineCommand({
       for (const indexCase of indices) {
         const rule = ruleOf(indexCase);
         if (rule === undefined) continue;
-        const evaluated = evaluateIndex(doc, material, rule, options);
+        const evaluated = evaluateIndex(doc, material, rule, { ...options, layup: layupOf(params.layups, material) });
         if (isExcluded(evaluated)) excluded.push(evaluated);
         else results.push(evaluated);
       }

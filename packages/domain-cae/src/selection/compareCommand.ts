@@ -7,21 +7,22 @@ import type { CadDocument } from '@core/model/types';
 import { basesOf, mixedBasesWarning, unverifiedSummary } from './bases';
 import { issue, REVIEW_SENTENCE, refuseSel } from './codes';
 import { constraintProblem, evaluateConstraint, type ConstraintFailure } from './constraints';
-import { evaluateIndex, isExcluded } from './indices';
-import { ruleOf } from './indexRules';
+import { isExcluded } from './indices';
+import { candidateProblem, layupOf } from './candidates';
+import { layupSchema } from './layups';
+import { evaluateObjective, objectiveProblem, objectiveSchema } from './objectives';
 import {
   directionSchema,
+  MAX_CANDIDATES,
   optionsProblem,
   quantitySchema,
   resolveOptionsOf,
-  strengthSchema,
   temperatureSchema,
   thicknessSchema,
   unique,
-  unknownMaterials,
 } from './inputs';
 import { normaliseWeights, paretoSet, rankScored } from './rank';
-import { INDEX_CASES, type Excluded, type IndexResult, type SelIssue } from './types';
+import type { Excluded, IndexResult, SelIssue } from './types';
 
 const COMMAND = 'compare_materials';
 
@@ -36,17 +37,6 @@ function candidatesOf(doc: CadDocument, materials: string[] | { readonly library
     .sort();
 }
 
-const objectiveSchema = z.object({
-  index: z.enum(INDEX_CASES).describe('Loading case whose index P^n / rho is maximised (see material_index for the cases).'),
-  weight: z
-    .number()
-    .optional()
-    .describe(
-      'Weight of this objective, >= 0. Give a weight to every objective or to none (equal weights, reported as defaulted). Normalised to sum 1.',
-    ),
-  strengthProperty: strengthSchema.optional(),
-});
-
 const constraintSchema = z.object({
   property: z.string().describe('Catalogue property constrained: density, E, G, nu, Ftu, Fty, Fcy, Fsu, cte, k, cp ...'),
   min: quantitySchema('Lower bound')
@@ -60,7 +50,7 @@ const constraintSchema = z.object({
  * @affects nothing - read-only; data { ranked[], failed[], excluded[], pareto?, weights, objectives[], basesUsed[], warnings[], unverified, reviewRequired }
  * @invariant score_i = sum_k w_k I_k,i / max_j I_k,j over the candidates that passed; descending score, ties by ascending id; a candidate missing a required
  *   value is excluded (never ranked on a guess, never a pass or a fail); the Pareto set minimises 1 / I_k, ascending ids; request order never changes the result
- * @failure no objective SEL_NO_OBJECTIVE, weight < 0 / all 0 / partly given SEL_WEIGHT_INVALID, unknown material or library SEL_MATERIAL_NOT_FOUND, strength index without
+ * @failure user index without derivationNote SEL_DERIVATION_NOTE_MISSING, lamina candidate without layup SEL_LAYUP_REQUIRED, no objective SEL_NO_OBJECTIVE, weight < 0 / all 0 / partly given SEL_WEIGHT_INVALID, unknown material or library SEL_MATERIAL_NOT_FOUND, strength index without
  *   strengthProperty SEL_STRENGTH_PROPERTY_UNSET, bad constraint / unit SEL_PARAMS_INVALID (refusals); every candidate failed or excluded -> empty ranked + SEL_NO_CANDIDATE warning
  */
 export const compareMaterials = defineCommand({
@@ -74,11 +64,12 @@ export const compareMaterials = defineCommand({
     'on a guess, and never counted as passing or failing. data.failed lists the failing constraint with its value. pareto: true adds data.pareto, the non-dominated candidates ' +
     'when every objective is minimised as relative mass 1/index (ascending ids). Strength indices need their own strengthProperty (Fty, Ftu, Fcy). Returns data { ranked: [{ material, rank, score, objectives }], failed, excluded, ' +
     'pareto?, weights: { value, defaulted, source? }, basesUsed, warnings, unverified, reviewRequired }. Typical / supplier values make the ranking unverified; mixed bases give SEL_BASIS_MIXED; an empty ranking is not an error ' +
-    '(warning SEL_NO_CANDIDATE). Read-only. Apply a choice with assign_material (after a human decision; substitute_material shows the effect on a part first).',
+    '(warning SEL_NO_CANDIDATE). A user-defined objective { index: "user", exponents: { E: 0.5 }, derivationNote } maximises prod(P^a) / density and REQUIRES a derivationNote (SEL_DERIVATION_NOTE_MISSING). ' +
+    'Composite candidates need layups (SEL_LAYUP_REQUIRED) and carry SEL_ANISOTROPIC. Read-only. Apply a choice with assign_material (after a human decision; substitute_material shows the effect on a part first).',
   params: z.object({
     materials: z
       .union([
-        z.array(z.string()),
+        z.array(z.string()).max(MAX_CANDIDATES),
         z.object({ library: z.string().describe('Library id: every material imported from it is a candidate.') }),
       ])
       .describe(
@@ -90,6 +81,12 @@ export const compareMaterials = defineCommand({
         'One or more objectives, e.g. [{ index: "beam_stiffness", weight: 0.7 }, { index: "beam_strength", strengthProperty: "Fty", weight: 0.3 }].',
       ),
     constraints: z.array(constraintSchema).optional().describe('Constraints every candidate must meet (all of them).'),
+    layups: z
+      .record(z.string(), layupSchema)
+      .optional()
+      .describe(
+        'Layup of each composite candidate: { <lamina id>: { laminate: "[0/+-45/90]s" } }. A 06 lamina material (create_lamina_material) is compared through the in-plane membrane Ex of its layup (analyze_laminate), never its fibre E1, with the warning SEL_ANISOTROPIC; without a layup it is refused (SEL_LAYUP_REQUIRED). A laminate has no scalar strength: strength indices and strength constraints exclude it.',
+      ),
     pareto: z.boolean().optional().describe('true: also return the Pareto set (non-dominated candidates). Default false.'),
     direction: directionSchema.optional(),
     thickness: thicknessSchema.optional(),
@@ -103,18 +100,8 @@ export const compareMaterials = defineCommand({
       const bad = objectives.findIndex((objective) => objective.weight !== undefined && !(objective.weight >= 0));
       return refuseSel(doc, COMMAND, 'SEL_WEIGHT_INVALID', weights, [], [`objectives.${Math.max(bad, 0)}.weight`]);
     }
-    const unset = objectives.findIndex(
-      (objective) => ruleOf(objective.index)?.property === 'strength' && objective.strengthProperty === undefined,
-    );
-    if (unset >= 0)
-      return refuseSel(
-        doc,
-        COMMAND,
-        'SEL_STRENGTH_PROPERTY_UNSET',
-        `objective ${unset} (${objectives[unset]?.index ?? ''}) needs a strength property`,
-        [],
-        [`objectives.${unset}.strengthProperty`],
-      );
+    const invalid = objectiveProblem(objectives);
+    if (invalid !== null) return refuseSel(doc, COMMAND, invalid.code, invalid.message, [], [invalid.path]);
     const problem = optionsProblem(params) ?? (constraints ?? []).map(constraintProblem).find((entry) => entry !== null) ?? null;
     if (problem !== null) return refuseSel(doc, COMMAND, 'SEL_PARAMS_INVALID', problem, [], [problem.split(/[:]/)[0] ?? 'params']);
     const candidates = candidatesOf(doc, params.materials);
@@ -127,16 +114,16 @@ export const compareMaterials = defineCommand({
         [],
         ['materials.library'],
       );
-    const unknown = unknownMaterials(doc, candidates);
-    if (unknown.length > 0)
+    const candidateIssue = candidateProblem(doc, candidates, params.layups);
+    if (candidateIssue !== null)
       return refuseSel(
         doc,
         COMMAND,
-        'SEL_MATERIAL_NOT_FOUND',
-        `no material ${unknown.map((id) => `'${id}'`).join(', ')}`,
-        unknown,
-        ['materials'],
-        { known: Object.keys(doc.materials) },
+        candidateIssue.code,
+        candidateIssue.message,
+        candidateIssue.ids,
+        [candidateIssue.path],
+        candidateIssue.detail,
       );
     const options = resolveOptionsOf(params);
     const excluded: Excluded[] = [];
@@ -144,18 +131,14 @@ export const compareMaterials = defineCommand({
     const survivors: { readonly item: readonly IndexResult[]; readonly id: string; readonly values: readonly number[] }[] = [];
     const constraintInputs: { readonly input: IndexResult['inputs'][number] }[] = [];
     for (const material of candidates) {
-      const evaluated = objectives.map((objective) => {
-        const rule = ruleOf(objective.index);
-        return rule === undefined
-          ? undefined
-          : evaluateIndex(doc, material, rule, { ...options, strengthProperty: objective.strengthProperty });
-      });
-      const missingIndex = evaluated.find((entry): entry is Excluded => entry !== undefined && isExcluded(entry));
-      const outcomes = (constraints ?? []).map((constraint) => evaluateConstraint(doc, material, constraint, options));
+      const layup = layupOf(params.layups, material);
+      const evaluated = objectives.map((objective) => evaluateObjective(doc, material, objective, { ...options, layup }));
+      const missingIndex = evaluated.find(isExcluded);
+      const outcomes = (constraints ?? []).map((constraint) => evaluateConstraint(doc, material, constraint, options, layup));
       const missingConstraint = outcomes.find((outcome) => outcome.kind === 'missing');
       if (missingIndex !== undefined || missingConstraint?.kind === 'missing') {
         const reasons = [
-          ...evaluated.flatMap((entry) => (entry !== undefined && isExcluded(entry) ? [entry] : [])),
+          ...evaluated.filter(isExcluded),
           ...outcomes.flatMap((outcome) => (outcome.kind === 'missing' ? [outcome.excluded] : [])),
         ];
         excluded.push({
@@ -171,7 +154,7 @@ export const compareMaterials = defineCommand({
         failed.push(...failures);
         continue;
       }
-      const results = evaluated.filter((entry): entry is IndexResult => entry !== undefined && !isExcluded(entry));
+      const results = evaluated.filter((entry): entry is IndexResult => !isExcluded(entry));
       constraintInputs.push(...outcomes.flatMap((outcome) => (outcome.kind === 'pass' ? [{ input: outcome.use }] : [])));
       survivors.push({ item: results, id: material, values: results.map((result) => result.value) });
     }
@@ -226,6 +209,7 @@ export const compareMaterials = defineCommand({
         objectives: objectives.map((objective) => ({
           index: objective.index,
           ...(objective.strengthProperty !== undefined ? { strengthProperty: objective.strengthProperty } : {}),
+          ...(objective.index === 'user' ? { exponents: objective.exponents, derivationNote: objective.derivationNote } : {}),
         })),
         basesUsed: bases,
         warnings,

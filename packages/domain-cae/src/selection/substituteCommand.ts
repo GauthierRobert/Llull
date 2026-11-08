@@ -7,7 +7,7 @@ import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { CadDocument, Entity } from '@core/model/types';
 import { issue, REVIEW_SENTENCE, refuseSel } from './codes';
 import { DESIGN_RULES, isStrengthRule, ratiosOf, type DesignRule, type Side } from './designRules';
-import { strengthSchema } from './inputs';
+import { MAX_CANDIDATES, strengthSchema } from './inputs';
 import { resolveProperty } from './properties';
 import { substituteMargins, type MarginsOutcome } from './substituteMargins';
 import type { PropertyUse, StrengthProperty } from './types';
@@ -113,7 +113,7 @@ export const substituteMaterial = defineCommand({
     '{ code SEL_MARGINS_NEED_RESOLVE, failedConditions, conditions, resolvePlan } (run the plan on a copy: assign_material, fea_mesh, fea_solve, compute_margins) and no margin is guessed; no analysis gives SEL_NO_ANALYSIS. ' +
     'Applying the swap is assign_material (a released part needs a change order first). Read-only.',
   params: z.object({
-    entityIds: z.array(z.string()).describe('3D solid entities to re-material, all made of `from`.'),
+    entityIds: z.array(z.string()).max(MAX_CANDIDATES).describe('3D solid entities to re-material, all made of `from`.'),
     from: z.string().describe('Current material id of every entity.'),
     to: z.string().describe('Candidate material id (must exist in the document: import_material_library / define_material_record).'),
     designRule: z

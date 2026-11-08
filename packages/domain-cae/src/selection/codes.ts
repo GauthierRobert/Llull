@@ -18,6 +18,12 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   SEL_DESIGN_RULE_UNSET: 'name the rule: same_geometry, equal_stiffness_tie / beam / panel or equal_strength_tie / beam / panel',
   SEL_BASIS_MIXED: 'compare like with like (A against A, typical against typical)',
   SEL_VALUE_UNVERIFIED: 'replace the typical / supplier / legacy value with a verified, sourced one (basis A, B, S or company)',
+  SEL_DERIVATION_NOTE_MISSING: 'state how the index follows from the loading case (derivationNote)',
+  SEL_LAYUP_REQUIRED: 'pass layups { <id>: { laminate: "[0/+-45/90]s" } }; create_lamina_material defines the lamina',
+  SEL_ANISOTROPIC: 'check the first-ply failure with analyze_laminate; the index covers in-plane stiffness only',
+  SEL_MARGINS_NEED_RESOLVE: 'run data.margins.resolvePlan on a copy (assign_material, fea_mesh, fea_solve, compute_margins)',
+  SEL_NO_ANALYSIS: 'create_analysis with these parts and solve it, or drop margins from include',
+  SEL_FEA_STALE_AFTER_SUBSTITUTION: 'fea_solve again (fea_mesh first when the mesh is stale too)',
   SEL_PARAMS_INVALID: 'follow the command description (units of the right dimension, bounds, no empty lists)',
 };
 

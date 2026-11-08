@@ -2,16 +2,19 @@
 
 import { BASE_UNITS, exponentValue, indexUnit, type IndexRule } from './indexRules';
 import { issue } from './codes';
-import { resolveProperty, type ResolveOptions } from './properties';
+import { anisotropicWarning, resolveCandidateProperty, type Layup } from './layups';
+import type { ResolveOptions } from './properties';
 import type { CadDocument } from '@core/model/types';
 import type { Excluded, IndexResult, PropertyUse, StrengthProperty } from './types';
 
 export interface IndexOptions extends ResolveOptions {
   readonly strengthProperty?: StrengthProperty | undefined;
+  /** The layup a lamina candidate is compared through. */
+  readonly layup?: Layup | undefined;
 }
 
 /** The unverified warning a result carries (not suppressible, SEL_VALUE_UNVERIFIED). */
-function unverifiedWarning(material: string, inputs: readonly PropertyUse[]): IndexResult['warnings'] {
+export function unverifiedWarning(material: string, inputs: readonly PropertyUse[]): IndexResult['warnings'] {
   const weak = inputs.filter((input) => input.unverified);
   return weak.length === 0
     ? []
@@ -34,8 +37,8 @@ export function evaluateIndex(doc: CadDocument, material: string, rule: IndexRul
   if (property === undefined)
     return { material, code: 'SEL_STRENGTH_PROPERTY_UNSET', reason: `${rule.case} needs a strength property`, missing: [] };
   const asked: ResolveOptions = { direction: options.direction, thickness: options.thickness, temperature: options.temperature };
-  const pValue = resolveProperty(doc, material, property, BASE_UNITS[rule.property], asked);
-  const density = resolveProperty(doc, material, 'density', BASE_UNITS.density, asked);
+  const pValue = resolveCandidateProperty(doc, material, property, BASE_UNITS[rule.property], asked, options.layup);
+  const density = resolveCandidateProperty(doc, material, 'density', BASE_UNITS.density, asked, options.layup);
   if (!pValue.ok || !density.ok) {
     const failures = [pValue, density].flatMap((entry) => (entry.ok ? [] : [entry]));
     return {
@@ -63,7 +66,10 @@ export function evaluateIndex(doc: CadDocument, material: string, rule: IndexRul
     inputs,
     unverified: inputs.some((input) => input.unverified),
     unverifiedReasons: reasons,
-    warnings: unverifiedWarning(material, inputs),
+    warnings: [
+      ...unverifiedWarning(material, inputs),
+      ...(options.layup === undefined ? [] : [anisotropicWarning(material, options.layup)]),
+    ],
     provenance: { rule: rule.source, derivation: rule.derivation },
   };
 }

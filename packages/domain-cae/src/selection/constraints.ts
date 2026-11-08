@@ -5,7 +5,8 @@ import { catalogEntry } from '@core/model/propertyCatalog';
 import type { PropertyDirection } from '@core/model/propertyModel';
 import type { CadDocument } from '@core/model/types';
 import { quantityProblem } from './inputs';
-import { resolveProperty, type ResolveOptions } from './properties';
+import { resolveCandidateProperty, type Layup } from './layups';
+import type { ResolveOptions } from './properties';
 import type { Excluded, PropertyUse, Quantity } from './types';
 
 export interface ConstraintParam {
@@ -57,12 +58,17 @@ export function evaluateConstraint(
   material: string,
   constraint: ConstraintParam,
   options: ResolveOptions,
+  layup?: Layup,
 ): ConstraintOutcome {
   const unit = unitOf(constraint) ?? '1';
-  const resolved = resolveProperty(doc, material, constraint.property, unit, {
-    ...options,
-    direction: constraint.direction ?? options.direction,
-  });
+  const resolved = resolveCandidateProperty(
+    doc,
+    material,
+    constraint.property,
+    unit,
+    { ...options, direction: constraint.direction ?? options.direction },
+    layup,
+  );
   if (!resolved.ok)
     return {
       kind: 'missing',

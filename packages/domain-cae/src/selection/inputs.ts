@@ -3,7 +3,6 @@
 import { z } from '@core/commands/schema';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { PROPERTY_DIRECTIONS } from '@core/model/propertyModel';
-import type { CadDocument } from '@core/model/types';
 import type { ResolveOptions } from './properties';
 
 export const quantitySchema = (what: string): z.ZodObject<{ value: z.ZodNumber; unit: z.ZodString }> =>
@@ -61,9 +60,8 @@ export const resolveOptionsOf = (options: CommonOptions): ResolveOptions => ({
   temperature: options.temperature,
 });
 
-/** The ids that are not materials of the document (own keys only). */
-export const unknownMaterials = (doc: CadDocument, ids: readonly string[]): string[] =>
-  ids.filter((id) => !Object.hasOwn(doc.materials, id));
+/** Most candidate materials / entities of one call (TECHNICAL_SPEC section 8: N <= 5,000): beyond it the call is refused as invalid params. */
+export const MAX_CANDIDATES = 5000;
 
 /** Duplicates removed, first occurrence kept (deterministic request order). */
 export const unique = <T>(values: readonly T[]): T[] => [...new Set(values)];

@@ -81,6 +81,12 @@ export const TOOLSET_SEE_ALSO: Partial<
 /** Industrial piping commands: contributed by the `building` (industrial) plugin, exposed as their own small toolset. */
 const PIPING_TOOLS = words('add_pipe_run add_pipe_support add_cable_tray check_pipe_supports pipe_hydraulics');
 
+/** Core material records, properties and libraries (08 MAT, PHY-01); the material-selection plugin adds its commands to the same toolset. */
+const MATERIALS_CORE_TOOLS = words(
+  'create_material assign_material define_material_record set_material_property get_material get_material_allowable convert_quantity import_material_library delete_material_library resolve_material_libraries diff_material_libraries set_export_marking check_materials register_material_library ' +
+    'define_property_model delete_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model delete_material_model define_constitutive_set check_material_models',
+);
+
 /** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   core: words(
@@ -102,10 +108,9 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'create_component insert_instance add_instance_array explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion motion_study create_contact_set delete_contact_set drive_joint_to create_exploded_view set_active_exploded_view delete_exploded_view animate stop_animation ' +
       'add_rigid_body add_body_joint add_transmission set_joint_physics add_load_schedule add_spring add_motor add_propeller add_rotor set_body_drag add_cylinder_pressure set_engine_losses add_reference_data set_gravity add_motion_profile evaluate_motion_profile check_motor_data set_motor_drive size_drive check_motion_truth fit_drive_parameters delete_dynamics_item set_dynamics_solver inspect_dynamics list_dynamics_loads simulate_motion plot_simulation render_motion render_animation',
   ),
-  materials: words(
-    'create_material assign_material define_material_record set_material_property get_material get_material_allowable convert_quantity import_material_library delete_material_library resolve_material_libraries diff_material_libraries set_export_marking check_materials register_material_library ' +
-      'define_property_model delete_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model delete_material_model define_constitutive_set check_material_models',
-  ),
+  get materials(): readonly string[] {
+    return [...MATERIALS_CORE_TOOLS, ...pluginToolNames('materials')];
+  },
   'material-lab': words('fit_material_model material_point_response export_material_cards'),
   /** Core review + display commands plus the plant display plugin's service colour schemes (plant 09 VIS). */
   get review(): readonly string[] {
