@@ -4,6 +4,8 @@ import type { BodyKinematics, SimulationTrace } from '@core/dynamics/physicsEngi
 import type { Rotor } from '@dynamics/flight/model';
 import { bodyDragForce, compileRotor, rotorOutput } from '@dynamics/flight/rotorLaw';
 import { flightData, flightSummary } from '@dynamics/flight/flightReport';
+import { compileFlight, withFlightLoads } from '@dynamics/flight/flightLoads';
+import { createEmptyDocument, type CadDocument } from '@core/model/types';
 
 const rotor = (overrides: Partial<Rotor>): Rotor => ({
   id: 'r',
@@ -163,6 +165,44 @@ describe('data.flight from a recorded trace', () => {
     ]);
     expect(flightSummary(data)).toContain('Rotor r (body b): thrust');
     expect(flightSummary(data)).toContain('Drag of body b: 6.000 N at 10.00 m/s');
+  });
+
+  it('short or empty recorded series read as rest, and a run with no sample reports no rotor', () => {
+    const sparse: SimulationTrace = {
+      ...trace(false),
+      bodyPosition: {},
+      bodyOrientation: {},
+      bodyVelocity: { b: { linear: [], angular: [] } },
+    };
+    const { data } = flightData(runtime, sparse, { series: false, energy: false });
+    expect(data.rotors['r']?.advanceRatio).toEqual({ min: 0, max: 0, final: 0 });
+    expect(data.bodyDrag['b']).toEqual({ finalSpeedMps: 0, finalForceN: 0, peakForceN: 0 });
+    const empty = flightData(runtime, { ...sparse, times: [] }, { series: false, energy: false });
+    expect(empty.data.rotors).toEqual({});
+    expect(empty.data.bodyDrag['b']).toEqual({ finalSpeedMps: 0, finalForceN: 0, peakForceN: 0 });
+  });
+
+  it('the loads wrapper adds to the base wrench and skips bodies the engine gave no state for', () => {
+    const base = (): {
+      jointForces: Record<string, number>;
+      bodyForces: Record<string, [number, number, number]>;
+      bodyMoments: Record<string, [number, number, number]>;
+    } => ({ jointForces: { j: 1 }, bodyForces: { b: [1, 0, 0] }, bodyMoments: { b: [0, 1, 0] } });
+    const loads = withFlightLoads(base, runtime);
+    const time = { time: 0, jointPosition: {}, jointVelocity: {} };
+    expect(loads(time)).toEqual(base());
+    const pushed = loads({ ...time, bodies: { b: { ...still, linearVelocity: [0, 0, -10] } } });
+    expect(pushed.jointForces).toEqual({ j: 1 });
+    expect(pushed.bodyForces['b']?.[0]).toBe(1);
+    expect(pushed.bodyForces['b']?.[2]).toBeCloseTo(2 * T + 0.5 * 1.2 * 0.1 * 100, 6);
+    expect(pushed.bodyMoments?.['b']?.[1]).toBe(1);
+  });
+
+  it('compileFlight: nothing to compile without flight records, a refusal without the body', () => {
+    const doc = createEmptyDocument();
+    expect(compileFlight(doc, {}, 1)).toBeNull();
+    const orphan = { ...doc, flight: { rotors: { r: rotor({}) }, bodyDrag: {} } } as CadDocument;
+    expect(compileFlight(orphan, {}, 1)).toEqual({ error: "rotor 'r' acts on 'b', which is not a rigid body" });
   });
 
   it('an engine that records no body velocity reports nothing for those bodies, with a warning', () => {

@@ -65,8 +65,8 @@ export function flightData(
   const outputs: Record<string, RotorOutput[]> = {};
   const rotors: Record<string, RotorResult> = {};
   for (const rotor of runtime.rotors) {
-    const samples = states.get(rotor.rotor.bodyId);
-    if (samples === null || samples === undefined) continue;
+    const samples = states.get(rotor.rotor.bodyId) ?? null;
+    if (samples === null) continue;
     const series = samples.map((state) => rotorOutput(rotor, state));
     const end = last(series);
     if (end === undefined) continue;
@@ -99,8 +99,8 @@ export function flightData(
   const dragSeries: Record<string, number[]> = {};
   const bodyDrag: FlightData['bodyDrag'] = {};
   for (const drag of runtime.drags) {
-    const samples = states.get(drag.bodyId);
-    if (samples === null || samples === undefined) continue;
+    const samples = states.get(drag.bodyId) ?? null;
+    if (samples === null) continue;
     const forces = samples.map((state) => len3(bodyDragForce(drag, state)));
     const speed = len3(last(samples)?.linearVelocity ?? ([0, 0, 0] as Vec3));
     dragSeries[drag.bodyId] = forces;
