@@ -108,6 +108,20 @@ describe('add_flight_controller', () => {
     expect(zeroMixer.summary).toContain('the mixer commands 1 of the 4 axes');
   });
 
+  it('refuses FLT_MIXER_ILL_CONDITIONED for four rotors nearly in a line (0.01 mm roll arms)', () => {
+    let line = airframe(1.115, [0.012, 0.012, 0.022], [0, 0, -G]);
+    for (const [id, x, y, spin] of [
+      ['a', 180, -0.01, 'ccw'],
+      ['b', -180, 0.01, 'ccw'],
+      ['c', 180, 0.01, 'cw'],
+      ['d', -180, -0.01, 'cw'],
+    ] as const)
+      line = step(line, 'add_rotor', rotorParams({ id, hub: [x, y, 0], spin, thrustCoefficient: 0.1158, powerCoefficient: 0.0466 })).doc;
+    const refused = execute(line, 'add_flight_controller', { body: 'frame', maxRpm: 7000 });
+    expectNoOp(refused, line, 'nearly singular');
+    expect(refused.error?.code).toBe('FLT_MIXER_ILL_CONDITIONED');
+  });
+
   it('is pure', () => {
     const doc = withController();
     expectPure(doc, () => execute(doc, 'add_flight_controller', { body: 'frame', maxRpm: 6000, id: 'fc2' }));

@@ -122,6 +122,46 @@ describe('13 FLT closed loop (FLT-M2)', () => {
     );
   });
 
+  it('VC-FLT-07 oracle: in a steady 3 m/s wind the hover tilts by atan(½ρ·CdA·v² / m g), against the wind', () => {
+    // drag 0.5 · 1.225 · 0.02 · 3² = 0.11025 N against the weight 1.115 · 9.80665 N: 0.5777°; the body-z drag term of the tilted body and the
+    // rotor inflow it sees (J ≈ 0.002, static coefficients) change it by < 0.1 %; 20 s lets the position integrator settle the drift
+    const expected = (Math.atan2(0.5 * 1.225 * 0.02 * 3 ** 2, 1.115 * G) * 180) / Math.PI;
+    const east = metricsOf(drone({ durationS: 20, wind: { steady: [3, 0, 0] } })).attitude.final;
+    expect(rel(-east.pitchDeg, expected)).toBeLessThan(1e-3);
+    expect(Math.abs(east.rollDeg)).toBeLessThan(1e-3 * expected);
+    const north = metricsOf(drone({ durationS: 20, wind: { steady: [0, 3, 0] } })).attitude.final;
+    expect(rel(north.rollDeg, expected)).toBeLessThan(1e-3);
+    expect(Math.abs(north.pitchDeg)).toBeLessThan(1e-3 * expected);
+  });
+
+  it('anti-windup: a yaw channel saturated on almost every update holds only the yaw-rate integrator, so the drift in a steady wind is trimmed out', () => {
+    // the geometric quad-X mixer with its yaw column scaled ×1000: any yaw demand is cut to the remaining authority (λ < 1) every update
+    const yawGain = 15.367 * 1000;
+    const mixer = [
+      [0.25, -1.3889, -1.3889, -yawGain],
+      [0.25, 1.3889, 1.3889, -yawGain],
+      [0.25, 1.3889, -1.3889, yawGain],
+      [0.25, -1.3889, 1.3889, yawGain],
+    ];
+    const metrics = metricsOf(drone({ durationS: 15, wind: { steady: [5, 0, 0] } }, { mixer }));
+    expect(metrics.control?.saturationFraction).toBeGreaterThan(0.9);
+    // velocity P alone would leave drag / (m · Kp_v · Kp_p) = 0.14 m of drift and the frozen vertical integrator a metre of sag
+    expect(Math.hypot(metrics.tracking.finalOffsetM[0], metrics.tracking.finalOffsetM[1])).toBeLessThan(0.02);
+    expect(metrics.tracking.finalPositionErrorM).toBeLessThan(0.05);
+    expect(Math.abs(metrics.tracking.finalYawErrorDeg)).toBeLessThan(1);
+  });
+
+  it('flight_report reads recovery on the same samples as run_flight at a given sampleRate', () => {
+    const doc = drone({ durationS: 6, setpoints: [{ t: 0 }, { t: 1, position: [1, 0, 0] }] });
+    for (const sampleRate of [20, 200]) {
+      const run = metricsOf(doc, { sampleRate });
+      const report = reportOf(doc, { sampleRate });
+      expect(report.metrics.recoveryTimeS).toBe(run.recoveryTimeS);
+      expect(report.metrics.samples).toBe(run.samples);
+    }
+    expect(metricsOf(doc, { sampleRate: 20 }).recoveryTimeS).not.toBe(metricsOf(doc, { sampleRate: 200 }).recoveryTimeS);
+  });
+
   it('VC-FLT-14: halving the timestep twice changes the gust max attitude by a GCI below 1 %', () => {
     const report = reportOf(drone(GUST), { timestepCheck: true });
     const check = report.timestepCheck;
@@ -229,6 +269,11 @@ describe('13 FLT closed loop (FLT-M2)', () => {
     // 200 s: 400 000 steps at 0.5 ms pass, the 1 600 000 of the timestep check at 0.125 ms do not (refused before anything is flown)
     const mid = step(doc, 'define_flight_scenario', { body: 'frame', controller: 'fc', durationS: 200, id: 'mid' }).doc;
     expect(code(execute(mid, 'flight_report', { scenario: 'mid', timestepCheck: true }))).toBe('FLT_RUN_TOO_LONG');
+    // 50 s: each run fits (100 000 / 200 000 / 400 000 steps) but together they fly 700 000
+    const sum = step(doc, 'define_flight_scenario', { body: 'frame', controller: 'fc', durationS: 50, id: 'sum' }).doc;
+    const summed = execute(sum, 'flight_report', { scenario: 'sum', timestepCheck: true });
+    expect(summed.error?.code).toBe('FLT_RUN_TOO_LONG');
+    expect(summed.summary).toContain('700000 physics steps in total');
     const pivot = step(doc, 'add_body_joint', {
       kind: 'revolute',
       parent: 'ground',

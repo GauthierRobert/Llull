@@ -46,8 +46,10 @@ export interface ControllerMemory {
   readonly previousVelocity: Vec3;
   readonly previousRate: Vec3;
   readonly hasPrevious: boolean;
-  /** The last update saturated (conditional integration: integrators hold while it does). */
-  readonly saturated: boolean;
+  /** The last update clamped a rotor: every integrator holds (conditional integration). */
+  readonly clamped: boolean;
+  /** The last update gave up yaw torque: only the yaw-rate integrator holds. */
+  readonly yawCut: boolean;
 }
 
 export const RESTING_MEMORY: ControllerMemory = {
@@ -56,12 +58,14 @@ export const RESTING_MEMORY: ControllerMemory = {
   previousVelocity: [0, 0, 0],
   previousRate: [0, 0, 0],
   hasPrevious: false,
-  saturated: false,
+  clamped: false,
+  yawCut: false,
 };
 
 export interface ControllerOutput {
   /** Commanded speed per controlled rotor, rev/min. */
   readonly rpm: number[];
+  /** A limit clipped the demand (a rotor clamped or the yaw torque reduced): the saturation count of the run. */
   readonly saturated: boolean;
   readonly memory: ControllerMemory;
 }
@@ -82,17 +86,18 @@ const clampEach = (value: Vec3, bound: Vec3): Vec3 =>
     return limit > 0 && Number.isFinite(limit) ? Math.min(limit, Math.max(-limit, value[i] ?? 0)) : 0;
   }) as unknown as Vec3;
 
-/** PID step with derivative on the measurement; the integral grows only when `integrate` and is clamped to ±integralBound. */
+/** PID step with derivative on the measurement; the integral grows on the axes `integrate` allows and is clamped to ±integralBound. */
 function pid(
   gains: PidGains,
   error: Vec3,
   integral: Vec3,
   derivative: Vec3,
   period: number,
-  integrate: boolean,
+  integrate: readonly [boolean, boolean, boolean],
   integralBound: Vec3,
 ): { output: Vec3; integral: Vec3 } {
-  const next = integrate ? clampEach(add3(integral, scale3(error, period)), integralBound) : integral;
+  const grown = clampEach(add3(integral, scale3(error, period)), integralBound);
+  const next: Vec3 = [integrate[0] ? grown[0] : integral[0], integrate[1] ? grown[1] : integral[1], integrate[2] ? grown[2] : integral[2]];
   return { output: sub3(add3(times(gains.p, error), times(gains.i, next)), times(gains.d, derivative)), integral: next };
 }
 
@@ -146,7 +151,10 @@ export function controllerUpdate(
   const { gains, limits } = controller;
   const gravityLength = len3(runtime.gravity);
   const up: Vec3 = gravityLength > 0 ? scale3(runtime.gravity, -1 / gravityLength) : [0, 0, 1];
-  const integrate = !memory.saturated;
+  // conditional integration: a clamped rotor holds every integrator, a yaw cut only the yaw-rate one (thrust, roll, pitch were delivered)
+  const free = !memory.clamped;
+  const integrate = [free, free, free] as const;
+  const integrateRate = [free, free, free && !memory.yawCut] as const;
   // position -> velocity -> acceleration
   const target = add3(runtime.start, setpoint.position);
   const velocitySp = velocitySetpoint(runtime, sub3(target, body.position));
@@ -179,7 +187,7 @@ export function controllerUpdate(
     memory.rateIntegral,
     angularAcceleration,
     period,
-    integrate,
+    integrateRate,
     integralBounds(gains.rate, maxRate),
   );
   const torque = add3(multiply(runtime.inertia, rateLoop.output), cross3(rate, multiply(runtime.inertia, rate)));
@@ -189,14 +197,15 @@ export function controllerUpdate(
       const k = runtime.thrustPerRpmSquared[i] ?? 0;
       return k > 0 ? Math.sqrt(Math.max(0, thrust) / k) : 0;
     }),
-    saturated: allocation.saturated,
+    saturated: allocation.clamped || allocation.yawCut,
     memory: {
       velocityIntegral: velocityLoop.integral,
       rateIntegral: rateLoop.integral,
       previousVelocity: body.linearVelocity,
       previousRate: rate,
       hasPrevious: true,
-      saturated: allocation.saturated,
+      clamped: allocation.clamped,
+      yawCut: allocation.yawCut,
     },
   };
 }

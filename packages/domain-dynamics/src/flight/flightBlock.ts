@@ -21,6 +21,7 @@ export const SLOT = {
   previousVelocity: 7,
   previousRate: 10,
   hasPrevious: 13,
+  /** Saturation of the last update: bit CLAMPED (a rotor at a limit), bit YAW_CUT (yaw torque reduced). */
   lastSaturated: 14,
   saturatedTicks: 15,
   ticks: 16,
@@ -39,6 +40,9 @@ export const SLOT = {
   peakPowerTime: 27,
 } as const;
 const ROTOR_BASE = 28;
+/** Bits of SLOT.lastSaturated. */
+const CLAMPED = 1;
+const YAW_CUT = 2;
 /** Per rotor: commanded rpm, rpm, thrust N, shaft power W, J, J min, J max, steps outside the validated J range. */
 export const ROTOR = { command: 0, rpm: 1, thrust: 2, power: 3, advanceRatio: 4, minJ: 5, maxJ: 6, outsideSteps: 7 } as const;
 const ROTOR_SLOTS = 8;
@@ -96,7 +100,8 @@ function readMemory(aux: Float64Array): ControllerMemory {
     previousVelocity: vecAt(aux, SLOT.previousVelocity),
     previousRate: vecAt(aux, SLOT.previousRate),
     hasPrevious: aux[SLOT.hasPrevious] === 1,
-    saturated: aux[SLOT.lastSaturated] === 1,
+    clamped: ((aux[SLOT.lastSaturated] ?? 0) & CLAMPED) !== 0,
+    yawCut: ((aux[SLOT.lastSaturated] ?? 0) & YAW_CUT) !== 0,
   };
 }
 
@@ -106,7 +111,7 @@ function writeMemory(aux: Float64Array, memory: ControllerMemory): void {
   writeVec(aux, SLOT.previousVelocity, memory.previousVelocity);
   writeVec(aux, SLOT.previousRate, memory.previousRate);
   aux[SLOT.hasPrevious] = memory.hasPrevious ? 1 : 0;
-  aux[SLOT.lastSaturated] = memory.saturated ? 1 : 0;
+  aux[SLOT.lastSaturated] = (memory.clamped ? CLAMPED : 0) | (memory.yawCut ? YAW_CUT : 0);
 }
 
 /** Tilt of the thrust axis from up, rad. */

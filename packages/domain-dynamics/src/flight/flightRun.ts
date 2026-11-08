@@ -4,7 +4,13 @@
  * the engine. Pure apart from the injected engine; deterministic.
  */
 
-import type { ActuatorBlock, PhysicsEngine, SimulationBody, SimulationTrace } from '@core/dynamics/physicsEngine';
+import {
+  SimulationDivergedError,
+  type ActuatorBlock,
+  type PhysicsEngine,
+  type SimulationBody,
+  type SimulationTrace,
+} from '@core/dynamics/physicsEngine';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
@@ -17,21 +23,23 @@ import type { ControllerRuntime, Inertia3 } from './controller';
 import { combineBlocks, flightBlock, meanAxis, NOT_CONTROLLED, type FlightLoop } from './flightBlock';
 import { compileFlight, withFlightLoads } from './flightLoads';
 import { shortestArc } from './frames';
-import { commandedAxes, effectiveness, matrixRank, pseudoInverse, type MixerRotor } from './mixer';
+import { assessMixer, effectiveness, type MixerRotor } from './mixer';
 import { flightOf } from './model';
 import { staticCoefficients, type RotorRuntime } from './rotorLaw';
 import { isCalm, windAt } from './wind';
 import { RESTING_MEMORY, controllerUpdate } from './controller';
 
 /** Largest number of physics steps of one run (a 60 s flight at 2 kHz is 120 000). */
-const MAX_FLIGHT_STEPS = 600_000;
+export const MAX_FLIGHT_STEPS = 600_000;
 /** Largest number of recorded samples of one run. */
 const MAX_FLIGHT_SAMPLES = 6001;
 
 type FlightRefusalCode =
   | 'FLT_SCENARIO_UNKNOWN'
   | 'FLT_BODY_NOT_FREE'
+  | 'FLT_VEHICLE_MULTIBODY'
   | 'FLT_MIXER_RANK'
+  | 'FLT_MIXER_ILL_CONDITIONED'
   | 'FLT_CONTROL_RATE'
   | 'FLT_RUN_TOO_LONG'
   | 'FLT_DIVERGED'
@@ -116,17 +124,14 @@ function compileController(
     ]);
   const thrustAxis = meanAxis(own);
   const b = effectiveness(mixerRotors(own), thrustAxis);
-  const mixer = controller.mixer ?? pseudoInverse(b);
-  const rank = mixer === null ? matrixRank(b) : matrixRank(commandedAxes(b, mixer));
-  if (mixer === null || rank < 4)
-    return refusal(
-      'FLT_MIXER_RANK',
-      `controller '${controller.id}': the mixer commands ${rank} of the 4 axes (thrust, roll, pitch, yaw) of this vehicle about its centre of mass`,
-      [controller.id],
-    );
+  const assessed = assessMixer(b, controller.mixer);
+  if ('code' in assessed)
+    return refusal(assessed.code, `controller '${controller.id}': about the vehicle's centre of mass the mixer ${assessed.message}`, [
+      controller.id,
+    ]);
   return {
     controller,
-    mixer,
+    mixer: assessed.mixer,
     thrustAxis,
     axisOffset: shortestArc([0, 0, 1], thrustAxis),
     massKg: vehicle.massKg,
@@ -198,7 +203,16 @@ export function runFlight(
   const compiled = compileFlight(doc, centers, toMetres(doc, 1));
   if (compiled !== null && 'error' in compiled) return refusal('FLT_MODEL_INVALID', compiled.error);
   const rotors = compiled?.rotors ?? [];
-  const massKg = subtreeOf(built.model.bodies, vehicle.id).reduce((sum, body) => sum + body.mass, 0);
+  // the controller's mass, centre of mass and inertia are the vehicle body's own: a body jointed below it would make them disagree with the
+  // dynamics silently, so multi-body vehicles wait for FLT-M4 (pivoting surfaces)
+  const carried = subtreeOf(built.model.bodies, vehicle.id).filter((body) => body.id !== vehicle.id);
+  if (carried.length > 0)
+    return refusal(
+      'FLT_VEHICLE_MULTIBODY',
+      `body '${vehicle.id}' carries ${carried.length} jointed bod${carried.length === 1 ? 'y' : 'ies'} (${carried.map((body) => `'${body.id}'`).join(', ')}): a flight vehicle is one rigid body until FLT-M4`,
+      [vehicle.id, ...carried.map((body) => body.id)],
+    );
+  const massKg = vehicle.mass;
   const inertia = inertia3(vehicle.inertia);
   const gravity = built.model.gravity;
   const start = vehicle.centerOfMass;
@@ -272,10 +286,9 @@ export function runFlight(
       ],
     };
   } catch (error) {
-    const message = errorMessage(error);
-    return message.includes('diverged')
-      ? refusal('FLT_DIVERGED', `the flight diverged (${message})`, [scenario.id])
-      : refusal('FLT_MODEL_INVALID', `the physics engine rejected the model: ${message}`);
+    return error instanceof SimulationDivergedError
+      ? refusal('FLT_DIVERGED', `the flight diverged: the state stopped being finite at t = ${error.timeS.toFixed(4)} s`, [scenario.id])
+      : refusal('FLT_MODEL_INVALID', `the physics engine rejected the model: ${errorMessage(error)}`);
   }
 }
 

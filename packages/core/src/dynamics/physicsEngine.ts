@@ -375,6 +375,20 @@ export interface SimulationTrace {
   readonly loopResidual?: number;
 }
 
+/**
+ * What an engine throws when the state stops being finite (NaN or infinite velocities): callers tell a divergence from a rejected model by
+ * the class, never by the message text.
+ */
+export class SimulationDivergedError extends Error {
+  /** Simulated time of the first non-finite state, s. */
+  readonly timeS: number;
+  constructor(timeS: number) {
+    super(`simulation diverged at t = ${timeS.toFixed(4)} s.`);
+    this.name = 'SimulationDivergedError';
+    this.timeS = timeS;
+  }
+}
+
 export interface PhysicsEngine {
   /** Engine name and version, reported with every result (e.g. "MuJoCo 3.16.0"). */
   readonly name: string;

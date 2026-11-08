@@ -3,13 +3,14 @@
  * multibody dynamics: joints are exact (no drift between linked parts), transmissions are equality constraints (limited tendons with backlash).
  */
 
-import type {
-  PhysicsEngine,
-  SimulationModel,
-  SimulationOptions,
-  SimulationState,
-  SimulationTrace,
-  StepPeak,
+import {
+  SimulationDivergedError,
+  type PhysicsEngine,
+  type SimulationModel,
+  type SimulationOptions,
+  type SimulationState,
+  type SimulationTrace,
+  type StepPeak,
 } from '@core/dynamics/physicsEngine';
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { OBJECT_BODY, OBJECT_JOINT, OBJECT_TENDON, type MjData, type MjModel, type MujocoModule } from './bindings';
@@ -261,7 +262,7 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
           actuatorWork += (actuatorForce[k] ?? 0) * ((data.qpos[joints[slot]?.qpos ?? 0] ?? 0) - (before.position[slot] ?? 0));
         });
       }
-      if (!data.qvel.every(Number.isFinite)) throw new Error(`simulation diverged at t = ${data.time.toFixed(4)} s.`);
+      if (!data.qvel.every(Number.isFinite)) throw new SimulationDivergedError(data.time);
       // anti-windup: after the step the set-point never leads the joint by more than the servo force limit allows (force = kp (act - q) - kv v);
       // a position hold (target speed 0) keeps its set-point
       model.servos.forEach((servo, i) => {

@@ -6,7 +6,8 @@ import { codedRejection, report } from '@core/commands/noop';
 import type { CadDocument } from '@core/model/types';
 import { gciTriplet } from '@lib/convergence';
 import { flightMetrics, flightSeries, type FlightMetrics } from '../flight/flightMetrics';
-import { runFlight, type FlightRefusal, type FlightRun } from '../flight/flightRun';
+import { MAX_FLIGHT_STEPS, runFlight, type FlightRefusal, type FlightRun } from '../flight/flightRun';
+import { flightOf } from '../flight/model';
 import { DEFAULT_FLIGHT_LIMITS, flightVerdict, type FlightLimits } from '../flight/flightVerdict';
 
 /** Physics step of a run unless given, s (2 kHz: a 400 Hz controller updates every 5 steps). */
@@ -19,6 +20,9 @@ const GCI_SAFETY_FACTOR = 1.25;
 const REMEDIATION: Readonly<Record<FlightRefusal['code'], string>> = {
   FLT_SCENARIO_UNKNOWN: 'Define it with define_flight_scenario (list them with inspect_dynamics).',
   FLT_BODY_NOT_FREE: 'Fly a free rigid body: no joint to another body, not fixed.',
+  FLT_VEHICLE_MULTIBODY:
+    'Merge the parts into one rigid body (add_rigid_body over all their entities) or remove the joints below it; multi-body vehicles come with FLT-M4.',
+  FLT_MIXER_ILL_CONDITIONED: 'Spread the rotors so their arms and spins separate roll, pitch and yaw clearly, or fix the mixer.',
   FLT_MIXER_RANK:
     'Give every controlled rotor static thrust and an arm / spin layout that separates roll, pitch and yaw, or fix the mixer.',
   FLT_CONTROL_RATE: 'Pick a timestep that divides 1/rateHz (e.g. 0.0005 s for 400 Hz), or change the controller rate.',
@@ -34,6 +38,15 @@ const timestepSchema = z
   .max(0.005)
   .optional()
   .describe('Physics step, s; must divide the controller period 1/rateHz into whole steps. Default 0.0005 (2 kHz).');
+
+const sampleRateSchema = z
+  .number()
+  .positive()
+  .max(10000)
+  .optional()
+  .describe(
+    'Recorded samples per second (at most 6001 samples per run, never finer than the timestep); the recovery times are read on these samples. Default 50.',
+  );
 
 const reject = (doc: CadDocument, command: string, refused: FlightRefusal): CommandResult =>
   codedRejection(doc, command, refused.code, refused.message, REMEDIATION[refused.code], refused.ids);
@@ -74,7 +87,7 @@ function metricsSummary(metrics: FlightMetrics): string {
  * @invariant deterministic: the same document, scenario and timestep give bit-identical data; records nothing in the document
  * @invariant kernel-optional: body mass properties are exact with a kernel, mesh integration otherwise (as simulate_motion)
  * @failure no engine -> FLT_NO_ENGINE; unknown scenario, non-free body, mixer rank, timestep not dividing the controller period, more than
- *          600 000 steps, an invalid physics model, a NaN state or a closed-loop tilt past 90° (FLT_DIVERGED, with time and state) -> rejected
+ *          600 000 steps, a vehicle body carrying jointed bodies (FLT_VEHICLE_MULTIBODY), an ill-conditioned mixer, an invalid physics model, a NaN state or a closed-loop tilt past 90° (FLT_DIVERGED, with time and state) -> rejected
  */
 export const runFlightCommand = defineCommand({
   name: 'run_flight',
@@ -91,16 +104,11 @@ export const runFlightCommand = defineCommand({
     'power and figure of merit (hover only), J range against the validated range of its coefficients (FLT_OUTSIDE_VALIDATED_RANGE); ' +
     'defaulted inputs (unverified). Peaks and integrals are exact per physics step; recovery uses the samples. detail "series" adds per-sample ' +
     'position offset, set-point, velocity, attitude, tilt, body rates, wind and per-rotor rpm / thrust / power. A closed loop tilting past ' +
-    '90° or a NaN state is refused as FLT_DIVERGED with the time. Use flight_report for a PASS / MARGINAL / FAIL verdict.',
+    '90° or a NaN state is refused as FLT_DIVERGED with the time. The vehicle is ONE free rigid body: a body with other bodies jointed below it is refused (FLT_VEHICLE_MULTIBODY, until FLT-M4); a rotor layout whose mixer is nearly singular is refused (FLT_MIXER_ILL_CONDITIONED). Use flight_report for a PASS / MARGINAL / FAIL verdict.',
   params: z.object({
     scenario: z.string().describe('Id of the flight scenario (define_flight_scenario).'),
     timestep: timestepSchema,
-    sampleRate: z
-      .number()
-      .positive()
-      .max(10000)
-      .optional()
-      .describe('Recorded samples per second (at most 6001 samples per run, never finer than the timestep). Default 50.'),
+    sampleRate: sampleRateSchema,
     detail: z.enum(['summary', 'series']).optional().describe('"summary" (default): numbers only; "series" adds the per-sample series.'),
   }),
   run: (doc, params, ctx): CommandResult => {
@@ -143,10 +151,11 @@ const limitsSchema = z
 
 /**
  * @affects nothing — read-only; data { verdict, checks[], limits, limitsDefaulted, hover, metrics, timestepCheck? }
- * @invariant runs the scenario exactly as run_flight (same numbers); a closed loop past 90° is a FAIL verdict with a `diverged` check
+ * @invariant runs the scenario exactly as run_flight at the same timestep and sampleRate (same numbers); a closed loop past 90° is a FAIL
+ *            verdict with a `diverged` check; a timestep check is bounded by the summed steps of its three runs (FLT_RUN_TOO_LONG)
  * @invariant kernel-optional: body mass properties are exact with a kernel, mesh integration otherwise (as simulate_motion)
- * @failure no engine, unknown scenario, a run run_flight refuses (except a tilt past 90°), a timestep check whose halved steps do not divide
- *          the controller period -> rejected with the code
+ * @failure no engine, unknown scenario, a run run_flight refuses (except a tilt past 90°), a timestep check whose three runs sum to more than
+ *          600 000 steps (FLT_RUN_TOO_LONG) -> rejected with the code
  */
 export const flightReportCommand = defineCommand({
   name: 'flight_report',
@@ -158,21 +167,35 @@ export const flightReportCommand = defineCommand({
     'MARGINAL (passes within 10 % of its limit), FAIL or not_applicable (e.g. thrust margin of an open-loop flight); verdict FAIL on any ' +
     'failure or a divergence (thrust axis past 90°), MARGINAL on any marginal check, else PASS. data.hover: total final shaft power, ' +
     'momentum-theory ideal power T^1.5 / sqrt(2ρA) summed over the rotors and the figure of merit (ideal / shaft) — meaningful once the ' +
-    'vehicle hovers. data.metrics is the run_flight data (no series). `timestepCheck: true` also flies the scenario at timestep/2 and ' +
-    'timestep/4 and gives the observed order and the GCI (Celik, Fs 1.25) of the max tilt (FR-FLT-16; each must still divide the controller ' +
-    'period). Read-only, deterministic.',
+    'vehicle hovers. data.metrics is the run_flight data at the same timestep and sampleRate (no series). `timestepCheck: true` also flies ' +
+    'the scenario at timestep/2 and timestep/4 and gives the observed order and the GCI (Celik, Fs 1.25) of the max tilt (FR-FLT-16); the ' +
+    'three runs together (7× the steps of one) must stay within the 600 000-step budget of a run, else FLT_RUN_TOO_LONG with the summed count. ' +
+    'Read-only, deterministic.',
   params: z.object({
     scenario: z.string().describe('Id of the flight scenario (define_flight_scenario).'),
     timestep: timestepSchema,
+    sampleRate: sampleRateSchema,
     limits: limitsSchema,
     timestepCheck: z.boolean().optional().describe('Also run at timestep/2 and /4 and report the GCI of the max tilt. Default false.'),
   }),
   run: (doc, params, ctx): CommandResult => {
     const timestep = params.timestep ?? DEFAULT_TIMESTEP;
-    // the finest run of a timestep check first: it is the one a step budget refuses, before anything is flown
-    const finest = params.timestepCheck === true ? fly(doc, params.scenario, timestep / 4, DEFAULT_SAMPLE_RATE, ctx) : null;
+    const sampleRate = params.sampleRate ?? DEFAULT_SAMPLE_RATE;
+    const check = params.timestepCheck === true;
+    const scenarios = flightOf(doc).scenarios ?? {};
+    const durationS = Object.hasOwn(scenarios, params.scenario) ? scenarios[params.scenario]?.durationS : undefined;
+    if (check && durationS !== undefined) {
+      const total = [timestep, timestep / 2, timestep / 4].reduce((sum, step) => sum + Math.round(durationS / step), 0);
+      if (total > MAX_FLIGHT_STEPS)
+        return reject(doc, 'flight_report', {
+          code: 'FLT_RUN_TOO_LONG',
+          message: `the timestep check flies ${total} physics steps in total over timestep, timestep/2 and timestep/4 (at most ${MAX_FLIGHT_STEPS}): shorten the scenario, raise the timestep or drop timestepCheck`,
+          ids: [params.scenario],
+        });
+    }
+    const finest = check ? fly(doc, params.scenario, timestep / 4, sampleRate, ctx) : null;
     if (finest !== null && 'code' in finest) return reject(doc, 'flight_report', finest);
-    const flown = fly(doc, params.scenario, timestep, DEFAULT_SAMPLE_RATE, ctx);
+    const flown = fly(doc, params.scenario, timestep, sampleRate, ctx);
     if ('code' in flown) return reject(doc, 'flight_report', flown);
     const { metrics } = flown;
     const given = params.limits ?? {};
@@ -192,7 +215,7 @@ export const flightReportCommand = defineCommand({
     };
     let timestepCheck: Record<string, unknown> | undefined;
     if (finest !== null) {
-      const half = fly(doc, params.scenario, timestep / 2, DEFAULT_SAMPLE_RATE, ctx);
+      const half = fly(doc, params.scenario, timestep / 2, sampleRate, ctx);
       if ('code' in half) return reject(doc, 'flight_report', half);
       const levels = [metrics, half.metrics, finest.metrics].map((entry) => entry.attitude.maxTiltDeg);
       timestepCheck = {

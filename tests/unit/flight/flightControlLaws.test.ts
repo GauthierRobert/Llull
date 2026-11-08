@@ -10,7 +10,17 @@ import { eulerDeg, type FlightMetrics } from '@dynamics/flight/flightMetrics';
 import { stepsPerTick } from '@dynamics/flight/flightRun';
 import { DEFAULT_FLIGHT_LIMITS, flightVerdict } from '@dynamics/flight/flightVerdict';
 import { conjugate, quaternionFromBasis, rotate, shortestArc } from '@dynamics/flight/frames';
-import { allocate, commandedAxes, effectiveness, matrixRank, pseudoInverse, type MixerRotor } from '@dynamics/flight/mixer';
+import {
+  allocate,
+  assessMixer,
+  commandedAxes,
+  effectiveness,
+  gramPivotRatio,
+  matrixRank,
+  MIN_GRAM_PIVOT_RATIO,
+  pseudoInverse,
+  type MixerRotor,
+} from '@dynamics/flight/mixer';
 import { airRelative, isCalm, windAt } from '@dynamics/flight/wind';
 
 const KAPPA = 0.016268;
@@ -59,22 +69,44 @@ describe('mixer', () => {
     ).toBe(0);
   });
 
+  it('rates a balanced quad X well conditioned and a quad whose rotors are nearly in a line (1e-5 m roll arm) ill-conditioned', () => {
+    const b = effectiveness(quadX, [0, 0, 1]);
+    expect(gramPivotRatio(b)).toBeGreaterThan(1e-3);
+    expect(assessMixer(b, null)).toHaveProperty('mixer');
+    const line = quadX.map((rotor) => ({ ...rotor, arm: [rotor.arm[0], Math.sign(rotor.arm[1]) * 1e-5, 0] as Vec3 }));
+    const thin = effectiveness(line, [0, 0, 1]);
+    expect(matrixRank(thin)).toBe(4);
+    expect(gramPivotRatio(thin)).toBeLessThan(MIN_GRAM_PIVOT_RATIO);
+    expect(assessMixer(thin, null)).toMatchObject({ code: 'FLT_MIXER_ILL_CONDITIONED' });
+    const wide = quadX.map((rotor) => ({ ...rotor, arm: [rotor.arm[0], Math.sign(rotor.arm[1]) * 1e-3, 0] as Vec3 }));
+    expect(assessMixer(effectiveness(wide, [0, 0, 1]), null)).toHaveProperty('mixer');
+    expect(assessMixer(effectiveness(quadX.slice(0, 2), [0, 0, 1]), null)).toMatchObject({ code: 'FLT_MIXER_RANK' });
+    expect(
+      gramPivotRatio([
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+      ]),
+    ).toBe(0);
+  });
+
   it('gives up yaw before the other axes, then clamps', () => {
     const mixer = pseudoInverse(effectiveness(quadX, [0, 0, 1])) ?? [];
     const min = [0, 0, 0, 0];
     const max = [4, 4, 4, 4];
     const free = allocate(mixer, [8, 0, 0, 0.01], min, max);
-    expect(free.saturated).toBe(false);
+    expect(free).toMatchObject({ clamped: false, yawCut: false });
     expect(free.thrusts.reduce((a, b) => a + b, 0)).toBeCloseTo(8, 12);
     const yawCut = allocate(mixer, [14, 0, 0, 0.05], min, max);
-    expect(yawCut.saturated).toBe(true);
+    expect(yawCut).toMatchObject({ clamped: false, yawCut: true });
     expect(Math.max(...yawCut.thrusts)).toBeCloseTo(4, 12);
     expect(yawCut.thrusts.reduce((a, b) => a + b, 0)).toBeCloseTo(14, 12);
     const negativeYaw = allocate(mixer, [1, 0, 0, -0.05], min, max);
     expect(Math.min(...negativeYaw.thrusts)).toBeCloseTo(0, 12);
-    expect(negativeYaw.saturated).toBe(true);
+    expect(negativeYaw).toMatchObject({ clamped: false, yawCut: true });
     const clamped = allocate(mixer, [20, 0, 0, 0], min, max);
-    expect(clamped).toEqual({ thrusts: [4, 4, 4, 4], saturated: true });
+    expect(clamped).toEqual({ thrusts: [4, 4, 4, 4], clamped: true, yawCut: false });
   });
 });
 
@@ -229,8 +261,18 @@ describe('controller update', () => {
   it('limits the commanded tilt and the horizontal speed for a far set-point, and integrates only while unsaturated', () => {
     const far = controllerUpdate(runtime, rest, { t: 0, position: [100, 0, 0], yawDeg: 0 }, RESTING_MEMORY);
     expect(far.memory.velocityIntegral[0]).toBeCloseTo(2 / 400, 12);
-    const held = controllerUpdate(runtime, rest, { t: 0, position: [100, 0, 0], yawDeg: 0 }, { ...RESTING_MEMORY, saturated: true });
+    const held = controllerUpdate(runtime, rest, { t: 0, position: [100, 0, 0], yawDeg: 0 }, { ...RESTING_MEMORY, clamped: true });
     expect(held.memory.velocityIntegral).toEqual([0, 0, 0]);
+    // a yaw cut holds only the yaw-rate integrator: the velocity integrator and the roll / pitch rate integrators still grow
+    const spinning = { ...rest, angularVelocity: [0.5, 0.5, 0.5] as Vec3 };
+    const yawCut = controllerUpdate(runtime, spinning, hold, { ...RESTING_MEMORY, yawCut: true });
+    const free = controllerUpdate(runtime, spinning, hold, RESTING_MEMORY);
+    expect(yawCut.memory.rateIntegral[2]).toBe(0);
+    expect(free.memory.rateIntegral[2]).not.toBe(0);
+    expect(yawCut.memory.rateIntegral[0]).toBe(free.memory.rateIntegral[0]);
+    expect(yawCut.memory.rateIntegral[1]).not.toBe(0);
+    const farCut = controllerUpdate(runtime, rest, { t: 0, position: [100, 0, 0], yawDeg: 0 }, { ...RESTING_MEMORY, yawCut: true });
+    expect(farCut.memory.velocityIntegral[0]).toBeCloseTo(2 / 400, 12);
     // tilting towards +x is a pitch-up demand: the rear rotors (x < 0) speed up
     expect((far.rpm[1] ?? 0) + (far.rpm[3] ?? 0)).toBeGreaterThan((far.rpm[0] ?? 0) + (far.rpm[2] ?? 0));
     const upside = controllerUpdate(runtime, { ...rest, orientation: [0, 1, 0, 0] }, hold, RESTING_MEMORY);

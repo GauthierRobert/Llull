@@ -11,7 +11,7 @@ import { scale3 } from '@lib/vec3';
 import type { FlightController, FlightScenario, PidGains } from '../flight/controlModel';
 import { meanAxis } from '../flight/flightBlock';
 import { mixerRotors, thrustPerRpmSquared } from '../flight/flightRun';
-import { commandedAxes, effectiveness, matrixRank, pseudoInverse } from '../flight/mixer';
+import { assessMixer, effectiveness } from '../flight/mixer';
 import { flightOf, idTakenInDynamicsOrFlight } from '../flight/model';
 import { compileRotor } from '../flight/rotorLaw';
 import { dynamicsOf } from './bodies';
@@ -81,7 +81,8 @@ function pidOf(
  * @invariant body is a non-fixed rigid body; every rotor is on it; minRpm < maxRpm; the mixer (given or geometric) commands 4 axes
  * @invariant gains are normalised (acceleration / angular acceleration out); every defaulted input is listed in the record's `defaulted`
  * @failure unknown / fixed body, no rotor, a rotor on another body or listed twice, minRpm >= maxRpm, a mixer row count that is not the rotor
- *          count, taken id -> no-op; a rotor without static thrust or a mixer of rank < 4 -> FLT_MIXER_RANK
+ *          count, taken id -> no-op; a rotor without static thrust or a mixer of rank < 4 -> FLT_MIXER_RANK; a nearly singular one
+ *          (Gram pivot ratio < 1e-8) -> FLT_MIXER_ILL_CONDITIONED
  */
 export const addFlightController = defineCommand({
   name: 'add_flight_controller',
@@ -95,7 +96,7 @@ export const addFlightController = defineCommand({
     'motorTimeConstantS. Gains are NORMALISED (the velocity loop outputs m/s², the rate loop rad/s²; mass and inertia come from the body), ' +
     'so the defaults fly any size of multirotor; every defaulted input is listed in the record and makes results `unverified`. Mixer: by ' +
     'default the pseudo-inverse of the rotor geometry (thrust axis, arm about the centre of mass, reaction torque Cp·D/(2π·Ct) per newton); ' +
-    "or give `mixer`. A mixer that cannot command collective thrust, roll, pitch and yaw is refused (FLT_MIXER_RANK). The rotors' own rpm " +
+    "or give `mixer`. A mixer that cannot command collective thrust, roll, pitch and yaw is refused (FLT_MIXER_RANK), and so is a nearly singular one (rotors almost in a line: FLT_MIXER_ILL_CONDITIONED, smallest Gram pivot of the row-normalised effectiveness under 1e-8 of the largest). The rotors' own rpm " +
     'is ignored while the controller flies them. Define a scenario with define_flight_scenario, then run_flight / flight_report. Returns the ' +
     'controller id in affected[0].',
   params: z.object({
@@ -185,15 +186,14 @@ export const addFlightController = defineCommand({
         [dead.rotor.id],
       );
     const b = effectiveness(mixerRotors(compiled), meanAxis(compiled));
-    const mixer = params.mixer ?? pseudoInverse(b);
-    const rank = mixer === null ? matrixRank(b) : matrixRank(commandedAxes(b, mixer));
-    if (mixer === null || rank < 4)
+    const assessed = assessMixer(b, params.mixer ?? null);
+    if ('code' in assessed)
       return codedRejection(
         doc,
         'add_flight_controller',
-        'FLT_MIXER_RANK',
-        `the ${params.mixer === undefined ? 'rotor geometry' : 'mixer'} commands ${rank} of the 4 axes (collective thrust, roll, pitch, yaw)`,
-        'Use at least 4 rotors whose arms and spins separate roll, pitch and yaw (a quad X with alternating spins), or fix `mixer`.',
+        assessed.code,
+        `the ${params.mixer === undefined ? 'rotor geometry' : 'mixer'} ${assessed.message}`,
+        'Use at least 4 rotors whose arms and spins separate roll, pitch and yaw clearly (a quad X with alternating spins), or fix `mixer`.',
         rotorIds,
       );
     const gains = params.gains;

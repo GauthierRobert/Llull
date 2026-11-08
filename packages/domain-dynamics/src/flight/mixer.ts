@@ -64,6 +64,46 @@ export function matrixRank(matrix: readonly (readonly number[])[]): number {
   return rank;
 }
 
+/** Smallest Gram pivot, relative to the largest, below which a full-rank layout is still refused as ill-conditioned (FLT_MIXER_ILL_CONDITIONED). */
+export const MIN_GRAM_PIVOT_RATIO = 1e-8;
+
+/**
+ * Conditioning of a 4 × [N] effectiveness (or of B·M, rows [thrust, roll, pitch, yaw]): the smallest over the largest pivot of the Gram matrix
+ * of its scaled rows (Gaussian elimination with partial pivoting; ≈ the squared ratio of its extreme singular values). The thrust row is scaled
+ * to unit length and the three torque rows by ONE common factor (the largest torque-row norm), so a torque axis with almost no authority
+ * (rotors nearly in a line) stays small instead of being normalised away. 1 = balanced orthogonal axes, 0 = rank deficient.
+ */
+export function gramPivotRatio(matrix: readonly (readonly number[])[]): number {
+  const norms = matrix.map((row) => Math.hypot(...row));
+  const torqueScale = Math.max(0, ...norms.slice(1));
+  const rows = matrix.map((row, i) => {
+    const scale = i === 0 ? (norms[0] ?? 0) : torqueScale;
+    return scale > 0 ? row.map((value) => value / scale) : row.map(() => 0);
+  });
+  const gram = rows.map((row) => rows.map((other) => row.reduce((sum, value, k) => sum + value * (other[k] ?? 0), 0)));
+  const pivots: number[] = [];
+  for (let column = 0; column < gram.length; column++) {
+    let pivot = column;
+    for (let r = column + 1; r < gram.length; r++) {
+      const candidate = Math.abs(gram[r]?.[column] ?? 0);
+      if (candidate > Math.abs(gram[pivot]?.[column] ?? 0)) pivot = r;
+    }
+    const pivotRow = gram[pivot] ?? [];
+    gram[pivot] = gram[column] ?? [];
+    gram[column] = pivotRow;
+    const lead = pivotRow[column] ?? 0;
+    pivots.push(Math.abs(lead));
+    if (lead === 0) continue;
+    for (let r = column + 1; r < gram.length; r++) {
+      const row = gram[r] ?? [];
+      const factor = (row[column] ?? 0) / lead;
+      gram[r] = row.map((value, k) => value - factor * (pivotRow[k] ?? 0));
+    }
+  }
+  const largest = Math.max(0, ...pivots);
+  return largest > 0 ? Math.min(...pivots) / largest : 0;
+}
+
 /** Moore-Penrose pseudo-inverse Bᵀ(BBᵀ)⁻¹ of a full-row-rank 4 × N effectiveness: N rows of 4, or null when BBᵀ is singular. */
 export function pseudoInverse(b: readonly (readonly number[])[]): MixerRow[] | null {
   const n = Math.max(0, ...b.map((row) => row.length));
@@ -82,11 +122,35 @@ export function commandedAxes(b: readonly (readonly number[])[], mixer: readonly
   return b.map((row) => [0, 1, 2, 3].map((j) => row.reduce((sum, value, i) => sum + value * (mixer[i]?.[j] ?? 0), 0)));
 }
 
+/**
+ * The mixer a controller flies with (the given one, else the pseudo-inverse of `b`) and why it cannot: rank < 4 of what it commands
+ * (FLT_MIXER_RANK), or full rank but a Gram pivot ratio under MIN_GRAM_PIVOT_RATIO (FLT_MIXER_ILL_CONDITIONED: thrusts would blow up).
+ */
+export function assessMixer(
+  b: readonly (readonly number[])[],
+  given: readonly MixerRow[] | null,
+): { readonly mixer: readonly MixerRow[] } | { readonly code: 'FLT_MIXER_RANK' | 'FLT_MIXER_ILL_CONDITIONED'; readonly message: string } {
+  const mixer = given ?? pseudoInverse(b);
+  const commanded = mixer === null ? b : commandedAxes(b, mixer);
+  const rank = matrixRank(commanded);
+  if (mixer === null || rank < 4)
+    return { code: 'FLT_MIXER_RANK', message: `commands ${rank} of the 4 axes (collective thrust, roll, pitch, yaw)` };
+  const ratio = gramPivotRatio(given === null ? b : commanded);
+  if (ratio < MIN_GRAM_PIVOT_RATIO)
+    return {
+      code: 'FLT_MIXER_ILL_CONDITIONED',
+      message: `commands the 4 axes but is nearly singular (Gram pivot ratio ${ratio.toPrecision(3)} < ${MIN_GRAM_PIVOT_RATIO}): one axis would need huge opposing thrusts`,
+    };
+  return { mixer };
+}
+
 export interface Allocation {
   /** N per rotor, inside its limits. */
   readonly thrusts: number[];
-  /** A limit clipped the demand (the yaw torque was reduced or a rotor clamped). */
-  readonly saturated: boolean;
+  /** A rotor was clamped at a thrust limit (thrust, roll or pitch were not delivered as demanded). */
+  readonly clamped: boolean;
+  /** The yaw torque was reduced (λ < 1) to keep the rotors inside their limits; thrust, roll and pitch were delivered. */
+  readonly yawCut: boolean;
 }
 
 /**
@@ -114,5 +178,5 @@ export function allocate(mixer: readonly MixerRow[], demand: MixerRow, min: read
     if (limited !== wanted) clamped = true;
     return limited;
   });
-  return { thrusts, saturated: clamped || lambda < 1 };
+  return { thrusts, clamped, yawCut: lambda < 1 };
 }

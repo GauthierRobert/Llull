@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { setPhysicsEngine, type PhysicsEngine } from '@core/dynamics/physicsEngine';
+import { setPhysicsEngine, SimulationDivergedError, type PhysicsEngine } from '@core/dynamics/physicsEngine';
 import type { CadDocument } from '@core/model/types';
 import type { FlightMetrics } from '@dynamics/flight/flightMetrics';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
@@ -80,22 +80,58 @@ describe('run_flight refusals of a stale document or a failing engine', () => {
       dynamics: { ...doc.dynamics!, bodies: { ...doc.dynamics!.bodies, stand: { ...doc.dynamics!.bodies['stand']!, fixed: true } } },
     };
     expect(execute(fixed, 'run_flight', { scenario: 's' }).summary).toContain("acts on 'stand', which is fixed to the ground");
-    const failing = (message: string): PhysicsEngine => ({
+    const failing = (error: Error): PhysicsEngine => ({
       name: 'failing',
       simulate: () => {
-        throw new Error(message);
+        throw error;
       },
     });
-    setPhysicsEngine(failing('bad model'));
+    setPhysicsEngine(failing(new Error('bad model')));
     try {
       const rejected = execute(flying(), 'run_flight', { scenario: 's' });
       expect(rejected.error?.code).toBe('FLT_MODEL_INVALID');
       expect(rejected.summary).toContain('the physics engine rejected the model: bad model');
-      setPhysicsEngine(failing('simulation diverged at t = 0.1 s.'));
-      expect(execute(flying(), 'run_flight', { scenario: 's' }).error?.code).toBe('FLT_DIVERGED');
+      // the class decides, not the text: a message that merely says "diverged" is a rejected model
+      setPhysicsEngine(failing(new Error('the solver diverged while parsing')));
+      expect(execute(flying(), 'run_flight', { scenario: 's' }).error?.code).toBe('FLT_MODEL_INVALID');
+      setPhysicsEngine(failing(new SimulationDivergedError(0.1234)));
+      const diverged = execute(flying(), 'run_flight', { scenario: 's' });
+      expect(diverged.error?.code).toBe('FLT_DIVERGED');
+      expect(diverged.summary).toContain('t = 0.1234 s');
     } finally {
       setPhysicsEngine(mujoco);
     }
+  });
+
+  it('refuses a vehicle body that carries a jointed body (FLT_VEHICLE_MULTIBODY) until FLT-M4', () => {
+    let doc = flying();
+    const box = step(doc, 'add_box', { size: [10, 10, 10], position: [0, 0, 80] });
+    doc = step(box.doc, 'add_rigid_body', { entityIds: [box.id], id: 'wing', massKg: 0.1 }).doc;
+    doc = step(doc, 'add_body_joint', {
+      kind: 'revolute',
+      parent: 'frame',
+      child: 'wing',
+      anchor: [0, 0, 80],
+      axis: [1, 0, 0],
+      id: 'pivot',
+    }).doc;
+    const refused = execute(doc, 'run_flight', { scenario: 's' });
+    expectNoOp(refused, doc, "body 'frame' carries 1 jointed body ('wing')");
+    expect(refused.error).toMatchObject({ code: 'FLT_VEHICLE_MULTIBODY', ids: ['frame', 'wing'] });
+    expect(execute(doc, 'flight_report', { scenario: 's' }).error?.code).toBe('FLT_VEHICLE_MULTIBODY');
+  });
+
+  it('refuses at run time a layout that became nearly singular (FLT_MIXER_ILL_CONDITIONED)', () => {
+    const thin = edited(flying(), (flight) => ({
+      ...flight,
+      rotors: Object.fromEntries(
+        Object.entries(flight.rotors).map(([id, rotor]) => [
+          id,
+          { ...rotor, hub: [rotor.hub[0], Math.sign(rotor.hub[1]) * 0.01, 0] as const },
+        ]),
+      ),
+    }));
+    expect(codeOf(thin)).toBe('FLT_MIXER_ILL_CONDITIONED');
   });
 
   it('flies a rotor on a second free body at its own rpm under the wind (it is in the block, not controlled)', () => {

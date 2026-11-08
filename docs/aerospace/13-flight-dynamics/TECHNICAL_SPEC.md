@@ -199,7 +199,9 @@ exchange (VC-FLT-10, no network beyond localhost).
 ## 11. Open questions
 
 - FLT-D1: keep the controller in TS inside the engine adapter, or a Rust crate from the start? **Decided: TS** (§14; measured: a 60 s
-  closed-loop flight at 2 kHz runs in 2.6 s, inside the 5 s budget).
+  closed-loop flight at 2 kHz runs in 2.6 s, inside the 5 s budget). The controller runs as an in-process actuator block on every physics
+  tick, so a Rust sidecar would add one IPC round-trip per tick (120 000 for that flight); a Rust port only pays if the whole loop, physics
+  included, moves native.
 - FLT-D2: bundle ArduPilot SITL binaries (GPL-3.0) or detect a user install? Default: detect, never bundle (legal check).
 - FLT-D3: default rotor table for unknown props: none (refuse) vs a generic APC-like table flagged grade C. **Decided: refuse** (§13).
 - FLT-D4..D8 decided with FLT-M1 (§13): world wrenches from the laws, plugin slice `flight`, world twist in the port, constant rotor speed
@@ -285,7 +287,8 @@ knocked at t = 0 (0.36 m/s, 0.37 rad/s), returns to a hover at 4082.56 rpm per r
 76.049 W shaft and 51.31 W ideal in total (gate 0.1 %, spec tolerance 1 %); with the controller update disabled the same test fails (the
 vehicle tumbles: FLT_DIVERGED at 4.53 s). VC-FLT-06: static APC 10x4.7 at 6528 rpm: 7.84039 N, 88.5698 W, ideal 62.3082 W, FM 0.70349 (gate
 0.5 %). VC-FLT-07: 3 m/s 1-cosine gust of 1 s in hover: max tilt, recovery, saturation fraction and verdict present and finite, two runs
-bit-identical (JSON); measured max tilt 0.3967°, the position error stays inside the 0.1 m band (recovery 0 s), saturation 0, verdict
+bit-identical (JSON). Independent oracle: in a steady 3 m/s wind the settled tilt (20 s) is 0.57757° against
+atan(½ρ·CdA·v² / m g) = 0.57768° (gate 0.1 %), tilting into the wind (negative pitch for a +x wind, positive roll for +y). Gust run: measured max tilt 0.3967°, the position error stays inside the 0.1 m band (recovery 0 s), saturation 0, verdict
 PASS. VC-FLT-14: the gust's max tilt at 0.5 / 0.25 / 0.125 ms converges monotonically (0.396719 / 0.396723 / 0.396726°, observed order 0.97) with a GCI of 7.9e-6 (gate 1 %). VC-FLT-02:
 torque-free body (I = 0.01 / 0.02 / 0.03 kg·m², 1 rev/s plus 1e-3 rad/s perturbation, 10 s, zero gravity): |H| drift < 1e-6 on all three
 axes, spin about the intermediate axis reverses, the other two stay within 1 %. Also: step response (1.5 m offset + 30° heading: final
@@ -322,8 +325,22 @@ yaw-first allocation, gust shape, attitude algebra, verdict bands, block composi
   measures the flight, not a spin-up transient. Rotors the controller does not command keep their own `rpm`.
 - **FLT-D17 (divergence)**: `run_flight` refuses a closed loop whose thrust axis passes 90° (FLT_DIVERGED, time and state in the error
   detail, §4); `flight_report` gives a FAIL verdict with a `diverged` check instead, so an owner still gets "will it fly: no".
-- **FLT-D18 (vehicle)**: no `define_flight_vehicle` yet: the controller and the scenario name one free body (its subtree's mass for the
-  thrust, the body's own inertia for the torque). Multi-body vehicles (servo-pivoted wings) come with FLT-M4.
+- **FLT-D18 (vehicle)**: no `define_flight_vehicle` yet: the controller and the scenario name one free body, and a body with other bodies
+  jointed below it is refused (`FLT_VEHICLE_MULTIBODY`): the controller's mass, centre of mass and inertia would otherwise silently differ
+  from the dynamics. Multi-body vehicles (servo-pivoted wings) come with FLT-M4.
+- **FLT-D19 (anti-windup, review round 1)**: the allocation reports a clamped rotor and a yaw cut (λ < 1) separately. A clamp holds every
+  integrator; a yaw cut holds only the yaw-rate integrator, because thrust, roll and pitch were still delivered. Test: a yaw channel
+  saturated on > 90 % of the updates in a 5 m/s steady wind still trims the drift to < 2 cm (holding every integrator left 0.20 m of drift
+  and 1.1 m of sag).
+- **FLT-D20 (mixer conditioning)**: a full-rank layout is still refused when nearly singular (`FLT_MIXER_ILL_CONDITIONED`): the smallest
+  pivot of the Gram matrix of B (thrust row scaled to unit length, the three torque rows by one common factor so a weak axis stays weak)
+  under 1e-8 of the largest. Four rotors 0.01 mm off a line are refused, 1 mm off pass; a quad X scores about 8e-3.
+- **FLT-D21 (divergence signal)**: the port exports `SimulationDivergedError` (with the time); the MuJoCo adapter throws it and
+  `run_flight` maps it to `FLT_DIVERGED` by class, never by message text. MuJoCo resets a state whose acceleration or velocity explodes
+  (its own instability guard), so in practice a flight diverges through the 90° tilt check.
+- **FLT-D22 (report sampling and budget)**: `flight_report` takes the same `sampleRate` as `run_flight` (the recovery times are read on the
+  samples, so they agree only at equal rates); a timestep check refuses when its three runs together exceed 600 000 steps
+  (`FLT_RUN_TOO_LONG` with the summed count), before anything is flown.
 - **Budgets**: at most 600 000 physics steps per run (FLT_RUN_TOO_LONG; a timestep check flies its finest run first) and 6001 samples;
   peaks, integrals and counts are exact per step, recovery uses the samples (50 Hz default). Measured: the 60 s hover at 2 kHz runs in 2.6 s (budget 5 s, §8).
 
