@@ -207,7 +207,7 @@ describe('imperfect deck nodes (TR-NLS-30)', () => {
       return 'message' in deck ? `${deck.code}: ${deck.message}` : undefined;
     };
     const steps = bar.bucklingResults.steps;
-    expect(pinTo({ ...bar.bucklingResults, steps: steps.slice(0, 1) })).toContain('hold 1 mode shape(s), not mode 2');
+    expect(pinTo({ ...bar.bucklingResults, steps: steps.slice(0, 1) })).toContain('the results hold 1 mode(s), not mode 2');
     const withoutNode8 = steps.map((set) => {
       const disp = set.fields['DISP'];
       if (disp === undefined) return set;

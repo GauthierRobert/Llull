@@ -4,6 +4,7 @@ import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { Imperfection } from '@core/model/nonlinear';
 import type { DeckContext, DeckRefusal } from '../decks/context';
 import { commentText } from '../decks/format';
+import { modeSet, modeSets } from '../results/modeSets';
 import { fetchArtifact } from '../shared/trust';
 import { imperfectionsOf } from './imperfectionShape';
 
@@ -16,19 +17,6 @@ const SAME_NODE_FRACTION = 1e-9;
 type Node = FeMeshArtifact['nodes'][number];
 
 const invalid = (message: string, ids: readonly string[]): DeckRefusal => ({ code: 'NLS_IMPERFECTION_SOURCE_INVALID', message, ids });
-
-/**
- * Relative tolerance between a mode set's time (its buckling factor in the .frd, e.g. 4623.062281) and the factor pinned by add_imperfection
- * (read from the .dat table, which ccx 2.21 prints to 7 significant digits: 4623.062). Measured in the real VC-NLS-50 run.
- */
-const FACTOR_MATCH = 1e-5;
-
-/**
- * Mode result sets of a buckling results artifact in mode order (the order of the .dat factor table): every set but the zero-time reference set.
- * Negative factors are kept, so set k is mode k + 1 even when ccx reports a load reversal first.
- */
-const bucklingModeSets = (results: FeResultsArtifact): FeResultsArtifact['steps'][number][] =>
-  results.steps.filter((set) => set.time !== 0);
 
 /** Diagonal of the bounding box of the mesh nodes (0 for an empty mesh). */
 function meshSize(mesh: FeMeshArtifact): number {
@@ -72,7 +60,7 @@ const peakText = (mode: number, node: number, phi: readonly number[], amplitude:
  * without a matching set or shape is left out.
  */
 export function modePeaks(results: FeResultsArtifact, modes: Imperfection['modes']): string[] {
-  const sets = bucklingModeSets(results);
+  const sets = modeSets(results, 'buckling');
   return modes.flatMap(({ mode, amplitude }) => {
     const values = sets[mode - 1]?.fields['DISP']?.values ?? {};
     let best: { node: number; phi: readonly number[]; size: number } | null = null;
@@ -102,18 +90,14 @@ function addOffsets(ctx: DeckContext, imperfection: Imperfection, offsets: Map<n
     );
   const mismatch = meshMismatch(ctx.mesh, sourceMesh.artifact, imperfection, ctx.analysisId);
   if (mismatch !== null) return mismatch;
-  const sets = bucklingModeSets(results);
   const peaks: string[] = [];
   for (const { mode, amplitude, factor } of imperfection.modes) {
-    const set = sets[mode - 1];
-    if (set !== undefined && !(Math.abs(set.time - factor) <= FACTOR_MATCH * Math.abs(factor)))
-      return invalid(
-        `imperfection '${imperfection.id}': mode ${mode} of the pinned results has buckling factor ${set.time}, not the pinned ${factor}: the mode order does not match, delete_imperfection + add_imperfection`,
-        ids,
-      );
-    const values = set?.fields['DISP']?.values;
+    const found = modeSet(results, 'buckling', mode, factor);
+    if (typeof found === 'string')
+      return invalid(`imperfection '${imperfection.id}': pinned results: ${found} (delete_imperfection + add_imperfection)`, ids);
+    const values = found.set.fields['DISP']?.values;
     if (values === undefined)
-      return invalid(`imperfection '${imperfection.id}': the pinned results hold ${sets.length} mode shape(s), not mode ${mode}`, ids);
+      return invalid(`imperfection '${imperfection.id}': mode ${mode} of the pinned results has no DISP field`, ids);
     const shape: (readonly number[])[] = [];
     let peak = 0;
     let peakNode = 0;
