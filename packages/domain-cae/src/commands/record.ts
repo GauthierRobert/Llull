@@ -9,6 +9,7 @@ import { significantNumber } from '@lib/compactNumber';
 import { analysisInputHash } from '../hash/inputHash';
 import { stressUnitName, lengthUnitName } from '../decks/units';
 import { nonlinearSummaryText } from '../nonlinear/summary';
+import { creepSummaryText } from '../creep/summary';
 import { eigenSummaryText, meshSummary, resultsSummary } from '../results/summary';
 import { caseOf, withCase } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
@@ -160,7 +161,7 @@ export const recordFeaResults = defineCommand({
         )
         .join(
           '',
-        )}${eigenSummaryText(expected)}${nonlinearSummaryText(expected)}${expected.thermal === undefined ? '' : analysisCase.type === 'heat_steady' ? '; thermal: steady state' : `; thermal: ${expected.thermal.times.length} time(s)`} (${expected.solver} ${expected.solverVersion}).`,
+        )}${eigenSummaryText(expected)}${nonlinearSummaryText(expected)}${creepSummaryText(expected)}${expected.thermal === undefined ? '' : analysisCase.type === 'heat_steady' ? '; thermal: steady state' : `; thermal: ${expected.thermal.times.length} time(s)`} (${expected.solver} ${expected.solverVersion}).`,
       [analysisId],
     );
   },

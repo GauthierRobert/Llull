@@ -13,6 +13,7 @@ import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord, type Trust } from '../shared/trust';
 import { analysisInputHash } from '../hash/inputHash';
 import { checkNonlinearItems } from '../nonlinear/check';
+import { checkCreepItems } from '../creep/check';
 import { marginItems } from '../margins/checkItems';
 import { structureItems } from './checkStructure';
 import { checkThermalItems } from '../thermal/check';
@@ -42,6 +43,7 @@ function partItems(doc: CadDocument, analysis: AnalysisCase): CheckItem[] {
   const structural =
     analysis.type === 'static' ||
     analysis.type === 'nonlinear_static' ||
+    analysis.type === 'creep' ||
     analysis.type === 'thermo_static' ||
     analysis.type === 'coupled_temperature_displacement';
   const items: CheckItem[] = [];
@@ -80,6 +82,7 @@ function setupItems(analysis: AnalysisCase): CheckItem[] {
   const structural =
     analysis.type === 'static' ||
     analysis.type === 'nonlinear_static' ||
+    analysis.type === 'creep' ||
     analysis.type === 'thermo_static' ||
     analysis.type === 'coupled_temperature_displacement';
   if (structural && analysis.constraintOrder.length === 0)
@@ -190,7 +193,9 @@ export const checkAnalysis = defineCommand({
         ? checkThermalItems(doc, analysisId, trust.results)
         : analysis.type === 'thermo_static' || analysis.type === 'coupled_temperature_displacement'
           ? checkThermomechItems(doc, analysisId, port)
-          : checkNonlinearItems(doc, analysis);
+          : analysis.type === 'creep'
+            ? checkCreepItems(doc, analysis)
+            : checkNonlinearItems(doc, analysis);
     const items: CheckItem[] = [
       ...partItems(doc, analysis),
       ...setupItems(analysis),

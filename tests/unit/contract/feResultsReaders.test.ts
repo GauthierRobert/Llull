@@ -24,6 +24,8 @@ const GATED: Readonly<Record<string, RegExp>> = {
 const EXEMPT: Readonly<Record<string, string>> = {
   'contact/queries.ts':
     'contact_report / check_contact read contact pressures, areas, slip and penetration (PHY-06): read-outs and set-up checks, no stress allowable or margin verdict',
+  'creep/queries.ts':
+    'creep_report / check_creep read creep strain, stress peaks and hold times (PHY-11): read-outs, a closed-form ratio and set-up checks, no stress allowable or margin verdict',
   'commands/analysis.ts': 'reads the case state only (unmeshed / meshed / solved), no result values',
   'commands/probeHistory.ts': 'a probe history is a read-out of nodal values with its hash; reviewRequired, no allowable, no verdict',
   'commands/record.ts': 'records a summary after re-hashing the artifact (record_fe_mesh / record_fea_results); no engineering verdict',

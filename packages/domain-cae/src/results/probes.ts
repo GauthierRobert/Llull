@@ -9,6 +9,7 @@ import { systemToSi } from '../thermal/thermalUnits';
 import { axisFrame, CYLINDRICAL_FIELDS, CYLINDRICAL_QUANTITIES, type AxisFrame, type CylindricalQuantity } from './cylindrical';
 import { locatePoint, type PointWeights } from './probeInterpolation';
 import { isDynamicType, type DynamicProbeQuantity } from '../dynamics/quantities';
+import { holdSets } from '../creep/history';
 
 interface ProbeValue {
   /** Load case name (static / thermo_static) or null for a time series (heat_*). */
@@ -43,6 +44,7 @@ export const QUANTITY_FIELDS: Readonly<
   u_x: { field: 'DISP', scalar: (values) => values[0] ?? Number.NaN },
   u_y: { field: 'DISP', scalar: (values) => values[1] ?? Number.NaN },
   u_z: { field: 'DISP', scalar: (values) => values[2] ?? Number.NaN },
+  ceeq: { field: 'PE', scalar: (values) => values[0] ?? Number.NaN },
   von_mises: { field: 'STRESS', scalar: vonMises },
   s_xx: { field: 'STRESS', scalar: (values) => values[0] ?? Number.NaN },
   s_yy: { field: 'STRESS', scalar: (values) => values[1] ?? Number.NaN },
@@ -56,6 +58,7 @@ export const quantityScale = (analysis: AnalysisCase, quantity: ProbeQuantity): 
 export function quantityUnit(analysis: AnalysisCase, quantity: ProbeQuantity): string {
   if (quantity === 'temperature') return analysis.thermal?.temperatureScale ?? analysis.thermomech?.temperatureScale ?? 'degC';
   if (quantity === 'heat_flux') return 'W/m^2';
+  if (quantity === 'ceeq') return '-';
   return quantity.startsWith('u_') ? lengthUnitName(analysis.unitSystem) : stressUnitName(analysis.unitSystem);
 }
 
@@ -127,12 +130,14 @@ export function evaluateProbes(
 ): ProbeReading[] {
   if (analysis.type === 'modal' || analysis.type === 'buckling' || isDynamicType(analysis.type)) return [];
   const heat = analysis.type === 'heat_steady' || analysis.type === 'heat_transient';
-  const sets: { loadCase: string | null; step: ResultStep }[] = heat
-    ? results.steps.map((step) => ({ loadCase: null, step }))
-    : loadCasesOf(analysis).flatMap(({ name }, index) => {
-        const step = stepOfLoadCase(results, index, analysis);
-        return step === undefined ? [] : [{ loadCase: name, step }];
-      });
+  const sets: { loadCase: string | null; step: ResultStep; time: number }[] = heat
+    ? results.steps.map((step) => ({ loadCase: null, step, time: analysis.type === 'heat_steady' ? 0 : step.time }))
+    : analysis.type === 'creep'
+      ? holdSets(analysis, results).map(({ step, holdTimeS }) => ({ loadCase: null, step, time: holdTimeS }))
+      : loadCasesOf(analysis).flatMap(({ name }, index) => {
+          const step = stepOfLoadCase(results, index, analysis);
+          return step === undefined ? [] : [{ loadCase: name, step, time: step.time }];
+        });
   const coordinates = nodeCoordinates(mesh);
   return Object.entries(analysis.probes).map(([probeId, probe]) => {
     const [nodeId, nodeDistance] = nearestNode(mesh, probeId, probe.point, lengthToAnalysis);
@@ -159,7 +164,7 @@ export function evaluateProbes(
       unit: quantityUnit(analysis, probe.quantity),
       nodeId,
       nodeDistance,
-      values: sets.map(({ loadCase, step }) => {
+      values: sets.map(({ loadCase, step, time }) => {
         const values = nodeId === null ? undefined : step.fields[field]?.values[String(nodeId)];
         const value =
           inside !== null
@@ -167,12 +172,7 @@ export function evaluateProbes(
             : values === undefined
               ? Number.NaN
               : scalar(values) * quantityScale(analysis, probe.quantity);
-        return {
-          loadCase,
-          step: step.step,
-          time: heat && analysis.type === 'heat_steady' ? 0 : step.time,
-          value: Number.isFinite(value) ? value : null,
-        };
+        return { loadCase, step: step.step, time, value: Number.isFinite(value) ? value : null };
       }),
     };
   });

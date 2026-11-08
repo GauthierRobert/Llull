@@ -25,6 +25,7 @@ import { docWith, sampleCatalogFile } from '../unit/aero/fasteners/fixtures';
 import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
 import { blocks, must, pairParams } from '../unit/cae/contact/support';
+import { creepCube, holdFrd, solveCube } from '../unit/cae/creep/support';
 import { barModel } from '../unit/cae/explicit/support';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
@@ -515,6 +516,16 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     build: contactDocument,
     query: { name: 'check_contact', params: (doc) => ({ analysisId: analysisId(doc) }) },
     mutate: { name: 'update_contact_pair', params: (doc) => ({ analysisId: analysisId(doc), pair: 'stack', friction: { mu: 0.3 } }) },
+  },
+  // PHY-11 M2: the hold and the recorded creep summary of a creep case
+  'cae#creep': {
+    roots: ['analysis'],
+    build: () => {
+      const c = creepCube({ probes: [{ name: 'centre', quantity: 'ceeq' }] });
+      return solveCube(c, holdFrd(1e-3)).doc;
+    },
+    query: { name: 'check_creep', params: (doc) => ({ analysisId: analysisId(doc) }) },
+    mutate: { name: 'delete_creep_step', params: (doc) => ({ analysisId: analysisId(doc) }) },
   },
   topology: {
     roots: ['analysis'],

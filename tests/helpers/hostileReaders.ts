@@ -5,6 +5,7 @@ import { AEC_READERS } from './hostile/aecReaders';
 import { DEXPI20_READERS } from './hostile/dexpi20Readers';
 import { AERO_READERS } from './hostile/aeroReaders';
 import { CAE_READERS } from './hostile/caeReaders';
+import { CREEP_READERS } from './hostile/creepReaders';
 import { CORE_READERS } from './hostile/coreReaders';
 import { GLTF_READERS } from './hostile/gltfReaders';
 import { EXCHANGE_READERS } from './hostile/exchangeReaders';
@@ -21,6 +22,7 @@ export const HOSTILE_READERS: readonly HostileReader[] = [
   ...BCF_READERS,
   ...GLTF_READERS,
   ...CAE_READERS,
+  ...CREEP_READERS,
   ...AERO_READERS,
   ...AEC_READERS,
   ...DEXPI20_READERS,

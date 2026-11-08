@@ -1,6 +1,6 @@
 # PHY-11: Creep, stress relaxation and viscoelastic time response — technical specification
 
-Gap id **CRP** · status: specification · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
+Gap id **CRP** · status: M1 + M2 built, M3 partly (2026-11-08, §13) · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
 · validation: [`validation/README.md`](validation/README.md) · sources: [`validation/sources.md`](validation/sources.md)
 
 Placement follows [`../README.md`](../README.md) §6.2 and is a **proposal** pending decision §5.1 there.
@@ -422,3 +422,85 @@ Total MVP ≈ 5 w; V1 ≈ 3 w.
 - [R13] NIMS MatNavi — https://mits.nims.go.jp/en/ (accessed 2026-10, search)
 - Others ([R4], [R8], [R14]): [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
 - L1 llull: `.claude/rules/architecture.md`, `.claude/context/command-layer.md`, `packages/core/src/model/types.ts`, `packages/core/src/commands/project/types.ts`, `packages/mcp/src/toolsets.ts`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`.
+
+## 13. As built (M1 + M2 + M3 partial, 2026-11-08)
+
+Placement: the discipline lives in the 05 package, `packages/domain-cae/src/creep/` (plugin `cae`, toolset `analysis`), not in a `@phys` package (the
+`plugins-and-kernels-depend-on-core-only` rule forbids `@phys → @cae`; §2 fallback). Types: `packages/core/src/model/creep.ts` (`CreepStepSpec`,
+`CreepOutputTimes`, `CreepResultsSummary`, `CreepProbeHistory`); `AnalysisType` gains `'creep'`, `AnalysisCase.creep?`, `ResultsSummary.creep?`,
+`ProbeQuantity` gains `'ceeq'`.
+
+| Command | Kind | File |
+| ------- | ---- | ---- |
+| `creep_closed_form` | Q | `creep/closedFormCommand.ts` (checks `closedFormChecks.ts`, formulas `closedForm.ts`, inputs `inputs.ts`, A conversion `units.ts`) |
+| `set_creep_step` / `delete_creep_step` | M | `creep/stepCommands.ts` (law readiness `readiness.ts` + `law.ts`) |
+| `creep_report` / `check_creep` | Q | `creep/queries.ts` (items `check.ts`, hold sets + bounded selection `history.ts`, summary `summary.ts`) |
+
+Hook points outside `creep/` (all minimal): `plugin.ts` (catalog), `decks/deckBuilder.ts` (procedure dispatch), `hash/inputHash.ts` (`creep` in the full hash,
+not the mesh hash), `model/validate.ts` (type + quantity lists, `creepErrors`), `commands/analysis.ts` (type lists, `CRP_SOLVER_UNSUPPORTED`),
+`commands/check.ts` (`checkCreepItems` in `check_analysis`, structural lists), `commands/probes.ts` + `results/probes.ts` (`ceeq`, hold sets as the time series),
+`results/summary.ts` + `commands/record.ts` (`creepSummary`, text), `results/plotSetup.ts` (`fea_result_field` / `render` pick a hold set). `guard.ts` needs no change
+(the step holds no entity id).
+
+Deck (`creep/deck.ts`): after the materials (`*ELASTIC` + `*CREEP, LAW=NORTON` from the shared constitutive writer, `A` converted to MPa): `*INITIAL CONDITIONS,
+TYPE=TEMPERATURE`, `*TIME POINTS, NAME=TP_HOLD` (explicit list, **step time**, ends exactly at the duration), step 1 = elastic `*STATIC` of `preloadPeriodS` (when
+`preloadStep`), step 2 (or 1) = `*STEP[, NLGEOM], INC=` + `*VISCO, CETOL=` + `initial, duration[, min, max]`, loads and constraints restated with `OP=NEW` (all load
+cases act), `*TEMPERATURE`, `*NODE FILE U` and `*EL FILE S, CEEQ` at the time points. Hold clock = frd total time − `preloadPeriodS` (rounded to 9 significant digits).
+
+### 13.1 Decisions
+
+| # | Decision | Rejected option | Why |
+| - | -------- | --------------- | --- |
+| D1 | §11 Q1: creep lives in `@cae`. | New `domain-physics` package importing `@cae` | The dependency law forbids it; contact (PHY-06) took the same route. |
+| D2 | `AnalysisType` gains `creep` only. | Also `viscoelastic` (TR-CRP-01) | V2, nothing consumes it: an unbuilt member is dead code and `create_analysis` would have to refuse it. |
+| D3 | `CreepStepSpec` is the §3 type minus `holdBlocks` and the `field` temperature (M4); `temperature` keeps its `{ kind: 'uniform' }` tag so M4 adds a member; times are s, `min` and `h` only (the 08 unit grammar has no `d` / `yr`). | Add `d` / `yr` to the grammar | Outside this scope and shared by every unit-bearing command. |
+| D4 | Named defaults are stored resolved and listed in the summary: initial increment = duration / 1000, `maxIncrements` 1000, `preloadStep` true, `nlgeom` false, output log 50, preload period = 1e-6 × duration. `cetol` has no default. | A default `cetol` | A strain tolerance is a modelling choice (AF-31). |
+| D5 | `CreepResultsSummary` records `outputSets` (stored result sets of the hold) instead of §3's `increments` / `lastIncrementS`, and `probesOmitted`. | Parse `.sta` for increments | The host reads `.sta` for nonlinear cases only (`server/src`, not in this lane); the frd sets are what the artifact holds. |
+| D6 | Probe extension = quantity `ceeq` (frd `PE`); the history of every probe is `probe_history` / `creep_report` (hold seconds). `s_hoop` / `s_radial` already exist (`axisPoint` / `axisDirection`). | A `history?: boolean` flag, `axis` field, `reaction_force` quantity | `probe_history` already returns every probe over every stored set; `reaction_force` has no deck request or consumer yet. |
+| D7 | The range guard checks the **temperature** against the law's `T` validity (`CRP_LAW_OUT_OF_RANGE`); the stress maximum is reported (`maxVonMisesOverHoldMPa`) and `creep_report.laws[].stressValidity` says no stress range is declared. | Reuse the PHY-02 `pressure` variable as a stress range | The validity variables of a PHY-02 model have no stress; abusing another variable would make a wrong claim. A stress range needs a PHY-02 variable first. |
+| D8 | `creep_closed_form` takes `material` for the three Norton checks (A, n, m from the default constitutive set, converted to MPa / s); `temperature_K` is then checked against the law. | Pass A, n, m only | VC-CRP-63 needs the guard on a stored law. |
+| D9 | The creep law must have `timeUnit: 's'` (`CRP_LAW_TIME_UNIT`). | Convert in the deck | **Finding:** the shared CalculiX card writer (`core/model/materialLaws/cardsCalculix.ts` `creepCards`) converts the stress unit of `A` but ignores `timeUnit`; a law in hours would write a wrong `*CREEP` card. Fixing it is a PHY-02 change (outside this lane); the refusal keeps the deck honest meanwhile. |
+| D10 | WLF refuses `T − Tr < 0`; the `C2 + ΔT ≤ 0` branch of TR-CRP-41 cannot occur (C2 > 0 is validated, ΔT ≥ 0). | Keep an unreachable branch | Dead code. |
+| D11 | `fea_result_field` / `render` of a creep case read the hold set at `time` (a stored hold time, else refused; default the last). | Leave the preload step selected | The preload step writes no output, so the load-case selection found nothing. |
+| D13 | When only one of `minIncrement` / `maxIncrement` is set, the other is the CalculiX default (minimum 1e-5 × the period capped at the initial increment, maximum the period), not the initial increment / duration (review round 1). | Fill from `initial` / `duration` | The old fill forced a minimum equal to the initial increment, so the solver could not cut back. |
+| D14 | A unit system other than N-mm-t-s is refused at `set_creep_step` / reported by `check_creep` (`CRP_UNIT_SYSTEM`), not only at the deck. Hold-time matching in `fea_result_field` is relative to the time (exact at 0). Integer ranges (`maxIncrements`, log `count`, `maxPoints`) are in the zod schema: out-of-range is `CMD_INVALID_PARAMS`; the tool-schema derivation emits no minimum / maximum, so the ranges are stated in the descriptions. | Coded `CRP_STEP_PARAM_INVALID` for those ranges | A coded refusal and a schema range cannot both fire; the schema one is validated before `run`. |
+| D12 | `check_creep` composes `check_analysis` through `execute` (which already carries the creep set-up items), adds the hold result (`CRP_HOLD_INCOMPLETE`) and de-duplicates by code + ids. | Re-implement the 05 items | One source of items. |
+
+New codes beyond §7.1: `CRP_STEP_PARAM_INVALID`, `CRP_STEP_MISSING`, `CRP_LAW_FORM_UNSUPPORTED`, `CRP_LAW_TIME_UNIT`, `CRP_INCREMENT_UNBOUNDED` (warning),
+`CRP_RESULTS_MISSING`, `CRP_NOTHING_TO_DELETE`, `CRP_INPUT_INVALID`.
+
+### 13.2 CalculiX 2.21 behaviour measured (Windows build, 2026-11-08)
+
+- `*TIME POINTS` times are **step time** and the definition must precede the first `*STEP`; frd times are total time (preload + hold).
+- `CEEQ` in `*EL FILE` is written as frd block `PE` (`S, CEEQ` accepted; `*EL PRINT` only warns that CEEQ is converted to PEEQ).
+- **`CETOL` does not bound the increment under a constant stress.** In the load-controlled unit cube the creep strain rate is constant, so the error estimate is
+  zero and the increment grows ×1.5 per increment until the matrix becomes singular (spooles "matrix found to be singular", exit 127 / −1) once
+  E · A · n · σ^(n−1) · Δt exceeds about 60 (Δt ≈ 3.5 s for the cube; ≈ 370 s for the tube). Same result for CETOL 1 and 1e-3. `maxIncrement` is the control:
+  `check_creep` warns `CRP_INCREMENT_UNBOUNDED` when it is not set.
+- The default minimum increment of `*VISCO` is 1e-5 × the period, so the first increment cannot be cut below it by default.
+- `*VISCO` after a `*STATIC` preload step with `*DLOAD` / `*CLOAD, OP=NEW` restated: loads are step loads, no relaxation of the elastic state.
+
+### 13.3 Validation status
+
+Solver runs: CalculiX 2.21 (Windows build), Netgen 6.2.2604 through `llull-mesh` (native `llull-kernel` for the tube), 2026-11-08; `server/tests/feaCreep.test.ts`
+(skipped without the tools; VC-CRP-42 also needs `llull-kernel`).
+
+| VC | Status | Evidence |
+| -- | ------ | -------- |
+| VC-CRP-01 | pass (plans) | the four plans replay through `build_project` (`tests/unit/cae/creep/plans.test.ts`); the `cae#creep` slice seed passes `pluginSliceFuzz`; history replay keeps the hold (`step.test.ts`); `set_creep_step` / `delete_creep_step` / `creep_closed_form` / `creep_report` / `check_creep` are pure (tests). No separate golden snapshot: the replay test already asserts every step and the stored hold. |
+| VC-CRP-10…16, 30…34 | pass | `creep_closed_form` reproduces every generated value of `expected_results.json` within its tolerance (`closedForm.test.ts`); n = 1 is Lamé to 1e-12; A conversion round trip 1e-12 |
+| VC-CRP-40 | pass | unit cube, 20 MPa, 1000 s, A = 1e-10: probe `centre` creep strain **0.319997** vs 0.32 (−0.001 %, gate 1 %); `creep_report` quick-check ratio 1.00. Mesh 0.25 mm C3D10, `maxIncrement` 2 s (§13.2); about 100 s. |
+| VC-CRP-41 | pass | bar relaxation, uz held 5e-4, E = 200 GPa, A = 1e-18: s_zz(3600 s) **93.9327** MPa vs 93.8687 (+0.07 %, gate 1 %); every history point within 1 % of `relaxedStress`; about 35 s |
+| VC-CRP-42 | pass | quarter tube a = 160, b = 250 mm, p = 10 MPa, n = 5, **2000 s** (stationary; the pack's 1e5 s costs 50 × the increments for the same state): hoop stress at the bore **14.4677** vs 14.46657 (+0.008 %), at the outer face **20.4601** vs 20.46657 (−0.03 %) (gate 3 %); `maxIncrement` 100 s (CalculiX stops with a singular matrix above ~370 s, §13.2); 4.5 min. The 05 mesh-adequacy finding `FEA_MESH_INADEQUATE` (10 mm axial slice, plane strain) is the only item of `check_creep` after the solve. |
+| VC-CRP-43 | **open** | the plan replays and `check_creep` accepts it, but CalculiX 2.21 does not converge the first `*VISCO` increment of the end-moment model: the increment is cut below the minimum ("increment size smaller than minimum", exit 201), also with a 0.01 s first increment, minimum 1e-7 and CETOL 1e-3 / 1e-5 (83 504 equations, 38 s to the failure). Re-tried after review round 1 with the deck minimum no longer forced (D13: only an explicit `minIncrement` / CalculiX default is written) and with first increment 0.01 s, `minIncrement` 1e-7 s, `maxIncrement` 100 s: same exit 201, so the written minimum is **not** the cause. The log shows a material-routine `pnewdt` request and diverging residuals at nodes near the loaded face; the cause is **not established** (a stress concentration of the nodal couple raised to the power 5 is a hypothesis, untested). `it.todo` in the server test. Next: a distributed end load, or n = 3 with a rescaled law, then re-derive the closed form with `creep_closed_form`. |
+| VC-CRP-44, 47 | not built | the pinned `beamcr*` decks are GPL and not stored; the frd reader is pinned on a real run of our own deck instead (`tests/unit/cae/fixtures/ccx221_creep_excerpt.frd`: PE / STRESS / DISP at five time points, step 2, total time in the `100CL` header) |
+| VC-CRP-60, 64 | not built (M5) | `creep_rupture_life`, `creep_damage_summary`, the margin provider and `dispose_margin` rows are M5 |
+| VC-CRP-61 | partial | `creep_report` and `check_creep`: `reviewRequired: true`, `reviewReason`, summary "Computed by llull, not approved" (tests); the M5 queries are not built |
+| VC-CRP-62 | pass | typical-basis law: `unverified: true` + reasons in `creep_closed_form` and `creep_report`; `CRP_LAW_UNVERIFIED` warning in `check_creep` / `check_analysis`, deck header `** UNVERIFIED` |
+| VC-CRP-63 | partial | temperature outside the law validity: refused by `creep_closed_form` and `set_creep_step`, error in `check_creep` and the deck; the **stress** range is not expressible (D7) |
+| VC-CRP-65 | partial | tested: `CRP_INPUT_MISSING`, `CRP_INPUT_INVALID`, `CRP_DURATION_INVALID`, `CRP_CETOL_INVALID`, `CRP_STEP_PARAM_INVALID`, `CRP_LAW_MISSING`, `CRP_NO_VISCOUS_MATERIAL`, `CRP_LAW_FORM_UNSUPPORTED`, `CRP_LAW_TIME_UNIT`, `CRP_ORTHOTROPIC_V2`, `CRP_LAW_OUT_OF_RANGE`, `CRP_OVERSTRESS_MODEL`, `CRP_HOLD_INCOMPLETE`, `CRP_CASE_TYPE`, `CRP_SOLVER_UNSUPPORTED`, `CRP_WLF_OUT_OF_RANGE`; `m ≤ −1` is refused by PHY-02 on the law; the coarse temperature table is M4 |
+| VC-CRP-66 | not built | private-library redaction in `creep_report`; an unresolved library refuses the deck (`MAT_LIBRARY_UNRESOLVED`) |
+
+Not done in this change (outside the lane or later milestones): `llull guide` creep section, the `compare.py` CLI harness and the MCP prompt (`packages/protocol`, `server`;
+there is no MCP server, LC1), `--dry-run`, M4 (temperature tables, PHY-03 field, hold blocks, NLGEOM validation) and M5. The core PHY-02 card writer ignores `timeUnit` (D9).
+

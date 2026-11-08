@@ -27,7 +27,7 @@ MMPDS, supplier) and lives only in 08 MAT private libraries ([S13]).
 | `viscoelastic_sls.csv` | (b) | Standard linear solid: E(t), J(t) and E·J over 1e-2 … 1e3 s. |
 | `wlf_shift.csv` | (b) | log10 aT and aT for T − Tr = 0 … 100 K with C1 = 17.44, C2 = 51.6 K. |
 | `calculix_creep_reference.json` | (c) | CalculiX `beamcr`, `beamcr3`, `beamcr4` decks pinned by sha256 at commit fd58870, with the beamcr3 values (σzz ≈ 20 MPa, creep strain 0.319987–0.320016 at 1000 s). GPL, so not stored. |
-| `plans/*.plan.json` | draft plans | `build_project` action lists. Geometry steps use existing llull commands (`set_units`, `add_box`, `add_cylinder`, `boolean`, `create_material`, `assign_material`). Analysis steps use **proposed** commands: 08 MAT `define_material_record` / `set_material_property`, PHY-02 `add_material_model` (name to align with the PHY-02 pack), 05 FEA `create_analysis` / `set_part_idealization` / `add_fea_constraint` / `add_fea_load` / `set_mesh_controls` / `add_result_probe`, and this pack's `set_creep_step` plus the `analysisType: "creep"` member and the probe `history` flag. Drafts until those exist. |
+| `plans/*.plan.json` | plans | `build_project` action lists, replayed by `tests/unit/cae/creep/plans.test.ts` and run through the real pipeline by `server/tests/feaCreep.test.ts`. Material steps use the PHY-02 form of the built commands (`add_material_model` `elastic_isotropic` + `creep_norton` with `validity`, `define_constitutive_set`); `validRange.stressMPa` is not expressible (TECHNICAL_SPEC §13.1 D7). Mesh sizes, `cetol` and `maxIncrement` are the ones that converged on CalculiX 2.21 (§13.2). |
 | `sources.md` | register | Sources, access mode, what was verified, grade. |
 
 ## Real use cases (sourced value statements only)

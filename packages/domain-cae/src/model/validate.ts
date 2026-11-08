@@ -10,6 +10,7 @@ import { ledgerErrors, studyErrors } from '../vnv/validateStudies';
 import { fitDispositionErrors } from '../thermomech/validateDispositions';
 import { dispositionLedgerErrors } from '../shared/validateDispositionLedger';
 import { contactErrors } from '../contact/validate';
+import { creepErrors } from '../creep/validate';
 
 const TYPES = [
   'static',
@@ -20,6 +21,7 @@ const TYPES = [
   'thermo_static',
   'coupled_temperature_displacement',
   'nonlinear_static',
+  'creep',
   'frequency_response',
   'random_response',
   'explicit_dynamics',
@@ -36,6 +38,7 @@ const QUANTITIES = [
   'u_x',
   'u_y',
   'u_z',
+  'ceeq',
   'von_mises',
   's_xx',
   's_yy',
@@ -236,6 +239,7 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
   }
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
   errors.push(...contactErrors(analysisCase, where, scope.entities));
+  errors.push(...creepErrors(analysisCase, where));
   errors.push(...settingsErrors(analysisCase, where));
   errors.push(...studyErrors(analysisCase, id, where));
   checkStudyControls(scope, analysisCase, where);

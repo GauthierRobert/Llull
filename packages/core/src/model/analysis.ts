@@ -34,6 +34,7 @@ export type AnalysisType =
   | 'thermo_static'
   | 'coupled_temperature_displacement'
   | 'nonlinear_static'
+  | 'creep'
   | 'frequency_response'
   | 'random_response'
   | 'explicit_dynamics';
@@ -60,6 +61,7 @@ export type ProbeQuantity =
   | 'u_x'
   | 'u_y'
   | 'u_z'
+  | 'ceeq'
   | 'von_mises'
   | 's_xx'
   | 's_yy'
@@ -233,6 +235,8 @@ export interface ResultsSummary {
   readonly thermomechTransient?: ThermomechTransientSummary;
   /** PHY-05: present iff the case is `nonlinear_static`. */
   readonly nonlinear?: NonlinearResultsSummary;
+  /** PHY-11: present iff the case is `creep`. */
+  readonly creep?: import('./creep').CreepResultsSummary;
   /** PHY-09: present iff the case is `frequency_response` or `random_response`. */
   readonly dynamics?: DynamicSummary;
 }
@@ -492,6 +496,8 @@ export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly nonlinear?: NonlinearSettings;
   /** PHY-06 contact pairs (nonlinear_static only); absent until the first `add_contact_pair`. */
   readonly contact?: ContactSettings;
+  /** PHY-11 hold of a `creep` case; absent until `set_creep_step`. */
+  readonly creep?: import('./creep').CreepStepSpec;
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];
