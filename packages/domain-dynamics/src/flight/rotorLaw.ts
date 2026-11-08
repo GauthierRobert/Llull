@@ -85,13 +85,29 @@ function coefficientsAt(runtime: RotorRuntime, j: number): { ct: number; cp: num
   };
 }
 
+/** C_T and C_P at J = 0 (the hover / static coefficients the mixer inverts the rotor law with). */
+export function staticCoefficients(runtime: RotorRuntime): { readonly ct: number; readonly cp: number } {
+  const { ct, cp } = coefficientsAt(runtime, 0);
+  return { ct, cp };
+}
+
+/** Validated advance-ratio range of a rotor's coefficients (FR-FLT-08): ±STATIC_ADVANCE_RATIO_LIMIT for a static pair, the table span else. */
+export function validatedRange(runtime: RotorRuntime): readonly [number, number] {
+  const { law } = runtime;
+  if (law.kind === 'static') return [-STATIC_ADVANCE_RATIO_LIMIT, STATIC_ADVANCE_RATIO_LIMIT];
+  const first = law.thrust.xs[0] ?? 0;
+  const last = law.thrust.xs[law.thrust.xs.length - 1] ?? 0;
+  return [first, last];
+}
+
 /**
  * Rotor wrench at body state `body`: V_axial = (v + ω × r) · a, J = V_axial / (n D); T = C_T ρ n² D⁴ along a at the hub;
- * Q = C_P ρ n² D⁵ / (2π), reaction -s·Q·a; gyroscopic -ω × (I_s · 2πn · s · a); s = +1 for 'ccw'.
+ * Q = C_P ρ n² D⁵ / (2π), reaction -s·Q·a; gyroscopic -ω × (I_s · 2πn · s · a); s = +1 for 'ccw'. `rpm` is the rotor's own constant speed
+ * unless a flight controller commands it; `body.linearVelocity` is relative to the air (`airRelative` under wind).
  */
-export function rotorOutput(runtime: RotorRuntime, body: BodyKinematics): RotorOutput {
+export function rotorOutput(runtime: RotorRuntime, body: BodyKinematics, rpm: number = runtime.rotor.rpm): RotorOutput {
   const { rotor } = runtime;
-  const n = rotor.rpm / 60;
+  const n = rpm / 60;
   const spin = rotor.spin === 'ccw' ? 1 : -1;
   const axis = rotate(body.orientation, runtime.axis);
   const arm = rotate(body.orientation, runtime.arm);
@@ -108,7 +124,7 @@ export function rotorOutput(runtime: RotorRuntime, body: BodyKinematics): RotorO
   return { thrust, torque, power: torque * 2 * Math.PI * n, axialVelocity, advanceRatio, outsideRange: outside, force, moment };
 }
 
-/** World drag force (N) at the centre of mass: -½ ρ CdA_i |v| v_i in the body axes. */
+/** World drag force (N) at the centre of mass: -½ ρ CdA_i |v| v_i in the body axes (v relative to the air). */
 export function bodyDragForce(drag: BodyDrag, body: BodyKinematics): Vec3 {
   const local = rotateInverse(body.orientation, body.linearVelocity);
   const speed = Math.hypot(local[0], local[1], local[2]);

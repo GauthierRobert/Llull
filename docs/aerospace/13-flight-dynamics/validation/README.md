@@ -44,4 +44,5 @@ verbatim from the published data files ([S1], [S2]) and the law under test is th
 
 - `expected_results.json` — index of the cases above (same shape as 10 AER).
 - `sources.md` — references with grade and access status.
-- `plans/` — to add with the implementation: `sc-flt-01-hover.json`, `sc-flt-02-gust.json` (build_project plans).
+- `plans/` — `sc-flt-01-hover.plan.json` (VC-FLT-09 hover after a knock), `sc-flt-02-gust.plan.json` (VC-FLT-07 gust + VC-FLT-14
+  timestep check): build_project plans pinned by `tests/golden/fltPlans.test.ts`.

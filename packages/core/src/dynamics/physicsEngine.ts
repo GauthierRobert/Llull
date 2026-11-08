@@ -44,6 +44,11 @@ export interface SimulationBody {
   /** Connection to the parent; null = welded to it when `fixed`, else a free 6-DOF body. */
   readonly joint: SimulationJoint | null;
   readonly fixed: boolean;
+  /**
+   * Free bodies only (no joint, not fixed): velocity of the centre of mass (m/s) and angular velocity (rad/s) at t = 0, world axes; absent =
+   * at rest. Ignored on a jointed or fixed body.
+   */
+  readonly initialTwist?: { readonly linear: Vec3; readonly angular: Vec3 };
 }
 
 /**
@@ -184,6 +189,12 @@ interface BodyForce {
   readonly force: Vec3;
 }
 
+/** A moment about a body's centre of mass produced by an actuator, world axes, N·m. */
+interface BodyMoment {
+  readonly body: string;
+  readonly moment: Vec3;
+}
+
 export type LedgerKind = 'electrical_input' | 'copper' | 'magnetic' | 'iron' | 'rotor' | 'transmission_loss' | 'regeneration';
 
 /**
@@ -205,6 +216,8 @@ export interface ActuatorBlock {
     readonly aux: Float64Array;
     readonly jointForces: Float64Array;
     readonly bodyForces: readonly BodyForce[];
+    /** Moments about the bodies' centres of mass (a rotor's thrust off the centre of mass, its reaction torque); absent = none. */
+    readonly bodyMoments?: readonly BodyMoment[];
     readonly ledger: Float64Array;
   };
   readonly ledgerLayout: readonly { readonly element: string; readonly kind: LedgerKind }[];
@@ -360,6 +373,20 @@ export interface SimulationTrace {
   readonly stops?: Record<string, { readonly peakPenetration: number; readonly peakForce: number }>;
   /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
   readonly loopResidual?: number;
+}
+
+/**
+ * What an engine throws when the state stops being finite (NaN or infinite velocities): callers tell a divergence from a rejected model by
+ * the class, never by the message text.
+ */
+export class SimulationDivergedError extends Error {
+  /** Simulated time of the first non-finite state, s. */
+  readonly timeS: number;
+  constructor(timeS: number) {
+    super(`simulation diverged at t = ${timeS.toFixed(4)} s.`);
+    this.name = 'SimulationDivergedError';
+    this.timeS = timeS;
+  }
 }
 
 export interface PhysicsEngine {

@@ -1,0 +1,88 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [100, 100, 100], "position": [0, 0, 0] }, "as": "frame_geo" },
+  {
+    "command": "add_rigid_body",
+    "params": { "entityIds": ["$frame_geo"], "id": "frame", "massKg": 1.115, "inertiaKgM2": [0.012, 0.012, 0.022, 0, 0, 0] }
+  },
+  { "command": "set_gravity", "params": { "gravity": [0, 0, -9.80665] } },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r1",
+      "body": "frame",
+      "hub": [180, -180, 0],
+      "axis": [0, 0, 1],
+      "spin": "ccw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r2",
+      "body": "frame",
+      "hub": [-180, 180, 0],
+      "axis": [0, 0, 1],
+      "spin": "ccw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r3",
+      "body": "frame",
+      "hub": [180, 180, 0],
+      "axis": [0, 0, 1],
+      "spin": "cw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r4",
+      "body": "frame",
+      "hub": [-180, -180, 0],
+      "axis": [0, 0, 1],
+      "spin": "cw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  { "command": "set_body_drag", "params": { "body": "frame", "cdaM2": [0.02, 0.02, 0.05] } },
+  { "command": "add_flight_controller", "params": { "body": "frame", "maxRpm": 7000, "id": "fc" } },
+  {
+    "command": "define_flight_scenario",
+    "params": {
+      "body": "frame",
+      "controller": "fc",
+      "durationS": 8,
+      "id": "hover",
+      "initialVelocity": [0.3, 0, -0.2],
+      "initialAngularVelocity": [0.3, -0.2, 0.1]
+    }
+  },
+  { "command": "run_flight", "params": { "scenario": "hover" } },
+  { "command": "flight_report", "params": { "scenario": "hover" } }
+]
