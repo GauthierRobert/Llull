@@ -24,6 +24,7 @@ import { addBody, caseParams, metreDocument, ok } from '../unit/aero/cfd/fixture
 import { docWith, sampleCatalogFile } from '../unit/aero/fasteners/fixtures';
 import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
+import { blocks, must, pairParams } from '../unit/cae/contact/support';
 import { barModel } from '../unit/cae/explicit/support';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
@@ -245,6 +246,16 @@ let studySeed: ReturnType<typeof studyBar> | undefined;
 const studyFixture = (): ReturnType<typeof studyBar> => (studySeed ??= studyBar());
 
 const analysisId = (doc: CadDocument): string => doc.analysis?.caseOrder[0] ?? 'missing';
+/** PHY-06: two stacked cubes with a surface_to_surface pair (friction, activeSteps) in a nonlinear_static case. */
+function contactDocument(): CadDocument {
+  const b = blocks({ holdUpper: true });
+  return must(
+    b.doc,
+    'add_contact_pair',
+    pairParams(b, { friction: { mu: 0.2 }, activeSteps: [b.stepId], adjust: { kind: 'clearance', value: 0.01 } }),
+  ).doc;
+}
+
 const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc)]?.topologyOrder?.[0] ?? 'missing';
 
 /** `doc` with a valid human-act ledger entry and a copy bound to another document uid, in both ledgers, plus the matching fit dispositions. */
@@ -466,6 +477,13 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     ctx: () => studyFixture().ctx,
     query: { name: 'check_verification', params: (doc) => ({ analysisId: analysisId(doc), gciTarget: 0.05 }) },
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz ledger analysis', analysisType: 'static' }) },
+  },
+  // PHY-06 M2: the contact pairs of a nonlinear_static case
+  'cae#contact': {
+    roots: ['analysis'],
+    build: contactDocument,
+    query: { name: 'check_contact', params: (doc) => ({ analysisId: analysisId(doc) }) },
+    mutate: { name: 'update_contact_pair', params: (doc) => ({ analysisId: analysisId(doc), pair: 'stack', friction: { mu: 0.3 } }) },
   },
   topology: {
     roots: ['analysis'],

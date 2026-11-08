@@ -1,6 +1,6 @@
 # PHY-06: Nonlinear contact, friction and bolt preload — technical specification
 
-Gap id **PHY-06** · prefix **CNT** · status: specification · written 2026-10-15 · functional spec:
+Gap id **PHY-06** · prefix **CNT** · status: M1 + M2 built (2026-11-07, §13) · written 2026-10-15 · functional spec:
 [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) · validation: [`validation/README.md`](validation/README.md) · sources:
 [`validation/sources.md`](validation/sources.md)
 
@@ -363,7 +363,7 @@ Reused: `NLS_*` (PHY-05), `FEA_*` (05), `VNV_NO_CONVERGENCE_STUDY` (PHY-00), `MA
 4. **Separation factor of safety**: the standard's Figure 1 logic flow was not readable; `factors.separation` stays an
    input until a human transcribes it.
 5. **Eq. 6-6** (ultimate MS when separation precedes rupture) text was not captured in the extract; implement after a
-   transcription check.
+   transcription check. As built: no ultimate margin, warning `CNT_ULTIMATE_MARGIN_PENDING` until transcribed (§13.1 D9).
 6. **Lug analysis method**: AFFDL stress manual / ESDU 91008 not verified; keep FE template only.
 7. **Subsurface Hertz formulas**: fetch Johnson (1985) or an equivalent open source to lift `CNT_SUBSURFACE_UNVERIFIED`.
 
@@ -375,3 +375,80 @@ Reused: `NLS_*` (PHY-05), `FEA_*` (05), `VNV_NO_CONVERGENCE_STUDY` (PHY-00), `MA
 - [R4] code_aster SSNV104 — https://gitlab.com/codeaster/src/-/blob/94bf28a308de5a77587675a598aacdddb722f84e/astest/ssnv104a.comm (accessed 2026-10)
 - [R6] K. L. Johnson, Contact Mechanics (1985) — not fetched
 - Repo: `.dependency-cruiser.cjs`, `docs/aerospace/05-fea-cae-handoff/`, `docs/aerospace/08-materials-standards-libraries/`, `docs/physics/05-nonlinear-structural/`, `docs/physics/02-constitutive-models/`.
+
+## 13. As built (M1 + M2, 2026-11-07)
+
+Placement: Proposal B of §2 (the discipline lives in the 05 package, `packages/domain-cae/src/contact/`, plugin `cae`, toolset `analysis`).
+Types: `packages/core/src/model/contact.ts` (`ContactSettings`, `ContactPair`, `ContactBehaviour`, `ContactFormulation`), `AnalysisCase.contact?`;
+the 05 `FeaTarget` moved to `packages/core/src/model/feaTarget.ts` (shared by `analysis.ts` and `contact.ts`).
+Pretension (`add_bolt_pretension`, `BoltPretension`, `PreloadSpec`) is M3 and not built; `ContactSettings` has no pretension fields yet.
+
+| Command | Kind | File |
+| ------- | ---- | ---- |
+| `hertz_contact` | Q | `contact/hertzCommand.ts` (formulas `contact/hertz.ts`) |
+| `interference_fit` | Q | `contact/interferenceCommand.ts` (`contact/lame.ts`) |
+| `bolted_joint_check` | Q | `contact/boltedJointCommand.ts` (schema `boltedJointSchema.ts`, equations `nasa5020.ts`) |
+| `add_contact_pair` / `update_contact_pair` / `delete_contact_pair` | M | `contact/pairCommands.ts` (rules `pairRules.ts`, schema `pairSchema.ts`) |
+| `contact_report` / `check_contact` | Q | `contact/queries.ts` (reader `reader.ts`, items `check.ts`, `overclosure.ts`) |
+
+Deck (`contact/deck.ts`, called by `nonlinear/deck.ts`): model data before the first `*STEP`: per pair (n = its 1-based position in `pairOrder`, so deck names can never collide)
+`*SURFACE, NAME=CPS_<n> | CPM_<n>, TYPE=ELEMENT` from the mesh face sets `CP_<pairId>_S|M` (new mesh target keys, `hash/targets.ts`), `*SURFACE INTERACTION, NAME=CPI_<n>`,
+`*SURFACE BEHAVIOR` (HARD / LINEAR `slope[, σ∞][, c0]` / EXPONENTIAL `c0, p0` / TIED `slope`; none for mortar + hard), `*FRICTION mu[, λ]`
+(tied: `1, stickSlope`), `*CONTACT PAIR, INTERACTION=…, TYPE=…[, SMALL SLIDING][, ADJUST=<analysis length>]`. Per step: `*MODEL CHANGE,
+TYPE=CONTACT PAIR, REMOVE | ADD` where `activeSteps` changes (a pair starts active), `*CONTACT FILE[, FREQUENCY=n]` `CDIS, CSTR`. The pair
+set-up is part of the full input hash (pair names and `noSlipRequired`, a check judgement, excluded), its targets of the mesh hash; the analysis guard keeps referenced entities.
+Load validation: `contact/validate.ts` (zod shape + ids / order / names / reserved keys / entity refs / steps / pair rules).
+
+Reader (`contact/reader.ts`): the frd `CONTACT` block (COPEN, CSLIP1, CSLIP2, CPRESS, CSHEAR1, CSHEAR2), last stored increment per step (or
+all), integrated over the slave faces with tributary corner areas: closed = CPRESS > 0, sliding = |shear| ≥ 0.99 μ p (llull rule),
+penetration = max(0, −COPEN), normal / shear force = Σ p A / Σ |τ| A, `closedBox` of the closed nodes.
+
+### 13.1 Decisions (open points decided while building)
+
+| # | Decision | Rejected option | Why |
+| - | -------- | --------------- | --- |
+| D1 | Contact results are recomputed from the trusted artifacts on every `contact_report` / `check_contact`; no `ContactSettings.results` summary is stored. | Store `ContactResultsSummary` (§3) | 05 TR-FEA-05: a stored summary is a claim that must be re-verified against its artifact anyway; a second claim doubles the trust surface. |
+| D2 | Read source = frd `*CONTACT FILE` (CDIS, CSTR); `*CONTACT PRINT` is not requested. | Parse `.dat` CONTACT PRINT tables (TR-CNT-10) | The frd block layout was pinned on real CalculiX 2.21 output (fixture `tests/unit/cae/fixtures/ccx221_contact_excerpt.frd`); `*CONTACT PRINT, CF` was refused by ccx 2.21 on our decks ("no existing contact pair defined") and its table layout is not pinned. |
+| D3 | The first pair must state `formulation` (`CNT_FORMULATION_UNSET`), later pairs inherit it. | Default `surface_to_surface` | The three formulations differ in accuracy and convergence; AF-31 forbids a silent default for a modelling choice. |
+| D4 | Tied pairs take no `friction`; the deck writes `*FRICTION 1, stickSlope` (μ on the card, tied does not slide). | Accept a friction μ on tied pairs | ccx needs the stick slope on `*FRICTION` for TIED; a μ there has no meaning for glued faces. Deck accepted and solved by ccx 2.21 (§13.2). |
+| D5 | `penetrationTolerance` is a `check_contact` input, not stored. | `ContactSettings.penetrationTolerance` | It is a reviewer judgement, not a model input: storing it would make it part of the input hash and stale the results. |
+| D6 | `hertz_contact` takes unit-suffixed keys (mm, N, MPa) only; no `units` switch. | `units: 'in-lbf-psi'` | A switch would change the meaning of `R1_mm` etc.; same convention as `hand_check`. |
+| D7 | `bolted_joint_check` uses Ppi-min = (1 − Γ) Tmin/(K D) (A.2-3a) for the separation margin of every joint; (1 − Γ/n_f) only for slip. | (1 − Γ/n_f) for non-critical separation (FR-CNT-05 wording) | VC-CNT-40.a/d bind the conservative form for the worked (non-critical) example; it is stated in `data.assumptions`. |
+| D8 | `bolted_joint_check.status` is pass / fail / incomplete: fail = a fail item (negative margin, friction above cap); incomplete = the check could not be completed (D9); warnings (defaulted Γ) are items. | pass / warn / fail | §5.3 shows `status: pass` with a warning item; warnings stay visible in `items`; an incomplete check must never read as pass. `check_contact` keeps pass / warn / fail. |
+| D9 | Separation before rupture: no ultimate margin, warning `CNT_ULTIMATE_MARGIN_PENDING` and `status: incomplete` (review round 1). Eq. 6-6 is not transcribed: the archived PDF ([R2], sha256 ea1b5b03…) is not in the repo or on this machine, and its text was not captured in the extract (§11 q5). The reviewer's reading (MS_u = Ptu-allow / (FF · FSu · PtL) − 1, preload ignored once separated) is plausible but unverified, so it is not implemented. | Compute MS_u from 6-11, or from the unverified reading | 6-11 is the rupture-first case; implementing an equation from memory would state an unsupported margin. The worked example (VC-CNT-40) separates first, so it reports `incomplete`. |
+| D10 | `noSlipRequired?: boolean` on a pair feeds `CNT_SLIP` (fail). | No slip flag in M2 | §7.1 names `noSlipRequired`; without it CNT_SLIP could never fire. |
+| D12 | `noSlipRequired` needs friction (`CNT_FRICTION_INVALID`); it is excluded from the input hash (toggling it keeps results current). | Hash it with the pair | A frictionless pair always slides; like D5 it is a judgement of the check, not a model input. |
+| D11 | Contact `unverified` flag dropped from `contact_report`: layout and COPEN sign are pinned on ccx 2.21 output. | Keep `unverified` until VC-CNT-50 `.dat.ref` decks | The real runs (§13.2) confirmed the six components and penetration = p / slope = −COPEN for surface_to_surface. |
+
+New codes beyond §7.1: `CNT_FORMULATION_UNSET`, `CNT_BEHAVIOUR_INVALID`, `CNT_ADJUST_INVALID`, `CNT_PAIR_NOT_FOUND`, `CNT_PAIR_NAME_TAKEN`,
+`CNT_NOTHING_TO_UPDATE`, `CNT_CONTACT_RESULTS_MISSING`, `CNT_HERTZ_INPUT_INVALID`, `CNT_LAME_INPUT_INVALID`, `CNT_INPUT_INVALID`,
+`CNT_ULTIMATE_MARGIN_PENDING`.
+
+### 13.2 Validation status
+
+Solver runs: CalculiX 2.21 (Windows build), Netgen 6.2.2604 through `llull-mesh`, on 2026-11-07.
+
+| VC | Status | Evidence |
+| -- | ------ | -------- |
+| VC-CNT-01 | pass (plan) | `tests/unit/cae/contact/plans.test.ts`: `cnt_ssnp154_cylinder_block` replays (tet in place of hex_dominant, which is not built), pair recorded, `CP_` mesh targets requested; replay keeps the slice (`pairs.test.ts`) |
+| VC-CNT-10.a/b analytic | pass | `hertz_contact` = generator at 1e-9 (`analytic.test.ts`) |
+| VC-CNT-10 FE | half-width pass, p0 **fail** (ccx, plan as written with tet order 1) | `cnt_ssnp154_cylinder_block` with tet in place of hex_dominant: 18 451 nodes, 54 700 C3D4, solved in 2 min 14 s (7 increments, 79 iterations). `contact_report`: closed nodes span x −6.06 … 6.55 mm → half-width **6.31 mm** vs 6.2146 (+1.5 %, within 2 %); max pressure **5512 MPa** vs 3585.36 (+54 %); normal force 39 746 N vs 35 000 N (+13.6 %, nodal integration). The 1 mm slice holds ~0.4 linear tets through its thickness: the peak pressure needs quadratic elements or a finer slice. A C3D10 run of the same plan did not finish within 35 min on this machine. Not gated in a test (runtime); re-measure after hex_dominant (planned plan mesh) or a refined slice. |
+| VC-CNT-11.a–c, 12 | pass (analytic) | 1e-9 vs generator; FE sphere model is V1 |
+| VC-CNT-13.a/b | pass (grade B) | subsurface τmax/p0 and depth reproduce the generator (1e-9 / 1e-6); still `unverified` (Johnson not fetched) |
+| VC-CNT-20.a/b | pass (analytic) | p 39.375 MPa, hub bore hoop 65.625 MPa at 1e-9; FE shrink-fit check not built (needs interference geometry, V1) |
+| VC-CNT-30.a | **pass (ccx)** | `server/tests/feaContact.test.ts`: 10 mm steel cube on an equal cube, 10 MPa, μ 0.2, slid 0.05 mm: ground reaction plateau **199.85 N** vs μN = 200 N (−0.07 %); pressing step normal force 1000.16 N (+0.02 %), whole face closed and sticking; sliding step τ/p = 0.2000 at every slave node, sliding fraction 1 |
+| VC-CNT-40.a–i | pass | `analytic.test.ts` (1e-9 vs `bolted_joint_nasa5020.json`, cap, defaults 25 / 35 %, separation-critical refusal) |
+| VC-CNT-50 | partial (ccx) | All deck variants accepted and solved by ccx 2.21 on the block model: surface_to_surface LINEAR / HARD, MORTAR (no behaviour card), NODE TO SURFACE + SMALL SLIDING, TIED with `*FRICTION 1, λ`; EXPONENTIAL and `*MODEL CHANGE … REMOVE` are read without error (the free block then diverges, as expected). frd CONTACT layout pinned. Pending: reproduction of the CalculiX test decks `contact1`, `friction1`, `hueeber1_mortar` against their `.dat.ref` (not available offline). |
+| VC-CNT-51 | M3 | pretension not built |
+| VC-CNT-60 | pass | `CNT_MIXED_CONTACT_TYPES` (`pairs.test.ts`) |
+| VC-CNT-61 | pass | stick slope default reported `{ value: E1/2 = 105000 MPa/mm, source: "CalculiX *FRICTION default …", defaulted: true }` (`add_contact_pair` summary, `contact_report.pairs`) |
+| VC-CNT-62 | pass | `reviewRequired: true` and "not approved" on every contact / joint / Hertz result |
+| VC-CNT-63 | pass | untested nut factor → `unverified: true` on every margin |
+| VC-CNT-65 | pass | `CNT_INITIAL_OVERCLOSURE` (mesh-based measurement beyond adjust), `CNT_RIGID_BODY_BY_CONTACT_ONLY`, `CNT_BEHAVIOUR_FORMULATION_MISMATCH` (refused by the commands and on load; re-checked by `check_contact`) |
+
+Measured accuracy note: forces integrate the nodal (extrapolated) contact pressures. Exact for a uniform pressure (1000.16 N for 1000 N); where
+the pressure peaks at an edge the integral is high: +4.4 % on the sliding cube (1043.9 N for 1000 N), +5.7 % for a 10 mm punch on a 20 mm
+base. Use reactions (curve probes) for absolute forces.
+
+Not built in M2: `*CONTACT PRINT` parsing, the guide section of `llull guide` (CLI lane), contact overlay fields in the UI, margins
+integration (FR-CNT-12) of `bolted_joint_check`, pretension (M3).

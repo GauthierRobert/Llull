@@ -475,6 +475,26 @@
       "file": "domain-dynamics/src/sim/transmissions.ts",
       "match": "return dampingRatio ?? dampingRatioForRestitution(restitution ?? 0.5) ?? 0.999;",
       "reason": "documented in set_joint_physics: no damping ratio and no restitution means restitution 0.5; 0.999 is the largest ratio of the closed form and is unreachable: the command refuses and the loader rejects a restitution with no damping ratio (dampingRatioForRestitution null)"
+    },
+    {
+      "file": "domain-cae/src/contact/boltedJointCommand.ts",
+      "match": "creepLoss: creepLoss ?? 0,",
+      "reason": "bolted_joint_check: an absent creep / thermal preload term is 0 as stated in the param description, and the result lists it in data.assumptions"
+    },
+    {
+      "file": "domain-cae/src/contact/boltedJointCommand.ts",
+      "match": "thermalIncrease: thermalIncrease ?? 0,",
+      "reason": "bolted_joint_check: an absent creep / thermal preload term is 0 as stated in the param description, and the result lists it in data.assumptions"
+    },
+    {
+      "file": "domain-cae/src/contact/boltedJointCommand.ts",
+      "match": "thermalDecrease: thermalDecrease ?? 0,",
+      "reason": "bolted_joint_check: an absent creep / thermal preload term is 0 as stated in the param description, and the result lists it in data.assumptions"
+    },
+    {
+      "file": "domain-cae/src/contact/overclosure.ts",
+      "match": "if (s !== null && (nearest === null || Math.abs(s) < Math.abs(nearest))) nearest = s;",
+      "reason": "geometric nearest-face search of the overclosure measurement (closest master face to a slave node); not a value substituted for an input"
     }
   ]
 }

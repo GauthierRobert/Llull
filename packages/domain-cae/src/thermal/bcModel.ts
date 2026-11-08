@@ -1,6 +1,7 @@
 /** Thermal boundary condition assembly and validation shared by add_thermal_bc, update_thermal_bc and check_thermal. */
 
-import type { AnalysisCase, FeaTarget, Q, TemperatureScale, ThermalBc, ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
+import type { AnalysisCase, Q, TemperatureScale, ThermalBc, ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
+import type { FeaTarget } from '@core/model/feaTarget';
 import { is3D, type CadDocument } from '@core/model/types';
 import { z } from '@core/commands/schema';
 import { problem, type Problem } from './access';

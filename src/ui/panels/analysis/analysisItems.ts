@@ -6,12 +6,12 @@ import type {
   AnalysisCase,
   FeaConstraint,
   FeaLoad,
-  FeaTarget,
   ResultsSummary,
   ThermalBc,
   ThermalResultsSummary,
   UnitSystem,
 } from '@core/model/analysis';
+import type { FeaTarget } from '@core/model/feaTarget';
 import { boundsCenter, boundsExtent, entityBoundsInDoc, mergeBounds, type Bounds } from '@core/geometry/bounds';
 import { toMetres } from '@core/model/units';
 import type { CadDocument, Vec3 } from '@core/model/types';

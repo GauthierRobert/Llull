@@ -1,6 +1,7 @@
 /** add_thermal_contact / update_thermal_contact (PHY-03 V1): contact conductances between two parts, recorded as data. */
 
-import type { FeaTarget, Q, ThermalContact } from '@core/model/analysis';
+import type { Q, ThermalContact } from '@core/model/analysis';
+import type { FeaTarget } from '@core/model/feaTarget';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';

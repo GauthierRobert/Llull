@@ -3,7 +3,6 @@
   "blocked": {
     "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": ["add_imperfection"],
     "docs/physics/06-contact-joints/validation/plans/cnt_pretension_bar.plan.json": ["add_bolt_pretension"],
-    "docs/physics/06-contact-joints/validation/plans/cnt_ssnp154_cylinder_block.plan.json": ["add_contact_pair"],
     "docs/physics/11-creep-viscoelasticity/validation/plans/crp_bar_relaxation.plan.json": ["set_creep_step"],
     "docs/physics/11-creep-viscoelasticity/validation/plans/crp_beam_stationary_bending.plan.json": ["set_creep_step"],
     "docs/physics/11-creep-viscoelasticity/validation/plans/crp_norton_unit_cube.plan.json": ["set_creep_step"],
