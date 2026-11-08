@@ -272,3 +272,34 @@ fn dual_contouring_refuses_above_its_cap_by_name_and_above_the_triangle_budget()
     assert_eq!(triangles["code"], "IMP_TRIANGLE_BUDGET");
     assert!(triangles["samples"].as_u64().unwrap() > 50, "the exact count of the crossed edges, before any datum is computed");
 }
+
+#[test]
+fn stuffs_a_sphere_into_tetrahedra_through_the_job_folder() {
+    let job = json!({
+        "op": "tets", "program": sphere_program(), "grid": grid(), "order": 2, "maxLatticeVertices": 1u64 << 26, "maxTets": 5_000_000,
+        "lengthScale": 0.001, "targets": [{ "key": "S", "facesNear": [[4.0, 0.0, 0.0]] }]
+    });
+    let dir = folder("tets", &job);
+    let (outputs, events) = run_job(&dir);
+    let names: Vec<&str> = outputs.iter().map(|o| o.path.as_str()).collect();
+    assert_eq!(names, ["nodes.f64", "elements.u32", "report.json"]);
+    let r = report(&dir);
+    let nodes = r["nodes"].as_u64().unwrap();
+    assert_eq!(fs::read(dir.join("nodes.f64")).unwrap().len() as u64, nodes * 24);
+    assert_eq!(fs::read(dir.join("elements.u32")).unwrap().len() as u64, r["elements"].as_u64().unwrap() * 40, "10 nodes per C3D10");
+    let exact = 4.0 / 3.0 * std::f64::consts::PI * 64.0;
+    assert!((r["volume"].as_f64().unwrap() / exact - 1.0).abs() < 1e-3, "{r}");
+    assert!(r["sets"]["S"]["residual"].as_f64().unwrap() < 1e-3 * 0.5, "residual in the analysis unit (lengthScale)");
+    let progress = events.lines().filter(|line| line.contains("\"progress\"")).count();
+    assert!(progress >= 20, "a progress event per percent of the job: {progress}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_tets_job_with_an_order_of_three_is_malformed() {
+    let job = json!({ "op": "tets", "program": sphere_program(), "grid": grid(), "order": 3, "maxLatticeVertices": 1, "maxTets": 1, "lengthScale": 1.0 });
+    let dir = folder("tets-order", &job);
+    let error = llull_field::run(&dir, &mut Vec::new()).unwrap_err();
+    assert_eq!(error.code, "NATIVE_JOB_INPUT");
+    let _ = fs::remove_dir_all(&dir);
+}

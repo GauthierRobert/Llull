@@ -2,3 +2,4 @@
 
 export { implicitPlugin } from './plugin';
 export { installArtifactPort } from './sampledInputs';
+export { implicitBodyField, type BodyField } from './bodyField';

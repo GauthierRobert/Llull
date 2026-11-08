@@ -26,6 +26,7 @@ import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
 import { blocks, must, pairParams } from '../unit/cae/contact/support';
 import { barModel } from '../unit/cae/explicit/support';
+import { implicitAnalysis } from '../unit/cae/fieldMeshFixtures';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
@@ -258,7 +259,6 @@ function contactDocument(): CadDocument {
   ).doc;
 }
 
-
 /** PHY-05 NLS-M3: the nonlinear bar (first case) with a buckling-mode imperfection pinned to the solved buckling case. */
 let imperfectSeed: { doc: CadDocument; ctx: ExecutionContext } | undefined;
 function imperfectFixture(): { doc: CadDocument; ctx: ExecutionContext } {
@@ -433,6 +433,12 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     roots: ['analysis'],
     build: planOf(plans, 'fea_modal_cantilever'),
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz analysis', analysisType: 'static' }) },
+  },
+  // 14 FLL-M1: an implicit body (with its material) analysed with mesh source implicit_field
+  'cae#field-mesh': {
+    roots: ['analysis', 'implicit'],
+    build: () => implicitAnalysis().doc,
+    mutate: { name: 'set_mesh_controls', params: (doc) => ({ analysisId: analysisId(doc), source: 'geometry' }) },
   },
   // a second seed of the same plugin (`<plugin>#<variant>`): the analysis slice with a verified convergence study (PHY-00 VNV-M3)
   'cae#studies': {

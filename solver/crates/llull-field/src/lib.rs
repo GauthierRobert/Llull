@@ -5,13 +5,15 @@
 //! scan orders, same vertex numbering; rayon only parallelises independent nodes, tiles and chunks, so results do not depend on the thread count.
 //!
 //! Job folder: `job.json` + little-endian files, prefix `` for the program and `region_` for the optional region program:
-//! - `job.json` = `{ op: "mesh" | "measure" | "evaluate", program, region?, grid?, maxSamples, maxTriangles, request?, points? }`;
+//! - `job.json` = `{ op: "mesh" | "measure" | "evaluate" | "tets", program, region?, grid?, maxSamples, maxTriangles, request?, points? }`;
 //!   a program is `{ instructions: [{op, args}], output, meshes: n, strutSets: [{periodic: {cell, origin} | null, nodes: n, beams: n}] }`;
 //!   `grid` = `{min, max, voxel}`; `request` = `{kind: "volume", sampling} | {kind: "quantile", probabilities, absolute} | {kind: "components"}`.
 //! - `constants.f64`; `mesh<i>_positions.f64` + `mesh<i>_indices.u32`; `strut<i>_nodes.f64` (3 per node) + `strut<i>_beams.f64` (a, b, ra, rb, cap 1 =
 //!   sphere, 5 per beam); `points.f64` (3 per point) for `evaluate`. `sampled<i>_values.f64` (+ `_points.f64`, `_tets.u32` for tetrahedra; program JSON `sampled: [{kind: grid, nodes, origin, voxel} | {kind: tets, points, tets}]`).
 //! - Out: `report.json` always (`{ refusal: { code, message, samples, limit } }` on a budget refusal, else the op's figures); `positions.f64` +
 //!   `indices.u32` for `mesh`; `values.f64` (+ `gradients.f64`) for `evaluate`. One `progress` event per 5 % of the cell layers while meshing.
+//!
+//! `tets` (FLL-M1, `field_to_tets`) stuffs {f < 0} into a tetrahedral FE mesh on a BCC lattice (contract in `tets_job.rs`).
 //!
 //! `evaluate` with `gradient: true` also writes `gradients.f64` (3 per point, `gradient.rs`, twin of `gradient.ts`).
 
@@ -29,10 +31,17 @@ mod sampled;
 mod sampling;
 mod strut_bvh;
 mod struts;
+mod stuffing;
 mod tape;
 #[cfg(test)]
 mod testkit;
+mod tet_order2;
+mod tet_quality;
+mod tet_targets;
 mod tetra;
+mod tets_job;
+#[cfg(test)]
+mod tets_tests;
 
 pub use files::JobError;
 pub use job::run;

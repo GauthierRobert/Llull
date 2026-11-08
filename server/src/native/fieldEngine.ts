@@ -38,7 +38,7 @@ export const NATIVE_FIELD_LIMITS: FieldEngine['limits'] = { maxSamples: 2 ** 30,
 /** Grid nodes the native dual-contouring sign grid holds (one byte per node, 05 IMP 14.10); the streamed tetrahedra mesher goes up to `maxSamples`. */
 export const NATIVE_DUAL_CONTOURING_MAX_SAMPLES = 2 ** 29;
 
-type Files = Record<string, Buffer | string>;
+export type Files = Record<string, Buffer | string>;
 
 class FieldJobFailure extends Error {
   constructor(
@@ -56,7 +56,7 @@ const u32Bytes = (values: readonly number[]): Buffer => {
 };
 
 /** The JSON part of `program` and its binary operands under `prefix` (`` or `region_`). */
-function packProgram(program: FieldProgram, prefix: string, files: Files): Record<string, unknown> {
+export function packProgram(program: FieldProgram, prefix: string, files: Files): Record<string, unknown> {
   files[`${prefix}constants.f64`] = f64Bytes(Float64Array.from(program.constants));
   program.meshes.forEach((entry, index) => {
     files[`${prefix}mesh${index}_positions.f64`] = f64Bytes(Float64Array.from(entry.mesh.positions));

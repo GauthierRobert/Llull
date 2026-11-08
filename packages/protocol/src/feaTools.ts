@@ -24,6 +24,10 @@ export type FeaToolResult = Omit<CommandOutcome, 'changed'>;
 export interface FeaHost {
   readonly getDoc: () => CadDocument;
   readonly applyCommand: (name: string, params: unknown) => FeaToolResult;
+  /** The caller's cancellation (CLI Ctrl-C, a closed REST request): a native job stops waiting on it and commits nothing. */
+  readonly signal?: AbortSignal;
+  /** One line per progress report of a native job (the CLI's `--progress`). */
+  readonly onProgress?: (line: string) => void;
 }
 
 /** A temperature table as the agent gave it: CSV text and the units it declares. */
@@ -89,7 +93,10 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
         'Mesh the solid parts of a finite-element analysis (Netgen tetrahedra, set_mesh_controls): the parts are exported from the geometry ' +
         'kernel (exact STEP with the OCC kernel, else a faceted STL), the constraint / load / refinement points are resolved to the ' +
         'nearest faces and nodes, and the mesh is stored as a content-addressed artifact and recorded with record_fe_mesh. ' +
-        'Run it after the set-up commands and before fea_solve; any set-up change makes the mesh stale. Needs the llull-mesh sidecar (Netgen) on the server.',
+        'Run it after the set-up commands and before fea_solve; any set-up change makes the mesh stale. Needs the llull-mesh sidecar (Netgen) on the server. ' +
+        'With set_mesh_controls source implicit_field, implicit bodies are instead meshed straight from their field by llull-compute (isosurface ' +
+        'stuffing, no Netgen): data.fieldParts gives each body its element count, volume and dihedral-angle range; refused with FLL_IMPLICIT_MESH_QUALITY, ' +
+        'FLL_IMPLICIT_MESH_TOO_LARGE or FLL_IMPLICIT_FIELD_MISSING (a part that is not an implicit body).',
       inputSchema: { type: 'object', properties: { analysisId: ANALYSIS_ID }, required: ['analysisId'] },
       annotations: { idempotentHint: true },
     },

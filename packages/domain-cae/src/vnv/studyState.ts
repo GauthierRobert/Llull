@@ -86,10 +86,13 @@ export function staleReasons(doc: CadDocument, analysisCase: AnalysisCase, study
   const finest = study.levels[0]?.controls;
   const now = analysisCase.mesh;
   const orderMoved = study.refinement !== 'p' && finest?.order !== now.order;
-  if (finest !== undefined && (orderMoved || finest.elementFamily !== now.elementFamily || finest.bonding !== now.bonding))
-    reasons.push(
-      `the case now meshes with ${now.elementFamily} order ${now.order}${now.bonding === undefined ? '' : ` ${now.bonding}`}, the study with ${finest.elementFamily} order ${finest.order}${finest.bonding === undefined ? '' : ` ${finest.bonding}`}`,
-    );
+  const meshedAs = (controls: MeshControls): string =>
+    `${controls.elementFamily} order ${controls.order}${controls.bonding === undefined ? '' : ` ${controls.bonding}`}${controls.source === undefined ? '' : ` from the ${controls.source}`}`;
+  if (
+    finest !== undefined &&
+    (orderMoved || finest.elementFamily !== now.elementFamily || finest.bonding !== now.bonding || finest.source !== now.source)
+  )
+    reasons.push(`the case now meshes with ${meshedAs(now)}, the study with ${meshedAs(finest)}`);
   // a dt / p study carries no mesh sizes of its own to scale: any other change of the case's mesh controls (sizes, refinements, minSize) stales it
   if (finest !== undefined && study.refinement !== 'h') {
     const { order: _finestOrder, ...finestRest } = finest;

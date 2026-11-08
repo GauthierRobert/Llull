@@ -136,6 +136,8 @@ export interface MeshControls {
   readonly optimize: 'default' | 'netgen' | 'high_order' | 'none';
   /** 'conformal': touching parts are fragmented into one model and share interface nodes (STEP only). Absent = 'separate'. */
   readonly bonding?: 'conformal';
+  /** 'implicit_field': implicit bodies are meshed from their field (llull-field isosurface stuffing, 14 FLL-M1), not by Netgen. Absent = the part geometry. */
+  readonly source?: 'implicit_field';
 }
 
 export interface FactorSet {

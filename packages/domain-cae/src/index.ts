@@ -15,6 +15,14 @@ export { findStudy } from './topology/model';
 // input hashing and mesh requests for the FEA host
 export { analysisInputHash } from './hash/inputHash';
 export { meshRequest, type MeshRequest } from './hash/meshRequest';
+export {
+  assembleFieldMesh,
+  fieldJobTargets,
+  FIELD_MESH_LIMITS,
+  FIELD_MESH_PAD,
+  type FieldPartFigures,
+  type FieldPartMesh,
+} from './fieldMesh/fieldMesh';
 
 // explicit dynamics: plugin, job and artifact builders
 export { explicitPlugin } from './explicit/plugin';
