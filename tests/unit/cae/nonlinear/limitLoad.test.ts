@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import type { HumanSignaturePort } from '@core/model/analysis';
+import { analysisInputHash } from '@cae/hash/inputHash';
+import { marginDispositionPayload } from '@cae/margins/disposition';
 import { limitLoadOf } from '@cae/nonlinear/limitLoad';
+import { isRecord } from '@lib/isRecord';
 import { solvedPressure, solvedPull, type SolvedCurve } from './limitFixtures';
 
 describe('limitLoadOf (TR-NLS-05, synthetic curves)', () => {
@@ -72,7 +76,7 @@ describe('limit_load', () => {
     expect(data).toMatchObject({
       found: 'peak',
       probeName: 'pull_curve',
-      forceUnit: 'N',
+      loadUnit: 'N',
       lengthUnit: 'mm',
       points: 6,
       reviewRequired: true,
@@ -89,7 +93,8 @@ describe('limit_load', () => {
 
   it('gives only a lower bound when the curve never peaks (VC-NLS-60 analogue) and finds a plateau with explicit parameters', () => {
     const pressure = limit(solvedPressure(), { method: 'auto' });
-    expect(pressure.data).toMatchObject({ found: 'not_reached', lowerBound: 50 });
+    expect(pressure.data).toMatchObject({ found: 'not_reached', lowerBound: 50, loadUnit: 'MPa' });
+    expect(pressure.summary).toContain('lower bound 50 MPa');
     expect((pressure.data as Data).warnings.join()).toContain('NLS_LIMIT_NOT_REACHED');
     const plateau = solvedPull([105, 210, 250, 251, 252]);
     expect(limit(plateau, { method: 'plateau', plateau: { slopeFraction: 0.02, window: 0.002 } }).data).toMatchObject({
@@ -148,7 +153,8 @@ describe('compute_margins criterion limit_load (FR-NLS-14, VC-NLS-67/68)', () =>
     });
     expect(passing.error, passing.summary).toBeUndefined();
     const row = rowOf(passing);
-    const capacity = Number(row['capacityN']);
+    const capacity = Number(row['capacity']);
+    expect(row['loadUnit']).toBe('N');
     expect(row).toMatchObject({
       criterion: 'limit_load',
       basis: 'peak',
@@ -190,12 +196,59 @@ describe('compute_margins criterion limit_load (FR-NLS-14, VC-NLS-67/68)', () =>
     expect(disposed.error?.code).toBe('FEA_HUMAN_GATE');
   });
 
+  it('records a human disposition through a signing port (FAIL (accepted), status FAIL) that lapses when the design load changes', () => {
+    const solved = solvedPull([105, 250, 260, 240, 200]);
+    const doc = { ...solved.doc, uid: 'd'.repeat(32) };
+    const SECRET = 'limit-load-test-secret';
+    const port: HumanSignaturePort = {
+      verify: (given, payload) =>
+        isRecord(given) && given['secret'] === SECRET && given['payload'] === payload ? { signer: 'alice', signatureId: 'sig-1' } : null,
+      spend: () => true,
+    };
+    const ctx = { ...solved.ctx, humanSignature: port };
+    const limitLoad = { probe: solved.probeId, method: 'auto', designLoad: { value: 200, category: 'limit', source: 'test loads' } };
+    const query = { analysisId: solved.analysisId, criterion: 'limit_load', limitLoad, acceptInadequateMesh: true };
+    const row = rowOf(execute(doc, 'compute_margins', query, ctx)) as { rowKey: string; status: string; ms: number };
+    expect(row.status).toBe('FAIL');
+    const justification = 'accepted: test of the human gate';
+    const payload = marginDispositionPayload(
+      solved.analysisId,
+      { rowKey: row.rowKey, status: row.status, ms: row.ms, inputHash: analysisInputHash(doc, solved.analysisId, 'full') },
+      'accepted',
+      justification,
+      doc.analysis?.cases[solved.analysisId]?.results?.resultsHash ?? '',
+      doc.uid,
+    );
+    const disposed = execute(
+      doc,
+      'dispose_margin',
+      { ...query, rowId: 'r1', decision: 'accepted', justification, confirmation: { secret: SECRET, payload } },
+      ctx,
+    );
+    expect(disposed.error, disposed.summary).toBeUndefined();
+    const after = rowOf(execute(disposed.document, 'compute_margins', query, ctx));
+    expect(after).toMatchObject({ status: 'FAIL', disposition: 'accepted', statusLabel: 'FAIL (accepted)' });
+    const changed = { ...query, limitLoad: { ...limitLoad, designLoad: { ...limitLoad.designLoad, value: 210 } } };
+    expect(rowOf(execute(disposed.document, 'compute_margins', changed, ctx))).toMatchObject({
+      status: 'FAIL',
+      disposition: 'pending_human',
+    });
+  });
+
   it('uses the probe load as the design load by default and the lower bound when the curve never peaks', () => {
     const pressure = solvedPressure();
     const result = margins(pressure, { probe: pressure.probeId, method: 'auto' });
     expect(result.error, result.summary).toBeUndefined();
     const row = rowOf(result);
-    expect(row).toMatchObject({ basis: 'lower_bound', capacityN: 50, designLoadN: 1, designLoad: { stated: false, category: 'limit' } });
+    // the probe load is a pressure: the curve load axis, capacity and design load are MPa (N-mm-t-s), not N
+    expect(row).toMatchObject({
+      basis: 'lower_bound',
+      capacity: 50,
+      loadUnit: 'MPa',
+      designLoad: { value: 1, stated: false, category: 'limit' },
+    });
+    expect(result.summary).toContain('capacity 50 MPa');
+    expect(result.summary).not.toContain(' N ');
     expect(Number(row['ms'])).toBeCloseTo(50 / 1.5 - 1, 12);
     expect((result.data as Data).warnings.join()).toContain('NLS_LIMIT_NOT_REACHED');
   });

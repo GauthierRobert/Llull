@@ -31,11 +31,13 @@ export interface PathPoint {
   readonly u: Float64Array;
 }
 
-export interface PathResult {
-  readonly points: readonly PathPoint[];
-  /** finished: maxSteps / increments done or the stop rule met; not_converged: a step failed after the last point; singular: the first tangent. */
-  readonly outcome: 'finished' | 'stopped' | 'not_converged' | 'singular';
-}
+/** Why a step failed: no real root of the arc-length constraint, a singular tangent at the start of the step or in the corrector, or the iteration cap. */
+export type StepFailure = 'no_real_root' | 'singular_tangent' | 'singular_corrector' | 'iterations';
+
+export type PathResult =
+  | { readonly points: readonly PathPoint[]; readonly outcome: 'finished' | 'stopped' | 'mechanism' }
+  /** A step failed after the last point (possibly the first step: then only the origin is in points). */
+  | { readonly points: readonly PathPoint[]; readonly outcome: 'not_converged'; readonly failure: StepFailure };
 
 const dot = (a: Float64Array, b: Float64Array): number => {
   let sum = 0;
@@ -85,17 +87,18 @@ export function arcLengthPath(
   let u: Float64Array = new Float64Array(model.dofs);
   let lambda = 0;
   const points: PathPoint[] = [{ loadFactor: 0, u }];
-  if (isMechanism(model, referenceFree)) return { points, outcome: 'singular' };
+  if (isMechanism(model, referenceFree)) return { points, outcome: 'mechanism' };
   let previous: Float64Array | null = null;
   for (let stepIndex = 0; stepIndex < maxSteps; stepIndex++) {
     const start = factor(assemble(model, u).stiffness);
-    if (start === null) return { points, outcome: stepIndex === 0 ? 'singular' : 'not_converged' };
+    if (start === null) return { points, outcome: 'not_converged', failure: 'singular_tangent' };
     let tangent = solve(start, referenceFree);
     let dLambda = arcLength / Math.sqrt(dot(tangent, tangent));
     if (previous !== null && dot(tangent, previous) < 0) dLambda = -dLambda;
     let Du = tangent.map((value) => dLambda * value);
     let DLambda = dLambda;
     let converged = false;
+    let failure: StepFailure = 'iterations';
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       const { force, stiffness } = assemble(model, plus(model, u, Du));
       const R = residual(model, lambda + DLambda, reference, force);
@@ -104,7 +107,10 @@ export function arcLengthPath(
         break;
       }
       const lu = factor(stiffness);
-      if (lu === null) break;
+      if (lu === null) {
+        failure = 'singular_corrector';
+        break;
+      }
       tangent = solve(lu, referenceFree);
       const correction = solve(lu, R);
       const shifted = Du.map((value, k) => value + (correction[k] ?? 0));
@@ -112,7 +118,10 @@ export function arcLengthPath(
       const b = 2 * dot(tangent, shifted);
       const c = dot(shifted, shifted) - arcLength * arcLength;
       const discriminant = b * b - 4 * a * c;
-      if (discriminant < 0) break;
+      if (discriminant < 0) {
+        failure = 'no_real_root';
+        break;
+      }
       const root1 = (-b + Math.sqrt(discriminant)) / (2 * a);
       const root2 = (-b - Math.sqrt(discriminant)) / (2 * a);
       let along1 = 0;
@@ -131,7 +140,7 @@ export function arcLengthPath(
         break;
       }
     }
-    if (!converged) return { points, outcome: stepIndex === 0 ? 'singular' : 'not_converged' };
+    if (!converged) return { points, outcome: 'not_converged', failure };
     u = plus(model, u, Du);
     lambda += DLambda;
     previous = Du;
@@ -157,10 +166,11 @@ export function loadControlPath(
   const referenceNorm = Math.sqrt(dot(referenceFree, referenceFree));
   let u: Float64Array = new Float64Array(model.dofs);
   const points: PathPoint[] = [{ loadFactor: 0, u }];
-  if (isMechanism(model, referenceFree)) return { points, outcome: 'singular' };
+  if (isMechanism(model, referenceFree)) return { points, outcome: 'mechanism' };
   for (let increment = 1; increment <= increments; increment++) {
     const lambda = (maxFactor * increment) / increments;
     let converged = false;
+    let failure: StepFailure = 'iterations';
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       const { force, stiffness } = assemble(model, u);
       const R = residual(model, lambda, reference, force);
@@ -169,7 +179,10 @@ export function loadControlPath(
         break;
       }
       const lu = factor(stiffness);
-      if (lu === null) break;
+      if (lu === null) {
+        failure = 'singular_tangent';
+        break;
+      }
       const delta = solve(lu, R);
       u = plus(model, u, delta);
       const size = freeOf(model, u);
@@ -178,7 +191,7 @@ export function loadControlPath(
         break;
       }
     }
-    if (!converged) return { points, outcome: increment === 1 ? 'singular' : 'not_converged' };
+    if (!converged) return { points, outcome: 'not_converged', failure };
     const point = { loadFactor: lambda, u };
     points.push(point);
     if (stop(point)) return { points, outcome: 'stopped' };

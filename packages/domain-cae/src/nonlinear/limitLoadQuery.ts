@@ -5,7 +5,7 @@ import type { CadDocument } from '@core/model/types';
 import type { ExecutionContext } from '@core/commands/types';
 import { z } from '@core/commands/schema';
 import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../decks/elastic';
-import { lengthUnitName } from '../decks/units';
+import { lengthUnitName, stressUnitName } from '../decks/units';
 import { caseOf } from '../shared/access';
 import { trustedRecord } from '../shared/trust';
 import { extractCurves, type CurveData } from './curves';
@@ -42,7 +42,8 @@ export interface LimitLoadReport {
   readonly resultsHash: string;
   readonly results: FeResultsArtifact;
   readonly mesh: FeMeshArtifact | null;
-  readonly forceUnit: string;
+  /** Unit of the curve load axis: force for reactions and force loads, stress for a pressure, force x length for a moment. */
+  readonly loadUnit: string;
   readonly lengthUnit: string;
   readonly warnings: readonly string[];
   readonly unverifiedReasons: readonly string[];
@@ -75,6 +76,17 @@ function unverifiedReasons(doc: CadDocument, analysis: AnalysisCase): string[] {
     if (!isElasticRefusal(elastic)) for (const reason of elastic.unverifiedReasons) reasons.add(`E/nu of '${materialId}': ${reason}`);
   }
   return [...reasons];
+}
+
+/** Unit of the load axis of a probe: what the curve load really is (a pressure probe plots a pressure, not a force). */
+function loadUnitOf(analysis: AnalysisCase, probe: CurveProbe): string {
+  const force = analysis.unitSystem.split('-')[0] ?? '';
+  if (probe.load.kind === 'reaction') return force;
+  const load = Object.hasOwn(analysis.loads, probe.load.loadId) ? analysis.loads[probe.load.loadId] : undefined;
+  if (load?.kind === 'pressure') return stressUnitName(analysis.unitSystem);
+  if (load?.kind === 'moment') return `${force}*${lengthUnitName(analysis.unitSystem)}`;
+  if (load?.kind === 'gravity') return `${lengthUnitName(analysis.unitSystem)}/s^2`;
+  return force;
 }
 
 const RULES: Readonly<Record<LimitMethod, string>> = {
@@ -161,7 +173,7 @@ export function limitLoadReport(
     resultsHash: analysis.results?.resultsHash ?? '',
     results,
     mesh: trust.meshArtifact,
-    forceUnit: analysis.unitSystem.split('-')[0] ?? '',
+    loadUnit: loadUnitOf(analysis, probe),
     lengthUnit: lengthUnitName(analysis.unitSystem),
     warnings,
     unverifiedReasons: unverifiedReasons(doc, analysis),

@@ -6,9 +6,12 @@ import { frameModel, type FrameElement, type FrameModel } from './frameModel';
 /** Element i of a numeric array; 0 for an index past the end (noUncheckedIndexedAccess identity, never an engineering default). */
 const at = (values: ArrayLike<number>, index: number): number => values[index] ?? 0;
 
-/** Most elements of one frame, and the work cap maxSteps x free dofs x (bandwidth + 1)^2 (measured about 0.1 s per 1e6: a query answers in seconds, AF-40). */
+/**
+ * Most elements of one frame, and the work cap maxSteps x free dofs x (bandwidth + 1)^2: measured about 0.1 s per 1e6 units, so 3e7 is about 3 s of
+ * a synchronous query (it blocks the host event loop). A larger need is the TECHNICAL_SPEC 13.2 item 5 trigger for a solver/ crate.
+ */
 const MAX_ELEMENTS = 4000;
-const WORK_BUDGET = 2e8;
+const WORK_BUDGET = 3e7;
 
 const DOFS = ['ux', 'uy', 'rz'] as const;
 type Dof = (typeof DOFS)[number];

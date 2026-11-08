@@ -41,6 +41,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
     'delete_convergence_study and the human gate accept_verification_exception (re-verifies the study through studyVerify before the gate); it records an acceptance, no stress verdict',
   'vnv/studyVerify.ts':
     're-derives the levels of a convergence study from the artifact store for the study commands; a trust check, no stress verdict',
+  'nonlinear/imperfectionCommand.ts':
+    'add_imperfection reads the pinned buckling results only to name the peak node and offset in its summary; no allowable, no verdict',
   'nonlinear/imperfectionDeck.ts':
     'reads the pinned buckling mode shapes to move the deck nodes (an input geometry, not a result verdict); no allowable, no pass / fail',
   'nonlinear/limitLoadQuery.ts':

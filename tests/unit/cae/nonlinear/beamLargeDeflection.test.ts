@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
+import { vertex } from '@cae/nonlinear/beam/beamCommand';
 
 const PACK = 'docs/physics/05-nonlinear-structural/validation';
 const LEE = JSON.parse(readFileSync(`${PACK}/plans/nls_lee_frame.query.json`, 'utf8')) as Record<string, unknown>;
@@ -232,5 +233,114 @@ describe('beam_large_deflection refusals', () => {
     const data = dataOf({ ...base, members, control: { kind: 'arc_length', arcLength: 1, maxSteps: 20 } });
     expect(data.converged).toBe(true);
     expect(data.steps).toBe(20);
+  });
+});
+
+describe('beam_large_deflection failure modes, refinement and snap-back (review round 1)', () => {
+  type FailedData = BeamData & { readonly failure?: string; readonly hint?: string };
+  const failed = (params: Record<string, unknown>): FailedData => {
+    const result = run(params);
+    expect(result.error, result.summary).toBeUndefined();
+    return result.data as FailedData;
+  };
+
+  it('a first arc-length step without a real root is a not-converged path (only the origin) with the arcLength hint, not a mechanism', () => {
+    const data = failed({ ...LEE, control: { kind: 'arc_length', arcLength: 200, maxSteps: 50 } });
+    expect(data).toMatchObject({ converged: false, stopCode: 'NLS_NOT_CONVERGED', failure: 'no_real_root', steps: 0 });
+    expect(data.path).toHaveLength(1);
+    expect(data.hint).toContain('reduce control.arcLength');
+  });
+
+  it('a later arc-length step failure keeps the converged path', () => {
+    const data = failed({ ...LEE, control: { kind: 'arc_length', arcLength: 60, maxSteps: 200 } });
+    expect(data).toMatchObject({ converged: false, failure: 'no_real_root', steps: 7, stoppedBy: 'not_converged' });
+    expect(data.path.at(-1)?.step).toBe(7);
+  });
+
+  it('a first load-control increment beyond the limit load does not converge and asks for more increments', () => {
+    const data = failed({ ...LEE, control: { kind: 'load', increments: 1, maxFactor: 2.5 } });
+    expect(data).toMatchObject({ converged: false, failure: 'iterations', steps: 0 });
+    expect(data.hint).toContain('raise control.increments');
+  });
+
+  it('a cantilever curling under an end moment reverses ux under a rising load: no snap-back', () => {
+    const data = dataOf({
+      units: { length: 'm', force: 'N' },
+      nodes: [
+        { id: 'root', x: 0, y: 0 },
+        { id: 'tip', x: 1, y: 0 },
+      ],
+      members: [{ from: 'root', to: 'tip', E: 1, A: 1e6, I: 1, elements: 20 }],
+      supports: [{ node: 'root', ux: true, uy: true, rz: true }],
+      referenceLoad: [{ node: 'tip', mz: 1 }],
+      control: { kind: 'load', increments: 200, maxFactor: 6 },
+      report: { node: 'tip', dofs: ['ux', 'uy'] },
+    });
+    const ux = data.path.map((entry) => entry.u.ux ?? 0);
+    const lowest = ux.indexOf(Math.min(...ux));
+    // x_tip / L = sin(theta) / theta, smallest near theta = 4.49: ux falls, then rises again
+    expect(lowest).toBeGreaterThan(0);
+    expect(lowest).toBeLessThan(ux.length - 1);
+    expect(data.snapBack).toBe(false);
+    expect(data.limitPoints).toEqual([]);
+  });
+});
+
+describe('limit-point parabola refinement guards', () => {
+  it('refines only with the curvature of the extremum, inside the samples and beyond the sampled value', () => {
+    // P = -(x - 1.2)^2 + 5 sampled at 0, 1, 2: a maximum 5 at x = 1.2
+    const top = vertex(
+      [
+        [0, 3.56],
+        [1, 4.96],
+        [2, 4.36],
+      ],
+      'max',
+    );
+    expect(top?.[0]).toBeCloseTo(1.2, 12);
+    expect(top?.[1]).toBeCloseTo(5, 12);
+    expect(
+      vertex(
+        [
+          [0, 3.56],
+          [1, 4.96],
+          [2, 4.36],
+        ],
+        'min',
+      ),
+    ).toBeNull();
+    // vertex outside the three x values (x = 3.5)
+    expect(
+      vertex(
+        [
+          [0, -12.25],
+          [1, -6.25],
+          [2, -2.25],
+        ],
+        'max',
+      ),
+    ).toBeNull();
+    // coincident x values
+    expect(
+      vertex(
+        [
+          [1, 1],
+          [1, 2],
+          [2, 1],
+        ],
+        'max',
+      ),
+    ).toBeNull();
+    // a minimum refined for a min
+    expect(
+      vertex(
+        [
+          [0, 1],
+          [1, 0],
+          [2, 1],
+        ],
+        'min',
+      ),
+    ).toEqual([1, 0]);
   });
 });

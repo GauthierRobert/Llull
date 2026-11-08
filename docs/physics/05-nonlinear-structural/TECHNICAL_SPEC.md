@@ -529,23 +529,40 @@ buckling case of the same part. Codes added besides §7.1: `NLS_IMPERFECTION_NOT
 3. **Same mesh = node-for-node** (same ids, coordinates within 1e-9 x mesh size, same unit system), checked when the deck is written
    [equal `meshHash` (TR-NLS-30): the mesh artifact holds the target node sets (curve probe `N_*`, step `S_*`), so two cases with identical
    geometry and controls never share a hash; interpolating modes between different meshes is V2]. Netgen is deterministic for equal geometry
-   and controls: the real run below matched node-for-node.
+   and controls: the real run below matched node-for-node. **Modes are matched by factor** (review round 1): set k of the buckling results (every
+   set but the zero-time one, negative factors included) must carry the pinned factor of mode k + 1 within 1e-5 relative (the .dat table the
+   factor is pinned from prints 7 digits: 4623.062 against the .frd 4623.062281 in the real run), else
+   `NLS_IMPERFECTION_SOURCE_INVALID` [the k-th set with a positive time: a negative factor, which ccx reports for a load reversal, shifted the
+   index and applied the wrong shape]. A mode with a factor <= 0 is refused (it buckles under the reversed load). The amplitude sign is relative to
+   the mode as solved (the eigensolver picks it; `render_fea_results mode N` shows it); the summary and the deck comments name the peak node and
+   its signed offset.
 4. **`add_imperfection` checks amplitude and `amplitudeSource` first** (AF-31: `NLS_IMPERFECTION_AMPLITUDE_UNSET` even before the source is
    solved, AC-6), then the source: buckling, same parts and idealizations, solved (hash state), enough modes (`NLS_IMPERFECTION_SOURCE_INVALID`).
 5. **`beam_large_deflection` is pure TypeScript** [a Rust crate, the C7 default]: the layer requires TS: a registry query must run in-process
    through `execute` (plans, golden replay, the desktop app without a backend), and a `solver/` sidecar would make it a host transport with a
-   process lifecycle for no performance need (NL7 at 40 elements per leg: 1298 arc steps in 1.35 s, §8 budget <= 2 s).
+   process lifecycle for no performance need (NL7 at 40 elements per leg: 1298 arc steps in 1.35 s, §8 budget <= 2 s). The query runs
+   synchronously and blocks the host event loop, so its work budget is 3e7 units (steps x free dofs x (bandwidth + 1)^2, about 3 s; review
+   round 1, lowered from 2e8). **Revisit trigger:** 3D corotational beams (V2) or a real need above 3e7 move the solver to a `solver/` crate
+   behind a ctx port, keeping this TypeScript solver as the reference and the fallback without the port.
 6. **Solver deviations from the generator** (none changes the generator cases, which converge on the residual first and match it to 1e-6): a
    stagnation stop (correction < 1e-12 of the step increment), because on frames of about 1000 elements rounding keeps the residual just above the
    absolute 1e-9; mechanism detection by the unloaded compliance (`|K^-1 P| x max|K_ii| / |P| > 1e12`), because a rounded rigid-body mode leaves a
    finite pivot; dofs numbered along the members in input order with the exact bandwidth [reverse Cuthill-McKee: only branched frames would gain,
-   and a work budget (steps x free dofs x (bandwidth + 1)^2 <= 2e8, else `NLS_FRAME_INVALID`) bounds them]; the primary dof (limit-point
+   and a work budget (steps x free dofs x (bandwidth + 1)^2 <= 3e7, else `NLS_FRAME_INVALID`) bounds them]; the primary dof (limit-point
    refinement, snap-back) is `report.dofs[0]` [the dof of largest range: for NL7 `ux` (0.787 L) beats `uy` (0.782 L) and the refinement would
    no longer be the generator's v-parabola]. The NL7 query now lists `["uy", "ux"]` and lost its `_note` key (the registry refuses unknown params).
+   The parabola refinement is kept only when it is genuine (curvature of the extremum's sign, vertex inside the three samples, refined value
+   beyond the sample), else the sample stands. **Snap-back** = a reversal of the primary dof while the load-factor magnitude keeps falling through
+   it (a displacement limit point on the unloading branch, `data.snapBackPoints`) [any reversal of the primary dof: a cantilever curling under an
+   end moment reverses `ux` under a rising load and is a stable path]. Only an unloaded mechanism is refused; a step that fails (also the first)
+   returns the path so far with `failure` (no_real_root / singular_tangent / singular_corrector / iterations) and a hint (reduce arcLength / raise
+   increments).
 7. **Limit-load margin design load**: `limitLoad.designLoad { value, category, source }`; default for a load probe = that load as defined by
    `add_fea_load` (multiplier 1) with its category; a reaction probe needs it. A curve that never peaks uses its lower bound as capacity (row
    `basis: "lower_bound"`, `NLS_LIMIT_NOT_REACHED`, conservative) [refusing the row]. Stress-only params (allowable, groupBy, loadCases,
-   singularity) are refused for this criterion; the mesh adequacy gate applies as for stress rows.
+   singularity) are refused for this criterion; the mesh adequacy gate applies as for stress rows. The load axis carries its unit
+   (`loadUnit`: force for reactions and force loads, stress for a pressure, force x length for a moment); rows give `capacity` and
+   `designLoad` in it [force units for every probe: a pressure curve was labelled N].
 8. **Column plan = the equivalent fixed-free half column** (L/2 = 250 mm, base face fixed, tip load and tip probe) [the pinned 500 mm draft]: a
    pinned end of a solid cannot be expressed with today's targets (`edgesNear [10, 5, 0]` ties between the two long edges of the end face;
    `intersectPlane` is accepted by the target schema but not sent to the mesher, `server/src/fea/feaMesh.ts` maps only facesNear / edgesNear /

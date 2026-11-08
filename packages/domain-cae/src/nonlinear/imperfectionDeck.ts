@@ -17,8 +17,18 @@ type Node = FeMeshArtifact['nodes'][number];
 
 const invalid = (message: string, ids: readonly string[]): DeckRefusal => ({ code: 'NLS_IMPERFECTION_SOURCE_INVALID', message, ids });
 
-/** Mode result sets of a buckling results artifact in mode order: every set but the zero-factor reference set (the rule of plotSetup's modeSteps). */
-const bucklingModeSets = (results: FeResultsArtifact): FeResultsArtifact['steps'][number][] => results.steps.filter((set) => set.time > 0);
+/**
+ * Relative tolerance between a mode set's time (its buckling factor in the .frd, e.g. 4623.062281) and the factor pinned by add_imperfection
+ * (read from the .dat table, which ccx 2.21 prints to 7 significant digits: 4623.062). Measured in the real VC-NLS-50 run.
+ */
+const FACTOR_MATCH = 1e-5;
+
+/**
+ * Mode result sets of a buckling results artifact in mode order (the order of the .dat factor table): every set but the zero-time reference set.
+ * Negative factors are kept, so set k is mode k + 1 even when ccx reports a load reversal first.
+ */
+const bucklingModeSets = (results: FeResultsArtifact): FeResultsArtifact['steps'][number][] =>
+  results.steps.filter((set) => set.time !== 0);
 
 /** Diagonal of the bounding box of the mesh nodes (0 for an empty mesh). */
 function meshSize(mesh: FeMeshArtifact): number {
@@ -50,8 +60,32 @@ function meshMismatch(mesh: FeMeshArtifact, source: FeMeshArtifact, imperfection
   );
 }
 
-/** Adds the offsets (analysis length units) of one imperfection into `offsets` by node id; or the refusal. */
-function addOffsets(ctx: DeckContext, imperfection: Imperfection, offsets: Map<number, [number, number, number]>): DeckRefusal | null {
+/** Signed offset of the node of largest |phi| (document units): amplitude x phi / |phi| there, in the mode shape as solved. */
+const peakText = (mode: number, node: number, phi: readonly number[], amplitude: number): string => {
+  const norm = Math.hypot(at(phi, 0), at(phi, 1), at(phi, 2));
+  const offset = [0, 1, 2].map((axis) => Number(((amplitude * at(phi, axis)) / norm).toPrecision(6)));
+  return `mode ${mode} peak node ${node} offset [${offset.join(', ')}]`;
+};
+
+/**
+ * The peak node and signed offset of each mode of an imperfection in a buckling results artifact (for the add_imperfection summary); a mode
+ * without a matching set or shape is left out.
+ */
+export function modePeaks(results: FeResultsArtifact, modes: Imperfection['modes']): string[] {
+  const sets = bucklingModeSets(results);
+  return modes.flatMap(({ mode, amplitude }) => {
+    const values = sets[mode - 1]?.fields['DISP']?.values ?? {};
+    let best: { node: number; phi: readonly number[]; size: number } | null = null;
+    for (const [node, phi] of Object.entries(values)) {
+      const size = Math.hypot(at(phi, 0), at(phi, 1), at(phi, 2));
+      if (Number.isFinite(size) && size > (best === null ? 0 : best.size)) best = { node: Number(node), phi, size };
+    }
+    return best === null ? [] : [peakText(mode, best.node, best.phi, amplitude)];
+  });
+}
+
+/** Adds the offsets (analysis length units) of one imperfection into `offsets` by node id; the peak node of each mode, or the refusal. */
+function addOffsets(ctx: DeckContext, imperfection: Imperfection, offsets: Map<number, [number, number, number]>): DeckRefusal | string[] {
   const ids = [imperfection.id, imperfection.fromAnalysisId];
   const fetched = fetchArtifact(ctx.artifacts, imperfection.sourceResultsHash, 'fe_results');
   if ('code' in fetched)
@@ -69,21 +103,31 @@ function addOffsets(ctx: DeckContext, imperfection: Imperfection, offsets: Map<n
   const mismatch = meshMismatch(ctx.mesh, sourceMesh.artifact, imperfection, ctx.analysisId);
   if (mismatch !== null) return mismatch;
   const sets = bucklingModeSets(results);
-  for (const { mode, amplitude } of imperfection.modes) {
-    const values = sets[mode - 1]?.fields['DISP']?.values;
+  const peaks: string[] = [];
+  for (const { mode, amplitude, factor } of imperfection.modes) {
+    const set = sets[mode - 1];
+    if (set !== undefined && !(Math.abs(set.time - factor) <= FACTOR_MATCH * Math.abs(factor)))
+      return invalid(
+        `imperfection '${imperfection.id}': mode ${mode} of the pinned results has buckling factor ${set.time}, not the pinned ${factor}: the mode order does not match, delete_imperfection + add_imperfection`,
+        ids,
+      );
+    const values = set?.fields['DISP']?.values;
     if (values === undefined)
       return invalid(`imperfection '${imperfection.id}': the pinned results hold ${sets.length} mode shape(s), not mode ${mode}`, ids);
     const shape: (readonly number[])[] = [];
     let peak = 0;
+    let peakNode = 0;
+    let peakPhi: readonly number[] = [];
     for (const node of ctx.mesh.nodes) {
       const value = Object.hasOwn(values, String(node[0])) ? values[String(node[0])] : undefined;
       const magnitude = value === undefined ? Number.NaN : Math.hypot(at(value, 0), at(value, 1), at(value, 2));
       if (value === undefined || !Number.isFinite(magnitude))
         return invalid(`imperfection '${imperfection.id}': mode ${mode} has no finite displacement at node ${node[0]}`, ids);
       shape.push(value);
-      peak = Math.max(peak, magnitude);
+      if (magnitude > peak) [peak, peakNode, peakPhi] = [magnitude, node[0], value];
     }
     if (!(peak > 0)) return invalid(`imperfection '${imperfection.id}': mode ${mode} is zero everywhere`, ids);
+    peaks.push(peakText(mode, peakNode, peakPhi, amplitude));
     const scale = (amplitude * ctx.lengthToAnalysis) / peak;
     ctx.mesh.nodes.forEach((node, index) => {
       const value = shape[index] ?? [];
@@ -91,7 +135,7 @@ function addOffsets(ctx: DeckContext, imperfection: Imperfection, offsets: Map<n
       offsets.set(node[0], [offset[0] + scale * at(value, 0), offset[1] + scale * at(value, 1), offset[2] + scale * at(value, 2)]);
     });
   }
-  return null;
+  return peaks;
 }
 
 /**
@@ -105,11 +149,12 @@ export function imperfectNodes(ctx: DeckContext): { readonly nodes: readonly Nod
   const offsets = new Map<number, [number, number, number]>();
   const comments: string[] = [];
   for (const imperfection of imperfections) {
-    const refusal = addOffsets(ctx, imperfection, offsets);
-    if (refusal !== null) return refusal;
+    const peaks = addOffsets(ctx, imperfection, offsets);
+    if (!Array.isArray(peaks)) return peaks;
     const modes = imperfection.modes.map(({ mode, amplitude }) => `mode ${mode} x ${amplitude}`).join(' + ');
     comments.push(
       `** imperfection ${commentText(imperfection.id)}: ${modes} (document length units) from ${commentText(imperfection.fromAnalysisId)} results ${imperfection.sourceResultsHash.slice(0, 12)}; amplitude source ${commentText(imperfection.amplitudeSource, 120)}`,
+      ...peaks.map((peak) => `** imperfection ${commentText(imperfection.id)} ${peak} (document length units, sign of the mode as solved)`),
     );
   }
   const nodes = ctx.mesh.nodes.map((node): Node => {

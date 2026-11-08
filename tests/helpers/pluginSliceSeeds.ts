@@ -29,6 +29,7 @@ import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtu
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import { flatDocument } from '../unit/vibroacoustics/fixtures';
+import { SOURCE_TEXT, imperfectBar } from '../unit/cae/nonlinear/imperfectionFixtures';
 import {
   bemNozzles,
   bemParams,
@@ -245,6 +246,22 @@ let studySeed: ReturnType<typeof studyBar> | undefined;
 const studyFixture = (): ReturnType<typeof studyBar> => (studySeed ??= studyBar());
 
 const analysisId = (doc: CadDocument): string => doc.analysis?.caseOrder[0] ?? 'missing';
+
+/** PHY-05 NLS-M3: the nonlinear bar (first case) with a buckling-mode imperfection pinned to the solved buckling case. */
+let imperfectSeed: { doc: CadDocument; ctx: ExecutionContext } | undefined;
+function imperfectFixture(): { doc: CadDocument; ctx: ExecutionContext } {
+  if (imperfectSeed !== undefined) return imperfectSeed;
+  const bar = imperfectBar();
+  const added = execute(bar.doc, 'add_imperfection', {
+    analysisId: bar.analysisId,
+    fromAnalysisId: bar.bucklingId,
+    modes: [{ mode: 1, amplitude: 0.5 }],
+    amplitudeSource: SOURCE_TEXT,
+  });
+  if (added.error !== undefined) throw new Error(added.summary);
+  imperfectSeed = { doc: added.document, ctx: bar.ctx };
+  return imperfectSeed;
+}
 const studyId = (doc: CadDocument): string => doc.analysis?.cases[analysisId(doc)]?.topologyOrder?.[0] ?? 'missing';
 
 /** `doc` with a valid human-act ledger entry and a copy bound to another document uid, in both ledgers, plus the matching fit dispositions. */
@@ -430,6 +447,19 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
       params: (doc) => ({
         analysisId: analysisId(doc),
         studyId: Object.keys(doc.analysis?.cases[analysisId(doc)]?.studies ?? {})[0] ?? 'missing',
+      }),
+    },
+  },
+  'cae#imperfection': {
+    roots: ['analysis'],
+    build: () => imperfectFixture().doc,
+    ctx: () => imperfectFixture().ctx,
+    query: { name: 'check_analysis', params: (doc) => ({ analysisId: analysisId(doc) }) },
+    mutate: {
+      name: 'delete_imperfection',
+      params: (doc) => ({
+        analysisId: analysisId(doc),
+        imperfectionId: doc.analysis?.cases[analysisId(doc)]?.nonlinear?.imperfectionOrder?.[0] ?? 'missing',
       }),
     },
   },

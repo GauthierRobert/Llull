@@ -19,7 +19,11 @@ export const limitLoadMarginSchema = z
     ...limitLoadShape,
     designLoad: z
       .object({
-        value: z.number().describe('Design LIMIT (or ultimate) load on the curve load axis, analysis force units, > 0.'),
+        value: z
+          .number()
+          .describe(
+            'Design LIMIT (or ultimate) load on the curve load axis, in its unit (force; stress for a pressure probe; see limit_load data.loadUnit), > 0.',
+          ),
         category: z
           .enum(['limit', 'ultimate'])
           .describe('limit: MS uses the ultimate factor; ultimate: only the extra factors (14 CFR 25.303).'),
@@ -144,8 +148,8 @@ export function limitLoadMarginTable(
     category: design.category,
     method: input.method,
     basis: result.found === 'not_reached' ? 'lower_bound' : result.found,
-    [`capacity${found.forceUnit}`]: capacity,
-    [`designLoad${found.forceUnit}`]: design.value,
+    capacity,
+    loadUnit: found.loadUnit,
     designLoad: { value: design.value, category: design.category, source: design.source, stated: design.stated },
     atDisplacement: result.atDisplacement,
     curveHash: found.curveHash,
@@ -176,7 +180,7 @@ export function limitLoadMarginTable(
   const pending = rows.filter((entry) => entry.disposition === 'pending_human').length;
   const worst = gate.gated
     ? notAssessedText(gate.reasons)
-    : `MS ${ms === null ? 'n/a' : significantNumber(ms, 4)} (${String(gated?.['statusLabel'] ?? status)}): capacity ${significantNumber(capacity, 6)} ${found.forceUnit} (${row.basis}) against design ${significantNumber(design.value, 6)} ${found.forceUnit} x factor ${significantNumber(factor, 4)}`;
+    : `MS ${ms === null ? 'n/a' : significantNumber(ms, 4)} (${String(gated?.['statusLabel'] ?? status)}): capacity ${significantNumber(capacity, 6)} ${found.loadUnit} (${row.basis}) against design ${significantNumber(design.value, 6)} ${found.loadUnit} x factor ${significantNumber(factor, 4)}`;
   return {
     analysis,
     rows,

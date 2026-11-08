@@ -21,7 +21,7 @@ export const limitLoad = defineCommand({
     'first load maximum (with the displacement still increasing) refined by a parabola; method=plateau needs plateau { slopeFraction, window } ' +
     '(no defaults) and takes the load where the secant slope over the window falls below slopeFraction x the initial slope; method=auto is ' +
     'peak when the curve has a maximum. A curve that never peaks (e.g. a load-controlled run, which cannot pass a limit point) gives only a ' +
-    'lowerBound (largest load carried) with NLS_LIMIT_NOT_REACHED. Values are magnitudes in the analysis force / length units. Refuses stale ' +
+    'lowerBound (largest load carried) with NLS_LIMIT_NOT_REACHED. Values are magnitudes in data.loadUnit (force for reactions and force loads, stress for a pressure) and the analysis length unit. Refuses stale ' +
     'results (NLS_CURVE_STALE). Without a PHY-00 mesh convergence study on the case it warns VNV_NO_CONVERGENCE_STUDY. Next: compute_margins ' +
     'criterion=limit_load, or check_analysis.',
   annotations: { readOnly: true },
@@ -29,12 +29,12 @@ export const limitLoad = defineCommand({
   run: (doc, { analysisId, probe, method, plateau }, ctx): CommandResult => {
     const found = limitLoadReport(doc, analysisId, { probe, method, plateau }, ctx);
     if ('code' in found) return refuseNls(doc, 'limit_load', found.code, found.message, found.ids, found.paths);
-    const { result, forceUnit, lengthUnit } = found;
+    const { result, loadUnit, lengthUnit } = found;
     const value = result.found === 'not_reached' ? result.lowerBound : result.limitLoad;
     const text =
       result.found === 'not_reached'
-        ? `limit not reached: lower bound ${significantNumber(value, 6)} ${forceUnit} (NLS_LIMIT_NOT_REACHED)`
-        : `limit load ${significantNumber(value, 6)} ${forceUnit} (${result.found}) at displacement ${significantNumber(result.atDisplacement, 6)} ${lengthUnit}`;
+        ? `limit not reached: lower bound ${significantNumber(value, 6)} ${loadUnit} (NLS_LIMIT_NOT_REACHED)`
+        : `limit load ${significantNumber(value, 6)} ${loadUnit} (${result.found}) at displacement ${significantNumber(result.atDisplacement, 6)} ${lengthUnit}`;
     return report(
       doc,
       `limit_load: '${analysisId}' curve '${found.probe.name}' (${found.curve.time.length} points, method ${method}): ${text}${found.warnings.length > 0 ? `; ${found.warnings.map((warning) => warning.split(':')[0]).join(', ')}` : ''}${found.unverifiedReasons.length > 0 ? '; UNVERIFIED inputs' : ''}. Computed by llull, not approved: needs a qualified engineer.`,
@@ -47,7 +47,7 @@ export const limitLoad = defineCommand({
         ...(result.found === 'not_reached' ? { lowerBound: result.lowerBound } : { limitLoad: result.limitLoad }),
         ...(result.found === 'peak' ? { sample: result.sample } : {}),
         atDisplacement: result.atDisplacement,
-        forceUnit,
+        loadUnit,
         lengthUnit,
         points: found.curve.time.length,
         curveHash: found.curveHash,

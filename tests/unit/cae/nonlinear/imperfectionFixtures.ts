@@ -13,8 +13,12 @@ import { pressureBar, step, type PressureBar } from './support';
 
 export const FACTORS = [4.5, 9.1] as const;
 
-/** Mode 1: uy = x (peak 2 at x = 2); mode 2: uz = -x * y (peak 2 at x = 2, y = 1). Every node of the bar has a value. */
-const MODE_SHAPES: readonly ((x: number, y: number) => [number, number, number])[] = [(x) => [0, x, 0], (x, y) => [0, 0, -x * y]];
+/** Mode 1: uy = x (peak 2 at x = 2); mode 2: uz = -x * y (peak 2 at x = 2, y = 1); mode 3: ux = y. Every node of the bar has a value. */
+const MODE_SHAPES: readonly ((x: number, y: number) => [number, number, number])[] = [
+  (x) => [0, x, 0],
+  (x, y) => [0, 0, -x * y],
+  (_x, y) => [y, 0, 0],
+];
 
 export interface ImperfectBar extends PressureBar {
   readonly bucklingId: string;
@@ -26,14 +30,14 @@ export interface ImperfectBar extends PressureBar {
 }
 
 /** Results artifact of the buckling case: two mode sets (time = buckling factor) and the factor table. */
-function bucklingResults(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact): FeResultsArtifact {
+function bucklingResults(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, factors: readonly number[]): FeResultsArtifact {
   return {
     kind: 'fe_results',
     meshHash: hashOf(mesh),
     inputHash: analysisInputHash(doc, analysisId, 'full'),
     solver: 'CalculiX',
     solverVersion: '2.21',
-    steps: FACTORS.map((factor, index) => ({
+    steps: factors.map((factor, index) => ({
       step: 1,
       time: factor,
       fields: {
@@ -43,15 +47,15 @@ function bucklingResults(doc: CadDocument, analysisId: string, mesh: FeMeshArtif
         },
       },
     })),
-    dat: parseDat(bucklingDat(FACTORS)),
+    dat: parseDat(bucklingDat(factors)),
   };
 }
 
-/** The pressure bar (nlgeom as given) plus buckling case `bk` with the x = 0 face fixed and an end force, meshed and solved (recorded). */
-export function imperfectBar(nlgeom = true): ImperfectBar {
+/** The pressure bar (nlgeom as given) plus buckling case (factors as given; ccx can report a negative factor for a load reversal) `bk` with the x = 0 face fixed and an end force, meshed and solved (recorded). */
+export function imperfectBar(nlgeom = true, factors: readonly number[] = FACTORS): ImperfectBar {
   const bar = pressureBar({ controls: { nlgeom } });
   let doc = bar.doc;
-  const created = step(doc, 'create_analysis', { name: 'bk', analysisType: 'buckling', modes: 2 });
+  const created = step(doc, 'create_analysis', { name: 'bk', analysisType: 'buckling', modes: factors.length });
   const bucklingId = created.id;
   doc = step(created.doc, 'set_part_idealization', { analysisId: bucklingId, entityId: bar.boxId }).doc;
   const fixed = step(doc, 'add_fea_constraint', {
@@ -76,7 +80,7 @@ export function imperfectBar(nlgeom = true): ImperfectBar {
     { [`C_${fixed.id}`]: X0_NODES, [`L_${load.id}`]: X2_NODES },
     { [`L_${load.id}`]: facesOn(X2_NODES) },
   );
-  const results = bucklingResults(doc, bucklingId, bucklingMesh);
+  const results = bucklingResults(doc, bucklingId, bucklingMesh, factors);
   const ctx: ExecutionContext = { ...defaultContext(), feaArtifacts: portOf(bar.mesh, bucklingMesh, results) };
   const meshed = execute(doc, 'record_fe_mesh', { analysisId: bucklingId, summary: meshSummary(bucklingMesh, hashOf(bucklingMesh)) }, ctx);
   if (meshed.error !== undefined) throw new Error(meshed.summary);

@@ -230,6 +230,84 @@ describe('imperfect deck nodes (TR-NLS-30)', () => {
   });
 });
 
+describe('imperfection sign and peak report (review round 1)', () => {
+  it('names the peak node and the signed offset of each mode in the summary (with the artifact store) and in the deck', () => {
+    const bar = imperfectBar();
+    const params = {
+      analysisId: bar.analysisId,
+      fromAnalysisId: bar.bucklingId,
+      modes: [{ mode: 1, amplitude: -0.5 }],
+      amplitudeSource: SOURCE_TEXT,
+    };
+    const withStore = execute(bar.doc, 'add_imperfection', params, bar.ctx);
+    // mode 1 is uy = x: largest at node 2 (2, 0, 0); a negative amplitude moves it to -y
+    expect(withStore.summary).toContain('Largest offsets: mode 1 peak node 2 offset [0, -0.5, 0] (mm, sign of the mode as solved)');
+    expect(execute(bar.doc, 'add_imperfection', params).summary).not.toContain('Largest offsets');
+    const deck = deckOf(bar, withStore.document);
+    expect('text' in deck ? deck.text : '').toContain(`** imperfection ${withStore.affected[0]} mode 1 peak node 2 offset [0, -0.5, 0]`);
+  });
+});
+
+describe('mode order with a negative buckling factor (review round 1)', () => {
+  // ccx can report a load-reversal mode first: factors [-3.2, 4.5, 9.1]; mode 2 must be the 4.5 shape (uz = -x y), not the 9.1 one (ux = y)
+  const reversed = (): ImperfectBar => imperfectBar(true, [-3.2, 4.5, 9.1]);
+
+  it('refuses a mode whose factor is not positive', () => {
+    const bar = reversed();
+    const refused = add(bar, [{ mode: 1, amplitude: 0.5 }]);
+    expect(refused.error?.code).toBe('NLS_IMPERFECTION_SOURCE_INVALID');
+    expect(refused.summary).toContain('buckling factor <= 0 (-3.2)');
+  });
+
+  it('applies the shape of the set whose factor is the pinned one', () => {
+    const bar = reversed();
+    const added = add(bar, [{ mode: 2, amplitude: 0.2 }]);
+    expect(caseOf(added.document, bar.analysisId)?.nonlinear?.imperfections?.[added.affected[0] ?? '']?.modes).toEqual([
+      { mode: 2, amplitude: 0.2, factor: 4.5 },
+    ]);
+    const deck = deckOf(bar, added.document);
+    expect('text' in deck).toBe(true);
+    // node 4 at (2, 1, 0): uz = -x y = -2 at the peak, scaled by 0.2 / 2; the 9.1 shape would have moved x instead
+    if ('text' in deck) expect(nodeRows(deck.text).get(4)).toEqual([2, 1, -0.2]);
+  });
+
+  it('accepts the .frd factor that the 7-digit .dat table rounded (ccx 2.21: 4623.062281 vs 4623.062)', () => {
+    const bar = reversed();
+    const added = add(bar, [{ mode: 2, amplitude: 0.2 }]);
+    const id = added.affected[0] ?? '';
+    const precise: FeResultsArtifact = {
+      ...bar.bucklingResults,
+      steps: bar.bucklingResults.steps.map((set) => ({ ...set, time: set.time * (1 + 4e-7) })),
+    };
+    const analysis = caseOf(added.document, bar.analysisId);
+    const imperfection = analysis?.nonlinear?.imperfections?.[id];
+    if (analysis?.nonlinear === undefined || imperfection === undefined) throw new Error('fixture');
+    const repinned = withCase(added.document, {
+      ...analysis,
+      nonlinear: { ...analysis.nonlinear, imperfections: { [id]: { ...imperfection, sourceResultsHash: hashOf(precise) } } },
+    });
+    expect('text' in writeInp(repinned, bar.analysisId, bar.mesh, portOf(bar.mesh, bar.bucklingMesh, precise))).toBe(true);
+  });
+
+  it('refuses when the set at that mode position carries another factor than the pinned one', () => {
+    const bar = reversed();
+    const added = add(bar, [{ mode: 2, amplitude: 0.2 }]);
+    const id = added.affected[0] ?? '';
+    const [first, ...rest] = bar.bucklingResults.steps;
+    const shuffled: FeResultsArtifact = { ...bar.bucklingResults, steps: first === undefined ? rest : [...rest, first] };
+    const analysis = caseOf(added.document, bar.analysisId);
+    const imperfection = analysis?.nonlinear?.imperfections?.[id];
+    if (analysis?.nonlinear === undefined || imperfection === undefined) throw new Error('fixture');
+    const repinned = withCase(added.document, {
+      ...analysis,
+      nonlinear: { ...analysis.nonlinear, imperfections: { [id]: { ...imperfection, sourceResultsHash: hashOf(shuffled) } } },
+    });
+    const deck = writeInp(repinned, bar.analysisId, bar.mesh, portOf(bar.mesh, bar.bucklingMesh, shuffled));
+    expect(deck).toMatchObject({ code: 'NLS_IMPERFECTION_SOURCE_INVALID' });
+    expect('message' in deck ? deck.message : '').toContain('the mode order does not match');
+  });
+});
+
 describe('delete_imperfection', () => {
   it('removes the imperfection and restores the input hash of a case without one; is pure', () => {
     const bar = imperfectBar();

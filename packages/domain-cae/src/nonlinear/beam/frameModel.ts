@@ -123,6 +123,10 @@ export function assemble(model: FrameModel, u: Float64Array): { readonly force: 
   return { force, stiffness };
 }
 
+/** Entry (row, column) of a banded matrix over the free dofs; 0 outside the band. */
+export const bandedEntry = (matrix: Banded, row: number, column: number): number =>
+  Math.abs(row - column) > matrix.bandwidth ? 0 : at(matrix.values, slot(matrix, row, column));
+
 /** Largest |diagonal entry| of a banded matrix (the stiffness scale of the frame). */
 export function maxDiagonal(matrix: Banded): number {
   let largest = 0;

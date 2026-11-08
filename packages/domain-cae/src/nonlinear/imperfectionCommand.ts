@@ -12,6 +12,8 @@ import { caseOf } from '../shared/access';
 import { analysisIdSchema } from '../shared/schemas';
 import { stateOf } from '../shared/state';
 import { refuseNls } from './codes';
+import { fetchArtifact } from '../shared/trust';
+import { modePeaks } from './imperfectionDeck';
 import { MAX_IMPERFECTIONS, MAX_IMPERFECTION_MODES, MAX_SOURCE_TEXT, imperfectionsOf } from './imperfectionShape';
 import { isRefusal, nonlinearCase, nonlinearOf, withNonlinear } from './settings';
 
@@ -32,9 +34,14 @@ function sourceProblem(doc: CadDocument, target: AnalysisCase, sourceId: string,
   if (!sameParts(source, target)) return `'${sourceId}' does not analyse the same parts with the same idealizations as '${target.id}'`;
   const state = stateOf(doc, source);
   if (state !== 'solved') return `'${sourceId}' is ${state}, not solved: fea_mesh + fea_solve it first`;
-  const available = (source.results?.bucklingFactors ?? []).length;
-  const beyond = modes.filter((mode) => mode > available);
-  return beyond.length === 0 ? null : `'${sourceId}' has ${available} buckling mode(s); mode ${beyond.join(', ')} does not exist`;
+  const factors = source.results?.bucklingFactors ?? [];
+  const beyond = modes.filter((mode) => mode > factors.length);
+  if (beyond.length > 0) return `'${sourceId}' has ${factors.length} buckling mode(s); mode ${beyond.join(', ')} does not exist`;
+  // a factor <= 0 is a buckling load in the reversed direction (or none): not an imperfection shape of the loading being studied
+  const reversed = modes.filter((mode) => !(Number(factors[mode - 1]) > 0));
+  return reversed.length === 0
+    ? null
+    : `mode ${reversed.join(', ')} of '${sourceId}' has a buckling factor <= 0 (${reversed.map((mode) => factors[mode - 1]).join(', ')}): it buckles under the REVERSED load; choose a mode with a positive factor`;
 }
 
 /**
@@ -52,7 +59,7 @@ export const addImperfection = defineCommand({
   description:
     'Give a nonlinear_static analysis a geometric imperfection taken from the mode shapes of a SOLVED buckling analysis (fromAnalysisId: same ' +
     'parts and mesh controls, meshed and solved with fea_mesh + fea_solve first). Each mode shape is scaled so its largest nodal displacement ' +
-    'equals the signed amplitude (DOCUMENT length units) and the modes are summed; the deck moves every node by that offset before the run ' +
+    'equals the signed amplitude (DOCUMENT length units; the sign is relative to the mode shape AS SOLVED, the one render_fea_results mode N shows, whose sign the eigensolver picks) and the modes are summed; the deck moves every node by that offset before the run ' +
     '(NLGEOM run of an imperfect column / panel: load-displacement curve, collapse load). amplitude and amplitudeSource are REQUIRED and have ' +
     'no default (refused with NLS_IMPERFECTION_AMPLITUDE_UNSET): ask the owner or cite the company rule (e.g. L/1000). The buckling results are ' +
     'pinned by hash: re-solving the buckling case later does not change this imperfection (delete_imperfection + add_imperfection to take the ' +
@@ -86,7 +93,7 @@ export const addImperfection = defineCommand({
         'REQUIRED, no default: who or which rule set the amplitudes, e.g. "owner instruction 2026-11-07" or "company rule SR-12: L/1000".',
       ),
   }),
-  run: (doc, { analysisId, fromAnalysisId, modes, amplitudeSource }): CommandResult => {
+  run: (doc, { analysisId, fromAnalysisId, modes, amplitudeSource }, ctx): CommandResult => {
     const fail = (code: string, message: string, paths: readonly string[], ids: readonly string[] = [analysisId]): CommandResult =>
       refuseNls(doc, 'add_imperfection', code, message, ids, paths);
     const found = nonlinearCase(doc, 'add_imperfection', analysisId);
@@ -139,12 +146,15 @@ export const addImperfection = defineCommand({
       imperfections: { ...nonlinear.imperfections, [id]: imperfection },
       imperfectionOrder: [...(nonlinear.imperfectionOrder ?? []), id],
     };
+    const pinned = fetchArtifact(ctx?.feaArtifacts, solved.resultsHash, 'fe_results');
+    const peaks = 'code' in pinned ? [] : modePeaks(pinned.artifact, imperfection.modes);
+    const peakText = peaks.length === 0 ? '' : ` Largest offsets: ${peaks.join('; ')} (${doc.units}, sign of the mode as solved).`;
     const text = imperfection.modes
       .map(({ mode, amplitude, factor }) => `mode ${mode} (buckling factor ${significantNumber(factor, 6)}) x ${amplitude} ${doc.units}`)
       .join(' + ');
     return changed(
       withNonlinear(doc, analysis, next),
-      `add_imperfection: '${id}' on '${analysisId}': ${text} from '${fromAnalysisId}' (results ${solved.resultsHash.slice(0, 12)}, pinned); amplitude source "${source}"; ${next.imperfectionOrder.length} imperfection(s). The deck moves the nodes by these offsets; mesh this case like the buckling case and fea_solve.`,
+      `add_imperfection: '${id}' on '${analysisId}': ${text} from '${fromAnalysisId}' (results ${solved.resultsHash.slice(0, 12)}, pinned); amplitude source "${source}"; ${next.imperfectionOrder.length} imperfection(s). The deck moves the nodes by these offsets; mesh this case like the buckling case and fea_solve.${peakText}`,
       [id],
     );
   },
