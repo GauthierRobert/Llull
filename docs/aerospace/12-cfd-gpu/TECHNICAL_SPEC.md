@@ -566,7 +566,7 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   grid nx ny nz, h, origin, the symmetry planes, then f32 ux, uy, uz, p per cell and a u8 fluid mask; the same time-averaged f32 fields the
   solve samples its own probes, slices and surface from). `cfd_solve` checks its header against the grid of `result.json`
   (`CFD_SOLVER_FAILED` otherwise), keeps it raw and content-addressed beside the bundle (`server/src/cfd/fileStore.ts`:
-  `<FE store>/cfd-files/<sha256>.bin`, re-hashed on read: a damaged file reads as absent) and binds it in the bundle by hash:
+  `<FE store>/cfd-files/<sha256>.bin`, hashed by stream and copied by path, never read into one JavaScript Buffer, which caps at 2 GiB) and binds it in the bundle by hash:
   `CfdResultArtifact.field = { sha256, bytes }` (core `model/cfdResult.ts`). The field is not inside the bundle JSON (a 2e7-cell grid is
   340 MB); the bundle hash covers the field hash, so a query reads the field of exactly the recorded result. M2 bundles without a field
   are not read (no backward compatibility).
@@ -602,7 +602,7 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   `CFD_GPU_UNAVAILABLE` for `gpu`, the reason in `gpuFallback` for `auto`). VC-CFD-42 (`tests/gpu_streamlines.rs`): on an analytic helix
   field with a solid block, GPU and CPU agree point for point to **2.3e-5 m** on a 4 m domain (gate 4e-4 m) with the same stop reasons
   (RTX 4080 Laptop, Vulkan).
-- **`cfd_stop` and the solve lifecycle** (`server/src/cfd/solveRegistry.ts`). Identical concurrent solves (same case and job bytes) share
+- **`cfd_stop` and the solve lifecycle** (`server/src/native/sharedRun.ts`, the run lifecycle the deferred mesh jobs share). Identical concurrent solves (same case and job bytes) share
   one native run; each caller joins with its own signal (CLI Ctrl-C, or the closing `POST /exchange` request: `ExchangeHost.signal`, set
   by the CLI local backend and the exchange route) and its own progress sink. A caller whose signal aborts stops waiting at once
   (`CFD_CANCELLED`, nothing recorded); the run is killed (the runner's process-tree kill) when its last waiter leaves. `cfd_stop caseId`
@@ -611,6 +611,14 @@ overlay, the Flow panel, nested grid boxes, `gridStudy`, AA-pattern storage, `he
   built: the solver writes no checkpoint, and a stop commits nothing (host-lifecycle rule); a graceful stop with a partial record needs a
   checkpointing solver (later). Nothing running gives `CFD_NOT_RUNNING` with the running cases. The second caller of a shared run finds it
   recorded and does not record it again (no duplicate history step).
+- **Review round 1 (2026-11-08).** A run that rejects in the host (storing the field, the version probe, storing the bundle) answers
+  `CFD_SOLVER_FAILED` with the reason, never `CFD_CANCELLED`. A query hands the stored field to the job by path (hard link, else copy);
+  `llull-compute flow-query` re-hashes it against `fieldSha256` (`CFD_RESULT_HASH_MISMATCH`: a damaged store file), requires
+  `field: "field.bin"` and a right-handed frame. A probe or slice sample inside a solid cell or in the face layer is a miss (`solid` /
+  `outside`, NaN in a slice), the rule streamlines use, so a probe never returns the fluid values next to a body as its own. A max-side
+  symmetry face is recorded at the grid face (`min + ceil((max - min) / h) h`), not at the requested `maxM`; tested on a box that
+  does not divide into whole cells, and on both devices (VC-CFD-42 mirrored case: 1.9e-5 m). A zero slice normal is `CFD_PARAM_INVALID`.
+  A completed request never aborts its run (the run is marked settled before any waiter releases it).
 - **Codes.** New: `CFD_CANCELLED`, `CFD_NOT_RUNNING`. The queries also answer `CFD_PARAM_INVALID`, `CFD_NO_RESULT`, `CFD_RESULT_MISSING`,
   `CFD_RESULT_HASH_MISMATCH`, `CFD_RESULT_STALE`, `CFD_SOLVER_MISSING`, `CFD_TIMEOUT`, `CFD_SOLVER_FAILED` (`data.nativeCode`).
 - **Validation.** Rust: `llull-flow-core` unit tests (field round trip and damage, half-model mirror, strict velocity, rotation circles,

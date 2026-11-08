@@ -9,7 +9,7 @@ import { execute } from '@core/commands/registry';
 import { toParamsSchema } from '@core/commands/schema';
 import type { CfdResultArtifact } from '@core/model/cfdResult';
 import { flowQueryInput, parseFlowQuery, type FlowQueryInput, type FlowQueryRequest } from '@aero/cfd/queryInput';
-import { flowFieldHeader, flowQueryReport, parseFlowQueryAnswer } from '@aero/cfd/queryOutput';
+import { FIELD_HEADER_BYTES, flowFieldHeader, flowQueryReport, parseFlowQueryAnswer } from '@aero/cfd/queryOutput';
 import { cfdProbeParams, cfdSliceParams, cfdStreamlinesParams, rakeSeeds } from '@aero/cfd/queryParams';
 import { buildNativeToolDefinitions } from '@protocol/nativeTools';
 import { canonicalJson } from '@lib/canonicalJson';
@@ -144,6 +144,15 @@ describe('flowQueryInput trust ladder', () => {
 });
 
 describe('slice and streamline jobs', () => {
+  it('refuses a zero slice normal with CFD_PARAM_INVALID', () => {
+    const built = flowQueryInput(recorded.doc, request('slice', { origin: [0, 0, 0], normal: [0, 0, 0] }), recorded.port, null);
+    expect(built).toMatchObject({ ok: false, code: 'CFD_PARAM_INVALID' });
+    expect(!built.ok && built.message).toContain('not a direction');
+    expect(flowQueryInput(recorded.doc, request('slice', { origin: [0, 0, 0], normal: [0, 1e-13, 0] }), recorded.port, null)).toMatchObject(
+      { code: 'CFD_PARAM_INVALID' },
+    );
+  });
+
   it('fills the slice defaults from the grid and names them', () => {
     const built = input('slice', { origin: [0, 0, 0], normal: [0, 1, 0] });
     expect(built.job['slice']).toEqual({
@@ -320,13 +329,30 @@ describe('field header', () => {
     return bytes;
   }
 
-  it('reads the grid of a field file and refuses a damaged one', () => {
-    expect(flowFieldHeader(header(2, 3, 4, 1))).toEqual({ nx: 2, ny: 3, nz: 4, cellM: 0.125, originM: [-1, -0.75, 0], mirrors: 1 });
-    expect(flowFieldHeader(header(2, 3, 4, 0, 1))).toContain('declares');
-    expect(flowFieldHeader(new Uint8Array(10))).toContain('LLFD');
+  /** What the host reads: the head of the file and its size (the file itself is never loaded). */
+  const check = (bytes: Uint8Array): ReturnType<typeof flowFieldHeader> =>
+    flowFieldHeader(bytes.subarray(0, FIELD_HEADER_BYTES), bytes.length);
+
+  it('reads the grid of a field file from its head and size, and refuses a damaged one', () => {
+    expect(check(header(2, 3, 4, 1))).toEqual({ nx: 2, ny: 3, nz: 4, cellM: 0.125, originM: [-1, -0.75, 0], mirrors: 1 });
+    expect(check(header(2, 3, 4, 0, 1))).toContain('declares');
+    expect(check(new Uint8Array(10))).toContain('LLFD');
     const wrongVersion = header(2, 2, 2, 0);
     new DataView(wrongVersion.buffer).setUint32(4, 2, true);
-    expect(flowFieldHeader(wrongVersion)).toContain('version 2');
+    expect(check(wrongVersion)).toContain('version 2');
+  });
+
+  it('refuses more than three symmetry planes, a degenerate or huge grid and a bad cell size without reading the cells', () => {
+    const planes = header(2, 2, 2, 0);
+    new DataView(planes.buffer).setUint32(52, 4, true);
+    expect(check(planes)).toContain('4 symmetry planes');
+    const huge = header(2, 2, 2, 0);
+    [100_000, 100_000, 100_000].forEach((n, k) => new DataView(huge.buffer).setUint32(8 + 4 * k, n, true));
+    expect(flowFieldHeader(huge.subarray(0, FIELD_HEADER_BYTES), 1e18)).toContain('invalid grid');
+    expect(check(header(1, 2, 2, 0))).toContain('invalid grid');
+    const cell = header(2, 2, 2, 0);
+    new DataView(cell.buffer).setFloat64(20, Number.NaN, true);
+    expect(check(cell)).toContain('cell size');
   });
 });
 

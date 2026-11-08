@@ -73,6 +73,8 @@ export interface FakeOptions {
   ) => { readonly json: unknown; readonly file?: Buffer } | { readonly fail: { code: string; message: string } };
   /** Writes a field.bin whose header disagrees with result.json. */
   readonly wrongField?: boolean;
+  /** `version()` rejects (the host's version probe failing after the run). */
+  readonly versionFails?: boolean;
 }
 
 export interface FakeRunner extends ComputeRunner {
@@ -107,6 +109,17 @@ const cancelled = (): JobRun => ({
 
 function answerQuery(folder: string, options: FakeOptions): JobRun {
   const job = JSON.parse(readFileSync(path.join(folder, 'job.json'), 'utf8')) as Record<string, unknown>;
+  // the gate of llull_flow_core::query: the field in the folder must hash to the one the bundle names
+  if (sha(readFileSync(path.join(folder, 'field.bin'))) !== job['fieldSha256'])
+    return {
+      ok: false,
+      outputs: [],
+      code: 'CFD_RESULT_HASH_MISMATCH',
+      message: 'field.bin does not hash to fieldSha256',
+      warnings: [],
+      log: '',
+      elapsedMs: 1,
+    };
   const answer = options.query?.(job) ?? { fail: { code: 'NATIVE_JOB_INPUT', message: 'no query answer configured' } };
   if ('fail' in answer) return { ok: false, outputs: [], ...answer.fail, warnings: [], log: 'query log tail', elapsedMs: 1 };
   const outputs: Record<string, Buffer> = { 'query.json': Buffer.from(JSON.stringify(answer.json)) };
@@ -134,7 +147,7 @@ export function fakeRunner(options: FakeOptions = {}): FakeRunner {
     calls,
     signals,
     release: () => release(),
-    version: () => Promise.resolve('9.9.9'),
+    version: () => (options.versionFails === true ? Promise.reject(new Error('version probe: EPERM')) : Promise.resolve('9.9.9')),
     async run(args, folder, timeoutMs, onProgress, signal) {
       const files = Object.fromEntries(readdirSync(folder).map((name) => [name, readFileSync(path.join(folder, name))]));
       calls.push({ args, timeoutMs, files });

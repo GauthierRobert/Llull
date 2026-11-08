@@ -5,13 +5,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execute } from '@core/commands/registry';
 import { runCfdQuery } from '../src/cfd/flowQuery';
 import { cfdFileStore } from '../src/cfd/fileStore';
-import { runCfdSolve } from '../src/cfd/flowSolve';
+import { _stopAllCfdSolves, runCfdSolve } from '../src/cfd/flowSolve';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import { isNativeTool, runNativeTool } from '../src/native/tools';
 import { fakeField, fakeRunner, hostOf, missingRunner, sha, sphereModel, type FakeOptions, type TestHost } from './cfdTestSupport';
@@ -22,7 +22,10 @@ beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'llull-cfd-query-'));
   store = createFeArtifactStore(dir);
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  _stopAllCfdSolves();
+  rmSync(dir, { recursive: true, force: true });
+});
 
 async function solvedHost(): Promise<{ host: TestHost; ballId: string }> {
   const model = sphereModel();
@@ -239,6 +242,32 @@ describe('query refusals', () => {
       { signal: gone.signal },
     );
     expect(cancelled.data).toMatchObject({ code: 'CFD_CANCELLED' });
+  });
+});
+
+describe('the field file', () => {
+  it('is handed to the job by path and gated by its hash: a damaged stored field is CFD_RESULT_HASH_MISMATCH', async () => {
+    const { host } = await solvedHost();
+    const stored = cfdFileStore(store.directory).pathOf(sha(fakeField()));
+    expect(stored).not.toBeNull();
+    writeFileSync(stored as string, Buffer.concat([fakeField(), Buffer.from([0])]));
+    const runner = answering(() => ({ json: probeAnswer }));
+    const result = await runCfdQuery('probe', { caseId: 're100', points: [[2, 0, 0]] }, host, { store, runner });
+    expect(result).toMatchObject({ isError: true, data: { code: 'CFD_RESULT_HASH_MISMATCH' } });
+    expect(result.summary).toContain('damaged');
+  });
+
+  it('is stored by stream: hash and size of the file, idempotent, absent for unknown or malformed hashes', async () => {
+    const files = cfdFileStore(store.directory);
+    const source = path.join(dir, 'field-source.bin');
+    const bytes = Buffer.alloc(300_000, 7);
+    writeFileSync(source, bytes);
+    const stored = await files.putFile(source);
+    expect(stored).toEqual({ sha256: sha(bytes), bytes: bytes.length });
+    expect(await files.putFile(source)).toEqual(stored);
+    expect(readFileSync(files.pathOf(stored.sha256) as string).equals(bytes)).toBe(true);
+    expect(files.pathOf('f'.repeat(64))).toBeNull();
+    expect(files.pathOf('../../etc')).toBeNull();
   });
 });
 

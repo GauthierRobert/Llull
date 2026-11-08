@@ -126,17 +126,31 @@ export interface FieldHeader {
   readonly mirrors: number;
 }
 
-/** The header of a `field.bin` whose length matches it, or what is wrong. */
-export function flowFieldHeader(bytes: Uint8Array): FieldHeader | string {
-  if (bytes.length < 56 || !magic(bytes, 'LLFD')) return 'field.bin does not start with an LLFD header';
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+/** Bytes of the longest `field.bin` header (three symmetry planes): what a host reads to check a field without loading it. */
+export const FIELD_HEADER_BYTES = 56 + 16 * 3;
+
+/** Named guard: the largest grid a field file may declare (as `llull_flow_core::field::MAX_FIELD_CELLS`). */
+const MAX_FIELD_CELLS = 400_000_000;
+
+/**
+ * The header of a `field.bin` of `totalBytes` bytes from its first bytes `head` (at least `FIELD_HEADER_BYTES` when the file has them), or
+ * what is wrong.
+ * @invariant the file length equals the length the header declares; at most 3 symmetry planes; a grid of 2..MAX_FIELD_CELLS cells per the job
+ */
+export function flowFieldHeader(head: Uint8Array, totalBytes: number): FieldHeader | string {
+  if (head.length < 56 || !magic(head, 'LLFD')) return 'field.bin does not start with an LLFD header';
+  const view = new DataView(head.buffer, head.byteOffset, head.byteLength);
   if (view.getUint32(4, true) !== 1) return `field.bin version ${view.getUint32(4, true)} is not 1`;
   const [nx, ny, nz] = [view.getUint32(8, true), view.getUint32(12, true), view.getUint32(16, true)];
   const cellM = view.getFloat64(20, true);
   const originM: Vec3 = [view.getFloat64(28, true), view.getFloat64(36, true), view.getFloat64(44, true)];
   const mirrors = view.getUint32(52, true);
-  const expected = 56 + 16 * mirrors + 17 * nx * ny * nz;
-  if (mirrors > 3 || bytes.length !== expected) return `field.bin holds ${bytes.length} bytes, its header declares ${expected}`;
+  if (mirrors > 3) return `field.bin declares ${mirrors} symmetry planes (at most 3)`;
+  const cells = nx * ny * nz;
+  if (nx < 2 || ny < 2 || nz < 2 || cells > MAX_FIELD_CELLS) return `field.bin declares an invalid grid ${nx} x ${ny} x ${nz}`;
+  if (!(cellM > 0 && Number.isFinite(cellM)) || !originM.every(Number.isFinite)) return 'field.bin declares an invalid cell size or origin';
+  const expected = 56 + 16 * mirrors + 17 * cells;
+  if (totalBytes !== expected) return `field.bin holds ${totalBytes} bytes, its header declares ${expected}`;
   return { nx, ny, nz, cellM, originM, mirrors };
 }
 

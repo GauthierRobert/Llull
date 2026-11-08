@@ -60,6 +60,8 @@ describe.each(HOSTILE_READERS.map((reader) => [reader.name, reader] as const))('
 const PACKAGES = path.resolve(__dirname, '../../../packages');
 const IMPORTER = /^(import_|load_|read_)/;
 const READER_FUNCTION = /^export (?:async )?function ((?:read|parse)[A-Z0-9]\w*)/gm;
+/** Binary header readers (`flowFieldHeader(head: Uint8Array, …)`): untrusted bytes too, whatever their verb. */
+const HEADER_FUNCTION = /^export (?:async )?function (\w+Header)\(\w+: Uint8Array/gm;
 
 /** Every `packages/<dir>/src/**.ts` file, relative to `packages/` with forward slashes. */
 function sourceFiles(directory: string, found: string[] = []): string[] {
@@ -77,7 +79,8 @@ function exportedReaders(): string[] {
     const src = path.join(PACKAGES, dir.name, 'src');
     for (const file of sourceFiles(src)) {
       const text = readFileSync(path.join(PACKAGES, file), 'utf8');
-      for (const match of text.matchAll(READER_FUNCTION)) keys.push(`${file}:${match[1] as string}`);
+      for (const match of [...text.matchAll(READER_FUNCTION), ...text.matchAll(HEADER_FUNCTION)])
+        keys.push(`${file}:${match[1] as string}`);
     }
   }
   return keys;
@@ -98,7 +101,7 @@ describe('hostile input: completeness (a new importer or reader cannot skip the 
     ).toEqual([]);
   });
 
-  it('every exported read* / parse* function of a package is in the table or in the exclusion list', () => {
+  it('every exported read* / parse* / *Header(bytes) function of a package is in the table or in the exclusion list', () => {
     const missing = exportedReaders().filter((key) => !accounted(key));
     expect(
       missing,

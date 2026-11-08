@@ -15,7 +15,8 @@ import { defaultMeshAssetStore } from '../meshAssets/store';
 import { readOutput, withJobFolder } from '../native/computeJob';
 import type { NativeDeps } from '../native/fatigueField';
 import { nativeInstallHint } from '../native/nativeBinary';
-import { cfdFileStore } from './fileStore';
+import path from 'node:path';
+import { cfdFileStore, linkOrCopy } from './fileStore';
 import { cfdResultPort } from './resultPort';
 
 /** Named default: wall-clock limit of one query job (4096 streamlines take seconds; the field read dominates large grids). */
@@ -53,7 +54,8 @@ export async function runCfdQuery(
       caseId,
     ]);
   const files = cfdFileStore(deps.store.directory);
-  const field = files.get(input.artifact.field.sha256);
+  // By path, never read here (a field can exceed one Buffer): flow-query re-hashes it against fieldSha256 (CFD_RESULT_HASH_MISMATCH).
+  const field = files.pathOf(input.artifact.field.sha256);
   if (field === null)
     return fail(
       tool,
@@ -64,8 +66,9 @@ export async function runCfdQuery(
   const output = FILE_OF[op];
   const seconds = Math.max(1, Math.min(86_400, options.timeoutS ?? DEFAULT_CFD_QUERY_TIMEOUT_S));
   const outcome = await withJobFolder(
-    { 'job.json': JSON.stringify(input.job), 'field.bin': field },
+    { 'job.json': JSON.stringify(input.job) },
     async (folder) => {
+      await linkOrCopy(field, path.join(folder, 'field.bin'));
       const run = await deps.runner.run(['flow-query'], folder, seconds * 1000, undefined, options.signal);
       if (!run.ok) return { run, text: null, file: null };
       const [text, file] = await Promise.all([
@@ -82,6 +85,13 @@ export async function runCfdQuery(
     if (run.code === 'NATIVE_CANCELLED')
       return fail(tool, 'CFD_CANCELLED', 'the query was cancelled: the process tree was killed', [caseId]);
     if (run.code === 'NATIVE_TOOL_MISSING') return fail(tool, 'CFD_SOLVER_MISSING', run.message ?? 'llull-compute is missing', [caseId]);
+    if (run.code === 'CFD_RESULT_HASH_MISMATCH')
+      return fail(
+        tool,
+        run.code,
+        `the stored field file of result ${input.resultsHash.slice(0, 12)} is damaged (${run.message ?? 'hash mismatch'}): run cfd_solve`,
+        [caseId, input.resultsHash],
+      );
     const code = run.code === 'NATIVE_TIMEOUT' ? 'CFD_TIMEOUT' : 'CFD_SOLVER_FAILED';
     return fail(tool, code, `${run.message ?? 'llull-compute flow-query failed'}. Last output:\n${run.log.slice(-2000)}`, [caseId], {
       nativeCode: run.code,

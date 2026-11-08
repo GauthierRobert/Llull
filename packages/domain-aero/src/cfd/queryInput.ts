@@ -153,6 +153,7 @@ function sectionOf(request: FlowQueryRequest, artifact: CfdResultArtifact): Sect
   if (request.op === 'probe') return { section: { probe: { pointsM: request.params.points } }, defaults: [], seeds: [] };
   if (request.op === 'slice') {
     const { params } = request;
+    if (!(Math.hypot(...params.normal) > 1e-12)) return `normal [${params.normal.join(', ')}] is not a direction (length below 1e-12)`;
     const defaults: NamedDefault[] = [
       ...(params.field === undefined ? [{ path: 'field', value: 'speed', source: 'llull default' }] : []),
       ...(params.spacingM === undefined ? [{ path: 'spacingM', value: h, source: 'the solver cell size (TECHNICAL_SPEC §5.5)' }] : []),
@@ -214,7 +215,7 @@ function sectionOf(request: FlowQueryRequest, artifact: CfdResultArtifact): Sect
 
 /**
  * The query job of `request` on the recorded result of its case.
- * @failure see `trustedResult`; a plane rake over 4096 seeds or a step above the cell -> CFD_PARAM_INVALID
+ * @failure see `trustedResult`; a zero slice normal, a plane rake over 4096 seeds or a step above the cell -> CFD_PARAM_INVALID
  */
 export function flowQueryInput(
   doc: CadDocument,

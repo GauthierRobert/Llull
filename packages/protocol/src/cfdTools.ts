@@ -1,7 +1,7 @@
 /**
  * Schema-only definitions of the flow transports added by 12 CFD M3a: cfd_stop, cfd_probe, cfd_slice, cfd_streamlines (runners in
  * `server/src/cfd`). The protocol may not import the plugin, so the query schemas are written here a second time; `tests/unit/aero/cfd/
- * queryTools.test.ts` pins them equal to the plugin's own zod schemas (`@aero/cfd/queryParams`), which validate the calls.
+ * query.test.ts` ('protocol schemas') pins them equal to the plugin's own zod schemas (`@aero/cfd/queryParams`), which validate the calls.
  */
 import { toParamsSchema, vec3, z } from '@core/commands/schema';
 import type { ToolDefinition } from './tools';

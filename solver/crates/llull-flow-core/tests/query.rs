@@ -73,7 +73,8 @@ fn close(a: f64, b: f64, tolerance: f64) -> bool {
 fn probes_are_world_frame_values_and_misses_are_named() {
     let f = field(true, vec![]);
     // world point (-0.5, 1.4, 0.6) is case (1.4, 0.5, 0.6); case u = (2.4, 0.5, 0) is world (-0.5, 2.4, 0).
-    let folder = job("probe", &f, TURNED, "probe", r#""probe": { "pointsM": [[-0.5, 1.4, 0.6], [-0.5, 1.01, 0.5], [5, 5, 5]] }"#);
+    let folder =
+        job("probe", &f, TURNED, "probe", r#""probe": { "pointsM": [[-0.5, 1.4, 0.6], [-0.5, 1.01, 0.5], [5, 5, 5], [-0.5, 0.99, 0.5]] }"#);
     let (json, _) = answer(&folder).unwrap();
     let probe = &json["probes"][0];
     let v: Vec<f64> = probe["velocityMS"].as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
@@ -81,7 +82,10 @@ fn probes_are_world_frame_values_and_misses_are_named() {
     assert!(close(probe["pressurePa"].as_f64().unwrap(), 6.0, 1e-5));
     assert!(close(probe["speedMS"].as_f64().unwrap(), (0.25f64 + 2.4 * 2.4).sqrt(), 1e-6));
     assert_eq!(probe["miss"], Value::Null);
-    assert!(json["probes"][1]["pressurePa"].is_number(), "a probe in a solid cell interpolates its fluid neighbours");
+    // case (1.01, 0.5, 0.5) lies in a cell of the block: a miss, never the interpolated values of its fluid neighbours.
+    assert_eq!(json["probes"][1]["miss"], "solid");
+    assert_eq!(json["probes"][1]["pressurePa"], Value::Null);
+    assert!(json["probes"][3]["pressurePa"].is_number(), "a fluid cell next to the block still interpolates");
     assert_eq!(json["probes"][2]["miss"], "outside");
     assert_eq!(json["probes"][2]["velocityMS"], Value::Null);
 }
@@ -103,8 +107,8 @@ fn a_slice_samples_the_plane_in_world_components_with_nan_outside() {
     assert_eq!(&bytes[..4], b"LLSL");
     assert_eq!(bytes.len(), 72 + 4 * 21 * 21);
     let valid = slice["validSamples"].as_u64().unwrap();
-    assert!(valid > 100 && valid < 441, "the 2 m patch overhangs the 1 m wide box: {valid}");
-    assert!(close(slice["min"].as_f64().unwrap(), 1.025, 1e-5) && close(slice["max"].as_f64().unwrap(), 2.975, 1e-5), "{slice}");
+    assert!(valid > 100 && valid < 441, "the 2 m patch overhangs the 1 m wide box (face layers excluded): {valid}");
+    assert!(close(slice["min"].as_f64().unwrap(), 1.1, 1e-5) && close(slice["max"].as_f64().unwrap(), 2.9, 1e-5), "{slice}");
     let cp = job(
         "slice-cp",
         &f,
@@ -171,8 +175,14 @@ fn refusals_name_the_input_problem() {
     let mut folder = job("sha", &f, IDENTITY, "probe", r#""probe": { "pointsM": [] }"#);
     fs::write(folder.0.join("field.bin"), b"LLFD tampered").unwrap();
     let (code, message) = answer(&folder).unwrap_err();
-    assert_eq!(code, "NATIVE_JOB_INPUT");
+    assert_eq!(code, "CFD_RESULT_HASH_MISMATCH");
     assert!(message.contains("fieldSha256"), "{message}");
+    folder = job("name", &f, IDENTITY, "probe", r#""probe": { "pointsM": [] }"#);
+    let text = fs::read_to_string(folder.0.join("job.json")).unwrap().replace(r#""field": "field.bin""#, r#""field": "../field.bin""#);
+    fs::write(folder.0.join("job.json"), text).unwrap();
+    assert!(answer(&folder).unwrap_err().1.contains("must be \"field.bin\""));
+    folder = job("mirrored", &f, r#"{ "x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, -1] }"#, "probe", r#""probe": { "pointsM": [] }"#);
+    assert!(answer(&folder).unwrap_err().1.contains("right-handed"));
     folder = job("section", &f, IDENTITY, "slice", r#""probe": { "pointsM": [] }"#);
     assert!(answer(&folder).unwrap_err().1.contains("'slice' section"));
     folder = job("frame", &f, r#"{ "x": [1, 0, 0], "y": [1, 0, 0], "z": [0, 0, 1] }"#, "probe", r#""probe": { "pointsM": [] }"#);

@@ -161,17 +161,15 @@ impl FlowField {
         [i, j, k].iter().zip(n).any(|(index, size)| *index == 0 || *index + 1 == size)
     }
 
-    /// The stencil at a folded point; `None` with the reason when it has no value. A point in a solid cell is a wall hit even
-    /// when fluid neighbours would interpolate (streamlines stop at the staircase surface).
-    fn stencil(&self, folded: [f64; 3], strict: bool) -> Result<Stencil, Miss> {
-        if strict {
-            if self.outside(folded) {
-                return Err(Miss::Outside);
-            }
-            if let Some((i, j, k)) = self.grid.cell_at(folded) {
-                if !self.valid[self.grid.index(i, j, k)] {
-                    return Err(Miss::Solid);
-                }
+    /// The stencil at a folded point, or why it has no value. A point in a solid cell is a miss even when fluid neighbours would
+    /// interpolate (probes report `solid`, streamlines stop at the staircase surface).
+    fn stencil(&self, folded: [f64; 3]) -> Result<Stencil, Miss> {
+        if self.outside(folded) {
+            return Err(Miss::Outside);
+        }
+        if let Some((i, j, k)) = self.grid.cell_at(folded) {
+            if !self.valid[self.grid.index(i, j, k)] {
+                return Err(Miss::Solid);
             }
         }
         match locate(&self.grid, &self.valid, folded) {
@@ -181,19 +179,18 @@ impl FlowField {
         }
     }
 
-    /// Velocity and pressure at `point` by the trilinear rule of `sample::trilinear` (probes and slices: a point next to the
-    /// surface still samples its fluid neighbours). Half models sample the mirror image with the normal velocity reversed.
+    /// Velocity and pressure at `point` by the trilinear rule of `sample::trilinear` over the valid cells (probes, slices). A point
+    /// whose own cell is solid is a `Solid` miss, one in the face layer or beyond an `Outside` miss (the fluid box ends there), so a
+    /// probe never reports fluid values from inside a body. Half models sample the mirror image with the normal velocity reversed.
     pub fn sample(&self, point: [f64; 3]) -> Result<Sample, Miss> {
         let (folded, flipped) = self.fold(point);
-        let stencil = self.stencil(folded, false)?;
+        let stencil = self.stencil(folded)?;
         Ok(self.evaluate(&stencil, flipped))
     }
 
-    /// Velocity at `point` for streamline integration: a miss when the point left the fluid box or entered a solid cell.
+    /// Velocity at `point` for streamline integration (the rule of [`FlowField::sample`]).
     pub fn velocity_strict(&self, point: [f64; 3]) -> Result<[f64; 3], Miss> {
-        let (folded, flipped) = self.fold(point);
-        let stencil = self.stencil(folded, true)?;
-        Ok(self.evaluate(&stencil, flipped).velocity)
+        self.sample(point).map(|sample| sample.velocity)
     }
 
     fn evaluate(&self, stencil: &Stencil, flipped: [bool; 3]) -> Sample {
@@ -262,7 +259,7 @@ mod tests {
         let centre = f.grid.centre(i, j, k);
         let solid = [centre[0] + 0.1, centre[1] + 0.1, centre[2] - 0.1];
         assert_eq!(f.velocity_strict(solid), Err(Miss::Solid));
-        assert!(f.sample(solid).is_ok(), "probes interpolate the fluid neighbours of a solid cell");
+        assert_eq!(f.sample(solid), Err(Miss::Solid), "a probe inside a body is a miss, not its fluid neighbours' value");
         assert_eq!(f.velocity_strict([0.1, 0.5, 0.5]), Err(Miss::Outside));
         assert!(f.velocity_strict([0.6, 0.6, 0.4]).is_ok());
     }

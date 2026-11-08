@@ -120,6 +120,16 @@ fn symmetry_faces(job: &JobFile) -> Vec<(usize, bool)> {
     job.faces.faces().iter().filter(|(_, _, kind)| *kind == FaceKind::Symmetry).map(|(axis, high, _)| (*axis, *high)).collect()
 }
 
+/// The coordinate of a symmetry face: the box's min face, or for a max face the boundary of the grid's last face layer, which lies at
+/// `min + ceil((max - min) / h) h` (the grid rounds the box up to whole cells), not at `grid.maxM` itself.
+fn symmetry_plane(grid: &Grid, job: &JobFile, axis: usize, high: bool) -> f64 {
+    if !high {
+        return job.grid.min_m[axis];
+    }
+    let n = [grid.nx, grid.ny, grid.nz][axis];
+    grid.origin[axis] + (n - 1) as f64 * grid.h
+}
+
 /// Builds the domain: the fluid box plus one face layer, the voxelised body strictly inside except through symmetry faces,
 /// whose layer loses its body cells (the mirror image stands there).
 fn build_domain(
@@ -399,7 +409,7 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
         if job.outputs.surface_fields.is_empty() { vec!["p".to_string(), "cp".to_string()] } else { job.outputs.surface_fields.clone() };
     // Triangles of the dropped half sample their mirror image: the symmetry plane is the fluid box's face on that side.
     let mirrors: Vec<Mirror> =
-        symmetric.iter().map(|(axis, high)| (*axis, if *high { job.grid.max_m[*axis] } else { job.grid.min_m[*axis] }, *high)).collect();
+        symmetric.iter().map(|(axis, high)| (*axis, symmetry_plane(&domain.grid, &job, *axis, *high), *high)).collect();
     write("surface.bin", &surface_file(&domain, &triangles, &fields, &surface_fields, dynamic_pressure, &mirrors))?;
     let mut slice_names = Vec::new();
     for (k, slice) in job.outputs.slices.iter().enumerate() {

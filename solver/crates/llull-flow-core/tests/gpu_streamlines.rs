@@ -9,7 +9,7 @@ use llull_flow_core::gpu_streamline::trace_gpu;
 use llull_flow_core::grid::Grid;
 use llull_flow_core::streamline::{trace_cpu, Settings};
 
-fn helix() -> FlowField {
+fn helix(mirrors: Vec<(usize, f64, bool)>) -> FlowField {
     let grid = Grid::covering([0.0, 0.0, 0.0], [2.0, 2.0, 4.0], 0.05);
     let n = grid.cells();
     let centre = |cell: usize| {
@@ -24,23 +24,22 @@ fn helix() -> FlowField {
         p: vec![0.0; n],
         valid: (0..n).map(|c| !blocked(centre(c))).collect(),
         grid,
-        mirrors: vec![],
+        mirrors,
     }
 }
 
-#[test]
-fn gpu_and_cpu_streamlines_agree() {
-    let field = helix();
+/// Traces `field` on both devices and compares point for point; false when no adapter could be opened (logged).
+fn agree(field: &FlowField, label: &str) -> bool {
     let seeds: Vec<[f64; 3]> = (0..24).map(|s| [1.0 + 0.03 * f64::from(s), 1.0, 1.0 + 0.05 * f64::from(s % 5)]).collect();
     let settings = Settings { step_m: 0.02, max_length_m: 30.0, max_steps: 1500, min_speed_ms: 1e-4, forward: true, backward: true };
-    let (gpu, adapter) = match trace_gpu(&field, &seeds, &settings) {
+    let (gpu, adapter) = match trace_gpu(field, &seeds, &settings) {
         Ok(found) => found,
         Err(reason) => {
-            eprintln!("VC-CFD-42 skipped: {reason}");
-            return;
+            eprintln!("VC-CFD-42 {label} skipped: {reason}");
+            return false;
         }
     };
-    let cpu = trace_cpu(&field, &seeds, &settings);
+    let cpu = trace_cpu(field, &seeds, &settings);
     let mut worst: f64 = 0.0;
     let mut compared = 0;
     for (a, b) in cpu.iter().zip(&gpu) {
@@ -57,7 +56,19 @@ fn gpu_and_cpu_streamlines_agree() {
             }
         }
     }
-    eprintln!("VC-CFD-42 on {adapter}: {compared} points, worst difference {worst:.3e} m (domain 4 m)");
+    eprintln!("VC-CFD-42 {label} on {adapter}: {compared} points, worst difference {worst:.3e} m (domain 4 m)");
     assert!(compared > 5_000, "{compared} points compared");
     assert!(worst < 4e-4, "worst point difference {worst}");
+    true
+}
+
+#[test]
+fn gpu_and_cpu_streamlines_agree() {
+    agree(&helix(vec![]), "whole");
+}
+
+#[test]
+fn gpu_and_cpu_streamlines_agree_across_a_max_symmetry_plane() {
+    // A high mirror at y = 1.5: circles of radius > 0.5 cross it and are traced on the folded field (uy reversed) on both devices.
+    agree(&helix(vec![(1, 1.5, true)]), "mirrored");
 }

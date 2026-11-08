@@ -15,7 +15,7 @@ import type { CfdResultArtifact } from '@core/model/cfdResult';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { cfdResultPort } from '../src/cfd/resultPort';
-import { DEFAULT_CFD_TIMEOUT_S, runCfdSolve } from '../src/cfd/flowSolve';
+import { _stopAllCfdSolves, DEFAULT_CFD_TIMEOUT_S, runCfdSolve } from '../src/cfd/flowSolve';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import { isNativeTool, runNativeTool } from '../src/native/tools';
 import { cfdFileStore } from '../src/cfd/fileStore';
@@ -27,7 +27,10 @@ beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'llull-cfd-store-'));
   store = createFeArtifactStore(dir);
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  _stopAllCfdSolves();
+  rmSync(dir, { recursive: true, force: true });
+});
 
 describe('cfd_solve with a fake job runner', () => {
   it('writes the job folder, stores the bundle and records the summary through record_cfd_results', async () => {

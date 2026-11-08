@@ -5,10 +5,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { runCfdSolve, runCfdStop } from '../src/cfd/flowSolve';
+import { _stopAllCfdSolves, runCfdSolve, runCfdStop } from '../src/cfd/flowSolve';
 import { createFeArtifactStore, type FeArtifactCache } from '../src/fea/artifactStore';
 import { isNativeTool, runNativeTool } from '../src/native/tools';
 import { fakeRunner, hostOf, sphereModel } from './cfdTestSupport';
@@ -19,7 +19,19 @@ beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), 'llull-cfd-stop-'));
   store = createFeArtifactStore(dir);
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  // a failing test must not leave a running solve behind for the next one (the registry is per process)
+  _stopAllCfdSolves();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+/** Index of the runner call whose case.json asked for `maxSteps` (runs start in any order). */
+const callWith = (runner: ReturnType<typeof fakeRunner>, maxSteps: number): number =>
+  runner.calls.findIndex(
+    (call) =>
+      (JSON.parse(call.files['case.json']?.toString('utf8') ?? '{}') as { settings?: { maxSteps?: number } }).settings?.maxSteps ===
+      maxSteps,
+  );
 
 describe('cfd_stop', () => {
   it('kills the running solve, answers its caller CFD_CANCELLED and records nothing', async () => {
@@ -104,17 +116,20 @@ describe('concurrent cfd_solve callers', () => {
     const host = hostOf(model, store);
     const runner = fakeRunner({ hold: true });
     const [x, y] = [new AbortController(), new AbortController()];
-    const a = runCfdSolve('re100', { signal: x.signal }, host, { store, runner });
-    const b = runCfdSolve('re100', { signal: y.signal }, host, { store, runner });
+    const a = runCfdSolve('re100', { signal: x.signal, maxSteps: 55 }, host, { store, runner });
+    const b = runCfdSolve('re100', { signal: y.signal, maxSteps: 55 }, host, { store, runner });
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1));
     const c = runCfdSolve('re100', { maxSteps: 77 }, host, { store, runner });
     await vi.waitFor(() => expect(runner.calls).toHaveLength(2));
+    const [shared, separate] = [callWith(runner, 55), callWith(runner, 77)];
+    expect([shared, separate].sort()).toEqual([0, 1]);
     x.abort();
-    expect(runner.signals[0]?.aborted).toBe(false);
+    expect(runner.signals[shared]?.aborted).toBe(false);
     y.abort();
-    expect(runner.signals[0]?.aborted).toBe(true);
+    expect(runner.signals[shared]?.aborted).toBe(true);
     expect((await a).data).toMatchObject({ code: 'CFD_CANCELLED' });
     expect((await b).data).toMatchObject({ code: 'CFD_CANCELLED' });
-    expect(runner.signals[1]?.aborted).toBe(false);
+    expect(runner.signals[separate]?.aborted).toBe(false);
     expect(runCfdStop('re100').summary).toContain('stopped 1 running solve(s)');
     expect((await c).data).toMatchObject({ code: 'CFD_CANCELLED' });
     expect(host.current()).toBe(model.doc);
@@ -128,6 +143,42 @@ describe('concurrent cfd_solve callers', () => {
     expect(await runCfdSolve('re100', { signal: gone.signal }, host, { store, runner })).toMatchObject({ data: { code: 'CFD_CANCELLED' } });
     expect(runner.calls).toHaveLength(0);
     expect((await runCfdSolve('re100', {}, host, { store, runner })).isError).toBe(false);
+  });
+});
+
+describe('a run that fails in the host', () => {
+  it('answers CFD_SOLVER_FAILED with the reason, not CFD_CANCELLED, when the field cannot be stored', async () => {
+    const model = sphereModel();
+    const host = hostOf(model, store);
+    mkdirSync(store.directory, { recursive: true });
+    writeFileSync(path.join(store.directory, 'cfd-files'), 'a file where the store directory should be');
+    const solved = await runCfdSolve('re100', {}, host, { store, runner: fakeRunner() });
+    expect(solved).toMatchObject({ isError: true, data: { code: 'CFD_SOLVER_FAILED' } });
+    expect(host.current()).toBe(model.doc);
+  });
+
+  it('answers CFD_SOLVER_FAILED with the reason when the run itself rejects (the version probe)', async () => {
+    const model = sphereModel();
+    const host = hostOf(model, store);
+    const solved = await runCfdSolve('re100', {}, host, { store, runner: fakeRunner({ versionFails: true }) });
+    expect(solved).toMatchObject({ isError: true, data: { code: 'CFD_SOLVER_FAILED' } });
+    expect(solved.summary).toContain('version probe: EPERM');
+    expect(host.current()).toBe(model.doc);
+  });
+
+  it('answers CFD_SOLVER_FAILED when the bundle cannot be stored', async () => {
+    const model = sphereModel();
+    const host = hostOf(model, store);
+    const broken = {
+      ...store,
+      put: (): string => {
+        throw new Error('ENOSPC: no space left on device');
+      },
+    };
+    const solved = await runCfdSolve('re100', {}, host, { store: broken, runner: fakeRunner() });
+    expect(solved).toMatchObject({ isError: true, data: { code: 'CFD_SOLVER_FAILED' } });
+    expect(solved.summary).toContain('ENOSPC');
+    expect(host.current()).toBe(model.doc);
   });
 });
 

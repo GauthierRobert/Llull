@@ -26,7 +26,8 @@
 //!   f32 xyz[points × 3] (world metres), f32 speed[points] (m/s).
 //!
 //! Events: `warning` `CFD_GPU_UNAVAILABLE` when a GPU was asked for and the CPU traced; `done` / `error` (`NATIVE_JOB_IO`,
-//! `NATIVE_JOB_INPUT`).
+//! `NATIVE_JOB_INPUT`: also `field` other than `field.bin` or a left-handed frame; `CFD_RESULT_HASH_MISMATCH`: the field does not hash
+//! to `fieldSha256`).
 
 use crate::field::{FlowField, Miss};
 use crate::slice::square_plane;
@@ -162,6 +163,11 @@ impl Rotation {
                     return Err(input("frame axes must be orthonormal"));
                 }
             }
+        }
+        let [x, y, z] = axes;
+        let determinant = x[0] * (y[1] * z[2] - y[2] * z[1]) - x[1] * (y[0] * z[2] - y[2] * z[0]) + x[2] * (y[0] * z[1] - y[1] * z[0]);
+        if determinant <= 0.0 {
+            return Err(input("frame axes must be right-handed (det > 0): a mirrored frame would flip every result"));
         }
         Ok(Rotation { axes })
     }
@@ -361,10 +367,13 @@ pub fn run(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobError>
     if job.version != 1 {
         return Err(input(format!("job.json version {} is not 1", job.version)));
     }
+    if job.field != "field.bin" {
+        return Err(input(format!("job.json field must be \"field.bin\" (a file of the job folder), got {:?}", job.field)));
+    }
     let rotation = Rotation::new(&job.frame)?;
     let bytes = fs::read(folder.join(&job.field)).map_err(|error| io(format!("{}: {error}", job.field)))?;
     if sha256_hex(&bytes) != job.field_sha256 {
-        return Err(input(format!("{} does not hash to fieldSha256", job.field)));
+        return Err(JobError { code: "CFD_RESULT_HASH_MISMATCH", message: format!("{} does not hash to fieldSha256", job.field) });
     }
     let field = FlowField::from_bytes(&bytes).map_err(input)?;
     drop(bytes);

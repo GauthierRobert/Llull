@@ -156,3 +156,19 @@ fn a_symmetry_face_halves_the_model_and_reports_whole_body_forces() {
     assert_eq!(memory["bytesPerCell"], 395);
     assert_eq!(memory["bytes"].as_u64().unwrap(), 395 * mirrored["grid"]["cells"].as_u64().unwrap());
 }
+
+#[test]
+fn a_max_symmetry_face_mirrors_at_the_grid_face_not_at_the_requested_box_edge() {
+    // y in [-2, 0.03] at h = 1/8 rounds up to 17 cells: the fluid box (and the symmetry face) ends at y = -2 + 17 / 8 = 0.125, so the
+    // recorded mirror plane must be 0.125 (at 0.03 the fluid cells between 0.03 and 0.125 would sample a mirror image of themselves).
+    let settings = r#"{ "maxSteps": 10, "sampleEvery": 5, "les": false }"#;
+    let job = cube_job_in("job-high-mirror", 8, 20.0, [-2.0, -2.0, -2.0], [4.0, 0.03, 2.0], settings, "{}", r#"{ "yMax": "symmetry" }"#);
+    run_job(&job.dir).1.unwrap();
+    let field = FlowField::from_bytes(&fs::read(job.dir.join("field.bin")).unwrap()).unwrap();
+    assert_eq!(field.mirrors.len(), 1);
+    let (axis, plane, high) = field.mirrors[0];
+    assert_eq!((axis, high), (1, true));
+    let face = field.grid.origin[1] + (field.grid.ny - 1) as f64 * field.grid.h;
+    assert_eq!(plane, face);
+    assert!((plane - 0.125).abs() < 1e-12, "{plane}");
+}
