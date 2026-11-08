@@ -1,5 +1,7 @@
-//! Validity and quality of a linear tetrahedral mesh (FLL-M1): dihedral angles, the boundary faces with their CalculiX labels, and interior
-//! faces whose two tetrahedra lie on the same side (folded) or that more than two tetrahedra share (non-manifold).
+//! Validity and quality of a linear tetrahedral mesh (FLL-M1): dihedral angles, the boundary faces with their CalculiX labels, interior faces
+//! whose two tetrahedra lie on the same side (folded) or that more than two tetrahedra share (non-manifold), elements of negative (inverted) or
+//! zero (degenerate) volume, and boundary faces with a corner off the iso-surface (open: a crack between neighbours that split a shared
+//! quadrilateral differently, which a closed-surface edge count cannot see because each crack edge is still shared by two faces).
 //! @invariant faces are matched by sorting (sorted corner triple, tetrahedron, face): a total order, so the result is thread-count independent
 
 use crate::stuffing::orient;
@@ -26,7 +28,9 @@ pub struct Quality {
     pub below: [u64; 3],
     pub folded: u64,
     pub non_manifold: u64,
+    pub inverted: u64,
     pub degenerate: u64,
+    pub open: u64,
 }
 
 impl Quality {
@@ -64,11 +68,20 @@ pub fn dihedrals(p: &[[f64; 3]; 4]) -> [f64; 6] {
     })
 }
 
-/// Quality figures and the boundary faces of `tets` over `positions`.
-pub fn analyse(positions: &[[f64; 3]], tets: &[[u32; 4]]) -> (Quality, Vec<BoundaryFace>) {
+/// Faces scanned between two progress reports.
+const SCAN_REPORT: usize = 1 << 16;
+
+/// Quality figures and the boundary faces of `tets` over `positions`; `surface[v]` = vertex v lies on the iso-surface; `report` hears
+/// (done, 100) between the stages and every SCAN_REPORT faces of the scan.
+pub fn analyse(
+    positions: &[[f64; 3]],
+    tets: &[[u32; 4]],
+    surface: &[bool],
+    report: &mut dyn FnMut(usize, usize),
+) -> (Quality, Vec<BoundaryFace>) {
     let corners = |t: &[u32; 4]| t.map(|v| positions[v as usize]);
     let bounds = COUNT_BELOW_DEG.map(f64::to_radians);
-    let (min, max, below, degenerate) = tets
+    let (min, max, below, signs) = tets
         .par_iter()
         .map(|t| {
             let p = corners(t);
@@ -76,12 +89,14 @@ pub fn analyse(positions: &[[f64; 3]], tets: &[[u32; 4]]) -> (Quality, Vec<Bound
             let lo = angles.iter().copied().fold(f64::INFINITY, f64::min);
             let hi = angles.iter().copied().fold(0.0, f64::max);
             let below = bounds.map(|b| u64::from(lo < b));
-            (lo, hi, below, u64::from(orient(&p) <= 0.0))
+            let volume = orient(&p);
+            (lo, hi, below, [u64::from(volume < 0.0), u64::from(volume == 0.0)])
         })
         .reduce(
-            || (f64::INFINITY, 0.0, [0u64; 3], 0u64),
-            |a, b| (a.0.min(b.0), a.1.max(b.1), [a.2[0] + b.2[0], a.2[1] + b.2[1], a.2[2] + b.2[2]], a.3 + b.3),
+            || (f64::INFINITY, 0.0, [0u64; 3], [0u64; 2]),
+            |a, b| (a.0.min(b.0), a.1.max(b.1), [a.2[0] + b.2[0], a.2[1] + b.2[1], a.2[2] + b.2[2]], [a.3[0] + b.3[0], a.3[1] + b.3[1]]),
         );
+    report(25, 100);
     let mut faces: Vec<([u32; 3], u32, u8)> = tets
         .par_iter()
         .enumerate()
@@ -93,15 +108,22 @@ pub fn analyse(positions: &[[f64; 3]], tets: &[[u32; 4]]) -> (Quality, Vec<Bound
             })
         })
         .collect();
+    report(40, 100);
     faces.par_sort_unstable();
-    let (mut boundary, mut folded, mut non_manifold) = (Vec::new(), 0u64, 0u64);
+    report(60, 100);
+    let (mut boundary, mut folded, mut non_manifold, mut open) = (Vec::new(), 0u64, 0u64, 0u64);
     let opposite = |t: u32, f: u8| {
         let used = CCX_FACES[f as usize].1;
         let tet = tets[t as usize];
         (0..4).find(|i| !used.contains(i)).map_or(tet[0], |i| tet[i])
     };
     let mut start = 0;
+    let mut next_report = SCAN_REPORT;
     while start < faces.len() {
+        if start >= next_report {
+            next_report = start + SCAN_REPORT;
+            report(60 + 40 * start / faces.len(), 100);
+        }
         let mut end = start + 1;
         while end < faces.len() && faces[end].0 == faces[start].0 {
             end += 1;
@@ -111,7 +133,11 @@ pub fn analyse(positions: &[[f64; 3]], tets: &[[u32; 4]]) -> (Quality, Vec<Bound
             1 => {
                 let (label, c) = CCX_FACES[f as usize];
                 let tet = tets[t as usize];
-                boundary.push(BoundaryFace { tet: t, label, corners: c.map(|i| tet[i]) });
+                let corners = c.map(|i| tet[i]);
+                if corners.iter().any(|&v| !surface.get(v as usize).copied().unwrap_or(false)) {
+                    open += 1;
+                }
+                boundary.push(BoundaryFace { tet: t, label, corners });
             }
             2 => {
                 let p = key.map(|v| positions[v as usize]);
@@ -131,7 +157,9 @@ pub fn analyse(positions: &[[f64; 3]], tets: &[[u32; 4]]) -> (Quality, Vec<Bound
         below,
         folded,
         non_manifold,
-        degenerate,
+        inverted: signs[0],
+        degenerate: signs[1],
+        open,
     };
     (quality, boundary)
 }
@@ -146,11 +174,11 @@ mod tests {
         let p = [[1.0, 0.0, -s], [-1.0, 0.0, -s], [0.0, 1.0, s], [0.0, -1.0, s]];
         let positions = p.to_vec();
         let tet = if orient(&p) > 0.0 { [0, 1, 2, 3] } else { [0, 2, 1, 3] };
-        let (q, boundary) = analyse(&positions, &[tet]);
+        let (q, boundary) = analyse(&positions, &[tet], &[true; 4], &mut |_, _| {});
         assert!((q.min_dihedral_deg - 70.528_779_365_509_3).abs() < 1e-9, "{}", q.min_dihedral_deg);
         assert!((q.max_dihedral_deg - 70.528_779_365_509_3).abs() < 1e-9);
         assert_eq!(boundary.len(), 4);
-        assert_eq!((q.folded, q.non_manifold, q.degenerate), (0, 0, 0));
+        assert_eq!((q.folded, q.non_manifold, q.inverted, q.degenerate, q.open), (0, 0, 0, 0, 0));
         let mut labels: Vec<i32> = boundary.iter().map(|f| f.label).collect();
         labels.sort_unstable();
         assert_eq!(labels, [1, 2, 3, 4]);
@@ -159,15 +187,20 @@ mod tests {
     #[test]
     fn two_tetrahedra_on_one_side_of_their_face_are_folded() {
         let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.2, 0.2, 1.0], [0.3, 0.3, 2.0], [0.2, 0.2, -1.0]];
-        let (q, boundary) = analyse(&positions, &[[0, 1, 2, 3], [0, 2, 1, 4]]);
+        let (q, boundary) = analyse(&positions, &[[0, 1, 2, 3], [0, 2, 1, 4]], &[true; 6], &mut |_, _| {});
         assert_eq!(q.folded, 1, "apexes 3 and 4 are both above face 0-1-2");
         assert_eq!(boundary.len(), 6);
-        let (good, _) = analyse(&positions, &[[0, 1, 2, 3], [0, 2, 1, 5]]);
+        let (good, _) = analyse(&positions, &[[0, 1, 2, 3], [0, 2, 1, 5]], &[true; 6], &mut |_, _| {});
         assert_eq!(good.folded, 0);
-        let (flat, _) = analyse(&[[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]], &[[0, 1, 2, 3]]);
+        let (flat, _) =
+            analyse(&[[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]], &[[0, 1, 2, 3]], &[true; 4], &mut |_, _| {});
         assert_eq!(flat.degenerate, 1);
         assert!(flat.min_dihedral_deg < 1e-6);
-        let (three, _) = analyse(&positions, &[[0, 1, 2, 3], [0, 2, 1, 5], [0, 1, 2, 4]]);
+        let (inside_out, _) = analyse(&positions, &[[0, 2, 1, 3]], &[true; 6], &mut |_, _| {});
+        assert_eq!((inside_out.inverted, inside_out.degenerate), (1, 0), "a negative element is inverted, not silently turned over");
+        let (cracked, _) = analyse(&positions, &[[0, 1, 2, 3]], &[true, true, true, false, true, true], &mut |_, _| {});
+        assert_eq!(cracked.open, 3, "three boundary faces touch the interior vertex 3");
+        let (three, _) = analyse(&positions, &[[0, 1, 2, 3], [0, 2, 1, 5], [0, 1, 2, 4]], &[true; 6], &mut |_, _| {});
         assert_eq!(three.non_manifold, 1);
     }
 }

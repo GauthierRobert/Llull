@@ -7,7 +7,9 @@
 //! indices per element, 0-based, C3D4 / C3D10 order), `report.json` (counts, volume in document units^3, dihedral angles, folds, sets with
 //! 0-based node / element indices, residuals in the analysis unit) or `report.json` alone with a `refusal`.
 //! @invariant the lattice-vertex budget is checked before the field is evaluated; the tetrahedron budget stops stuffing as soon as it is passed
-//! @invariant progress events (`message` = phase) are emitted at every whole percent of the job, so a host can bound the job on its progress
+//! @invariant progress events (`message` = phase) are emitted at every whole percent the phases reach, and at least every HEARTBEAT while a
+//!   phase keeps reporting (lattice planes, root-search chunks, stuffing layers, the quality scan, projection chunks, every undo pass), so a
+//!   host can bound the job on its progress; no single uninterrupted step is longer than one parallel sort or pass over the elements
 
 use crate::eval::Evaluator;
 use crate::files::{f64_bytes, input_error, u32_bytes, write_file, JobError};
@@ -22,6 +24,7 @@ use serde_json::{json, Map, Value};
 use std::cell::RefCell;
 use std::io::Write;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Deserialize)]
 struct GridSpec {
@@ -52,17 +55,23 @@ fn refusal(code: &str, message: String, samples: Option<u64>, limit: Option<u64>
     json!({ "refusal": { "code": code, "message": message, "samples": samples, "limit": limit } })
 }
 
-/// One progress event per whole percent of the job; phases own fixed spans of the 100 steps.
+/// Longest silence between two progress events while a phase reports.
+const HEARTBEAT: Duration = Duration::from_secs(5);
+
+/// One progress event per whole percent of the job (phases own fixed spans of the 100 steps), repeated every HEARTBEAT when the percent
+/// does not move.
 struct Progress<'a, W: Write> {
     out: &'a mut W,
     last: u64,
+    at: Instant,
 }
 
 impl<W: Write> Progress<'_, W> {
     fn at(&mut self, phase: &str, start: u64, span: u64, done: usize, of: usize) {
         let step = start + span * done as u64 / of.max(1) as u64;
-        if step != self.last {
+        if step != self.last || self.at.elapsed() >= HEARTBEAT {
             self.last = step;
+            self.at = Instant::now();
             let _ = emit(self.out, &Event::Progress { step, total: 100, message: phase, detail: None });
         }
     }
@@ -76,7 +85,9 @@ fn quality_json(q: &Quality) -> Value {
         "tetsBelowDeg": below,
         "folded": q.folded,
         "nonManifold": q.non_manifold,
+        "inverted": q.inverted,
         "degenerate": q.degenerate,
+        "open": q.open,
     })
 }
 
@@ -113,7 +124,7 @@ pub fn tets_job(
             Some(max_vertices),
         ));
     }
-    let mut progress = Progress { out, last: u64::MAX };
+    let mut progress = Progress { out, last: u64::MAX, at: Instant::now() };
     let lattice = Lattice::new(grid);
     let (mut signs, clipped) = lattice_signs(evaluator, &lattice, &mut |d, n| progress.at("lattice", 0, 40, d, n));
     let edges = crossings(&lattice, &signs);
@@ -142,9 +153,11 @@ pub fn tets_job(
         return Ok(refusal("IMP_BODY_EMPTY", "no lattice vertex of the grid is inside the field".to_string(), None, None));
     }
     progress.at("quality", 70, 0, 0, 1);
-    let (quality, boundary) = analyse(&stuffed.positions, &stuffed.tets);
+    let (quality, boundary) =
+        analyse(&stuffed.positions, &stuffed.tets, &stuffed.surface, &mut |d, n| progress.at("quality", 70, 10, d, n));
     progress.at("second order", 80, 0, 0, 1);
-    let quadratic = (job.order == 2).then(|| order2(evaluator, &stuffed.positions, &stuffed.tets, &boundary));
+    let quadratic = (job.order == 2)
+        .then(|| order2(evaluator, &stuffed.positions, &stuffed.tets, &boundary, &mut |d, n| progress.at("second order", 80, 10, d, n)));
     let linear_volume: f64 = stuffed.tets.iter().map(|t| orient(&t.map(|v| stuffed.positions[v as usize])) / 6.0).sum();
     let volume = match &quadratic {
         None => linear_volume,
@@ -163,7 +176,7 @@ pub fn tets_job(
         Some(q) => (&q.mids, &q.edges),
         None => (&[], &[]),
     };
-    let surface = Surface { positions: &stuffed.positions, mids, mid_edges, boundary: &boundary, spacing: grid.voxel };
+    let surface = Surface { positions: &stuffed.positions, mids, mid_edges, boundary: &boundary, spacing: grid.voxel, evaluator };
     let (sets, nearest) = match resolve(&surface, &job.targets) {
         Ok(found) => found,
         Err(failure) => return Ok(refusal(failure.code, failure.message, None, None)),

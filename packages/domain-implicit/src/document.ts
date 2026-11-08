@@ -220,6 +220,11 @@ function implicitErrors(raw: Record<string, unknown>): string[] {
       (body['materialId'] === undefined || typeof body['materialId'] === 'string') &&
       (body['asset'] === undefined || isAssetRef(body['asset']));
     if (!valid) errors.push(`implicit body '${key}' is malformed`);
+    // the material is a reference like any other: a dangling one refuses the load (the entity rebuilt from the record would point nowhere)
+    const materialId = isRecord(body) ? body['materialId'] : undefined;
+    const materials = isRecord(raw['materials']) ? raw['materials'] : {};
+    if (valid && typeof materialId === 'string' && !Object.hasOwn(materials, materialId))
+      errors.push(`implicit.bodies.${key}.materialId: '${materialId}' is not a material of the document`);
   }
   return errors;
 }

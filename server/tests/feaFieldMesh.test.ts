@@ -184,6 +184,8 @@ describe.skipIf(requireTools([['native:llull-compute', HAS_COMPUTE]]))('fea_mesh
  * VC-FLL-09 on a stand-in of the reference drone body (lite8.lld is not in the repository): a 250 x 250 x 44 mm blended hub, two arms and four
  * motor pads with a battery pocket, realised at voxel 0.8 like the reference and meshed from its field at 2 mm: under 1.5 M tetrahedra
  * (TECHNICAL_SPEC §8) and within 0.5 % of the implicit body volume. The 60 s budget is reported, not asserted (no wall-clock assertions).
+ * The support and the load sit on the flat bottom / top faces (z = -10 / +10) of two motor pads (radius 16): their node sets must stay on those
+ * disks and their face sets must cover about pi 16^2.
  */
 describe.skipIf(requireTools([['native:llull-compute', HAS_COMPUTE]]))('VC-FLL-09 drone-body stand-in (llull-compute)', () => {
   it('meshes the body from its field at 2 mm within the budgets and 0.5 % of its volume', async () => {
@@ -208,6 +210,33 @@ describe.skipIf(requireTools([['native:llull-compute', HAS_COMPUTE]]))('VC-FLL-0
     );
     expect(Math.abs((figures?.volume ?? 0) / bodyVolume - 1)).toBeLessThan(0.005);
     expect(figures?.elements).toBeLessThan(1.5e6);
+    const mesh = defaultFeArtifactStore().get(String(dataOf(meshed.json)['meshHash'])) as FeMeshArtifact;
+    const h = 2;
+    const coordinates = new Map(mesh.nodes.map((node) => [node[0], [node[1], node[2], node[3]] as const]));
+    const corners = new Map(mesh.blocks.flatMap((block) => block.elements.map((row) => [row[0], row.slice(1, 5)] as const)));
+    const faceCorners: Readonly<Record<number, readonly number[]>> = { 1: [0, 1, 2], 2: [0, 3, 1], 3: [1, 3, 2], 4: [2, 3, 0] };
+    for (const [prefix, centre, z] of [
+      ['C_', [116, 0], -10],
+      ['L_', [-116, 0], 10],
+    ] as const) {
+      const key = Object.keys(mesh.nodeSets).find((name) => name.startsWith(prefix)) ?? '';
+      const nodes = mesh.nodeSets[key] ?? [];
+      expect(nodes.length).toBeGreaterThan(20);
+      for (const id of nodes) {
+        const [x, y, nz] = coordinates.get(id) ?? [NaN, NaN, NaN];
+        expect(Math.abs(nz - z), `${key} node ${id} z`).toBeLessThanOrEqual(h);
+        expect(Math.hypot(x - centre[0], y - centre[1]), `${key} node ${id} r`).toBeLessThanOrEqual(16 + h);
+      }
+      const area = (mesh.faceSets[key] ?? []).reduce((sum, [element, label]) => {
+        const p = (faceCorners[label] ?? []).map((k) => coordinates.get(corners.get(element)?.[k] ?? -1) ?? [0, 0, 0]);
+        const [a, b, c] = [p[0] ?? [0, 0, 0], p[1] ?? [0, 0, 0], p[2] ?? [0, 0, 0]];
+        const u: readonly [number, number, number] = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        const v: readonly [number, number, number] = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+        return sum + 0.5 * Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]);
+      }, 0);
+      console.warn(`VC-FLL-09 stand-in: ${key} face set area ${area.toFixed(1)} mm^2 vs pi 16^2 = ${(Math.PI * 256).toFixed(1)}`);
+      expect(Math.abs(area / (Math.PI * 256) - 1)).toBeLessThan(0.05);
+    }
   }, 600_000);
 });
 

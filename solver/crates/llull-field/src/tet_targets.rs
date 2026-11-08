@@ -1,10 +1,16 @@
-//! Targets of a stuffed mesh (FLL-M1) resolved like the faceted (STL) parts of llull-mesh: `facesNear` -> the face region of the nearest
-//! boundary triangle (neighbouring triangles are one face unless the edge between them is sharper than CLASSIFY_ANGLE_DEG), `pointsNear` ->
-//! the nearest node; `edgesNear` is refused (a field has no B-rep edges). Lengths in document units.
+//! Targets of a stuffed mesh (FLL-M1): `facesNear` -> the face region of the nearest boundary triangle, `pointsNear` -> the nearest node;
+//! `edgesNear` is refused (a field has no B-rep edges). Lengths in document units.
+//! A face region grows across neighbouring boundary triangles whose FIELD normals (the normalised gradient at the triangle centroid) turn by less
+//! than CLASSIFY_ANGLE_DEG (the angle of llull-mesh's faceted parts). The facet normals would not do: stuffing cuts a sharp edge of the field
+//! that is off the lattice planes into a strip of facets of intermediate normals, and a flood across facet normals chains around it onto the
+//! next face; the field gradient jumps at the sharp edge, so the region stops there (14 FLL-D5).
+//! @invariant a triangle whose gradient is zero or not finite falls back to its outward facet normal
 //! @invariant nearest searches break distance ties by the lower index, so the sets do not depend on the thread count
 //! @failure a point farther than max(1e-3 x diagonal, half a lattice spacing) from every face -> FEA_TARGET_UNRESOLVED; a point as near (1e-6 x
 //!   diagonal) to two faces -> FEA_TARGET_AMBIGUOUS; edgesNear -> FEA_TARGET_UNRESOLVED
 
+use crate::eval::Evaluator;
+use crate::gradient::GradientScratch;
 use crate::tet_quality::{cross, BoundaryFace};
 use llull_bvh::geometry::closest_point_on_triangle;
 use rayon::prelude::*;
@@ -58,6 +64,8 @@ pub struct Surface<'a> {
     pub mid_edges: &'a [(u32, u32)],
     pub boundary: &'a [BoundaryFace],
     pub spacing: f64,
+    /// The field, for the normals that classify face regions.
+    pub evaluator: &'a Evaluator,
 }
 
 fn distance(a: &[f64; 3], b: &[f64; 3]) -> f64 {
@@ -128,15 +136,18 @@ impl Surface<'_> {
         out
     }
 
-    fn normal(&self, f: usize) -> [f64; 3] {
+    /// Unit field normal of boundary face `f` (gradient at its centroid), else its outward facet normal.
+    fn normal(&self, scratch: &mut GradientScratch, f: usize) -> [f64; 3] {
         let t = self.triangle(f);
-        let n = cross(&[0, 1, 2].map(|i| t[1][i] - t[0][i]), &[0, 1, 2].map(|i| t[2][i] - t[0][i]));
-        let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
-        if length > 0.0 {
-            n.map(|c| c / length)
-        } else {
-            n
-        }
+        let unit = |n: [f64; 3]| {
+            let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+            (length > 0.0 && length.is_finite()).then(|| n.map(|c| c / length))
+        };
+        let centre = [0, 1, 2].map(|i| (t[0][i] + t[1][i] + t[2][i]) / 3.0);
+        let (_, gradient) = self.evaluator.value_gradient_at(scratch, centre[0], centre[1], centre[2]);
+        // CalculiX face normals point into a positive element: the outward facet normal is the reverse
+        let facet = cross(&[0, 1, 2].map(|i| t[2][i] - t[0][i]), &[0, 1, 2].map(|i| t[1][i] - t[0][i]));
+        unit(gradient).or_else(|| unit(facet)).unwrap_or([0.0; 3])
     }
 
     /// The face region of `seed`: flood fill across edges whose two faces turn by less than the classification angle.
@@ -187,7 +198,14 @@ pub fn resolve(surface: &Surface<'_>, specs: &[TargetSpec]) -> Result<(Vec<Resol
     let tolerance = (UNRESOLVED_REL * diag).max(UNRESOLVED_SPACINGS * surface.spacing);
     let needs_faces = specs.iter().any(|s| !s.faces_near.is_empty());
     let neighbours = if needs_faces { surface.neighbours() } else { Vec::new() };
-    let normals: Vec<[f64; 3]> = if needs_faces { (0..surface.boundary.len()).map(|f| surface.normal(f)).collect() } else { Vec::new() };
+    let normals: Vec<[f64; 3]> = if needs_faces {
+        (0..surface.boundary.len())
+            .into_par_iter()
+            .map_init(|| GradientScratch::new(surface.evaluator.instrs.len()), |scratch, f| surface.normal(scratch, f))
+            .collect()
+    } else {
+        Vec::new()
+    };
     let (mut resolved, mut nearest) = (Vec::new(), Vec::new());
     for spec in specs {
         if !spec.edges_near.is_empty() {

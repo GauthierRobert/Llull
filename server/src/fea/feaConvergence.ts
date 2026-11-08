@@ -26,8 +26,11 @@ export interface FeaConvergenceDeps {
   readonly solve: (analysisId: string, options: { readonly timeoutS?: number }, host: FeaHost) => Promise<FeaToolResult>;
 }
 
-/** A host over a private copy of the document: commands run through `execute` against the store, nothing reaches the real document. */
-function levelHost(initial: CadDocument, store: FeArtifactStore): FeaHost {
+/**
+ * A host over a private copy of the document: commands run through `execute` against the store, nothing reaches the real document; the
+ * caller's cancellation and progress sink pass through, so a level's native job stops with the study and reports its progress.
+ */
+function levelHost(initial: CadDocument, store: FeArtifactStore, caller: FeaHost): FeaHost {
   let current = initial;
   return {
     getDoc: () => current,
@@ -36,6 +39,8 @@ function levelHost(initial: CadDocument, store: FeArtifactStore): FeaHost {
       if (result.rejected !== true) current = result.document;
       return { summary: result.summary, affected: result.affected, isError: result.rejected === true };
     },
+    ...(caller.signal !== undefined ? { signal: caller.signal } : {}),
+    ...(caller.onProgress !== undefined ? { onProgress: caller.onProgress } : {}),
   };
 }
 
@@ -64,7 +69,7 @@ export async function runConvergenceStudy(
   const solveOptions = options.timeoutS === undefined ? {} : { timeoutS: options.timeoutS };
   const runs = new Map<number, { mesh: FeMeshArtifact; meshHash: string; results: FeResultsArtifact; resultsHash: string }>();
   for (const level of [...plan.levels].reverse()) {
-    const sandbox = levelHost(deps.hooks.levelDocumentOf(doc, analysisId, plan.refinement, level), deps.store);
+    const sandbox = levelHost(deps.hooks.levelDocumentOf(doc, analysisId, plan.refinement, level), deps.store, host);
     const meshed = await deps.mesh(analysisId, sandbox);
     if (meshed.isError) return levelFailure(analysisId, level.index, 'meshing', meshed);
     const meshSummary = sandbox.getDoc().analysis?.cases[analysisId]?.meshSummary;

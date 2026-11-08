@@ -16,6 +16,7 @@ import { createFeArtifactStore, type FeArtifactStore } from '../../../server/src
 import { caeHooks } from '../../../server/src/fea/caeHooks';
 import { runFeaMesh } from '../../../server/src/fea/feaMesh';
 import { runFieldMesh } from '../../../server/src/fea/fieldMesh';
+import { runConvergenceStudy } from '../../../server/src/fea/feaConvergence';
 import type { ComputeRunner, JobRun } from '../../../server/src/native/computeJob';
 import { sha256Hex } from '../../../server/src/sha256';
 import type { MeshRequest } from '@cae/index';
@@ -83,7 +84,7 @@ function writeMesh(folder: string): JobRun['outputs'] {
     elements: 1,
     order: 2,
     volume: 1 / 6,
-    quality: { minDihedralDeg: 54.7, maxDihedralDeg: 90, folded: 0, nonManifold: 0, degenerate: 0 },
+    quality: { minDihedralDeg: 54.7, maxDihedralDeg: 90, folded: 0, nonManifold: 0, inverted: 0, degenerate: 0, open: 0 },
     sets,
     nearest,
     curvedMidNodes: 0,
@@ -244,5 +245,44 @@ describe('fea_mesh source implicit_field', () => {
       kernel: () => null,
     });
     expect(noTransport.summary).toContain('NATIVE_TOOL_MISSING');
+  });
+});
+
+describe('run_convergence_study on a field-meshed case', () => {
+  it('passes the caller signal to every level: cancelling stops the level job and records nothing', async () => {
+    const { doc, analysisId } = implicitAnalysis();
+    const probeId = Object.keys(caseIn(doc, analysisId).probes ?? {})[0] ?? '';
+    const job = scripted();
+    const cancel = new AbortController();
+    const host = hostOf(doc, { signal: cancel.signal });
+    const study = runConvergenceStudy(analysisId, { quantity: { kind: 'probe', probeId, loadCase: 'LC1' }, levels: 3 }, host, {
+      store,
+      hooks: caeHooks,
+      mesh: (id, levelHost) =>
+        runFeaMesh(id, levelHost, {
+          mesher: () => Promise.reject(new Error('Netgen must not run')),
+          store,
+          hooks: caeHooks,
+          kernel: () => null,
+          fieldMesh: (request, fieldHost) => runFieldMesh(request, fieldHost, deps(job.runner)),
+        }),
+      solve: () =>
+        Promise.resolve({
+          summary: 'fea_solve NOT_REACHED: the level must stop at meshing',
+          affected: [],
+          isError: true,
+          data: { code: 'NOT_REACHED' },
+        }),
+    });
+    await until(() => job.runs.length === 1);
+    cancel.abort();
+    // a level host without the caller's signal would keep waiting: release the job so that case ends (and fails the assertions below)
+    setTimeout(() => job.release(), 200);
+    const result = await study;
+    expect(result.summary).toContain('VNV_LEVEL_FAILED');
+    expect(result.data).toMatchObject({ stage: 'meshing', cause: 'FEA_MESH_CANCELLED' });
+    expect(job.runs[0]?.aborted).toBe(true);
+    expect(host.commands).toEqual([]);
+    expect(host.doc()).toBe(doc);
   });
 });

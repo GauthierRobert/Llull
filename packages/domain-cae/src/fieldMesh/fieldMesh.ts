@@ -4,7 +4,10 @@
  * The host runs the jobs; everything that decides lives here.
  * @invariant node and element ids are 1..n over the parts in request order, each part's nodes then elements in job order: same job outputs,
  *   same artifact (and the same meshHash)
- * @invariant a mesh below the dihedral bounds, or with a folded, non-manifold or degenerate element, is refused (FLL_IMPLICIT_MESH_QUALITY)
+ * @invariant a mesh below the dihedral bounds, with a folded, non-manifold, inverted or degenerate element, or with an open boundary face (a
+ *   corner off the iso-surface: neighbours that split a shared face differently) is refused (FLL_IMPLICIT_MESH_QUALITY)
+ * @invariant a lattice corner on the border that was inside the field (the field reaches the lattice border, so the mesher would cut it there
+ *   instead of at an iso-surface) is refused (FLL_IMPLICIT_MESH_CLIPPED); explicit bounds are clipped exactly upstream (implicitBodyField)
  */
 
 import type { FeMeshArtifact } from '@core/model/analysis';
@@ -97,9 +100,19 @@ function figuresOf(part: FieldPartMesh): FieldPartFigures {
 export function fieldMeshQualityProblem(part: FieldPartMesh, globalSize: number): CaeFailure | null {
   const quality = record(part.report['quality']);
   const [min, max] = [num(quality['minDihedralDeg']), num(quality['maxDihedralDeg'])];
-  const invalid = num(quality['folded']) + num(quality['nonManifold']) + num(quality['degenerate']);
+  const clipped = num(part.report['clippedCorners']);
+  if (clipped !== 0)
+    return {
+      code: 'FLL_IMPLICIT_MESH_CLIPPED',
+      message:
+        `'${part.entityId}': ${clipped} lattice border corner(s) are inside the field, so the mesh would be cut at the lattice instead of at a ` +
+        'surface: give the body bounds that enclose the solid (create_implicit_body bounds) or bound the field (intersect it with a box)',
+    };
+  const invalid = num(quality['folded']) + num(quality['nonManifold']) + num(quality['inverted']) + num(quality['degenerate']);
+  const open = num(quality['open']);
   const problems = [
-    ...(invalid !== 0 ? [`${invalid} folded / non-manifold / degenerate element(s)`] : []),
+    ...(invalid !== 0 ? [`${invalid} folded / non-manifold / inverted / degenerate element(s)`] : []),
+    ...(open !== 0 ? [`${open} open boundary face(s) (a corner off the iso-surface: a non-conforming split)`] : []),
     ...(!(min >= FIELD_MESH_DIHEDRAL_DEG.min) ? [`min dihedral ${min.toFixed(2)} deg below ${FIELD_MESH_DIHEDRAL_DEG.min}`] : []),
     ...(!(max <= FIELD_MESH_DIHEDRAL_DEG.max) ? [`max dihedral ${max.toFixed(2)} deg above ${FIELD_MESH_DIHEDRAL_DEG.max}`] : []),
   ];
@@ -116,7 +129,7 @@ const sortedNumbers = (values: readonly number[]): number[] => [...values].sort(
 
 /**
  * The mesh artifact of `parts` (in `request.entityIds` order) and the figures of each part.
- * @failure a part below the quality bounds -> FLL_IMPLICIT_MESH_QUALITY; a malformed job output -> FEA_MESH_FAILED; a target that resolved to
+ * @failure a part below the quality bounds -> FLL_IMPLICIT_MESH_QUALITY; a field cut at the lattice border -> FLL_IMPLICIT_MESH_CLIPPED; a malformed job output -> FEA_MESH_FAILED; a target that resolved to
  *   no node -> FEA_TARGET_UNRESOLVED
  */
 export function assembleFieldMesh(

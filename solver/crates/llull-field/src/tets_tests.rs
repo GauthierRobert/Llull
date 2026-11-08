@@ -88,12 +88,18 @@ fn run_job(name: &str, evaluator: &Evaluator, grid: Value, order: u8, targets: V
     Run { report, nodes, elements }
 }
 
-/// Every boundary edge is shared by exactly two boundary faces (a closed surface) and no face is folded.
+/// The job's own checks are clean (no open boundary face: conforming; no inverted, degenerate, folded or non-manifold element, no clipped
+/// corner), and, recounted from the output files, every boundary edge is shared by exactly two boundary faces and no face is folded.
 fn assert_valid(run: &Run, per_element: usize) {
+    let q = &run.report["quality"];
+    for key in ["open", "inverted", "degenerate", "folded", "nonManifold"] {
+        assert_eq!(q[key], 0, "{key}: {q}");
+    }
+    assert_eq!(run.report["clippedCorners"], 0);
     let positions: Vec<[f64; 3]> = run.nodes.chunks_exact(3).map(|p| [p[0], p[1], p[2]]).collect();
     let tets: Vec<[u32; 4]> = run.elements.chunks_exact(per_element).map(|e| [e[0], e[1], e[2], e[3]]).collect();
-    let (quality, boundary) = analyse(&positions, &tets);
-    assert_eq!((quality.folded, quality.non_manifold, quality.degenerate), (0, 0, 0));
+    let (quality, boundary) = analyse(&positions, &tets, &vec![true; positions.len()], &mut |_, _| {});
+    assert_eq!((quality.folded, quality.non_manifold, quality.inverted, quality.degenerate), (0, 0, 0, 0));
     let mut edges: HashMap<(u32, u32), u32> = HashMap::new();
     for face in &boundary {
         let c = face.corners;
@@ -229,4 +235,153 @@ fn a_global_target_reports_the_nearest_node_and_its_distance() {
     let d = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
     assert!((number(near, "distance") - d).abs() < 1e-12, "the origin is the nearer point");
     assert!(run.report["sets"].as_object().unwrap().is_empty());
+}
+
+/// `field` rotated: the field evaluated at R^T p, R = rotation about z by `about_z` then about x by `about_x` (radians).
+fn rotated_cuboid(half: [f64; 3], about_z: f64, about_x: f64) -> (Evaluator, [[f64; 3]; 3]) {
+    let (cz, sz, cx, sx) = (about_z.cos(), about_z.sin(), about_x.cos(), about_x.sin());
+    // rows of R^T: the body axes in world coordinates
+    let axes = [[cz, sz, 0.0], [-sz * cx, cz * cx, sx], [sz * sx, -cz * sx, cx]];
+    let mut t = Tape::new();
+    let world = [t.x(), t.y(), t.z()];
+    let mut parts = Vec::new();
+    for (axis, row) in axes.iter().enumerate() {
+        let mut sum = None;
+        for (k, &w) in world.iter().enumerate() {
+            let c = t.c(row[k]);
+            let term = t.bin(Op::Mul, w, c);
+            sum = Some(match sum {
+                None => term,
+                Some(acc) => t.bin(Op::Add, acc, term),
+            });
+        }
+        let a = t.un(Op::Abs, sum.unwrap_or(0));
+        let h = t.c(half[axis]);
+        parts.push(t.bin(Op::Sub, a, h));
+    }
+    let m = t.bin(Op::Max, parts[0], parts[1]);
+    let out = t.bin(Op::Max, m, parts[2]);
+    (t.finish(out), axes)
+}
+
+#[test]
+fn a_rotated_box_keeps_its_faces_apart_with_edges_off_the_lattice() {
+    let half = [8.0, 4.0, 3.0];
+    let (field, axes) = rotated_cuboid(half, 0.5, 0.35);
+    let centre = axes[0].map(|c| c * half[0]);
+    let run = run("rotated", &field, 12.0, 0.75, 2, json!([{ "key": "F", "facesNear": [centre] }]));
+    assert_valid(&run, 10);
+    let exact = 8.0 * half[0] * half[1] * half[2];
+    let v = number(&run.report, "volume");
+    eprintln!("rotated box: {v} vs {exact} ({:.3} %), {}", 100.0 * (v / exact - 1.0), run.report["quality"]);
+    assert!(v < exact && (v / exact - 1.0).abs() < 0.02, "edges and corners off the lattice are cut, by less than 2 %: {v}");
+    // the face set stays at the +x face: every node within one spacing of its plane (the cut strip along its edges), most on it
+    let nodes = run.report["sets"]["F"]["nodes"].as_array().unwrap();
+    assert!(nodes.len() > 20);
+    let along = |n: &Value| {
+        let n = n.as_u64().unwrap() as usize;
+        (0..3).map(|k| run.nodes[3 * n + k] * axes[0][k]).sum::<f64>()
+    };
+    assert!(nodes.iter().all(|n| (along(n) - half[0]).abs() <= 0.75), "every node within one spacing of the +x face");
+    let on_plane = nodes.iter().filter(|n| (along(n) - half[0]).abs() < 1e-6).count();
+    assert!(on_plane * 10 >= nodes.len() * 8, "{on_plane} of {} nodes on the plane", nodes.len());
+}
+
+#[test]
+fn a_field_clipped_by_a_box_meshes_to_the_clipped_volume_without_clipped_corners() {
+    let g = gyroid_ball(1.0, 0.35, 100.0);
+    // the same sheet, unclipped, fills its lattice to the border: corners there are held outside and counted
+    let bare = run("bare", &g, 4.0, 0.4, 1, json!([]));
+    assert!(bare.report["clippedCorners"].as_u64().unwrap() > 0, "{}", bare.report["clippedCorners"]);
+    // clipped by the box [-3, 3]^3 (what implicitBodyField builds for explicit bounds), meshed on the bounds padded by 2 spacings
+    let mut t = Tape::new();
+    let sheet = {
+        let kc = t.c(1.0);
+        let (x, y, z) = (t.x(), t.y(), t.z());
+        let p = [x, y, z].map(|q| t.bin(Op::Mul, q, kc));
+        let trig = |t: &mut Tape, a: i64, b: i64| {
+            let s = t.un(Op::Sin, a);
+            let c = t.un(Op::Cos, b);
+            t.bin(Op::Mul, s, c)
+        };
+        let (g1, g2, g3) = (trig(&mut t, p[0], p[1]), trig(&mut t, p[1], p[2]), trig(&mut t, p[2], p[0]));
+        let s12 = t.bin(Op::Add, g1, g2);
+        let sum = t.bin(Op::Add, s12, g3);
+        let a = t.un(Op::Abs, sum);
+        let w = t.c(0.35);
+        t.bin(Op::Sub, a, w)
+    };
+    let (x, y, z) = (t.x(), t.y(), t.z());
+    let three = t.c(3.0);
+    let faces = [x, y, z].map(|q| {
+        let a = t.un(Op::Abs, q);
+        t.bin(Op::Sub, a, three)
+    });
+    let b01 = t.bin(Op::Max, faces[0], faces[1]);
+    let boxed = t.bin(Op::Max, b01, faces[2]);
+    let out = t.bin(Op::Max, sheet, boxed);
+    let clipped = t.finish(out);
+    let run = run("clipped", &clipped, 3.5, 0.1, 2, json!([]));
+    assert_valid(&run, 10);
+    // reference: midpoint quadrature of the clipped field on a 0.02 grid; the mesh error is second order in the spacing (the sharp creases
+    // where the sheet meets the box are cut by a chord): -1.04 % at 0.2, -0.25 % at 0.1
+    let mut registers = vec![0.0; clipped.instrs.len()];
+    let (n, h) = (300usize, 0.02);
+    let mut inside = 0u64;
+    for k in 0..n {
+        for j in 0..n {
+            for i in 0..n {
+                let p = [i, j, k].map(|c| -3.0 + (c as f64 + 0.5) * h);
+                if clipped.value_at(&mut registers, p[0], p[1], p[2]) < 0.0 {
+                    inside += 1;
+                }
+            }
+        }
+    }
+    let reference = inside as f64 * h * h * h;
+    let v = number(&run.report, "volume");
+    eprintln!("clipped gyroid: {v} vs quadrature {reference} ({:.3} %)", 100.0 * (v / reference - 1.0));
+    assert!((v / reference - 1.0).abs() < 0.005, "{v} vs {reference}");
+}
+
+#[test]
+fn a_neighbour_that_splits_a_shared_quadrilateral_the_other_way_leaves_open_faces() {
+    crate::stuffing::test_flip::arm();
+    let cracked = run("crack", &sphere(10.0), 14.0, 2.0, 1, json!([]));
+    assert!(!crate::stuffing::test_flip::armed(), "a pyramid base was flipped");
+    assert!(cracked.report["quality"]["open"].as_u64().unwrap() > 0, "{}", cracked.report["quality"]);
+    // the open count is what sees it: the faces of the crack are boundary faces with a corner inside the body
+    let positions: Vec<[f64; 3]> = cracked.nodes.chunks_exact(3).map(|p| [p[0], p[1], p[2]]).collect();
+    let tets: Vec<[u32; 4]> = cracked.elements.chunks_exact(4).map(|e| [e[0], e[1], e[2], e[3]]).collect();
+    let (_, boundary) = analyse(&positions, &tets, &vec![true; positions.len()], &mut |_, _| {});
+    let mut edges: HashMap<(u32, u32), u32> = HashMap::new();
+    for face in &boundary {
+        let c = face.corners;
+        for (a, b) in [(c[0], c[1]), (c[1], c[2]), (c[2], c[0])] {
+            *edges.entry((a.min(b), a.max(b))).or_default() += 1;
+        }
+    }
+    let doubled = edges.values().filter(|&&n| n == 2).count();
+    eprintln!(
+        "cracked sphere: {} open faces, {doubled} of {} boundary edges shared by two faces",
+        cracked.report["quality"]["open"],
+        edges.len()
+    );
+    let whole = run("whole", &sphere(10.0), 14.0, 2.0, 1, json!([]));
+    assert_eq!(whole.report["quality"]["open"], 0);
+}
+
+#[test]
+fn the_quality_scan_and_the_second_order_pass_report_progress() {
+    let run = run("progress", &gyroid_ball(1.0, 0.35, 6.0), 8.0, 0.4, 1, json!([]));
+    let positions: Vec<[f64; 3]> = run.nodes.chunks_exact(3).map(|p| [p[0], p[1], p[2]]).collect();
+    let tets: Vec<[u32; 4]> = run.elements.chunks_exact(4).map(|e| [e[0], e[1], e[2], e[3]]).collect();
+    assert!(tets.len() * 4 > 2 * (1 << 16), "enough faces for scan reports: {}", tets.len());
+    let mut quality_reports = Vec::new();
+    let (_, boundary) = analyse(&positions, &tets, &vec![true; positions.len()], &mut |d, n| quality_reports.push((d, n)));
+    assert!(quality_reports.len() >= 5, "stages and scan chunks: {quality_reports:?}");
+    let mut order2_reports = 0;
+    let field = gyroid_ball(1.0, 0.35, 6.0);
+    let _ = crate::tet_order2::order2(&field, &positions, &tets, &boundary, &mut |_, _| order2_reports += 1);
+    assert!(order2_reports >= 5, "stages, projection chunks and undo passes: {order2_reports}");
 }

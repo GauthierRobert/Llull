@@ -20,22 +20,22 @@
   { "command": "add_field_primitive", "params": { "shape": "capsule", "radius": 9, "height": 232, "rotation": [90, 0, 0] }, "as": "armY" },
   {
     "command": "add_field_primitive",
-    "params": { "shape": "cylinder", "radius": 16, "height": 12, "position": [116, 0, 0] },
+    "params": { "shape": "cylinder", "radius": 16, "height": 20, "position": [116, 0, 0] },
     "as": "pad0"
   },
   {
     "command": "add_field_primitive",
-    "params": { "shape": "cylinder", "radius": 16, "height": 12, "position": [-116, 0, 0] },
+    "params": { "shape": "cylinder", "radius": 16, "height": 20, "position": [-116, 0, 0] },
     "as": "pad1"
   },
   {
     "command": "add_field_primitive",
-    "params": { "shape": "cylinder", "radius": 16, "height": 12, "position": [0, 116, 0] },
+    "params": { "shape": "cylinder", "radius": 16, "height": 20, "position": [0, 116, 0] },
     "as": "pad2"
   },
   {
     "command": "add_field_primitive",
-    "params": { "shape": "cylinder", "radius": 16, "height": 12, "position": [0, -116, 0] },
+    "params": { "shape": "cylinder", "radius": 16, "height": 20, "position": [0, -116, 0] },
     "as": "pad3"
   },
   {
@@ -59,7 +59,7 @@
   { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$body", "idealization": "solid" } },
   {
     "command": "add_fea_constraint",
-    "params": { "analysisId": "$an", "name": "root", "kind": "fixed", "target": { "entityId": "$body", "facesNear": [[116, 0, -6]] } }
+    "params": { "analysisId": "$an", "name": "root", "kind": "fixed", "target": { "entityId": "$body", "facesNear": [[116, 0, -10]] } }
   },
   {
     "command": "add_fea_load",
@@ -69,7 +69,7 @@
       "kind": "force",
       "loadCase": "LC1",
       "category": "limit",
-      "target": { "entityId": "$body", "facesNear": [[-116, 0, 6]] },
+      "target": { "entityId": "$body", "facesNear": [[-116, 0, 10]] },
       "vector": [0, 0, -10],
       "distribution": "total"
     }

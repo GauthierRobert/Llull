@@ -23,6 +23,28 @@ pub const ALPHA_LONG: f64 = 0.24999;
 pub const ALPHA_SHORT: f64 = 0.41189;
 /// Named guard of one edge root search; it stops earlier when the bracket stops shrinking or the value is exactly zero.
 const ROOT_ITERATIONS: usize = 80;
+/// Test hook: flip the diagonal of the next pyramid base (a quadrilateral shared with a neighbour), to prove a non-conforming split is detected.
+#[cfg(test)]
+pub mod test_flip {
+    use std::cell::Cell;
+    thread_local!(static NEXT: Cell<bool> = const { Cell::new(false) });
+    pub fn arm() {
+        NEXT.with(|n| n.set(true));
+    }
+    pub fn take() -> bool {
+        NEXT.with(|n| n.replace(false))
+    }
+    pub fn armed() -> bool {
+        NEXT.with(Cell::get)
+    }
+}
+#[cfg(not(test))]
+mod test_flip {
+    pub fn take() -> bool {
+        false
+    }
+}
+
 /// Keys of Steiner vertices start here (lattice ids and cut points stay below).
 const STEINER_BASE: u64 = 1 << 62;
 
@@ -322,6 +344,8 @@ struct Builder<'a> {
     index: HashMap<u64, u32, KeyBuild>,
     out: Stuffed,
     max_tets: u64,
+    /** Reference positions of the Steiner vertices (by key - STEINER_BASE), for the combinatorial orientation. */
+    steiner_references: Vec<[f64; 3]>,
 }
 
 fn dist2(a: &[f64; 3], b: &[f64; 3]) -> f64 {
@@ -343,6 +367,21 @@ impl Builder<'_> {
             self.s.cuts[(key - total) as usize].1
         } else {
             self.out.positions[self.index[&key] as usize]
+        }
+    }
+
+    /// The unwarped stencil configuration: lattice vertices at their lattice place, cut points at their edge midpoint, Steiner vertices at the
+    /// centroid of those. Every stencil piece is convex there (a midpoint cut is planar), so its split has a well-defined orientation.
+    fn reference(&self, key: u64) -> [f64; 3] {
+        let total = self.s.lattice.total as u64;
+        if key < total {
+            self.s.lattice.position(key as u32)
+        } else if key < STEINER_BASE {
+            let e = self.s.edges[(key - total) as usize];
+            let (a, b) = (self.s.lattice.position(e.lo), self.s.lattice.position(e.hi));
+            [0, 1, 2].map(|i| 0.5 * (a[i] + b[i]))
+        } else {
+            self.steiner_references[(key - STEINER_BASE) as usize]
         }
     }
 
@@ -371,9 +410,10 @@ impl Builder<'_> {
         if self.out.tets.len() as u64 >= self.max_tets {
             return Err(TetBudget(self.out.tets.len() as u64 + 1));
         }
+        // oriented by the reference configuration, never by the warped geometry: a geometrically inverted element stays inverted and is
+        // counted (Quality::inverted) instead of being turned over into an overlap
         let mut tet = keys.map(|k| self.vertex(k));
-        let p = tet.map(|v| self.out.positions[v as usize]);
-        if orient(&p) < 0.0 {
+        if orient(&keys.map(|k| self.reference(k))) < 0.0 {
             tet.swap(1, 2);
         }
         self.out.tets.push(tet);
@@ -418,6 +458,8 @@ impl Builder<'_> {
             let key = STEINER_BASE + self.out.steiner as u64;
             let corners = [a[0], a[1], a[2], b[0], b[1], b[2]].map(|k| self.position(k));
             let centre = [0, 1, 2].map(|axis| corners.iter().map(|p| p[axis]).sum::<f64>() / 6.0);
+            let references = [a[0], a[1], a[2], b[0], b[1], b[2]].map(|k| self.reference(k));
+            self.steiner_references.push([0, 1, 2].map(|axis| references.iter().map(|p| p[axis]).sum::<f64>() / 6.0));
             self.index.insert(key, self.out.positions.len() as u32);
             self.out.positions.push(centre);
             self.out.surface.push(false);
@@ -476,7 +518,7 @@ impl Builder<'_> {
             (2, 1, 1) => {
                 let (i1, i2, o) = (ins[0], ins[1], outs[0]);
                 let q = [key(i1), key(i2), self.cut(i2, o), self.cut(i1, o)];
-                let d = self.diagonal02(q);
+                let d = self.diagonal02(q) != test_flip::take();
                 self.pyramid(key(zeros[0]), q, d)
             }
             (2, 0, 2) => {
@@ -503,6 +545,7 @@ impl Stuffer<'_> {
             index: HashMap::default(),
             out: Stuffed { positions: Vec::new(), tets: Vec::new(), surface: Vec::new(), steiner: 0 },
             max_tets,
+            steiner_references: Vec::new(),
         };
         let (l, c) = (self.lattice, self.lattice.cells);
         for k in 0..c[2] {
@@ -544,7 +587,9 @@ mod tests {
     fn prism_of(points: [[f64; 3]; 6]) -> Stuffed {
         let lattice = Lattice::new(Grid::new([0.0; 3], [1.0; 3], 1.0).unwrap());
         let signs = vec![1i8; lattice.total];
-        let edges: Vec<Crossing> = (0..6).map(|i| Crossing { lo: i, hi: 8, long: true }).collect();
+        // point i is the cut of edge (corner, centre): its reference is that edge's midpoint, which for these corners is a straight prism of
+        // the same handedness as `points` (top a over corners 4 5 6, bottom b over 0 1 2)
+        let edges: Vec<Crossing> = [4u32, 5, 6, 0, 1, 2].iter().map(|&c| Crossing { lo: c, hi: 8, long: false }).collect();
         let cuts: Vec<(f64, [f64; 3])> = points.iter().map(|p| (0.5, *p)).collect();
         let warped = HashMap::default();
         let inside = |_: [f64; 3]| false;
@@ -554,6 +599,7 @@ mod tests {
             index: HashMap::default(),
             out: Stuffed { positions: Vec::new(), tets: Vec::new(), surface: Vec::new(), steiner: 0 },
             max_tets: 100,
+            steiner_references: Vec::new(),
         };
         let total = lattice.total as u64;
         builder.prism([total, total + 1, total + 2], [total + 3, total + 4, total + 5], None).unwrap();
@@ -566,10 +612,20 @@ mod tests {
     }
 
     #[test]
+    fn a_piece_inverted_by_its_geometry_stays_inverted_and_is_counted() {
+        // the same prism mirrored through z: its reference is unchanged, so its elements keep the reference orientation and are negative
+        let mirrored = ring(0.0).map(|p| [p[0], p[1], 1.0 - p[2]]);
+        let out = prism_of(mirrored);
+        let (q, _) = analyse(&out.positions, &out.tets, &out.surface, &mut |_, _| {});
+        assert_eq!(q.inverted, 3, "never turned over into an overlap that hides the fold");
+    }
+
+    #[test]
     fn a_straight_prism_splits_into_three_tetrahedra() {
         let out = prism_of(ring(0.0));
         assert_eq!((out.tets.len(), out.steiner), (3, 0));
-        let (q, boundary) = analyse(&out.positions, &out.tets);
+        let (q, boundary) = analyse(&out.positions, &out.tets, &out.surface, &mut |_, _| {});
+        assert_eq!((q.inverted, q.open), (0, 0));
         assert_eq!((q.folded, q.degenerate, boundary.len()), (0, 0, 8), "2 end triangles + 3 quads split in 2");
         let volume: f64 = out.tets.iter().map(|t| orient(&t.map(|v| out.positions[v as usize])) / 6.0).sum();
         assert!((volume - 3.0 * 3f64.sqrt() / 4.0).abs() < 1e-12, "the triangle of circumradius 1 times height 1: {volume}");
@@ -583,7 +639,8 @@ mod tests {
         assert_eq!(interior.len(), 1, "one Steiner vertex, off the surface");
         let centre = out.positions[interior[0]];
         assert!(centre[0].abs() < 1e-12 && centre[1].abs() < 1e-12 && (centre[2] - 0.5).abs() < 1e-12, "at the centroid: {centre:?}");
-        let (q, boundary) = analyse(&out.positions, &out.tets);
+        let (q, boundary) = analyse(&out.positions, &out.tets, &out.surface, &mut |_, _| {});
+        assert_eq!((q.inverted, q.open), (0, 0));
         assert_eq!((q.folded, q.degenerate, boundary.len()), (0, 0, 8));
     }
 }

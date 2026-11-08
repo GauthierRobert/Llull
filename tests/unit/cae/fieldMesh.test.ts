@@ -148,7 +148,7 @@ function part(entityId: string, distance: number, quality: Record<string, number
       nodes: 4,
       elements: 1,
       volume: 1 / 6,
-      quality: { minDihedralDeg: 54.7, maxDihedralDeg: 90, folded: 0, nonManifold: 0, degenerate: 0, ...quality },
+      quality: { minDihedralDeg: 54.7, maxDihedralDeg: 90, folded: 0, nonManifold: 0, inverted: 0, degenerate: 0, open: 0, ...quality },
       sets: { [`F_${entityId}`]: { nodes: [0, 1, 2], faces: [[0, 1]], residual: 0.25 } },
       nearest: { P_probe: { node: 3, distance } },
       curvedMidNodes: 0,
@@ -200,6 +200,14 @@ describe('assembleFieldMesh', () => {
     expect((sliver as { message: string }).message).toContain('min dihedral 4.00 deg below 10.7832');
     expect(fieldMeshQualityProblem(part('a', 0, { maxDihedralDeg: 170 }), 2)?.message).toContain('above 164.817');
     expect(fieldMeshQualityProblem(part('a', 0, { folded: 2 }), 2)?.message).toContain('2 folded');
+    expect(fieldMeshQualityProblem(part('a', 0, { inverted: 1 }), 2)?.message).toContain('1 folded / non-manifold / inverted');
+    expect(fieldMeshQualityProblem(part('a', 0, { open: 4 }), 2)).toMatchObject({
+      code: 'FLL_IMPLICIT_MESH_QUALITY',
+      message: expect.stringContaining('4 open boundary face(s)'),
+    });
+    const clipped = { ...part('a', 0), report: { ...part('a', 0).report, clippedCorners: 3 } };
+    expect(fieldMeshQualityProblem(clipped, 2)).toMatchObject({ code: 'FLL_IMPLICIT_MESH_CLIPPED' });
+    expect(assembleFieldMesh(request, [clipped, part('b', 0.1)], 't')).toMatchObject({ code: 'FLL_IMPLICIT_MESH_CLIPPED' });
     expect(fieldMeshQualityProblem(part('a', 0), 2)).toBeNull();
   });
 

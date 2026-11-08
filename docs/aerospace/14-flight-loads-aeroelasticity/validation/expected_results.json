@@ -94,7 +94,7 @@
       "grade": "A",
       "proves": ["FR-FLL-05"],
       "plans": ["plans/fll_m1_drone_standin.plan.json"],
-      "status": "stand-in measured 2026-11-08: +0.028 % volume, 849676 C3D10, 35-37 s; reference body (lite8.lld) not in the repository"
+      "status": "stand-in measured 2026-11-08: +0.028 % volume, 889868 C3D10, 28 s, pad face sets 802.4 / 795.6 mm2 vs 804.2; reference body (lite8.lld) not in the repository"
     }
   ]
 }

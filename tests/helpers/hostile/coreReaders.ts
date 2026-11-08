@@ -19,6 +19,21 @@ import { parseInstant } from '@plm/pdm/part21';
 import { parseQuery } from '@protocol/discoveryRank';
 import { parseCommandResponse } from '@protocol/restProtocol';
 import { libraryFile } from '../../unit/materials/support';
+
+/** A saved document with one implicit body of material petg, its body record changed by `mutate` (14 FLL-D6: the material is a reference). */
+function implicitBodyDocument(mutate: (body: Record<string, unknown>) => void): string {
+  const steps: [string, Record<string, unknown>][] = [
+    ['create_material', { name: 'petg', density: 0.00127, color: '#88aacc', metalness: 0, roughness: 0.6 }],
+    ['add_field_primitive', { shape: 'sphere', radius: 2 }],
+  ];
+  let doc = createEmptyDocument();
+  for (const [name, params] of steps) doc = execute(doc, name, params).document;
+  const field = Object.keys(doc.implicit?.fields ?? {})[0] ?? '';
+  doc = execute(doc, 'create_implicit_body', { field, voxel: 0.5, material: 'petg' }).document;
+  const saved = JSON.parse(serializeDocument(doc)) as { document: { implicit: { bodies: Record<string, Record<string, unknown>> } } };
+  for (const body of Object.values(saved.document.implicit.bodies)) mutate(body);
+  return JSON.stringify(saved);
+}
 import { firaBytes } from '../../unit/wrap/fixtures';
 import { seacFont, variableFont } from '../../unit/wrap/variableFonts';
 import { variableTrueTypeWithMetrics } from '../../unit/wrap/variableTrueType';
@@ -535,6 +550,12 @@ export const CORE_READERS: readonly HostileReader[] = [
       },
       { name: 'instance array: table as a nested array', input: () => arrayDocument((record) => (record['transforms'] = [[[1]]])) },
       { name: 'instance array: component id __proto__', input: () => arrayDocument((record) => (record['componentId'] = '__proto__')) },
+      {
+        name: 'implicit body: material that is not in the document',
+        input: () => implicitBodyDocument((body) => (body['materialId'] = 'ghost')),
+      },
+      { name: 'implicit body: material id __proto__', input: () => implicitBodyDocument((body) => (body['materialId'] = '__proto__')) },
+      { name: 'implicit body: material id as an object', input: () => implicitBodyDocument((body) => (body['materialId'] = { petg: 1 })) },
     ],
   },
   {

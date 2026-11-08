@@ -123,26 +123,45 @@ body margins → resonance → drop.
   diagonal** (exact tie: the diagonal through the smaller vertex key), evaluated by both tetrahedra on the same numbers, so the mesh is
   conforming; a prism whose three diagonals turn one way gets a **Steiner vertex** at its centroid (never seen on 80 sweep fields, unit-tested
   directly). The [R9] dihedral bounds are therefore not proven for this variant; they are the refusal gate (`FLL_IMPLICIT_MESH_QUALITY` below
-  10.7832° or above 164.817°, or any folded / non-manifold / degenerate element) and measured: worst 13.6° over the sweep, 17.5° on a gyroid
-  sheet, 20.1° on the drone stand-in. **Pin [R9] and compare its parity rule before raising the gate.**
+  10.7832° or above 164.817°, or any folded / non-manifold / inverted / degenerate element, or any **open** boundary face) and measured:
+  worst 13.6° over the sweep, 17.5° on a gyroid sheet, 20.1° on the drone stand-in. **Pin [R9] and compare its parity rule before raising
+  the gate.** Conformity is checked, not assumed (review round 1): a boundary face with a corner off the iso-surface (`open`) is a crack
+  between neighbours that split a shared quadrilateral differently; a test that flips one split proves the count sees it. Elements are
+  oriented by the **reference configuration** (lattice vertices unwarped, cut points at edge midpoints, where every stencil piece is convex),
+  never by the warped geometry, so a geometrically inverted element is counted (`inverted`) and refused instead of being turned over.
 - FLL-D3 (FLL-M1): second order: one mid node per edge; mid nodes of boundary edges are projected onto the iso-surface (Newton on the field
-  gradient, at most 0.25 of the edge), undone where det J drops below 0.2 of the straight element at any of 15 check points (loop bounded by
-  progress). The reported volume is the exact integral of det J (Keast degree 3). Sphere R 10 at 2 mm: C3D4 −1.01 %, C3D10 −0.0012 %.
+  gradient, at most 0.25 of the edge), undone where any of the 20 **Bernstein coefficients** of det J (a cubic in the barycentric
+  coordinates) is below 0.2 of the straight element's det J: det J is their convex combination, so this bounds it everywhere in the element
+  (sufficient, not necessary: a few valid curvings are undone). The undo loop is bounded by progress. The reported volume is the exact
+  integral of det J (Keast degree 3). Sphere R 10 at 2 mm: C3D4 −1.01 %, C3D10 −0.0012 %.
 - FLL-D4 (FLL-M1): `source` is a **mesh control** (`set_mesh_controls source=implicit_field`), not an argument of the `fea_mesh` call: it is
   document data, so it enters the mesh input hash (a change makes the mesh stale), replays, and convergence studies re-mesh the same way
   (level controls carry it). Uniform size only: refinements and conformal bonding are refused (`FLL_IMPLICIT_MESH_UNSUPPORTED`), so are
   shell / plane-stress parts and plane-intersection targets; `edgesNear` is refused (a field has no B-rep edges).
-- FLL-D5 (FLL-M1): targets resolve like faceted (STL) parts in llull-mesh: `facesNear` = the face region of the nearest boundary triangle
-  (flood across edges turning less than 40°), tolerance max(1e-3 × diagonal, ½ spacing); `pointsNear` = nearest node. Verified on a box:
-  the end-face set holds only end-face nodes and covers its area exactly.
+- FLL-D5 (FLL-M1, revised in review round 1): `facesNear` = the face region of the nearest boundary triangle, grown across neighbours whose
+  **field normals** (normalised gradient at the triangle centroid) turn by less than 40° (llull-mesh's angle), tolerance max(1e-3 ×
+  diagonal, ½ spacing); `pointsNear` = nearest node. Facet normals are not enough: stuffing cuts a sharp field edge that lies off the
+  lattice planes into a strip of intermediate facets, and a facet-normal flood chained around it onto the next face (a box rotated off the
+  lattice: the +x face set reached the −x face); the gradient jumps at the edge, so the region stops there. Verified: the end face of an
+  axis box exactly; the +x face of a rotated box (every node within one spacing of its plane, ≥ 80 % on it); the pad faces of the drone
+  stand-in (nodes within h of z = ∓10 and r ≤ 16 + h, areas within 5 % of π 16²).
 - FLL-D6 (FLL-M1): an implicit body is derived and read-only (`assign_material` is refused, and its entity is rebuilt on load), so the
   material is given to `create_implicit_body material=<name>` and kept on the body record. Changing it later = a new body (follow-up: a body
-  material command if owners need it).
+  material command if owners need it). A body's `materialId` that is not a document material refuses the load (`implicit.bodies.<id>.
+materialId`), like every other dangling reference.
 - FLL-D7 (FLL-M1): host lifecycle: one job per part, shared by concurrent identical calls (content key over the job files), each caller with
   its own signal; the job tree is killed when its last caller leaves; a job silent for `LLULL_FIELD_TETS_STALL_S` (120 s) is stopped
   (`FLL_IMPLICIT_MESH_STALLED`); cancel / stall / refusal commit nothing. Budgets: 2^26 lattice vertices (checked before evaluation,
   `FLL_IMPLICIT_MESH_TOO_LARGE`), 2·10^6 tetrahedra (checked while stuffing) and the TS pre-check from the body volume (12 × 1.25 tets per
-  spacing³, `FEA_MESH_TOO_LARGE`).
+  spacing³, `FEA_MESH_TOO_LARGE`). Progress: every whole percent and at least every 5 s while a phase reports (lattice planes, root-search
+  chunks, stuffing layers, the quality scan, projection chunks, each undo pass). Convergence studies pass the caller's signal and progress
+  sink to every level, so a study of a field-meshed case is cancellable.
+- FLL-D8 (FLL-M1, review round 1): **explicit bounds clip exactly.** For a body created with `bounds` (a bare TPMS or lattice), the FE solid
+  is the field intersected with the bounds box (the compiler's own box primitive and sharp intersect, built in `implicitBodyField`), so the
+  clip is an iso-surface and no lattice corner on the border is inside the field. A border corner inside the field is refused by name
+  (`FLL_IMPLICIT_MESH_CLIPPED`) as a backstop. The display mesh of such a body is not clipped that way (marching tetrahedra over the bounds
+  padded by 2 voxels, open at the grid border): bounds state the solid, the display mesh only shows it. Clipped gyroid: −1.04 % at h 0.2,
+  −0.25 % at h 0.1 against a fine quadrature (second order: the chord across the sharp creases where the sheet meets the box).
 - FLL-D2: angular-acceleration body force: exact per-element load vs approximation; decide after VC-FLL-02 accuracy.
 
 ## 12. References
