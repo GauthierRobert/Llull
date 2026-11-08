@@ -9,6 +9,7 @@ import { partSetId } from '../decks/constitutive';
 import { FIELD_KEYS, TIME_KEYS, nonlinearValueProblems } from './shape';
 import { hyperelasticParts } from './settings';
 import { multiplierHistory } from './history';
+import { contactModelLines, contactStepLines } from '../contact/deck';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
 
@@ -161,7 +162,9 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
   if (refusal !== null) return refusal;
   const steps = nonlinear.stepOrder.flatMap((id) => (nonlinear.steps[id] === undefined ? [] : [nonlinear.steps[id]]));
   const history = multiplierHistory(nonlinear);
-  const lines: string[] = [];
+  const contact = contactModelLines(ctx);
+  if (!Array.isArray(contact)) return contact;
+  const lines: string[] = [...contact];
   for (const step of steps.filter((entry) => entry.amplitude === 'step'))
     lines.push(`*AMPLITUDE, NAME=${amplitudeName(step)}`, row(0, 1, 1, 1));
   for (const [index, step] of steps.entries()) {
@@ -179,13 +182,23 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
     lines.push(`*STEP${nonlinear.nlgeom === true ? ', NLGEOM' : ''}, INC=${control.maxIncrements}`);
     lines.push('*STATIC', row(control.initialIncrement, 1, control.minIncrement, control.maxIncrement));
     lines.push(...controlLines(nonlinear.convergence));
+    const contactStep = contactStepLines(ctx, step.id, steps[index - 1]?.id ?? null, rate);
+    lines.push(...contactStep.switches);
     lines.push(...mechanical.text.split('\n').filter((line) => line !== ''));
     if (control.kind === 'displacement') {
       const dof = DOF_NUMBER[control.dof];
       lines.push(`*BOUNDARY${step.amplitude === 'step' ? `, AMPLITUDE=${amplitudeName(step)}` : ''}`);
       lines.push(row(ctx.nset(`S_${step.id}`), dof, dof, control.value * ctx.lengthToAnalysis));
     }
-    lines.push(`*NODE FILE${rate}`, 'U, RF', `*EL FILE${rate}`, 'S, E, PEEQ', ...printLines(ctx, nonlinear, rate), '*END STEP');
+    lines.push(
+      `*NODE FILE${rate}`,
+      'U, RF',
+      `*EL FILE${rate}`,
+      'S, E, PEEQ',
+      ...printLines(ctx, nonlinear, rate),
+      ...contactStep.output,
+      '*END STEP',
+    );
   }
   return { text: linesText(lines) };
 }

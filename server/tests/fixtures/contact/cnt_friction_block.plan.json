@@ -1,0 +1,110 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [10, 10, 10], "position": [0, 0, 0], "anchor": "min" }, "as": "base" },
+  { "command": "add_box", "params": { "size": [10, 10, 10], "position": [0, 0, 10], "anchor": "min" }, "as": "block" },
+  { "command": "create_material", "params": { "name": "steel", "density": 0.00785, "color": "#999999", "metalness": 1, "roughness": 0.4 } },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "steel",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 210, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "unspecified",
+      "source": { "citation": "test input of VC-CNT-30 (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "steel", "set": { "id": "linear", "elastic": "elastic" }, "makeDefault": true }
+  },
+  { "command": "assign_material", "params": { "materialName": "steel", "entityIds": ["$base", "$block"] } },
+  { "command": "create_analysis", "params": { "name": "friction_block", "analysisType": "nonlinear_static" }, "as": "an" },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$base" } },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$block" } },
+  {
+    "command": "add_fea_constraint",
+    "params": { "analysisId": "$an", "name": "ground", "kind": "fixed", "target": { "entityId": "$base", "facesNear": [[5, 5, 0]] } },
+    "as": "ground"
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "guide",
+      "kind": "displacement",
+      "dofs": { "uy": 0 },
+      "target": { "entityId": "$block", "facesNear": [[5, 5, 20]] }
+    }
+  },
+  {
+    "command": "add_fea_load",
+    "params": {
+      "analysisId": "$an",
+      "name": "press",
+      "kind": "pressure",
+      "loadCase": "LC1",
+      "magnitude": 10,
+      "target": { "entityId": "$block", "facesNear": [[5, 5, 20]] }
+    }
+  },
+  {
+    "command": "add_contact_pair",
+    "params": {
+      "analysisId": "$an",
+      "name": "block_base",
+      "slave": { "entityId": "$block", "facesNear": [[5, 5, 10]] },
+      "master": { "entityId": "$base", "facesNear": [[5, 5, 10]] },
+      "formulation": "surface_to_surface",
+      "behaviour": { "kind": "linear", "slope": 1000000 },
+      "friction": { "mu": 0.2 },
+      "adjust": { "kind": "clearance", "value": 0.01 }
+    }
+  },
+  { "command": "set_nonlinear_controls", "params": { "analysisId": "$an", "nlgeom": false, "outputIncrements": "last_per_step" } },
+  {
+    "command": "add_analysis_step",
+    "params": {
+      "analysisId": "$an",
+      "name": "press",
+      "multipliers": { "LC1": 1 },
+      "control": {
+        "kind": "displacement",
+        "target": { "entityId": "$block", "facesNear": [[5, 5, 20]] },
+        "dof": "ux",
+        "value": 0,
+        "initialIncrement": 0.25,
+        "minIncrement": 0.0001,
+        "maxIncrement": 1,
+        "maxIncrements": 100
+      }
+    }
+  },
+  {
+    "command": "add_analysis_step",
+    "params": {
+      "analysisId": "$an",
+      "name": "slide",
+      "multipliers": { "LC1": 1 },
+      "control": {
+        "kind": "displacement",
+        "target": { "entityId": "$block", "facesNear": [[5, 5, 20]] },
+        "dof": "ux",
+        "value": 0.05,
+        "initialIncrement": 0.1,
+        "minIncrement": 0.0001,
+        "maxIncrement": 0.25,
+        "maxIncrements": 200
+      }
+    }
+  },
+  {
+    "command": "add_curve_probe",
+    "params": {
+      "analysisId": "$an",
+      "name": "friction",
+      "load": { "kind": "reaction", "constraintId": "$ground", "component": "x" },
+      "displacement": { "point": [5, 5, 20], "dof": "ux" }
+    }
+  },
+  { "command": "set_mesh_controls", "params": { "analysisId": "$an", "elementFamily": "tet", "order": 1, "globalSize": 2.5 } }
+]

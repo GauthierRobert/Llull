@@ -135,6 +135,18 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
       : { ...analysisCase.thermomech, thermal: withoutDispositions(analysisCase.thermomech.thermal) },
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
   ...(analysisCase.nonlinear !== undefined ? { nonlinear: withoutNames(analysisCase.nonlinear) } : {}),
+  ...(analysisCase.contact !== undefined
+    ? {
+        contact: {
+          formulation: analysisCase.contact.formulation,
+          pairs: analysisCase.contact.pairOrder.map((id) => {
+            const { name, ...rest } = analysisCase.contact?.pairs[id] ?? { name: '' };
+            void name;
+            return rest;
+          }),
+        },
+      }
+    : {}),
   ...laminateInputs(doc, analysisCase),
   ...(analysisCase.dynamics !== undefined ? { dynamics: analysisCase.dynamics, spectrum: baseSpectrum(doc, analysisCase) } : {}),
 });

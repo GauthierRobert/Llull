@@ -22,6 +22,8 @@ const GATED: Readonly<Record<string, RegExp>> = {
 
 /** Exempt readers and why: none issues a stress / fatigue / distortion pass-fail verdict that depends on the through-thickness resolution. */
 const EXEMPT: Readonly<Record<string, string>> = {
+  'contact/queries.ts':
+    'contact_report / check_contact read contact pressures, areas, slip and penetration (PHY-06): read-outs and set-up checks, no stress allowable or margin verdict',
   'commands/analysis.ts': 'reads the case state only (unmeshed / meshed / solved), no result values',
   'commands/probeHistory.ts': 'a probe history is a read-out of nodal values with its hash; reviewRequired, no allowable, no verdict',
   'commands/record.ts': 'records a summary after re-hashing the artifact (record_fe_mesh / record_fea_results); no engineering verdict',

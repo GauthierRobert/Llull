@@ -10,7 +10,6 @@ import type { DispositionLedgerEntry } from './dispositionLedger';
 import type { FitDispositions, FitLedgerEntry } from './fitDisposition';
 import type { Quantity } from './quantity';
 import type { FeMeshAdequacy } from './meshAdequacy';
-import type { DurabilityModel } from './durability';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
@@ -516,6 +515,8 @@ export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly thermal?: ThermalSetup;
   readonly thermomech?: ThermoMechSetup;
   readonly nonlinear?: NonlinearSettings;
+  /** PHY-06 contact pairs (nonlinear_static only); absent until the first `add_contact_pair`. */
+  readonly contact?: import('./contact').ContactSettings;
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */
   readonly topology?: Readonly<Record<string, TopologyStudy>>;
   readonly topologyOrder?: readonly string[];
@@ -542,7 +543,7 @@ export interface AnalysisModel {
   /** Margin / thermal-limit dispositions a human really signed (appended by dispose_margin / dispose_thermal_limit), kept by the cae `replaySeed` so a recorded step re-applies its verified act. */
   readonly dispositionLedger?: readonly DispositionLedgerEntry[];
   /** Absent until the first durability command (`define_load_history`, `define_crack`; plugin `cae`, PHY-07 / PHY-08). */
-  readonly durability?: DurabilityModel;
+  readonly durability?: import('./durability').DurabilityModel;
   /** PHY-09 spectrum / time-history library and equivalent-load provenance; absent until the first spectrum or history command. */
   readonly vibration?: DynamicsLibrary;
   readonly exceptionLedger?: readonly import('./convergenceStudy').StudyExceptionRecord[];

@@ -9,6 +9,7 @@ import { defeatureErrors, idealizationErrors } from './validateIdealization';
 import { ledgerErrors, studyErrors } from '../vnv/validateStudies';
 import { fitDispositionErrors } from '../thermomech/validateDispositions';
 import { dispositionLedgerErrors } from '../shared/validateDispositionLedger';
+import { contactErrors } from '../contact/validate';
 
 const TYPES = [
   'static',
@@ -234,6 +235,7 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
     scope.errors.push(...orientationErrors(thermomech['orientations'], scope.entities, `${where}.thermomech`));
   }
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
+  errors.push(...contactErrors(analysisCase, where, scope.entities));
   errors.push(...settingsErrors(analysisCase, where));
   errors.push(...studyErrors(analysisCase, id, where));
   checkStudyControls(scope, analysisCase, where);
