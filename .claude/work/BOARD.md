@@ -13,7 +13,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
-- 2026-11-07 (later) — owner goal: finish all aero + FEA tasks (section "Aero + FEA program"); subagents Sonnet 5.5, Opus 5.5 for complex lanes. Merged: VAC-M1 (cad-reviewer APPROVE + 4 fixes; check:fast on main 26666 pass, 0 fail). WIP: CNT-M2 (lane7, opus), CFD-M3a (lane2, opus), FLT-M1 (lane3, opus), NLS-M3 (lane6, sonnet). Next: NLS-M3, CRP-M2, FLL-M1, PRB, MSEL. CalculiX install pending the owner.
+- 2026-11-07 (later) — owner goal: finish all aero + FEA tasks (section "Aero + FEA program"); subagents Sonnet 5.5, Opus 5.5 for complex lanes. Merged: VAC-M1 (cad-reviewer APPROVE + 4 fixes; check:fast on main 26666 pass, 0 fail), CNT-M1/M2 (review round 1, 10 fixes; D9 bolted joint "incomplete" until NASA-STD-5020 eq. 6-6 is transcribed; check:fast 26757 pass + 1 load timeout that passes alone; real ccx feaContact + feaConvergence 4/4). WIP: CFD-M3a (lane2, review fixes), FLT-M1 (lane3), NLS-M3 (lane6, in review), CRP-M2 (lane7). Next: NLS-M3, CRP-M2, FLL-M1, PRB, MSEL. CalculiX install pending the owner.
 
 - 2026-11-07 — owner goal: execute all eligible tasks, merge into main, workers + reviewers on sonnet. Merged this run: PST-M5a, MOV-M2, CAT-FU, EQP-PID-FU, DRV-M1, MOV-M3, MOV-M4 (Export animation dialog; VC-MOV-10 playback in Media Player / PowerPoint is the owner's check), ISO-M6c (rest → ISO-M6d), SHP1 (uncapped settle + 100k-quad budget; subdivision_to_nurbs 6 s at the edge, accepted), DRV-M2 (transmissions, joint physics, load schedules; add_gear_coupling removed), DRV-UI (motors / drives / profiles / ledger in the Physics panel)., DAT-VIS-FU (scoped IFC; rest → DAT-VIS-FU2)., FIX-FUZZ-PD (all plugins pass the slice fuzz at 120 cases)., VNV-M3 (studies + check_verification + gate; rest → VNV-M3b)., ENG-10b (modal search + guide)., DRV-M3 (size_drive, check_motion_truth, fit_drive_parameters)., FIX-SIG-DFR (signature out of history, spend last, re-verified ledger)., S3 (region + hatch_region; rest → S3b)., FIX-JOBDIR., FIX-FLAKE-EAD., X3 (export_dxf R2000 + export_svg; rest → X3b, AutoCAD open = X3-CAD)., FIX-SIG-REST (every human gate: confirmation, spend last, verified ledgers; KNOWN_OFFENDERS empty)., DRV-M4 (pmsm / stepper / induction; run warnings reach check_motion_truth)., VNV-M4 (dt / p studies, least-squares order, verification panel; rest → VNV-M4b). No WIP: owner asked to stop after the in-flight tasks. Owner asked to stop after the in-flight tasks. Next: DRV-M5 / MOV-M5 / DRV-V1 (unblocked), VIS-M8 rest, ENG-4/5, 2D backlog.
 
@@ -145,11 +145,12 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 ## Aero + FEA program (owner 2026-11-07: "finish all aero and fea tasks"; spec = each pack's TECHNICAL_SPEC §10; each lane first audits which milestones are already built)
 
-- `[WIP]` **CNT-M2** 06 contact pairs, friction, deck writer, contact reader, `contact_report`, `check_contact` (+ M1 pure checks if missing). _Lane 1 (lane7, opus)_
 - `[TODO]` **CNT-M3** 06 bolt pretension (`add_bolt_pretension`, section imprint, lock), bolt forces, separation, VC-CNT-51. _deps: CNT-M2_
 - `[TODO]` **CNT-M4** 06 `joint_from_fastener_stack`, pin-in-hole, `joint_stiffness_from_fe`, joint margins. _deps: CNT-M3_
 - `[WIP]` **NLS-M3** 05 nonlinear: `add_imperfection`, `beam_large_deflection`, limit-load margins, VC-NLS-10/20/50 (+ M4 guide / curve panel). _Lane 1_
-- `[TODO]` **CRP-M2** 11 creep: `set_creep_step` / `delete_creep_step`, deck hook, history reader, `creep_report`, `check_creep` (+ M3–M5). _Lane 1_
+- `[TODO]` **NLS-M2b** 05 nonlinear leftovers of M1/M2 (found in NLS-M3): `update_analysis_step`, `delete_analysis_step`, `delete_curve_probe`, `nonlinear_report`, `check_nonlinear`, `nonlinear_analytic_check`; M4 guide section (`packages/protocol/src/conventions.ts`, Lane 4) + curve panel (Lane 2). _Lane 1 (+2, 4)_
+- `[TODO]` **FEA-PLANE** 05 bug: `server/src/fea/feaMesh.ts` drops `intersectPlane` from the mesh request although the target schema accepts it (pinned ends cannot be targeted). _Lane 4_
+- `[WIP]` **CRP-M2** 11 creep: `set_creep_step` / `delete_creep_step`, deck hook, history reader, `creep_report`, `check_creep` (+ M3–M5). _Lane 1_
 - `[TODO]` **MSEL** 12 material selection M1–M6 (`material_index`, `compare_materials`, `check_material_selection`, `substitute_material`). _Lane 1_
 - `[TODO]` **COR** 13 corrosion M1–M3 + M6 (`find_contacts`, environment, isolation, `check_material_compatibility`); M5 needs MIL-STD-889D access. _Lane 1_
 - `[TODO]` **MOI** 14 moisture / outgassing (`moisture_uptake`, `hygro_strain`, `ao_erosion`, mission environment, check). _Lane 1_
