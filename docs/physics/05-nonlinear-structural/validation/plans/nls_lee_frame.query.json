@@ -71,7 +71,7 @@
  ],
  "control": {
   "kind": "arc_length",
-  "arcLength": 1.0,
+  "arcLength": 1,
   "maxSteps": 5000
  },
  "stop": {
@@ -80,10 +80,9 @@
  "report": {
   "node": "P",
   "dofs": [
-   "ux",
-   "uy"
+   "uy",
+   "ux"
   ],
   "every": 5
- },
- "_note": "NAFEMS NL7 as quoted by S1 (consistent units, unit-free in the source); 20 elements per leg as the generator; normalised load = loadFactor x 120^2 / (720 x 2)"
+ }
 }

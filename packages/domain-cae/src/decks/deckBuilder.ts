@@ -13,6 +13,7 @@ import { commentText, idLines, linesText, row } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { nonlinearSteps } from '../nonlinear/deck';
+import { imperfectNodes } from '../nonlinear/imperfectionDeck';
 import { deckElementType, isCompositePart, planarSectionCards } from '../shell/shellDeck';
 import { PLANAR_TYPES } from '../shell/shellResults';
 import { isDynamicType } from '../dynamics/quantities';
@@ -142,9 +143,10 @@ export function precheck(
   return null;
 }
 
-function modelBlock(ctx: DeckContext): string[] {
+/** Nodes (the mesh nodes, or the imperfect ones of a nonlinear case), elements, the all-element set and the target node sets. */
+function modelBlock(ctx: DeckContext, nodes: FeMeshArtifact['nodes']): string[] {
   const { mesh } = ctx;
-  const lines = [`*NODE, NSET=${ALL_NODES}`, ...mesh.nodes.map(([id, x, y, z]) => row(id, x, y, z))];
+  const lines = [`*NODE, NSET=${ALL_NODES}`, ...nodes.map(([id, x, y, z]) => row(id, x, y, z))];
   for (const block of mesh.blocks) {
     lines.push(`*ELEMENT, TYPE=${deckElementType(ctx, block.type, block.entityId)}, ELSET=${ctx.elset(block.entityId)}`);
     lines.push(...block.elements.map((element) => row(...element)));
@@ -180,11 +182,14 @@ export function buildInp(
   if (problem !== null) return problem;
   const { analysis } = ctx;
   const heat = analysis.type === 'heat_steady' || analysis.type === 'heat_transient';
+  const geometry = analysis.type === 'nonlinear_static' ? imperfectNodes(ctx) : { nodes: mesh.nodes, comments: [] };
+  if ('code' in geometry) return geometry;
   const lines = [
     `** llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${analysisInputHash(doc, analysisId, 'full')} meshHash ${sha256Hex(canonicalJson(mesh))}`,
     '*HEADING',
     bindingMarker(analysisInputHash(doc, analysisId, 'full')),
-    ...modelBlock(ctx),
+    ...geometry.comments,
+    ...modelBlock(ctx, geometry.nodes),
   ];
   const materialOwners = new Map<string, string>();
   for (const entityId of Object.keys(analysis.parts))

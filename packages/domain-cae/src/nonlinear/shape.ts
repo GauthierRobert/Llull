@@ -4,6 +4,7 @@
  */
 
 import { isRecord } from '@lib/isRecord';
+import { imperfectionProblems } from './imperfectionShape';
 
 export const FIELD_KEYS = ['Rn', 'Cn', 'q0', 'qu', 'Rp', 'eps', 'Ceps', 'Rl'] as const;
 export const TIME_KEYS = ['I0', 'IR', 'IP', 'IC', 'IL', 'IG', 'IS', 'IA', 'IJ', 'IT'] as const;
@@ -91,7 +92,7 @@ function probeValueProblems(id: string, probe: Record<string, unknown>, where: s
   return problems;
 }
 
-/** Every value problem of a raw `nonlinear` slice (nlgeom, convergence, output, steps, probes). Structure of the bags is checked elsewhere. */
+/** Every value problem of a raw `nonlinear` slice (nlgeom, convergence, output, steps, probes, imperfections incl. their bag structure). Structure of the step / probe bags is checked elsewhere. */
 export function nonlinearValueProblems(nonlinear: unknown, where: string): string[] {
   if (!isRecord(nonlinear)) return [`${where}: expected a settings record`];
   const problems: string[] = [];
@@ -109,5 +110,6 @@ export function nonlinearValueProblems(nonlinear: unknown, where: string): strin
     if (!isRecord(entries)) continue;
     for (const [id, entry] of Object.entries(entries)) if (isRecord(entry)) problems.push(...check(id, entry, where));
   }
+  problems.push(...imperfectionProblems(nonlinear, where));
   return problems;
 }

@@ -35,6 +35,7 @@ import { refuseMargins } from './refusal';
 import { screenSingularities } from './singularity';
 import { adequacyOf } from '../results/adequacy';
 import { adequacyWarnings, gateRows, notAssessedText, overallOf } from './adequacyGate';
+import { limitLoadMarginSchema, limitLoadMarginTable } from './limitLoadMargins';
 
 const CRITERIA = ['von_mises', 's_xx', 's_yy', 's_zz'] as const;
 type Criterion = (typeof CRITERIA)[number];
@@ -316,9 +317,12 @@ function buildRows(
 /** Parameters that choose which margin table is computed (shared by compute_margins and dispose_margin, so a row id means the same row in both). */
 export const marginQueryShape = {
   criterion: z
-    .enum(CRITERIA)
+    .enum([...CRITERIA, 'limit_load'])
     .optional()
-    .describe('Applied stress: von_mises (default) or the largest magnitude of the normal component s_xx, s_yy or s_zz.'),
+    .describe(
+      'von_mises (default) or the largest |s_xx| / |s_yy| / |s_zz|; limit_load: limit-load margin of a nonlinear_static case (limitLoad).',
+    ),
+  limitLoad: limitLoadMarginSchema.optional(),
   allowable: allowableSchema
     .optional()
     .describe('"ftu" (ultimate check), "fty" (yield check), or { value, unit, against? }. Omit for both checks from the material models.'),
@@ -375,14 +379,16 @@ export function marginTable(
   ctx: ExecutionContext | undefined,
 ): MarginTable | MarginRefusal {
   const { groupBy = 'part', marginalBand } = query;
-  const criterion = query.criterion ?? 'von_mises';
   const refuse = (code: string, message: string): MarginRefusal => ({ code, message, ids: [analysisId] });
   const analysis = caseOf(doc, analysisId);
   if (analysis === undefined) return refuse('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`);
-  if (analysis.type !== 'static' && analysis.type !== 'thermo_static')
-    return refuse('FEA_ANALYSIS_TYPE_UNSUPPORTED', `margins need structural results; '${analysisId}' is ${analysis.type}`);
   if (marginalBand !== undefined && !(Number.isFinite(marginalBand) && marginalBand >= 0))
     return refuse('FEA_MARGIN_PARAM_INVALID', `marginalBand ${marginalBand} must be a finite number >= 0`);
+  if (query.criterion === 'limit_load') return limitLoadMarginTable(doc, analysis, query, ctx);
+  if (query.limitLoad !== undefined) return refuse('FEA_MARGIN_PARAM_INVALID', 'limitLoad applies to criterion limit_load only');
+  const criterion = query.criterion ?? 'von_mises';
+  if (analysis.type !== 'static' && analysis.type !== 'thermo_static')
+    return refuse('FEA_ANALYSIS_TYPE_UNSUPPORTED', `margins need structural results; '${analysisId}' is ${analysis.type}`);
   const { singularityRadius, singularityNote } = query;
   if (singularityRadius !== undefined && !(Number.isFinite(singularityRadius) && singularityRadius >= 0))
     return refuse(
@@ -513,7 +519,7 @@ export function marginTable(
 export const computeMargins = defineCommand({
   name: 'compute_margins',
   description:
-    'Compute margins of safety of a SOLVED static or thermo_static analysis from its results artifact (never from the document ' +
+    'Compute margins of safety of a SOLVED static or thermo_static analysis (or, criterion limit_load, of a solved nonlinear_static one: see limitLoad) from its results artifact (never from the document ' +
     'summary): per load case and part (groupBy part) or per constraint / load target (groupBy target), the maximum von Mises stress (or ' +
     'the largest magnitude of s_xx / s_yy / s_zz) over the nodes, against allowables. allowable omitted = both checks from the part ' +
     'material PHY-01 property models Ftu and Fty: for a thermo_static case read at the SOLVED temperature (the lower value at the coldest and hottest node of the part / target, ' +
