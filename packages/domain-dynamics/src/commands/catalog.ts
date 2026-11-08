@@ -1,4 +1,4 @@
-/** Rigid-body dynamics: bodies, joints, transmissions, joint physics, motors, propellers and the physics simulation. */
+/** Rigid-body dynamics: bodies, joints, transmissions, joint physics, motors, propellers, flight loads (rotors, body drag) and the physics simulation. */
 
 import { commandCatalog } from '@core/commands/schema';
 import { addRigidBody, deleteDynamicsItem, setGravity } from './bodies';
@@ -15,6 +15,7 @@ import { addReferenceData } from './engine/reference';
 import { compareToReference } from './engine/compareReference';
 import { checkTimestepConvergence } from './engine/timestepConvergence';
 import { addMotor, addPropeller } from './drives';
+import { addRotor, setBodyDrag } from './flight';
 import { checkMotorDataCommand } from './motorData';
 import { setMotorDrive } from './motorDrive';
 import { inspectDynamics } from './inspect';
@@ -43,6 +44,8 @@ export const dynamicsCommands = commandCatalog(
   checkMotorDataCommand,
   setMotorDrive,
   addPropeller,
+  addRotor,
+  setBodyDrag,
   addCylinderPressure,
   setEngineLosses,
   addReferenceData,

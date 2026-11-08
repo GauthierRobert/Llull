@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
 import { changed, commandError, failer, rejection } from '@core/commands/noop';
-import { dynamicsIdTaken } from '@core/model/dynamics';
+import { idTakenInDynamicsOrFlight } from '../flight/model';
 import { dynamicsOf, withDynamics } from './bodies';
 import { BODY_JOINT_KINDS, bodyJointKind } from './kinematicKinds';
 
@@ -96,7 +96,7 @@ export const addBodyJoint = defineCommand({
       return fail('a spherical joint has no spring (put stiffness on a revolute or prismatic tree joint)');
     if (params.springReference !== undefined && (params.stiffness ?? 0) === 0) return fail('springReference needs a stiffness > 0');
     const jointId = idOrNext(params.id, 'bjoint');
-    if (dynamicsIdTaken(dynamics, jointId)) return fail(`id '${jointId}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, jointId)) return fail(`id '${jointId}' is already used`);
     const initialVelocity =
       params.initialRpm !== undefined && kind === 'revolute' ? params.initialRpm * RAD_PER_S_PER_RPM : (params.initialVelocity ?? 0);
     const joint: DynamicJoint = {

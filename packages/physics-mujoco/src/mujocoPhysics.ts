@@ -17,23 +17,13 @@ import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './const
 import { createConstraintPhysics } from './constraintPhysics';
 import { springTendonName, toMjcf } from './mjcf';
 import { createServoSchedule } from './servoSchedule';
+import { createBodyStateReader, type BodyStateReader } from './bodyKinematics';
+import { relativeQuaternion } from './quaternion';
 
 interface JointSlot {
   readonly id: string;
   readonly qpos: number;
   readonly dof: number;
-}
-
-/** Quaternion product a · conj(b): the rotation from orientation b to orientation a. */
-function relativeQuaternion(a: Quaternion, b: Quaternion): Quaternion {
-  const [aw, ax, ay, az] = a;
-  const [bw, bx, by, bz] = [b[0], -b[1], -b[2], -b[3]];
-  return [
-    aw * bw - ax * bx - ay * by - az * bz,
-    aw * bx + ax * bw + ay * bz - az * by,
-    aw * by - ax * bz + ay * bw + az * bx,
-    aw * bz + ax * by - ay * bx + az * bw,
-  ];
 }
 
 function lookup(mujoco: MujocoModule, model: MjModel, type: number, name: string): number {
@@ -55,6 +45,17 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     for (const body of model.bodies) if (body.joint !== null) data.qvel[jointDof(joints, body.joint.id)] = body.joint.initialVelocity;
     mujoco.mj_forward(mjModel, data);
     const initialOrientation = new Map(bodies.map(({ id, index }) => [id, readQuaternion(data, index)]));
+    const stateBodies = new Set(model.bodyStates ?? []);
+    const bodyReader = createBodyStateReader(
+      mujoco,
+      mjModel,
+      data,
+      bodies.filter((body) => stateBodies.has(body.id)),
+      initialOrientation,
+    );
+    const bodyVelocity: Record<string, { linear: Vec3[]; angular: Vec3[] }> = Object.fromEntries(
+      bodies.filter((body) => stateBodies.has(body.id)).map((body) => [body.id, { linear: [], angular: [] }]),
+    );
     const wantReactions = options.reactions === true;
     const slots = loopSlots(mujoco, mjModel, model.loops);
     const reader = loopReader(slots);
@@ -175,6 +176,12 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     mujoco.mj_forward(mjModel, data); // actuator forces of the start state, with the set-points above
     const record = (read?: Reactions): void => {
       trace.times.push(data.time);
+      // a kinematics pass of the sampled state (it also makes xpos / xquat below those of the sample, not of the last RK4 stage)
+      if (bodyReader !== null)
+        for (const [id, velocity] of Object.entries(bodyReader.sample())) {
+          bodyVelocity[id]?.linear.push(velocity.linear);
+          bodyVelocity[id]?.angular.push(velocity.angular);
+        }
       auxTrace.forEach((series, slot) => series.push(aux[slot] ?? 0));
       ledgerTrace.forEach((series, entry) => series.push(ledgerCumulative[entry] ?? 0));
       if (options.energy === true && block !== undefined) actuatorWorkTrace.push(actuatorWork);
@@ -216,7 +223,14 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     record();
     let previousVelocity = joints.map((joint) => data.qvel[joint.dof] ?? 0);
     for (let step = 1; step <= steps; step++) {
-      const applied = applyLoads(model, data, { joints, bodies, initialPosition, previousVelocity, timestep: options.timestep });
+      const applied = applyLoads(model, data, {
+        joints,
+        bodies,
+        initialPosition,
+        previousVelocity,
+        timestep: options.timestep,
+        bodyReader,
+      });
       previousVelocity = applied.velocity;
       if (block !== undefined) {
         const out = block.advance(applied.state, aux, options.timestep);
@@ -271,6 +285,7 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     const potentialStart = energy.potential[0] ?? 0;
     return {
       ...trace,
+      ...(bodyReader === null ? {} : { bodyVelocity }),
       ...(options.energy === true
         ? {
             energy: {
@@ -373,6 +388,8 @@ interface LoadContext {
   /** Joint velocities at the start of the previous step. */
   readonly previousVelocity: readonly number[];
   readonly timestep: number;
+  /** Body kinematics for the bodies the loads read (null = none, no extra pass). */
+  readonly bodyReader: BodyStateReader | null;
 }
 
 /**
@@ -381,7 +398,7 @@ interface LoadContext {
  * drag) second-order. Returns the current velocities (the next call's `previousVelocity`).
  */
 function applyLoads(model: SimulationModel, data: MjData, context: LoadContext): { velocity: number[]; state: SimulationState } {
-  const { joints, bodies, initialPosition, previousVelocity, timestep } = context;
+  const { joints, bodies, initialPosition, previousVelocity, timestep, bodyReader } = context;
   const { qpos, qvel, qfrc_applied: jointForce, xfrc_applied: bodyForce } = data;
   const velocity = joints.map((joint) => qvel[joint.dof] ?? 0);
   const midVelocity = velocity.map((v, i) => v + 0.5 * (v - (previousVelocity[i] ?? v)));
@@ -394,12 +411,17 @@ function applyLoads(model: SimulationModel, data: MjData, context: LoadContext):
       ]),
     ),
     jointVelocity: Object.fromEntries(joints.map((joint, i) => [joint.id, midVelocity[i] ?? 0])),
+    ...(bodyReader === null ? {} : { bodies: bodyReader.midpoint(timestep) }),
   };
   const loads = model.loads(state);
   for (const joint of joints) jointForce[joint.dof] = loads.jointForces[joint.id] ?? 0;
   for (const { id, index } of bodies) {
     const force: Vec3 = loads.bodyForces[id] ?? [0, 0, 0];
-    for (let axis = 0; axis < 3; axis++) bodyForce[6 * index + axis] = force[axis] ?? 0;
+    const moment: Vec3 = loads.bodyMoments?.[id] ?? [0, 0, 0];
+    for (let axis = 0; axis < 3; axis++) {
+      bodyForce[6 * index + axis] = force[axis] ?? 0;
+      bodyForce[6 * index + 3 + axis] = moment[axis] ?? 0;
+    }
   }
   return { velocity, state };
 }

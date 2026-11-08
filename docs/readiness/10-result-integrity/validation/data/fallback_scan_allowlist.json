@@ -495,6 +495,11 @@
       "file": "domain-cae/src/contact/overclosure.ts",
       "match": "if (s !== null && (nearest === null || Math.abs(s) < Math.abs(nearest))) nearest = s;",
       "reason": "geometric nearest-face search of the overclosure measurement (closest master face to a slave node); not a value substituted for an input"
+    },
+    {
+      "file": "domain-dynamics/src/commands/flight.ts",
+      "match": "spinInertiaKgM2: params.spinInertiaKgM2 ?? 0,",
+      "reason": "add_rotor: omitted spinInertiaKgM2 means \"no gyroscopic torque\", stated in the param description and in the summary"
     }
   ]
 }

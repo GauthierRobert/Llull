@@ -9,7 +9,7 @@ import { changed, failer } from '@core/commands/noop';
 import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CadDocument, Vec3 } from '@core/model/types';
-import { dynamicsIdTaken } from '@core/model/dynamics';
+import { idTakenInDynamicsOrFlight } from '../flight/model';
 import { dynamicsOf, withDynamics } from './bodies';
 
 /** Attachment points closer than this (m) have no direction for the spring force. */
@@ -110,7 +110,7 @@ export const addSpring = defineCommand({
         `preloadN ${params.preloadN} N at ${params.stiffness} N/m would need a negative free length (distance ${distance * 1000} mm)`,
       );
     const springId = idOrNext(params.id, 'spring');
-    if (dynamicsIdTaken(dynamics, springId)) return fail(`id '${springId}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, springId)) return fail(`id '${springId}' is already used`);
     const spring: PointSpring = {
       id: springId,
       bodyA: params.bodyA,

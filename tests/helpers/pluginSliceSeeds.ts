@@ -30,6 +30,7 @@ import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtu
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import { flatDocument } from '../unit/vibroacoustics/fixtures';
+import { airframe, rotorParams } from '../unit/flight/flightFixture';
 import {
   bemNozzles,
   bemParams,
@@ -508,6 +509,35 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     query: { name: 'plm_status', params: constant({}) },
     mutate: { name: 'submit_for_review', params: constant({ comment: 'fuzz', at: '2026-11-02T10:00:00Z', by: 'u-0007' }) },
   },
+  dynamics: {
+    roots: ['flight'],
+    build: () => {
+      const table = {
+        points: [
+          [0, 0.1, 0.05],
+          [0.4, 0.06, 0.04],
+        ],
+        source: 'fuzz table',
+        grade: 'B',
+      };
+      const steps: [string, Record<string, unknown>][] = [
+        ['add_rotor', rotorParams({ id: 'r-static', hub: [10, 0, 0], spinInertiaKgM2: 1e-5 })],
+        [
+          'add_rotor',
+          {
+            ...rotorParams({ id: 'r-table', spin: 'cw', table }),
+            thrustCoefficient: undefined,
+            powerCoefficient: undefined,
+            source: undefined,
+          },
+        ],
+        ['set_body_drag', { body: 'frame', cdaM2: [0.01, 0.02, 0.05] }],
+      ];
+      return steps.reduce((doc, [name, params]) => execute(doc, name, params).document, airframe(1, [0.01, 0.01, 0.01], [0, 0, -9.81]));
+    },
+    query: { name: 'inspect_dynamics', params: constant({}) },
+    mutate: { name: 'set_body_drag', params: constant({ body: 'frame', cdaM2: [0.1, 0.1, 0.1] }) },
+  },
 };
 
 type SeedStep = { name: string; params: Record<string, unknown>; as?: string };
@@ -609,7 +639,7 @@ function machineSteps(): SeedStep[] {
  * SLICE_SEEDS; tests/unit/contract/pluginSliceFuzz.test.ts runs it with the targeted `driveMutations` as well.
  */
 export const DYNAMICS_SEED: PluginSliceSeed = {
-  roots: ['dynamics'],
+  roots: ['dynamics', 'flight'],
   build: () => {
     const steps: { name: string; params: Record<string, unknown>; as?: string }[] = [
       { name: 'add_cylinder', params: { radius: 5, height: 5, position: [0, 0, 0], axis: [0, 0, 1] }, as: 'cylinder' },
@@ -726,6 +756,9 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
         },
       },
       ...machineSteps(),
+      // a rotor and a body drag on bodies of the drive model: mutations of doc.dynamics (a body deleted, made fixed, an id reused) meet them
+      { name: 'add_rotor', params: rotorParams({ body: 'wheel', id: 'rt', hub: [50, 0, 0], spinInertiaKgM2: 1e-6 }) },
+      { name: 'set_body_drag', params: { body: 'nut', cdaM2: [0.01, 0.01, 0.02] } },
     ];
     let doc = createEmptyDocument();
     const ids = new Map<string, string>();

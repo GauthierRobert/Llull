@@ -2,5 +2,6 @@
 
 import type { CadPlugin } from '@core/plugins/plugin';
 import { dynamicsCommands } from './commands/catalog';
+import { flightDocument } from './flight/document';
 
-export const dynamicsPlugin: CadPlugin = { name: 'dynamics', toolset: 'assembly', commands: dynamicsCommands };
+export const dynamicsPlugin: CadPlugin = { name: 'dynamics', toolset: 'assembly', commands: dynamicsCommands, document: flightDocument };

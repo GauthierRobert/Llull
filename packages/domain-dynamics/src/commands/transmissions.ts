@@ -3,7 +3,8 @@
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, codedRejection, failer } from '@core/commands/noop';
-import { dynamicsIdTaken, type DynamicJoint, type DynamicsModel } from '@core/model/dynamics';
+import type { DynamicJoint, DynamicsModel } from '@core/model/dynamics';
+import { idTakenInDynamicsOrFlight } from '../flight/model';
 import { transmissionJoints, transmissionRatio, type Transmission } from '@core/model/transmissions';
 import { idOrNext } from '@lib/explicitId';
 import { leadScrewEfficiency, transmissionEfficiency } from '../sim/transmissions';
@@ -158,7 +159,7 @@ export const addTransmission = defineCommand({
         `efficiency ${params.efficiency} / efficiencyBack ${params.efficiencyBack} must be in (0, 1]`,
       );
     const id = idOrNext(params.id, 'trans');
-    if (dynamicsIdTaken(dynamics, id)) return fail(`id '${id}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, id)) return fail(`id '${id}' is already used`);
     const source = params.source === undefined ? {} : { source: toSource(params.source) };
     let transmission: Transmission;
     if (params.kind === 'gear') {

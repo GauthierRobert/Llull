@@ -152,10 +152,30 @@ export interface SimulationServo {
   readonly maxForce: number;
 }
 
+/**
+ * Pose and twist of one body (TR-FLT-01), world axes, SI. The body frame sits at the centre of mass with world-aligned axes at t = 0, so a
+ * vector fixed in the body at the modelled pose (a rotor axis, a hub offset) is `orientation` applied to it in the world at any time.
+ */
+export interface BodyKinematics {
+  /** Centre of mass, world, m. */
+  readonly position: Vec3;
+  /** Rotation from the t = 0 orientation (body axes = world axes at t = 0). */
+  readonly orientation: Quaternion;
+  /** Velocity of the centre of mass, world, m/s. */
+  readonly linearVelocity: Vec3;
+  /** Angular velocity, world, rad/s. */
+  readonly angularVelocity: Vec3;
+}
+
 export interface SimulationState {
   readonly time: number;
   readonly jointPosition: Readonly<Record<string, number>>;
   readonly jointVelocity: Readonly<Record<string, number>>;
+  /**
+   * Per body listed in `SimulationModel.bodyStates`, its kinematics at the same instant as the joint state (the step midpoint inside the
+   * engine); absent when the model lists none.
+   */
+  readonly bodies?: Readonly<Record<string, BodyKinematics>>;
 }
 
 /** A force at a body's centre of mass produced by an actuator, world axes, N. */
@@ -195,6 +215,8 @@ export interface AppliedLoads {
   readonly jointForces: Readonly<Record<string, number>>;
   /** World force at each body's centre of mass, N. */
   readonly bodyForces: Readonly<Record<string, Vec3>>;
+  /** World moment on each body about its centre of mass, N·m; absent = none. A force law acting off the centre of mass adds r × F here. */
+  readonly bodyMoments?: Readonly<Record<string, Vec3>>;
 }
 
 /**
@@ -259,6 +281,11 @@ export interface SimulationModel {
   readonly jointPhysics?: JointPhysicsBlock;
   /** Force laws, evaluated by the engine at every step (at the step midpoint) from the state. Must be pure. */
   readonly loads: (state: SimulationState) => AppliedLoads;
+  /**
+   * Bodies whose kinematics `loads` and `actuators` read (`SimulationState.bodies`) and the trace records (`SimulationTrace.bodyVelocity`);
+   * absent / empty = none, and the engine then does no extra work (the run is bit-identical to one without the field).
+   */
+  readonly bodyStates?: readonly string[];
 }
 
 export interface SimulationOptions {
@@ -289,6 +316,8 @@ export interface SimulationTrace {
   readonly bodyPosition: Record<string, Vec3[]>;
   /** Rotation from the t = 0 orientation. */
   readonly bodyOrientation: Record<string, Quaternion[]>;
+  /** Per body of `model.bodyStates`: velocity of the centre of mass (m/s) and angular velocity (rad/s), world, per sample. */
+  readonly bodyVelocity?: Record<string, { linear: Vec3[]; angular: Vec3[] }>;
   /** Force each servo applied: N·m or N. */
   readonly servoForce: Record<string, number[]>;
   /** Force the constraint of each loop exerts on its `bodyB`, world axes, N, per sample (needs `options.reactions`). */

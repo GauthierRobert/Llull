@@ -129,6 +129,7 @@ export const inspectDynamics = defineCommand({
       propellers: dynamics.propellers,
       cylinders: dynamics.cylinders ?? {},
       ...(Object.keys(dynamics.losses ?? {}).length > 0 ? { losses: dynamics.losses } : {}),
+      ...(doc.flight !== undefined ? { flight: doc.flight } : {}),
       problems,
       warnings,
       ...(structure ?? {}),
@@ -146,7 +147,10 @@ export const inspectDynamics = defineCommand({
     const counts =
       `${Object.keys(dynamics.joints).length} joint(s), ${Object.keys(dynamics.transmissions ?? {}).length} transmission(s), ` +
       `${Object.keys(dynamics.motors).length} motor(s), ${Object.keys(dynamics.propellers).length} propeller(s)` +
-      `${Object.keys(dynamics.cylinders ?? {}).length > 0 ? `, ${Object.keys(dynamics.cylinders ?? {}).length} cylinder(s)` : ''}`;
+      `${Object.keys(dynamics.cylinders ?? {}).length > 0 ? `, ${Object.keys(dynamics.cylinders ?? {}).length} cylinder(s)` : ''}` +
+      (doc.flight !== undefined
+        ? `, ${Object.keys(doc.flight.rotors).length} rotor(s), ${Object.keys(doc.flight.bodyDrag).length} body drag(s)`
+        : '');
     const mobilityText =
       structure !== null
         ? ` Mobility: ${structure.mobility.dof} DOF (Gruebler ${structure.mobility.gruebler}, rank ${structure.mobility.rank}), ` +
