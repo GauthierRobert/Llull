@@ -7,6 +7,7 @@ import { directionFrame } from '@core/geometry/viewDirections';
 import type { ViewFrame } from '@core/geometry/viewProjection';
 import { significantNumber } from '@lib/compactNumber';
 import { loadCasesOf } from '../decks/context';
+import { holdSets } from '../creep/history';
 import { stepOfLoadCase, type ResultStep } from './fields';
 import type { PlotMarker } from './fieldPlotSvg';
 import { faceNodes, indexMesh } from '../thermal/meshGeometry';
@@ -40,6 +41,9 @@ export function frameOf(view: (typeof VIEW_DIRECTIONS)[number], direction: reado
   ];
   return { toViewer, project: (p) => [p[0] * right[0] + p[1] * right[1] + p[2] * right[2], p[0] * up[0] + p[1] * up[1] + p[2] * up[2]] };
 }
+
+/** A requested hold time matches a stored result set within this relative tolerance (the frd time column has 10 digits); never the nearest set. */
+const CREEP_TIME_MATCH = 1e-6;
 
 export interface Selected {
   readonly step: ResultStep;
@@ -84,6 +88,17 @@ export function selectStep(
     return step === undefined
       ? 'the results hold no result set'
       : { step, label: analysis.type === 'heat_steady' ? 'steady state' : `t = ${significantNumber(step.time, 6)} s` };
+  }
+  if (analysis.type === 'creep') {
+    const sets = holdSets(analysis, results);
+    const picked =
+      time === undefined
+        ? sets.at(-1)
+        : sets.find((candidate) => Math.abs(candidate.holdTimeS - time) <= CREEP_TIME_MATCH * Math.max(1, Math.abs(time)));
+    if (picked !== undefined) return { step: picked.step, label: `hold t = ${significantNumber(picked.holdTimeS, 6)} s` };
+    return time === undefined
+      ? 'the results hold no result set of the creep hold'
+      : `no stored result set at hold time ${significantNumber(time, 6)} s (stored: ${sets.map((set) => significantNumber(set.holdTimeS, 6)).join(', ')})`;
   }
   const cases = loadCasesOf(analysis);
   const index = loadCase === undefined ? 0 : cases.findIndex((entry) => entry.name === loadCase);

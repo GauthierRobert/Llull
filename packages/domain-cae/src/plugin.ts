@@ -1,4 +1,4 @@
-/** CAE plugin: analysis set-up (05), thermal (PHY-03), thermo-mechanical (PHY-04), nonlinear static (PHY-05), contact and joints (PHY-06) and structural dynamics (PHY-09) commands under the `analysis` toolset. */
+/** CAE plugin: analysis set-up (05), thermal (PHY-03), thermo-mechanical (PHY-04), nonlinear static (PHY-05), contact and joints (PHY-06), creep (PHY-11) and structural dynamics (PHY-09) commands under the `analysis` toolset. */
 
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { analyticCommands } from './analytic/catalog';
@@ -12,6 +12,7 @@ import { marginCommands } from './margins/catalog';
 import { analysisErrors } from './model/validate';
 import { nonlinearCommands } from './nonlinear/catalog';
 import { contactCommands } from './contact/catalog';
+import { creepCommands } from './creep/catalog';
 import { reliabilityCommands } from './reliability/catalog';
 import { reliabilityErrors } from './reliability/model';
 import { vnvCommands } from './vnv/catalog';
@@ -48,6 +49,7 @@ export const caePlugin: CadPlugin = {
     ...thermomechCommands,
     ...nonlinearCommands,
     ...contactCommands,
+    ...creepCommands,
     ...fatigueCommands,
     ...fractureCommands,
     ...reliabilityCommands,

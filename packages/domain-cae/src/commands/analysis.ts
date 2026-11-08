@@ -27,6 +27,7 @@ const ANALYSIS_TYPES = [
   'buckling',
   'coupled_temperature_displacement',
   'nonlinear_static',
+  'creep',
   'frequency_response',
   'random_response',
   'explicit_dynamics',
@@ -40,6 +41,7 @@ const BUILT: ReadonlySet<AnalysisType> = new Set([
   'thermo_static',
   'coupled_temperature_displacement',
   'nonlinear_static',
+  'creep',
   'frequency_response',
   'random_response',
   'explicit_dynamics',
@@ -100,7 +102,7 @@ export const createAnalysis = defineCommand({
     'add_fea_constraint / add_fea_load, REQUIRES referenceTemperature; the temperature field is solved, not set), modal (free-vibration natural ' +
     'frequencies and mode shapes with `modes`, optionally restricted to frequencyRangeHz; needs a material density, loads are ignored; constraints define the supports - a model without supports (free-free) is written with a lower frequency bound of -1 Hz in *FREQUENCY; how ccx treats that bound (it may read it as a shift sigma = (2 pi fmin)^2 rather than a limit below zero) is UNVERIFIED against a real ccx run, and has six rigid-body modes at about 0 Hz, flagged by check_analysis FEA_UNDERCONSTRAINED; results.frequenciesHz, analysis_report data.eigen with mass participation) or buckling ' +
     '(linear eigenvalue buckling of the FIRST load case as reference load, `modes` factors; the critical load is factor x the applied load; ' +
-    'results.bucklingFactors; needs constraints and a load) or nonlinear_static (plasticity and/or large displacement with load or displacement steps: set it up with set_nonlinear_controls, set_part_constitutive_set, add_analysis_step and add_curve_probe; results.nonlinear) or frequency_response (harmonic steady-state response to loads or a base acceleration, CalculiX *STEADY STATE DYNAMICS over the modes) or random_response (response to a base acceleration ASD by modal superposition: rms, 3-sigma peaks, nodal rms field); both need modes or fMaxHz, then set_dynamic_damping, set_frequency_sweep and set_base_excitation (check_structural_dynamics lists what is missing). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
+    'results.bucklingFactors; needs constraints and a load) or nonlinear_static (plasticity and/or large displacement with load or displacement steps: set it up with set_nonlinear_controls, set_part_constitutive_set, add_analysis_step and add_curve_probe; results.nonlinear) or creep (a hold at constant loads and temperature while a Norton creep law relaxes / deforms the part, CalculiX *VISCO: set it up with set_creep_step, probe the creep strain with add_result_probe quantity ceeq, then creep_report and check_creep; needs a creep law on the part material, solver calculix) or frequency_response (harmonic steady-state response to loads or a base acceleration, CalculiX *STEADY STATE DYNAMICS over the modes) or random_response (response to a base acceleration ASD by modal superposition: rms, 3-sigma peaks, nodal rms field); both need modes or fMaxHz, then set_dynamic_damping, set_frequency_sweep and set_base_excitation (check_structural_dynamics lists what is missing). SAFETY FACTORS: without `factors`/`factor` the aerospace defaults apply ' +
     '(ultimate 1.5 per 14 CFR 25.303, yield 1.0) and the summary says so; when the user states a safety factor (e.g. "SF 2") pass `factor: 2` ' +
     '(one number applied to both ultimate and yield) or `factors` { ultimate, yield } - compute_margins applies exactly these. unitSystem follows the document unit (mm: N-mm-t-s, m: N-m-kg-s, in: lbf-in-slinch-s) and a different one is ' +
     'refused. The case starts with the default mesh (tet, quadratic, 10 mm) and no parts: next set_part_idealization, then ' +
@@ -111,7 +113,7 @@ export const createAnalysis = defineCommand({
     analysisType: z
       .enum(ANALYSIS_TYPES)
       .describe(
-        'static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement | modal | buckling | nonlinear_static | frequency_response | random_response.',
+        'static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement | modal | buckling | nonlinear_static | creep | frequency_response | random_response.',
       ),
     solver: z
       .enum(['calculix', 'llull_explicit', 'opencourant'])
@@ -183,6 +185,8 @@ export const createAnalysis = defineCommand({
         [],
         ['solver'],
       );
+    if (type === 'creep' && solver !== 'calculix')
+      return fail('CRP_SOLVER_UNSUPPORTED', `solver '${solver}' cannot run a creep analysis (calculix only)`, [], ['solver']);
     const unitSystem = unitSystemOf(doc.units);
     if (params.unitSystem !== undefined && params.unitSystem !== unitSystem)
       return fail(

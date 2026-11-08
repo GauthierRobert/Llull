@@ -13,6 +13,7 @@ import { commentText, idLines, linesText, row } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { nonlinearSteps } from '../nonlinear/deck';
+import { creepSteps } from '../creep/deck';
 import { deckElementType, isCompositePart, planarSectionCards } from '../shell/shellDeck';
 import { PLANAR_TYPES } from '../shell/shellResults';
 import { isDynamicType } from '../dynamics/quantities';
@@ -237,13 +238,15 @@ export function buildInp(
         ? staticStep(ctx)
         : analysis.type === 'nonlinear_static'
           ? nonlinearSteps(ctx)
-          : analysis.type === 'modal'
-            ? modalStep(ctx)
-            : analysis.type === 'buckling'
-              ? bucklingSteps(ctx)
-              : analysis.type === 'coupled_temperature_displacement'
-                ? disciplines.coupled.sections(ctx)
-                : disciplines.thermomech.sections(ctx);
+          : analysis.type === 'creep'
+            ? creepSteps(ctx)
+            : analysis.type === 'modal'
+              ? modalStep(ctx)
+              : analysis.type === 'buckling'
+                ? bucklingSteps(ctx)
+                : analysis.type === 'coupled_temperature_displacement'
+                  ? disciplines.coupled.sections(ctx)
+                  : disciplines.thermomech.sections(ctx);
   if (isDeckRefusal(steps)) return steps;
   return { text: `${linesText(lines)}${steps.text === '' || steps.text.endsWith('\n') ? steps.text : `${steps.text}\n`}` };
 }

@@ -22,6 +22,7 @@ const QUANTITIES = [
   's_xx',
   's_yy',
   's_zz',
+  'ceeq',
 ] as const satisfies readonly ProbeQuantity[];
 
 export const PROBE_QUANTITIES = [...QUANTITIES, ...CYLINDRICAL_QUANTITIES] as const;
@@ -39,7 +40,7 @@ export const addResultProbe = defineCommand({
     'axis (axisPoint + axisDirection; default: the z axis through the centre of the mesh bounding box, so a quarter / half model needs the ' +
     'real axis; hoop / radial are null on the axis). Dynamic cases: random_response probes read a_x / a_y / a_z (absolute acceleration rms, g), ' +
     'u_x_rel / u_y_rel / u_z_rel (displacement relative to the base) and s_xx / s_yy / s_zz; frequency_response probes read u_x / u_y / u_z and ' +
-    's_xx / s_yy / s_zz (complex response peaks). Returns the probe id in affected[0].',
+    's_xx / s_yy / s_zz (complex response peaks). creep cases also read ceeq (equivalent creep strain, dimensionless; time series in probe_history and creep_report, hold seconds). Returns the probe id in affected[0].',
   params: z.object({
     analysisId: analysisIdSchema,
     name: z.string().min(1).describe('Display name, e.g. "hot spot".'),
@@ -65,6 +66,15 @@ export const addResultProbe = defineCommand({
         'add_result_probe',
         'DYN_PROBE_QUANTITY',
         `quantity ${quantity} does not apply to a ${analysisCase.type} analysis${allowed === null ? '' : ` (use ${allowed.join(', ')})`}`,
+        [analysisId],
+        ['quantity'],
+      );
+    if (quantity === 'ceeq' && analysisCase.type !== 'creep')
+      return refuseCode(
+        doc,
+        'add_result_probe',
+        'FEA_PROBE_INVALID',
+        'ceeq (equivalent creep strain) applies to creep analyses only',
         [analysisId],
         ['quantity'],
       );

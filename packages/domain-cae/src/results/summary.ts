@@ -4,9 +4,12 @@ import type { FeMeshArtifact, FeResultsArtifact, MeshSummary, ResultsSummary } f
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { significantNumber } from '@lib/compactNumber';
+import { toMetres } from '@core/model/units';
 import { loadCasesOf } from '../decks/context';
+import { analysisLengthMetres } from '../shared/defaults';
 import { caseOf } from '../shared/access';
 import { nonlinearSummary } from '../nonlinear/summary';
+import { creepSummary } from '../creep/summary';
 import { thermalResultsSummary } from '../thermal/summary';
 import { transientResults } from '../thermomech/transientSummary';
 import { maxOverNodes, magnitude, nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from './fields';
@@ -77,6 +80,8 @@ export function resultsSummary(
   if (analysis.type === 'heat_steady' || analysis.type === 'heat_transient')
     return { ...base, loadCases: [], thermal: thermalResultsSummary(doc, analysisId, mesh, results) };
   if (analysis.type === 'nonlinear_static') return { ...base, ...nonlinearSummary(analysis, mesh, results) };
+  if (analysis.type === 'creep')
+    return { ...base, ...creepSummary(analysis, mesh, results, toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem)) };
   if (analysis.type === 'modal') return { ...base, loadCases: [], frequenciesHz: eigenColumn(results, 'eigenvalues', 3) };
   if (isDynamicType(analysis.type))
     return {

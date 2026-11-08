@@ -39,7 +39,7 @@
   "params": {
    "material": "relax_cube",
    "property": "E",
-   "value": 200000.0,
+   "value": 200000,
    "unit": "MPa",
    "basis": "company",
    "source": {
@@ -80,29 +80,74 @@
   "command": "add_material_model",
   "params": {
    "material": "relax_cube",
+   "id": "el",
    "model": {
-    "kind": "norton",
-    "A": {
-     "value": 1e-18,
-     "unit": "MPa^-5 s^-1"
+    "kind": "elastic_isotropic",
+    "E": {
+     "value": 200000,
+     "unit": "MPa"
     },
-    "n": 5.0,
-    "m": 0.0,
-    "validRange": {
-     "stressMPa": [
-      1,
-      400
-     ],
-     "temperatureK": [
+    "nu": {
+     "value": 0.3,
+     "unit": "1"
+    }
+   },
+   "validity": [
+    {
+     "variable": "T",
+     "unit": "K",
+     "data": [
       293,
       293
      ]
     }
-   },
+   ],
    "basis": "company",
    "source": {
     "citation": "test input of this validation case (not a material claim)"
    }
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "relax_cube",
+   "id": "creep",
+   "model": {
+    "kind": "creep_norton",
+    "A": 1e-18,
+    "n": 5,
+    "m": 0,
+    "stressUnit": "MPa",
+    "timeUnit": "s",
+    "hardening": "time"
+   },
+   "validity": [
+    {
+     "variable": "T",
+     "unit": "K",
+     "data": [
+      293,
+      293
+     ]
+    }
+   ],
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "define_constitutive_set",
+  "params": {
+   "material": "relax_cube",
+   "set": {
+    "id": "creep",
+    "elastic": "el",
+    "creep": "creep"
+   },
+   "makeDefault": true
   }
  },
  {
@@ -229,7 +274,7 @@
     "value": 1,
     "unit": "s"
    },
-   "cetol": 1e-05,
+   "cetol": 0.00001,
    "maxIncrements": 1000,
    "preloadStep": true,
    "nlgeom": false,
@@ -245,7 +290,7 @@
    "analysisId": "$an",
    "elementFamily": "tet",
    "order": 2,
-   "globalSize": 0.5
+   "globalSize": 0.25
   }
  },
  {

@@ -135,6 +135,7 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
       : { ...analysisCase.thermomech, thermal: withoutDispositions(analysisCase.thermomech.thermal) },
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
   ...(analysisCase.nonlinear !== undefined ? { nonlinear: withoutNames(analysisCase.nonlinear) } : {}),
+  ...(analysisCase.creep !== undefined ? { creep: analysisCase.creep } : {}),
   ...(analysisCase.contact !== undefined
     ? {
         contact: {
