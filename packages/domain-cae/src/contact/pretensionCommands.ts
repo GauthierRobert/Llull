@@ -11,7 +11,7 @@ import { isRefusal, nonlinearCase } from '../nonlinear/settings';
 import { refuseCnt } from './codes';
 import { findBolt, forceUnitName, pretensionProblem, withPretension } from './pretensionRules';
 import { preloadForce } from './pretensionDeck';
-import { lengthUnitName, toAnalysisLength } from '../decks/units';
+import { toAnalysisLength } from '../decks/units';
 
 const preloadSchema = z
   .discriminatedUnion('kind', [
@@ -109,7 +109,7 @@ export const addBoltPretension = defineCommand({
     const force = preloadForce(bolt.preload, toAnalysisLength(doc, analysis.unitSystem, 1));
     return changed(
       withPretension(doc, analysis, next),
-      `${command}: '${bolt.id}' (${bolt.name}) on '${bolt.entityId}' in '${analysis.id}': preload ${n(force)} ${forceUnitName(analysis.unitSystem)}${bolt.preload.kind === 'torque' ? ` (= ${n(bolt.preload.torque)} / (K ${bolt.preload.nutFactor} x D ${bolt.preload.diameter} ${lengthUnitName(analysis.unitSystem)}), nut factor source: ${bolt.preload.nutFactorSource})` : ''}, applied in step '${bolt.preloadStepId}', lockAfter ${bolt.lockAfter}${params.lockAfter === undefined ? ' (default)' : ''}; section plane through [${bolt.section.point.join(', ')}] normal [${bolt.section.normal.join(', ')}], cut from the mesh at fea_mesh time.`,
+      `${command}: '${bolt.id}' (${bolt.name}) on '${bolt.entityId}' in '${analysis.id}': preload ${n(force)} ${forceUnitName(analysis.unitSystem)}${bolt.preload.kind === 'torque' ? ` (= ${n(bolt.preload.torque)} / (K ${bolt.preload.nutFactor} x D ${bolt.preload.diameter} ${doc.units}), nut factor source: ${bolt.preload.nutFactorSource})` : ''}, applied in step '${bolt.preloadStepId}', lockAfter ${bolt.lockAfter}${params.lockAfter === undefined ? ' (default)' : ''}; section plane through [${bolt.section.point.join(', ')}] normal [${bolt.section.normal.join(', ')}], cut from the mesh at fea_mesh time.`,
       [analysis.id, bolt.id],
     );
   },

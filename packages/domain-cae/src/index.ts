@@ -54,6 +54,7 @@ export { writeVtu, type VtuEncoding } from './results/vtuWriter';
 export { meshSummary, resultsSummary } from './results/summary';
 export { meshAdequacy, inadequacyReasons } from './results/adequacy';
 export { bindingOf, frdBoundHashes, mismatchMessage, UNBOUND_WARNING } from './results/inputBinding';
+export { pretensionExtraNodes } from './contact/pretensionDeck';
 export { fieldPlotLayout } from './results/fieldPlotSvg';
 export { finishRaster, prepareRaster, rasterPixels, type PreparedRaster, type RasterPixels } from './results/fieldRaster';
 export { fieldPlotRequest, renderParams } from './results/plotRequest';

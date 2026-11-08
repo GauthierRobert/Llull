@@ -4,14 +4,14 @@
  * Oracle: statics (each end reaction = the preload, section force = the preload) and, for the lock, the bar stiffness E A / L. Skipped without llull-mesh / ccx.
  */
 
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { boltCuts } from '@cae/contact/pretensionResults';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { closeCase, dataOf, listOf, openCase, type PlanStep, type ThermalCase } from './feaThermalSupport';
-import { feaToolsMissing } from './feaTestSupport';
+import { FEA_TOOL_ENV, feaToolsMissing } from './feaTestSupport';
 
 const PLAN = path.resolve(__dirname, 'fixtures/contact/cnt_pretension_bar.plan.json');
 const PRELOAD_N = 10_000;
@@ -53,7 +53,31 @@ function driven(lockAfter: boolean): PlanStep[] {
   return out;
 }
 
+/** Two bolts in series on the same bar (each 10 kN): the planes at z = 7 and z = 14 cut the one part twice. */
+function series(): PlanStep[] {
+  const out: PlanStep[] = [];
+  for (const entry of plan()) {
+    out.push(entry);
+    if (entry.command === 'add_bolt_pretension')
+      out.push({ ...entry, params: { ...entry.params, name: 'pt2', section: { point: [0, 0, 14], normal: [0, 0, 1] } } });
+  }
+  return out.map((entry) =>
+    entry.command === 'add_bolt_pretension' && entry.params['name'] === 'pt'
+      ? { ...entry, params: { ...entry.params, section: { point: [0, 0, 7], normal: [0, 0, 1] } } }
+      : entry,
+  );
+}
+
+/** The bar meshed with second-order tetrahedra (C3D10). */
+function quadratic(): PlanStep[] {
+  return plan().map((entry) =>
+    entry.command === 'set_mesh_controls' ? { ...entry, params: { ...entry.params, order: 2, globalSize: 1.5 } } : entry,
+  );
+}
+
 interface Run {
+  readonly jobDirectory: string;
+  readonly nodes: number;
   readonly bolts: Record<string, number | null>[];
   readonly peaks: Record<string, number>;
   readonly check: Record<string, unknown>;
@@ -72,6 +96,7 @@ async function runPlan(name: string, steps: PlanStep[]): Promise<{ run: Run; c: 
   const meshed = await c.cli('fea_mesh', `analysisId=${c.analysisId}`, 'timeoutS=300');
   expect(meshed.code, String(meshed.json['summary'])).toBe(0);
   const checkBefore = dataOf((await c.cli('check_contact', `analysisId=${c.analysisId}`)).json);
+  (FEA_TOOL_ENV as Record<string, string>)['LLULL_FEA_KEEP'] = '1';
   const solved = await c.cli('fea_solve', `analysisId=${c.analysisId}`, 'timeoutS=600');
   expect(solved.code, String(solved.json['summary'])).toBe(0);
   const reported = await c.cli('contact_report', `analysisId=${c.analysisId}`);
@@ -83,7 +108,19 @@ async function runPlan(name: string, steps: PlanStep[]): Promise<{ run: Run; c: 
   const mesh = JSON.parse(gunzipSync(readFileSync(path.join(cacheDirectory, `${meshHash}.json.gz`))).toString('utf8')) as FeMeshArtifact;
   const cuts = analysis === undefined ? [] : boltCuts(analysis, mesh, 1);
   const area = Array.isArray(cuts) ? (cuts[0]?.cut.area ?? Number.NaN) : Number.NaN;
-  return { c, run: { bolts: listOf(dataOf(reported.json)['bolts']) as Record<string, number | null>[], peaks, check, checkBefore, area } };
+  const jobDirectory = String(dataOf(solved.json)['jobDirectory'] ?? '');
+  return {
+    c,
+    run: {
+      jobDirectory,
+      nodes: mesh.nodes.length,
+      bolts: listOf(dataOf(reported.json)['bolts']) as Record<string, number | null>[],
+      peaks,
+      check,
+      checkBefore,
+      area,
+    },
+  };
 }
 
 describe.skipIf(feaToolsMissing())('bolt pretension (netgen + ccx)', () => {
@@ -93,11 +130,17 @@ describe.skipIf(feaToolsMissing())('bolt pretension (netgen + ccx)', () => {
   let lockedCase: ThermalCase | undefined;
   let free: Run | undefined;
   let freeCase: ThermalCase | undefined;
+  let twin: Run | undefined;
+  let twinCase: ThermalCase | undefined;
+  let second: Run | undefined;
+  let secondCase: ThermalCase | undefined;
 
   beforeAll(async () => {
     ({ run: fixed, c: fixedCase } = await runPlan('pretension', plan()));
     ({ run: locked, c: lockedCase } = await runPlan('pretension-locked', driven(true)));
     ({ run: free, c: freeCase } = await runPlan('pretension-free', driven(false)));
+    ({ run: twin, c: twinCase } = await runPlan('pretension-series', series()));
+    ({ run: second, c: secondCase } = await runPlan('pretension-quadratic', quadratic()));
     const target = process.env['LLULL_PHYSICS_MEASUREMENTS'];
     if (target !== undefined && target !== '')
       appendFileSync(
@@ -110,6 +153,10 @@ describe.skipIf(feaToolsMissing())('bolt pretension (netgen + ccx)', () => {
     closeCase(fixedCase);
     closeCase(lockedCase);
     closeCase(freeCase);
+    closeCase(twinCase);
+    closeCase(secondCase);
+    for (const run of [fixed, locked, free, twin, second])
+      if (run !== undefined && run.jobDirectory !== '') rmSync(run.jobDirectory, { recursive: true, force: true });
   });
 
   it('accepts the deck: no set-up error before the solve, one bolt row for the one step', () => {
@@ -141,5 +188,38 @@ describe.skipIf(feaToolsMissing())('bolt pretension (netgen + ccx)', () => {
     const [, loose] = free?.bolts ?? [];
     expect(Math.abs((loose?.['axialForce'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
     expect(Math.abs(Math.abs(free?.peaks['bottom_reaction'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
+  });
+
+  it('two bolts in series on one part: each section force equals its own preload (0.5 %), the end reactions the preload', () => {
+    expect(twin?.bolts).toHaveLength(2);
+    for (const bolt of twin?.bolts ?? []) expect(Math.abs((bolt['axialForce'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
+    expect(Math.abs(Math.abs(twin?.peaks['bottom_reaction'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
+    expect(Math.abs(Math.abs(twin?.peaks['top_reaction'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
+  });
+
+  it('second-order tetrahedra: the section force is the preload (1 %), the end reactions the preload (0.5 %)', () => {
+    expect(Math.abs((second?.bolts[0]?.['axialForce'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.01);
+    expect(Math.abs(Math.abs(second?.peaks['bottom_reaction'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
+  });
+
+  it('the equation reaction of the duplicate nodes (CalculiX RF) is an independent bolt force: it equals the preload (0.5 %)', () => {
+    expect(Math.abs((fixed?.bolts[0]?.['reactionForce'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
+    expect(Math.abs((locked?.bolts[1]?.['reactionForce'] ?? 0) / (locked?.bolts[1]?.['axialForce'] ?? 1) - 1)).toBeLessThan(0.01);
+  });
+
+  it('fea_import_results accepts the CalculiX frd of a pretensioned case (duplicate nodes beyond the mesh) and records results the readers verify', async () => {
+    const analysisId = fixedCase?.analysisId ?? '';
+    const imported = await fixedCase?.cli(
+      'fea_import_results',
+      `analysisId=${analysisId}`,
+      'format=frd',
+      `file=${fixed?.jobDirectory}/job.frd`,
+    );
+    expect(imported?.code, String(imported?.json['summary'])).toBe(0);
+    const reported = await fixedCase?.cli('contact_report', `analysisId=${analysisId}`);
+    expect(reported?.code, String(reported?.json['summary'])).toBe(0);
+    const bolt = listOf(dataOf(reported?.json ?? {})['bolts'])[0];
+    expect(Math.abs(((bolt?.['axialForce'] as number | undefined) ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
+    expect(fixed?.nodes).toBeGreaterThan(0);
   });
 });

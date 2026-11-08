@@ -54,6 +54,18 @@ describe('add_bolt_pretension', () => {
     expect(result.summary).not.toContain('(default)');
   });
 
+  it('labels the diameter of a torque preload with the document unit, not the analysis one', () => {
+    const b = bolted({ units: 'cm' });
+    const result = execute(
+      b.doc,
+      'add_bolt_pretension',
+      sectionParams(b, { preload: { kind: 'torque', torque: 50, diameter: 0.5, nutFactor: 0.2, nutFactorSource: 's' } }),
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.summary).toContain('x D 0.5 cm)');
+    expect(result.summary).toContain('preload 50 N');
+  });
+
   it.each([
     ['analysisId', { analysisId: 'nope' }, 'FEA_ANALYSIS_NOT_FOUND'],
     ['entityId', { entityId: 'missing' }, 'FEA_TARGET_UNRESOLVED'],

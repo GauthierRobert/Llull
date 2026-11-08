@@ -51,13 +51,14 @@ export function pretensionErrors(
     typeof nonlinear === 'object' && nonlinear !== null && 'stepOrder' in nonlinear && Array.isArray(nonlinear.stepOrder)
       ? nonlinear.stepOrder
       : [];
+  const listed = new Set(settings.order);
   const names = new Set<string>();
   for (const key of Object.keys(settings.bolts)) {
     const bolt = settings.bolts[key] as BoltPretension;
     const path = `${at}.bolts.${key}`;
     if (RESERVED.has(key)) errors.push(`${path}: reserved key`);
     if (bolt.id !== key) errors.push(`${path}: id '${bolt.id}' differs from its key`);
-    if (!settings.order.includes(key)) errors.push(`${path}: missing from order`);
+    if (!listed.has(key)) errors.push(`${path}: missing from order`);
     if (names.has(bolt.name)) errors.push(`${path}: name '${bolt.name}' is used by another bolt`);
     names.add(bolt.name);
     if (!Object.hasOwn(entities, bolt.entityId)) errors.push(`${path}.entityId: entity '${bolt.entityId}' does not exist`);

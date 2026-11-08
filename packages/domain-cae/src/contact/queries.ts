@@ -89,8 +89,9 @@ export const contactReport = defineCommand({
     'a few % high where the pressure peaks at edges (measured +4 % on a sliding block); every result is reviewRequired. Compare with ' +
     'hertz_contact; finish with check_contact. With bolt pretensions (add_bolt_pretension) it also returns bolts [{ pretensionId, stepId, preload, ' +
     'axialForce (tension +), shearForce, bendingMoment, torsion, shortening }] from the stress on the section faces, clamp [{ pretensionId, pairId, ' +
-    'stepId, closedFraction }] (contact pairs within 1.5 bolt diameters of the axis) and separated [{ pretensionId, pairId, stepId, time }] (a pair fully ' +
-    'open around a bolt). A case with pretensions and no pair is accepted.',
+    'stepId, closedFraction }] (contact pairs within 1.5 bolt diameters of the axis) and separated [{ pretensionId, pairId, stepId, time }] (a pair with NO node in ' +
+    'contact inside that zone; a partly open zone is not separated: read its closedFraction). bolts also carry reactionForce, the independent cross-check from the equation ' +
+    'reactions of the duplicated cut nodes. Result fields at a cut node (fea_result_field, views) are the low-side copy: the nodes on the cut are duplicated in the solve. A case with pretensions and no pair is accepted.',
   annotations: { readOnly: true },
   params: z.object({
     analysisId: analysisIdSchema,

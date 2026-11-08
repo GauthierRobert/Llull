@@ -9,8 +9,10 @@
 
 import type { BoltPretension, PreloadSpec } from '@core/model/contact';
 import type { Vec3 } from '@core/model/vectors';
-import type { DeckContext, DeckRefusal } from '../decks/context';
-import { commentText, row } from '../decks/format';
+import type { FeMeshArtifact } from '@core/model/analysis';
+import type { CadDocument } from '@core/model/types';
+import { buildDeckContext, type DeckContext, type DeckRefusal } from '../decks/context';
+import { commentText, idLines, row } from '../decks/format';
 import { indexMesh } from '../thermal/meshGeometry';
 import { pretensionProblem } from './pretensionRules';
 import { isCutRefusal, numberDuplicates, pretensionCut, type PretensionCut } from './pretensionSection';
@@ -22,7 +24,7 @@ interface PlannedBolt {
   readonly cut: PretensionCut;
   readonly duplicates: ReadonlyMap<number, number>;
   readonly referenceNode: number;
-  readonly names: { readonly nset: string };
+  readonly names: { readonly nset: string; readonly duplicates: string };
 }
 
 export interface PretensionPlan {
@@ -89,6 +91,13 @@ function build(ctx: DeckContext): PretensionPlan | DeckRefusal {
         `bolt pretension '${bolt.id}' (${bolt.name}): the section touches the nodes of '${held[0]}' (a constraint, load or probe target); move the plane along the shank`,
         [bolt.id],
       );
+    const clash = cuts.find((other) => other.cut.nodes.some((node) => onCut.has(node)));
+    if (clash !== undefined)
+      return refuse(
+        'CNT_PRETENSION_SECTION_INVALID',
+        `bolt pretension '${bolt.id}' (${bolt.name}): its section shares nodes with the section of '${clash.bolt.id}' (${clash.bolt.name}); keep the planes one element apart`,
+        [bolt.id, clash.bolt.id],
+      );
     cuts.push({ bolt, position, cut });
   }
   const numbered = numberDuplicates(
@@ -101,19 +110,20 @@ function build(ctx: DeckContext): PretensionPlan | DeckRefusal {
     ...entry,
     duplicates: numbered[order] ?? new Map(),
     referenceNode: firstReference + entry.position,
-    names: { nset: `PTN_${entry.position + 1}` },
+    names: { nset: `PTN_${entry.position + 1}`, duplicates: `PTD_${entry.position + 1}` },
   }));
   const duplicateNodes = bolts.flatMap((planned) =>
-    [...planned.duplicates].map(([node, copy]) => {
-      const at = index.coordinates.get(node) ?? [0, 0, 0];
-      return [copy, at[0], at[1], at[2]] as const;
+    [...planned.duplicates].flatMap(([node, copy]) => {
+      const at = index.coordinates.get(node);
+      return at === undefined ? [] : [[copy, at[0], at[1], at[2]] as const];
     }),
   );
+  // an element above several cuts takes the copy of every cut it lies above (the cuts share no node, checked above)
   const substitute = (element: readonly number[]): readonly number[] => {
     const [id = 0, ...nodes] = element;
-    const owner = bolts.find((planned) => planned.cut.highElements.has(id));
-    if (owner === undefined) return element;
-    return [id, ...nodes.map((node) => owner.duplicates.get(node) ?? node)];
+    const above = bolts.filter((planned) => planned.cut.highElements.has(id));
+    if (above.length === 0) return element;
+    return [id, ...nodes.map((node) => above.find((planned) => planned.duplicates.has(node))?.duplicates.get(node) ?? node)];
   };
   return { bolts, substitute, duplicateNodes };
 }
@@ -145,6 +155,8 @@ export function pretensionModelLines(ctx: DeckContext): string[] | DeckRefusal {
   for (const planned of plan.bolts)
     lines.push(
       `** bolt pretension ${commentText(planned.bolt.id)} ${commentText(planned.bolt.name)}: ${planned.cut.nodes.length} cut nodes, section area ${row(planned.cut.area)}`,
+      `*NSET, NSET=${planned.names.duplicates}`,
+      ...idLines([...planned.duplicates.values()]),
       `*NODE, NSET=${planned.names.nset}`,
       row(planned.referenceNode, ...planned.cut.centroid),
       ...equations(planned),
@@ -176,7 +188,12 @@ export function pretensionStepLines(
       zeroed.push(row(planned.referenceNode, 1, 0));
       locks.push(row(planned.referenceNode, 1, 1));
     }
-    output.push(`*NODE PRINT, NSET=${planned.names.nset}${rate}`, 'U, RF');
+    output.push(
+      `*NODE PRINT, NSET=${planned.names.nset}${rate}`,
+      'U, RF',
+      `*NODE PRINT, NSET=${planned.names.duplicates}, TOTALS=ONLY${rate}`,
+      'RF',
+    );
   }
   return {
     loads: [
@@ -185,5 +202,25 @@ export function pretensionStepLines(
       ...(locks.length > 0 ? ['*BOUNDARY, FIXED', ...locks] : []),
     ],
     output,
+  };
+}
+
+/**
+ * Node numbers the pretensions add to the mesh: the duplicates of every cut and the reference nodes (which belong to no element, so a CalculiX results
+ * file does not hold them), ascending.
+ * @failure no pretension, or one the deck would refuse -> both lists empty
+ */
+export function pretensionExtraNodes(
+  doc: CadDocument,
+  analysisId: string,
+  mesh: FeMeshArtifact,
+): { duplicates: number[]; references: number[] } {
+  const ctx = buildDeckContext(doc, analysisId, mesh);
+  const plan = ctx === null ? null : pretensionPlan(ctx);
+  if (plan === null || 'code' in plan) return { duplicates: [], references: [] };
+  const ascending = (nodes: number[]): number[] => nodes.sort((a, b) => a - b);
+  return {
+    duplicates: ascending(plan.bolts.flatMap((planned) => [...planned.duplicates.values()])),
+    references: ascending(plan.bolts.map((planned) => planned.referenceNode)),
   };
 }

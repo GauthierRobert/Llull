@@ -200,3 +200,51 @@ describe('separation (clamp zone of the pairs around a bolt)', () => {
     expect(data.separated).toMatchObject([{ stepId: b.stepId, time: 1 }]);
   });
 });
+
+describe('bolt readout cross-checks and cut nodes', () => {
+  const stress = (value: number): number[] => [0, 0, value, 0, 0, 0];
+  const labels = ['SXX', 'SYY', 'SZZ', 'SXY', 'SYZ', 'SZX'];
+
+  it('reads the equation force of the duplicate nodes as an independent cross-check: reactionForce = -(sum RF) . n', () => {
+    const b = bolted();
+    const added = must(b.doc, 'add_bolt_pretension', sectionParams(b));
+    const dat: FeResultsArtifact['dat'] = {
+      tables: [{ title: 'total force (fx,fy,fz) for set PTD_1 and time 0.1000000E+01', time: 1, rows: [[22.2, 22.2, -10]] }],
+    };
+    const { doc, ctx } = solveBolted(b, added.doc, frdSet(1, 1, [stressBlock(() => stress(10))]), dat);
+    const [row] = dataOf(execute(doc, 'contact_report', { analysisId: b.analysisId }, ctx)).bolts;
+    expect(row?.['reactionForce']).toBeCloseTo(10, 12);
+    const bare = solveBolted(b, added.doc, frdSet(1, 1, [stressBlock(() => stress(10))]));
+    expect(dataOf(execute(bare.doc, 'contact_report', { analysisId: b.analysisId }, bare.ctx)).bolts[0]?.['reactionForce']).toBeNull();
+  });
+
+  it('no stress on any section face is an error, stress on only some faces is a warning with the counts', () => {
+    const b = bolted();
+    const added = must(b.doc, 'add_bolt_pretension', sectionParams(b));
+    const none = solveBolted(b, added.doc, frdSet(1, 1, [stressBlock(() => stress(10), [1])]));
+    const empty = (
+      execute(none.doc, 'check_contact', { analysisId: b.analysisId }, none.ctx).data as { items: { code: string; severity: string }[] }
+    ).items;
+    expect(empty.find((entry) => entry.code === 'CNT_PRELOAD_MISMATCH')?.severity).toBe('error');
+    const some = solveBolted(b, added.doc, frdSet(1, 1, [stressBlock(() => stress(10), [9, 11, 12])]));
+    const result = execute(some.doc, 'check_contact', { analysisId: b.analysisId }, some.ctx);
+    const items = (result.data as { items: { code: string; severity: string; message: string }[] }).items;
+    expect(items.find((entry) => entry.message.includes('of 2 section faces only'))?.severity).toBe('warning');
+  });
+
+  it('a node on the cut reads the low-side copy; the duplicates are no mesh nodes and stay out of the statistics', () => {
+    const b = bolted();
+    const added = must(b.doc, 'add_bolt_pretension', sectionParams(b));
+    const values: Record<number, readonly number[]> = {};
+    for (let node = 1; node <= 28; node++) values[node] = stress(8);
+    for (const node of [29, 30, 31, 32]) values[node] = stress(12);
+    const { doc, ctx } = solveBolted(b, added.doc, frdSet(1, 1, [frdBlock('STRESS', labels, values)]));
+    const result = execute(doc, 'fea_result_field', { analysisId: b.analysisId, field: 'von_mises', nodes: [9, 29] }, ctx);
+    expect(result.error).toBeUndefined();
+    const data = result.data as { count: number; max: { value: number }; rows: { node: number; value: number }[]; missingNodes: number[] };
+    expect(data.rows).toEqual([expect.objectContaining({ node: 9, value: expect.closeTo(8, 10) })]);
+    expect(data.missingNodes).toEqual([29]);
+    expect(data.count).toBe(28);
+    expect(data.max.value).toBeCloseTo(8, 10);
+  });
+});

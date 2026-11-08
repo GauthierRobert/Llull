@@ -23,11 +23,13 @@ export interface Bolted {
   readonly bottomId: string;
   readonly topId: string;
   readonly pairId: string | null;
+  /** Document length unit -> analysis length (mm): 1 for a mm document, 10 for centimetres. */
+  readonly lengthScale: number;
 }
 
 /** Bolt z 0..4 and plate z 4..5; steel; fixed bottom (bolt z = 0) and top (plate z = 5); one load step (no external load); nlgeom false. */
-export function bolted(options: { readonly pair?: boolean } = {}): Bolted {
-  let doc = createEmptyDocument();
+export function bolted(options: { readonly pair?: boolean; readonly units?: 'mm' | 'cm' } = {}): Bolted {
+  let doc = options.units === 'cm' ? must(createEmptyDocument(), 'set_units', { units: 'cm' }).doc : createEmptyDocument();
   const boltBox = must(doc, 'add_box', { size: [1, 1, 4], position: [0, 0, 0], anchor: 'min' });
   const plateBox = must(boltBox.doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 4], anchor: 'min' });
   const [bolt = '', plate = ''] = [boltBox.affected[0], plateBox.affected[0]];
@@ -87,6 +89,7 @@ export function bolted(options: { readonly pair?: boolean } = {}): Bolted {
     bottomId: bottom.affected[0] ?? '',
     topId: top.affected[0] ?? '',
     pairId,
+    lengthScale: options.units === 'cm' ? 10 : 1,
   };
 }
 
@@ -152,7 +155,7 @@ export function boltedMesh(b: Bolted, doc: CadDocument): FeMeshArtifact {
     mesher: 'test',
     mesherVersion: '1',
     inputHash: analysisInputHash(doc, b.analysisId, 'mesh'),
-    nodes: NODES,
+    nodes: NODES.map(([id, x, y, z]) => [id, x * b.lengthScale, y * b.lengthScale, z * b.lengthScale] as const),
     blocks: [
       { type: 'C3D4', entityId: b.bolt, elements: ELEMENTS.slice(0, 24) },
       { type: 'C3D4', entityId: b.plate, elements: ELEMENTS.slice(24) },
@@ -238,4 +241,40 @@ export function solveBolted(b: Bolted, doc: CadDocument, frd: string, dat?: FeRe
   const summary = resultsSummary(meshed.doc, b.analysisId, mesh, results, hashOf(results));
   const recorded = must(meshed.doc, 'record_fea_results', { analysisId: b.analysisId, summary }, ctx);
   return { doc: recorded.doc, ctx, mesh, results };
+}
+
+/** The mesh with every tetrahedron made a C3D10: mid-side nodes 5..10 on edges 12, 23, 31, 14, 24, 34 (CalculiX order), shared per edge, ids from 101. */
+export function quadraticMesh(mesh: FeMeshArtifact): FeMeshArtifact {
+  const at = new Map(mesh.nodes.map(([id, x, y, z]) => [id, [x, y, z] as const]));
+  const mids = new Map<string, number>();
+  const extra: [number, number, number, number][] = [];
+  const mid = (a: number, b: number): number => {
+    const key = a < b ? `${a},${b}` : `${b},${a}`;
+    const found = mids.get(key);
+    if (found !== undefined) return found;
+    const id = 101 + mids.size;
+    const [ax = 0, ay = 0, az = 0] = at.get(a) ?? [];
+    const [bx = 0, by = 0, bz = 0] = at.get(b) ?? [];
+    mids.set(key, id);
+    extra.push([id, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2]);
+    return id;
+  };
+  const blocks = mesh.blocks.map((block) => ({
+    ...block,
+    type: 'C3D10' as const,
+    elements: block.elements.map(([id = 0, a = 0, b = 0, c = 0, d = 0]) => [
+      id,
+      a,
+      b,
+      c,
+      d,
+      mid(a, b),
+      mid(b, c),
+      mid(c, a),
+      mid(a, d),
+      mid(b, d),
+      mid(c, d),
+    ]),
+  }));
+  return { ...mesh, nodes: [...mesh.nodes, ...extra], blocks };
 }

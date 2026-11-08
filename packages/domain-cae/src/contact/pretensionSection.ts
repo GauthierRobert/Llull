@@ -65,8 +65,12 @@ function pieceCount(index: MeshIndex, faces: readonly (readonly [number, number]
   return new Set(faces.map((_, face) => find(face))).size;
 }
 
-const cornersOf = (index: MeshIndex, element: MeshElement, fallback: Vec3): Vec3[] =>
-  element.nodes.slice(0, 4).map((node) => index.coordinates.get(node) ?? fallback);
+/** Corner coordinates of an element (the cut refuses a part with a node that has none, so none is skipped there). */
+const cornersOf = (index: MeshIndex, element: MeshElement): Vec3[] =>
+  element.nodes.slice(0, 4).flatMap((node) => {
+    const at = index.coordinates.get(node);
+    return at === undefined ? [] : [at];
+  });
 
 /** Area vector (cross product / 2) of the triangle `a b c`. */
 const triangleAreaVector = (a: Vec3, b: Vec3, c: Vec3): Vec3 => scale3(cross3(sub3(b, a), sub3(c, a)), 0.5);
@@ -74,7 +78,7 @@ const triangleAreaVector = (a: Vec3, b: Vec3, c: Vec3): Vec3 => scale3(cross3(su
 /** Area vector of the face `a b c` of `element`, pointing out of the element (away from its centroid). */
 export function outwardAreaVector(index: MeshIndex, element: MeshElement, a: Vec3, b: Vec3, c: Vec3): Vec3 {
   const centre = scale3(add3(add3(a, b), c), 1 / 3);
-  const corners = cornersOf(index, element, centre);
+  const corners = cornersOf(index, element);
   const inside = scale3(
     corners.reduce((sum, corner) => add3(sum, corner), [0, 0, 0] as Vec3),
     1 / corners.length,
@@ -110,9 +114,11 @@ export function pretensionCut(
   const unit = scale3(normal, 1 / length);
   const part = [...index.elements.values()].filter((element) => element.entityId === entityId);
   if (part.length === 0) return refuse(`part '${entityId}' has no tetrahedral elements in the mesh`);
+  const missing = part.flatMap((element) => element.nodes.filter((node) => !index.coordinates.has(node)))[0];
+  if (missing !== undefined) return refuse(`part '${entityId}' uses node ${missing}, which has no coordinates in the mesh`);
   const high = new Set<number>();
   for (const element of part) {
-    const corners = cornersOf(index, element, point);
+    const corners = cornersOf(index, element);
     const centroid = scale3(
       corners.reduce((sum, corner) => add3(sum, corner), [0, 0, 0] as Vec3),
       1 / corners.length,
@@ -141,6 +147,15 @@ export function pretensionCut(
   faces.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const pieces = pieceCount(index, faces);
   if (pieces !== 1) return refuse(`the plane cuts part '${entityId}' in ${pieces} separate sections (a bolt shank needs exactly one)`);
+  const cutNodes = [...lowNodes].filter((node) => highNodes.has(node)).sort((a, b) => a - b);
+  const onCut = new Set(cutNodes);
+  for (const element of index.elements.values()) {
+    const shared = element.entityId === entityId ? undefined : element.nodes.find((node) => onCut.has(node));
+    if (shared !== undefined)
+      return refuse(
+        `cut node ${shared} is also a node of part '${element.entityId}' (a conformal mesh shares nodes between parts); move the plane`,
+      );
+  }
   let area = 0;
   let weighted: Vec3 = [0, 0, 0];
   for (const [elementId, label] of faces) {
@@ -156,7 +171,7 @@ export function pretensionCut(
   return {
     faces,
     highElements: high,
-    nodes: [...lowNodes].filter((node) => highNodes.has(node)).sort((a, b) => a - b),
+    nodes: cutNodes,
     area,
     diameter: Math.sqrt((4 * area) / Math.PI),
     centroid: area > 0 ? scale3(weighted, 1 / area) : point,

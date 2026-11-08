@@ -173,20 +173,36 @@ export function boltItems(analysis: AnalysisCase, report: BoltReport): ContactIt
     item(
       'CNT_SEPARATED',
       'fail',
-      `bolt '${entry.pretensionId}': the clamp zone of pair '${entry.pairId}' is fully open from step '${entry.stepId}' (time ${n(entry.time)})`,
+      `bolt '${entry.pretensionId}': the clamp zone of pair '${entry.pairId}' has no node in contact (every slave node within the clamp zone, CPRESS = 0) from step '${entry.stepId}' (time ${n(entry.time)}); partial opening is not flagged`,
       [entry.pretensionId, entry.pairId, entry.stepId],
     ),
   );
   for (const row of report.bolts) {
-    const bolt = analysis.pretension?.bolts[row.pretensionId];
-    if (bolt === undefined || row.stepId !== bolt.preloadStepId) continue;
     if (row.facesUsed === 0)
       items.push(
-        item('CNT_PRELOAD_MISMATCH', 'warning', `bolt '${row.pretensionId}': the results carry no stress on the section faces`, [
-          row.pretensionId,
-        ]),
+        item(
+          'CNT_PRELOAD_MISMATCH',
+          'error',
+          `bolt '${row.pretensionId}' step '${row.stepId}': the results carry no stress on any of the ${row.faces} section faces`,
+          [row.pretensionId, row.stepId],
+        ),
       );
-    else if (Math.abs(row.axialForce - row.preload) > PRELOAD_TOLERANCE * Math.abs(row.preload))
+    else if (row.facesUsed < row.faces)
+      items.push(
+        item(
+          'CNT_PRELOAD_MISMATCH',
+          'warning',
+          `bolt '${row.pretensionId}' step '${row.stepId}': stress found on ${row.facesUsed} of ${row.faces} section faces only; the force is an underestimate`,
+          [row.pretensionId, row.stepId],
+        ),
+      );
+    const bolt = analysis.pretension?.bolts[row.pretensionId];
+    if (
+      row.facesUsed > 0 &&
+      bolt !== undefined &&
+      row.stepId === bolt.preloadStepId &&
+      Math.abs(row.axialForce - row.preload) > PRELOAD_TOLERANCE * Math.abs(row.preload)
+    )
       items.push(
         item(
           'CNT_PRELOAD_MISMATCH',

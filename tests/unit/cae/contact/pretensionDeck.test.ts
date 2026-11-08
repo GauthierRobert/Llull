@@ -6,7 +6,7 @@ import { writeInp } from '@cae/decks/inpWriter';
 import { caseOf, withCase } from '@cae/shared/access';
 import { isCutRefusal, pretensionCut } from '@cae/contact/pretensionSection';
 import { must } from './support';
-import { bolted, boltedMesh, sectionParams, type Bolted } from './boltSupport';
+import { bolted, boltedMesh, quadraticMesh, sectionParams, type Bolted } from './boltSupport';
 
 function deckOf(b: Bolted, doc: CadDocument, mesh: FeMeshArtifact = boltedMesh(b, doc)): string {
   const written = writeInp(doc, b.analysisId, mesh);
@@ -76,7 +76,7 @@ describe('pretension deck', () => {
     expect(text).toContain('*NODE\n29, 0, 0, 2\n30, 1, 0, 2\n31, 0, 1, 2\n32, 1, 1, 2\n*ELEMENT');
     expect(text.match(/^\*EQUATION$/gm)).toHaveLength(12);
     expect(text).toContain(
-      `** bolt pretension ${boltId} m1: 4 cut nodes, section area 1\n*NODE, NSET=PTN_1\n33, 0.5, 0.5, 2\n*EQUATION\n2\n29, 1, 1, 9, 1, -1\n`,
+      `** bolt pretension ${boltId} m1: 4 cut nodes, section area 1\n*NSET, NSET=PTD_1\n29, 30, 31, 32\n*NODE, NSET=PTN_1\n33, 0.5, 0.5, 2\n*EQUATION\n2\n29, 1, 1, 9, 1, -1\n`,
     );
     expect(text).toContain('*EQUATION\n3\n29, 3, 1, 9, 3, -1, 33, 1, 1\n');
     const rows = text.split('\n').filter((line) => /^\d+, \d+, \d+, \d+, \d+$/.test(line));
@@ -84,7 +84,7 @@ describe('pretension deck', () => {
     expect(rows.filter((line) => Number(line.split(', ')[0]) >= 13 && copies(line)).length).toBeGreaterThan(0);
     expect(rows.filter((line) => Number(line.split(', ')[0]) <= 12 && copies(line))).toHaveLength(0);
     expect(text).toContain('*CLOAD\n33, 1, 10\n*NODE FILE');
-    expect(text).toContain('*NODE PRINT, NSET=PTN_1\nU, RF\n*END STEP');
+    expect(text).toContain('*NODE PRINT, NSET=PTN_1\nU, RF\n*NODE PRINT, NSET=PTD_1, TOTALS=ONLY\nRF\n*END STEP');
     expect(text).not.toContain('*PRE-TENSION');
   });
 
@@ -142,5 +142,136 @@ describe('pretension deck', () => {
     expect(writeInp(flat, b.analysisId, boltedMesh(b, flat))).toMatchObject({ code: 'CNT_PRETENSION_SECTION_INVALID', ids: [boltId] });
     const late = at({ preloadStepId: 'gone' });
     expect(writeInp(late, b.analysisId, boltedMesh(b, late))).toMatchObject({ code: 'CNT_STEP_UNKNOWN', ids: [boltId] });
+  });
+});
+
+/** Element rows `[id, ...nodes]` of every `*ELEMENT` card of a deck. */
+function elementRows(text: string): number[][] {
+  const rows: number[][] = [];
+  let inside = false;
+  for (const line of text.split('\n')) {
+    if (line.startsWith('*')) inside = line.startsWith('*ELEMENT');
+    else if (inside && line !== '') rows.push(line.split(', ').map(Number));
+  }
+  return rows;
+}
+
+/** Duplicate node ids of a deck: the rows of the `*NODE` card without a set. */
+function duplicateIds(text: string): number[] {
+  const lines = text.split('\n');
+  const start = lines.indexOf('*NODE');
+  const ids: number[] = [];
+  for (let at = start + 1; start >= 0 && at < lines.length && !(lines[at] ?? '*').startsWith('*'); at++)
+    ids.push(Number((lines[at] ?? '').split(', ')[0]));
+  return ids;
+}
+
+describe('pretension deck invariants', () => {
+  const nested = (
+    planes: readonly number[],
+    meshOf: (b: Bolted, doc: CadDocument) => FeMeshArtifact = boltedMesh,
+  ): { b: Bolted; doc: CadDocument; text: string; mesh: FeMeshArtifact } => {
+    const b = bolted();
+    let doc = b.doc;
+    planes.forEach((z, k) => {
+      doc = must(
+        doc,
+        'add_bolt_pretension',
+        sectionParams({ ...b, doc }, { name: `m${k}`, section: { point: [0.5, 0.5, z], normal: [0, 0, 1] } }),
+      ).doc;
+    });
+    const built = meshOf(b, doc);
+    return { b, doc, mesh: built, text: deckOf(b, doc, built) };
+  };
+
+  it('two sections of one part: every duplicate sits in an element, no element above a cut keeps a cut node, no element below one holds a copy', () => {
+    const { b, text, mesh } = nested([1, 3]);
+    const rows = elementRows(text);
+    const copies = duplicateIds(text);
+    expect(copies).toHaveLength(8);
+    for (const copy of copies)
+      expect(
+        rows.some((row) => row.slice(1).includes(copy)),
+        `duplicate ${copy} is in no element`,
+      ).toBe(true);
+    [1, 3].forEach((z, order) => {
+      const cut = pretensionCut(mesh, b.bolt, [0.5, 0.5, z], [0, 0, 1]);
+      if (isCutRefusal(cut)) throw new Error(cut.message);
+      const own = copies.slice(4 * order, 4 * order + 4);
+      for (const row of rows) {
+        const [id = 0, ...nodes] = row;
+        if (cut.highElements.has(id))
+          expect(
+            nodes.filter((node) => cut.nodes.includes(node)),
+            `element ${id} above z=${z}`,
+          ).toEqual([]);
+        else if (id <= 24)
+          expect(
+            nodes.filter((node) => own.includes(node)),
+            `element ${id} below z=${z}`,
+          ).toEqual([]);
+      }
+    });
+  });
+
+  it('refuses two sections that share nodes (the same plane twice)', () => {
+    const b = bolted();
+    const one = must(b.doc, 'add_bolt_pretension', sectionParams(b));
+    const two = must(one.doc, 'add_bolt_pretension', sectionParams(b, { name: 'again' }));
+    expect(writeInp(two.doc, b.analysisId, boltedMesh(b, two.doc))).toMatchObject({
+      code: 'CNT_PRETENSION_SECTION_INVALID',
+      message: expect.stringContaining('shares nodes with the section'),
+    });
+  });
+
+  it('cuts a second-order mesh: the mid-side nodes of the cut are duplicated too and every copy is attached to an element', () => {
+    const { b, text, mesh } = nested([2], (bolt, doc) => quadraticMesh(boltedMesh(bolt, doc)));
+    const cut = pretensionCut(mesh, b.bolt, [0.5, 0.5, 2], [0, 0, 1]);
+    if (isCutRefusal(cut)) throw new Error(cut.message);
+    expect(cut.nodes).toHaveLength(9);
+    const copies = duplicateIds(text);
+    expect(copies).toHaveLength(9);
+    const rows = elementRows(text);
+    for (const copy of copies) expect(rows.some((row) => row.slice(1).includes(copy))).toBe(true);
+    for (const row of rows)
+      if (cut.highElements.has(row[0] ?? 0)) expect(row.slice(1).filter((node) => cut.nodes.includes(node))).toEqual([]);
+    expect(text.match(/^\*EQUATION$/gm)).toHaveLength(27);
+  });
+
+  it('refuses a cut node that another part uses (a conformal mesh shares nodes between parts) and a part with a node without coordinates', () => {
+    const b = bolted();
+    const added = must(b.doc, 'add_bolt_pretension', sectionParams(b));
+    const mesh = boltedMesh(b, added.doc);
+    const [boltBlock, plate] = mesh.blocks;
+    if (boltBlock === undefined || plate === undefined) throw new Error('no blocks');
+    const fused: FeMeshArtifact = {
+      ...mesh,
+      blocks: [
+        boltBlock,
+        { ...plate, elements: plate.elements.map(([id = 0, first = 0, ...rest]) => (id === 25 ? [id, 9, ...rest] : [id, first, ...rest])) },
+      ],
+    };
+    expect(writeInp(added.doc, b.analysisId, fused)).toMatchObject({
+      code: 'CNT_PRETENSION_SECTION_INVALID',
+      message: expect.stringContaining('also a node of part'),
+    });
+    const holed: FeMeshArtifact = { ...mesh, nodes: mesh.nodes.filter(([id]) => id !== 3) };
+    expect(writeInp(added.doc, b.analysisId, holed)).toMatchObject({
+      code: 'CNT_PRETENSION_SECTION_INVALID',
+      message: expect.stringContaining('no coordinates'),
+    });
+  });
+
+  it('converts units: a centimetre document in a millimetre analysis puts the copies, the plane and the torque preload in millimetres', () => {
+    const b = bolted({ units: 'cm' });
+    const added = must(
+      b.doc,
+      'add_bolt_pretension',
+      sectionParams(b, { preload: { kind: 'torque', torque: 50, diameter: 0.5, nutFactor: 0.2, nutFactorSource: 'test' } }),
+    );
+    const text = deckOf(b, added.doc);
+    expect(text).toContain('*NODE\n29, 0, 0, 20\n30, 10, 0, 20\n31, 0, 10, 20\n32, 10, 10, 20\n');
+    expect(text).toContain('*NODE, NSET=PTN_1\n33, 5, 5, 20\n');
+    expect(text).toContain('*CLOAD\n33, 1, 50\n');
   });
 });

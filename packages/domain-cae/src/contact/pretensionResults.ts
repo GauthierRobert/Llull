@@ -35,7 +35,9 @@ export interface BoltRow {
   /** Moments about the section centroid: bending (transverse to the axis) and torsion (about it); analysis force x length. */
   readonly bendingMoment: number;
   readonly torsion: number;
-  /** Shortening of the bolt = degree of freedom 1 of the reference node (analysis length), null when its table is absent. */
+  /** Cross-check of axialForce: -(sum of RF over the duplicate nodes) . n, the force the equations carry; null when the table is absent. */
+  readonly reactionForce: number | null;
+  /** Shortening of the reference node = degree of freedom 1 of the reference node (analysis length), null when its table is absent. */
   readonly shortening: number | null;
   /** Faces of the cut with stress at all three nodes / all faces. */
   readonly facesUsed: number;
@@ -128,6 +130,24 @@ const meanTensor = (low: Tensor | null, high: Tensor | null): Tensor | null =>
 const apply = (tensor: Tensor, vector: Vec3): Vec3 => [dot3(tensor[0], vector), dot3(tensor[1], vector), dot3(tensor[2], vector)];
 
 /** Shortening of the reference node (U1) printed at the stored time `time`, from the `.dat` tables. */
+/** Summed reaction (fx, fy, fz) of the duplicate nodes of bolt `position`, from the `TOTALS=ONLY` table of the stored time `time`. */
+function duplicateReactionAt(results: FeResultsArtifact, position: number, time: number): Vec3 | null {
+  const marker = ` FOR SET PTD_${position + 1} AND TIME`;
+  for (const table of results.dat?.tables ?? []) {
+    const [fx, fy, fz] = table.rows[0] ?? [];
+    if (
+      table.title.toLowerCase().startsWith('total force') &&
+      table.title.toUpperCase().includes(marker) &&
+      Math.abs(table.time - time) <= 1e-9 * Math.max(1, Math.abs(time)) &&
+      fx !== undefined &&
+      fy !== undefined &&
+      fz !== undefined
+    )
+      return [fx, fy, fz];
+  }
+  return null;
+}
+
 function shorteningAt(results: FeResultsArtifact, position: number, time: number): number | null {
   const marker = ` FOR SET PTN_${position + 1} AND TIME`;
   for (const table of results.dat?.tables ?? [])
@@ -180,8 +200,9 @@ function sectionIntegral(
 
 /**
  * One row per (bolt, analysis step) from the last stored increment of each step (`all`: every stored increment), bolts in creation order.
- * Axial force = (sigma . A) . n summed over the faces of the cut, tension positive along the section normal; nodal stress of the low side
- * (the extrapolated, element-averaged frd STRESS block).
+ * Axial force = (sigma . A) . n summed over the faces of the cut, tension positive along the section normal; nodal stress averaged between
+ * the low-side node and its duplicate (the extrapolated, element-averaged frd STRESS block). `reactionForce` is the independent cross-check: minus the summed
+ * CalculiX reaction (the equation force) of the duplicate nodes along the normal.
  * @invariant a stored increment without a STRESS block gives zero faces used (the caller reports it)
  */
 export function boltRows(
@@ -212,6 +233,9 @@ export function boltRows(
           shearForce: Math.hypot(...sub3(force, scale3(axis, axial))),
           bendingMoment: Math.hypot(...sub3(moment, scale3(axis, torsion))),
           torsion,
+          reactionForce: ((total) => (total === null ? null : -dot3(total, axis)))(
+            duplicateReactionAt(results, planned.position, step.time),
+          ),
           shortening: shorteningAt(results, planned.position, step.time),
           facesUsed: used,
           faces: planned.cut.faces.length,
