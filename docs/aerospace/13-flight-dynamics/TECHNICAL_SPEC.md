@@ -248,7 +248,11 @@ Not in M1: VC-FLT-02 (needs an initial body twist: the scenario of FLT-M2), VC-F
   midpoint pose a second time; one pure-TS place is enough and is testable without an engine).
 - **FLT-D5 (where rotors live)**: a plugin slice `doc.flight` owned by the dynamics plugin (L10), referencing `doc.dynamics` bodies by id.
   Rejected: new fields on core `DynamicsModel` / `PropellerLoad` (a core model change for a plugin capability). Cost: rotor ids are checked
-  against both id spaces when created; a later explicit dynamics id equal to a rotor id makes `delete_dynamics_item` remove both.
+  against both id spaces when created, and every plugin command that creates a dynamics record checks the rotors too
+  (`idTakenInDynamicsOrFlight`); `add_motion_profile` lives in core and cannot see `doc.flight`, so a profile may still take a rotor's id:
+  `delete_dynamics_item` then refuses the ambiguous id instead of removing both, and load validation refuses a rotor key that is also a
+  `doc.dynamics` id (hand-edited files). A body referenced by a rotor or a drag is never fixed (load validation); a future `set_body_fixed`
+  must cascade or refuse.
 - **FLT-D6 (twist frames in the port)**: world angular and linear velocity plus the orientation only; body-frame values are one rotation in
   the law (`flight/frames.ts`). Rejected: both frames in the port (redundant data every engine must keep consistent).
 - **FLT-D7 (rotor speed in M1)**: a constant `rpm` per rotor (no spin-up torque, dΩ/dt = 0); the controller (M2) and the motor chain (M3)

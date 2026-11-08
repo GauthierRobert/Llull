@@ -18,23 +18,12 @@ import { createConstraintPhysics } from './constraintPhysics';
 import { springTendonName, toMjcf } from './mjcf';
 import { createServoSchedule } from './servoSchedule';
 import { createBodyStateReader, type BodyStateReader } from './bodyKinematics';
+import { relativeQuaternion } from './quaternion';
 
 interface JointSlot {
   readonly id: string;
   readonly qpos: number;
   readonly dof: number;
-}
-
-/** Quaternion product a · conj(b): the rotation from orientation b to orientation a. */
-function relativeQuaternion(a: Quaternion, b: Quaternion): Quaternion {
-  const [aw, ax, ay, az] = a;
-  const [bw, bx, by, bz] = [b[0], -b[1], -b[2], -b[3]];
-  return [
-    aw * bw - ax * bx - ay * by - az * bz,
-    aw * bx + ax * bw + ay * bz - az * by,
-    aw * by - ax * bz + ay * bw + az * bx,
-    aw * bz + ax * by - ay * bx + az * bw,
-  ];
 }
 
 function lookup(mujoco: MujocoModule, model: MjModel, type: number, name: string): number {

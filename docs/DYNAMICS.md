@@ -31,6 +31,11 @@ table (PCHIP, held and flagged outside it, FLT_OUTSIDE_VALIDATED_RANGE); no defa
 constant `rpm` until the flight controller (FLT-M2). `set_body_drag` gives a body quadratic drag -½·ρ·CdA_i·|v|·v_i in its own axes. The load
 callback receives the pose and twist of the bodies the laws read (`SimulationModel.bodyStates` → `SimulationState.bodies`, step midpoint) and
 returns moments as well as forces (`AppliedLoads.bodyMoments`); a model with no rotor or drag lists no body and runs bit-identically.
+Each step the body-state pass (`mj_kinematics`, `mj_comPos`, `mj_comVel` of the current state) runs before the loads, the actuator block,
+the servo gain schedule and the constraint physics; it only recomputes position and velocity quantities, so datasheet drives, governors,
+transmissions and joint physics give the same results with an idle rotor as without (`tests/unit/flight/flightActuators.test.ts`). Rotor ids
+share the dynamics id space: every dynamics command refuses a rotor's id, and `delete_dynamics_item` refuses an id that names both a rotor
+and a motion profile (`add_motion_profile` lives in core and cannot see rotors).
 `simulate_motion` reports `data.flight` (rotor thrust / torque / power / J range, drag speed and force, series with detail "series"). The work
 of rotors and drag is not in the energy balance (FLT_ENERGY_UNCOUNTED).
 

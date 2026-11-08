@@ -53,8 +53,39 @@ function bodiesOf(raw: Record<string, unknown>): ReadonlyMap<string, boolean> {
   return new Map(Object.entries(bodies).map(([id, body]) => [id, isRecord(body) && body['fixed'] === true]));
 }
 
+/** The id-keyed tables of `doc.dynamics` whose ids share the dynamics id space with rotors (as `dynamicsIdTaken`). */
+const DYNAMICS_ID_TABLES = [
+  'bodies',
+  'joints',
+  'transmissions',
+  'motors',
+  'propellers',
+  'cylinders',
+  'losses',
+  'springs',
+  'profiles',
+  'loadSchedules',
+  'referenceSeries',
+] as const;
+
+/** Ids of the raw document's dynamics records. */
+function dynamicsIdsOf(raw: Record<string, unknown>): ReadonlySet<string> {
+  const dynamics = raw['dynamics'];
+  if (!isRecord(dynamics)) return new Set();
+  return new Set(
+    DYNAMICS_ID_TABLES.flatMap((table) => {
+      const records = dynamics[table];
+      return isRecord(records) ? Object.keys(records) : [];
+    }),
+  );
+}
+
 /** Key, id and body checks the schema cannot express. */
-function referenceErrors(slice: z.infer<typeof flightSchema>, bodies: ReadonlyMap<string, boolean>): string[] {
+function referenceErrors(
+  slice: z.infer<typeof flightSchema>,
+  bodies: ReadonlyMap<string, boolean>,
+  dynamicsIds: ReadonlySet<string>,
+): string[] {
   const errors: string[] = [];
   const body = (at: string, id: string): void => {
     const fixed = bodies.get(id);
@@ -64,6 +95,7 @@ function referenceErrors(slice: z.infer<typeof flightSchema>, bodies: ReadonlyMa
   for (const [key, entry] of Object.entries(slice.rotors)) {
     const at = `flight.rotors.${key}`;
     if (entry.id !== key) errors.push(`${at}.id must equal its key`);
+    if (dynamicsIds.has(key)) errors.push(`${at}: id '${key}' is also a doc.dynamics record (rotor ids share the dynamics id space)`);
     if (Math.hypot(...entry.axis) < 1e-12) errors.push(`${at}.axis must be non-zero`);
     const points = entry.coefficients.kind === 'table' ? entry.coefficients.points : [];
     if (points.some((point, i) => i > 0 && point[0] <= (points[i - 1]?.[0] ?? Infinity)))
@@ -96,7 +128,7 @@ export const flightDocument: DocumentExtension = {
     if (reserved.length > 0) return reserved;
     const errors = sliceSchemaErrors(flightSchema, slice, 'flight');
     if (errors.length > 0) return errors;
-    return referenceErrors(flightSchema.parse(slice), bodiesOf(raw));
+    return referenceErrors(flightSchema.parse(slice), bodiesOf(raw), dynamicsIdsOf(raw));
   },
   derivedEntityIds: () => new Set(),
   restore: (raw) => raw,

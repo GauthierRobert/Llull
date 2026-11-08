@@ -186,6 +186,43 @@ describe('flight slice lifecycle', () => {
     expectNoOp(execute(doc, 'delete_dynamics_item', { id: 'r2' }), doc, "no dynamics record 'r2'");
   });
 
+  it('a rotor id is taken for every plugin dynamics record (add_rigid_body, add_motor, add_spring, ...)', () => {
+    const doc = withFlight();
+    const box = step(doc, 'add_box', { size: [10, 10, 10], position: [300, 0, 0] });
+    expectNoOp(execute(box.doc, 'add_rigid_body', { entityIds: [box.id], id: 'r1' }), box.doc, "id 'r1' is already used");
+    const second = step(box.doc, 'add_rigid_body', { entityIds: [box.id], id: 'other' }).doc;
+    const joint = step(second, 'add_body_joint', { kind: 'revolute', child: 'other', anchor: [300, 0, 0], axis: [0, 0, 1], id: 'j' }).doc;
+    const attempts: [string, Record<string, unknown>][] = [
+      ['add_body_joint', { kind: 'revolute', child: 'frame', parent: 'other', anchor: [0, 0, 0], axis: [0, 0, 1], id: 'r1' }],
+      ['add_motor', { joint: 'j', kind: 'torque_curve', torque: 1, id: 'r1' }],
+      ['add_propeller', { joint: 'j', diameter: 0.2, thrustCoefficient: 0.1, powerCoefficient: 0.05, id: 'r1' }],
+      ['add_spring', { bodyA: 'frame', bodyB: 'other', pointA: [0, 0, 0], pointB: [300, 0, 0], stiffness: 10, id: 'r1' }],
+      ['add_load_schedule', { body: 'frame', kind: 'force', direction: [1, 0, 0], constant: 1, id: 'r1' }],
+    ];
+    for (const [name, params] of attempts) expectNoOp(execute(joint, name, params), joint, "id 'r1' is already used");
+  });
+
+  it('delete_dynamics_item refuses an id that names both a rotor and a core record (add_motion_profile cannot see rotors)', () => {
+    const doc = withFlight();
+    const profile = execute(doc, 'add_motion_profile', {
+      id: 'r1',
+      quantity: 'velocity',
+      unit: 'rad/s',
+      segments: [{ kind: 'dwell', duration: 1 }],
+    });
+    expect(profile.document.dynamics?.profiles?.['r1']).toBeDefined();
+    expectNoOp(execute(profile.document, 'delete_dynamics_item', { id: 'r1' }), profile.document, "id 'r1' names both a rotor");
+  });
+
+  it('deleting a record that is not a flight record leaves doc.flight as it was', () => {
+    const doc = withFlight();
+    const box = step(doc, 'add_box', { size: [10, 10, 10], position: [300, 0, 0] });
+    const other = step(box.doc, 'add_rigid_body', { entityIds: [box.id], id: 'other' }).doc;
+    const result = execute(other, 'delete_dynamics_item', { id: 'other' });
+    expect(result.document.flight).toBe(other.flight);
+    expect(result.summary).toBe("delete_dynamics_item: removed 'other'.");
+  });
+
   it('inspect_dynamics lists the rotors and body drag', () => {
     const result = execute(withFlight(), 'inspect_dynamics', {});
     expect((result.data as { flight?: unknown }).flight).toEqual(withFlight().flight);
@@ -252,6 +289,10 @@ describe('flight slice lifecycle', () => {
       "flight.bodyDrag.frame.bodyId: 'frame' is fixed to the ground",
     ]);
     expect(bad({ extra: 1 })[0]).toMatch(/^flight: /);
+    const motorNamedR1 = { ...(raw['dynamics'] as object), motors: { r1: {} } };
+    expect(bad({}, motorNamedR1)).toEqual([
+      "flight.rotors.r1: id 'r1' is also a doc.dynamics record (rotor ids share the dynamics id space)",
+    ]);
     const hostile = JSON.parse(`{"rotors": {"__proto__": ${JSON.stringify(rotor)}}, "bodyDrag": {}}`) as unknown;
     expect(flightDocument.validate({ ...raw, flight: hostile })).toEqual(['flight.rotors.__proto__: reserved key']);
     const long = {

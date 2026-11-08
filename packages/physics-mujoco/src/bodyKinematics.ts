@@ -6,6 +6,7 @@
 import type { BodyKinematics } from '@core/dynamics/physicsEngine';
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import type { MjData, MjModel, MujocoModule } from './bindings';
+import { multiplyQuaternion, relativeQuaternion } from './quaternion';
 
 interface BodySlot {
   readonly id: string;
@@ -20,20 +21,6 @@ export interface BodyStateReader {
 }
 
 const vec3At = (values: Float64Array, offset: number): Vec3 => [values[offset] ?? 0, values[offset + 1] ?? 0, values[offset + 2] ?? 0];
-
-/** Quaternion product a · b ([w, x, y, z]). */
-function multiply(a: Quaternion, b: Quaternion): Quaternion {
-  const [aw, ax, ay, az] = a;
-  const [bw, bx, by, bz] = b;
-  return [
-    aw * bw - ax * bx - ay * by - az * bz,
-    aw * bx + ax * bw + ay * bz - az * by,
-    aw * by - ax * bz + ay * bw + az * bx,
-    aw * bz + ax * by - ay * bx + az * bw,
-  ];
-}
-
-const conjugate = (q: Quaternion): Quaternion => [q[0], -q[1], -q[2], -q[3]];
 
 /** Rotation by angle |w|·t about w (world angular velocity w over time t), as a unit quaternion. */
 function rotationOver(w: Vec3, t: number): Quaternion {
@@ -65,7 +52,7 @@ export function createBodyStateReader(
       const position = vec3At(data.xpos, 3 * i);
       const q = data.xquat;
       const world: Quaternion = [q[4 * i] ?? 1, q[4 * i + 1] ?? 0, q[4 * i + 2] ?? 0, q[4 * i + 3] ?? 0];
-      const orientation = multiply(world, conjugate(initialOrientation.get(slot.id) ?? [1, 0, 0, 0]));
+      const orientation = relativeQuaternion(world, initialOrientation.get(slot.id) ?? [1, 0, 0, 0]);
       // cvel = [angular; linear at the subtree centre of mass of the body's root], world axes
       const angular = vec3At(data.cvel, 6 * i);
       const atRoot = vec3At(data.cvel, 6 * i + 3);
@@ -90,7 +77,7 @@ export function createBodyStateReader(
           const h = 0.5 * timestep;
           const kinematics: BodyKinematics = {
             position: [position[0] + h * linear[0], position[1] + h * linear[1], position[2] + h * linear[2]],
-            orientation: multiply(rotationOver(angular, h), orientation),
+            orientation: multiplyQuaternion(rotationOver(angular, h), orientation),
             linearVelocity: ahead(linear, before?.linear),
             angularVelocity: ahead(angular, before?.angular),
           };

@@ -5,7 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
 import { changed, codedRejection, failer } from '@core/commands/noop';
-import { dynamicsIdTaken } from '@core/model/dynamics';
+import { idTakenInDynamicsOrFlight } from '../flight/model';
 import { dynamicsOf, withDynamics } from './bodies';
 import { buildDatasheetMotor, datasheetDescription, foreignField } from './motorBuild';
 import { inductionSheetSchema, pmsmSheetSchema, stepperSheetSchema } from './machineSchemas';
@@ -91,7 +91,7 @@ export const addMotor = defineCommand({
     const foreign = foreignField(params.kind, params);
     if (foreign !== null) return fail(`${foreign} does not apply to a ${params.kind} motor`);
     const motorId = idOrNext(params.id, 'motor');
-    if (dynamicsIdTaken(dynamics, motorId)) return fail(`id '${motorId}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, motorId)) return fail(`id '${motorId}' is already used`);
     let motor: Motor;
     let verdict = '';
     if (params.kind === 'dc' || params.kind === 'pmsm' || params.kind === 'stepper' || params.kind === 'induction') {
@@ -209,7 +209,7 @@ export const addPropeller = defineCommand({
         return fail('table J values must start at >= 0 and strictly increase');
     } else if (params.airspeedMps !== undefined) return fail('airspeedMps needs a Ct / Cp table (give `table`)');
     const propellerId = idOrNext(params.id, 'prop');
-    if (dynamicsIdTaken(dynamics, propellerId)) return fail(`id '${propellerId}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, propellerId)) return fail(`id '${propellerId}' is already used`);
     const propeller: PropellerLoad = {
       id: propellerId,
       joint: params.joint,

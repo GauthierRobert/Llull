@@ -4,9 +4,8 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { changed, codedRejection, failer } from '@core/commands/noop';
-import { dynamicsIdTaken } from '@core/model/dynamics';
-import { idOrNext, idTaken } from '@lib/explicitId';
-import { flightOf, ISA_SEA_LEVEL_DENSITY, type Rotor, type RotorCoefficients } from '../flight/model';
+import { idOrNext } from '@lib/explicitId';
+import { flightOf, idTakenInDynamicsOrFlight, ISA_SEA_LEVEL_DENSITY, type Rotor, type RotorCoefficients } from '../flight/model';
 import { dynamicsOf } from './bodies';
 import { compileRotor, rotorOutput } from '../flight/rotorLaw';
 
@@ -126,7 +125,7 @@ export const addRotor = defineCommand({
       return fail('table J values must strictly increase');
     const rotorId = idOrNext(params.id, 'rotor');
     const flight = flightOf(doc);
-    if (dynamicsIdTaken(dynamicsOf(doc), rotorId) || idTaken(flight.rotors, rotorId)) return fail(`id '${rotorId}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, rotorId)) return fail(`id '${rotorId}' is already used`);
     const rotor: Rotor = {
       id: rotorId,
       bodyId: params.body,

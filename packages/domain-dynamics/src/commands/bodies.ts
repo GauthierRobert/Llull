@@ -13,7 +13,7 @@ import { formatLength } from '@core/model/units';
 import { toMetres } from '@core/model/units';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { symmetricEigen, type Symmetric3 } from '@lib/symmetricEigen';
-import { flightRecordCount, flightWithout } from '../flight/model';
+import { flightRecordCount, flightWithout, idTakenInDynamicsOrFlight } from '../flight/model';
 
 /** The document's dynamics model (empty when absent). */
 export function dynamicsOf(doc: CadDocument): DynamicsModel {
@@ -102,7 +102,7 @@ export const addRigidBody = defineCommand({
     }
     if (new Set(entityIds).size !== entityIds.length) return fail('entityIds lists an entity twice');
     const bodyId = idOrNext(id, 'body');
-    if (dynamicsIdTaken(dynamics, bodyId)) return fail(`id '${bodyId}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, bodyId)) return fail(`id '${bodyId}' is already used`);
     const body = {
       id: bodyId,
       entityIds,
@@ -154,12 +154,25 @@ export const deleteDynamicsItem = defineCommand({
     'takes its joints, springs, rotors and body drag (set_body_drag) with it; a joint takes the transmissions, its joint physics, load schedules, motors (and their drive), propellers, cylinder pressures and engine losses (set_engine_losses) on it. ' +
     'A time-series reference goes with the joint or motor it measures. A profile that a motor drive or a load schedule still uses is refused (the users are listed): change the drive first. Entities (geometry) are never deleted.',
   params: z.object({
-    id: z.string().describe('Id of the body / joint / transmission / load schedule / motor / propeller / cylinder / spring to remove.'),
+    id: z
+      .string()
+      .describe(
+        'Id of the body / joint / transmission / load schedule / motor / propeller / cylinder / spring / motion profile / time-series reference / rotor (add_rotor) to remove.',
+      ),
   }),
   run: (doc, { id }): CommandResult => {
     const dynamics = dynamicsOf(doc);
     const rotor = doc.flight !== undefined && Object.hasOwn(doc.flight.rotors, id);
-    if (!dynamicsIdTaken(dynamics, id) && !rotor) return failer(doc, 'delete_dynamics_item')(`no dynamics record '${id}'`);
+    const recorded = dynamicsIdTaken(dynamics, id);
+    if (!recorded && !rotor) return failer(doc, 'delete_dynamics_item')(`no dynamics record '${id}'`);
+    // add_motion_profile (core) cannot see doc.flight, so a profile may share a rotor's id: refuse rather than remove both
+    if (recorded && rotor)
+      return failer(
+        doc,
+        'delete_dynamics_item',
+      )(
+        `id '${id}' names both a rotor and another dynamics record; it is ambiguous, nothing was removed (recreate one of them under another id)`,
+      );
     const users = Object.values(dynamics.drives ?? {}).filter((drive) => drive.profile === id);
     if (users.length > 0)
       return failer(
@@ -247,9 +260,10 @@ export const deleteDynamicsItem = defineCommand({
     )
       .map((table) => Object.keys(dynamics[table] ?? {}).length - Object.keys(withDrives[table] ?? {}).length)
       .reduce((a, b) => a + b, 0);
-    const flight = doc.flight === undefined ? null : flightWithout(doc.flight, id, withDrives.bodies);
+    const before = doc.flight;
+    const flight = before === undefined ? null : flightWithout(before, id, withDrives.bodies);
     const updated = withDynamics(flight === null ? doc : { ...doc, flight }, withDrives);
-    const total = removed + (flight === null ? 0 : flightRecordCount(doc.flight) - flightRecordCount(flight));
+    const total = removed + (before === undefined || flight === null ? 0 : flightRecordCount(before) - flightRecordCount(flight));
     return report(updated, `delete_dynamics_item: removed '${id}'${total > 1 ? ` and ${total - 1} dependent record(s)` : ''}.`);
   },
 });

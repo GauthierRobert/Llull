@@ -4,7 +4,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { changed, codedRejection, failer } from '@core/commands/noop';
 import { compileProfile, isProfileRefusal, profileUnitScale } from '@core/geometry/motionProfile';
-import { dynamicsIdTaken } from '@core/model/dynamics';
+import { idTakenInDynamicsOrFlight } from '../flight/model';
 import type { LoadSchedule } from '@core/model/transmissions';
 import { idOrNext } from '@lib/explicitId';
 import { dynamicsOf, withDynamics } from './bodies';
@@ -78,7 +78,7 @@ export const addLoadSchedule = defineCommand({
         );
     }
     const id = idOrNext(params.id, 'load');
-    if (dynamicsIdTaken(dynamics, id)) return fail(`id '${id}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, id)) return fail(`id '${id}' is already used`);
     const load: LoadSchedule = {
       id,
       target: params.body !== undefined ? { body: params.body } : { joint: params.joint ?? '' },

@@ -4,6 +4,7 @@
  */
 
 import type { CadDocument } from '@core/model/types';
+import { createDynamicsModel, dynamicsIdTaken } from '@core/model/dynamics';
 import type { Vec3 } from '@core/model/vectors';
 
 /** [advance ratio J, C_T, C_P] with strictly increasing J. */
@@ -21,7 +22,9 @@ export type RotorCoefficients =
  * A rotor fixed to a rigid body (TR-FLT-02): thrust T = C_T·ρ·n²·D⁴ along the body-fixed `axis` at `hub`, reaction torque Q = C_P·ρ·n²·D⁵/(2π)
  * about -spin·axis, gyroscopic torque -ω × H of its spinning parts (H = spinInertiaKgM2 · Ω · spin · axis), J = V_axial / (n D) from the body
  * state. `spin` 'ccw' = the rotor turns counter-clockwise seen from the side the thrust points to (angular velocity along +axis).
- * @invariant bodyId is a non-fixed rigid body; axis non-zero; rpm >= 0; diameter, airDensity > 0; spinInertiaKgM2 >= 0
+ * @invariant bodyId is a non-fixed rigid body (a body referenced by a rotor or a body drag is never fixed: a future set_body_fixed must cascade
+ *            or refuse); axis non-zero; rpm >= 0; diameter, airDensity > 0; spinInertiaKgM2 >= 0
+ * @invariant id unique across doc.dynamics records and rotors (idTakenInDynamicsOrFlight)
  */
 export interface Rotor {
   readonly id: string;
@@ -90,5 +93,12 @@ export function flightWithout(flight: FlightModel, id: string, bodies: Readonly<
 }
 
 /** Number of records in a flight slice. */
-export const flightRecordCount = (flight: FlightModel | undefined): number =>
-  flight === undefined ? 0 : Object.keys(flight.rotors).length + Object.keys(flight.bodyDrag).length;
+export const flightRecordCount = (flight: FlightModel): number => Object.keys(flight.rotors).length + Object.keys(flight.bodyDrag).length;
+
+/**
+ * True when `id` is taken in the shared id space of the dynamics plugin: any `doc.dynamics` record or a rotor of `doc.flight`. Every plugin
+ * command that creates a dynamics record checks it (add_motion_profile, in core, cannot: delete_dynamics_item refuses an id that names both).
+ */
+export function idTakenInDynamicsOrFlight(doc: CadDocument, id: string): boolean {
+  return dynamicsIdTaken(doc.dynamics ?? createDynamicsModel(), id) || (doc.flight !== undefined && Object.hasOwn(doc.flight.rotors, id));
+}

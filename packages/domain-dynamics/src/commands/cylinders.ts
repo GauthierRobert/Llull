@@ -10,7 +10,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
 import { changed, commandError, failer, rejection } from '@core/commands/noop';
-import { dynamicsIdTaken } from '@core/model/dynamics';
+import { idTakenInDynamicsOrFlight } from '../flight/model';
 import { dynamicsOf, withDynamics } from './bodies';
 import { calibrateCylinder } from './engine/calibrateCylinder';
 
@@ -249,7 +249,7 @@ export const addCylinderPressure = defineCommand({
         );
     }
     const cylinderId = idOrNext(params.id, 'cyl');
-    if (dynamicsIdTaken(dynamics, cylinderId)) return fail(`id '${cylinderId}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, cylinderId)) return fail(`id '${cylinderId}' is already used`);
     let cylinder: CylinderPressure = {
       id: cylinderId,
       piston: piston.id,

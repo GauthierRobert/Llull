@@ -614,7 +614,7 @@ function machineSteps(): SeedStep[] {
  * SLICE_SEEDS; tests/unit/contract/pluginSliceFuzz.test.ts runs it with the targeted `driveMutations` as well.
  */
 export const DYNAMICS_SEED: PluginSliceSeed = {
-  roots: ['dynamics'],
+  roots: ['dynamics', 'flight'],
   build: () => {
     const steps: { name: string; params: Record<string, unknown>; as?: string }[] = [
       { name: 'add_cylinder', params: { radius: 5, height: 5, position: [0, 0, 0], axis: [0, 0, 1] }, as: 'cylinder' },
@@ -731,6 +731,9 @@ export const DYNAMICS_SEED: PluginSliceSeed = {
         },
       },
       ...machineSteps(),
+      // a rotor and a body drag on bodies of the drive model: mutations of doc.dynamics (a body deleted, made fixed, an id reused) meet them
+      { name: 'add_rotor', params: rotorParams({ body: 'wheel', id: 'rt', hub: [50, 0, 0], spinInertiaKgM2: 1e-6 }) },
+      { name: 'set_body_drag', params: { body: 'nut', cdaM2: [0.01, 0.01, 0.02] } },
     ];
     let doc = createEmptyDocument();
     const ids = new Map<string, string>();

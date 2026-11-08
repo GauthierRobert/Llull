@@ -4,7 +4,7 @@ import type { CadDocument } from '@core/model/types';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { z } from '@core/commands/schema';
 import { changed, failer, report } from '@core/commands/noop';
-import { dynamicsIdTaken } from '@core/model/dynamics';
+import { idTakenInDynamicsOrFlight } from '../../flight/model';
 import { MAX_TOTAL_POINTS, SERIES_QUANTITIES, type ReferenceSeries } from '@core/model/drives';
 import { elementAt } from '@lib/elementAt';
 import { idOrNext, idTaken } from '@lib/explicitId';
@@ -81,7 +81,7 @@ export function addSeriesReference(
       `the document would hold ${held + params.series.times.length} reference points (budget ${MAX_TOTAL_POINTS}): delete a series first`,
     );
   const id = params.id ?? idOrNext(undefined, 'ref');
-  if (dynamicsIdTaken(dynamics, id) || idTaken(doc.prototype?.references ?? {}, id)) return fail(`id '${id}' is already used`);
+  if (idTakenInDynamicsOrFlight(doc, id) || idTaken(doc.prototype?.references ?? {}, id)) return fail(`id '${id}' is already used`);
   const record: ReferenceSeries = {
     id,
     quantity: params.series.quantity,

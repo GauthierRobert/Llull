@@ -7,7 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { idOrNext } from '@lib/explicitId';
 import { changed, codedRejection, failer } from '@core/commands/noop';
-import { dynamicsIdTaken } from '@core/model/dynamics';
+import { idTakenInDynamicsOrFlight } from '../../flight/model';
 import { dynamicsOf, withDynamics } from '../bodies';
 
 /** Absolute peak pressure of a motored cylinder at rest (1 bar): the Chen-Flynn constants must give FMEP >= 0 there. */
@@ -104,7 +104,7 @@ export const setEngineLosses = defineCommand({
       model = { kind: 'fmep_table', points, source };
     }
     const lossId = idOrNext(params.id, 'loss');
-    if (dynamicsIdTaken(dynamics, lossId)) return fail(`id '${lossId}' is already used`);
+    if (idTakenInDynamicsOrFlight(doc, lossId)) return fail(`id '${lossId}' is already used`);
     const record: EngineLosses = { id: lossId, crank: crank.id, cylinders, model, oilTempFactor: params.oilTempFactor ?? 1 };
     const { band, basis } = fmepBand(record);
     return changed(
