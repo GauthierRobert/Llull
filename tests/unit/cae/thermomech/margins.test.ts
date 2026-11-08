@@ -96,7 +96,7 @@ describe('VC-TMC-50 staleness chain thermal -> thermo_static', () => {
     expect(items.map((item) => item.code)).toEqual([]);
   });
 
-  it('judges fea_report state, compute_margins code and check_thermo_mechanical items after editing the thermal case (all three keys)', () => {
+  it('judges analysis_report state, compute_margins code and check_thermo_mechanical items after editing the thermal case (all three keys)', () => {
     const { doc, ctx, analysisId, source } = solvedChain();
     const edited = mustRun(doc, 'add_result_probe', { analysisId: source.thermalId, name: 'p', point: [1, 1, 1], quantity: 'temperature' });
     const report = execute(edited, 'analysis_report', { analysisId }, ctx);
@@ -104,7 +104,7 @@ describe('VC-TMC-50 staleness chain thermal -> thermo_static', () => {
     const check = execute(edited, 'check_thermo_mechanical', { analysisId }, ctx);
     expect(margins.document).toBe(edited);
     expectCase(PACK, 'VC-TMC-50', {
-      'fea_report(ms).state': (report.data as Report).state,
+      'analysis_report(ms).state': (report.data as Report).state,
       'compute_margins(ms).code': margins.error?.code ?? null,
       'check_thermo_mechanical(ms).items': (check.data as { items: Item[] }).items.map((item) => item.code),
     });
