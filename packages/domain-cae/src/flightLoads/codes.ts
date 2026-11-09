@@ -25,6 +25,15 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
     'give three points that are not collinear and far apart (the supports must remove all six rigid-body motions and nothing more)',
   FLL_SUPPORT_CONFLICT:
     'a free-body support is the only support of its analysis: delete the other constraints (delete_analysis_item) first',
+  FLL_NOT_MODAL: 'give a modal analysis (create_analysis analysisType modal), solved',
+  FLL_MODAL_UNAVAILABLE:
+    'solve the modal analysis (fea_mesh, fea_solve) and re-check; a stale case must be re-solved after the set-up change',
+  FLL_NO_MODES: 'the model gave no elastic mode: extract more modes or restrain / unrestrain the model as intended',
+  FLL_NO_ROTORS: 'add the rotors of the vehicle with add_rotor (and a controller with add_flight_controller for the rpm band)',
+  FLL_ROTOR_UNKNOWN: 'list the rotors with inspect_dynamics (data.flight.rotors)',
+  FLL_TRIM_FAILED: 'fix the trim condition (trim_flight gives the refusal) or pass operatingRpm',
+  FLL_BAND_INVALID: 'give rpmBand as [low, high] with low <= high, in rev/min',
+  FLL_THRESHOLD_SOURCE: 'give marginThresholdPct together with marginSource, or neither (the rows are then unknown)',
   FLL_SUPPORT_POINTS: 'the three support points must be finite and at least 1e-6 of their spread apart',
 };
 
