@@ -565,8 +565,8 @@ buckling case of the same part. Codes added besides §7.1: `NLS_IMPERFECTION_NOT
    `designLoad` in it [force units for every probe: a pressure curve was labelled N].
 8. **Column plan = the equivalent fixed-free half column** (L/2 = 250 mm, base face fixed, tip load and tip probe) [the pinned 500 mm draft]: a
    pinned end of a solid cannot be expressed with today's targets (`edgesNear [10, 5, 0]` ties between the two long edges of the end face;
-   `intersectPlane` is accepted by the target schema but not sent to the mesher, `server/src/fea/feaMesh.ts` maps only facesNear / edgesNear /
-   pointsNear). The half column has the same P_cr = pi^2 E I / L^2 and its tip is the mid-span of the pinned column, so the generator values hold
+   `intersectPlane` is accepted by the target schema and now forwarded by `server/src/fea/feaMesh.ts`, but `llull-mesh` (solver/bins/llull-mesh) does not
+   resolve it yet: no OCCT fuse / plane imprint exists there). The half column has the same P_cr = pi^2 E I / L^2 and its tip is the mid-span of the pinned column, so the generator values hold
    unchanged. The plan gained the 0.8 P_cr step (VC-NLS-50.c).
 
 ### 13.3 Validation, measured
