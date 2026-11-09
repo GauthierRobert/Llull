@@ -416,3 +416,69 @@ describe('Campbell SVG edge cases', () => {
     expect(campbellSvg({ ...base, bands: [{ rotorId: 'a', lowRpm: 0, highRpm: 0 }], modes: [] }, 'T')).toContain('<svg');
   });
 });
+
+describe('check_rotor_resonance review fixes', () => {
+  it('an empty rotors list is rejected (no vacuous pass); document unchanged', () => {
+    const setup = flightModal();
+    const result = check(setup, { rotors: [], rpmBand: [2000, 2400] });
+    expect(result.rejected).toBe(true);
+    expectNoOp(result, setup.doc);
+  });
+
+  it('a controller with minRpm above maxRpm gives no band (falls back to the rotor rpm); a negative rotor rpm is its magnitude', () => {
+    const setup = flightModal();
+    let doc = mustRun(setup.doc, 'add_rotor', {
+      body: 'frame',
+      hub: [50, 50, 0],
+      axis: [0, 0, 1],
+      spin: 'cw',
+      diameter: 0.254,
+      thrustCoefficient: 0.1,
+      powerCoefficient: 0.05,
+      source: 'test',
+      id: 'rneg',
+      rpm: 3000,
+    });
+    const flight = Reflect.get(doc, 'flight') as unknown as {
+      rotors: Record<string, Record<string, unknown>>;
+      controllers?: Record<string, unknown>;
+    };
+    const rotor = flight.rotors['rneg'] ?? {};
+    doc = {
+      ...doc,
+      flight: {
+        ...flight,
+        rotors: { ...flight.rotors, rneg: { ...rotor, rpm: -3000 } },
+        controllers: { bad: { id: 'bad', rotorIds: ['rneg'], minRpm: 5000, maxRpm: 1000 } },
+      },
+    } as unknown as CadDocument;
+    const data = dataOf(
+      execute(doc, 'check_rotor_resonance', { analysisId: setup.analysisId, rotors: ['rneg'], bladeCount: 2 }, setup.fixture.ctx),
+    );
+    expect(data.rotors[0]).toMatchObject({ bandRpm: [3000, 3000], bandSource: 'rotor rpm (constant)', operatingRpm: [3000] });
+    expect(rowOf(data, 'rneg', 2, 1).atOperating[0]?.excitationHz).toBe(100);
+  });
+
+  it('the SVG stays well-formed XML for a hostile rotor id (markup and control characters)', () => {
+    const svg = campbellSvg(
+      {
+        modes: [{ mode: 1, frequencyHz: 40 }],
+        harmonics: [],
+        bands: [{ rotorId: 'a</text><script>x</script>\u0001\u0000b', lowRpm: 1, highRpm: 2 }],
+        crossings: [],
+      },
+      'T\u001f',
+    );
+    expect(svg).not.toContain('<script>');
+    expect(svg).toContain('a&lt;/text&gt;&lt;script&gt;x&lt;/script&gt;b band');
+    // eslint-disable-next-line no-control-regex
+    expect(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(svg)).toBe(false);
+    const stack: string[] = [];
+    for (const [, closing, name, selfClosing] of svg.matchAll(/<(\/?)([a-z]+)\b[^>]*?(\/?)>/g)) {
+      if (selfClosing === '/') continue;
+      if (closing === '/') expect(stack.pop()).toBe(name);
+      else stack.push(name ?? '');
+    }
+    expect(stack).toEqual([]);
+  });
+});

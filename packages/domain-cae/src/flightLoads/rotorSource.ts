@@ -49,9 +49,9 @@ export function rotorsOfFlightModel(
       const high = controller?.['maxRpm'];
       return {
         id,
-        rpm: finite(rotor['rpm']) ? rotor['rpm'] : 0,
+        rpm: finite(rotor['rpm']) ? Math.abs(rotor['rpm']) : 0,
         controllerBand:
-          controller !== undefined && finite(low) && finite(high) && high > 0
+          controller !== undefined && finite(low) && finite(high) && high > 0 && low <= high
             ? { controllerId: String(controller['id']), lowRpm: low, highRpm: high }
             : null,
       };

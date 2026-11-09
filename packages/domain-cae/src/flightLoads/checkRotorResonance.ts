@@ -54,7 +54,7 @@ export const checkRotorResonance = defineCommand({
   annotations: { readOnly: true },
   description:
     'Check a rotor against the modes of a SOLVED modal analysis (14 FLL, Campbell diagram): for each rotor of the flight model (add_rotor), each excitation ' +
-    'harmonic k (default 1 and 2 per rev, plus the blade count B when known: blade passing) and each elastic mode, the crossing speed rpm = 60 f / k when it ' +
+    'harmonic k (default [1, 2, B]: 1 and 2 per rev plus the blade count B when known, blade passing; pass harmonics for others such as 2B or coaxial orders) and each elastic mode, the crossing speed rpm = 60 f / k when it ' +
     'lies inside the rotor rpm band, and the margin |f_mode - f_exc| / f_exc x 100 % with f_exc = k rpm / 60, at the operating speeds and as the smallest value over ' +
     'the band (0 at a crossing). Reads the stored modal frequencies only (create_analysis modal, solved; unsolved or stale results are refused); rigid-body modes (about 0 Hz) are skipped; ' +
     'frequencies are taken as constant with rpm (no centrifugal stiffening or gyroscopic split: the Campbell mode lines are horizontal). The rpm band is the caller rpmBand, else the ' +
@@ -69,7 +69,7 @@ export const checkRotorResonance = defineCommand({
     'plot false omits it. Read-only.',
   params: z.object({
     analysisId: analysisIdSchema.describe('Id of a MODAL analysis that is solved (state solved in analysis_report).'),
-    rotors: z.array(z.string()).optional().describe('Rotor ids (add_rotor) to check. Default: every rotor of the flight model.'),
+    rotors: z.array(z.string()).min(1).optional().describe('Rotor ids (add_rotor) to check. Default: every rotor of the flight model.'),
     scenario: z
       .string()
       .optional()
@@ -101,7 +101,9 @@ export const checkRotorResonance = defineCommand({
     harmonics: z
       .array(z.number().int().min(1).max(HARMONIC_LIMIT))
       .optional()
-      .describe('Excitation orders k (per-rev multiples). Default [1, 2]; the blade count is added when known.'),
+      .describe(
+        'Excitation orders k (per-rev multiples). Default [1, 2] plus the blade count B when known ([1, 2, B]); pass the orders that matter (2B, coaxial or gearbox orders) explicitly.',
+      ),
     bladeCount: z
       .number()
       .int()
@@ -165,6 +167,7 @@ export const checkRotorResonance = defineCommand({
         ['rotors'],
       );
     const rotors = records.filter((rotor) => params.rotors === undefined || params.rotors.includes(rotor.id));
+    if (rotors.length === 0) return fail('FLL_NO_ROTORS', 'no rotor selected: nothing to check');
     let trimmed: Record<string, number> = {};
     if (
       params.operatingRpm === undefined &&
@@ -247,7 +250,11 @@ export const checkRotorResonance = defineCommand({
     const crossings = rows.filter((row) => row.crossingRpm !== null);
     const failed = rows.filter((row) => row.status === 'fail');
     const status: Status =
-      failed.length > 0 ? 'fail' : rows.some((row) => row.status === 'unknown') || unassessed.length > 0 ? 'unknown' : 'pass';
+      failed.length > 0
+        ? 'fail'
+        : rows.length === 0 || rows.some((row) => row.status === 'unknown') || unassessed.length > 0
+          ? 'unknown'
+          : 'pass';
     const reviewRequired = status !== 'pass' || trust.resultsArtifact?.binding === 'imported-unbound';
     const svg =
       params.plot === false || bands.length === 0

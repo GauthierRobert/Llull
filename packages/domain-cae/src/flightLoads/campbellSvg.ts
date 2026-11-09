@@ -17,7 +17,10 @@ const TOP = 40;
 const BOTTOM = 60;
 
 const fixed = (value: number): string => value.toFixed(2);
-const escapeText = (text: string): string => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** XML 1.0 forbids U+0000-U+001F except tab, newline and carriage return: they are dropped, then & < > are escaped. */
+const xmlSafe = (text: string): string =>
+  [...text].filter((char) => char.charCodeAt(0) >= 0x20 || [9, 10, 13].includes(char.charCodeAt(0))).join('');
+const escapeText = (text: string): string => xmlSafe(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 /** Round an axis end up to 1, 2 or 5 x 10^n. */
 function niceCeil(value: number): number {
   if (!(value > 0)) return 1;
