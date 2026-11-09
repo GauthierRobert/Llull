@@ -687,7 +687,7 @@ exports[`13 FLT validation plans, golden > sc-flt-01-hover: the reference quad k
     ],
     "divergedAtS": null,
     "durationS": 8,
-    "engine": "MuJoCo 3.16.0",
+    "engine": "MuJoCo 4.0.0",
     "events": [],
     "power": {
       "finalShaftPowerW": 76.049,
@@ -845,7 +845,7 @@ exports[`13 FLT validation plans, golden > sc-flt-01-hover: the reference quad k
   ],
   "divergedAtS": null,
   "durationS": 8,
-  "engine": "MuJoCo 3.16.0",
+  "engine": "MuJoCo 4.0.0",
   "events": [],
   "power": {
     "finalShaftPowerW": 76.049,
@@ -1622,8 +1622,8 @@ exports[`13 FLT validation plans, golden > sc-flt-02-gust: the VC-FLT-07 gust re
     "attitude": {
       "final": {
         "pitchDeg": -0.00909094,
-        "rollDeg": -3.74946e-15,
-        "yawDeg": 4.97326e-16,
+        "rollDeg": 3.28537e-16,
+        "yawDeg": -4.27825e-16,
       },
       "maxRateDegS": 1.07787,
       "maxRateTimeS": 1.63925,
@@ -1659,7 +1659,7 @@ exports[`13 FLT validation plans, golden > sc-flt-02-gust: the VC-FLT-07 gust re
     ],
     "divergedAtS": null,
     "durationS": 6,
-    "engine": "MuJoCo 3.16.0",
+    "engine": "MuJoCo 4.0.0",
     "events": [
       {
         "kind": "gust",
@@ -1757,7 +1757,7 @@ exports[`13 FLT validation plans, golden > sc-flt-02-gust: the VC-FLT-07 gust re
     "tracking": {
       "finalOffsetM": [
         -0.00151511,
-        -1.08771e-16,
+        -1.65323e-16,
         0.00000233614,
       ],
       "finalPositionErrorM": 0.00151512,

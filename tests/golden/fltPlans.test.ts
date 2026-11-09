@@ -48,8 +48,8 @@ function six(value: unknown): unknown {
 const dataOf = (steps: Step[], command: string): unknown => steps.find((step) => step.command === command)?.data;
 
 describe('13 FLT validation plans, golden', () => {
-  it('the plans were produced by MuJoCo 3.16 (the pins are per engine version)', () => {
-    expect(engineName).toMatch(/MuJoCo 3\.16\./);
+  it('the plans were produced by MuJoCo 4.0 (the pins are per engine version)', () => {
+    expect(engineName).toMatch(/MuJoCo 4\.0\./);
   });
 
   it('sc-flt-01-hover: the reference quad knocked at t = 0 returns to the VC-FLT-09 hover; replay is identical', () => {

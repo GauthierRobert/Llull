@@ -37,7 +37,7 @@ const last = (series: number[] | undefined): number => series?.[series.length - 
 
 describe('MuJoCo physics engine', () => {
   it('reports its version', () => {
-    expect(engine.name).toMatch(/^MuJoCo 3\.\d+\.\d+/);
+    expect(engine.name).toMatch(/^MuJoCo 4\.\d+\.\d+/);
   });
 
   it('constant torque on a flywheel: ω = τt/I and θ = τt²/(2I)', () => {
