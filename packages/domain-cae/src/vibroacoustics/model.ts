@@ -5,7 +5,7 @@ import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import type { CadDocument } from '@core/model/types';
 import { bandByNominal } from './math/bands';
 import { LEVEL_DB_MAX, LEVEL_DB_MIN } from './math/levels';
-import type { AcousticSpectrum, VibroacousticsModel } from './types';
+import type { AcousticExposure, AcousticSpectrum, VibroacousticsModel } from './types';
 
 const EMPTY: VibroacousticsModel = { spectra: {}, spectrumOrder: [], exposures: {}, exposureOrder: [] };
 
@@ -34,12 +34,35 @@ export const withoutSpectrum = (doc: CadDocument, name: string): CadDocument => 
   return { ...doc, vibroacoustics: { ...model, spectra, spectrumOrder: model.spectrumOrder.filter((entry) => entry !== name) } };
 };
 
+export const exposureOf = (doc: CadDocument, name: string): AcousticExposure | undefined => {
+  const { exposures } = vibroacousticsOf(doc);
+  return Object.hasOwn(exposures, name) ? exposures[name] : undefined;
+};
+
+export const withExposure = (doc: CadDocument, exposure: AcousticExposure): CadDocument => {
+  const model = vibroacousticsOf(doc);
+  return {
+    ...doc,
+    vibroacoustics: {
+      ...model,
+      exposures: { ...model.exposures, [exposure.name]: exposure },
+      exposureOrder: model.exposureOrder.includes(exposure.name) ? model.exposureOrder : [...model.exposureOrder, exposure.name],
+    },
+  };
+};
+
+export const withoutExposure = (doc: CadDocument, name: string): CadDocument => {
+  const model = vibroacousticsOf(doc);
+  const exposures = Object.fromEntries(Object.entries(model.exposures).filter(([key]) => key !== name));
+  return { ...doc, vibroacoustics: { ...model, exposures, exposureOrder: model.exposureOrder.filter((entry) => entry !== name) } };
+};
+
 /** Name rule shared by the commands and the slice schema: a letter first (`__proto__`, `constructor`, `prototype` refused), then letters, digits, `_`, `.`, `-`. */
 export const NAME_PATTERN = /^(?!(?:constructor|prototype)$)[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
 
 /** Bands per spectrum (the third-octave table has 30), faces per exposure (the export budget of TECHNICAL_SPEC §8) and the entity-id shape (`box-2.1`). */
 export const MAX_BANDS = 30;
-const MAX_FACES = 1000;
+export const MAX_FACES = 1000;
 const ENTITY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 
 const nameSchema = z.string().regex(NAME_PATTERN);

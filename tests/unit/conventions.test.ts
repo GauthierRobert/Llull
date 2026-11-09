@@ -239,7 +239,7 @@ describe('CONVENTIONS_GUIDE solution verification section (PHY-00 V&V, VNV-M4)',
 
 describe('CONVENTIONS_GUIDE nonlinear static section (PHY-05 M4, AF-03)', () => {
   const start = CONVENTIONS_GUIDE.indexOf('## 19. Nonlinear static');
-  const section = CONVENTIONS_GUIDE.slice(start);
+  const section = CONVENTIONS_GUIDE.slice(start, CONVENTIONS_GUIDE.indexOf('## 20. Acoustic'));
 
   it('names only registered commands, every nonlinear command of the pack and the review wording', async () => {
     const { getCommand } = await import('@core/commands/registry');
@@ -264,5 +264,30 @@ describe('CONVENTIONS_GUIDE nonlinear static section (PHY-05 M4, AF-03)', () => 
     expect(section).toContain('not approved');
     for (const code of ['NLS_ARC_LENGTH_UNSUPPORTED', 'NLS_CURVE_STALE', 'NLS_LIMIT_NOT_REACHED', 'FEA_HUMAN_GATE'])
       expect(section).toContain(code);
+  });
+});
+
+describe('CONVENTIONS_GUIDE acoustics section (PHY-20 M2, AF-03)', () => {
+  const start = CONVENTIONS_GUIDE.indexOf('## 20. Acoustic environments');
+  const section = CONVENTIONS_GUIDE.slice(start);
+
+  it('names only registered commands, every acoustic command and the hand-off boundary', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    expect(start).toBeGreaterThan(0);
+    const names = [...section.matchAll(/`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`/g)].map((match) => match[1] ?? '');
+    expect(names.filter((name) => getCommand(name) === undefined)).toEqual([]);
+    for (const command of [
+      'define_acoustic_spectrum',
+      'acoustic_spectrum_report',
+      'acoustic_level',
+      'convert_acoustic_spectrum',
+      'define_acoustic_exposure',
+      'delete_acoustic_exposure',
+      'check_acoustic_handoff',
+      'export_acoustic_load',
+    ])
+      expect(section).toContain(command);
+    for (const text of ['20 micropascal', 'VAC_OUT_OF_SCOPE', 'KRN_NO_EXACT_KERNEL', 'reviewRequired', 'VAC_FIELD_UNSET'])
+      expect(section).toContain(text);
   });
 });

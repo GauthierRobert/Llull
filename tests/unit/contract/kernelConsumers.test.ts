@@ -39,6 +39,7 @@ const KERNEL_HELPERS: readonly string[] = [
   'recognitionOf',
   'machinedPart',
   'resolveFace',
+  'facesNearPoints', // domain-cae vibroacoustics/faceResolve: exposure points to faces through a kernel
   'pickFaces',
   'buildBodies',
   'lawIndex',

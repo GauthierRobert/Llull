@@ -1,0 +1,517 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PHY-20 vac_flat_spectrum_handoff plan, golden > reproduces VC-VAC-06 / 09, records the exposure and reports the handoff unknown without a kernel; replay is identical > check_acoustic_handoff 1`] = `
+{
+  "exposures": 1,
+  "items": [
+    {
+      "code": "VAC_EXPOSURE_UNCHECKED",
+      "message": "exposure 'enclosure_skin': faces of 'box-2.1' not checked, no exact kernel",
+      "remediation": "run with the exact kernel (desktop app, or LLULL_KERNEL=occt-native)",
+      "severity": "info",
+    },
+  ],
+  "reviewRequired": true,
+  "status": "unknown",
+}
+`;
+
+exports[`PHY-20 vac_flat_spectrum_handoff plan, golden > reproduces VC-VAC-06 / 09, records the exposure and reports the handoff unknown without a kernel; replay is identical > document 1`] = `
+{
+  "document": {
+    "animations": {},
+    "camera": {
+      "azimuth": 2.35619449,
+      "distance": 12,
+      "polar": 1.04719755,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+    },
+    "components": {},
+    "configurations": {},
+    "constraintOrder": [],
+    "constraints": {},
+    "displayPrecision": 3,
+    "driveRelationOrder": [],
+    "driveRelations": {},
+    "entities": {
+      "#1": {
+        "color": "#6b8f9c",
+        "id": "#1",
+        "kind": "box",
+        "layerId": "#2",
+        "position": [
+          150,
+          100,
+          50,
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+        ],
+        "size": [
+          300,
+          200,
+          100,
+        ],
+      },
+    },
+    "featureHistory": [
+      {
+        "affected": [],
+        "id": "#3",
+        "name": "set_units",
+        "params": {
+          "units": "mm",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "#1",
+        ],
+        "id": "#4",
+        "name": "add_box",
+        "params": {
+          "anchor": "min",
+          "position": [
+            0,
+            0,
+            0,
+          ],
+          "size": [
+            300,
+            200,
+            100,
+          ],
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "flat130",
+        ],
+        "id": "#5",
+        "name": "define_acoustic_spectrum",
+        "params": {
+          "bands": [
+            {
+              "nominalHz": 25,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 31.5,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 40,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 50,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 63,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 80,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 100,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 125,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 160,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 200,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 250,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 315,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 400,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 500,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 630,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 800,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 1000,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 1250,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 1600,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 2000,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 2500,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 3150,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 4000,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 5000,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 6300,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 8000,
+              "splDb": 130,
+            },
+            {
+              "nominalHz": 10000,
+              "splDb": 130,
+            },
+          ],
+          "bandwidth": "third_octave",
+          "name": "flat130",
+          "reference": "20uPa",
+          "source": {
+            "citation": "synthetic test input of VC-VAC-06 (not a test level)",
+            "grade": "A",
+          },
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "flat130_oct",
+        ],
+        "id": "#6",
+        "name": "convert_acoustic_spectrum",
+        "params": {
+          "name": "flat130_oct",
+          "spectrum": "flat130",
+          "to": "octave",
+        },
+        "suppressed": false,
+      },
+      {
+        "affected": [
+          "enclosure_skin",
+        ],
+        "id": "#7",
+        "name": "define_acoustic_exposure",
+        "params": {
+          "field": "diffuse",
+          "name": "enclosure_skin",
+          "spectrum": "flat130",
+          "target": {
+            "entityId": "#1",
+            "facesNear": [
+              [
+                150,
+                100,
+                100,
+              ],
+            ],
+          },
+        },
+        "suppressed": false,
+      },
+    ],
+    "groups": {},
+    "jointOrder": [],
+    "joints": {},
+    "layerOrder": [
+      "#2",
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "locked": false,
+        "name": "Layer 0",
+        "visible": true,
+      },
+    },
+    "materials": {},
+    "nextStepNumber": 6,
+    "order": [
+      "#1",
+    ],
+    "parameters": {},
+    "recipes": {},
+    "selection": [],
+    "units": "mm",
+    "vibroacoustics": {
+      "exposureOrder": [
+        "enclosure_skin",
+      ],
+      "exposures": {
+        "enclosure_skin": {
+          "field": "diffuse",
+          "name": "enclosure_skin",
+          "spectrum": "flat130",
+          "target": {
+            "entityId": "#1",
+            "facesNear": [
+              [
+                150,
+                100,
+                100,
+              ],
+            ],
+          },
+        },
+      },
+      "spectra": {
+        "flat130": {
+          "bands": [
+            {
+              "exactMidHz": 25.1188643,
+              "nominalHz": 25,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 31.6227766,
+              "nominalHz": 31.5,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 39.8107171,
+              "nominalHz": 40,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 50.1187234,
+              "nominalHz": 50,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 63.0957344,
+              "nominalHz": 63,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 79.4328235,
+              "nominalHz": 80,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 100,
+              "nominalHz": 100,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 125.892541,
+              "nominalHz": 125,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 158.489319,
+              "nominalHz": 160,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 199.526231,
+              "nominalHz": 200,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 251.188643,
+              "nominalHz": 250,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 316.227766,
+              "nominalHz": 315,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 398.107171,
+              "nominalHz": 400,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 501.187234,
+              "nominalHz": 500,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 630.957344,
+              "nominalHz": 630,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 794.328235,
+              "nominalHz": 800,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 1000,
+              "nominalHz": 1000,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 1258.92541,
+              "nominalHz": 1250,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 1584.89319,
+              "nominalHz": 1600,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 1995.26231,
+              "nominalHz": 2000,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 2511.88643,
+              "nominalHz": 2500,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 3162.27766,
+              "nominalHz": 3150,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 3981.07171,
+              "nominalHz": 4000,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 5011.87234,
+              "nominalHz": 5000,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 6309.57344,
+              "nominalHz": 6300,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 7943.28235,
+              "nominalHz": 8000,
+              "splDb": 130,
+            },
+            {
+              "exactMidHz": 10000,
+              "nominalHz": 10000,
+              "splDb": 130,
+            },
+          ],
+          "bandwidth": "third_octave",
+          "name": "flat130",
+          "reference": "20uPa",
+          "source": {
+            "citation": "synthetic test input of VC-VAC-06 (not a test level)",
+            "grade": "A",
+          },
+          "unverified": false,
+        },
+        "flat130_oct": {
+          "bands": [
+            {
+              "exactMidHz": 31.6227766,
+              "nominalHz": 31.5,
+              "splDb": 134.771213,
+            },
+            {
+              "exactMidHz": 63.0957344,
+              "nominalHz": 63,
+              "splDb": 134.771213,
+            },
+            {
+              "exactMidHz": 125.892541,
+              "nominalHz": 125,
+              "splDb": 134.771213,
+            },
+            {
+              "exactMidHz": 251.188643,
+              "nominalHz": 250,
+              "splDb": 134.771213,
+            },
+            {
+              "exactMidHz": 501.187234,
+              "nominalHz": 500,
+              "splDb": 134.771213,
+            },
+            {
+              "exactMidHz": 1000,
+              "nominalHz": 1000,
+              "splDb": 134.771213,
+            },
+            {
+              "exactMidHz": 1995.26231,
+              "nominalHz": 2000,
+              "splDb": 134.771213,
+            },
+            {
+              "exactMidHz": 3981.07171,
+              "nominalHz": 4000,
+              "splDb": 134.771213,
+            },
+            {
+              "exactMidHz": 7943.28235,
+              "nominalHz": 8000,
+              "splDb": 134.771213,
+            },
+          ],
+          "bandwidth": "octave",
+          "name": "flat130_oct",
+          "reference": "20uPa",
+          "source": {
+            "citation": "regrouped from flat130: synthetic test input of VC-VAC-06 (not a test level)",
+            "grade": "A",
+          },
+          "unverified": false,
+        },
+      },
+      "spectrumOrder": [
+        "flat130",
+        "flat130_oct",
+      ],
+    },
+  },
+  "format": "llull-document",
+  "version": 3,
+}
+`;

@@ -1,6 +1,6 @@
 # PHY-20: Vibro-acoustics (hand-off) — technical specification
 
-Gap id **VAC** · status: M1 built (§13) · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
+Gap id **VAC** · status: M1 built (§13), M2 built (§14) · written 2026-10-15 · functional spec: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md)
 · validation: [`validation/README.md`](validation/README.md) · sources: [`validation/sources.md`](validation/sources.md)
 
 ## 1. Current state in llull
@@ -187,9 +187,40 @@ other than `octave`, an octave source, or no complete octave refuse with `VAC_CO
 (`splDb` | `pRmsPa` | `levelsDb`), `acoustic_spectrum_report` (OASPL, overall pressure, per-band edges / bandwidth / pressure / band-averaged PSD, octave
 regrouping, items). Added code `VAC_PARAMS_INVALID` (not exactly one input of `acoustic_level`; invalid name). `reference` is an optional string in
 the schema so that its absence is the coded refusal `VAC_REFERENCE_UNSET`. Levels are bounded to [-100, 300] dB so 10^(L/20) stays finite. Octave
-labels go to 16 kHz (the §2 table), third labels to 20 kHz. Not built (M2): exposures, export package, `check_acoustic_handoff`, `VAC_OUT_OF_SCOPE`,
+labels go to 16 kHz (the §2 table), third labels to 20 kHz. Built in M2 (§14): exposures, export package, `check_acoustic_handoff`, `VAC_OUT_OF_SCOPE`,
 guide section. The slice already carries `exposures` / `exposureOrder` so M2 adds no slice change; `delete_acoustic_spectrum` already refuses a
 spectrum an exposure uses. The plan `vac_flat_spectrum_handoff.plan.json` stays blocked only on `define_acoustic_exposure` and `check_acoustic_handoff`.
 
 **Validation.** VC-VAC-01..12 and the rows of `third_octave_bands.csv` / `example_spectrum.csv` run in `tests/unit/vibroacoustics/` (pins have 12
 significant digits, so comparisons use max(case tolerance, 1e-11) relative); VC-VAC-30 / 31 / 35 as behaviour cases; VC-VAC-32 / 33 wait for M2.
+
+## 14. As built (M2, 2026-11-09)
+
+**Commands (M2).** `define_acoustic_exposure`, `delete_acoustic_exposure` (added: §7.1's `VAC_SPECTRUM_IN_USE` remediation needs a way to remove an exposure), `export_acoustic_load`
+(`requiresKernel`, `readOnly`), `check_acoustic_handoff` (`kernelOptional`). No slice change. The tool count of the plugin is nine.
+
+**Exposure.** Params `{ name, spectrum, target: { entityId, facesNear[] }, field?, incidenceDeg?, notes? }`. `field` is an optional string in the schema so that its absence is the coded
+refusal `VAC_FIELD_UNSET` (a value other than `diffuse` / `progressive` is the same refusal); `incidenceDeg` (0..90) is only valid with `progressive` (`VAC_PARAMS_INVALID` otherwise). The target is checked by
+`entityTargetProblem` (`shared/target.ts`, the entity half of the 05 `targetProblem`, split out because an exposure is not tied to an analysis case, so `FEA_PART_NOT_IN_ANALYSIS` does not apply): a missing
+or 2D entity, or no `facesNear` point, is `FEA_TARGET_UNRESOLVED`. The summary carries the 05 far-point warning (`targetDistanceWarning`). Faces are NOT resolved at definition (no kernel is needed to define).
+
+**Export.** `export_acoustic_load { exposure, kind?, confirmExportControlled? }` (it runs the export-control gate like every `export_*`). Order: `kind` given -> `VAC_OUT_OF_SCOPE`; unknown exposure ->
+`VAC_EXPOSURE_UNKNOWN` (code added); no exact kernel with a face-query port -> `KRN_NO_EXACT_KERNEL` (an area is never estimated from a mesh); each `facesNear` point resolves to the nearest face with
+the kernel's exact face distance (tolerance 1e-3 x largest bounding-box extent + 1e-6 document units; a point on an edge or seam names no single face) else `VAC_EXPOSURE_UNRESOLVED`; the areas and centroids
+come from `execute(doc, 'inspect_faces', { entityId, faces })` and are converted from document units to mm / mm^2. Faces are unique and ascending. Package `llull.acousticLoad/1` as §6 with these differences:
+bands also carry `lowerHz`, `upperHz`, `bandwidthHz`, `pRmsPa`; spectrum adds `pRmsPa` and `psdKind`; faces add `surface` and `rmsForceN`; `totalAreaMm2`, `totalRmsForceN` and `items` are added;
+`provenance` is `{ source, documentHash }` (`exportDocumentHash`, bound to the exported document) without `llullVersion` (no version is reachable from a plugin; the host stamps its own). `--save` stays the CLI's job.
+**Force (decision).** The spec §6 has no force; `rmsForceN` = overall rms pressure (Pa, energy sum of the bands) x face area (m^2) for a `diffuse` field only (uniform pressure, spatial correlation not
+modelled: FR-VAC-12 / VC-VAC-34 remain V1); for a `progressive` field it is `null` (the incidence angle is stored, not applied). Items: `VAC_SPECTRUM_UNVERIFIED` when not grade A, and always
+`VAC_REVIEW_PENDING` (there is no reviewer disposition in M2); `reviewRequired: true`, `reviewReason: 'acoustic environment for qualification analysis'`.
+
+**Check.** `check_acoustic_handoff {}` -> `{ status: pass | warn | fail | unknown, exposures, items[], reviewRequired: true }`. Errors: lost spectrum (`VAC_SPECTRUM_UNKNOWN`), target not a 3D solid or, with the
+exact kernel, a point that resolves to no single face (`VAC_EXPOSURE_UNRESOLVED`). Warning: `VAC_SPECTRUM_UNVERIFIED`. Info (code added): `VAC_NO_EXPOSURE`, `VAC_EXPOSURE_UNCHECKED` (no exact kernel). `fail` if
+any error, else `unknown` if any info item, else `warn` if any warning, else `pass`: missing data is never a pass.
+
+**Codes added** to §7.1: `VAC_EXPOSURE_UNKNOWN`, `VAC_NO_EXPOSURE`, `VAC_EXPOSURE_UNCHECKED`; the table of remediations also carries `KRN_NO_EXACT_KERNEL` and `FEA_TARGET_UNRESOLVED`.
+
+**Guide and plan.** `llull guide` section 20 (`packages/protocol/src/conventions.ts`, test in `tests/unit/conventions.test.ts`). The plan `vac_flat_spectrum_handoff.plan.json` runs end to end
+(`tests/golden/vacPlans.test.ts`, snapshot of the normalised document and of the check; no kernel in that run, so its check is `unknown`) and left `blockedPlanCommands.json`.
+Validation: VC-VAC-32 (grade B export: `unverified`, `reviewRequired`, `VAC_SPECTRUM_UNVERIFIED`) and VC-VAC-33 (`VAC_OUT_OF_SCOPE`) in `tests/unit/vibroacoustics/exposure.test.ts`, run on a stub exact kernel
+(a 300 x 200 x 100 box: exact face areas of 20000 / 30000 / 60000 mm^2); VC-VAC-06 / 09 / 10 are re-asserted on the export package. The export against the real OCC kernel is not exercised here.
