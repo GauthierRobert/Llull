@@ -25,6 +25,7 @@ struct PartNodes {
 }
 
 fn mesh_parts(parts: &[Value], targets: &[Value], controls: &Value, scale: f64, workdir: &Path) -> MeshResult<Vec<RawMesh>> {
+    crate::imprint::refuse_unsupported(parts, targets, controls)?;
     if controls.get("bonding").and_then(Value::as_str) == Some("conformal") {
         return crate::conformal::mesh_conformal(parts, targets, controls, scale, workdir);
     }
