@@ -77,5 +77,6 @@ export function drydenSeries(spec: DrydenSpec, count: number): readonly Vec3[] {
     }
     return out;
   });
-  return Array.from({ length: samples }, (_, k) => [columns[0]?.[k] ?? 0, columns[1]?.[k] ?? 0, columns[2]?.[k] ?? 0] as Vec3);
+  const [u, v, w] = columns as [Float64Array, Float64Array, Float64Array];
+  return Array.from({ length: samples }, (_, k): Vec3 => [u[k] as number, v[k] as number, w[k] as number]);
 }

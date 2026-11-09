@@ -16,6 +16,9 @@ export interface AeroRuntime {
   readonly frame: ReturnType<typeof flowFrame>;
 }
 
+/** Pivot angle of a surface without a scenario command: the servo's neutral angle, 0 for a surface that does not pivot. */
+export const neutralPivotDeg = (surface: AeroSurface): number => (surface.servo === null ? 0 : surface.servo.neutralDeg);
+
 export function compileAero(surface: AeroSurface, centerOfMass: Vec3, metresPerUnit: number): AeroRuntime {
   return { surface, arm: sub3(scale3(surface.momentCentre, metresPerUnit), centerOfMass), frame: flowFrame(surface.forward) };
 }

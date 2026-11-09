@@ -34,11 +34,9 @@ export function assembleTable(
   clMax: number | null,
 ): AssembledTable | null {
   const first = rowsByPivot[0] ?? [];
-  const within = first.map((_, a) => clMax === null || rowsByPivot.every((rows) => Math.abs(rows[a]?.cl ?? 0) <= clMax));
-  let centre = 0;
-  first.forEach((row, a) => {
-    if (Math.abs(row.alphaDeg) < Math.abs(first[centre]?.alphaDeg ?? Infinity)) centre = a;
-  });
+  const within = first.map((_, a) => clMax === null || rowsByPivot.every((rows) => Math.abs((rows[a] as LatticeRow).cl) <= clMax));
+  const smallest = Math.min(...first.map((row) => Math.abs(row.alphaDeg)));
+  const centre = first.findIndex((row) => Math.abs(row.alphaDeg) === smallest);
   if (within[centre] !== true) return null;
   let lo = centre;
   let hi = centre;

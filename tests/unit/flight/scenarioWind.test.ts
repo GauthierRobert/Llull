@@ -34,7 +34,7 @@ describe('scenario turbulence (FLT-M4)', () => {
     const scenario = (
       raw: Record<string, unknown>,
     ): { wind: { turbulence: Record<string, unknown> }; setpoints: Record<string, unknown>[] } =>
-      (raw['flight'] as { scenarios: Record<string, never> }).scenarios['s'];
+      (raw['flight'] as { scenarios: Record<string, ReturnType<typeof scenario>> }).scenarios['s'] as ReturnType<typeof scenario>;
     expect(flightDocument.validate(made)).toEqual([]);
     const slow = structuredClone(made);
     scenario(slow).wind.turbulence['airspeedMps'] = 0.1;

@@ -57,7 +57,9 @@ export function flowSections(
       incidenceDeg: incidenceDeg + pivot.deg,
     };
   });
-  const run = (mapped[mapped.length - 1]?.leadingEdge[1] ?? 0) - (mapped[0]?.leadingEdge[1] ?? 0);
+  const root = mapped[0];
+  const tip = mapped[mapped.length - 1];
+  const run = root === undefined || tip === undefined ? 0 : tip.leadingEdge[1] - root.leadingEdge[1];
   if (!(run < 0)) return mapped;
   return reflect
     ? mapped.map((section) => ({ ...section, leadingEdge: [section.leadingEdge[0], -section.leadingEdge[1], section.leadingEdge[2]] }))

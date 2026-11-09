@@ -8,7 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { add3 } from '@lib/vec3';
 import type { BodyDrag } from './model';
-import { aeroOutput, compileAero, type AeroRuntime } from './aeroSurface';
+import { aeroOutput, compileAero, neutralPivotDeg, type AeroRuntime } from './aeroSurface';
 import { bodyDragForce, compileRotor, rotorOutput, type RotorRuntime } from './rotorLaw';
 import { airRelative } from './wind';
 
@@ -92,7 +92,7 @@ export function withFlightLoads(base: Loads, runtime: FlightRuntime, wind?: (tim
     for (const surface of runtime.aero) {
       const body = stateOf(surface.surface.bodyId);
       if (body === undefined) continue;
-      const output = aeroOutput(surface, body, surface.surface.servo?.neutralDeg ?? 0);
+      const output = aeroOutput(surface, body, neutralPivotDeg(surface.surface));
       const id = surface.surface.bodyId;
       bodyForces[id] = add3(bodyForces[id] ?? [0, 0, 0], output.force);
       bodyMoments[id] = add3(bodyMoments[id] ?? [0, 0, 0], output.moment);

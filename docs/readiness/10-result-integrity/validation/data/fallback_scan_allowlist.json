@@ -505,6 +505,16 @@
       "file": "domain-dynamics/src/commands/flight.ts",
       "match": "spinInertiaKgM2: params.spinInertiaKgM2 ?? 0,",
       "reason": "add_rotor: omitted spinInertiaKgM2 means \"no gyroscopic torque\", stated in the param description and in the summary"
+    },
+    {
+      "file": "domain-dynamics/src/commands/flightAero.ts",
+      "match": "const neutralDeg = Math.min(maxDeg, Math.max(minDeg, servo?.neutralDeg ?? 0));",
+      "reason": "documented param default: neutralDeg omitted means 0 clamped to the servo limits, stated in the generate_aero_table param description"
+    },
+    {
+      "file": "domain-dynamics/src/flight/aeroSweep.ts",
+      "match": "const incidenceDeg = section.incidenceDeg ?? 0;",
+      "reason": "documented param default: section incidence omitted means 0 (flat section), stated in the generate_aero_table param description"
     }
   ]
 }

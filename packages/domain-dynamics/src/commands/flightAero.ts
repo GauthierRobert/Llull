@@ -199,7 +199,8 @@ export const generateAeroTable = defineCommand({
       ...(chord === undefined ? {} : { referenceChord: chord }),
     });
     // the reference area and chord come from the call nearest zero pivot (the un-pivoted planform) and are held for the others
-    const zeroIndex = pivots.reduce((best, pivot, i) => (Math.abs(pivot) < Math.abs(pivots[best] ?? Infinity) ? i : best), 0);
+    const smallestPivot = Math.min(...pivots.map(Math.abs));
+    const zeroIndex = pivots.findIndex((pivot) => Math.abs(pivot) === smallestPivot);
     const call = (pivotDeg: number, area?: number, chord?: number): { rows: LatticeRow[]; data: Record<string, unknown> } | string => {
       const result = lattice.run(doc, callFor(pivotDeg, area, chord), ctx);
       const rows = latticeRows(result.data);
@@ -233,7 +234,7 @@ export const generateAeroTable = defineCommand({
     const metres = toMetres(doc, 1);
     const { id: _ignored, ...inputs } = params;
     const inputsHash = hashText(canonicalJson(inputs));
-    const panels = (first.data['lattice'] as { panels?: number } | undefined)?.panels ?? 0;
+    const panels = (first.data['lattice'] as { panels: number }).panels;
     const surface: AeroSurface = {
       id,
       bodyId: params.body,

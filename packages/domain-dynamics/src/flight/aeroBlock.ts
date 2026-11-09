@@ -7,7 +7,7 @@ import type { BodyKinematics } from '@core/dynamics/physicsEngine';
 import type { Vec3 } from '@core/model/vectors';
 import { add3 } from '@lib/vec3';
 import type { FlightScenario } from './controlModel';
-import { aeroOutput, type AeroRuntime } from './aeroSurface';
+import { aeroOutput, neutralPivotDeg, type AeroRuntime } from './aeroSurface';
 
 /** Per surface: pivot angle deg, angle of attack deg, CL, CD, lift N, drag N, steps outside the table, α min, α max, peak |lift| N, time of the peak. */
 export const AERO = {
@@ -43,7 +43,7 @@ export function initialAeroAux(surfaces: readonly AeroRuntime[], scenario: Fligh
   surfaces.forEach((runtime, i) => {
     const { servo } = runtime.surface;
     const at = base + AERO_SLOTS * i;
-    const start = pivotCommand(scenario, runtime.surface.id, 0, servo?.neutralDeg ?? 0);
+    const start = pivotCommand(scenario, runtime.surface.id, 0, neutralPivotDeg(runtime.surface));
     aux[at + AERO.pivot] = servo === null ? 0 : clampTo(start, servo.minDeg, servo.maxDeg);
     aux[at + AERO.minAlpha] = Infinity;
     aux[at + AERO.maxAlpha] = -Infinity;
