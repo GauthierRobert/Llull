@@ -28,6 +28,7 @@ import { blocks, must, pairParams } from '../unit/cae/contact/support';
 import { creepCube, holdFrd, solveCube } from '../unit/cae/creep/support';
 import { barModel } from '../unit/cae/explicit/support';
 import { implicitAnalysis } from '../unit/cae/fieldMeshFixtures';
+import { printedBar, recordCoupon } from '../unit/cae/printFixtures';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
@@ -464,6 +465,16 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     roots: ['analysis'],
     build: planOf(plans, 'fea_modal_cantilever'),
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz analysis', analysisType: 'static' }) },
+  },
+  // 14 FLL-M3: a printed part (walls + infill + build direction, coupon values) and the recorded printed coupons
+  'cae#printed': {
+    roots: ['analysis'],
+    build: () => recordCoupon(recordCoupon(printedBar().printed, 'xy-20', 0.2, 'xy', 400), 'xy-60', 0.6, 'xy', 1100),
+    query: { name: 'fit_print_infill_exponent', params: () => ({ pattern: 'gyroid', direction: 'xy' }) },
+    mutate: {
+      name: 'set_print_idealization',
+      params: (doc) => ({ analysisId: analysisId(doc), entityId: Object.keys(doc.entities)[0] ?? 'missing', clear: true }),
+    },
   },
   // 14 FLL-M1: an implicit body (with its material) analysed with mesh source implicit_field
   'cae#field-mesh': {

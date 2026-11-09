@@ -34,6 +34,24 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FLL_TRIM_FAILED: 'fix the trim condition (trim_flight gives the refusal) or pass operatingRpm',
   FLL_BAND_INVALID: 'give rpmBand as [low, high] with low <= high, in rev/min',
   FLL_THRESHOLD_SOURCE: 'give marginThresholdPct together with marginSource, or neither (the rows are then unknown)',
+  FEA_MATERIAL_MISSING: 'assign a material to the part (assign_material): its Poisson ratio and density are read from it',
+  FEA_MATERIAL_NO_ELASTIC:
+    'give the material E and nu (property models or an elastic_isotropic constitutive set): its Poisson ratio is read from it',
+  FLL_PRINT_CASE_TYPE: 'printed idealization is for static, modal or buckling analyses: use one of those or analyse the part as a solid',
+  FLL_PRINT_PARAM:
+    'correct the print settings: walls and topBottomLayers integers >= 0, lineWidthMm and layerHeightMm > 0, infill density in (0, 1], a non-zero layerAxis, moduli and strengths > 0 in a stress unit',
+  FLL_PRINT_COUPON_MISSING:
+    'give coupon { E_xy, E_z, uts_xy, uts_z, source } measured on solid (100 % infill) printed coupons pulled in the build plane (xy) and along the build direction (z), with their source: llull ships no typical printed-part values',
+  FLL_PRINT_EXPONENT_MISSING:
+    'give infillExponent { value, source } (the exponent m of E_core = E_solid density^m, with where it comes from) or { fitDirection } to fit it from the coupons recorded with record_print_coupon: no default exponent is assumed',
+  FLL_PRINT_FIT_POINTS:
+    'record at least 2 coupons of that pattern and direction at distinct infill densities (record_print_coupon), densities in (0, 1] and moduli > 0',
+  FLL_PRINT_COUPON_EXISTS: 'choose another id, or pass replace: true to overwrite the recorded coupon',
+  FLL_PRINT_GEOMETRY: 'give a closed 3D solid part: the skin fraction is measured on its triangles',
+  FLL_PRINT_STIFFNESS:
+    'the coupon moduli are too far apart for the material Poisson ratio (the orthotropic stiffness is not positive definite): check the coupon values and units',
+  FLL_PRINT_CONSTITUTIVE:
+    'a printed part is linear orthotropic: use a material without plastic, hyperelastic or creep sets, or clear the print idealization',
   FLL_SUPPORT_POINTS: 'the three support points must be finite and at least 1e-6 of their spread apart',
 };
 

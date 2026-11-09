@@ -7,6 +7,7 @@ import { dynamicsCommands } from './dynamics/catalog';
 import { dynamicsErrors } from './dynamics/validate';
 import { fatigueCommands } from './fatigue/catalog';
 import { flightLoadCommands } from './flightLoads/catalog';
+import { printErrors } from './flightLoads/print/validate';
 import { fractureCommands } from './fracture/catalog';
 import { analysisReferenceGuard, durabilityReferenceGuard } from './guard';
 import { marginCommands } from './margins/catalog';
@@ -23,7 +24,7 @@ import { caeRetiredCommands } from './retired';
 
 /** The analysis slice is pure definition data: nothing is derived, nothing is restored. */
 const analysisDocument: DocumentExtension = {
-  validate: (raw) => [...analysisErrors(raw), ...reliabilityErrors(raw), ...dynamicsErrors(raw)],
+  validate: (raw) => [...analysisErrors(raw), ...reliabilityErrors(raw), ...dynamicsErrors(raw), ...printErrors(raw)],
   derivedEntityIds: () => new Set<string>(),
   restore: (raw) => raw,
   // Replay regenerates the cases from their steps: the ledgers of human acts are kept so a recorded accept_verification_exception / dispose_fit_result / dispose_margin / dispose_thermal_limit re-applies its verified act.

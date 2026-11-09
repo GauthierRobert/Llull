@@ -11,6 +11,7 @@ import type { DurabilityModel } from './durability';
 import type { DispositionLedgerEntry } from './dispositionLedger';
 import type { FitDispositions, FitLedgerEntry } from './fitDisposition';
 import type { Quantity } from './quantity';
+import type { PrintCoupon, PrintIdealization } from './printIdealization';
 import type { FeMeshAdequacy } from './meshAdequacy';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
 import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } from './structuralDynamics';
@@ -539,6 +540,8 @@ export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly marginalBand?: number;
   /** Per part: features removed before meshing (`defeature_for_analysis`); part of the mesh input hash. Absent = none. */
   readonly defeature?: Readonly<Record<EntityId, DefeatureSpec>>;
+  /** 14 FLL-M3: per part, the printed-part (walls + infill + layer direction) idealization the deck writes as an orthotropic material (`set_print_idealization`). Absent = isotropic solid. */
+  readonly printed?: Readonly<Record<EntityId, PrintIdealization>>;
 }
 
 export interface AnalysisModel {
@@ -553,6 +556,9 @@ export interface AnalysisModel {
   readonly durability?: DurabilityModel;
   /** PHY-09 spectrum / time-history library and equivalent-load provenance; absent until the first spectrum or history command. */
   readonly vibration?: DynamicsLibrary;
+  /** 14 FLL-M3: printed coupon results (`record_print_coupon`), shared by every case; the infill exponent is fitted from them. Absent until the first. */
+  readonly printCoupons?: Readonly<Record<string, PrintCoupon>>;
+  readonly printCouponOrder?: readonly string[];
   readonly exceptionLedger?: readonly import('./convergenceStudy').StudyExceptionRecord[];
 }
 
