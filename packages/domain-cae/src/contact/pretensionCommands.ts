@@ -13,7 +13,7 @@ import { findBolt, forceUnitName, pretensionProblem, withPretension } from './pr
 import { preloadForce } from './pretensionDeck';
 import { toAnalysisLength } from '../decks/units';
 
-const preloadSchema = z
+export const preloadSchema = z
   .discriminatedUnion('kind', [
     z.object({
       kind: z.literal('force').describe('Preload given as the bolt axial force.'),
