@@ -9,7 +9,10 @@ import { magnitude, maxOverNodes } from '../results/fields';
  * @failure no displacement field or an empty mesh -> null
  */
 export function estimatedRotation(mesh: FeMeshArtifact, results: FeResultsArtifact): number | null {
-  const peak = results.steps.reduce((best, step) => Math.max(best, maxOverNodes(step.fields['DISP'], magnitude)?.value ?? 0), 0);
+  const peak = results.steps.reduce((best, step) => {
+    const found = maxOverNodes(step.fields['DISP'], magnitude);
+    return found === null ? best : Math.max(best, found.value);
+  }, 0);
   if (mesh.nodes.length === 0 || peak === 0) return null;
   const extent = [1, 2, 3].reduce((best, axis) => {
     const values = mesh.nodes.map((node) => node[axis] ?? 0);

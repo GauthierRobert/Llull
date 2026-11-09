@@ -465,8 +465,8 @@ parameters and imperfection amplitudes come from the owner or a company rule (as
    \`set_nonlinear_controls\` nlgeom=true|false (required, no default) → \`add_analysis_step\` per step: multipliers per load case at the END of the step (load, unload, reload = 3 steps), control
    load or displacement (target + dof + value in document units) with initial / min / max increment (fractions of the step time) and maxIncrements → \`add_curve_probe\`
    (a reaction or a load against a displacement at a point). Edit with \`update_analysis_step\`, \`delete_analysis_step\`, \`delete_curve_probe\`; every edit makes recorded results stale.
-3. Buckling-type collapse: solve a \`buckling\` case first, then \`add_imperfection\` (mode + signed amplitude + amplitudeSource, no default; \`NLS_IMPERFECTION_AMPLITUDE_UNSET\` without them).
-   Arc-length (Riks) does not exist in CalculiX (\`NLS_ARC_LENGTH_UNSUPPORTED\`): use displacement control, or \`beam_large_deflection\` for frames (limit points and snap-back).
+3. Buckling-type collapse: solve a buckling case first, then \`add_imperfection\` (mode + signed amplitude + amplitudeSource, no default; NLS_IMPERFECTION_AMPLITUDE_UNSET without them).
+   Arc-length (Riks) does not exist in CalculiX (NLS_ARC_LENGTH_UNSUPPORTED): use displacement control, or \`beam_large_deflection\` for frames (limit points and snap-back).
 4. \`check_nonlinear\` before \`llull fea_mesh\` and \`llull fea_solve\` (errors stop the deck: NLS_NLGEOM_UNSET, NLS_NO_STEPS, NLS_MATERIAL_MODEL_MISSING ...). A run that stops
    (NLS_NOT_CONVERGED, NLS_INCREMENT_TOO_SMALL, NLS_MAX_INCREMENTS) records nothing: smaller initial increment or displacement control, never raise a tolerance silently.
 5. Read: \`nonlinear_report\` (steps, increments, cutbacks, curves with units, max PEEQ, permanentSet; \`increments=all\` pages 1000 points, pass nextCursor as cursor) and \`limit_load\`

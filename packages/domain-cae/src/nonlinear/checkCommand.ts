@@ -83,10 +83,10 @@ function thresholdItems(doc: CadDocument, analysis: AnalysisCase, mesh: FeMeshAr
   }
   if (nonlinear.nlgeom === false) {
     const rotation = estimatedRotation(mesh, results);
-    const peeq = results.steps.reduce(
-      (best, step) => Math.max(best, maxOverNodes(step.fields['PE'], (values) => values[0] ?? 0)?.value ?? 0),
-      0,
-    );
+    const peeq = results.steps.reduce((best, step) => {
+      const found = maxOverNodes(step.fields['PE'], (values) => values[0] ?? Number.NaN);
+      return found === null ? best : Math.max(best, found.value);
+    }, 0);
     const { smallRotation, strain } = nonlinear.thresholds ?? {};
     const reasons = [
       ...(smallRotation !== undefined && rotation !== null && rotation > smallRotation.value

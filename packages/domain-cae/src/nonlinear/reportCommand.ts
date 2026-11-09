@@ -193,7 +193,7 @@ export const nonlinearReport = defineCommand({
         'FEA_RESULTS_MISSING',
         `analysis '${analysisId}' has no verified nonlinear results (${trust.problem?.message ?? `state ${trust.state}`})`,
       );
-    const view = { all: increments === 'all', from: cursor ?? 0 };
+    const view = { all: increments === 'all', from: cursor === undefined ? 0 : cursor };
     const curves = extractCurves(analysis, results)
       .filter((curve) => wanted === undefined || curve.probeId === wanted.id)
       .flatMap((curve) => {
