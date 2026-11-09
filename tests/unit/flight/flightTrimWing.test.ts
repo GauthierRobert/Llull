@@ -56,14 +56,16 @@ interface Mode {
   stability: string;
 }
 interface Linear {
+  a: number[][];
   modes: Mode[];
   warnings: string[];
   modeSet: string;
   trim: {
     condition: { flightPathDeg: number };
+    attitude: { pitchDeg: number };
     angleOfAttackDeg: number;
     controls: { id: string; value: number }[];
-    aero: { liftN: number; dragN: number }[];
+    aero: { alphaDeg: number; liftN: number; dragN: number }[];
   };
 }
 
@@ -84,6 +86,21 @@ describe('glider trim and modes (FLT-M5)', () => {
     expect(surface?.liftN).toBeCloseTo(MASS * G * Math.cos((flightPath * Math.PI) / 180), 3);
     expect(surface?.dragN).toBeCloseTo(-MASS * G * Math.sin((flightPath * Math.PI) / 180), 3);
     expect(Math.abs(linear.trim.controls[0]?.value ?? 99)).toBeLessThan(8);
+  });
+
+  it('reports the angle of attack with z up (= surface alpha = pitch - flight path); the path speed derivative is -2 D / (m V) within 1 %', () => {
+    const { trim, a } = linear;
+    const alpha = (trim.angleOfAttackDeg * Math.PI) / 180;
+    expect(trim.angleOfAttackDeg).toBeCloseTo(trim.aero[0]?.alphaDeg ?? Number.NaN, 6);
+    expect(trim.angleOfAttackDeg).toBeCloseTo(trim.attitude.pitchDeg - trim.condition.flightPathDeg, 3);
+    // body velocity (u, w) = V (cos alpha, -sin alpha) with z up: d(V-dot)/dV at constant alpha
+    const du = Math.cos(alpha);
+    const dw = -Math.sin(alpha);
+    const accelerationU = (a[0]?.[0] ?? 0) * du + (a[0]?.[2] ?? 0) * dw;
+    const accelerationW = (a[2]?.[0] ?? 0) * du + (a[2]?.[2] ?? 0) * dw;
+    const pathXu = du * accelerationU + dw * accelerationW;
+    const expected = (-2 * (trim.aero[0]?.dragN ?? Number.NaN)) / (MASS * SPEED);
+    expect(Math.abs(pathXu / expected - 1)).toBeLessThan(0.01);
   });
 
   it('the phugoid period is Lanchester sqrt(2) pi V / g within 10 % and the short period is much faster', () => {

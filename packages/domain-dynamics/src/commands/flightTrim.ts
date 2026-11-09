@@ -192,7 +192,7 @@ function trimData(trim: Trimmed): Record<string, unknown> {
     condition: { airspeedMps: condition.airspeedMps, flightPathDeg: state.flightPath * DEG, flightPathFree: condition.freeFlightPath },
     attitude: { rollDeg: state.roll * DEG, pitchDeg: state.pitch * DEG, headingDeg: 0 },
     velocityBodyMps: velocity,
-    angleOfAttackDeg: Math.atan2(velocity[2], velocity[0]) * DEG,
+    angleOfAttackDeg: Math.atan2(-velocity[2], velocity[0]) * DEG,
     sideslipDeg: Math.asin(Math.max(-1, Math.min(1, velocity[1] / Math.max(condition.airspeedMps, 1e-12)))) * DEG,
     worldUpInBody: world,
     controls: vehicle.controls.map((control, i) => {
@@ -352,7 +352,7 @@ export const linearizeFlightCommand = defineCommand({
           ...(vehicle.aero.length === 0
             ? []
             : [
-                'the aero tables have no sideslip, roll-rate or yaw-rate dependence (FLT-D30): the lateral modes (dutch_roll, roll_subsidence, spiral) of an aero vehicle are neutral by construction, not a stability result',
+                'the aero tables have no sideslip, roll-rate or yaw-rate dependence (FLT-D30): the lateral modes (dutch_roll, roll_subsidence, spiral) of an aero vehicle are neutral by construction, not a stability result; longitudinal rate damping (Mq, Zq, Malpha-dot) is absent too (each surface is lumped at its moment centre), so the DAMPING of the phugoid and short period is not a stability result, their periods are',
               ]),
         ],
         modeSet,
