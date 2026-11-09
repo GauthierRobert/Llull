@@ -571,7 +571,16 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   },
   explicit: {
     roots: ['analysis'],
-    build: () => barModel().doc,
+    build: () => {
+      const bar = barModel();
+      return must(bar.doc, 'add_time_history', {
+        analysisId: bar.analysisId,
+        name: 'wall',
+        kind: 'rigid_wall',
+        wallId: bar.wallId,
+        quantities: ['normal_force'],
+      }).doc;
+    },
     query: { name: 'explicit_energy_check', params: (doc) => ({ analysisId: analysisId(doc) }) },
     mutate: { name: 'create_analysis', params: constant({ name: 'fuzz explicit', analysisType: 'explicit_dynamics' }) },
   },

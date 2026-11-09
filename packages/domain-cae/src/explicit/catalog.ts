@@ -7,6 +7,7 @@ import { addContact } from './contactCommands';
 import { setJohnsonCookFailure } from './failureCommand';
 import { setAdiabaticHeating } from './heatingCommand';
 import { addImposedMotion } from './imposedMotionCommands';
+import { addTimeHistory } from './timeHistoryCommand';
 import { setExplicitShell } from './shellCommand';
 import { recordExplicitResults } from './record';
 import { addRigidWall, setExplicitControls, setInitialVelocity } from './setupCommands';
@@ -19,6 +20,7 @@ export const explicitCommands = commandCatalog(
   setAdiabaticHeating,
   addImposedMotion,
   addContact,
+  addTimeHistory,
   setExplicitShell,
   recordExplicitResults,
   explicitEnergyCheck,

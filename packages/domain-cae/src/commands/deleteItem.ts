@@ -124,12 +124,43 @@ const explicitItems: Remover = (doc, analysisCase, id) => {
       analysisId,
       [analysisId],
     );
+  if (spec.timeHistories !== undefined && Object.hasOwn(spec.timeHistories, id))
+    return done(
+      withSpec(doc, found.analysisCase, {
+        ...spec,
+        timeHistories: without(spec.timeHistories, id),
+        timeHistoryOrder: (spec.timeHistoryOrder ?? []).filter((other) => other !== id),
+      }),
+      'time history',
+      id,
+      analysisId,
+      [analysisId],
+    );
+  if (spec.timeHistories !== undefined && Object.hasOwn(spec.timeHistories, id))
+    return done(
+      withSpec(doc, found.analysisCase, {
+        ...spec,
+        timeHistories: without(spec.timeHistories, id),
+        timeHistoryOrder: (spec.timeHistoryOrder ?? []).filter((other) => other !== id),
+      }),
+      'time history',
+      id,
+      analysisId,
+      [analysisId],
+    );
   if (!Object.hasOwn(spec.rigidWalls, id)) return null;
+  const keptHistories = Object.entries(spec.timeHistories ?? {}).filter(([, history]) => history.wallId !== id);
   return done(
     withSpec(doc, found.analysisCase, {
       ...spec,
       rigidWalls: without(spec.rigidWalls, id),
       rigidWallOrder: spec.rigidWallOrder.filter((other) => other !== id),
+      ...(spec.timeHistories === undefined
+        ? {}
+        : {
+            timeHistories: Object.fromEntries(keptHistories),
+            timeHistoryOrder: (spec.timeHistoryOrder ?? []).filter((other) => keptHistories.some(([key]) => key === other)),
+          }),
     }),
     'rigid wall',
     id,
@@ -150,12 +181,14 @@ export const deleteAnalysisItem = defineCommand({
   description:
     'Remove one set-up record from an analysis by its id: a constraint (fc-), load (fl-), result probe (pr-), thermal BC (tb-), thermal contact (tc-), ' +
     'temperature limit (tl-, also drops its dispositions), thermal amplitude (am-, refused while a thermal BC uses it), explicit contact (ct-), ' +
-    'imposed motion (im-) or rigid wall (rw-). The id is affected[0] of the add_* / define_* command that created it (affected[1] for explicit ' +
+    'imposed motion (im-), time history (th-) or rigid wall (rw-). Removing a rigid wall also drops the rigid-wall time histories that name it. The id is affected[0] of the add_* / define_* command that created it (affected[1] for explicit ' +
     'records). Results become stale; the recorded mesh stays. To remove the whole analysis use delete_analysis.',
   annotations: { destructive: true },
   params: z.object({
     analysisId: analysisIdSchema,
-    itemId: z.string().describe('Id of the record to remove (fc-, fl-, pr-, tb-, tc-, tl-, am-, ct-, im- or rw- prefix, e.g. fl-3.1).'),
+    itemId: z
+      .string()
+      .describe('Id of the record to remove (fc-, fl-, pr-, tb-, tc-, tl-, am-, ct-, im-, th- or rw- prefix, e.g. fl-3.1).'),
   }),
   run: (doc, { analysisId, itemId }): CommandResult => {
     const analysisCase = caseOf(doc, analysisId);

@@ -515,7 +515,9 @@ the reviewer reads the history.
 | Transport `explicit_run {analysisId, timeoutS?, device?}` | `server/src/native/explicitRun.ts`, `explicitJobFiles.ts`, registered in `tools.ts` | `EXP_TOOL_MISSING` (+ `NATIVE_TOOL_MISSING`) without the binary; `EXP_RUN_TIMEOUT`, `EXP_SOLVER_FAILED` |
 | Solver | `solver/crates/llull-explicit` (`hex8`, `tet4`, `stability`, `material`, `solver`, `job`) | `llull-compute explicit <folder>`; contract in `job.rs` |
 
-Not built from §3 / §4: `imposedMotions`, `contacts`, `timeHistories` / `add_time_history` (energies and wall forces are always written),
+Time-history requests (EXP-TH): `add_time_history {analysisId, name, kind: node|part|rigid_wall, target? (node: facesNear / pointsNear via `feaTargetSchema` + `targetProblem`), partId?, wallId?, quantities[], intervalS?}` in `explicit/timeHistoryCommand.ts` stores `ExplicitSpec.timeHistories` / `timeHistoryOrder` (ids `th-<step>.<k>`, max 32, unique names, quantities per kind from `TIME_HISTORY_QUANTITIES`: node displacement / velocity / acceleration, part internal_energy / kinetic_energy / momentum / mass, rigid_wall normal_force / normal_impulse / energy, the wall by `wallId` = its rw- id or name; `intervalS` absent = the case `historyIntervalS`, never defaulted). `delete_analysis_item` removes a `th-` id; deleting a wall drops its wall histories. Slice validation in `explicit/model.ts`; the requests are part of `explicitInputHash` (a change makes a recorded run stale). **Request data only:** `llull-explicit` and the job do not read them yet (no deck writers or `th_to_csv` reader exist either: OpenCourant is refused, `/TH/*` and `/TFILE` cards, `thCsvReader.ts` and recording of node / part series are open).
+
+Not built from §3 / §4: `imposedMotions`, `contacts`, (energies and wall forces are always written),
 `set_explicit_scenario`, moving walls, wall friction, `check_explicit`, the deck writers and readers, `explicit_import_results`,
 `explicit_result_field`. The validation plans still use `solver: opencourant` and `add_time_history`; they stay drafts until M2–M4.
 

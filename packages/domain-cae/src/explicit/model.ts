@@ -1,7 +1,7 @@
 /** Access to and validation of the explicit set-up stored on analysis cases (`AnalysisCase.explicit`, plugin `explicit`). */
 
 import type { AnalysisCase } from '@core/model/analysis';
-import type { ExplicitSpec } from '@core/model/explicit';
+import { TIME_HISTORY_QUANTITIES, type ExplicitSpec, type ExplicitTimeHistoryKind } from '@core/model/explicit';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { unitSystemFactors } from '../decks/units';
@@ -143,6 +143,29 @@ function specErrors(caseId: string, spec: unknown): string[] {
       ))
   )
     errors.push(`${where}.imposedMotions / imposedMotionOrder are malformed`);
+  const histories = spec['timeHistories'];
+  const historyOrder = spec['timeHistoryOrder'];
+  if (
+    histories !== undefined &&
+    (!isRecord(histories) ||
+      !Array.isArray(historyOrder) ||
+      historyOrder.length > 32 ||
+      historyOrder.some((id) => typeof id !== 'string' || !Object.hasOwn(histories, id)) ||
+      !Object.values(histories).every((entry) => {
+        if (!isRecord(entry) || typeof entry['name'] !== 'string' || !Array.isArray(entry['quantities'])) return false;
+        const kind = String(entry['kind']);
+        if (!Object.hasOwn(TIME_HISTORY_QUANTITIES, kind)) return false;
+        const allowed: readonly unknown[] = TIME_HISTORY_QUANTITIES[kind as ExplicitTimeHistoryKind];
+        const target = entry['target'];
+        return (
+          entry['quantities'].length > 0 &&
+          entry['quantities'].every((quantity) => allowed.includes(quantity)) &&
+          (entry['intervalS'] === undefined || (finite(entry['intervalS']) && (entry['intervalS'] as number) > 0)) &&
+          (kind === 'rigid_wall' ? typeof entry['wallId'] === 'string' : isRecord(target) && typeof target['entityId'] === 'string')
+        );
+      }))
+  )
+    errors.push(`${where}.timeHistories / timeHistoryOrder are malformed`);
   const heating = spec['heating'];
   if (
     heating !== undefined &&

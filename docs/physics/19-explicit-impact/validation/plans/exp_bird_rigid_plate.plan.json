@@ -181,10 +181,10 @@
    "analysisId": "$an",
    "name": "plate_impulse",
    "kind": "rigid_wall",
-   "target": "plate",
+   "wallId": "plate",
    "quantities": [
-    "impulse_z",
-    "force_z"
+    "normal_impulse",
+    "normal_force"
    ]
   }
  }

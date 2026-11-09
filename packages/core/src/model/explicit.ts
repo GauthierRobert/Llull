@@ -75,6 +75,29 @@ export interface ExplicitContact {
   readonly penaltyScale: NamedValue;
 }
 
+/** Quantities a time history records, per kind (the Radioss /TH/NODE, /TH/PART and /TH/RWALL families). */
+export const TIME_HISTORY_QUANTITIES = {
+  node: ['displacement', 'velocity', 'acceleration'],
+  part: ['internal_energy', 'kinetic_energy', 'momentum', 'mass'],
+  rigid_wall: ['normal_force', 'normal_impulse', 'energy'],
+} as const;
+
+export type ExplicitTimeHistoryKind = keyof typeof TIME_HISTORY_QUANTITIES;
+
+/** Requested time history (TR-EXP-10 /TH/*): nodes, a part or a rigid wall, written at its own interval or the case history interval. */
+export interface ExplicitTimeHistory {
+  readonly name: string;
+  readonly kind: ExplicitTimeHistoryKind;
+  /** node: the part and near points / faces (document units); part: `entityId` only; rigid_wall: absent. */
+  readonly target?: ExplicitMotionTarget;
+  /** rigid_wall: id `rw-<step>.<k>` of a wall of the case. */
+  readonly wallId?: string;
+  /** Subset of `TIME_HISTORY_QUANTITIES[kind]`, in request order, no repeats. */
+  readonly quantities: readonly string[];
+  /** Seconds; absent = the case `historyIntervalS`. */
+  readonly intervalS?: number;
+}
+
 export interface ExplicitSpec {
   readonly endTimeS: number;
   readonly historyIntervalS: number;
@@ -102,6 +125,9 @@ export interface ExplicitSpec {
   /** Penalty contacts (RS-8c), by id `ct-<step>.<k>`. */
   readonly contacts?: Readonly<Record<string, ExplicitContact>>;
   readonly contactOrder?: readonly string[];
+  /** Requested time histories (at most 32), by id `th-<step>.<k>`. */
+  readonly timeHistories?: Readonly<Record<string, ExplicitTimeHistory>>;
+  readonly timeHistoryOrder?: readonly string[];
   /** Parts meshed as Belytschko–Tsay shells (thin boxes: mid-surface, thickness = the smallest dimension), by entity id (RS-8c). */
   readonly shells?: Readonly<Record<string, { readonly points: number }>>;
   readonly results?: ExplicitResultsSummary;
