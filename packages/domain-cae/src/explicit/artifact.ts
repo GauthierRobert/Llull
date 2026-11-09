@@ -15,6 +15,7 @@ import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { explicitMaterial } from './laws';
 import { supportedUnits } from './model';
+import { historySummary, parseHistorySeries } from './historyArtifact';
 import type { ExplicitJob } from './job';
 
 /** Values per element in `fields.f64`: von Mises, equivalent plastic strain, failed flag, temperature (K), centroid x, y, z. */
@@ -46,13 +47,14 @@ function wallHistories(value: unknown): ExplicitWallHistory[] | null {
 
 /**
  * The artifact of one run.
- * @failure result.json not matching the job contract, or a fields array of the wrong length -> explanation string
+ * @failure result.json not matching the job contract, histories.json malformed, or a fields array of the wrong length -> explanation string
  */
 export function buildExplicitArtifact(
   job: ExplicitJob,
   resultText: string,
   fields: Float64Array,
   version: string,
+  historiesText: string | null = null,
 ): FeExplicitArtifact | string {
   let value: unknown;
   try {
@@ -87,6 +89,8 @@ export function buildExplicitArtifact(
   const centroids: number[] = [];
   for (let element = 0; element < count; element++)
     for (let axis = 0; axis < 3; axis++) centroids.push(fields[FIELD_STRIDE * element + 4 + axis] ?? 0);
+  const histories = parseHistorySeries(historiesText, job.timeHistories, job.units);
+  if (typeof histories === 'string') return histories;
   return {
     kind: 'fe_explicit',
     inputHash: job.inputHash,
@@ -107,6 +111,7 @@ export function buildExplicitArtifact(
     failed: column(2),
     temperature: column(3),
     centroids,
+    ...(histories.length > 0 ? { histories } : {}),
   };
 }
 
@@ -174,6 +179,7 @@ export function explicitSummary(
     }),
   );
   const reasons = unverifiedReasons(doc, analysisCase);
+  const histories = historySummary(analysisCase.explicit, artifact, units);
   return {
     artifactHash,
     inputHash: artifact.inputHash,
@@ -204,6 +210,7 @@ export function explicitSummary(
     maxPlasticStrain: extreme(artifact.plasticStrain, artifact.centroids, '-'),
     maxTemperature: extreme(artifact.temperature, artifact.centroids, 'K'),
     failedElements: artifact.failed.filter((flag) => flag > 0).length,
+    ...(histories !== undefined ? { histories } : {}),
     walls,
     unverified: reasons.length > 0,
     unverifiedReasons: reasons,

@@ -332,6 +332,72 @@ describe('explicit_run with the real llull-compute', () => {
     600_000,
   );
   native(
+    'requested time histories are recorded on the interval grid and read back: the wall gets 2 m v, the bar momentum flips (EXP-TH)',
+    async () => {
+      const model = barModel({ size: 5 });
+      let doc = model.doc;
+      const add = (params: Record<string, unknown>): void => {
+        doc = must(doc, 'add_time_history', { analysisId: model.analysisId, ...params }).document;
+      };
+      add({
+        name: 'anvil',
+        kind: 'rigid_wall',
+        wallId: 'anvil',
+        quantities: ['normal_impulse', 'normal_force', 'energy'],
+        intervalS: 2e-6,
+      });
+      add({ name: 'bar', kind: 'part', partId: model.barId, quantities: ['momentum', 'kinetic_energy', 'internal_energy'] });
+      add({
+        name: 'top',
+        kind: 'node',
+        target: { entityId: model.barId, facesNear: [[5, 5, 200]] },
+        quantities: ['displacement', 'velocity'],
+      });
+      const host: FeaHost = {
+        getDoc: () => doc,
+        applyCommand: (name, params) => {
+          const result = execute(doc, name, params, { ...defaultContext(), feaArtifacts: store });
+          if (result.rejected !== true) doc = result.document;
+          return { summary: result.summary, affected: result.affected, isError: result.rejected === true, data: result.data };
+        },
+      };
+      const result = await runExplicitRun(model.analysisId, { timeoutS: 300 }, host, { store, runner: createComputeRunner({}, BINARY) });
+      expect(result.isError, result.summary).toBe(false);
+      const ctx = { ...defaultContext(), feaArtifacts: store };
+      const read = (history: string, quantity: string): { unit: string; t: number[]; values: unknown[]; status: string } => {
+        const answer = execute(doc, 'explicit_time_history', { analysisId: model.analysisId, history, quantity, limit: 2000 }, ctx);
+        expect(answer.rejected, answer.summary).toBeUndefined();
+        return (answer.data as { series: { unit: string; t: number[]; values: unknown[]; status: string }[] }).series[0] as never;
+      };
+      const impulse = read('anvil', 'normal_impulse');
+      expect(impulse.status).toBe('recorded');
+      expect(impulse.unit).toBe('N*s');
+      // Exact multiples of the 2 us request interval, from 0 to the 160 us end.
+      expect(impulse.t).toHaveLength(81);
+      expect(impulse.t.every((time, k) => Math.abs(time - k * 2e-6) < 1e-15)).toBe(true);
+      const momentumValue = 7.85e-9 * 10 * 10 * 200 * 10_000;
+      const total = impulse.values[80] as number;
+      // nu = 0.3 (3D wave effects, hourglass and bulk viscosity) bounces back a little slower than the 1D 2 m v.
+      expect(Math.abs(total / (2 * momentumValue) - 1)).toBeLessThan(0.06);
+      const momentum = read('bar', 'momentum');
+      expect(momentum.t).toHaveLength(161);
+      expect(((momentum.values[0] as number[])[2] ?? 0) / momentumValue).toBeCloseTo(-1, 9);
+      const bounced = (momentum.values[160] as number[])[2] ?? 0;
+      expect(Math.abs(bounced / momentumValue - 1)).toBeLessThan(0.06);
+      // The wall impulse is the model's change of momentum.
+      expect(Math.abs(total / (bounced + momentumValue) - 1)).toBeLessThan(0.01);
+      const top = read('top', 'velocity');
+      expect((top.values[0] as number[])[2] ?? 0).toBeCloseTo(-10_000, 3);
+      const energy = read('anvil', 'energy');
+      expect((energy.values as number[]).every((value) => value >= -1e-9)).toBe(true);
+      const summary = doc.analysis?.cases[model.analysisId]?.explicit?.results as ExplicitResultsSummary;
+      const states = Object.values(summary.histories ?? {}).flatMap((entry) => entry.quantities.map((quantity) => quantity.status));
+      expect(states).toHaveLength(8);
+      expect(states.every((state) => state === 'recorded')).toBe(true);
+    },
+    300_000,
+  );
+  native(
     'a bar pulled by add_imposed_motion carries rho c0 v behind the front (RS-8, through commands and the job contract)',
     async () => {
       const model = barModel({ size: 2.5 });

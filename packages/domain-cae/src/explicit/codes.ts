@@ -32,6 +32,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   EXP_IMPOSED_MOTION_NOT_FOUND: 'list the imposed motions with analysis_report',
   EXP_TIME_HISTORY_INVALID:
     'give a unique name, quantities valid for the kind (node: displacement / velocity / acceleration; part: internal_energy / kinetic_energy / momentum / mass; rigid_wall: normal_force / normal_impulse / energy), the matching target or wallId and 0 < intervalS <= endTime; at most 32 per case',
+  EXP_TIME_HISTORY_NOT_FOUND: 'list the time histories with analysis_report (setup.timeHistories)',
+  EXP_TIME_HISTORY_NOT_RECORDED:
+    'the solver output has no series for it: re-run explicit_run with an llull-compute that records time histories',
   EXP_SHELL_INVALID: 'pick an unrotated box part whose smallest dimension is at most a quarter of the others, points 1 to 5',
 };
 

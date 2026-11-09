@@ -169,6 +169,19 @@ export interface ExplicitWallHistory {
  * @invariant per-element arrays have one value per element (hex8 first, then tet4); `centroids` holds 3 values per element in the FINAL
  *   configuration, analysis length units
  */
+/** One recorded time-history series (an `ExplicitTimeHistory` quantity): `components` numbers per time, analysis units. */
+export interface ExplicitHistorySeries {
+  /** Id `th-<step>.<k>` of the request. */
+  readonly id: string;
+  readonly name: string;
+  readonly quantity: string;
+  readonly components: 1 | 3;
+  readonly unit: string;
+  /** Sample times, s: exact multiples of the request interval. */
+  readonly t: readonly number[];
+  readonly values: readonly number[];
+}
+
 export interface FeExplicitArtifact {
   readonly kind: 'fe_explicit';
   readonly inputHash: string;
@@ -190,6 +203,8 @@ export interface FeExplicitArtifact {
   /** Element temperature, K (adiabatic heating; the initial temperature without it). */
   readonly temperature: readonly number[];
   readonly centroids: readonly number[];
+  /** Series of the requested time histories the solver recorded (absent without a request or from a binary that does not record them). */
+  readonly histories?: readonly ExplicitHistorySeries[];
 }
 
 export interface ExplicitExtreme {
@@ -198,6 +213,20 @@ export interface ExplicitExtreme {
   /** Final-configuration element centroid, analysis length units. */
   readonly at: Vec3;
   readonly element: number;
+}
+
+/** What the run gave of one requested time history (bounded: the series live in the artifact; `explicit_time_history` reads them). */
+export interface ExplicitHistorySummary {
+  readonly name: string;
+  readonly quantities: readonly {
+    readonly quantity: string;
+    readonly unit: string;
+    /** `recorded`, or `EXP_TIME_HISTORY_NOT_RECORDED` when the solver output has no series for it (never read as empty data). */
+    readonly status: 'recorded' | 'EXP_TIME_HISTORY_NOT_RECORDED';
+    readonly samples: number;
+    /** Largest absolute value over all samples and components. */
+    readonly peakAbs: number;
+  }[];
 }
 
 export interface ExplicitResultsSummary {
@@ -233,6 +262,8 @@ export interface ExplicitResultsSummary {
   /** Hottest element, K (RS-8 adiabatic heating). */
   readonly maxTemperature: ExplicitExtreme;
   readonly failedElements: number;
+  /** Per requested time history id; absent when none was requested. */
+  readonly histories?: Readonly<Record<string, ExplicitHistorySummary>>;
   readonly walls: Readonly<Record<string, { readonly peakForce: number; readonly impulse: number; readonly forceUnit: string }>>;
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];

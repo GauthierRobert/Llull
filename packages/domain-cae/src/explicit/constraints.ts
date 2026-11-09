@@ -46,7 +46,7 @@ interface Located {
 }
 
 /** Nodes of a part selected by its box faces / nearest nodes (case length unit points), or the reason it cannot. */
-function locate(
+export function locate(
   mesh: ExplicitMesh,
   target: ExplicitMotionTarget & { readonly edgesNear?: unknown; readonly intersectPlane?: unknown },
   toCase: number,
