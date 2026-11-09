@@ -7,6 +7,7 @@ import { sha256Hex } from '@lib/sha256';
 import { REVIEW_REASON, UNVERIFIED_REASON } from './codes';
 import { type PartFacts, isolationsOf, materialOfPart, partFacts } from './resolve';
 import { ALUMINIUM_GROUPS, CFRP_GROUP, GALVANIC_889D_MATRIX, REMEDIES, type Remedy, limitOf } from './tables';
+import type { AcceptanceState } from './gate';
 import type { Acceptance, CorrosionEnvironment, CorrosionScheme } from './types';
 
 export type ItemStatus = 'pass' | 'pass_isolated' | 'warn' | 'fail' | 'unknown';
@@ -30,7 +31,9 @@ export interface CompatibilityItem {
   /** Hash of the finding (key, status, code, inputs): an acceptance applies only while it matches. */
   readonly fingerprint: string;
   readonly acceptance?: { readonly decision: Acceptance['decision']; readonly signer: string; readonly signatureId: string };
+  /** A stored acceptance that does not count: the finding changed (`stale`), or its signature does not verify for this document / no port can confirm it. */
   readonly staleAcceptance?: true;
+  readonly unconfirmedAcceptance?: Exclude<AcceptanceState, 'ok'>;
 }
 
 /** Guard on volt comparisons (spec §5.7). */
@@ -88,7 +91,7 @@ function screening(
       anodeAreaMm2: anodeArea,
       cathodeAreaMm2: cathodeArea,
       areaRatio,
-      areaBasis: 'box total surface area (MVP closed form)',
+      areaBasis: 'box total surface area (MVP closed form; the spec V1 basis, total minus contact area, needs the kernel)',
     };
     return {
       status: small ? 'warn' : 'pass',
@@ -99,7 +102,15 @@ function screening(
       warnings,
     };
   }
-  return { status: 'pass', code: 'COR_GALVANIC_OK', ruleId: 'COR-R-02', rule: RULE_ANODIC, inputs: full, warnings };
+  const unavailable = anode === null ? full : { ...full, areaBasis: 'unavailable' };
+  return {
+    status: 'pass',
+    code: 'COR_GALVANIC_OK',
+    ruleId: 'COR-R-02',
+    rule: RULE_ANODIC,
+    inputs: unavailable,
+    warnings: anode === null ? warnings : [...warnings, 'COR_AREA_UNKNOWN'],
+  };
 }
 
 function verdictOf(a: PartFacts, b: PartFacts, scheme: CorrosionScheme, environment: CorrosionEnvironment): Verdict {
@@ -151,6 +162,7 @@ export function galvanicItem(
   scheme: CorrosionScheme,
   environment: CorrosionEnvironment,
   acceptances: Readonly<Record<string, Acceptance>>,
+  confirm: (key: string, acceptance: Acceptance) => AcceptanceState,
 ): CompatibilityItem {
   const [partA, partB] = [
     partFacts(doc, pair.a, pair.materials[0] ?? materialOfPart(doc, pair.a)),
@@ -165,10 +177,16 @@ export function galvanicItem(
     ...verdict.inputs,
     isolations: isolations.map(({ id, method, spec }) => ({ id, method, ...(spec === undefined ? {} : { spec }) })),
   };
-  const warnings = [...verdict.warnings, ...(pair.approximate ? ['COR_CONTACT_APPROXIMATE'] : [])];
+  const warnings = [
+    ...verdict.warnings,
+    ...(pair.approximate ? ['COR_CONTACT_APPROXIMATE'] : []),
+    ...(isolated && isolations.some((isolation) => isolation.entityId !== undefined) ? ['COR_ISOLATION_BROAD'] : []),
+  ];
   const fingerprint = fingerprintOf(key, status, verdict.code, inputs);
   const accepted = Object.hasOwn(acceptances, key) ? acceptances[key] : undefined;
-  const live = accepted !== undefined && accepted.fingerprint === fingerprint;
+  const current = accepted !== undefined && accepted.fingerprint === fingerprint;
+  const state = accepted !== undefined && current ? confirm(key, accepted) : undefined;
+  const live = accepted !== undefined && state === 'ok';
   return {
     key,
     status,
@@ -187,6 +205,31 @@ export function galvanicItem(
     reviewReason: REVIEW_REASON,
     fingerprint,
     ...(live ? { acceptance: { decision: accepted.decision, signer: accepted.signer, signatureId: accepted.signatureId } } : {}),
-    ...(accepted !== undefined && !live ? { staleAcceptance: true as const } : {}),
+    ...(accepted !== undefined && !current ? { staleAcceptance: true as const } : {}),
+    ...(state !== undefined && state !== 'ok' ? { unconfirmedAcceptance: state } : {}),
+  };
+}
+
+/** A solid find_contacts could not test (missing component, nesting too deep): its contacts are unknown, never an implicit pass. */
+export function skippedItem(id: string, reason: string): CompatibilityItem {
+  const key = `skipped:${id}`;
+  const inputs = { reason };
+  return {
+    key,
+    status: 'unknown',
+    code: 'COR_CONTACT_SKIPPED',
+    ruleId: 'COR-R-02',
+    ruleGrade: 'B',
+    rule: RULE_ANODIC,
+    ids: [id, id],
+    contact: { kind: 'none', source: 'skipped', approximate: true },
+    inputs,
+    warnings: [],
+    remedies: [],
+    unverified: true,
+    unverifiedReasons: [UNVERIFIED_REASON],
+    reviewRequired: true,
+    reviewReason: REVIEW_REASON,
+    fingerprint: fingerprintOf(key, 'unknown', 'COR_CONTACT_SKIPPED', inputs),
   };
 }

@@ -37,7 +37,7 @@ export function reportCsv(items: readonly CompatibilityItem[]): string {
     return [
       item.key,
       item.status,
-      item.code,
+      [item.code, ...item.warnings.filter((warning) => warning !== 'COR_SCREENING_RULE_ONLY')].join(';'),
       item.ids[0],
       item.ids[1],
       parts.map((part) => part['material'] ?? '').join(' | '),

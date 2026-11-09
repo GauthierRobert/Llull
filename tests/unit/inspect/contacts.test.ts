@@ -240,3 +240,33 @@ describe('find_contacts instances: nesting and broken components', () => {
     expect(() => find(cyclic as CadDocument, TOL)).not.toThrow();
   });
 });
+
+describe('find_contacts reports what it could not test', () => {
+  it('lists a missing component and a nesting overflow in data.skipped and the summary', () => {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 10], position: [0, 0, 0] });
+    const unit = execute(base.document, 'add_box', { size: [10, 10, 10], position: [0, 0, 10] });
+    const component = execute(unit.document, 'create_component', { name: 'Unit', entityIds: [unit.affected[0]] });
+    const instance = component.affected.find((id) => component.document.entities[id]?.kind === 'instance') ?? '';
+    const missing = execute({ ...component.document, components: {} }, 'find_contacts', TOL);
+    expect((missing.data as { skipped: { id: string; reason: string }[] }).skipped).toEqual([
+      { id: instance, reason: expect.stringContaining('missing') },
+    ]);
+    expect(missing.summary).toContain('SKIPPED 1 solid(s) that were NOT tested');
+    const [componentId] = Object.keys(component.document.components);
+    const inner = component.document.components[componentId ?? ''];
+    const entity = component.document.entities[instance];
+    if (inner === undefined || entity === undefined) throw new Error('fixture');
+    const cyclic = {
+      ...component.document,
+      components: {
+        [inner.id]: { ...inner, entities: { ...inner.entities, loop: { ...entity, id: 'loop' } }, order: [...inner.order, 'loop'] },
+      },
+    };
+    const deep = (execute(cyclic as CadDocument, 'find_contacts', TOL).data as { skipped: { reason: string }[] }).skipped;
+    expect(deep.some((entry) => entry.reason.includes('nesting deeper than 8'))).toBe(true);
+  });
+
+  it('reports no skipped solid for a plain scene', () => {
+    expect((execute(scene([20, 10, 10]).doc, 'find_contacts', TOL).data as { skipped: unknown[] }).skipped).toEqual([]);
+  });
+});

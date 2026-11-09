@@ -8,24 +8,13 @@ import { humanGate, humanGatePayload } from '@core/model/humanGate';
 import { documentIdentity } from '@core/model/documentUid';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { refuseCor } from './codes';
+import { ACCEPT_ACT, acceptanceDetails, nonceOf } from './gate';
 import type { CompatibilityItem } from './items';
 import { corrosionOf, withCorrosion } from './model';
 import type { Acceptance } from './types';
 
 const COMMAND = 'accept_corrosion_item';
-const ACT = 'accept or reject a corrosion compatibility item';
-
-const nonceOf = (signature: unknown): string =>
-  typeof signature === 'object' && signature !== null && typeof (signature as { nonce?: unknown }).nonce === 'string'
-    ? (signature as { nonce: string }).nonce
-    : '';
-
-const detailsOf = (decision: string, justification: string, fingerprint: string, documentUid: string): Record<string, unknown> => ({
-  decision,
-  justification,
-  fingerprint,
-  documentUid,
-});
+const ACT = ACCEPT_ACT;
 
 /**
  * @affects doc.corrosion.acceptances[itemKey] (decision, justification, fingerprint of the finding, signer, signatureId, the verified signature, document uid; affected: [itemKey]); never changes an item's status or number
@@ -95,13 +84,13 @@ export const acceptCorrosionItem = defineCommand({
     if (kept !== undefined && keptMatches) {
       const signed = port?.verify(
         kept.signature,
-        humanGatePayload(ACT, [itemKey], detailsOf(decision, justification, item.fingerprint, uid), nonceOf(kept.signature)),
+        humanGatePayload(ACT, [itemKey], acceptanceDetails(decision, justification, item.fingerprint, uid), nonceOf(kept.signature)),
       );
       if (port !== null && (signed === null || signed === undefined || signed.signer !== kept.signer))
         return fail('COR_HUMAN_GATE', 'the kept signature of this acceptance does not verify');
       return changed(doc, `${COMMAND}: '${itemKey}' ${decision} by ${kept.signer} (replayed).`, [itemKey]);
     }
-    const gate = humanGate(port, ACT, [itemKey], confirmation, detailsOf(decision, justification, item.fingerprint, uid));
+    const gate = humanGate(port, ACT, [itemKey], confirmation, acceptanceDetails(decision, justification, item.fingerprint, uid));
     if (!gate.cleared) return fail('COR_HUMAN_GATE', gate.reason);
     const acceptance: Acceptance = {
       itemKey,

@@ -4,9 +4,11 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
+import type { Acceptance } from './types';
 import type { ContactPair } from '@core/geometry/contacts';
 import { refuseCor } from './codes';
-import { type CompatibilityItem, type ItemStatus, galvanicItem } from './items';
+import { type AcceptanceState, acceptanceState } from './gate';
+import { type CompatibilityItem, type ItemStatus, galvanicItem, skippedItem } from './items';
 import { corrosionOf } from './model';
 import { rootOf } from './resolve';
 import { reportCsv } from './reportCsv';
@@ -18,6 +20,7 @@ const RANK: Readonly<Record<ItemStatus, number>> = { pass: 0, pass_isolated: 1, 
 interface ContactsData {
   readonly pairs: readonly ContactPair[];
   readonly tolerance: Record<string, unknown>;
+  readonly skipped: readonly { readonly id: string; readonly reason: string }[];
 }
 
 /** Overall status: the worst of the items that no human acceptance covers. */
@@ -43,7 +46,7 @@ export const checkMaterialCompatibility = defineCommand({
     'so every item carries COR_SCREENING_RULE_ONLY. A smaller anode on a larger cathode warns COR_SMALL_ANODE (area ratio from box surface areas). Carbon fibre (group graphite) on aluminium fails COR_CFRP_ALUMINIUM. ' +
     'A pair covered by declare_isolation reports pass_isolated. A part with no material, group or index is `unknown` (COR_MATERIAL_MISSING, COR_GROUP_MISSING, COR_GROUP_VALUE_MISSING), never pass. ' +
     'Scheme mil_std_889d reports COR_889_TABLE_MISSING (the matrix is not shipped). Every item has reviewRequired true: a human decides; stress-corrosion and hydrogen-embrittlement rules are not evaluated. ' +
-    'Returns data { status: pass | pass_isolated | warn | unknown | fail (worst unaccepted item), scheme, environment, items: [{ key, status, code, ruleId, ruleGrade, ids, inputs, warnings, remedies, unverified, reviewRequired, acceptance? }], counts, tolerance, contacts }. ' +
+    'Returns data { status: pass | pass_isolated | warn | unknown | fail (worst item without a CONFIRMED human acceptance: an acceptance counts only when its signature re-verifies through the signing port for this document, so without a port nothing is accepted), scheme, environment, items: [{ key, status, code, ruleId, ruleGrade, ids, inputs, warnings, remedies, unverified, reviewRequired, acceptance? }], counts, tolerance, contacts }. ' +
     'report: true adds data.text (CSV, `--save corrosion.csv`). Next: declare_isolation, accept_corrosion_item (human only).',
   params: z.object({
     entityIds: z
@@ -87,9 +90,12 @@ export const checkMaterialCompatibility = defineCommand({
         materials: [null, null] as const,
         stack: true,
       }));
-    const items = [...geometric, ...fromStacks]
-      .map((pair) => galvanicItem(doc, pair, scheme, environment, model.acceptances))
-      .sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0));
+    const port = ctx?.humanSignature ?? null;
+    const confirm = (key: string, acceptance: Acceptance): AcceptanceState => acceptanceState(doc, port, key, acceptance);
+    const items = [
+      ...[...geometric, ...fromStacks].map((pair) => galvanicItem(doc, pair, scheme, environment, model.acceptances, confirm)),
+      ...contacts.skipped.map((skip) => skippedItem(skip.id, skip.reason)),
+    ].sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0));
     const status = overall(items);
     const counts: Record<string, number> = { accepted: items.filter((item) => item.acceptance?.decision === 'accepted').length };
     for (const item of items) counts[item.status] = (counts[item.status] ?? 0) + 1;

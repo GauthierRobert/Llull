@@ -266,3 +266,65 @@ describe('CSV cells and replay seed', () => {
     expect(replayed.document.corrosion?.environment).toEqual({ scheme: 'anodic_index', value: 'normal' });
   });
 });
+
+describe('what the check cannot see is never a silent pass', () => {
+  it('an instance whose component is missing becomes an unknown COR_CONTACT_SKIPPED item', () => {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 10], position: [0, 0, 0] });
+    const unit = execute(base.document, 'add_box', { size: [10, 10, 10], position: [100, 0, 0] });
+    const component = execute(unit.document, 'create_component', { name: 'Unit', entityIds: [unit.affected[0]] });
+    const instance = component.affected.find((id) => component.document.entities[id]?.kind === 'instance') ?? '';
+    const broken = { ...withEnvironment(component.document, 'normal'), components: {} };
+    const result = check(broken);
+    expect(result.status).toBe('unknown');
+    expect(result.items).toMatchObject([
+      { key: `skipped:${instance}`, status: 'unknown', code: 'COR_CONTACT_SKIPPED', reviewRequired: true },
+    ]);
+    expect(result.items[0]?.inputs['reason']).toContain('missing');
+  });
+
+  it('a pair whose anode area is unknown (a sphere) warns COR_AREA_UNKNOWN instead of skipping the small-anode rule', () => {
+    const { doc } = pair(['aluminium_wrought_other', 'aluminium_wrought_2000']);
+    const sphere = execute(doc, 'add_sphere', { radius: 4, position: [50, 25, 18] });
+    const withSphere = run(sphere.document, 'assign_material', { materialName: 'm_plate', entityIds: [sphere.affected[0]] });
+    const item = check(withEnvironment(withSphere, 'normal')).items.find((entry) => entry.ids.includes(sphere.affected[0] ?? ''));
+    expect(item?.warnings).toContain('COR_AREA_UNKNOWN');
+    expect(item?.inputs['areaBasis']).toBe('unavailable');
+    const csv = check(withEnvironment(withSphere, 'normal'), { report: true }).text ?? '';
+    expect(csv).toContain('COR_GALVANIC_OK;COR_AREA_UNKNOWN');
+  });
+
+  it('known areas record their basis', () => {
+    const { doc } = pair(['aluminium_wrought_other', 'aluminium_wrought_2000']);
+    expect(String(check(withEnvironment(doc, 'normal')).items[0]?.inputs['areaBasis'])).toContain('box total surface area');
+  });
+
+  it('a whole-part isolation warns COR_ISOLATION_BROAD; a pair isolation does not', () => {
+    const { doc, plate, block } = pair(['aluminium_wrought_other', 'nickel_titanium_group']);
+    const env = withEnvironment(doc, 'normal');
+    expect(check(run(env, 'declare_isolation', { entityId: plate, method: 'primer' })).items[0]?.warnings).toContain('COR_ISOLATION_BROAD');
+    expect(check(run(env, 'declare_isolation', { pair: [plate, block], method: 'primer' })).items[0]?.warnings).not.toContain(
+      'COR_ISOLATION_BROAD',
+    );
+  });
+
+  it('the plugin keeps acceptances through a replay seed and validates / restores a slice unchanged', async () => {
+    const { corrosionPlugin } = await import('@cae/corrosion/plugin');
+    const extension = corrosionPlugin.document;
+    const { doc } = pair();
+    expect(extension?.replaySeed?.(doc)).toEqual({});
+    const acceptance = {
+      itemKey: 'k',
+      decision: 'accepted',
+      justification: 'j',
+      fingerprint: 'a'.repeat(64),
+      signer: 's',
+      signatureId: 'i',
+      signature: {},
+      documentUid: 'u',
+    };
+    const seeded = { ...doc, corrosion: { materials: {}, surfaceSystems: {}, isolations: {}, acceptances: { k: acceptance } } } as never;
+    expect(extension?.replaySeed?.(seeded)).toMatchObject({ corrosion: { acceptances: { k: acceptance }, isolations: {} } });
+    expect(extension?.derivedEntityIds(doc).size).toBe(0);
+    expect(extension?.restore({ a: 1 })).toEqual({ a: 1 });
+  });
+});

@@ -55,7 +55,7 @@ describe('accept_corrosion_item: the human gate (VC-COR-15)', () => {
       signatureId: 'sig-1',
       documentUid: doc.uid,
     });
-    const after = check(result.document);
+    const after = check(result.document, {}, signingContext);
     expect(after.items[0]).toMatchObject({ status: 'fail', acceptance: { decision: 'accepted', signer: 'alice' } });
     expect(after.status).toBe('pass');
     expect(after.counts['accepted']).toBe(1);
@@ -65,18 +65,18 @@ describe('accept_corrosion_item: the human gate (VC-COR-15)', () => {
   it('a rejected decision is recorded but still counts against the status', () => {
     const { doc, key } = failing();
     const result = accept(doc, key, { decision: 'rejected', confirmation: { nonce: 'n1' } });
-    expect(check(result.document).items[0]?.acceptance?.decision).toBe('rejected');
-    expect(check(result.document).status).toBe('fail');
+    expect(check(result.document, {}, signingContext).items[0]?.acceptance?.decision).toBe('rejected');
+    expect(check(result.document, {}, signingContext).status).toBe('fail');
   });
 
   it('the acceptance ends when the finding changes (another environment): staleAcceptance, status back to fail', () => {
     const { doc, key } = failing();
     const accepted = accept(doc, key, { confirmation: { nonce: 'n1' } }).document;
     const changed = run(accepted, 'set_service_environment', { scheme: 'anodic_index', environment: 'harsh' });
-    const item = check(changed).items[0];
+    const item = check(changed, {}, signingContext).items[0];
     expect(item?.acceptance).toBeUndefined();
     expect(item?.staleAcceptance).toBe(true);
-    expect(check(changed).status).toBe('fail');
+    expect(check(changed, {}, signingContext).status).toBe('fail');
   });
 
   it('the signed payload binds the item, decision, justification, finding and document', () => {
@@ -148,5 +148,89 @@ describe('accept_corrosion_item: the human gate (VC-COR-15)', () => {
     expect(accept(doc, key, { confirmation: { verified: true } }, { ...defaultContext(), humanSignature: null }).error?.code).toBe(
       'COR_HUMAN_GATE',
     );
+  });
+});
+
+describe('stored acceptances are re-verified, never trusted (a record in the slice proves nothing)', () => {
+  /** A port that verifies only the signature the test minted for the genuine payload (recorded from a first, refused call). */
+  function strictFor(doc: CadDocument, key: string): { ctx: ReturnType<typeof defaultContext>; accepted: CadDocument } {
+    const payloads: string[] = [];
+    const recording = { ...defaultContext(), humanSignature: { verify: (_s: unknown, payload: string) => (payloads.push(payload), null) } };
+    accept(doc, key, { confirmation: { nonce: 'n' } }, recording);
+    const strict: HumanSignaturePort = {
+      verify: (signature, payload) =>
+        (signature as { sig?: string }).sig === 'genuine' && payload === payloads[0] ? { signer: 'alice', signatureId: 'sig-1' } : null,
+    };
+    const ctx = { ...defaultContext(), humanSignature: strict };
+    return { ctx, accepted: accept(doc, key, { confirmation: { nonce: 'n', sig: 'genuine' } }, ctx).document };
+  }
+
+  const forge = (doc: CadDocument, key: string, signature: unknown): CadDocument => {
+    const real = accept(doc, key, { confirmation: { nonce: 'n' } }).document;
+    const entry = real.corrosion?.acceptances[key];
+    if (entry === undefined || real.corrosion === undefined) throw new Error('fixture');
+    return { ...real, corrosion: { ...real.corrosion, acceptances: { [key]: { ...entry, signature } } } };
+  };
+
+  it('a genuine acceptance counts with a port that verifies it', () => {
+    const { doc, key } = failing();
+    const { ctx, accepted } = strictFor(doc, key);
+    expect(accepted.corrosion?.acceptances[key]).toBeDefined();
+    expect(check(accepted, {}, ctx)).toMatchObject({ status: 'pass', items: [{ acceptance: { decision: 'accepted' } }] });
+  });
+
+  it('a fabricated acceptance (junk signature) does not clear the item: it stays in the status and the count', () => {
+    const { doc, key } = failing();
+    const { ctx } = strictFor(doc, key);
+    const forged = forge(doc, key, { nonce: 'n', sig: 'junk' });
+    const result = check(forged, {}, ctx);
+    expect(result.status).toBe('fail');
+    expect(result.counts['accepted']).toBe(0);
+    expect(result.items[0]).toMatchObject({ status: 'fail', unconfirmedAcceptance: 'invalid' });
+    expect(result.items[0]?.acceptance).toBeUndefined();
+  });
+
+  it('without a signing port an acceptance cannot be confirmed and the item stays in the status', () => {
+    const { doc, key } = failing();
+    const accepted = accept(doc, key, { confirmation: { nonce: 'n' } }).document;
+    const result = check(accepted, {}, { ...defaultContext(), humanSignature: null });
+    expect(result).toMatchObject({ status: 'fail', items: [{ unconfirmedAcceptance: 'noport' }] });
+    expect(result.counts['accepted']).toBe(0);
+  });
+
+  it('an acceptance copied into a document with another uid is foreign: still fail and counted', () => {
+    const { doc, key } = failing();
+    const { ctx, accepted } = strictFor(doc, key);
+    const copy = { ...accepted, uid: 'f'.repeat(32) };
+    const result = check(copy, {}, ctx);
+    expect(result).toMatchObject({ status: 'fail', items: [{ unconfirmedAcceptance: 'foreign' }] });
+    expect(result.counts['accepted']).toBe(0);
+  });
+
+  it('an acceptance without a recorded uid is unbound', () => {
+    const { doc, key } = failing();
+    const real = accept(doc, key, { confirmation: { nonce: 'n' } }).document;
+    const entry = real.corrosion?.acceptances[key];
+    if (entry === undefined || real.corrosion === undefined) throw new Error('fixture');
+    const unbound = { ...real, corrosion: { ...real.corrosion, acceptances: { [key]: { ...entry, documentUid: '' } } } };
+    expect(check(unbound, {}, signingContext)).toMatchObject({ status: 'fail', items: [{ unconfirmedAcceptance: 'unbound' }] });
+  });
+
+  it.each([
+    ['null', null],
+    ['a string', 'ok'],
+    ['an array', [1, 2, 3]],
+    ['an empty object', {}],
+    ['a prototype-shaped object', { nonce: 'n', constructor: { prototype: {} } }],
+    ['a huge nonce', { nonce: 'x'.repeat(100_000) }],
+  ])('a hostile signature (%s) never improves a status: no port and strict port both keep fail', (_label, signature) => {
+    const { doc, key } = failing();
+    const { ctx } = strictFor(doc, key);
+    const forged = forge(doc, key, signature);
+    for (const context of [ctx, { ...defaultContext(), humanSignature: null }]) {
+      const result = check(forged, {}, context);
+      expect(result.status).toBe('fail');
+      expect(result.counts['accepted']).toBe(0);
+    }
   });
 });
