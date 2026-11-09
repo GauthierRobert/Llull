@@ -13,7 +13,7 @@ orchestrator edits it; agents never do. Detail lives in the linked spec: one lin
 
 ## NOW (auto-updated by the skill)
 
-- 2026-11-09 — owner goal: finish all aero + FEA tasks. CNT-M3, MSEL, FLT-M2, FLL-M1 are on origin/main; gate on main 0186a38ad: check:static green; test:coverage 27376 pass, 4 load-timing failures (hostileInput dexpi 20000, xlsxWrite budget, renameFollowups cheap) that pass alone; coverage totals not printed (no reportOnFailure). Merged: FEA-PLANE + MAT-CREEPTU (2 review rounds; intersectPlane refused until FEA-PLANE-MESH). WIP: PRB (lane3 `feat/prb`), NLS-M2b (lane6 `feat/nls-m2b`), FLT-M3 (lane7 `feat/flt-m3`), FLL-M2 (lane8 `feat/fll-m2`); workers + reviewers on sonnet. Next: FLT-M4, FLL-M2, CNT-M3b, CNT-M4.
+- 2026-11-09 — owner goal: finish all aero + FEA tasks. CNT-M3, MSEL, FLT-M2, FLL-M1 are on origin/main; gate on main 0186a38ad: check:static green; test:coverage 27376 pass, 4 load-timing failures (hostileInput dexpi 20000, xlsxWrite budget, renameFollowups cheap) that pass alone; coverage totals not printed (no reportOnFailure). Merged: FLT-M3 (APPROVE + 4 fixes; sc-flt-03 endurance 46.9 min), FEA-PLANE + MAT-CREEPTU (2 review rounds; intersectPlane refused until FEA-PLANE-MESH). WIP: PRB (lane3 `feat/prb`), NLS-M2b (lane6 `feat/nls-m2b`), FLT-M4 (lane7 `feat/flt-m4`), FLL-M2 (lane8 `feat/fll-m2`, review fixes), CNT-M3b + CNT-M4 (lane2 `feat/cnt-m4`); workers + reviewers on sonnet. Next: FLT-M4, FLL-M2, CNT-M3b, CNT-M4.
 
 - 2026-11-08 (late) — owner goal: finish all aero + FEA tasks. Pushed: VAC-M1, CNT-M1/M2, FLT-M1, CFD-M3a, NLS-M3, FEA-TMC50, CRP-M1/M2. Merged on LOCAL main, not pushed (gates pending: a gate run was reaped for low system memory; owner to OK a sequential `check:coverage --maxWorkers=2` + server suite): CNT-M3 (2 review rounds; real ccx fea* 39 files 135 pass), MSEL M1–M6 core (2 rounds), FLT-M2 (APPROVE + 8 fixes), FLL-M1 (2 rounds; sphere C3D10 −0.0012 %, VC-FLL-01 −0.24 %). No lane WIP. Next: PRB, MAT-CREEPTU, NLS-M2b, FLT-M3, FLT-M4, FLL-M2.
 
@@ -147,8 +147,8 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 
 ## Aero + FEA program (owner 2026-11-07: "finish all aero and fea tasks"; spec = each pack's TECHNICAL_SPEC §10; each lane first audits which milestones are already built)
 
-- `[TODO]` **CNT-M3b** 06 pretension follow-ups: deck test of a nonlinear case with both an imperfection and a bolt (duplicates take the imperfect coordinates, merge 53d31591c; the pressure-bar fixture is one element long, needs a finer bar); result consumers (vtu, fatigue, margins) read the low-side copy at a cut (documented), map the high face when a consumer needs it. _Lane 1_
-- `[TODO]` **CNT-M4** 06 `joint_from_fastener_stack`, pin-in-hole, `joint_stiffness_from_fe`, joint margins. _deps: CNT-M3_
+- `[WIP]` **CNT-M3b** 06 pretension follow-ups: deck test of a nonlinear case with both an imperfection and a bolt (duplicates take the imperfect coordinates, merge 53d31591c; the pressure-bar fixture is one element long, needs a finer bar); result consumers (vtu, fatigue, margins) read the low-side copy at a cut (documented), map the high face when a consumer needs it. _Lane 1_
+- `[WIP]` **CNT-M4** 06 `joint_from_fastener_stack`, pin-in-hole, `joint_stiffness_from_fe`, joint margins. _deps: CNT-M3_
 - `[WIP]` **NLS-M2b** 05 nonlinear leftovers of M1/M2 (found in NLS-M3): `update_analysis_step`, `delete_analysis_step`, `delete_curve_probe`, `nonlinear_report`, `check_nonlinear`, `nonlinear_analytic_check`; M4 guide section (`packages/protocol/src/conventions.ts`, Lane 4) + curve panel (Lane 2). _Lane 1 (+2, 4)_
 - `[TODO]` **FEA-PLANE-MESH** 05 `llull-mesh` (`solver/bins/llull-mesh/src/targets.rs`) does not resolve `intersectPlane` (server forwards it since fix/fea-quick): OCCT general fuse / plane imprint, then lift the `FEA_TARGET_PLANE_UNSUPPORTED` refusal (`@cae/shared/target.ts` `targetProblem`, `hash/meshRequest.ts`) with a native test that targeted nodes lie on the plane (`solver/bins/llull-mesh/tests/mesh_requests.rs`); `record_convergence_study` refinement targets should go through `targetProblem` too. _Lane 1 + native_
 - `[TODO]` **FIX-COMPUTE-TMP** flaky unhandled ENOENT on `llull-compute-*/job.json` in a temp dir under load (seen in `fieldMeshTransport`, `filmTable`, `eigenAnalysis`, `propertyModelEval`): a temp-dir cleanup race around the spawned compute job; pass alone. Reproduce under load, fix the lifetime. _Lane 4_
@@ -164,9 +164,9 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **FEA-BL** 05 backlog: beam elements, `*DISTRIBUTING COUPLING`, `.llullz` result bundling. _Lane 1 + 4_
 - `[TODO]` **RS-PHY19** 19 rounded shell edges in contact (§29.8.3), shell thickness change (§29.8.2). _Lane 1 + native_
 - `[TODO]` **FLT-M2b** 13 host / UI: `flight` toolset view, flight report panel, viewport replay of a `run_flight` series (`render_motion`). _Lane 2 + 4_
-- `[REVIEW]` **FLT-M3** motor / ESC / battery chain, endurance. _deps: FLT-M2_
-- `[TODO]` **FLT-M4** `generate_aero_table`, pivoting surfaces, wind + gusts. _deps: FLT-M1_
+- `[WIP]` **FLT-M4** `generate_aero_table`, pivoting surfaces, wind + gusts. _deps: FLT-M1_
 - `[TODO]` **FLT-M5** `export_flight_loads` handoff, trim + linearisation. _deps: FLT-M2, FLL-M1_
+- `[TODO]` **FLT-M3b** 13 M3 left: VC-FLT-11 bench measurement (stays grade C), motor thermal limits, ESC efficiency maps, Peukert + cell temperature, a minimum-endurance limit in `flight_report`, viewport SoC trace, pmsm / stepper motors feeding the chain (TECHNICAL_SPEC §15). _Lane 1_
 - `[TODO]` **FLT-M6** SITL bridges (ArduPilot JSON, then PX4). _deps: FLT-M3_
 - `[TODO]` **FLL-M1b** 14 follow-ups: VC-FLL-09 on the real `lite8.lld` reference body (686,657 mm³; not on disk — stand-in used); pin [R9] isosurface-stuffing paper and compare before relaxing the dihedral gate (FLL-D1); `implicit_properties id=<body>` on an explicit-bounds body measures the open display mesh, not the bounds-clipped FE solid (FLL-D8): clip it or document `region`; clip-node ids `fll-clip*` → a prefix the minter cannot produce. _Lane 1_
 - `[WIP]` **FLL-M2** `export_flight_loads`, `set_free_body_support`, relief check. _deps: FLT-M2_
