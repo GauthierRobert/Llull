@@ -50,7 +50,7 @@ acceptance choices.
 | VC-CNT-61 | FR-CNT-02, 14 | friction without stick slope | `stickSlope` returned `{ value: E1/2, source: "CalculiX *FRICTION default", defaulted: true }` | exact | A (S1) | unit |
 | VC-CNT-62 | FR-CNT-15 | any query | `reviewRequired: true`, "not approved" | exact | A (AF-33) | unit |
 | VC-CNT-63 | FR-CNT-16 | nut factor `tested: false` | `unverified: true` on all margins | exact | A (AF-32) | unit |
-| VC-CNT-64 | FR-CNT-10, 11 | V1 `joint_from_fastener_stack` on the 08 sample stack; pin-in-hole template | TBD — pairs and pretension created as listed; bearing pressure measured | — | TBD | integration |
+| VC-CNT-64 | FR-CNT-10, 11 | V1 `joint_from_fastener_stack` on the 08 sample stack; pin-in-hole template | partial (TECHNICAL_SPEC §13.4): pairs and pretension created as listed (unit), Shigley eq. 8-20 oracle, rigid-pin cosine oracle; real CalculiX `joint_stiffness_from_fe` on the locked bar; no FE run of the 08 sample stack or a lug | — | A (derived) | unit + integration |
 | VC-CNT-65 | FR-CNT-17, 18 | `check_contact` on wrong set-ups (overclosure, contact-only restraint, tied with node-to-surface) | `CNT_INITIAL_OVERCLOSURE`, `CNT_RIGID_BODY_BY_CONTACT_ONLY`, `CNT_BEHAVIOUR_FORMULATION_MISMATCH` | exact | A (spec) | unit |
 
 ## CLI harness (AF-23)
