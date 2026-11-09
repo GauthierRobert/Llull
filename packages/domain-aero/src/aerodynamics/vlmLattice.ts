@@ -68,7 +68,10 @@ function station(sections: readonly LatticeSection[], cumulative: readonly numbe
   const t = s1 > s0 ? Math.min(1, Math.max(0, (s - s0) / (s1 - s0))) : 0;
   const incidence = a.incidence + (b.incidence - a.incidence) * t;
   const span = spanDirection(a.leadingEdge, b.leadingEdge);
-  const up = cross3([1, 0, 0], span);
+  // "nose up" must not depend on the listing direction: a section run toward -y (or -z for a vertical fin) flips cross([1,0,0], span), so it is re-oriented
+  // to +z for a surface with a spanwise y component, and to -y (the sense of a fin listed upward) for a vertical one
+  const raw = cross3([1, 0, 0], span);
+  const up = span[1] < -1e-12 || (Math.abs(span[1]) <= 1e-12 && span[2] < 0) ? scale3(raw, -1) : raw;
   return {
     le: lerp3(a.leadingEdge, b.leadingEdge, t),
     chord: a.chord + (b.chord - a.chord) * t,

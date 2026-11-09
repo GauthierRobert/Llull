@@ -29,18 +29,14 @@ export function toFlow(point: Vec3, forward: ForwardAxis): Vec3 {
 
 /**
  * Sections in the flow frame, the pivoting ones turned by `pivot.deg` (nose up positive) about the spanwise axis through `pivot.point` (flow
- * frame): the leading edges rotate in the x-z plane and the incidence grows by the angle, as for a wing turned as a whole. The lattice measures
- * incidence and camber about the span direction of the section list, so a half wing running toward -y would turn nose-down for a positive
- * incidence: such a list is mirrored about y = 0 when the surface is mirrored anyway (`reflect`; coefficients are even in the mirror, the
- * lattice clustering is kept) and reversed otherwise.
+ * frame): the leading edges rotate in the x-z plane and the incidence grows by the angle, as for a wing turned as a whole.
  */
 export function flowSections(
   sections: readonly BodySection[],
   forward: ForwardAxis,
   pivot: { readonly point: Vec3; readonly deg: number } | null,
-  reflect: boolean,
 ): FlowSection[] {
-  const mapped = sections.map((section): FlowSection => {
+  return sections.map((section): FlowSection => {
     const [x, y, z] = toFlow(section.leadingEdge, forward);
     const incidenceDeg = section.incidenceDeg ?? 0;
     if (pivot === null || pivot.deg === 0) return { leadingEdge: [x, y, z], chord: section.chord, incidenceDeg };
@@ -57,13 +53,6 @@ export function flowSections(
       incidenceDeg: incidenceDeg + pivot.deg,
     };
   });
-  const root = mapped[0];
-  const tip = mapped[mapped.length - 1];
-  const run = root === undefined || tip === undefined ? 0 : tip.leadingEdge[1] - root.leadingEdge[1];
-  if (!(run < 0)) return mapped;
-  return reflect
-    ? mapped.map((section) => ({ ...section, leadingEdge: [section.leadingEdge[0], -section.leadingEdge[1], section.leadingEdge[2]] }))
-    : mapped.reverse();
 }
 
 /** Rows of an analyze_vortex_lattice `data.polar` (null when the data has no usable rows). */

@@ -81,7 +81,7 @@ export const generateAeroTable = defineCommand({
     'no stall: with `profileDrag.clMax` the table keeps only the run of angles of attack around zero where |CL| stays within it, and outside it the ' +
     'coefficients are held with a warning. Pivot sweep: `pivotsDeg` (strictly increasing, nose up positive, e.g. [-30, 0, 30]) turns the surfaces with ' +
     '`pivots: true` about the spanwise axis through `pivotPoint` (body axes, document units); `servo` gives the rate limit (deg/s) and optional ' +
-    'limits of the pivot, driven by the `pivotDeg` field of define_flight_scenario set-points. Not modelled: sideslip (the flow outside the x-z plane ' +
+    'limits of the pivot, driven by the `pivotDeg` field of define_flight_scenario set-points. The pivot changes the aerodynamics only: the mass, inertia and centre of mass of the body do not follow it and no hinge load is computed. Flow from the downstream side (|alpha| > 90°) gives no force and counts as outside the table. Not modelled: sideslip (the flow outside the x-z plane ' +
     'is ignored), rates dependence beyond the local velocity, control-surface (flap) deflection, stall, compressibility. Returns the surface id in affected[0]; data holds ' +
     'the table, the polar CL-CD at the pivot nearest 0, the lift slope per rad, the reference values and the provenance.',
   params: z.object({
@@ -181,12 +181,7 @@ export const generateAeroTable = defineCommand({
     const callFor = (pivotDeg: number, area?: number, chord?: number): Record<string, unknown> => ({
       surfaces: params.surfaces.map((surface) => ({
         name: surface.name,
-        sections: flowSections(
-          surface.sections,
-          forward,
-          surface.pivots === true ? { point: pivotPoint, deg: pivotDeg } : null,
-          surface.mirror !== false,
-        ),
+        sections: flowSections(surface.sections, forward, surface.pivots === true ? { point: pivotPoint, deg: pivotDeg } : null),
         ...(surface.mirror === undefined ? {} : { mirror: surface.mirror }),
         ...(surface.spanwisePanels === undefined ? {} : { spanwisePanels: surface.spanwisePanels }),
         ...(surface.chordwisePanels === undefined ? {} : { chordwisePanels: surface.chordwisePanels }),

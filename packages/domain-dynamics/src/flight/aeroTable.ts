@@ -61,17 +61,19 @@ export interface AeroCoefficients {
   readonly outside: boolean;
 }
 
+/** Element `i` of a non-empty array whose indices the caller keeps in range (the table axes and grids are validated on load). */
+const item = <T>(values: readonly T[], i: number): T => values[i] as T;
+
 function bracket(axis: readonly number[], x: number): { i: number; t: number; outside: boolean } {
   const last = axis.length - 1;
-  const lo = axis[0] ?? 0;
-  const hi = axis[last] ?? 0;
-  if (last <= 0) return { i: 0, t: 0, outside: x !== lo };
+  const lo = item(axis, 0);
+  const hi = item(axis, last);
+  if (last === 0) return { i: 0, t: 0, outside: x !== lo };
   const clamped = Math.min(hi, Math.max(lo, x));
   let i = 0;
-  while (i < last - 1 && (axis[i + 1] ?? hi) <= clamped) i++;
-  const a = axis[i] ?? 0;
-  const b = axis[i + 1] ?? a;
-  return { i, t: b > a ? (clamped - a) / (b - a) : 0, outside: x < lo || x > hi };
+  while (i < last - 1 && item(axis, i + 1) <= clamped) i++;
+  const a = item(axis, i);
+  return { i, t: (clamped - a) / (item(axis, i + 1) - a), outside: x < lo || x > hi };
 }
 
 /** Bilinear lookup of the table at (α, pivot), both deg; held at the edges (`outside`). A one-column table ignores the pivot angle. */
@@ -80,11 +82,11 @@ export function lookupAero(table: AeroTable, alphaDeg: number, pivotDeg: number)
   const p = bracket(table.pivotDeg, pivotDeg);
   const at = (grid: readonly (readonly number[])[]): number => {
     const column = (row: readonly number[]): number => {
-      const left = row[p.i] ?? 0;
-      return left + ((row[p.i + 1] ?? left) - left) * p.t;
+      const left = item(row, p.i);
+      return p.t === 0 ? left : left + (item(row, p.i + 1) - left) * p.t;
     };
-    const v0 = column(grid[a.i] ?? []);
-    return v0 + (column(grid[a.i + 1] ?? grid[a.i] ?? []) - v0) * a.t;
+    const v0 = column(item(grid, a.i));
+    return a.t === 0 ? v0 : v0 + (column(item(grid, a.i + 1)) - v0) * a.t;
   };
   return { cl: at(table.cl), cd: at(table.cd), cm: at(table.cm), outside: a.outside || (table.pivotDeg.length > 1 && p.outside) };
 }

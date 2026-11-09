@@ -43,7 +43,7 @@ const NONE: AeroOutput = { alphaDeg: 0, cl: 0, cd: 0, liftN: 0, dragN: 0, outsid
 /**
  * Wrench of the surface at the body state `body` (velocity relative to the air) with the pivot at `pivotDeg`: the air velocity at the moment centre
  * u = −(v + ω × r) is split on the flow frame (ux downstream, uz up), α = atan2(uz, ux), q = ½ρ(ux² + uz²); F = q·S·[CD cos α − CL sin α, 0,
- * CD sin α + CL cos α] in the flow frame (drag along the flow, lift across it), moment q·S·c·CM about the spanwise axis. No flow gives no wrench.
+ * CD sin α + CL cos α] in the flow frame (drag along the flow, lift across it), moment q·S·c·CM about the spanwise axis. No flow, or flow from the downstream side (ux <= 0), gives no wrench (the latter flagged outside).
  */
 export function aeroOutput(runtime: AeroRuntime, body: BodyKinematics, pivotDeg: number): AeroOutput {
   const { surface, frame } = runtime;
@@ -53,6 +53,8 @@ export function aeroOutput(runtime: AeroRuntime, body: BodyKinematics, pivotDeg:
   const uz = dot3(air, frame.z);
   const speedSquared = ux * ux + uz * uz;
   if (speedSquared < 1e-12) return NONE;
+  // flow coming from the downstream side (|α| > 90°): the table does not describe it, so no force and the step counts as outside the table
+  if (ux <= 0) return { ...NONE, alphaDeg: Math.atan2(uz, ux) * DEG, outside: true };
   const alpha = Math.atan2(uz, ux);
   const alphaDeg = alpha * DEG;
   const { cl, cd, cm, outside } = lookupAero(surface.table, alphaDeg, pivotDeg);

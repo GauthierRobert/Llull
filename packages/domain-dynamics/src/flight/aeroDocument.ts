@@ -47,10 +47,10 @@ export const aeroSurfaceSchema = z.strictObject({
   bodyId: text,
   momentCentre: vec3,
   forward: z.enum(['+x', '-x', '+y', '-y']),
-  refAreaM2: positive,
-  refChordM: positive,
-  refSpanM: positive,
-  airDensity: positive,
+  refAreaM2: positive.max(1e6),
+  refChordM: positive.max(1e4),
+  refSpanM: positive.max(1e4),
+  airDensity: positive.max(100),
   table: z.strictObject({
     alphaDeg: z.array(finite).min(2).max(100),
     pivotDeg: z.array(finite).min(1).max(100),
@@ -62,7 +62,7 @@ export const aeroSurfaceSchema = z.strictObject({
   profileDrag: z.strictObject({ cd0: z.number().min(0), clMax: positive.nullable(), source: text.nullable() }),
   provenance: z.literal('vlm+polar'),
   unverified: z.boolean(),
-  servo: z.strictObject({ rateDegS: positive, minDeg: finite, maxDeg: finite, neutralDeg: finite }).nullable(),
+  servo: z.strictObject({ rateDegS: positive.max(1e5), minDeg: finite, maxDeg: finite, neutralDeg: finite }).nullable(),
   inputsHash: text,
   designHash: text,
   solver: z.strictObject({ engine: text, panels: z.number().int().min(0), calls: z.number().int().min(1) }),
@@ -109,7 +109,8 @@ export function aeroErrors(slice: AeroSlice, dynamicsIds: ReadonlySet<string>, b
     for (const name of ['cl', 'cd', 'cm'] as const)
       if (table[name].length !== table.alphaDeg.length || table[name].some((row) => row.length !== table.pivotDeg.length))
         errors.push(`${at}.table.${name}: needs one row per angle of attack and one column per pivot angle`);
-    if (!(entry.validAlphaDeg[0] <= entry.validAlphaDeg[1])) errors.push(`${at}.validAlphaDeg: must be ascending`);
+    if (entry.validAlphaDeg[0] !== table.alphaDeg[0] || entry.validAlphaDeg[1] !== table.alphaDeg[table.alphaDeg.length - 1])
+      errors.push(`${at}.validAlphaDeg: must equal the first and last angle of attack of the table`);
     const { servo } = entry;
     const pivotLow = table.pivotDeg[0] ?? 0;
     const pivotHigh = table.pivotDeg[table.pivotDeg.length - 1] ?? 0;

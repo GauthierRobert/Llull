@@ -135,6 +135,23 @@ describe('generate_aero_table (FLT-M4)', () => {
     expect((zero[1] as number) + (zero[0] as number)).toBeGreaterThan(0.4);
   });
 
+  it('a full-span wing listed toward -y with mirror omitted gives the table of the same wing listed toward +y', () => {
+    const full = (a: number, b: number): Record<string, unknown> => ({
+      name: 'w',
+      sections: [
+        { leadingEdge: [-250, a, 0], chord: 1000, incidenceDeg: 2 },
+        { leadingEdge: [-250, b, 0], chord: 1000, incidenceDeg: 2 },
+      ],
+      spanwisePanels: 8,
+      chordwisePanels: 2,
+    });
+    const plus = surfaceOf(generate(vehicle(), base(full(-3000, 3000))).document);
+    const minus = surfaceOf(generate(vehicle(), base(full(3000, -3000))).document);
+    expect(minus.table.cl).toEqual(plus.table.cl);
+    expect(minus.table.cm).toEqual(plus.table.cm);
+    expect(plus.table.cl[plus.table.alphaDeg.indexOf(0)]?.[0]).toBeGreaterThan(0.1);
+  });
+
   it('a pivot sweep turns the pivoting surface: CL(alpha, pivot) close to CL(alpha + pivot) of the flat wing, with a servo', () => {
     const result = generate(
       vehicle(),
@@ -302,7 +319,9 @@ describe('aero surfaces in the document slice', () => {
     expect(edit((s) => (s['servo'] = { rateDegS: 1, minDeg: -20, maxDeg: 10, neutralDeg: 0 }))).toContain(
       "lie inside the table's pivot range",
     );
-    expect(edit((s) => (s['validAlphaDeg'] = [5, -5]))).toContain('must be ascending');
+    expect(edit((s) => (s['validAlphaDeg'] = [5, -5]))).toContain('must equal the first and last angle of attack');
+    expect(edit((s) => (s['servo'] = { rateDegS: 1e9, minDeg: -10, maxDeg: 10, neutralDeg: 0 }))).toContain('rateDegS');
+    expect(edit((s) => (s['airDensity'] = 1e6))).toContain('airDensity');
     const clash = raw(made());
     const slice = clash['flight'] as { aeroSurfaces: Record<string, Record<string, unknown>> };
     slice.aeroSurfaces = { frame: { ...(slice.aeroSurfaces['w'] as Record<string, unknown>), id: 'frame' } };

@@ -120,6 +120,13 @@ describe('aero surface in run_flight (FLT-M4)', () => {
     expect(calm.aero['w']?.peakLiftN).toBeLessThan(1e-6);
   });
 
+  it('a body moving backwards gets no aero force and the run warns the table is outside', () => {
+    const metrics = fly(winged(1e5), { durationS: 0.01, initialVelocity: [-20, 0, 0] });
+    expect(metrics.aero['w']?.finalLiftN).toBe(0);
+    expect(metrics.aero['w']?.outsideFraction).toBe(1);
+    expect(metrics.warnings.join(' ')).toContain('FLT_AERO_OUTSIDE_TABLE');
+  });
+
   it('a steady updraft equals the same alpha by body velocity (the wind enters the relative flow)', () => {
     const doc = winged(1e5);
     const vz = -20 * Math.tan((4 * Math.PI) / 180);
