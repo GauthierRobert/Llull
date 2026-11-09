@@ -7,7 +7,7 @@ import type { GeometryKernel } from '@core/geometry/kernel';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { readStack } from '@cae/contact/stackRead';
+import { stackOf } from '@cae/contact/stackRead';
 import { caseOf } from '@cae/shared/access';
 import { ctxWith, docWith, inchDocument, ok, sampleCatalogFile } from '../../aero/fasteners/fixtures';
 
@@ -102,7 +102,7 @@ function scene(): Scene {
 describe('joint_from_fastener_stack on a stack placed by the fasteners plugin', () => {
   it('reads the stack the plugin wrote (inch document, catalogue diameter in inches) and sets the joint up in document units', () => {
     const s = scene();
-    const view = readStack(s.doc, s.stackId);
+    const view = stackOf(s.doc, s.stackId);
     if ('message' in view) throw new Error(view.message);
     expect(view.holeDiameter).toBeCloseTo(0.19, 9);
     expect(view.nominalDiameter).toBeCloseTo(0.1875, 9);

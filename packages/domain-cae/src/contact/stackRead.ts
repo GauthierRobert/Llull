@@ -45,7 +45,7 @@ function nominalDiameterOf(doc: CadDocument, fasteners: Record<string, unknown>,
  * Stack `stackId` of the document, or why it cannot be read.
  * @failure no fasteners slice / unknown stack / a field of the stack malformed -> { message }
  */
-export function readStack(doc: CadDocument, stackId: string): StackView | { readonly message: string } {
+export function stackOf(doc: CadDocument, stackId: string): StackView | { readonly message: string } {
   const fasteners = (doc as unknown as Record<string, unknown>)['fasteners'];
   if (!isRecord(fasteners) || !isRecord(fasteners['stacks']))
     return { message: 'the document has no fastener stacks (insert_fastener / insert_fastener_row first)' };

@@ -8,7 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import { analysisErrors } from '@cae/model/validate';
 import { caseOf } from '@cae/shared/access';
 import { boltStiffness, membersStiffness, stiffnessFactor } from '@cae/contact/stackStiffness';
-import { readStack } from '@cae/contact/stackRead';
+import { stackOf } from '@cae/contact/stackRead';
 import { blocks, must, type Blocks } from './support';
 
 const D = 0.4;
@@ -256,7 +256,7 @@ describe('stack reader', () => {
   };
 
   it('reads washers, the nut and a missing catalogue size as null diameter', () => {
-    expect(readStack(slice(good), 'fst-1.1')).toMatchObject({ washerCount: 2, hasNut: true, nominalDiameter: null, holeDiameter: 0 });
+    expect(stackOf(slice(good), 'fst-1.1')).toMatchObject({ washerCount: 2, hasNut: true, nominalDiameter: null, holeDiameter: 0 });
   });
 
   it.each([
@@ -264,14 +264,14 @@ describe('stack reader', () => {
     ['layer', { ...good, layers: [{ entityId: 'a' }] }],
     ['fastener', { ...good, fastener: {} }],
   ])('rejects a malformed %s', (_what, stack) => {
-    expect(readStack(slice(stack), 'fst-1.1')).toHaveProperty('message');
+    expect(stackOf(slice(stack), 'fst-1.1')).toHaveProperty('message');
   });
 
   it('converts the catalogue diameter to document units (0.5 in in a mm document = 12.7)', () => {
     const doc = stacked({
       slice: { catalogs: { NAS: { sizes: [{ dash: '-5', nominalDiameter: { value: 0.5, unit: 'in' } }] } }, stacks: { 'fst-1.1': good } },
     }).doc;
-    expect(readStack(doc, 'fst-1.1')).toMatchObject({ nominalDiameter: 12.7 });
+    expect(stackOf(doc, 'fst-1.1')).toMatchObject({ nominalDiameter: 12.7 });
   });
 });
 

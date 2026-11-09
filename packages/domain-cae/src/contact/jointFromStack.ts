@@ -15,7 +15,7 @@ import { isRefusal, nonlinearCase } from '../nonlinear/settings';
 import { refuseCnt, NOT_APPROVED } from './codes';
 import { behaviourSchema, formulationSchema, frictionSchema } from './pairSchema';
 import { preloadSchema } from './pretensionCommands';
-import { readStack, type StackView } from './stackRead';
+import { stackOf, type StackView } from './stackRead';
 import { stackGeometry, type StackGeometry } from './stackGeometry';
 import { boltStiffness, membersStiffness, stiffnessFactor } from './stackStiffness';
 
@@ -183,7 +183,7 @@ export const jointFromFastenerStack = defineCommand({
     const { analysis } = found;
     const fail = (code: string, message: string, path: string): CommandResult =>
       refuseCnt(doc, command, code, message, [params.analysisId, params.stackId], [path]);
-    const stack = readStack(doc, params.stackId);
+    const stack = stackOf(doc, params.stackId);
     if ('message' in stack) return fail('CNT_STACK_NOT_FOUND', stack.message, 'stackId');
     const geometry = stackGeometry(doc, stack);
     if ('message' in geometry) return fail('CNT_STACK_NOT_FOUND', geometry.message, 'stackId');

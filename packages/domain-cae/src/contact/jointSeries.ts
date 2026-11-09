@@ -44,7 +44,7 @@ function probeOf(analysis: AnalysisCase, reference: string): CurveProbe | undefi
  * The (load, bolt force) points of step `params.stepId` of a solved case.
  * @failure unknown / non-nonlinear case, bolt, probe, step; the preload step; a probe in stress units; no / stale results; no stored increment with both values -> the coded refusal of `command`
  */
-export function readJointSeries(
+export function jointSeriesOf(
   doc: CadDocument,
   command: string,
   params: { readonly analysisId: string; readonly pretension: string; readonly loadProbe: string; readonly stepId: string },

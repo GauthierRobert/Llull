@@ -10,7 +10,7 @@ import { dispositionOf } from '../margins/disposition';
 import { marginOfSafety, statusOf } from '../margins/marginMath';
 import { analysisIdSchema } from '../shared/schemas';
 import { NOT_APPROVED, refuseCnt } from './codes';
-import { isSeries, readJointSeries, type Point } from './jointSeries';
+import { isSeries, jointSeriesOf, type Point } from './jointSeries';
 import { forceUnitName } from './pretensionRules';
 
 const n = (value: number): string => significantNumber(value, 5);
@@ -81,7 +81,7 @@ export const jointMargins = defineCommand({
   }),
   run: (doc, params, ctx?: ExecutionContext): CommandResult => {
     const command = 'joint_margins';
-    const series = readJointSeries(doc, command, params, ctx);
+    const series = jointSeriesOf(doc, command, params, ctx);
     if (!isSeries(series)) return series;
     const { analysis, bolt, probe, stepId, points, separatedAt } = series;
     const fail = (code: string, message: string, path: string): CommandResult =>

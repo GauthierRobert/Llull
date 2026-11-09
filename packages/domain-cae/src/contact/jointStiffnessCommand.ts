@@ -6,7 +6,7 @@ import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { analysisIdSchema } from '../shared/schemas';
 import { forceUnitName } from './pretensionRules';
-import { isSeries, readJointSeries, type Point } from './jointSeries';
+import { isSeries, jointSeriesOf, type Point } from './jointSeries';
 import { NOT_APPROVED, refuseCnt } from './codes';
 
 const n = (value: number): string => significantNumber(value, 5);
@@ -66,7 +66,7 @@ export const jointStiffnessFromFe = defineCommand({
   }),
   run: (doc, params, ctx?: ExecutionContext): CommandResult => {
     const command = 'joint_stiffness_from_fe';
-    const series = readJointSeries(doc, command, params, ctx);
+    const series = jointSeriesOf(doc, command, params, ctx);
     if (!isSeries(series)) return series;
     const { analysis, bolt, probe, stepId, sign, separatedAt } = series;
     const fail = (code: string, message: string, path: string): CommandResult =>
