@@ -9,7 +9,10 @@ interface Vlm {
 }
 const doc = createEmptyDocument();
 const run = (surface: Record<string, unknown>): Vlm =>
-  data<Vlm>(doc, 'analyze_vortex_lattice', { surfaces: [{ name: 'w', spanwisePanels: 8, chordwisePanels: 3, ...surface }], alphasDeg: [-4, 0, 6] });
+  data<Vlm>(doc, 'analyze_vortex_lattice', {
+    surfaces: [{ name: 'w', spanwisePanels: 8, chordwisePanels: 3, ...surface }],
+    alphasDeg: [-4, 0, 6],
+  });
 
 const tapered = (sign: 1 | -1, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
   sections: [
