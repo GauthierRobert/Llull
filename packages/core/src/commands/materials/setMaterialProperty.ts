@@ -60,6 +60,7 @@ export const setMaterialProperty = defineCommand({
     'e/D for bearing, and a temperature table (absolute values or percent of the room-temperature value). Several values may coexist (two supplier ' +
     'densities); mark at most one preferred per key. Values of typical / supplier_unstated / unspecified basis are flagged unverified downstream. ' +
     'Stored as a PHY-01 property model, so evaluate_property and get_material_allowable read it. Records imported from a library are read-only. ' +
+    'Space-environment properties (PHY-14): TML, CVCM, WVR, RML (unit "%"), moistureDiffusivity (m^2/s), moistureSaturation ("%"), cme ("1/%"), aoErosionYield (volume per atom, e.g. 3e-24 "cm^3"). ' +
     'Next: get_material_allowable, mass_properties, check_materials.',
   params: z.object({
     material: z.string().describe('Material id (the name given to create_material or the id of define_material_record).'),

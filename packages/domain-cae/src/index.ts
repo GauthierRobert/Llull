@@ -12,6 +12,9 @@ export { corrosionPlugin } from './corrosion/plugin';
 // vibro-acoustics hand-off (PHY-20): plugin
 export { vibroacousticsPlugin } from './vibroacoustics/plugin';
 
+// space environment: moisture, outgassing, atomic oxygen (PHY-14): plugin
+export { environmentPlugin } from './environment/plugin';
+
 // topology optimisation: plugin, job and artifact builders, study lookup
 export { topologyPlugin } from './topology/plugin';
 export { buildTopologyJob, type TopologyJob, type TopologyJobResult } from './topology/job';

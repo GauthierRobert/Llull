@@ -32,6 +32,7 @@ const SLICE_PROBES: Record<Exclude<OptionalKey, KeptKey>, unknown> = {
   sheetMetal: {},
   probabilistic: {},
   vibroacoustics: {},
+  spaceEnvironment: {},
   corrosion: {},
   plm: {},
   plant: {},

@@ -38,6 +38,7 @@ export const TOOLSET_NAMES = [
   'scan',
   'mesh',
   'implicit',
+  'environment',
   'freeform',
 ] as const;
 
@@ -207,6 +208,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Implicit / field modelling and lattices (05 IMP): contributed by the installed implicit plugin. */
   get implicit(): readonly string[] {
     return pluginToolNames('implicit');
+  },
+  /** Space environment (PHY-14): moisture uptake, outgassing screening, atomic-oxygen erosion; contributed by the installed environment plugin. */
+  get environment(): readonly string[] {
+    return pluginToolNames('environment');
   },
   /** Point clouds (plant 10): the host transport `scan_import` plus the installed scan plugin's commands. */
   get scan(): readonly string[] {
