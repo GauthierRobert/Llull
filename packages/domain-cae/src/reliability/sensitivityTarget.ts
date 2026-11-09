@@ -36,14 +36,20 @@ export function sensitivityTarget(
   const response = responseOf(doc, name);
   if (response === undefined) return { code: 'PRB_RESPONSE_NOT_FOUND', message: `no response '${name}'`, ids: [name] };
   const model = reliabilityOf(doc);
-  const variables = model.variableOrder.flatMap((n) => {
+  const all = model.variableOrder.flatMap((n) => {
     const variable = model.variables[n];
-    return variable !== undefined &&
-      isDocumentInput(variable) &&
-      (variable.binding.kind !== 'parameter' || Object.hasOwn(doc.parameters, variable.binding.parameter))
-      ? [variable]
-      : [];
+    return variable === undefined ? [] : [variable];
   });
+  const applicable = (variable: RandomVariable): boolean =>
+    isDocumentInput(variable) && (variable.binding.kind !== 'parameter' || Object.hasOwn(doc.parameters, variable.binding.parameter));
+  const variables = all.filter(applicable);
+  const unapplied = all.filter((variable) => !applicable(variable)).map((variable) => variable.name);
+  if (unapplied.length > 0)
+    return {
+      code: 'PRB_VARIABLE_NOT_APPLIED',
+      message: `a response study cannot apply ${unapplied.join(', ')} to the document (only parameter and density bindings reach a response; free symbols, other material properties and bindings to a missing parameter do not): indices over a subset would be wrong`,
+      ids: unapplied,
+    };
   if (variables.length === 0)
     return {
       code: 'PRB_MODEL_EMPTY',

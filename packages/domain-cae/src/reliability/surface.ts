@@ -55,7 +55,8 @@ export function fitQuadraticSurface(points: readonly (readonly number[])[], valu
     const leverage = row.reduce((sum, t, a) => sum + t * rowOf(inverse, a).reduce((inner, c, b) => inner + c * at(row, b), 0), 0);
     sse += residual * residual;
     sst += (at(values, k) - mean) ** 2;
-    press += (residual / (1 - leverage)) ** 2;
+    // a point that alone determines its own fit has no leave-one-out residual: infinite, never a silent NaN
+    press += 1 - leverage > 1e-9 ? (residual / (1 - leverage)) ** 2 : Number.POSITIVE_INFINITY;
     maxLeverage = Math.max(maxLeverage, leverage);
   });
   return { dimension, coefficients, evaluate, rSquared: sst > 0 ? 1 - sse / sst : 1, looRmse: Math.sqrt(press / rows.length), maxLeverage };

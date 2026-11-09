@@ -10,6 +10,7 @@ import { isStudyFailure, studyContext } from './context';
 import { momentsOf } from './distributions';
 import { limitStateModelHash } from './modelHash';
 import { reliabilityOf } from './model';
+import { RESULT_FORM_ITERATIONS, RESULT_FORM_TOLERANCE, resultDigest } from './resultHash';
 import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
 import { formStudy, monteCarloStudy } from './studies';
 
@@ -18,7 +19,7 @@ const DEFAULT_SAMPLES = 10_000;
 
 /**
  * @affects nothing; read-only, data { variables, correlation, responses, limitStates (each with modelHash and acceptance), unverified, reviewRequired: true }
- * @invariant resolved distributions with mean / sd; a limit state's modelHash is the one accept_reliability_result needs
+ * @invariant resolved distributions with mean / sd; modelHash changes with the model or anything a response reads; the result hash to accept comes from check_probabilistic (with a seed)
  * @failure none (an empty model is described as empty)
  */
 export const describeProbabilisticModel = defineCommand({
@@ -26,7 +27,7 @@ export const describeProbabilisticModel = defineCommand({
   annotations: { readOnly: true },
   description:
     'Describe the probabilistic model of the document: every random variable with its resolved distribution (mean, sd, unit, binding, citation, unverified when the scatter has no citation), the correlation, ' +
-    'the responses (define_response), and every limit state with its expression, unit, targets, `modelHash` (what accept_reliability_result binds to) and whether it carries a signed acceptance. ' +
+    'the responses (define_response), and every limit state with its expression, unit, targets, `modelHash` (hash of the model and everything a response reads) and whether it carries a signed acceptance. ' +
     `Run it before a study to see what is defined. ${REVIEW_NOTE}`,
   params: z.object({}),
   run: (doc): CommandResult => {
@@ -65,7 +66,15 @@ export const describeProbabilisticModel = defineCommand({
           ...(limitState.targetPf === undefined ? {} : { targetPf: limitState.targetPf }),
           modelHash: limitStateModelHash(doc, name),
           acceptance:
-            accepted === undefined ? null : { signer: accepted.signer, signatureId: accepted.signatureId, modelHash: accepted.modelHash },
+            accepted === undefined
+              ? null
+              : {
+                  signer: accepted.signer,
+                  signatureId: accepted.signatureId,
+                  resultHash: accepted.resultHash,
+                  seed: accepted.seed,
+                  samples: accepted.samples,
+                },
         },
       ];
     });
@@ -138,7 +147,8 @@ export const checkProbabilistic = defineCommand({
         items.push(item(context.code, 'error', context.message, 'fix the limit state or its variables', context.ids));
         continue;
       }
-      const form = formStudy(context, false, 100, 1e-8);
+      const form = formStudy(context, false, RESULT_FORM_ITERATIONS, RESULT_FORM_TOLERANCE);
+      let resultHash: string | null = null;
       items.push(...((form.data['items'] as Item[] | undefined) ?? []));
       if (params.seed !== undefined) {
         if (context.usesResponses && samples > MAX_RESPONSE_EVALUATIONS)
@@ -153,6 +163,7 @@ export const checkProbabilistic = defineCommand({
           );
         else {
           const study = monteCarloStudy(context, 'lhs', samples, params.seed);
+          resultHash = resultDigest(limitStateModelHash(doc, name) ?? '', params.seed, samples, form.beta, form.pf, study.pf);
           const mc = study.data;
           const standardError = typeof mc['standardError'] === 'number' ? mc['standardError'] : Number.NaN;
           items.push(...(mc['items'] as Item[]).filter((i) => i.code === 'PRB_PF_BELOW_RESOLUTION' || i.code === 'PRB_RESPONSE_FAILED'));
@@ -170,7 +181,7 @@ export const checkProbabilistic = defineCommand({
       }
       const accepted = model.acceptances?.[name];
       if (accepted !== undefined) {
-        const check = verifyAcceptance(ctx?.humanSignature, doc, name, accepted);
+        const check = verifyAcceptance(ctx?.humanSignature, doc, name, accepted, ctx);
         items.push(
           check.valid
             ? item('PRB_ACCEPTED', 'info', `accepted by ${accepted.signer} (signature ${accepted.signatureId})`, 'none', [name])
@@ -185,7 +196,7 @@ export const checkProbabilistic = defineCommand({
               ),
         );
       }
-      summaries[name] = { beta: form.beta, pfForm: form.pf, converged: form.converged, accepted: accepted !== undefined };
+      summaries[name] = { beta: form.beta, pfForm: form.pf, converged: form.converged, accepted: accepted !== undefined, resultHash };
     }
     const status = statusOfItems(items);
     const codes = [...new Set(items.map((i) => i.code))];

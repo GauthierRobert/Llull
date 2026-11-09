@@ -23,7 +23,8 @@ describe('importance sampling (method "is" of run_reliability_study)', () => {
     const [low, high] = d['ci95'] as [number, number];
     expect(low).toBeLessThan(phiOfMinus(2));
     expect(high).toBeGreaterThan(phiOfMinus(2));
-    expect(d['effectiveSampleSize']).toBeGreaterThan(100);
+    expect(d['effectiveFailureSamples']).toBeGreaterThan(100);
+    expect(d['effectiveFailureSamples'] as number).toBeLessThanOrEqual(4000);
     expect(result.document).toBeDefined();
     expect(result.affected).toEqual([]);
   });
@@ -169,7 +170,7 @@ describe('quadratic response surface', () => {
   it('is exact for the SORM benchmark g = 3 - u1 + 0.1 u2^2: FORM beta 3 and Pf of the surface = 1.04359876e-3 (VC-PRB-04)', () => {
     const doc = modelDoc([normal('u1', 0, 1), normal('u2', 0, 1)], '3 - u1 + 0.1 * pow(u2, 2)');
     const before = JSON.stringify(doc);
-    const result = run(doc, { samples: 800_000 });
+    const result = run(doc, { samples: 800_000, spread: 2 });
     expect(JSON.stringify(doc)).toBe(before);
     expect(result.document).toBe(doc);
     const d = data(result);

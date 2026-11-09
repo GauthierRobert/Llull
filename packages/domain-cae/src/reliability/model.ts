@@ -76,6 +76,9 @@ function acceptanceErrors(slice: Record<string, unknown>): string[] {
   const valid = (entry: unknown, limitState: boolean): boolean =>
     isRecord(entry) &&
     isString(entry['modelHash']) &&
+    isString(entry['resultHash']) &&
+    typeof entry['seed'] === 'number' &&
+    typeof entry['samples'] === 'number' &&
     isString(entry['justification']) &&
     isString(entry['signer']) &&
     isString(entry['signatureId']) &&

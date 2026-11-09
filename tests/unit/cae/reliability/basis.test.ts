@@ -6,7 +6,7 @@ import { code, data } from './support';
 
 /**
  * Published one-sided normal tolerance factors (B-basis: 90 % / 95 %, A-basis: 99 % / 95 %), 4-digit table values as quoted in MIL-HDBK-5J /
- * CMH-17 Vol. 1 (the table values are quoted from memory of those tables: see validation/sources.md, open question 5).
+ * CMH-17 Vol. 1; independently recomputed (non-central t quadrature) in review, agreeing to 1e-3 for n = 2..100 (the published values themselves are not checked against the books).
  */
 const PUBLISHED: ReadonlyArray<readonly [number, number, number]> = [
   [2, 20.581, 37.094],

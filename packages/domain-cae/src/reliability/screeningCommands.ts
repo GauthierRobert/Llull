@@ -15,8 +15,8 @@ import { sensitivityTarget } from './sensitivityTarget';
 const MAX_EXPRESSION_EVALUATIONS = 2_000_000;
 const DEFAULT_TRAJECTORIES = 20;
 const DEFAULT_LEVELS = 4;
-/** Unit-cube end points map to the quantiles EDGE and 1 - EDGE (unbounded marginals have no finite 0 / 1 quantile). */
-const EDGE = 1e-6;
+/** Default tail probability: the unit-cube end points map to the quantiles EDGE and 1 - EDGE (unbounded marginals have no finite 0 / 1 quantile); 1e-6 is +-4.75 sigma of a normal. */
+const DEFAULT_EDGE = 1e-6;
 
 /**
  * @affects nothing; read-only, data { variables [{ name, unit, mu, muStar, sigma }], ranking, trajectories, levels, evaluations, items, reviewRequired }
@@ -45,6 +45,14 @@ export const morrisScreening = defineCommand({
       .optional()
       .describe(`Number of random trajectories r (default ${DEFAULT_TRAJECTORIES}); 10 to 50 is usual.`),
     levels: z.number().int().min(4).max(20).optional().describe(`Even number of grid levels p (default ${DEFAULT_LEVELS}).`),
+    tailProbability: z
+      .number()
+      .gt(0)
+      .lt(0.25)
+      .optional()
+      .describe(
+        `Probability range of each variable: q in [0, 1] maps to the quantiles [tailProbability, 1 - tailProbability] (default ${DEFAULT_EDGE} = +-4.75 sigma of a normal; use 0.001 for +-3.09 sigma when the extreme tails are not of interest). Effects are per unit of q.`,
+      ),
     seed: z
       .number()
       .int()
@@ -77,10 +85,11 @@ export const morrisScreening = defineCommand({
     const correlated = reliabilityOf(doc).correlation?.names.filter((name) => names.includes(name)) ?? [];
     if (correlated.length >= 2)
       return fail('PRB_SOBOL_CORRELATED', `variables ${correlated.join(', ')} are correlated`, correlated, ['limitState']);
+    const edge = params.tailProbability ?? DEFAULT_EDGE;
     let failed = 0;
     const f = (q: readonly number[]): number => {
       const x = target.variables.map((variable, i) =>
-        fromStandardNormal(variable.distribution, normalInv(EDGE + (1 - 2 * EDGE) * (q[i] ?? 0))),
+        fromStandardNormal(variable.distribution, normalInv(edge + (1 - 2 * edge) * (q[i] ?? 0))),
       );
       const value = target.evaluate(x);
       if (!Number.isFinite(value)) failed += 1;
@@ -118,6 +127,7 @@ export const morrisScreening = defineCommand({
         method: 'Morris 1991 elementary effects, Campolongo 2007 mu*',
         trajectories,
         levels,
+        tailProbability: edge,
         delta: result.delta,
         seed: { value: params.seed, source: 'caller', defaulted: false },
         prng: 'xoshiro128**',

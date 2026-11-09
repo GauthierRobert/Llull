@@ -47,7 +47,17 @@ describe('describe_probabilistic_model', () => {
 
   it('its slice validation rejects a malformed acceptance or ledger', () => {
     const slice = rMinusS().probabilistic as unknown as Record<string, unknown>;
-    const acceptance = { modelHash: 'h', justification: 'j', signer: 's', signatureId: 'i', documentUid: 'u', signature: {} };
+    const acceptance = {
+      modelHash: 'h',
+      resultHash: 'r',
+      seed: 1,
+      samples: 10,
+      justification: 'j',
+      signer: 's',
+      signatureId: 'i',
+      documentUid: 'u',
+      signature: {},
+    };
     expect(reliabilityErrors({ probabilistic: { ...slice, acceptances: { g: acceptance } } })).toEqual([]);
     expect(reliabilityErrors({ probabilistic: { ...slice, acceptances: { ghost: acceptance } } })).toHaveLength(1);
     expect(reliabilityErrors({ probabilistic: { ...slice, acceptances: { g: { ...acceptance, signer: 3 } } } })).toHaveLength(1);

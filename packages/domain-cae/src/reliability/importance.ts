@@ -8,8 +8,8 @@ export interface ImportanceEstimate {
   readonly standardError: number;
   /** Normal-approximation 95 % interval of Pf, clipped to [0, 1]. */
   readonly ci95: readonly [number, number];
-  /** (sum w)^2 / sum w^2 over the valid samples: how many plain samples the weighted set is worth. */
-  readonly effectiveSampleSize: number;
+  /** (sum w)^2 / sum w^2 over the FAILURE samples only (the ones that carry the estimate): equal-weight failures it is worth; small = the estimate rests on a few draws. */
+  readonly effectiveFailureSamples: number;
   readonly failures: number;
   readonly validSamples: number;
 }
@@ -32,23 +32,20 @@ export function importanceSampling(
   let failures = 0;
   let sum = 0;
   let sumSquares = 0;
-  let weightSum = 0;
-  let weightSquares = 0;
   for (let k = 0; k < samples; k += 1) {
     const draw = Array.from(z.subarray(k * d, (k + 1) * d));
     const value = g(draw.map((zi, i) => zi + at(designPoint, i)));
     if (!Number.isFinite(value)) continue;
     valid += 1;
     const weight = Math.exp(-draw.reduce((acc, zi, i) => acc + zi * at(designPoint, i), 0) - half);
-    weightSum += weight;
-    weightSquares += weight * weight;
     if (value < 0) {
       failures += 1;
       sum += weight;
       sumSquares += weight * weight;
     }
   }
-  if (valid === 0) return { pf: Number.NaN, standardError: Number.NaN, ci95: [0, 1], effectiveSampleSize: 0, failures: 0, validSamples: 0 };
+  if (valid === 0)
+    return { pf: Number.NaN, standardError: Number.NaN, ci95: [0, 1], effectiveFailureSamples: 0, failures: 0, validSamples: 0 };
   const pf = sum / valid;
   const variance = Math.max(sumSquares / valid - pf * pf, 0) / valid;
   const standardError = Math.sqrt(variance);
@@ -56,7 +53,7 @@ export function importanceSampling(
     pf,
     standardError,
     ci95: [Math.max(pf - 1.959963984540054 * standardError, 0), Math.min(pf + 1.959963984540054 * standardError, 1)],
-    effectiveSampleSize: weightSquares > 0 ? (weightSum * weightSum) / weightSquares : 0,
+    effectiveFailureSamples: sumSquares > 0 ? (sum * sum) / sumSquares : 0,
     failures,
     validSamples: valid,
   };

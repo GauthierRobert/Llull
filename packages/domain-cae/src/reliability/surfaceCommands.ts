@@ -17,6 +17,8 @@ const DEFAULT_SPREAD = 1.5;
 const DEFAULT_SURFACE_SAMPLES = 100_000;
 /** Leave-one-out RMSE above this share of the response's own spread flags PRB_SURFACE_RESIDUAL. */
 const RESIDUAL_LIMIT = 0.05;
+/** A FORM design point farther than this many spreads from the origin lies outside the fitted region. */
+const EXTRAPOLATION_FACTOR = 2;
 
 /**
  * @affects nothing; read-only, data { surface { terms, rSquared, looRmse, looRelative, maxLeverage }, design, form, monteCarlo, items, reviewRequired }
@@ -103,7 +105,14 @@ export const responseSurfaceStudy = defineCommand({
     if (surface === null) return fail('PRB_PARAMS_INVALID', 'the design is singular: change the seed or add points', [], ['points']);
     const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
     const spreadOfValues = Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1));
-    const looRelative = spreadOfValues > 0 ? surface.looRmse / spreadOfValues : 0;
+    const looRelative = spreadOfValues > 0 ? surface.looRmse / spreadOfValues : surface.looRmse > 0 ? Number.POSITIVE_INFINITY : 0;
+    if (!Number.isFinite(looRelative))
+      return fail(
+        'PRB_SURFACE_UNRELIABLE',
+        'a design point alone determines its own fit (leverage 1): the leave-one-out residual does not exist; add points or change the seed',
+        [target.label],
+        ['points'],
+      );
     const items: Item[] = [...target.items];
     if (looRelative > RESIDUAL_LIMIT)
       items.push(
@@ -118,7 +127,18 @@ export const responseSurfaceStudy = defineCommand({
     const form = runForm((u) => surface.evaluate(u), d, { maxIterations: 100, tolerance: 1e-8 });
     if (!form.converged)
       items.push(item('PRB_FORM_NOT_CONVERGED', 'warning', 'FORM on the surface did not converge', 'check the surface', [target.label]));
-    const draws = standardNormalSamples('lhs', samples, d, params.seed + 1);
+    const radius = Math.sqrt(form.u.reduce((sum, value) => sum + value * value, 0));
+    if (radius > EXTRAPOLATION_FACTOR * spread)
+      items.push(
+        item(
+          'PRB_SURFACE_EXTRAPOLATION',
+          'warning',
+          `the design point is at |u| = ${radius.toPrecision(3)}, beyond ${EXTRAPOLATION_FACTOR} x spread (${EXTRAPOLATION_FACTOR * spread}): the Pf comes from extrapolating the surface`,
+          'raise spread so the design covers the design point, or use run_reliability_study',
+          [target.label],
+        ),
+      );
+    const draws = standardNormalSamples('lhs', samples, d, (params.seed + 1) >>> 0);
     let failures = 0;
     for (let k = 0; k < samples; k += 1) if (surface.evaluate(Array.from(draws.subarray(k * d, (k + 1) * d))) < 0) failures += 1;
     const mc = estimatePf(failures, samples);

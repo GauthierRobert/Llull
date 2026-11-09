@@ -12,7 +12,7 @@ export interface ImportanceStudy {
 
 /**
  * Pf of the limit state by importance sampling at the FORM design point.
- * @invariant unbiased for any design point; a non-converged FORM, an origin in the failure domain or no failure drawn each raise a named item; deterministic for (model, samples, seed)
+ * @invariant runForm always returns a finite design point (the origin when g cannot be evaluated), so the centre is never non-finite; unbiased for any design point; a non-converged FORM, an origin in the failure domain or no failure drawn each raise a named item; deterministic for (model, samples, seed)
  */
 export function importanceStudy(
   context: StudyContext,
@@ -66,7 +66,7 @@ export function importanceStudy(
       pf: estimate.pf,
       standardError: estimate.standardError,
       ci95: estimate.ci95,
-      effectiveSampleSize: estimate.effectiveSampleSize,
+      effectiveFailureSamples: estimate.effectiveFailureSamples,
       centre: Object.fromEntries(context.variables.map((v, i) => [v.name, form.u[i] ?? Number.NaN])),
       betaForm: form.beta,
       items,

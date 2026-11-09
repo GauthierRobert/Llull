@@ -85,7 +85,12 @@ export interface Response {
 
 /** A reviewer's signed acceptance of the reliability result of one limit state (human gate; verified when read). */
 export interface Acceptance {
+  /** Hash of the model the result was computed on (limitStateModelHash). */
   readonly modelHash: string;
+  /** Hash of the result the reviewer saw (resultDigest): the study is re-run from `seed` / `samples` when the acceptance is read. */
+  readonly resultHash: string;
+  readonly seed: number;
+  readonly samples: number;
   readonly justification: string;
   readonly signer: string;
   readonly signatureId: string;

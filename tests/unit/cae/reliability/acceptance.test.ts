@@ -1,6 +1,6 @@
 /**
  * accept_reliability_result as a human gate (TR-PRB-12): the signature is `confirmation`, never reaches the history, is verified first and spent last,
- * binds the model hash and the document uid, and a replay keeps the acceptance only from the ledger a human really signed.
+ * binds the RESULT (hash of the seeded study, model and everything a response reads) and the document uid, and a replay keeps the acceptance only from the ledger a human really signed.
  */
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
@@ -10,9 +10,9 @@ import type { ExecutionContext } from '@core/commands/types';
 import type { HumanSignaturePort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { acceptancePayload } from '@cae/reliability/acceptance';
-import { limitStateModelHash } from '@cae/reliability/modelHash';
 import { isRecord } from '@lib/isRecord';
-import { code, data, rMinusS } from './support';
+import { code, data, rMinusS, type Json } from './support';
+import { massModel } from './responses.support';
 
 const SECRET = 'sig-bytes-prb';
 const justification = 'beta 2.0 is accepted for the prototype, covered by the proof test';
@@ -36,9 +36,19 @@ const signedFor = (payload: string): Record<string, unknown> => ({ nonce: 'n1', 
 const ctxWith = (signing: HumanSignaturePort | null): ExecutionContext => ({ ...defaultContext(), humanSignature: signing });
 
 const doc: CadDocument = { ...rMinusS(), uid: 'a'.repeat(32) };
-const modelHash = limitStateModelHash(doc, 'g') ?? '';
-const params = { limitState: 'g', modelHash, justification };
-const payloadOf = (d: CadDocument, hash = modelHash, text = justification): string => acceptancePayload('g', hash, text, d.uid ?? '');
+const SEED = 7;
+const SAMPLES = 2000;
+/** The result hash a reviewer is shown: check_probabilistic with the study's seed and samples. */
+const resultHashOf = (d: CadDocument, seed = SEED, name = 'g'): string =>
+  (
+    (data(execute(d, 'check_probabilistic', { limitState: name, seed, samples: SAMPLES }))['limitStates'] as Record<string, Json>)[
+      name
+    ] as Json
+  )['resultHash'] as string;
+const resultHash = resultHashOf(doc);
+const params = { limitState: 'g', resultHash, seed: SEED, samples: SAMPLES, justification };
+const payloadOf = (d: CadDocument, hash = resultHash, text = justification): string =>
+  acceptancePayload('g', hash, SEED, SAMPLES, text, d.uid ?? '');
 const confirmation = signedFor(payloadOf(doc));
 const accept = (
   d: CadDocument,
@@ -53,7 +63,9 @@ const replay = (d: CadDocument, signing: HumanSignaturePort | null): CadDocument
 describe('accept_reliability_result', () => {
   it('records the acceptance with its proof and the document uid; the history and the saved file hold no signature', () => {
     expect(signed.probabilistic?.acceptances?.['g']).toMatchObject({
-      modelHash,
+      resultHash,
+      seed: SEED,
+      samples: SAMPLES,
       signer: 'alice',
       signatureId: 'sig-9',
       signature: confirmation,
@@ -86,7 +98,7 @@ describe('accept_reliability_result', () => {
 
   it('verifies first and spends last: a refusal never burns the signature, a used one is refused', () => {
     const signing = port();
-    const wrongHash = accept(doc, { confirmation, modelHash: 'f'.repeat(64) }, signing);
+    const wrongHash = accept(doc, { confirmation, resultHash: 'f'.repeat(64) }, signing);
     expect(code(wrongHash)).toBe('PRB_RESULT_STALE');
     expect(accept(doc, { confirmation, limitState: 'nope' }, signing).error?.code).toBe('PRB_LIMIT_STATE_NOT_FOUND');
     expect(accept(doc, { confirmation, justification: ' ' }, signing).error?.code).toBe('PRB_PARAMS_INVALID');
@@ -132,6 +144,28 @@ describe('accept_reliability_result', () => {
     expect(replay(stripped, port()).probabilistic?.acceptances?.['g']).toBeUndefined();
   });
 
+  it('the result hash is reported by check_probabilistic and run_reliability_study alike, deterministic and seed-bound', () => {
+    expect(resultHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(resultHashOf(doc)).toBe(resultHash);
+    expect(resultHashOf(doc, 8)).not.toBe(resultHash);
+    const study = data(execute(doc, 'run_reliability_study', { limitState: 'g', methods: ['form', 'mc'], seed: SEED, samples: SAMPLES }));
+    expect(study['resultHash']).toBe(resultHash);
+    expect(data(execute(doc, 'run_reliability_study', { limitState: 'g', methods: ['form'] }))['resultHash']).toBeUndefined();
+  });
+
+  it('an acceptance is bound to its seed: the same hash with another seed is refused, the other seed hash is a different result', () => {
+    const otherSeed = accept(doc, { confirmation, seed: 8 }, port());
+    expect(code(otherSeed)).toBe('PRB_RESULT_STALE');
+    expect(otherSeed.document).toBe(doc);
+    const result = resultHashOf(doc, 8);
+    expect(code(accept(doc, { confirmation, seed: 8, resultHash: result }, port()))).toBe('PRB_HUMAN_GATE');
+  });
+
+  it('a limit state that cannot be studied is refused with its own code', () => {
+    const broken = { ...doc, probabilistic: { ...doc.probabilistic, variables: {}, variableOrder: [] } } as CadDocument;
+    expect(code(accept(broken, { confirmation }, port()))).toBe('PRB_EXPRESSION_INVALID');
+  });
+
   it('check_probabilistic re-verifies the acceptance: valid, then stale once the model changes, then unverifiable without a port', () => {
     const signing = port();
     const items = (d: CadDocument, s: HumanSignaturePort | null): string[] =>
@@ -145,7 +179,65 @@ describe('accept_reliability_result', () => {
       citation: { text: 't' },
     }).document;
     expect(items(changed, signing)).toContain('PRB_RESULT_STALE');
+    const seedless = execute(signed, 'check_probabilistic', { limitState: 'g' }, ctxWith(signing));
+    expect((data(seedless)['items'] as Array<{ code: string }>).map((i) => i.code)).toContain('PRB_ACCEPTED');
     const copied = { ...signed, uid: 'f'.repeat(32) } as CadDocument;
     expect(items(copied, signing)).toContain('PRB_HUMAN_GATE');
+  });
+});
+
+describe('an acceptance covers what a response reads', () => {
+  const base = massModel().doc;
+  const uid = { ...base, uid: 'b'.repeat(32) } as CadDocument;
+  const study = { limitState: 'mass_budget', seed: 3, samples: 200 };
+  const hash = ((data(execute(uid, 'check_probabilistic', study))['limitStates'] as Record<string, Json>)['mass_budget'] as Json)[
+    'resultHash'
+  ] as string;
+  const asked = { ...study, resultHash: hash, justification };
+  const payload = (d: CadDocument): string => acceptancePayload('mass_budget', hash, study.seed, study.samples, justification, d.uid ?? '');
+  const accepted = execute(uid, 'accept_reliability_result', { ...asked, confirmation: signedFor(payload(uid)) }, ctxWith(port())).document;
+  const codes = (d: CadDocument): string[] =>
+    (data(execute(d, 'check_probabilistic', { limitState: 'mass_budget' }, ctxWith(port())))['items'] as Array<{ code: string }>).map(
+      (i) => i.code,
+    );
+
+  it('is accepted and stays valid while nothing behind the response changes', () => {
+    expect(accepted.probabilistic?.acceptances?.['mass_budget']).toBeDefined();
+    expect(codes(accepted)).toContain('PRB_ACCEPTED');
+  });
+
+  it('turns stale when the density of the material behind the response is edited', () => {
+    const denser = execute(accepted, 'create_material', {
+      name: 'test_al',
+      density: 0.0028,
+      color: '#b8bcc2',
+      metalness: 1,
+      roughness: 0.4,
+    }).document;
+    expect(codes(denser)).toContain('PRB_RESULT_STALE');
+    expect(codes(denser)).not.toContain('PRB_ACCEPTED');
+  });
+
+  it('turns stale when an entity behind the response is edited, and when an unrelated parameter changes', () => {
+    const id = Object.keys(accepted.entities)[0] ?? '';
+    const edited = {
+      ...accepted,
+      entities: { ...accepted.entities, [id]: { ...accepted.entities[id], note: 'moved' } },
+    } as unknown as CadDocument;
+    expect(codes(edited)).toContain('PRB_RESULT_STALE');
+    const reparameterised = execute(accepted, 'set_parameter', { name: 'extra', expression: '1' }).document;
+    expect(codes(reparameterised)).toContain('PRB_RESULT_STALE');
+  });
+
+  it('refuses to accept after such an edit with the old hash', () => {
+    const denser = execute(uid, 'create_material', {
+      name: 'test_al',
+      density: 0.0028,
+      color: '#b8bcc2',
+      metalness: 1,
+      roughness: 0.4,
+    }).document;
+    const result = execute(denser, 'accept_reliability_result', { ...asked, confirmation: signedFor(payload(denser)) }, ctxWith(port()));
+    expect(code(result)).toBe('PRB_RESULT_STALE');
   });
 });

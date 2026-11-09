@@ -10,6 +10,8 @@ import { isStudyFailure, studyContext, type StudyContext } from './context';
 import { reliabilityOf } from './model';
 import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
 import { importanceStudy } from './importanceStudy';
+import { limitStateModelHash } from './modelHash';
+import { resultDigest } from './resultHash';
 import { formStudy, fosmStudy, monteCarloStudy } from './studies';
 
 const MAX_SAMPLES = 2_000_000;
@@ -142,10 +144,10 @@ export const runReliabilityStudy = defineCommand({
   annotations: { readOnly: true },
   description:
     'Reliability analysis of ONE limit state g(x) (failure when g < 0) with one or several methods, compared: "form" (Hasofer-Lind / Rackwitz-Fiessler iteration in standard normal space, Nataf transform for ' +
-    'distributions and correlation), "sorm" (FORM + Breitung curvature correction, needs a converged design point with beta > 0), "mc" (seeded Monte Carlo or Latin hypercube, needs `seed`), "is" (importance sampling centred on the FORM design point: unbiased, far smaller variance than mc for rare failures; needs `seed`; data.importanceSampling = { pf, standardError, ci95, effectiveSampleSize, ... }) and "fosm" ' +
+    'distributions and correlation), "sorm" (FORM + Breitung curvature correction, needs a converged design point with beta > 0), "mc" (seeded Monte Carlo or Latin hypercube, needs `seed`), "is" (importance sampling centred on the FORM design point: unbiased, far smaller variance than mc for rare failures; needs `seed`; data.importanceSampling = { pf, standardError, ci95, effectiveFailureSamples, ... }) and "fosm" ' +
     '(first-order second-moment). Default methods: form, mc, fosm; methods ["form"] is the plain FORM run. data.form (and data.sorm) = { beta, pfForm = Φ(-beta), designPointX { variable: { value, unit } } ' +
     '(most probable failure point), importance { variable: alpha^2 } (sums to 1: which variable drives failure), iterations, converged, items[] } (beta is negative when all variables at their medians already ' +
-    'fail; exact for linear g in normal variables: (muR - muS) / sqrt(sR^2 + sS^2); gradients by central differences); data.monteCarlo and data.fosm as in propagate_uncertainty; ' +
+    'fail; exact for linear g in normal variables: (muR - muS) / sqrt(sR^2 + sS^2); gradients by central differences); data.monteCarlo and data.fosm as in propagate_uncertainty; data.resultHash (only when methods include form and mc, lhs sampling and default iteration limits) = the result hash accept_reliability_result takes; ' +
     'comparison { pf: { method: Pf }, formInsideMonteCarloInterval } and the item PRB_FORM_MC_DISAGREE when the FORM Pf falls outside the Monte Carlo ' +
     `Wilson 95 % interval (report the Monte Carlo value, consider SORM). For several limit states or the distribution of g itself use propagate_uncertainty. ${REVIEW_NOTE}`,
   params: z.object({
@@ -226,6 +228,27 @@ export const runReliabilityStudy = defineCommand({
             message: `${compared?.method} Pf ${comparedPf} is outside the Monte Carlo Wilson 95 % interval [${interval?.[0]}, ${interval?.[1]}]`,
             remediation: compared?.method === 'SORM' ? 'report the Monte Carlo value' : 'report the Monte Carlo value; consider SORM',
           });
+        const formData = data['form'] as { beta?: number } | undefined;
+        const formPf = pf['form'];
+        const mcPf = pf['mc'];
+        if (
+          formData?.beta !== undefined &&
+          formPf !== undefined &&
+          formPf !== null &&
+          mcPf !== undefined &&
+          mcPf !== null &&
+          (params.sampling ?? 'lhs') === 'lhs' &&
+          params.maxIterations === undefined &&
+          params.tolerance === undefined
+        )
+          data['resultHash'] = resultDigest(
+            limitStateModelHash(doc, params.limitState) ?? '',
+            params.seed ?? Number.NaN,
+            samples,
+            formData.beta,
+            formPf,
+            mcPf,
+          );
         data['comparison'] = { pf, formInsideMonteCarloInterval: inside };
         data['items'] = items;
         const shown = Object.entries(pf).map(([method, value]) => `${method} ${value === null ? 'n/a' : value.toPrecision(6)}`);

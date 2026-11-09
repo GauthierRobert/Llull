@@ -207,22 +207,25 @@ export const sensitivityIndices = defineCommand({
     for (let k = 0; k < n; k += 1) {
       const a = rowA(k);
       const b = rowB(k);
+      const refuseAt = (which: string): CommandResult =>
+        fail(
+          'PRB_RESPONSE_FAILED',
+          `'${target.label}' is not a finite number at base sample ${k} (${which}); stopped after ${k * (d + 2)} of ${evaluations} evaluations`,
+          [target.label],
+          [],
+        );
       fA[k] = target.evaluate(a);
+      if (!Number.isFinite(fA[k])) return refuseAt('matrix A');
       fB[k] = target.evaluate(b);
+      if (!Number.isFinite(fB[k])) return refuseAt('matrix B');
       for (let i = 0; i < d; i += 1) {
         const mixed = [...a];
         mixed[i] = b[i] ?? 0;
-        (fAB[i] as Float64Array)[k] = target.evaluate(mixed);
+        const value = target.evaluate(mixed);
+        if (!Number.isFinite(value)) return refuseAt(`column ${names[i]} of A taken from B`);
+        (fAB[i] as Float64Array)[k] = value;
       }
     }
-    const failed = [fA, fB, ...fAB].reduce((sum, column) => sum + column.filter((value) => !Number.isFinite(value)).length, 0);
-    if (failed > 0)
-      return fail(
-        'PRB_RESPONSE_FAILED',
-        `${failed} of ${evaluations} evaluations of '${target.label}' were not finite numbers`,
-        [target.label],
-        [],
-      );
     const bootstrap = params.bootstrap ?? DEFAULT_BOOTSTRAP;
     const result = sobolIndices(fA, fB, fAB, bootstrap);
     if (!(result.variance > 0))
