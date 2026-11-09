@@ -49,6 +49,10 @@ const EXEMPT: Readonly<Record<string, string>> = {
     'add_imperfection reads the pinned buckling results only to name the peak node and offset in its summary; no allowable, no verdict',
   'nonlinear/imperfectionDeck.ts':
     'reads the pinned buckling mode shapes to move the deck nodes (an input geometry, not a result verdict); no allowable, no pass / fail',
+  'nonlinear/reportCommand.ts':
+    'nonlinear_report is a read-out of curves, step bookkeeping and the residual state (reviewRequired); it issues no stress allowable or margin verdict',
+  'nonlinear/checkCommand.ts':
+    'check_nonlinear compares displacement and plastic strain with limits the owner stated (thresholds, no default) and lists set-up items; no stress allowable, the margin verdict stays in compute_margins (gated)',
   'nonlinear/limitLoadQuery.ts':
     'limit_load is a read-out of a curve (reviewRequired, VNV_NO_CONVERGENCE_STUDY warning); the limit-load MARGIN verdict is margins/limitLoadMargins.ts, which applies gateRows',
   'thermal/check.ts':

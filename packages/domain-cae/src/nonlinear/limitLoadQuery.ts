@@ -58,7 +58,7 @@ export interface LimitLoadRefusal {
 }
 
 /** The probe whose id or unique name is `reference`. */
-function probeOf(analysis: AnalysisCase, reference: string): CurveProbe | undefined {
+export function probeOf(analysis: AnalysisCase, reference: string): CurveProbe | undefined {
   const probes = analysis.nonlinear?.probes ?? {};
   if (Object.hasOwn(probes, reference)) return probes[reference];
   const named = Object.values(probes).filter((probe) => probe.name === reference);
@@ -66,7 +66,7 @@ function probeOf(analysis: AnalysisCase, reference: string): CurveProbe | undefi
 }
 
 /** E / nu unverified reasons of the materials of the parts (AF-32: they flag every number computed from them). */
-function unverifiedReasons(doc: CadDocument, analysis: AnalysisCase): string[] {
+export function unverifiedReasons(doc: CadDocument, analysis: AnalysisCase): string[] {
   const reasons = new Set<string>();
   for (const entityId of Object.keys(analysis.parts)) {
     const materialId = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId]?.materialId : undefined;
@@ -79,7 +79,7 @@ function unverifiedReasons(doc: CadDocument, analysis: AnalysisCase): string[] {
 }
 
 /** Unit of the load axis of a probe: what the curve load really is (a pressure probe plots a pressure, not a force). */
-function loadUnitOf(analysis: AnalysisCase, probe: CurveProbe): string {
+export function loadUnitOf(analysis: AnalysisCase, probe: CurveProbe): string {
   const force = analysis.unitSystem.split('-')[0] ?? '';
   if (probe.load.kind === 'reaction') return force;
   const load = Object.hasOwn(analysis.loads, probe.load.loadId) ? analysis.loads[probe.load.loadId] : undefined;

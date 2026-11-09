@@ -16,6 +16,8 @@ const sci = (value: number): string =>
     .toUpperCase()
     .replace(/E([+-])(\d)$/, (_match, sign: string, digit: string) => `E${sign}0${digit}`);
 
+const STRESS_COMPONENTS = ['SXX', 'SYY', 'SZZ', 'SXY', 'SYZ', 'SZX'];
+
 const setName = (name: string): string => name.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
 
 function displacementTable(set: string, time: number, ux: number): string[] {
@@ -48,13 +50,14 @@ function recorded(
 }
 
 /** The pulled bar (displacement control, reaction-x probe) solved with reaction magnitudes `loads` at ux = 0.01 x time, time = (k + 1) / n. */
-export function solvedPull(loads: readonly number[]): SolvedCurve {
+export function solvedPull(loads: readonly number[], displacements?: readonly number[]): SolvedCurve {
+  const ux = (time: number, index: number): number => displacements?.[index] ?? 0.01 * time;
   const bar = pulledBar();
   const mesh = meshOf(bar);
   const times = loads.map((_, index) => (index + 1) / loads.length);
   const text = times
     .flatMap((time, index) => [
-      ...displacementTable(setName(`N_${bar.probeId}`), time, 0.01 * time),
+      ...displacementTable(setName(`N_${bar.probeId}`), time, ux(time, index)),
       '',
       ` total force (fx,fy,fz) for set ${setName(`C_${bar.constraints['x0']}`)} and time  ${sci(time)}`,
       '',
@@ -67,10 +70,10 @@ export function solvedPull(loads: readonly number[]): SolvedCurve {
     inputHash: analysisInputHash(bar.doc, bar.analysisId, 'full'),
     solver: 'CalculiX',
     solverVersion: '2.21',
-    steps: times.map((time) => ({
+    steps: times.map((time, index) => ({
       step: 1,
       time,
-      fields: { DISP: { components: ['D1', 'D2', 'D3'], values: { '2': [0.01 * time, 0, 0] } } },
+      fields: { DISP: { components: ['D1', 'D2', 'D3'], values: { '2': [ux(time, index), 0, 0] } } },
     })),
     dat: parseDat(text),
   };
@@ -100,6 +103,7 @@ export function solvedPressure(loadKind?: 'inertial'): SolvedCurve {
   const bar = { ...plain, doc: retyped };
   const times = [0.5, 1, 1.5, 2];
   const ux = [0.001, 0.002, 0.0015, 0.0005];
+  const residual = [1, 2, 1.5, 0.5];
   const text = times.flatMap((time, index) => displacementTable(setName(`N_${bar.probeId}`), time, ux[index] ?? 0)).join('\n');
   const results: FeResultsArtifact = {
     kind: 'fe_results',
@@ -110,7 +114,11 @@ export function solvedPressure(loadKind?: 'inertial'): SolvedCurve {
     steps: times.map((time, index) => ({
       step: time <= 1 ? 1 : 2,
       time,
-      fields: { DISP: { components: ['D1', 'D2', 'D3'], values: { '2': [ux[index] ?? 0, 0, 0] } } },
+      fields: {
+        DISP: { components: ['D1', 'D2', 'D3'], values: { '2': [ux[index] ?? 0, 0, 0] } },
+        STRESS: { components: STRESS_COMPONENTS, values: { '2': [(residual[index] ?? 0) * 100, 0, 0, 0, 0, 0] } },
+        PE: { components: ['PEEQ'], values: { '2': [(residual[index] ?? 0) * 0.01] } },
+      },
     })),
     dat: parseDat(text),
   };

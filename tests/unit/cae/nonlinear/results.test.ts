@@ -155,7 +155,7 @@ describe('nonlinear results summary and trust', () => {
     expect(summary.nonlinear?.curves[0]?.dispRange).toEqual([0, 0.01]);
     expect(summary.nonlinear?.maxPeeq?.value).toBeCloseTo(0.0028, 9);
     expect(summary.loadCases).toHaveLength(1);
-    expect(summary.loadCases[0]).toMatchObject({ name: 'pull', category: 'limit' });
+    expect(summary.loadCases[0]).toMatchObject({ name: 'step 1', category: 'limit' });
     expect(JSON.stringify(summary)).toBe(JSON.stringify(resultsSummary(bar.doc, bar.analysisId, mesh, results, hash)));
   });
 

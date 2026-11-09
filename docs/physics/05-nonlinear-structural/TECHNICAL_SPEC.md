@@ -588,11 +588,43 @@ buckling case of the same part. Codes added besides §7.1: `NLS_IMPERFECTION_NOT
 
 The real run takes about 190 s (mesh, buckling solve, mesh, two load-controlled NLGEOM steps).
 
+### 13.3b As built (NLS-M2b, 2026-11-09): the six leftover commands
+
+| Name | Kind | File | What it does |
+| ---- | ---- | ---- | ------------ |
+| `update_analysis_step` | M | `nonlinear/stepEditCommand.ts` | Replaces name / multipliers / amplitude / control of one step in place (same id, same position); the merged step runs the same `validateStep` as `add_analysis_step` (`nonlinear/stepSpec.ts`, extracted from `stepCommand.ts`). Unknown step: `NLS_STEP_NOT_FOUND`; no field: `NLS_CONTROL_INVALID` |
+| `delete_analysis_step` | M (destructive) | same | Removes a step; later steps keep their ids. A case left without a step stays legal data, `check_nonlinear` reports `NLS_NO_STEPS` |
+| `delete_curve_probe` | M (destructive) | `nonlinear/probeCommand.ts` | Removes a probe by id or unique name; unknown: `NLS_PROBE_REFERENCE_UNKNOWN` |
+| `nonlinear_report` | Q | `nonlinear/reportCommand.ts` | §5.5 data from the re-verified artifact: controls with named values, per-step increments / cutbacks, curves (`summary`: <= 100 samples, `all`: pages of 1000 with `cursor` / `nextCursor`), `maxLoad` (magnitude), `snapBack`, `maxPeeq`, `permanentSet`, provenance, unverified, `reviewRequired` |
+| `check_nonlinear` | Q | `nonlinear/checkCommand.ts` | The `check_analysis` items (they already hold the §7.1 set-up items) composed through `execute`, plus `NLS_MATERIAL_MODEL_UNVERIFIED`, `NLS_THRESHOLD_UNSET`, `NLS_PERMANENT_SET_THRESHOLD_UNSET` and, on verified results, `NLS_SNAP_BACK_DETECTED` |
+| `nonlinear_analytic_check` | Q | `nonlinear/analytic{Command,Checks,Formulas}.ts` | The five §5.6 checks; inputs in unit-suffixed keys (number or `{ value, unit }`); values carry units; codes `NLS_INPUT_MISSING` / `NLS_INPUT_INVALID` |
+
+Decisions:
+
+- **Snap-back (§5.4)** is detected inside displacement-controlled steps that do not unload: the controlled displacement grows, so a probe
+  displacement that falls while the load magnitude falls flags `snapBack` (`nonlinear/curveRules.ts`). [Rejected: any displacement reversal, it
+  would flag every unloading step.]
+- **Permanent set** is read after the last step that returns every load case it names to zero (`unloadingStep`), matched to the stored increments by POSITION in
+  the step order (`nonlinear/permanentSet.ts`); names are presentation, so the summary rows of `loadCases` are named `step <n>` and a rename after the solve keeps
+  the results current and trusted. A step with no stored increment gives an explicit note, not a bare null.
+- **Thresholds** (`NonlinearSettings.thresholds`, `set_nonlinear_controls`): `permanentDisplacement` (document length units), `permanentPeeq`, `smallRotation` (rad),
+  `strain`, each `{ value > 0, source }`, no default. They are not solution inputs: excluded from the input hash, so stating them keeps results current. `check_nonlinear`
+  warns `NLS_THRESHOLD_UNSET` (nlgeom false without smallRotation or strain) and `NLS_PERMANENT_SET_THRESHOLD_UNSET` (unloading step without a permanent limit) only until stated,
+  then judges: `NLS_PERMANENT_SET_EXCEEDED` (error) and `NLS_NLGEOM_RECOMMENDED` (warning; strain against the largest PEEQ, smallRotation against an estimate
+  atan(largest displacement / largest part extent) named as an estimate in the finding, `smallDeformation.ts`). `nonlinear_report` returns the limits and
+  `displacementExceeded` / `peeqExceeded` (null when no limit is stated).
+- **Oracles of `nonlinear_analytic_check`** are the frozen generator values (`validation/expected_results.json`: VC-NLS-10.a-d elastica, 30.a-e thick
+  cylinder, 40.a-e hinges and moment-curvature, 50.a-c column), asserted in `tests/unit/cae/nonlinear/analyticCheck.test.ts`. The elastica uses the
+  generator's 24-point Gauss-Legendre elliptic integrals (64 panels) and bisection on the tip slope, so it equals the generator to ~1e-12. Sources: Bisshopp
+  & Drucker 1945 (elastica); Hill, The Mathematical Theory of Plasticity (thick cylinder); Timoshenko & Gere (imperfect column).
+- Test fixtures: `limitFixtures.ts` gained optional probe displacements (`solvedPull(loads, displacements)`) and STRESS / PE fields in `solvedPressure()`.
+
+Not evaluated by `check_nonlinear` yet: `NLS_STRAIN_BEYOND_CURVE`, `NLS_STRAIN_EXCEEDS_ELONGATION`, `NLS_MESH_PLASTIC_ADEQUACY`; `nonlinear_report` does not read the plastic volume fraction (`provenance.notRead`).
+
 ### 13.4 Not built yet
 
 - M4: the `llull guide` nonlinear section lives in `packages/protocol/src/conventions.ts` (CLI lane); the curve panel is UI (desktop lane); the MCP
   prompt is moot (no MCP server, LC1); the production-gate scenario.
-- From M1 / M2: `update_analysis_step`, `delete_analysis_step`, `delete_curve_probe`, `nonlinear_report`, `check_nonlinear`,
-  `nonlinear_analytic_check`, `NLS_LIMIT_POINT_REACHED` (a stopped run is a solver failure and is never recorded); company-rule amplitude tables
+- From M1 / M2: `NLS_LIMIT_POINT_REACHED` (a stopped run is a solver failure and is never recorded); company-rule amplitude tables
   (§11 q4: amplitudes stay explicit, no table).
 - `intersectPlane` targets (decision 8) and `hex_dominant` meshing are 05 gaps.

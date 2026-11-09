@@ -7,6 +7,7 @@ import { isRecord } from '@lib/isRecord';
 import { imperfectionProblems } from './imperfectionShape';
 
 export const FIELD_KEYS = ['Rn', 'Cn', 'q0', 'qu', 'Rp', 'eps', 'Ceps', 'Rl'] as const;
+const THRESHOLD_KEYS = ['permanentDisplacement', 'permanentPeeq', 'smallRotation', 'strain'] as const;
 export const TIME_KEYS = ['I0', 'IR', 'IP', 'IC', 'IL', 'IG', 'IS', 'IA', 'IJ', 'IT'] as const;
 
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -92,6 +93,25 @@ function probeValueProblems(id: string, probe: Record<string, unknown>, where: s
   return problems;
 }
 
+/** Problems of the optional judgement thresholds: known keys only, each a finite number > 0 with a non-empty source. */
+function thresholdProblems(thresholds: unknown, where: string): string[] {
+  if (thresholds === undefined) return [];
+  if (!isRecord(thresholds)) return [`${where}: expected a record`];
+  const problems: string[] = [];
+  for (const [key, entry] of Object.entries(thresholds)) {
+    if (!THRESHOLD_KEYS.some((known) => known === key)) problems.push(`${where}: unknown key '${key.slice(0, 40)}'`);
+    else if (
+      !isRecord(entry) ||
+      !finite(entry['value']) ||
+      !(entry['value'] > 0) ||
+      typeof entry['source'] !== 'string' ||
+      entry['source'].trim() === ''
+    )
+      problems.push(`${where}.${key}: needs a finite value > 0 and a non-empty source`);
+  }
+  return problems;
+}
+
 /** Every value problem of a raw `nonlinear` slice (nlgeom, convergence, output, steps, probes, imperfections incl. their bag structure). Structure of the step / probe bags is checked elsewhere. */
 export function nonlinearValueProblems(nonlinear: unknown, where: string): string[] {
   if (!isRecord(nonlinear)) return [`${where}: expected a settings record`];
@@ -110,6 +130,7 @@ export function nonlinearValueProblems(nonlinear: unknown, where: string): strin
     if (!isRecord(entries)) continue;
     for (const [id, entry] of Object.entries(entries)) if (isRecord(entry)) problems.push(...check(id, entry, where));
   }
+  problems.push(...thresholdProblems(nonlinear['thresholds'], `${where}.thresholds`));
   problems.push(...imperfectionProblems(nonlinear, where));
   return problems;
 }
