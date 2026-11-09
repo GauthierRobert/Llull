@@ -10,7 +10,6 @@ import type { ExecutionContext } from '@core/commands/types';
 import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { analysisInputHash } from '@cae/hash/inputHash';
-import { pairTargetKey } from '@cae/hash/targets';
 import { axisFrame, bearingOf, type WallNode } from '@cae/contact/pinBearingMath';
 import { parseFrd } from '@cae/results/frdReader';
 import { meshSummary, resultsSummary } from '@cae/results/summary';

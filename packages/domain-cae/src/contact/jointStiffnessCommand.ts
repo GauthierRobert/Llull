@@ -1,33 +1,15 @@
 /** joint_stiffness_from_fe: the joint stiffness factor n*phi of a preloaded bolt from a solved nonlinear_static case (PHY-06 FR-CNT-07, VDI 2230 / NASA-STD-5020 definitions). */
 
-import type { AnalysisCase, CurveProbe } from '@core/model/analysis';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { analysisIdSchema } from '../shared/schemas';
-import { trustedRecord } from '../shared/trust';
-import { extractCurves } from '../nonlinear/curves';
-import { isRefusal, nonlinearCase } from '../nonlinear/settings';
-import { forceUnitName, findBolt } from './pretensionRules';
-import { boltReport } from './boltReport';
+import { forceUnitName } from './pretensionRules';
+import { isSeries, readJointSeries, type Point } from './jointSeries';
 import { NOT_APPROVED, refuseCnt } from './codes';
 
 const n = (value: number): string => significantNumber(value, 5);
-
-interface Point {
-  readonly time: number;
-  readonly load: number;
-  readonly force: number;
-}
-
-/** Probe of `analysis` by id or unique name. */
-function probeOf(analysis: AnalysisCase, reference: string): CurveProbe | undefined {
-  const probes = analysis.nonlinear?.probes ?? {};
-  if (Object.hasOwn(probes, reference)) return probes[reference];
-  const named = Object.values(probes).filter((probe) => probe.name === reference);
-  return named.length === 1 ? named[0] : undefined;
-}
 
 /**
  * Least-squares line of the bolt force against the applied load.
@@ -84,70 +66,12 @@ export const jointStiffnessFromFe = defineCommand({
   }),
   run: (doc, params, ctx?: ExecutionContext): CommandResult => {
     const command = 'joint_stiffness_from_fe';
-    const found = nonlinearCase(doc, command, params.analysisId);
-    if (isRefusal(found)) return found;
-    const { analysis } = found;
+    const series = readJointSeries(doc, command, params, ctx);
+    if (!isSeries(series)) return series;
+    const { analysis, bolt, probe, stepId, sign, separatedAt } = series;
     const fail = (code: string, message: string, path: string): CommandResult =>
       refuseCnt(doc, command, code, message, [analysis.id], [path]);
-    const bolt = findBolt(analysis.pretension, params.pretension);
-    if (bolt === undefined)
-      return fail('CNT_PRETENSION_NOT_FOUND', `no bolt pretension '${params.pretension}' in '${analysis.id}'`, 'pretension');
-    const probe = probeOf(analysis, params.loadProbe);
-    if (probe === undefined)
-      return fail('CNT_INPUT_INVALID', `no curve probe '${params.loadProbe}' in '${analysis.id}' (add_curve_probe)`, 'loadProbe');
-    const steps = analysis.nonlinear?.steps ?? {};
-    const stepId = Object.hasOwn(steps, params.stepId)
-      ? params.stepId
-      : Object.values(steps).find((step) => step.name === params.stepId)?.id;
-    if (stepId === undefined) return fail('NLS_STEP_NOT_FOUND', `no step '${params.stepId}'`, 'stepId');
-    if (stepId === bolt.preloadStepId)
-      return fail(
-        'CNT_INPUT_INVALID',
-        `step '${stepId}' is the preload step of '${bolt.id}': the bolt force there is the tightening, not the response to a load`,
-        'stepId',
-      );
-    if (probe.load.kind === 'load') {
-      const loadId = probe.load.loadId;
-      const load = Object.hasOwn(analysis.loads, loadId) ? analysis.loads[loadId] : undefined;
-      if (load?.kind !== 'force')
-        return fail(
-          'CNT_INPUT_INVALID',
-          `probe '${probe.name}' plots a ${load?.kind ?? 'missing'} load, not a force: use a force load or a reaction probe`,
-          'loadProbe',
-        );
-    }
-    const trust = trustedRecord(doc, analysis, ctx?.feaArtifacts);
-    if (trust.state !== 'solved' || trust.resultsArtifact === null || trust.meshArtifact === null)
-      return fail(
-        trust.state === 'stale' ? 'FEA_RESULTS_STALE' : trust.state === 'untrusted' ? 'FEA_SUMMARY_MISMATCH' : 'FEA_RESULTS_MISSING',
-        trust.problem?.message ?? `no current verified results (state ${trust.state}): run fea_mesh and fea_solve`,
-        'analysisId',
-      );
-    const bolts = boltReport(doc, analysis, trust.meshArtifact, trust.resultsArtifact, 'all');
-    if ('code' in bolts) return refuseCnt(doc, command, bolts.code, bolts.message, bolts.ids, ['analysisId']);
-    const curve = extractCurves(analysis, trust.resultsArtifact).find((entry) => entry.probeId === probe.id);
-    if (curve === undefined) return fail('CNT_INPUT_INVALID', `probe '${probe.name}' has no curve in the results`, 'loadProbe');
-    const sign = probe.load.kind === 'reaction' ? -1 : 1;
-    const loadAt = new Map(curve.time.map((time, index) => [time, sign * (curve.load[index] ?? 0)]));
-    const rows = bolts.bolts.filter((row) => row.pretensionId === bolt.id).sort((a, b) => a.time - b.time);
-    const order = analysis.nonlinear?.stepOrder ?? [];
-    const previous = order[order.indexOf(stepId) - 1];
-    const inStep = rows.filter((row) => row.stepId === stepId);
-    if (inStep.length === 0)
-      return fail(
-        'CNT_INPUT_INVALID',
-        `step '${stepId}' has no stored increment with a bolt force: set_nonlinear_controls outputIncrements all`,
-        'stepId',
-      );
-    const start = rows.filter((row) => row.stepId === previous).at(-1);
-    const candidates = start === undefined ? inStep : [start, ...inStep];
-    const withLoad = candidates.flatMap((row) => {
-      const load = loadAt.get(row.time);
-      return load === undefined ? [] : [{ time: row.time, load, force: row.axialForce }];
-    });
-    const separatedAt = bolts.separated
-      .filter((entry) => entry.pretensionId === bolt.id)
-      .reduce<number | null>((first, entry) => (first === null ? entry.time : Math.min(first, entry.time)), null);
+    const withLoad = series.points;
     const used: Point[] = withLoad.filter((point) => separatedAt === null || point.time < separatedAt);
     const first = used[0];
     const last = used[used.length - 1];
@@ -197,10 +121,10 @@ export const jointStiffnessFromFe = defineCommand({
           toTime: last.time,
           load: [first.load, last.load],
           boltForce: [first.force, last.force],
-          startsFromPreviousStep: start !== undefined && used[0]?.time === start.time,
+          startsFromPreviousStep: series.startsFromPreviousStep,
         },
         separatedAt,
-        droppedIncrements: candidates.length - withLoad.length,
+        droppedIncrements: series.droppedIncrements,
         unit: force,
         warnings,
         provenance: {
