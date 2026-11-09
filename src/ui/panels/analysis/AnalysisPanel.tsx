@@ -22,6 +22,7 @@ import { AnalysisModes } from './AnalysisModes';
 import { AnalysisProbes } from './AnalysisProbes';
 import { AnalysisResults } from './AnalysisResults';
 import { AnalysisSetup } from './AnalysisSetup';
+import { NonlinearCurves } from './NonlinearCurves';
 import { VerificationPanel } from './VerificationPanel';
 import { TopologyPanel } from './TopologyPanel';
 import { useHostQuery } from './useHostQuery';
@@ -125,6 +126,9 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
             />
           )}
           {detail.described.state === 'solved' && <AnalysisResultSummary analysisCase={detail.described.analysisCase} />}
+          {detail.described.state === 'solved' && detail.described.analysisCase.type === 'nonlinear_static' && (
+            <NonlinearCurves key={`nonlinear-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
+          )}
           {detail.described.state === 'solved' &&
             (detail.described.analysisCase.type === 'static' || detail.described.analysisCase.type === 'thermo_static') && (
               <AnalysisMargins analysisCase={detail.described.analysisCase} />
