@@ -47,7 +47,7 @@ export const checkMaterialCompatibility = defineCommand({
     'A pair covered by declare_isolation reports pass_isolated. A part with no material, group or index is `unknown` (COR_MATERIAL_MISSING, COR_GROUP_MISSING, COR_GROUP_VALUE_MISSING), never pass. ' +
     'Scheme mil_std_889d reports COR_889_TABLE_MISSING (the matrix is not shipped). Every item has reviewRequired true: a human decides; stress-corrosion and hydrogen-embrittlement rules are not evaluated. ' +
     'Returns data { status: pass | pass_isolated | warn | unknown | fail (worst item without a CONFIRMED human acceptance: an acceptance counts only when its signature re-verifies through the signing port for this document, so without a port nothing is accepted), scheme, environment, items: [{ key, status, code, ruleId, ruleGrade, ids, inputs, warnings, remedies, unverified, reviewRequired, acceptance? }], counts, tolerance, contacts }. ' +
-    'report: true adds data.text (CSV, `--save corrosion.csv`). Next: declare_isolation, accept_corrosion_item (human only).',
+    'Malformed fastener stacks cannot be scope-filtered (their layers are unknown) and always yield an unknown item. report: true adds data.text (CSV, `--save corrosion.csv`). Next: declare_isolation, accept_corrosion_item (human only).',
   params: z.object({
     entityIds: z
       .array(z.string())

@@ -5,6 +5,7 @@
  */
 
 import { execute } from '@core/commands/registry';
+import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 
@@ -73,11 +74,18 @@ export function stackPairsOf(stacks: unknown): StackContacts {
 }
 
 /**
- * The stack contacts of the document, through `list_fastener_stacks`.
- * @invariant a document without the fasteners plugin (the command is unknown) has no stacks
+ * The stack contacts in a `list_fastener_stacks` result.
+ * @invariant the command being unregistered (CMD_UNKNOWN: no fasteners plugin) means no stacks; ANY other rejection, or an answer without data, is a skipped
+ *   entry (the stacks could not be read, so their contacts are unknown), never an empty answer
  */
-export function stackContacts(doc: CadDocument): StackContacts {
-  const answer = execute(doc, 'list_fastener_stacks', {});
-  if (answer.rejected === true || !isRecord(answer.data)) return { pairs: [], skipped: [] };
+export function stackContactsOf(answer: CommandResult): StackContacts {
+  if (answer.rejected === true && answer.error?.code === 'CMD_UNKNOWN') return { pairs: [], skipped: [] };
+  if (answer.rejected === true || !isRecord(answer.data))
+    return { pairs: [], skipped: [{ id: 'list_fastener_stacks', reason: `the fastener stacks could not be read: ${answer.summary}` }] };
   return stackPairsOf(answer.data['stacks']);
+}
+
+/** The stack contacts of the document, through `list_fastener_stacks`. */
+export function stackContacts(doc: CadDocument): StackContacts {
+  return stackContactsOf(execute(doc, 'list_fastener_stacks', {}));
 }

@@ -18,6 +18,7 @@ const ACT = ACCEPT_ACT;
 
 /**
  * @affects doc.corrosion.acceptances[itemKey] (decision, justification, fingerprint of the finding, signer, signatureId, the verified signature, document uid; affected: [itemKey]); never changes an item's status or number
+ * @invariant a replayed acceptance kept without a signing port is trusted only for the replay: every later check_material_compatibility re-verifies it and, with no port, does not count it; a skipped (untested) item is not acceptable
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); recorded only with a signature verified (and spent last) by `ctx.humanSignature` over sha256 of
  *   (act, item key, decision, justification, finding fingerprint, document uid, nonce); it applies only while the finding is unchanged (the check compares the fingerprint) and in this document; a replay honours a
  *   recorded step only from an acceptance already in the slice (kept by replaySeed) with the same decision, justification, fingerprint and uid, its signature re-verified when a port is installed
@@ -67,6 +68,11 @@ export const acceptCorrosionItem = defineCommand({
     const items = (checked.data as { items: readonly CompatibilityItem[] }).items;
     const item = items.find((candidate) => candidate.key === itemKey);
     if (item === undefined) return fail('COR_ITEM_NOT_FOUND', `no item '${itemKey}' among the ${items.length} reported`);
+    if (item.code === 'COR_CONTACT_SKIPPED')
+      return fail(
+        'COR_ITEM_NOT_ACCEPTABLE',
+        `'${itemKey}' was not tested: test it (fix the component / nesting), an untested solid cannot be accepted`,
+      );
     if (item.status === 'pass' || item.status === 'pass_isolated')
       return fail('COR_ITEM_NOT_ACCEPTABLE', `'${itemKey}' is ${item.status}: nothing to decide`);
     const uid = documentIdentity(doc);

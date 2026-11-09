@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { stackContacts, stackPairsOf } from '@cae/corrosion/stacks';
+import { stackContacts, stackContactsOf, stackPairsOf } from '@cae/corrosion/stacks';
 import { ctxWith, docWith, inchDocument, ok, sampleCatalogFile } from '../aero/fasteners/fixtures';
 import { check, expected, withEnvironment } from './fixtures';
 
@@ -114,5 +114,25 @@ describe('stack contacts from list_fastener_stacks (VC-COR-12)', () => {
     const started = performance.now();
     expect(stackPairsOf(entries).pairs.length).toBe(50_000);
     expect(performance.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe('stackContactsOf: an unreadable answer is not an empty one', () => {
+  const base = { document: {} as never, summary: 'boom', affected: [] };
+  it('only an unregistered command means no stacks', () => {
+    expect(stackContactsOf({ ...base, rejected: true, error: { code: 'CMD_UNKNOWN', ids: [], paths: [], remediation: '' } })).toEqual({
+      pairs: [],
+      skipped: [],
+    });
+  });
+  it.each([
+    ['another rejection', { rejected: true as const, error: { code: 'KERNEL_REQUIRED', ids: [], paths: [], remediation: '' } }],
+    ['a rejection without error', { rejected: true as const }],
+    ['no data', {}],
+    ['non-object data', { data: 5 }],
+  ])('%s is a skipped entry', (_label, extra) => {
+    const answer = stackContactsOf({ ...base, ...extra });
+    expect(answer.pairs).toEqual([]);
+    expect(answer.skipped).toEqual([{ id: 'list_fastener_stacks', reason: expect.stringContaining('boom') }]);
   });
 });

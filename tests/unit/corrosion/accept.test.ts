@@ -234,3 +234,16 @@ describe('stored acceptances are re-verified, never trusted (a record in the sli
     }
   });
 });
+
+describe('an untested solid cannot be accepted', () => {
+  it('a skipped:<id> item is COR_ITEM_NOT_ACCEPTABLE and nothing is stored', () => {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 10], position: [0, 0, 0] });
+    const unit = execute(base.document, 'add_box', { size: [10, 10, 10], position: [100, 0, 0] });
+    const component = execute(unit.document, 'create_component', { name: 'Unit', entityIds: [unit.affected[0]] });
+    const instance = component.affected.find((id) => component.document.entities[id]?.kind === 'instance') ?? '';
+    const broken = { ...withEnvironment(component.document, 'normal'), components: {} };
+    const result = accept(broken, `skipped:${instance}`, { confirmation: { nonce: 'n' } });
+    expect(result.error?.code).toBe('COR_ITEM_NOT_ACCEPTABLE');
+    expect(result.document).toBe(broken);
+  });
+});
