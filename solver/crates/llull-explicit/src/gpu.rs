@@ -670,6 +670,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<(Outcom
         fields,
         coordinates: x,
         velocities: v_half,
+        histories: Vec::new(),
     };
     Ok((outcome, gpu.adapter.clone()))
 }

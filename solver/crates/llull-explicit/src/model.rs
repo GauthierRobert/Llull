@@ -250,6 +250,8 @@ pub struct Model {
     pub initial_temperature: Option<f64>,
     /// Imposed motions, applied after the fixed dofs in this order (a later one wins on a shared dof).
     pub imposed: Vec<ImposedMotion>,
+    /// Requested time histories (PHY-19 `add_time_history`), recorded by the CPU path.
+    pub histories: Vec<crate::history::Request>,
 }
 
 impl Model {
