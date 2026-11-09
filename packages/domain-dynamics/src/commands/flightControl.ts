@@ -9,6 +9,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { idOrNext } from '@lib/explicitId';
 import { scale3 } from '@lib/vec3';
 import type { FlightController, FlightScenario, PidGains } from '../flight/controlModel';
+import { turbulenceProblem } from '../flight/aeroDocument';
 import { meanAxis } from '../flight/flightBlock';
 import { mixerRotors, thrustPerRpmSquared } from '../flight/flightRun';
 import { assessMixer, effectiveness } from '../flight/mixer';
@@ -31,7 +32,7 @@ const CONTROLLER_DEFAULTS = {
   maxRateDegS: [220, 220, 120] as Vec3,
 } as const;
 
-const SCENARIO_DEFAULTS = { settleBandM: 0.1 } as const;
+const SCENARIO_DEFAULTS = { settleBandM: 0.1, turbulenceAirspeedMps: 10, turbulenceLengthScaleM: [200, 200, 200] as Vec3 } as const;
 /** Heading of a set-point without yawDeg: the start heading (not a modelling default: the documented hold of the start pose). */
 const START_HEADING_DEG = 0;
 
@@ -257,7 +258,7 @@ export const defineFlightScenario = defineCommand({
     'OFFSET of the centre of mass from where it starts, in METRES, world axes (Z up), `yawDeg` the heading about world Z from the start ' +
     'heading; the first set-point must be at t = 0 (default: one hold at the start pose). Wind (world, m/s): `steady` plus 1-cosine gusts ' +
     'v = (peak/2)(1 - cos(2π(t - startS)/durationS)) during [startS, startS + durationS]; it acts on rotor inflow (advance ratio) and ' +
-    'body drag (set_body_drag). `settleBandM` (default 0.1 m) is the position error under which the vehicle counts as recovered after each ' +
+    'body drag (set_body_drag) and aero surfaces (generate_aero_table); `wind.turbulence` adds seeded Dryden turbulence (same seed, same series). Set-points may carry `pivotDeg` per aero surface with a pivot servo (the servo slews at its rate limit). `settleBandM` (default 0.1 m) is the position error under which the vehicle counts as recovered after each ' +
     'event (a set-point change or a gust start). Example hover + 1 m climb + side gust: durationS 10, setpoints [{t: 0}, {t: 4, position: ' +
     '[0, 0, 1]}], wind {gusts: [{startS: 6, durationS: 1, peak: [3, 0, 0]}]}. Returns the scenario id in affected[0].',
   params: z.object({
@@ -270,6 +271,12 @@ export const defineFlightScenario = defineCommand({
           t: z.number().min(0).describe('Time the set-point starts, s.'),
           position: vec3('Centre-of-mass offset from the start, METRES, world axes. Default [0, 0, 0].').optional(),
           yawDeg: z.number().optional().describe('Heading about world Z from the start heading, deg. Default 0.'),
+          pivotDeg: z
+            .record(z.string(), z.number())
+            .optional()
+            .describe(
+              'Pivot angle commanded to aero surfaces with a servo (generate_aero_table pivotsDeg), deg, keyed by surface id; the servo slews toward it at its rate limit and holds it until a later set-point names the surface. Values must lie inside the servo limits.',
+            ),
         }),
       )
       .min(1)
@@ -292,6 +299,26 @@ export const defineFlightScenario = defineCommand({
           .max(100)
           .optional()
           .describe('1-cosine gusts.'),
+        turbulence: z
+          .object({
+            sigmaMps: vec3('Standard deviation of the u (x), v (y), w (z) turbulence components, m/s, world axes.'),
+            airspeedMps: z
+              .number()
+              .positive()
+              .optional()
+              .describe('Airspeed the frozen-field spectrum is evaluated at, m/s (Ω = ω / V). Default 10 (listed in defaulted).'),
+            lengthScaleM: vec3('Dryden scale lengths Lu, Lv, Lw, m. Default [200, 200, 200] (listed in defaulted).').optional(),
+            seed: z
+              .number()
+              .int()
+              .min(0)
+              .max(Number.MAX_SAFE_INTEGER)
+              .describe('Seed of the white noise: the same seed gives the same series.'),
+          })
+          .optional()
+          .describe(
+            'Dryden turbulence (MIL-HDBK-1797 spectra, realised by forming filters on seeded Gaussian noise every 5 ms, linear between samples), added to steady + gusts.',
+          ),
       })
       .optional()
       .describe('World air velocity; default calm.'),
@@ -315,7 +342,19 @@ export const defineFlightScenario = defineCommand({
       t: setpoint.t,
       position: setpoint.position ?? ([0, 0, 0] as Vec3),
       yawDeg: setpoint.yawDeg ?? START_HEADING_DEG,
+      ...(setpoint.pivotDeg === undefined ? {} : { pivotDeg: setpoint.pivotDeg }),
     }));
+    for (const setpoint of setpoints)
+      for (const [surfaceId, angle] of Object.entries(setpoint.pivotDeg ?? {})) {
+        const surface = Object.hasOwn(flight.aeroSurfaces ?? {}, surfaceId) ? flight.aeroSurfaces?.[surfaceId] : undefined;
+        if (surface === undefined || surface.servo === null)
+          return fail(`'${surfaceId}' is not an aero surface with a pivot servo (generate_aero_table first)`);
+        if (surface.bodyId !== params.body) return fail(`aero surface '${surfaceId}' is on body '${surface.bodyId}', not '${params.body}'`);
+        if (!(angle >= surface.servo.minDeg && angle <= surface.servo.maxDeg))
+          return fail(
+            `pivot command ${angle}° of '${surfaceId}' at t = ${setpoint.t} s is outside its servo limits [${surface.servo.minDeg}, ${surface.servo.maxDeg}]°`,
+          );
+      }
     if (setpoints[0]?.t !== 0) return fail('the first set-point must be at t = 0');
     if (setpoints.some((setpoint, i) => i > 0 && setpoint.t <= (setpoints[i - 1]?.t ?? Infinity)))
       return fail('set-point times must strictly increase');
@@ -327,6 +366,34 @@ export const defineFlightScenario = defineCommand({
     const id = idOrNext(params.id, 'scenario');
     if (idTakenInDynamicsOrFlight(doc, id)) return fail(`id '${id}' is already used`);
     const defaulted: string[] = [];
+    const turbulenceInput = params.wind?.turbulence;
+    if (
+      turbulenceInput !== undefined &&
+      (turbulenceInput.sigmaMps.some((sigma) => !(sigma >= 0)) || turbulenceInput.lengthScaleM?.some((length) => !(length > 0)))
+    )
+      return fail('turbulence sigmaMps must be >= 0 and lengthScaleM > 0');
+    const slow =
+      turbulenceInput === undefined
+        ? null
+        : turbulenceProblem({
+            lengthScaleM: turbulenceInput.lengthScaleM ?? SCENARIO_DEFAULTS.turbulenceLengthScaleM,
+            airspeedMps: turbulenceInput.airspeedMps ?? SCENARIO_DEFAULTS.turbulenceAirspeedMps,
+          });
+    if (slow !== null) return fail(slow);
+    const turbulence =
+      turbulenceInput === undefined
+        ? undefined
+        : {
+            sigmaMps: turbulenceInput.sigmaMps,
+            airspeedMps: pick(turbulenceInput.airspeedMps, SCENARIO_DEFAULTS.turbulenceAirspeedMps, 'turbulence.airspeedMps', defaulted),
+            lengthScaleM: pick(
+              turbulenceInput.lengthScaleM,
+              SCENARIO_DEFAULTS.turbulenceLengthScaleM,
+              'turbulence.lengthScaleM',
+              defaulted,
+            ),
+            seed: turbulenceInput.seed,
+          };
     const scenario: FlightScenario = {
       id,
       bodyId: params.body,
@@ -335,7 +402,7 @@ export const defineFlightScenario = defineCommand({
       setpoints,
       initialVelocity: params.initialVelocity ?? [0, 0, 0],
       initialAngularVelocity: params.initialAngularVelocity ?? [0, 0, 0],
-      wind: { steady: params.wind?.steady ?? [0, 0, 0], gusts },
+      wind: { steady: params.wind?.steady ?? [0, 0, 0], gusts, ...(turbulence === undefined ? {} : { turbulence }) },
       settleBandM: pick(params.settleBandM, SCENARIO_DEFAULTS.settleBandM, 'settleBandM', defaulted),
       defaulted,
     };
@@ -343,7 +410,7 @@ export const defineFlightScenario = defineCommand({
     return changed(
       { ...doc, flight: { ...flight, scenarios: { ...flight.scenarios, [id]: scenario } } },
       `define_flight_scenario: '${id}' — body '${params.body}' ${loop}, ${format(params.durationS)} s, ${setpoints.length} set-point(s), ` +
-        `${gusts.length} gust(s), steady wind [${scenario.wind.steady.join(', ')}] m/s, settle band ${format(scenario.settleBandM)} m` +
+        `${gusts.length} gust(s)${turbulence === undefined ? '' : `, Dryden turbulence σ [${turbulence.sigmaMps.join(', ')}] m/s seed ${turbulence.seed}`}, steady wind [${scenario.wind.steady.join(', ')}] m/s, settle band ${format(scenario.settleBandM)} m` +
         `${controllerId === null && setpoints.length > 1 ? ' (open loop: set-points only score the tracking error)' : ''}.`,
       [id],
     );

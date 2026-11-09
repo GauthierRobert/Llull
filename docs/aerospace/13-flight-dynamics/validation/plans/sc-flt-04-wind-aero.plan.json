@@ -1,0 +1,121 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [100, 100, 100], "position": [0, 0, 0] }, "as": "frame_geo" },
+  {
+    "command": "add_rigid_body",
+    "params": { "entityIds": ["$frame_geo"], "id": "frame", "massKg": 1.115, "inertiaKgM2": [0.012, 0.012, 0.022, 0, 0, 0] }
+  },
+  { "command": "set_gravity", "params": { "gravity": [0, 0, -9.80665] } },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r1",
+      "body": "frame",
+      "hub": [180, -180, 0],
+      "axis": [0, 0, 1],
+      "spin": "ccw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r2",
+      "body": "frame",
+      "hub": [-180, 180, 0],
+      "axis": [0, 0, 1],
+      "spin": "ccw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r3",
+      "body": "frame",
+      "hub": [180, 180, 0],
+      "axis": [0, 0, 1],
+      "spin": "cw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r4",
+      "body": "frame",
+      "hub": [-180, -180, 0],
+      "axis": [0, 0, 1],
+      "spin": "cw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  { "command": "set_body_drag", "params": { "body": "frame", "cdaM2": [0.02, 0.02, 0.05] } },
+  { "command": "add_flight_controller", "params": { "body": "frame", "maxRpm": 7000, "id": "fc" } },
+  {
+    "command": "generate_aero_table",
+    "params": {
+      "id": "wing",
+      "body": "frame",
+      "surfaces": [
+        {
+          "name": "wing",
+          "pivots": true,
+          "sections": [
+            { "leadingEdge": [60, 0, 0], "chord": 120 },
+            { "leadingEdge": [60, 300, 0], "chord": 120 }
+          ],
+          "spanwisePanels": 8,
+          "chordwisePanels": 3
+        }
+      ],
+      "momentCentre": [0, 0, 0],
+      "forward": "+x",
+      "alphasDeg": [-10, -5, 0, 5, 10, 15],
+      "pivotsDeg": [0, 15],
+      "pivotPoint": [60, 0, 0],
+      "servo": { "rateDegS": 30 },
+      "profileDrag": { "cd0": 0.012, "source": "flat-plate estimate, grade C (golden plan input)" }
+    }
+  },
+  {
+    "command": "define_flight_scenario",
+    "params": {
+      "body": "frame",
+      "controller": "fc",
+      "durationS": 12,
+      "id": "windy",
+      "setpoints": [
+        { "t": 0, "pivotDeg": { "wing": 0 } },
+        { "t": 6, "pivotDeg": { "wing": 8 } }
+      ],
+      "wind": {
+        "steady": [-6, 0, 0],
+        "gusts": [{ "startS": 1, "durationS": 1, "peak": [-2, 0, 0] }],
+        "turbulence": { "sigmaMps": [0.5, 0.5, 0.3], "airspeedMps": 6, "lengthScaleM": [50, 50, 50], "seed": 3 }
+      }
+    }
+  },
+  { "command": "run_flight", "params": { "scenario": "windy", "sampleRate": 20 } },
+  { "command": "flight_report", "params": { "scenario": "windy" } }
+]

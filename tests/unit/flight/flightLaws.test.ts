@@ -148,6 +148,7 @@ describe('data.flight from a recorded trace', () => {
       ),
     ],
     drags: [{ bodyId: 'b', cdaM2: [0, 0, 0.1] as const, airDensity: 1.2 }],
+    aero: [],
     bodies: ['b'],
   };
 

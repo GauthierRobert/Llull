@@ -21,7 +21,7 @@ const REMEDIATION: Readonly<Record<FlightRefusal['code'], string>> = {
   FLT_SCENARIO_UNKNOWN: 'Define it with define_flight_scenario (list them with inspect_dynamics).',
   FLT_BODY_NOT_FREE: 'Fly a free rigid body: no joint to another body, not fixed.',
   FLT_VEHICLE_MULTIBODY:
-    'Merge the parts into one rigid body (add_rigid_body over all their entities) or remove the joints below it; multi-body vehicles come with FLT-M4.',
+    'Merge the parts into one rigid body (add_rigid_body over all their entities) or remove the joints below it; a pivoting wing is an aero surface with a pivot servo (generate_aero_table), not a second body.',
   FLT_MIXER_ILL_CONDITIONED: 'Spread the rotors so their arms and spins separate roll, pitch and yaw clearly, or fix the mixer.',
   FLT_MIXER_RANK:
     'Give every controlled rotor static thrust and an arm / spin layout that separates roll, pitch and yaw, or fix the mixer.',
@@ -114,7 +114,7 @@ export const runFlightCommand = defineCommand({
     'terminal voltage (sag), motor current peak against the datasheet limit, peak throttle, the cut-off time (the motors then stop: warning ' +
     'FLT_BATTERY_CUTOFF) and enduranceS (the cut-off time, or an ESTIMATE: the run time plus what the final current still allows, optimistic on a sloping OCV curve or constant-power load; estimate_endurance integrates the discharge properly). Peaks and integrals are exact per physics step; recovery uses the samples. detail "series" adds per-sample ' +
     'position offset, set-point, velocity, attitude, tilt, body rates, wind and per-rotor rpm / thrust / power. A closed loop tilting past ' +
-    '90° or a NaN state is refused as FLT_DIVERGED with the time. The vehicle is ONE free rigid body: a body with other bodies jointed below it is refused (FLT_VEHICLE_MULTIBODY, until FLT-M4); a rotor layout whose mixer is nearly singular is refused (FLT_MIXER_ILL_CONDITIONED). Use flight_report for a PASS / MARGINAL / FAIL verdict.',
+    '90° or a NaN state is refused as FLT_DIVERGED with the time. The vehicle is ONE free rigid body: a body with other bodies jointed below it is refused (FLT_VEHICLE_MULTIBODY: a pivoting wing is an aero surface with a pivot servo, generate_aero_table); aero surfaces (generate_aero_table) act with their table at the local flow and pivot angle (data.aero[surfaceId]: alpha range, pivot, lift / drag, peak lift, share of steps outside the table, FLT_AERO_OUTSIDE_TABLE; a table made on another design of its body warns FLT_AERO_TABLE_STALE and is unverified); a rotor layout whose mixer is nearly singular is refused (FLT_MIXER_ILL_CONDITIONED). Use flight_report for a PASS / MARGINAL / FAIL verdict.',
   params: z.object({
     scenario: z.string().describe('Id of the flight scenario (define_flight_scenario).'),
     timestep: timestepSchema,

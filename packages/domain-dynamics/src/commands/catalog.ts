@@ -18,6 +18,7 @@ import { addMotor, addPropeller } from './drives';
 import { addRotor, setBodyDrag } from './flight';
 import { estimateEnduranceCommand } from './flightEndurance';
 import { addFlightController, defineFlightScenario } from './flightControl';
+import { generateAeroTable } from './flightAero';
 import { addBattery, addFlightPowertrain } from './flightPower';
 import { flightReportCommand, runFlightCommand } from './flightRun';
 import { checkMotorDataCommand } from './motorData';
@@ -54,6 +55,7 @@ export const dynamicsCommands = commandCatalog(
   defineFlightScenario,
   addBattery,
   addFlightPowertrain,
+  generateAeroTable,
   estimateEnduranceCommand,
   runFlightCommand,
   flightReportCommand,
