@@ -8,6 +8,7 @@ import { refuseEnv, unverifiedItem, type EnvItem } from './codes';
 import { describeInput, givenInput, isInputProblem, materialInput, type ResolvedInput } from './inputs';
 import { materialProperty, type MaterialMissing } from './materialValue';
 import { spaceEnvironmentOf } from './model';
+import { exposedAreaCm2 } from './exposedArea';
 import { quantitySchema, type UnitProblem } from './units';
 
 const COMMAND = 'ao_erosion';
@@ -32,7 +33,7 @@ export const aoErosion = defineCommand({
     'Atomic-oxygen (LEO) erosion of a polymer: recession depth d = Ey * F and, with density and exposed area, mass loss m = rho * A * Ey * F, where Ey is the erosion yield (volume eroded per incident atom) ' +
     'and F the fluence (atoms per area). Ey: `erosionYield` {value, unit cm^3/atom | mm^3/atom | m^3/atom, source}, or `reference` "kapton_h" (3.0e-24 cm^3/atom, flight-experiment reference: STS-8 / EOIM-1, ' +
     'JAXA AA1830019009 + SPENVIS; it depends on exposure conditions), or `material` with an aoErosionYield property. F: `fluence` {value, unit atoms/cm^2 | atoms/m^2, source} or the mission fluence ' +
-    '(set_mission_environment aoFluence); llull never computes fluence from an orbit. Mass loss needs `area` {value, unit} and a density (`density` {value, unit, source}, or the material density). ' +
+    '(set_mission_environment aoFluence); llull never computes fluence from an orbit. Mass loss needs `area` {value, unit} (or `exposedFaces` [{entityId, faces[]}]: the face areas are summed from the exact kernel; `area` overrides) and a density (`density` {value, unit, source}, or the material density). ' +
     'Every yield, fluence and density given as a parameter needs its `source`. Returns recessionUm, massLossG (when area is given), the inputs with their sources and the ENV_VALUE_UNVERIFIED warning for ' +
     'unsourced or typical values. Example: Kapton H, F 1e21 atoms/cm^2: 30.0 um. Not an exposure-condition-specific prediction: yields in ISS orbit and ground facilities differ.',
   params: z.object({
@@ -58,6 +59,18 @@ export const aoErosion = defineCommand({
       .optional()
       .describe('Atomic-oxygen fluence; default: the mission aoFluence.'),
     area: quantitySchema.optional().describe('Exposed area {value, unit (cm^2, mm^2, m^2 ...)} for the mass loss.'),
+    exposedFaces: z
+      .array(
+        z.object({
+          entityId: z.string().describe('Id of an exact 3D solid.'),
+          faces: z
+            .array(z.number().int().min(0))
+            .describe('0-based face indices (as listed by inspect_topology / inspect_faces) exposed to atomic oxygen.'),
+        }),
+      )
+      .max(1000)
+      .optional()
+      .describe('Exposed faces: their areas are summed through inspect_faces (needs the exact kernel) when `area` is not given.'),
     density: z
       .object({
         value: z.number().describe('Density, > 0.'),
@@ -132,10 +145,19 @@ export const aoErosion = defineCommand({
       fluence: describeInput(fluence),
     };
     let mass: number | undefined;
+    let area: ResolvedInput | undefined;
     if (params.area !== undefined) {
-      const area = givenInput(params.area, 'cm^2', 'area');
-      if (isInputProblem(area)) return failFor(area, 'area');
-      if (!(area.value > 0)) return fail('ENV_PARAM_INVALID', `area must be > 0 (got ${params.area.value} ${params.area.unit})`, 'area');
+      const given = givenInput(params.area, 'cm^2', 'area');
+      if (isInputProblem(given)) return failFor(given, 'area');
+      if (!(given.value > 0)) return fail('ENV_PARAM_INVALID', `area must be > 0 (got ${params.area.value} ${params.area.unit})`, 'area');
+      area = { ...given, unverified: false };
+    } else if (params.exposedFaces !== undefined) {
+      const measured = exposedAreaCm2(doc, ctx, params.exposedFaces);
+      if ('code' in measured) return fail(measured.code, measured.message, 'exposedFaces');
+      if (!(measured.areaCm2 > 0)) return fail('ENV_PARAM_INVALID', 'the exposed faces have no area', 'exposedFaces');
+      area = { value: measured.areaCm2, unit: 'cm^2', source: `inspect_faces: ${measured.detail}`, unverified: false };
+    }
+    if (area !== undefined) {
       let density: ResolvedInput;
       if (params.density !== undefined) {
         if (blank(params.density.source)) return fail('ENV_SOURCE_MISSING', 'the density needs its source', 'density.source');
@@ -149,7 +171,7 @@ export const aoErosion = defineCommand({
       } else return fail('ENV_PROPERTY_MISSING', 'mass loss needs a density: give `density` (with source) or a `material`', 'density');
       if (!(density.value > 0) || !Number.isFinite(density.value))
         return fail('ENV_PARAM_INVALID', 'density must be finite and > 0', 'density');
-      inputs['area'] = describeInput({ ...area, unverified: false });
+      inputs['area'] = describeInput(area);
       inputs['density'] = describeInput(density);
       mass = massLossG(density.value, area.value, erosionYield.value, fluence.value);
     }
