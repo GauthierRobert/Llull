@@ -98,8 +98,8 @@ const simPin = (data: SimData): unknown => ({
 });
 
 describe('PHY-23 validation plans, golden', () => {
-  it('the plans were produced by MuJoCo 3.16 (the pins are per engine version)', () => {
-    expect(engineName).toMatch(/MuJoCo 3\.16\./);
+  it('the plans were produced by MuJoCo 4.0 (the pins are per engine version)', () => {
+    expect(engineName).toMatch(/MuJoCo 4\.0\./);
   });
 
   it('drv_maxon_step: the document and the 30 ms run (VC-DRV-01, 04, 05)', () => {

@@ -371,7 +371,7 @@ exports[`PHY-23 validation plans, golden > drv_lead_screw: the document and the 
 
 exports[`PHY-23 validation plans, golden > drv_lead_screw: the document and the 0.2 s lift (VC-DRV-13) > run 1`] = `
 {
-  "engine": "MuJoCo 3.16.0",
+  "engine": "MuJoCo 4.0.0",
   "ledger": {
     "closure": "pass",
     "closureRelative": 6.24582e-10,
@@ -777,7 +777,7 @@ exports[`PHY-23 validation plans, golden > drv_maxon_step: the document and the 
       "voltage": "4e5dab391aa64f0c",
     },
   },
-  "engine": "MuJoCo 3.16.0",
+  "engine": "MuJoCo 4.0.0",
   "ledger": {
     "closure": "pass",
     "closureRelative": 2.32263e-8,
@@ -1429,7 +1429,7 @@ exports[`PHY-23 validation plans, golden > drv_servo_sizing: the document, the 5
       "voltage": "3c1c4f46ff7b4b28",
     },
   },
-  "engine": "MuJoCo 3.16.0",
+  "engine": "MuJoCo 4.0.0",
   "ledger": {
     "closure": "pass",
     "closureRelative": 1.25866e-7,
@@ -1972,7 +1972,7 @@ exports[`PHY-23 validation plans, golden > drv_stick_slip: the document and the 
 
 exports[`PHY-23 validation plans, golden > drv_stick_slip: the document and the 3 s limit cycle (VC-DRV-18) > run 1`] = `
 {
-  "engine": "MuJoCo 3.16.0",
+  "engine": "MuJoCo 4.0.0",
   "ledger": {
     "closure": "fail",
     "closureRelative": 0.0703927,
