@@ -58,7 +58,7 @@
 //! - `fields.f64`: per element `[von Mises, equivalent plastic strain, failed (0/1), centroid x, y, z]` at the end, little-endian f64.
 //!   Every output is byte-identical across runs and thread counts.
 
-use crate::history::{check, RequestSpec};
+use crate::history::{check, within_cap, RequestSpec, MAX_INTERVALS};
 use crate::model::{
     Contact, ContactKind, Controls, Friction, Heating, ImposedKind, ImposedMotion, JohnsonCook, JohnsonCookFailure, MassScaling, Material,
     Model, Wall,
@@ -374,6 +374,9 @@ fn controls_of(spec: ControlsSpec) -> Result<Controls, JobError> {
     } = spec;
     if !(end_time > 0.0 && history_interval > 0.0 && history_interval <= end_time) || !end_time.is_finite() {
         return Err(input("controls need 0 < historyInterval <= endTime"));
+    }
+    if !within_cap(end_time, history_interval) {
+        return Err(input(format!("controls need endTime / historyInterval <= {MAX_INTERVALS}")));
     }
     if !(time_step_scale > 0.0 && time_step_scale <= 1.0)
         || !(hourglass_coefficient >= 0.0)

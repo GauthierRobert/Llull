@@ -128,6 +128,30 @@ describe('add_time_history', () => {
     });
   });
 
+  it('caps the samples of a series and of the controls at 100 000 intervals', () => {
+    // end time 1.6e-4 s: 1e-9 s gives 160 000 intervals, 2e-9 s gives 80 000
+    expect(code(execute(bar.doc, 'add_time_history', { ...wallParams, intervalS: 1e-9 }))).toBe('EXP_TIME_HISTORY_INVALID');
+    expect(specOf(must(bar.doc, 'add_time_history', { ...wallParams, intervalS: 2e-9 }).document)?.timeHistoryOrder).toHaveLength(1);
+    const controls = { analysisId: bar.analysisId, endTime: { value: 1, unit: 's' }, mesh: { kind: 'structured_hex', size: 5 } };
+    expect(code(execute(bar.doc, 'set_explicit_controls', { ...controls, historyInterval: { value: 5e-6, unit: 's' } }))).toBe(
+      'EXP_TIME_INVALID',
+    );
+    expect(code(execute(bar.doc, 'set_explicit_controls', { ...controls, historyInterval: { value: 1e-5, unit: 's' } }))).toBeUndefined();
+    // a history without its own interval follows the case interval: lowering the cap through a long end time refuses it
+    const long = must(bar.doc, 'set_explicit_controls', { ...controls, historyInterval: { value: 1e-5, unit: 's' } }).document;
+    expect(code(execute(long, 'add_time_history', { ...wallParams, intervalS: 5e-6 }))).toBe('EXP_TIME_HISTORY_INVALID');
+  });
+
+  it('deletes a history once: the second delete refuses and changes nothing', () => {
+    const added = must(bar.doc, 'add_time_history', wallParams);
+    const params = { analysisId: bar.analysisId, itemId: added.affected[1] ?? '' };
+    const removed = must(added.document, 'delete_analysis_item', params);
+    const again = execute(removed.document, 'delete_analysis_item', params);
+    expect(code(again)).toBe('FEA_ITEM_NOT_FOUND');
+    expect(again.document).toBe(removed.document);
+    expect(specOf(removed.document)?.timeHistoryOrder).toEqual([]);
+  });
+
   it('rejects malformed histories on load (slice validation)', () => {
     const raw = JSON.parse(JSON.stringify(must(bar.doc, 'add_time_history', wallParams).document)) as {
       analysis: { cases: Record<string, { explicit: Record<string, unknown> }> };
@@ -148,6 +172,20 @@ describe('add_time_history', () => {
     expect(mutate((entry) => (entry['intervalS'] = -1))).toHaveLength(1);
     expect(mutate((entry) => delete entry['wallId'])).toHaveLength(1);
     expect(mutate((entry) => (entry['name'] = 3))).toHaveLength(1);
+    expect(mutate((entry) => (entry['intervalS'] = 1))).toHaveLength(1);
+    expect(mutate((entry) => (entry['intervalS'] = 1e-9))).toHaveLength(1);
+    expect(mutate((entry) => (entry['quantities'] = ['energy', 'energy']))).toHaveLength(1);
+    expect(mutate((entry) => (entry['wallId'] = 'rw-404'))).toHaveLength(1);
+    const twins = structuredClone(raw);
+    const twinSpec = twins.analysis.cases[bar.analysisId]?.explicit ?? {};
+    const twinHistories = twinSpec['timeHistories'] as Record<string, Record<string, unknown>>;
+    twinHistories['th-copy'] = { ...(twinHistories[id] ?? {}) };
+    twinSpec['timeHistoryOrder'] = [id, 'th-copy'];
+    expect(explicitErrors(twins as unknown as Record<string, unknown>)).toHaveLength(1);
+    const capped = structuredClone(raw);
+    const cappedSpec = capped.analysis.cases[bar.analysisId]?.explicit ?? {};
+    cappedSpec['historyIntervalS'] = 1e-9;
+    expect(explicitErrors(capped as unknown as Record<string, unknown>)).toHaveLength(1);
     const orderless = structuredClone(raw);
     delete orderless.analysis.cases[bar.analysisId]?.explicit['timeHistoryOrder'];
     expect(explicitErrors(orderless as unknown as Record<string, unknown>)).toHaveLength(1);

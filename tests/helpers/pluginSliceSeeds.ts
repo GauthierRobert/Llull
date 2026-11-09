@@ -573,12 +573,28 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     roots: ['analysis'],
     build: () => {
       const bar = barModel();
-      return must(bar.doc, 'add_time_history', {
-        analysisId: bar.analysisId,
+      const common = { analysisId: bar.analysisId };
+      const wall = must(bar.doc, 'add_time_history', {
+        ...common,
         name: 'wall',
         kind: 'rigid_wall',
         wallId: bar.wallId,
         quantities: ['normal_force'],
+      }).doc;
+      const part = must(wall, 'add_time_history', {
+        ...common,
+        name: 'bar',
+        kind: 'part',
+        partId: bar.barId,
+        quantities: ['momentum', 'mass'],
+      }).doc;
+      return must(part, 'add_time_history', {
+        ...common,
+        name: 'tip',
+        kind: 'node',
+        target: { entityId: bar.barId, facesNear: [[5, 5, 200]] },
+        quantities: ['velocity'],
+        intervalS: 2e-6,
       }).doc;
     },
     query: { name: 'explicit_energy_check', params: (doc) => ({ analysisId: analysisId(doc) }) },

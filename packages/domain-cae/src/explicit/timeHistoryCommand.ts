@@ -8,6 +8,7 @@ import { nextId } from '@lib/id';
 import { analysisIdSchema } from '../shared/schemas';
 import { feaTargetSchema, targetProblem, toTarget } from '../shared/target';
 import { refuseExplicit } from './codes';
+import { MAX_HISTORY_INTERVALS, withinHistoryCap } from './defaults';
 import { explicitCase, withSpec } from './model';
 
 /** Most histories one case may request. */
@@ -65,6 +66,8 @@ export const addTimeHistory = defineCommand({
     if (new Set(quantities).size !== quantities.length) return invalid('quantities repeat', ['quantities']);
     if (intervalS !== undefined && !(intervalS > 0 && intervalS <= spec.endTimeS))
       return invalid(`intervalS must satisfy 0 < intervalS <= end time (${spec.endTimeS} s)`, ['intervalS']);
+    if (!withinHistoryCap(spec.endTimeS, intervalS ?? spec.historyIntervalS))
+      return invalid(`end time / interval must be at most ${MAX_HISTORY_INTERVALS} samples (raise intervalS)`, ['intervalS']);
     const extra = [
       ...(kind !== 'node' && target !== undefined ? ['target'] : []),
       ...(kind !== 'part' && partId !== undefined ? ['partId'] : []),

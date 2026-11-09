@@ -164,11 +164,6 @@ export interface ExplicitWallHistory {
   readonly force: readonly number[];
 }
 
-/**
- * Artifact of one explicit run (JSON; stored by the host under `sha256Hex(canonicalJson(artifact))`).
- * @invariant per-element arrays have one value per element (hex8 first, then tet4); `centroids` holds 3 values per element in the FINAL
- *   configuration, analysis length units
- */
 /** One recorded time-history series (an `ExplicitTimeHistory` quantity): `components` numbers per time, analysis units. */
 export interface ExplicitHistorySeries {
   /** Id `th-<step>.<k>` of the request. */
@@ -182,6 +177,11 @@ export interface ExplicitHistorySeries {
   readonly values: readonly number[];
 }
 
+/**
+ * Artifact of one explicit run (JSON; stored by the host under `sha256Hex(canonicalJson(artifact))`).
+ * @invariant per-element arrays have one value per element (hex8 first, then tet4); `centroids` holds 3 values per element in the FINAL
+ *   configuration, analysis length units
+ */
 export interface FeExplicitArtifact {
   readonly kind: 'fe_explicit';
   readonly inputHash: string;

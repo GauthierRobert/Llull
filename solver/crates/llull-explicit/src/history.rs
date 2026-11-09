@@ -324,6 +324,14 @@ impl RequestSpec {
     }
 }
 
+/// Most intervals (samples - 1) of one series or of the energy history: bounds the output size.
+pub const MAX_INTERVALS: f64 = 100_000.0;
+
+/// Whether `end_time / interval` is within `MAX_INTERVALS` (1e-9 relative slack for the division round-off).
+pub fn within_cap(end_time: f64, interval: f64) -> bool {
+    end_time / interval <= MAX_INTERVALS * (1.0 + 1e-9)
+}
+
 /// Index, part and interval checks of a request against the model it records.
 pub fn check(request: &Request, model: &Model) -> Result<(), String> {
     let name = &request.name;
@@ -341,6 +349,9 @@ pub fn check(request: &Request, model: &Model) -> Result<(), String> {
     if let Some(interval) = request.interval {
         if !(interval > 0.0 && interval <= model.controls.end_time) {
             return Err(format!("timeHistory '{name}': interval must satisfy 0 < interval <= endTime"));
+        }
+        if !within_cap(model.controls.end_time, interval) {
+            return Err(format!("timeHistory '{name}': endTime / interval must be at most {MAX_INTERVALS}"));
         }
     }
     Ok(())

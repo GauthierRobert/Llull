@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { ExplicitResultsSummary, FeExplicitArtifact } from '@core/model/explicit';
 import type { CadDocument } from '@core/model/types';
-import { historyUnit } from '@cae/explicit/historyJob';
+import { historyUnit, jobTimeHistories } from '@cae/explicit/historyJob';
+import type { ExplicitMesh } from '@cae/explicit/mesh';
+import type { ExplicitSpec } from '@core/model/explicit';
 import { buildExplicitArtifact, buildExplicitJob, type ExplicitJob } from '@cae/index';
 import { artifactStore, barModel, code, contextWith, data, must } from './support';
 
@@ -267,5 +269,50 @@ describe('historyUnit', () => {
     ];
     expect(names.map((name) => historyUnit(name, mm))).toEqual(['mm', 'mm/s', 'mm/s^2', 't', 'N*s', 'N*s', 'N', 'mJ', 'mJ']);
     expect(names.map((name) => historyUnit(name, si))).toEqual(['m', 'm/s', 'm/s^2', 'kg', 'N*s', 'N*s', 'N', 'J', 'J']);
+  });
+});
+
+describe('jobTimeHistories refusals', () => {
+  const mesh: ExplicitMesh = {
+    nodes: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1],
+    hex8: [0, 1, 2, 3, 4, 5, 6, 7],
+    tet4: [],
+    shell4: [],
+    shellThickness: [],
+    elementPart: ['a'],
+    nodePart: ['a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'],
+  };
+  const specWith = (histories: ExplicitSpec['timeHistories'], extra: Partial<ExplicitSpec> = {}): ExplicitSpec =>
+    ({
+      rigidWallOrder: ['rw-1'],
+      rigidWalls: {},
+      timeHistories: histories,
+      timeHistoryOrder: Object.keys(histories ?? {}),
+      ...extra,
+    }) as unknown as ExplicitSpec;
+  const resolve = (histories: ExplicitSpec['timeHistories'], extra: Partial<ExplicitSpec> = {}): unknown =>
+    jobTimeHistories(specWith(histories, extra), mesh, ['a'], 1);
+
+  it('resolves a good request', () => {
+    expect(
+      resolve({
+        't-1': { name: 'n', kind: 'node', target: { entityId: 'a', pointsNear: [[1, 1, 1]] }, quantities: ['velocity'] },
+        't-2': { name: 'w', kind: 'rigid_wall', wallId: 'rw-1', quantities: ['energy'] },
+      }),
+    ).toMatchObject([{ nodes: [6] }, { wall: 0 }]);
+  });
+
+  it('refuses a shell part, a vanished part, a vanished wall, no target and a target that selects no node', () => {
+    const refused = (histories: ExplicitSpec['timeHistories'], extra: Partial<ExplicitSpec> = {}): string =>
+      String((resolve(histories, extra) as { code?: string; message?: string }).message);
+    const part = { name: 'p', kind: 'part', target: { entityId: 'a' }, quantities: ['mass'] } as const;
+    expect(refused({ 't-1': part }, { shells: { a: { points: 2 } } })).toContain('meshed as shells');
+    expect(refused({ 't-1': { ...part, target: { entityId: 'gone' } } })).toContain('no longer a part');
+    expect(refused({ 't-1': { name: 'w', kind: 'rigid_wall', wallId: 'rw-9', quantities: ['energy'] } })).toContain("rigid wall 'rw-9'");
+    expect(refused({ 't-1': { name: 'n', kind: 'node', quantities: ['velocity'] } })).toContain('no target');
+    expect(refused({ 't-1': { name: 'n', kind: 'node', target: { entityId: 'a' }, quantities: ['velocity'] } })).toContain(
+      'selects no node',
+    );
+    expect(resolve({ 't-1': { ...part, target: { entityId: 'gone' } } })).toMatchObject({ code: 'EXP_TIME_HISTORY_INVALID', ids: ['t-1'] });
   });
 });

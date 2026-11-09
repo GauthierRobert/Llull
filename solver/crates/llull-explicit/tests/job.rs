@@ -188,3 +188,20 @@ fn refuses_malformed_histories() {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+#[test]
+fn caps_the_samples_of_a_history_and_of_the_controls() {
+    // endTime 2e-3 s: 1e-8 s is 200 000 intervals (refused), 2e-8 s is exactly 100 000 (accepted)
+    let dir = folder("cap-history");
+    write_job(&dir, history_job(serde_json::json!([{ "name": "a", "kind": "part", "part": 0, "quantities": ["mass"], "interval": 1e-8 }])));
+    let error = run_job(&dir, &mut Vec::new()).expect_err("history cap");
+    assert_eq!(error.code, "NATIVE_JOB_INPUT");
+    assert!(error.message.contains("100000"), "{}", error.message);
+    let _ = fs::remove_dir_all(&dir);
+    let dir = folder("cap-controls");
+    let mut spec = job("cpu");
+    spec["controls"]["historyInterval"] = 1e-8.into();
+    write_job(&dir, spec);
+    assert_eq!(run_job(&dir, &mut Vec::new()).expect_err("controls cap").code, "NATIVE_JOB_INPUT");
+    let _ = fs::remove_dir_all(&dir);
+}

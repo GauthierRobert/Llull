@@ -12,7 +12,14 @@ import { convertValue, isUnitFailure } from '@lib/quantity';
 import { nextId } from '@lib/id';
 import { analysisIdSchema } from '../shared/schemas';
 import { refuseExplicit } from './codes';
-import { DEFAULT_BULK_LINEAR, DEFAULT_BULK_QUADRATIC, DEFAULT_HOURGLASS_COEFFICIENT, DEFAULT_TIME_STEP_SCALE } from './defaults';
+import {
+  DEFAULT_BULK_LINEAR,
+  DEFAULT_BULK_QUADRATIC,
+  DEFAULT_HOURGLASS_COEFFICIENT,
+  DEFAULT_TIME_STEP_SCALE,
+  MAX_HISTORY_INTERVALS,
+  withinHistoryCap,
+} from './defaults';
 import { explicitCase, supportedUnits, withSpec } from './model';
 
 const timeSchema = z.object({
@@ -120,6 +127,13 @@ export const setExplicitControls = defineCommand({
     if (endTimeS === null || !(endTimeS > 0)) return fail('EXP_TIME_INVALID', 'endTime must be a time > 0', [], ['endTime']);
     if (historyIntervalS === null || !(historyIntervalS > 0) || historyIntervalS > endTimeS)
       return fail('EXP_TIME_INVALID', 'historyInterval must be a time in (0, endTime]', [], ['historyInterval']);
+    if (!withinHistoryCap(endTimeS, historyIntervalS))
+      return fail(
+        'EXP_TIME_INVALID',
+        `endTime / historyInterval must be at most ${MAX_HISTORY_INTERVALS} (bounds the result size)`,
+        [],
+        ['historyInterval'],
+      );
     const minTimeStepS = params.minTimeStep === undefined ? undefined : seconds(params.minTimeStep);
     if (minTimeStepS === null || (minTimeStepS !== undefined && !(minTimeStepS > 0)))
       return fail('EXP_TIME_INVALID', 'minTimeStep must be a time > 0', [], ['minTimeStep']);

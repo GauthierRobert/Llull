@@ -136,18 +136,6 @@ const explicitItems: Remover = (doc, analysisCase, id) => {
       analysisId,
       [analysisId],
     );
-  if (spec.timeHistories !== undefined && Object.hasOwn(spec.timeHistories, id))
-    return done(
-      withSpec(doc, found.analysisCase, {
-        ...spec,
-        timeHistories: without(spec.timeHistories, id),
-        timeHistoryOrder: (spec.timeHistoryOrder ?? []).filter((other) => other !== id),
-      }),
-      'time history',
-      id,
-      analysisId,
-      [analysisId],
-    );
   if (!Object.hasOwn(spec.rigidWalls, id)) return null;
   const keptHistories = Object.entries(spec.timeHistories ?? {}).filter(([, history]) => history.wallId !== id);
   return done(
