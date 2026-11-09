@@ -27,7 +27,8 @@ const FATIGUE_FIELD_SOLVER = 'llull-compute post fatigue';
 /** Values per node: damage per block, cycles counted, largest equivalent amplitude (MPa), flags. */
 export const FIELD_COMPONENTS = ['D', 'CYCLES', 'SEQA', 'FLAGS'] as const;
 const FIELD_NAME = 'FATIGUE';
-export const FLAG_BITS = { static_failure: 1, swt_nonpositive: 2, no_life: 4, extrapolated: 8 } as const;
+/** Bits 1..8 come from the native job; `high_face` (16) is set by the fold of a pretension cut node whose high-side copy did more damage than the node itself. */
+export const FLAG_BITS = { static_failure: 1, swt_nonpositive: 2, no_life: 4, extrapolated: 8, high_face: 16 } as const;
 
 /** `job.json` of `llull-compute post fatigue` (field names are the Rust `FatigueJob`). */
 interface FatigueFieldJob {
@@ -44,7 +45,7 @@ interface FatigueFieldJob {
 export interface FatigueFieldInput {
   readonly fatigueCase: FatigueCase;
   readonly job: FatigueFieldJob;
-  /** node-major `nodeCount x loadCases x 6`, MPa. */
+  /** node-major `nodeCount x loadCases x 6`, MPa: the mesh nodes (`nodeIds`), then the high-side copies of the cut nodes (`faces`). */
   readonly tensors: Float64Array;
   readonly nodeIds: readonly number[];
   /** fatigueInputHash: sha256 of everything the field depends on (results hash, histories, measure, counting, resolved curve). */
@@ -57,8 +58,8 @@ export interface FatigueFieldInput {
   readonly damage: DamageSetup;
   /** Mesh nodes without a finite stress tensor in every mapped load case (left out of the field). */
   readonly skippedNodes: number;
-  /** Nodes on a bolt pretension cut: which face (low = the mesh node, high = its duplicate) gave the stress. */
-  readonly governing: readonly GoverningFace[];
+  /** Nodes on a bolt pretension cut with a high-side copy: the copy is a job node of its own (`jobIndex` = row of `tensors` / of the native field). */
+  readonly faces: readonly CutFace[];
 }
 
 const failure = (code: string, message: string, ids: readonly string[]): Failure => ({ code, message, ids });
@@ -153,41 +154,20 @@ function mappedHistories(
   return { histories, loadCaseIndex };
 }
 
-type StressField = { readonly values: Readonly<Record<string, readonly number[]>> } | undefined;
+/** Element `index` of a numeric row; NaN for an index past the end (never an engineering default). */
+const at = (row: ArrayLike<number>, index: number): number => {
+  const value = row[index];
+  return value === undefined ? Number.NaN : value;
+};
 
-const finiteTensor = (tensor: readonly number[] | undefined): tensor is readonly number[] =>
-  tensor !== undefined && tensor.length >= 6 && tensor.slice(0, 6).every((v) => Number.isFinite(v));
+const finiteTensor = (tensor: readonly (number | undefined)[] | undefined): tensor is readonly number[] =>
+  tensor !== undefined && tensor.length >= 6 && tensor.slice(0, 6).every((v) => v !== undefined && Number.isFinite(v));
 
-/** A face of a bolt pretension cut that set the stress of a node: the solver node (low side = the mesh node, or a high-side copy). */
-interface GoverningFace {
+/** The high-side copy of a node on a bolt pretension cut, evaluated as a job node of its own. */
+interface CutFace {
   readonly node: number;
-  readonly solverNode: number;
-  readonly face: 'low' | 'high';
-}
-
-/**
- * Tensors (one per load case) of the face of mesh node `node` that governs. A node on a bolt pretension cut is solved twice: itself (the low side) and
- * its `copies` (the high side). Each face is evaluated as its own scalar history (superposed load cases, the case measure) and the face with the larger
- * peak-to-peak equivalent stress governs (ties: the low side), so the one-sided nodal stress of neither face is averaged away. A face without a finite
- * tensor in every load case is not a candidate.
- */
-function governingTensors(
-  fields: readonly StressField[],
-  node: number,
-  copies: readonly number[],
-  histories: readonly (readonly number[])[],
-  measure: MeasureSpec,
-): { readonly tensors: readonly (readonly number[])[]; readonly solverNode: number } | null {
-  let best: { tensors: readonly (readonly number[])[]; solverNode: number; range: number } | null = null;
-  for (const solverNode of [node, ...copies]) {
-    const tensors = fields.map((field) => field?.values[String(solverNode)]);
-    if (!tensors.every(finiteTensor)) continue;
-    if (copies.length === 0) return { tensors, solverNode };
-    const series = nodeSeries(tensors, histories, measure);
-    const range = Math.max(...series) - Math.min(...series);
-    if (best === null || range > best.range) best = { tensors, solverNode, range };
-  }
-  return best;
+  readonly copy: number;
+  readonly jobIndex: number;
 }
 
 /**
@@ -235,22 +215,33 @@ export function fatigueFieldInput(
   const plan = pretensionResultMap(doc, analysisId, mesh);
   const copies = plan === null ? new Map<number, readonly number[]>() : copiesOf(plan);
   const measure = measureSpecOf(fatigueCase.measure);
-  const governing: GoverningFace[] = [];
+  const tensorsOf = (solverNode: number): readonly (readonly number[])[] | null => {
+    const tensors = fields.map((field) => field?.values[String(solverNode)]);
+    return tensors.every(finiteTensor) ? tensors : null;
+  };
+  const copyValues: number[] = [];
+  const copyNodes: { node: number; copy: number }[] = [];
   for (const [nodeId] of mesh.nodes) {
-    const chosen = governingTensors(fields, nodeId, copies.get(nodeId) ?? [], mapped.histories, measure);
-    if (chosen === null) continue;
-    const { tensors } = chosen;
-    if (chosen.solverNode !== nodeId || copies.has(nodeId))
-      governing.push({ node: nodeId, solverNode: chosen.solverNode, face: chosen.solverNode === nodeId ? 'low' : 'high' });
+    const own = tensorsOf(nodeId);
+    if (own === null) continue;
     nodeIds.push(nodeId);
-    for (const tensor of tensors) for (let c = 0; c < 6; c += 1) values.push((tensor?.[c] ?? 0) / perMpa);
+    for (const tensor of own) for (let c = 0; c < 6; c += 1) values.push(at(tensor, c) / perMpa);
+    // each face of a pretension cut is its own job node: the damage decides which one governs after the native run (mean-stress rules make the larger range not always the worse)
+    for (const copy of copies.get(nodeId) ?? []) {
+      const high = tensorsOf(copy);
+      if (high === null) continue;
+      copyNodes.push({ node: nodeId, copy });
+      for (const tensor of high) for (let c = 0; c < 6; c += 1) copyValues.push(at(tensor, c) / perMpa);
+    }
   }
+  const faces: CutFace[] = copyNodes.map((entry, index) => ({ ...entry, jobIndex: nodeIds.length + index }));
+  values.push(...copyValues);
   if (nodeIds.length === 0)
     return failure('FAT_RESULTS_MISSING', 'no mesh node has a finite stress tensor in every mapped load case', [analysisId]);
   const { method, residue, gate } = fatigueCase.counting;
   const job: FatigueFieldJob = {
     task: 'fatigue',
-    nodeCount: nodeIds.length,
+    nodeCount: nodeIds.length + faces.length,
     loadCases: mapped.histories.length,
     steps: mapped.histories[0]?.length ?? 0,
     histories: mapped.histories,
@@ -259,7 +250,7 @@ export function fatigueFieldInput(
     damage: jobDamageOf(damage),
   };
   const resultsHash = analysisCase.results.resultsHash;
-  const key = sha256Hex(canonicalJson({ format: 'llull/fatigue-field/1', resultsHash, meshHash: results.meshHash, nodeIds, job }));
+  const key = sha256Hex(canonicalJson({ format: 'llull/fatigue-field/1', resultsHash, meshHash: results.meshHash, nodeIds, faces, job }));
   return {
     fatigueCase,
     job,
@@ -272,7 +263,7 @@ export function fatigueFieldInput(
     adequacy: adequacyOf(results, mesh),
     damage,
     skippedNodes: mesh.nodes.length - nodeIds.length,
-    governing,
+    faces,
   };
 }
 
@@ -300,12 +291,21 @@ export function cyclesOfNode(input: FatigueFieldInput, index: number): ReturnTyp
  */
 export function fatigueFieldArtifact(input: FatigueFieldInput, field: Float64Array, solverVersion: string): FeResultsArtifact | string {
   const width = FIELD_COMPONENTS.length;
-  if (field.length !== input.nodeIds.length * width)
-    return `the field holds ${field.length} values, expected ${input.nodeIds.length * width}`;
+  const jobNodes = input.nodeIds.length + input.faces.length;
+  if (field.length !== jobNodes * width) return `the field holds ${field.length} values, expected ${jobNodes * width}`;
   const bad = field.findIndex((value) => !Number.isFinite(value));
-  if (bad >= 0) return `the field value of node ${input.nodeIds[Math.floor(bad / width)]} is not finite`;
+  if (bad >= 0) return `the field value of job node ${Math.floor(bad / width)} is not finite`;
+  const rows = input.nodeIds.map((_, index) => Array.from(field.subarray(index * width, index * width + width)));
+  const slot = new Map(input.nodeIds.map((nodeId, index) => [nodeId, index]));
+  for (const face of input.faces) {
+    const index = slot.get(face.node);
+    const high = Array.from(field.subarray(face.jobIndex * width, face.jobIndex * width + width));
+    const low = index === undefined ? undefined : rows[index];
+    if (index === undefined || low === undefined || !worse(high, low)) continue;
+    rows[index] = [at(high, 0), at(high, 1), at(high, 2), at(high, 3) + FLAG_BITS.high_face];
+  }
   const values: Record<string, number[]> = {};
-  input.nodeIds.forEach((nodeId, index) => (values[String(nodeId)] = Array.from(field.subarray(index * width, index * width + width))));
+  input.nodeIds.forEach((nodeId, index) => (values[String(nodeId)] = rows[index] ?? []));
   return {
     kind: 'fe_results',
     meshHash: input.meshHash,
@@ -314,6 +314,23 @@ export function fatigueFieldArtifact(input: FatigueFieldInput, field: Float64Arr
     solverVersion,
     steps: [{ step: 1, time: 0, fields: { [FIELD_NAME]: { components: [...FIELD_COMPONENTS], values } } }],
   };
+}
+
+/** Damage ranking key of a field row: a static failure outranks everything (as in the hot-spot ranking). */
+const damageKey = (row: ArrayLike<number>): number =>
+  (at(row, 3) & FLAG_BITS.static_failure) !== 0 ? Number.POSITIVE_INFINITY : at(row, 0);
+
+/** True when `high` did strictly more damage than `low` (ties keep the low side). */
+const worse = (high: readonly number[], low: readonly number[]): boolean => damageKey(high) > damageKey(low);
+
+/**
+ * Job row (index into `input.tensors`) that the field row of mesh node `index` came from: the node itself, or its high-side copy when the fold marked it.
+ */
+export function governingJobIndex(input: FatigueFieldInput, field: Float64Array, index: number): number {
+  const width = FIELD_COMPONENTS.length;
+  if ((at(field, index * width + 3) & FLAG_BITS.high_face) === 0) return index;
+  const node = input.nodeIds[index];
+  return input.faces.find((face) => face.node === node)?.jobIndex ?? index;
 }
 
 /**
