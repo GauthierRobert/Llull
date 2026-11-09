@@ -9,10 +9,10 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FEA_LOAD_INVALID: 'check the mounts (a force or a rotorId + direction, a target on a part of the analysis) and the load case name',
   FLL_ANALYSIS_TYPE: 'flight loads and free-body supports are for a static analysis: create_analysis analysisType static',
   FLL_SCENARIO_UNKNOWN: 'define the scenario with define_flight_scenario (list them with inspect_dynamics)',
+  FLL_STATE_INVALID: 'pass referencePoint [x, y, z] (document units): the centre of mass the acceleration refers to',
   FLL_RUN_FAILED: 'fix the flight run first: run_flight on the same scenario gives the refusal',
   FLL_INSTANT_UNKNOWN: 'give a time inside the run (0 .. durationS), peak_load or envelope',
   FLL_MOUNT_INVALID: 'a mount is a name + target + either force [x, y, z] or rotorId + direction (unit vector of the thrust in model axes)',
-  FLL_STATE_INVALID: 'give finite linearAccel, angularVelocity and angularAccel (3 numbers each)',
   FLL_SOURCE_AMBIGUOUS: 'pass either scenario (+ at) or state, not both and not neither',
   FLL_RUN_STALE: 'the design changed after the flight run: re-run export_flight_loads for the same scenario, then re-solve',
   FLL_RELIEF_RESIDUAL:

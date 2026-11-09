@@ -6,8 +6,11 @@ import type { GeometryKernel } from '@core/geometry/kernel';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { boxOf, step } from '../materials/support';
 
-/** `export_*` commands that emit nothing from the document. None today; add a name here only with the reason. */
-const NOT_CONTENT_EXPORTS: ReadonlySet<string> = new Set<string>([]);
+/**
+ * `export_*` commands that emit nothing from the document. Add a name here only with the reason.
+ * - export_flight_loads (14 FLL): turns a flight run into load cases INSIDE an analysis of the same document; no content leaves it (the deck is written by fea_export, which is gated).
+ */
+const NOT_CONTENT_EXPORTS: ReadonlySet<string> = new Set<string>(['export_flight_loads']);
 
 const ctx = { ...defaultContext(), kernel: {} as unknown as GeometryKernel, humanSignature: null };
 

@@ -13,6 +13,7 @@ export interface InertialTerms {
   readonly angular: readonly { readonly alpha: Vec3; readonly point: Vec3 }[];
 }
 
+const component = (values: readonly number[], index: number): number => values[index] ?? 0;
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
 /**
@@ -73,7 +74,7 @@ function elementCentroids(ctx: DeckContext): readonly (readonly [elementId: numb
  */
 export function inertialDloadLines(
   ctx: DeckContext,
-  gravity: Vec3,
+  gravity: readonly number[],
   terms: InertialTerms,
 ): { readonly lines: string[]; readonly perElement: boolean } | DeckRefusal {
   if (terms.centrifugal.length > 1)
@@ -85,7 +86,7 @@ export function inertialDloadLines(
   const centrifugal = terms.centrifugal[0];
   if (terms.angular.length > 0) {
     for (const [elementId, centroid] of elementCentroids(ctx)) {
-      const field: [number, number, number] = [...gravity];
+      const field: [number, number, number] = [component(gravity, 0), component(gravity, 1), component(gravity, 2)];
       for (const { alpha, point } of terms.angular) {
         const moment = cross(alpha, [centroid[0] - point[0], centroid[1] - point[1], centroid[2] - point[2]]);
         field[0] -= moment[0];

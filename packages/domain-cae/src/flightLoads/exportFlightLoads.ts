@@ -51,7 +51,7 @@ const stateSchema = z.object({
 type Mount = z.output<typeof mountSchema>;
 
 const sanitize = (text: string): string => text.replace(/[^A-Za-z0-9_]/g, '_');
-const finite = (v: readonly number[]): boolean => v.every(Number.isFinite);
+const countOf = (points: readonly unknown[] | undefined): number => (points === undefined ? 0 : points.length);
 
 /** The load of one mount at an instant, or a refusal text. */
 function mountLoads(
@@ -74,12 +74,11 @@ function mountLoads(
     force = direction.map((component) => (thrust * component * forceUnit) / length) as unknown as Vec3;
   } else if (mount.direction !== undefined) return `mount '${mount.name}': direction needs a rotorId`;
   if (force === undefined && mount.moment === undefined) return `mount '${mount.name}': give a force, a rotorId + direction, or a moment`;
-  if (force !== undefined && !finite(force)) return `mount '${mount.name}': the force is not finite`;
   if (force !== undefined && force.some((component) => component !== 0))
     out.push({ ...base, id: nextId('fl'), name: `${mount.name} force`, kind: 'force', vector: force, distribution: 'total' });
   if (mount.moment !== undefined) {
     const target = mount.target;
-    if ((target.facesNear?.length ?? 0) === 0 && (target.edgesNear?.length ?? 0) === 0 && (target.pointsNear?.length ?? 0) < 3)
+    if (countOf(target.facesNear) === 0 && countOf(target.edgesNear) === 0 && countOf(target.pointsNear) < 3)
       return `mount '${mount.name}': a moment needs a face, an edge or at least three points in its target`;
     if (mount.moment.some((component) => component !== 0))
       out.push({ ...base, id: nextId('fl'), name: `${mount.name} moment`, kind: 'moment', vector: mount.moment });
@@ -192,8 +191,6 @@ export const exportFlightLoads = defineCommand({
     let chosen: ChosenInstant[];
     if (params.state !== undefined) {
       const s = params.state;
-      if (![s.linearAccel, s.angularVelocity, s.angularAccel, ...(s.gravity === undefined ? [] : [s.gravity])].every(finite))
-        return fail('FLL_STATE_INVALID', 'the state has a non-finite component', [analysisId], ['state']);
       chosen = [
         {
           instant: {
@@ -212,7 +209,7 @@ export const exportFlightLoads = defineCommand({
       const instants = readRun(doc, { scenario: params.scenario ?? '', sampleRate: params.sampleRate }, ctx);
       if (typeof instants === 'string') return fail('FLL_RUN_FAILED', instants, [analysisId, params.scenario ?? '']);
       const at = params.at ?? 'peak_load';
-      const last = instants[instants.length - 1]?.timeS ?? 0;
+      const last = Math.max(...instants.map((instant) => instant.timeS));
       if (typeof at === 'number' && at > last + 1e-9)
         return fail(
           'FLL_INSTANT_UNKNOWN',

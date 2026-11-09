@@ -19,6 +19,7 @@ export interface FlightInstant {
 }
 
 const isVec3 = (value: unknown): value is Vec3 => Array.isArray(value) && value.length === 3 && value.every((c) => Number.isFinite(c));
+const valueAt = (values: readonly number[], index: number): number => values[index] ?? 0;
 const isVecList = (value: unknown, length: number): value is Vec3[] =>
   Array.isArray(value) && value.length === length && value.every(isVec3);
 
@@ -44,7 +45,7 @@ function toBodyAxes(v: Vec3, rollDeg: number, pitchDeg: number, yawDeg: number):
 function derivative(times: readonly number[], values: readonly Vec3[]): Vec3[] {
   return values.map((_, k) => {
     const [a, b] = [Math.max(0, k - 1), Math.min(values.length - 1, k + 1)];
-    const dt = (times[b] ?? 0) - (times[a] ?? 0);
+    const dt = valueAt(times, b) - valueAt(times, a);
     const [va, vb] = [values[a] ?? [0, 0, 0], values[b] ?? [0, 0, 0]];
     return [(vb[0] - va[0]) / dt, (vb[1] - va[1]) / dt, (vb[2] - va[2]) / dt] as Vec3;
   });
@@ -103,16 +104,7 @@ export function chooseInstants(instants: readonly FlightInstant[], at: number | 
     instants.reduce((best, instant) => (score(instant) > score(best) ? instant : best), instants[0] as FlightInstant);
   const specific = (i: FlightInstant): number =>
     norm([i.accelMps2[0] - i.gravityMps2[0], i.accelMps2[1] - i.gravityMps2[1], i.accelMps2[2] - i.gravityMps2[2]]);
-  if (typeof at === 'number')
-    return [
-      {
-        instant: instants.reduce(
-          (best, i) => (Math.abs(i.timeS - at) < Math.abs(best.timeS - at) ? i : best),
-          instants[0] as FlightInstant,
-        ),
-        label: 't',
-      },
-    ];
+  if (typeof at === 'number') return [{ instant: argmax((i) => -Math.abs(i.timeS - at)), label: 't' }];
   if (at === 'peak_load') return [{ instant: argmax(specific), label: 'peak' }];
   const picks: ChosenInstant[] = [
     { instant: argmax(specific), label: 'peak_f' },

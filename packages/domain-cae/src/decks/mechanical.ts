@@ -275,7 +275,7 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
     .map(([element, face, value]) => row(element, face === 0 ? 'P' : `P${face}`, value));
   const magnitude = Math.hypot(gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0);
   const directionLength = Math.hypot(gravityDirection[0] ?? 0, gravityDirection[1] ?? 0, gravityDirection[2] ?? 0);
-  const inertial = inertialDloadLines(ctx, [gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0], { centrifugal, angular });
+  const inertial = inertialDloadLines(ctx, gravity, { centrifugal, angular });
   if ('code' in inertial) return inertial;
   if (inertial.perElement) dloads.push(...inertial.lines);
   else if (magnitude > 0)
