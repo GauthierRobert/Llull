@@ -14,7 +14,7 @@ const stepIdSchema = z
 
 /**
  * @affects doc.analysis.cases[analysisId].nonlinear.steps[stepId] (replaced in place, same id and position; affected: [stepId])
- * @invariant only the fields given change; the merged step passes the add_analysis_step validation; the recorded results turn stale (input hash)
+ * @invariant only the fields given change; the merged step passes the add_analysis_step validation; a change other than the name turns the recorded results stale (input hash); a name-only edit keeps them
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not nonlinear_static -> NLS_CASE_NOT_NONLINEAR; unknown step -> NLS_STEP_NOT_FOUND; no field
  *   given, bad increments / multipliers -> NLS_CONTROL_INVALID; arc_length -> NLS_ARC_LENGTH_UNSUPPORTED; unknown load case -> NLS_LOAD_CASE_UNKNOWN;
  *   unresolved displacement target -> FEA_TARGET_UNRESOLVED / FEA_PART_NOT_IN_ANALYSIS (refusals, unchanged doc)
@@ -25,7 +25,7 @@ export const updateAnalysisStep = defineCommand({
     'Edit one step of a nonlinear_static analysis in place (same id, same position). Give only the fields to change: name; multipliers ' +
     '(REPLACES the whole load-case -> end-of-step multiplier record of the step); amplitude "ramp" | "step"; control (REPLACES the whole control: ' +
     '{ kind: "load", ...increments } or { kind: "displacement", target, dof, value, ...increments }, same rules as add_analysis_step; arc_length is ' +
-    'refused). The edited step is validated like a new one. Recorded results of the case turn stale: run fea_mesh and fea_solve again.',
+    'refused). The edited step is validated like a new one. A change of multipliers, amplitude or control makes the recorded results stale (run fea_mesh and fea_solve again); a name-only edit keeps them (names are presentation).',
   params: z.object({
     analysisId: analysisIdSchema,
     stepId: stepIdSchema,

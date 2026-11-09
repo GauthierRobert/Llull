@@ -1,6 +1,9 @@
 /** nonlinear_report: the solved results of a nonlinear_static case as data (PHY-05 FR-NLS-06, TR §5.5). */
 
-import type { AnalysisCase, NonlinearSettings, ResultsSummary } from '@core/model/analysis';
+import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, NonlinearSettings, ResultsSummary } from '@core/model/analysis';
+import type { CadDocument } from '@core/model/types';
+import { toMetres } from '@core/model/units';
+import { analysisLengthMetres } from '../shared/defaults';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
@@ -11,9 +14,10 @@ import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord } from '../shared/trust';
 import { NOT_APPROVED } from '../contact/codes';
 import { refuseNls } from './codes';
-import { snapBackDetected, unloadingStep } from './curveRules';
+import { snapBackDetected } from './curveRules';
 import { extractCurves, type CurveData } from './curves';
 import { loadUnitOf, probeOf, unverifiedReasons } from './limitLoadQuery';
+import { permanentSetOf, permanentSetVerdict } from './permanentSet';
 
 const NAME = 'nonlinear_report';
 /** Samples of a curve in the default `summary` view (first and last kept) and the page size of `increments: all` (AF-12). */
@@ -71,21 +75,19 @@ function controlsOf(nonlinear: NonlinearSettings): Record<string, unknown> {
   };
 }
 
-/** Residual state after the unloading step: its max displacement (and PEEQ of the last stored increment when it belongs to that step). */
-function permanentSetOf(nonlinear: NonlinearSettings, summary: ResultsSummary): Record<string, unknown> | null {
-  const stepId = unloadingStep(nonlinear);
-  const step = stepId === undefined ? undefined : nonlinear.steps[stepId];
-  if (stepId === undefined || step === undefined) return null;
-  const stored = summary.loadCases.filter((entry) => entry.name === step.name).at(-1);
-  if (stored === undefined) return null;
-  const peeq = summary.nonlinear?.maxPeeq;
-  return {
-    stepId,
-    maxDisplacement: stored.maxDisplacement,
-    ...(peeq !== undefined && peeq.step === nonlinear.stepOrder.indexOf(stepId) + 1 ? { maxPeeq: peeq } : {}),
-    threshold: null,
-    note: 'residual state after the step that returns every load to zero; no permanent-set limit is known (none by default, ask the owner or the company rule)',
-  };
+/** permanentSet of the data: the residual state with the stated limits and whether each is exceeded (null = no limit stated or nothing to compare). */
+function permanentSetRecord(
+  doc: CadDocument,
+  analysis: AnalysisCase,
+  nonlinear: NonlinearSettings,
+  results: FeResultsArtifact,
+  mesh: FeMeshArtifact | null,
+): Record<string, unknown> | null {
+  if (mesh === null) return null;
+  const set = permanentSetOf(nonlinear, mesh, results);
+  if (set === null) return null;
+  const lengthToAnalysis = toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem);
+  return { ...set, ...permanentSetVerdict(set, nonlinear.thresholds, lengthToAnalysis) };
 }
 
 function curveRecord(
@@ -217,7 +219,8 @@ export const nonlinearReport = defineCommand({
         curves: curves.map((entry) => entry.record),
         nextCursor,
         maxPeeq: solved.maxPeeq ?? null,
-        permanentSet: permanentSetOf(nonlinear, summary),
+        permanentSet: permanentSetRecord(doc, analysis, nonlinear, results, trust.meshArtifact),
+        thresholds: nonlinear.thresholds ?? null,
         loadCases: summary.loadCases,
         provenance: {
           solver: results.solver,

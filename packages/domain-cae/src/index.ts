@@ -96,3 +96,4 @@ export { isPostProblem } from './dynamics/randomSetup';
 
 // shared analysis defaults
 export { analysisLengthMetres, DEFAULT_FACTORS } from './shared/defaults';
+export { NOT_APPROVED } from './contact/codes';

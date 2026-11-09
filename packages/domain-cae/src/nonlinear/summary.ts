@@ -36,7 +36,7 @@ function peakPeeq(mesh: FeMeshArtifact, results: FeResultsArtifact): NonlinearRe
 }
 
 /**
- * `loadCases` (one per analysis step: max von Mises and max displacement of its last stored increment) and `nonlinear` of a nonlinear_static case.
+ * `loadCases` (one per analysis step: max von Mises and max displacement of its last stored increment, named 'step <n>' by position: step names are presentation and never enter a recorded summary) and `nonlinear` of a nonlinear_static case.
  * @invariant deterministic and pure; curve hashes cover the numbers of the curve (time, load, displacement)
  */
 export function nonlinearSummary(
@@ -67,7 +67,7 @@ export function nonlinearSummary(
     const displacement = maxOverNodes(stored?.fields.DISP, magnitude);
     if (step !== undefined && stress !== null && displacement !== null)
       loadCases.push({
-        name: step.name,
+        name: `step ${index + 1}`,
         category: 'limit',
         maxVonMises: { value: stress.value, at: at(stress.node), entityId: entities.get(stress.node) ?? '' },
         maxDisplacement: { value: displacement.value, at: at(displacement.node) },

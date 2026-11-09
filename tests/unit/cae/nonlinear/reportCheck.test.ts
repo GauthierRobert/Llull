@@ -119,7 +119,6 @@ describe('nonlinear_report', () => {
       stepId: solved.doc.analysis?.cases[solved.analysisId]?.nonlinear?.stepOrder[1],
       maxDisplacement: { value: 0.0005 },
       maxPeeq: { value: 0.005 },
-      threshold: null,
     });
     expect(data.curves[0]!).toMatchObject({ loadUnit: 'MPa' });
   });

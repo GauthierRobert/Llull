@@ -604,19 +604,22 @@ Decisions:
 - **Snap-back (§5.4)** is detected inside displacement-controlled steps that do not unload: the controlled displacement grows, so a probe
   displacement that falls while the load magnitude falls flags `snapBack` (`nonlinear/curveRules.ts`). [Rejected: any displacement reversal, it
   would flag every unloading step.]
-- **Permanent set** is read after the last step that returns every load case it names to zero (`unloadingStep`): max displacement of that step (the
-  `loadCases` row of the summary) and the max PEEQ when it belongs to that step. Its `threshold` is `null`: no permanent-set limit exists in the
-  model (AF-31), `check_nonlinear` warns `NLS_PERMANENT_SET_THRESHOLD_UNSET`.
-- **No thresholds in the model.** `set_nonlinear_controls` has no `thresholds` parameter, so the small-rotation / strain check cannot judge
-  NLGEOM off: `check_nonlinear` warns `NLS_THRESHOLD_UNSET` for every `nlgeom: false` case instead of inventing a limit.
+- **Permanent set** is read after the last step that returns every load case it names to zero (`unloadingStep`), matched to the stored increments by POSITION in
+  the step order (`nonlinear/permanentSet.ts`); names are presentation, so the summary rows of `loadCases` are named `step <n>` and a rename after the solve keeps
+  the results current and trusted. A step with no stored increment gives an explicit note, not a bare null.
+- **Thresholds** (`NonlinearSettings.thresholds`, `set_nonlinear_controls`): `permanentDisplacement` (document length units), `permanentPeeq`, `smallRotation` (rad),
+  `strain`, each `{ value > 0, source }`, no default. They are not solution inputs: excluded from the input hash, so stating them keeps results current. `check_nonlinear`
+  warns `NLS_THRESHOLD_UNSET` (nlgeom false without smallRotation or strain) and `NLS_PERMANENT_SET_THRESHOLD_UNSET` (unloading step without a permanent limit) only until stated,
+  then judges: `NLS_PERMANENT_SET_EXCEEDED` (error) and `NLS_NLGEOM_RECOMMENDED` (warning; strain against the largest PEEQ, smallRotation against an estimate
+  atan(largest displacement / largest part extent) named as an estimate in the finding, `smallDeformation.ts`). `nonlinear_report` returns the limits and
+  `displacementExceeded` / `peeqExceeded` (null when no limit is stated).
 - **Oracles of `nonlinear_analytic_check`** are the frozen generator values (`validation/expected_results.json`: VC-NLS-10.a-d elastica, 30.a-e thick
   cylinder, 40.a-e hinges and moment-curvature, 50.a-c column), asserted in `tests/unit/cae/nonlinear/analyticCheck.test.ts`. The elastica uses the
   generator's 24-point Gauss-Legendre elliptic integrals (64 panels) and bisection on the tip slope, so it equals the generator to ~1e-12. Sources: Bisshopp
   & Drucker 1945 (elastica); Hill, The Mathematical Theory of Plasticity (thick cylinder); Timoshenko & Gere (imperfect column).
 - Test fixtures: `limitFixtures.ts` gained optional probe displacements (`solvedPull(loads, displacements)`) and STRESS / PE fields in `solvedPressure()`.
 
-Not evaluated by `check_nonlinear` yet: `NLS_STRAIN_BEYOND_CURVE`, `NLS_STRAIN_EXCEEDS_ELONGATION`, `NLS_MESH_PLASTIC_ADEQUACY`,
-`NLS_NLGEOM_RECOMMENDED` (needs thresholds); `nonlinear_report` does not read the plastic volume fraction (`provenance.notRead`).
+Not evaluated by `check_nonlinear` yet: `NLS_STRAIN_BEYOND_CURVE`, `NLS_STRAIN_EXCEEDS_ELONGATION`, `NLS_MESH_PLASTIC_ADEQUACY`; `nonlinear_report` does not read the plastic volume fraction (`provenance.notRead`).
 
 ### 13.4 Not built yet
 

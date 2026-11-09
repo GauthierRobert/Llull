@@ -3,6 +3,7 @@
 
 import React, { useId, useState } from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
+import { NOT_APPROVED } from '@cae/index';
 import { PanelSection, StatusChip, StatusLine } from '@ui/panels/PanelParts';
 import { useStore } from '@ui/store';
 import { formatSignificant } from './quantityFormat';
@@ -10,7 +11,6 @@ import { parseLimitLoad, parseNonlinearReport, plotCurve, type CurveView, type P
 import { useHostQuery } from './useHostQuery';
 
 const PLOT: PlotSize = { width: 320, height: 200, margin: 24 };
-const NOT_APPROVED = 'Computed by llull, not approved: needs a qualified engineer.';
 
 function CurvePlot({ analysisId, curve }: { analysisId: string; curve: CurveView }): React.ReactElement {
   const ids = useId();
@@ -68,6 +68,11 @@ function CurvePlot({ analysisId, curve }: { analysisId: string; curve: CurveView
       {curve.load.length < curve.points && (
         <p className="analysis__hint">
           Showing {curve.load.length} evenly spread samples of {curve.points} points (summary view).
+        </p>
+      )}
+      {limitAnswer.status === 'done' && limit === null && (
+        <p className="analysis__hint" data-testid={`nonlinear-limit-error-${curve.probeId}`}>
+          Limit load unavailable: {limitAnswer.summary}
         </p>
       )}
       {limit !== null && (

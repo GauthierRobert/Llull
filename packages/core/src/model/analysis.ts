@@ -17,7 +17,7 @@ import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } fro
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
 import type { CaseStudies } from './convergenceStudy';
 import type { ContactSettings, PretensionSettings } from './contact';
-import type { Imperfection, NonlinearResultsSummary } from './nonlinear';
+import type { Imperfection, NonlinearResultsSummary, NonlinearThresholds } from './nonlinear';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
 type EntityId = string;
@@ -302,6 +302,8 @@ export interface NonlinearSettings {
   /** PHY-05 V1 geometric imperfections (`add_imperfection`); absent = none. */
   readonly imperfections?: Readonly<Record<string, Imperfection>>;
   readonly imperfectionOrder?: readonly string[];
+  /** Limits stated by the owner or a rule for check_nonlinear (not part of the input hash); absent = none known. */
+  readonly thresholds?: NonlinearThresholds;
 }
 
 /** Convergence bookkeeping of a nonlinear solve (CalculiX `.sta`): one row per increment. */

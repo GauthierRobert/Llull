@@ -18,6 +18,23 @@ export interface Imperfection {
   readonly amplitudeSource: string;
 }
 
+/** A limit stated by the owner or a company rule (AF-31: no default); `source` names who or which rule. */
+interface NonlinearThreshold {
+  readonly value: number;
+  readonly source: string;
+}
+
+/**
+ * Judgement limits of a nonlinear_static case (`NonlinearSettings.thresholds`), all optional: permanentDisplacement in DOCUMENT length units, permanentPeeq and
+ * strain dimensionless (equivalent plastic strain), smallRotation in radians. They never enter the solve (not part of the input hash); check_nonlinear reads them.
+ */
+export interface NonlinearThresholds {
+  readonly permanentDisplacement?: NonlinearThreshold;
+  readonly permanentPeeq?: NonlinearThreshold;
+  readonly smallRotation?: NonlinearThreshold;
+  readonly strain?: NonlinearThreshold;
+}
+
 /** `ResultsSummary.nonlinear` of a solved nonlinear_static case. */
 export interface NonlinearResultsSummary {
   readonly nlgeom: boolean;

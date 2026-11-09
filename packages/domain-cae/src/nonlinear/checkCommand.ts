@@ -1,6 +1,11 @@
 /** check_nonlinear: readiness and guardrails of a nonlinear_static case (PHY-05 FR-NLS-10, TR §7.1). */
 
-import type { AnalysisCase } from '@core/model/analysis';
+import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
+import { toMetres } from '@core/model/units';
+import { analysisLengthMetres } from '../shared/defaults';
+import { maxOverNodes } from '../results/fields';
+import { permanentSetOf, permanentSetVerdict } from './permanentSet';
+import { estimatedRotation } from './smallDeformation';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import { execute } from '@core/commands/registry';
@@ -16,9 +21,9 @@ import { extractCurves } from './curves';
 import { unverifiedReasons } from './limitLoadQuery';
 import { isRefusal, nonlinearCase } from './settings';
 
-const item = (code: string, message: string, ids: readonly string[]): NonlinearCheckItem => ({
+const item = (code: string, message: string, ids: readonly string[], severity: 'error' | 'warning' = 'warning'): NonlinearCheckItem => ({
   code,
-  severity: 'warning',
+  severity,
   ids,
   message,
   remediation: nlsRemediation(code),
@@ -37,15 +42,62 @@ function setupWarnings(doc: CadDocument, analysis: AnalysisCase): NonlinearCheck
   const reasons = unverifiedReasons(doc, analysis);
   if (reasons.length > 0)
     items.push(item('NLS_MATERIAL_MODEL_UNVERIFIED', `material data is unverified: ${reasons.join('; ')}`, Object.keys(analysis.parts)));
-  if (nonlinear?.nlgeom === false)
+  const limits = nonlinear?.thresholds;
+  if (nonlinear?.nlgeom === false && limits?.smallRotation === undefined && limits?.strain === undefined)
     items.push(
-      item('NLS_THRESHOLD_UNSET', 'nlgeom is false and no small-rotation / strain threshold is available to judge it', [analysis.id]),
+      item(
+        'NLS_THRESHOLD_UNSET',
+        'nlgeom is false and no small-rotation / strain threshold is stated to judge it (set_nonlinear_controls thresholds, with a source)',
+        [analysis.id],
+      ),
     );
   const unload = nonlinear === undefined ? undefined : unloadingStep(nonlinear);
-  if (unload !== undefined)
+  if (unload !== undefined && limits?.permanentDisplacement === undefined && limits?.permanentPeeq === undefined)
     items.push(
-      item('NLS_PERMANENT_SET_THRESHOLD_UNSET', `step '${unload}' unloads the case but no permanent-set limit is known`, [unload]),
+      item(
+        'NLS_PERMANENT_SET_THRESHOLD_UNSET',
+        `step '${unload}' unloads the case but no permanent-set limit is stated (set_nonlinear_controls thresholds)`,
+        [unload],
+      ),
     );
+  return items;
+}
+
+/** Findings against the stated thresholds on verified results: permanent set exceeded (error) and nlgeom false beyond the small-deformation limits (warning). */
+function thresholdItems(doc: CadDocument, analysis: AnalysisCase, mesh: FeMeshArtifact, results: FeResultsArtifact): NonlinearCheckItem[] {
+  const nonlinear = analysis.nonlinear;
+  if (nonlinear === undefined) return [];
+  const items: NonlinearCheckItem[] = [];
+  const set = permanentSetOf(nonlinear, mesh, results);
+  if (set !== null) {
+    const verdict = permanentSetVerdict(set, nonlinear.thresholds, toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem));
+    if (verdict.displacementExceeded === true || verdict.peeqExceeded === true)
+      items.push(
+        item(
+          'NLS_PERMANENT_SET_EXCEEDED',
+          `residual state after '${set.stepId}' exceeds the stated limit: displacement ${set.maxDisplacement?.value ?? 'n/a'} (limit ${nonlinear.thresholds?.permanentDisplacement?.value ?? 'none'} document units), equivalent plastic strain ${set.maxPeeq?.value ?? 'n/a'} (limit ${nonlinear.thresholds?.permanentPeeq?.value ?? 'none'}); a qualified reviewer decides`,
+          [set.stepId],
+          'error',
+        ),
+      );
+  }
+  if (nonlinear.nlgeom === false) {
+    const rotation = estimatedRotation(mesh, results);
+    const peeq = results.steps.reduce(
+      (best, step) => Math.max(best, maxOverNodes(step.fields['PE'], (values) => values[0] ?? 0)?.value ?? 0),
+      0,
+    );
+    const { smallRotation, strain } = nonlinear.thresholds ?? {};
+    const reasons = [
+      ...(smallRotation !== undefined && rotation !== null && rotation > smallRotation.value
+        ? [
+            `estimated rotation ${rotation} rad (atan of the largest displacement over the largest part extent, an estimate) exceeds ${smallRotation.value} rad`,
+          ]
+        : []),
+      ...(strain !== undefined && peeq > strain.value ? [`equivalent plastic strain ${peeq} exceeds ${strain.value}`] : []),
+    ];
+    if (reasons.length > 0) items.push(item('NLS_NLGEOM_RECOMMENDED', `nlgeom is false but ${reasons.join('; ')}`, [analysis.id]));
+  }
   return items;
 }
 
@@ -53,7 +105,7 @@ function setupWarnings(doc: CadDocument, analysis: AnalysisCase): NonlinearCheck
  * @affects nothing (read-only query; data = status, state, items, notes, reviewRequired)
  * @invariant the check_analysis items first (they include the nonlinear set-up items NLS_NLGEOM_UNSET, NLS_NO_STEPS, NLS_ARC_LENGTH_UNSUPPORTED,
  *   NLS_MATERIAL_MODEL_MISSING, NLS_PROBE_REFERENCE_UNKNOWN, NLS_IMPERFECTION_MISSING ...), then warnings (NLS_MATERIAL_MODEL_UNVERIFIED,
- *   NLS_THRESHOLD_UNSET, NLS_PERMANENT_SET_THRESHOLD_UNSET) and, on verified results, NLS_SNAP_BACK_DETECTED; duplicates removed by code and ids;
+ *   NLS_THRESHOLD_UNSET, NLS_PERMANENT_SET_THRESHOLD_UNSET) and, on verified results, NLS_SNAP_BACK_DETECTED;
  *   status fail on any error, warn on warnings only; reviewRequired always
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not nonlinear_static -> NLS_CASE_NOT_NONLINEAR (refusals, unchanged doc)
  */
@@ -66,7 +118,7 @@ export const checkNonlinear = defineCommand({
     'set (NLS_MATERIAL_MODEL_MISSING), probe pointing at a deleted load / constraint (NLS_PROBE_REFERENCE_UNKNOWN), invalid controls ' +
     '(NLS_CONTROL_INVALID), an NLGEOM case without imperfection next to a solved buckling case of the same part (NLS_IMPERFECTION_MISSING, warning), ' +
     'unverified material data (NLS_MATERIAL_MODEL_UNVERIFIED, warning, not suppressible), nlgeom false without a threshold (NLS_THRESHOLD_UNSET, ' +
-    'warning), an unloading step without a permanent-set limit (NLS_PERMANENT_SET_THRESHOLD_UNSET, warning) and, on verified results, a snap-back ' +
+    'warning), an unloading step without a permanent-set limit (NLS_PERMANENT_SET_THRESHOLD_UNSET, warning), and, on verified results, the residual state beyond a stated permanent-set limit (NLS_PERMANENT_SET_EXCEEDED, error), nlgeom false beyond a stated small-rotation / strain limit (NLS_NLGEOM_RECOMMENDED, warning) and a snap-back ' +
     'indicator on a displacement-controlled curve (NLS_SNAP_BACK_DETECTED, warning). No threshold is invented: the owner or a company rule supplies ' +
     'them. Run it before fea_mesh / fea_solve and at the end of every job. Always reviewRequired: computed by llull, not approved.',
   annotations: { readOnly: true },
@@ -78,7 +130,7 @@ export const checkNonlinear = defineCommand({
     const trust = trustedRecord(doc, analysis, ctx?.feaArtifacts);
     const notes: string[] = [];
     const resultItems: NonlinearCheckItem[] = [];
-    if (trust.state !== 'solved' || trust.resultsArtifact === null || analysis.nonlinear === undefined)
+    if (trust.state !== 'solved' || trust.resultsArtifact === null || trust.meshArtifact === null || analysis.nonlinear === undefined)
       notes.push(`result checks skipped: no current verified results (state ${trust.state})`);
     else {
       for (const curve of extractCurves(analysis, trust.resultsArtifact))
@@ -86,15 +138,10 @@ export const checkNonlinear = defineCommand({
           resultItems.push(
             item('NLS_SNAP_BACK_DETECTED', `curve '${curve.name}' turns back on a displacement-controlled step`, [curve.probeId]),
           );
+      resultItems.push(...thresholdItems(doc, analysis, trust.meshArtifact, trust.resultsArtifact));
       notes.push('strain-beyond-hardening-curve, elongation and plastic-mesh-adequacy guardrails are not evaluated by this version');
     }
-    const seen = new Set<string>();
-    const items = [...baseItems(doc, analysisId, ctx), ...setupWarnings(doc, analysis), ...resultItems].filter((entry) => {
-      const key = `${entry.code}|${entry.ids.join(',')}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const items = [...baseItems(doc, analysisId, ctx), ...setupWarnings(doc, analysis), ...resultItems];
     const errors = items.filter((entry) => entry.severity === 'error').length;
     const status = errors > 0 ? 'fail' : items.length > 0 ? 'warn' : 'pass';
     return report(

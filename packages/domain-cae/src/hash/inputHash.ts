@@ -102,7 +102,7 @@ function withoutDispositions(thermal: ThermalSetup | undefined): Omit<ThermalSet
   return rest;
 }
 
-/** Display names of steps and curve probes are presentation: renaming never makes results stale. */
+/** Display names of steps and curve probes, and the judgement thresholds, are not solution inputs: changing them never makes results stale. */
 function withoutNames(
   nonlinear: NonlinearSettings,
 ): Omit<NonlinearSettings, 'steps' | 'probes'> & { readonly steps: Record<string, unknown>; readonly probes: Record<string, unknown> } {
@@ -114,7 +114,10 @@ function withoutNames(
         return [id, rest];
       }),
     );
-  return { ...nonlinear, steps: strip(nonlinear.steps), probes: strip(nonlinear.probes) };
+  // thresholds are judgement limits read by check_nonlinear: they never change the solution
+  const { thresholds, ...solved } = nonlinear;
+  void thresholds;
+  return { ...solved, steps: strip(nonlinear.steps), probes: strip(nonlinear.probes) };
 }
 
 /** A bolt's display name is presentation (like pair names): it never changes the solution. */

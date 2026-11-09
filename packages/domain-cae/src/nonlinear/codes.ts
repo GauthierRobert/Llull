@@ -39,6 +39,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   NLS_LIMIT_NOT_REACHED: 'the curve is still rising: extend the controlled displacement (displacement control passes the peak)',
   NLS_INPUT_MISSING: 'nonlinear_analytic_check needs every input of the check: the message names the key and its unit',
   NLS_INPUT_INVALID: 'give finite numbers in the unit of the key suffix (or { value, unit }) inside the domain of the formula',
+  NLS_PERMANENT_SET_EXCEEDED:
+    'the residual displacement or plastic strain after unloading is above the stated limit: redesign or have a qualified reviewer decide',
+  NLS_NLGEOM_RECOMMENDED: 'set_nonlinear_controls nlgeom=true and solve again: small-displacement theory is outside the stated limits',
   NLS_THRESHOLD_UNSET:
     'nlgeom is false and llull has no small-rotation / strain threshold to judge it: ask the owner or the company rule, or set nlgeom true',
   NLS_PERMANENT_SET_THRESHOLD_UNSET:

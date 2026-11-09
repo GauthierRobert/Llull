@@ -473,5 +473,5 @@ parameters and imperfection amplitudes come from the owner or a company rule (as
    (method peak, or plateau with the slopeFraction + window you were given; a curve that never peaks gives only a lowerBound and NLS_LIMIT_NOT_REACHED: say "at least"). Stale results are
    refused (NLS_CURVE_STALE): run fea_mesh and fea_solve again. \`compute_margins\` criterion=limit_load turns the limit load into a margin; FAIL rows stay with a human (FEA_HUMAN_GATE).
 6. Finish with \`check_nonlinear\`: report NLS_SNAP_BACK_DETECTED, NLS_MATERIAL_MODEL_UNVERIFIED, NLS_THRESHOLD_UNSET and NLS_PERMANENT_SET_THRESHOLD_UNSET to the user and ask for the missing
-   limits instead of inventing them. A limit load without a mesh convergence study carries VNV_NO_CONVERGENCE_STUDY (\`llull run_convergence_study\`, section 18).
+   limits instead of inventing them; once given, state them with set_nonlinear_controls thresholds (each with its source) so check_nonlinear can judge NLS_PERMANENT_SET_EXCEEDED and NLS_NLGEOM_RECOMMENDED. A limit load without a mesh convergence study carries VNV_NO_CONVERGENCE_STUDY (\`llull run_convergence_study\`, section 18).
 `;
