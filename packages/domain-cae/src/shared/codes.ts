@@ -29,6 +29,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_COMPOSITE_CORE_UNSUPPORTED: 'sandwich cores are not written: analyse the skins, or keep the solid idealization',
   FEA_TARGET_UNRESOLVED:
     'give an existing 3D entityId and at least one point in facesNear / edgesNear / pointsNear on the intended topology',
+  FEA_TARGET_PLANE_UNSUPPORTED:
+    'remove intersectPlane and target by facesNear / edgesNear / pointsNear (a plane-section target is refused until llull-mesh resolves it)',
   FEA_CONSTRAINT_NOT_FOUND: 'list constraints with describe_analysis',
   FEA_CONSTRAINT_INVALID: 'fixed / pinned / symmetry need a target; displacement also needs dofs with finite values',
   FEA_ITEM_NOT_FOUND: 'list the constraints, loads, probes and thermal / explicit records with describe_analysis (or analysis_report)',

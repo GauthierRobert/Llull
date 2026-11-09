@@ -10,6 +10,7 @@ import { analysisLengthMetres } from '../shared/defaults';
 import { implicitFieldConflict } from '../fieldMesh/controls';
 import { analysisInputHash } from './inputHash';
 import { keyedTargets, type KeyedTarget } from './targets';
+import { PLANE_UNSUPPORTED } from '../shared/target';
 
 /** Named guard (05 §5.5 VNV_LEVEL cap analogue): most tetrahedra a mesh request may be expected to produce. */
 const MAX_ESTIMATED_ELEMENTS = 2e6;
@@ -70,7 +71,7 @@ export interface MeshRequest {
  * Mesher request for `analysisId`.
  * @invariant refuses a request whose estimated element count (bounding-box volume / globalSize^3 x 6 per part; source implicit_field: body volume /
  *   globalSize^3 x 15) exceeds 2e6
- * @failure unknown analysis, or no part -> `{ code, message }` (FEA_ANALYSIS_NOT_FOUND / FEA_PART_INVALID); too many elements -> FEA_MESH_TOO_LARGE;
+ * @failure a target with intersectPlane (hand-written / older document) -> FEA_TARGET_PLANE_UNSUPPORTED; unknown analysis, or no part -> `{ code, message }` (FEA_ANALYSIS_NOT_FOUND / FEA_PART_INVALID); too many elements -> FEA_MESH_TOO_LARGE;
  *   source implicit_field with refinements, conformal bonding or a non-solid part -> FLL_IMPLICIT_MESH_UNSUPPORTED
  */
 export function meshRequest(doc: CadDocument, analysisId: string): MeshRequest | { readonly code: string; readonly message: string } {
@@ -78,6 +79,9 @@ export function meshRequest(doc: CadDocument, analysisId: string): MeshRequest |
   if (analysisCase === undefined) return { code: 'FEA_ANALYSIS_NOT_FOUND', message: `no analysis '${analysisId}'` };
   const entityIds = Object.keys(analysisCase.parts);
   if (entityIds.length === 0) return { code: 'FEA_PART_INVALID', message: `analysis '${analysisId}' has no part (set_part_idealization)` };
+  const targets = keyedTargets(analysisCase);
+  const planar = targets.filter((target) => target.intersectPlane !== undefined).map((target) => target.key);
+  if (planar.length > 0) return { code: 'FEA_TARGET_PLANE_UNSUPPORTED', message: `target(s) ${planar.join(', ')}: ${PLANE_UNSUPPORTED}` };
   const fieldProblem = fieldSourceProblem(analysisCase);
   if (fieldProblem !== null) return fieldProblem;
   const estimate = estimatedElements(doc, entityIds, analysisCase.mesh);
@@ -92,7 +96,7 @@ export function meshRequest(doc: CadDocument, analysisId: string): MeshRequest |
     unitSystem: analysisCase.unitSystem,
     documentUnit: doc.units,
     lengthToAnalysis: toMetres(doc, 1) / analysisLengthMetres(analysisCase.unitSystem),
-    targets: keyedTargets(analysisCase),
+    targets,
     controls: analysisCase.mesh,
     inputHash: analysisInputHash(doc, analysisId, 'mesh'),
   };

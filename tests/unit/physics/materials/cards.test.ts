@@ -1,6 +1,8 @@
 /** VC-MATL-13, 14: CalculiX and Nastran material cards (exact text), export refusals and warnings. */
 import { describe, expect, it } from 'vitest';
 import { calculixNumber, nastranReal } from '@core/model/materialLaws/cardFormat';
+import { writeCalculixCards } from '@core/model/materialLaws/cardsCalculix';
+import type { CardRequest } from '@core/model/materialLaws/cardTypes';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { expectCase } from '../benchmarkCases';
@@ -158,6 +160,21 @@ describe('CalculiX cards (VC-MATL-13)', () => {
     const [A, n, writtenM] = (cards(doc, { material: 'creep_t', target: 'calculix' }).lines[4] ?? '').split(',').map(Number);
     expect((A ?? 0) / expected).toBeCloseTo(1, 12);
     expect([n, writtenM]).toEqual([5, m]);
+  });
+
+  it('returns a named failure and writes no card when the Norton time unit is not a time (a document carrying it by hand)', () => {
+    const request = {
+      record: { name: 'x' },
+      name: 'X',
+      mid: 1,
+      temperaturesK: [],
+      slots: {
+        creep: { id: 'c', model: { kind: 'creep_norton', A: 1e-10, n: 5, m: 0, stressUnit: 'MPa', timeUnit: 'kg', hardening: 'time' } },
+      },
+    } as unknown as CardRequest;
+    const written = writeCalculixCards(request);
+    expect('lines' in written).toBe(false);
+    expect(written).toMatchObject({ code: 'MATL_CREEP_PARAMS_INVALID' });
   });
 
   it('writes anisotropic, transversely isotropic and every hyperelastic card', () => {

@@ -49,7 +49,7 @@ packages/domain-physics/src (@phys)  ── CadPlugin "physics-creep", toolset "
    creep/deck.ts            INP fragment writer plugged into @cae/decks/inpWriter (step + material blocks)
    creep/history.ts         PEEQ / S / U history extraction from FRD/DAT artifacts (pure)
    creep/rupture.ts         Larson-Miller, time-fraction damage (pure)
-   creep/units.ts           A conversion (TR-CRP-12)
+   core model/materialLaws/nortonUnits.ts  A conversion (TR-CRP-12)
         ▼ (public APIs only, L10)
 @cae (05 plugin)          AnalysisCase, deck writer hooks, artifact port, margins provider registry
 packages/core/src/model   analysis.ts (05) + AnalysisType members 'creep' | 'viscoelastic'; CreepStepSpec (data type)
@@ -74,7 +74,7 @@ deck hook move into `@cae` as an extension point and `@phys` only registers comm
 | TR-CRP-02 | MUST | Plugin `physics-creep` (`CadPlugin { name, toolset: 'analysis', commands, document }`); `document.validate` checks `creep` blocks (finite numbers, units parse, duration > 0, cetol > 0, m > −1 is checked on the law by PHY-02). |
 | TR-CRP-10 | MUST | `CreepLawView` (§3) is built per analysed part from the PHY-02 model on the part's 08 record; missing → `CRP_LAW_MISSING`; unresolved private library → `MAT_LIBRARY_UNRESOLVED` (08). |
 | TR-CRP-11 | MUST | Range guard: every quick check and life query validates σ, T (and LMP) against the law's `validRange`; FE results are scanned (max von Mises over the hold, element temperatures) by `check_creep`. Outside → `CRP_LAW_OUT_OF_RANGE`. Never extrapolate. |
-| TR-CRP-12 | MUST | `@phys/creep/units.ts` converts A: stress factor `A_new = A_old · c_s^(−n)`; time factor `A_new = A_old · c_t^(m+1)` where `t_old = c_t · t_new`. Round-trip 1e-12 rel (VC-CRP-16). |
+| TR-CRP-12 | MUST | `core/model/materialLaws/nortonUnits.ts` converts A: stress factor `A_new = A_old · c_s^(−n)`; time factor `A_new = A_old · c_t^(m+1)` where `t_old = c_t · t_new`. Round-trip 1e-12 rel (VC-CRP-16). |
 | TR-CRP-20 | MUST | `closedForm.norton(A, n, m, σ, t) = A σⁿ t^(m+1)/(m+1)`; strain-hardening and time-hardening coincide at constant stress (§5.2). |
 | TR-CRP-21 | MUST | Relaxation closed form `σ(t) = [σ0^(1−n) + (n−1) E′ A t]^(1/(1−n))`, `E′ = E k_m/(k_m + k_b)`; n = 1 branch `σ0 exp(−E′ A t)`. |
 | TR-CRP-22 | MUST | Stationary creep closed forms of §5.2 (tube, beam), with the n = 1 limits unit-tested against Lamé / elastic beam (1e-12). |

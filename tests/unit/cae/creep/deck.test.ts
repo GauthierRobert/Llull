@@ -127,6 +127,25 @@ describe('creep deck', () => {
     expect(Number(card?.[1])).toBeCloseTo(1e-10, 20);
   });
 
+  it('refuses by name (no throw, no deck) a law whose time unit is not a time, carried by a hand-written document', () => {
+    const c = creepCube();
+    const materials = Object.fromEntries(
+      Object.entries(c.doc.materials).map(([id, material]) => [
+        id,
+        {
+          ...material,
+          materialModels: (material.materialModels ?? []).map((model) =>
+            model.model.kind === 'creep_norton' ? { ...model, model: { ...model.model, timeUnit: 'kg' } } : model,
+          ),
+        },
+      ]),
+    );
+    const bad = { ...c.doc, materials } as unknown as CadDocument;
+    const refused = refusalOf(c, bad);
+    expect(refused.code).toBe('MATL_CREEP_PARAMS_INVALID');
+    expect(refused.message).toContain("'kg'");
+  });
+
   it('marks an unverified law in the deck header and writes no output of the preload step', () => {
     const c = creepCube({ basis: 'typical' });
     const text = deckOf(c);

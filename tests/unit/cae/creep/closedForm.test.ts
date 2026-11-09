@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import { convertNortonA } from '@cae/creep/units';
+import { convertNortonA } from '@core/model/materialLaws/nortonUnits';
 import { creepCube, must } from './support';
 
 interface Expected {

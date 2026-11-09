@@ -218,7 +218,7 @@ export const setCreepStep = defineCommand({
   description:
     'Set the creep hold of a creep analysis (create_analysis analysisType=creep, CalculiX): the loads and held displacements of the case act for ' +
     '`duration` at a uniform `temperature` while the Norton law eps_dot = A sigma^n t^m of the part materials (add_material_model creep_norton + ' +
-    'define_constitutive_set elastic + creep, makeDefault; any timeUnit, converted to the card seconds) lets the part creep or relax. `cetol` (creep strain error per increment) has ' +
+    'define_constitutive_set elastic + creep, makeDefault; any timeUnit: A is converted to MPa and seconds for the CalculiX card, whose t is the CalculiX total step time in seconds, which matters when m != 0) lets the part creep or relax. `cetol` (creep strain error per increment) has ' +
     'no default. preloadStep true writes an elastic *STATIC step first (creep is off there) so the hold starts from the elastic state; the hold clock ' +
     'is the CalculiX total time minus that step. Time hardening (m != 0) counts that step: keep m = 0 or accept the shift. All loads of the case act ' +
     '(every load case summed). Returns affected [analysisId] and states every named default used. Next: set_mesh_controls, add_result_probe ' +

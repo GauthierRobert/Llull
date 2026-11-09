@@ -14,7 +14,7 @@ import {
   wlfLogShift,
 } from './closedForm';
 import { isInputProblem, inputValue, inputValues, type InputProblem, type InputSpec } from './inputs';
-import { convertNortonA } from './units';
+import { convertNortonA } from '@core/model/materialLaws/nortonUnits';
 
 export const CHECKS = [
   'norton_constant_stress',

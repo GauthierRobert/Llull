@@ -1,6 +1,6 @@
-/** PHY-11 TR-CRP-12: unit conversion of the Norton coefficient A in ε̇ = A σⁿ tᵐ. */
+/** Unit conversion of the Norton coefficient A in ε̇ = A σⁿ tᵐ (PHY-11 TR-CRP-12); the CalculiX *CREEP card is its conversion to MPa and s. */
 
-import { convertValue, isUnitFailure } from '@lib/quantity';
+import { convertValue, isUnitFailure } from '../../lib/quantity';
 
 /** Factor 1 `from` = factor `to`, or the reason when either is not a unit of `dimensionOf` (MPa for stress, s for time). */
 function factor(from: string, to: string, dimensionOf: 'MPa' | 's'): number | string {
