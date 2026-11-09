@@ -1,12 +1,6 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/physics/13-corrosion-compatibility/validation/plans/galvanic_plate_check_proposed.json": [
-      "check_material_compatibility",
-      "declare_isolation",
-      "find_contacts",
-      "set_service_environment"
-    ],
     "docs/physics/14-moisture-outgassing/validation/plans/ao_erosion_proposed.json": ["ao_erosion"],
     "docs/physics/14-moisture-outgassing/validation/plans/moisture_uptake_proposed.json": ["hygro_strain", "moisture_uptake"],
     "docs/physics/14-moisture-outgassing/validation/plans/outgassing_check_proposed.json": [

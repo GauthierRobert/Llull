@@ -25,7 +25,7 @@ export const listFastenerStacks = defineCommand({
   description:
     'List the fastener stacks placed in the document (insert_fastener_stack / insert_fastener_row), or the one named by stackId. Each entry: id (fst-<step>.<k>), ' +
     'axis { origin, direction } in document units, layers [{ entityId, thickness }] in stack order, familyId, diameterDash, nominalDiameter (document units, null when the ' +
-    'catalogue has no such size), holeDiameter (document units, 0 = no hole cut), washerCount, hasNut, rowId. Used by joint_from_fastener_stack. Returns data.stacks; the document is unchanged.',
+    'catalogue has no such size), holeDiameter (document units, 0 = no hole cut), washerCount, hasNut, rowId, and the entity ids of the placed parts: fastenerInstanceId, washers [{ instanceId, side: head | nut }], nutInstanceId (absent without a nut). Used by joint_from_fastener_stack. Returns data.stacks; the document is unchanged.',
   params: z.object({ stackId: z.string().optional().describe('Only this stack (fst-<step>.<k>); absent = every stack.') }),
   run: (doc, { stackId }): CommandResult => {
     const stacks = Object.values(fastenerModel(doc).stacks).filter((stack) => stackId === undefined || stack.id === stackId);
@@ -38,6 +38,9 @@ export const listFastenerStacks = defineCommand({
       nominalDiameter: nominalDiameter(doc, stack),
       holeDiameter: stack.holeDiameter,
       washerCount: stack.washers.length,
+      fastenerInstanceId: stack.fastener.instanceId,
+      washers: stack.washers.map((washer) => ({ instanceId: washer.instanceId, side: washer.side })),
+      ...(stack.nut === undefined ? {} : { nutInstanceId: stack.nut.instanceId }),
       hasNut: stack.nut !== undefined,
       ...(stack.rowId === undefined ? {} : { rowId: stack.rowId }),
     }));

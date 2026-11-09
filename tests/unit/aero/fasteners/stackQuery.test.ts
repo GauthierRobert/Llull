@@ -49,6 +49,9 @@ describe('list_fastener_stacks', () => {
       hasNut: true,
       axis: { origin: [1, 0.5, 0], direction: [0, 0, 1] },
     });
+    expect(typeof entry?.['fastenerInstanceId']).toBe('string');
+    expect((entry?.['washers'] as { instanceId: string; side: string }[]).length).toBe(1);
+    expect(typeof entry?.['nutInstanceId']).toBe('string');
     expect(entry?.['nominalDiameter']).toBeCloseTo(0.1875, 9);
     expect(entry?.['holeDiameter']).toBeCloseTo(0.19, 9);
     expect((entry?.['layers'] as { entityId: string }[]).map((layer) => layer.entityId)).toEqual(plates);
