@@ -474,4 +474,15 @@ parameters and imperfection amplitudes come from the owner or a company rule (as
    refused (NLS_CURVE_STALE): run fea_mesh and fea_solve again. \`compute_margins\` criterion=limit_load turns the limit load into a margin; FAIL rows stay with a human (FEA_HUMAN_GATE).
 6. Finish with \`check_nonlinear\`: report NLS_SNAP_BACK_DETECTED, NLS_MATERIAL_MODEL_UNVERIFIED, NLS_THRESHOLD_UNSET and NLS_PERMANENT_SET_THRESHOLD_UNSET to the user and ask for the missing
    limits instead of inventing them; once given, state them with set_nonlinear_controls thresholds (each with its source) so check_nonlinear can judge NLS_PERMANENT_SET_EXCEEDED and NLS_NLGEOM_RECOMMENDED. A limit load without a mesh convergence study carries VNV_NO_CONVERGENCE_STUDY (\`llull run_convergence_study\`, section 18).
+
+## 20. Acoustic environments: hand-off only (toolset analysis, PHY-20)
+
+Levels are dB re 20 micropascal (air); bands are the IEC 61260-1 base-10 series, labelled by NOMINAL Hz (third octave 25 ... 20000, octave 31.5 ... 16000). llull hands the environment over; it computes no SEA, no
+acoustic FE, no structural response (VAC_OUT_OF_SCOPE). Nothing is a default: the reference, the field type and every level come from the programme document (ask), never from memory.
+
+1. \`define_acoustic_spectrum\` (reference "20uPa" stated, source with grade: only grade A is verified, else VAC_SPECTRUM_UNVERIFIED) → \`acoustic_spectrum_report\` (OASPL, rms pressure, band PSD Pa^2/Hz, band-averaged)
+   / \`acoustic_level\` (dB <-> Pa, energy sums) / \`convert_acoustic_spectrum\` (thirds to octaves; the reverse is VAC_CONVERSION_UNSUPPORTED).
+2. \`define_acoustic_exposure\` binds a spectrum to faces by points (target.facesNear) with field diffuse | progressive (VAC_FIELD_UNSET without it); \`delete_acoustic_exposure\` frees the spectrum.
+3. \`check_acoustic_handoff\`, then \`llull export_acoustic_load exposure=NAME --save FILE\`: face areas come from the exact kernel only (KRN_NO_EXACT_KERNEL otherwise, never a guess; VAC_EXPOSURE_UNRESOLVED for a point off
+   the solid or on an edge). The check is unknown, never pass, when the faces could not be checked. Every package is reviewRequired: report VAC_REVIEW_PENDING and VAC_SPECTRUM_UNVERIFIED to the user.
 `;
