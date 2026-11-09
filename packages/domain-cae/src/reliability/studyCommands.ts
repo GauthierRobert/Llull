@@ -231,30 +231,27 @@ export const runReliabilityStudy = defineCommand({
         const formData = data['form'] as { beta?: number } | undefined;
         const formPf = pf['form'];
         const mcPf = pf['mc'];
-        if (
-          formData?.beta !== undefined &&
-          formPf !== undefined &&
-          formPf !== null &&
-          mcPf !== undefined &&
-          mcPf !== null &&
-          (params.sampling ?? 'lhs') === 'lhs' &&
-          params.maxIterations === undefined &&
-          params.tolerance === undefined
-        )
+        const hashable = formData?.beta !== undefined && formPf !== undefined && formPf !== null && mcPf !== undefined && mcPf !== null;
+        const customised = (params.sampling ?? 'lhs') !== 'lhs' || params.maxIterations !== undefined || params.tolerance !== undefined;
+        if (hashable && !customised)
           data['resultHash'] = resultDigest(
             limitStateModelHash(doc, params.limitState) ?? '',
             params.seed ?? Number.NaN,
             samples,
-            formData.beta,
-            formPf,
-            mcPf,
+            formData?.beta ?? Number.NaN,
+            formPf ?? Number.NaN,
+            mcPf ?? Number.NaN,
           );
         data['comparison'] = { pf, formInsideMonteCarloInterval: inside };
         data['items'] = items;
         const shown = Object.entries(pf).map(([method, value]) => `${method} ${value === null ? 'n/a' : value.toPrecision(6)}`);
         return report(
           doc,
-          `run_reliability_study '${params.limitState}': Pf by method — ${shown.join(', ')}${inside === false ? ' (PRB_FORM_MC_DISAGREE)' : ''}. ${REVIEW_NOTE}`,
+          `run_reliability_study '${params.limitState}': Pf by method — ${shown.join(', ')}${inside === false ? ' (PRB_FORM_MC_DISAGREE)' : ''}.${
+            hashable && customised
+              ? ' No resultHash: it exists only for the reviewable study (lhs sampling, default maxIterations and tolerance); use check_probabilistic or the defaults.'
+              : ''
+          } ${REVIEW_NOTE}`,
           data,
         );
       },

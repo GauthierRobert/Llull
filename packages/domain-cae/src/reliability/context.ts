@@ -113,8 +113,26 @@ export function studyContext(doc: CadDocument, limitStateName: string, ctx?: Exe
   const inherited = variables.flatMap((variable) =>
     (variable.derivedFrom?.unverifiedReasons ?? []).map((reason) => `${variable.name}: ${reason}`),
   );
-  const items =
-    unsourced.length === 0
+  const ignored =
+    responseNames.length === 0
+      ? []
+      : model.variableOrder.filter((name) => {
+          const variable = Object.hasOwn(model.variables, name) ? model.variables[name] : undefined;
+          return variable !== undefined && variable.binding.kind !== 'free' && !variables.includes(variable);
+        });
+  const items: Item[] = [
+    ...(ignored.length === 0
+      ? []
+      : [
+          item(
+            'PRB_VARIABLE_NOT_APPLIED',
+            'warning',
+            `the study reads a response, which only parameter and density bindings reach: ${ignored.join(', ')} (document-bound, not named in the expression) is ignored`,
+            'name the variable in the limit-state expression, or bind it to a parameter or a material density',
+            ignored,
+          ),
+        ]),
+    ...(unsourced.length === 0
       ? []
       : [
           item(
@@ -124,7 +142,8 @@ export function studyContext(doc: CadDocument, limitStateName: string, ctx?: Exe
             'redefine the variable with a citation (test report, specification, tolerance drawing)',
             unsourced,
           ),
-        ];
+        ]),
+  ];
   return {
     model,
     limitState,
