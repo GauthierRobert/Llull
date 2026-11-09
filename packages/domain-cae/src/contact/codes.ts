@@ -25,6 +25,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'the section force after the preload step should equal the preload: check the plane (one clean cut), the mesh and that the deck was written by the current llull',
   CNT_STACK_NOT_FOUND:
     'place the stack first (insert_fastener / insert_fastener_row) and pass its fst-<step>.<k> id; its plates must still be entities of the document',
+  CNT_PIN_FIT_INVALID:
+    'give finite positive diameters with holeDiameter > pinDiameter (clearance); a tighter fit is an interference fit: use interference_fit',
   CNT_PAIR_NOT_FOUND: 'list the pairs with contact_report (no pair) or describe_analysis',
   CNT_PAIR_NAME_TAKEN: 'give the pair a name no other pair of the case uses',
   CNT_NOTHING_TO_UPDATE: 'give at least one field to change',
