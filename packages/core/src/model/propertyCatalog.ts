@@ -54,6 +54,22 @@ const PROPERTY_CATALOG: readonly PropertyCatalogEntry[] = [
     positive: false,
     ownerPack: 'PHY-09',
   }),
+  row('TML', '1', 'ASTM E595 total mass loss, mass fraction (enter in % with unit "%")', { positive: false, ownerPack: 'PHY-14' }),
+  row('CVCM', '1', 'ASTM E595 collected volatile condensable material, mass fraction (unit "%")', { positive: false, ownerPack: 'PHY-14' }),
+  row('WVR', '1', 'ASTM E595 water vapour regained, mass fraction (unit "%")', { positive: false, ownerPack: 'PHY-14' }),
+  row('RML', '1', 'recovered mass loss (ECSS-Q-ST-70-02: TML minus water regained), mass fraction (unit "%")', {
+    positive: false,
+    ownerPack: 'PHY-14',
+  }),
+  row('moistureDiffusivity', 'm^2/s', 'Fickian moisture diffusivity through the thickness', { ownerPack: 'PHY-14' }),
+  row('moistureSaturation', '1', 'equilibrium moisture content, mass fraction (unit "%")', { positive: false, ownerPack: 'PHY-14' }),
+  row('cme', '1', 'coefficient of moisture expansion: strain per unit moisture mass fraction (unit "1/%" = strain per % moisture)', {
+    positive: false,
+    ownerPack: 'PHY-14',
+  }),
+  row('aoErosionYield', 'm^3', 'atomic-oxygen erosion yield: volume eroded per incident atom (enter 3e-24 with unit "cm^3")', {
+    ownerPack: 'PHY-14',
+  }),
 ];
 
 export function catalogEntry(name: string): PropertyCatalogEntry | undefined {
