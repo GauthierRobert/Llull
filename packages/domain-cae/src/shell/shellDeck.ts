@@ -81,7 +81,9 @@ function laminaCards(doc: CadDocument, ctx: DeckContext, name: string, laminate:
   if (!(nu23 > -1 && nu23 < 0.5))
     return `lamina '${materialName}': derived nu23 = ${num(nu23)} (E2 / (2 G23) - 1) is outside (-1, 0.5): check G23`;
   const assumed = [lamina.G13 === undefined ? 'G13 = G12' : ''].filter((text) => text !== '');
-  const needsDensity = ctx.analysis.type === 'modal' || ctx.analysis.loadOrder.some((id) => ctx.analysis.loads[id]?.kind === 'gravity');
+  const needsDensity =
+    ctx.analysis.type === 'modal' ||
+    ctx.analysis.loadOrder.some((id) => ['gravity', 'inertial'].includes(ctx.analysis.loads[id]?.kind ?? ''));
   if (needsDensity && lamina.density === undefined) return `lamina '${materialName}' has no density (modal / gravity need one)`;
   return [
     `** lamina ${name} = '${commentText(materialName, 80)}' (${commentText(lamina.source, 80)}); transversely isotropic: E3 = E2, nu13 = nu12, nu23 = E2 / (2 G23) - 1${assumed.length > 0 ? `; assumed ${assumed.join(', ')}` : ''}`,

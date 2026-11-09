@@ -29,7 +29,7 @@ const TYPES = [
 ];
 const UNIT_SYSTEMS = ['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'];
 const CONSTRAINT_KINDS = ['fixed', 'pinned', 'symmetry', 'displacement'];
-const LOAD_KINDS = ['force', 'pressure', 'gravity', 'moment'];
+const LOAD_KINDS = ['force', 'pressure', 'gravity', 'moment', 'inertial'];
 const CATEGORIES = ['limit', 'ultimate'];
 const SCALES = ['degC', 'K'];
 const QUANTITIES = [
@@ -212,6 +212,8 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
     if (!oneOf(CATEGORIES, load['category'])) errors.push(`${where}: load '${lid}' has an unknown category`);
     if (load['target'] !== undefined) checkTarget(scope, load['target'], `${where}: load '${lid}'`);
     if (load['vector'] !== undefined && !isVec3(load['vector'])) errors.push(`${where}: load '${lid}' vector must be three finite numbers`);
+    for (const field of ['angularVelocity', 'angularAccel'])
+      if (load[field] !== undefined && !isVec3(load[field])) errors.push(`${where}: load '${lid}' ${field} must be three finite numbers`);
   });
   checkMesh(scope, analysisCase['mesh'], where);
   const probes = analysisCase['probes'];

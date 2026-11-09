@@ -10,6 +10,7 @@ import { caseTemperatureRange } from '../thermal/material';
 import { commentText, linesText, num, row } from './format';
 import { consistentWeights, momentForces } from './loadDistribution';
 import { targetKind } from '../shell/shellDeck';
+import { inertialContribution, inertialDloadLines, type InertialTerms } from './inertialBodyForce';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
 /** Shell nodes carry rotations (radians): CalculiX dofs 4-6. */
@@ -199,6 +200,8 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
   const pressures = new Map<string, readonly [element: number, face: number, value: number]>();
   const gravity = [0, 0, 0];
   const gravityDirection = [0, 0, 0];
+  const centrifugal: InertialTerms['centrifugal'][number][] = [];
+  const angular: InertialTerms['angular'][number][] = [];
   for (const id of ctx.analysis.loadOrder) {
     const load = ctx.analysis.loads[id];
     if (load === undefined || (loadCase !== undefined && load.loadCase !== loadCase && !options?.addLoadCases?.includes(load.loadCase)))
@@ -210,6 +213,14 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
         gravity[axis] = (gravity[axis] ?? 0) + component * factor;
         gravityDirection[axis] = (gravityDirection[axis] ?? 0) + component;
       });
+    } else if (load.kind === 'inertial') {
+      const part = inertialContribution(ctx, load, factor);
+      part.field.forEach((component, axis) => {
+        gravity[axis] = (gravity[axis] ?? 0) + component;
+        gravityDirection[axis] = (gravityDirection[axis] ?? 0) + component;
+      });
+      if (part.centrifugal !== undefined) centrifugal.push(part.centrifugal);
+      if (part.angular !== undefined) angular.push(part.angular);
     } else if (load.kind === 'force' && load.vector !== undefined) {
       const nodes = Object.hasOwn(ctx.mesh.nodeSets, key) ? (ctx.mesh.nodeSets[key] ?? []) : [];
       if (nodes.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `force '${id}' (${load.name}) has no nodes in the mesh`, [id]);
@@ -264,10 +275,14 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
     .map(([element, face, value]) => row(element, face === 0 ? 'P' : `P${face}`, value));
   const magnitude = Math.hypot(gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0);
   const directionLength = Math.hypot(gravityDirection[0] ?? 0, gravityDirection[1] ?? 0, gravityDirection[2] ?? 0);
-  if (magnitude > 0)
+  const inertial = inertialDloadLines(ctx, [gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0], { centrifugal, angular });
+  if ('code' in inertial) return inertial;
+  if (inertial.perElement) dloads.push(...inertial.lines);
+  else if (magnitude > 0)
     dloads.push(`${ALL_ELEMENTS}, GRAV, ${num(magnitude)}, ${gravity.map((component) => num(component / magnitude)).join(', ')}`);
   else if (options !== undefined && directionLength > 0)
     dloads.push(`${ALL_ELEMENTS}, GRAV, 0, ${gravityDirection.map((component) => num(component / directionLength)).join(', ')}`);
+  if (!inertial.perElement) dloads.push(...inertial.lines);
   if (options === undefined || cloads.length > 0)
     lines.push(`*CLOAD${parameters}`, ...cloads.map(([node, dof, value]) => row(node, dof, value)));
   if (options === undefined || dloads.length > 0) lines.push(`*DLOAD${parameters}`, ...dloads);

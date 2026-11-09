@@ -112,6 +112,18 @@ export interface FeaConstraint {
   /** displacement only; absent DOF = free. Values in document length units (0 = fixed). */
   readonly dofs?: Partial<Record<'ux' | 'uy' | 'uz' | 'rx' | 'ry' | 'rz', number>>;
   readonly target: FeaTarget;
+  /** 14 FLL `set_free_body_support`: one of the three statically determinate supports of an inertial-relief case (reactions must vanish). */
+  readonly freeBody?: true;
+}
+
+/**
+ * Where a load of a flight export came from (14 FLL export_flight_loads): the scenario run and the instant, with the hash of the design that run
+ * flew (a differing current hash makes the load stale). All null for an explicit rigid-body state.
+ */
+export interface FlightLoadSource {
+  readonly scenario: string | null;
+  readonly timeS: number | null;
+  readonly designHash: string | null;
 }
 
 export interface FeaLoad {
@@ -119,12 +131,20 @@ export interface FeaLoad {
   readonly name: string;
   readonly loadCase: string;
   readonly category: LoadCategory;
-  readonly kind: 'force' | 'pressure' | 'gravity' | 'moment';
+  /**
+   * `inertial` (14 FLL): the body force of a rigid-body motion, static analyses only. `vector` = absolute acceleration of the reference point O
+   * (`referencePoint`, document units, default the origin) in the case unit system; `angularVelocity` / `angularAccel` in rad/s and rad/s^2 (about O,
+   * model axes). The deck applies the d'Alembert body force -rho (a + alpha x r + omega x (omega x r)); `gravity` stays a separate load.
+   */
+  readonly kind: 'force' | 'pressure' | 'gravity' | 'moment' | 'inertial';
   readonly target?: FeaTarget;
   readonly vector?: Vec3;
   readonly magnitude?: number;
   readonly distribution?: 'total' | 'per_node';
   readonly referencePoint?: Vec3;
+  readonly angularVelocity?: Vec3;
+  readonly angularAccel?: Vec3;
+  readonly flightSource?: FlightLoadSource;
 }
 
 export interface MeshControls {

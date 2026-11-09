@@ -180,6 +180,8 @@ export const updateFeaLoad = defineCommand({
     if (analysisCase === undefined) return fail('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId], ['analysisId']);
     const existing = Object.hasOwn(analysisCase.loads, loadId) ? analysisCase.loads[loadId] : undefined;
     if (existing === undefined) return fail('FEA_LOAD_NOT_FOUND', `no load '${loadId}' in '${analysisId}'`);
+    if (existing.kind === 'inertial')
+      return fail('FEA_LOAD_INVALID', `'${loadId}' is an inertial flight load: re-run export_flight_loads instead of editing it`);
     const unused = irrelevantParams(existing.kind, fields);
     if (unused.length > 0)
       return fail('FEA_LOAD_INVALID', `${unused.join(', ')} do not apply to a ${existing.kind} load`, undefined, unused);
