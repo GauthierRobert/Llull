@@ -66,6 +66,14 @@ describe('define_response', () => {
     expect(refuse({ name: 'v' }, withVariable)).toBe('PRB_PARAMS_INVALID');
   });
 
+  it('a random variable cannot take the name of a response (symmetric with define_response)', () => {
+    const { doc } = massModel();
+    const result = execute(doc, 'define_random_variable', { name: 'mass', unit: 'g', distribution: { kind: 'normal', mean: 1, sd: 0.1 } });
+    expect(code(result)).toBe('PRB_PARAMS_INVALID');
+    expect(result.summary).toContain('already a response');
+    expect(result.document).toBe(doc);
+  });
+
   it('its slice is validated: a malformed responses table is reported', () => {
     const { doc } = massModel();
     const slice = doc.probabilistic as unknown as Record<string, unknown>;

@@ -28,7 +28,7 @@ const targetSchema = (what: string): z.ZodObject<{ value: z.ZodNumber; source: z
 /**
  * @affects doc.reliability.variables (adds or replaces the variable called `name`; affected: [variable id])
  * @invariant distribution parameters valid (sd > 0, lognormal mean > 0, min < max); a parameter binding names an existing document parameter
- * @failure bad name, name of a document parameter or built-in constant, invalid distribution, unknown parameter -> PRB_DISTRIBUTION_INVALID / PRB_PARAMS_INVALID / PRB_BINDING_UNRESOLVED (unchanged doc)
+ * @failure bad name, name of a document parameter, response or built-in constant, invalid distribution, unknown parameter -> PRB_DISTRIBUTION_INVALID / PRB_PARAMS_INVALID / PRB_BINDING_UNRESOLVED (unchanged doc)
  */
 export const defineRandomVariable = defineCommand({
   name: 'define_random_variable',
@@ -63,6 +63,12 @@ export const defineRandomVariable = defineCommand({
       refuseReliability(doc, 'define_random_variable', code, message, [params.name], paths);
     if (!IDENTIFIER.test(params.name))
       return fail('PRB_PARAMS_INVALID', `name '${params.name}' is not an identifier (letters, digits, underscore)`, ['name']);
+    if (Object.hasOwn(reliabilityOf(doc).responses ?? {}, params.name))
+      return fail(
+        'PRB_PARAMS_INVALID',
+        `name '${params.name}' is already a response: a limit-state expression could not tell them apart; choose another name`,
+        ['name'],
+      );
     if (Object.hasOwn(doc.parameters, params.name) || isBuiltinConstant(params.name))
       return fail(
         'PRB_PARAMS_INVALID',

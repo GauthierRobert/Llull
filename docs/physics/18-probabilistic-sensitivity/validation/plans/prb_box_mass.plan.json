@@ -156,7 +156,7 @@
   "command": "propagate_uncertainty",
   "params": {
    "method": "lhs",
-   "samples": 10000,
+   "samples": 2000,
    "seed": 7
   }
  }
