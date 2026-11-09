@@ -41,7 +41,11 @@ const plan = (split: boolean): unknown[] => [
   },
   { command: 'define_constitutive_set', params: { material: 'steel', set: { id: 'set', elastic: 'elastic' }, makeDefault: true } },
   { command: 'assign_material', params: { materialName: 'steel', entityIds: ['$beam'] } },
-  { command: 'create_analysis', params: { name: 'cantilever', analysisType: 'static', unitSystem: 'N-mm-t-s', solver: 'calculix' }, as: 'an' },
+  {
+    command: 'create_analysis',
+    params: { name: 'cantilever', analysisType: 'static', unitSystem: 'N-mm-t-s', solver: 'calculix' },
+    as: 'an',
+  },
   { command: 'set_part_idealization', params: { analysisId: '$an', entityId: '$beam', idealization: 'solid' } },
   {
     command: 'add_fea_constraint',
@@ -67,7 +71,12 @@ const plan = (split: boolean): unknown[] => [
       order: 2,
       globalSize: 3,
       refinements: split
-        ? [{ target: { entityId: '$beam', facesNear: [[MID, SIDE / 2, SIDE]], intersectPlane: { point: [MID, 0, 0], normal: [1, 0, 0] } }, size: 2 }]
+        ? [
+            {
+              target: { entityId: '$beam', facesNear: [[MID, SIDE / 2, SIDE]], intersectPlane: { point: [MID, 0, 0], normal: [1, 0, 0] } },
+              size: 2,
+            },
+          ]
         : [],
     },
   },

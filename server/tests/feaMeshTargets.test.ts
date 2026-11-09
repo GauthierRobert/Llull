@@ -136,7 +136,8 @@ const nativeMissing = requireTools([
 
 describe.skipIf(nativeMissing)('fea_mesh + llull-mesh + OCC kernel: a support on a plane-cut edge', () => {
   it('the fixed support is the line of nodes where the plane meets the base face, in the artifact and in the deck', async () => {
-    const real = (request: Record<string, unknown>): Promise<MesherResponse> => callNativeMesher(MESH_BIN ?? '', request, 120_000, process.env);
+    const real = (request: Record<string, unknown>): Promise<MesherResponse> =>
+      callNativeMesher(MESH_BIN ?? '', request, 120_000, process.env);
     const occt = createNativeTestKernel();
     try {
       const run = await mesh(true, real, occt);
