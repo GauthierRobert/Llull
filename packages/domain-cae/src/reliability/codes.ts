@@ -20,6 +20,9 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PRB_PARAMETER_NOT_FOUND: 'create the document parameter first (set_parameter)',
   PRB_SOBOL_CORRELATED: 'Sobol indices need independent inputs: remove the correlation of the used variables',
   PRB_VARIANCE_ZERO: 'the response does not vary over the sampled inputs; widen the distributions or pick another response',
+  PRB_HUMAN_GATE: 'hand the result over to the qualified reviewer, who accepts it in the desktop app; an agent cannot sign',
+  PRB_DOCUMENT_UNIDENTIFIED: 'save the document so it has a uid before a human signs for it',
+  PRB_RESULT_STALE: 'the model changed: re-run the study, read the new modelHash from describe_probabilistic_model and hand it over again',
   PRB_TARGET_INVALID: 'targetBeta / targetPf need a value (targetPf in (0, 1)) and a non-empty source (owner or company rule)',
 };
 

@@ -53,6 +53,22 @@ export interface Response {
   readonly query: { readonly command: string; readonly params: Readonly<Record<string, unknown>>; readonly pointer: string };
 }
 
+/** A reviewer's signed acceptance of the reliability result of one limit state (human gate; verified when read). */
+export interface Acceptance {
+  readonly modelHash: string;
+  readonly justification: string;
+  readonly signer: string;
+  readonly signatureId: string;
+  /** The signature the port verified, kept so readers can re-verify it. */
+  readonly signature: unknown;
+  readonly documentUid: string;
+}
+
+/** Acceptance a human really signed, kept across replay (the recorded step carries no signature). */
+export interface AcceptanceLedgerEntry extends Acceptance {
+  readonly limitState: string;
+}
+
 export interface ReliabilityModel {
   readonly variables: Readonly<Record<string, RandomVariable>>;
   readonly variableOrder: readonly string[];
@@ -63,6 +79,10 @@ export interface ReliabilityModel {
   /** Absent until the first `define_response`. */
   readonly responses?: Readonly<Record<string, Response>>;
   readonly responseOrder?: readonly string[];
+  /** Acceptances by limit state name (accept_reliability_result). */
+  readonly acceptances?: Readonly<Record<string, Acceptance>>;
+  /** Kept by replaySeed so a replayed accept_reliability_result re-applies its verified act. */
+  readonly acceptanceLedger?: readonly AcceptanceLedgerEntry[];
 }
 
 declare module '@core/model/documentExtensions' {

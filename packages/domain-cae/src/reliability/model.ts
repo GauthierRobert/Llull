@@ -65,6 +65,30 @@ export const responseOf = (doc: CadDocument, name: string): Response | undefined
   return Object.hasOwn(responses, name) ? responses[name] : undefined;
 };
 
+function acceptanceErrors(slice: Record<string, unknown>): string[] {
+  const valid = (entry: unknown, limitState: boolean): boolean =>
+    isRecord(entry) &&
+    isString(entry['modelHash']) &&
+    isString(entry['justification']) &&
+    isString(entry['signer']) &&
+    isString(entry['signatureId']) &&
+    isString(entry['documentUid']) &&
+    entry['signature'] !== undefined &&
+    (!limitState || isString(entry['limitState']));
+  const { acceptances, acceptanceLedger } = slice;
+  const errors: string[] = [];
+  if (acceptances !== undefined) {
+    if (!isRecord(acceptances)) errors.push('probabilistic.acceptances must be an object');
+    else
+      for (const [name, entry] of Object.entries(acceptances))
+        if (isReservedKey(name) || !Object.hasOwn(isRecord(slice['limitStates']) ? slice['limitStates'] : {}, name) || !valid(entry, false))
+          errors.push(`acceptance '${name}' is malformed or names no limit state`);
+  }
+  if (acceptanceLedger !== undefined && (!Array.isArray(acceptanceLedger) || !acceptanceLedger.every((entry) => valid(entry, true))))
+    errors.push('probabilistic.acceptanceLedger is malformed');
+  return errors;
+}
+
 function responseErrors(slice: Record<string, unknown>): string[] {
   const { responses, responseOrder } = slice;
   if (responses === undefined && responseOrder === undefined) return [];
@@ -112,5 +136,5 @@ export function reliabilityErrors(raw: Record<string, unknown>): string[] {
     errors.push('probabilistic.variableOrder names an unknown variable');
   if (limitStateOrder.some((n) => !isString(n) || !Object.hasOwn(limitStates, n)))
     errors.push('probabilistic.limitStateOrder names an unknown limit state');
-  return [...errors, ...responseErrors(slice), ...correlationErrors(slice['correlation'], variables)];
+  return [...errors, ...responseErrors(slice), ...acceptanceErrors(slice), ...correlationErrors(slice['correlation'], variables)];
 }

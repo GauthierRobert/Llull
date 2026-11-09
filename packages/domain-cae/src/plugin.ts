@@ -33,7 +33,13 @@ const analysisDocument: DocumentExtension = {
       ...(fitLedger !== undefined && fitLedger.length > 0 ? { fitLedger } : {}),
       ...(dispositionLedger !== undefined && dispositionLedger.length > 0 ? { dispositionLedger } : {}),
     };
-    return Object.keys(kept).length === 0 ? {} : { analysis: { cases: {}, caseOrder: [], ...kept } };
+    const ledger = base.probabilistic?.acceptanceLedger;
+    return {
+      ...(Object.keys(kept).length === 0 ? {} : { analysis: { cases: {}, caseOrder: [], ...kept } }),
+      ...(ledger === undefined || ledger.length === 0
+        ? {}
+        : { probabilistic: { variables: {}, variableOrder: [], limitStates: {}, limitStateOrder: [], acceptanceLedger: ledger } }),
+    };
   },
 };
 
