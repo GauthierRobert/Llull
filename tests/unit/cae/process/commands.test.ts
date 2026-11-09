@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
+import { analysisInputHash } from '@cae/hash/inputHash';
 import { caseOf } from '@cae/shared/access';
 import { amBar, STRAIN, LAYER_HEIGHT, must } from './support';
 
@@ -271,5 +272,25 @@ describe('check_analysis of an AM case', () => {
       vector: [0, 0, -9810],
     });
     expect(items(loaded.doc, good.analysisId)).toContain('PRC_LOADS_UNSUPPORTED');
+  });
+});
+
+describe('am inputs are part of the analysis input hash (recorded results go stale when the build changes)', () => {
+  it('changes with the strain, the layer height and a release step and not with a repeated identical call', () => {
+    const bar = amBar();
+    const hash = (doc: CadDocument): string => analysisInputHash(doc, bar.analysisId, 'full');
+    const base = hash(bar.doc);
+    const strain = must(bar.doc, 'set_inherent_strain', { analysisId: bar.analysisId, ...STRAIN, exx: -0.003 }).doc;
+    const same = must(bar.doc, 'set_inherent_strain', { analysisId: bar.analysisId, ...STRAIN }).doc;
+    const layer = must(bar.doc, 'am_build_setup', {
+      analysisId: bar.analysisId,
+      buildDirection: [0, 0, 1],
+      plateEntityId: bar.plate,
+      layerHeight: 0.25,
+    }).doc;
+    expect(hash(strain)).not.toBe(base);
+    expect(hash(layer)).not.toBe(base);
+    expect(hash(amBar({ release: true }).doc)).not.toBe(base);
+    expect(hash(same)).toBe(base);
   });
 });
