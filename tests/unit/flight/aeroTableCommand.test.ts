@@ -167,6 +167,9 @@ describe('generate_aero_table (FLT-M4)', () => {
     const empty = generate(doc, base(rectangle(6000, 1000), { profileDrag: { cd0: 0.01, clMax: 0.001 } }));
     expectNoOp(empty, doc, 'leaves fewer than 2 angles');
     expect(empty.error?.code).toBe('FLT_AERO_TABLE_EMPTY');
+    // a cambered wing already over clMax at zero alpha has no valid range around zero lift
+    const cambered = generate(doc, base({ ...rectangle(6000, 1000), naca: '4412' }, { profileDrag: { cd0: 0.01, clMax: 0.1 } }));
+    expectNoOp(cambered, doc, 'leaves fewer than 2 angles');
   });
 
   it('refuses bad input without changing the document', () => {

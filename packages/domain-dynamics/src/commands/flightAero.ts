@@ -30,6 +30,7 @@ const surfaceSchema = z.object({
       }),
     )
     .min(2)
+    .max(200)
     .describe('Sections root to tip, at least 2 (leading edge, chord, incidence).'),
   mirror: z
     .boolean()

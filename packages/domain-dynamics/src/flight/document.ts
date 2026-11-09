@@ -4,7 +4,7 @@ import { z } from '@core/commands/schema';
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { isRecord } from '@lib/isRecord';
-import { aeroErrors, aeroSurfaceSchema, pivotCommandsSchema, turbulenceSchema } from './aeroDocument';
+import { aeroErrors, aeroSurfaceSchema, pivotCommandsSchema, reservedPivotKeys, turbulenceSchema } from './aeroDocument';
 import { batterySchema, powerErrors, powertrainSchema } from './powerDocument';
 
 const RESERVED_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
@@ -225,7 +225,8 @@ export const flightDocument: DocumentExtension = {
           : [];
       },
     );
-    if (reserved.length > 0) return reserved;
+    const reservedPivots = reservedPivotKeys(slice);
+    if (reserved.length + reservedPivots.length > 0) return [...reserved, ...reservedPivots];
     const errors = sliceSchemaErrors(flightSchema, slice, 'flight');
     if (errors.length > 0) return errors;
     return referenceErrors(flightSchema.parse(slice), bodiesOf(raw), dynamicsIdsOf(raw));

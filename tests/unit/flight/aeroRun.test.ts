@@ -112,6 +112,9 @@ describe('aero surface in run_flight (FLT-M4)', () => {
     const measured = (metrics.aero['w']?.peakLiftN as number) / (massKg * G);
     expect(rel(measured, expected)).toBeLessThan(0.03);
     expect(metrics.aero['w']?.peakLiftTimeS).toBeCloseTo(2, 1);
+    // in still air at rest there is no flow, no force and no angle
+    const still = fly(doc, { durationS: 0.01 });
+    expect(still.aero['w']).toMatchObject({ finalLiftN: 0, finalDragN: 0, peakLiftN: 0 });
     // no gust: no lift at zero alpha
     const calm = fly(doc, { durationS: 1, initialVelocity: [20, 0, 0] });
     expect(calm.aero['w']?.peakLiftN).toBeLessThan(1e-6);
@@ -184,6 +187,16 @@ describe('aero surface in run_flight (FLT-M4)', () => {
     // starts at the t = 0 command and holds it until the next set-point
     const held = fly(doc, { durationS: 0.4, setpoints: [{ t: 0, pivotDeg: { w: -10 } }], initialVelocity: [20, 0, 0] });
     expect(held.aero['w']?.pivotDeg.final).toBeCloseTo(-10, 9);
+    // a later set-point that does not name the surface leaves its command alone
+    const kept = fly(doc, {
+      durationS: 1,
+      setpoints: [
+        { t: 0, pivotDeg: { w: -10 } },
+        { t: 0.5, position: [0, 0, 0] },
+      ],
+      initialVelocity: [20, 0, 0],
+    });
+    expect(kept.aero['w']?.pivotDeg.final).toBeCloseTo(-10, 9);
   });
 
   it('the pivot angle is in the table lookup: lift at alpha = 0 follows the table column of the pivot angle, and a hand-edited command is clamped to the servo limits', () => {

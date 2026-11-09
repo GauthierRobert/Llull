@@ -18,6 +18,9 @@ export const TURBULENCE_STEP_S = 0.005;
 /** Largest number of samples of one realisation (600 s at TURBULENCE_STEP_S). */
 const MAX_SAMPLES = 120_001;
 
+/** Largest filter time constant L / V, s (the warm-up before the first sample is 8 of them). */
+export const MAX_TURBULENCE_TAU_S = 120;
+
 export interface DrydenSpec {
   /** Standard deviation of the u, v, w components, m/s. */
   readonly sigmaMps: Vec3;

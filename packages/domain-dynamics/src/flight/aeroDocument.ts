@@ -1,7 +1,10 @@
 /** Load-time validation of the aero surface table and of the turbulence / pivot fields of `CadDocument.flight` (13 FLT M4). */
 
 import { z } from '@core/commands/schema';
+import { isRecord } from '@lib/isRecord';
+import { MAX_TURBULENCE_TAU_S } from './turbulence';
 
+const RESERVED_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 const text = z.string().trim().min(1);
 const finite = z.number();
 const positive = z.number().positive();
@@ -14,6 +17,28 @@ export const turbulenceSchema = z.strictObject({
   airspeedMps: positive,
   seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
 });
+
+/** Why `spec` (a turbulence field) cannot be realised, or null: a filter time constant L / V over MAX_TURBULENCE_TAU_S. */
+export function turbulenceProblem(spec: { readonly lengthScaleM: readonly number[]; readonly airspeedMps: number }): string | null {
+  const tau = Math.max(...spec.lengthScaleM) / spec.airspeedMps;
+  return tau > MAX_TURBULENCE_TAU_S
+    ? `turbulence lengthScaleM / airspeedMps = ${tau.toPrecision(4)} s exceeds ${MAX_TURBULENCE_TAU_S} s`
+    : null;
+}
+
+/** Reserved record keys among the pivot commands of the raw flight slice's scenarios (zod would drop an own "__proto__" key). */
+export function reservedPivotKeys(slice: unknown): string[] {
+  const scenarios = isRecord(slice) && isRecord(slice['scenarios']) ? slice['scenarios'] : {};
+  return Object.entries(scenarios).flatMap(([key, scenario]) => {
+    const setpoints = isRecord(scenario) && Array.isArray(scenario['setpoints']) ? scenario['setpoints'] : [];
+    return setpoints.flatMap((setpoint: unknown, k) => {
+      const commands = isRecord(setpoint) && isRecord(setpoint['pivotDeg']) ? setpoint['pivotDeg'] : {};
+      return Object.keys(commands)
+        .filter((name) => RESERVED_KEYS.has(name))
+        .map((name) => `flight.scenarios.${key}.setpoints.${k}.pivotDeg.${name}: reserved key`);
+    });
+  });
+}
 
 export const pivotCommandsSchema = z.record(text, finite).optional();
 
@@ -53,7 +78,11 @@ interface AeroSlice {
     | Readonly<
         Record<
           string,
-          { readonly bodyId: string; readonly setpoints: readonly { readonly pivotDeg?: Readonly<Record<string, number>> | undefined }[] }
+          {
+            readonly bodyId: string;
+            readonly wind: { readonly turbulence?: z.infer<typeof turbulenceSchema> | undefined };
+            readonly setpoints: readonly { readonly pivotDeg?: Readonly<Record<string, number>> | undefined }[];
+          }
         >
       >
     | undefined;
@@ -98,7 +127,10 @@ export function aeroErrors(slice: AeroSlice, dynamicsIds: ReadonlySet<string>, b
     )
       errors.push(`${at}.servo: minDeg <= neutralDeg <= maxDeg must lie inside the table's pivot range`);
   }
-  for (const [key, scenario] of Object.entries(slice.scenarios ?? {}))
+  for (const [key, scenario] of Object.entries(slice.scenarios ?? {})) {
+    const turbulence = scenario.wind.turbulence;
+    const problem = turbulence === undefined ? null : turbulenceProblem(turbulence);
+    if (problem !== null) errors.push(`flight.scenarios.${key}.wind: ${problem}`);
     scenario.setpoints.forEach((setpoint, k) => {
       for (const id of Object.keys(setpoint.pivotDeg ?? {})) {
         const surface = Object.hasOwn(surfaces, id) ? surfaces[id] : undefined;
@@ -107,5 +139,6 @@ export function aeroErrors(slice: AeroSlice, dynamicsIds: ReadonlySet<string>, b
         else if (surface.bodyId !== scenario.bodyId) errors.push(`${at}: surface '${id}' is on another body`);
       }
     });
+  }
   return errors;
 }

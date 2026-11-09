@@ -9,6 +9,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { idOrNext } from '@lib/explicitId';
 import { scale3 } from '@lib/vec3';
 import type { FlightController, FlightScenario, PidGains } from '../flight/controlModel';
+import { turbulenceProblem } from '../flight/aeroDocument';
 import { meanAxis } from '../flight/flightBlock';
 import { mixerRotors, thrustPerRpmSquared } from '../flight/flightRun';
 import { assessMixer, effectiveness } from '../flight/mixer';
@@ -371,6 +372,14 @@ export const defineFlightScenario = defineCommand({
       (turbulenceInput.sigmaMps.some((sigma) => !(sigma >= 0)) || turbulenceInput.lengthScaleM?.some((length) => !(length > 0)))
     )
       return fail('turbulence sigmaMps must be >= 0 and lengthScaleM > 0');
+    const slow =
+      turbulenceInput === undefined
+        ? null
+        : turbulenceProblem({
+            lengthScaleM: turbulenceInput.lengthScaleM ?? SCENARIO_DEFAULTS.turbulenceLengthScaleM,
+            airspeedMps: turbulenceInput.airspeedMps ?? SCENARIO_DEFAULTS.turbulenceAirspeedMps,
+          });
+    if (slow !== null) return fail(slow);
     const turbulence =
       turbulenceInput === undefined
         ? undefined
