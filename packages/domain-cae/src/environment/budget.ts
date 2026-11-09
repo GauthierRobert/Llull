@@ -2,10 +2,10 @@
 
 import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
-import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { isMissing } from './materialValue';
 import type { MaterialOutgassing } from './outgassing';
+import type { Part } from './parts';
 
 interface PartBudget {
   readonly entityId: string;
@@ -34,44 +34,37 @@ const LABEL = 'screening quantity (TML x mass, CVCM x mass), not a contamination
 
 const percentOf = (percent: number, massG: number): number => (percent / 100) * massG;
 
-/** Budget of every entity that carries one of `users`' materials; a part whose mass cannot be measured is listed with the reason. */
-export function budgetOf(
-  doc: CadDocument,
-  ctx: ExecutionContext | undefined,
-  users: ReadonlyMap<string, readonly string[]>,
-  data: ReadonlyMap<string, MaterialOutgassing>,
-): Budget {
+/** Budget of every part (instanced children once per instance); a part whose mass cannot be measured is listed with the reason. */
+export function budgetOf(ctx: ExecutionContext | undefined, parts: readonly Part[], data: ReadonlyMap<string, MaterialOutgassing>): Budget {
   const perPart: PartBudget[] = [];
-  for (const [material, entityIds] of users) {
+  for (const { entityId, material, measureIn } of parts) {
     const values = data.get(material);
-    for (const entityId of entityIds) {
-      const measured = execute(doc, 'mass_properties', { entityId }, ctx);
-      const result: unknown = measured.data;
-      const massG = isRecord(result) && typeof result['massG'] === 'number' ? result['massG'] : null;
-      const massUnverified = !isRecord(result) || result['unverified'] !== false;
-      if (massG === null || values === undefined) {
-        perPart.push({
-          entityId,
-          material,
-          massG: null,
-          maxMassLossG: null,
-          maxCondensableG: null,
-          unverified: true,
-          note: massG === null ? measured.summary : 'no material data',
-        });
-        continue;
-      }
-      const { TML, CVCM } = values;
+    const measured = execute(measureIn, 'mass_properties', { entityId }, ctx);
+    const result: unknown = measured.data;
+    const massG = isRecord(result) && typeof result['massG'] === 'number' ? result['massG'] : null;
+    const massUnverified = !isRecord(result) || result['unverified'] !== false;
+    if (massG === null || values === undefined) {
       perPart.push({
         entityId,
         material,
-        massG,
-        maxMassLossG: isMissing(TML) ? null : percentOf(TML.value, massG),
-        maxCondensableG: isMissing(CVCM) ? null : percentOf(CVCM.value, massG),
-        unverified: massUnverified || (!isMissing(TML) && TML.unverified) || (!isMissing(CVCM) && CVCM.unverified),
-        ...(isMissing(TML) || isMissing(CVCM) ? { note: `${isMissing(TML) ? 'TML' : 'CVCM'} unknown: that figure is not counted` } : {}),
+        massG: null,
+        maxMassLossG: null,
+        maxCondensableG: null,
+        unverified: true,
+        note: massG === null ? measured.summary : 'no material data',
       });
+      continue;
     }
+    const { TML, CVCM } = values;
+    perPart.push({
+      entityId,
+      material,
+      massG,
+      maxMassLossG: isMissing(TML) ? null : percentOf(TML.value, massG),
+      maxCondensableG: isMissing(CVCM) ? null : percentOf(CVCM.value, massG),
+      unverified: massUnverified || (!isMissing(TML) && TML.unverified) || (!isMissing(CVCM) && CVCM.unverified),
+      ...(isMissing(TML) || isMissing(CVCM) ? { note: `${isMissing(TML) ? 'TML' : 'CVCM'} unknown: that figure is not counted` } : {}),
+    });
   }
   const sum = (pick: (part: PartBudget) => number | null): number =>
     perPart.reduce((total, part) => {

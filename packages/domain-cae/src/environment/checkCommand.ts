@@ -3,9 +3,9 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
-import { materialsInUse } from '@core/model/materialsInUse';
 import { aoItems } from './aoCheck';
 import { budgetOf } from './budget';
+import { partsOf, usersOf } from './parts';
 import { refuseEnv, type EnvItem } from './codes';
 import { spaceEnvironmentOf } from './model';
 import { outgassingOf, screenMaterial, type MaterialOutgassing, type OutgassingItem } from './outgassing';
@@ -76,7 +76,8 @@ export const checkSpaceEnvironment = defineCommand({
         ['entityIds'],
       );
 
-    const users = materialsInUse(doc, params.entityIds);
+    const parts = partsOf(doc, params.entityIds);
+    const users = usersOf(parts);
     const data = new Map<string, MaterialOutgassing>();
     const items: OutgassingItem[] = [];
     for (const [material, entityIds] of users) {
@@ -100,7 +101,7 @@ export const checkSpaceEnvironment = defineCommand({
           message: `${material}: a value used is typical, supplier-unstated or unspecified: not a verified basis`,
         });
     }
-    const budget = budgetOf(doc, ctx, users, data);
+    const budget = budgetOf(ctx, parts, data);
     const ao =
       mission.aoFluence === undefined ? undefined : { fluence: mission.aoFluence, items: aoItems(doc, ctx, users, mission.aoFluence) };
     const notes = [
