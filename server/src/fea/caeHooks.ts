@@ -33,6 +33,8 @@ import {
   op2ToResults,
   type Op2Import,
   writeVtu,
+  pretensionResultMap,
+  type VtuCut,
   type VtuEncoding,
   meshSummary,
   resultsSummary,
@@ -87,7 +89,10 @@ export interface CaeHooks {
     mesh: FeMeshArtifact,
     results: FeResultsArtifact | null,
     encoding: VtuEncoding,
+    cut?: VtuCut | null,
   ): { readonly text: string; readonly cells: number; readonly dropped: number };
+  /** The duplicate nodes of a pretensioned case (cut of the bolts on this mesh), null without bolts. */
+  pretensionResultMap(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact): VtuCut | null;
   readOp2(bytes: Uint8Array): Op2Result;
   op2ToResults(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, meshHash: string, op2: Op2Tables): Op2Import;
   parseFrd(text: string): FeResultsArtifact['steps'];
@@ -135,6 +140,7 @@ export const caeHooks: CaeHooks = {
   writeInp,
   writeBdf,
   writeVtu,
+  pretensionResultMap,
   readOp2,
   op2ToResults,
   parseFrd,

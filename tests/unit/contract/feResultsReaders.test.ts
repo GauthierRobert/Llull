@@ -24,6 +24,10 @@ const GATED: Readonly<Record<string, RegExp>> = {
 const EXEMPT: Readonly<Record<string, string>> = {
   'contact/queries.ts':
     'contact_report / check_contact read contact pressures, areas, slip and penetration (PHY-06): read-outs and set-up checks, no stress allowable or margin verdict',
+  'contact/jointSeries.ts':
+    'bolt force (section stress integral) against the applied load for joint_stiffness_from_fe and joint_margins (PHY-06): a global force equilibrium quantity, not a local stress, so the through-thickness bending budget of TR-INT-07 does not apply; the joint margins are force ratios with stated factors, reviewRequired, FAIL / MARGINAL pending a human',
+  'contact/pinInHole.ts':
+    'pin_bearing_report reads contact pressures and the hoop stress at the hole wall as a read-out (reviewRequired); no allowable, no pass / fail verdict',
   'creep/queries.ts':
     'creep_report / check_creep read creep strain, stress peaks and hold times (PHY-11): read-outs, a closed-form ratio and set-up checks, no stress allowable or margin verdict',
   'commands/analysis.ts': 'reads the case state only (unmeshed / meshed / solved), no result values',

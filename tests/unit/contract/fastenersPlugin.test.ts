@@ -18,6 +18,7 @@ const NAMES = [
   'insert_fastener_row',
   'check_fastener_layout',
   'delete_fastener_stack',
+  'list_fastener_stacks',
   'joint_capacity',
 ];
 

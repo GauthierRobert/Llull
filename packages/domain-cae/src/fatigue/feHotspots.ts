@@ -13,7 +13,7 @@ import { blocksAssessment } from '../results/adequacy';
 import { inadequacyReasons } from '../results/adequacy';
 import { nodeCoordinates, nodeEntities } from '../results/fields';
 import { evaluateCycles, isEvaluationFailure, type Evaluation, type Failure } from './evaluate';
-import { cyclesOfNode, fatigueFieldInput, FIELD_COMPONENTS, FLAG_BITS, readFatigueField } from './feField';
+import { cyclesOfNode, fatigueFieldInput, FIELD_COMPONENTS, FLAG_BITS, governingJobIndex, readFatigueField } from './feField';
 import { item, type Item } from './items';
 
 /** Relative agreement required between the native and the TypeScript damage of a hot spot (VC-FAT-43: same formulas in f64). */
@@ -89,7 +89,7 @@ export function evaluateFeCase(
     .slice(0, count)
     .map((index, rank): HotSpot => {
       const node = input.nodeIds[index] ?? 0;
-      const evaluation = evaluateCycles(fatigueCase, cyclesOfNode(input, index), input.damage);
+      const evaluation = evaluateCycles(fatigueCase, cyclesOfNode(input, governingJobIndex(input, field, index)), input.damage);
       const nativeDamage = field[index * FIELD_COMPONENTS.length] ?? Number.NaN;
       const rowKey = `h${rank + 1}`;
       if (!agrees(nativeDamage, evaluation.sum.damage))
