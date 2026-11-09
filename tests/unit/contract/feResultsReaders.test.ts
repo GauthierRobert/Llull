@@ -36,6 +36,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
   'commands/report.ts': 'fea_report states what was solved and its adequacy is shown by check_analysis; it issues no pass / fail margin',
   'commands/resultField.ts': 'a result field read-out (values, statistics) for the agent; no allowable, no verdict',
   'results/plotRequest.ts': 'builds a plot request of a verified field for the renderer; a picture, not a verdict',
+  'flightLoads/checkRotorResonance.ts':
+    'check_rotor_resonance compares stored modal FREQUENCIES with rotor excitation orders (a frequency margin against a caller-given requirement, unknown without one, reviewRequired); no stress allowable, no through-thickness bending budget',
   'dynamics/check.ts': 'modal / buckling / dynamic checks judge frequencies, participation and factors, not a stress margin',
   'dynamics/reportCommands.ts': 'modal and dynamic report read-outs (frequencies, mode shapes); no stress allowable',
   'explicit/queries.ts': 'explicit-dynamics artifacts (fe_explicit), not fe_results; energy and contact read-outs',

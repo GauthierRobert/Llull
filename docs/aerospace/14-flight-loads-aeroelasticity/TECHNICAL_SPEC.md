@@ -107,7 +107,7 @@ body margins → resonance → drop.
 | FLL-M1      | `field_to_tets` + `fea_mesh source=implicit_field` (unblocks the drone body today) | llull-field       |
 | FLL-M2      | `export_flight_loads`, `set_free_body_support`, relief check (**built**, §13)      | 13 FLT-M2         |
 | FLL-M3      | `set_print_idealization` + coupon workflow                                         | —                 |
-| FLL-M4      | `check_rotor_resonance` (modal exists)                                             | 13 FLT-M3 for rpm |
+| FLL-M4      | `check_rotor_resonance` (modal exists) (**built**, §14)                            | 13 FLT-M3 for rpm |
 | FLL-M5      | `create_drop_case`                                                                 | explicit exists   |
 | FLL-M6 (V1) | rotating loads, fatigue from flight, CFD pressure mapping, bonded joints           | 12 CFD            |
 | FLL-M7 (V2) | static aeroelastic, flutter, preCICE                                               | 10 AER, 13 FLT    |
@@ -193,3 +193,24 @@ See [FUNCTIONAL_SPEC.md §11](FUNCTIONAL_SPEC.md#11-references).
 - **Point supports**: a point support has a singular stress field whatever its reaction; read stresses away from the three support nodes (the mid-section in the tests).
 
 **Not in M2.** A solved-reaction cross-check; rotor reaction torques as mount moments; multi-body vehicles (13 FLT-M4); `envelope` is the three peaks (specific force, angular velocity, angular acceleration), not a convex envelope of all instants; nonlinear / modal analyses refuse inertial loads (`FLL_INERTIAL_UNSUPPORTED` in `check_analysis`); the Nastran export refuses them.
+
+## 14. Implementation status — FLL-M4 (2026-11-09)
+
+**Built.** `check_rotor_resonance` (read-only, plugin `cae`, toolset analysis): crossings of the stored modal frequencies of a solved modal analysis with the k . rpm / 60 excitation of the flight model's rotors.
+
+| Piece                                                                                                                                                                                                      | Where                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Command                                                                                                                                                                                                    | `packages/domain-cae/src/flightLoads/checkRotorResonance.ts` |
+| Arithmetic: crossing rpm = 60 f / k, margin = abs(f - k rpm/60) / (k rpm/60), smallest margin over a band                                                                                                  | `flightLoads/campbellMath.ts`                                |
+| Campbell SVG (rpm vs Hz, mode lines, k rpm/60 rays, shaded bands, crossings; `data.svg` + `data.width`, so `--save x.svg` / `x.png` work like `render_probe_history`)                                      | `flightLoads/campbellSvg.ts`                                 |
+| Rotors, controller rpm band, trimmed speed, read through `ctx.registry` (`inspect_dynamics`, `trim_flight`; no import of `domain-dynamics`, L10)                                                           | `flightLoads/rotorSource.ts`                                 |
+| Codes `FLL_NOT_MODAL`, `FLL_MODAL_UNAVAILABLE` (unsolved / stale / untrusted results), `FLL_NO_MODES`, `FLL_NO_ROTORS`, `FLL_ROTOR_UNKNOWN`, `FLL_TRIM_FAILED`, `FLL_BAND_INVALID`, `FLL_THRESHOLD_SOURCE` | `flightLoads/codes.ts`                                       |
+
+**Decisions.**
+
+- **FLL-D14 (what is read)**: only the stored modal results (`trustedRecord` state solved: a stale or unsolved case is refused, never read as zero modes; modes at or below 1e-3 Hz are rigid-body modes and skipped). Frequencies are constant with rpm: no centrifugal stiffening, no gyroscopic split, so the Campbell mode lines are horizontal (stated in `data.note`). Exact for the stored result; a spinning rotor on a flexible mount needs a prestressed modal solve (not built).
+- **FLL-D15 (rpm band and operating speeds)**: band = caller `rpmBand`, else `minRpm..maxRpm` of the flight controller commanding the rotor (the scenario's controller with `scenario`), else the rotor's own constant rpm, else none (rows unknown). Operating speeds = caller `operatingRpm`, else the trimmed speed of `scenario` (`trim_flight` at `airspeedMps` / `flightPathDeg`; a failed trim is `FLL_TRIM_FAILED`), else the rotor's own rpm when above 0. The band, the operating speeds and their sources are in `data.rotors[]`.
+- **FLL-D16 (no invented requirement)**: the spec names no required margin, so none is defaulted. `marginThresholdPct` is given together with `marginSource` (else `FLL_THRESHOLD_SOURCE`). Without it every row is `unknown` (crossings and margins are still reported); with it a row passes when its smallest margin over the band (0 at a crossing) is at least the threshold, else fails. The overall status is fail if any row fails, else unknown if any row or rotor is unknown (no band, no blade count), else pass; `reviewRequired` is true unless every row passes (also true for imported-unbound results).
+- **FLL-D17 (blade count)**: the flight model (`add_rotor`) has no blade count. It is the caller's `bladeCount` / `bladeCounts` (per rotor); harmonics default to [1, 2] plus the blade count. A rotor without a blade count is listed in `data.unassessed` and the overall status cannot be pass.
+
+**Validation.** `tests/unit/cae/rotorResonance.test.ts`. VC-FLL-04 oracle (Euler-Bernoulli cantilever of VC-FLL-01, rho 1270 kg/m^3): f1 = 72.078 Hz, f2 = 451.72 Hz as a `.dat` modal fixture: 2P crossing 2162.34 rpm (60 f / 2, exact), 1P 4324.68 rpm; hand margin: 72.078 Hz against 2P at 3000 rpm (100 Hz) is 27.922 %, at the 2400 rpm band edge (80 Hz) 9.9025 %. Failure paths: unknown / non-modal / unsolved / stale analysis, rigid-body-only results, no rotors, unknown rotor or scenario, inverted band, threshold without source, failed trim, schema rejection; purity; deterministic SVG. Trimmed hover speed read from `trim_flight` on a quad. The tests were mutation-checked (crossing factor, unknown to pass, threshold comparison each fail a test). **Not built:** a golden plan (the spec names none for M4; a modal solve needs CalculiX, so the real-solver case is open), a Campbell with speed-dependent frequencies, the rotor blade count in the flight model.
