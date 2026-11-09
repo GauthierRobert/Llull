@@ -110,4 +110,23 @@ describe('13 FLT validation plans, golden', () => {
     expect(again.document).toEqual(plan.document);
     expect(JSON.stringify(dataOf(again.steps, 'run_flight'))).toBe(JSON.stringify(dataOf(plan.steps, 'run_flight')));
   }, 120_000);
+
+  it('sc-flt-05-loads: flight -> trim -> run -> export_flight_loads -> static case: the relief balance closes, no relief finding; replay is identical', () => {
+    const plan = run('sc-flt-05-loads');
+    expect(normalize(plan.document)).toMatchSnapshot('document');
+    const trim = dataOf(plan.steps, 'trim_flight') as { controls: { value: number }[] };
+    // VC-FLT-09 hover of the reference quad: sqrt(m g / (4 k)) rpm on every rotor (closed form)
+    const hover = Math.sqrt((1.115 * 9.80665) / (4 * ((0.1158 * 1.225 * 0.254 ** 4) / 3600)));
+    for (const control of trim.controls) expect(control.value).toBeCloseTo(hover, 4);
+    expect(six(trim)).toMatchSnapshot('trim_flight');
+    expect(six(dataOf(plan.steps, 'linearize_flight'))).toMatchSnapshot('linearize_flight');
+    const exported = dataOf(plan.steps, 'export_flight_loads') as { instants: { loadCase: string; thrustN: Record<string, number> }[] };
+    expect(exported.instants[0]?.loadCase).toBe('FLT_climb_peak');
+    expect(six(exported)).toMatchSnapshot('export_flight_loads');
+    const checked = dataOf(plan.steps, 'check_analysis') as { items: { code: string }[] };
+    expect(checked.items.map((item) => item.code)).not.toContain('FLL_RELIEF_RESIDUAL');
+    const again = run('sc-flt-05-loads');
+    expect(again.document).toEqual(plan.document);
+    expect(JSON.stringify(dataOf(again.steps, 'export_flight_loads'))).toBe(JSON.stringify(dataOf(plan.steps, 'export_flight_loads')));
+  }, 120_000);
 });

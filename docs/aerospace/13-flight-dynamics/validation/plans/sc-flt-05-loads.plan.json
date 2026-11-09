@@ -1,0 +1,158 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [100, 100, 100], "position": [0, 0, 0] }, "as": "frame_geo" },
+  {
+    "command": "add_rigid_body",
+    "params": {
+      "entityIds": ["$frame_geo"],
+      "id": "frame",
+      "massKg": 1.115,
+      "inertiaKgM2": [0.001858333, 0.001858333, 0.001858333, 0, 0, 0]
+    }
+  },
+  { "command": "set_gravity", "params": { "gravity": [0, 0, -9.80665] } },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r1",
+      "body": "frame",
+      "hub": [180, -180, 0],
+      "axis": [0, 0, 1],
+      "spin": "ccw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r2",
+      "body": "frame",
+      "hub": [-180, 180, 0],
+      "axis": [0, 0, 1],
+      "spin": "ccw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r3",
+      "body": "frame",
+      "hub": [180, 180, 0],
+      "axis": [0, 0, 1],
+      "spin": "cw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  {
+    "command": "add_rotor",
+    "params": {
+      "id": "r4",
+      "body": "frame",
+      "hub": [-180, -180, 0],
+      "axis": [0, 0, 1],
+      "spin": "cw",
+      "rpm": 0,
+      "diameter": 0.254,
+      "thrustCoefficient": 0.1158,
+      "powerCoefficient": 0.0466,
+      "source": "UIUC apcsf_10x4.7_static row 4029 rpm (grade A)",
+      "spinInertiaKgM2": 0.00002
+    }
+  },
+  { "command": "add_flight_controller", "params": { "body": "frame", "maxRpm": 7000, "id": "fc" } },
+  {
+    "command": "define_flight_scenario",
+    "params": {
+      "body": "frame",
+      "controller": "fc",
+      "id": "climb",
+      "durationS": 3,
+      "setpoints": [{ "t": 0 }, { "t": 1, "position": [0.5, 0, 1] }]
+    }
+  },
+  { "command": "trim_flight", "params": { "scenario": "climb", "airspeedMps": 0 } },
+  { "command": "linearize_flight", "params": { "scenario": "climb", "airspeedMps": 0 } },
+  { "command": "run_flight", "params": { "scenario": "climb", "sampleRate": 50 } },
+  { "command": "create_material", "params": { "name": "abs", "density": 0.001115, "color": "#999999", "metalness": 0, "roughness": 0.5 } },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "abs",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 2, "unit": "GPa" }, "nu": { "value": 0.35, "unit": "1" } },
+      "basis": "unspecified",
+      "source": { "citation": "synthetic test fixture (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "abs", "set": { "id": "linear", "elastic": "elastic" }, "makeDefault": true }
+  },
+  { "command": "assign_material", "params": { "materialName": "abs", "entityIds": ["$frame_geo"] } },
+  { "command": "create_analysis", "params": { "name": "airframe", "analysisType": "static" }, "as": "an" },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$frame_geo" } },
+  {
+    "command": "set_free_body_support",
+    "params": {
+      "analysisId": "$an",
+      "entityId": "$frame_geo",
+      "points": [
+        [-40, -40, 0],
+        [40, -40, 0],
+        [-40, 40, 0]
+      ]
+    }
+  },
+  {
+    "command": "export_flight_loads",
+    "params": {
+      "analysisId": "$an",
+      "scenario": "climb",
+      "at": "peak_load",
+      "sampleRate": 1000,
+      "mounts": [
+        {
+          "name": "r1 mount",
+          "rotorId": "r1",
+          "direction": [0, 0, 1],
+          "target": { "entityId": "$frame_geo", "pointsNear": [[180, -180, 0]] }
+        },
+        {
+          "name": "r2 mount",
+          "rotorId": "r2",
+          "direction": [0, 0, 1],
+          "target": { "entityId": "$frame_geo", "pointsNear": [[-180, 180, 0]] }
+        },
+        {
+          "name": "r3 mount",
+          "rotorId": "r3",
+          "direction": [0, 0, 1],
+          "target": { "entityId": "$frame_geo", "pointsNear": [[180, 180, 0]] }
+        },
+        {
+          "name": "r4 mount",
+          "rotorId": "r4",
+          "direction": [0, 0, 1],
+          "target": { "entityId": "$frame_geo", "pointsNear": [[-180, -180, 0]] }
+        }
+      ]
+    }
+  },
+  { "command": "check_analysis", "params": { "analysisId": "$an" } }
+]

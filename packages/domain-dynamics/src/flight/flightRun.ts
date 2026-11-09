@@ -17,11 +17,11 @@ import { toMetres } from '@core/model/units';
 import type { Vec3 } from '@core/model/vectors';
 import { errorMessage } from '@lib/errorMessage';
 import { len3, scale3, sub3 } from '@lib/vec3';
-import { buildSimulationModel } from '../sim/simulationModel';
+import { buildSimulationModel, type BuiltSimulation } from '../sim/simulationModel';
 import type { FlightController, FlightScenario } from './controlModel';
 import type { ControllerRuntime, Inertia3 } from './controller';
 import { combineBlocks, flightBlock, meanAxis, NOT_CONTROLLED, type FlightLoop } from './flightBlock';
-import { compileFlight, withFlightLoads } from './flightLoads';
+import { compileFlight, withFlightLoads, type FlightRuntime } from './flightLoads';
 import { shortestArc } from './frames';
 import { assessMixer, effectiveness, type MixerRotor } from './mixer';
 import { flightOf, type FlightModel } from './model';
@@ -178,37 +178,29 @@ function sampleIntervalOf(duration: number, timestep: number, requested: number)
   return Math.max(1, Math.ceil(wanted / timestep - 1e-9)) * timestep;
 }
 
-/** Run scenario `scenarioId` of `doc` at physics step `timestep` (s), recording a sample every `sampleInterval` (s, rounded to steps). */
-export function runFlight(
+/** The vehicle of a scenario ready to fly or trim: simulation model without the flight records, rotors / aero / drag compiled, mass properties, controller. */
+export interface PreparedVehicle {
+  readonly built: BuiltSimulation;
+  readonly vehicle: SimulationBody;
+  readonly compiled: FlightRuntime | null;
+  readonly rotors: readonly RotorRuntime[];
+  readonly massKg: number;
+  readonly inertia: Inertia3;
+  readonly gravity: Vec3;
+  readonly start: Vec3;
+  readonly runtime: ControllerRuntime | null;
+  readonly power: readonly PowerRuntime[];
+}
+
+/** The scenario's body as one free rigid body with rotors, aero surfaces, drag, controller and powertrains compiled, or the refusal that says why not. */
+export function prepareVehicle(
   doc: CadDocument,
-  scenarioId: string,
-  options: { readonly timestep: number; readonly sampleInterval: number },
-  engine: PhysicsEngine,
+  scenario: FlightScenario,
+  controller: FlightController | null,
   kernel: GeometryKernel | null,
-): FlightRun | FlightRefusal {
+  timestep: number,
+): PreparedVehicle | FlightRefusal {
   const flight = flightOf(doc);
-  const scenarios = flight.scenarios ?? {};
-  const scenario = Object.hasOwn(scenarios, scenarioId) ? scenarios[scenarioId] : undefined;
-  if (scenario === undefined) return refusal('FLT_SCENARIO_UNKNOWN', `no flight scenario '${scenarioId}' (define_flight_scenario first)`);
-  const controllers = flight.controllers ?? {};
-  const controller = scenario.controllerId === null ? null : (controllers[scenario.controllerId] ?? null);
-  if (scenario.controllerId !== null && controller === null)
-    return refusal('FLT_MODEL_INVALID', `scenario '${scenario.id}' names a missing controller '${scenario.controllerId}'`);
-  const { timestep } = options;
-  const steps = Math.round(scenario.durationS / timestep);
-  if (steps > MAX_FLIGHT_STEPS)
-    return refusal(
-      'FLT_RUN_TOO_LONG',
-      `${scenario.durationS} s at ${timestep} s is ${steps} physics steps (at most ${MAX_FLIGHT_STEPS}): shorten the scenario or raise the timestep`,
-      [scenario.id],
-    );
-  const tick = controller === null ? 1 : stepsPerTick(controller.rateHz, timestep);
-  if (tick === null)
-    return refusal(
-      'FLT_CONTROL_RATE',
-      `the timestep ${timestep} s does not divide the controller period 1/${controller?.rateHz ?? 0} s into whole physics steps`,
-      [controller?.id ?? ''],
-    );
   const { flight: _ignored, ...withoutFlight } = doc;
   const built = buildSimulationModel(withoutFlight, timestep, kernel);
   if ('error' in built) return refusal('FLT_MODEL_INVALID', built.error);
@@ -247,6 +239,43 @@ export function runFlight(
   if (runtime !== null && 'code' in runtime) return runtime;
   const power = compilePowertrains(flight, rotors);
   if ('code' in power) return power;
+  return { built, vehicle, compiled, rotors, massKg, inertia, gravity, start, runtime, power };
+}
+
+/** Run scenario `scenarioId` of `doc` at physics step `timestep` (s), recording a sample every `sampleInterval` (s, rounded to steps). */
+export function runFlight(
+  doc: CadDocument,
+  scenarioId: string,
+  options: { readonly timestep: number; readonly sampleInterval: number },
+  engine: PhysicsEngine,
+  kernel: GeometryKernel | null,
+): FlightRun | FlightRefusal {
+  const flight = flightOf(doc);
+  const scenarios = flight.scenarios ?? {};
+  const scenario = Object.hasOwn(scenarios, scenarioId) ? scenarios[scenarioId] : undefined;
+  if (scenario === undefined) return refusal('FLT_SCENARIO_UNKNOWN', `no flight scenario '${scenarioId}' (define_flight_scenario first)`);
+  const controllers = flight.controllers ?? {};
+  const controller = scenario.controllerId === null ? null : (controllers[scenario.controllerId] ?? null);
+  if (scenario.controllerId !== null && controller === null)
+    return refusal('FLT_MODEL_INVALID', `scenario '${scenario.id}' names a missing controller '${scenario.controllerId}'`);
+  const { timestep } = options;
+  const steps = Math.round(scenario.durationS / timestep);
+  if (steps > MAX_FLIGHT_STEPS)
+    return refusal(
+      'FLT_RUN_TOO_LONG',
+      `${scenario.durationS} s at ${timestep} s is ${steps} physics steps (at most ${MAX_FLIGHT_STEPS}): shorten the scenario or raise the timestep`,
+      [scenario.id],
+    );
+  const tick = controller === null ? 1 : stepsPerTick(controller.rateHz, timestep);
+  if (tick === null)
+    return refusal(
+      'FLT_CONTROL_RATE',
+      `the timestep ${timestep} s does not divide the controller period 1/${controller?.rateHz ?? 0} s into whole physics steps`,
+      [controller?.id ?? ''],
+    );
+  const prepared = prepareVehicle(doc, scenario, controller, kernel, timestep);
+  if ('code' in prepared) return prepared;
+  const { built, vehicle, compiled, rotors, massKg, inertia, gravity, start, runtime, power } = prepared;
   const rowOf = rotors.map((rotor) => (controller === null ? NOT_CONTROLLED : controller.rotorIds.indexOf(rotor.rotor.id)));
   const ordered = controller?.rotorIds.flatMap((id) => rotors.filter((rotor) => rotor.rotor.id === id)) ?? [];
   const gravityLength = len3(gravity);

@@ -13,6 +13,8 @@ const KERNEL_HELPERS: readonly string[] = [
   'resolveMassProperties', // geometry/resolveMassProperties: exact mass through ctx.kernel
   'bodyMassProperties', // geometry/bodyMassProperties: rigid-body mass through a kernel
   'runFlight', // domain-dynamics flight/flightRun: the flight model's mass properties through a kernel
+  'prepareVehicle', // domain-dynamics flight/flightRun: the same vehicle set-up (trim, linearisation) through a kernel
+  'prepareVehicle', // domain-dynamics flight/flightRun: the same vehicle set-up (trim, linearisation) through a kernel
   'exactLeafVolume',
   'massProvenance',
   'buildSimulationModel', // domain-dynamics: body mass properties through a kernel

@@ -21,6 +21,7 @@ import { addFlightController, defineFlightScenario } from './flightControl';
 import { generateAeroTable } from './flightAero';
 import { addBattery, addFlightPowertrain } from './flightPower';
 import { flightReportCommand, runFlightCommand } from './flightRun';
+import { linearizeFlightCommand, trimFlightCommand } from './flightTrim';
 import { checkMotorDataCommand } from './motorData';
 import { setMotorDrive } from './motorDrive';
 import { inspectDynamics } from './inspect';
@@ -59,6 +60,8 @@ export const dynamicsCommands = commandCatalog(
   estimateEnduranceCommand,
   runFlightCommand,
   flightReportCommand,
+  trimFlightCommand,
+  linearizeFlightCommand,
   addCylinderPressure,
   setEngineLosses,
   addReferenceData,
