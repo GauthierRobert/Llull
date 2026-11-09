@@ -1,5 +1,6 @@
 /** Hostile-input table: CAE result readers (CalculiX .dat / .frd / .sta, Nastran OP2, field tables). */
 import { pretensionErrors } from '@cae/contact/pretensionValidate';
+import { parseHistorySeries } from '@cae/explicit/historyArtifact';
 import { parseSta } from '@cae/nonlinear/solverLog';
 import { parseDat } from '@cae/results/datReader';
 import { parseFrd } from '@cae/results/frdReader';
@@ -52,6 +53,16 @@ const staBuild = (records: number): string =>
     ' SUMMARY OF JOB INFORMATION\n  STEP      INC     ATT   ITRS     TOT TIME     STEP TIME      INC TIME\n',
     (k) => `     1${String(k + 1).padStart(9)}       1      3  ${sci(k / 1000)}${sci(0.5)}${sci(0.1)}\n`,
     '',
+    records,
+  );
+
+const historyRequests = [{ id: 'th-1.1', name: 'h', kind: 'part', part: 0, quantities: ['mass'] }] as const;
+
+const historiesBuild = (records: number): string =>
+  repeated(
+    '{"version":1,"series":[',
+    (k) => `${k > 0 ? ',' : ''}{"name":"h","quantity":"mass","components":1,"times":[${k + 1}],"values":[${k}]}`,
+    ']}',
     records,
   );
 
@@ -145,6 +156,14 @@ export const CAE_READERS: readonly HostileReader[] = [
     build: staBuild,
     read: (input) => parseSta(asText(input)),
     accepts: (result) => (result as unknown[]).length === 3,
+  },
+  {
+    name: 'cae: parseHistorySeries (histories.json of an explicit run)',
+    covers: ['domain-cae/src/explicit/historyArtifact.ts:parseHistorySeries'],
+    input: 'text',
+    build: historiesBuild,
+    read: (input) => parseHistorySeries(asText(input), historyRequests, { length: 'mm', energy: 'mJ' }),
+    accepts: (result) => Array.isArray(result) && result.length === 3,
   },
   {
     name: 'cae: parseFieldTable (x,y,z,T csv)',

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { ExplicitResultsSummary, FeExplicitArtifact } from '@core/model/explicit';
 import type { CadDocument } from '@core/model/types';
+import { historyUnit } from '@cae/explicit/historyJob';
 import { buildExplicitArtifact, buildExplicitJob, type ExplicitJob } from '@cae/index';
 import { artifactStore, barModel, code, contextWith, data, must } from './support';
 
@@ -246,5 +247,25 @@ describe('artifact, summary and explicit_time_history', () => {
     expect(build2(historiesText(run.job, [], (series) => (series['values'] = [1])))).toContain('malformed');
     expect(build2(historiesText(run.job, [], (series) => (series['times'] = [0, 0, 1, 2, 3])))).toContain('not increasing');
     expect(build2(historiesText(run.job, [], (series) => (series['name'] = 'ghost')))).toContain('was not requested');
+  });
+});
+
+describe('historyUnit', () => {
+  it('names the unit of every quantity in both supported unit systems', () => {
+    const mm = { length: 'mm', energy: 'mJ' };
+    const si = { length: 'm', energy: 'J' };
+    const names = [
+      'displacement',
+      'velocity',
+      'acceleration',
+      'mass',
+      'momentum',
+      'normal_impulse',
+      'normal_force',
+      'kinetic_energy',
+      'energy',
+    ];
+    expect(names.map((name) => historyUnit(name, mm))).toEqual(['mm', 'mm/s', 'mm/s^2', 't', 'N*s', 'N*s', 'N', 'mJ', 'mJ']);
+    expect(names.map((name) => historyUnit(name, si))).toEqual(['m', 'm/s', 'm/s^2', 'kg', 'N*s', 'N*s', 'N', 'J', 'J']);
   });
 });
