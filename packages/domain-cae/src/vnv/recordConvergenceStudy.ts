@@ -7,6 +7,7 @@ import type { CommandResult } from '@core/commands/types';
 import type { NamedValue } from '@core/model/topology';
 import { caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
+import { targetProblem } from '../shared/target';
 import { analysisIdSchema } from '../shared/schemas';
 import { percent } from './analysisShared';
 import { FS_THREE } from './convergenceAnalysis';
@@ -27,7 +28,7 @@ const NOTE =
  *   study is current each level's element count, h, value and unit equal the ones re-derived from the artifacts and the measure is the finest mesh volume;
  *   a study of an older set-up is recorded STALE as given; WITHOUT a store (replay on another machine) it is kept flagged `verified: false`;
  *   the report is never taken from params (it is recomputed from the levels on every read); Fs and the formal order are named values
- * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; a hash absent from the store -> VNV_ARTIFACT_NOT_FOUND (live; during a replay the study is kept `verified: false`); any recorded number differing from the
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; a level refinement target that targetProblem refuses (missing / 2D / not a part / no selector, intersectPlane without facesNear) -> its code; a hash absent from the store -> VNV_ARTIFACT_NOT_FOUND (live; during a replay the study is kept `verified: false`); any recorded number differing from the
  *   artifacts -> VNV_SUMMARY_MISMATCH; malformed levels -> VNV_LEVELS_INVALID; spacing ratio < 1.1 -> VNV_RATIO_TOO_SMALL; order iteration not
  *   converged -> VNV_ORDER_NOT_CONVERGED; unreadable quantity -> VNV_QUANTITY_UNAVAILABLE; levels that vary a control other than the study's own
  *   (mixed kinds) -> VNV_MIXED_REFINEMENT; a level count the kind does not allow, or a measure missing (h) / given (dt, p) -> VNV_LEVELS_INVALID / VNV_PARAM_INVALID
@@ -85,6 +86,11 @@ export const recordConvergenceStudy = defineCommand({
     const quantity = toStudyQuantity(given.quantity);
     if (isQuantityProblem(quantity)) return fail(quantity.code, quantity.message, [analysisId], ['study.quantity']);
     const levels = given.levels.map((level, index) => toStudyLevel(level, index));
+    for (const [index, level] of levels.entries())
+      for (const refinement of level.controls.refinements) {
+        const problem = targetProblem(doc, analysisCase, refinement.target);
+        if (problem !== null) return fail(problem.code, problem.message, [analysisId], [`study.levels.${index}.controls.refinements`]);
+      }
     const kind = kindProblem(
       given.refinement,
       levels.map((level) => level.controls),

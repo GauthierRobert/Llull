@@ -565,8 +565,8 @@ buckling case of the same part. Codes added besides §7.1: `NLS_IMPERFECTION_NOT
    `designLoad` in it [force units for every probe: a pressure curve was labelled N].
 8. **Column plan = the equivalent fixed-free half column** (L/2 = 250 mm, base face fixed, tip load and tip probe) [the pinned 500 mm draft]: a
    pinned end of a solid cannot be expressed with today's targets (`edgesNear [10, 5, 0]` ties between the two long edges of the end face;
-   `intersectPlane` is refused with `FEA_TARGET_PLANE_UNSUPPORTED` (commands and `meshRequest`) until `llull-mesh` resolves it: no OCCT fuse / plane
-   imprint exists there). The half column has the same P_cr = pi^2 E I / L^2 and its tip is the mid-span of the pinned column, so the generator values hold
+   `intersectPlane` was refused when this plan was written; `llull-mesh` now imprints the plane (05 §5.1, FEA-PLANE-MESH), so a pinned-end plan is expressible,
+   but the plan keeps the half column). The half column has the same P_cr = pi^2 E I / L^2 and its tip is the mid-span of the pinned column, so the generator values hold
    unchanged. The plan gained the 0.8 P_cr step (VC-NLS-50.c).
 
 ### 13.3 Validation, measured
@@ -595,4 +595,4 @@ The real run takes about 190 s (mesh, buckling solve, mesh, two load-controlled 
 - From M1 / M2: `update_analysis_step`, `delete_analysis_step`, `delete_curve_probe`, `nonlinear_report`, `check_nonlinear`,
   `nonlinear_analytic_check`, `NLS_LIMIT_POINT_REACHED` (a stopped run is a solver failure and is never recorded); company-rule amplitude tables
   (§11 q4: amplitudes stay explicit, no table).
-- `intersectPlane` targets (decision 8) and `hex_dominant` meshing are 05 gaps.
+- `hex_dominant` meshing is a 05 gap (`intersectPlane` targets, decision 8, are built: 05 §5.1).

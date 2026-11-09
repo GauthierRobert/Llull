@@ -151,6 +151,26 @@ describe('record_convergence_study (VC-VNV-10 at the level of artifacts, VC-VNV-
     expect(run(levels.map((level, index) => (index === 0 ? { ...level, elements: 5 } : level))).error?.code).toBe('VNV_SUMMARY_MISMATCH');
   });
 
+  it('refuses a level whose refinement target is not a valid FEA target (missing entity, intersectPlane without facesNear)', () => {
+    const bar = studyBar();
+    const levels = bar.study['levels'] as { controls: Record<string, unknown> }[];
+    const withTarget = (target: Record<string, unknown>): Record<string, unknown> => ({
+      ...bar.study,
+      levels: levels.map((level, index) =>
+        index === 1 ? { ...level, controls: { ...level.controls, refinements: [{ target, size: 0.1 }] } } : level,
+      ),
+    });
+    const refuse = (target: Record<string, unknown>): ReturnType<typeof execute> =>
+      execute(bar.doc, 'record_convergence_study', { analysisId: bar.analysisId, study: withTarget(target) }, bar.ctx);
+    const missing = refuse({ entityId: 'nope-1', facesNear: [[0, 0, 0]] });
+    expect(missing.error?.code).toBe('FEA_TARGET_UNRESOLVED');
+    expect(missing.error?.paths).toEqual(['study.levels.1.controls.refinements']);
+    expect(missing.document).toBe(bar.doc);
+    const noFaces = refuse({ entityId: bar.boxId, pointsNear: [[0, 0, 0]], intersectPlane: { point: [1, 0, 0], normal: [1, 0, 0] } });
+    expect(noFaces.error?.code).toBe('FEA_TARGET_UNRESOLVED');
+    expect(noFaces.summary).toContain('intersectPlane needs facesNear');
+  });
+
   it('refuses malformed input without changing the document', () => {
     const bar = studyBar();
     const levels = bar.study['levels'] as Record<string, unknown>[];
