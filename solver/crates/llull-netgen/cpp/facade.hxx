@@ -72,7 +72,7 @@ class Shape {
   std::unique_ptr<Shape> defeatured(rust::Slice<const int32_t> faces) const;
   // The shape split by the plane through `plane` = [px, py, pz, nx, ny, nz] (OCCT splitter; the plane is bounded to the shape's box): the faces
   // it crosses are split along the section and the solids it cuts become several solids sharing the cut face. owners(face) = the face of
-  // this shape the new face lies on (empty for a cut face). Throws when the plane does not cut the shape.
+  // this shape the new face lies on (empty for a cut face). Returns null (not an error) when the plane does not cut the shape: it misses it, is tangent to it, or lies in one of its faces.
   std::unique_ptr<Shape> imprinted(rust::Slice<const double> plane) const;
 
   TopoDS_Shape shape;

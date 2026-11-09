@@ -13,13 +13,24 @@ const ON_REL: f64 = 1e-5;
 /// Sample points per edge are at most this fraction of the part diagonal apart.
 const SAMPLE_REL: f64 = 1.0 / 50.0;
 
+/// Two planes are one when their unit normals agree (either sign) and the point of one is this close to the other (analysis unit, relative to 1).
+const SAME_PLANE: f64 = 1e-9;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Plane {
     pub point: Point,
+    /// Unit length.
     pub normal: Point,
 }
 
 impl Plane {
+    /// The same plane written differently (rounding, a flipped or scaled normal): imprinted once.
+    pub fn same(&self, other: &Plane) -> bool {
+        let dot: f64 = (0..3).map(|k| self.normal[k] * other.normal[k]).sum();
+        let scale = 1.0 + other.point.iter().map(|c| c.abs()).fold(0.0, f64::max);
+        (dot.abs() - 1.0).abs() <= SAME_PLANE && self.distance(&other.point) <= SAME_PLANE * scale
+    }
+
     fn distance(&self, p: &Point) -> f64 {
         let length = self.normal.iter().map(|c| c * c).sum::<f64>().sqrt();
         (0..3).map(|k| (p[k] - self.point[k]) * self.normal[k]).sum::<f64>().abs() / length
@@ -34,7 +45,8 @@ pub fn plane_of(target: &Value, scale: f64) -> MeshResult<Option<Plane>> {
     if !normal.iter().chain(&point).all(|c| c.is_finite()) || normal.iter().all(|c| *c == 0.0) {
         return Err(malformed("'intersectPlane' needs a finite point and a non-zero normal"));
     }
-    Ok(Some(Plane { point, normal }))
+    let length = normal.iter().map(|c| c * c).sum::<f64>().sqrt();
+    Ok(Some(Plane { point, normal: normal.map(|c| c / length) }))
 }
 
 /// A plane target is only resolved on an STEP part meshed alone: other geometry / conformal bonding refuses it, never ignoring it.
@@ -79,15 +91,20 @@ impl Imprinted {
         if edges.is_empty() {
             return Ok(out);
         }
+        // one distance to each original edge decides most split edges; the rest of the samples are checked only for the edges that pass
         for edge in 1..=self.shape.edge_count() as i32 {
             let samples = self.shape.sample_edge(edge, SAMPLE_REL * diagonal)?;
             for &own in edges {
                 let mut near = !samples.is_empty();
                 for p in &samples {
-                    near &= original.edge_distance(own, p)? <= ON_REL * diagonal;
+                    if original.edge_distance(own, p)? > ON_REL * diagonal {
+                        near = false;
+                        break;
+                    }
                 }
                 if near {
                     out.insert(edge);
+                    break;
                 }
             }
         }
@@ -114,19 +131,19 @@ pub fn imprint(shape: &Shape, planes: &[Plane], entity_id: &str) -> MeshResult<I
     let mut origins: Vec<BTreeSet<i32>> = (1..=shape.face_count() as i32).map(|f| BTreeSet::from([f])).collect();
     let mut current: Option<Shape> = None;
     for plane in planes {
-        let next = current.as_ref().unwrap_or(shape).imprinted(&plane.point, &plane.normal).map_err(|error| {
-            if error.0.contains("does not cut") {
-                MeshError::new(
-                    "FEA_TARGET_UNRESOLVED",
-                    format!(
-                        "intersectPlane through {} with normal {} does not cut '{entity_id}'",
-                        py_point(&plane.point),
-                        py_point(&plane.normal)
-                    ),
-                )
-            } else {
+        let split =
+            current.as_ref().unwrap_or(shape).imprinted(&plane.point, &plane.normal).map_err(|error| {
                 MeshError::new("FEA_MESH_FAILED", format!("the plane could not be imprinted on '{entity_id}': {error}"))
-            }
+            })?;
+        let next = split.ok_or_else(|| {
+            MeshError::new(
+                "FEA_TARGET_UNRESOLVED",
+                format!(
+                    "intersectPlane through {} with normal {} does not cut '{entity_id}' (it misses it, is tangent to it, or lies in one of its faces)",
+                    py_point(&plane.point),
+                    py_point(&plane.normal)
+                ),
+            )
         })?;
         origins = (1..=next.face_count() as i32)
             .map(|f| next.owners(f).iter().filter_map(|&o| origins.get(o as usize - 1)).flatten().copied().collect())

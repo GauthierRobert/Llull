@@ -293,7 +293,7 @@ std::unique_ptr<Shape> Shape::imprinted(rust::Slice<const double> plane) const {
       if (index >= 1) out->owner_lists[index - 1].push_back(f);
     }
   }
-  if (!changed) throw std::runtime_error("the plane does not cut the shape");
+  if (!changed) return nullptr;
   return out;
 }
 

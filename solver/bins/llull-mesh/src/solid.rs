@@ -96,7 +96,7 @@ fn mesh_step(part: &Value, targets: &[&Value], controls: &Value, scale: f64, pat
     }
     let mut distinct: Vec<Plane> = Vec::new();
     for (_, plane) in &planes {
-        if !distinct.contains(plane) {
+        if !distinct.iter().any(|known| known.same(plane)) {
             distinct.push(*plane);
         }
     }
