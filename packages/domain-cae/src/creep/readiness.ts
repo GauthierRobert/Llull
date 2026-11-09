@@ -50,12 +50,7 @@ export function partIssues(doc: CadDocument, analysis: AnalysisCase, temperature
     const ids = [entityId, law.materialId];
     const error = (code: string, message: string): number =>
       issues.push({ code, severity: 'error', message: `part '${entityId}' (${law.materialId}): ${message}`, ids });
-    if (law.timeUnit !== 's')
-      error(
-        'CRP_LAW_TIME_UNIT',
-        `creep model '${law.modelId}' has timeUnit '${law.timeUnit}': the CalculiX cards are written without converting it`,
-      );
-    else if (law.elasticKind !== null && law.elasticKind !== 'elastic_isotropic')
+    if (law.elasticKind !== null && law.elasticKind !== 'elastic_isotropic')
       error('CRP_ORTHOTROPIC_V2', `elastic model is ${law.elasticKind}: only elastic_isotropic is accepted with creep`);
     else if (
       temperatureK !== null &&

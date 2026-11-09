@@ -118,7 +118,7 @@ describe('CalculiX cards (VC-MATL-13)', () => {
       'creep_n5',
       {
         e: { kind: 'elastic_isotropic', E: MPa(200000), nu: ONE(0.3) },
-        c: { kind: 'creep_norton', A: 1e-10, n: 5, m: 0, stressUnit: 'MPa', timeUnit: 'h', hardening: 'time' },
+        c: { kind: 'creep_norton', A: 1e-10, n: 5, m: 0, stressUnit: 'MPa', timeUnit: 's', hardening: 'time' },
       },
       { id: 's', elastic: 'e', creep: 'c' },
     );
@@ -131,11 +131,33 @@ describe('CalculiX cards (VC-MATL-13)', () => {
       'creep_gpa',
       {
         e: { kind: 'elastic_isotropic', E: MPa(200000), nu: ONE(0.3) },
-        c: { kind: 'creep_norton', A: 1e-10, n: 2, m: 0, stressUnit: 'GPa', timeUnit: 'h', hardening: 'time' },
+        c: { kind: 'creep_norton', A: 1e-10, n: 2, m: 0, stressUnit: 'GPa', timeUnit: 's', hardening: 'time' },
       },
       { id: 's', elastic: 'e', creep: 'c' },
     );
     expect(cards(gpa, { material: 'creep_gpa', target: 'calculix' }).lines[4]).toBe('1e-16,2.,0.');
+  });
+
+  // law de/dt_u = A sigma_u^n t_u^m; CalculiX reads sigma in MPa, t in s, de/dt in 1/s
+  // => A_card = A / (inMpa^n * inSeconds^(1+m)), inSeconds = seconds per timeUnit
+  it.each([
+    ['s', 0, 1e-10],
+    ['h', 0, 1e-10 / 3600],
+    ['min', 0, 1e-10 / 60],
+    ['h', 0.5, 1e-10 / 3600 ** 1.5],
+    ['h', -0.5, 1e-10 / 3600 ** 0.5],
+  ])('converts the Norton time unit %s (m = %d) into the card time of seconds', (timeUnit, m, expected) => {
+    const doc = single(
+      'creep_t',
+      {
+        e: { kind: 'elastic_isotropic', E: MPa(200000), nu: ONE(0.3) },
+        c: { kind: 'creep_norton', A: 1e-10, n: 5, m, stressUnit: 'MPa', timeUnit, hardening: 'time' },
+      },
+      { id: 's', elastic: 'e', creep: 'c' },
+    );
+    const [A, n, writtenM] = (cards(doc, { material: 'creep_t', target: 'calculix' }).lines[4] ?? '').split(',').map(Number);
+    expect((A ?? 0) / expected).toBeCloseTo(1, 12);
+    expect([n, writtenM]).toEqual([5, m]);
   });
 
   it('writes anisotropic, transversely isotropic and every hyperelastic card', () => {

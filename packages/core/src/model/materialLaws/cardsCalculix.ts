@@ -328,7 +328,11 @@ function creepCards(model: MaterialModel, context: Context): string[] | LawFailu
   if (law.hardening !== 'time') return unsupported('creep_norton', 'only time hardening has a native card');
   const inMpa = convertQuantity(1, law.stressUnit, 'stress', `models.${model.id}.stressUnit`);
   if (isLawFailure(inMpa)) return inMpa;
-  const A = law.A / inMpa ** law.n;
+  const inSeconds = convertQuantity(1, law.timeUnit, 'time', `models.${model.id}.timeUnit`);
+  if (isLawFailure(inSeconds)) return inSeconds;
+  // law: de/dt_u = A (sigma_u)^n (t_u)^m, sigma_u = sigma_MPa / inMpa, t_u = t_s / inSeconds, de/dt_s = de/dt_u / inSeconds
+  // => A_card = A / (inMpa^n * inSeconds^(1+m))
+  const A = law.A / (inMpa ** law.n * inSeconds ** (1 + law.m));
   return ['*CREEP,LAW=NORTON', ...context.temperatures.map((temperature) => row([A, law.n, law.m], temperature))];
 }
 

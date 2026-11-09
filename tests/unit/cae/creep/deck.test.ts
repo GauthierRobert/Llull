@@ -121,6 +121,12 @@ describe('creep deck', () => {
     expect(deckOf(gpa)).toContain('*CREEP,LAW=NORTON\n1e-10,5.,0.\n');
   });
 
+  it('converts a law in hours to the card seconds (A in 1/h = 1/3600 per s at m = 0) instead of refusing it', () => {
+    const hours = creepCube({ law: { A: 3.6e-7, timeUnit: 'h' } });
+    const card = /\*CREEP,LAW=NORTON\n([^,]+),5\.,0\.\n/.exec(deckOf(hours));
+    expect(Number(card?.[1])).toBeCloseTo(1e-10, 20);
+  });
+
   it('marks an unverified law in the deck header and writes no output of the preload step', () => {
     const c = creepCube({ basis: 'typical' });
     const text = deckOf(c);
@@ -128,12 +134,10 @@ describe('creep deck', () => {
     expect(procedure(text).split('*NODE FILE')).toHaveLength(2);
   });
 
-  it('refuses with the creep code: no hold, no creep law, a law in hours, a temperature outside the law validity', () => {
+  it('refuses with the creep code: no hold, no creep law, a temperature outside the law validity', () => {
     expect(refusalOf(creepCube({ step: null })).code).toBe('CRP_STEP_MISSING');
     const none = creepCube({ creep: false, step: null });
     expect(refusalOf(none, withHold(none, HOLD)).code).toBe('CRP_NO_VISCOUS_MATERIAL');
-    const hours = creepCube({ law: { timeUnit: 'h' }, step: null });
-    expect(refusalOf(hours, withHold(hours, HOLD)).code).toBe('CRP_LAW_TIME_UNIT');
     const c = creepCube();
     const hot = refusalOf(c, withCreep(c, { temperature: { kind: 'uniform', valueK: 500 } }));
     expect(hot.code).toBe('CRP_LAW_OUT_OF_RANGE');

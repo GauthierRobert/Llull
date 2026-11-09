@@ -9,8 +9,6 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   CRP_LAW_MISSING:
     'add_material_model a creep_norton law and an elastic model, define_constitutive_set { elastic, creep } with makeDefault, assign the material',
   CRP_LAW_FORM_UNSUPPORTED: 'use a time-hardening creep_norton law (creep_garofalo and strain hardening have no CalculiX card yet)',
-  CRP_LAW_TIME_UNIT:
-    "give the creep_norton law timeUnit 's' (the CalculiX cards do not convert the time unit of A; convert with creep_closed_form check=convert_norton_a)",
   CRP_LAW_OUT_OF_RANGE: 'change the temperature / load, or supply a law whose validity covers it; llull never extrapolates a creep law',
   CRP_LAW_UNVERIFIED: 'replace the law by a sourced, verified one (basis A, B or S, or company with a stated source)',
   CRP_DURATION_INVALID: 'give duration { value > 0, unit s | min | h }',

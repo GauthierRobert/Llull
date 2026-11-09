@@ -33,7 +33,7 @@ function problem(ctx: DeckContext): DeckRefusal | null {
  * `preloadStep`, and the `*VISCO, CETOL=` hold step (`INC=maxIncrements`, increments initial, duration, min, max) with the loads restated (step loads),
  * `*NODE FILE U` and `*EL FILE S, CEEQ` at the time points. The hold is CalculiX step 2 (1 without a preload step); its total time starts at `preloadPeriodS`.
  * @invariant a case without `creep` is never written; pure and byte-deterministic; every load case acts
- * @failure CRP_STEP_MISSING, CRP_NO_VISCOUS_MATERIAL, CRP_LAW_MISSING, CRP_LAW_FORM_UNSUPPORTED, CRP_LAW_TIME_UNIT, CRP_ORTHOTROPIC_V2, CRP_LAW_OUT_OF_RANGE; mechanical refusals
+ * @failure CRP_STEP_MISSING, CRP_NO_VISCOUS_MATERIAL, CRP_LAW_MISSING, CRP_LAW_FORM_UNSUPPORTED, CRP_ORTHOTROPIC_V2, CRP_LAW_OUT_OF_RANGE; mechanical refusals
  */
 export function creepSteps(ctx: DeckContext): DeckSections {
   const blocked = problem(ctx);

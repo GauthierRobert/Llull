@@ -215,7 +215,7 @@ export const checkCreep = defineCommand({
   description:
     'Check a creep analysis end to end and return data { analysisId, state, status pass | warn | fail, items [{ code, severity, ids, message, remediation }], ' +
     'notes, reviewRequired: true }: the check_analysis items (parts, supports, mesh, stale results) plus the creep ones - no hold (CRP_STEP_MISSING), a part ' +
-    'without a creep law (CRP_LAW_MISSING, CRP_NO_VISCOUS_MATERIAL, CRP_LAW_FORM_UNSUPPORTED), a law with timeUnit other than s (CRP_LAW_TIME_UNIT), the hold temperature ' +
+    'without a creep law (CRP_LAW_MISSING, CRP_NO_VISCOUS_MATERIAL, CRP_LAW_FORM_UNSUPPORTED), the hold temperature ' +
     'outside the law validity (CRP_LAW_OUT_OF_RANGE), orthotropic elasticity (CRP_ORTHOTROPIC_V2), unverified law (CRP_LAW_UNVERIFIED, warning, not suppressible), plastic ' +
     'model beside creep (CRP_OVERSTRESS_MODEL, warning) and, on verified results, a hold that stopped early (CRP_HOLD_INCOMPLETE). Run it before fea_mesh / fea_solve ' +
     'and after the solve.',

@@ -171,7 +171,6 @@ describe('set_creep_step', () => {
   it.each([
     ['a material without a creep law', { creep: false }, 'CRP_LAW_MISSING'],
     ['a strain-hardening law', { law: { hardening: 'strain' } }, 'CRP_LAW_FORM_UNSUPPORTED'],
-    ['a law in hours (the cards do not convert the time unit)', { law: { timeUnit: 'h' } }, 'CRP_LAW_TIME_UNIT'],
     ['orthotropic elasticity', { elastic: 'orthotropic' }, 'CRP_ORTHOTROPIC_V2'],
     ['a hold temperature outside the law validity', { validityK: [400, 500] }, 'CRP_LAW_OUT_OF_RANGE'],
   ] as const)('refuses %s with %s, naming the part and the material', (_name, options, code) => {
