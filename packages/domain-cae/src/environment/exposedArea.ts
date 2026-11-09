@@ -23,7 +23,7 @@ export interface ExposedAreaRefusal {
 }
 
 /**
- * Total area of the named faces of the named solids. A face listed twice counts once.
+ * Total area of the named faces of the named solids. Entries of the same entity are merged and a face listed twice counts once.
  * @failure no exact kernel / unknown entity / face index out of range -> the inspect_faces code (KRN_NO_EXACT_KERNEL, ENTITY_NOT_FOUND, KRN_FACE_INDEX); an empty face list or a face without an area -> ENV_PARAM_INVALID
  */
 export function exposedAreaCm2(
@@ -35,9 +35,15 @@ export function exposedAreaCm2(
   if (isUnitFailure(scale)) return { code: 'ENV_PARAM_INVALID', message: `document unit '${doc.units}' has no area conversion` };
   let total = 0;
   const lines: string[] = [];
+  const merged = new Map<string, Set<number>>();
   for (const { entityId, faces } of exposed) {
-    const unique = [...new Set(faces)];
-    if (unique.length === 0) return { code: 'ENV_PARAM_INVALID', message: `exposedFaces for '${entityId}' lists no face` };
+    if (faces.length === 0) return { code: 'ENV_PARAM_INVALID', message: `exposedFaces for '${entityId}' lists no face` };
+    const set = merged.get(entityId);
+    if (set === undefined) merged.set(entityId, new Set(faces));
+    else faces.forEach((face) => set.add(face));
+  }
+  for (const [entityId, faceSet] of merged) {
+    const unique = [...faceSet];
     const result = execute(doc, 'inspect_faces', { entityId, faces: unique }, ctx);
     if (result.error !== undefined) return { code: result.error.code, message: result.summary };
     const data: unknown = result.data;

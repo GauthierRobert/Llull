@@ -59,6 +59,30 @@ describe('ao_erosion exposedFaces (M3): areas summed from inspect_faces', () => 
     expect(result.document).toBe(doc);
   });
 
+  it('merges entries of the same entity: the same face in two entries counts once, different faces add up', () => {
+    const { doc, box } = scene();
+    const area = (faces: { entityId: string; faces: number[] }[]): number =>
+      (erosion(doc, { density, exposedFaces: faces }, kernelWithFaces()).data as { inputs: { area: { value: number } } }).inputs.area.value;
+    expect(
+      close(
+        area([
+          { entityId: box, faces: [0] },
+          { entityId: box, faces: [0] },
+        ]),
+        50,
+      ),
+    ).toBe(true);
+    expect(
+      close(
+        area([
+          { entityId: box, faces: [0] },
+          { entityId: box, faces: [1, 0] },
+        ]),
+        70,
+      ),
+    ).toBe(true);
+  });
+
   it('a caller `area` overrides the faces', () => {
     const { doc, box } = scene();
     const data = erosion(

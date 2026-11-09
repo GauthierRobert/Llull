@@ -14,8 +14,8 @@ export function serviceMismatch(doc: CadDocument, exposure: HumidityExposure | u
   if (service === undefined || exposure === undefined) return null;
   const rh = exposure.relativeHumidity;
   if (service.value === 'controlled' && rh > CONTROLLED_RH_MAX)
-    return `the corrosion service environment is 'controlled' but the humidity exposure is ${rh} % RH (above ${CONTROLLED_RH_MAX} %): one of the two is wrong`;
+    return `the corrosion service environment is 'controlled' but the humidity exposure is ${rh} % RH (above ${CONTROLLED_RH_MAX} %): one of the two is wrong (llull consistency heuristic, ${CONTROLLED_RH_MAX} % RH, not a standard)`;
   if ((service.value === 'harsh' || service.value === 'artificial_seawater') && rh < HARSH_RH_MIN)
-    return `the corrosion service environment is '${service.value}' but the humidity exposure is ${rh} % RH (below ${HARSH_RH_MIN} %): one of the two is wrong`;
+    return `the corrosion service environment is '${service.value}' but the humidity exposure is ${rh} % RH (below ${HARSH_RH_MIN} %): one of the two is wrong (llull consistency heuristic, ${HARSH_RH_MIN} % RH, not a standard)`;
   return null;
 }

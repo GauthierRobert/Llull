@@ -78,7 +78,7 @@ export const checkSpaceEnvironment = defineCommand({
         ['entityIds'],
       );
 
-    const parts = partsOf(doc, params.entityIds);
+    const { parts, skipped } = partsOf(doc, params.entityIds);
     const users = usersOf(parts);
     const data = new Map<string, MaterialOutgassing>();
     const screened: OutgassingItem[] = [];
@@ -106,9 +106,15 @@ export const checkSpaceEnvironment = defineCommand({
           message: `${material}: a value used is typical, supplier-unstated or unspecified: not a verified basis`,
         });
     }
+    for (const entry of skipped)
+      findings.push({
+        code: 'ENV_PARTS_SKIPPED',
+        severity: 'warning',
+        message: `${entry.rootId}: parts not listed (${entry.reason}); the budget is incomplete`,
+      });
     const mismatch = serviceMismatch(doc, mission.humidityExposure);
     if (mismatch !== null) findings.push({ code: 'ENV_SERVICE_ENVIRONMENT_MISMATCH', severity: 'warning', message: mismatch });
-    const budget = budgetOf(ctx, parts, data);
+    const budget = budgetOf(ctx, parts, data, skipped);
     const ao =
       mission.aoFluence === undefined ? undefined : { fluence: mission.aoFluence, items: aoItems(doc, ctx, users, mission.aoFluence) };
     const notes = [

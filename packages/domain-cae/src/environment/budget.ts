@@ -5,7 +5,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import { isRecord } from '@lib/isRecord';
 import { isMissing } from './materialValue';
 import type { MaterialOutgassing } from './outgassing';
-import type { Part } from './parts';
+import type { Part, SkippedPart } from './parts';
 
 interface PartBudget {
   readonly entityId: string;
@@ -35,8 +35,23 @@ const LABEL = 'screening quantity (TML x mass, CVCM x mass), not a contamination
 const percentOf = (percent: number, massG: number): number => (percent / 100) * massG;
 
 /** Budget of every part (instanced children once per instance); a part whose mass cannot be measured is listed with the reason. */
-export function budgetOf(ctx: ExecutionContext | undefined, parts: readonly Part[], data: ReadonlyMap<string, MaterialOutgassing>): Budget {
-  const perPart: PartBudget[] = [];
+export function budgetOf(
+  ctx: ExecutionContext | undefined,
+  parts: readonly Part[],
+  data: ReadonlyMap<string, MaterialOutgassing>,
+  skipped: readonly SkippedPart[] = [],
+): Budget {
+  const perPart: PartBudget[] = skipped.map(
+    ({ rootId, reason }): PartBudget => ({
+      entityId: rootId,
+      material: '(unlisted)',
+      massG: null,
+      maxMassLossG: null,
+      maxCondensableG: null,
+      unverified: true,
+      note: `parts of this instance are not in the budget: ${reason}`,
+    }),
+  );
   for (const { entityId, material, measureIn } of parts) {
     const values = data.get(material);
     const measured = execute(measureIn, 'mass_properties', { entityId }, ctx);
