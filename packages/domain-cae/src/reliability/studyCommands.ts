@@ -2,12 +2,13 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
-import type { CommandResult } from '@core/commands/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { REVIEW_NOTE } from '../fatigue/items';
 import { refuseReliability } from './codes';
 import { isStudyFailure, studyContext, type StudyContext } from './context';
 import { reliabilityOf } from './model';
+import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
 import { formStudy, fosmStudy, monteCarloStudy } from './studies';
 
 const MAX_SAMPLES = 2_000_000;
@@ -43,8 +44,9 @@ const withContext = (
   command: string,
   limitState: string,
   proceed: (context: StudyContext) => CommandResult,
+  ctx?: ExecutionContext,
 ): CommandResult => {
-  const context = studyContext(doc, limitState);
+  const context = studyContext(doc, limitState, ctx);
   return isStudyFailure(context) ? refuseReliability(doc, command, context.code, context.message, context.ids, []) : proceed(context);
 };
 
@@ -73,7 +75,7 @@ export const propagateUncertainty = defineCommand({
       .describe(`Number of samples (default ${DEFAULT_SAMPLES}, at most ${MAX_SAMPLES}). Ignored by fosm.`),
     seed: seedSchema.optional(),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const fail = (code: string, message: string, paths: string[]): CommandResult =>
       refuseReliability(doc, 'propagate_uncertainty', code, message, [], paths);
     const model = reliabilityOf(doc);
@@ -89,8 +91,14 @@ export const propagateUncertainty = defineCommand({
     const results: Record<string, unknown> = {};
     const lines: string[] = [];
     for (const name of names) {
-      const context = studyContext(doc, name);
+      const context = studyContext(doc, name, ctx);
       if (isStudyFailure(context)) return fail(context.code, context.message, ['limitState']);
+      if (method !== 'fosm' && context.usesResponses && samples * names.length > MAX_RESPONSE_EVALUATIONS)
+        return fail(
+          'PRB_BUDGET_EXCEEDED',
+          `'${name}' reads a response: ${samples} samples x ${names.length} limit state(s) exceed ${MAX_RESPONSE_EVALUATIONS} registry evaluations`,
+          ['samples'],
+        );
       if (method === 'fosm') {
         const fosm = fosmStudy(context);
         results[name] = fosm.data;
@@ -154,7 +162,7 @@ export const runReliabilityStudy = defineCommand({
     maxIterations: iterationsSchema,
     tolerance: toleranceSchema,
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const methods = new Set(params.methods ?? ['form', 'mc', 'fosm']);
     const samples = params.samples ?? DEFAULT_SAMPLES;
     const precheck = (code: string, message: string, path: string): CommandResult =>
@@ -162,53 +170,65 @@ export const runReliabilityStudy = defineCommand({
     if (methods.has('mc') && params.seed === undefined) return precheck('PRB_PARAMS_INVALID', "method 'mc' needs an integer seed", 'seed');
     const budget = methods.has('mc') ? budgetIssue(samples, 1, reliabilityOf(doc).variableOrder.length) : null;
     if (budget !== null) return precheck('PRB_BUDGET_EXCEEDED', budget, 'samples');
-    return withContext(doc, 'run_reliability_study', params.limitState, (context) => {
-      const pf: Record<string, number | null> = {};
-      const items: unknown[] = [];
-      const data: Record<string, unknown> = { limitState: params.limitState, unit: context.limitState.unit, reviewRequired: true };
-      const iterations = params.maxIterations ?? 100;
-      const tolerance = params.tolerance ?? 1e-8;
-      let compared: { method: string; value: number | null } | null = null;
-      if (methods.has('form') || methods.has('sorm')) {
-        const study = formStudy(context, methods.has('sorm'), iterations, tolerance);
-        if (methods.has('form')) {
-          data['form'] = study.data;
-          pf['form'] = study.pf;
+    return withContext(
+      doc,
+      'run_reliability_study',
+      params.limitState,
+      (context) => {
+        if (methods.has('mc') && context.usesResponses && samples > MAX_RESPONSE_EVALUATIONS)
+          return precheck(
+            'PRB_BUDGET_EXCEEDED',
+            `the limit state reads a response: ${samples} samples exceed ${MAX_RESPONSE_EVALUATIONS} registry evaluations`,
+            'samples',
+          );
+        const pf: Record<string, number | null> = {};
+        const items: unknown[] = [];
+        const data: Record<string, unknown> = { limitState: params.limitState, unit: context.limitState.unit, reviewRequired: true };
+        const iterations = params.maxIterations ?? 100;
+        const tolerance = params.tolerance ?? 1e-8;
+        let compared: { method: string; value: number | null } | null = null;
+        if (methods.has('form') || methods.has('sorm')) {
+          const study = formStudy(context, methods.has('sorm'), iterations, tolerance);
+          if (methods.has('form')) {
+            data['form'] = study.data;
+            pf['form'] = study.pf;
+          }
+          if (methods.has('sorm')) data['sorm'] = study.data;
+          if (methods.has('sorm')) pf['sorm'] = study.pfSorm;
+          compared = methods.has('form') ? { method: 'FORM', value: study.pf } : { method: 'SORM', value: study.pfSorm };
         }
-        if (methods.has('sorm')) data['sorm'] = study.data;
-        if (methods.has('sorm')) pf['sorm'] = study.pfSorm;
-        compared = methods.has('form') ? { method: 'FORM', value: study.pf } : { method: 'SORM', value: study.pfSorm };
-      }
-      let interval: [number, number] | null = null;
-      if (methods.has('mc')) {
-        const study = monteCarloStudy(context, params.sampling ?? 'lhs', samples, params.seed ?? 0);
-        data['monteCarlo'] = study.data;
-        pf['mc'] = study.pf;
-        interval = study.wilson95;
-      }
-      if (methods.has('fosm')) {
-        const study = fosmStudy(context);
-        data['fosm'] = study.data;
-        pf['fosm'] = study.pf;
-      }
-      const comparedPf = compared?.value ?? null;
-      const inside = comparedPf !== null && interval !== null ? comparedPf >= interval[0] && comparedPf <= interval[1] : null;
-      if (inside === false)
-        items.push({
-          code: 'PRB_FORM_MC_DISAGREE',
-          severity: 'warning',
-          ids: [params.limitState],
-          message: `${compared?.method} Pf ${comparedPf} is outside the Monte Carlo Wilson 95 % interval [${interval?.[0]}, ${interval?.[1]}]`,
-          remediation: compared?.method === 'SORM' ? 'report the Monte Carlo value' : 'report the Monte Carlo value; consider SORM',
-        });
-      data['comparison'] = { pf, formInsideMonteCarloInterval: inside };
-      data['items'] = items;
-      const shown = Object.entries(pf).map(([method, value]) => `${method} ${value === null ? 'n/a' : value.toPrecision(6)}`);
-      return report(
-        doc,
-        `run_reliability_study '${params.limitState}': Pf by method — ${shown.join(', ')}${inside === false ? ' (PRB_FORM_MC_DISAGREE)' : ''}. ${REVIEW_NOTE}`,
-        data,
-      );
-    });
+        let interval: [number, number] | null = null;
+        if (methods.has('mc')) {
+          const study = monteCarloStudy(context, params.sampling ?? 'lhs', samples, params.seed ?? 0);
+          data['monteCarlo'] = study.data;
+          pf['mc'] = study.pf;
+          interval = study.wilson95;
+        }
+        if (methods.has('fosm')) {
+          const study = fosmStudy(context);
+          data['fosm'] = study.data;
+          pf['fosm'] = study.pf;
+        }
+        const comparedPf = compared?.value ?? null;
+        const inside = comparedPf !== null && interval !== null ? comparedPf >= interval[0] && comparedPf <= interval[1] : null;
+        if (inside === false)
+          items.push({
+            code: 'PRB_FORM_MC_DISAGREE',
+            severity: 'warning',
+            ids: [params.limitState],
+            message: `${compared?.method} Pf ${comparedPf} is outside the Monte Carlo Wilson 95 % interval [${interval?.[0]}, ${interval?.[1]}]`,
+            remediation: compared?.method === 'SORM' ? 'report the Monte Carlo value' : 'report the Monte Carlo value; consider SORM',
+          });
+        data['comparison'] = { pf, formInsideMonteCarloInterval: inside };
+        data['items'] = items;
+        const shown = Object.entries(pf).map(([method, value]) => `${method} ${value === null ? 'n/a' : value.toPrecision(6)}`);
+        return report(
+          doc,
+          `run_reliability_study '${params.limitState}': Pf by method — ${shown.join(', ')}${inside === false ? ' (PRB_FORM_MC_DISAGREE)' : ''}. ${REVIEW_NOTE}`,
+          data,
+        );
+      },
+      ctx,
+    );
   },
 });

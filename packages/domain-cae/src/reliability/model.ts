@@ -1,8 +1,9 @@
 /** Access to and validation of the probabilistic slice of the document (`CadDocument.probabilistic`, plugin `cae`). */
 
 import type { CadDocument } from '@core/model/types';
-import type { LimitState, RandomVariable, ReliabilityModel } from '@cae/reliability/types';
+import type { LimitState, RandomVariable, ReliabilityModel, Response } from '@cae/reliability/types';
 import { isRecord } from '@lib/isRecord';
+import { isReservedKey } from '@lib/reservedKey';
 import { distributionIssue } from './distributions';
 import { cholesky } from '@lib/denseLinalg';
 
@@ -59,6 +60,34 @@ function correlationErrors(correlation: unknown, variables: Record<string, unkno
   return symmetric && cholesky(rows) !== null ? [] : bad;
 }
 
+export const responseOf = (doc: CadDocument, name: string): Response | undefined => {
+  const responses = reliabilityOf(doc).responses ?? {};
+  return Object.hasOwn(responses, name) ? responses[name] : undefined;
+};
+
+function responseErrors(slice: Record<string, unknown>): string[] {
+  const { responses, responseOrder } = slice;
+  if (responses === undefined && responseOrder === undefined) return [];
+  if (!isRecord(responses) || !Array.isArray(responseOrder)) return ['probabilistic.responses / responseOrder are malformed'];
+  const errors = Object.entries(responses).flatMap(([name, response]) => {
+    const query = isRecord(response) ? response['query'] : undefined;
+    return !isReservedKey(name) &&
+      isRecord(response) &&
+      response['name'] === name &&
+      isString(response['id']) &&
+      isString(response['unit']) &&
+      isRecord(query) &&
+      isString(query['command']) &&
+      isRecord(query['params']) &&
+      isString(query['pointer'])
+      ? []
+      : [`response '${name}' is malformed`];
+  });
+  if (responseOrder.some((n) => !isString(n) || !Object.hasOwn(responses, n)))
+    errors.push('probabilistic.responseOrder names an unknown response');
+  return errors;
+}
+
 /** Value errors of the raw `probabilistic` slice (persistence rejects the file when non-empty). */
 export function reliabilityErrors(raw: Record<string, unknown>): string[] {
   const slice = raw['probabilistic'];
@@ -83,5 +112,5 @@ export function reliabilityErrors(raw: Record<string, unknown>): string[] {
     errors.push('probabilistic.variableOrder names an unknown variable');
   if (limitStateOrder.some((n) => !isString(n) || !Object.hasOwn(limitStates, n)))
     errors.push('probabilistic.limitStateOrder names an unknown limit state');
-  return [...errors, ...correlationErrors(slice['correlation'], variables)];
+  return [...errors, ...responseErrors(slice), ...correlationErrors(slice['correlation'], variables)];
 }

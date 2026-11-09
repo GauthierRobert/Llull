@@ -351,3 +351,19 @@ density (Simpson, 8000 panels) and bisection; `validation/tolerance_factors.csv`
 - [R7] OpenTURNS, LGPL-3.0+ — https://github.com/openturns/openturns (commit 829e678d78400544bd0849199caefd3f62cbeadd)
 - [R8] MMPDS statistical overview — https://www.mmpds.org/wp-content/uploads/2015/03/mmpds_2015_statistical_property_analysis_overview.pdf (search)
 - PHY-01 `PropertyModel` / `PropertyUncertainty`: `docs/physics/01-property-models/TECHNICAL_SPEC.md` §3, §5.5; 03 GDT §5.7; llull `commands/parametric/parameters.ts`, `commands/history/regenerate.ts`, `commands/types.ts` (`replayCache`).
+
+## 13. As built (PRB M2 rest: responses, parameter sensitivity, Sobol)
+
+Location and names differ from §2: the plugin is `cae` (`packages/domain-cae/src/reliability/`, toolset analysis); numerics sit next to the commands, not in core `lib`.
+
+| Spec | Built |
+| ---- | ----- |
+| `define_response` | `responseCommands.ts`: query must be a registered `readOnly` command (`PRB_RESPONSE_NOT_QUERY`), pointer is RFC 6901 applied to `{ summary, affected, data }` (so `/data/mass`), name not a variable / parameter / `pi` / `tau`; the summary probes the query once (current value or why it is not evaluable). Slice: `probabilistic.responses` + `responseOrder`, validated on load (`model.ts`). |
+| `evaluate.ts` (TR-PRB-08) | `responseEval.ts`: `withParameters` = `set_parameter` per bound parameter on an in-memory copy (history regenerates), `queryValue` reads the pointer; a failure is NaN per sample, reported (`PRB_RESPONSE_FAILED`), never dropped. Not done: material-property / load-scale overrides (binding kinds `materialProperty`, `loadScale` do not exist yet). |
+| limit state over responses | `define_limit_state` accepts response names; `studyContext` evaluates them through the registry and then takes EVERY parameter-bound variable as input (a response is opaque). `propagate_uncertainty` / `run_reliability_study` refuse more than 20 000 response evaluations (`PRB_BUDGET_EXCEEDED`). |
+| `parameter_sensitivity` | `sensitivityCommands.ts`: central difference (relative step `relativeStep`, default 1e-3, absolute step when the value is 0), forward / backward, elasticity (null for x = 0 or y = 0), `smooth` per §TR-PRB-09, item `PRB_NOT_SMOOTH`. `response` = defined name or inline `{ command, params, pointer }`. Row `unit` = unit of a variable bound to the parameter, else the document unit. |
+| `sensitivity_indices` | `sobol.ts` + `sensitivityCommands.ts`: Saltelli 2010 first order (f(B) centred on the mean, otherwise the noise scales with the mean: the box mass has mean 21.6 and sd 0.16), Jansen total, percentile bootstrap (default 200, 0 = none). Matrices A, B from one 2d-column standard-normal sample (`sampling` mc default | lhs) mapped by the Nataf transform. Cost N (d + 2), cap 2 000 000 (expression) / 20 000 (response). Refuses correlated inputs (`PRB_SOBOL_CORRELATED`), constant output (`PRB_VARIANCE_ZERO`), non-finite evaluations (`PRB_RESPONSE_FAILED`). |
+
+Validation: Ishigami N = 8192 seed 12345 within 0.03 of the closed form for S and ST (oracle committed in `tests/unit/cae/reliability/sobol.test.ts`); box mass dm/d(w,h,d) = 0.54 / 1.08 / 2.16 g/mm with unit elasticities and Sobol indices of m = rho w h d vs the product closed form (`parameterSensitivity.test.ts`). The random variables of `prb_box_mass.plan.json` are renamed `w_rv`, `h_rv`, `d_rv`: `define_random_variable` refuses a name equal to a document parameter.
+
+Left (not in M2-rest scope): `describe_probabilistic_model`, `basis_tolerance_factor`, `check_probabilistic`, `accept_reliability_result` (human gate); M3 material binding (VC-PRB-17, needs PHY-01 PropertyModel uncertainty); M4 response surfaces / importance sampling / Morris / FE transports.

@@ -2,6 +2,8 @@
 
 import { commandCatalog } from '@core/commands/schema';
 import { defineLimitState, defineRandomVariable, deleteRandomVariable, setCorrelation } from './setupCommands';
+import { defineResponse } from './responseCommands';
+import { parameterSensitivity, sensitivityIndices } from './sensitivityCommands';
 import { propagateUncertainty, runReliabilityStudy } from './studyCommands';
 
 export const reliabilityCommands = commandCatalog(
@@ -11,4 +13,7 @@ export const reliabilityCommands = commandCatalog(
   defineLimitState,
   propagateUncertainty,
   runReliabilityStudy,
+  defineResponse,
+  parameterSensitivity,
+  sensitivityIndices,
 );

@@ -45,6 +45,14 @@ export interface LimitState {
   readonly targetPf?: NamedTarget;
 }
 
+/** A named scalar read from a read-only registry command (`query.pointer` is an RFC 6901 JSON pointer into its `data`). */
+export interface Response {
+  readonly id: string;
+  readonly name: string;
+  readonly unit: string;
+  readonly query: { readonly command: string; readonly params: Readonly<Record<string, unknown>>; readonly pointer: string };
+}
+
 export interface ReliabilityModel {
   readonly variables: Readonly<Record<string, RandomVariable>>;
   readonly variableOrder: readonly string[];
@@ -52,6 +60,9 @@ export interface ReliabilityModel {
   readonly correlation?: { readonly names: readonly string[]; readonly matrix: readonly (readonly number[])[] };
   readonly limitStates: Readonly<Record<string, LimitState>>;
   readonly limitStateOrder: readonly string[];
+  /** Absent until the first `define_response`. */
+  readonly responses?: Readonly<Record<string, Response>>;
+  readonly responseOrder?: readonly string[];
 }
 
 declare module '@core/model/documentExtensions' {

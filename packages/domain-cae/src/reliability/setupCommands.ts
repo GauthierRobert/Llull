@@ -194,7 +194,7 @@ export const setCorrelation = defineCommand({
 
 /**
  * @affects doc.reliability.limitStates (adds or replaces the limit state called `name`; affected: [limit state id])
- * @invariant expression parses; every symbol is a random variable, a document parameter or pi / tau; failure is g < 0
+ * @invariant expression parses; every symbol is a random variable, a response, a document parameter or pi / tau; failure is g < 0
  * @failure bad name / expression / unknown symbol / bad target -> PRB_PARAMS_INVALID / PRB_EXPRESSION_INVALID / PRB_TARGET_INVALID (unchanged doc)
  */
 export const defineLimitState = defineCommand({
@@ -219,10 +219,16 @@ export const defineLimitState = defineCommand({
     if (syntax !== null) return fail('PRB_EXPRESSION_INVALID', syntax, ['expression']);
     const model = reliabilityOf(doc);
     const unknown = [...extractReferences(params.expression)].filter(
-      (symbol) => !Object.hasOwn(model.variables, symbol) && !Object.hasOwn(doc.parameters, symbol) && !isBuiltinConstant(symbol),
+      (symbol) =>
+        !Object.hasOwn(model.variables, symbol) &&
+        !Object.hasOwn(model.responses ?? {}, symbol) &&
+        !Object.hasOwn(doc.parameters, symbol) &&
+        !isBuiltinConstant(symbol),
     );
     if (unknown.length > 0)
-      return fail('PRB_EXPRESSION_INVALID', `unknown symbol(s) ${unknown.join(', ')}: define the random variables first`, ['expression']);
+      return fail('PRB_EXPRESSION_INVALID', `unknown symbol(s) ${unknown.join(', ')}: define the random variables / responses first`, [
+        'expression',
+      ]);
     const { targetBeta, targetPf } = params;
     if (
       (targetBeta !== undefined && (!(targetBeta.value > 0) || targetBeta.source.trim() === '')) ||
