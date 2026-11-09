@@ -57,6 +57,8 @@ export interface FatigueFieldInput {
   readonly damage: DamageSetup;
   /** Mesh nodes without a finite stress tensor in every mapped load case (left out of the field). */
   readonly skippedNodes: number;
+  /** Nodes on a bolt pretension cut: which face (low = the mesh node, high = its duplicate) gave the stress. */
+  readonly governing: readonly GoverningFace[];
 }
 
 const failure = (code: string, message: string, ids: readonly string[]): Failure => ({ code, message, ids });
@@ -151,25 +153,41 @@ function mappedHistories(
   return { histories, loadCaseIndex };
 }
 
+type StressField = { readonly values: Readonly<Record<string, readonly number[]>> } | undefined;
+
+const finiteTensor = (tensor: readonly number[] | undefined): tensor is readonly number[] =>
+  tensor !== undefined && tensor.length >= 6 && tensor.slice(0, 6).every((v) => Number.isFinite(v));
+
+/** A face of a bolt pretension cut that set the stress of a node: the solver node (low side = the mesh node, or a high-side copy). */
+export interface GoverningFace {
+  readonly node: number;
+  readonly solverNode: number;
+  readonly face: 'low' | 'high';
+}
+
 /**
- * Stress tensor of mesh node `node`. A node on a bolt pretension cut is solved as itself (the low-side copy) plus its `copies` (the high side): the
- * value of the unsplit node is taken as the mean over the copies that hold a tensor (the nodal stress of an unsplit node averages the elements on
- * both sides; the same low / high mean the bolt force readout uses, PHY-06 D18), so neither face's one-sided extrapolation sets the fatigue stress.
+ * Tensors (one per load case) of the face of mesh node `node` that governs. A node on a bolt pretension cut is solved twice: itself (the low side) and
+ * its `copies` (the high side). Each face is evaluated as its own scalar history (superposed load cases, the case measure) and the face with the larger
+ * peak-to-peak equivalent stress governs (ties: the low side), so the one-sided nodal stress of neither face is averaged away. A face without a finite
+ * tensor in every load case is not a candidate.
  */
-function nodeTensor(
-  field: { readonly values: Readonly<Record<string, readonly number[]>> } | undefined,
+function governingTensors(
+  fields: readonly StressField[],
   node: number,
   copies: readonly number[],
-): readonly number[] | undefined {
-  const own = field?.values[String(node)];
-  if (own === undefined || own.length < 6 || copies.length === 0) return own;
-  const held = [
-    own,
-    ...copies
-      .map((copy) => field?.values[String(copy)])
-      .filter((values): values is readonly number[] => values !== undefined && values.length >= 6),
-  ];
-  return own.map((_, component) => held.reduce((sum, values) => sum + (values[component] ?? 0), 0) / held.length);
+  histories: readonly (readonly number[])[],
+  measure: MeasureSpec,
+): { readonly tensors: readonly (readonly number[])[]; readonly solverNode: number } | null {
+  let best: { tensors: readonly (readonly number[])[]; solverNode: number; range: number } | null = null;
+  for (const solverNode of [node, ...copies]) {
+    const tensors = fields.map((field) => field?.values[String(solverNode)]);
+    if (!tensors.every(finiteTensor)) continue;
+    if (copies.length === 0) return { tensors, solverNode };
+    const series = nodeSeries(tensors, histories, measure);
+    const range = Math.max(...series) - Math.min(...series);
+    if (best === null || range > best.range) best = { tensors, solverNode, range };
+  }
+  return best;
 }
 
 /**
@@ -216,10 +234,14 @@ export function fatigueFieldInput(
   const values: number[] = [];
   const plan = pretensionResultMap(doc, analysisId, mesh);
   const copies = plan === null ? new Map<number, readonly number[]>() : copiesOf(plan);
+  const measure = measureSpecOf(fatigueCase.measure);
+  const governing: GoverningFace[] = [];
   for (const [nodeId] of mesh.nodes) {
-    const tensors = fields.map((field) => nodeTensor(field, nodeId, copies.get(nodeId) ?? []));
-    if (tensors.some((tensor) => tensor === undefined || tensor.length < 6 || tensor.slice(0, 6).some((v) => !Number.isFinite(v))))
-      continue;
+    const chosen = governingTensors(fields, nodeId, copies.get(nodeId) ?? [], mapped.histories, measure);
+    if (chosen === null) continue;
+    const { tensors } = chosen;
+    if (chosen.solverNode !== nodeId || copies.has(nodeId))
+      governing.push({ node: nodeId, solverNode: chosen.solverNode, face: chosen.solverNode === nodeId ? 'low' : 'high' });
     nodeIds.push(nodeId);
     for (const tensor of tensors) for (let c = 0; c < 6; c += 1) values.push((tensor?.[c] ?? 0) / perMpa);
   }
@@ -232,7 +254,7 @@ export function fatigueFieldInput(
     loadCases: mapped.histories.length,
     steps: mapped.histories[0]?.length ?? 0,
     histories: mapped.histories,
-    measure: measureSpecOf(fatigueCase.measure),
+    measure,
     counting: { method, residue, gate: gate ?? 0 },
     damage: jobDamageOf(damage),
   };
@@ -250,6 +272,7 @@ export function fatigueFieldInput(
     adequacy: adequacyOf(results, mesh),
     damage,
     skippedNodes: mesh.nodes.length - nodeIds.length,
+    governing,
   };
 }
 
