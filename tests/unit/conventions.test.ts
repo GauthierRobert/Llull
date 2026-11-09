@@ -236,3 +236,33 @@ describe('CONVENTIONS_GUIDE solution verification section (PHY-00 V&V, VNV-M4)',
     expect(names.filter((name) => getCommand(name) === undefined)).toEqual([]);
   });
 });
+
+describe('CONVENTIONS_GUIDE nonlinear static section (PHY-05 M4, AF-03)', () => {
+  const start = CONVENTIONS_GUIDE.indexOf('## 19. Nonlinear static');
+  const section = CONVENTIONS_GUIDE.slice(start);
+
+  it('names only registered commands, every nonlinear command of the pack and the review wording', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    expect(start).toBeGreaterThan(0);
+    const names = [...section.matchAll(/`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`/g)].map((match) => match[1] ?? '');
+    expect(names.filter((name) => getCommand(name) === undefined)).toEqual([]);
+    for (const command of [
+      'nonlinear_analytic_check',
+      'set_nonlinear_controls',
+      'add_analysis_step',
+      'update_analysis_step',
+      'delete_analysis_step',
+      'add_curve_probe',
+      'delete_curve_probe',
+      'add_imperfection',
+      'check_nonlinear',
+      'nonlinear_report',
+      'limit_load',
+      'beam_large_deflection',
+    ])
+      expect(section).toContain(command);
+    expect(section).toContain('not approved');
+    for (const code of ['NLS_ARC_LENGTH_UNSUPPORTED', 'NLS_CURVE_STALE', 'NLS_LIMIT_NOT_REACHED', 'FEA_HUMAN_GATE'])
+      expect(section).toContain(code);
+  });
+});
