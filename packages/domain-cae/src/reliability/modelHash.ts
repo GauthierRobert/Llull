@@ -1,20 +1,18 @@
 /** The hash that binds a reviewer's acceptance to the exact reliability model it was given (everything a limit state's result depends on). */
 
-import { derivedEntityIds } from '@core/plugins/host';
 import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { limitStateOf, reliabilityOf } from './model';
 
 /**
- * The entities as constructed: plugin-derived entities are left out (re-derived on load) and a kernel solid keeps its exact `brep` recipe but not the
- * tessellated `mesh` it evaluates to (so the hash does not depend on the machine's kernel arithmetic); imported meshes keep their triangles (input).
+ * The entities with the tessellated `mesh` of a kernel solid left out when it has a `brep` recipe (the recipe is the construction; the mesh is evaluated, so the hash
+ * does not depend on the machine's kernel arithmetic); imported meshes keep their triangles (input). Plugin-derived entities stay in: a plugin may not read the
+ * host's derived-id registry, and they are deterministic functions of the definition (a save and load keeps the hash: tested).
  */
 function constructiveEntities(doc: CadDocument): Record<string, unknown> {
-  const derived = derivedEntityIds(doc);
   return Object.fromEntries(
     Object.entries(doc.entities).flatMap(([id, entity]): Array<[string, unknown]> => {
-      if (derived.has(id)) return [];
       if (entity.kind !== 'mesh' || entity.brep === undefined) return [[id, entity]];
       const { mesh, ...recipe } = entity;
       void mesh;
