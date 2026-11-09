@@ -200,6 +200,7 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
   const pressures = new Map<string, readonly [element: number, face: number, value: number]>();
   const gravity = [0, 0, 0];
   const gravityDirection = [0, 0, 0];
+  let inertialCount = 0;
   const centrifugal: InertialTerms['centrifugal'][number][] = [];
   const angular: InertialTerms['angular'][number][] = [];
   for (const id of ctx.analysis.loadOrder) {
@@ -214,6 +215,13 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
         gravityDirection[axis] = (gravityDirection[axis] ?? 0) + component;
       });
     } else if (load.kind === 'inertial') {
+      if (inertialCount > 0)
+        return refusal(
+          'FEA_LOAD_INVALID',
+          `load case '${load.loadCase}' carries more than one inertial load ('${id}'): one rigid-body state per load case`,
+          [id],
+        );
+      inertialCount += 1;
       const part = inertialContribution(ctx, load, factor);
       part.field.forEach((component, axis) => {
         gravity[axis] = (gravity[axis] ?? 0) + component;
@@ -275,7 +283,7 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
     .map(([element, face, value]) => row(element, face === 0 ? 'P' : `P${face}`, value));
   const magnitude = Math.hypot(gravity[0] ?? 0, gravity[1] ?? 0, gravity[2] ?? 0);
   const directionLength = Math.hypot(gravityDirection[0] ?? 0, gravityDirection[1] ?? 0, gravityDirection[2] ?? 0);
-  const inertial = inertialDloadLines(ctx, gravity, { centrifugal, angular });
+  const inertial = inertialDloadLines(ctx, gravity, { centrifugal, angular }, options !== undefined);
   if ('code' in inertial) return inertial;
   if (inertial.perElement) dloads.push(...inertial.lines);
   else if (magnitude > 0)

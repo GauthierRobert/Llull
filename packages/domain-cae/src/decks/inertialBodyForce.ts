@@ -45,8 +45,12 @@ export function inertialContribution(
   };
 }
 
+const centroidCache = new WeakMap<DeckContext['mesh'], readonly (readonly [elementId: number, centroid: Vec3])[]>();
+
 /** Centroid (mean of the element's nodes, exact for linear and quadratic tetrahedra) of every element, in element order. */
 function elementCentroids(ctx: DeckContext): readonly (readonly [elementId: number, centroid: Vec3])[] {
+  const cached = centroidCache.get(ctx.mesh);
+  if (cached !== undefined) return cached;
   const coordinates = new Map(ctx.mesh.nodes.map((node) => [node[0], [node[1], node[2], node[3]] as const]));
   const out: [number, Vec3][] = [];
   for (const block of ctx.mesh.blocks)
@@ -63,6 +67,7 @@ function elementCentroids(ctx: DeckContext): readonly (readonly [elementId: numb
       }
       if (count > 0) out.push([element[0] ?? 0, [sum[0] / count, sum[1] / count, sum[2] / count]]);
     }
+  centroidCache.set(ctx.mesh, out);
   return out;
 }
 
@@ -70,18 +75,16 @@ function elementCentroids(ctx: DeckContext): readonly (readonly [elementId: numb
  * `*DLOAD` data lines of the inertial terms of a step. Without angular acceleration: the uniform field is the caller's `EALL, GRAV` line, only
  * the `CENTRIF` line is added here. With it the field is not uniform (CalculiX has no body-force field): one `GRAV` line per element with the
  * field of its centroid, `gravity - alpha x (centroid - O)`, replaces the uniform line (`perElement` true).
- * @failure more than one rotation about different axes in one step -> FEA_LOAD_INVALID (CENTRIF takes one axis per element)
+ * @param keepZero nonlinear steps restate loads with OP=MOD: an element whose field is zero still gets `GRAV, 0` so an earlier value is replaced, not kept
+ * @invariant at most one inertial load per step (the caller refuses more: CENTRIF takes one axis, and a second GRAV line of an element would replace the first)
+ * @invariant deck size with angular acceleration: one line of about 60 bytes per element
  */
 export function inertialDloadLines(
   ctx: DeckContext,
   gravity: readonly number[],
   terms: InertialTerms,
+  keepZero = false,
 ): { readonly lines: string[]; readonly perElement: boolean } | DeckRefusal {
-  if (terms.centrifugal.length > 1)
-    return {
-      code: 'FEA_LOAD_INVALID',
-      message: 'one load case carries more than one rotating inertial load: CalculiX CENTRIF takes one axis per step',
-    };
   const lines: string[] = [];
   const centrifugal = terms.centrifugal[0];
   if (terms.angular.length > 0) {
@@ -96,6 +99,7 @@ export function inertialDloadLines(
       const magnitude = Math.hypot(field[0], field[1], field[2]);
       if (magnitude > 0)
         lines.push(`${elementId}, GRAV, ${num(magnitude)}, ${field.map((component) => num(component / magnitude)).join(', ')}`);
+      else if (keepZero) lines.push(`${elementId}, GRAV, 0, 0, 0, 1`);
     }
   }
   if (centrifugal !== undefined)

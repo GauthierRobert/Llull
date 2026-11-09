@@ -8,7 +8,8 @@ import { boxOf, step } from '../materials/support';
 
 /**
  * `export_*` commands that emit nothing from the document. Add a name here only with the reason.
- * - export_flight_loads (14 FLL): turns a flight run into load cases INSIDE an analysis of the same document; no content leaves it (the deck is written by fea_export, which is gated).
+ * - export_flight_loads (14 FLL): turns a flight run into load cases INSIDE an analysis of the same document; nothing leaves it. Flight-derived data (loads, decks) leaves the
+ *   document only through the gated exports (fea_export, export_material_cards, ...), which refuse a controlled document.
  */
 const NOT_CONTENT_EXPORTS: ReadonlySet<string> = new Set<string>(['export_flight_loads']);
 

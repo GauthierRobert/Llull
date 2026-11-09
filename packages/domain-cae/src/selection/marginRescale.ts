@@ -68,7 +68,7 @@ export function marginConditions(
   const toMaterial = Object.hasOwn(doc.materials, swap.to) ? doc.materials[swap.to] : undefined;
   const nuFrom = fromMaterial === undefined ? 'no material' : poisson(fromMaterial, swap.from, analysis);
   const nuTo = toMaterial === undefined ? 'no material' : poisson(toMaterial, swap.to, analysis);
-  const gravity = analysis.loadOrder.filter((id) => analysis.loads[id]?.kind === 'gravity');
+  const gravity = analysis.loadOrder.filter((id) => analysis.loads[id]?.kind === 'gravity' || analysis.loads[id]?.kind === 'inertial');
   const prescribed = analysis.constraintOrder.filter((id) =>
     Object.values(analysis.constraints[id]?.dofs ?? {}).some((value) => value !== 0 && value !== undefined),
   );
@@ -89,7 +89,7 @@ export function marginConditions(
     result(
       'no_body_force',
       gravity.length === 0,
-      gravity.length === 0 ? 'no gravity / inertia load' : `gravity load(s) ${gravity.join(', ')} depend on the density`,
+      gravity.length === 0 ? 'no gravity / inertia load' : `gravity / inertial load(s) ${gravity.join(', ')} depend on the density`,
     ),
     result(
       'no_thermal_load',

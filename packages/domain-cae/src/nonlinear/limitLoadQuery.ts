@@ -85,7 +85,7 @@ function loadUnitOf(analysis: AnalysisCase, probe: CurveProbe): string {
   const load = Object.hasOwn(analysis.loads, probe.load.loadId) ? analysis.loads[probe.load.loadId] : undefined;
   if (load?.kind === 'pressure') return stressUnitName(analysis.unitSystem);
   if (load?.kind === 'moment') return `${force}*${lengthUnitName(analysis.unitSystem)}`;
-  if (load?.kind === 'gravity') return `${lengthUnitName(analysis.unitSystem)}/s^2`;
+  if (load?.kind === 'gravity' || load?.kind === 'inertial') return `${lengthUnitName(analysis.unitSystem)}/s^2`;
   return force;
 }
 

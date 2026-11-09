@@ -4,10 +4,14 @@ import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { flightDesignHash } from '@cae/flightLoads/designHash';
 import { chooseInstants, flightInstants } from '@cae/flightLoads/flightInstants';
+import { analysisErrors } from '@cae/model/validate';
+import { buildDeckContext } from '@cae/decks/context';
+import { inertialDloadLines } from '@cae/decks/inertialBodyForce';
+import { writeInp } from '@cae/decks/inpWriter';
 import { reliefAssessment } from '@cae/flightLoads/rigidBalance';
 import { bestSupportPattern } from '@cae/flightLoads/supportPattern';
 import { expectNoOp } from '../../helpers/expectNoOp';
-import { barDocument, mustRun } from './deckFixtures';
+import { barDocument, barMesh, mustRun } from './deckFixtures';
 
 const GRAVITY: [number, number, number] = [0, 0, -9.80665];
 
@@ -226,15 +230,17 @@ describe('reliefAssessment', () => {
 });
 
 describe('designHash and export edge cases', () => {
+  const hashOf = (doc: CadDocument): string =>
+    flightDesignHash(doc, doc.analysis?.cases[Object.keys(doc.analysis?.cases ?? {})[0] ?? ''] ?? ({ parts: {} } as never));
   it('is stable for the same document and sensitive to a body, not to an unrelated entity', () => {
     const bar = barDocument({ supports: false });
-    expect(flightDesignHash(bar.doc)).toBe(flightDesignHash(bar.doc));
+    expect(hashOf(bar.doc)).toBe(hashOf(bar.doc));
     const added = mustRun(bar.doc, 'add_box', { size: [1, 1, 1] });
-    expect(flightDesignHash(added)).toBe(flightDesignHash(bar.doc));
+    expect(hashOf(added)).toBe(hashOf(bar.doc));
     const body = mustRun(bar.doc, 'add_rigid_body', { entityIds: [bar.boxId], id: 'b', massKg: 1 });
-    expect(flightDesignHash(body)).not.toBe(flightDesignHash(bar.doc));
+    expect(hashOf(body)).not.toBe(hashOf(bar.doc));
     const heavier = mustRun(body, 'set_gravity', { gravity: [0, 0, -1] });
-    expect(flightDesignHash(heavier)).not.toBe(flightDesignHash(body));
+    expect(hashOf(heavier)).not.toBe(hashOf(body));
   });
 
   it('keeps the loads of other load cases when a case is re-exported, and refuses a direction without a rotor and a state without a reference point', () => {
@@ -263,5 +269,131 @@ describe('designHash and export edge cases', () => {
     const refused = execute(massless.doc, 'export_flight_loads', { analysisId: massless.analysisId, state });
     expectNoOp(refused, massless.doc);
     expect(refused.error?.code).toBe('FLL_STATE_INVALID');
+  });
+});
+
+describe('review fixes', () => {
+  const bar = barDocument({ supports: false });
+  const state = { linearAccel: [1, 0, 0], angularVelocity: [0, 0, 0], angularAccel: [0, 0, 0] };
+  const exported = (): CadDocument => {
+    const supported = mustRun(bar.doc, 'set_free_body_support', {
+      analysisId: bar.analysisId,
+      entityId: bar.boxId,
+      points: [
+        [0, 0, 0],
+        [2, 0, 0],
+        [0, 1, 0],
+      ],
+    });
+    return mustRun(supported, 'export_flight_loads', { analysisId: bar.analysisId, state });
+  };
+
+  it('the 3-2-1 pattern is refused just below a pivot of 0.05 and accepted just above (P3 off the P1P2 line)', () => {
+    const at = (h: number): boolean =>
+      bestSupportPattern([
+        [0, 0, 0],
+        [1, 0, 0],
+        [0.5, h, 0],
+      ]) !== null;
+    let [low, high] = [0, 1];
+    for (let i = 0; i < 50; i++) {
+      const mid = (low + high) / 2;
+      if (at(mid)) high = mid;
+      else low = mid;
+    }
+    expect(high).toBeGreaterThan(0.01);
+    expect(high).toBeLessThan(0.5);
+    expect(at(high * 0.95)).toBe(false);
+    expect(at(high * 1.05)).toBe(true);
+  });
+
+  it('FLL_RUN_STALE also sees a change of an analysed part (the design hash includes analysis.parts)', () => {
+    const doc = exported();
+    const analysis = doc.analysis?.cases[bar.analysisId];
+    if (analysis === undefined) throw new Error('no case');
+    const hash = flightDesignHash(doc, analysis);
+    const entity = doc.entities[bar.boxId];
+    if (entity === undefined) throw new Error('no entity');
+    const edited = {
+      ...doc,
+      entities: { ...doc.entities, [bar.boxId]: { ...entity, name: 'changed', position: [5, 0, 0] } },
+    } as CadDocument;
+    expect(flightDesignHash(edited, analysis)).not.toBe(hash);
+  });
+
+  it('a second inertial load in one load case is refused by the deck and not assessed by the balance', () => {
+    const doc = exported();
+    const analysis = doc.analysis?.cases[bar.analysisId];
+    const first = analysis?.loads[analysis.loadOrder[0] ?? ''];
+    if (analysis === undefined || first === undefined) throw new Error('no load');
+    const twin = { ...first, id: 'twin' };
+    const two = {
+      ...doc,
+      analysis: {
+        ...doc.analysis,
+        cases: {
+          ...doc.analysis?.cases,
+          [bar.analysisId]: { ...analysis, loads: { ...analysis.loads, twin }, loadOrder: [...analysis.loadOrder, 'twin'] },
+        },
+      },
+    } as CadDocument;
+    expect(reliefAssessment(two, two.analysis?.cases[bar.analysisId] ?? ({} as never))?.unassessed.join(' ')).toContain(
+      'more than one inertial load',
+    );
+    const sets = Object.fromEntries(analysis.constraintOrder.map((id, index) => [`C_${id}`, [[1], [2], [3]][index] ?? [1]]));
+    const written = writeInp(two, bar.analysisId, barMesh(two, bar.analysisId, bar.boxId, sets));
+    expect('code' in written && written.code).toBe('FEA_LOAD_INVALID');
+    expect('message' in written && written.message).toContain('more than one inertial load');
+  });
+
+  it('validation rejects a malformed freeBody, flightSource and angular vector and accepts the recorded ones', () => {
+    const doc = exported();
+    const analysis = doc.analysis?.cases[bar.analysisId];
+    if (analysis === undefined) throw new Error('no case');
+    const constraintId = analysis.constraintOrder[0] ?? '';
+    const loadId = analysis.loadOrder[0] ?? '';
+    const errorsOf = (loadPatch: Record<string, unknown>, constraintPatch: Record<string, unknown> = {}): string =>
+      analysisErrors({
+        ...doc,
+        analysis: {
+          ...doc.analysis,
+          cases: {
+            ...doc.analysis?.cases,
+            [bar.analysisId]: {
+              ...analysis,
+              loads: { ...analysis.loads, [loadId]: { ...analysis.loads[loadId], ...loadPatch } },
+              constraints: { ...analysis.constraints, [constraintId]: { ...analysis.constraints[constraintId], ...constraintPatch } },
+            },
+          },
+        },
+      } as unknown as Record<string, unknown>).join(' ');
+    expect(errorsOf({})).toBe('');
+    expect(errorsOf({}, { freeBody: 'yes' })).toContain('freeBody must be true');
+    expect(errorsOf({ flightSource: { scenario: 3, timeS: null, designHash: null } })).toContain('flightSource');
+    expect(errorsOf({ flightSource: { scenario: 's', timeS: 'now', designHash: 'h' } })).toContain('flightSource');
+    expect(errorsOf({ flightSource: 'x' })).toContain('flightSource');
+    expect(errorsOf({ flightSource: { scenario: 's', timeS: 1.5, designHash: 'abc' } })).toBe('');
+    expect(errorsOf({ angularVelocity: [0, 'x', 0] })).toContain('angularVelocity');
+  });
+
+  it('with OP=MOD (nonlinear steps) an element whose angular field is zero still gets GRAV 0, and the centroids are cached', () => {
+    const doc = exported();
+    const analysis = doc.analysis?.cases[bar.analysisId];
+    const sets = Object.fromEntries((analysis?.constraintOrder ?? []).map((id, index) => [`C_${id}`, [[1], [2], [3]][index] ?? [1]]));
+    const mesh = barMesh(doc, bar.analysisId, bar.boxId, sets);
+    const ctx = buildDeckContext(doc, bar.analysisId, mesh);
+    if (ctx === null) throw new Error('no context');
+    // element 1 = nodes 1 2 4 8: centroid (1.5, 0.5, 0.25); O on the line through it along alpha = z
+    const terms = {
+      centrifugal: [],
+      angular: [{ alpha: [0, 0, 5] as [number, number, number], point: [1.5, 0.5, 0] as [number, number, number] }],
+    };
+    const plain = inertialDloadLines(ctx, [0, 0, 0], terms);
+    const kept = inertialDloadLines(ctx, [0, 0, 0], terms, true);
+    if ('code' in plain || 'code' in kept) throw new Error('refused');
+    expect(plain.lines.some((line) => line.startsWith('1, GRAV'))).toBe(false);
+    expect(kept.lines).toContain('1, GRAV, 0, 0, 0, 1');
+    expect(kept.lines).toHaveLength(plain.lines.length + 1);
+    expect(inertialDloadLines(ctx, [0, 0, 0], terms, true)).toEqual(kept);
   });
 });

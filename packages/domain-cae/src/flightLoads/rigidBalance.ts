@@ -47,7 +47,9 @@ function applyInertia(inertia: MassProperties['inertia'], v: Vec3): Vec3 {
   return [ixx * v[0] + ixy * v[1] + ixz * v[2], ixy * v[0] + iyy * v[1] + iyz * v[2], ixz * v[0] + iyz * v[1] + izz * v[2]];
 }
 
-/** Application point of a force: the mean of the target points (pointsNear, else edgesNear, else facesNear), document units. */
+/**
+ * Application point of a force: the mean of the target points (the hints the user gave, not the resolved face centroid: the resolution needs the mesh, which this
+ * pre-solve balance does not have; a mount on a large face should be given points around its centroid) (pointsNear, else edgesNear, else facesNear), document units. */
 function loadPoint(load: FeaLoad): Vec3 | null {
   const points = [load.target?.pointsNear, load.target?.edgesNear, load.target?.facesNear].find(
     (list) => list !== undefined && list.length > 0,
@@ -107,12 +109,19 @@ function collect(analysis: AnalysisCase, loadCase: string, mass: MassProperties,
     momentScale: 0,
   };
   let assessed = true;
+  let inertialSeen = false;
   for (const id of analysis.loadOrder) {
     const load = analysis.loads[id];
     if (load === undefined || load.loadCase !== loadCase) continue;
     const vector = load.vector ?? ZERO;
     if (load.kind === 'gravity') sum.gravity = add(sum.gravity, vector);
     else if (load.kind === 'inertial') {
+      if (inertialSeen) {
+        reasons.push(`inertial load '${id}' (${load.name}) in '${loadCase}': more than one inertial load in a load case`);
+        assessed = false;
+        continue;
+      }
+      inertialSeen = true;
       sum.linear = add(sum.linear, vector);
       sum.omega = add(sum.omega, load.angularVelocity ?? ZERO);
       sum.alpha = add(sum.alpha, load.angularAccel ?? ZERO);

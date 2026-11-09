@@ -201,6 +201,12 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
       byCase.set(load.loadCase, accumulated);
       continue;
     }
+    if (load.kind === 'inertial')
+      return refuse(
+        'TOP_SETUP_INVALID',
+        `load '${id}' is an inertial flight load: topology optimisation takes gravity, not a rigid-body state (export_flight_loads is for static analyses)`,
+        [id],
+      );
     if (load.kind === 'moment' || load.target === undefined)
       return refuse(
         'TOP_SETUP_INVALID',

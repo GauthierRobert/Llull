@@ -74,7 +74,9 @@ function domainInputs(doc: CadDocument, study: TopologyStudy, withDensity: boole
 export function topologyInputHash(doc: CadDocument, study: TopologyStudy): string {
   const analysisCase = caseOf(doc, study.analysisId);
   if (analysisCase === undefined) return '';
-  const hasGravity = analysisCase.loadOrder.some((id) => analysisCase.loads[id]?.kind === 'gravity');
+  const hasGravity = analysisCase.loadOrder.some(
+    (id) => analysisCase.loads[id]?.kind === 'gravity' || analysisCase.loads[id]?.kind === 'inertial',
+  );
   const strip = <T extends { readonly name: string }>(record: T): Omit<T, 'name'> => {
     const { name, ...rest } = record;
     void name;

@@ -46,7 +46,7 @@ export function flightLoadItems(doc: CadDocument, analysis: AnalysisCase, ctx?: 
     );
   const sourced = loads.filter((load) => load.flightSource?.designHash != null);
   if (sourced.length > 0) {
-    const current = flightDesignHash(doc);
+    const current = flightDesignHash(doc, analysis);
     const stale = sourced.filter((load) => load.flightSource?.designHash !== current);
     if (stale.length > 0)
       items.push(
@@ -66,7 +66,7 @@ export function flightLoadItems(doc: CadDocument, analysis: AnalysisCase, ctx?: 
         item(
           'FLL_RELIEF_RESIDUAL',
           'error',
-          `load case '${balance.loadCase}' is not balanced: the supports would carry a net force ${number(balance.residualForce)} (${number((100 * balance.residualForce) / Math.max(balance.appliedForce, 1e-300))} % of the applied ${number(balance.appliedForce)}) and moment ${number(balance.residualMoment)} (${number((100 * balance.residualMoment) / Math.max(balance.appliedMoment, 1e-300))} % of ${number(balance.appliedMoment)}), above ${RELIEF_TOLERANCE * 100} %`,
+          `load case '${balance.loadCase}' is not balanced: the supports would carry a net force ${number(balance.residualForce)} (${number((100 * balance.residualForce) / Math.max(balance.appliedForce, 1e-300))} % of the applied ${number(balance.appliedForce)}) and moment ${number(balance.residualMoment)} (${number((100 * balance.residualMoment) / Math.max(balance.appliedMoment, 1e-300))} % of ${number(balance.appliedMoment)}), above ${RELIEF_TOLERANCE * 100} % (computed from the loads, a force acting at the mean of its target points)`,
           [analysis.id],
         ),
       );

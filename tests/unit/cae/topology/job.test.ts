@@ -1,5 +1,6 @@
 /** buildTopologyJob: voxelisation, 05 loads / supports mapped onto grid nodes (TECHNICAL_SPEC 5.4), regions and refusals. */
 import { describe, expect, it } from 'vitest';
+import { withInertialLoad } from '../inertialInject';
 import { execute } from '@core/commands/registry';
 import { entityToTriangles } from '@core/geometry/entityTriangles';
 import type { CadDocument } from '@core/model/types';
@@ -21,7 +22,11 @@ function analysisOn(
   doc = execute(doc, 'set_part_idealization', { analysisId: id, entityId, idealization: 'solid' }).document;
   for (const constraint of setup.constraints ?? [])
     doc = execute(doc, 'add_fea_constraint', { analysisId: id, name: 'c', ...constraint }).document;
-  for (const load of setup.loads ?? []) doc = execute(doc, 'add_fea_load', { analysisId: id, name: 'l', ...load }).document;
+  for (const load of setup.loads ?? [])
+    doc =
+      load['kind'] === 'inertial'
+        ? withInertialLoad(doc, id)
+        : execute(doc, 'add_fea_load', { analysisId: id, name: 'l', ...load }).document;
   const study = execute(doc, 'create_topology_study', {
     analysisId: id,
     name: 's',
@@ -330,6 +335,16 @@ describe('refusals of buildTopologyJob', () => {
     const refused = refusal(analysisOn(model, resolved));
     expect(refused.code).toBe(expected);
     expect(refused.message.length).toBeGreaterThan(10);
+  });
+
+  it('names an inertial flight load as unsupported (not as a load without a target)', () => {
+    const resolved = analysisOn(model, {
+      constraints: [left],
+      loads: [{ kind: 'inertial', loadCase: 'LC1', category: 'limit', vector: [0, 0, 0] } as never],
+    });
+    const refused = refusal(resolved);
+    expect(refused.code).toBe('TOP_SETUP_INVALID');
+    expect(refused.message).toContain('inertial flight load');
   });
 
   it('refuses a load or support on an entity outside the design domain', () => {

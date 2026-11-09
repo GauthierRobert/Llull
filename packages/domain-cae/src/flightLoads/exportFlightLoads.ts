@@ -19,13 +19,17 @@ import { analysedCentre } from './rigidBalance';
 
 const NEWTON_PER_LBF = 4.4482216152605;
 /** Sampling of the run the instants are read from, Hz (accelerations are central differences of the recorded velocity). */
-const DEFAULT_SAMPLE_RATE = 200;
+const DEFAULT_SAMPLE_RATE = 1000;
+/** Effective sampling below which the finite-difference acceleration can miss the 1e-4 relief gate (about 1e-3 at 200 Hz, 1e-6 at 1 kHz). */
+const LOW_SAMPLE_RATE_HZ = 900;
 /** Standard gravity of a flight document without a dynamics model, m/s^2 (world Z up). */
 const DEFAULT_GRAVITY: Vec3 = [0, 0, -9.80665];
 
 const mountSchema = z.object({
   name: z.string().min(1).describe('Name of the mount, e.g. "motor arm 1"; names its loads.'),
-  target: feaTargetSchema.describe('Where the interface load acts: faces (spread), edges or points of a part of the analysis.'),
+  target: feaTargetSchema.describe(
+    'Where the interface load acts: faces (spread), edges or points of a part of the analysis. The relief balance takes the force to act at the MEAN of these points (not the meshed face centroid): for a face mount give points around its centroid.',
+  ),
   force: vec3(
     'Fixed interface force [x, y, z] in model axes, in the case unit system (N-mm-t-s: N), the same at every exported instant.',
   ).optional(),
@@ -139,7 +143,7 @@ export const exportFlightLoads = defineCommand({
     'Turn a flight into load cases of a static FEA analysis (14 FLL, inertial relief): the rigid-body state (absolute acceleration a of the ' +
     'reference point O, angular velocity and acceleration, gravity) at an instant of a flight scenario, plus the interface forces / moments at ' +
     'named mounts. Source: scenario (+ at) flies it with run_flight and reads the series (acceleration and angular acceleration are central ' +
-    'differences of the 200 Hz default samples, rotated into the start-attitude model axes: the model axes must be the vehicle axes at t = 0), or an ' +
+    'differences of the 1 kHz default samples, rotated into the start-attitude model axes: the model axes must be the vehicle axes at t = 0), or an ' +
     'explicit state (m/s^2, rad/s, rad/s^2) without a flight. at = a time in s (nearest sample), "peak_load" (largest specific force |a - g|, ' +
     'default) or "envelope" (peaks of specific force, angular velocity and angular acceleration: up to three load cases). Each load case gets an ' +
     'inertial load, a gravity load and one force load per mount: a mount is a target with a fixed force, or a rotorId + direction (force = rotor ' +
@@ -172,7 +176,9 @@ export const exportFlightLoads = defineCommand({
       .positive()
       .max(10000)
       .optional()
-      .describe('Samples per second of the run the instants are read from. Default 200.'),
+      .describe(
+        'Samples per second of the run the instants are read from. Default 1000 (a run longer than 6 s is coarsened by run_flight to 6001 samples; data.effectiveSampleRateHz reports the real rate and the summary warns below 900 Hz).',
+      ),
   }),
   run: (doc, params, ctx): CommandResult => {
     const { analysisId } = params;
@@ -187,8 +193,9 @@ export const exportFlightLoads = defineCommand({
     const factors = unitSystemFactors(analysis.unitSystem);
     const accelUnit = 1 / factors.metresPerLength;
     const forceUnit = analysis.unitSystem === 'lbf-in-slinch-s' ? 1 / NEWTON_PER_LBF : 1;
-    const designHash = flightDesignHash(doc);
+    const designHash = flightDesignHash(doc, analysis);
     let chosen: ChosenInstant[];
+    let effectiveHz: number | null = null;
     if (params.state !== undefined) {
       const s = params.state;
       chosen = [
@@ -208,6 +215,7 @@ export const exportFlightLoads = defineCommand({
     } else {
       const instants = readRun(doc, { scenario: params.scenario ?? '', sampleRate: params.sampleRate }, ctx);
       if (typeof instants === 'string') return fail('FLL_RUN_FAILED', instants, [analysisId, params.scenario ?? '']);
+      const first = Math.min(...instants.map((instant) => instant.timeS));
       const at = params.at ?? 'peak_load';
       const last = Math.max(...instants.map((instant) => instant.timeS));
       if (typeof at === 'number' && at > last + 1e-9)
@@ -217,6 +225,7 @@ export const exportFlightLoads = defineCommand({
           [analysisId, params.scenario ?? ''],
           ['at'],
         );
+      effectiveHz = (instants.length - 1) / (last - first);
       chosen = chooseInstants(instants, at);
     }
     const fromRun = params.scenario !== undefined;
@@ -305,9 +314,21 @@ export const exportFlightLoads = defineCommand({
     const result = changed(
       withCase(doc, next),
       `export_flight_loads: ${chosen.length} load case(s) in '${analysisId}' from ${fromRun ? `scenario '${params.scenario}'` : 'an explicit state'} about O = [${reference.map((c) => Number(c.toPrecision(5))).join(', ')}]: ${summaries.join('; ')}. ` +
-        'Add set_free_body_support and check_analysis (FLL_RELIEF_RESIDUAL) before solving.',
+        (effectiveHz !== null && effectiveHz < LOW_SAMPLE_RATE_HZ
+          ? ` WARNING: the run was sampled at ${Number(effectiveHz.toPrecision(4))} Hz (a long run is coarsened to 6001 samples): the finite-difference acceleration may miss the 1e-4 relief gate, shorten the scenario or the instant window.`
+          : '') +
+        ' Add set_free_body_support and check_analysis (FLL_RELIEF_RESIDUAL) before solving.',
       added.map((load) => load.id),
     );
-    return { ...result, data: { analysisId, referencePoint: reference, designHash: fromRun ? designHash : null, instants: data } };
+    return {
+      ...result,
+      data: {
+        analysisId,
+        referencePoint: reference,
+        designHash: fromRun ? designHash : null,
+        effectiveSampleRateHz: effectiveHz,
+        instants: data,
+      },
+    };
   },
 });

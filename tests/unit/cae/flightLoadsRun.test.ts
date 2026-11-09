@@ -154,6 +154,25 @@ describe('export_flight_loads from a flight scenario', () => {
     expect(late.error?.code).toBe('FLL_INSTANT_UNKNOWN');
   });
 
+  it('the DEFAULT sampling (1 kHz) closes the 1e-4 relief gate with no warning and reports the effective rate', () => {
+    const result = execute(doc, 'export_flight_loads', { analysisId, scenario: 's', mounts: mounts(boxId) });
+    expect(result.rejected, result.summary).not.toBe(true);
+    expect(result.summary).not.toContain('WARNING');
+    expect((result.data as { effectiveSampleRateHz: number }).effectiveSampleRateHz).toBeGreaterThan(990);
+    const codes = (execute(result.document, 'check_analysis', { analysisId }).data as { items: { code: string }[] }).items.map(
+      (item) => item.code,
+    );
+    expect(codes).not.toContain('FLL_RELIEF_RESIDUAL');
+  });
+
+  it('a long run is coarsened by run_flight: the effective rate is reported and the summary warns', () => {
+    const long = step(doc, 'define_flight_scenario', { body: 'frame', controller: 'fc', id: 'long', durationS: 12 }).doc;
+    const result = execute(long, 'export_flight_loads', { analysisId, scenario: 'long', mounts: mounts(boxId) });
+    expect(result.rejected, result.summary).not.toBe(true);
+    expect((result.data as { effectiveSampleRateHz: number }).effectiveSampleRateHz).toBeLessThan(900);
+    expect(result.summary).toContain('WARNING');
+  });
+
   it('is pure; a mount that names a rotor the run does not have is refused', () => {
     expectPure(doc, () => exportedAt('peak_load'));
     const bad = exportedAt('peak_load', {
