@@ -90,3 +90,41 @@ export const addCurveProbe = defineCommand({
     );
   },
 });
+
+/**
+ * @affects doc.analysis.cases[analysisId].nonlinear.probes / probeOrder (removes 1 probe; affected: [probeId])
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not nonlinear_static -> NLS_CASE_NOT_NONLINEAR; unknown probe -> NLS_PROBE_REFERENCE_UNKNOWN
+ */
+export const deleteCurveProbe = defineCommand({
+  name: 'delete_curve_probe',
+  description:
+    'Remove one load-displacement curve probe (add_curve_probe) from a nonlinear_static analysis. The curve disappears from the next deck and ' +
+    'summary, and the recorded results turn stale: run fea_mesh and fea_solve again.',
+  annotations: { destructive: true },
+  params: z.object({
+    analysisId: analysisIdSchema,
+    probeId: z.string().describe('Id of the probe (affected[0] of add_curve_probe, e.g. prb-10.1) or its unique name.'),
+  }),
+  run: (doc, { analysisId, probeId }): CommandResult => {
+    const found = nonlinearCase(doc, 'delete_curve_probe', analysisId);
+    if (isRefusal(found)) return found;
+    const nonlinear = nonlinearOf(found.analysis);
+    const id = resolve(nonlinear.probes, nonlinear.probeOrder, probeId);
+    if (id === null)
+      return refuseNls(
+        doc,
+        'delete_curve_probe',
+        'NLS_PROBE_REFERENCE_UNKNOWN',
+        `no unique curve probe '${probeId}' in '${analysisId}' (probes: ${nonlinear.probeOrder.join(', ') || 'none'})`,
+        [analysisId],
+        ['probeId'],
+      );
+    const probes = Object.fromEntries(Object.entries(nonlinear.probes).filter(([key]) => key !== id));
+    const probeOrder = nonlinear.probeOrder.filter((key) => key !== id);
+    return changed(
+      withNonlinear(doc, found.analysis, { ...nonlinear, probes, probeOrder }),
+      `delete_curve_probe: removed '${id}' from '${analysisId}' (${probeOrder.length} curve probe(s) left).`,
+      [id],
+    );
+  },
+});

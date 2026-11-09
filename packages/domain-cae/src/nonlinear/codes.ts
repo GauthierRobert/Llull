@@ -37,6 +37,16 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'method plateau needs plateau { slopeFraction, window } stated by the engineer (no defaults), or use method peak / auto',
   NLS_CURVE_STALE: 'the set-up changed after the solve: run fea_mesh and fea_solve again before reading curves or limit loads',
   NLS_LIMIT_NOT_REACHED: 'the curve is still rising: extend the controlled displacement (displacement control passes the peak)',
+  NLS_INPUT_MISSING: 'nonlinear_analytic_check needs every input of the check: the message names the key and its unit',
+  NLS_INPUT_INVALID: 'give finite numbers in the unit of the key suffix (or { value, unit }) inside the domain of the formula',
+  NLS_THRESHOLD_UNSET:
+    'nlgeom is false and llull has no small-rotation / strain threshold to judge it: ask the owner or the company rule, or set nlgeom true',
+  NLS_PERMANENT_SET_THRESHOLD_UNSET:
+    'the case unloads to zero but no permanent-set limit is known: ask the owner or the company rule (no default, AF-31) and compare nonlinear_report permanentSet',
+  NLS_MATERIAL_MODEL_UNVERIFIED:
+    'use a verified, sourced material model and verified E / nu (PHY-02 / 08); every number computed from it is flagged',
+  NLS_SNAP_BACK_DETECTED:
+    'the probe displacement reverses while the load falls although the controlled displacement grows: trace it with beam_large_deflection (frames) or an arc-length solver',
   FEA_RESULTS_MISSING: 'run fea_mesh and fea_solve on the analysis so the results artifact exists in the store',
   FEA_ANALYSIS_NOT_FOUND: 'list the analyses with describe_analysis (no analysisId), or create one with create_analysis',
   FEA_PART_NOT_IN_ANALYSIS: 'add the entity first with set_part_idealization',
