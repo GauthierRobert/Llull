@@ -201,3 +201,27 @@ describe('dispose_bond_check: history replay', () => {
     expect(electroOpticalPlugin.document?.replaySeed?.(doc)).toEqual({});
   });
 });
+
+describe('stored dispositions and a port that fails', () => {
+  it('a port that throws on a hostile signature has not confirmed it: unconfirmed, never a crash', () => {
+    const { doc, p2, hash } = base();
+    const accepted = dispose(doc, { pathId: p2, confirmation: signature(doc, p2, hash) }).document;
+    const throwing: HumanSignaturePort = {
+      verify: () => {
+        throw new Error('hostile signature');
+      },
+    };
+    const row = checkBonding(accepted, {}, { ...defaultContext(), humanSignature: throwing }).rows.find((item) => item.pathId === p2);
+    expect(row?.disposition).toBe('unconfirmed');
+  });
+
+  it('deleting a path frees its solid: the guard no longer holds it', () => {
+    const { doc, p1, p2, box } = base();
+    const blocked = execute(doc, 'delete_entities', { ids: [box] });
+    expect(blocked.summary).toContain('is used by');
+    const withoutPaths = run(run(doc, 'delete_bond_path', { pathId: p1 }), 'delete_bond_path', { pathId: p2 });
+    const deleted = execute(withoutPaths, 'delete_entities', { ids: [box] });
+    expect(deleted.error).toBeUndefined();
+    expect(deleted.document.entities[box]).toBeUndefined();
+  });
+});

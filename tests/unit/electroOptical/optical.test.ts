@@ -226,10 +226,22 @@ describe('optical_balance: never a silent value', () => {
   });
 
   it('refuses impossible values in the record or the parameters (EOP_PROPERTY_RANGE)', () => {
-    const wild = run(doc, 'define_property_model', {
-      material: 'white_paint_test',
-      model: model('abs_eol', 'absorptivitySolar', { kind: 'constant', value: 1.4 }, { lifeState: 'EOL' }),
-    });
+    const paint = doc.materials['white_paint_test']!;
+    const bol = paint.propertyModels!.find((item) => item.id === 'abs_bol')!;
+    // define_property_model refuses 1.4, so a record like this can only arrive in a loaded file
+    const wild = {
+      ...doc,
+      materials: {
+        ...doc.materials,
+        white_paint_test: {
+          ...paint,
+          propertyModels: [
+            ...paint.propertyModels!,
+            { ...bol, id: 'abs_eol', form: { kind: 'constant' as const, value: 1.4 }, condition: { lifeState: 'EOL' as const } },
+          ],
+        },
+      },
+    };
     expect(refuse({ coating: 'white_paint_test', solarFlux: FLUX, radiatingFaces: 1, state: 'EOL' }, wild)).toBe('EOP_PROPERTY_RANGE');
     expect(refuse({ alpha: -0.1, eps: 0.9, solarFlux: FLUX, radiatingFaces: 1 })).toBe('EOP_PROPERTY_RANGE');
     expect(refuse({ alpha: 0.2, eps: 0, solarFlux: FLUX, radiatingFaces: 1 })).toBe('EOP_PROPERTY_RANGE');
@@ -251,5 +263,74 @@ describe('optical_balance: never a silent value', () => {
     const result = data(typical, { entityId: panel, solarFlux: FLUX, radiatingFaces: 1, state: 'EOL' });
     expect(result.unverified).toBe(true);
     expect(result.unverifiedReasons.some((reason) => reason.startsWith('alpha'))).toBe(true);
+  });
+});
+
+describe('optical_balance: temperature-dependent emissivity that does not settle', () => {
+  const { doc } = runPlan('eop_radiator_coating.plan.json', 'optical_balance');
+  /** eps = 0.1 below 300 K and 0.9 from 300 K: T(0.9) = 299.07 K < 300 K, T(0.1) = 518 K > 300 K, so the iteration swaps between the two forever. */
+  const stepped = (alphaValue: number): CadDocument => {
+    let next = run(doc, 'define_material_record', {
+      id: 'osc',
+      designation: 't',
+      productForm: 'coating',
+      specs: [],
+      licence: 'company-proprietary',
+      exportMarking: { regime: 'none' },
+    });
+    next = run(next, 'define_property_model', {
+      material: 'osc',
+      model: model('a', 'absorptivitySolar', { kind: 'constant', value: alphaValue }, { lifeState: 'BOL' }),
+    });
+    return run(next, 'define_property_model', {
+      material: 'osc',
+      model: {
+        id: 'e',
+        property: 'emissivityIr',
+        unit: '1',
+        variables: [{ variable: 'T', unit: 'K' }],
+        form: {
+          kind: 'table1d',
+          variable: 'T',
+          points: [
+            [100, 0.1],
+            [300, 0.9],
+            [600, 0.9],
+          ],
+          interpolation: 'step',
+        },
+        validity: [{ variable: 'T', unit: 'K', data: [100, 600] }],
+        basis: 'company',
+        condition: { opticalKind: 'hemispherical_total' },
+        source: SRC,
+        preferred: true,
+      },
+    });
+  };
+
+  it('is refused with EOP_BALANCE_NOT_CONVERGED naming the last temperature and change', () => {
+    const oscillating = stepped(0.3);
+    const result = balance(oscillating, { coating: 'osc', solarFlux: FLUX, radiatingFaces: 1 });
+    expect(result.error?.code).toBe('EOP_BALANCE_NOT_CONVERGED');
+    expect(result.summary).toMatch(/last T [\d.]+ K, last change [\d.]+ K/);
+    expect(result.document).toBe(oscillating);
+  });
+
+  it('alpha = 0 with a temperature-dependent emissivity is refused explicitly (T = 0 K is outside every model)', () => {
+    const result = balance(stepped(0), { coating: 'osc', solarFlux: FLUX, radiatingFaces: 1 });
+    expect(result.error?.code).toBe('EOP_BALANCE_DEGENERATE');
+  });
+
+  it('alpha = 0 with a constant emissivity answers T = 0 K (the closed form) and reports iterations 0', () => {
+    const result = data(doc, { alpha: 0, eps: 0.9, solarFlux: FLUX, radiatingFaces: 1 });
+    expect(result.temperatureK).toBe(0);
+    expect((result as unknown as { iterations: number }).iterations).toBe(0);
+  });
+
+  it('a converging temperature-dependent emissivity reports its iteration count', () => {
+    const { doc: radiator } = runPlan('eop_radiator_coating.plan.json');
+    expect(
+      (data(radiator, { coating: 'white_paint_test', solarFlux: FLUX, radiatingFaces: 1 }) as unknown as { iterations: number }).iterations,
+    ).toBe(0);
   });
 });

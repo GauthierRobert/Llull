@@ -8,7 +8,8 @@ import { humanGate, humanGatePayload } from '@core/model/humanGate';
 import { isRecordedConfirmation } from '@lib/withoutConfirmations';
 import { checkedRows } from './checkBonding';
 import { refuseEop } from './codes';
-import { DISPOSE_ACT, dispositionDetails, nonceOf } from './gate';
+import { DISPOSE_ACT, dispositionDetails } from './gate';
+import { nonceOf } from '../shared/signedGate';
 import { dispositionOf, electroOpticalOf, withElectroOptical } from './model';
 import { DISPOSITIONS, type BondDisposition } from './types';
 
@@ -17,7 +18,7 @@ const COMMAND = 'dispose_bond_check';
 /**
  * @affects doc.electroOptical.dispositions[pathId] (decision, justification, inputsHash of the path as checked, signer, signatureId, the verified signature, document uid; affected: [pathId]); never changes a row's status or number
  * @invariant the param is `confirmation` (never reaches the history: execute records { verified: true }); recorded only with a signature verified (and spent last) by `ctx.humanSignature` over sha256 of
- *   (act, path id, decision, justification, inputsHash, document uid, nonce); it applies only while the path is unchanged (check_bonding compares inputsHash) and in this document; a replay honours a recorded step only from a
+ *   (act, path id, decision, justification, inputsHash, document uid, nonce); it applies only while the path is unchanged (check_bonding compares inputsHash) and in this document; with no signing port a replay trusts the kept record only for the replay itself: every later check_bonding re-verifies it and, with no port, reports it unconfirmed (never accepted); a replay honours a recorded step only from a
  *   disposition already in the slice (kept by replaySeed) with the same decision, justification, inputsHash and uid
  * @failure no signing port, no signature or one that does not verify (an agent always) -> EOP_HUMAN_GATE; unknown path -> EOP_PATH_NOT_FOUND; a passing path -> EOP_NOTHING_TO_DISPOSE; blank justification -> EOP_PARAMS_INVALID;
  *   a document without uid -> EOP_DOCUMENT_UNIDENTIFIED (all refusals, unchanged doc)

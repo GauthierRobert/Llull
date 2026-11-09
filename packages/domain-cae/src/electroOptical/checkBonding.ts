@@ -4,7 +4,8 @@ import { defineCommand, z } from '@core/commands/schema';
 import { codedRejection, report } from '@core/commands/noop';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
-import { type BondRow, type BondStatus, bondRow, contactPairs } from './bondEval';
+import { bondContext } from './bondContext';
+import { type BondRow, type BondStatus, bondRow } from './bondEval';
 import { dispositionState } from './gate';
 import { dispositionOf, electroOpticalOf } from './model';
 
@@ -45,11 +46,10 @@ export function checkedRows(
     const path = bondPaths[id];
     return path === undefined ? [] : [path];
   });
-  const contacts = contactPairs(doc, paths, ctx);
-  if ('refusal' in contacts) return { ...contacts.refusal, summary: `${COMMAND}: ${contacts.refusal.summary}` };
-  const { pairs } = contacts;
+  const context = bondContext(doc, paths, ctx);
+  if ('refusal' in context) return { ...context.refusal, summary: `${COMMAND}: ${context.refusal.summary}` };
   return paths.map((path) => {
-    const row = bondRow(doc, path, pairs, ctx);
+    const row = bondRow(doc, path, context, ctx);
     return { ...row, disposition: dispositionView(doc, row, ctx) };
   });
 }
@@ -57,7 +57,7 @@ export function checkedRows(
 /**
  * @affects nothing; read-only, document returned unchanged, affected: []
  * @invariant data = { status, rows, counts, open, reviewRequired: true, notes }; row total = sum of its elements (joints as given, straps rho L / A with rho from evaluate_property at the path temperature); a path passes only when
- *   every element resolves, a sourced limit exists, the total is <= the limit, no bonded-interface coating is insulating or undeclared, and joined solids touch (find_contacts); overall status = worst row without a CONFIRMED human
+ *   every element resolves, a sourced limit exists, the total is <= the limit, no bonded-interface coating (or surface system, list_surface_systems) is insulating or undeclared, and joined solids touch (find_contacts or a fastener stack) and were tested; overall status = worst row without a CONFIRMED human
  *   disposition 'accepted' (re-verified through the signing port for this document and the path as it is); every limit is unverified
  * @failure unknown pathIds entry -> EOP_PATH_NOT_FOUND; a find_contacts refusal is returned as is (document unchanged)
  */
@@ -70,7 +70,7 @@ export const checkBonding = defineCommand({
     '(EOP_BOND_RESISTANCE_EXCEEDED, or EOP_COATING_INSULATES when a bonded_interface coating on a joint solid is declared insulating); unknown (never pass): no limit (EOP_BOND_LIMIT_MISSING), an unresolved strap resistivity ' +
     '(EOP_RESISTIVITY_UNAVAILABLE), a coating whose electrical effect is undeclared or a surface system without a declared one (EOP_COATING_UNKNOWN), joined solids that do not touch (EOP_JOINT_NO_CONTACT). ' +
     'Every row has reviewRequired true: a qualified engineer decides; a failed or unknown path is disposed only by a human (dispose_bond_check, disposition pending_human until then). ' +
-    'CFRP parts, part-geometry paths and fastener-stack contacts are not evaluated. Returns data { status, rows: [{ pathId, name, totalOhm, totalMilliohm, elements: [{ kind, ohm, share, provenance }], limit?, status, code, findings, unverified, unverifiedReasons, reviewRequired, disposition, inputsHash }], counts, open }.',
+    'A joint also counts as touching when its two solids are consecutive layers of a placed fastener stack (list_fastener_stacks); a solid find_contacts did not test (a broken instance) is unknown (EOP_CONTACT_NOT_TESTED), never a pass. A joint naming no solids is flagged in unverifiedReasons. A composite strap (record productForm / designation) adds the warning EOP_CFRP_IN_PATH (status unchanged: a metallic path is needed). Part-geometry paths are not evaluated. Returns data { status, rows: [{ pathId, name, totalOhm, totalMilliohm, elements: [{ kind, ohm, share, provenance }], limit?, status, code, findings, warnings, unverified, unverifiedReasons, reviewRequired, disposition, inputsHash }], counts, open }.',
   params: z.object({
     pathIds: z.array(z.string()).optional().describe('Only these bond paths (ids from define_bond_path). Omit for all.'),
   }),
@@ -98,7 +98,7 @@ export const checkBonding = defineCommand({
       open: open.map((row) => row.pathId),
       reviewRequired: true,
       notes: [
-        'bond limits are programme rules supplied by the owner (no default); CFRP parts, part-geometry paths and fastener-stack contacts are not evaluated',
+        'bond limits are programme rules supplied by the owner (no default); part-geometry paths are not evaluated; CFRP is detected from the strap material record text only',
       ],
     });
   },

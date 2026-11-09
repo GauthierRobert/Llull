@@ -2,64 +2,71 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
-import { execute } from '@core/commands/registry';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import type { CadDocument } from '@core/model/types';
-import { isRecord } from '@lib/isRecord';
 import { refuseEop } from './codes';
 import { electroOpticalOf } from './model';
+import { type Missing, type Value, isMissing, propertyOf } from './opticalProperty';
 import { STEFAN_BOLTZMANN, equilibriumTemperature } from './physics';
 
 const COMMAND = 'optical_balance';
 const MAX_ITERATIONS = 200;
 const TOLERANCE_K = 1e-9;
 
-interface Value {
-  readonly value: number;
-  readonly provenance: string;
-  readonly unverified: readonly string[];
+interface Solved {
+  readonly eps: Value;
+  /** The self-consistent temperature of a T-dependent emissivity, null for a constant one. */
+  readonly temperature: number | null;
+  readonly iterations: number;
 }
 
-interface Missing {
-  readonly code: string;
-  readonly message: string;
-}
-
-/** A PHY-01 value of the coating material, or why it is not available. `at` is empty for a constant model. */
-function propertyOf(
+/** The emissivity record at the equilibrium temperature: a constant model directly, a T-dependent one by fixed-point iteration (refused when it does not settle). */
+function solveEmissivity(
   doc: CadDocument,
   material: string,
-  property: string,
-  condition: Record<string, string>,
-  at: Record<string, { value: number; unit: string }>,
+  alpha: number,
+  fluxW: number,
+  incidenceRad: number,
+  faces: 1 | 2,
   ctx: ExecutionContext | undefined,
-): Value | Missing {
-  const answer = execute(doc, 'evaluate_property', { material, property, at, condition }, ctx);
-  const data = answer.data;
-  if (answer.rejected === true || !isRecord(data) || typeof data['value'] !== 'number' || !Number.isFinite(data['value']))
+): Solved | Missing {
+  const condition = { opticalKind: 'hemispherical_total' };
+  const direct = propertyOf(doc, material, 'emissivityIr', condition, {}, ctx);
+  if (!isMissing(direct)) return { eps: direct, temperature: null, iterations: 0 };
+  const unavailable = (why: string): Missing => ({
+    code: 'EOP_SURFACE_PROPERTY_MISSING',
+    message: `emissivityIr (hemispherical_total) unavailable: ${why}`,
+  });
+  if (direct.code !== 'PROP_VARIABLE_MISSING') return unavailable(direct.message);
+  if (alpha === 0)
     return {
-      code: isRecord(data) && typeof data['code'] === 'string' ? data['code'] : 'EOP_SURFACE_PROPERTY_MISSING',
-      message: `${material} ${property} ${JSON.stringify(condition)}: ${answer.summary}`,
+      code: 'EOP_BALANCE_DEGENERATE',
+      message:
+        'alpha = 0 absorbs nothing (T = 0 K), outside every temperature-dependent emissivity model: give a constant emissivity or alpha > 0',
     };
-  const citation =
-    isRecord(data['provenance']) && typeof data['provenance']['citation'] === 'string' ? data['provenance']['citation'] : 'unsourced';
-  const reasons = data['unverified'] === true && Array.isArray(data['unverifiedReasons']) ? data['unverifiedReasons'].map(String) : [];
+  let current = equilibriumTemperature(alpha, fluxW, incidenceRad, 0.5, faces);
+  let delta = Number.POSITIVE_INFINITY;
+  for (let step = 1; step <= MAX_ITERATIONS; step += 1) {
+    const found = propertyOf(doc, material, 'emissivityIr', condition, { T: { value: current, unit: 'K' } }, ctx);
+    if (isMissing(found)) return unavailable(`${found.message} (iteration ${step} at ${current} K)`);
+    const next = equilibriumTemperature(alpha, fluxW, incidenceRad, found.value, faces);
+    delta = Math.abs(next - current);
+    current = next;
+    if (delta < TOLERANCE_K) return { eps: found, temperature: current, iterations: step };
+  }
   return {
-    value: data['value'],
-    provenance: `${material} ${property}: ${citation}`,
-    unverified: data['unverified'] === true && reasons.length === 0 ? ['value is unverified'] : reasons,
+    code: 'EOP_BALANCE_NOT_CONVERGED',
+    message: `the temperature-dependent emissivity did not settle after ${MAX_ITERATIONS} iterations (last T ${current} K, last change ${delta} K): the balance may have no stable solution`,
   };
 }
-
-const isMissing = (value: Value | Missing): value is Missing => 'code' in value;
 
 /**
  * @affects nothing; read-only, document returned unchanged, affected: []
  * @invariant T = (alpha S cos(theta) / (n eps sigma))^(1/4) with sigma from the exact SI constants; alpha at the requested BOL / EOL state (default BOL, reported as defaulted), eps hemispherical total (a temperature-dependent
  *   model is solved by fixed-point iteration); never a default solar flux, alpha or epsilon; caller-supplied alpha / eps are reported unverified; flat plate, no conduction, albedo or planet IR
  * @failure no flux -> EOP_SOLAR_FLUX_MISSING; flux not positive or a bad incidence angle -> EOP_PARAMS_INVALID; no coating or value -> EOP_COATING_NOT_ASSIGNED / EOP_COATING_AMBIGUOUS / EOP_COATING_NOT_FOUND / EOP_SURFACE_PROPERTY_MISSING;
- *   alpha outside [0, 1] or epsilon outside (0, 1] -> EOP_PROPERTY_RANGE (all refusals, unchanged doc)
+ *   alpha outside [0, 1] or epsilon outside (0, 1] -> EOP_PROPERTY_RANGE; a T-dependent emissivity that does not settle in 200 iterations -> EOP_BALANCE_NOT_CONVERGED (last T and change named), alpha = 0 with a T-dependent emissivity -> EOP_BALANCE_DEGENERATE (T = 0 K is outside every model; refused, not answered) (all refusals, unchanged doc)
  */
 export const opticalBalance = defineCommand({
   name: COMMAND,
@@ -69,7 +76,7 @@ export const opticalBalance = defineCommand({
     "alpha and eps come from the coating: pass coating (a material with absorptivitySolar [condition lifeState BOL|EOL] and emissivityIr [condition opticalKind hemispherical_total] PHY-01 models) or entityId (its 'exposed' " +
     'assign_surface_coating coating), or pass alpha and eps directly (reported unverified). solarFlux { value, unit } is REQUIRED with its source in your report: llull has no default flux. ' +
     'state BOL (default, reported) | EOL selects alpha; incidenceAngle (default 0 deg, normal to the sun) scales the flux by cos. Assumptions: no conduction, albedo or planet IR. ' +
-    'Returns data { alpha, eps, alphaOverEps, temperatureK, temperatureDegC, solarFluxW_m2, incidenceAngleDeg, radiatingFaces, state, sigma, formula, assumptions, provenance, unverified, unverifiedReasons, reviewRequired }.',
+    'Returns data { alpha, eps, alphaOverEps, iterations (0 for a constant emissivity), temperatureK, temperatureDegC, solarFluxW_m2, incidenceAngleDeg, radiatingFaces, state, sigma, formula, assumptions, provenance, unverified, unverifiedReasons, reviewRequired }.',
   params: z.object({
     entityId: z.string().optional().describe("Solid whose 'exposed' coating assignment supplies alpha and eps."),
     coating: z.string().optional().describe('Coating material id (overrides entityId).'),
@@ -146,36 +153,20 @@ export const opticalBalance = defineCommand({
       reasons.push(...found.unverified.map((reason) => `alpha: ${reason}`));
     } else reasons.push('EOP_VALUE_UNSOURCED: alpha was supplied by the caller without a record');
     if (!(alpha >= 0 && alpha <= 1)) return fail('EOP_PROPERTY_RANGE', `absorptivity ${alpha} is outside [0, 1]`, [], 'alpha');
-    const hemispherical = { opticalKind: 'hemispherical_total' };
     let eps = params.eps;
-    let temperature = 0;
+    let temperature: number | null = null;
+    let iterations = 0;
     if (eps === undefined) {
-      let found = propertyOf(doc, material ?? '', 'emissivityIr', hemispherical, {}, ctx);
-      let current = equilibriumTemperature(alpha, flux.value, angle.value, 0.5, params.radiatingFaces);
-      if (isMissing(found) && found.code === 'PROP_VARIABLE_MISSING') {
-        for (let step = 0; step < MAX_ITERATIONS; step += 1) {
-          found = propertyOf(doc, material ?? '', 'emissivityIr', hemispherical, { T: { value: current, unit: 'K' } }, ctx);
-          if (isMissing(found)) break;
-          const next = equilibriumTemperature(alpha, flux.value, angle.value, found.value, params.radiatingFaces);
-          const settled = Math.abs(next - current) < TOLERANCE_K;
-          current = next;
-          if (settled) break;
-        }
-        temperature = current;
-      }
-      if (isMissing(found))
-        return fail(
-          'EOP_SURFACE_PROPERTY_MISSING',
-          `emissivityIr (hemispherical_total) unavailable: ${found.message}`,
-          [material ?? ''],
-          'coating',
-        );
-      eps = found.value;
-      provenance.push(found.provenance);
-      reasons.push(...found.unverified.map((reason) => `eps: ${reason}`));
+      const solved = solveEmissivity(doc, material ?? '', alpha, flux.value, angle.value, params.radiatingFaces, ctx);
+      if (isMissing(solved)) return fail(solved.code, solved.message, [material ?? ''], 'coating');
+      eps = solved.eps.value;
+      temperature = solved.temperature;
+      iterations = solved.iterations;
+      provenance.push(solved.eps.provenance);
+      reasons.push(...solved.eps.unverified.map((reason) => `eps: ${reason}`));
     } else reasons.push('EOP_VALUE_UNSOURCED: eps was supplied by the caller without a record');
     if (!(eps > 0 && eps <= 1)) return fail('EOP_PROPERTY_RANGE', `emissivity ${eps} is outside (0, 1]`, [], 'eps');
-    const kelvin = temperature > 0 ? temperature : equilibriumTemperature(alpha, flux.value, angle.value, eps, params.radiatingFaces);
+    const kelvin = temperature ?? equilibriumTemperature(alpha, flux.value, angle.value, eps, params.radiatingFaces);
     const degC = kelvin - 273.15;
     const data = {
       alpha,
@@ -187,6 +178,7 @@ export const opticalBalance = defineCommand({
       incidenceAngleDeg: (angle.value * 180) / Math.PI,
       radiatingFaces: params.radiatingFaces,
       state,
+      iterations,
       sigma: {
         value: STEFAN_BOLTZMANN,
         unit: 'W/(m^2*K^4)',

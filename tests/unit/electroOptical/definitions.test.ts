@@ -104,8 +104,8 @@ describe('assign_surface_coating / remove_surface_coating', () => {
   it('the coating material and the solid cannot be deleted while assigned (guard)', () => {
     const { doc, box } = withBox();
     const assigned = run(doc, 'assign_surface_coating', { entityId: box, coating: 'paint' });
-    const deleted = execute(assigned, 'delete_entity', { ids: [box] });
-    expect(deleted.rejected === true || deleted.error !== undefined).toBe(true);
+    const deleted = execute(assigned, 'delete_entities', { ids: [box] });
+    expect(deleted.summary).toContain('is used by');
     expect(deleted.document).toBe(assigned);
   });
 });

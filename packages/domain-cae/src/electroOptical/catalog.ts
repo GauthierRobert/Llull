@@ -4,7 +4,10 @@ import { commandCatalog } from '@core/commands/schema';
 import { defineBondPath, deleteBondPath } from './bondCommands';
 import { checkBonding } from './checkBonding';
 import { assignSurfaceCoating, removeSurfaceCoating } from './coatingCommands';
+import { checkSurfaceProperties } from './checkSurfaceProperties';
+import { electricalResistance, shieldAbsorption } from './conductorQueries';
 import { disposeBondCheck } from './disposeCommand';
+import { normalReflectance } from './normalReflectance';
 import { opticalBalance } from './opticalBalance';
 
 export const electroOpticalCommands = commandCatalog(
@@ -15,4 +18,8 @@ export const electroOpticalCommands = commandCatalog(
   checkBonding,
   opticalBalance,
   disposeBondCheck,
+  checkSurfaceProperties,
+  electricalResistance,
+  shieldAbsorption,
+  normalReflectance,
 );

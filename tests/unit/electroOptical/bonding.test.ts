@@ -180,8 +180,8 @@ describe('check_bonding: a path never passes on missing or contradicting data', 
 
   it('a solid a path names cannot be deleted (guard); a missing one in a loaded slice is reported unknown', () => {
     const { result } = addPath(doc, box, structure, { elements: [joint(0.5, [box, structure])], limit: LIMIT });
-    const deleted = execute(result.document, 'delete_entity', { ids: [box] });
-    expect(deleted.rejected === true || deleted.error !== undefined).toBe(true);
+    const deleted = execute(result.document, 'delete_entities', { ids: [box] });
+    expect(deleted.summary).toContain('is used by');
     expect(deleted.document).toBe(result.document);
     const entities = Object.fromEntries(Object.entries(result.document.entities).filter(([id]) => id !== box));
     const rows = checkBonding({ ...result.document, entities }).rows;

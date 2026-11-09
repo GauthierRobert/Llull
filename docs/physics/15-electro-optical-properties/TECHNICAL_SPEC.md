@@ -273,9 +273,19 @@ shapes and are executed by `tests/unit/electroOptical/`.
 - Limits are stored `unverified: true` always (no command verifies one); the 2.5 mohm figure is NOT bundled: the validation plans carry it as a test input. MIL-STD-464C /
   ARP1870 values are not redistributable as data here (sources.md grade B only).
 - `optical_balance` adds `incidenceAngle` (flux * cos theta), `state` BOL (default, reported) | EOL, a fixed-point solution when `emissivityIr` has a `T` variable, and
-  caller-given `alpha` / `eps` (reported unverified). Range checks (alpha in [0, 1], eps in (0, 1]) run at use (`EOP_PROPERTY_RANGE`), not yet at `define_property_model` (TR-EOP-02).
+  caller-given `alpha` / `eps` (reported unverified). Range checks (alpha in [0, 1], eps in (0, 1]) run at use (`EOP_PROPERTY_RANGE`) and, for record values, at `define_property_model` (round 2).
 - sigma comes from the exact SI constants (`physics.ts`), equal to the generator to 1e-12 relative.
 
-**Left**: `electrical_resistance`, `shield_absorption`, `normal_reflectance`, `check_surface_properties` (M1 queries), TR-EOP-02 range validation hook on `define_property_model`,
-CFRP detection (`EOP_CFRP_IN_PATH`) and anisotropic `direction`, `set_lightning_zone`, part-geometry paths (V1), fastener-stack contacts as joint evidence
-(`list_fastener_stacks`), PHY-03 link `emissivity: 'material'` (TR-EOP-32), UI overlay and the `llull guide` section.
+
+**Round 2 (review)**
+- Queries added: `check_surface_properties` (per coating assignment: emissivityIr hemispherical_total and absorptivitySolar BOL missing = fail, EOL missing = warn, values in [0, 1], unverified warns; a bonded coating of unknown effect warns; solids with no coating are not reported because which faces radiate is the thermal case's business),
+  `electrical_resistance` (R = rho L / A, skin depth delta = sqrt(rho / (pi f mu0 mur)) with mu0 = 4 pi 1e-7 named, round-wire r / (2 delta) with the r/delta < 5 approximation flag and the r/delta < 1 DC rule; oracles VC-EOP-02/03/04),
+  `shield_absorption` (A = 20 log10(e) t / delta dB, absorption term only; VC-EOP-05), `normal_reflectance` (Fresnel R = ((n1-n2)^2 + k^2) / ((n1+n2)^2 + k^2), lossless slab T = (1-R) / (1+R); VC-EOP-09).
+  mur and n1 default to 1 as named, reported defaults; n2, k and a caller resistivity are reported unverified. The catalogue rows `refractiveIndex` and `relativePermeability` are NOT added (they need the wavelength / frequency variables, whose unit tables live in core): n and mur are caller-supplied, a material is not accepted for them.
+- The linear temperature-coefficient resistivity model of TR-EOP-11 is not built: a material's T dependence comes only from its PHY-01 model.
+- Core: the catalogue has a `range` column; `define_property_model` (and every model writer) refuses emissivityIr / absorptivitySolar outside [0, 1] with `EOP_PROPERTY_RANGE` (constant, table points and piecewise segments; polynomial forms are not range-checked).
+- `check_bonding` reads the document only through read-only commands: `find_contacts` (its `skipped` list: a solid not tested is `EOP_CONTACT_NOT_TESTED`, an unreadable list confirms nothing), `list_fastener_stacks` (consecutive stack layers count as contact evidence) and the new PHY-13 `list_surface_systems`. A joint without `interfaces` is flagged in `unverifiedReasons`. A composite strap (record productForm / designation text) warns `EOP_CFRP_IN_PATH` without changing the status.
+- `optical_balance` refuses a T-dependent emissivity that does not settle in 200 iterations (`EOP_BALANCE_NOT_CONVERGED`, last T and change named) and alpha = 0 with a T-dependent emissivity (`EOP_BALANCE_DEGENERATE`: T = 0 K is outside every model); a constant emissivity with alpha = 0 answers T = 0 K by the closed form. It reports `iterations`.
+- The signed-gate re-verification is shared (`packages/domain-cae/src/shared/signedGate.ts`) by corrosion and electro-optical.
+
+**Left**: anisotropic `direction` and CFRP resistivity by direction, `set_lightning_zone`, part-geometry paths (V1), faces (`facesNear`) instead of whole solids, PHY-03 link `emissivity: 'material'` (TR-EOP-32), the wavelength / frequency variables with refractiveIndex / relativePermeability rows, UI overlay, the `llull guide` section and a golden plan.

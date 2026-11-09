@@ -71,6 +71,7 @@ interface Row {
   status: string;
   code: string | null;
   findings: { code: string; message: string }[];
+  warnings: { code: string; message: string }[];
   unverified: boolean;
   unverifiedReasons: string[];
   reviewRequired: boolean;

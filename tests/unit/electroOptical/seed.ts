@@ -22,6 +22,13 @@ export function electroOpticalDocument(): CadDocument {
     electrical: 'conductive',
     source: { citation: 'seed' },
   });
+  next = run(next, 'assign_surface_coating', {
+    entityId: aliases['box'],
+    coating: 'seed_coating',
+    location: 'bonded_interface',
+    electrical: 'insulating',
+    source: { citation: 'seed' },
+  });
   const disposed = execute(
     next,
     'dispose_bond_check',

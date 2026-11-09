@@ -14,3 +14,19 @@ export const bulkResistance = (resistivity: number, length: number, area: number
 /** Equilibrium temperature of a flat plate, K: alpha S cos(theta) = n eps sigma T^4 (n radiating faces; no conduction, albedo or planet IR). */
 export const equilibriumTemperature = (alpha: number, flux: number, incidenceRad: number, epsilon: number, faces: 1 | 2): number =>
   ((alpha * flux * Math.cos(incidenceRad)) / (faces * epsilon * STEFAN_BOLTZMANN)) ** 0.25;
+
+/** Vacuum permeability N/A^2, the classical 4 pi 1e-7 (the CODATA 2018 value differs by 5.5e-10 relative, far below the checks' tolerances). */
+export const MU_0 = 4 * Math.PI * 1e-7;
+
+/** Skin depth, m: delta = sqrt(rho / (pi f mu0 mur)) = sqrt(2 rho / (omega mu)). */
+export const skinDepth = (resistivity: number, frequencyHz: number, mur: number): number =>
+  Math.sqrt(resistivity / (Math.PI * frequencyHz * MU_0 * mur));
+
+/** Absorption loss of a conducting sheet, dB: A = 20 log10(e) t / delta (the field decays as exp(-t / delta)); reflection loss not included. */
+export const absorptionLossDb = (thickness: number, depth: number): number => (20 * Math.LOG10E * thickness) / depth;
+
+/** Normal-incidence reflectance R = ((n1 - n2)^2 + k^2) / ((n1 + n2)^2 + k^2) at an interface (k = extinction coefficient of medium 2, 0 for a lossless one). */
+export const normalReflectance = (n1: number, n2: number, k = 0): number => ((n1 - n2) ** 2 + k ** 2) / ((n1 + n2) ** 2 + k ** 2);
+
+/** Transmittance of a lossless slab with incoherent multiple reflections: T = (1 - R) / (1 + R). */
+export const slabTransmittance = (reflectance: number): number => (1 - reflectance) / (1 + reflectance);

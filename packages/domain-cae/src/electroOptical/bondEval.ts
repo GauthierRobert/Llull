@@ -1,18 +1,18 @@
 /**
  * Bond path evaluation (PHY-15 TR-EOP-20): series resistance of the elements, the status against the sourced limit, and the findings that stop a path
- * from passing (an insulating or undeclared coating on a bonded interface, joined solids that do not touch, missing data).
- * Resistivities are read through `evaluate_property` (PHY-01, composed via `execute`); contacts through `find_contacts` (the caller passes the pairs).
+ * from passing (an insulating or undeclared coating on a bonded interface, joined solids that do not touch or were not tested, missing data).
+ * Resistivities are read through `evaluate_property` (PHY-01), the rest of the document through `BondContext` (read-only commands composed via `execute`).
  */
 
-import { execute } from '@core/commands/registry';
-import type { CommandResult, ExecutionContext } from '@core/commands/types';
+import type { ExecutionContext } from '@core/commands/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { sha256Hex } from '@lib/sha256';
 import type { CadDocument } from '@core/model/types';
-import { isRecord } from '@lib/isRecord';
+import { type BondContext, pairKey } from './bondContext';
 import { electroOpticalOf } from './model';
 import { bulkResistance } from './physics';
+import { resistivityOf } from './resistivity';
 import type { BondElement, BondPath } from './types';
 
 export type BondStatus = 'pass' | 'fail' | 'unknown';
@@ -48,6 +48,8 @@ export interface BondRow {
   /** The most severe finding's code (null for a pass). */
   readonly code: string | null;
   readonly findings: readonly Finding[];
+  /** Warnings that do not change the status (a CFRP strap). */
+  readonly warnings: readonly Finding[];
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];
   readonly reviewRequired: true;
@@ -61,86 +63,36 @@ const LIMIT_UNVERIFIED = 'EOP_LIMIT_UNVERIFIED: the limit is a programme rule en
 
 const FAIL_ORDER = ['EOP_COATING_INSULATES', 'EOP_BOND_RESISTANCE_EXCEEDED'];
 
-/** `a|b` ordered, over the solid at the root of each id (an assembly child `inst/child` counts as `inst`). */
-const pairKey = (a: string, b: string): string => [a.split('/')[0], b.split('/')[0]].sort().join('|');
-
-/** Contacting pairs of find_contacts, or the refusal result to return as is. */
-export function contactPairs(
-  doc: CadDocument,
-  paths: readonly BondPath[],
-  ctx: ExecutionContext | undefined,
-): { readonly pairs: ReadonlySet<string> | null } | { readonly refusal: CommandResult } {
-  const ids = [
-    ...new Set(paths.flatMap((path) => path.elements.flatMap((element) => (element.kind === 'joint' ? (element.interfaces ?? []) : [])))),
-  ].filter((id) => Object.hasOwn(doc.entities, id));
-  if (ids.length === 0) return { pairs: null };
-  const found = execute(doc, 'find_contacts', { entityIds: ids }, ctx);
-  if (found.error !== undefined) return { refusal: found };
-  const pairs = isRecord(found.data) && Array.isArray(found.data['pairs']) ? found.data['pairs'] : [];
-  const keys = new Set(
-    pairs.flatMap((pair) =>
-      isRecord(pair) && typeof pair['a'] === 'string' && typeof pair['b'] === 'string' ? [pairKey(pair['a'], pair['b'])] : [],
-    ),
-  );
-  return { pairs: keys };
-}
-
-interface Resistivity {
-  readonly rho: number;
-  readonly unverified: boolean;
-  readonly reasons: readonly string[];
-  readonly provenance: string;
-}
-
-/** rho (ohm m) of a material at the path temperature through evaluate_property, or why it is unavailable. */
-function resistivityOf(doc: CadDocument, material: string, path: BondPath, ctx: ExecutionContext | undefined): Resistivity | Finding {
-  const answer = execute(
-    doc,
-    'evaluate_property',
-    { material, property: 'electricalResistivity', at: path.temperature === undefined ? {} : { T: path.temperature }, outputUnit: 'ohm*m' },
-    ctx,
-  );
-  const data = answer.data;
-  if (
-    answer.rejected === true ||
-    !isRecord(data) ||
-    typeof data['value'] !== 'number' ||
-    !Number.isFinite(data['value']) ||
-    data['value'] <= 0
-  )
-    return {
-      code: 'EOP_RESISTIVITY_UNAVAILABLE',
-      message: `strap material '${material}': ${answer.error?.code ?? 'no value'} - ${answer.summary}`,
-    };
-  const provenance =
-    isRecord(data['provenance']) && typeof data['provenance']['citation'] === 'string' ? data['provenance']['citation'] : 'unsourced';
-  const reasons = Array.isArray(data['unverifiedReasons'])
-    ? data['unverifiedReasons'].filter((reason): reason is string => typeof reason === 'string')
-    : [];
-  return {
-    rho: data['value'],
-    unverified: data['unverified'] === true,
-    reasons,
-    provenance: `${material}: ${provenance} (${String(data['method'] ?? 'model')})`,
-  };
-}
+/** A composite material cannot replace a metallic bond path: its record names a composite product form or designation (a heuristic on the record text, stated in the warning). */
+const COMPOSITE_TEXT = /cfrp|carbon|composite|laminate|prepreg|fabric|gfrp|kevlar/i;
 
 interface Evaluated {
   readonly row: BondElementRow;
   readonly finding?: Finding;
+  readonly warning?: Finding;
   readonly unverified: readonly string[];
 }
 
-function evaluateElement(doc: CadDocument, element: BondElement, path: BondPath, ctx: ExecutionContext | undefined): Evaluated {
+function evaluateElement(
+  doc: CadDocument,
+  element: BondElement,
+  index: number,
+  path: BondPath,
+  ctx: ExecutionContext | undefined,
+): Evaluated {
   if (element.kind === 'joint') {
     const ohm = convertValue(element.resistance.value, element.resistance.unit, 'ohm');
+    const unchecked =
+      element.interfaces === undefined
+        ? [`EOP_JOINT_UNCHECKED: joint ${index} names no solids, so its contact and coating are not checked`]
+        : [];
     return isUnitFailure(ohm)
       ? {
           row: { kind: 'joint', ohm: null, share: null, provenance: element.source.citation },
           finding: { code: 'EOP_BOND_ELEMENT_INVALID', message: ohm.message },
-          unverified: [],
+          unverified: unchecked,
         }
-      : { row: { kind: 'joint', ohm: ohm.value, share: null, provenance: element.source.citation }, unverified: [] };
+      : { row: { kind: 'joint', ohm: ohm.value, share: null, provenance: element.source.citation }, unverified: unchecked };
   }
   const length = convertValue(element.length.value, element.length.unit, 'm');
   const area = convertValue(element.crossSection.value, element.crossSection.unit, 'm^2');
@@ -151,25 +103,31 @@ function evaluateElement(doc: CadDocument, element: BondElement, path: BondPath,
       finding: { code: 'EOP_BOND_ELEMENT_INVALID', message: 'strap length or cross-section unit is invalid' },
       unverified: [],
     };
-  const rho = resistivityOf(doc, element.material, path, ctx);
-  if ('code' in rho) return { row: strap(null, element.material), finding: rho, unverified: [] };
+  const rho = resistivityOf(doc, element.material, path.temperature, ctx);
+  if ('code' in rho)
+    return { row: strap(null, element.material), finding: { code: rho.code, message: `strap ${rho.message}` }, unverified: [] };
+  const record = Object.hasOwn(doc.materials, element.material) ? doc.materials[element.material]?.record : undefined;
+  const composite = COMPOSITE_TEXT.test(`${record?.productForm ?? ''} ${record?.designation ?? ''}`);
   return {
     row: strap(bulkResistance(rho.rho, length.value, area.value), `${rho.provenance}; R = rho L / A`),
+    ...(composite
+      ? {
+          warning: {
+            code: 'EOP_CFRP_IN_PATH',
+            message: `strap material '${element.material}' is a composite (record productForm / designation): it cannot replace a metallic bond path; its resistivity is anisotropic and direction is not evaluated`,
+          },
+        }
+      : {}),
     unverified: rho.unverified ? rho.reasons.map((reason) => `strap ${element.material}: ${reason}`) : [],
   };
 }
 
-/** Findings about the coatings and the contact of one joint (an insulating coating breaks the path; an undeclared one is `unknown`). */
-function interfaceFindings(
-  doc: CadDocument,
-  joint: Extract<BondElement, { kind: 'joint' }>,
-  contacts: ReadonlySet<string> | null,
-): Finding[] {
+/** Findings about the coatings and the contact of one joint (an insulating coating breaks the path; an undeclared one, an untested or missing contact is `unknown`). */
+function interfaceFindings(doc: CadDocument, joint: Extract<BondElement, { kind: 'joint' }>, context: BondContext): Finding[] {
   const interfaces = joint.interfaces;
   if (interfaces === undefined) return [];
   const findings: Finding[] = [];
   const model = electroOpticalOf(doc);
-  const corrosionSystems = Object.values(doc.corrosion?.surfaceSystems ?? {});
   for (const entityId of interfaces) {
     if (!Object.hasOwn(doc.entities, entityId)) {
       findings.push({ code: 'EOP_ENTITY_MISSING', message: `joint solid '${entityId}' no longer exists` });
@@ -188,18 +146,27 @@ function interfaceFindings(
           message: `coating '${coating.coating}' (${coating.id}) on ${entityId}: electrical effect not declared`,
         });
     }
-    const system = corrosionSystems.find((candidate) => candidate.entityIds.includes(entityId));
+    const system = context.systems.find((candidate) => candidate.entityIds.includes(entityId));
     if (bonded.length === 0 && system !== undefined)
       findings.push({
         code: 'EOP_COATING_UNKNOWN',
-        message: `${entityId} has surface system ${system.id} (${system.layers.map((layer) => layer.class).join(' + ')}) but no bonded_interface coating declares its electrical effect`,
+        message: `${entityId} has surface system ${system.id} (${system.layers.join(' + ')}) but no bonded_interface coating declares its electrical effect`,
       });
   }
-  if (contacts !== null && !contacts.has(pairKey(interfaces[0], interfaces[1])))
-    findings.push({
-      code: 'EOP_JOINT_NO_CONTACT',
-      message: `${interfaces[0]} and ${interfaces[1]} are not in contact (find_contacts): the joint connects nothing`,
-    });
+  const key = pairKey(interfaces[0], interfaces[1]);
+  if (context.contacts !== null && !context.stackPairs.has(key)) {
+    const reason = context.untested.get('*') ?? interfaces.map((id) => context.untested.get(id)).find((why) => why !== undefined);
+    if (reason !== undefined)
+      findings.push({
+        code: 'EOP_CONTACT_NOT_TESTED',
+        message: `${interfaces[0]} and ${interfaces[1]}: find_contacts did not test them (${reason})`,
+      });
+    else if (!context.contacts.has(key))
+      findings.push({
+        code: 'EOP_JOINT_NO_CONTACT',
+        message: `${interfaces[0]} and ${interfaces[1]} are not in contact (find_contacts) nor in a fastener stack: the joint connects nothing`,
+      });
+  }
   return findings;
 }
 
@@ -208,16 +175,11 @@ const severity = (finding: Finding): number => {
   return fail >= 0 ? fail : FAIL_ORDER.length;
 };
 
-/** The row of one path. `contacts` is null when no joint names interfaces. */
-export function bondRow(
-  doc: CadDocument,
-  path: BondPath,
-  contacts: ReadonlySet<string> | null,
-  ctx: ExecutionContext | undefined,
-): BondRow {
-  const evaluated = path.elements.map((element) => evaluateElement(doc, element, path, ctx));
+/** The row of one path. */
+export function bondRow(doc: CadDocument, path: BondPath, context: BondContext, ctx: ExecutionContext | undefined): BondRow {
+  const evaluated = path.elements.map((element, index) => evaluateElement(doc, element, index, path, ctx));
   const findings: Finding[] = evaluated.flatMap((item) => (item.finding === undefined ? [] : [item.finding]));
-  for (const element of path.elements) if (element.kind === 'joint') findings.push(...interfaceFindings(doc, element, contacts));
+  for (const element of path.elements) if (element.kind === 'joint') findings.push(...interfaceFindings(doc, element, context));
   const resolved = evaluated.every((item) => item.row.ohm !== null);
   const totalOhm = resolved ? evaluated.reduce((sum, item) => sum + (item.row.ohm === null ? 0 : item.row.ohm), 0) : null;
   const elements = evaluated.map(
@@ -234,6 +196,7 @@ export function bondRow(
   const failing = findings.filter((finding) => FAIL_ORDER.includes(finding.code));
   const status: BondStatus = failing.length > 0 ? 'fail' : findings.length > 0 ? 'unknown' : 'pass';
   const ordered = [...findings].sort((x, y) => severity(x) - severity(y));
+  const warnings = evaluated.flatMap((item) => (item.warning === undefined ? [] : [item.warning]));
   const unverifiedReasons = [...(path.limit === undefined ? [] : [LIMIT_UNVERIFIED]), ...evaluated.flatMap((item) => item.unverified)];
   const limit =
     path.limit === undefined || limitOhm === null || isUnitFailure(limitOhm)
@@ -248,7 +211,14 @@ export function bondRow(
             unverified: true as const,
           },
         };
-  const core = { path, totalOhm, status, codes: ordered.map((finding) => finding.code), elements: elements.map((element) => element.ohm) };
+  const core = {
+    path,
+    totalOhm,
+    status,
+    codes: ordered.map((finding) => finding.code),
+    warnings: warnings.map((warning) => warning.code),
+    elements: elements.map((element) => element.ohm),
+  };
   return {
     pathId: path.id,
     name: path.name,
@@ -259,6 +229,7 @@ export function bondRow(
     status,
     code: ordered[0]?.code ?? null,
     findings: ordered,
+    warnings,
     unverified: unverifiedReasons.length > 0,
     unverifiedReasons,
     reviewRequired: true,
