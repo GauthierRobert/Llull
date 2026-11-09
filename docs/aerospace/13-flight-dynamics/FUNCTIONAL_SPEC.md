@@ -108,7 +108,9 @@ llull run fly.json --doc drone.llull.json      # builds the flight model from th
 llull run_flight scenarioId=hover_climb_gust --doc drone.llull.json --json
 llull flight_report runId=... --doc drone.llull.json
 llull plot_flight runId=... field=attitude --save att.svg
-llull export_flight_loads runId=... at=peak_load --doc drone.llull.json   # -> 14 FLL load cases
+llull export_flight_loads analysisId=... scenario=hover_climb_gust at=peak_load --doc drone.llull.json   # -> 14 FLL load cases (the run id is the scenario id)
+llull trim_flight scenario=hover_climb_gust airspeedMps=12 --doc drone.llull.json     # steady state, controls
+llull linearize_flight scenario=hover_climb_gust airspeedMps=12 --doc drone.llull.json  # A, B, eigenvalues, mode labels
 llull sitl_bridge autopilot=ardupilot_json --doc drone.llull.json         # V1, localhost only
 ```
 
