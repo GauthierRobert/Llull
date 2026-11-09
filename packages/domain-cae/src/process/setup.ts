@@ -31,7 +31,7 @@ export const amBuildSetup = defineCommand({
     'never strained); supportEntityIds further parts present from the start and never strained (removed by add_release_step remove [supports]); layerHeight the ' +
     'lumped layer thickness in document units. Every other part of the case is the part that is built: its elements are binned into layers by centroid height ' +
     'above the plate top, (k-1) layerHeight <= h < k layerHeight, and activated layer by layer, so the mesh must resolve the layer height ' +
-    '(layers without an element are skipped and reported). No default for any value. Keeps an existing inherent strain and release steps. Add the parts with ' +
+    '(layers without an element are skipped and reported). A node added with a layer starts from zero displacement at its activation (CalculiX): the displacement of the built part is the distortion since it was deposited, so clamp the plate during the build (add_fea_constraint) to read the true distortion, and for a free plate read probes on nodes that exist from the start (the plate surface, the interface with the part). No default for any value. Keeps an existing inherent strain and release steps. Add the parts with ' +
     'set_part_idealization first, the plate constraints with add_fea_constraint (loads are not applied), the readout points with add_result_probe (u_x, u_y, u_z, ' +
     'u_mag), then set_inherent_strain, add_release_step, set_mesh_controls, fea_mesh, fea_solve. Returns affected [analysisId].',
   params: z.object({

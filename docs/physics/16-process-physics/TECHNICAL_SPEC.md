@@ -308,3 +308,46 @@ Relayed: 07 `FTR_BEND_RADIUS_BELOW_MIN`, `FTR_BEND_RADIUS_NO_TABLE_ROW`; PHY-05 
 - [R5] NIST AM-Bench 2018 — https://www.nist.gov/node/1339701 (search); https://github.com/usnistgov/ambench (git, commit 77adb06c…)
 - [R6] ISO/ASTM 52911-1 — catalogue search https://www.iso.org/search.html?q=52911-1 (not fetched)
 - Repo: `.dependency-cruiser.cjs`, physics PHY-01/02/03/05/06 specs, aerospace 05/07/08 specs.
+
+## 13. As built (M4 core, 2026-11)
+
+Built: the additive-build lane of M4 (`am_build_setup`, `set_inherent_strain`, `add_release_step`, the deck, the per-phase results, the oracle and the real-ccx
+test). Not built (open): M1 `springback_calc` / `springback_compensation` / `check_process`, M2 `check_am_overhang`, M3 FE springback, M4 `process_report` and
+`am_calibrate_inherent_strain`, V2 machining distortion.
+
+| Item | As built |
+| ---- | -------- |
+| Placement | plugin `cae` (toolset `analysis`), `packages/domain-cae/src/process/`; `AnalysisType` += `am_build_distortion` and `AnalysisCase.am?: AmBuildSettings` in core (`model/analysis.ts`, `model/am.ts`); no `@phys` package exists |
+| Commands | `am_build_setup` (direction, plate, supports, layer height; keeps strain and release steps), `set_inherent_strain` (exx, eyy, ezz in the build frame, `source` and `calibrated` mandatory), `add_release_step` (remove plate and / or supports once each, 3-2-1 points) |
+| Probes | not a parameter of `am_build_setup`: `add_result_probe` (u_x / u_y / u_z / u_mag) is reused; probe values are read per phase (`build`, then each release step name) |
+| Build frame | z = build direction, x = document X made orthogonal to z (document Y when the build is within 0.9 of X), y = z x x; written as `*ORIENTATION` (VC-PRC-31: the same bar built along X reproduces the curvatures) |
+| Layers | build parts = parts of the case besides plate and supports; elements binned by centroid height above the plate top, `(k-1) t <= h < k t`; empty layers are skipped and reported in the deck header; at most 500 non-empty layers |
+| Supports | plate and supports are present from the start and never strained (they are not built layer by layer: TR-PRC-21 for supports stays open) |
+| 3-2-1 | `support321`: P1 x y z, P2 the two axes orthogonal to the dominant axis of P1P2, P3 the axis of the largest component of (P1P2 / |P1P2|) x P1P3; always six independent rigid-body constraints (proved in the source, checked on 200 random triples); the deck snaps the points to the nearest nodes of the remaining parts and refuses shared nodes |
+| Codes | `PRC_CASE_TYPE`, `PRC_SOLVER_UNSUPPORTED`, `PRC_BUILD_SETUP_INVALID`, `PRC_BUILD_SETUP_MISSING`, `PRC_INHERENT_STRAIN_SOURCE_MISSING`, `PRC_INHERENT_STRAIN_INVALID`, `PRC_INHERENT_STRAIN_MISSING`, `PRC_INHERENT_STRAIN_UNCALIBRATED` (warning), `PRC_RELEASE_INVALID`, `PRC_RELEASE_UNSUPPORTED`, `PRC_LAYERS_TOO_MANY`, `PRC_LOADS_UNSUPPORTED`, `PRC_PART_NOT_BUILT`; `PRC_LAYER_MESH_MISMATCH` is reported as the "EMPTY layers" note of the deck header (no finding yet) |
+| Data | no inherent-strain table: the values and their `source` come from the caller, `calibrated: false` is a warning in `check_analysis` and in the command summary |
+
+### 13.1 Carrier decision (VC-PRC-31), measured with CalculiX 2.21
+
+1. `*MODEL CHANGE, ADD=STRAIN FREE` needs `*STEP, NLGEOM` ("only possible for nonlinear calculations").
+2. A temperature raised in the same step as the `ADD` is absorbed by the strain-free offset (a layer added and heated in one step shows no strain at all); a second
+   `REMOVE` of elements that are already removed breaks the later activations (no strain at all): the deck removes every layer once, in step 1.
+3. Nodal temperatures on the layer's nodes (the §5.3 sketch) cannot work: layers share their interface nodes, so a layer cannot be strained independently of its
+   neighbours; with the delayed raise "node at the highest layer + 1" the first layers were strained while the next one was already stiffening the stack: the
+   build curvature was 17 % low (10 layers, hex mesh, VC-PRC-30.b) and the strain history differs by one layer.
+4. Adopted carrier: a GLOBAL temperature T = s after the strain step of build layer s, with one material per layer whose `*EXPANSION, TYPE=ORTHO, ZERO=0` rows are
+   alpha(T) = e(T) / T, e(T) = eps clamp(T - (s - 1), 0, 1): layer s strains only while T goes from s - 1 to s, then saturates. Two steps per layer (activation, strain),
+   so layer s + 1 is added only after layer s has its strain: this is the exact sequential model. Hex mesh, 10 layers x 0.2 mm on a 4 mm substrate, L = 40:
+   curvature after the layers 0.9% below the generator (9.128e-4 against 9.2011e-4 /mm), after removing the substrate 2.0330e-3 against 2.0323e-3 /mm (0.02 %).
+5. Printed displacements of nodes added with a layer start from zero at their activation: read the distortion on nodes that exist from the start (the plate
+   surface) or clamp the plate during the build (the real process): a probe on the top face of a free plate read 0.24 of the curvature.
+6. Large deflection (L = 160 mm, curvature 7e-4 /mm, end deflection 5 mm) makes the release step diverge in one increment and the build drift by 5 %: the
+   method is for small distortions (the NLGEOM stack is only needed for the activation).
+
+Real pipeline (`server/tests/feaAmBuild.test.ts`: Netgen conformal C3D10 size 0.3 mm, 30 x 1 mm bar, 2 mm plate + 3 x 0.5 mm layers, E 200 GPa, nu 0, eps -0.002):
+the interface curvature after the build is 0.980 of the oracle, after the plate release 0.967 (tolerance 5 %); the bar built along X gives the same numbers within 2 %.
+
+### 13.2 Oracle
+
+`tests/helpers/layeredBeam.ts` ports §5.3 of the generator (Euler-Bernoulli, layer by layer, substrate release); `tests/unit/cae/process/oracle.test.ts` reproduces
+`layered_eigenstrain.csv` to 1e-9 per layer, the total and the release, the Timoshenko bimetal form for one layer, and the all-at-once case (ratio 2.07).
