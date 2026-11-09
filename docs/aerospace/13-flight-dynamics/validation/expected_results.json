@@ -112,7 +112,7 @@
       "id": "VC-FLT-11",
       "command": "flight_report",
       "inputs": { "battery": "4S2P Molicel P28A", "nominalEnergy_Wh": 80.6 },
-      "expected": "TBD - measure hover current on the bench",
+      "expected": "closed forms verified (FLT-M3: capacity / current on an ideal pack, bus power, momentum theory); bench hover current TBD",
       "tolerance": "-",
       "source": "TBD",
       "grade": "C",
