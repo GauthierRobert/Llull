@@ -83,4 +83,3 @@ describe('compute_margins of a pretensioned case', () => {
     expect(result.error?.code).toBe('FEA_ANALYSIS_TYPE_UNSUPPORTED');
   });
 });
-
