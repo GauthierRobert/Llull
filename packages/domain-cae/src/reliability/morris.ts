@@ -3,7 +3,7 @@
 import { at } from './numerics';
 import { createPrng } from './prng';
 
-export interface MorrisEffect {
+interface MorrisEffect {
   /** Mean of the elementary effects (sign kept: cancellation shows). */
   readonly mu: number;
   /** Mean of their absolute values (Campolongo mu*): overall influence. */

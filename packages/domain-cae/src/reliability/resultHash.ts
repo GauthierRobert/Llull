@@ -10,7 +10,7 @@ import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
 import { formStudy, monteCarloStudy, type FormStudy, type MonteCarloStudy } from './studies';
 
 /** Significant digits of beta and Pf in the hash: the same inputs reproduce them bit-for-bit, the rounding only absorbs platform libm differences. */
-export const RESULT_DIGITS = 6;
+const RESULT_DIGITS = 6;
 export const RESULT_FORM_ITERATIONS = 100;
 export const RESULT_FORM_TOLERANCE = 1e-8;
 

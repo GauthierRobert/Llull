@@ -24,10 +24,7 @@ export interface MaterialPropertyBinding {
   readonly measurementCoverage?: number | undefined;
 }
 
-export type VariableBinding =
-  | { readonly kind: 'free' }
-  | { readonly kind: 'parameter'; readonly parameter: string }
-  | MaterialPropertyBinding;
+type VariableBinding = { readonly kind: 'free' } | { readonly kind: 'parameter'; readonly parameter: string } | MaterialPropertyBinding;
 
 /** What a materialProperty distribution was derived from (snapshot at definition; a replay re-derives it). */
 export interface DerivedScatter {

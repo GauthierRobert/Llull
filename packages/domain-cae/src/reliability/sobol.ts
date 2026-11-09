@@ -3,7 +3,7 @@
 import { at } from './numerics';
 import { createPrng } from './prng';
 
-export interface Interval {
+interface Interval {
   readonly value: number;
   readonly ci95: readonly [number, number] | null;
 }
