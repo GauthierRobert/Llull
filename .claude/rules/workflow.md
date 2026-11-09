@@ -13,6 +13,7 @@
    Heavy runs (`check`, `check:coverage`, `npm test`, the server / desktop suites, `native:check`) take a machine-wide slot
    (`scripts/heavyLock.mjs`): parallel lanes queue instead of thrashing RAM; a run narrowed to test files never waits. Typecheck
    with the npm scripts (TypeScript 7, incremental, seconds), never a bare `tsc --noEmit` (a hook blocks it).
+   A lane worker (W5) never runs the full suite: it finishes with the W5 lane gate, the orchestrator runs the full gate at merge.
 4. Before review: self-review against `.claude/context/review-checklist.md` and run the contract suites it names.
 5. Viewport/UI work: verify in the desktop app (`verify-llull` skill).
 
@@ -72,6 +73,16 @@ Lanes own disjoint write scopes (`.claude/work/BOARD.md` is the ledger):
 
 Core feature catalogs (`commands/<feature>/catalog.ts`) are Lane-1-only. Run `cad-reviewer` when the diff touches `packages/core`, the
 registry, a plugin's commands, or `packages/protocol`/`server` — not for docs, tests-only or small UI tweaks.
+
+- **At most 3 lanes in flight** (owner 2026-11-09). With 5 lanes one `check:fast` took ~23 min and unrelated timing tests failed
+  under load; a review / fix round counts as in flight.
+- **Lane gate** (what a worker runs before reporting, every round): `npm run check:static`, `npx vitest related --run <changed
+  files>`, the contract suites `.claude/context/review-checklist.md` names for what it touched, targeted coverage on its own files,
+  and the native / server tests of what it touched. Never `check:fast` (it sweeps every test file once core or the registry
+  changes), `check` or `check:coverage`; report the vitest summary lines, not a tail.
+- **Merge gate** (orchestrator, one at a time on `main` after the merge): `npm run check:static` + the suites of the touched packages
+  + `tests/unit/contract` + `tests/golden` + the server suites of what changed; the full `check:coverage --maxWorkers=2` once per
+  batch of merges, before push when `packages/*/src` changed.
 
 ## W6 — When unsure
 
