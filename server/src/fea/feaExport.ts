@@ -54,7 +54,12 @@ export function runFeaExport(
         gate.ids,
       );
     const results = currentResults(analysisId, host, current.meshHash, deps.store, deps.hooks);
-    const written = deps.hooks.writeVtu(current.mesh, results, options.encoding ?? 'ascii');
+    const written = deps.hooks.writeVtu(
+      current.mesh,
+      results,
+      options.encoding ?? 'ascii',
+      deps.hooks.pretensionResultMap(doc, analysisId, current.mesh),
+    );
     text = written.text;
     note = results === null ? ' (mesh only: no current results recorded)' : ` (mesh + ${results.steps.length} result set(s))`;
     Object.assign(extra, {

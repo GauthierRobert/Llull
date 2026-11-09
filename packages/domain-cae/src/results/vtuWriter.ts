@@ -20,6 +20,12 @@ const CELL_TYPES: Readonly<Record<FeElementType, number>> = {
 
 export type VtuEncoding = 'ascii' | 'base64';
 
+/** The pretension cut of a case (PHY-06): duplicate points `[id, x, y, z]` and the substitution that gives the high-side elements their copies. */
+export interface VtuCut {
+  readonly duplicateNodes: readonly (readonly [number, number, number, number])[];
+  readonly substitute: (element: readonly number[]) => readonly number[];
+}
+
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 function base64(bytes: Uint8Array): string {
@@ -73,14 +79,18 @@ const arrayName = (text: string): string => text.replace(/[^A-Za-z0-9_]/g, '_');
  * VTU text of `mesh`: points (node order of the artifact), one cell per element with the part index in the cell array `part` and the element id in
  * `element_id`; with `results`, point arrays per result set `k` (1-based, artifact order): `U_k` (displacement vector), `von_mises_k` and `S_k` (sxx, syy,
  * szz, sxy, syz, szx) where the set has STRESS, and for a modal / buckling set `mode_k` the same `U_k`. Nodes without a value get 0.
+ * With `cut` (a pretensioned case) the duplicate nodes of the cut are written after the mesh nodes as extra points at the same position, the high-side
+ * cells use them, and the point arrays read each copy's own value: both faces of the cut show their own displacement and stress.
  * @invariant byte-identical for identical inputs; every cell node exists (an element with an unknown node is dropped and counted in `dropped`)
  */
 export function writeVtu(
   mesh: FeMeshArtifact,
   results: FeResultsArtifact | null,
   encoding: VtuEncoding = 'ascii',
+  cut: VtuCut | null = null,
 ): { readonly text: string; readonly cells: number; readonly dropped: number } {
-  const index = new Map(mesh.nodes.map((node, position) => [node[0], position] as const));
+  const points = [...mesh.nodes, ...(cut?.duplicateNodes ?? [])];
+  const index = new Map(points.map((node, position) => [node[0], position] as const));
   const parts = [...new Set(mesh.blocks.map((block) => block.entityId))];
   const connectivity: number[] = [];
   const offsets: number[] = [];
@@ -89,7 +99,8 @@ export function writeVtu(
   const elementIds: number[] = [];
   let dropped = 0;
   for (const block of mesh.blocks)
-    for (const [id = 0, ...nodes] of block.elements) {
+    for (const element of block.elements) {
+      const [id = 0, ...nodes] = cut === null ? element : cut.substitute(element);
       const positions = nodes.map((node) => index.get(node));
       if (positions.some((position) => position === undefined)) {
         dropped++;
@@ -105,29 +116,29 @@ export function writeVtu(
   results?.steps.forEach((step, position) => {
     const k = position + 1;
     const pick = (field: string, width: number): number[] =>
-      mesh.nodes.flatMap((node) => {
+      points.flatMap((node) => {
         const values = step.fields[field]?.values[String(node[0])] ?? [];
         return Array.from({ length: width }, (_, component) => values[component] ?? 0);
       });
     if (step.fields['DISP'] !== undefined) pointArrays.push(dataArray(`U_${k}`, 'Float64', 3, pick('DISP', 3), encoding, '        '));
     if (step.fields['STRESS'] !== undefined) {
       pointArrays.push(dataArray(`S_${k}`, 'Float64', 6, pick('STRESS', 6), encoding, '        '));
-      const mises = mesh.nodes.map((node) => vonMises(step.fields['STRESS']?.values[String(node[0])] ?? []));
+      const mises = points.map((node) => vonMises(step.fields['STRESS']?.values[String(node[0])] ?? []));
       pointArrays.push(dataArray(`von_mises_${k}`, 'Float64', 1, mises, encoding, '        '));
     }
   });
   const lines = [
     '<?xml version="1.0"?>',
-    `<!-- llull ${arrayName(mesh.unitSystem)} ${mesh.nodes.length} nodes ${types.length} cells; parts: ${parts.map(arrayName).join(', ')} -->`,
+    `<!-- llull ${arrayName(mesh.unitSystem)} ${points.length} nodes ${types.length} cells; parts: ${parts.map(arrayName).join(', ')} -->`,
     `<VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian" header_type="UInt32">`,
     '  <UnstructuredGrid>',
-    `    <Piece NumberOfPoints="${mesh.nodes.length}" NumberOfCells="${types.length}">`,
+    `    <Piece NumberOfPoints="${points.length}" NumberOfCells="${types.length}">`,
     '      <Points>',
     dataArray(
       'Points',
       'Float64',
       3,
-      mesh.nodes.flatMap((node) => [node[1], node[2], node[3]]),
+      points.flatMap((node) => [node[1], node[2], node[3]]),
       encoding,
       '        ',
     ),

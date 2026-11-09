@@ -14,6 +14,7 @@ import { loadCasesOf } from '../decks/context';
 import { stressPerMpa } from '../decks/units';
 import { adequacyOf } from '../results/adequacy';
 import { stepOfLoadCase } from '../results/fields';
+import { copiesOf, pretensionResultMap } from '../contact/pretensionDeck';
 import { caseOf } from '../shared/access';
 import { trustedRecord } from '../shared/trust';
 import { damageSetupOf, isEvaluationFailure, type DamageSetup, type Failure } from './evaluate';
@@ -151,6 +152,27 @@ function mappedHistories(
 }
 
 /**
+ * Stress tensor of mesh node `node`. A node on a bolt pretension cut is solved as itself (the low-side copy) plus its `copies` (the high side): the
+ * value of the unsplit node is taken as the mean over the copies that hold a tensor (the nodal stress of an unsplit node averages the elements on
+ * both sides; the same low / high mean the bolt force readout uses, PHY-06 D18), so neither face's one-sided extrapolation sets the fatigue stress.
+ */
+function nodeTensor(
+  field: { readonly values: Readonly<Record<string, readonly number[]>> } | undefined,
+  node: number,
+  copies: readonly number[],
+): readonly number[] | undefined {
+  const own = field?.values[String(node)];
+  if (own === undefined || own.length < 6 || copies.length === 0) return own;
+  const held = [
+    own,
+    ...copies
+      .map((copy) => field?.values[String(copy)])
+      .filter((values): values is readonly number[] => values !== undefined && values.length >= 6),
+  ];
+  return own.map((_, component) => held.reduce((sum, values) => sum + (values[component] ?? 0), 0) / held.length);
+}
+
+/**
  * The native job of FE fatigue case `caseId` and everything needed to check its result.
  * @failure unknown case -> FAT_CASE_NOT_FOUND; history-only case / bad mapping -> FAT_CASE_INVALID; analysis stale -> FAT_RESULTS_STALE;
  *   unsolved / unverifiable results or no STRESS field -> FAT_RESULTS_MISSING; history / curve problems -> their FAT_* code
@@ -192,8 +214,10 @@ export function fatigueFieldInput(
   const perMpa = stressPerMpa(analysisCase.unitSystem);
   const nodeIds: number[] = [];
   const values: number[] = [];
+  const plan = pretensionResultMap(doc, analysisId, mesh);
+  const copies = plan === null ? new Map<number, readonly number[]>() : copiesOf(plan);
   for (const [nodeId] of mesh.nodes) {
-    const tensors = fields.map((field) => field?.values[String(nodeId)]);
+    const tensors = fields.map((field) => nodeTensor(field, nodeId, copies.get(nodeId) ?? []));
     if (tensors.some((tensor) => tensor === undefined || tensor.length < 6 || tensor.slice(0, 6).some((v) => !Number.isFinite(v))))
       continue;
     nodeIds.push(nodeId);
