@@ -4,6 +4,7 @@ import { z } from '@core/commands/schema';
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { isRecord } from '@lib/isRecord';
+import { aeroErrors, aeroSurfaceSchema, pivotCommandsSchema, turbulenceSchema } from './aeroDocument';
 import { batterySchema, powerErrors, powertrainSchema } from './powerDocument';
 
 const RESERVED_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
@@ -74,12 +75,16 @@ const scenario = z.strictObject({
   controllerId: text.nullable(),
   durationS: positive.max(600),
   setpoints: z
-    .array(z.strictObject({ t: nonNegative, position: vec3, yawDeg: finite }))
+    .array(z.strictObject({ t: nonNegative, position: vec3, yawDeg: finite, pivotDeg: pivotCommandsSchema }))
     .min(1)
     .max(1000),
   initialVelocity: vec3,
   initialAngularVelocity: vec3,
-  wind: z.strictObject({ steady: vec3, gusts: z.array(z.strictObject({ startS: nonNegative, durationS: positive, peak: vec3 })).max(100) }),
+  wind: z.strictObject({
+    steady: vec3,
+    gusts: z.array(z.strictObject({ startS: nonNegative, durationS: positive, peak: vec3 })).max(100),
+    turbulence: turbulenceSchema.optional(),
+  }),
   settleBandM: positive,
   defaulted: z.array(z.string()),
 });
@@ -91,6 +96,7 @@ const flightSchema = z.strictObject({
   scenarios: z.record(z.string(), scenario).optional(),
   batteries: z.record(z.string(), batterySchema).optional(),
   powertrains: z.record(z.string(), powertrainSchema).optional(),
+  aeroSurfaces: z.record(z.string(), aeroSurfaceSchema).optional(),
 });
 
 /** Controller and scenario checks the schema cannot express (keys, rotors on the body, set-point order, the controller's body). */
@@ -198,7 +204,9 @@ function referenceErrors(
     if (entry.cdaM2.every((value) => value === 0)) errors.push(`${at}.cdaM2 must have a component > 0`);
     body(at, entry.bodyId);
   }
-  return [...errors, ...controlErrors(slice, dynamicsIds, body), ...powerErrors(slice, dynamicsIds)];
+  // the later checks report body problems through `body` into `errors`: spread it after them
+  const later = [...controlErrors(slice, dynamicsIds, body), ...powerErrors(slice, dynamicsIds), ...aeroErrors(slice, dynamicsIds, body)];
+  return [...errors, ...later];
 }
 
 /** `DocumentExtension` for `CadDocument.flight`: input data only (nothing is derived). */
@@ -207,14 +215,16 @@ export const flightDocument: DocumentExtension = {
     const slice = raw['flight'];
     if (slice === undefined) return [];
     // zod rebuilds records by assignment, so an own "__proto__" key would vanish from the parsed copy: read the keys on the raw value
-    const reserved = (['rotors', 'bodyDrag', 'controllers', 'scenarios', 'batteries', 'powertrains'] as const).flatMap((table) => {
-      const records = isRecord(slice) ? slice[table] : undefined;
-      return isRecord(records)
-        ? Object.keys(records)
-            .filter((key) => RESERVED_KEYS.has(key))
-            .map((key) => `flight.${table}.${key}: reserved key`)
-        : [];
-    });
+    const reserved = (['rotors', 'bodyDrag', 'controllers', 'scenarios', 'batteries', 'powertrains', 'aeroSurfaces'] as const).flatMap(
+      (table) => {
+        const records = isRecord(slice) ? slice[table] : undefined;
+        return isRecord(records)
+          ? Object.keys(records)
+              .filter((key) => RESERVED_KEYS.has(key))
+              .map((key) => `flight.${table}.${key}: reserved key`)
+          : [];
+      },
+    );
     if (reserved.length > 0) return reserved;
     const errors = sliceSchemaErrors(flightSchema, slice, 'flight');
     if (errors.length > 0) return errors;

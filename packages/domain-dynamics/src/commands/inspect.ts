@@ -151,7 +151,8 @@ export const inspectDynamics = defineCommand({
       (doc.flight !== undefined
         ? `, ${Object.keys(doc.flight.rotors).length} rotor(s), ${Object.keys(doc.flight.bodyDrag).length} body drag(s)` +
           `${doc.flight.controllers === undefined ? '' : `, flight controller(s) ${Object.keys(doc.flight.controllers).join(', ') || 'none'}`}` +
-          `${doc.flight.scenarios === undefined ? '' : `, flight scenario(s) ${Object.keys(doc.flight.scenarios).join(', ') || 'none'}`}`
+          `${doc.flight.scenarios === undefined ? '' : `, flight scenario(s) ${Object.keys(doc.flight.scenarios).join(', ') || 'none'}`}` +
+          `${doc.flight.aeroSurfaces === undefined ? '' : `, aero surface(s) ${Object.keys(doc.flight.aeroSurfaces).join(', ') || 'none'}`}`
         : '');
     const mobilityText =
       structure !== null

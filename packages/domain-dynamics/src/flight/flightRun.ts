@@ -25,9 +25,10 @@ import { compileFlight, withFlightLoads } from './flightLoads';
 import { shortestArc } from './frames';
 import { assessMixer, effectiveness, type MixerRotor } from './mixer';
 import { flightOf, type FlightModel } from './model';
+import { aeroDesignHash } from './aeroTable';
 import { compilePower, type PowerRuntime } from './powerBlock';
 import { staticCoefficients, type RotorRuntime } from './rotorLaw';
-import { isCalm, windAt } from './wind';
+import { isCalm, windSource } from './wind';
 import { RESTING_MEMORY, controllerUpdate } from './controller';
 
 /** Largest number of physics steps of one run (a 60 s flight at 2 kHz is 120 000). */
@@ -67,8 +68,10 @@ export interface FlightRun {
   readonly timestep: number;
   readonly sampleInterval: number;
   readonly engine: string;
-  /** Inputs that took a default (controller + scenario). */
+  /** Inputs that took a default (controller + scenario + aero profile drag) or a stale aero table. */
   readonly defaulted: readonly string[];
+  /** Aero surfaces whose table was generated on another design of their body (aeroDesignHash). */
+  readonly staleAero: readonly string[];
 }
 
 const refusal = (code: FlightRefusalCode, message: string, ids: readonly string[] = []): FlightRefusal => ({ code, message, ids });
@@ -221,12 +224,12 @@ export function runFlight(
   if (compiled !== null && 'error' in compiled) return refusal('FLT_MODEL_INVALID', compiled.error);
   const rotors = compiled?.rotors ?? [];
   // the controller's mass, centre of mass and inertia are the vehicle body's own: a body jointed below it would make them disagree with the
-  // dynamics silently, so multi-body vehicles wait for FLT-M4 (pivoting surfaces)
+  // dynamics silently, so a vehicle is one rigid body; pivoting surfaces are aero surfaces with a servo (generate_aero_table), not bodies
   const carried = subtreeOf(built.model.bodies, vehicle.id).filter((body) => body.id !== vehicle.id);
   if (carried.length > 0)
     return refusal(
       'FLT_VEHICLE_MULTIBODY',
-      `body '${vehicle.id}' carries ${carried.length} jointed bod${carried.length === 1 ? 'y' : 'ies'} (${carried.map((body) => `'${body.id}'`).join(', ')}): a flight vehicle is one rigid body until FLT-M4`,
+      `body '${vehicle.id}' carries ${carried.length} jointed bod${carried.length === 1 ? 'y' : 'ies'} (${carried.map((body) => `'${body.id}'`).join(', ')}): a flight vehicle is one rigid body (model a pivoting wing as an aero surface with a pivot servo, generate_aero_table)`,
       [vehicle.id, ...carried.map((body) => body.id)],
     );
   const massKg = vehicle.mass;
@@ -249,8 +252,11 @@ export function runFlight(
   const gravityLength = len3(gravity);
   const thrustAxis = runtime?.thrustAxis ?? meanAxis(rotors.filter((rotor) => rotor.rotor.bodyId === vehicle.id));
   const control = runtime === null ? null : { runtime, rowOf, initialRpm: hoverRpm(runtime, ordered.length) };
+  const wind = windSource(scenario.wind, scenario.durationS);
   const loop: FlightLoop = {
     scenario,
+    wind,
+    aero: compiled?.aero ?? [],
     vehicleId: vehicle.id,
     rotors,
     control,
@@ -262,14 +268,13 @@ export function runFlight(
     stepsPerTick: tick,
   };
   const drags = compiled?.drags ?? [];
-  const wind = scenario.wind;
   const loads =
     drags.length === 0
       ? built.model.loads
       : withFlightLoads(
           built.model.loads,
-          { rotors: [], drags, bodies: compiled?.bodies ?? [] },
-          isCalm(wind) ? undefined : (t) => windAt(wind, t),
+          { rotors: [], drags, aero: [], bodies: compiled?.bodies ?? [] },
+          isCalm(scenario.wind) ? undefined : wind,
         );
   const block = flightBlock(loop);
   const existing: ActuatorBlock | undefined = built.model.actuators;
@@ -285,6 +290,9 @@ export function runFlight(
     actuators: existing === undefined ? block : combineBlocks(existing, block),
     bodyStates: [...new Set([...(compiled?.bodies ?? []), vehicle.id])],
   };
+  const staleAero = loop.aero
+    .filter(({ surface }) => aeroDesignHash(doc, surface.bodyId, surface.inputsHash) !== surface.designHash)
+    .map(({ surface }) => surface.id);
   const sampleInterval = sampleIntervalOf(scenario.durationS, timestep, options.sampleInterval);
   try {
     const trace = engine.simulate(model, { duration: steps * timestep, timestep, sampleInterval });
@@ -300,9 +308,12 @@ export function runFlight(
       timestep,
       sampleInterval,
       engine: engine.name,
+      staleAero,
       defaulted: [
+        ...staleAero.map((id) => `aero.${id}.stale`),
         ...(controller?.defaulted ?? []).map((name) => `controller.${name}`),
         ...scenario.defaulted.map((name) => `scenario.${name}`),
+        ...(compiled?.aero ?? []).flatMap((entry) => entry.surface.defaulted.map((name) => `aero.${entry.surface.id}.${name}`)),
         ...power.flatMap((feed) => [
           ...feed.battery.defaulted.map((name) => `battery.${feed.battery.id}.${name}`),
           ...feed.powertrain.defaulted.map((name) => `powertrain.${feed.powertrain.id}.${name}`),

@@ -8,6 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
 import { add3 } from '@lib/vec3';
 import type { BodyDrag } from './model';
+import { aeroOutput, compileAero, type AeroRuntime } from './aeroSurface';
 import { bodyDragForce, compileRotor, rotorOutput, type RotorRuntime } from './rotorLaw';
 import { airRelative } from './wind';
 
@@ -16,6 +17,8 @@ type Loads = (state: SimulationState) => AppliedLoads;
 export interface FlightRuntime {
   readonly rotors: readonly RotorRuntime[];
   readonly drags: readonly BodyDrag[];
+  /** Aero surfaces (at their neutral pivot angle outside run_flight, which owns their servos). */
+  readonly aero: readonly AeroRuntime[];
   /** Bodies whose state the laws read (the model's `bodyStates`). */
   readonly bodies: readonly string[];
 }
@@ -32,11 +35,13 @@ export function compileFlight(
   const flight = doc.flight;
   const rotors = Object.values(flight?.rotors ?? {});
   const drags = Object.values(flight?.bodyDrag ?? {});
-  if (rotors.length === 0 && drags.length === 0) return null;
+  const surfaces = Object.values(flight?.aeroSurfaces ?? {});
+  if (rotors.length === 0 && drags.length === 0 && surfaces.length === 0) return null;
   const bodies = doc.dynamics?.bodies ?? {};
   for (const [what, bodyId] of [
     ...rotors.map((rotor) => [`rotor '${rotor.id}'`, rotor.bodyId] as const),
     ...drags.map((drag) => [`body drag of '${drag.bodyId}'`, drag.bodyId] as const),
+    ...surfaces.map((surface) => [`aero surface '${surface.id}'`, surface.bodyId] as const),
   ]) {
     const body = Object.hasOwn(bodies, bodyId) ? bodies[bodyId] : undefined;
     if (body === undefined || !Object.hasOwn(centerOfMass, bodyId))
@@ -46,12 +51,19 @@ export function compileFlight(
   return {
     rotors: rotors.map((rotor) => compileRotor(rotor, centerOfMass[rotor.bodyId] ?? [0, 0, 0], metresPerUnit)),
     drags,
-    bodies: [...new Set([...rotors.map((rotor) => rotor.bodyId), ...drags.map((drag) => drag.bodyId)])],
+    aero: surfaces.map((surface) => compileAero(surface, centerOfMass[surface.bodyId] ?? [0, 0, 0], metresPerUnit)),
+    bodies: [
+      ...new Set([
+        ...rotors.map((rotor) => rotor.bodyId),
+        ...drags.map((drag) => drag.bodyId),
+        ...surfaces.map((surface) => surface.bodyId),
+      ]),
+    ],
   };
 }
 
 /**
- * `base` plus the rotor and drag wrenches of `runtime` (a body the engine gave no state for gets none); with `wind` (world air velocity, m/s,
+ * `base` plus the rotor, drag and aero-surface wrenches of `runtime` (a body the engine gave no state for gets none); with `wind` (world air velocity, m/s,
  * at time t) the laws read the body velocity relative to the air.
  */
 export function withFlightLoads(base: Loads, runtime: FlightRuntime, wind?: (time: number) => Vec3): Loads {
@@ -76,6 +88,14 @@ export function withFlightLoads(base: Loads, runtime: FlightRuntime, wind?: (tim
       const body = stateOf(drag.bodyId);
       if (body === undefined) continue;
       bodyForces[drag.bodyId] = add3(bodyForces[drag.bodyId] ?? [0, 0, 0], bodyDragForce(drag, body));
+    }
+    for (const surface of runtime.aero) {
+      const body = stateOf(surface.surface.bodyId);
+      if (body === undefined) continue;
+      const output = aeroOutput(surface, body, surface.surface.servo?.neutralDeg ?? 0);
+      const id = surface.surface.bodyId;
+      bodyForces[id] = add3(bodyForces[id] ?? [0, 0, 0], output.force);
+      bodyMoments[id] = add3(bodyMoments[id] ?? [0, 0, 0], output.moment);
     }
     return { jointForces: loads.jointForces, bodyForces, bodyMoments };
   };

@@ -618,6 +618,40 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
             motorSource: 'fuzz motor',
           },
         ],
+        [
+          'generate_aero_table',
+          {
+            id: 'wing',
+            body: 'frame',
+            surfaces: [
+              {
+                name: 'wing',
+                pivots: true,
+                sections: [
+                  { leadingEdge: [20, 0, 0], chord: 100 },
+                  { leadingEdge: [20, 300, 0], chord: 100 },
+                ],
+                spanwisePanels: 4,
+                chordwisePanels: 2,
+              },
+            ],
+            momentCentre: [0, 0, 0],
+            alphasDeg: [-4, 0, 4],
+            pivotsDeg: [-5, 5],
+            pivotPoint: [20, 0, 0],
+            servo: { rateDegS: 20 },
+          },
+        ],
+        [
+          'define_flight_scenario',
+          {
+            body: 'frame',
+            durationS: 1,
+            id: 'windy',
+            setpoints: [{ t: 0, pivotDeg: { wing: 3 } }],
+            wind: { turbulence: { sigmaMps: [1, 1, 0.5], seed: 5 } },
+          },
+        ],
       ];
       return steps.reduce((doc, [name, params]) => execute(doc, name, params).document, quadDrone());
     },

@@ -6,13 +6,13 @@
 
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { dot3, len3, sub3 } from '@lib/vec3';
+import { aeroMetrics, type AeroSurfaceMetrics } from './aeroMetrics';
 import { batteryMetrics, batteryWarnings, type BatteryMetrics } from './batteryMetrics';
 import { mixerRow, NOT_CONTROLLED, powerBase, ROTOR, rotorSlot, setpointAt, SLOT, tiltOf } from './flightBlock';
 import { POWER } from './powerBlock';
 import { offsetAt, type FlightRun } from './flightRun';
 import { rotateInverse } from './frames';
 import { STATIC_ADVANCE_RATIO_LIMIT, validatedRange } from './rotorLaw';
-import { windAt } from './wind';
 
 const DEG = 180 / Math.PI;
 
@@ -87,6 +87,8 @@ export interface FlightMetrics {
   readonly rotors: Readonly<Record<string, RotorMetrics>>;
   /** Per powertrain id (13 FLT M3); empty without a powertrain. */
   readonly battery: Readonly<Record<string, BatteryMetrics>>;
+  /** Per aero surface (13 FLT M4): empty without one. */
+  readonly aero: Readonly<Record<string, AeroSurfaceMetrics>>;
   /** First time the thrust axis tilted past 90° under a controller; null = it did not. */
   readonly divergedAtS: number | null;
   readonly defaulted: readonly string[];
@@ -194,6 +196,8 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
     loop.power.map((feed, index) => [feed.powertrain.id, batteryMetrics(feed, index, loop.rotors.length, final, duration, physicsSteps)]),
   );
   for (const [id, entry] of Object.entries(battery)) warnings.push(...batteryWarnings(id, entry));
+  const aero = aeroMetrics(loop, final, physicsSteps, run.staleAero);
+  warnings.push(...aero.warnings);
   const runtime = loop.control?.runtime ?? null;
   const maxThrustN =
     runtime === null
@@ -260,6 +264,7 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
     },
     rotors,
     battery,
+    aero: aero.surfaces,
     divergedAtS: divergedTime >= 0 ? divergedTime : null,
     defaulted: run.defaulted,
     unverified: run.defaulted.length > 0,
@@ -295,7 +300,7 @@ export function flightSeries(run: FlightRun): Record<string, unknown> {
     bodyRateDegS: ks.map((k) =>
       vec(rotateInverse(samples.orientation(k), samples.angularVelocity(k)).map((w) => w * DEG) as unknown as Vec3),
     ),
-    windMps: ks.map((k) => vec(windAt(run.scenario.wind, samples.time(k)))),
+    windMps: ks.map((k) => vec(run.loop.wind(samples.time(k)))),
     battery: Object.fromEntries(
       run.loop.power.map((feed, p) => {
         const at = (field: number, k: number): number => round(samples.aux(powerBase(run.loop.rotors.length, p) + field, k));
