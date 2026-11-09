@@ -4,8 +4,9 @@
 use crate::common::*;
 use crate::defeature::{defeature, wants_defeature};
 use crate::elements::{curve_nodes, region_sets, surface_triangles, tet_faces, tet_rows, Nodes};
-use crate::raw::{RawMesh, ResolvedTargets};
-use crate::sizes::{mesh_params, point_sizes, shape_sizes};
+use crate::imprint::{carry_over, imprint, plane_of, Plane};
+use crate::raw::{RawMesh, Refinement, Resolved, ResolvedTargets};
+use crate::sizes::{mesh_params, point_sizes, refinements_of, shape_sizes};
 use crate::stl::StlSurface;
 use crate::targets::{face_map, resolve_targets, Faces, TargetScope};
 use llull_netgen::{MeshData, Shape, Sizes};
@@ -86,9 +87,32 @@ fn mesh_step(part: &Value, targets: &[&Value], controls: &Value, scale: f64, pat
         face_map: (!refs.is_empty()).then_some(&mapped),
         ambiguous: (!refs.is_empty()).then_some(&ambiguous),
     };
-    let (resolved, refinements) = resolve_targets(&scope, targets, controls, scale, entity_id)?;
-    let sizes = shape_sizes(&shape, &refinements, controls, scale)?;
-    let mesh = shape.mesh(&mesh_params(controls, scale, false, false)?, &sizes).map_err(|error| mesh_failed(entity_id, error))?;
+    let (mut resolved, mut refinements) = resolve_targets(&scope, targets, controls, scale, entity_id)?;
+    let mut planes: Vec<(String, Plane)> = Vec::new();
+    for target in targets {
+        if let Some(plane) = plane_of(target, scale)? {
+            planes.push((text(target, "key")?.to_string(), plane));
+        }
+    }
+    let mut distinct: Vec<Plane> = Vec::new();
+    for (_, plane) in &planes {
+        if !distinct.contains(plane) {
+            distinct.push(*plane);
+        }
+    }
+    let imprinted = if distinct.is_empty() { None } else { Some(imprint(&shape, &distinct, entity_id)?) };
+    if let Some(split) = &imprinted {
+        carry_over(split, &shape, &mut resolved, &planes, entity_id)?;
+        refinements = refinements_of(controls, &resolved, |size, item: &Resolved| Refinement {
+            size,
+            surfaces: item.faces.iter().copied().collect(),
+            curves: if item.section { item.edges.iter().copied().collect() } else { Vec::new() },
+            points: item.points.clone(),
+        })?;
+    }
+    let meshed = imprinted.as_ref().map_or(&shape, |split| &split.shape);
+    let sizes = shape_sizes(meshed, &refinements, controls, scale)?;
+    let mesh = meshed.mesh(&mesh_params(controls, scale, false, false)?, &sizes).map_err(|error| mesh_failed(entity_id, error))?;
     let mut nodes = Nodes::new(&mesh.points);
     let quadratic = order_of(controls)? == 2;
     let mut raw = extract(&mesh, &mut nodes, |_| true, |face, _| Some(face), quadratic, entity_id, resolved)?;

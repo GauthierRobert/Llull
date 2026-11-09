@@ -178,3 +178,29 @@ fn a_closed_stl_surface_is_meshed_and_a_broken_one_refused() {
 fn a_missing_step_file_is_an_error() {
     assert!(Shape::read_step(&fixture("missing.step"), 1.0).is_err());
 }
+
+#[test]
+fn a_plane_splits_the_crossed_faces_and_tracks_where_they_came_from() {
+    let shape = Shape::read_step(&fixture("box_20x10x10.step"), 1.0).unwrap();
+    let cut = shape.imprinted(&[10.0, 0.0, 0.0], &[1.0, 0.0, 0.0]).unwrap();
+    assert_eq!((cut.solid_count(), cut.face_count()), (2, 11), "4 crossed faces become 8, 2 ends stay, 1 shared cut face");
+    let ownerless: Vec<i32> = (1..=11).filter(|&f| cut.owners(f).is_empty()).collect();
+    assert_eq!(ownerless.len(), 1, "the cut face has no owner");
+    for original in 1..=6 {
+        let pieces = (1..=11).filter(|&f| cut.owners(f).contains(&original)).count();
+        let crossed =
+            shape.face_centroid(original).unwrap()[0].abs() > 1e-9 && (shape.face_centroid(original).unwrap()[0] - 20.0).abs() > 1e-9;
+        assert_eq!(pieces, if crossed { 2 } else { 1 }, "face {original}");
+    }
+    let mesh = cut.mesh(&params(4.0), &Sizes::default()).unwrap();
+    assert_tets_in_range(&mesh);
+    assert!(mesh.tet_domains.contains(&1) && mesh.tet_domains.contains(&2));
+}
+
+#[test]
+fn a_plane_that_misses_the_shape_is_an_error() {
+    let shape = Shape::read_step(&fixture("box_20x10x10.step"), 1.0).unwrap();
+    let error = shape.imprinted(&[50.0, 0.0, 0.0], &[1.0, 0.0, 0.0]).err().unwrap();
+    assert!(error.0.contains("does not cut"), "{error}");
+    assert!(shape.imprinted(&[1.0, 0.0, 0.0], &[0.0, 0.0, 0.0]).is_err());
+}

@@ -288,3 +288,137 @@ fn a_malformed_request_is_an_error_response() {
     let response = run(&json!("not a request"));
     assert_eq!(response["ok"], false);
 }
+
+/// A STEP part with one target carrying a plane (millimetres, analysis unit = document unit).
+fn plane_request(fixture: &str, target: Value, order: i64) -> Value {
+    json!({
+        "op": "mesh", "lengthScale": 1.0,
+        "parts": [{ "entityId": "b", "geometry": step(fixture) }],
+        "targets": [target],
+        "controls": { "order": order, "globalSize": 3.0, "refinements": [] }
+    })
+}
+
+fn volumes_are_positive(response: &Value) {
+    let xyz = coords(response);
+    let rows = elements(response, 0);
+    assert!(!rows.is_empty());
+    for row in rows {
+        let corners: Vec<[f64; 3]> = (1..=4).map(|k| xyz[&row[k].as_u64().unwrap()]).collect();
+        let edge = |i: usize| [0, 1, 2].map(|k| corners[i][k] - corners[0][k]);
+        let (a, b, c) = (edge(1), edge(2), edge(3));
+        let volume = a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+        assert!(volume.abs() > 0.0, "flat element {row}");
+    }
+}
+
+fn plane_x(at: f64) -> Value {
+    json!({ "point": [at, 0.0, 0.0], "normal": [1.0, 0.0, 0.0] })
+}
+
+#[test]
+fn a_box_top_face_cut_by_the_mid_plane_targets_the_nodes_on_the_section_line() {
+    for order in [1, 2] {
+        let target = json!({ "key": "C_mid", "entityId": "b", "facesNear": [[3.0, 5.0, 10.0]], "intersectPlane": plane_x(10.0) });
+        let response = run(&plane_request("box_20x10x10.step", target, order));
+        assert_eq!(response["ok"], true, "{response}");
+        let xyz = coords(&response);
+        let set = ids(&response["nodeSets"]["C_mid"]);
+        assert!(set.len() >= 3, "{}", set.len());
+        assert!(set.iter().all(|n| (xyz[n][0] - 10.0).abs() < 1e-9 && (xyz[n][2] - 10.0).abs() < 1e-9), "on the plane AND the top face");
+        let (low, high) = set.iter().fold((f64::MAX, f64::MIN), |(lo, hi), n| (lo.min(xyz[n][1]), hi.max(xyz[n][1])));
+        assert!(low.abs() < 1e-9 && (high - 10.0).abs() < 1e-9, "the whole section line [0, 10] is covered: {low}..{high}");
+        assert!(response["faceSets"].get("C_mid").is_none(), "a plane target has no faces of its own");
+        volumes_are_positive(&response);
+    }
+}
+
+#[test]
+fn an_off_centre_plane_gives_a_line_of_nodes_not_the_whole_face() {
+    let cut = |plane: Option<Value>| {
+        let mut target = json!({ "key": "L", "entityId": "b", "facesNear": [[3.0, 5.0, 10.0]] });
+        if let Some(plane) = plane {
+            target["intersectPlane"] = plane;
+        }
+        run(&plane_request("box_20x10x10.step", target, 1))
+    };
+    let whole = cut(None);
+    let section = cut(Some(plane_x(7.3)));
+    let xyz = coords(&section);
+    let line = ids(&section["nodeSets"]["L"]);
+    assert!(!line.is_empty() && line.iter().all(|n| (xyz[n][0] - 7.3).abs() < 1e-9), "mesh nodes lie exactly on the imprinted plane");
+    let top = ids(&whole["nodeSets"]["L"]);
+    assert!(top.len() > 2 * line.len(), "{} of the top face's {}", line.len(), top.len());
+}
+
+#[test]
+fn a_cylinder_cut_by_a_plane_through_its_axis_targets_the_two_seam_lines() {
+    let target = json!({ "key": "S", "entityId": "b", "facesNear": [[7.0, 10.0, 1.0]], "intersectPlane": plane_x(10.0) });
+    let response = run(&plane_request("plate_hole.step", target, 1));
+    assert_eq!(response["ok"], true, "{response}");
+    let xyz = coords(&response);
+    let set = ids(&response["nodeSets"]["S"]);
+    assert!(set.len() >= 4, "{}", set.len());
+    for n in &set {
+        let [x, y, _] = xyz[n];
+        assert!((x - 10.0).abs() < 1e-9, "on the plane: x = {x}");
+        assert!(((y - 10.0).abs() - 3.0).abs() < 1e-6, "on the hole wall: y = {y}");
+    }
+    assert!(set.iter().any(|n| xyz[n][1] < 10.0) && set.iter().any(|n| xyz[n][1] > 10.0), "both seams");
+    volumes_are_positive(&response);
+}
+
+#[test]
+fn a_plane_that_misses_the_part_or_the_selected_faces_is_a_named_error() {
+    let miss = json!({ "key": "C", "entityId": "b", "facesNear": [[3.0, 5.0, 10.0]], "intersectPlane": plane_x(50.0) });
+    let response = run(&plane_request("box_20x10x10.step", miss, 1));
+    assert_eq!(response["code"], "FEA_TARGET_UNRESOLVED", "{response}");
+    assert!(response["error"].as_str().unwrap().contains("does not cut"), "{response}");
+    // the plane cuts the part but not the (end) face the target selects
+    let off_face = json!({ "key": "C", "entityId": "b", "facesNear": [[0.0, 5.0, 5.0]], "intersectPlane": plane_x(10.0) });
+    let response = run(&plane_request("box_20x10x10.step", off_face, 1));
+    assert_eq!(response["code"], "FEA_TARGET_UNRESOLVED", "{response}");
+    assert!(response["error"].as_str().unwrap().contains("meets no edge of the selected faces"), "{response}");
+    let no_face = json!({ "key": "C", "entityId": "b", "pointsNear": [[0.0, 5.0, 5.0]], "intersectPlane": plane_x(10.0) });
+    let response = run(&plane_request("box_20x10x10.step", no_face, 1));
+    assert!(response["error"].as_str().unwrap().contains("needs facesNear"), "{response}");
+}
+
+#[test]
+fn a_plane_target_on_stl_geometry_or_with_conformal_bonding_is_refused_not_ignored() {
+    let mut request = box_request(1);
+    request["targets"] = json!([{ "key": "C", "entityId": "box-1", "facesNear": [[0.0, 5.0, 5.0]], "intersectPlane": plane_x(10.0) }]);
+    assert_eq!(run(&request)["code"], "FEA_TARGET_PLANE_UNSUPPORTED");
+    let target = json!({ "key": "C", "entityId": "b", "facesNear": [[3.0, 5.0, 10.0]], "intersectPlane": plane_x(10.0) });
+    let mut request = plane_request("box_20x10x10.step", target, 1);
+    request["controls"]["bonding"] = json!("conformal");
+    assert_eq!(run(&request)["code"], "FEA_TARGET_PLANE_UNSUPPORTED");
+}
+
+#[test]
+fn targets_without_a_plane_still_resolve_when_another_target_imprints_one() {
+    let request = json!({
+        "op": "mesh", "lengthScale": 1.0,
+        "parts": [{ "entityId": "b", "geometry": step("box_20x10x10.step") }],
+        "targets": [
+            { "key": "C", "entityId": "b", "facesNear": [[0.0, 5.0, 5.0]] },
+            { "key": "T", "entityId": "b", "facesNear": [[3.0, 5.0, 10.0]] },
+            { "key": "E", "entityId": "b", "edgesNear": [[10.0, 0.0, 0.0]] },
+            { "key": "P", "entityId": "b", "facesNear": [[3.0, 5.0, 10.0]], "intersectPlane": plane_x(10.0) }
+        ],
+        "controls": { "order": 1, "globalSize": 3.0, "refinements": [{ "key": "P", "size": 1.5 }] }
+    });
+    let response = run(&request);
+    assert_eq!(response["ok"], true, "{response}");
+    let xyz = coords(&response);
+    let near = |key: &str, axis: usize, value: f64| ids(&response["nodeSets"][key]).iter().all(|n| (xyz[n][axis] - value).abs() < 1e-9);
+    assert!(near("C", 0, 0.0) && near("T", 2, 10.0) && near("P", 0, 10.0));
+    // the edge y = 0, z = 0 runs the whole 20 mm although the plane split it at x = 10
+    let edge = ids(&response["nodeSets"]["E"]);
+    let span = edge.iter().fold((f64::MAX, f64::MIN), |(lo, hi), n| (lo.min(xyz[n][0]), hi.max(xyz[n][0])));
+    assert!(edge.iter().all(|n| xyz[n][1].abs() < 1e-9 && xyz[n][2].abs() < 1e-9) && span.0.abs() < 1e-9 && (span.1 - 20.0).abs() < 1e-9);
+    // the whole top face: both halves
+    let top = ids(&response["nodeSets"]["T"]);
+    assert!(top.iter().any(|n| xyz[n][0] < 10.0 - 1e-9) && top.iter().any(|n| xyz[n][0] > 10.0 + 1e-9));
+    assert!(response["faceSets"].get("T").is_some());
+}

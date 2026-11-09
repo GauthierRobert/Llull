@@ -87,6 +87,7 @@ mod ffi {
         fn sample_face(self: &Shape, face: i32, spacing: f64) -> Result<Vec<f64>>;
         fn sample_edge(self: &Shape, edge: i32, spacing: f64) -> Result<Vec<f64>>;
         fn defeatured(self: &Shape, faces: &[i32]) -> Result<UniquePtr<Shape>>;
+        fn imprinted(self: &Shape, plane: &[f64]) -> Result<UniquePtr<Shape>>;
 
         fn mesh_shape(shape: &Shape, params: &MeshParams, sizes: &Sizes) -> Result<MeshData>;
         fn mesh_stl(facets: &[f64], params: &MeshParams, sizes: &Sizes) -> Result<MeshData>;
@@ -245,6 +246,14 @@ impl Shape {
     pub fn defeatured(&self, faces: &[i32]) -> Result<Shape> {
         let _netgen = lock();
         present(self.0.defeatured(faces)?)
+    }
+
+    /// The shape split by the plane through `point` with `normal` (OCCT splitter, plane bounded to the shape's box): crossed faces are split
+    /// along the section, cut solids become solids sharing the cut face. [`Shape::owners`] of a face = the face of `self` it lies on (empty
+    /// for a cut face). Errors when the plane does not cut the shape.
+    pub fn imprinted(&self, point: &Point, normal: &Point) -> Result<Shape> {
+        let _netgen = lock();
+        present(self.0.imprinted(&[point[0], point[1], point[2], normal[0], normal[1], normal[2]])?)
     }
 
     /// Tetrahedra (or, with `params.surface_only`, surface elements) of the shape.

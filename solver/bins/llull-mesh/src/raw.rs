@@ -13,6 +13,8 @@ pub struct Resolved {
     /// Shells: pressure side per mid face (1 = +normal side, 2 = below), in resolution order.
     pub labels: Vec<(i32, i32)>,
     pub edges: BTreeSet<i32>,
+    /// `intersectPlane`: `edges` are the section edges of the selected faces, and the target has no faces of its own.
+    pub section: bool,
     pub residual: f64,
     /// `pointsNear`, scaled to the analysis unit.
     pub points: Vec<Point>,

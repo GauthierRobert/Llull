@@ -70,6 +70,10 @@ class Shape {
   rust::Vec<double> sample_edge(int32_t edge, double spacing) const;
   // The shape without faces `faces` (OCCT defeaturing).
   std::unique_ptr<Shape> defeatured(rust::Slice<const int32_t> faces) const;
+  // The shape split by the plane through `plane` = [px, py, pz, nx, ny, nz] (OCCT splitter; the plane is bounded to the shape's box): the faces
+  // it crosses are split along the section and the solids it cuts become several solids sharing the cut face. owners(face) = the face of
+  // this shape the new face lies on (empty for a cut face). Throws when the plane does not cut the shape.
+  std::unique_ptr<Shape> imprinted(rust::Slice<const double> plane) const;
 
   TopoDS_Shape shape;
   std::shared_ptr<netgen::OCCGeometry> geometry;
