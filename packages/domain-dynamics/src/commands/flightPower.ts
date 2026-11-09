@@ -56,7 +56,7 @@ export const addBattery = defineCommand({
   name: 'add_battery',
   description:
     'Add a battery pack for run_flight and estimate_endurance (13 FLT): an equivalent circuit V = OCV(SoC) - R_int·I with dSoC/dt = -I / (3600·C), ' +
-    'cut off when the terminal voltage falls below cutoffVoltPerCell × cellsSeries (the ESC low-voltage cut-off: the motors then stop). ' +
+    'cut off when the terminal voltage falls below cutoffVoltPerCell × cellsSeries (the ESC low-voltage cut-off: it latches on the first step where the terminal voltage, with sag under load, falls below the cut-off, and the motors then stay stopped). ' +
     'Units: capacityMah is the capacity of the WHOLE pack in mAh (a 4S2P pack of 2800 mAh cells is 5600), internalResistanceOhm the resistance of the ' +
     'whole pack in ohm (the sum over series cells divided by parallel strings), ocv the open-circuit voltage of ONE cell in volt against state of charge ' +
     '0..1 (rest voltage; the pack voltage is cellsSeries times it). Without `ocv` a typical LiPo curve (3.27 V empty, 3.82 V half, 4.20 V full) is used ' +

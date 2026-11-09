@@ -197,6 +197,8 @@ describe('13 FLT power chain in the loop (FLT-M3)', () => {
     expect(thrust).toBeLessThan(2.7336 * 0.8);
     for (const rotor of Object.values(metrics.rotors)) expect(rel(rotor.finalThrustN, thrust)).toBeLessThan(0.01);
     expect(metrics.battery['pt']?.voltageLimitedFraction).toBeGreaterThan(0.9);
+    // the cap uses the previous step's voltage: the throttle may exceed 1 only by the one-step lag
+    expect(metrics.battery['pt']?.peakThrottle).toBeLessThanOrEqual(1.05);
     expect(metrics.warnings.some((warning) => warning.startsWith('FLT_PACK_VOLTAGE_LIMITED'))).toBe(true);
   });
 
@@ -213,6 +215,13 @@ describe('13 FLT power chain in the loop (FLT-M3)', () => {
     const metrics = run(weak, { scenario: 's' });
     expect(metrics.battery['pt']?.overCurrentFraction).toBeGreaterThan(0.9);
     expect(metrics.warnings.some((warning) => warning.startsWith('FLT_MOTOR_CURRENT_LIMIT'))).toBe(true);
+  });
+
+  it('prints the extrapolated endurance as an estimate and a reached cut-off plainly', () => {
+    const summary = (doc: CadDocument): string => execute(doc, 'run_flight', { scenario: 's', timestep: 0.0025 }).summary;
+    expect(summary(flyingQuad({}, { durationS: 1 }))).toMatch(/endurance ~[0-9.e+]+ s est. [(]extrapolated_at_final_current[)]/);
+    const cut = summary(flyingQuad({ ocv: FLAT, cutoffVoltPerCell: 3, internalResistanceOhm: 0, capacityMah: 10 }, { durationS: 8 }));
+    expect(cut).toMatch(/endurance [0-9.e+]+ s [(]cutoff_reached[)]/);
   });
 
   it('is deterministic and carries per-sample battery series', () => {

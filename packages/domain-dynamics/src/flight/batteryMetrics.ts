@@ -24,12 +24,12 @@ export interface BatteryMetrics {
   /** Largest motor current of a step, A, and the datasheet limit it is judged against. */
   readonly motorPeakCurrentA: number;
   readonly motorCurrentLimitA: number;
-  /** Largest throttle (motor voltage / pack voltage) of a step; above 1 never happens: the speed is limited instead. */
+  /** Largest throttle (motor voltage / pack voltage) of a step; the speed cap uses the previous step's terminal voltage while this ratio divides by the present one, so it can exceed 1 by a small one-step lag (FLT-D26). */
   readonly peakThrottle: number;
   /** Share of the physics steps where the pack voltage limited a rotor's speed below its command. */
   readonly voltageLimitedFraction: number;
   readonly overCurrentFraction: number;
-  /** Flight time to the cut-off: reached, or the run time plus what the final current still allows (state of charge down to the cut-off floor). null = no load. */
+  /** Flight time to the cut-off: reached, or (an ESTIMATE, optimistic on a sloping OCV or a constant-power load; estimate_endurance integrates properly) the run time plus what the final current still allows (state of charge down to the cut-off floor). null = no load. */
   readonly enduranceS: number | null;
   readonly enduranceBasis: 'cutoff_reached' | 'extrapolated_at_final_current' | 'no_load';
 }

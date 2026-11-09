@@ -76,9 +76,9 @@ const isCutOff = (aux: Float64Array, base: number): boolean => {
 export function packRpm(runtime: PowerRuntime, aux: Float64Array, base: number, rpm: number, torqueNm: number): number {
   if (isCutOff(aux, base)) return 0;
   const omega = (rpm * 2 * Math.PI) / 60;
-  const available = aux[base + POWER.voltage] ?? 0;
+  const available = aux[base + POWER.voltage] as number;
   if (motorPoint(runtime.motor, torqueNm, omega).voltageV <= available) return rpm;
-  aux[base + POWER.limitedSteps] = (aux[base + POWER.limitedSteps] ?? 0) + 1;
+  aux[base + POWER.limitedSteps] = (aux[base + POWER.limitedSteps] as number) + 1;
   return (maxOmega(runtime.motor, torqueNm, omega, available) * 60) / (2 * Math.PI);
 }
 
@@ -101,25 +101,27 @@ export function stepPower(
     aux[base + POWER.current] = 0;
     return;
   }
-  const soc = aux[base + POWER.soc] ?? 0;
+  const soc = aux[base + POWER.soc] as number;
   const ocv = openCircuitVolts(runtime.pack, soc);
   const motors = loads.map((load) => motorPoint(runtime.motor, load.torqueNm, (load.rpm * 2 * Math.PI) / 60));
   const solved = solveBus(runtime.pack, ocv, busPower(runtime.powertrain, motors));
   const currentA = solved === null ? 0 : solved.currentA;
   const volts = solved === null ? 0 : solved.terminalV;
-  const next = soc - (currentA * dt) / runtime.pack.capacityAs;
+  // charge and energy stop at an empty pack: only what is left of the SoC can be drawn in the last step
+  const drawnAs = Math.min(currentA * dt, soc * runtime.pack.capacityAs);
+  const next = soc - drawnAs / runtime.pack.capacityAs;
   aux[base + POWER.soc] = Math.max(0, next);
-  aux[base + POWER.chargeAs] = (aux[base + POWER.chargeAs] ?? 0) + currentA * dt;
-  aux[base + POWER.energyJ] = (aux[base + POWER.energyJ] ?? 0) + volts * currentA * dt;
+  aux[base + POWER.chargeAs] = (aux[base + POWER.chargeAs] as number) + currentA * dt;
+  aux[base + POWER.energyJ] = (aux[base + POWER.energyJ] as number) + volts * currentA * dt;
   aux[base + POWER.voltage] = solved === null ? 0 : volts;
   aux[base + POWER.current] = currentA;
-  aux[base + POWER.minVoltage] = Math.min(aux[base + POWER.minVoltage] ?? Infinity, volts);
-  aux[base + POWER.peakCurrent] = Math.max(aux[base + POWER.peakCurrent] ?? 0, currentA);
+  aux[base + POWER.minVoltage] = Math.min(aux[base + POWER.minVoltage] as number, volts);
+  aux[base + POWER.peakCurrent] = Math.max(aux[base + POWER.peakCurrent] as number, currentA);
   const motorPeak = Math.max(0, ...motors.map((motor) => motor.currentA));
-  aux[base + POWER.peakMotorCurrent] = Math.max(aux[base + POWER.peakMotorCurrent] ?? 0, motorPeak);
-  if (motorPeak > runtime.motor.peakCurrentA) aux[base + POWER.overCurrentSteps] = (aux[base + POWER.overCurrentSteps] ?? 0) + 1;
+  aux[base + POWER.peakMotorCurrent] = Math.max(aux[base + POWER.peakMotorCurrent] as number, motorPeak);
+  if (motorPeak > runtime.motor.peakCurrentA) aux[base + POWER.overCurrentSteps] = (aux[base + POWER.overCurrentSteps] as number) + 1;
   const throttle = volts > 0 ? Math.max(0, ...motors.map((motor) => motor.voltageV / volts)) : 0;
-  aux[base + POWER.peakThrottle] = Math.max(aux[base + POWER.peakThrottle] ?? 0, throttle);
+  aux[base + POWER.peakThrottle] = Math.max(aux[base + POWER.peakThrottle] as number, throttle);
   if (solved === null || (currentA > 0 && volts < runtime.pack.cutoffV) || next <= 0) aux[base + POWER.cutoffTime] = time;
 }
 

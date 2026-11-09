@@ -82,7 +82,7 @@ function metricsSummary(metrics: FlightMetrics): string {
       .map(
         ([id, pack]) =>
           `, battery '${pack.batteryId}' (${id}): SoC ${format(pack.initialSoc)} -> ${format(pack.finalSoc)}, ${format(pack.usedChargeMah)} mAh / ${format(pack.energyWh)} Wh, current mean ${format(pack.meanCurrentA)} A / peak ${format(pack.peakCurrentA)} A, min ${format(pack.minVoltageV)} V, ` +
-          `${pack.cutoffAtS === null ? 'no cut-off' : `CUT-OFF at ${format(pack.cutoffAtS)} s`}, endurance ${pack.enduranceS === null ? 'n/a' : `${format(pack.enduranceS)} s (${pack.enduranceBasis})`}`,
+          `${pack.cutoffAtS === null ? 'no cut-off' : `CUT-OFF at ${format(pack.cutoffAtS)} s`}, endurance ${pack.enduranceS === null ? 'n/a' : `${pack.enduranceBasis === 'extrapolated_at_final_current' ? '~' : ''}${format(pack.enduranceS)} s ${pack.enduranceBasis === 'extrapolated_at_final_current' ? 'est. ' : ''}(${pack.enduranceBasis})`}`,
       )
       .join('') +
     `${metrics.unverified ? `; unverified (${metrics.defaulted.length} input(s) defaulted, see data.defaulted)` : ''}${metrics.warnings.length > 0 ? `; warnings: ${[...new Set(metrics.warnings.map((warning) => warning.split(':')[0]))].join(', ')}` : ''}.`
@@ -112,7 +112,7 @@ export const runFlightCommand = defineCommand({
     'defaulted inputs (unverified). With a powertrain (add_battery + add_flight_powertrain) every rotor it feeds draws its motor current from the ' +
     'pack each step: data.battery[powertrainId] gives the state of charge, charge in mAh, energy in Wh, mean / peak / final current, the lowest ' +
     'terminal voltage (sag), motor current peak against the datasheet limit, peak throttle, the cut-off time (the motors then stop: warning ' +
-    'FLT_BATTERY_CUTOFF) and enduranceS (the cut-off time, or the run time plus what the final current still allows). Peaks and integrals are exact per physics step; recovery uses the samples. detail "series" adds per-sample ' +
+    'FLT_BATTERY_CUTOFF) and enduranceS (the cut-off time, or an ESTIMATE: the run time plus what the final current still allows, optimistic on a sloping OCV curve or constant-power load; estimate_endurance integrates the discharge properly). Peaks and integrals are exact per physics step; recovery uses the samples. detail "series" adds per-sample ' +
     'position offset, set-point, velocity, attitude, tilt, body rates, wind and per-rotor rpm / thrust / power. A closed loop tilting past ' +
     '90° or a NaN state is refused as FLT_DIVERGED with the time. The vehicle is ONE free rigid body: a body with other bodies jointed below it is refused (FLT_VEHICLE_MULTIBODY, until FLT-M4); a rotor layout whose mixer is nearly singular is refused (FLT_MIXER_ILL_CONDITIONED). Use flight_report for a PASS / MARGINAL / FAIL verdict.',
   params: z.object({
