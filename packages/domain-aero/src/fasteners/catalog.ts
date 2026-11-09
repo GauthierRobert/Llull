@@ -6,6 +6,7 @@ import { deleteFastenerStack, insertFastenerStack, selectFastener } from './inse
 import { jointCapacity } from './jointCapacity';
 import { checkFastenerLayout } from './layoutCommand';
 import { insertFastenerRow } from './rowCommand';
+import { listFastenerStacks } from './stackQuery';
 
 export const fastenerCommands = commandCatalog(
   importFastenerCatalog,
@@ -16,5 +17,6 @@ export const fastenerCommands = commandCatalog(
   insertFastenerRow,
   checkFastenerLayout,
   deleteFastenerStack,
+  listFastenerStacks,
   jointCapacity,
 );

@@ -15,10 +15,10 @@
 | [assembly](#assembly) | 53 |
 | [materials](#materials) | 28 |
 | [material-lab](#material-lab) | 3 |
-| [analysis](#analysis) | 162 |
+| [analysis](#analysis) | 161 |
 | [review](#review) | 48 |
 | [manufacturing](#manufacturing) | 63 |
-| [fasteners](#fasteners) | 9 |
+| [fasteners](#fasteners) | 10 |
 | [aerodynamics](#aerodynamics) | 18 |
 | [fluids](#fluids) | 4 |
 | [flow](#flow) | 8 |
@@ -456,7 +456,6 @@
 | `hertz_contact` | Hertz contact hand check (frictionless, elastic, small contact) for a sphere or cylinder on a sphere / cylinder / plane; pure, reads no document. | read-only |
 | `interference_fit` | Interference (shrink / press) fit hand check with Lamé thick-cylinder theory: contact pressure from radial displacement compatibility, radial and hoop stresses… | read-only |
 | `joint_from_fastener_stack` | Set up the FE model of a placed fastener stack (insert_fastener / insert_fastener_row, plugin fasteners) in a nonlinear_static analysis: one bolt pretension (a… |  |
-| `joint_margins` | Joint margins of safety of a preloaded bolt from a SOLVED nonlinear_static analysis, as 05-style margin rows (reviewRequired, FAIL / MARGINAL rows pending_huma… | read-only |
 | `joint_stiffness_from_fe` | Joint stiffness factor n*phi of a preloaded bolt from a SOLVED nonlinear_static analysis: the slope of the bolt axial force (contact_report bolts: stress on th… | read-only |
 | `limit_load` | Find the limit (collapse) load of a SOLVED nonlinear_static analysis from one curve probe (add_curve_probe). | read-only |
 | `margin_disposition_payload` | The SHA-256 a human signs to authorize dispose_margin on one FAIL or MARGINAL row of compute_margins: pass the same analysisId / rowId / decision / justificati… | read-only |
@@ -652,6 +651,7 @@
 | `insert_fastener_stack` | Insert one fastener stack through plates: runs the select_fastener rules, cuts the hole through every plate (exact boolean with the kernel), and places the bol… | kernel |
 | `joint_capacity` | Joint capacity of one placed fastener stack (read-only, V2 hook): single shear = fastener Fsu × π·D²/4 (one shear plane) and, for each sheet layer, bearing = s… | read-only |
 | `list_fastener_families` | List the fastener families in the document catalogue: id, kind, standard, licence, grip mode, part-number pattern and every size dash with its diameter in inch… | read-only |
+| `list_fastener_stacks` | List the fastener stacks placed in the document (insert_fastener_stack / insert_fastener_row), or the one named by stackId. | read-only |
 | `select_fastener` | Select the fastener for a stack (read-only): grip dash, part number, shim washers, length and thread protrusion. | read-only |
 
 ## aerodynamics

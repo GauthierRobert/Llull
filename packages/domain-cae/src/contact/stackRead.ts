@@ -1,13 +1,13 @@
 /**
- * The placed fastener stacks of the document (aerospace 08 MAT, plugin `fasteners`), read as PUBLIC DATA of `CadDocument.fasteners` (L10: no import of
- * the fasteners plugin): validated structurally, only the fields the joint set-up needs.
+ * The placed fastener stacks of the document (aerospace 08 MAT, plugin `fasteners`), obtained by composing the read-only command `list_fastener_stacks`
+ * through `execute` (L10: no import of the fasteners plugin, no knowledge of its slice). The answer is validated structurally: only the fields the joint
+ * set-up needs, a renamed field of the command output is a refusal, not a silent default.
  */
 
 import type { CadDocument } from '@core/model/types';
 import type { Vec3 } from '@core/model/vectors';
-import { convertValue, isUnitFailure } from '@lib/quantity';
+import { execute } from '@core/commands/registry';
 import { isRecord } from '@lib/isRecord';
-import { fromMm } from '@core/model/units';
 
 export interface StackView {
   readonly id: string;
@@ -29,60 +29,50 @@ const isVec3 = (value: unknown): value is Vec3 =>
 const isText = (value: unknown): value is string => typeof value === 'string' && value !== '';
 const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
-/** Nominal diameter of size `dash` of family `familyId`, document units. */
-function nominalDiameterOf(doc: CadDocument, fasteners: Record<string, unknown>, familyId: string, dash: string): number | null {
-  const catalogs = fasteners['catalogs'];
-  const family = isRecord(catalogs) && Object.hasOwn(catalogs, familyId) ? catalogs[familyId] : undefined;
-  const sizes = isRecord(family) && Array.isArray(family['sizes']) ? family['sizes'] : [];
-  const size = sizes.find((entry) => isRecord(entry) && entry['dash'] === dash);
-  const quantity = isRecord(size) ? size['nominalDiameter'] : undefined;
-  if (!isRecord(quantity) || typeof quantity['value'] !== 'number' || typeof quantity['unit'] !== 'string') return null;
-  const millimetres = convertValue(quantity['value'], quantity['unit'], 'mm');
-  return isUnitFailure(millimetres) ? null : fromMm(doc, millimetres.value);
-}
-
 /**
  * Stack `stackId` of the document, or why it cannot be read.
- * @failure no fasteners slice / unknown stack / a field of the stack malformed -> { message }
+ * @failure fasteners plugin not installed / no such stack / a field of the answer malformed -> { message }
  */
 export function stackOf(doc: CadDocument, stackId: string): StackView | { readonly message: string } {
-  const fasteners = (doc as unknown as Record<string, unknown>)['fasteners'];
-  if (!isRecord(fasteners) || !isRecord(fasteners['stacks']))
-    return { message: 'the document has no fastener stacks (insert_fastener / insert_fastener_row first)' };
-  const stacks = fasteners['stacks'];
-  const raw = Object.hasOwn(stacks, stackId) ? stacks[stackId] : undefined;
-  if (!isRecord(raw)) return { message: `no fastener stack '${stackId}' in the document` };
-  const axis = raw['axis'];
-  const layers = raw['layers'];
-  const fastener = raw['fastener'];
+  const answer = execute(doc, 'list_fastener_stacks', { stackId });
+  if (answer.rejected === true) return { message: `the fasteners plugin cannot list stacks (${answer.summary})` };
+  const list = isRecord(answer.data) ? answer.data['stacks'] : undefined;
+  const raw: unknown = Array.isArray(list) ? list[0] : undefined;
+  if (!isRecord(raw))
+    return { message: `no fastener stack '${stackId}' in the document (insert_fastener_stack / insert_fastener_row first)` };
+  const { axis, layers } = raw;
   if (
+    raw['id'] !== stackId ||
     !isRecord(axis) ||
     !isVec3(axis['origin']) ||
     !isVec3(axis['direction']) ||
     !Array.isArray(layers) ||
     layers.length === 0 ||
-    !isRecord(fastener) ||
-    !isText(fastener['family']) ||
-    !isText(fastener['diameterDash']) ||
-    !isCount(raw['holeDiameter'])
+    !isText(raw['familyId']) ||
+    !isText(raw['diameterDash']) ||
+    !isCount(raw['holeDiameter']) ||
+    !isCount(raw['washerCount']) ||
+    typeof raw['hasNut'] !== 'boolean' ||
+    !(raw['nominalDiameter'] === null || isCount(raw['nominalDiameter']))
   )
-    return { message: `fastener stack '${stackId}' is malformed (axis, layers, fastener or holeDiameter)` };
+    return {
+      message: `fastener stack '${stackId}' is malformed in the list_fastener_stacks answer (id, axis, layers, familyId, diameterDash, holeDiameter, washerCount, hasNut, nominalDiameter)`,
+    };
   const plates = layers.flatMap((layer) =>
     isRecord(layer) && isText(layer['entityId']) && isCount(layer['thickness'])
       ? [{ entityId: layer['entityId'], thickness: layer['thickness'] }]
       : [],
   );
   if (plates.length !== layers.length) return { message: `fastener stack '${stackId}' has a layer without entityId / thickness` };
-  const washers = raw['washers'];
   return {
     id: stackId,
     axis: { origin: axis['origin'], direction: axis['direction'] },
     layers: plates,
-    familyId: fastener['family'],
-    diameterDash: fastener['diameterDash'],
+    familyId: raw['familyId'],
+    diameterDash: raw['diameterDash'],
     holeDiameter: raw['holeDiameter'],
-    washerCount: Array.isArray(washers) ? washers.length : 0,
-    hasNut: raw['nut'] !== undefined,
-    nominalDiameter: nominalDiameterOf(doc, fasteners, fastener['family'], fastener['diameterDash']),
+    washerCount: raw['washerCount'],
+    hasNut: raw['hasNut'],
+    nominalDiameter: raw['nominalDiameter'],
   };
 }

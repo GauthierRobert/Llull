@@ -308,3 +308,42 @@ describe('frustum stiffness (Shigley section 8-2)', () => {
     expect(stiffnessFactor(1, 3)).toBe(0.25);
   });
 });
+
+describe('frustum validity warnings', () => {
+  const stiffnessOf = (doc: CadDocument, s: Stacked): { warnings: string[]; available: boolean } =>
+    (
+      execute(doc, 'joint_from_fastener_stack', params(s, { bearing: false })).data as {
+        stiffness: { warnings: string[]; available: boolean };
+      }
+    ).stiffness;
+  const withStack = (s: Stacked, patch: Record<string, unknown>, nominal = D): CadDocument => {
+    const slice = (s.doc as unknown as { fasteners: { stacks: Record<string, Record<string, unknown>> } }).fasteners;
+    return {
+      ...s.doc,
+      fasteners: {
+        catalogs: { NAS: { id: 'NAS', sizes: [{ dash: '-5', nominalDiameter: { value: nominal, unit: 'mm' } }] } },
+        stacks: { 'fst-1.1': { ...slice.stacks['fst-1.1'], ...patch } },
+      },
+    } as unknown as CadDocument;
+  };
+
+  it('warns that k_members is overestimated when the pressure cone at mid-grip is wider than the narrowest plate (1 mm cubes, d 0.4, grip 2: cone 1.755 mm)', () => {
+    const s = stacked();
+    const result = stiffnessOf(s.doc, s);
+    expect(result.available).toBe(true);
+    expect(result.warnings.join(' ')).toContain('OVERESTIMATED');
+    expect(result.warnings.join(' ')).toContain('1.7547');
+  });
+
+  it('no cone warning when the plate is wider than the cone (d 0.1, one 1 mm layer: cone 0.727 mm) and the axis is aligned', () => {
+    const s = stacked();
+    const doc = withStack(s, { layers: [{ entityId: s.lower, thickness: 1 }], holeDiameter: 0.1 }, 0.1);
+    expect(stiffnessOf(doc, s).warnings).toEqual([]);
+  });
+
+  it('states the thickness upper bound when the axis is not parallel to a coordinate axis', () => {
+    const s = stacked();
+    const doc = withStack(s, { axis: { origin: [0.5, 0.5, 0.5], direction: [0, 0.6, 0.8] } });
+    expect(stiffnessOf(doc, s).warnings.join(' ')).toContain('UPPER bound');
+  });
+});

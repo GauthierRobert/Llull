@@ -57,8 +57,24 @@ function stiffnessOf(
   const shank = (stack.nominalDiameter ?? diameter) * unit;
   const kBolt = boltStiffness(shank, grip, boltModulus);
   const kMembers = membersStiffness(layers, shank);
+  const unitsToMm = unit;
+  const coneAtMidGrip = (1.5 * shank + grip * Math.tan(Math.PI / 6)) / unitsToMm;
+  const narrowest = Math.min(...geometry.plates.map((plate) => plate.width));
+  const warnings = [
+    ...(coneAtMidGrip > narrowest
+      ? [
+          `the pressure cone at mid-grip is ${n(coneAtMidGrip)} ${doc.units} wide but the narrowest plate is ${n(narrowest)} ${doc.units} across: the frustum method assumes plates wider than the cone, so k_members is OVERESTIMATED (unconservative for the bolt load: phi too low); use the FE n*phi`,
+        ]
+      : []),
+    ...(geometry.axisAligned
+      ? []
+      : [
+          'the stack axis is not parallel to a coordinate axis: the plate thicknesses along it come from axis-aligned bounds, an UPPER bound (k_members too low)',
+        ]),
+  ];
   return {
     available: true,
+    warnings,
     kBolt,
     kMembers,
     phi: stiffnessFactor(kBolt, kMembers),
