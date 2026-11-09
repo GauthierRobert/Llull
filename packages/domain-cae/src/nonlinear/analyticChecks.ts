@@ -12,12 +12,12 @@ export const CHECKS = [
 ] as const;
 export type NonlinearCheck = (typeof CHECKS)[number];
 
-export interface CheckValue {
+interface CheckValue {
   readonly value: number;
   readonly unit: string;
 }
 
-export interface CheckOutput {
+interface CheckOutput {
   readonly values: Readonly<Record<string, CheckValue>>;
   readonly formula: string;
   readonly source: string;

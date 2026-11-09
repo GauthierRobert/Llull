@@ -16,7 +16,7 @@ export interface CurveView {
   readonly displacement: readonly number[];
 }
 
-export interface StepView {
+interface StepView {
   readonly stepId: string;
   readonly increments: number;
   readonly cutbacks: number;
