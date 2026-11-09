@@ -25,7 +25,9 @@ interface Balance {
   reviewRequired: boolean;
 }
 
-const balance = (doc: CadDocument, params: Record<string, unknown>): CommandResult => execute(doc, 'optical_balance', params);
+const NORMAL = { value: 0, unit: 'deg' };
+const balance = (doc: CadDocument, params: Record<string, unknown>): CommandResult =>
+  execute(doc, 'optical_balance', { incidenceAngle: NORMAL, ...params });
 const data = (doc: CadDocument, params: Record<string, unknown>): Balance => balance(doc, params).data as Balance;
 
 const model = (
@@ -68,7 +70,7 @@ describe('optical_balance: the validation plan (AC-4, VC-EOP-08)', () => {
   const panel = aliases['panel'] ?? '';
 
   it('gives 270.2455 K and alpha/eps 0.2222 from the assigned coating, with provenance and the exact sigma', () => {
-    const result = data(doc, { entityId: panel, solarFlux: FLUX, radiatingFaces: 1 });
+    const result = data(doc, { entityId: panel, solarFlux: FLUX, radiatingFaces: 1, state: 'BOL' });
     expect(result.temperatureK).toBeCloseTo(oracle('VC-EOP-08.a'), 6);
     expect(result.temperatureDegC).toBeCloseTo(oracle('VC-EOP-08.a') - 273.15, 6);
     expect(result.alphaOverEps).toBeCloseTo(oracle('VC-EOP-08.c'), 12);
@@ -77,6 +79,12 @@ describe('optical_balance: the validation plan (AC-4, VC-EOP-08)', () => {
     expect(result.provenance).toHaveLength(2);
     expect(result.provenance[0]).toContain('absorptivitySolar');
     expect(result.unverified).toBe(false);
+  });
+
+  it('an omitted state falls back to BOL and the result says so (unverified, EOP_DEFAULT_APPLIED)', () => {
+    const result = data(doc, { entityId: panel, solarFlux: FLUX, radiatingFaces: 1 });
+    expect(result).toMatchObject({ state: 'BOL', unverified: true });
+    expect(result.unverifiedReasons[0]).toContain('EOP_DEFAULT_APPLIED');
   });
 
   it('two radiating faces give 227.2485 K', () => {
@@ -164,6 +172,12 @@ describe('optical_balance: never a silent value', () => {
     expect(result.affected).toEqual([]);
     return result.error?.code;
   };
+
+  it('refuses a missing incidenceAngle at the schema (no default angle)', () => {
+    const result = execute(doc, 'optical_balance', { entityId: panel, solarFlux: FLUX, radiatingFaces: 1 });
+    expect(result.error?.code).toBe('CMD_INVALID_PARAMS');
+    expect(result.document).toBe(doc);
+  });
 
   it('refuses a missing flux, a non-positive flux and a wrong flux unit', () => {
     expect(refuse({ entityId: panel, radiatingFaces: 1 })).toBe('EOP_SOLAR_FLUX_MISSING');

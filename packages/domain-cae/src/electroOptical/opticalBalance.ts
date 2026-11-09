@@ -75,7 +75,7 @@ export const opticalBalance = defineCommand({
     'Equilibrium temperature of a sun-facing flat plate: alpha S cos(theta) = n eps sigma T^4, n = radiatingFaces (1 = insulated back, 2 = thin plate), sigma from the exact SI constants. ' +
     "alpha and eps come from the coating: pass coating (a material with absorptivitySolar [condition lifeState BOL|EOL] and emissivityIr [condition opticalKind hemispherical_total] PHY-01 models) or entityId (its 'exposed' " +
     'assign_surface_coating coating), or pass alpha and eps directly (reported unverified). solarFlux { value, unit } is REQUIRED with its source in your report: llull has no default flux. ' +
-    'state BOL (default, reported) | EOL selects alpha; incidenceAngle (default 0 deg, normal to the sun) scales the flux by cos. Assumptions: no conduction, albedo or planet IR. ' +
+    'state BOL | EOL selects alpha (omitted: BOL is used and the result is flagged unverified with EOP_DEFAULT_APPLIED); incidenceAngle (REQUIRED, e.g. 0 deg for a sun-normal plate) scales the flux by cos. Assumptions: no conduction, albedo or planet IR. ' +
     'Returns data { alpha, eps, alphaOverEps, iterations (0 for a constant emissivity), temperatureK, temperatureDegC, solarFluxW_m2, incidenceAngleDeg, radiatingFaces, state, sigma, formula, assumptions, provenance, unverified, unverifiedReasons, reviewRequired }.',
   params: z.object({
     entityId: z.string().optional().describe("Solid whose 'exposed' coating assignment supplies alpha and eps."),
@@ -101,8 +101,7 @@ export const opticalBalance = defineCommand({
         value: z.number().describe('Angle between the sun direction and the plate normal.'),
         unit: z.string().describe("Angle unit, e.g. 'deg'."),
       })
-      .optional()
-      .describe('Default 0 deg.'),
+      .describe('REQUIRED. Angle between the sun direction and the plate normal: state 0 deg for a sun-normal plate. There is no default.'),
   }),
   run: (doc, params, ctx): CommandResult => {
     const fail = (code: string, message: string, ids: readonly string[] = [], path = 'coating'): CommandResult =>
@@ -112,11 +111,7 @@ export const opticalBalance = defineCommand({
     const flux = convertValue(params.solarFlux.value, params.solarFlux.unit, 'W/m^2');
     if (isUnitFailure(flux) || !Number.isFinite(flux.value) || flux.value <= 0)
       return fail('EOP_PARAMS_INVALID', 'solarFlux must be a positive irradiance (W/m^2)', [], 'solarFlux');
-    const angle = convertValue(
-      params.incidenceAngle === undefined ? 0 : params.incidenceAngle.value,
-      params.incidenceAngle === undefined ? 'deg' : params.incidenceAngle.unit,
-      'rad',
-    );
+    const angle = convertValue(params.incidenceAngle.value, params.incidenceAngle.unit, 'rad');
     if (isUnitFailure(angle) || !(Math.cos(angle.value) > 1e-9) || Math.abs(angle.value) >= Math.PI / 2)
       return fail('EOP_PARAMS_INVALID', 'incidenceAngle must be an angle in [0, 90) degrees from the plate normal', [], 'incidenceAngle');
     const state = params.state ?? 'BOL';
@@ -149,6 +144,8 @@ export const opticalBalance = defineCommand({
           'coating',
         );
       alpha = found.value;
+      if (params.state === undefined)
+        reasons.push('EOP_DEFAULT_APPLIED: state was not given, BOL absorptivity was used (state a life state to clear this)');
       provenance.push(found.provenance);
       reasons.push(...found.unverified.map((reason) => `alpha: ${reason}`));
     } else reasons.push('EOP_VALUE_UNSOURCED: alpha was supplied by the caller without a record');

@@ -100,7 +100,11 @@
     "value": 1361,
     "unit": "W/m^2"
    },
-   "radiatingFaces": 1
+   "radiatingFaces": 1,
+   "incidenceAngle": {
+    "value": 0,
+    "unit": "deg"
+   }
   }
  }
 ]

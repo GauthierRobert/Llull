@@ -30,7 +30,8 @@ describe('electrical_resistance (VC-EOP-02, 03, 04)', () => {
       crossSection: { value: 1, unit: 'mm^2' },
     });
     expect(rel(data['dcOhm'], oracle('VC-EOP-02.a'))).toBeLessThan(1e-9);
-    expect(data).toMatchObject({ formula: 'R = rho L / A', unverified: true, murDefaulted: true });
+    expect(data).toMatchObject({ formula: 'R = rho L / A', unverified: true });
+    expect(data['mur']).toBeUndefined();
   });
 
   it('reads rho from a material model at the temperature and names the model', () => {
@@ -54,6 +55,7 @@ describe('electrical_resistance (VC-EOP-02, 03, 04)', () => {
       length: { value: 1, unit: 'm' },
       crossSection: { value: 1, unit: 'mm^2' },
       frequency: { value: hertz, unit: 'Hz' },
+      mur: 1,
     });
     expect(rel(data['skinDepthM'], oracle(id))).toBeLessThan(1e-6);
   });
@@ -67,11 +69,11 @@ describe('electrical_resistance (VC-EOP-02, 03, 04)', () => {
       mur: 100,
     });
     expect(rel(data['skinDepthM'], oracle('VC-EOP-03.c'))).toBeLessThan(1e-6);
-    expect(data['murDefaulted']).toBe(false);
+    expect(data['mur']).toBe(100);
   });
 
   it('round wire AC/DC ratio r / (2 delta) = 7.566 at 1 MHz, valid (VC-EOP-04); thin regimes are flagged', () => {
-    const wire = { resistivity: COPPER, length: { value: 1, unit: 'm' }, crossSection: { value: Math.PI, unit: 'mm^2' } };
+    const wire = { resistivity: COPPER, length: { value: 1, unit: 'm' }, crossSection: { value: Math.PI, unit: 'mm^2' }, mur: 1 };
     const thick = ask(base, 'electrical_resistance', {
       ...wire,
       frequency: { value: 1, unit: 'MHz' },
@@ -99,13 +101,13 @@ describe('electrical_resistance (VC-EOP-02, 03, 04)', () => {
     ['a negative length', { resistivity: COPPER, length: { value: -1, unit: 'm' } }, 'EOP_PARAMS_INVALID'],
     ['an area in a length unit', { resistivity: COPPER, crossSection: { value: 1, unit: 'mm' } }, 'EOP_PARAMS_INVALID'],
     ['a radius without frequency', { resistivity: COPPER, radius: { value: 1, unit: 'mm' } }, 'EOP_PARAMS_INVALID'],
-    ['a zero frequency', { resistivity: COPPER, frequency: { value: 0, unit: 'Hz' } }, 'EOP_PARAMS_INVALID'],
+    ['a zero frequency', { resistivity: COPPER, mur: 1, frequency: { value: 0, unit: 'Hz' } }, 'EOP_PARAMS_INVALID'],
     [
       'a negative radius',
-      { resistivity: COPPER, frequency: { value: 1, unit: 'MHz' }, radius: { value: -1, unit: 'mm' } },
+      { resistivity: COPPER, mur: 1, frequency: { value: 1, unit: 'MHz' }, radius: { value: -1, unit: 'mm' } },
       'EOP_PARAMS_INVALID',
     ],
-    ['a non-positive mur', { resistivity: COPPER, mur: 0 }, 'EOP_PARAMS_INVALID'],
+    ['a non-positive mur', { resistivity: COPPER, mur: 0, frequency: { value: 1, unit: 'MHz' } }, 'EOP_PARAMS_INVALID'],
   ])('refuses %s and leaves the document unchanged', (_label, extra, code) => {
     const params = { length: { value: 1, unit: 'm' }, crossSection: { value: 1, unit: 'mm^2' }, ...extra };
     const result = ask(base, 'electrical_resistance', params);
@@ -120,11 +122,41 @@ describe('electrical_resistance (VC-EOP-02, 03, 04)', () => {
   });
 });
 
+describe('mur and the optical defaults: required, never assumed', () => {
+  const base = createEmptyDocument();
+  const wire = { resistivity: COPPER, length: { value: 1, unit: 'm' }, crossSection: { value: 1, unit: 'mm^2' } };
+
+  it('the skin-depth path of electrical_resistance refuses a missing mur naming it, and the DC path needs none', () => {
+    const refused = execute(base, 'electrical_resistance', { ...wire, frequency: { value: 1, unit: 'MHz' } });
+    expect(refused.error?.code).toBe('EOP_PARAMS_INVALID');
+    expect(refused.error?.paths).toEqual(['mur']);
+    expect(refused.document).toBe(base);
+    expect(ask(base, 'electrical_resistance', wire).ok).toBe(true);
+  });
+
+  it('shield_absorption refuses a missing mur naming it', () => {
+    const refused = execute(base, 'shield_absorption', {
+      resistivity: COPPER,
+      thickness: { value: 0.1, unit: 'mm' },
+      frequency: { value: 1, unit: 'MHz' },
+    });
+    expect(refused.error?.code).toBe('EOP_PARAMS_INVALID');
+    expect(refused.error?.paths).toEqual(['mur']);
+    expect(refused.document).toBe(base);
+  });
+
+  it('normal_reflectance requires n1 and k (schema refusals)', () => {
+    expect(ask(base, 'normal_reflectance', { n2: 1.5, k: 0 }).code).toBe('CMD_INVALID_PARAMS');
+    expect(ask(base, 'normal_reflectance', { n2: 1.5, n1: 1 }).code).toBe('CMD_INVALID_PARAMS');
+  });
+});
+
 describe('shield_absorption (VC-EOP-05)', () => {
   const base = createEmptyDocument();
 
   it('0.1 mm copper at 1 MHz gives 13.1436 dB and says absorption term only', () => {
     const { data } = ask(base, 'shield_absorption', {
+      mur: 1,
       resistivity: COPPER,
       thickness: { value: 0.1, unit: 'mm' },
       frequency: { value: 1, unit: 'MHz' },
@@ -135,6 +167,7 @@ describe('shield_absorption (VC-EOP-05)', () => {
 
   it('a magnetic sheet absorbs more (mur) and the material route works', () => {
     const plain = ask(base, 'shield_absorption', {
+      mur: 1,
       resistivity: COPPER,
       thickness: { value: 0.1, unit: 'mm' },
       frequency: { value: 1, unit: 'MHz' },
@@ -149,6 +182,7 @@ describe('shield_absorption (VC-EOP-05)', () => {
     const { doc } = runPlan('eop_bonding_paths.plan.json', 'define_bond_path');
     expect(
       ask(doc, 'shield_absorption', {
+        mur: 1,
         material: 'strap_61iacs',
         thickness: { value: 0.1, unit: 'mm' },
         frequency: { value: 1, unit: 'MHz' },
@@ -157,8 +191,8 @@ describe('shield_absorption (VC-EOP-05)', () => {
   });
 
   it.each([
-    ['a zero thickness', { thickness: { value: 0, unit: 'mm' }, frequency: { value: 1, unit: 'MHz' } }],
-    ['a frequency in a length unit', { thickness: { value: 1, unit: 'mm' }, frequency: { value: 1, unit: 'mm' } }],
+    ['a zero thickness', { mur: 1, thickness: { value: 0, unit: 'mm' }, frequency: { value: 1, unit: 'MHz' } }],
+    ['a frequency in a length unit', { mur: 1, thickness: { value: 1, unit: 'mm' }, frequency: { value: 1, unit: 'mm' } }],
     ['a negative mur', { thickness: { value: 1, unit: 'mm' }, frequency: { value: 1, unit: 'MHz' }, mur: -1 }],
   ])('refuses %s', (_label, extra) => {
     const result = ask(base, 'shield_absorption', { resistivity: COPPER, ...extra });
@@ -167,7 +201,7 @@ describe('shield_absorption (VC-EOP-05)', () => {
   });
 
   it('refuses without a resistivity source', () => {
-    expect(ask(base, 'shield_absorption', { thickness: { value: 1, unit: 'mm' }, frequency: { value: 1, unit: 'MHz' } }).code).toBe(
+    expect(ask(base, 'shield_absorption', { mur: 1, thickness: { value: 1, unit: 'mm' }, frequency: { value: 1, unit: 'MHz' } }).code).toBe(
       'EOP_PARAMS_INVALID',
     );
   });
@@ -177,10 +211,10 @@ describe('normal_reflectance (VC-EOP-09)', () => {
   const base = createEmptyDocument();
 
   it('n = 1.5 in air gives R = 0.04 and a lossless slab T = 0.923077; n1 is a named default', () => {
-    const { data } = ask(base, 'normal_reflectance', { n2: 1.5 });
+    const { data } = ask(base, 'normal_reflectance', { n2: 1.5, n1: 1, k: 0 });
     expect(rel(data['R'], oracle('VC-EOP-09.a'))).toBeLessThan(1e-12);
     expect(rel(data['slabT'], oracle('VC-EOP-09.b'))).toBeLessThan(1e-12);
-    expect(data).toMatchObject({ n1: 1, n1Defaulted: true, unverified: true });
+    expect(data).toMatchObject({ n1: 1, k: 0, unverified: true });
   });
 
   it('an absorbing medium gets R with k and no slab transmittance', () => {
@@ -191,14 +225,14 @@ describe('normal_reflectance (VC-EOP-09)', () => {
   });
 
   it('a non-finite number is rejected by the schema before the command runs', () => {
-    expect(ask(base, 'normal_reflectance', { n2: Infinity }).code).toBe('CMD_INVALID_PARAMS');
+    expect(ask(base, 'normal_reflectance', { n2: Infinity, n1: 1, k: 0 }).code).toBe('CMD_INVALID_PARAMS');
   });
 
   it.each([
-    ['n2 below 1 for a lossless medium', { n2: 0.5 }],
-    ['n1 below 1', { n2: 1.5, n1: 0.5 }],
-    ['a negative k', { n2: 1.5, k: -1 }],
-    ['a non-positive n2 with k', { n2: 0, k: 1 }],
+    ['n2 below 1 for a lossless medium', { n2: 0.5, n1: 1, k: 0 }],
+    ['n1 below 1', { n2: 1.5, n1: 0.5, k: 0 }],
+    ['a negative k', { n2: 1.5, n1: 1, k: -1 }],
+    ['a non-positive n2 with k', { n2: 0, n1: 1, k: 1 }],
   ])('refuses %s', (_label, params) => {
     const result = ask(base, 'normal_reflectance', params);
     expect(result.code).toBe('EOP_PARAMS_INVALID');

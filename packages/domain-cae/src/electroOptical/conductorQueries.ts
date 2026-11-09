@@ -80,7 +80,9 @@ const RHO_PARAMS = {
   mur: z
     .number()
     .optional()
-    .describe('Relative permeability (>= 1 except diamagnetic). Default 1, reported as a named default (non-magnetic assumption).'),
+    .describe(
+      'Relative permeability (> 0; >= 1 except diamagnetic). REQUIRED for the skin-depth path (frequency given) and for shield_absorption: state 1 for a non-magnetic conductor. There is no default.',
+    ),
 };
 
 /**
@@ -92,9 +94,9 @@ export const electricalResistance = defineCommand({
   name: 'electrical_resistance',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'DC resistance of a straight conductor R = rho L / A, with rho from a material electricalResistivity model (evaluated at `temperature`) or given directly. With frequency it adds the skin depth ' +
+    'DC resistance of a straight conductor R = rho L / A, with rho from a material electricalResistivity model (evaluated at `temperature`) or given directly. With frequency it adds the skin depth (mur REQUIRED then: state 1 for a non-magnetic conductor) ' +
     'delta = sqrt(rho / (pi f mu0 mur)) (mu0 = 4 pi 1e-7 N/A^2); with frequency and radius (round wire) the AC/DC ratio r / (2 delta), flagged approximate unless r/delta >= 5 and reported as 1 (DC regime) when r/delta < 1. ' +
-    'Returns data { dcOhm, rho, temperatureModel, skinDepthM?, rOverDelta?, acOverDc?, validity?, mur, formula, provenance, unverified, unverifiedReasons }. llull ships no resistivity values.',
+    'Returns data { dcOhm, rho, temperatureModel, skinDepthM?, rOverDelta?, acOverDc?, validity?, mur? (with frequency), mu0?, formula, provenance, unverified, unverifiedReasons }. llull ships no resistivity values.',
   params: z.object({
     ...RHO_PARAMS,
     length: quantity('Conductor length', 'mm'),
@@ -113,16 +115,11 @@ export const electricalResistance = defineCommand({
     if (area === null) return fail('EOP_PARAMS_INVALID', 'crossSection must be a positive area', 'crossSection');
     if (params.radius !== undefined && params.frequency === undefined)
       return fail('EOP_PARAMS_INVALID', 'radius needs a frequency', 'frequency');
-    const mur = params.mur === undefined ? 1 : params.mur;
-    if (!(mur > 0) || !Number.isFinite(mur)) return fail('EOP_PARAMS_INVALID', 'mur must be positive', 'mur');
     const dc = bulkResistance(rho.rho, length, area);
     const data: Record<string, unknown> = {
       dcOhm: dc,
       rho: rho.rho,
       temperatureModel: rho.temperatureModel,
-      mur,
-      murDefaulted: params.mur === undefined,
-      mu0: { value: MU_0, unit: 'N/A^2', source: 'classical 4 pi 1e-7' },
       formula: 'R = rho L / A',
       provenance: [rho.source],
       unverified: rho.unverified.length > 0,
@@ -132,7 +129,16 @@ export const electricalResistance = defineCommand({
     if (params.frequency !== undefined) {
       const hertz = positive(params.frequency, 'Hz');
       if (hertz === null) return fail('EOP_PARAMS_INVALID', 'frequency must be a positive frequency', 'frequency');
+      const mur = params.mur;
+      if (mur === undefined || !(mur > 0) || !Number.isFinite(mur))
+        return fail(
+          'EOP_PARAMS_INVALID',
+          'the skin depth needs mur, a positive relative permeability (state 1 for a non-magnetic conductor): there is no default',
+          'mur',
+        );
       const depth = skinDepth(rho.rho, hertz, mur);
+      data['mur'] = mur;
+      data['mu0'] = { value: MU_0, unit: 'N/A^2', source: 'classical 4 pi 1e-7' };
       data['skinDepthM'] = depth;
       text += `, skin depth ${depth.toPrecision(6)} m at ${hertz} Hz`;
       if (params.radius !== undefined) {
@@ -181,8 +187,13 @@ export const shieldAbsorption = defineCommand({
     const hertz = positive(params.frequency, 'Hz');
     if (thickness === null) return fail('EOP_PARAMS_INVALID', 'thickness must be a positive length', 'thickness');
     if (hertz === null) return fail('EOP_PARAMS_INVALID', 'frequency must be a positive frequency', 'frequency');
-    const mur = params.mur === undefined ? 1 : params.mur;
-    if (!(mur > 0) || !Number.isFinite(mur)) return fail('EOP_PARAMS_INVALID', 'mur must be positive', 'mur');
+    const mur = params.mur;
+    if (mur === undefined || !(mur > 0) || !Number.isFinite(mur))
+      return fail(
+        'EOP_PARAMS_INVALID',
+        'mur is required: a positive relative permeability (state 1 for a non-magnetic sheet), there is no default',
+        'mur',
+      );
     const depth = skinDepth(rho.rho, hertz, mur);
     const dB = absorptionLossDb(thickness, depth);
     return report(
@@ -196,7 +207,6 @@ export const shieldAbsorption = defineCommand({
         note: 'absorption term only: reflection loss and apertures are not included',
         rho: rho.rho,
         mur,
-        murDefaulted: params.mur === undefined,
         provenance: [rho.source],
         unverified: rho.unverified.length > 0,
         unverifiedReasons: rho.unverified,
