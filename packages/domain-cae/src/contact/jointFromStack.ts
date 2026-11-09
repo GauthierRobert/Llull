@@ -54,8 +54,9 @@ function stiffnessOf(
     return { available: false, reason: 'a plate or the bolt has no isotropic elastic law (assign_material + a constitutive set)' };
   const layers = geometry.plates.map((plate, index) => ({ thickness: (plate.high - plate.low) * unit, modulus: moduli[index] ?? 0 }));
   const grip = layers.reduce((sum, layer) => sum + layer.thickness, 0);
-  const kBolt = boltStiffness(diameter * unit, grip, boltModulus);
-  const kMembers = membersStiffness(layers, diameter * unit);
+  const shank = (stack.nominalDiameter ?? diameter) * unit;
+  const kBolt = boltStiffness(shank, grip, boltModulus);
+  const kMembers = membersStiffness(layers, shank);
   return {
     available: true,
     kBolt,
@@ -63,13 +64,13 @@ function stiffnessOf(
     phi: stiffnessFactor(kBolt, kMembers),
     unit: 'N/mm',
     grip: grip / unit,
-    diameter,
+    diameter: stack.nominalDiameter ?? diameter,
     method:
       'Shigley, Mechanical Engineering Design 10th ed. section 8-2: eq. 8-13 (shank over the whole grip, no thread in the grip), eq. 8-18 / 8-20 (30 degree frusta from a 1.5 d bearing face, meeting at mid-grip)',
     assumptions: [
       'bolt shank diameter = nominal diameter over the whole grip (thread in the grip ignored: k_b is high, phi conservative for the bolt load)',
       `${stack.washerCount} washer(s) and the nut are not in the grip length`,
-      'hole diameter taken as the nominal diameter in the cone formula',
+      'the cone formula uses the nominal fastener diameter (the catalogue size; the hole diameter when the catalogue has none)',
     ],
   };
 }
@@ -149,8 +150,8 @@ export const jointFromFastenerStack = defineCommand({
     'one bolt pretension (add_bolt_pretension) cut at the grip mid-plane normal to the stack axis, one contact pair per clamped plate interface ' +
     'and, with bearing (default true), a head-side and a nut-side pair between the outer plates and the bolt part (add_contact_pair; plate = slave, ' +
     'the other face = master). The stack is read from the document (stackId = fst-<step>.<k>): its plates must be parts of the analysis ' +
-    '(set_part_idealization). boltEntityId = the bolt as a SOLID part of the analysis (explode_instance the bolt instance of the stack, then ' +
-    'set_part_idealization): an instance is not meshable. The bolt part must have a bearing face at each outer plate face (head and a nut / collar ' +
+    '(set_part_idealization). boltEntityId = the bolt as a SOLID part of the analysis (an instance is not meshable and the stack instances are plugin-owned: ' +
+    'insert_instance a fresh copy of the bolt component, explode_instance it, set_part_idealization the SHANK (a catalogue bolt explodes into a head cylinder and a shank cylinder); or model the bolt as one solid): The bolt part must have a bearing face at each outer plate face (head and a nut / collar ' +
     'fused to the shank): the washers and the nut instances of the stack are NOT modelled. preload = { kind: "force", value } or a torque with its ' +
     'nut factor (never defaulted); preloadStepId = the FIRST step of the case. Absent formulation = the case formulation, else surface_to_surface ' +
     '(reported); absent behaviour = hard; absent friction = frictionless (named in the summary). Returns data.stiffness: the Shigley frustum estimate ' +
