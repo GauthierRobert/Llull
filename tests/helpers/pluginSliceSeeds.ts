@@ -26,6 +26,7 @@ import { bracket, RULE } from '../unit/aero/sheetmetal/helpers';
 import { mbbModel } from '../unit/cae/topology/support';
 import { blocks, must, pairParams } from '../unit/cae/contact/support';
 import { creepCube, holdFrd, solveCube } from '../unit/cae/creep/support';
+import { amBar } from '../unit/cae/process/support';
 import { barModel } from '../unit/cae/explicit/support';
 import { implicitAnalysis } from '../unit/cae/fieldMeshFixtures';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
@@ -555,6 +556,16 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     },
     query: { name: 'check_creep', params: (doc) => ({ analysisId: analysisId(doc) }) },
     mutate: { name: 'delete_creep_step', params: (doc) => ({ analysisId: analysisId(doc) }) },
+  },
+  // PHY-16 M4: the build set-up (direction, plate, layer height, strain with its source, a release step) of an am_build_distortion case
+  'cae#am': {
+    roots: ['analysis'],
+    build: () => amBar({ release: true }).doc,
+    query: { name: 'check_analysis', params: (doc) => ({ analysisId: analysisId(doc) }) },
+    mutate: {
+      name: 'set_inherent_strain',
+      params: (doc) => ({ analysisId: analysisId(doc), exx: -0.003, eyy: 0, ezz: 0, source: 'fuzz seed', calibrated: false }),
+    },
   },
   topology: {
     roots: ['analysis'],

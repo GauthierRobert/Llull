@@ -11,6 +11,7 @@ import { fitDispositionErrors } from '../thermomech/validateDispositions';
 import { dispositionLedgerErrors } from '../shared/validateDispositionLedger';
 import { contactErrors } from '../contact/validate';
 import { creepErrors } from '../creep/validate';
+import { amErrors } from '../process/validate';
 import { pretensionErrors } from '../contact/pretensionValidate';
 
 const TYPES = [
@@ -26,6 +27,7 @@ const TYPES = [
   'frequency_response',
   'random_response',
   'explicit_dynamics',
+  'am_build_distortion',
 ];
 const UNIT_SYSTEMS = ['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'];
 const CONSTRAINT_KINDS = ['fixed', 'pinned', 'symmetry', 'displacement'];
@@ -257,6 +259,7 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
   if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
   errors.push(...contactErrors(analysisCase, where, scope.entities));
   errors.push(...creepErrors(analysisCase, where));
+  errors.push(...amErrors(analysisCase, where));
   errors.push(...pretensionErrors(analysisCase, where, scope.entities));
   errors.push(...settingsErrors(analysisCase, where));
   errors.push(...studyErrors(analysisCase, id, where));

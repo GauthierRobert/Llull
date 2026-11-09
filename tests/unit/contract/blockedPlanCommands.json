@@ -7,11 +7,6 @@
       "check_surface_properties",
       "optical_balance"
     ],
-    "docs/physics/16-process-physics/validation/plans/prc_am_layered_beam.plan.json": [
-      "add_release_step",
-      "am_build_setup",
-      "set_inherent_strain"
-    ],
     "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": ["add_time_history"],
     "docs/physics/19-explicit-impact/validation/plans/exp_bird_rigid_plate.plan.json": ["add_time_history"],
     "docs/physics/19-explicit-impact/validation/plans/exp_drop_box.plan.json": ["add_time_history"],
