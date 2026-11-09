@@ -1,3 +1,6 @@
+/** Element `i` of a dense numeric array whose index the caller knows is in range (noUncheckedIndexedAccess, without a never-taken branch). */
+export const at = (values: ArrayLike<number>, i: number): number => values[i] as number;
+
 /** Pure numerics of the reliability pack: Φ and Φ⁻¹ in double precision, Gamma and a symmetric eigen solver. */
 
 import { jacobiRotate } from '@lib/symmetricEigen';
