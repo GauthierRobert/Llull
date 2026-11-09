@@ -252,3 +252,31 @@ See FUNCTIONAL_SPEC §11 [R1]–[R13] and `validation/sources.md` [S1]–[S17]. 
 
 - [T1] 06 CMP TECHNICAL_SPEC §3 `LaminaMaterial`, §5.3 ("no hygrothermal") — `docs/aerospace/06-composites/TECHNICAL_SPEC.md`
 - [T2] Physics gap list and pack conventions — `docs/physics/README.md` §6
+
+## 13. As built (2026-11-09, branch feat/moi)
+
+**Home.** Plugin `physics-environment`, toolset `environment`, in `packages/domain-cae/src/environment/` (not a new `domain-physics` package: `@cae` already hosts the analysis-side plugins and the 08 / PHY-01 reads go through the registry). Tests: `tests/unit/environment/` (oracles read from `validation/expected_results.json`, never retyped).
+
+**Delivered.**
+
+| Milestone | Status | Notes |
+| --------- | ------ | ----- |
+| M1 | done | `set_mission_environment`, `check_space_environment` (outgassing, mass-loss budget, AO section), shipped profiles `nasa_gsfc_screening` (`<=`, OQ-ENV-01 default) and `ecss_q_st_70_02`, custom profiles (status `company`, source required) |
+| M2 | done | `moisture_uptake` (absorption / desorption, both / one face, targets, 50-point curve, material D and M_inf through `evaluate_property`), `hygro_strain` |
+| M3 | partly | `ao_erosion` done; `exposedFaces` from topology NOT done: the area is a caller value |
+| M4 | not done | NASA CSV converter (OQ-ENV-03: licence unconfirmed, nothing bundled) and `approve_environment_deviation` (09 signature port) |
+| M5 | not done | equivalent-DeltaT field hand-off to PHY-04 / 06 V2: `hygro_strain` returns the number and `handOff` only |
+
+**Decisions.**
+
+- Material properties are additions to the PHY-01 catalogue (`packages/core/src/model/propertyCatalog.ts`, owner pack PHY-14): `TML`, `CVCM`, `WVR`, `RML` (dimensionless, entered with unit `%`), `moistureDiffusivity` (`m^2/s`), `moistureSaturation` (`%`), `cme` (`1/%` = strain per % moisture), `aoErosionYield` (stored as `m^3`; enter `3e-24` with unit `cm^3`, per incident atom implicit: the unit grammar has no `atom`).
+- Slice key is `CadDocument.spaceEnvironment` (top-level, validated by a zod schema through `sliceSchema`), not `physics.environment`: no `physics` envelope exists. It holds `outgassingProfile` (shipped id or whole custom profile), `humidityExposure`, `aoFluence`. This pack defines its own mission environment; a corrosion-pack environment record is separate, so the two overlap in concept only (humidity / temperature) and a later merge should make one of them reference the other.
+- OQ-ENV-02 / `ENV_TEST_METHOD_MISMATCH` is NOT implemented: `PropertyCondition` has no `testMethod` field (08 owns the shape), so the method of a stored TML is unknown. RML derived from TML - WVR is reported as `ENV_RML_DERIVED`. The test method of a profile is shown in `data.profile.testMethod`; the reviewer must confirm the data was measured with it.
+- `moisture_uptake` takes M_inf either as a value, as `saturationLaw {a, b, relativeHumidity}` (M_inf[%] = a RH[%]^b), or from the material; RH is not a PHY-01 variable, so there is no `Mm(RH)` property model (a PHY-01 `RH` variable would be the way to add it). D(T) uses the existing T variable and forwards `PROP_OUT_OF_RANGE`.
+- Numerics as specified (TR-ENV-05): series to a 1e-17 term, short-time form below tau 1e-4, inverse closed form below G = 0.0226 and bisection (rel 1e-14 in tau) above. Oracles match `expected_results.json` at rel 1e-9 (the pins have 12 digits).
+- AO: only a Kapton H reference (`reference: "kapton_h"`, 3.0e-24 cm^3/atom, source and exposure-condition caveat in the result) is bundled. No other yield, no density, no fluence, no E595 value is bundled; every other value is user data with a required source (`ENV_SOURCE_MISSING`).
+- `check_space_environment` `data.status` covers the outgassing items only (fail > unknown > pass; no materials -> unknown). AO items have no limit: `info` with a recession figure, or `unknown` (`ENV_PROPERTY_MISSING`). The moisture exposure is not screened in the check (it needs a part thickness): a note points to `moisture_uptake useMissionExposure`.
+- Budget per part: `maxMassLossG = TML / 100 x massG`, `maxCondensableG = CVCM / 100 x massG` (mass from `mass_properties` through the registry); a part without a measurable mass or TML / CVCM is listed with a note and not counted.
+- The three `*_proposed.json` plans run unchanged (`tests/unit/environment/plans.test.ts`) and are off the blocked-plan list.
+
+**Left.** M3 exposed faces; M4 CSV converter + human-gated deviation; M5 equivalent-DeltaT field hand-off; `testMethod` qualifier on stored values (needs 08); moisture screening per part in the check; UI (materials table, uptake curve).

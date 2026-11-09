@@ -32,6 +32,7 @@ import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtu
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import { flatDocument } from '../unit/vibroacoustics/fixtures';
+import { missionDocument } from '../unit/environment/fixtures';
 import { quadDrone, rotorParams } from '../unit/flight/flightFixture';
 import { SOURCE_TEXT, imperfectBar } from '../unit/cae/nonlinear/imperfectionFixtures';
 import {
@@ -341,6 +342,12 @@ function withLedgers(doc: CadDocument): CadDocument {
 }
 
 export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
+  'physics-environment': {
+    roots: ['spaceEnvironment'],
+    build: missionDocument,
+    query: { name: 'check_space_environment', params: constant({ profile: 'nasa_gsfc_screening' }) },
+    mutate: { name: 'set_mission_environment', params: constant({ aoFluence: { value: 2e21, unit: 'atoms/cm^2', source: 'fuzz' } }) },
+  },
   'physics-vibroacoustics': {
     roots: ['vibroacoustics'],
     build: flatDocument,

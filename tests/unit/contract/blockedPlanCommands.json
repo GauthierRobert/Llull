@@ -7,12 +7,6 @@
       "find_contacts",
       "set_service_environment"
     ],
-    "docs/physics/14-moisture-outgassing/validation/plans/ao_erosion_proposed.json": ["ao_erosion"],
-    "docs/physics/14-moisture-outgassing/validation/plans/moisture_uptake_proposed.json": ["hygro_strain", "moisture_uptake"],
-    "docs/physics/14-moisture-outgassing/validation/plans/outgassing_check_proposed.json": [
-      "check_space_environment",
-      "set_mission_environment"
-    ],
     "docs/physics/15-electro-optical-properties/validation/plans/eop_bonding_paths.plan.json": ["check_bonding", "define_bond_path"],
     "docs/physics/15-electro-optical-properties/validation/plans/eop_radiator_coating.plan.json": [
       "assign_surface_coating",
