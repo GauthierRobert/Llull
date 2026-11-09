@@ -4,6 +4,7 @@
  */
 
 import type { Vec3 } from '@core/model/vectors';
+import type { DrydenSpec } from './turbulence';
 
 /** Proportional / integral / derivative gains of one cascade level, per axis. */
 export interface PidGains {
@@ -61,6 +62,8 @@ export interface FlightSetpoint {
   readonly t: number;
   readonly position: Vec3;
   readonly yawDeg: number;
+  /** Pivot angle commanded to each named aero surface from t, deg (a surface not named keeps its previous command). */
+  readonly pivotDeg?: Readonly<Record<string, number>>;
 }
 
 /** 1-cosine gust: air velocity (peak/2)(1 - cos(2π(t - startS)/durationS)) for startS <= t <= startS + durationS. */
@@ -71,10 +74,14 @@ interface FlightGust {
   readonly peak: Vec3;
 }
 
-/** World air velocity: steady + discrete gusts (Dryden turbulence is FLT-M4). */
+/**
+ * World air velocity: steady + discrete gusts + optional seeded Dryden turbulence (see turbulence.ts).
+ * @invariant turbulence sigma >= 0, lengthScaleM > 0, airspeedMps > 0, seed an integer 0 <= seed < 2^53
+ */
 export interface FlightWind {
   readonly steady: Vec3;
   readonly gusts: readonly FlightGust[];
+  readonly turbulence?: DrydenSpec;
 }
 
 /**
