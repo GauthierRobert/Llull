@@ -6,7 +6,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { add3, cross3, dot3, scale3, sub3 } from '@lib/vec3';
 import type { StackView } from './stackRead';
 
-export interface PlateExtent {
+interface PlateExtent {
   readonly entityId: string;
   /** Extent of the plate bounds along the axis, as s in `origin + s * direction`. */
   readonly low: number;

@@ -25,7 +25,7 @@ export interface AxisFrame {
   readonly reference: Vec3;
 }
 
-export interface BearingRow {
+interface BearingRow {
   readonly node: number;
   /** Angle from the load direction, degrees in (-180, 180], positive about the axis (right-hand rule). */
   readonly angleDeg: number;
