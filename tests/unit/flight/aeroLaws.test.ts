@@ -76,7 +76,8 @@ describe('lookupAero', () => {
 });
 
 describe('assembleTable', () => {
-  const rows = (cls: number[]) => cls.map((cl, k) => ({ alphaDeg: -2 + 2 * k, cl, cdi: 0.001, cm: 0 }));
+  const rows = (cls: number[]): { alphaDeg: number; cl: number; cdi: number; cm: number }[] =>
+    cls.map((cl, k) => ({ alphaDeg: -2 + 2 * k, cl, cdi: 0.001, cm: 0 }));
   it('keeps everything without a bound and only the run around zero lift with one', () => {
     const all = assembleTable([0], [rows([-0.2, 0, 0.2, 0.4])], 0.01, null);
     expect(all?.table.alphaDeg).toEqual([-2, 0, 2, 4]);
