@@ -48,13 +48,24 @@ export interface Jointed {
 
 export function joint(
   pressures: readonly number[],
-  options: { readonly tables?: boolean; readonly load?: (increment: Increment) => number } = {},
+  options: { readonly tables?: boolean; readonly load?: (increment: Increment) => number; readonly forceLoad?: 'force' | 'pressure' } = {},
 ): Jointed {
   const base = bolted({ pair: true });
-  const second = must(base.doc, 'add_analysis_step', {
+  const loaded =
+    options.forceLoad === undefined
+      ? null
+      : must(base.doc, 'add_fea_load', {
+          analysisId: base.analysisId,
+          name: 'pull',
+          kind: options.forceLoad,
+          loadCase: 'LC1',
+          ...(options.forceLoad === 'force' ? { vector: [0, 0, 400] } : { magnitude: 400 }),
+          target: { entityId: base.plate, facesNear: [[0.5, 0.5, 5]] },
+        });
+  const second = must(loaded?.doc ?? base.doc, 'add_analysis_step', {
     analysisId: base.analysisId,
     name: 'service',
-    multipliers: {},
+    multipliers: loaded === null ? {} : { LC1: 1 },
     control: { kind: 'load', initialIncrement: 0.25, minIncrement: 0.001, maxIncrement: 0.25, maxIncrements: 20 },
   });
   const b: Bolted = { ...base, doc: second.doc };
@@ -62,7 +73,8 @@ export function joint(
   const probe = must(added.doc, 'add_curve_probe', {
     analysisId: b.analysisId,
     name: 'pull',
-    load: { kind: 'reaction', constraintId: b.topId, component: 'z' },
+    load:
+      loaded === null ? { kind: 'reaction', constraintId: b.topId, component: 'z' } : { kind: 'load', loadId: loaded.affected[0] ?? '' },
     displacement: { point: [0.5, 0.5, 5], dof: 'uz' },
   });
   const increments = rowsOf(pressures);
@@ -76,11 +88,15 @@ export function joint(
       options.tables === false
         ? []
         : increments.flatMap((row) => [
-            {
-              title: `total force (fx,fy,fz) for set ${safeName(`C_${b.topId}`)} and time ${row.time}`,
-              time: row.time,
-              rows: [[0, 0, -loadOf(row)]],
-            },
+            ...(loaded !== null
+              ? []
+              : [
+                  {
+                    title: `total force (fx,fy,fz) for set ${safeName(`C_${b.topId}`)} and time ${row.time}`,
+                    time: row.time,
+                    rows: [[0, 0, -loadOf(row)]],
+                  },
+                ]),
             {
               title: `displacements (vx,vy,vz) for set ${safeName(`N_${probeId}`)} and time ${row.time}`,
               time: row.time,

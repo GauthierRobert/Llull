@@ -204,6 +204,45 @@ describe('joint_from_fastener_stack', () => {
   });
 });
 
+describe('stack geometry', () => {
+  it('a stack along x puts the section on x, the lateral offset on y and the interface on the x planes', () => {
+    const s = stacked();
+    const placed = (s.doc as unknown as { fasteners: { stacks: Record<string, Record<string, unknown>> } }).fasteners;
+    const stack = { ...placed.stacks['fst-1.1'], axis: { origin: [0, 0.5, 0.5], direction: [1, 0, 0] } };
+    const doc = { ...s.doc, fasteners: { ...placed, stacks: { 'fst-1.1': stack } } } as unknown as CadDocument;
+    // the plates are stacked on z: along x both plates span 0..1, so they overlap and the interface is at x = 1
+    const result = execute(doc, 'joint_from_fastener_stack', params(s, { bearing: false }));
+    const bolt = Object.values(caseOf(result.document, s.analysisId)?.pretension?.bolts ?? {})[0];
+    expect(result.error, result.summary).toBeUndefined();
+    expect(bolt?.section).toEqual({ point: [0.5, 0.5, 0.5], normal: [1, 0, 0] });
+  });
+
+  it('refuses a zero axis and a plate that is not an entity (CNT_STACK_NOT_FOUND)', () => {
+    const s = stacked();
+    const slice = (s.doc as unknown as { fasteners: { stacks: Record<string, Record<string, unknown>> } }).fasteners;
+    const withStack = (patch: Record<string, unknown>): CadDocument =>
+      ({ ...s.doc, fasteners: { ...slice, stacks: { 'fst-1.1': { ...slice.stacks['fst-1.1'], ...patch } } } }) as unknown as CadDocument;
+    const zero = execute(withStack({ axis: { origin: [0, 0, 0], direction: [0, 0, 0] } }), 'joint_from_fastener_stack', params(s));
+    expect(zero.error?.code).toBe('CNT_STACK_NOT_FOUND');
+    expect(zero.summary).toContain('zero axis');
+    const ghost = execute(withStack({ layers: [{ entityId: 'ghost', thickness: 1 }] }), 'joint_from_fastener_stack', params(s));
+    expect(ghost.error?.code).toBe('CNT_STACK_NOT_FOUND');
+    expect(ghost.summary).toContain("layer 'ghost'");
+  });
+
+  it('refuses a stack with neither a hole diameter nor a catalogue diameter', () => {
+    const s = stacked();
+    const slice = (s.doc as unknown as { fasteners: { stacks: Record<string, Record<string, unknown>> } }).fasteners;
+    const doc = {
+      ...s.doc,
+      fasteners: { catalogs: {}, stacks: { 'fst-1.1': { ...slice.stacks['fst-1.1'], holeDiameter: 0 } } },
+    } as unknown as CadDocument;
+    const result = execute(doc, 'joint_from_fastener_stack', params(s));
+    expect(result.error?.code).toBe('CNT_STACK_NOT_FOUND');
+    expect(result.summary).toContain('no hole diameter');
+  });
+});
+
 describe('stack reader', () => {
   const slice = (stack: Record<string, unknown>): CadDocument => stacked({ slice: { catalogs: {}, stacks: { 'fst-1.1': stack } } }).doc;
   const good = {

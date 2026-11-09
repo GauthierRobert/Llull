@@ -80,6 +80,15 @@ describe('joint_stiffness_from_fe', () => {
     expect(strong.warnings.join(' ')).toContain('outside [0, 1]');
   });
 
+  it('reads a force LOAD probe (load = magnitude x step multiplier, no sign flip) the same way', () => {
+    const j = joint([5, 5, 5, 5, 5], { forceLoad: 'force', tables: true });
+    const result = query(j);
+    expect(result.error, result.summary).toBeUndefined();
+    const data = result.data as Data & { probe: { load: string; sign: number } };
+    expect(data.probe).toMatchObject({ load: 'load', sign: 1 });
+    expect(data.nPhi).toBeCloseTo(NPHI, 9);
+  });
+
   it('warns when the force-load relation is not linear over the range', () => {
     const bent = joint([5, 5, 5, 5, 5], { load: (row) => row.load * (1 + row.load / 400) });
     expect((query(bent).data as Data).warnings.join(' ')).toContain('not linear');
