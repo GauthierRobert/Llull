@@ -191,7 +191,7 @@ exchange (VC-FLT-10, no network beyond localhost).
 | FLT-M1      | Core port: body pose / twist in load callbacks; body-frame rotor law with J from state; body drag | —             |
 | FLT-M2      | Controller, mixer, scenario, `run_flight`, `flight_report`                                        | M1            |
 | FLT-M3      | Motor / ESC / battery chain, endurance                                                            | M2            |
-| FLT-M4      | `generate_aero_table` (VLM sweep + polar), pivoting surfaces, wind and gusts                      | M1, 10 AER    |
+| FLT-M4      | `generate_aero_table` (VLM sweep + polar), pivoting surfaces, wind and gusts (built, §16)         | M1, 10 AER    |
 | FLT-M5      | `export_flight_loads` → 14 FLL; trim and linearisation                                            | M2, 14 FLL-M1 |
 | FLT-M6      | SITL bridges (ArduPilot JSON first, then PX4)                                                     | M3            |
 | FLT-M7 (V2) | BEMT rotor, dataset replay / identification                                                       | M3            |
@@ -404,3 +404,66 @@ verified against closed forms, not against a measured pack.
 
 **Not in M3 / remainder.** Motor thermal limits and ESC efficiency maps, Peukert / temperature dependence of the cell, the bench measurement of
 VC-FLT-11, a minimum-endurance limit in `flight_report`, a viewport trace of SoC, and non-dc motors (PMSM / stepper data cannot yet feed the chain).
+
+## 16. Implementation status — FLT-M4 (2026-11-09)
+
+**Built (TR-FLT-03 aero surfaces, TR-FLT-04 Dryden turbulence, FR-FLT-03 / 04 / 12 / 08 for aero tables).**
+
+| Item | Where |
+| ---- | ----- |
+| `generate_aero_table`: one `analyze_vortex_lattice` call per pivot angle through `ctx.registry` (angles of attack swept inside the call, one factorisation); CL, Cm as solved, CD = cd0 + CDi; stored as `doc.flight.aeroSurfaces[id]` with reference S / c / span (m², m), moment centre, provenance `vlm+polar`, `unverified`, `designHash`, solver stats | `commands/flightAero.ts`, `flight/{aeroModel,aeroTable,aeroSweep}.ts` |
+| Table lookup: bilinear in (α, pivot), held at the edges and counted (`FLT_AERO_OUTSIDE_TABLE`); stall bound: with `profileDrag.clMax` only the run of angles around zero lift where \|CL\| stays within it at every pivot angle is kept (valid range stored) | `flight/aeroTable.ts` |
+| Surface law: air velocity at the moment centre u = -(v + ω × r) (relative to the wind) on the flow frame, α = atan2(uz, ux), q = ½ρ(ux² + uz²), F = q·S·[CD cos α - CL sin α, 0, CD sin α + CL cos α], pitching moment q·S·c·Cm about the spanwise axis, force at the moment centre | `flight/aeroSurface.ts` |
+| Pivot servo in the flight block: per surface the angle slews toward the scenario command at `rateDegS` inside `[minDeg, maxDeg]`; the law reads the mean angle of the step; exact per-step peaks in aux; scenario set-points gain `pivotDeg` per surface id | `flight/aeroBlock.ts`, `flight/flightBlock.ts` |
+| Dryden turbulence: `wind.turbulence { sigmaMps, lengthScaleM, airspeedMps, seed }`, MIL-HDBK-1797 spectra realised by forming filters on Philox-counter Gaussian noise (every 5 ms, linear between samples, held after the end); steady + gusts + turbulence in one `WindSource` | `flight/turbulence.ts`, `flight/wind.ts` |
+| Stale detection: `designHash` = hash(generation inputs, body record, entities of the body); `run_flight` compares it again (`FLT_AERO_TABLE_STALE`, `unverified`, `data.aero[id].stale`) | `flight/aeroTable.ts`, `flight/flightRun.ts` |
+| Run output `data.aero[surfaceId]` (α range, final pivot / CL / CD / lift / drag, peak lift and time, share of steps outside the table, valid α range, stale, unverified); `simulate_motion` applies the table at the neutral pivot | `flight/aeroMetrics.ts`, `flight/flightLoads.ts` |
+| Load validation of `aeroSurfaces`, `wind.turbulence`, set-point `pivotDeg` (keys, grid shape, servo inside the pivot range, pivot commands name servo surfaces of the scenario's body); `delete_dynamics_item` cascades body -> surface and strips pivot commands | `flight/{aeroDocument,document,model}.ts` |
+
+**Evidence** (`tests/unit/flight/{aeroTableCommand,aeroRun,turbulence}.test.ts`, MuJoCo 4.0).
+
+- Lift slope: an elliptic AR 20 wing gives CL_α within 3 % of 2πA/(A + 2) (VLM below the lifting-line value, as in VC-AER-35); a rectangular AR 20 wing
+  sits 4.6 % below it (the known rectangular-wing gap); CD - cd0 = CL² / (π A e) with e near 1 for the elliptic planform (3 digits).
+- VC-FLT-12: the force of a run at α = 4° equals ½ρV²S·CL from `analyze_vortex_lattice` at the same condition to 1e-5 (the dynamics samples the state at the
+  step midpoint, so 1e-6 is not reachable at one step; the heavy body keeps the velocity change below 2e-7 m/s).
+- 1-cosine gust: the peak load factor of a heavy wing equals ρ V CL_α U_g / (2 W/S) within 3 % and peaks at the gust midpoint (2.0 s).
+- Dryden: Welch spectra (Hann, 8192-sample segments, 20 independent 600 s realisations) against Φu, Φv, Φw: log-mean ratio within 5 %, every bin of
+  [corner/4, 10·corner] within a factor 1.6, pooled standard deviation within 5 % of the stated σ, same seed -> identical series, sample i independent of
+  the series length. Mutation check: replacing the second-order numerator of the lateral / vertical filter fails the spectrum and variance tests.
+- Steady crosswind on a drag body (zero gravity, CdA 0.5 m², 2 kg, 6 m/s): ground track within 0.5 % of x(t) = w·t - ln(1 + k·w·t) / k, k = ½ρCdA/m.
+- Pivot servo: -10° -> +10° at 10 deg/s is at -5.0° after 1 s, 0° after 1.5 s, +10° held; a hand-edited command beyond the limit is held at the limit.
+- Golden plan `sc-flt-04-wind-aero` (wing quad, pivoting wing, 6 m/s head wind, 1 s gust, Dryden σ 0.5 / 0.5 / 0.3, seed 3): pinned in `tests/golden/fltPlans.test.ts`.
+
+**Decisions.**
+
+- **FLT-D29 (pivot = servo state, not a second body)**: §3 sketched `pivotJointId` and FLT-D18 deferred multi-body vehicles to M4. The controller's mass,
+  centre of mass and inertia are the vehicle body's own, so a jointed wing body would silently disagree with them; the pivot is instead a servo state of the
+  surface (angle, rate limit, travel limits) that selects the table column. Consequence: the wing's own mass does not move and its hinge reaction is not
+  a separate load (the aero wrench acts at the moment centre on the vehicle body); FLT_VEHICLE_MULTIBODY stays. Rejected: real jointed bodies with the
+  controller re-derived from the whole subtree (a rewrite of M2's mass model, left for a later milestone when a mass-moving wing matters).
+- **FLT-D30 (table axes and what the lattice cannot give)**: the table is (α, pivot) as §3 says. `analyze_vortex_lattice` has no sideslip, rotation-rate
+  or flap-deflection input, so there is no β axis, no control-surface (hinged flap) deflection and no rate derivatives: lift and drag use the flow in the
+  surface's x-z plane (the cross flow is ignored), and rate effects enter only through the local velocity ω × r at the moment centre. An all-moving surface
+  (stabilator, pivoting wing) is covered by the pivot axis. A flap needs a VLM input first (reported to the aerodynamics owner).
+- **FLT-D31 (turned wing is not the flat wing at α + pivot)**: the lattice keeps its trailing legs along the free stream, so a wing turned by 10° gives
+  CL 5.6 % above the flat wing at α = 10°; the pivot sweep therefore solves the turned geometry (leading edges rotated about the pivot axis plus the incidence
+  change) at each pivot angle instead of shifting α.
+- **FLT-D32 (flow frame and half-wing direction)**: `forward` names the body axis of travel (default "+x"); the flow frame is x downstream, y = z × x, z up.
+  The lattice measures incidence and camber about the span direction of the section list, so a half wing that runs toward -y of the flow frame is mirrored
+  about y = 0 (or reversed when `mirror: false`); a "+x" table of a mirrored wing is identical to the "-x" one (test).
+- **FLT-D33 (viscous model, stall, validity)**: CD = cd0 + CDi with a constant, stated `profileDrag.cd0` (default 0.01, then `unverified`; a stated `source`
+  makes the result verified). The lattice is inviscid, so stall is a bound, not a model: `clMax` truncates the angle-of-attack axis, and outside the table
+  the coefficients are held at the edge with a warning (FR-FLT-08), never extrapolated. §5's `allowExtrapolation` was not built.
+- **FLT-D34 (staleness)**: the design is the body record and the entities of the body (the sections are inputs of the command, stored only as a hash):
+  moving or reshaping the body's entities stales the table; editing the inputs means calling the command again. Rejected: storing the sections in the record
+  (duplicates geometry the agent already holds).
+- **FLT-D35 (turbulence model)**: Dryden with a fixed airspeed (frozen field, the stated `airspeedMps`, default 10 m/s listed in `defaulted`) and
+  world-axis components u = x, v = y, w = z; the spectra are the MIL-HDBK-1797 forms (Φu with L, Φv / Φw with the (1 + 3(Lω/V)²) numerator).
+  The realisation is a pure function of the seed (Philox counter noise, 5 ms hold-first-order stages started after an 8τ warm-up), computed once
+  per run up to 600 s. The turbulence is not altitude or airspeed scheduled; a von Kármán form is not built (Dryden is what §5 names).
+- **FLT-D36 (load validation fix)**: `referenceErrors` spread its own `errors` before the later checks pushed body problems into it, so a controller or
+  scenario on a missing body passed load validation; the later checks now run first.
+
+**Not in M4 / remainder.** A hinged control surface (flap) and sideslip / rate derivatives (need VLM inputs), a mass-moving pivoting wing (multi-body vehicle),
+stall and post-stall models (a graded section polar), viewport replay of the surface, the `U3` forward-flight power comparison with pivoted wings (the
+pieces exist: run `sc-flt-04-wind-aero`-style scenarios at two pivot commands), the `flight` toolset view. Next: FLT-M5 (`export_flight_loads`, trim, linearisation).
