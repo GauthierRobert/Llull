@@ -9,10 +9,6 @@
     "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": ["add_time_history"],
     "docs/physics/19-explicit-impact/validation/plans/exp_bird_rigid_plate.plan.json": ["add_time_history"],
     "docs/physics/19-explicit-impact/validation/plans/exp_drop_box.plan.json": ["add_time_history"],
-    "docs/physics/20-vibroacoustics/validation/plans/vac_flat_spectrum_handoff.plan.json": [
-      "check_acoustic_handoff",
-      "define_acoustic_exposure"
-    ],
     "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": ["export_caesar_neutral"],
     "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": ["fit_steel_member"],
     "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": ["export_pdf"],

@@ -49,10 +49,10 @@ export interface TargetProblem {
 const hasPoints = (points: readonly unknown[] | undefined): boolean => points !== undefined && points.length > 0;
 
 /**
- * Shape + entity-existence check of a target (resolution to topology happens in the mesher).
- * @failure entity missing / not 3D / no selector point / intersectPlane without facesNear -> FEA_TARGET_UNRESOLVED; entity not a part of the case -> FEA_PART_NOT_IN_ANALYSIS
+ * Shape + entity-existence check of a target, without the analysis (a consumer that is not tied to an analysis case, e.g. an acoustic exposure).
+ * @failure entity missing / not 3D / no selector point / intersectPlane without facesNear -> FEA_TARGET_UNRESOLVED
  */
-export function targetProblem(doc: CadDocument, analysisCase: AnalysisCase, target: FeaTarget): TargetProblem | null {
+export function entityTargetProblem(doc: CadDocument, target: FeaTarget): TargetProblem | null {
   const entity = Object.hasOwn(doc.entities, target.entityId) ? doc.entities[target.entityId] : undefined;
   if (entity === undefined) return { code: 'FEA_TARGET_UNRESOLVED', message: `entity '${target.entityId}' does not exist` };
   if (!is3D(entity))
@@ -61,6 +61,16 @@ export function targetProblem(doc: CadDocument, analysisCase: AnalysisCase, targ
     return { code: 'FEA_TARGET_UNRESOLVED', message: 'give at least one point in facesNear, edgesNear or pointsNear' };
   if (target.intersectPlane !== undefined && !hasPoints(target.facesNear))
     return { code: 'FEA_TARGET_UNRESOLVED', message: 'intersectPlane needs facesNear: the plane cuts the faces those points select' };
+  return null;
+}
+
+/**
+ * `entityTargetProblem` plus the analysis membership (resolution to topology happens in the mesher).
+ * @failure see entityTargetProblem; entity not a part of the case -> FEA_PART_NOT_IN_ANALYSIS
+ */
+export function targetProblem(doc: CadDocument, analysisCase: AnalysisCase, target: FeaTarget): TargetProblem | null {
+  const problem = entityTargetProblem(doc, target);
+  if (problem !== null) return problem;
   if (!Object.hasOwn(analysisCase.parts, target.entityId))
     return { code: 'FEA_PART_NOT_IN_ANALYSIS', message: `entity '${target.entityId}' is not a part of analysis '${analysisCase.id}'` };
   return null;

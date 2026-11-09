@@ -4,9 +4,8 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { refuseVac, unverifiedItem } from './codes';
-import { bandByNominal } from './math/bands';
+import { bandRows } from './bandReport';
 import { energySumDb, LEVEL_DB_MAX, LEVEL_DB_MIN, overallPressurePa, pressureToSpl, splToPressure } from './math/levels';
-import { bandPsd } from './math/psd';
 import { regroupThirdsToOctaves } from './math/regroup';
 import { spectrumOf } from './model';
 import { spectrumName } from './spectrumCommands';
@@ -88,22 +87,7 @@ export const acousticSpectrumReport = defineCommand({
     const levels = spectrum.bands.map((band) => band.splDb);
     const oasplDb = energySumDb(levels);
     const pRmsPa = overallPressurePa(levels);
-    const bands = spectrum.bands.flatMap((band) => {
-      const geometry = bandByNominal(spectrum.bandwidth, band.nominalHz);
-      if (geometry === undefined) return [];
-      return [
-        {
-          nominalHz: band.nominalHz,
-          exactMidHz: band.exactMidHz,
-          lowerHz: geometry.lowerHz,
-          upperHz: geometry.upperHz,
-          bandwidthHz: geometry.bandwidthHz,
-          splDb: band.splDb,
-          pRmsPa: splToPressure(band.splDb),
-          psdPa2PerHz: bandPsd(band.splDb, geometry.lowerHz, geometry.upperHz),
-        },
-      ];
-    });
+    const bands = bandRows(spectrum);
     const regrouped = spectrum.bandwidth === 'third_octave' ? regroupThirdsToOctaves(spectrum.bands) : undefined;
     const items = spectrum.unverified ? [unverifiedItem(spectrum.name)] : [];
     return report(
