@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import { readPointer } from '@cae/reliability/responseEval';
+import { pointerTarget } from '@cae/reliability/responseEval';
 import { reliabilityErrors } from '@cae/reliability/model';
 import { code, data, type Json } from './support';
 import { boxDoc, massModel } from './responses.support';
 
 const massQuery = (entityId: string, pointer = '/data/mass'): Json => ({ command: 'mass_properties', params: { entityId }, pointer });
-describe('readPointer', () => {
+describe('pointerTarget', () => {
   it('walks objects and arrays, decodes ~0 ~1, and refuses what does not resolve', () => {
     const root = { data: { 'a/b': { 'c~d': 3 }, list: [{ v: 7 }] } };
-    expect(readPointer(root, '/data/a~1b/c~0d')).toBe(3);
-    expect(readPointer(root, '/data/list/0/v')).toBe(7);
-    expect(readPointer(root, '/data/missing')).toBeUndefined();
-    expect(readPointer(root, 'data')).toBeUndefined();
-    expect(readPointer(root, '/data/list/5/v')).toBeUndefined();
+    expect(pointerTarget(root, '/data/a~1b/c~0d')).toBe(3);
+    expect(pointerTarget(root, '/data/list/0/v')).toBe(7);
+    expect(pointerTarget(root, '/data/missing')).toBeUndefined();
+    expect(pointerTarget(root, 'data')).toBeUndefined();
+    expect(pointerTarget(root, '/data/list/5/v')).toBeUndefined();
   });
 });
 

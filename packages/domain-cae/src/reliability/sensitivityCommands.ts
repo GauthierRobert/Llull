@@ -16,6 +16,8 @@ import type { RandomVariable, Response } from '@cae/reliability/types';
 
 const MAX_EXPRESSION_EVALUATIONS = 2_000_000;
 /** Smoothness flag of parameter_sensitivity: |D+ - D-| > SMOOTH_RELATIVE |Dc| + SMOOTH_ABSOLUTE. */
+const DEFAULT_RELATIVE_STEP = 1e-3;
+const DEFAULT_BOOTSTRAP = 200;
 const SMOOTH_RELATIVE = 1e-2;
 const SMOOTH_ABSOLUTE = 1e-12;
 
@@ -69,7 +71,7 @@ export const parameterSensitivity = defineCommand({
     const missing = params.parameters.filter((name) => !Object.hasOwn(doc.parameters, name));
     if (missing.length > 0)
       return fail('PRB_PARAMETER_NOT_FOUND', `no document parameter ${missing.map((n) => `'${n}'`).join(', ')}`, missing, ['parameters']);
-    const h = params.relativeStep ?? 1e-3;
+    const h = params.relativeStep ?? DEFAULT_RELATIVE_STEP;
     const evaluate = (name: string, value: number): number | string => {
       const perturbed = withParameters(doc, { [name]: value }, ctx);
       if (perturbed === null) return `set_parameter '${name}' = ${value} was refused`;
@@ -79,9 +81,10 @@ export const parameterSensitivity = defineCommand({
     const base = queryValue(doc, resolved.query, ctx);
     if (!base.ok) return fail('PRB_RESPONSE_FAILED', `at the current values: ${base.reason}`, [], ['response']);
     const variables = Object.values(reliabilityOf(doc).variables);
+    const parameterValues = Object.fromEntries(Object.entries(doc.parameters).map(([key, parameter]) => [key, parameter.value]));
     const rows: Record<string, unknown>[] = [];
     for (const name of params.parameters) {
-      const x = doc.parameters[name]?.value ?? 0;
+      const x = parameterValues[name] ?? Number.NaN;
       const step = x === 0 ? h : h * Math.abs(x);
       const up = evaluate(name, x + step);
       const down = evaluate(name, x - step);
@@ -291,7 +294,7 @@ export const sensitivityIndices = defineCommand({
         [target.label],
         [],
       );
-    const bootstrap = params.bootstrap ?? 200;
+    const bootstrap = params.bootstrap ?? DEFAULT_BOOTSTRAP;
     const result = sobolIndices(fA, fB, fAB, bootstrap);
     if (!(result.variance > 0))
       return fail('PRB_VARIANCE_ZERO', `'${target.label}' has zero variance over the sampled inputs`, [target.label], []);
@@ -318,7 +321,8 @@ export const sensitivityIndices = defineCommand({
       unverifiedReasons: target.unverifiedReasons,
       reviewRequired: true,
     };
-    const shown = names.map((name, i) => `${name} S ${round(result.first[i]?.value ?? 0)} / ST ${round(result.total[i]?.value ?? 0)}`);
+    const at = (rowsOf: typeof result.first, i: number): number => rowsOf[i]?.value ?? Number.NaN;
+    const shown = names.map((name, i) => `${name} S ${round(at(result.first, i))} / ST ${round(at(result.total, i))}`);
     return report(
       doc,
       `sensitivity_indices of '${target.label}' (N = ${n}, ${evaluations} evaluations, seed ${params.seed}): mean ${round(result.mean)}, variance ${round(result.variance)}; ${shown.join('; ')}. ${REVIEW_NOTE}`,

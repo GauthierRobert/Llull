@@ -26,11 +26,12 @@ interface Raw {
 /** Estimators on the rows `rows` (indices into the N base samples) of f(A), f(B) and f(AB_i); f(B) is centred on the mean so the noise scales with the spread, not the mean. */
 function estimate(fA: Float64Array, fB: Float64Array, fAB: readonly Float64Array[], rows: ArrayLike<number>): Raw {
   const n = rows.length;
+  const at = (values: ArrayLike<number>, i: number): number => values[i] ?? 0;
   let sum = 0;
-  for (let k = 0; k < n; k += 1) sum += (fA[rows[k] ?? 0] ?? 0) + (fB[rows[k] ?? 0] ?? 0);
+  for (let k = 0; k < n; k += 1) sum += at(fA, at(rows, k)) + at(fB, at(rows, k));
   const mean = sum / (2 * n);
   let squares = 0;
-  for (let k = 0; k < n; k += 1) squares += ((fA[rows[k] ?? 0] ?? 0) - mean) ** 2 + ((fB[rows[k] ?? 0] ?? 0) - mean) ** 2;
+  for (let k = 0; k < n; k += 1) squares += (at(fA, at(rows, k)) - mean) ** 2 + (at(fB, at(rows, k)) - mean) ** 2;
   const variance = squares / (2 * n);
   const first: number[] = [];
   const total: number[] = [];

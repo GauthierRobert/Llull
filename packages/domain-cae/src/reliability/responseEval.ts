@@ -11,7 +11,7 @@ type Query = Response['query'];
 export const MAX_RESPONSE_EVALUATIONS = 20_000;
 
 /** Value at an RFC 6901 JSON `pointer` ('/data/mass', '/data/items/0/value'), or undefined when it does not resolve. */
-export function readPointer(root: unknown, pointer: string): unknown {
+export function pointerTarget(root: unknown, pointer: string): unknown {
   if (!pointer.startsWith('/')) return undefined;
   let node: unknown = root;
   for (const raw of pointer.slice(1).split('/')) {
@@ -31,7 +31,7 @@ export type QueryValue = { readonly ok: true; readonly value: number } | { reado
 export function queryValue(doc: CadDocument, query: Query, ctx: ExecutionContext | undefined): QueryValue {
   const result = execute(doc, query.command, query.params, ctx);
   if (result.error !== undefined) return { ok: false, reason: `${query.command} refused: ${result.summary}` };
-  const value = readPointer({ summary: result.summary, affected: result.affected, data: result.data }, query.pointer);
+  const value = pointerTarget({ summary: result.summary, affected: result.affected, data: result.data }, query.pointer);
   return typeof value === 'number' && Number.isFinite(value)
     ? { ok: true, value }
     : { ok: false, reason: `${query.command}: pointer '${query.pointer}' is not a finite number in its result` };
