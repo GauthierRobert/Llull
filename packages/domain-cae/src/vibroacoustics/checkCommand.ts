@@ -91,7 +91,7 @@ export const checkAcousticHandoff = defineCommand({
     }
     const errors = items.filter((entry) => entry.severity === 'error').length;
     const warnings = items.filter((entry) => entry.severity === 'warning').length;
-    const unchecked = items.some((entry) => entry.severity === 'info');
+    const unchecked = items.some((entry) => entry.code === 'VAC_EXPOSURE_UNCHECKED' || entry.code === 'VAC_NO_EXPOSURE');
     const status = errors > 0 ? 'fail' : unchecked ? 'unknown' : warnings > 0 ? 'warn' : 'pass';
     return report(
       doc,

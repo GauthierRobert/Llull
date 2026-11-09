@@ -19,13 +19,24 @@ interface FaceRecord {
   readonly centroid: Vec3;
 }
 
-const isFaceRecords = (value: unknown): value is readonly FaceRecord[] => Array.isArray(value);
+const isFiniteVec3 = (value: unknown): value is Vec3 =>
+  Array.isArray(value) && value.length === 3 && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry));
+
+/** Every record has an integer index, a string surface, a finite area and a finite 3-element centroid (a malformed kernel answer is never exported). */
+const isFaceRecords = (value: unknown, count: number): value is readonly FaceRecord[] =>
+  Array.isArray(value) &&
+  value.length === count &&
+  value.every((face: Partial<FaceRecord> | null) => {
+    if (face === null || typeof face !== 'object') return false;
+    return Number.isInteger(face.index) && typeof face.surface === 'string' && Number.isFinite(face.area) && isFiniteVec3(face.centroid);
+  });
 
 /**
  * @affects nothing; read-only, data = the llull.acousticLoad/1 package { schema, exposure, field, spectrum, faces[{ entityId, faceIndex, areaMm2, centroidMm, rmsForceN }], totalAreaMm2,
  *   provenance, unverified, reviewRequired: true, reviewReason, items }
- * @invariant areas and centroids come from inspect_faces (exact kernel) in document units and are converted to mm / mm^2, never estimated; deterministic for one document
- * @failure kind given -> VAC_OUT_OF_SCOPE; unknown exposure / spectrum -> VAC_EXPOSURE_UNKNOWN / VAC_SPECTRUM_UNKNOWN; no exact kernel -> KRN_NO_EXACT_KERNEL; target solid
+ * @invariant areas and centroids come from inspect_faces (exact kernel) in document units and are converted to mm / mm^2 and rounded to 1e-6 (stable across kernel builds), never estimated; deterministic for one document
+ * @failure kind given -> VAC_OUT_OF_SCOPE; unknown exposure / spectrum -> VAC_EXPOSURE_UNKNOWN / VAC_SPECTRUM_UNKNOWN; no exact kernel -> KRN_NO_EXACT_KERNEL; inspect_faces refusals are forwarded with their code (ENTITY_NOT_FOUND, ENTITY_NOT_SOLID, KRN_NO_EXACT_KERNEL, KRN_SHAPE_UNAVAILABLE,
+ *   KRN_FACE_INDEX, KRN_FACE_QUERY_FAILED); malformed face records -> KRN_FACE_QUERY_FAILED; target solid
  *   gone, a point off the solid or on an edge -> VAC_EXPOSURE_UNRESOLVED (rejected, no data)
  */
 export const exportAcousticLoad = defineCommand({
@@ -76,8 +87,13 @@ export const exportAcousticLoad = defineCommand({
     if ('problem' in resolved) return fail('VAC_EXPOSURE_UNRESOLVED', resolved.problem, [exposure.name, entityId]);
     const inspected = execute(doc, 'inspect_faces', { entityId, faces: [...resolved.faces] }, ctx);
     const records: unknown = (inspected.data as { faces?: unknown } | undefined)?.faces;
-    if (inspected.rejected === true || inspected.error !== undefined || !isFaceRecords(records))
+    if (inspected.rejected === true || inspected.error !== undefined)
       return { ...inspected, summary: `export_acoustic_load: ${inspected.summary}` };
+    if (!isFaceRecords(records, resolved.faces.length))
+      return fail('KRN_FACE_QUERY_FAILED', 'the kernel returned malformed face records (non-finite area or centroid, wrong count)', [
+        exposure.name,
+        entityId,
+      ]);
     const areaFactor = MM_PER_UNIT[doc.units] ** 2;
     const faces: ExposedFace[] = records.map((face) => ({
       entityId,

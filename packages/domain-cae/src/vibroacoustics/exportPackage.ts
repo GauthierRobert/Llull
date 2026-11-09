@@ -5,6 +5,10 @@ import { unverifiedItem, type VacItem } from './codes';
 import { energySumDb, overallPressurePa } from './math/levels';
 import type { AcousticExposure, AcousticSpectrum } from './types';
 
+/** Fixed precision of exported areas (mm^2) and centroids (mm): the kernel build must not change a saved package. */
+const PER_UNIT = 1e6;
+const fixed = (value: number): number => Math.round(value * PER_UNIT) / PER_UNIT;
+
 /** One exposed face from the exact kernel (`inspect_faces`), converted to millimetres. */
 export interface ExposedFace {
   readonly entityId: string;
@@ -47,7 +51,7 @@ const reviewPending: VacItem = {
 };
 
 /**
- * @invariant bands in ascending exactMidHz; psdPa2PerHz band-averaged one-sided Pa^2/Hz; rmsForceN = overall rms pressure (Pa) x area (m^2) for a diffuse field
+ * @invariant face areas and centroids are rounded to 1e-6 (mm^2, mm); bands in ascending exactMidHz; psdPa2PerHz band-averaged one-sided Pa^2/Hz; rmsForceN = overall rms pressure (Pa) x area (m^2) for a diffuse field
  *   (uniform rms pressure, spatial correlation not modelled), null for a progressive field (the incidence is not applied); unverified = the spectrum is not grade A
  */
 export function acousticLoadPackage(
@@ -59,7 +63,12 @@ export function acousticLoadPackage(
   const levels = spectrum.bands.map((band) => band.splDb);
   const pRmsPa = overallPressurePa(levels);
   const rmsForceOf = (areaMm2: number): number | null => (exposure.field === 'diffuse' ? pRmsPa * areaMm2 * 1e-6 : null);
-  const totalAreaMm2 = faces.reduce((sum, face) => sum + face.areaMm2, 0);
+  const rounded = faces.map((face) => ({
+    ...face,
+    areaMm2: fixed(face.areaMm2),
+    centroidMm: [fixed(face.centroidMm[0]), fixed(face.centroidMm[1]), fixed(face.centroidMm[2])] as const,
+  }));
+  const totalAreaMm2 = rounded.reduce((sum, face) => sum + face.areaMm2, 0);
   return {
     schema: 'llull.acousticLoad/1',
     exposure: exposure.name,
@@ -75,7 +84,7 @@ export function acousticLoadPackage(
       psdKind: 'band-averaged one-sided Pa^2/Hz',
       bands: bandRows(spectrum),
     },
-    faces: faces.map((face) => ({ ...face, rmsForceN: rmsForceOf(face.areaMm2) })),
+    faces: rounded.map((face) => ({ ...face, rmsForceN: rmsForceOf(face.areaMm2) })),
     totalAreaMm2,
     totalRmsForceN: rmsForceOf(totalAreaMm2),
     provenance: { source: spectrum.source, documentHash },

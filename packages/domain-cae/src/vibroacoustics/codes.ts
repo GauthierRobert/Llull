@@ -20,6 +20,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   KRN_NO_EXACT_KERNEL:
     'start the exact OCC kernel (the desktop default; LLULL_KERNEL=occt-native for the CLI): face areas are never guessed',
   FEA_TARGET_UNRESOLVED: 'target an existing 3D solid with at least one facesNear point',
+  KRN_FACE_QUERY_FAILED: 'retry; check the solid is valid with inspect_topology',
   VAC_PARAMS_INVALID: 'follow the command description',
 };
 

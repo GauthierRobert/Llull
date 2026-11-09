@@ -346,6 +346,31 @@ describe('export_acoustic_load', () => {
     expect(exportOf(doc, unbuildable).summary).toContain('could not build');
   });
 
+  it('refuses malformed inspect_faces records (non-finite area, bad centroid, wrong surface) with KRN_FACE_QUERY_FAILED', () => {
+    const { doc } = exposedDocument();
+    const bad: Partial<FaceDetail>[] = [
+      { area: Number.NaN },
+      { centroid: [1, 2] as unknown as Vec3 },
+      { surface: 3 as unknown as 'plane' },
+    ];
+    for (const change of bad) {
+      const result = exportOf(doc, boxKernel({ faceDetails: () => FACES.map((face) => ({ ...face, ...change })) }));
+      expect(refusal(result)).toBe('KRN_FACE_QUERY_FAILED');
+      expect(result.data).toBeUndefined();
+    }
+  });
+
+  it('rounds areas and centroids to 1e-6 so a saved package is stable across kernel builds', () => {
+    const { doc } = exposedDocument();
+    const noisy = boxKernel({
+      faceDetails: () => FACES.map((face) => ({ ...face, area: face.area + 1e-9, centroid: [150 + 1e-10, 100, 100] })),
+    });
+    const data = exportOf(doc, noisy).data as Package;
+    expect(data.faces[0]?.areaMm2).toBe(60000);
+    expect(data.faces[0]?.centroidMm).toEqual([150, 100, 100]);
+    expect(data.totalAreaMm2).toBe(60000);
+  });
+
   it('forwards a refusal of inspect_faces (the kernel cannot compute the faces)', () => {
     const { doc } = exposedDocument();
     const result = exportOf(doc, boxKernel({ faceDetails: () => null }));
