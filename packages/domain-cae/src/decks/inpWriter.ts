@@ -15,7 +15,17 @@ const DISCIPLINES: DisciplineTable = {
   materialCardWriter: constitutiveMaterialCards,
   heat: { materialCards: thermalMaterialCards, sections: thermalSections },
   thermomech: { materialCards: thermomechMaterialCards, sections: thermomechSections },
-  orientation: (ctx, entityId) => printedOrientation(ctx, entityId) ?? orientationBlock(ctx, entityId),
+  orientation: (ctx, entityId) => {
+    const printed = printedOrientation(ctx, entityId);
+    const given = orientationBlock(ctx, entityId);
+    if (printed === null) return given;
+    if (given === null) return printed;
+    return {
+      code: 'FLL_PRINT_ORIENTATION',
+      message: `part '${entityId}' is printed (material direction 3 = the build direction) and also has a thermo-mechanical material orientation: one material axes system per part`,
+      ids: [entityId],
+    };
+  },
   coupled: { materialCards: coupledMaterialCards, sections: coupledSections },
   dynamics: { materialCards: dynamicMaterialCards, sections: dynamicSections },
 };

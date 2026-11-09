@@ -28,7 +28,7 @@ import { blocks, must, pairParams } from '../unit/cae/contact/support';
 import { creepCube, holdFrd, solveCube } from '../unit/cae/creep/support';
 import { barModel } from '../unit/cae/explicit/support';
 import { implicitAnalysis } from '../unit/cae/fieldMeshFixtures';
-import { printedBar, recordCoupon } from '../unit/cae/printFixtures';
+import { BAR_PRINT, printedBar, recordCoupon } from '../unit/cae/printFixtures';
 import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtures';
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
@@ -470,10 +470,17 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
   'cae#printed': {
     roots: ['analysis'],
     build: () => recordCoupon(recordCoupon(printedBar().printed, 'xy-20', 0.2, 'xy', 400), 'xy-60', 0.6, 'xy', 1100),
-    query: { name: 'fit_print_infill_exponent', params: () => ({ pattern: 'gyroid', direction: 'xy' }) },
+    query: {
+      name: 'fit_print_infill_exponent',
+      params: () => ({ pattern: 'gyroid', direction: 'xy', solidModulus: { value: 2000, unit: 'MPa' } }),
+    },
     mutate: {
       name: 'set_print_idealization',
-      params: (doc) => ({ analysisId: analysisId(doc), entityId: Object.keys(doc.entities)[0] ?? 'missing', clear: true }),
+      params: (doc) => ({
+        ...BAR_PRINT,
+        analysisId: analysisId(doc),
+        entityId: Object.keys(doc.analysis?.cases[analysisId(doc)]?.parts ?? {})[0] ?? 'missing',
+      }),
     },
   },
   // 14 FLL-M1: an implicit body (with its material) analysed with mesh source implicit_field

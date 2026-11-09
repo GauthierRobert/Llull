@@ -35,7 +35,7 @@ export const setPrintIdealization = defineCommand({
     'coupons pulled in the build plane and along the build direction; required, there are no typical values) and the infill exponent m of E_core = E_solid x density^m: infillExponent { value, source } ' +
     'or { fitDirection: "xy" | "z" } to fit it from the coupons recorded with record_print_coupon for that infill pattern (fit_print_infill_exponent previews it); no default exponent exists. ' +
     'The skin fraction f is measured on the part triangles (first order); direction modulus = coupon modulus x (f + (1 - f) density^m), directions 1 and 2 in the build plane, 3 along layerAxis; ' +
-    'Poisson ratio and density come from the material of the part (density x (f + (1 - f) density)); shear is not measured and follows the isotropic relation (flagged). The deck writes ' +
+    'Poisson ratios (nu12 = nu13 = nu23) and density come from the material of the part (density x (f + (1 - f) density)); shear is not measured: G12 = E_xy / (2 (1 + nu)), G13 = G23 = E_z / (2 (1 + nu)) (flagged). Skin and core are mixed in parallel, which over-estimates E_z (series along the build direction is softer). The deck writes ' +
     '*ELASTIC, TYPE=ENGINEERING CONSTANTS and *ORIENTATION (layerAxis is the material direction 3). Strengths are reported unhomogenised. clear: true removes the idealization. ' +
     'Returns data { skinFraction, volume, effective { E_xy, E_z, nu, G_xy, G_z (MPa), densityRatio, coreFactor }, exponent, ratio E_z / E_xy, strengths, unverified, unverifiedReasons, warnings }.',
   params: z.object({
@@ -145,7 +145,8 @@ export const setPrintIdealization = defineCommand({
       exponent = { value: given.value, basis: 'given', source: cleanSource(given.source) };
     } else if (given.fitDirection !== undefined) {
       const direction = given.fitDirection;
-      const fitted = fitCoupons(analysisOf(doc), infill.pattern, direction);
+      const solid = direction === 'xy' ? E_xy : E_z;
+      const fitted = fitCoupons(analysisOf(doc), infill.pattern, direction, solid);
       if (typeof fitted === 'string') return fail('FLL_PRINT_FIT_POINTS', fitted, ['infillExponent.fitDirection']);
       if (!(fitted.fit.m > 0))
         return fail(
@@ -160,7 +161,6 @@ export const setPrintIdealization = defineCommand({
           citation: `fit_print_infill_exponent: least squares on ln E over coupons ${fitted.couponIds.join(', ')} (pattern ${infill.pattern}, direction ${direction}); rms ln residual ${fitted.fit.rmsLogResidual.toExponential(3)}`,
         },
       };
-      const solid = direction === 'xy' ? E_xy : E_z;
       const mismatch = Math.abs(fitted.fit.C / solid - 1);
       if (mismatch > SOLID_MISMATCH)
         warnings.push(

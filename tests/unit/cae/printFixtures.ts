@@ -51,10 +51,12 @@ export function recordCoupon(
   direction: 'xy' | 'z',
   modulusMpa: number,
   pattern = 'gyroid',
+  skinFraction = 0,
 ): CadDocument {
   return mustRun(doc, 'record_print_coupon', {
     id,
     pattern,
+    skinFraction,
     infillDensity: density,
     direction,
     modulus: { value: modulusMpa, unit: 'MPa' },

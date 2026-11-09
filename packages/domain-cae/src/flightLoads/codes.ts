@@ -50,6 +50,10 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FLL_PRINT_GEOMETRY: 'give a closed 3D solid part: the skin fraction is measured on its triangles',
   FLL_PRINT_STIFFNESS:
     'the coupon moduli are too far apart for the material Poisson ratio (the orthotropic stiffness is not positive definite): check the coupon values and units',
+  FLL_PRINT_ORIENTATION:
+    'a printed part owns its material axes: remove the thermo-mechanical orientation (set_material_orientation) of that part',
+  MESH_ASSET_LOD_ONLY:
+    'the host must hand the deck a full-resolution document (withFullResolution); a printed part cannot be built from its display mesh',
   FLL_PRINT_CONSTITUTIVE:
     'a printed part is linear orthotropic: use a material without plastic, hyperelastic or creep sets, or clear the print idealization',
   FLL_SUPPORT_POINTS: 'the three support points must be finite and at least 1e-6 of their spread apart',

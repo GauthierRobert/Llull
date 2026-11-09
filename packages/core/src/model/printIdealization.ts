@@ -21,6 +21,8 @@ export interface PrintCoupon {
   /** Infill volume fraction of the coupon, in (0, 1]; 1 = solid. */
   readonly infillDensity: number;
   readonly direction: 'xy' | 'z';
+  /** Skin fraction of the coupon in [0, 1): the volume share of its walls and top / bottom layers (the coupon modulus includes them). */
+  readonly skinFraction: number;
   readonly modulusMpa: number;
   readonly utsMpa?: number;
   readonly source: PrintSource;

@@ -490,7 +490,7 @@
 | `fatigue_life` | Quick fatigue life at ONE stress or strain amplitude (no FE, no document change). | read-only |
 | `fea_result_field` | Read one result field of a SOLVED analysis as numbers: von_mises, u_mag, u_x, u_y, u_z, s_xx, s_yy, s_zz (heat cases: temperature, heat_flux) for a load case (… | read-only |
 | `fit_at_temperature` | Clearance of a hole/shaft fit at operating temperatures. | read-only |
-| `fit_print_infill_exponent` | Fit the infill exponent m of E = C density^m (Gibson-Ashby form) to the coupons recorded with record_print_coupon for one infill pattern and one direction (xy … | read-only |
+| `fit_print_infill_exponent` | Fit the infill exponent m of E_core = C density^m (Gibson-Ashby form) to the coupons recorded with record_print_coupon for one infill pattern and one direction… | read-only |
 | `hand_check` | Closed-form (hand-calculation) reference values to sanity-check a finite-element or explicit-dynamics result; pure, reads no document. | read-only |
 | `hertz_contact` | Hertz contact hand check (frictionless, elastic, small contact) for a sphere or cylinder on a sphere / cylinder / plane; pure, reads no document. | read-only |
 | `interference_fit` | Interference (shrink / press) fit hand check with Lamé thick-cylinder theory: contact pressure from radial displacement compatibility, radial and hoop stresses… | read-only |

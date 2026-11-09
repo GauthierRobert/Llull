@@ -8,6 +8,7 @@ import { execute } from '@core/commands/registry';
 import type { PrintIdealization } from '@core/model/printIdealization';
 import { writeInp } from '@cae/decks/inpWriter';
 import { printAxes } from '@cae/flightLoads/print/deck';
+import { printedProperties } from '@cae/flightLoads/print/properties';
 import { fitPowerLaw, homogenise, isStable, skinEstimate } from '@cae/flightLoads/print/homogenize';
 import { printErrors } from '@cae/flightLoads/print/validate';
 import { buildDeckContext } from '@cae/decks/context';
@@ -24,6 +25,7 @@ const print = (overrides: Record<string, unknown> = {}): Record<string, unknown>
   ...BAR_PRINT,
   ...overrides,
 });
+const SOLID_XY = { value: 2000, unit: 'MPa' };
 const codeOf = (result: ReturnType<typeof execute>): string | undefined => result.error?.code;
 
 describe('fitPowerLaw (oracle: data sampled from E = C density^m)', () => {
@@ -144,6 +146,19 @@ describe('homogenise and skinEstimate', () => {
 });
 
 describe('printAxes (oracle: axis1 x axis2 = the build direction)', () => {
+  it('oblique build axis [1,1,1]/sqrt3: axis1 perpendicular to it, |axis2| = 1, axis1 x axis2 = the axis', () => {
+    const s = 1 / Math.sqrt(3);
+    const { axis1, axis2 } = printAxes([s, s, s]);
+    expect(axis1[0] * s + axis1[1] * s + axis1[2] * s).toBeCloseTo(0, 14);
+    expect(Math.hypot(...axis2)).toBeCloseTo(1, 14);
+    const third = [
+      axis1[1] * axis2[2] - axis1[2] * axis2[1],
+      axis1[2] * axis2[0] - axis1[0] * axis2[2],
+      axis1[0] * axis2[1] - axis1[1] * axis2[0],
+    ];
+    third.forEach((component) => expect(component).toBeCloseTo(s, 14));
+  });
+
   it('is orthonormal and 3 = layerAxis for z, x and an oblique axis', () => {
     for (const axis of [
       [0, 0, 1],
@@ -168,6 +183,7 @@ describe('printAxes (oracle: axis1 x axis2 = the build direction)', () => {
 describe('record_print_coupon', () => {
   const params = {
     id: 'c1',
+    skinFraction: 0.2,
     pattern: 'gyroid',
     infillDensity: 0.25,
     direction: 'xy',
@@ -201,6 +217,11 @@ describe('record_print_coupon', () => {
     const noSource = execute(doc, 'record_print_coupon', { ...params, id: 'c9', source: { citation: '  ' } });
     expect(codeOf(noSource)).toBe('FLL_PRINT_PARAM');
     expectNoOp(noSource, doc);
+    for (const skinFraction of [1, -0.1, undefined]) {
+      const bad = execute(doc, 'record_print_coupon', { ...params, id: 'c7', skinFraction });
+      expect(bad.rejected, String(skinFraction)).toBe(true);
+      expectNoOp(bad, doc);
+    }
     expect(codeOf(execute(doc, 'record_print_coupon', { ...params, id: '__proto__' }))).toBe('CMD_RESERVED_ID');
     expect(codeOf(execute(doc, 'record_print_coupon', { ...params, id: 'c8', modulus: { value: 3, unit: 'mm' } }))).toBe('FLL_PRINT_PARAM');
     expect(codeOf(execute(doc, 'record_print_coupon', { ...params, id: 'c8', modulus: { value: -3, unit: 'MPa' } }))).toBe(
@@ -223,7 +244,7 @@ describe('fit_print_infill_exponent', () => {
   };
 
   it('fits only the coupons of the pattern and direction and reports the fit and its residual', () => {
-    const result = execute(withCoupons(), 'fit_print_infill_exponent', { pattern: 'gyroid', direction: 'xy' });
+    const result = execute(withCoupons(), 'fit_print_infill_exponent', { pattern: 'gyroid', direction: 'xy', solidModulus: SOLID_XY });
     const data = result.data as {
       m: number;
       C: number;
@@ -237,6 +258,10 @@ describe('fit_print_infill_exponent', () => {
     expect(data.C).toBeCloseTo(2000, 8);
     expect(data.rmsLogResidual).toBeLessThan(1e-12);
     expect(data.residuals).toHaveLength(3);
+    expect(
+      execute(withCoupons(), 'fit_print_infill_exponent', { pattern: 'gyroid', direction: 'xy', solidModulus: { value: 2, unit: 'kg' } })
+        .error?.code,
+    ).toBe('FLL_PRINT_PARAM');
     expect(data.warning).toBeNull();
     expect(result.affected).toEqual([]);
   });
@@ -248,16 +273,48 @@ describe('fit_print_infill_exponent', () => {
       ['grid', 'xy'],
       ['honeycomb', 'xy'],
     ] as const) {
-      const result = execute(doc, 'fit_print_infill_exponent', { pattern, direction });
+      const result = execute(doc, 'fit_print_infill_exponent', { pattern, direction, solidModulus: SOLID_XY });
       expect(codeOf(result)).toBe('FLL_PRINT_FIT_POINTS');
       expectNoOp(result, doc);
     }
   });
 
+  it('removes the skin of each coupon: coupons built as f E_s + (1 - f) E_s density^m give m exactly (no double count)', () => {
+    let doc = bar.doc;
+    const [f, Es, m] = [0.3, 2000, 1.7];
+    for (const [i, density] of [0.15, 0.3, 0.55, 0.8].entries())
+      doc = recordCoupon(doc, `s${i}`, density, 'xy', f * Es + (1 - f) * Es * density ** m, 'gyroid', f);
+    const data = execute(doc, 'fit_print_infill_exponent', { pattern: 'gyroid', direction: 'xy', solidModulus: SOLID_XY }).data as {
+      m: number;
+      C: number;
+      rmsLogResidual: number;
+    };
+    expect(data.m).toBeCloseTo(1.7, 12);
+    expect(data.C).toBeCloseTo(2000, 8);
+    expect(data.rmsLogResidual).toBeLessThan(1e-12);
+    // without the skin removal the same moduli would fit a smaller exponent
+    const naive = fitPowerLaw([0.15, 0.3, 0.55, 0.8].map((density) => ({ density, modulus: f * Es + (1 - f) * Es * density ** m })));
+    expect(typeof naive === 'string' ? 0 : naive.m).toBeLessThan(1.5);
+    // set_print_idealization with the same coupons: exponent 1.7 and no solid-mismatch warning
+    const set = execute(doc, 'set_print_idealization', print({ infillExponent: { fitDirection: 'xy' } }));
+    expect(set.document.analysis?.cases[bar.analysisId]?.printed?.[bar.boxId]?.exponent.value).toBeCloseTo(1.7, 12);
+    expect((set.data as { warnings: string[] }).warnings).toEqual([]);
+  });
+
+  it('refuses a coupon whose modulus is not above its skin share of the solid modulus', () => {
+    let doc = recordCoupon(bar.doc, 'a', 0.2, 'xy', 100, 'gyroid', 0.5);
+    doc = recordCoupon(doc, 'b', 0.6, 'xy', 1500, 'gyroid', 0.5);
+    const result = execute(doc, 'fit_print_infill_exponent', { pattern: 'gyroid', direction: 'xy', solidModulus: SOLID_XY });
+    expect(codeOf(result)).toBe('FLL_PRINT_FIT_POINTS');
+    expect(result.summary).toContain('coupon(s) a ');
+  });
+
   it('warns that two coupons fit exactly', () => {
     let doc = recordCoupon(bar.doc, 'a', 0.2, 'xy', 300);
     doc = recordCoupon(doc, 'b', 0.6, 'xy', 1200);
-    const data = execute(doc, 'fit_print_infill_exponent', { pattern: 'gyroid', direction: 'xy' }).data as { warning: string };
+    const data = execute(doc, 'fit_print_infill_exponent', { pattern: 'gyroid', direction: 'xy', solidModulus: SOLID_XY }).data as {
+      warning: string;
+    };
     expect(data.warning).toMatch(/two coupons/);
   });
 });
@@ -463,6 +520,66 @@ describe('the deck of a printed part', () => {
     doc = defineSet(doc, 'steel', { id: 'nl', elastic: 'elasticv', plastic: 'j2' }, true);
     const deck = writeInp(doc, fixture.analysisId, { ...mesh, inputHash: analysisInputHash(doc, fixture.analysisId, 'mesh') });
     expect('code' in deck && deck.code).toBe('FLL_PRINT_CONSTITUTIVE');
+  });
+});
+
+describe('deck refusals of a printed part', () => {
+  const fixture = printedBar();
+  const sets = (c: Record<string, string>): Record<string, number[]> => ({
+    [`C_${c['x0']}`]: X0_NODES,
+    [`C_${c['nodeA']}`]: [1],
+    [`C_${c['nodeB']}`]: [3],
+  });
+  const deckOf = (doc: typeof fixture.printed): ReturnType<typeof writeInp> =>
+    writeInp(doc, fixture.analysisId, barMesh(doc, fixture.analysisId, fixture.boxId, sets(fixture.constraints)));
+
+  it('refuses at write time, naming the part, when the material is gone after set_print_idealization', () => {
+    const entity = fixture.printed.entities[fixture.boxId];
+    if (entity === undefined) throw new Error('no box');
+    const { materialId, ...bare } = entity;
+    void materialId;
+    const deck = deckOf({ ...fixture.printed, entities: { ...fixture.printed.entities, [fixture.boxId]: bare as typeof entity } });
+    expect('code' in deck && deck.code).toBe('FEA_MATERIAL_MISSING');
+    expect('ids' in deck && deck.ids).toEqual([fixture.boxId]);
+  });
+
+  it('refuses an asset-backed part held only as its display mesh (MESH_ASSET_LOD_ONLY), at write time and from printedProperties', () => {
+    const entity = fixture.printed.entities[fixture.boxId];
+    if (entity === undefined) throw new Error('no box');
+    const lod = {
+      ...entity,
+      kind: 'mesh',
+      mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] },
+      asset: { triangles: 1000 },
+    } as unknown as typeof entity;
+    const doc = { ...fixture.printed, entities: { ...fixture.printed.entities, [fixture.boxId]: lod } };
+    const deck = deckOf(doc);
+    expect('code' in deck && deck.code).toBe('MESH_ASSET_LOD_ONLY');
+    const stored = doc.analysis?.cases[fixture.analysisId]?.printed?.[fixture.boxId];
+    if (stored === undefined) throw new Error('no print');
+    expect(printedProperties(doc, fixture.boxId, stored)).toMatchObject({ code: 'MESH_ASSET_LOD_ONLY' });
+  });
+
+  it('refuses a part that has both a print and a thermo-mechanical material orientation (FLL_PRINT_ORIENTATION)', () => {
+    const steel = fixture.printed.materials['steel'];
+    const analysisCase = fixture.printed.analysis?.cases[fixture.analysisId];
+    if (steel === undefined || analysisCase === undefined) throw new Error('fixture');
+    const orientations = { [fixture.boxId]: { axis1: [1, 0, 0], axis2: [0, 1, 0] } };
+    const doc = {
+      ...fixture.printed,
+      materials: {
+        ...fixture.printed.materials,
+        steel: { ...steel, propertyModels: [...(steel.propertyModels ?? []), { property: 'cte', direction: '1' } as never] },
+      },
+      analysis: {
+        ...fixture.printed.analysis,
+        caseOrder: fixture.printed.analysis?.caseOrder ?? [],
+        cases: { ...fixture.printed.analysis?.cases, [fixture.analysisId]: { ...analysisCase, thermomech: { orientations } as never } },
+      },
+    };
+    const deck = deckOf(doc);
+    expect('code' in deck && deck.code).toBe('FLL_PRINT_ORIENTATION');
+    expect('ids' in deck && deck.ids).toEqual([fixture.boxId]);
   });
 });
 

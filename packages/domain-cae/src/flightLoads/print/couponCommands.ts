@@ -51,13 +51,25 @@ export interface CouponFit {
   readonly couponIds: readonly string[];
 }
 
+/** Modulus of the infill core of a coupon: its measured modulus is skin + core in parallel, E = f E_solid + (1 - f) E_core. */
+const coreModulus = (coupon: PrintCoupon, solidMpa: number): number =>
+  (coupon.modulusMpa - coupon.skinFraction * solidMpa) / (1 - coupon.skinFraction);
+
 /**
- * Least-squares fit of E = C density^m through the recorded coupons of one pattern and direction.
- * @failure fewer than 2 coupons or 2 distinct densities -> a reason string
+ * Least-squares fit of E_core = C density^m through the recorded coupons of one pattern and direction, E_core the core modulus after the skin of each coupon is removed.
+ * @failure fewer than 2 coupons or 2 distinct densities, or a coupon whose modulus is not above its skin share -> a reason string
  */
-export function fitCoupons(analysis: ReturnType<typeof analysisOf>, pattern: PrintPattern, direction: 'xy' | 'z'): CouponFit | string {
+export function fitCoupons(
+  analysis: ReturnType<typeof analysisOf>,
+  pattern: PrintPattern,
+  direction: 'xy' | 'z',
+  solidMpa: number,
+): CouponFit | string {
   const coupons = couponsOf(analysis, pattern, direction);
-  const fit = fitPowerLaw(coupons.map((coupon) => ({ density: coupon.infillDensity, modulus: coupon.modulusMpa })));
+  const weak = coupons.filter((coupon) => !(coreModulus(coupon, solidMpa) > 0));
+  if (weak.length > 0)
+    return `coupon(s) ${weak.map((coupon) => coupon.id).join(', ')} have a modulus not above their skin share of the solid modulus ${solidMpa} MPa: the core modulus would be <= 0`;
+  const fit = fitPowerLaw(coupons.map((coupon) => ({ density: coupon.infillDensity, modulus: coreModulus(coupon, solidMpa) })));
   return typeof fit === 'string'
     ? `${fit} (pattern ${pattern}, direction ${direction}: ${coupons.length} recorded)`
     : { fit, couponIds: coupons.map((coupon) => coupon.id) };
@@ -78,6 +90,13 @@ export const recordPrintCoupon = defineCommand({
   params: z.object({
     id: z.string().min(1).describe('Coupon id, unique in the document, e.g. "gyroid-25-xy-1".'),
     pattern: z.enum(PRINT_PATTERNS).describe('Infill pattern of the coupon: gyroid, grid, lightning or honeycomb.'),
+    skinFraction: z
+      .number()
+      .min(0)
+      .lt(1)
+      .describe(
+        'Volume share of the coupon walls and top / bottom layers in [0, 1) (0 = a pure-infill coupon), from its geometry and print settings (walls x lineWidth, layers x layerHeight over the coupon section). The measured modulus includes this skin; the fit removes it. Required: state how it was computed in source.note.',
+      ),
     infillDensity: z.number().gt(0).max(1).describe('Infill volume fraction of the coupon in (0, 1]; 1 = solid.'),
     direction: z
       .enum(['xy', 'z'])
@@ -104,6 +123,7 @@ export const recordPrintCoupon = defineCommand({
       pattern: params.pattern,
       infillDensity: params.infillDensity,
       direction: params.direction,
+      skinFraction: params.skinFraction,
       modulusMpa: modulus,
       ...(uts === undefined ? {} : { utsMpa: uts }),
       source: cleanSource(params.source),
@@ -132,16 +152,21 @@ export const fitPrintInfillExponent = defineCommand({
   name: 'fit_print_infill_exponent',
   annotations: { readOnly: true },
   description:
-    'Fit the infill exponent m of E = C density^m (Gibson-Ashby form) to the coupons recorded with record_print_coupon for one infill pattern and one direction (xy or z), by least squares on ' +
-    'ln E against ln density. Needs at least 2 coupons at distinct densities (refused otherwise). Returns data { pattern, direction, couponIds, m, C (modulus extrapolated to density 1, MPa), ' +
-    'points, rmsLogResidual, maxRelativeResidual, rSquared, residuals[] { couponId, density, modulusMpa, fittedMpa }, warning }. Two points determine the fit exactly (residual 0): ' +
+    'Fit the infill exponent m of E_core = C density^m (Gibson-Ashby form) to the coupons recorded with record_print_coupon for one infill pattern and one direction (xy or z), by least squares on ' +
+    'ln E_core against ln density, where E_core = (E - f E_solid) / (1 - f) removes the skin share f of each coupon (it needs solidModulus, the 100 % infill coupon modulus of that direction). Needs at least 2 coupons at distinct densities (refused otherwise). Returns data { pattern, direction, couponIds, m, C (modulus extrapolated to density 1, MPa), ' +
+    'points, rmsLogResidual, maxRelativeResidual, rSquared, residuals[] { couponId, density, modulusMpa, coreModulusMpa, fittedCoreMpa }, warning }. Two points determine the fit exactly (residual 0): ' +
     'a residual says nothing then, record more densities. Pass the result to set_print_idealization with infillExponent { fitDirection } (it refits from the same coupons) or give m with its source. Read-only.',
   params: z.object({
     pattern: z.enum(PRINT_PATTERNS).describe('Infill pattern whose coupons are fitted.'),
     direction: z.enum(['xy', 'z']).describe('Coupon direction to fit: xy (in the build plane) or z (along the build direction).'),
+    solidModulus: quantitySchema.describe(
+      'Modulus of the solid (100 % infill) coupon of that direction, e.g. { value: 2000, unit: "MPa" }: the skin of each coupon is taken at this modulus.',
+    ),
   }),
-  run: (doc, { pattern, direction }): CommandResult => {
-    const fitted = fitCoupons(analysisOf(doc), pattern, direction);
+  run: (doc, { pattern, direction, solidModulus }): CommandResult => {
+    const solid = toMpa(solidModulus, 'solidModulus');
+    if (typeof solid === 'string') return refuseFll(doc, 'fit_print_infill_exponent', 'FLL_PRINT_PARAM', solid, [], ['solidModulus']);
+    const fitted = fitCoupons(analysisOf(doc), pattern, direction, solid);
     if (typeof fitted === 'string') return refuseFll(doc, 'fit_print_infill_exponent', 'FLL_PRINT_FIT_POINTS', fitted, [], ['pattern']);
     const { fit, couponIds } = fitted;
     const coupons = couponsOf(analysisOf(doc), pattern, direction);
@@ -163,7 +188,8 @@ export const fitPrintInfillExponent = defineCommand({
           couponId: coupon.id,
           density: coupon.infillDensity,
           modulusMpa: coupon.modulusMpa,
-          fittedMpa: fit.C * coupon.infillDensity ** fit.m,
+          coreModulusMpa: coreModulus(coupon, solid),
+          fittedCoreMpa: fit.C * coupon.infillDensity ** fit.m,
         })),
         warning: exactFromTwo ? 'two coupons fix m and C exactly: the zero residual is not evidence of the power law' : null,
       },

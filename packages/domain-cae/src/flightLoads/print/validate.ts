@@ -27,6 +27,9 @@ function couponErrors(id: string, coupon: unknown): string[] {
     ...(PRINT_PATTERNS.includes(coupon['pattern'] as never) ? [] : [`${where}.pattern must be one of ${PRINT_PATTERNS.join(', ')}`]),
     ...(density(coupon['infillDensity']) ? [] : [`${where}.infillDensity must be a number in (0, 1]`]),
     ...(coupon['direction'] === 'xy' || coupon['direction'] === 'z' ? [] : [`${where}.direction must be xy or z`]),
+    ...(typeof coupon['skinFraction'] === 'number' && coupon['skinFraction'] >= 0 && coupon['skinFraction'] < 1
+      ? []
+      : [`${where}.skinFraction must be a number in [0, 1)`]),
     ...(positive(coupon['modulusMpa']) ? [] : [`${where}.modulusMpa must be a number > 0`]),
     ...(coupon['utsMpa'] === undefined || positive(coupon['utsMpa']) ? [] : [`${where}.utsMpa must be a number > 0`]),
     ...sourceErrors(coupon['source'], where),
