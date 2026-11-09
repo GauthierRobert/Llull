@@ -6,6 +6,7 @@ import { feaCommands } from './commands/catalog';
 import { dynamicsCommands } from './dynamics/catalog';
 import { dynamicsErrors } from './dynamics/validate';
 import { fatigueCommands } from './fatigue/catalog';
+import { flightLoadCommands } from './flightLoads/catalog';
 import { fractureCommands } from './fracture/catalog';
 import { analysisReferenceGuard, durabilityReferenceGuard } from './guard';
 import { marginCommands } from './margins/catalog';
@@ -51,6 +52,7 @@ export const caePlugin: CadPlugin = {
     ...contactCommands,
     ...creepCommands,
     ...fatigueCommands,
+    ...flightLoadCommands,
     ...fractureCommands,
     ...reliabilityCommands,
     ...dynamicsCommands,
