@@ -4,7 +4,6 @@ import { commandCatalog } from '@core/commands/schema';
 import { boltedJointCheck } from './boltedJointCommand';
 import { hertzContact } from './hertzCommand';
 import { jointFromFastenerStack } from './jointFromStack';
-import { jointMargins } from './jointMargins';
 import { jointStiffnessFromFe } from './jointStiffnessCommand';
 import { pinBearingReport, pinInHole } from './pinInHole';
 import { interferenceFit } from './interferenceCommand';
@@ -23,7 +22,6 @@ export const contactCommands = commandCatalog(
   deleteBoltPretension,
   jointFromFastenerStack,
   jointStiffnessFromFe,
-  jointMargins,
   pinInHole,
   pinBearingReport,
   contactReport,

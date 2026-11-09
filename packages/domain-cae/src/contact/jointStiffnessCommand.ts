@@ -94,6 +94,11 @@ export const jointStiffnessFromFe = defineCommand({
     const factor = params.loadingPlaneFactor;
     const phi = factor !== undefined && factor > 0 && factor <= 1 ? fit.slope / factor : null;
     const warnings = [
+      ...(series.monotonic
+        ? []
+        : [
+            'the applied load falls between two increments (unloading or reversal): the line is fitted over a load path that is not one monotonic response',
+          ]),
       ...(fit.slope < -0.05 || fit.slope > 1.05
         ? [`nPhi ${n(fit.slope)} is outside [0, 1]: check that the probe is the external force through the joint and its direction`]
         : []),

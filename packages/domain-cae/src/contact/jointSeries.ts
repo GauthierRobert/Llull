@@ -27,6 +27,8 @@ export interface JointSeries {
   /** Increments of the step (and the last one of the previous step) that have both a bolt force and a probe load, in time order. */
   readonly points: readonly Point[];
   readonly startsFromPreviousStep: boolean;
+  /** False when the applied load falls between two consecutive increments (an unloading or a reversal): a slope or an interpolation over it is not one joint response. */
+  readonly monotonic: boolean;
   /** Time of the first increment in which the clamp zone of the bolt is fully open; null when it never separates. */
   readonly separatedAt: number | null;
   readonly droppedIncrements: number;
@@ -121,6 +123,10 @@ export function jointSeriesOf(
     sign,
     points: withLoad,
     startsFromPreviousStep: start !== undefined,
+    monotonic: withLoad.every((point, index) => {
+      const before = withLoad[index - 1];
+      return before === undefined || point.load >= before.load;
+    }),
     separatedAt,
     droppedIncrements: candidates.length - withLoad.length,
   };
