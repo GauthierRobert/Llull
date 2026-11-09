@@ -100,6 +100,10 @@ export interface PropertyCondition {
   readonly edOverD?: number;
   /** Exposure time at temperature, hours (08 MAT temperature tables). */
   readonly exposureHours?: number;
+  /** Which emissivity an `emissivityIr` model is (PHY-15). */
+  readonly opticalKind?: 'hemispherical_total' | 'normal_total';
+  /** Beginning or end of life of an `absorptivitySolar` model (PHY-15). */
+  readonly lifeState?: 'BOL' | 'EOL';
 }
 
 export interface PropertyUncertainty {

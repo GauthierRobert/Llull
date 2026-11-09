@@ -51,6 +51,8 @@ const conditionSchema = z.strictObject({
   rrr: z.number().optional(),
   environment: z.string().optional(),
   note: z.string().optional(),
+  opticalKind: z.enum(['hemispherical_total', 'normal_total']).optional(),
+  lifeState: z.enum(['BOL', 'EOL']).optional(),
 });
 
 const firstIssuePath = (error: z.ZodError, prefix: string): string => {
@@ -101,7 +103,7 @@ export const definePropertyModel = defineCommand({
         doc,
         name,
         'PROP_FORM_INVALID',
-        'condition fields are temper, productForm, environment, note (text) and rrr (number)',
+        'condition fields are temper, productForm, environment, note (text), rrr (number), opticalKind (hemispherical_total | normal_total) and lifeState (BOL | EOL)',
         [input.id],
         firstIssuePath(condition.error, 'model.condition'),
       );

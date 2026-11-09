@@ -128,7 +128,7 @@ export const modelInputSchema = z.object({
     .record(z.string(), z.union([z.string(), z.number()]))
     .optional()
     .describe(
-      'Condition of the data, any of: temper (e.g. T6), productForm, rrr (residual resistivity ratio, a number), environment, note.',
+      'Condition of the data, any of: temper (e.g. T6), productForm, rrr (residual resistivity ratio, a number), environment, note, opticalKind (hemispherical_total | normal_total), lifeState (BOL | EOL).',
     ),
   uncertainty: z
     .object({

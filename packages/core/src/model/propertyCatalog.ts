@@ -54,6 +54,12 @@ const PROPERTY_CATALOG: readonly PropertyCatalogEntry[] = [
     positive: false,
     ownerPack: 'PHY-09',
   }),
+  row('electricalResistivity', 'ohm*m', 'electrical resistivity rho; R = rho L / A (bond-path straps)', { ownerPack: 'PHY-15' }),
+  row('emissivityIr', '1', 'thermal infrared emissivity in [0, 1]; condition opticalKind hemispherical_total | normal_total', {
+    positive: false,
+    ownerPack: 'PHY-15',
+  }),
+  row('absorptivitySolar', '1', 'solar absorptivity in [0, 1]; condition lifeState BOL | EOL', { positive: false, ownerPack: 'PHY-15' }),
 ];
 
 export function catalogEntry(name: string): PropertyCatalogEntry | undefined {
