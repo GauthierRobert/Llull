@@ -33,6 +33,7 @@ import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import { flatDocument } from '../unit/vibroacoustics/fixtures';
 import { corrosionDocument } from '../unit/corrosion/seed';
+import { electroOpticalDocument } from '../unit/electroOptical/seed';
 import { quadDrone, rotorParams } from '../unit/flight/flightFixture';
 import { SOURCE_TEXT, imperfectBar } from '../unit/cae/nonlinear/imperfectionFixtures';
 import {
@@ -342,6 +343,12 @@ function withLedgers(doc: CadDocument): CadDocument {
 }
 
 export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
+  'physics-electro-optical': {
+    roots: ['electroOptical'],
+    build: electroOpticalDocument,
+    query: { name: 'check_bonding', params: constant({}) },
+    mutate: { name: 'delete_bond_path', params: (doc) => ({ pathId: first(doc.electroOptical?.bondPaths) }) },
+  },
   'physics-corrosion': {
     roots: ['corrosion'],
     build: corrosionDocument,

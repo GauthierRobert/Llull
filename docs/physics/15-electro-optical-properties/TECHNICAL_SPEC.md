@@ -244,3 +244,38 @@ resolution cached per recipe key).
 - [R1]–[R12]: [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
 - llull: `packages/core/src/model/types.ts`, `.dependency-cruiser.cjs`, `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`,
   `docs/physics/03-thermal-analysis/TECHNICAL_SPEC.md`, `docs/physics/README.md`.
+
+## 13. As built (EOP-M2 subset, 2026-11-09)
+
+Plugin `physics-electro-optical` (toolset `analysis`) lives in `packages/domain-cae/src/electroOptical/` (not a new `domain-physics` package: the CAE
+package already owns the analysis toolset). Slice `CadDocument.electroOptical { coatings, bondPaths, dispositions }`, validated on load
+(`model.ts`, slice-fuzz seed `tests/unit/electroOptical/seed.ts`), replay keeps the dispositions (`replaySeed`), a derivation guard refuses deleting a solid or
+material a coating assignment or path still names.
+
+**Built**: `assign_surface_coating`, `remove_surface_coating`, `define_bond_path`, `delete_bond_path`, `check_bonding`, `optical_balance`, `dispose_bond_check`
+(human gate, same pattern as `accept_corrosion_item`: signature bound to act, path, decision, justification, `inputsHash` and document uid; re-verified on every
+`check_bonding`; a changed path goes `stale`, no port / foreign document goes `unconfirmed`). Validation plans (`validation/plans/`) were rewritten to these
+shapes and are executed by `tests/unit/electroOptical/`.
+
+**Decisions**
+- Coating = document material with `record.productForm: 'coating'` and PHY-01 models (open question 2: yes). Core additions: catalogue rows
+  `electricalResistivity` (ohm*m), `emissivityIr`, `absorptivitySolar` (ownerPack PHY-15) and `PropertyCondition.opticalKind` / `lifeState` accepted by
+  `define_property_model` (open question 1: conditions only; the `wavelength` / `frequency` variables and `relativePermeability`, `refractiveIndex` rows are not added yet).
+- The slice stores only the PLACEMENT of a coating (`location: exposed | bonded_interface`) and its DECLARED electrical effect (`conductive | insulating | unknown`,
+  conductive / insulating need a source). Optical and electrical VALUES stay on the material, not in a parallel coating store. The PHY-13 `corrosion.surfaceSystems` record is
+  read (never written, no import of its code): a joint solid that has a surface system but no declared bonded-interface coating makes the path `unknown` (`EOP_COATING_UNKNOWN`).
+- Coatings and endpoints are assigned per SOLID (no `facesNear`, no kernel face resolution): `location` tells which surface the coating is on.
+- Bond element `joint` takes optional `interfaces: [a, b]`: `check_bonding` composes `find_contacts` (one call) and reports `EOP_JOINT_NO_CONTACT` (status `unknown`) for solids
+  that do not touch. Path endpoints are entity ids (`from`, `to`), not `{ entityId, pointNear }`.
+- Status is `pass | fail | unknown`. `fail`: total above the limit (`EOP_BOND_RESISTANCE_EXCEEDED`) or an insulating bonded-interface coating (`EOP_COATING_INSULATES`).
+  `unknown` (never pass): no limit (`EOP_BOND_LIMIT_MISSING`, spec said "no status"), unresolved strap resistivity (`EOP_RESISTIVITY_UNAVAILABLE`, from `evaluate_property` at the
+  path temperature), undeclared coating, joined solids not in contact, a solid deleted from a loaded file (`EOP_ENTITY_MISSING`).
+- Limits are stored `unverified: true` always (no command verifies one); the 2.5 mohm figure is NOT bundled: the validation plans carry it as a test input. MIL-STD-464C /
+  ARP1870 values are not redistributable as data here (sources.md grade B only).
+- `optical_balance` adds `incidenceAngle` (flux * cos theta), `state` BOL (default, reported) | EOL, a fixed-point solution when `emissivityIr` has a `T` variable, and
+  caller-given `alpha` / `eps` (reported unverified). Range checks (alpha in [0, 1], eps in (0, 1]) run at use (`EOP_PROPERTY_RANGE`), not yet at `define_property_model` (TR-EOP-02).
+- sigma comes from the exact SI constants (`physics.ts`), equal to the generator to 1e-12 relative.
+
+**Left**: `electrical_resistance`, `shield_absorption`, `normal_reflectance`, `check_surface_properties` (M1 queries), TR-EOP-02 range validation hook on `define_property_model`,
+CFRP detection (`EOP_CFRP_IN_PATH`) and anisotropic `direction`, `set_lightning_zone`, part-geometry paths (V1), fastener-stack contacts as joint evidence
+(`list_fastener_stacks`), PHY-03 link `emissivity: 'material'` (TR-EOP-32), UI overlay and the `llull guide` section.
