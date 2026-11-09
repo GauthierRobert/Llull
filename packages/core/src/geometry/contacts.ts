@@ -10,7 +10,7 @@ import type { Bounds } from './bounds';
 import { packBoxes } from './instanceBvh';
 import { type SpatialIndexPort, resolveSpatialIndex } from './spatialIndex';
 
-export type ContactKind = 'interference' | 'face' | 'edge' | 'vertex' | 'possible';
+type ContactKind = 'interference' | 'face' | 'edge' | 'vertex' | 'possible';
 
 export interface ContactPair {
   /** Entity ids, `a < b`; instance children are `<instanceId>/<childId>`. */
@@ -55,7 +55,7 @@ const unitAxis = (axis: number, sign: 1 | -1): Vec3 => [axis === 0 ? sign : 0, a
  * @invariant overlap o_k = min(max) - max(min) per axis; all o_k > tol: interference (V = product); else gap = max(0, -min o_k) <= tol, axes with
  *   o_k <= tol touch: one = face (area = product of the other two overlaps), two = edge, three = vertex
  */
-export function contactOf(first: ContactBody, second: ContactBody, tolerance: number): ContactPair | null {
+function contactOf(first: ContactBody, second: ContactBody, tolerance: number): ContactPair | null {
   const [a, b] = first.id <= second.id ? [first, second] : [second, first];
   const o = overlaps(a.bounds, b.bounds);
   const gap = Math.max(0, -Math.min(o[0], o[1], o[2]));

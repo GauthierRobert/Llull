@@ -3,7 +3,7 @@
 import { isRecord } from '@lib/isRecord';
 import type { CompatibilityItem } from './items';
 
-export const REPORT_COLUMNS = [
+const REPORT_COLUMNS = [
   'key',
   'status',
   'code',

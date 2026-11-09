@@ -38,7 +38,7 @@ const VOLT_GUARD = 1e-12;
 const round12 = (value: number): number => Math.round(value * 1e12) / 1e12;
 
 /** The stable fingerprint of a finding. */
-export const fingerprintOf = (key: string, status: string, code: string, inputs: Readonly<Record<string, unknown>>): string =>
+const fingerprintOf = (key: string, status: string, code: string, inputs: Readonly<Record<string, unknown>>): string =>
   sha256Hex(jcsJson({ key, status, code, inputs }));
 
 interface Verdict {

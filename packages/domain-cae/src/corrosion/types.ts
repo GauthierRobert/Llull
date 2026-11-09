@@ -7,7 +7,7 @@
 export type CorrosionScheme = 'anodic_index' | 'mil_std_889d';
 export type CorrosionEnvironment = 'harsh' | 'normal' | 'controlled' | 'artificial_seawater';
 
-export interface CorrosionSource {
+interface CorrosionSource {
   readonly citation: string;
   readonly locator?: string;
 }
@@ -22,7 +22,7 @@ export interface MaterialGalvanic {
 }
 
 export const SURFACE_CLASSES = ['none', 'anodize', 'conversion_coating', 'metallic_plating', 'acid_process', 'primer', 'paint'] as const;
-export type SurfaceSystemClass = (typeof SURFACE_CLASSES)[number];
+type SurfaceSystemClass = (typeof SURFACE_CLASSES)[number];
 
 export interface SurfaceLayer {
   readonly class: SurfaceSystemClass;
@@ -46,7 +46,7 @@ export const ISOLATION_METHODS = [
   'glass_isolation_ply',
   'isolating_washer_or_tape',
 ] as const;
-export type IsolationMethod = (typeof ISOLATION_METHODS)[number];
+type IsolationMethod = (typeof ISOLATION_METHODS)[number];
 
 export interface Isolation {
   readonly id: string;

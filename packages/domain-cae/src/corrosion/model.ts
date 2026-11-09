@@ -26,7 +26,6 @@ export const withCorrosion = (doc: CadDocument, patch: Partial<CorrosionModel>):
 export const materialGalvanicOf = (doc: CadDocument, material: string): MaterialGalvanic | undefined =>
   own(corrosionOf(doc).materials, material);
 export const isolationOf = (doc: CadDocument, id: string): Isolation | undefined => own(corrosionOf(doc).isolations, id);
-export const surfaceSystemOf = (doc: CadDocument, id: string): SurfaceSystem | undefined => own(corrosionOf(doc).surfaceSystems, id);
 
 /** The surface system that covers `entityId`, or undefined (one system per entity). */
 export const surfaceSystemOfEntity = (doc: CadDocument, entityId: string): SurfaceSystem | undefined =>
