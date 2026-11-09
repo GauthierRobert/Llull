@@ -190,6 +190,24 @@ describe.skipIf(feaToolsMissing())('bolt pretension (netgen + ccx)', () => {
     expect(Math.abs(Math.abs(free?.peaks['bottom_reaction'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
   });
 
+  it('joint_stiffness_from_fe on the locked bar: the whole load passes through the one bolt, n phi = 1 (2 %) and the joint does not separate (real increments, real probe table)', async () => {
+    const analysis = lockedCase?.document().analysis?.cases[lockedCase.analysisId];
+    const [first, second] = analysis?.nonlinear?.stepOrder ?? [];
+    expect(first).toBeDefined();
+    const boltId = String(locked?.bolts[0]?.['pretensionId'] ?? '');
+    const result = await lockedCase?.cli(
+      'joint_stiffness_from_fe',
+      `analysisId=${lockedCase.analysisId}`,
+      `pretension=${boltId}`,
+      'loadProbe=bottom_reaction',
+      `stepId=${second}`,
+    );
+    expect(result?.code, String(result?.json['summary'])).toBe(0);
+    const data = dataOf(result?.json ?? {});
+    expect(Math.abs((data['nPhi'] as number) - 1)).toBeLessThan(0.02);
+    expect(data['separatedAt']).toBeNull();
+  });
+
   it('two bolts in series on one part: each section force equals its own preload (0.5 %), the end reactions the preload', () => {
     expect(twin?.bolts).toHaveLength(2);
     for (const bolt of twin?.bolts ?? []) expect(Math.abs((bolt['axialForce'] ?? 0) / PRELOAD_N - 1)).toBeLessThan(0.005);
