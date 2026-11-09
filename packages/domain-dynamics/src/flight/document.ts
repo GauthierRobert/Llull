@@ -4,6 +4,7 @@ import { z } from '@core/commands/schema';
 import type { DocumentExtension } from '@core/plugins/plugin';
 import { sliceSchemaErrors } from '@core/plugins/sliceSchema';
 import { isRecord } from '@lib/isRecord';
+import { batterySchema, powerErrors, powertrainSchema } from './powerDocument';
 
 const RESERVED_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -88,6 +89,8 @@ const flightSchema = z.strictObject({
   bodyDrag: z.record(z.string(), bodyDrag),
   controllers: z.record(z.string(), controller).optional(),
   scenarios: z.record(z.string(), scenario).optional(),
+  batteries: z.record(z.string(), batterySchema).optional(),
+  powertrains: z.record(z.string(), powertrainSchema).optional(),
 });
 
 /** Controller and scenario checks the schema cannot express (keys, rotors on the body, set-point order, the controller's body). */
@@ -195,7 +198,7 @@ function referenceErrors(
     if (entry.cdaM2.every((value) => value === 0)) errors.push(`${at}.cdaM2 must have a component > 0`);
     body(at, entry.bodyId);
   }
-  return [...errors, ...controlErrors(slice, dynamicsIds, body)];
+  return [...errors, ...controlErrors(slice, dynamicsIds, body), ...powerErrors(slice, dynamicsIds)];
 }
 
 /** `DocumentExtension` for `CadDocument.flight`: input data only (nothing is derived). */
@@ -204,7 +207,7 @@ export const flightDocument: DocumentExtension = {
     const slice = raw['flight'];
     if (slice === undefined) return [];
     // zod rebuilds records by assignment, so an own "__proto__" key would vanish from the parsed copy: read the keys on the raw value
-    const reserved = (['rotors', 'bodyDrag', 'controllers', 'scenarios'] as const).flatMap((table) => {
+    const reserved = (['rotors', 'bodyDrag', 'controllers', 'scenarios', 'batteries', 'powertrains'] as const).flatMap((table) => {
       const records = isRecord(slice) ? slice[table] : undefined;
       return isRecord(records)
         ? Object.keys(records)

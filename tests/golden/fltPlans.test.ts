@@ -69,4 +69,29 @@ describe('13 FLT validation plans, golden', () => {
     expect(report.timestepCheck.gci.gci21Fine).toBeLessThan(0.01);
     expect(six(report)).toMatchSnapshot('flight_report');
   }, 120_000);
+
+  it('sc-flt-03-endurance: the 4S2P pack hover chain (VC-FLT-11): analytic endurance, the flown current and a replay-identical run', () => {
+    const plan = run('sc-flt-03-endurance');
+    expect(normalize(plan.document)).toMatchSnapshot('document');
+    const estimate = dataOf(plan.steps, 'estimate_endurance') as {
+      bus: { currentA: number };
+      hover: { figureOfMerit: number };
+      endurance: { timeS: number; limitedBy: string };
+      capacityOverCurrentS: number;
+    };
+    // momentum theory on the static coefficients: FM = Ct^1.5 / (Cp sqrt(pi / 2))
+    expect(estimate.hover.figureOfMerit).toBeCloseTo(0.1158 ** 1.5 / (0.0466 * Math.sqrt(Math.PI / 2)), 9);
+    expect(estimate.endurance.limitedBy).toBe('cutoff_voltage');
+    expect(estimate.endurance.timeS).toBeLessThan(estimate.capacityOverCurrentS);
+    expect(estimate.endurance.timeS).toBeGreaterThan(0.6 * estimate.capacityOverCurrentS);
+    const flown = dataOf(plan.steps, 'run_flight') as { battery: { pt: { meanCurrentA: number; cutoffAtS: number | null } } };
+    expect(Math.abs(flown.battery.pt.meanCurrentA - estimate.bus.currentA) / estimate.bus.currentA).toBeLessThan(0.03);
+    expect(flown.battery.pt.cutoffAtS).toBeNull();
+    expect(six(estimate)).toMatchSnapshot('estimate_endurance');
+    expect(six(flown)).toMatchSnapshot('run_flight');
+    expect(six(dataOf(plan.steps, 'flight_report'))).toMatchSnapshot('flight_report');
+    const again = run('sc-flt-03-endurance');
+    expect(again.document).toEqual(plan.document);
+    expect(JSON.stringify(dataOf(again.steps, 'run_flight'))).toBe(JSON.stringify(dataOf(plan.steps, 'run_flight')));
+  }, 120_000);
 });

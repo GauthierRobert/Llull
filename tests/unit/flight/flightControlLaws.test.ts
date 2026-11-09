@@ -8,7 +8,7 @@ import type { FlightController } from '@dynamics/flight/controlModel';
 import { combineBlocks, meanAxis, setpointAt } from '@dynamics/flight/flightBlock';
 import { eulerDeg, type FlightMetrics } from '@dynamics/flight/flightMetrics';
 import { stepsPerTick } from '@dynamics/flight/flightRun';
-import { DEFAULT_FLIGHT_LIMITS, flightVerdict } from '@dynamics/flight/flightVerdict';
+import { DEFAULT_FLIGHT_LIMITS, flightVerdict, type FlightCheck } from '@dynamics/flight/flightVerdict';
 import { conjugate, quaternionFromBasis, rotate, shortestArc } from '@dynamics/flight/frames';
 import {
   allocate,
@@ -289,6 +289,8 @@ describe('verdict', () => {
       recoveryTimeS: 1,
       control: { thrustMargin: 0.6, saturationFraction: 0 },
       divergedAtS: null,
+      battery: {},
+      durationS: 10,
       ...patch,
     }) as unknown as FlightMetrics;
   it('passes, marks a check within 10 % of its limit MARGINAL and fails past it', () => {
@@ -316,8 +318,26 @@ describe('verdict', () => {
       'saturation_fraction',
       'final_position_error_m',
       'recovery_time_s',
+      'battery_final_soc',
     ]);
     expect(open.verdict).toBe('PASS');
+  });
+  it('judges the battery reserve against minFinalSoc and fails a cut-off', () => {
+    const pack = (finalSoc: number, cutoffAtS: number | null): Record<string, unknown> => ({
+      pt: { batteryId: 'pack', finalSoc, cutoffAtS },
+    });
+    const soc = (battery: Record<string, unknown>): FlightCheck | undefined =>
+      flightVerdict(metrics({ battery }), DEFAULT_FLIGHT_LIMITS).checks.find((entry) => entry.name === 'battery_final_soc');
+    expect(soc(pack(0.8, null))).toMatchObject({ status: 'PASS', value: 0.8, limit: 0.2, comparison: '>=' });
+    expect(soc(pack(0.21, null))?.status).toBe('MARGINAL');
+    expect(soc(pack(0.1, null))?.status).toBe('FAIL');
+    expect(soc({ ...pack(0.9, null), other: { batteryId: 'b2', finalSoc: 0.1, cutoffAtS: null } })?.value).toBe(0.1);
+    const cut = flightVerdict(metrics({ battery: pack(0, 4.5) }), DEFAULT_FLIGHT_LIMITS);
+    expect(cut.verdict).toBe('FAIL');
+    expect(cut.checks.find((entry) => entry.name === 'battery_cutoff')).toMatchObject({ status: 'FAIL', value: 4.5 });
+    expect(
+      flightVerdict(metrics({ battery: pack(0.8, null) }), DEFAULT_FLIGHT_LIMITS).checks.some((entry) => entry.name === 'battery_cutoff'),
+    ).toBe(false);
   });
 });
 

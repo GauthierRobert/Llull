@@ -1,6 +1,6 @@
 # Gap 13 FLT — Technical specification
 
-Specification 2026-11-02; FLT-M1 built 2026-11-07 (§13); FLT-M2 built 2026-11-08 (§14). Ids `TR-FLT-nn`. Validation cases in [validation/README.md](validation/README.md).
+Specification 2026-11-02; FLT-M1 built 2026-11-07 (§13); FLT-M2 built 2026-11-08 (§14); FLT-M3 built 2026-11-09 (§15). Ids `TR-FLT-nn`. Validation cases in [validation/README.md](validation/README.md).
 
 ## 1. Current state in llull (audit 2026-11-02, source read, nothing executed)
 
@@ -348,3 +348,59 @@ yaw-first allocation, gust shape, attitude algebra, verdict bands, block composi
 report panel and a viewport replay of a run (`run_flight` returns the series; `render_motion` does not read them yet). Later milestones:
 motor / ESC / battery chain (M3), aero tables, pivot servos and Dryden turbulence (M4), trim / linearisation and `export_flight_loads`
 (M5), SITL (M6).
+
+## 15. Implementation status — FLT-M3 (2026-11-09)
+
+**Built (TR-FLT-06, FR-FLT-06 and the battery part of FR-FLT-07 / 08).**
+
+| Item                                                                                                                                                                                                                                                                                                                  | Where                                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Slice `doc.flight.batteries` / `doc.flight.powertrains` (optional tables), load validation (schema, keys, OCV curve, battery / rotor references, one powertrain per battery and per rotor, shared id space); `delete_dynamics_item` removes them and cascades battery -> powertrain, rotor -> powertrain              | `flight/{powerModel,powerDocument,model,document}.ts`    |
+| Pack law: V = OCV(SoC) - R_int·I, P_bus = V·I solved in closed form I = (OCV - sqrt(OCV² - 4·R_int·P)) / (2·R_int) (a pack that cannot deliver P = OCV² / 4R is a cut-off), SoC from the charge drawn; OCV linear in SoC between the table points, inverse lookup for the cut-off floor                               | `flight/powerChain.ts`                                   |
+| Motor + ESC: the DC datasheet of add_motor (kt, R, I0): i = Q/kt + I0, V = kt·ω + R·i; ESC input power V·i / η, throttle = V / V_pack; speed cap when V_motor > V_pack from the positive root of kt·ω + R·(c·ω²/kt + I0) = V (propeller torque ∝ ω² at fixed J)                                                       | `flight/powerChain.ts`                                   |
+| The chain inside the flight block: per physics step the shaft torque of every fed rotor -> motor current / voltage -> bus power -> pack current, SoC, energy, minimum voltage, peak current, peak throttle, over-current and voltage-limited step counts in the aux state; the low-voltage cut-off stops the motors   | `flight/{powerBlock,flightBlock}.ts`                     |
+| Battery metrics per powertrain (charge in mAh, energy in Wh, mean / peak / final current, sag, cut-off time, `enduranceS` = cut-off time, or run time + remaining time at the final current down to the SoC floor where OCV = cut-off + R·I), warnings, series, verdict checks `battery_final_soc` / `battery_cutoff` | `flight/{batteryMetrics,flightMetrics,flightVerdict}.ts` |
+| `estimate_endurance`: steady discharge at fixed rotor speeds (hover) along the OCV curve with sag, to cut-off / empty / pack-power / motor-voltage, with the momentum-theory hover power and the capacity / current bound                                                                                             | `flight/endurance.ts`, `commands/flightEndurance.ts`     |
+| Commands `add_battery`, `add_flight_powertrain` (mutating), `estimate_endurance` (read-only); `run_flight` / `flight_report` gain `data.battery` and the `minFinalSoc` limit                                                                                                                                          | `commands/{flightPower,flightEndurance,flightRun}.ts`    |
+| Validation plan `sc-flt-03-endurance` (golden pins + replay equality)                                                                                                                                                                                                                                                 | `validation/plans/`, `tests/golden/fltPlans.test.ts`     |
+
+**Validation (`tests/unit/flight/flightPowerCommands.test.ts`, `flightPowerRun.test.ts`, MuJoCo 4.0, dt 2.5 ms).** Closed forms written in the
+tests, independent of the implementation: hover of the 1.115 kg quad from its weight: 4082.5 rpm, 76.04 W shaft, momentum-theory ideal 51.31 W,
+FM = Ct^1.5 / (Cp·sqrt(π/2)) = 0.6747 (1e-9); bus power Σ V·i / η from kt = 60/(2π·Kv), R, I0 (1e-9); V·I = P at the pack terminals.
+Endurance on an ideal flat pack (R = 0) is capacity / current to 0.2 % (5.6 Ah at 14.8 V); with sag and the sloping OCV curve it matches an
+independent 1 s integration written in the test to 0.5 %. Flown: the mean battery current of a closed-loop hover is the analytic hover current
+within 2 % (final current within 1 %), mAh = A·s/3.6 and SoC = 1 - Q/C (1e-9), the lowest voltage is OCV - R·I (0.1 %); a 10 mAh pack reaches
+its cut-off at capacity / current (3 %) and the motors stop (zero thrust, FLT_BATTERY_CUTOFF, report FAIL with `battery_cutoff`); a run that
+stays above the cut-off extrapolates the endurance at the final current (ideal pack: capacity / current, 1 %); a 1S pack cannot spin the hover
+speed and the thrust follows an independent bisection of the motor voltage equation (1 %, FLT_PACK_VOLTAGE_LIMITED); a motor over its peak
+current warns FLT_MOTOR_CURRENT_LIMIT. With the powertrain code mutated (resistance ignored, speed cap removed, cut-off removed) five of these
+tests fail. Sample pack of VC-FLT-11 (plan `sc-flt-03-endurance`: 4S 5.6 Ah, R_int 40 mΩ, 920 Kv class motors, ESC 95 %, 5 W avionics; grade C
+inputs): hover 104.0 W electrical, 6.286 A at 16.55 V, throttle 0.297, endurance 2813.6 s (46.9 min) to the 3.0 V per cell cut-off against
+3207 s for capacity / current. The bench measurement of VC-FLT-11 (hover current of the real 1.115 kg airframe) is still open: the chain is
+verified against closed forms, not against a measured pack.
+
+**Decisions.**
+
+- **FLT-D23 (one powertrain record, not `add_flight_motor`)**: §4 listed `add_flight_motor` + `add_battery`. A motor of `doc.dynamics` is bound
+  to a joint (it would drive that joint in `simulate_motion`), and a free-flight rotor has none; llull has one motor model (the DC datasheet:
+  schema, consistency check, `kt`, `R`, `I0`), so the powertrain takes either a stored direct-drive dc motor (`motor`, copied) or an inline
+  `datasheet` checked like `check_motor_data`, and `add_flight_powertrain` connects battery, motors and rotors. A brushless motor is entered as
+  its Kt (60 / (2π·Kv)), R and I0. Rejected: a second `Motor` record with its own law; a rotor `motorId`.
+- **FLT-D24 (units)**: pack-level numbers in explicit units: `capacityMah` of the whole pack, `internalResistanceOhm` of the whole pack,
+  `cutoffVoltPerCell` and the OCV curve per cell. §3's `cells.parallel` is not stored: parallel strings only change the pack capacity and
+  resistance, which the caller states for the pack (a 4S2P of 2800 mAh cells is `cellsSeries` 4, `capacityMah` 5600).
+- **FLT-D25 (quasi-static motor)**: the current follows the torque algebraically (i = Q/kt + I0; no winding inductance, no rotor spin-up
+  I·dω/dt in the chain); the rotor speed dynamics stay the controller's first-order lag `motorTimeConstantS` (FLT-D7). §5's dω/dt equation is
+  left for FLT-M7 with the BEMT rotor. The ESC efficiency is one constant (no efficiency map).
+- **FLT-D26 (voltage limit and cut-off)**: a rotor whose motor needs more voltage than the pack gives is held at the speed the pack sustains
+  (terminal voltage of the previous step; FLT_PACK_VOLTAGE_LIMITED); at the low-voltage cut-off, an empty pack or a pack that cannot deliver the
+  power, the motors stop and stay stopped (FLT_BATTERY_CUTOFF, a failing `battery_cutoff` check): the flight ends in the simulation, so a run
+  past the cut-off shows the fall. A battery feeds one powertrain and a rotor belongs to one.
+- **FLT-D27 (defaults flagged)**: without `ocv` a typical LiPo rest curve is used, without `cutoffVoltPerCell` 3.3 V, without `escEfficiency`
+  0.95; each is listed in `defaulted` and makes the run `unverified` (FR-FLT-08). An OCV curve that does not run from SoC 0 to 1, whose SoC is
+  not increasing or whose voltage decreases, or a cut-off at or above the full-charge voltage is `FLT_ECM_INVALID`.
+- **FLT-D28 (reserve limit)**: `flight_report` gains `minFinalSoc` (default 0.2, MARGINAL within 10 %): the check `battery_final_soc` is
+  `not_applicable` without a powertrain. This adds one check and one limit to every report (the golden pins of the M2 plans were updated).
+
+**Not in M3 / remainder.** Motor thermal limits and ESC efficiency maps, Peukert / temperature dependence of the cell, the bench measurement of
+VC-FLT-11, a minimum-endurance limit in `flight_report`, a viewport trace of SoC, and non-dc motors (PMSM / stepper data cannot yet feed the chain).

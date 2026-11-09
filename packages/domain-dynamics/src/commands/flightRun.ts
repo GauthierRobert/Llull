@@ -78,6 +78,13 @@ function metricsSummary(metrics: FlightMetrics): string {
     `at ${format(metrics.attitude.maxTiltTimeS)} s, max rate ${format(metrics.attitude.maxRateDegS)} °/s, position error rms ${format(metrics.tracking.rmsPositionErrorM)} m / ` +
     `max ${format(metrics.tracking.maxPositionErrorM)} m / final ${format(metrics.tracking.finalPositionErrorM)} m, recovery ${metrics.recoveryTimeS === null ? 'n/a' : `${format(metrics.recoveryTimeS)} s`}, ` +
     `${control}, shaft power mean ${format(metrics.power.meanShaftPowerW)} W / peak ${format(metrics.power.peakShaftPowerW)} W / final ${format(metrics.power.finalShaftPowerW)} W` +
+    Object.entries(metrics.battery)
+      .map(
+        ([id, pack]) =>
+          `, battery '${pack.batteryId}' (${id}): SoC ${format(pack.initialSoc)} -> ${format(pack.finalSoc)}, ${format(pack.usedChargeMah)} mAh / ${format(pack.energyWh)} Wh, current mean ${format(pack.meanCurrentA)} A / peak ${format(pack.peakCurrentA)} A, min ${format(pack.minVoltageV)} V, ` +
+          `${pack.cutoffAtS === null ? 'no cut-off' : `CUT-OFF at ${format(pack.cutoffAtS)} s`}, endurance ${pack.enduranceS === null ? 'n/a' : `${pack.enduranceBasis === 'extrapolated_at_final_current' ? '~' : ''}${format(pack.enduranceS)} s ${pack.enduranceBasis === 'extrapolated_at_final_current' ? 'est. ' : ''}(${pack.enduranceBasis})`}`,
+      )
+      .join('') +
     `${metrics.unverified ? `; unverified (${metrics.defaulted.length} input(s) defaulted, see data.defaulted)` : ''}${metrics.warnings.length > 0 ? `; warnings: ${[...new Set(metrics.warnings.map((warning) => warning.split(':')[0]))].join(', ')}` : ''}.`
   );
 }
@@ -102,7 +109,10 @@ export const runFlightCommand = defineCommand({
     'updates, saturationFraction = share clipped by a rotor limit, max thrust, thrust/weight, thrustMargin = 1 - weight / max thrust); power ' +
     '(shaft energy J, mean / peak / final shaft power W); per rotor the final rpm, thrust, shaft power, advance ratio, momentum-theory ideal ' +
     'power and figure of merit (hover only), J range against the validated range of its coefficients (FLT_OUTSIDE_VALIDATED_RANGE); ' +
-    'defaulted inputs (unverified). Peaks and integrals are exact per physics step; recovery uses the samples. detail "series" adds per-sample ' +
+    'defaulted inputs (unverified). With a powertrain (add_battery + add_flight_powertrain) every rotor it feeds draws its motor current from the ' +
+    'pack each step: data.battery[powertrainId] gives the state of charge, charge in mAh, energy in Wh, mean / peak / final current, the lowest ' +
+    'terminal voltage (sag), motor current peak against the datasheet limit, peak throttle, the cut-off time (the motors then stop: warning ' +
+    'FLT_BATTERY_CUTOFF) and enduranceS (the cut-off time, or an ESTIMATE: the run time plus what the final current still allows, optimistic on a sloping OCV curve or constant-power load; estimate_endurance integrates the discharge properly). Peaks and integrals are exact per physics step; recovery uses the samples. detail "series" adds per-sample ' +
     'position offset, set-point, velocity, attitude, tilt, body rates, wind and per-rotor rpm / thrust / power. A closed loop tilting past ' +
     '90° or a NaN state is refused as FLT_DIVERGED with the time. The vehicle is ONE free rigid body: a body with other bodies jointed below it is refused (FLT_VEHICLE_MULTIBODY, until FLT-M4); a rotor layout whose mixer is nearly singular is refused (FLT_MIXER_ILL_CONDITIONED). Use flight_report for a PASS / MARGINAL / FAIL verdict.',
   params: z.object({
@@ -145,6 +155,12 @@ const limitsSchema = z
     maxAttitudeDeg: z.number().positive().optional().describe('Largest tilt from vertical, deg. Default 45.'),
     maxFinalPositionErrorM: z.number().positive().optional().describe('Largest position error at the end, m. Default 0.1.'),
     maxRecoveryTimeS: z.number().positive().optional().describe('Largest recovery time after an event, s. Default 5.'),
+    minFinalSoc: z
+      .number()
+      .min(0)
+      .max(1)
+      .optional()
+      .describe('Least battery state of charge (0..1) left at the end of a run with a powertrain. Default 0.2.'),
   })
   .optional()
   .describe('Named limits of the verdict; each omitted one takes its default (listed in data.limitsDefaulted).');
@@ -163,7 +179,8 @@ export const flightReportCommand = defineCommand({
   description:
     'Verdict of a flight scenario (13 FLT): runs it exactly as run_flight and judges the numbers against named limits, each overridable: ' +
     'thrust_margin >= 0.3 (1 - weight / max thrust), saturation_fraction <= 0.05, max_attitude_deg <= 45, final_position_error_m <= 0.1, ' +
-    'recovery_time_s <= 5 (largest recovery after a set-point change or gust; an event that never recovers fails). Each check is PASS, ' +
+    'recovery_time_s <= 5 (largest recovery after a set-point change or gust; an event that never recovers fails), battery_final_soc >= 0.2 ' +
+    '(only with a powertrain; a battery cut-off adds a failing battery_cutoff check). Each check is PASS, ' +
     'MARGINAL (passes within 10 % of its limit), FAIL or not_applicable (e.g. thrust margin of an open-loop flight); verdict FAIL on any ' +
     'failure or a divergence (thrust axis past 90°), MARGINAL on any marginal check, else PASS. data.hover: total final shaft power, ' +
     'momentum-theory ideal power T^1.5 / sqrt(2ρA) summed over the rotors and the figure of merit (ideal / shaft) — meaningful once the ' +

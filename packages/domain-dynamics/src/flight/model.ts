@@ -7,6 +7,7 @@ import type { CadDocument } from '@core/model/types';
 import { createDynamicsModel, dynamicsIdTaken } from '@core/model/dynamics';
 import type { Vec3 } from '@core/model/vectors';
 import type { FlightController, FlightScenario } from './controlModel';
+import type { FlightBattery, FlightPowertrain } from './powerModel';
 
 /** [advance ratio J, C_T, C_P] with strictly increasing J. */
 type RotorTablePoint = readonly [advanceRatio: number, thrustCoefficient: number, powerCoefficient: number];
@@ -67,6 +68,10 @@ export interface FlightModel {
   readonly controllers?: Readonly<Record<string, FlightController>>;
   /** Absent until the first define_flight_scenario (13 FLT M2). */
   readonly scenarios?: Readonly<Record<string, FlightScenario>>;
+  /** Absent until the first add_battery (13 FLT M3). */
+  readonly batteries?: Readonly<Record<string, FlightBattery>>;
+  /** Absent until the first add_flight_powertrain (13 FLT M3). */
+  readonly powertrains?: Readonly<Record<string, FlightPowertrain>>;
 }
 
 declare module '@core/model/documentExtensions' {
@@ -87,7 +92,8 @@ export function flightOf(doc: CadDocument): FlightModel {
 /**
  * `flight` without the records `delete_dynamics_item` removes with `id`: the rotor / controller / scenario of that id, every rotor / drag of a
  * body that is no longer in `bodies`, every controller that lost its body or one of its rotors, every scenario that lost its body or its
- * controller; null when nothing goes.
+ * controller, the battery of that id with the powertrain that used it, every powertrain that lost its battery or one of its rotors; null when
+ * nothing goes.
  */
 export function flightWithout(flight: FlightModel, id: string, bodies: Readonly<Record<string, unknown>>): FlightModel | null {
   const gone = (bodyId: string): boolean => !Object.hasOwn(bodies, bodyId);
@@ -105,11 +111,20 @@ export function flightWithout(flight: FlightModel, id: string, bodies: Readonly<
         key !== id && !gone(scenario.bodyId) && (scenario.controllerId === null || Object.hasOwn(controllers, scenario.controllerId)),
     ),
   );
+  const batteries = Object.fromEntries(Object.entries(flight.batteries ?? {}).filter(([key]) => key !== id));
+  const powertrains = Object.fromEntries(
+    Object.entries(flight.powertrains ?? {}).filter(
+      ([key, train]) =>
+        key !== id && Object.hasOwn(batteries, train.batteryId) && train.rotorIds.every((rotorId) => Object.hasOwn(rotors, rotorId)),
+    ),
+  );
   const next: FlightModel = {
     rotors,
     bodyDrag,
     ...(flight.controllers === undefined ? {} : { controllers }),
     ...(flight.scenarios === undefined ? {} : { scenarios }),
+    ...(flight.batteries === undefined ? {} : { batteries }),
+    ...(flight.powertrains === undefined ? {} : { powertrains }),
   };
   return flightRecordCount(next) === flightRecordCount(flight) ? null : next;
 }
@@ -119,11 +134,19 @@ export const flightRecordCount = (flight: FlightModel): number =>
   Object.keys(flight.rotors).length +
   Object.keys(flight.bodyDrag).length +
   Object.keys(flight.controllers ?? {}).length +
-  Object.keys(flight.scenarios ?? {}).length;
+  Object.keys(flight.scenarios ?? {}).length +
+  Object.keys(flight.batteries ?? {}).length +
+  Object.keys(flight.powertrains ?? {}).length;
 
-/** True when `id` names a rotor, a flight controller or a flight scenario of `flight`. */
+/** True when `id` names a rotor, controller, scenario, battery or powertrain of `flight`. */
 export function flightIdTaken(flight: FlightModel, id: string): boolean {
-  return Object.hasOwn(flight.rotors, id) || Object.hasOwn(flight.controllers ?? {}, id) || Object.hasOwn(flight.scenarios ?? {}, id);
+  return (
+    Object.hasOwn(flight.rotors, id) ||
+    Object.hasOwn(flight.controllers ?? {}, id) ||
+    Object.hasOwn(flight.scenarios ?? {}, id) ||
+    Object.hasOwn(flight.batteries ?? {}, id) ||
+    Object.hasOwn(flight.powertrains ?? {}, id)
+  );
 }
 
 /**

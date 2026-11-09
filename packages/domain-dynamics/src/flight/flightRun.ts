@@ -24,7 +24,8 @@ import { combineBlocks, flightBlock, meanAxis, NOT_CONTROLLED, type FlightLoop }
 import { compileFlight, withFlightLoads } from './flightLoads';
 import { shortestArc } from './frames';
 import { assessMixer, effectiveness, type MixerRotor } from './mixer';
-import { flightOf } from './model';
+import { flightOf, type FlightModel } from './model';
+import { compilePower, type PowerRuntime } from './powerBlock';
 import { staticCoefficients, type RotorRuntime } from './rotorLaw';
 import { isCalm, windAt } from './wind';
 import { RESTING_MEMORY, controllerUpdate } from './controller';
@@ -102,6 +103,22 @@ export function mixerRotors(rotors: readonly RotorRuntime[]): MixerRotor[] {
 export function thrustPerRpmSquared(rotor: RotorRuntime): number {
   const { ct } = staticCoefficients(rotor);
   return (ct * rotor.rotor.airDensity * rotor.rotor.diameter ** 4) / 3600;
+}
+
+/** The powertrains of `flight` compiled against the run's rotors, or the one whose battery is missing. */
+function compilePowertrains(flight: FlightModel, rotors: readonly RotorRuntime[]): PowerRuntime[] | FlightRefusal {
+  const batteries = flight.batteries ?? {};
+  const ids = rotors.map((rotor) => rotor.rotor.id);
+  const compiled: PowerRuntime[] = [];
+  for (const powertrain of Object.values(flight.powertrains ?? {})) {
+    const battery = Object.hasOwn(batteries, powertrain.batteryId) ? batteries[powertrain.batteryId] : undefined;
+    if (battery === undefined)
+      return refusal('FLT_MODEL_INVALID', `powertrain '${powertrain.id}' names a missing battery '${powertrain.batteryId}'`, [
+        powertrain.id,
+      ]);
+    compiled.push(compilePower(powertrain, battery, ids));
+  }
+  return compiled;
 }
 
 /** The controller compiled for the run, or why it cannot fly this vehicle. */
@@ -225,6 +242,8 @@ export function runFlight(
           { massKg, inertia, gravity, start, timestep },
         );
   if (runtime !== null && 'code' in runtime) return runtime;
+  const power = compilePowertrains(flight, rotors);
+  if ('code' in power) return power;
   const rowOf = rotors.map((rotor) => (controller === null ? NOT_CONTROLLED : controller.rotorIds.indexOf(rotor.rotor.id)));
   const ordered = controller?.rotorIds.flatMap((id) => rotors.filter((rotor) => rotor.rotor.id === id)) ?? [];
   const gravityLength = len3(gravity);
@@ -235,6 +254,7 @@ export function runFlight(
     vehicleId: vehicle.id,
     rotors,
     control,
+    power,
     thrustAxis,
     up: gravityLength > 0 ? scale3(gravity, -1 / gravityLength) : [0, 0, 1],
     start,
@@ -283,6 +303,10 @@ export function runFlight(
       defaulted: [
         ...(controller?.defaulted ?? []).map((name) => `controller.${name}`),
         ...scenario.defaulted.map((name) => `scenario.${name}`),
+        ...power.flatMap((feed) => [
+          ...feed.battery.defaulted.map((name) => `battery.${feed.battery.id}.${name}`),
+          ...feed.powertrain.defaulted.map((name) => `powertrain.${feed.powertrain.id}.${name}`),
+        ]),
       ],
     };
   } catch (error) {

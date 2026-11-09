@@ -16,6 +16,8 @@ export interface FlightLimits {
   readonly maxFinalPositionErrorM: number;
   /** Largest recovery time after an event (set-point change, gust), s. */
   readonly maxRecoveryTimeS: number;
+  /** Least state of charge left at the end of the run (the reserve), 0..1. */
+  readonly minFinalSoc: number;
 }
 
 /** Default limits (TECHNICAL_SPEC §4: thrust margin >= 30 %, saturation < 5 %). */
@@ -25,6 +27,7 @@ export const DEFAULT_FLIGHT_LIMITS: FlightLimits = {
   maxAttitudeDeg: 45,
   maxFinalPositionErrorM: 0.1,
   maxRecoveryTimeS: 5,
+  minFinalSoc: 0.2,
 };
 
 /** A check passing by less than this share of its limit is MARGINAL. */
@@ -62,6 +65,9 @@ export function flightVerdict(
         ? 'an event never recovered inside the settle band before the next one: see events'
         : 'largest recovery over the events';
   const neverRecovered = metrics.events.length > 0 && metrics.recoveryTimeS === null;
+  const packs = Object.values(metrics.battery);
+  const cutoffs = packs.flatMap((pack) => (pack.cutoffAtS === null ? [] : [{ pack, at: pack.cutoffAtS }]));
+  const cutoff = cutoffs[0];
   const checks: FlightCheck[] = [
     check(
       'thrust_margin',
@@ -89,6 +95,26 @@ export function flightVerdict(
       ? { name: 'recovery_time_s', value: null, limit: limits.maxRecoveryTimeS, comparison: '<=', status: 'FAIL', note: recoveryNote }
       : check('recovery_time_s', control === null ? null : metrics.recoveryTimeS, limits.maxRecoveryTimeS, '<=', recoveryNote),
   ];
+  checks.push(
+    check(
+      'battery_final_soc',
+      packs.length === 0 ? null : Math.min(...packs.map((pack) => pack.finalSoc)),
+      limits.minFinalSoc,
+      '>=',
+      packs.length === 0 ? 'no powertrain: no battery is drawn' : 'lowest state of charge over the packs at the end of the run',
+    ),
+  );
+  if (cutoff !== undefined) {
+    const at = cutoff.at;
+    checks.push({
+      name: 'battery_cutoff',
+      value: at,
+      limit: metrics.durationS,
+      comparison: '>=',
+      status: 'FAIL',
+      note: `battery '${cutoff.pack.batteryId}' reached its cut-off at t = ${at.toFixed(3)} s: the motors stopped (FLT_BATTERY_CUTOFF)`,
+    });
+  }
   if (metrics.divergedAtS !== null)
     checks.push({
       name: 'diverged',

@@ -6,7 +6,9 @@
 
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { dot3, len3, sub3 } from '@lib/vec3';
-import { mixerRow, NOT_CONTROLLED, ROTOR, rotorSlot, setpointAt, SLOT, tiltOf } from './flightBlock';
+import { batteryMetrics, batteryWarnings, type BatteryMetrics } from './batteryMetrics';
+import { mixerRow, NOT_CONTROLLED, powerBase, ROTOR, rotorSlot, setpointAt, SLOT, tiltOf } from './flightBlock';
+import { POWER } from './powerBlock';
 import { offsetAt, type FlightRun } from './flightRun';
 import { rotateInverse } from './frames';
 import { STATIC_ADVANCE_RATIO_LIMIT, validatedRange } from './rotorLaw';
@@ -83,6 +85,8 @@ export interface FlightMetrics {
     readonly finalShaftPowerW: number;
   };
   readonly rotors: Readonly<Record<string, RotorMetrics>>;
+  /** Per powertrain id (13 FLT M3); empty without a powertrain. */
+  readonly battery: Readonly<Record<string, BatteryMetrics>>;
   /** First time the thrust axis tilted past 90° under a controller; null = it did not. */
   readonly divergedAtS: number | null;
   readonly defaulted: readonly string[];
@@ -186,6 +190,10 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
         `FLT_OUTSIDE_VALIDATED_RANGE: rotor '${rotor.rotor.id}' ran at J ${final(rotorSlot(i, ROTOR.minJ)).toPrecision(3)} to ${final(rotorSlot(i, ROTOR.maxJ)).toPrecision(3)}, outside its validated range [${range.map((value) => value.toPrecision(3)).join(', ')}] for ${((100 * outside) / physicsSteps).toPrecision(3)} % of the steps`,
       );
   });
+  const battery = Object.fromEntries(
+    loop.power.map((feed, index) => [feed.powertrain.id, batteryMetrics(feed, index, loop.rotors.length, final, duration, physicsSteps)]),
+  );
+  for (const [id, entry] of Object.entries(battery)) warnings.push(...batteryWarnings(id, entry));
   const runtime = loop.control?.runtime ?? null;
   const maxThrustN =
     runtime === null
@@ -251,6 +259,7 @@ export function flightMetrics(run: FlightRun): FlightMetrics {
       finalShaftPowerW: loop.rotors.reduce((sum, _, i) => sum + final(rotorSlot(i, ROTOR.power)), 0),
     },
     rotors,
+    battery,
     divergedAtS: divergedTime >= 0 ? divergedTime : null,
     defaulted: run.defaulted,
     unverified: run.defaulted.length > 0,
@@ -287,6 +296,19 @@ export function flightSeries(run: FlightRun): Record<string, unknown> {
       vec(rotateInverse(samples.orientation(k), samples.angularVelocity(k)).map((w) => w * DEG) as unknown as Vec3),
     ),
     windMps: ks.map((k) => vec(windAt(run.scenario.wind, samples.time(k)))),
+    battery: Object.fromEntries(
+      run.loop.power.map((feed, p) => {
+        const at = (field: number, k: number): number => round(samples.aux(powerBase(run.loop.rotors.length, p) + field, k));
+        return [
+          feed.powertrain.id,
+          {
+            soc: ks.map((k) => at(POWER.soc, k)),
+            voltageV: ks.map((k) => at(POWER.voltage, k)),
+            currentA: ks.map((k) => at(POWER.current, k)),
+          },
+        ];
+      }),
+    ),
     rotors: Object.fromEntries(
       run.loop.rotors.map((rotor, i) => [
         rotor.rotor.id,

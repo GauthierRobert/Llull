@@ -601,6 +601,23 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
           },
         ],
         ['set_body_drag', { body: 'frame', cdaM2: [0.01, 0.02, 0.05] }],
+        ['add_battery', { id: 'pack', cellsSeries: 4, capacityMah: 5000, internalResistanceOhm: 0.05, source: 'fuzz pack' }],
+        [
+          'add_flight_powertrain',
+          {
+            id: 'pt',
+            battery: 'pack',
+            rotors: ['r1', 'r2'],
+            datasheet: {
+              nominalVoltageV: 14.8,
+              terminalResistanceOhm: 0.1,
+              torqueConstantNmPerA: 0.0104,
+              rotorInertiaKgM2: 1e-5,
+              noLoadCurrentA: 0.5,
+            },
+            motorSource: 'fuzz motor',
+          },
+        ],
       ];
       return steps.reduce((doc, [name, params]) => execute(doc, name, params).document, quadDrone());
     },
