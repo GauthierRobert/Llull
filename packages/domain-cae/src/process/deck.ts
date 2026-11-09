@@ -15,6 +15,7 @@ import { mechanicalMaterialLines, mechanicalStepLines } from '../decks/mechanica
 import { buildFrame } from './frame';
 import { amLayerPlan, type AmLayerPlan } from './layers';
 import { activationStep, strainStep } from './plan';
+import { cross3, len3, sub3 } from '@lib/vec3';
 import { support321 } from './support321';
 
 const refuse = (code: string, message: string, ids: readonly string[] = []): DeckRefusal => ({ code, message, ids });
@@ -24,8 +25,10 @@ const ORIENTATION = 'AM_BUILD';
 /** Solver controls of a release step: the removal redistributes the whole residual stress at once. */
 const RELEASE_FIRST_INCREMENT = 0.1;
 const MINIMUM_INCREMENT = 1e-5;
-/** One increment per build step (a cut-back is still allowed down to the minimum, which also silences the CalculiX warning about a zero minimum). */
-const ONE_INCREMENT = row(1, 1, MINIMUM_INCREMENT, 1);
+/** One increment per build step with the minimum equal to it: no cut-back, because an intermediate temperature of a cut-back would interpolate the expansion table (alpha linear in T) and apply a non-physical strain; a step that does not converge in one increment fails instead. */
+const ONE_INCREMENT = row(1, 1, 1, 1);
+/** Smallest sine of the angle of the snapped 3-2-1 triangle: below it the support is nearly singular. */
+const DEGENERATE_SUPPORT = 1e-3;
 const SETS_PER_LINE = 8;
 const ELEMENTS_PER_LINE = 16;
 const LAYER_OUTPUT = ['*NODE FILE', 'U', '*EL FILE', 'S, E'];
@@ -139,7 +142,7 @@ function boundaryLines(text: string): string[] {
  * breaks later activations) and applies the constraints, then an activation and a strain step per non-empty layer, then one step per release.
  * A release removes the plate and / or supports and replaces the constraints by the 3-2-1 support on the nearest nodes of the remaining parts.
  * Results (`*NODE FILE U`, `*EL FILE S, E`) are requested in the last strain step and in every release step only.
- * @invariant byte-deterministic; each part is removed at most once; the 3-2-1 dofs are six independent rigid-body constraints
+ * @invariant build steps never cut back (minimum increment = 1, so every strain is the one tabulated at an integer temperature); byte-deterministic; each part is removed at most once; the 3-2-1 dofs are six independent rigid-body constraints
  * @failure PRC_BUILD_SETUP_MISSING, PRC_INHERENT_STRAIN_MISSING, PRC_LOADS_UNSUPPORTED, PRC_PART_NOT_BUILT, PRC_LAYERS_TOO_MANY,
  *   PRC_RELEASE_UNSUPPORTED (no node, shared node, dependent support); mechanical refusals
  */
@@ -210,6 +213,14 @@ export function amSteps(ctx: DeckContext): DeckSections {
       return refuse(
         'PRC_RELEASE_UNSUPPORTED',
         `${stepName}: the three support points do not resolve to three distinct nodes of the remaining parts`,
+        [ctx.analysisId],
+      );
+    const edge1 = sub3(s2.at, s1.at);
+    const edge2 = sub3(s3.at, s1.at);
+    if (len3(cross3(edge1, edge2)) < DEGENERATE_SUPPORT * len3(edge1) * len3(edge2))
+      return refuse(
+        'PRC_RELEASE_UNSUPPORTED',
+        `${stepName}: the snapped support nodes are nearly collinear (sine of the angle below ${DEGENERATE_SUPPORT}): refine the mesh or move the points apart`,
         [ctx.analysisId],
       );
     const dofs = support321([s1.at, s2.at, s3.at]);

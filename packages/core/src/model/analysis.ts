@@ -261,6 +261,10 @@ export interface ResultsSummary {
   readonly nonlinear?: NonlinearResultsSummary;
   /** PHY-11: present iff the case is `creep`. */
   readonly creep?: import('./creep').CreepResultsSummary;
+  /** PHY-16: present iff the case is `am_build_distortion`: findings of the mesh and results (empty layers, probes on built nodes, large deflection). */
+  readonly am?: {
+    readonly findings: readonly { readonly code: string; readonly severity: 'warning' | 'error'; readonly message: string }[];
+  };
   /** PHY-09: present iff the case is `frequency_response` or `random_response`. */
   readonly dynamics?: DynamicSummary;
 }

@@ -22,6 +22,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PRC_LAYER_MESH_MISMATCH: 'refine the mesh along the build direction or raise layerHeight so every layer holds an element',
   PRC_LAYERS_TOO_MANY: 'raise layerHeight: a deck holds at most 500 lumped layers (two CalculiX steps and one material per layer)',
   PRC_LOADS_UNSUPPORTED: 'delete the loads of the case: the build is driven by the inherent strain and the constraints only',
+  PRC_PROBE_ON_BUILT_NODE:
+    'move the probe to a node that exists from the start (the plate surface, the plate-part interface) or clamp the plate: a node added with a layer reads its displacement since its activation',
+  PRC_LARGE_DEFLECTION:
+    'reduce the inherent strain / part size or accept a drift: the layer activation is validated for displacements below 1 % of the part size',
   PRC_PART_NOT_BUILT: 'the case has no part besides the plate and the supports: add the part that is built layer by layer',
   PRC_RESULTS_MISSING: 'run fea_mesh then fea_solve on this case first',
 };

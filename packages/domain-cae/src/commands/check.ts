@@ -15,6 +15,8 @@ import { analysisInputHash } from '../hash/inputHash';
 import { checkNonlinearItems } from '../nonlinear/check';
 import { checkCreepItems } from '../creep/check';
 import { checkAmItems } from '../process/check';
+import { toMetres } from '@core/model/units';
+import { analysisLengthMetres } from '../shared/defaults';
 import { marginItems } from '../margins/checkItems';
 import { structureItems } from './checkStructure';
 import { flightLoadItems } from '../flightLoads/checkItems';
@@ -201,7 +203,12 @@ export const checkAnalysis = defineCommand({
           : analysis.type === 'creep'
             ? checkCreepItems(doc, analysis)
             : analysis.type === 'am_build_distortion'
-              ? checkAmItems(analysis)
+              ? checkAmItems(
+                  analysis,
+                  trust.meshArtifact,
+                  trust.resultsArtifact,
+                  toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem),
+                )
               : checkNonlinearItems(doc, analysis);
     const items: CheckItem[] = [
       ...partItems(doc, analysis),
