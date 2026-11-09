@@ -1,0 +1,20 @@
+# A 200 g panel of a synthetic low-outgassing material screened against the NASA GSFC profile, with the Fick uptake of a 2 mm plate and the atomic-oxygen recession of Kapton H
+design outgassing_panel units=mm
+param w = 100mm
+param d = 100mm
+param t = 16.6666666667mm
+
+add_box panel size=[w, d, t] position=[0, 0, t/2]
+
+create_material _ name=syn_low density=1.2 densityUnit=g/cm^3 color="#d9a441" metalness=0 roughness=0.6
+set_material_property _ material=syn_low property=TML value=0.95 unit="%" basis=company source.citation="synthetic test value (PHY-14 VC-ENV-06.1)"
+set_material_property _ material=syn_low property=CVCM value=0.05 unit="%" basis=company source.citation="synthetic test value (PHY-14 VC-ENV-06.1)"
+set_material_property _ material=syn_low property=WVR value=0.3 unit="%" basis=company source.citation="synthetic test value (PHY-14 VC-ENV-06.1)"
+assign_material _ materialName=syn_low entityIds=[panel]
+
+set_mission_environment _ outgassingProfile=nasa_gsfc_screening aoFluence.value=1e21 aoFluence.unit=atoms/cm^2 aoFluence.source="synthetic fluence (PHY-14 VC-ENV-08)"
+
+check check_space_environment path=status expect == "pass"
+check check_space_environment path=budget.totalMassLossG expect ~= 1.9
+check moisture_uptake thickness.value=2 thickness.unit=mm diffusivity.value=1e-6 diffusivity.unit=mm^2/s diffusivity.source="synthetic" saturation.value=1.5 saturation.unit="%" saturation.source="synthetic" exposure.value=7 exposure.unit=d faces=both path=moisturePercent expect ~= 1.22660470969
+check ao_erosion reference=kapton_h path=recessionUm expect ~= 30
