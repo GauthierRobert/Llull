@@ -101,6 +101,30 @@ function formProblem(form: PropertyForm, path: string, knownModelIds: ReadonlySe
   }
 }
 
+/** The first constant / table value of a form outside `[min, max]` (nested piecewise segments included), or null. */
+function rangeProblem(
+  form: PropertyForm,
+  path: string,
+  range: { readonly min: number; readonly max: number },
+  property: string,
+): ModelProblem | null {
+  const outside = (value: number): boolean => value < range.min || value > range.max;
+  const bad = (where: string, value: number): ModelProblem =>
+    problem('EOP_PROPERTY_RANGE', `${path}.${where}`, `${property} must be within [${range.min}, ${range.max}], got ${value}`);
+  if (form.kind === 'constant') return outside(form.value) ? bad('value', form.value) : null;
+  if (form.kind === 'table1d') {
+    const index = form.points.findIndex(([, y]) => outside(y));
+    return index >= 0 ? bad(`points[${index}]`, form.points[index]?.[1] ?? Number.NaN) : null;
+  }
+  if (form.kind === 'piecewise') {
+    for (const [i, segment] of form.segments.entries()) {
+      const nested = rangeProblem(segment.form, `${path}.segments[${i}].form`, range, property);
+      if (nested !== null) return nested;
+    }
+  }
+  return null;
+}
+
 /** First problem of a whole model, or null. `otherModelIds` = the other models already on the material. */
 export function modelProblem(model: PropertyModel, otherModelIds: ReadonlySet<string>): ModelProblem | null {
   const entry = catalogEntry(model.property);
@@ -117,6 +141,10 @@ export function modelProblem(model: PropertyModel, otherModelIds: ReadonlySet<st
   }
   const formIssue = formProblem(model.form, 'model.form', otherModelIds);
   if (formIssue !== null) return formIssue;
+  if (entry.range !== undefined) {
+    const outside = rangeProblem(model.form, 'model.form', entry.range, model.property);
+    if (outside !== null) return outside;
+  }
   for (const [i, spec] of model.variables.entries()) {
     const unit = parseUnit(spec.unit);
     if (isUnitFailure(unit)) return problem(unit.code, `model.variables[${i}].unit`, unit.message);

@@ -10,13 +10,15 @@ export interface PropertyCatalogEntry {
   readonly strength: boolean;
   readonly ownerPack: string;
   readonly description: string;
+  /** Inclusive bounds every value of a model must respect (PHY-15 emissivity / absorptivity in [0, 1]); absent = unbounded. */
+  readonly range?: { readonly min: number; readonly max: number };
 }
 
 const row = (
   name: string,
   canonicalUnit: string,
   description: string,
-  options: { positive?: boolean; strength?: boolean; ownerPack?: string } = {},
+  options: { positive?: boolean; strength?: boolean; ownerPack?: string; range?: { min: number; max: number } } = {},
 ): PropertyCatalogEntry => ({
   name,
   canonicalUnit,
@@ -24,6 +26,7 @@ const row = (
   strength: options.strength ?? false,
   ownerPack: options.ownerPack ?? '08 MAT',
   description,
+  ...(options.range === undefined ? {} : { range: options.range }),
 });
 
 const PROPERTY_CATALOG: readonly PropertyCatalogEntry[] = [
@@ -58,8 +61,13 @@ const PROPERTY_CATALOG: readonly PropertyCatalogEntry[] = [
   row('emissivityIr', '1', 'thermal infrared emissivity in [0, 1]; condition opticalKind hemispherical_total | normal_total', {
     positive: false,
     ownerPack: 'PHY-15',
+    range: { min: 0, max: 1 },
   }),
-  row('absorptivitySolar', '1', 'solar absorptivity in [0, 1]; condition lifeState BOL | EOL', { positive: false, ownerPack: 'PHY-15' }),
+  row('absorptivitySolar', '1', 'solar absorptivity in [0, 1]; condition lifeState BOL | EOL', {
+    positive: false,
+    ownerPack: 'PHY-15',
+    range: { min: 0, max: 1 },
+  }),
 ];
 
 export function catalogEntry(name: string): PropertyCatalogEntry | undefined {

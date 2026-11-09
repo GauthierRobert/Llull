@@ -21,6 +21,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PROP_MODEL_NOT_FOUND: 'list the material models (describe_scene / evaluate_property candidates)',
   PROP_MODEL_IN_USE: 'remove or re-base the dependent ratioOf models first',
   PROP_PROPERTY_UNKNOWN: 'use a catalogue property (k, cp, E, G, nu, density, cte, thermalStrain, Ftu, Fty, …)',
+  EOP_PROPERTY_RANGE: 'emissivityIr and absorptivitySolar values are fractions in [0, 1]',
   MAT_UNIT_DIMENSION: 'use a unit of the property / variable dimension',
   MAT_UNIT_INVALID: "write units like 'W/(m*K)', 'J/(kg*K)', 'GPa', 'K', 'degC', '1e-5'",
   MAT_PROVENANCE_MISSING: 'give source.citation (and locator / url / accessed)',
