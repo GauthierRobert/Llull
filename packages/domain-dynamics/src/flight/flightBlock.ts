@@ -12,7 +12,9 @@ import { controllerUpdate, type ControllerMemory, type ControllerRuntime } from 
 import { rotate } from './frames';
 import { initialPowerAux, packRpm, POWER_SLOTS, stepPower, type MotorLoad, type PowerRuntime } from './powerBlock';
 import { rotorOutput, validatedRange, type RotorRuntime } from './rotorLaw';
-import { airRelative, windAt } from './wind';
+import { AERO_SLOTS, initialAeroAux, stepAero } from './aeroBlock';
+import type { AeroRuntime } from './aeroSurface';
+import { airRelative, type WindSource } from './wind';
 
 /** Aux slots of the block (per-rotor slots follow at ROTOR_BASE + ROTOR_SLOTS · i). */
 export const SLOT = {
@@ -55,8 +57,15 @@ export const rotorSlot = (rotor: number, field: number): number => ROTOR_BASE + 
 /** First aux slot of powertrain `power` of a loop with `rotorCount` rotors (power slots follow the rotor slots, see POWER). */
 export const powerBase = (rotorCount: number, power: number): number => ROTOR_BASE + ROTOR_SLOTS * rotorCount + POWER_SLOTS * power;
 
+/** First aux slot of the aero surfaces of a loop (they follow the power slots). */
+export const aeroBase = (loop: Pick<FlightLoop, 'rotors' | 'power'>): number => powerBase(loop.rotors.length, loop.power.length);
+
 export interface FlightLoop {
   readonly scenario: FlightScenario;
+  /** Air velocity of the run (steady + gusts + turbulence). */
+  readonly wind: WindSource;
+  /** Aero surfaces of the run (tables + pivot servos), aux slots from aeroBase. */
+  readonly aero: readonly AeroRuntime[];
   readonly vehicleId: string;
   /** Every rotor of the run (the block owns them all). */
   readonly rotors: readonly RotorRuntime[];
@@ -126,8 +135,9 @@ export function tiltOf(loop: FlightLoop, body: BodyKinematics): number {
 }
 
 function initialAux(loop: FlightLoop): Float64Array {
-  const aux = new Float64Array(powerBase(loop.rotors.length, loop.power.length));
+  const aux = new Float64Array(aeroBase(loop) + AERO_SLOTS * loop.aero.length);
   aux[SLOT.divergedTime] = -1;
+  initialAeroAux(loop.aero, loop.scenario, aux, aeroBase(loop));
   loop.power.forEach((feed, p) => initialPowerAux(feed, aux, powerBase(loop.rotors.length, p)));
   loop.rotors.forEach((rotor, i) => {
     const row = mixerRow(loop, i);
@@ -170,7 +180,7 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
   const ranges = loop.rotors.map(validatedRange);
   const fedBy = loop.rotors.map((_, i) => loop.power.findIndex((feed) => feed.rotorIndexes.includes(i)));
   return {
-    size: powerBase(loop.rotors.length, loop.power.length),
+    size: aeroBase(loop) + AERO_SLOTS * loop.aero.length,
     aux0: initialAux(loop),
     joints: [],
     ledgerLayout: [],
@@ -192,7 +202,7 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
         });
       }
       trackMetrics(loop, aux, body, state.time, dt);
-      const wind = windAt(loop.scenario.wind, state.time);
+      const wind = loop.wind(state.time);
       const air = airRelative(body, wind);
       const forces: Record<string, Vec3> = {};
       const moments: Record<string, Vec3> = {};
@@ -227,6 +237,19 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
         if (output.advanceRatio < lo || output.advanceRatio > hi)
           aux[rotorSlot(i, ROTOR.outsideSteps)] = (aux[rotorSlot(i, ROTOR.outsideSteps)] ?? 0) + 1;
       });
+      stepAero(
+        loop.aero,
+        loop.scenario,
+        aux,
+        aeroBase(loop),
+        state.time,
+        dt,
+        (id) => {
+          const target = id === loop.vehicleId ? body : state.bodies?.[id];
+          return target === undefined ? undefined : id === loop.vehicleId ? air : airRelative(target, wind);
+        },
+        { forces, moments },
+      );
       loop.power.forEach((feed, p) => stepPower(feed, aux, powerBase(loop.rotors.length, p), loads[p] ?? [], state.time, dt));
       aux[SLOT.shaftEnergy] = (aux[SLOT.shaftEnergy] ?? 0) + power * dt;
       if (power > (aux[SLOT.peakPower] ?? 0)) {

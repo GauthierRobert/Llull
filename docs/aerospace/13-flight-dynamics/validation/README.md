@@ -46,3 +46,5 @@ verbatim from the published data files ([S1], [S2]) and the law under test is th
 - `sources.md` — references with grade and access status.
 - `plans/` — `sc-flt-01-hover.plan.json` (VC-FLT-09 hover after a knock), `sc-flt-02-gust.plan.json` (VC-FLT-07 gust + VC-FLT-14
   timestep check): build_project plans pinned by `tests/golden/fltPlans.test.ts`.
+  `sc-flt-03-endurance.plan.json` (VC-FLT-11 pack chain) and `sc-flt-04-wind-aero.plan.json` (FLT-M4: pivoting wing from `generate_aero_table`, 6 m/s head wind,
+  gust and seeded Dryden turbulence; VC-FLT-12 is checked in `tests/unit/flight/aeroRun.test.ts`).

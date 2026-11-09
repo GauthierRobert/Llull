@@ -33,6 +33,7 @@ import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import { flatDocument } from '../unit/vibroacoustics/fixtures';
 import { missionDocument } from '../unit/environment/fixtures';
+import { corrosionDocument } from '../unit/corrosion/seed';
 import { quadDrone, rotorParams } from '../unit/flight/flightFixture';
 import { SOURCE_TEXT, imperfectBar } from '../unit/cae/nonlinear/imperfectionFixtures';
 import {
@@ -348,6 +349,12 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     query: { name: 'check_space_environment', params: constant({ profile: 'nasa_gsfc_screening' }) },
     mutate: { name: 'set_mission_environment', params: constant({ aoFluence: { value: 2e21, unit: 'atoms/cm^2', source: 'fuzz' } }) },
   },
+  'physics-corrosion': {
+    roots: ['corrosion'],
+    build: corrosionDocument,
+    query: { name: 'check_material_compatibility', params: constant({}) },
+    mutate: { name: 'set_service_environment', params: constant({ scheme: 'anodic_index', environment: 'harsh' }) },
+  },
   'physics-vibroacoustics': {
     roots: ['vibroacoustics'],
     build: flatDocument,
@@ -623,6 +630,40 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
               noLoadCurrentA: 0.5,
             },
             motorSource: 'fuzz motor',
+          },
+        ],
+        [
+          'generate_aero_table',
+          {
+            id: 'wing',
+            body: 'frame',
+            surfaces: [
+              {
+                name: 'wing',
+                pivots: true,
+                sections: [
+                  { leadingEdge: [20, 0, 0], chord: 100 },
+                  { leadingEdge: [20, 300, 0], chord: 100 },
+                ],
+                spanwisePanels: 4,
+                chordwisePanels: 2,
+              },
+            ],
+            momentCentre: [0, 0, 0],
+            alphasDeg: [-4, 0, 4],
+            pivotsDeg: [-5, 5],
+            pivotPoint: [20, 0, 0],
+            servo: { rateDegS: 20 },
+          },
+        ],
+        [
+          'define_flight_scenario',
+          {
+            body: 'frame',
+            durationS: 1,
+            id: 'windy',
+            setpoints: [{ t: 0, pivotDeg: { wing: 3 } }],
+            wind: { turbulence: { sigmaMps: [1, 1, 0.5], seed: 5 } },
           },
         ],
       ];

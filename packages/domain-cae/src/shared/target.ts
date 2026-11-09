@@ -23,7 +23,9 @@ export const feaTargetSchema = z.object({
   intersectPlane: z
     .object({ point: vec3('A point on the plane.'), normal: vec3('Plane normal (need not be unit length).') })
     .optional()
-    .describe('NOT SUPPORTED YET: any target with intersectPlane is refused (FEA_TARGET_PLANE_UNSUPPORTED) until the mesher resolves it.'),
+    .describe(
+      'Restrict the target to the curve where the faces selected by facesNear meet this plane (needs facesNear): the plane is imprinted on the part before meshing, so the target is the nodes on the section edges, e.g. a symmetry-plane support line. The plane must cut the part and those faces; an exact STEP part meshed on its own only (no STL, no conformal bonding).',
+    ),
 });
 
 export type FeaTargetInput = z.output<typeof feaTargetSchema>;
@@ -40,29 +42,25 @@ export function toTarget(input: FeaTargetInput): FeaTarget {
 }
 
 export interface TargetProblem {
-  readonly code: 'FEA_TARGET_UNRESOLVED' | 'FEA_PART_NOT_IN_ANALYSIS' | 'FEA_TARGET_PLANE_UNSUPPORTED';
+  readonly code: 'FEA_TARGET_UNRESOLVED' | 'FEA_PART_NOT_IN_ANALYSIS';
   readonly message: string;
 }
-
-/** Shared by the command-time check and the host (`runFeaMesh`). */
-export const PLANE_UNSUPPORTED =
-  'intersectPlane is not supported yet: the mesher does not honour it and the target would silently cover the whole face; drop it and target by facesNear / edgesNear / pointsNear';
 
 const hasPoints = (points: readonly unknown[] | undefined): boolean => points !== undefined && points.length > 0;
 
 /**
  * Shape + entity-existence check of a target (resolution to topology happens in the mesher).
- * @failure intersectPlane set -> FEA_TARGET_PLANE_UNSUPPORTED (llull-mesh does not resolve it yet: it would silently target the whole face);
- *   entity missing / not 3D / no selector point -> FEA_TARGET_UNRESOLVED; entity not a part of the case -> FEA_PART_NOT_IN_ANALYSIS
+ * @failure entity missing / not 3D / no selector point / intersectPlane without facesNear -> FEA_TARGET_UNRESOLVED; entity not a part of the case -> FEA_PART_NOT_IN_ANALYSIS
  */
 export function targetProblem(doc: CadDocument, analysisCase: AnalysisCase, target: FeaTarget): TargetProblem | null {
-  if (target.intersectPlane !== undefined) return { code: 'FEA_TARGET_PLANE_UNSUPPORTED', message: PLANE_UNSUPPORTED };
   const entity = Object.hasOwn(doc.entities, target.entityId) ? doc.entities[target.entityId] : undefined;
   if (entity === undefined) return { code: 'FEA_TARGET_UNRESOLVED', message: `entity '${target.entityId}' does not exist` };
   if (!is3D(entity))
     return { code: 'FEA_TARGET_UNRESOLVED', message: `entity '${target.entityId}' is 2D (${entity.kind}); targets need a solid` };
   if (!hasPoints(target.facesNear) && !hasPoints(target.edgesNear) && !hasPoints(target.pointsNear))
     return { code: 'FEA_TARGET_UNRESOLVED', message: 'give at least one point in facesNear, edgesNear or pointsNear' };
+  if (target.intersectPlane !== undefined && !hasPoints(target.facesNear))
+    return { code: 'FEA_TARGET_UNRESOLVED', message: 'intersectPlane needs facesNear: the plane cuts the faces those points select' };
   if (!Object.hasOwn(analysisCase.parts, target.entityId))
     return { code: 'FEA_PART_NOT_IN_ANALYSIS', message: `entity '${target.entityId}' is not a part of analysis '${analysisCase.id}'` };
   return null;

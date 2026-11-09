@@ -2,7 +2,7 @@
 //! request / response are those of the Python bridge op `mesh` it replaces (server/src/fea/feaMesh.ts builds the request):
 //!
 //!   request  {"lengthScale", "parts": [{"entityId", "geometry": {"kind": "step"|"stl"|"midsurface", ...}, "faces"?, "defeature"?}],
-//!             "targets": [{"key", "entityId"|null, "facesNear"?, "faceIndices"?, "edgesNear"?, "pointsNear"?}],
+//!             "targets": [{"key", "entityId"|null, "facesNear"?, "faceIndices"?, "edgesNear"?, "pointsNear"?, "intersectPlane"?: {"point", "normal"}}],
 //!             "controls": {"order", "elementFamily"?, "bonding"?, "globalSize", "minSize"?, "refinements": [{"key", "size"}]}}
 //!   response {"ok": true, "mesher": "netgen", "mesherVersion", "nodes", "blocks", "nodeSets", "faceSets", "targets", "faceMap", "defeatured"}
 //!            | {"ok": false, "code"?: "FEA_*", "error"}
@@ -15,6 +15,7 @@ mod common;
 mod conformal;
 mod defeature;
 mod elements;
+mod imprint;
 mod raw;
 mod shell;
 mod sizes;

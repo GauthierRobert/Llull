@@ -16,7 +16,15 @@ import {
   pipeStressPlugin,
   structuresPlugin,
 } from '@aec/index';
-import { caePlugin, environmentPlugin, explicitPlugin, selectionPlugin, topologyPlugin, vibroacousticsPlugin } from '@cae/index';
+import {
+  caePlugin,
+  corrosionPlugin,
+  environmentPlugin,
+  explicitPlugin,
+  selectionPlugin,
+  topologyPlugin,
+  vibroacousticsPlugin,
+} from '@cae/index';
 import {
   aerodynamicsPlugin,
   cfdPlugin,
@@ -61,6 +69,7 @@ export function installDefaultPlugins(): void {
   installPlugin(scanPlugin);
   installPlugin(implicitPlugin);
   installPlugin(vibroacousticsPlugin);
+  installPlugin(corrosionPlugin);
   installPlugin(selectionPlugin);
   installPlugin(environmentPlugin);
 }

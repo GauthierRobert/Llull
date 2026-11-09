@@ -8,6 +8,7 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_Defeaturing.hxx>
+#include <BRepAlgoAPI_Splitter.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -28,6 +29,8 @@
 #include <ShapeFix_Face.hxx>
 #include <Standard_Version.hxx>
 #include <TopExp.hxx>
+#include <TopTools_ListOfShape.hxx>
+#include <gp_Pln.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
@@ -250,6 +253,48 @@ std::unique_ptr<Shape> Shape::defeatured(rust::Slice<const int32_t> faces) const
     throw std::runtime_error("OCCT defeaturing failed: " + report.str());
   }
   return std::make_unique<Shape>(algorithm.Shape());
+}
+
+std::unique_ptr<Shape> Shape::imprinted(rust::Slice<const double> plane) const {
+  if (plane.size() != 6) throw std::invalid_argument("imprinted: a plane is 6 numbers (point, normal)");
+  const gp_Pnt origin(plane[0], plane[1], plane[2]);
+  const gp_Vec direction(plane[3], plane[4], plane[5]);
+  if (direction.Magnitude() <= 1e-12) throw std::invalid_argument("imprinted: the plane normal has no length");
+  const rust::Vec<double> box = bounds();
+  const gp_Pnt centre(0.5 * (box[0] + box[3]), 0.5 * (box[1] + box[4]), 0.5 * (box[2] + box[5]));
+  const double diagonal = gp_Vec(gp_Pnt(box[0], box[1], box[2]), gp_Pnt(box[3], box[4], box[5])).Magnitude();
+  const double half = 2.0 * (diagonal + origin.Distance(centre));
+  const TopoDS_Face cutter = BRepBuilderAPI_MakeFace(gp_Pln(origin, gp_Dir(direction)), -half, half, -half, half).Face();
+  BRepAlgoAPI_Splitter splitter;
+  TopTools_ListOfShape arguments, tools;
+  arguments.Append(shape);
+  tools.Append(cutter);
+  splitter.SetArguments(arguments);
+  splitter.SetTools(tools);
+  splitter.SetRunParallel(false);
+  splitter.SetToFillHistory(true);
+  splitter.Build();
+  if (splitter.HasErrors() || splitter.Shape().IsNull()) {
+    std::ostringstream report;
+    splitter.DumpErrors(report);
+    throw std::runtime_error("OCCT could not split the shape by the plane: " + report.str());
+  }
+  auto out = std::make_unique<Shape>(splitter.Shape());
+  out->owner_lists.resize(out->geometry->fmap.Extent());
+  bool changed = false;
+  for (int f = 1; f <= geometry->fmap.Extent(); ++f) {
+    const TopoDS_Shape &face = geometry->fmap(f);
+    std::vector<TopoDS_Shape> pieces;
+    for (const TopoDS_Shape &piece : splitter.Modified(face)) pieces.push_back(piece);
+    if (pieces.size() > 1) changed = true;
+    if (pieces.empty() && !splitter.IsDeleted(face)) pieces.push_back(face);
+    for (const TopoDS_Shape &piece : pieces) {
+      const int index = out->geometry->fmap.FindIndex(piece);
+      if (index >= 1) out->owner_lists[index - 1].push_back(f);
+    }
+  }
+  if (!changed) return nullptr;
+  return out;
 }
 
 rust::String occt_version() { return rust::String(OCC_VERSION_COMPLETE); }

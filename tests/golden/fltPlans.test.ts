@@ -94,4 +94,20 @@ describe('13 FLT validation plans, golden', () => {
     expect(again.document).toEqual(plan.document);
     expect(JSON.stringify(dataOf(again.steps, 'run_flight'))).toBe(JSON.stringify(dataOf(plan.steps, 'run_flight')));
   }, 120_000);
+
+  it('sc-flt-04-wind-aero: the wing quad with a pivoting wing in a 6 m/s head wind with a gust and seeded Dryden turbulence; replay is identical', () => {
+    const plan = run('sc-flt-04-wind-aero');
+    expect(normalize(plan.document)).toMatchSnapshot('document');
+    const flown = dataOf(plan.steps, 'run_flight') as {
+      aero: { wing: { pivotDeg: { final: number }; peakLiftN: number; outsideFraction: number } };
+    };
+    // the servo reached the 8° command (6 s + 0.27 s at 30 deg/s) before the end
+    expect(flown.aero.wing.pivotDeg.final).toBeCloseTo(8, 6);
+    expect(flown.aero.wing.peakLiftN).toBeGreaterThan(0);
+    expect(six(flown)).toMatchSnapshot('run_flight');
+    expect(six(dataOf(plan.steps, 'flight_report'))).toMatchSnapshot('flight_report');
+    const again = run('sc-flt-04-wind-aero');
+    expect(again.document).toEqual(plan.document);
+    expect(JSON.stringify(dataOf(again.steps, 'run_flight'))).toBe(JSON.stringify(dataOf(plan.steps, 'run_flight')));
+  }, 120_000);
 });
