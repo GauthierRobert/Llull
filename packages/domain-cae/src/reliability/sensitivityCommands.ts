@@ -2,17 +2,16 @@
 
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
-import type { CommandResult, ExecutionContext } from '@core/commands/types';
+import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { item, REVIEW_NOTE, type Item } from '../fatigue/items';
 import { refuseReliability } from './codes';
-import { isStudyFailure, studyContext } from './context';
-import { buildTransform, type Transform } from './nataf';
 import { reliabilityOf, responseOf } from './model';
+import { sensitivityTarget } from './sensitivityTarget';
 import { MAX_RESPONSE_EVALUATIONS, queryValue, withParameters } from './responseEval';
 import { sobolIndices } from './sobol';
 import { standardNormalSamples } from './sampling';
-import type { RandomVariable, Response } from '@cae/reliability/types';
+import type { Response } from '@cae/reliability/types';
 
 const MAX_EXPRESSION_EVALUATIONS = 2_000_000;
 /** Smoothness flag of parameter_sensitivity: |D+ - D-| > SMOOTH_RELATIVE |Dc| + SMOOTH_ABSOLUTE. */
@@ -133,76 +132,6 @@ export const parameterSensitivity = defineCommand({
   },
 });
 
-interface Target {
-  readonly label: string;
-  readonly unit: string;
-  readonly variables: readonly RandomVariable[];
-  readonly transform: Transform;
-  readonly evaluate: (x: readonly number[]) => number;
-  readonly usesResponses: boolean;
-  readonly items: readonly Item[];
-  readonly unverifiedReasons: readonly string[];
-}
-
-/** The sampled function of sensitivity_indices: a limit state g(x), or a response of the parameter-bound variables. */
-function sobolTarget(
-  doc: CadDocument,
-  params: { response?: string | undefined; limitState?: string | undefined },
-  ctx: ExecutionContext | undefined,
-): Target | { code: string; message: string; ids: string[] } {
-  if (params.limitState !== undefined) {
-    const context = studyContext(doc, params.limitState, ctx);
-    if (isStudyFailure(context)) return { code: context.code, message: context.message, ids: [...context.ids] };
-    return { ...context, label: params.limitState, unit: context.limitState.unit };
-  }
-  const name = params.response ?? '';
-  const response = responseOf(doc, name);
-  if (response === undefined) return { code: 'PRB_RESPONSE_NOT_FOUND', message: `no response '${name}'`, ids: [name] };
-  const model = reliabilityOf(doc);
-  const variables = model.variableOrder.flatMap((n) => {
-    const variable = model.variables[n];
-    return variable !== undefined && variable.binding.kind === 'parameter' && Object.hasOwn(doc.parameters, variable.binding.parameter)
-      ? [variable]
-      : [];
-  });
-  if (variables.length === 0)
-    return {
-      code: 'PRB_MODEL_EMPTY',
-      message: `no random variable is bound to a document parameter: response '${name}' has no input`,
-      ids: [name],
-    };
-  const transform = buildTransform(model, variables);
-  if (typeof transform === 'string') return { code: 'PRB_CORRELATION_INVALID', message: transform, ids: variables.map((v) => v.name) };
-  const slots = variables.map((v) => (v.binding.kind === 'parameter' ? v.binding.parameter : ''));
-  const evaluate = (x: readonly number[]): number => {
-    const sampled = withParameters(doc, Object.fromEntries(slots.map((parameter, i) => [parameter, x[i] ?? 0])), ctx);
-    const value = sampled === null ? null : queryValue(sampled, response.query, ctx);
-    return value !== null && value.ok ? value.value : Number.NaN;
-  };
-  const unsourced = variables.filter((v) => v.citation === undefined).map((v) => v.name);
-  return {
-    label: name,
-    unit: response.unit,
-    variables,
-    transform,
-    evaluate,
-    usesResponses: true,
-    items:
-      unsourced.length === 0
-        ? []
-        : [
-            item(
-              'PRB_SCATTER_UNSOURCED',
-              'warning',
-              `no citation for the scatter of ${unsourced.join(', ')}`,
-              'redefine the variable with a citation',
-              unsourced,
-            ),
-          ],
-    unverifiedReasons: unsourced.map((n) => `${n}: scatter has no cited source`),
-  };
-}
-
 const round = (value: number): string => value.toPrecision(4);
 
 /**
@@ -250,7 +179,7 @@ export const sensitivityIndices = defineCommand({
       refuseReliability(doc, 'sensitivity_indices', code, message, [...ids], paths);
     if ((params.limitState === undefined) === (params.response === undefined))
       return fail('PRB_PARAMS_INVALID', 'give exactly one of limitState and response', [], ['limitState', 'response']);
-    const target = sobolTarget(doc, params, ctx);
+    const target = sensitivityTarget(doc, params, ctx);
     if ('code' in target)
       return fail(target.code, target.message, target.ids, [params.limitState === undefined ? 'response' : 'limitState']);
     const d = target.variables.length;

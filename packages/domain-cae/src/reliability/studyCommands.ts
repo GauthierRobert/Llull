@@ -9,6 +9,7 @@ import { refuseReliability } from './codes';
 import { isStudyFailure, studyContext, type StudyContext } from './context';
 import { reliabilityOf } from './model';
 import { MAX_RESPONSE_EVALUATIONS } from './responseEval';
+import { importanceStudy } from './importanceStudy';
 import { formStudy, fosmStudy, monteCarloStudy } from './studies';
 
 const MAX_SAMPLES = 2_000_000;
@@ -129,7 +130,7 @@ export const propagateUncertainty = defineCommand({
   },
 });
 
-const METHODS = ['form', 'sorm', 'mc', 'fosm'] as const;
+const METHODS = ['form', 'sorm', 'mc', 'is', 'fosm'] as const;
 
 /**
  * @affects nothing; read-only, data { form?, sorm?, monteCarlo?, fosm?, comparison { pf per method, formInsideMonteCarloInterval? }, items, reviewRequired: true }
@@ -141,7 +142,7 @@ export const runReliabilityStudy = defineCommand({
   annotations: { readOnly: true },
   description:
     'Reliability analysis of ONE limit state g(x) (failure when g < 0) with one or several methods, compared: "form" (Hasofer-Lind / Rackwitz-Fiessler iteration in standard normal space, Nataf transform for ' +
-    'distributions and correlation), "sorm" (FORM + Breitung curvature correction, needs a converged design point with beta > 0), "mc" (seeded Monte Carlo or Latin hypercube, needs `seed`) and "fosm" ' +
+    'distributions and correlation), "sorm" (FORM + Breitung curvature correction, needs a converged design point with beta > 0), "mc" (seeded Monte Carlo or Latin hypercube, needs `seed`), "is" (importance sampling centred on the FORM design point: unbiased, far smaller variance than mc for rare failures; needs `seed`; data.importanceSampling = { pf, standardError, ci95, effectiveSampleSize, ... }) and "fosm" ' +
     '(first-order second-moment). Default methods: form, mc, fosm; methods ["form"] is the plain FORM run. data.form (and data.sorm) = { beta, pfForm = Φ(-beta), designPointX { variable: { value, unit } } ' +
     '(most probable failure point), importance { variable: alpha^2 } (sums to 1: which variable drives failure), iterations, converged, items[] } (beta is negative when all variables at their medians already ' +
     'fail; exact for linear g in normal variables: (muR - muS) / sqrt(sR^2 + sS^2); gradients by central differences); data.monteCarlo and data.fosm as in propagate_uncertainty; ' +
@@ -154,7 +155,7 @@ export const runReliabilityStudy = defineCommand({
       .min(1)
       .optional()
       .describe(
-        'Methods to run, any of form, sorm, mc, fosm. Default ["form", "mc", "fosm"]. ["form"] = FORM only; add "sorm" for the Breitung correction.',
+        'Methods to run, any of form, sorm, mc, is, fosm. Default ["form", "mc", "fosm"]. ["form"] = FORM only; add "sorm" for the Breitung correction.',
       ),
     samples: z.number().int().min(2).optional().describe(`Monte Carlo samples (default ${DEFAULT_SAMPLES}, at most ${MAX_SAMPLES}).`),
     seed: seedSchema.optional(),
@@ -167,15 +168,16 @@ export const runReliabilityStudy = defineCommand({
     const samples = params.samples ?? DEFAULT_SAMPLES;
     const precheck = (code: string, message: string, path: string): CommandResult =>
       refuseReliability(doc, 'run_reliability_study', code, message, [params.limitState], [path]);
-    if (methods.has('mc') && params.seed === undefined) return precheck('PRB_PARAMS_INVALID', "method 'mc' needs an integer seed", 'seed');
-    const budget = methods.has('mc') ? budgetIssue(samples, 1, reliabilityOf(doc).variableOrder.length) : null;
+    const sampled = methods.has('mc') || methods.has('is');
+    if (sampled && params.seed === undefined) return precheck('PRB_PARAMS_INVALID', "methods 'mc' and 'is' need an integer seed", 'seed');
+    const budget = sampled ? budgetIssue(samples, 1, reliabilityOf(doc).variableOrder.length) : null;
     if (budget !== null) return precheck('PRB_BUDGET_EXCEEDED', budget, 'samples');
     return withContext(
       doc,
       'run_reliability_study',
       params.limitState,
       (context) => {
-        if (methods.has('mc') && context.usesResponses && samples > MAX_RESPONSE_EVALUATIONS)
+        if (sampled && context.usesResponses && samples > MAX_RESPONSE_EVALUATIONS)
           return precheck(
             'PRB_BUDGET_EXCEEDED',
             `the limit state reads a response: ${samples} samples exceed ${MAX_RESPONSE_EVALUATIONS} registry evaluations`,
@@ -203,6 +205,11 @@ export const runReliabilityStudy = defineCommand({
           data['monteCarlo'] = study.data;
           pf['mc'] = study.pf;
           interval = study.wilson95;
+        }
+        if (methods.has('is')) {
+          const study = importanceStudy(context, samples, params.seed ?? Number.NaN, iterations, tolerance);
+          data['importanceSampling'] = study.data;
+          pf['is'] = study.pf;
         }
         if (methods.has('fosm')) {
           const study = fosmStudy(context);
