@@ -50,7 +50,7 @@ interface Rebuilt {
 
 interface RebuiltOptions {
   readonly unitSystem?: 'N-mm-t-s' | 'N-m-kg-s' | 'lbf-in-slinch-s';
-  readonly loadKind?: 'force' | 'pressure' | 'gravity';
+  readonly loadKind?: 'force' | 'pressure' | 'gravity' | 'inertial';
   readonly loadCase?: string;
   readonly nodeSet?: readonly number[];
   /** Tetrahedron faces (element, CalculiX face) of the pressure load's face set. */
@@ -91,11 +91,32 @@ function rebuilt(base: CadDocument, topology: ReturnType<typeof artifactStore>, 
     name: 'pull',
     loadCase,
     category: 'limit',
-    kind: loadKind,
-    ...(loadKind === 'gravity' ? {} : { target: { entityId, facesNear: [[30, 10, 0.5]] } }),
-    ...(loadKind === 'force' ? { vector: [0, -1000, 0] } : loadKind === 'gravity' ? { vector: [0, -9810, 0] } : { magnitude: 1 }),
+    kind: loadKind === 'inertial' ? 'gravity' : loadKind,
+    ...(loadKind === 'gravity' || loadKind === 'inertial' ? {} : { target: { entityId, facesNear: [[30, 10, 0.5]] } }),
+    ...(loadKind === 'force'
+      ? { vector: [0, -1000, 0] }
+      : loadKind === 'gravity' || loadKind === 'inertial'
+        ? { vector: [0, -9810, 0] }
+        : { magnitude: 1 }),
   });
   doc = load.document;
+  if (loadKind === 'inertial') {
+    const retyped = doc.analysis?.cases[analysisId];
+    if (doc.analysis !== undefined && retyped !== undefined)
+      doc = {
+        ...doc,
+        analysis: {
+          ...doc.analysis,
+          cases: {
+            ...doc.analysis.cases,
+            [analysisId]: {
+              ...retyped,
+              loads: Object.fromEntries(Object.entries(retyped.loads).map(([id, l]) => [id, { ...l, kind: 'inertial' as const }])),
+            },
+          },
+        },
+      };
+  }
   const analysis = doc.analysis;
   const analysisCase = analysis?.cases[analysisId];
   if (analysis !== undefined && analysisCase !== undefined && unitSystem !== 'N-mm-t-s')
@@ -268,6 +289,12 @@ describe('compare_to_topology compliance ratio', () => {
       rebuilt(doc, topology, 0.09, { loadKind: 'pressure', faceSet: [[1, 3]], displacedNodes: [2, 4, 8], elementType: 'C3D10' }),
       'unsupported',
     );
+  });
+
+  it('names an inertial flight load as not rebuilt', () => {
+    const rebuild = rebuilt(doc, topology, 0.01, { loadKind: 'inertial', material: true, displacedNodes: [1, 2, 4, 8] });
+    unavailable(rebuild, 'unsupported');
+    expect(data<Compare>(compare(rebuild)).complianceStatus.message).toContain('inertial flight load');
   });
 
   it('reports the ratio as unavailable for loads and results it cannot read', () => {

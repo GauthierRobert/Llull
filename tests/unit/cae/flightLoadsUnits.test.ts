@@ -1,12 +1,13 @@
 /** 14 FLL-M2 pure parts: the series -> instants conversion, instant choice, the rigid-body balance branches, the 3-2-1 pattern and the design hash. */
 import { describe, expect, it } from 'vitest';
-import { execute } from '@core/commands/registry';
+import { defaultContext } from '@core/commands/context';
+import { execute, getCommand } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { flightDesignHash } from '@cae/flightLoads/designHash';
 import { chooseInstants, flightInstants } from '@cae/flightLoads/flightInstants';
 import { analysisErrors } from '@cae/model/validate';
 import { buildDeckContext } from '@cae/decks/context';
-import { inertialDloadLines } from '@cae/decks/inertialBodyForce';
+import { inertialContribution, inertialDloadLines } from '@cae/decks/inertialBodyForce';
 import { writeInp } from '@cae/decks/inpWriter';
 import { reliefAssessment } from '@cae/flightLoads/rigidBalance';
 import { bestSupportPattern } from '@cae/flightLoads/supportPattern';
@@ -395,5 +396,139 @@ describe('review fixes', () => {
     expect(kept.lines).toContain('1, GRAV, 0, 0, 0, 1');
     expect(kept.lines).toHaveLength(plain.lines.length + 1);
     expect(inertialDloadLines(ctx, [0, 0, 0], terms, true)).toEqual(kept);
+  });
+});
+
+describe('branch coverage of the pure parts', () => {
+  const bar = barDocument({ supports: false });
+
+  it('a run whose series has one sample is refused with FLL_RUN_FAILED (no NaN sampling rate reaches the loads)', () => {
+    const fake = {
+      run: (doc: CadDocument) => ({
+        document: doc,
+        summary: 'fake',
+        affected: [],
+        data: { series: { times: [0], velocityMps: [[0, 0, 0]], attitudeDeg: [[0, 0, 0]], bodyRateDegS: [[0, 0, 0]] } },
+      }),
+    };
+    const ctx = { ...defaultContext(), registry: (name: string) => (name === 'run_flight' ? (fake as never) : getCommand(name)) };
+    const result = execute(bar.doc, 'export_flight_loads', { analysisId: bar.analysisId, scenario: 'x', referencePoint: [0, 0, 0] }, ctx);
+    expectNoOp(result, bar.doc);
+    expect(result.error?.code).toBe('FLL_RUN_FAILED');
+    expect(result.summary).toContain('fewer than 3');
+    // no dynamics plugin registered
+    const none = execute(
+      bar.doc,
+      'export_flight_loads',
+      { analysisId: bar.analysisId, scenario: 'x', referencePoint: [0, 0, 0] },
+      { ...defaultContext(), registry: () => undefined },
+    );
+    expect(none.error?.code).toBe('FLL_RUN_FAILED');
+    expect(none.summary).toContain('not registered');
+  });
+
+  it.each([
+    ['times not a list', { times: 'abc' }],
+    ['a NaN time', { times: [0, 1, Number.NaN, 3, 4] }],
+    ['a rotors table that is not a record', { rotors: 5 }],
+    ['rotor thrust that is not numbers', { rotors: { r1: { thrustN: ['a', 'b', 'c', 'd', 'e'] } } }],
+    ['a rotor that is not a record', { rotors: { r1: 3 } }],
+  ])('hostile series: %s never throws', (_name, patch) => {
+    const times = [0, 1, 2, 3, 4];
+    const base = {
+      times,
+      velocityMps: times.map(() => [0, 0, 0]),
+      attitudeDeg: times.map(() => [0, 0, 0]),
+      bodyRateDegS: times.map(() => [0, 0, 0]),
+    };
+    const result = flightInstants({ ...base, ...patch }, GRAVITY);
+    if (typeof result === 'string') expect(result.length).toBeGreaterThan(0);
+    else expect(result.every((instant) => Object.keys(instant.thrustN).length === 0)).toBe(true);
+  });
+
+  it('supportPattern: an exactly collinear and a coincident set have no pattern; the best pattern of a generic set has distinct dofs per point', () => {
+    expect(
+      bestSupportPattern([
+        [0, 0, 0],
+        [1, 1, 1],
+        [2, 2, 2],
+      ]),
+    ).toBeNull();
+    expect(
+      bestSupportPattern([
+        [0, 0, 0],
+        [1, 0, 0],
+        [0.5, 0.01, 0],
+      ]),
+    ).toBeNull();
+    const generic = bestSupportPattern([
+      [0, 0, 0],
+      [3, 1, 0.5],
+      [1, 4, 2],
+    ]);
+    expect(generic?.dofs[0]).toEqual(['ux', 'uy', 'uz']);
+    expect(new Set(generic?.dofs[1]).size).toBe(2);
+    expect(generic?.dofs[2]).toHaveLength(1);
+  });
+
+  it('inertialContribution defaults (no reference point, no angular terms) and its centrifugal axis; elementCentroids skip missing nodes and quadratic mid nodes keep the centroid', () => {
+    const doc = mustRun(bar.doc, 'set_free_body_support', {
+      analysisId: bar.analysisId,
+      entityId: bar.boxId,
+      points: [
+        [0, 0, 0],
+        [2, 0, 0],
+        [0, 1, 0],
+      ],
+    });
+    const mesh = barMesh(doc, bar.analysisId, bar.boxId, {});
+    const ctx = buildDeckContext(doc, bar.analysisId, mesh);
+    if (ctx === null) throw new Error('no context');
+    const base = { id: 'i', name: 'i', loadCase: 'LC1', category: 'limit' as const, kind: 'inertial' as const };
+    const plain = inertialContribution(ctx, base, 2);
+    expect(plain.field).toEqual([-0, -0, -0]);
+    expect(plain.centrifugal).toBeUndefined();
+    expect(plain.angular).toBeUndefined();
+    const spin = inertialContribution(ctx, { ...base, vector: [1, 2, 3], angularVelocity: [0, 3, 4], referencePoint: [1, 1, 1] }, 1);
+    expect(spin.field).toEqual([-1, -2, -3]);
+    expect(spin.centrifugal).toEqual({ omegaSquared: 25, point: [1, 1, 1], axis: [0, 0.6, 0.8] });
+    // an element naming a node the mesh lacks: the known corners give the centroid; one with no known node gets no line
+    const holey = {
+      ...mesh,
+      blocks: [
+        {
+          type: 'C3D4' as const,
+          entityId: bar.boxId,
+          elements: [
+            [1, 1, 2, 4, 99],
+            [2, 98, 99, 97, 96],
+          ],
+        },
+      ],
+    };
+    const holeyCtx = buildDeckContext(doc, bar.analysisId, holey);
+    if (holeyCtx === null) throw new Error('no context');
+    const lines = inertialDloadLines(holeyCtx, [0, 0, 0], { centrifugal: [], angular: [{ alpha: [0, 0, 1], point: [0, 0, 0] }] });
+    if ('code' in lines) throw new Error('refused');
+    expect(lines.lines).toHaveLength(1);
+    expect(lines.lines[0]).toMatch(/^1, GRAV, /);
+  });
+
+  it('the balance and the hash tolerate a part whose entity is gone (not a 3D solid: reported, not thrown)', () => {
+    const supported = mustRun(bar.doc, 'set_free_body_support', {
+      analysisId: bar.analysisId,
+      entityId: bar.boxId,
+      points: [
+        [0, 0, 0],
+        [2, 0, 0],
+        [0, 1, 0],
+      ],
+    });
+    const { [bar.boxId]: _gone, ...rest } = supported.entities;
+    const broken = { ...supported, entities: rest } as CadDocument;
+    const analysis = broken.analysis?.cases[bar.analysisId];
+    if (analysis === undefined) throw new Error('no case');
+    expect(reliefAssessment(broken, analysis)?.unassessed[0]).toContain('not a 3D solid');
+    expect(flightDesignHash(broken, analysis)).toMatch(/^[0-9a-f]{16}$/);
   });
 });

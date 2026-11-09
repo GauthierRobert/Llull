@@ -225,7 +225,7 @@ export const exportFlightLoads = defineCommand({
           [analysisId, params.scenario ?? ''],
           ['at'],
         );
-      effectiveHz = (instants.length - 1) / (last - first);
+      effectiveHz = last > first ? (instants.length - 1) / (last - first) : null;
       chosen = chooseInstants(instants, at);
     }
     const fromRun = params.scenario !== undefined;
