@@ -68,10 +68,11 @@ function station(sections: readonly LatticeSection[], cumulative: readonly numbe
   const t = s1 > s0 ? Math.min(1, Math.max(0, (s - s0) / (s1 - s0))) : 0;
   const incidence = a.incidence + (b.incidence - a.incidence) * t;
   const span = spanDirection(a.leadingEdge, b.leadingEdge);
-  // "nose up" must not depend on the listing direction: a section run toward -y (or -z for a vertical fin) flips cross([1,0,0], span), so it is re-oriented
-  // to +z for a surface with a spanwise y component, and to -y (the sense of a fin listed upward) for a vertical one
+  // "nose up" must not depend on the listing direction: reversing a section run flips cross([1,0,0], span). The sign is fixed by the half plane
+  // up·(0,-1,1) > 0 (the cut sits at a 45° anhedral surface, far from wings, dihedral and fins, so the rule is continuous over every practical
+  // surface): +z for a horizontal wing, -y for a vertical fin, and a canted fin keeps the sense of the vertical one
   const raw = cross3([1, 0, 0], span);
-  const up = span[1] < -1e-12 || (Math.abs(span[1]) <= 1e-12 && span[2] < 0) ? scale3(raw, -1) : raw;
+  const up = span[1] + span[2] < 0 ? scale3(raw, -1) : raw;
   return {
     le: lerp3(a.leadingEdge, b.leadingEdge, t),
     chord: a.chord + (b.chord - a.chord) * t,

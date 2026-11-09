@@ -53,7 +53,7 @@ export function aeroOutput(runtime: AeroRuntime, body: BodyKinematics, pivotDeg:
   const uz = dot3(air, frame.z);
   const speedSquared = ux * ux + uz * uz;
   if (speedSquared < 1e-12) return NONE;
-  // flow coming from the downstream side (|α| > 90°): the table does not describe it, so no force and the step counts as outside the table
+  // flow coming from the downstream side (|α| >= 90°): the table does not describe it, so no force and the step counts as outside the table
   if (ux <= 0) return { ...NONE, alphaDeg: Math.atan2(uz, ux) * DEG, outside: true };
   const alpha = Math.atan2(uz, ux);
   const alphaDeg = alpha * DEG;

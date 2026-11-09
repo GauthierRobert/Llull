@@ -165,3 +165,21 @@ describe('pivot command and servo step', () => {
     expect(auxFixed[AERO.pivot]).toBe(0);
   });
 });
+
+describe('flow at and past 90 degrees', () => {
+  const runtime = compileAero(
+    surface(null, { ...table, pivotDeg: [0], cl: [[-0.2], [0], [0.4]], cd: [[0.02], [0.01], [0.03]], cm: [[0], [0], [0]] }),
+    [0, 0, 0],
+    1,
+  );
+  it('|alpha| = 90 degrees exactly (ux = 0) gives no force and counts as outside, like |alpha| > 90', () => {
+    // forward +x: flow frame x = -x_body, z up; air velocity = -body velocity
+    const edge = aeroOutput(runtime, { ...still, linearVelocity: [0, 0, -5] }, 0);
+    expect(edge.alphaDeg).toBeCloseTo(90, 9);
+    expect(edge.force).toEqual([0, 0, 0]);
+    expect(edge.outside).toBe(true);
+    const inside = aeroOutput(runtime, { ...still, linearVelocity: [5, 0, -0.01] }, 0);
+    expect(inside.outside).toBe(false);
+    expect(Math.abs(inside.force[2])).toBeGreaterThan(0);
+  });
+});
