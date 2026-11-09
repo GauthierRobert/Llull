@@ -68,7 +68,7 @@ export function stepAero(
     const { surface } = runtime;
     const at = base + AERO_SLOTS * i;
     const { servo } = surface;
-    const before = aux[at + AERO.pivot] ?? 0;
+    const before = aux[at + AERO.pivot] as number;
     let after = before;
     if (servo !== null) {
       const target = clampTo(pivotCommand(scenario, surface.id, time, before), servo.minDeg, servo.maxDeg);
@@ -86,10 +86,10 @@ export function stepAero(
     aux[at + AERO.cd] = out.cd;
     aux[at + AERO.lift] = out.liftN;
     aux[at + AERO.drag] = out.dragN;
-    if (out.outside) aux[at + AERO.outsideSteps] = (aux[at + AERO.outsideSteps] ?? 0) + 1;
-    aux[at + AERO.minAlpha] = Math.min(aux[at + AERO.minAlpha] ?? Infinity, out.alphaDeg);
-    aux[at + AERO.maxAlpha] = Math.max(aux[at + AERO.maxAlpha] ?? -Infinity, out.alphaDeg);
-    if (Math.abs(out.liftN) > (aux[at + AERO.peakLift] ?? 0)) {
+    if (out.outside) aux[at + AERO.outsideSteps] = (aux[at + AERO.outsideSteps] as number) + 1;
+    aux[at + AERO.minAlpha] = Math.min(aux[at + AERO.minAlpha] as number, out.alphaDeg);
+    aux[at + AERO.maxAlpha] = Math.max(aux[at + AERO.maxAlpha] as number, out.alphaDeg);
+    if (Math.abs(out.liftN) > (aux[at + AERO.peakLift] as number)) {
       aux[at + AERO.peakLift] = Math.abs(out.liftN);
       aux[at + AERO.peakLiftTime] = time;
     }

@@ -1,6 +1,6 @@
 /** Pure aero laws (13 FLT M4): table lookup, reverse flow, pivot command and servo step, load-validation bounds. */
 import { describe, expect, it } from 'vitest';
-import type { AeroSurface, AeroTable } from '@dynamics/flight/aeroModel';
+import { flowFrame, type AeroSurface, type AeroTable, type ForwardAxis } from '@dynamics/flight/aeroModel';
 import { assembleTable, lookupAero } from '@dynamics/flight/aeroTable';
 import { AERO, AERO_SLOTS, initialAeroAux, pivotCommand, stepAero } from '@dynamics/flight/aeroBlock';
 import { aeroOutput, compileAero } from '@dynamics/flight/aeroSurface';
@@ -58,6 +58,34 @@ const scenario = (setpoints: FlightScenario['setpoints']): FlightScenario => ({
   defaulted: [],
 });
 const still = { position: [0, 0, 0], orientation: [1, 0, 0, 0], angularVelocity: [0, 0, 0] } as const;
+
+describe('flowFrame', () => {
+  it('is right-handed with x against the travel direction and z up for each forward axis', () => {
+    const expected = {
+      '+x': [
+        [-1, 0, 0],
+        [0, -1, 0],
+      ],
+      '-x': [
+        [1, 0, 0],
+        [0, 1, 0],
+      ],
+      '+y': [
+        [0, -1, 0],
+        [1, 0, 0],
+      ],
+      '-y': [
+        [0, 1, 0],
+        [-1, 0, 0],
+      ],
+    } as const;
+    for (const [forward, [x, y]] of Object.entries(expected)) {
+      const frame = flowFrame(forward as ForwardAxis);
+      const plain = (v: readonly number[]): number[] => v.map((c) => c + 0);
+      expect({ x: plain(frame.x), y: plain(frame.y), z: plain(frame.z) }).toEqual({ x, y, z: [0, 0, 1] });
+    }
+  });
+});
 
 describe('lookupAero', () => {
   it('is exact on nodes, bilinear between them and flags both axes outside', () => {
