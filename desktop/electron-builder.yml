@@ -6,8 +6,11 @@ productName: llull
 copyright: Copyright © 2026 Gauthier Robert (GPL-3.0-or-later)
 directories:
   output: release
+# App / installer / taskbar icon, rendered from public/favicon.svg; electron-builder derives .ico and .icns from it.
+icon: assets/icon.png
 files:
   - dist/**
+  - assets/**
   - package.json
 extraResources:
   # llull's own licence (LIC1); third-party notices ship with python/ and native/.

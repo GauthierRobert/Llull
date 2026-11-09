@@ -20,6 +20,10 @@ describe('TopBar — brand', () => {
     render(<TopBar />);
     expect(screen.getByText('Llull')).toBeDefined();
   });
+  it('shows the logo from the favicon', () => {
+    const { container } = render(<TopBar />);
+    expect(container.querySelector('.brand-mark img')).toHaveAttribute('src', '/favicon.svg');
+  });
 });
 
 // TopBar — command palette trigger

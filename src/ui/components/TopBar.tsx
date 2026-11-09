@@ -50,10 +50,7 @@ export function TopBar(): React.ReactElement {
 
         <div className="brand" aria-label="Llull CAD">
           <div className="brand-mark" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-              <circle cx="11" cy="11" r="9.5" stroke="currentColor" strokeWidth="1.6" />
-              <circle cx="11" cy="11" r="4.5" fill="var(--accent)" />
-            </svg>
+            <img src="/favicon.svg" width={26} height={26} alt="" />
           </div>
           <h1 className="brand-wordmark">Llull</h1>
         </div>

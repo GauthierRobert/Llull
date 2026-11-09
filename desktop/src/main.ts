@@ -377,6 +377,7 @@ function createWindow(url: string): BrowserWindow {
     width: 1440,
     height: 900,
     title: 'llull',
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.js') },
   });
   const origin = new URL(url).origin;
