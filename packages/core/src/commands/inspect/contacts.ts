@@ -21,7 +21,12 @@ function solidsOf(doc: CadDocument, entity: Entity, path: string, depth: number)
   if (component === undefined || depth >= MAX_NESTING) return [];
   const prefix = `expanded::${entity.id}::`;
   return expandInstance(entity as InstanceEntity, component).flatMap((child) =>
-    solidsOf(doc, { ...child, id: child.id.startsWith(prefix) ? child.id.slice(prefix.length) : child.id }, `${path}${entity.id}/`, depth + 1),
+    solidsOf(
+      doc,
+      { ...child, id: child.id.startsWith(prefix) ? child.id.slice(prefix.length) : child.id },
+      `${path}${entity.id}/`,
+      depth + 1,
+    ),
   );
 }
 
@@ -79,7 +84,8 @@ export const findContacts = defineCommand({
         continue;
       }
       if (!is3D(entity)) {
-        if (entityIds !== undefined) return fail('COR_ENTITY_NOT_SOLID', `'${id}' (${entity.kind}) is not a 3D solid`, FIND_REMEDIATION, [id]);
+        if (entityIds !== undefined)
+          return fail('COR_ENTITY_NOT_SOLID', `'${id}' (${entity.kind}) is not a 3D solid`, FIND_REMEDIATION, [id]);
         continue;
       }
       bodies.push(...solidsOf(doc, entity, '', 0));
@@ -90,7 +96,10 @@ export const findContacts = defineCommand({
     const counts = countsOf(pairs);
     const listed = pairs
       .slice(0, MAX_LISTED)
-      .map((pair) => `${pair.a}|${pair.b} ${pair.kind}${pair.area === null || pair.kind === 'possible' ? '' : ` area ${pair.area}`}${pair.volume ? ` volume ${pair.volume}` : ''}`);
+      .map(
+        (pair) =>
+          `${pair.a}|${pair.b} ${pair.kind}${pair.area === null || pair.kind === 'possible' ? '' : ` area ${pair.area}`}${pair.volume ? ` volume ${pair.volume}` : ''}`,
+      );
     const toleranceData = {
       value: tolerance === undefined ? DEFAULT_TOLERANCE_MM : tolerance.value,
       unit: tolerance === undefined ? 'mm' : tolerance.unit,
@@ -98,7 +107,11 @@ export const findContacts = defineCommand({
       source: defaulted ? '08 MAT stack contact tolerance 1e-4 in' : 'caller',
     };
     const summary =
-      `${COMMAND}: ${pairs.length} contact(s) among ${bodies.length} solid(s) (${Object.entries(counts).map(([kind, n]) => `${kind} ${n}`).join(', ') || 'none'}); ` +
+      `${COMMAND}: ${pairs.length} contact(s) among ${bodies.length} solid(s) (${
+        Object.entries(counts)
+          .map(([kind, n]) => `${kind} ${n}`)
+          .join(', ') || 'none'
+      }); ` +
       `${nearMisses.length} near miss(es); tolerance ${toleranceData.value} ${toleranceData.unit}${defaulted ? ' (defaulted)' : ''}; lengths in ${doc.units}` +
       `${listed.length > 0 ? `: ${listed.join('; ')}${pairs.length > MAX_LISTED ? '; …' : ''}` : ''}.`;
     return report(doc, summary, { pairs, nearMisses, tolerance: toleranceData, unit: doc.units, counts });

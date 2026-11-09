@@ -75,7 +75,7 @@ export function contactOf(first: ContactBody, second: ContactBody, tolerance: nu
       ...base,
       kind: 'face',
       gap,
-      area: others.reduce((product, axis) => product * (o[axis] ?? 0), 1),
+      area: others.reduce<number>((product, axis) => product * (o[axis] ?? 0), 1),
       volume: 0,
       normal: unitAxis(first3, sign),
     };

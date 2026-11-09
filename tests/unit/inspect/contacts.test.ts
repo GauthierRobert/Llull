@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { defaultContext } from "@core/commands/context";
+import { defaultContext } from '@core/commands/context';
 import { tsSpatialIndex } from '@core/geometry/spatialIndex';
 import type { ContactPair } from '@core/geometry/contacts';
 
@@ -163,7 +163,7 @@ describe('find_contacts classification and scope', () => {
         return tsSpatialIndex.build(boxes);
       },
     };
-    const result = execute(doc, "find_contacts", TOL, { ...defaultContext(), spatialIndex });
+    const result = execute(doc, 'find_contacts', TOL, { ...defaultContext(), spatialIndex });
     expect(builds).toBe(1);
     expect((result.data as Found).pairs).toHaveLength(1);
   });
