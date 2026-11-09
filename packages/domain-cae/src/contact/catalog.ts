@@ -4,6 +4,7 @@ import { commandCatalog } from '@core/commands/schema';
 import { boltedJointCheck } from './boltedJointCommand';
 import { hertzContact } from './hertzCommand';
 import { jointFromFastenerStack } from './jointFromStack';
+import { jointStiffnessFromFe } from './jointStiffnessCommand';
 import { interferenceFit } from './interferenceCommand';
 import { addContactPair, deleteContactPair, updateContactPair } from './pairCommands';
 import { addBoltPretension, deleteBoltPretension } from './pretensionCommands';
@@ -19,6 +20,7 @@ export const contactCommands = commandCatalog(
   addBoltPretension,
   deleteBoltPretension,
   jointFromFastenerStack,
+  jointStiffnessFromFe,
   contactReport,
   checkContact,
 );
