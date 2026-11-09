@@ -43,7 +43,7 @@ export const checkMaterialCompatibility = defineCommand({
     'so every item carries COR_SCREENING_RULE_ONLY. A smaller anode on a larger cathode warns COR_SMALL_ANODE (area ratio from box surface areas). Carbon fibre (group graphite) on aluminium fails COR_CFRP_ALUMINIUM. ' +
     'A pair covered by declare_isolation reports pass_isolated. A part with no material, group or index is `unknown` (COR_MATERIAL_MISSING, COR_GROUP_MISSING, COR_GROUP_VALUE_MISSING), never pass. ' +
     'Scheme mil_std_889d reports COR_889_TABLE_MISSING (the matrix is not shipped). Every item has reviewRequired true: a human decides; stress-corrosion and hydrogen-embrittlement rules are not evaluated. ' +
-    'Returns data { status: pass | warn | unknown | fail (worst unaccepted item), scheme, environment, items: [{ key, status, code, ruleId, ruleGrade, ids, inputs, warnings, remedies, unverified, reviewRequired, acceptance? }], counts, tolerance, contacts }. ' +
+    'Returns data { status: pass | pass_isolated | warn | unknown | fail (worst unaccepted item), scheme, environment, items: [{ key, status, code, ruleId, ruleGrade, ids, inputs, warnings, remedies, unverified, reviewRequired, acceptance? }], counts, tolerance, contacts }. ' +
     'report: true adds data.text (CSV, `--save corrosion.csv`). Next: declare_isolation, accept_corrosion_item (human only).',
   params: z.object({
     entityIds: z

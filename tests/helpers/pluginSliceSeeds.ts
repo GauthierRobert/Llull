@@ -32,6 +32,7 @@ import { dtStudyBar, orderStudyBar, recordKind } from '../unit/cae/vnv/kindFixtu
 import { recordedStudy, studyBar } from '../unit/cae/vnv/studyFixtures';
 import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import { flatDocument } from '../unit/vibroacoustics/fixtures';
+import { corrosionDocument } from '../unit/corrosion/seed';
 import { quadDrone, rotorParams } from '../unit/flight/flightFixture';
 import { SOURCE_TEXT, imperfectBar } from '../unit/cae/nonlinear/imperfectionFixtures';
 import {
@@ -341,6 +342,12 @@ function withLedgers(doc: CadDocument): CadDocument {
 }
 
 export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
+  'physics-corrosion': {
+    roots: ['corrosion'],
+    build: corrosionDocument,
+    query: { name: 'check_material_compatibility', params: constant({}) },
+    mutate: { name: 'set_service_environment', params: constant({ scheme: 'anodic_index', environment: 'harsh' }) },
+  },
   'physics-vibroacoustics': {
     roots: ['vibroacoustics'],
     build: flatDocument,

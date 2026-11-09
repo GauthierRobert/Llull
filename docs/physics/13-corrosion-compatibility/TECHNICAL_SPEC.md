@@ -1,6 +1,6 @@
 # PHY-13 — Corrosion & environmental compatibility — Technical spec
 
-Gap id **COR** · Status: specification (no implementation) · Written 2026-10-15
+Gap id **COR** · Status: M1-M3 and M6 implemented (see §13 As built); M4, M5, RS-6 open · Written 2026-10-15
 Functional: [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md) · Validation: [validation/README.md](validation/README.md)
 
 ---
@@ -336,3 +336,26 @@ See FUNCTIONAL_SPEC §11 [R1]–[R15] and `validation/sources.md` [S1]–[S19]. 
 - [T2] 08 MAT TECHNICAL_SPEC §3.4 `FastenerStack`, §5.3 contact tolerance — `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`
 - [RS1] Native compute programme — [`../../decisions/RS1-native-compute.md`](../../decisions/RS1-native-compute.md) (step RS-6)
 - [T3] Open CASCADE Technology reference (BRepExtrema_DistShapeShape, BRepAlgoAPI_Common, BRepGProp) — https://dev.opencascade.org/doc/refman/html/ (not fetched; class names to verify against the bundled build)
+
+## 13. As built (COR M1, M2, M3, M6; 2026-11-09)
+
+Delivered: M1 (`find_contacts`), M2 (slice, environment, groups, surface systems, isolations, anodic screening, CFRP, area ratio, check, codes), M3 (stack contacts), M6 (human-gate acceptance, CSV report). Not delivered: **M4** (kernel proximity port), **M5** (the MIL-STD-889D matrix, SCC rows, HE: no free reviewed source, so `GALVANIC_889D_MATRIX` ships EMPTY and a check under `mil_std_889d` is `COR_889_TABLE_MISSING`; no SCC/HE item is produced; the check says so in `data.notes`), RS-6 (native broad phase; the broad phase already goes through the injected `SpatialIndexPort`).
+
+| Spec item | As built |
+| --------- | -------- |
+| §2.1 `find_contacts` | core `commands/inspect/contacts.ts`, narrow phase `geometry/contacts.ts`; registered in `inspect/catalog.ts`, toolset `measure` |
+| §2.1 plugin | `physics-corrosion` in `packages/domain-cae/src/corrosion/` (no new package), exported as `corrosionPlugin` from `@cae/index`, installed in `src/app/plugins.ts`. Toolset **`materials`** (shared with PHY-12), not a new `corrosion` toolset: a new toolset name touches the UI palette labels and is a lane-2 change |
+| TR-COR-01 broad phase | the existing `SpatialIndexPort.boxQuery` over boxes inflated by the reach (`ctx.spatialIndex`, else the TypeScript BVH); no second BVH, no sort-and-sweep. Candidates are identical by the port contract |
+| TR-COR-02 narrow phase | (a) closed form for two unrotated boxes; (d) every other solid pair is an AABB `possible` contact, `source: "aabb"`, `approximate: true`, `area`/`volume` null. Rotated boxes are NOT closed-form (their AABB is not the solid). (b)(c) need M4 |
+| §3.1 `ContactPair` | `source` is `closed_form` or `aabb` (stack pairs are produced by the plugin, not by `find_contacts`); `includeStacks` is a parameter of `check_material_compatibility`, not of `find_contacts` (core cannot read `doc.fasteners`) |
+| §3.3 slice | `CadDocument.corrosion` = `{ environment?, materials, surfaceSystems, isolations, acceptances }`; `materials` (name -> `{ galvanicGroup, anodicIndexV?, source }`) replaces the 08 `galvanicGroup` / `anodicIndex` properties because 08 property models are numeric; new command **`set_galvanic_group`**. `grainAxes` is not built (SCC is M5). Validated on load with a strict zod schema (`sliceSchemaErrors`) |
+| §4 commands | `find_contacts`, `set_service_environment`, `set_galvanic_group` (new), `assign_surface_system`, `declare_isolation`, `remove_isolation`, `list_compatibility_rules`, `check_material_compatibility`, `accept_corrosion_item`. The signature param is `confirmation` (the name `execute` strips from the command log), not `signature` |
+| TR-COR-05 | outermost `metallic_plating` layer group, else the material group; the material `anodicIndexV` override applies only to a group that comes from the material |
+| TR-COR-08 / VC-COR-03 | area basis is the closed-form TOTAL box surface area (4500 / 13000 mm^2 per the oracle), not "minus contact area" (V1 with the kernel); non-box parts give no ratio |
+| TR-COR-13 | item adds `rule`, `warnings` (`COR_SCREENING_RULE_ONLY`, `COR_CONTACT_APPROXIMATE`), `fingerprint`, `contact`; a passing pair has code `COR_GALVANIC_OK`; overall status is `pass`, `pass_isolated`, `warn`, `unknown` or `fail` (worst item no human accepted) |
+| TR-COR-15 | `accept_corrosion_item` verifies through `ctx.humanSignature` over (act, item key, decision, justification, finding fingerprint, document uid, nonce); the acceptance applies only while the fingerprint is unchanged (`staleAcceptance` otherwise); a replay honours the recorded step only from an acceptance kept by `replaySeed` |
+| §6 report | `check_material_compatibility { report: true }` adds `data.text` (CSV, 12 columns, formula cells neutralised) and `data.fileName`; `--save corrosion.csv` writes it |
+
+Data sources and licences (recorded per table in `corrosion/tables.ts`): the anodic-index rows and the three environment limits are the published industrial rule-of-thumb values of `validation/sources.md` S5-S8 (facts, grade B / A-for-limits); remedy specs name the MIL-PRF documents of S16/S17 by designation only. No text of MIL-STD-889D or MSFC-STD-3029A is bundled (OQ-COR-02 still open).
+
+Tests: `tests/unit/inspect/contacts.test.ts` (VC-COR-01), `tests/unit/corrosion/{commands,check,accept}.test.ts` (VC-COR-02, 03, 07-10, 12-16 and the gate), slice fuzz seed `physics-corrosion` in `tests/helpers/pluginSliceSeeds.ts`. Left: M4, M5, RS-6, the golden plan `galvanic_plate_check`, SCC/HE, a dangling-id guard (a deleted entity leaves its isolation / surface system ids in the slice; checks ignore them).
