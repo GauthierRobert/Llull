@@ -3,7 +3,7 @@
 import type { ThermalContact } from '@core/model/analysis';
 import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
-import { commentText, row } from '../decks/format';
+import { appendAll, commentText, row } from '../decks/format';
 import { stressPerMpa } from '../decks/units';
 import type { Blocks } from './deckLoads';
 import { siOf } from './quantities';
@@ -37,7 +37,11 @@ export function contactBlocks(ctx: DeckContext, contact: ThermalContact): Blocks
         `thermal contact '${contact.id}' (${contact.name}) has no ${suffix === 'M' ? 'master' : 'slave'} faces in the mesh`,
         [contact.id],
       );
-    lines.push(`*SURFACE, NAME=${surface}, TYPE=ELEMENT`, ...faces.map(([element, face]) => row(element, `S${face}`)));
+    lines.push(`*SURFACE, NAME=${surface}, TYPE=ELEMENT`);
+    appendAll(
+      lines,
+      faces.map(([element, face]) => row(element, `S${face}`)),
+    );
   }
   const conductance = contact.conductance;
   const data =

@@ -7,7 +7,7 @@ import { elasticConstants, elasticTable, isElasticRefusal, propertyTemperatureK 
 import { resolveTemperatureField, thermomechOf } from '../thermomech/field';
 import { fromKelvin, kelvinOf } from '../thermomech/units';
 import { caseTemperatureRange } from '../thermal/material';
-import { commentText, linesText, num, row } from './format';
+import { appendAll, commentText, linesText, num, row, textLines } from './format';
 import { consistentWeights, momentForces } from './loadDistribution';
 import { targetKind } from '../shell/shellDeck';
 import { inertialContribution, inertialDloadLines, type InertialTerms } from './inertialBodyForce';
@@ -164,7 +164,7 @@ export function boundaryData(ctx: DeckContext): string[] | DeckRefusal {
     if (constraint === undefined) continue;
     const lines = constraintLines(ctx, constraint);
     if (!Array.isArray(lines)) return lines;
-    boundary.push(...lines);
+    appendAll(boundary, lines);
   }
   return boundary;
 }
@@ -275,7 +275,10 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
     }
   }
   const lines: string[] = [];
-  if (boundary.length > 0) lines.push('*BOUNDARY, OP=NEW', ...boundary);
+  if (boundary.length > 0) {
+    lines.push('*BOUNDARY, OP=NEW');
+    appendAll(lines, boundary);
+  }
   const parameters = options === undefined ? ', OP=NEW' : options.parameters;
   const cloads = [...forces.values()].filter((entry) => options !== undefined || entry[2] !== 0).sort(byNumbers);
   const dloads = [...pressures.values()]
@@ -285,15 +288,23 @@ export function mechanicalStepLines(ctx: DeckContext, loadCase?: string, options
   const directionLength = Math.hypot(gravityDirection[0] ?? 0, gravityDirection[1] ?? 0, gravityDirection[2] ?? 0);
   const inertial = inertialDloadLines(ctx, gravity, { centrifugal, angular }, options !== undefined);
   if ('code' in inertial) return inertial;
-  if (inertial.perElement) dloads.push(...inertial.lines);
+  if (inertial.perElement) appendAll(dloads, inertial.lines);
   else if (magnitude > 0)
     dloads.push(`${ALL_ELEMENTS}, GRAV, ${num(magnitude)}, ${gravity.map((component) => num(component / magnitude)).join(', ')}`);
   else if (options !== undefined && directionLength > 0)
     dloads.push(`${ALL_ELEMENTS}, GRAV, 0, ${gravityDirection.map((component) => num(component / directionLength)).join(', ')}`);
-  if (!inertial.perElement) dloads.push(...inertial.lines);
-  if (options === undefined || cloads.length > 0)
-    lines.push(`*CLOAD${parameters}`, ...cloads.map(([node, dof, value]) => row(node, dof, value)));
-  if (options === undefined || dloads.length > 0) lines.push(`*DLOAD${parameters}`, ...dloads);
+  if (!inertial.perElement) appendAll(dloads, inertial.lines);
+  if (options === undefined || cloads.length > 0) {
+    lines.push(`*CLOAD${parameters}`);
+    appendAll(
+      lines,
+      cloads.map(([node, dof, value]) => row(node, dof, value)),
+    );
+  }
+  if (options === undefined || dloads.length > 0) {
+    lines.push(`*DLOAD${parameters}`);
+    appendAll(lines, dloads);
+  }
   return { text: linesText(lines) };
 }
 
@@ -319,7 +330,7 @@ export function staticStep(ctx: DeckContext): DeckSections {
     const mechanical = mechanicalStepLines(ctx, name);
     if (isDeckRefusal(mechanical)) return mechanical;
     out.push(`** load case ${commentText(name)}`, '*STEP', '*STATIC');
-    out.push(...mechanical.text.split('\n').filter((line) => line !== ''));
+    appendAll(out, textLines(mechanical.text));
     out.push('*NODE FILE', 'U', '*EL FILE', 'S, E', ...probePrintLines(ctx), '*END STEP');
   }
   return { text: linesText(out) };

@@ -9,7 +9,7 @@ import { analysisInputHash } from '../hash/inputHash';
 import { bindingMarker } from '../results/inputBinding';
 import { ALL_ELEMENTS, ALL_NODES, buildDeckContext, isDeckRefusal, type DeckContext, type DeckRefusal, type DeckSections } from './context';
 import type { MaterialCardWriter } from './constitutive';
-import { commentText, idLines, linesText, row } from './format';
+import { appendAll, commentText, idLines, linesText, row, textLines } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { nonlinearSteps } from '../nonlinear/deck';
@@ -157,17 +157,29 @@ function modelBlock(ctx: DeckContext, nodes: FeMeshArtifact['nodes']): string[] 
   const duplicateRows = (bolts?.duplicateNodes ?? []).map(
     ([copy, x, y, z]) => [copy, ...(at.get(originals.get(copy) ?? copy) ?? [x, y, z])] as const,
   );
-  if (duplicateRows.length > 0) lines.push('*NODE', ...duplicateRows.map((node) => row(...node)));
+  if (duplicateRows.length > 0) {
+    lines.push('*NODE');
+    appendAll(
+      lines,
+      duplicateRows.map((node) => row(...node)),
+    );
+  }
   for (const block of mesh.blocks) {
     lines.push(`*ELEMENT, TYPE=${deckElementType(ctx, block.type, block.entityId)}, ELSET=${ctx.elset(block.entityId)}`);
-    lines.push(...block.elements.map((element) => row(...(bolts === null ? element : bolts.substitute(element)))));
+    appendAll(
+      lines,
+      block.elements.map((element) => row(...(bolts === null ? element : bolts.substitute(element)))),
+    );
   }
   const elsets = [...new Set(mesh.blocks.map((block) => ctx.elset(block.entityId)))];
   lines.push(`*ELSET, ELSET=${ALL_ELEMENTS}`);
   for (let i = 0; i < elsets.length; i += 8) lines.push(elsets.slice(i, i + 8).join(', '));
   for (const key of Object.keys(mesh.nodeSets).sort()) {
     const ids = mesh.nodeSets[key] ?? [];
-    if (ids.length > 0) lines.push(`*NSET, NSET=${ctx.nset(key)}`, ...idLines(ids));
+    if (ids.length > 0) {
+      lines.push(`*NSET, NSET=${ctx.nset(key)}`);
+      appendAll(lines, idLines(ids));
+    }
   }
   return lines;
 }
@@ -222,7 +234,7 @@ export function buildInp(
     else lines.push(...constitutive.comments, ...constitutive.lines);
     for (const card of cards) {
       if (isDeckRefusal(card)) return card;
-      lines.push(...card.text.split('\n').filter((line) => line !== ''));
+      appendAll(lines, textLines(card.text));
     }
   }
   const orientations = new Map<string, string>();
@@ -230,14 +242,14 @@ export function buildInp(
     const block = disciplines.orientation?.(ctx, entityId) ?? null;
     if (block === null) continue;
     if ('code' in block) return block;
-    lines.push(...block.text.split('\n').filter((line) => line !== ''));
+    appendAll(lines, textLines(block.text));
     orientations.set(entityId, block.name);
   }
   for (const entityId of Object.keys(analysis.parts)) {
     const planar = planarSectionCards(ctx, entityId);
     if (planar !== null) {
       if (isDeckRefusal(planar)) return planar;
-      lines.push(...planar.text.split('\n').filter((line) => line !== ''));
+      appendAll(lines, textLines(planar.text));
       continue;
     }
     const orientation = orientations.get(entityId);

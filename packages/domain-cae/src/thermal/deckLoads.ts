@@ -3,7 +3,7 @@
 import type { CavityRadiation, ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
 import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
-import { commentText, num, row } from '../decks/format';
+import { appendAll, commentText, num, row } from '../decks/format';
 import { analysisLengthMetres } from '../shared/defaults';
 import { amplitudeName } from './deckNames';
 import { absoluteZeroOf, inScale, siOf } from './quantities';
@@ -31,7 +31,7 @@ export function allBcLines(ctx: DeckContext, thermal: ThermalSetup, volumes: Rea
     if (record === undefined) continue;
     const block = bcLines(ctx, thermal, record, volumes);
     if ('code' in block) return block;
-    lines.push(...block.lines);
+    appendAll(lines, block.lines);
   }
   return { lines };
 }
@@ -112,7 +112,10 @@ export function cavityLines(ctx: DeckContext, thermal: ThermalSetup, cavity: Cav
     if (ctx.faces(key).length === 0)
       return refusal('FEA_TARGET_UNRESOLVED', `cavity '${cavity.id}' face ${k} has no faces in the mesh`, [cavity.id]);
     const emissivity = typeof face.emissivity === 'number' ? face.emissivity : Number.NaN;
-    lines.push(...faceLines(ctx, key, 'R', environment, emissivity).map((line) => line.replace(/, (R\d)/, ', $1CR')));
+    appendAll(
+      lines,
+      faceLines(ctx, key, 'R', environment, emissivity).map((line) => line.replace(/, (R\d)/, ', $1CR')),
+    );
   }
   return { lines };
 }

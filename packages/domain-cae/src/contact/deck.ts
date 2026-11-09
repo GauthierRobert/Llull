@@ -2,7 +2,7 @@
 
 import type { ContactBehaviour, ContactPair, ContactSettings } from '@core/model/contact';
 import type { DeckContext, DeckRefusal } from '../decks/context';
-import { commentText, row } from '../decks/format';
+import { appendAll, commentText, row } from '../decks/format';
 import { pairValueProblem } from './pairRules';
 import { pairTargetKey } from '../hash/targets';
 
@@ -87,7 +87,11 @@ export function contactModelLines(ctx: DeckContext): string[] | DeckRefusal {
           `contact pair '${pair.id}' (${pair.name}) has no ${side === 'S' ? 'slave' : 'master'} faces in the mesh`,
           [pair.id],
         );
-      lines.push(`*SURFACE, NAME=${surface}, TYPE=ELEMENT`, ...faces.map(([element, face]) => row(element, `S${face}`)));
+      lines.push(`*SURFACE, NAME=${surface}, TYPE=ELEMENT`);
+      appendAll(
+        lines,
+        faces.map(([element, face]) => row(element, `S${face}`)),
+      );
     }
     lines.push(`*SURFACE INTERACTION, NAME=${names.interaction}`, ...behaviourLines(pair.behaviour, settings.formulation === 'mortar'));
     if (pair.friction !== undefined)

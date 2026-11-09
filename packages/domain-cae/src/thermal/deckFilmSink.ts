@@ -12,7 +12,7 @@ import type { ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
-import { commentText, row } from '../decks/format';
+import { appendAll, commentText, row } from '../decks/format';
 import { faceNodes, indexMesh, type MeshElement, type MeshIndex } from './meshGeometry';
 import { inScale } from './quantities';
 import { cross3, dot3, sub3 } from '@lib/vec3';
@@ -131,11 +131,20 @@ export function filmSinkBlocks(ctx: DeckContext, thermal: ThermalSetup): SinkBlo
       sinkFaces.push(row(lastElement, 'S1'));
     }
     model.push(`** ${commentText(record.id)} ${commentText(record.name)} (film h(T) table: tied gap conductance to a sink at ${sink})`);
-    model.push(`*NODE, NSET=${names.nodes}`, ...nodeLines);
-    for (const [type, lines] of wedges) model.push(`*ELEMENT, TYPE=${type}, ELSET=${names.elements}`, ...lines);
+    model.push(`*NODE, NSET=${names.nodes}`);
+    appendAll(model, nodeLines);
+    for (const [type, lines] of wedges) {
+      model.push(`*ELEMENT, TYPE=${type}, ELSET=${names.elements}`);
+      appendAll(model, lines);
+    }
     model.push(`*SOLID SECTION, ELSET=${names.elements}, MATERIAL=${FILM_SINK_MATERIAL}`);
-    model.push(`*SURFACE, NAME=${names.sink}, TYPE=ELEMENT`, ...sinkFaces);
-    model.push(`*SURFACE, NAME=${names.face}, TYPE=ELEMENT`, ...faces.map(([element, face]) => row(element, `S${face}`)));
+    model.push(`*SURFACE, NAME=${names.sink}, TYPE=ELEMENT`);
+    appendAll(model, sinkFaces);
+    model.push(`*SURFACE, NAME=${names.face}, TYPE=ELEMENT`);
+    appendAll(
+      model,
+      faces.map(([element, face]) => row(element, `S${face}`)),
+    );
     model.push(`*SURFACE INTERACTION, NAME=${names.interaction}`, '*SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=TIED', '*GAP CONDUCTANCE');
     for (const [temperature, h] of bc.filmCoefficient.table.points)
       model.push(row(siToSystem('film', h, ctx.unitSystem), 0, (temperature + sink) / 2));

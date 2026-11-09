@@ -29,5 +29,13 @@ export function idLines(ids: readonly number[]): string[] {
   return lines;
 }
 
+/** Appends every item to target in place, one push each: `target.push(...items)` throws RangeError past ~10^5 items (mesh-sized line blocks). */
+export function appendAll<T>(target: T[], items: readonly T[]): void {
+  for (const item of items) target.push(item);
+}
+
+/** The non-empty lines of a deck text block. */
+export const textLines = (text: string): string[] => text.split('\n').filter((line) => line !== '');
+
 /** Lines to text: each line terminated by a newline; no lines = ''. */
 export const linesText = (lines: readonly string[]): string => (lines.length === 0 ? '' : `${lines.join('\n')}\n`);

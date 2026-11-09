@@ -7,7 +7,7 @@
 import { siToSystem } from './thermalUnits';
 import { analysisInputHash } from '../hash/inputHash';
 import { ALL_NODES, type DeckContext, type DeckRefusal, type DeckSections } from '../decks/context';
-import { linesText, num, row } from '../decks/format';
+import { appendAll, linesText, num, row } from '../decks/format';
 import { absoluteZeroOf, inScale } from './quantities';
 import { temperatureConflictRefusal } from './bcConflicts';
 import { checkThermalItems } from './check';
@@ -80,20 +80,21 @@ export function thermalSections(ctx: DeckContext): DeckSections {
   for (const contact of Object.values(thermal.contacts)) {
     const block = contactBlocks(ctx, contact);
     if ('code' in block) return block;
-    lines.push(...block.lines);
+    appendAll(lines, block.lines);
   }
   const sink = filmSinkBlocks(ctx, thermal);
   if (sink !== null && 'code' in sink) return sink;
-  if (sink !== null) lines.push(...sink.model);
-  lines.push(...plan.notes, ...plan.stepLines);
+  if (sink !== null) appendAll(lines, sink.model);
+  appendAll(lines, plan.notes);
+  appendAll(lines, plan.stepLines);
   const bcBlocks = allBcLines(ctx, thermal, volumes);
   if ('code' in bcBlocks) return bcBlocks;
-  lines.push(...bcBlocks.lines);
-  if (sink !== null) lines.push(...sink.step);
+  appendAll(lines, bcBlocks.lines);
+  if (sink !== null) appendAll(lines, sink.step);
   for (const cavity of Object.values(thermal.cavities)) {
     const block = cavityLines(ctx, thermal, cavity);
     if ('code' in block) return block;
-    lines.push(...block.lines);
+    appendAll(lines, block.lines);
   }
   const output = plan.output === '' ? '' : `, ${plan.output}`;
   lines.push(`*NODE FILE${output}`, 'NT, RFL', `*EL FILE${output}`, 'HFL');

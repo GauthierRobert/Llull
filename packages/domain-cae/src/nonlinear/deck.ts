@@ -3,7 +3,7 @@
 import type { AnalysisStep, ConvergencePreset, NonlinearSettings } from '@core/model/analysis';
 import { findSet, setMembers } from '@core/model/materialLaws/combination';
 import { isDeckRefusal, safeName, type DeckContext, type DeckRefusal, type DeckSections } from '../decks/context';
-import { commentText, linesText, num, row } from '../decks/format';
+import { appendAll, commentText, linesText, num, row, textLines } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';
 import { partSetId } from '../decks/constitutive';
 import { FIELD_KEYS, TIME_KEYS, nonlinearValueProblems } from './shape';
@@ -189,8 +189,8 @@ export function nonlinearSteps(ctx: DeckContext): DeckSections {
     const bolts = pretensionStepLines(ctx, index, step.amplitude === 'step' ? `, AMPLITUDE=${amplitudeName(step)}` : '', rate);
     if ('code' in bolts) return bolts;
     lines.push(...contactStep.switches);
-    lines.push(...mechanical.text.split('\n').filter((line) => line !== ''));
-    lines.push(...bolts.loads);
+    appendAll(lines, textLines(mechanical.text));
+    appendAll(lines, bolts.loads);
     if (control.kind === 'displacement') {
       const dof = DOF_NUMBER[control.dof];
       lines.push(`*BOUNDARY${step.amplitude === 'step' ? `, AMPLITUDE=${amplitudeName(step)}` : ''}`);

@@ -2,7 +2,7 @@
 
 import { boundaryData, mechanicalStepLines } from './mechanical';
 import { isDeckRefusal, loadCasesOf, type DeckContext, type DeckRefusal, type DeckSections } from './context';
-import { commentText, linesText, num } from './format';
+import { appendAll, commentText, linesText, num, textLines } from './format';
 
 /** Modes requested when the case gives none. */
 const DEFAULT_MODES = 6;
@@ -33,7 +33,10 @@ export function modalStep(ctx: DeckContext): DeckSections {
   const boundary = boundaryData(ctx);
   if (!Array.isArray(boundary)) return boundary;
   const lines = ['** modal analysis', '*STEP', '*FREQUENCY', frequencyLine(ctx)];
-  if (boundary.length > 0) lines.push('*BOUNDARY', ...boundary);
+  if (boundary.length > 0) {
+    lines.push('*BOUNDARY');
+    appendAll(lines, boundary);
+  }
   lines.push('*NODE FILE', 'U', '*END STEP');
   return { text: linesText(lines) };
 }
@@ -69,7 +72,8 @@ export function bucklingSteps(ctx: DeckContext): DeckSections {
     const preloaded = mechanicalStepLines(ctx, preload);
     if (isDeckRefusal(preloaded)) return preloaded;
     lines.push(`** buckling preload (ccx scales it with the reference): load case ${commentText(preload)}`, '*STEP', '*STATIC');
-    lines.push(...preloaded.text.split('\n').filter((line) => line !== ''), '*END STEP');
+    appendAll(lines, textLines(preloaded.text));
+    lines.push('*END STEP');
   }
   const mechanical =
     preload === undefined
@@ -77,7 +81,7 @@ export function bucklingSteps(ctx: DeckContext): DeckSections {
       : mechanicalStepLines(ctx, loadCase, { scale: () => 1, parameters: '', boundary: false, addLoadCases: [preload] });
   if (isDeckRefusal(mechanical)) return mechanical;
   lines.push(`** buckling reference load case ${commentText(loadCase)}`, '*STEP', '*BUCKLE', num(modesOf(ctx)));
-  lines.push(...mechanical.text.split('\n').filter((line) => line !== ''));
+  appendAll(lines, textLines(mechanical.text));
   lines.push('*NODE FILE', 'U', '*END STEP');
   return { text: linesText(lines) };
 }
