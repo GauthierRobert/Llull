@@ -58,8 +58,10 @@ export function axisFrame(origin: Vec3, axis: Vec3, direction: Vec3): AxisFrame 
 
 /** sigma_theta = e . S . e for the unit hoop direction `e` and S = [sxx, syy, szz, sxy, syz, szx]. */
 const hoopOf = (stress: readonly number[], e: Vec3): number => {
-  const [sxx = 0, syy = 0, szz = 0, sxy = 0, syz = 0, szx = 0] = stress;
-  return sxx * e[0] * e[0] + syy * e[1] * e[1] + szz * e[2] * e[2] + 2 * (sxy * e[0] * e[1] + syz * e[1] * e[2] + szx * e[2] * e[0]);
+  const at = (index: number): number => stress[index] ?? Number.NaN;
+  return (
+    at(0) * e[0] * e[0] + at(1) * e[1] * e[1] + at(2) * e[2] * e[2] + 2 * (at(3) * e[0] * e[1] + at(4) * e[1] * e[2] + at(5) * e[2] * e[0])
+  );
 };
 
 /**
@@ -89,7 +91,7 @@ export function bearingOf(frame: AxisFrame, nodes: readonly WallNode[]): Bearing
     across += force * dot3(outward, second);
     normalForce += force;
     if (wall.pressure > 0) {
-      half = Math.max(half ?? 0, Math.abs(angleDeg));
+      half = half === null ? Math.abs(angleDeg) : Math.max(half, Math.abs(angleDeg));
       if (peak === null || wall.pressure > peak.pressure) peak = { pressure: wall.pressure, node: wall.node, angleDeg };
     }
     if (hoopStress !== null && (hoop === null || hoopStress > hoop.stress)) hoop = { stress: hoopStress, node: wall.node, angleDeg };

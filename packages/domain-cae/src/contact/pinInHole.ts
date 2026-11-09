@@ -18,7 +18,7 @@ import { NOT_APPROVED, refuseCnt } from './codes';
 import { behaviourSchema, formulationSchema, frictionSchema } from './pairSchema';
 import { findPair } from './pairRules';
 import { type WallNode, axisFrame, bearingOf } from './pinBearingMath';
-import { BLOCK, COMPONENTS, slaveAreas } from './reader';
+import { BLOCK, slaveAreas } from './reader';
 import { forceUnitName } from './pretensionRules';
 
 const n = (value: number): string => significantNumber(value, 5);
@@ -208,8 +208,7 @@ export const pinBearingReport = defineCommand({
     const stored = trust.resultsArtifact.steps.filter((step) => step.step === order.indexOf(stepId) + 1);
     const result = stored.at(-1);
     const contact = result?.fields[BLOCK];
-    const columns = COMPONENTS.map((name) => contact?.components.indexOf(name) ?? -1);
-    const pressureAt = columns[3] ?? -1;
+    const pressureAt = contact === undefined ? -1 : contact.components.indexOf('CPRESS');
     if (result === undefined || contact === undefined || pressureAt < 0)
       return fail('CNT_CONTACT_RESULTS_MISSING', `step '${stepId}' has no stored increment with a ${BLOCK} block`, 'step');
     const index = indexMesh(trust.meshArtifact);

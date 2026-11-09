@@ -87,8 +87,8 @@ export const jointMargins = defineCommand({
     const fail = (code: string, message: string, path: string): CommandResult =>
       refuseCnt(doc, command, code, message, [analysis.id], [path]);
     const { factors, designLoad, fastenerAllowable } = params;
-    const stated = [factors.separation, factors.ultimate, factors.fitting];
-    if (!stated.every(positive) || (factors.source ?? '').trim() === '')
+    const { separation: fsSeparation, ultimate: fsUltimate, fitting } = factors;
+    if (!positive(fsSeparation) || !positive(fsUltimate) || !positive(fitting) || (factors.source ?? '').trim() === '')
       return fail(
         'CNT_FACTORS_UNSET',
         'factors.separation, ultimate and fitting (each > 0) and factors.source are required: there is no default',
@@ -98,7 +98,6 @@ export const jointMargins = defineCommand({
       return fail('CNT_FACTORS_UNSET', 'designLoad.value must be > 0 with a source', 'designLoad');
     if (fastenerAllowable !== undefined && (!positive(fastenerAllowable.value) || fastenerAllowable.source.trim() === ''))
       return fail('CNT_INPUT_INVALID', 'fastenerAllowable.value must be > 0 with a source', 'fastenerAllowable');
-    const [fsSeparation = 0, fsUltimate = 0, fitting = 0] = stated as number[];
     if (points.length < 2)
       return fail('CNT_INPUT_INVALID', `fewer than 2 increments of step '${stepId}' carry both a bolt force and a probe load`, 'stepId');
     const closed = separatedAt === null ? points : points.filter((point) => point.time < separatedAt);
