@@ -159,7 +159,7 @@ const finiteTensor = (tensor: readonly number[] | undefined): tensor is readonly
   tensor !== undefined && tensor.length >= 6 && tensor.slice(0, 6).every((v) => Number.isFinite(v));
 
 /** A face of a bolt pretension cut that set the stress of a node: the solver node (low side = the mesh node, or a high-side copy). */
-export interface GoverningFace {
+interface GoverningFace {
   readonly node: number;
   readonly solverNode: number;
   readonly face: 'low' | 'high';

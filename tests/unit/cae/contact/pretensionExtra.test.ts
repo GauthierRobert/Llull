@@ -94,7 +94,7 @@ describe('defaultStickSlope', () => {
           { ...material, constitutiveSets: [], materialModels: [], propertyModels: undefined },
         ]),
       ),
-    } as CadDocument;
+    } as unknown as CadDocument;
     expect(defaultStickSlope(noElastic, analysis)).toBeNull();
   });
 });

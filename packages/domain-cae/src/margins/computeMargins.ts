@@ -320,9 +320,7 @@ export const marginQueryShape = {
   criterion: z
     .enum([...CRITERIA, 'limit_load', 'joint'])
     .optional()
-    .describe(
-      'von_mises (default) or the largest |s_xx| / |s_yy| / |s_zz|; limit_load: limit-load margin of a nonlinear_static case (limitLoad); joint: separation / fastener-ultimate margins of a preloaded bolt of a nonlinear_static case (joint).',
-    ),
+    .describe('von_mises (default) / |s_xx| / |s_yy| / |s_zz|; limit_load (limitLoad) and joint (joint): nonlinear_static case.'),
   limitLoad: limitLoadMarginSchema.optional(),
   joint: jointMarginSchema.optional(),
   allowable: allowableSchema
