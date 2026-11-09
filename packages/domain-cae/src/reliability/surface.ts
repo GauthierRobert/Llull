@@ -1,6 +1,9 @@
 /** Quadratic response surface in the standard normal space with its leave-one-out residual (PRESS via the hat matrix). Pure. */
 
 import { invertDense } from '@lib/denseLinalg';
+import { at } from './numerics';
+
+const rowOf = (rows: readonly (readonly number[])[], i: number): readonly number[] => rows[i] as readonly number[];
 
 export interface QuadraticSurface {
   readonly dimension: number;
@@ -18,11 +21,9 @@ export interface QuadraticSurface {
 /** Number of terms of a full quadratic in `dimension` variables. */
 export const quadraticTerms = (dimension: number): number => ((dimension + 1) * (dimension + 2)) / 2;
 
-const at = (values: readonly number[], i: number): number => values[i] ?? 0;
-
 function basis(u: readonly number[]): number[] {
   const terms = [1, ...u];
-  for (let i = 0; i < u.length; i += 1) for (let j = i; j < u.length; j += 1) terms.push((u[i] ?? Number.NaN) * (u[j] ?? Number.NaN));
+  for (let i = 0; i < u.length; i += 1) for (let j = i; j < u.length; j += 1) terms.push(at(u, i) * at(u, j));
   return terms;
 }
 
@@ -42,8 +43,8 @@ export function fitQuadraticSurface(points: readonly (readonly number[])[], valu
   const inverse = invertDense(normal);
   if (inverse === null) return null;
   const moment = Array.from({ length: terms }, (_, a) => rows.reduce((sum, row, k) => sum + at(row, a) * at(values, k), 0));
-  const coefficients = inverse.map((line) => line.reduce((sum, c, b) => sum + c * (moment[b] ?? 0), 0));
-  const evaluate = (u: readonly number[]): number => basis(u).reduce((sum, t, i) => sum + t * (coefficients[i] ?? 0), 0);
+  const coefficients = inverse.map((line) => line.reduce((sum, c, b) => sum + c * at(moment, b), 0));
+  const evaluate = (u: readonly number[]): number => basis(u).reduce((sum, t, i) => sum + t * at(coefficients, i), 0);
   const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
   let sse = 0;
   let sst = 0;
@@ -51,9 +52,9 @@ export function fitQuadraticSurface(points: readonly (readonly number[])[], valu
   let maxLeverage = 0;
   rows.forEach((row, k) => {
     const residual = at(values, k) - row.reduce((sum, t, i) => sum + t * at(coefficients, i), 0);
-    const leverage = row.reduce((sum, t, a) => sum + t * (inverse[a] ?? []).reduce((inner, c, b) => inner + c * (row[b] ?? 0), 0), 0);
+    const leverage = row.reduce((sum, t, a) => sum + t * rowOf(inverse, a).reduce((inner, c, b) => inner + c * at(row, b), 0), 0);
     sse += residual * residual;
-    sst += ((values[k] ?? 0) - mean) ** 2;
+    sst += (at(values, k) - mean) ** 2;
     press += (residual / (1 - leverage)) ** 2;
     maxLeverage = Math.max(maxLeverage, leverage);
   });

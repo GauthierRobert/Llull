@@ -6,7 +6,8 @@ import { item, type Item } from '../fatigue/items';
 import { isStudyFailure, studyContext } from './context';
 import { buildTransform, type Transform } from './nataf';
 import { reliabilityOf, responseOf } from './model';
-import { queryValue, withParameters } from './responseEval';
+import { queryValue } from './responseEval';
+import { isDocumentInput, withVariableValues } from './variableInputs';
 import type { RandomVariable } from '@cae/reliability/types';
 
 export interface SensitivityTarget {
@@ -37,21 +38,22 @@ export function sensitivityTarget(
   const model = reliabilityOf(doc);
   const variables = model.variableOrder.flatMap((n) => {
     const variable = model.variables[n];
-    return variable !== undefined && variable.binding.kind === 'parameter' && Object.hasOwn(doc.parameters, variable.binding.parameter)
+    return variable !== undefined &&
+      isDocumentInput(variable) &&
+      (variable.binding.kind !== 'parameter' || Object.hasOwn(doc.parameters, variable.binding.parameter))
       ? [variable]
       : [];
   });
   if (variables.length === 0)
     return {
       code: 'PRB_MODEL_EMPTY',
-      message: `no random variable is bound to a document parameter: response '${name}' has no input`,
+      message: `no random variable is bound to a document parameter or a material density: response '${name}' has no input`,
       ids: [name],
     };
   const transform = buildTransform(model, variables);
   if (typeof transform === 'string') return { code: 'PRB_CORRELATION_INVALID', message: transform, ids: variables.map((v) => v.name) };
-  const slots = variables.map((v) => (v.binding.kind === 'parameter' ? v.binding.parameter : ''));
   const evaluate = (x: readonly number[]): number => {
-    const sampled = withParameters(doc, Object.fromEntries(slots.map((parameter, i) => [parameter, x[i] ?? 0])), ctx);
+    const sampled = withVariableValues(doc, variables, x, ctx);
     const value = sampled === null ? null : queryValue(sampled, response.query, ctx);
     return value !== null && value.ok ? value.value : Number.NaN;
   };

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { reliabilityErrors } from '@cae/reliability/model';
+import { limitStateModelHash } from '@cae/reliability/modelHash';
 import { code, data, modelDoc, normal, rMinusS, type Json } from './support';
 
 const itemCodes = (d: Json): string[] => (d['items'] as Array<{ code: string }>).map((i) => i.code);
@@ -38,6 +39,10 @@ describe('describe_probabilistic_model', () => {
       )[0] ?? {})['modelHash'];
     expect(hashOf(300)).toBe(hashOf(300));
     expect(hashOf(300)).not.toBe(hashOf(301));
+  });
+
+  it('the model hash of an unknown limit state is null', () => {
+    expect(limitStateModelHash(rMinusS(), 'nope')).toBeNull();
   });
 
   it('its slice validation rejects a malformed acceptance or ledger', () => {

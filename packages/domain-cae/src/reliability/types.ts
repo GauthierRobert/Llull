@@ -11,7 +11,35 @@ export type Distribution =
   | { readonly kind: 'weibull'; readonly shape: number; readonly scale: number }
   | { readonly kind: 'gumbel'; readonly location: number; readonly scale: number };
 
-type VariableBinding = { readonly kind: 'free' } | { readonly kind: 'parameter'; readonly parameter: string };
+export interface MaterialPropertyBinding {
+  readonly kind: 'materialProperty';
+  /** Material id (create_material name) whose PHY-01 property model the scatter comes from. */
+  readonly material: string;
+  /** Catalogue property name (density, E, k, cte ...). */
+  readonly property: string;
+  /** Study condition the model is evaluated at (every variable the model needs, each { value, unit }). */
+  readonly at?: Readonly<Record<string, { readonly value: number; readonly unit: string }>> | undefined;
+  readonly modelId?: string | undefined;
+  /** Coverage of a 'measurement' uncertainty band (the model does not carry one). */
+  readonly measurementCoverage?: number | undefined;
+}
+
+export type VariableBinding =
+  | { readonly kind: 'free' }
+  | { readonly kind: 'parameter'; readonly parameter: string }
+  | MaterialPropertyBinding;
+
+/** What a materialProperty distribution was derived from (snapshot at definition; a replay re-derives it). */
+export interface DerivedScatter {
+  readonly modelId: string;
+  readonly uncertaintyKind: string;
+  readonly coverage: number;
+  /** Model value y at the study condition (the distribution mean). */
+  readonly value: number;
+  /** Half-width h of the uncertainty band. */
+  readonly halfWidth: number;
+  readonly unverifiedReasons: readonly string[];
+}
 
 interface Citation {
   readonly text: string;
@@ -26,6 +54,8 @@ export interface RandomVariable {
   readonly unit: string;
   readonly distribution: Distribution;
   readonly binding: VariableBinding;
+  /** Present when the distribution was derived from a PHY-01 uncertainty band (materialProperty binding without a caller distribution). */
+  readonly derivedFrom?: DerivedScatter;
   /** Source of the scatter; absent = unsourced (PRB_SCATTER_UNSOURCED). */
   readonly citation?: Citation;
 }

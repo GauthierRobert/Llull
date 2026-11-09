@@ -1,5 +1,6 @@
 /** Importance sampling around the FORM design point: Pf = E[1(g < 0) w], u = u* + z, w = phi(u) / phi(z) = exp(-u* . z - |u*|^2 / 2). Pure. */
 
+import { at } from './numerics';
 import { standardNormalSamples } from './sampling';
 
 export interface ImportanceEstimate {
@@ -35,10 +36,10 @@ export function importanceSampling(
   let weightSquares = 0;
   for (let k = 0; k < samples; k += 1) {
     const draw = Array.from(z.subarray(k * d, (k + 1) * d));
-    const value = g(draw.map((zi, i) => zi + (designPoint[i] ?? Number.NaN)));
+    const value = g(draw.map((zi, i) => zi + at(designPoint, i)));
     if (!Number.isFinite(value)) continue;
     valid += 1;
-    const weight = Math.exp(-draw.reduce((acc, zi, i) => acc + zi * (designPoint[i] ?? Number.NaN), 0) - half);
+    const weight = Math.exp(-draw.reduce((acc, zi, i) => acc + zi * at(designPoint, i), 0) - half);
     weightSum += weight;
     weightSquares += weight * weight;
     if (value < 0) {

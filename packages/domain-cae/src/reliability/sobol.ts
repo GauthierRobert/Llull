@@ -1,5 +1,6 @@
 /** Sobol variance-based sensitivity indices from model evaluations on the Saltelli sample matrices (pure estimators). */
 
+import { at } from './numerics';
 import { createPrng } from './prng';
 
 export interface Interval {
@@ -26,7 +27,6 @@ interface Raw {
 /** Estimators on the rows `rows` (indices into the N base samples) of f(A), f(B) and f(AB_i); f(B) is centred on the mean so the noise scales with the spread, not the mean. */
 function estimate(fA: Float64Array, fB: Float64Array, fAB: readonly Float64Array[], rows: ArrayLike<number>): Raw {
   const n = rows.length;
-  const at = (values: ArrayLike<number>, i: number): number => values[i] ?? 0;
   let sum = 0;
   for (let k = 0; k < n; k += 1) sum += at(fA, at(rows, k)) + at(fB, at(rows, k));
   const mean = sum / (2 * n);
@@ -39,10 +39,10 @@ function estimate(fA: Float64Array, fB: Float64Array, fAB: readonly Float64Array
     let saltelli = 0;
     let jansen = 0;
     for (let k = 0; k < n; k += 1) {
-      const row = rows[k] ?? 0;
-      const a = fA[row] ?? 0;
-      const ab = column[row] ?? 0;
-      saltelli += ((fB[row] ?? 0) - mean) * (ab - a);
+      const row = at(rows, k);
+      const a = at(fA, row);
+      const ab = at(column, row);
+      saltelli += (at(fB, row) - mean) * (ab - a);
       jansen += (a - ab) * (a - ab);
     }
     first.push(saltelli / n / variance);
@@ -77,14 +77,14 @@ export function sobolIndices(
   for (let r = 0; r < bootstrap; r += 1) {
     for (let k = 0; k < n; k += 1) rows[k] = Math.min(Math.floor(prng.uniform() * n), n - 1);
     const draw = estimate(fA, fB, fAB, rows);
-    draw.first.forEach((value, i) => first[i]?.push(value));
-    draw.total.forEach((value, i) => total[i]?.push(value));
+    draw.first.forEach((value, i) => (first[i] as number[]).push(value));
+    draw.total.forEach((value, i) => (total[i] as number[]).push(value));
   }
   const interval = (value: number, draws: number[] | undefined): Interval => {
     if (bootstrap === 0 || draws === undefined) return { value, ci95: null };
     const sorted = Float64Array.from(draws).sort();
-    const at = (p: number): number => sorted[Math.min(Math.floor(p * sorted.length), sorted.length - 1)] ?? 0;
-    return { value, ci95: [at(0.025), at(0.975)] };
+    const percentile = (p: number): number => at(sorted, Math.min(Math.floor(p * sorted.length), sorted.length - 1));
+    return { value, ci95: [percentile(0.025), percentile(0.975)] };
   };
   return {
     mean: base.mean,

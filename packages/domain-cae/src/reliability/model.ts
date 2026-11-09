@@ -37,8 +37,15 @@ function variableErrors(name: string, variable: unknown): string[] {
   const issue = distributionIssue(distribution as unknown as RandomVariable['distribution']);
   if (issue !== null) return bad(issue);
   const binding = variable['binding'];
-  if (!isRecord(binding) || (binding['kind'] !== 'free' && !(binding['kind'] === 'parameter' && isString(binding['parameter']))))
-    return bad('has a malformed binding');
+  const bound =
+    isRecord(binding) &&
+    (binding['kind'] === 'free' ||
+      (binding['kind'] === 'parameter' && isString(binding['parameter'])) ||
+      (binding['kind'] === 'materialProperty' && isString(binding['material']) && isString(binding['property'])));
+  if (!bound) return bad('has a malformed binding');
+  const derived = variable['derivedFrom'];
+  if (derived !== undefined && !(isRecord(derived) && isString(derived['modelId']) && typeof derived['value'] === 'number'))
+    return bad('has a malformed derivedFrom');
   const citation = variable['citation'];
   if (citation !== undefined && !(isRecord(citation) && isString(citation['text']))) return bad('has a malformed citation');
   return [];

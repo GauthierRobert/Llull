@@ -7,7 +7,8 @@ import { item, type Item } from '../fatigue/items';
 import type { LimitState, RandomVariable, ReliabilityModel } from '@cae/reliability/types';
 import { reliabilityOf, limitStateOf } from './model';
 import { buildTransform, type Transform } from './nataf';
-import { queryValue, withParameters } from './responseEval';
+import { queryValue } from './responseEval';
+import { isDocumentInput, withVariableValues } from './variableInputs';
 
 export interface StudyFailure {
   readonly code: string;
@@ -65,7 +66,8 @@ export function studyContext(doc: CadDocument, limitStateName: string, ctx?: Exe
     };
   const usedBy = (variable: RandomVariable): boolean =>
     symbols.has(variable.name) ||
-    (variable.binding.kind === 'parameter' && (responseNames.length > 0 || symbols.has(variable.binding.parameter)));
+    (variable.binding.kind === 'parameter' && (responseNames.length > 0 || symbols.has(variable.binding.parameter))) ||
+    (responseNames.length > 0 && isDocumentInput(variable));
   const variables = model.variableOrder.flatMap((name) => {
     const variable = Object.hasOwn(model.variables, name) ? model.variables[name] : undefined;
     return variable !== undefined && usedBy(variable) ? [variable] : [];
@@ -95,11 +97,7 @@ export function studyContext(doc: CadDocument, limitStateName: string, ctx?: Exe
       if (parameter !== null) env[parameter] = x[i] ?? 0;
     });
     if (responseNames.length > 0) {
-      const sampled = withParameters(
-        doc,
-        Object.fromEntries(slots.flatMap(([, parameter], i) => (parameter === null ? [] : [[parameter, x[i] ?? 0] as const]))),
-        ctx,
-      );
+      const sampled = withVariableValues(doc, variables, x, ctx);
       if (sampled === null) return Number.NaN;
       for (const name of responseNames) {
         const response = responses[name];
@@ -112,6 +110,9 @@ export function studyContext(doc: CadDocument, limitStateName: string, ctx?: Exe
     return result.ok ? result.value : Number.NaN;
   };
   const unsourced = variables.filter((variable) => variable.citation === undefined).map((variable) => variable.name);
+  const inherited = variables.flatMap((variable) =>
+    (variable.derivedFrom?.unverifiedReasons ?? []).map((reason) => `${variable.name}: ${reason}`),
+  );
   const items =
     unsourced.length === 0
       ? []
@@ -132,7 +133,7 @@ export function studyContext(doc: CadDocument, limitStateName: string, ctx?: Exe
     evaluate,
     usesResponses: responseNames.length > 0,
     items,
-    unverified: unsourced.length > 0,
-    unverifiedReasons: unsourced.map((name) => `${name}: scatter has no cited source`),
+    unverified: unsourced.length > 0 || inherited.length > 0,
+    unverifiedReasons: [...unsourced.map((name) => `${name}: scatter has no cited source`), ...inherited],
   };
 }
