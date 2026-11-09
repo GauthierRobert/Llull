@@ -5,6 +5,7 @@
  */
 
 import type { LawOf, MaterialModel } from '../materialModel';
+import { convertNortonA } from './nortonUnits';
 import { calculixLines, calculixNumber } from './cardFormat';
 import type { CardOutput, CardRequest } from './cardTypes';
 import { symmetricFromUpperTriangle } from './elastic';
@@ -326,9 +327,15 @@ function creepCards(model: MaterialModel, context: Context): string[] | LawFailu
   const law = model.model as LawOf<'creep_norton' | 'creep_garofalo'>;
   if (law.kind === 'creep_garofalo') return unsupported('creep_garofalo', '*CREEP,LAW=USER needs a creep.f user routine (V2)');
   if (law.hardening !== 'time') return unsupported('creep_norton', 'only time hardening has a native card');
-  const inMpa = convertQuantity(1, law.stressUnit, 'stress', `models.${model.id}.stressUnit`);
-  if (isLawFailure(inMpa)) return inMpa;
-  const A = law.A / inMpa ** law.n;
+  const converted = convertNortonA(law.A, law.n, law.m, { stress: law.stressUnit, time: law.timeUnit }, { stress: 'MPa', time: 's' });
+  if ('problem' in converted)
+    return failure(
+      'MATL_CREEP_PARAMS_INVALID',
+      `models.${model.id}`,
+      converted.problem,
+      'give a stress unit and a time unit for the Norton law',
+    );
+  const A = converted.A;
   return ['*CREEP,LAW=NORTON', ...context.temperatures.map((temperature) => row([A, law.n, law.m], temperature))];
 }
 

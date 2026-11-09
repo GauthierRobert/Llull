@@ -23,7 +23,7 @@ export const feaTargetSchema = z.object({
   intersectPlane: z
     .object({ point: vec3('A point on the plane.'), normal: vec3('Plane normal (need not be unit length).') })
     .optional()
-    .describe('Optional: restrict the target to the curve where the faces meet this plane.'),
+    .describe('NOT SUPPORTED YET: any target with intersectPlane is refused (FEA_TARGET_PLANE_UNSUPPORTED) until the mesher resolves it.'),
 });
 
 export type FeaTargetInput = z.output<typeof feaTargetSchema>;
@@ -40,17 +40,23 @@ export function toTarget(input: FeaTargetInput): FeaTarget {
 }
 
 export interface TargetProblem {
-  readonly code: 'FEA_TARGET_UNRESOLVED' | 'FEA_PART_NOT_IN_ANALYSIS';
+  readonly code: 'FEA_TARGET_UNRESOLVED' | 'FEA_PART_NOT_IN_ANALYSIS' | 'FEA_TARGET_PLANE_UNSUPPORTED';
   readonly message: string;
 }
+
+/** Shared by the command-time check and the host (`runFeaMesh`). */
+export const PLANE_UNSUPPORTED =
+  'intersectPlane is not supported yet: the mesher does not honour it and the target would silently cover the whole face; drop it and target by facesNear / edgesNear / pointsNear';
 
 const hasPoints = (points: readonly unknown[] | undefined): boolean => points !== undefined && points.length > 0;
 
 /**
  * Shape + entity-existence check of a target (resolution to topology happens in the mesher).
- * @failure entity missing / not 3D / no selector point -> FEA_TARGET_UNRESOLVED; entity not a part of the case -> FEA_PART_NOT_IN_ANALYSIS
+ * @failure intersectPlane set -> FEA_TARGET_PLANE_UNSUPPORTED (llull-mesh does not resolve it yet: it would silently target the whole face);
+ *   entity missing / not 3D / no selector point -> FEA_TARGET_UNRESOLVED; entity not a part of the case -> FEA_PART_NOT_IN_ANALYSIS
  */
 export function targetProblem(doc: CadDocument, analysisCase: AnalysisCase, target: FeaTarget): TargetProblem | null {
+  if (target.intersectPlane !== undefined) return { code: 'FEA_TARGET_PLANE_UNSUPPORTED', message: PLANE_UNSUPPORTED };
   const entity = Object.hasOwn(doc.entities, target.entityId) ? doc.entities[target.entityId] : undefined;
   if (entity === undefined) return { code: 'FEA_TARGET_UNRESOLVED', message: `entity '${target.entityId}' does not exist` };
   if (!is3D(entity))

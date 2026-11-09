@@ -284,7 +284,7 @@ machine without the artifact leaves the step recorded and the state `missing` (T
   `|area − area'| ≤ 1e-6·area` and centroid distance ≤ 1e-6·diag. Exactly one candidate is required, otherwise the run fails with `AMBIGUOUS_FACE_MAP`.
   The residuals go into `MeshSummary.faceMap`. Element and node sets for each target are then built from the mesh faces / edges of the
   mapped B-rep faces / edges.
-- `intersectPlane` (LE10 mid-plane edge) is applied in the mesher with an OCCT general fuse of the volume and a plane face before
+- `intersectPlane` (LE10 mid-plane edge) is REFUSED today (`FEA_TARGET_PLANE_UNSUPPORTED`, at command time and in `meshRequest`) until the mesher resolves it; the design is: applied in the mesher with an OCCT general fuse of the volume and a plane face before
   meshing. This imprints the curve, and the physical group takes the new curves that lie in the plane on the target faces.
 
 ### 5.2 Midsurface (FR-FEA-05, TR-FEA-20)
@@ -674,7 +674,7 @@ benchmarks.
 
 **Deviations:** targets are resolved by the mesher (closest mesh surface / node to the given points), not by the TR-FEA-32 face map,
 because the 01 face-query port (`faceDetails`) does not exist; without STEP (Manifold) the mesher rebuilds the geometry from the
-tessellation (`classifySurfaces` 40°), so faces are crease regions; `edgesNear` works with STEP only; `intersectPlane` is ignored.
+tessellation (`classifySurfaces` 40°), so faces are crease regions; `edgesNear` works with STEP only; `intersectPlane` is refused (`FEA_TARGET_PLANE_UNSUPPORTED`) until the mesher resolves it.
 Forces on edges / points are split equally over the target nodes (faces: area-consistent since 2026-10-19, see below). Probes use the nearest node
 (temperature: element interpolation). Case lengths are in document units, loads in the case unit system. The FE tools run synchronously in the
 server process (no ticket cancel yet).

@@ -211,14 +211,14 @@ const stepSchema = z.object({
  * @failure unknown / non-creep case -> FEA_ANALYSIS_NOT_FOUND / CRP_CASE_TYPE; other solver -> CRP_SOLVER_UNSUPPORTED; duration <= 0 or not a time ->
  *   CRP_DURATION_INVALID; cetol <= 0 -> CRP_CETOL_INVALID; increments / output / temperature -> CRP_STEP_PARAM_INVALID; no part, or a part without
  *   a creep law -> CRP_LAW_MISSING / CRP_NO_VISCOUS_MATERIAL / CRP_LAW_FORM_UNSUPPORTED; law outside its temperature validity ->
- *   CRP_LAW_OUT_OF_RANGE; orthotropic elasticity -> CRP_ORTHOTROPIC_V2; timeUnit other than s -> CRP_LAW_TIME_UNIT (all refusals, unchanged doc)
+ *   CRP_LAW_OUT_OF_RANGE; orthotropic elasticity -> CRP_ORTHOTROPIC_V2 (all refusals, unchanged doc)
  */
 export const setCreepStep = defineCommand({
   name: 'set_creep_step',
   description:
     'Set the creep hold of a creep analysis (create_analysis analysisType=creep, CalculiX): the loads and held displacements of the case act for ' +
     '`duration` at a uniform `temperature` while the Norton law eps_dot = A sigma^n t^m of the part materials (add_material_model creep_norton + ' +
-    'define_constitutive_set elastic + creep, makeDefault; timeUnit s) lets the part creep or relax. `cetol` (creep strain error per increment) has ' +
+    'define_constitutive_set elastic + creep, makeDefault; any timeUnit: A is converted to MPa and seconds for the CalculiX card, whose t is the CalculiX total step time in seconds, which matters when m != 0) lets the part creep or relax. `cetol` (creep strain error per increment) has ' +
     'no default. preloadStep true writes an elastic *STATIC step first (creep is off there) so the hold starts from the elastic state; the hold clock ' +
     'is the CalculiX total time minus that step. Time hardening (m != 0) counts that step: keep m = 0 or accept the shift. All loads of the case act ' +
     '(every load case summed). Returns affected [analysisId] and states every named default used. Next: set_mesh_controls, add_result_probe ' +

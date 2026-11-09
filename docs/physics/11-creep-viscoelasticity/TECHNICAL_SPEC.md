@@ -49,7 +49,7 @@ packages/domain-physics/src (@phys)  ── CadPlugin "physics-creep", toolset "
    creep/deck.ts            INP fragment writer plugged into @cae/decks/inpWriter (step + material blocks)
    creep/history.ts         PEEQ / S / U history extraction from FRD/DAT artifacts (pure)
    creep/rupture.ts         Larson-Miller, time-fraction damage (pure)
-   creep/units.ts           A conversion (TR-CRP-12)
+   core model/materialLaws/nortonUnits.ts  A conversion (TR-CRP-12)
         ▼ (public APIs only, L10)
 @cae (05 plugin)          AnalysisCase, deck writer hooks, artifact port, margins provider registry
 packages/core/src/model   analysis.ts (05) + AnalysisType members 'creep' | 'viscoelastic'; CreepStepSpec (data type)
@@ -74,7 +74,7 @@ deck hook move into `@cae` as an extension point and `@phys` only registers comm
 | TR-CRP-02 | MUST | Plugin `physics-creep` (`CadPlugin { name, toolset: 'analysis', commands, document }`); `document.validate` checks `creep` blocks (finite numbers, units parse, duration > 0, cetol > 0, m > −1 is checked on the law by PHY-02). |
 | TR-CRP-10 | MUST | `CreepLawView` (§3) is built per analysed part from the PHY-02 model on the part's 08 record; missing → `CRP_LAW_MISSING`; unresolved private library → `MAT_LIBRARY_UNRESOLVED` (08). |
 | TR-CRP-11 | MUST | Range guard: every quick check and life query validates σ, T (and LMP) against the law's `validRange`; FE results are scanned (max von Mises over the hold, element temperatures) by `check_creep`. Outside → `CRP_LAW_OUT_OF_RANGE`. Never extrapolate. |
-| TR-CRP-12 | MUST | `@phys/creep/units.ts` converts A: stress factor `A_new = A_old · c_s^(−n)`; time factor `A_new = A_old · c_t^(m+1)` where `t_old = c_t · t_new`. Round-trip 1e-12 rel (VC-CRP-16). |
+| TR-CRP-12 | MUST | `core/model/materialLaws/nortonUnits.ts` converts A: stress factor `A_new = A_old · c_s^(−n)`; time factor `A_new = A_old · c_t^(m+1)` where `t_old = c_t · t_new`. Round-trip 1e-12 rel (VC-CRP-16). |
 | TR-CRP-20 | MUST | `closedForm.norton(A, n, m, σ, t) = A σⁿ t^(m+1)/(m+1)`; strain-hardening and time-hardening coincide at constant stress (§5.2). |
 | TR-CRP-21 | MUST | Relaxation closed form `σ(t) = [σ0^(1−n) + (n−1) E′ A t]^(1/(1−n))`, `E′ = E k_m/(k_m + k_b)`; n = 1 branch `σ0 exp(−E′ A t)`. |
 | TR-CRP-22 | MUST | Stationary creep closed forms of §5.2 (tube, beam), with the n = 1 limits unit-tested against Lamé / elastic beam (1e-12). |
@@ -459,14 +459,14 @@ cases act), `*TEMPERATURE`, `*NODE FILE U` and `*EL FILE S, CEEQ` at the time po
 | D6 | Probe extension = quantity `ceeq` (frd `PE`); the history of every probe is `probe_history` / `creep_report` (hold seconds). `s_hoop` / `s_radial` already exist (`axisPoint` / `axisDirection`). | A `history?: boolean` flag, `axis` field, `reaction_force` quantity | `probe_history` already returns every probe over every stored set; `reaction_force` has no deck request or consumer yet. |
 | D7 | The range guard checks the **temperature** against the law's `T` validity (`CRP_LAW_OUT_OF_RANGE`); the stress maximum is reported (`maxVonMisesOverHoldMPa`) and `creep_report.laws[].stressValidity` says no stress range is declared. | Reuse the PHY-02 `pressure` variable as a stress range | The validity variables of a PHY-02 model have no stress; abusing another variable would make a wrong claim. A stress range needs a PHY-02 variable first. |
 | D8 | `creep_closed_form` takes `material` for the three Norton checks (A, n, m from the default constitutive set, converted to MPa / s); `temperature_K` is then checked against the law. | Pass A, n, m only | VC-CRP-63 needs the guard on a stored law. |
-| D9 | The creep law must have `timeUnit: 's'` (`CRP_LAW_TIME_UNIT`). | Convert in the deck | **Finding:** the shared CalculiX card writer (`core/model/materialLaws/cardsCalculix.ts` `creepCards`) converts the stress unit of `A` but ignores `timeUnit`; a law in hours would write a wrong `*CREEP` card. Fixing it is a PHY-02 change (outside this lane); the refusal keeps the deck honest meanwhile. |
+| D9 | The creep law must have `timeUnit: 's'` (was `CRP_LAW_TIME_UNIT`). | Convert in the deck | **Resolved:** `creepCards` now converts the time unit: `A_card = A / (inMpa^n * inSeconds^(1+m))` (ε̇ = A σⁿ tᵐ, t and ε̇ in the law's time unit, card time in s); the refusal and the code `CRP_LAW_TIME_UNIT` are removed. |
 | D10 | WLF refuses `T − Tr < 0`; the `C2 + ΔT ≤ 0` branch of TR-CRP-41 cannot occur (C2 > 0 is validated, ΔT ≥ 0). | Keep an unreachable branch | Dead code. |
 | D11 | `fea_result_field` / `render` of a creep case read the hold set at `time` (a stored hold time, else refused; default the last). | Leave the preload step selected | The preload step writes no output, so the load-case selection found nothing. |
 | D13 | When only one of `minIncrement` / `maxIncrement` is set, the other is the CalculiX default (minimum 1e-5 × the period capped at the initial increment, maximum the period), not the initial increment / duration (review round 1). | Fill from `initial` / `duration` | The old fill forced a minimum equal to the initial increment, so the solver could not cut back. |
 | D14 | A unit system other than N-mm-t-s is refused at `set_creep_step` / reported by `check_creep` (`CRP_UNIT_SYSTEM`), not only at the deck. Hold-time matching in `fea_result_field` is relative to the time (exact at 0). Integer ranges (`maxIncrements`, log `count`, `maxPoints`) are in the zod schema: out-of-range is `CMD_INVALID_PARAMS`; the tool-schema derivation emits no minimum / maximum, so the ranges are stated in the descriptions. | Coded `CRP_STEP_PARAM_INVALID` for those ranges | A coded refusal and a schema range cannot both fire; the schema one is validated before `run`. |
 | D12 | `check_creep` composes `check_analysis` through `execute` (which already carries the creep set-up items), adds the hold result (`CRP_HOLD_INCOMPLETE`) and de-duplicates by code + ids. | Re-implement the 05 items | One source of items. |
 
-New codes beyond §7.1: `CRP_STEP_PARAM_INVALID`, `CRP_STEP_MISSING`, `CRP_LAW_FORM_UNSUPPORTED`, `CRP_LAW_TIME_UNIT`, `CRP_INCREMENT_UNBOUNDED` (warning),
+New codes beyond §7.1: `CRP_STEP_PARAM_INVALID`, `CRP_STEP_MISSING`, `CRP_LAW_FORM_UNSUPPORTED`, `CRP_INCREMENT_UNBOUNDED` (warning),
 `CRP_RESULTS_MISSING`, `CRP_NOTHING_TO_DELETE`, `CRP_INPUT_INVALID`.
 
 ### 13.2 CalculiX 2.21 behaviour measured (Windows build, 2026-11-08)
@@ -498,9 +498,9 @@ Solver runs: CalculiX 2.21 (Windows build), Netgen 6.2.2604 through `llull-mesh`
 | VC-CRP-61 | partial | `creep_report` and `check_creep`: `reviewRequired: true`, `reviewReason`, summary "Computed by llull, not approved" (tests); the M5 queries are not built |
 | VC-CRP-62 | pass | typical-basis law: `unverified: true` + reasons in `creep_closed_form` and `creep_report`; `CRP_LAW_UNVERIFIED` warning in `check_creep` / `check_analysis`, deck header `** UNVERIFIED` |
 | VC-CRP-63 | partial | temperature outside the law validity: refused by `creep_closed_form` and `set_creep_step`, error in `check_creep` and the deck; the **stress** range is not expressible (D7) |
-| VC-CRP-65 | partial | tested: `CRP_INPUT_MISSING`, `CRP_INPUT_INVALID`, `CRP_DURATION_INVALID`, `CRP_CETOL_INVALID`, `CRP_STEP_PARAM_INVALID`, `CRP_LAW_MISSING`, `CRP_NO_VISCOUS_MATERIAL`, `CRP_LAW_FORM_UNSUPPORTED`, `CRP_LAW_TIME_UNIT`, `CRP_ORTHOTROPIC_V2`, `CRP_LAW_OUT_OF_RANGE`, `CRP_OVERSTRESS_MODEL`, `CRP_HOLD_INCOMPLETE`, `CRP_CASE_TYPE`, `CRP_SOLVER_UNSUPPORTED`, `CRP_WLF_OUT_OF_RANGE`; `m ≤ −1` is refused by PHY-02 on the law; the coarse temperature table is M4 |
+| VC-CRP-65 | partial | tested: `CRP_INPUT_MISSING`, `CRP_INPUT_INVALID`, `CRP_DURATION_INVALID`, `CRP_CETOL_INVALID`, `CRP_STEP_PARAM_INVALID`, `CRP_LAW_MISSING`, `CRP_NO_VISCOUS_MATERIAL`, `CRP_LAW_FORM_UNSUPPORTED`, `CRP_ORTHOTROPIC_V2`, `CRP_LAW_OUT_OF_RANGE`, `CRP_OVERSTRESS_MODEL`, `CRP_HOLD_INCOMPLETE`, `CRP_CASE_TYPE`, `CRP_SOLVER_UNSUPPORTED`, `CRP_WLF_OUT_OF_RANGE`; `m ≤ −1` is refused by PHY-02 on the law; the coarse temperature table is M4 |
 | VC-CRP-66 | not built | private-library redaction in `creep_report`; an unresolved library refuses the deck (`MAT_LIBRARY_UNRESOLVED`) |
 
 Not done in this change (outside the lane or later milestones): `llull guide` creep section, the `compare.py` CLI harness and the MCP prompt (`packages/protocol`, `server`;
-there is no MCP server, LC1), `--dry-run`, M4 (temperature tables, PHY-03 field, hold blocks, NLGEOM validation) and M5. The core PHY-02 card writer ignores `timeUnit` (D9).
+there is no MCP server, LC1), `--dry-run`, M4 (temperature tables, PHY-03 field, hold blocks, NLGEOM validation) and M5. The PHY-02 card writer converts `timeUnit` (D9).
 

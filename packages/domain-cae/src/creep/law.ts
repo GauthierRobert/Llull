@@ -5,7 +5,7 @@ import { modelUnverifiedReasonsOf, needsReview } from '@core/model/materialLaws/
 import type { MaterialModel } from '@core/model/materialModel';
 import type { Material } from '@core/model/types';
 import { convertValue, isUnitFailure } from '@lib/quantity';
-import { convertNortonA } from './units';
+import { convertNortonA } from '@core/model/materialLaws/nortonUnits';
 
 export interface CreepLaw {
   readonly materialId: string;

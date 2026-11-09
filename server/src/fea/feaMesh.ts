@@ -138,13 +138,14 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
       op: 'mesh',
       lengthScale: request.lengthToAnalysis,
       parts,
-      targets: request.targets.map(({ key, entityId, facesNear, edgesNear, pointsNear }) => ({
+      targets: request.targets.map(({ key, entityId, facesNear, edgesNear, pointsNear, intersectPlane }) => ({
         key,
         entityId,
         ...(facesNear !== undefined ? { facesNear } : {}),
         ...faceIndicesOf(kernelFaces.get(entityId ?? ''), facesNear),
         ...(edgesNear !== undefined ? { edgesNear } : {}),
         ...(pointsNear !== undefined ? { pointsNear } : {}),
+        ...(intersectPlane !== undefined ? { intersectPlane } : {}),
       })),
       controls: {
         order: request.controls.order,
