@@ -249,3 +249,20 @@ describe('CSV report (VC-COR-16)', () => {
     expect(check(withEnvironment(named, 'normal')).text).toBeUndefined();
   });
 });
+
+describe('CSV cells and replay seed', () => {
+  it('quotes commas and quotes, and writes the acceptance column', () => {
+    const { doc } = pair(['aluminium_wrought_other', 'nickel_titanium_group']);
+    const named = run(doc, 'create_material', { name: 'a,"b"', density: 0.001, color: '#ffffff', metalness: 0, roughness: 1 });
+    const second = run(named, 'assign_material', { materialName: 'a,"b"', entityIds: [Object.keys(named.entities)[1]] });
+    const text = check(withEnvironment(second, 'normal'), { report: true }).text ?? '';
+    expect(text).toContain('a,""b""');
+  });
+
+  it('a history replay of a document without acceptances keeps its slice', () => {
+    const { doc } = pair(['aluminium_wrought_other', 'nickel_titanium_group']);
+    const env = withEnvironment(doc, 'normal');
+    const replayed = execute(env, 'replay_history', {});
+    expect(replayed.document.corrosion?.environment).toEqual({ scheme: 'anodic_index', value: 'normal' });
+  });
+});

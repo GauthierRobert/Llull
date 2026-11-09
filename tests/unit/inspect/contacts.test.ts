@@ -192,3 +192,51 @@ describe('find_contacts refusals', () => {
   it('a negative tolerance', () => refused({ tolerance: { value: -1, unit: 'mm' } }, 'COR_TOLERANCE_INVALID'));
   it('a near-miss factor below 1', () => refused({ nearMissFactor: 0.5 }, 'COR_TOLERANCE_INVALID'));
 });
+
+describe('find_contacts instances: nesting and broken components', () => {
+  function instanced(): { doc: CadDocument; base: string; instance: string } {
+    const base = execute(createEmptyDocument(), 'add_box', { size: [10, 10, 10], position: [0, 0, 0] });
+    const unit = execute(base.document, 'add_box', { size: [10, 10, 10], position: [0, 0, 10] });
+    const component = execute(unit.document, 'create_component', { name: 'Unit', entityIds: [unit.affected[0]] });
+    const instance = component.affected.find((id) => component.document.entities[id]?.kind === 'instance') ?? '';
+    return { doc: component.document, base: base.affected[0] ?? '', instance };
+  }
+
+  it('a nested instance is expanded to its leaf: ids join with slashes', () => {
+    const { doc, base, instance } = instanced();
+    const outer = execute(doc, 'create_component', { name: 'Outer', entityIds: [instance] });
+    const outerInstance = outer.affected.find((id) => outer.document.entities[id]?.kind === 'instance') ?? '';
+    const pairs = find(outer.document, TOL).pairs;
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]?.a).toBe(base);
+    expect(pairs[0]?.b.split('/')).toHaveLength(3);
+    expect(pairs[0]?.b.startsWith(`${outerInstance}/`)).toBe(true);
+  });
+
+  it('an instance whose component is gone contributes no solid and does not throw', () => {
+    const { doc, instance } = instanced();
+    const broken = { ...doc, components: {} };
+    expect(find(broken, TOL).pairs).toEqual([]);
+    expect(find(broken, { ...TOL, entityIds: [instance] }).pairs).toEqual([]);
+  });
+
+  it('a self-referencing component stops at the nesting limit', () => {
+    const { doc, instance } = instanced();
+    const [componentId] = Object.keys(doc.components);
+    const component = doc.components[componentId ?? ''];
+    const entity = doc.entities[instance];
+    if (component === undefined || entity === undefined) throw new Error('fixture');
+    const cyclic = {
+      ...doc,
+      components: {
+        ...doc.components,
+        [component.id]: {
+          ...component,
+          entities: { ...component.entities, loop: { ...entity, id: 'loop' } },
+          order: [...component.order, 'loop'],
+        },
+      },
+    };
+    expect(() => find(cyclic as CadDocument, TOL)).not.toThrow();
+  });
+});
