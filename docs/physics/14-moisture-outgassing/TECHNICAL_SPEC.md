@@ -280,3 +280,10 @@ See FUNCTIONAL_SPEC §11 [R1]–[R13] and `validation/sources.md` [S1]–[S17]. 
 - The three `*_proposed.json` plans run unchanged (`tests/unit/environment/plans.test.ts`) and are off the blocked-plan list.
 
 **Left.** M3 exposed faces; M4 CSV converter + human-gated deviation; M5 equivalent-DeltaT field hand-off; `testMethod` qualifier on stored values (needs 08); moisture screening per part in the check; UI (materials table, uptake curve).
+
+**Update (review round 1, 2026-11-09).**
+
+- Budget: parts are the top-level solids plus every instanced child once per instance (`parts.ts`, `expandInstance`; mass per child through `mass_properties` on a local document); component definitions are never counted themselves.
+- M3: `ao_erosion` takes `exposedFaces [{entityId, faces[]}]`; the areas come from `inspect_faces` (exact kernel, otherwise its refusal is forwarded) and a caller `area` overrides. The budget does not use faces (it is mass-based). `exposedFaces` is a call parameter, not stored in the mission.
+- M4 (human gate only): `approve_environment_deviation`, same pattern as `accept_corrosion_item` (signature over the finding fingerprint, re-verified on every `check_space_environment`; foreign / unbound / invalid / no port keeps the item in the status with `unconfirmedDeviation`; replay keeps the records through `replaySeed`). Item key `outgassing:<material>|<quantity>`. The gate is a local copy (`environment/gate.ts`) until the shared signed-gate helper lands. The NASA CSV converter stays blocked on OQ-ENV-03.
+- Corrosion overlap: two slices kept, `ENV_SERVICE_ENVIRONMENT_MISMATCH` warning: `docs/decisions/PHY14-environment-vs-corrosion.md`.

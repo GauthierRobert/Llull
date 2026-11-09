@@ -63,11 +63,12 @@ const statusOf = (data: Check, material: string, quantity?: string): string[] =>
     .map((item) => item.status);
 
 describe('plugin physics-environment (TR-ENV, toolset environment)', () => {
-  it('registers the five PHY-14 commands in the environment toolset with a document slice', () => {
+  it('registers the six PHY-14 commands in the environment toolset with a document slice', () => {
     expect(environmentPlugin.name).toBe('physics-environment');
     expect(environmentPlugin.toolset).toBe('environment');
     expect(environmentPlugin.commands.map((command) => command.name).sort()).toEqual([
       'ao_erosion',
+      'approve_environment_deviation',
       'check_space_environment',
       'hygro_strain',
       'moisture_uptake',

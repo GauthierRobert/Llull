@@ -8,6 +8,11 @@ const environmentDocument: DocumentExtension = {
   validate: spaceEnvironmentErrors,
   derivedEntityIds: () => new Set<string>(),
   restore: (raw) => raw,
+  // A replay regenerates the environment from its steps and keeps the human deviations (their steps carry no signature).
+  replaySeed: (base) => {
+    const deviations = base.spaceEnvironment?.deviations ?? {};
+    return Object.keys(deviations).length === 0 ? {} : { spaceEnvironment: { deviations } };
+  },
 };
 
 export const environmentPlugin: CadPlugin = {

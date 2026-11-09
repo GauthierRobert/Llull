@@ -44,23 +44,56 @@ const profileSchema = z.strictObject({
   status: z.enum(['verified', 'secondary', 'company']),
 });
 
-const sliceSchema = z.strictObject({
-  outgassingProfile: z
-    .union([z.string().refine((id) => SHIPPED_PROFILE_IDS.includes(id), 'names no shipped profile'), profileSchema])
-    .optional(),
-  humidityExposure: z
-    .strictObject({
-      relativeHumidity: finite.refine((value) => value >= 0 && value <= 100, 'must be between 0 and 100 (percent)'),
-      temperature: quantityOf('temperature'),
-      duration: quantityOf('time').refine((quantity) => quantity.value >= 0, 'must be >= 0'),
-      faces: z.enum(['both', 'one']),
-      source: text,
-    })
-    .optional(),
-  aoFluence: z
-    .strictObject({ value: finite.refine((value) => value >= 0, 'must be >= 0'), unit: z.enum(['atoms/cm^2', 'atoms/m^2']), source: text })
-    .optional(),
+const MAX_DEVIATIONS = 10000;
+const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
+const itemKeySchema = z
+  .string()
+  .min(1)
+  .max(512)
+  .refine((key) => !RESERVED.has(key), 'reserved key');
+
+const deviationSchema = z.strictObject({
+  itemKey: itemKeySchema,
+  decision: z.enum(['accepted', 'rejected']),
+  justification: z.string().min(1).max(4000),
+  fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  signer: z.string().min(1).max(256),
+  signatureId: z.string().min(1).max(256),
+  signature: z.unknown(),
+  documentUid: z.string().min(1).max(256),
 });
+
+const sliceSchema = z
+  .strictObject({
+    deviations: z.record(itemKeySchema, deviationSchema).optional(),
+    outgassingProfile: z
+      .union([z.string().refine((id) => SHIPPED_PROFILE_IDS.includes(id), 'names no shipped profile'), profileSchema])
+      .optional(),
+    humidityExposure: z
+      .strictObject({
+        relativeHumidity: finite.refine((value) => value >= 0 && value <= 100, 'must be between 0 and 100 (percent)'),
+        temperature: quantityOf('temperature'),
+        duration: quantityOf('time').refine((quantity) => quantity.value >= 0, 'must be >= 0'),
+        faces: z.enum(['both', 'one']),
+        source: text,
+      })
+      .optional(),
+    aoFluence: z
+      .strictObject({
+        value: finite.refine((value) => value >= 0, 'must be >= 0'),
+        unit: z.enum(['atoms/cm^2', 'atoms/m^2']),
+        source: text,
+      })
+      .optional(),
+  })
+  .superRefine((slice, ctx) => {
+    const entries = Object.entries(slice.deviations ?? {});
+    if (entries.length > MAX_DEVIATIONS)
+      ctx.addIssue({ code: 'custom', path: ['deviations'], message: `at most ${MAX_DEVIATIONS} deviations` });
+    for (const [key, deviation] of entries.slice(0, MAX_DEVIATIONS))
+      if (deviation.itemKey !== key)
+        ctx.addIssue({ code: 'custom', path: ['deviations', key, 'itemKey'], message: `must equal its key '${key}'` });
+  });
 
 /** Value errors of the raw `spaceEnvironment` slice (persistence rejects the file when non-empty). */
 export const spaceEnvironmentErrors = (raw: Record<string, unknown>): string[] =>

@@ -6,6 +6,8 @@ import type { CommandResult } from '@core/commands/types';
 import { aoItems } from './aoCheck';
 import { budgetOf } from './budget';
 import { partsOf, usersOf } from './parts';
+import { covered, reviewItems } from './deviations';
+import { serviceMismatch } from './serviceCheck';
 import { refuseEnv, type EnvItem } from './codes';
 import { spaceEnvironmentOf } from './model';
 import { outgassingOf, screenMaterial, type MaterialOutgassing, type OutgassingItem } from './outgassing';
@@ -79,15 +81,18 @@ export const checkSpaceEnvironment = defineCommand({
     const parts = partsOf(doc, params.entityIds);
     const users = usersOf(parts);
     const data = new Map<string, MaterialOutgassing>();
-    const items: OutgassingItem[] = [];
+    const screened: OutgassingItem[] = [];
     for (const [material, entityIds] of users) {
       const read = outgassingOf(doc, ctx, material);
       data.set(material, read);
-      items.push(...screenMaterial(material, entityIds, read, profile));
+      screened.push(...screenMaterial(material, entityIds, read, profile));
     }
-    const failed = items.filter((item) => item.status === 'fail');
-    const unknown = items.filter((item) => item.status === 'unknown');
+    const items = reviewItems(doc, ctx?.humanSignature ?? null, screened, profile.id, mission.deviations ?? {});
+    const open = items.filter((item) => !covered(item));
+    const failed = open.filter((item) => item.status === 'fail');
+    const unknown = open.filter((item) => item.status === 'unknown');
     const status = items.length === 0 ? 'unknown' : failed.length > 0 ? 'fail' : unknown.length > 0 ? 'unknown' : 'pass';
+    const accepted = items.length - open.length;
 
     const findings: EnvItem[] = [];
     for (const [material] of users) {
@@ -101,6 +106,8 @@ export const checkSpaceEnvironment = defineCommand({
           message: `${material}: a value used is typical, supplier-unstated or unspecified: not a verified basis`,
         });
     }
+    const mismatch = serviceMismatch(doc, mission.humidityExposure);
+    if (mismatch !== null) findings.push({ code: 'ENV_SERVICE_ENVIRONMENT_MISMATCH', severity: 'warning', message: mismatch });
     const budget = budgetOf(ctx, parts, data);
     const ao =
       mission.aoFluence === undefined ? undefined : { fluence: mission.aoFluence, items: aoItems(doc, ctx, users, mission.aoFluence) };
@@ -111,7 +118,7 @@ export const checkSpaceEnvironment = defineCommand({
         : ['humidity exposure recorded: not screened here (needs the part thickness): run moisture_uptake with useMissionExposure']),
     ];
     const materials = [...users].map(([material, entityIds]) => {
-      const own = items.filter((item) => item.material === material);
+      const own = open.filter((item) => item.material === material);
       return {
         material,
         entityIds,
@@ -134,16 +141,17 @@ export const checkSpaceEnvironment = defineCommand({
       budget,
       ...(ao === undefined ? {} : { ao }),
       notes,
+      counts: { accepted },
       reviewRequired: true,
     };
-    const name = (list: readonly OutgassingItem[]): string =>
+    const name = (list: readonly { material: string; quantity: string }[]): string =>
       [...new Set(list.map((item) => `${item.material} ${item.quantity}`))].join(', ');
     const dataMissing = unknown.length > 0 ? ` Unknown (ENV_OUTGASSING_DATA_MISSING): ${name(unknown)}.` : '';
     const failing = failed.length > 0 ? ` Fail (ENV_OUTGASSING_FAIL): ${name(failed)}.` : '';
     const noneNote = items.length === 0 ? ' No entity with an assigned material was screened: status unknown.' : '';
     return report(
       doc,
-      `${COMMAND}: profile ${profile.id}${shippedProfile(profile.id) === undefined ? ' (custom)' : ''}: ${status.toUpperCase()} over ${users.size} material(s), ${items.length} limit check(s): ${items.length - failed.length - unknown.length} pass, ${failed.length} fail, ${unknown.length} unknown.${failing}${dataMissing}${noneNote} ` +
+      `${COMMAND}: profile ${profile.id}${shippedProfile(profile.id) === undefined ? ' (custom)' : ''}: ${status.toUpperCase()} over ${users.size} material(s), ${items.length} limit check(s): ${open.length - failed.length - unknown.length} pass, ${failed.length} fail, ${unknown.length} unknown${accepted > 0 ? `, ${accepted} covered by a confirmed human deviation` : ''}.${failing}${dataMissing}${noneNote} ` +
         `Screening budget (not a contamination prediction): max mass loss ${budget.totalMassLossG.toPrecision(6)} g, max condensables ${budget.totalCondensableG.toPrecision(6)} g over ${budget.counted} part(s)` +
         `${budget.uncounted > 0 ? `, ${budget.uncounted} part(s) without a figure` : ''}.${ao === undefined ? '' : ` AO fluence ${ao.fluence.value} ${ao.fluence.unit}: ${ao.items.filter((item) => item.status === 'info').length} material(s) with a recession figure.`} Review required.`,
       result,

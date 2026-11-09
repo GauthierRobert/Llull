@@ -43,11 +43,25 @@ export interface AoFluence {
   readonly source: string;
 }
 
+/** A qualified human decision on one finding of check_space_environment, bound to the finding as it was (fingerprint) and to the document it was signed for. */
+export interface Deviation {
+  readonly itemKey: string;
+  readonly decision: 'accepted' | 'rejected';
+  readonly justification: string;
+  readonly fingerprint: string;
+  readonly signer: string;
+  readonly signatureId: string;
+  readonly signature: unknown;
+  readonly documentUid: string;
+}
+
 export interface SpaceEnvironment {
   /** Id of a shipped profile, or a custom profile. */
   readonly outgassingProfile?: string | OutgassingProfile;
   readonly humidityExposure?: HumidityExposure;
   readonly aoFluence?: AoFluence;
+  /** Human deviation decisions keyed by item key; re-verified on every check (a record proves nothing by itself). */
+  readonly deviations?: Readonly<Record<string, Deviation>>;
 }
 
 declare module '@core/model/documentExtensions' {

@@ -14,6 +14,11 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   ENV_FLUENCE_UNSET: 'pass `fluence` (with its source) or record it with set_mission_environment aoFluence',
   ENV_EQUIVALENT_TEMPERATURE_INVALID:
     'beta / alpha differs between directions: use the laminate hygrothermal path of the composites pack instead of an equivalent temperature',
+  ENV_HUMAN_GATE: 'hand the item to the qualified reviewer, who signs the decision in the desktop app; do not retry',
+  ENV_ITEM_NOT_FOUND:
+    'run check_space_environment (same entityIds and profile) and pass an item key it reported (outgassing:<material>|<quantity>)',
+  ENV_ITEM_NOT_ACCEPTABLE: 'only a fail or unknown item can be approved or rejected',
+  ENV_DOCUMENT_UNIDENTIFIED: 'save the document first so it has a uid',
 };
 
 export const refuseEnv = tableRejection(REMEDIATION);
