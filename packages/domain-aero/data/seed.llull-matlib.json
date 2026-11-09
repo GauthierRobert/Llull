@@ -5,7 +5,9 @@
   "version": "0.1.0",
   "title": "llull aerospace seed library (verified entries only; supplier / typical / specification-minimum values, no design allowables)",
   "licence": "vendor-catalogue",
-  "exportMarking": { "regime": "none" },
+  "exportMarking": {
+    "regime": "none"
+  },
   "storage": "embedded",
   "sources": {
     "S13": {
@@ -46,9 +48,16 @@
       "designation": "Aluminium alloy 7075",
       "temper": "T6",
       "productForm": "sheet",
-      "specs": [{ "body": "SAE", "id": "AMS 4045" }],
+      "specs": [
+        {
+          "body": "SAE",
+          "id": "AMS 4045"
+        }
+      ],
       "licence": "vendor-catalogue",
-      "exportMarking": { "regime": "none" },
+      "exportMarking": {
+        "regime": "none"
+      },
       "propertyModels": [
         {
           "id": "density_ams4045_supplier",
@@ -56,7 +65,10 @@
           "unit": "lb/in^3",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 0.101 },
+          "form": {
+            "kind": "constant",
+            "value": 0.101
+          },
           "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S13",
@@ -74,9 +86,16 @@
       "designation": "Titanium Ti-6Al-4V (UNS R56400)",
       "temper": "annealed",
       "productForm": "sheet",
-      "specs": [{ "body": "SAE", "id": "AMS 4911" }],
+      "specs": [
+        {
+          "body": "SAE",
+          "id": "AMS 4911"
+        }
+      ],
       "licence": "vendor-catalogue",
-      "exportMarking": { "regime": "none" },
+      "exportMarking": {
+        "regime": "none"
+      },
       "propertyModels": [
         {
           "id": "density_supplier",
@@ -84,7 +103,10 @@
           "unit": "lb/in^3",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 0.16 },
+          "form": {
+            "kind": "constant",
+            "value": 0.16
+          },
           "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S15",
@@ -100,7 +122,10 @@
           "unit": "lb/in^3",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 0.163 },
+          "form": {
+            "kind": "constant",
+            "value": 0.163
+          },
           "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S15",
@@ -116,9 +141,18 @@
           "unit": "ksi",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 134 },
+          "form": {
+            "kind": "constant",
+            "value": 134
+          },
           "basis": "typical",
-          "condition": { "thickness": { "min": 0.063, "max": 0.1875, "unit": "in" } },
+          "condition": {
+            "thickness": {
+              "min": 0.063,
+              "max": 0.1875,
+              "unit": "in"
+            }
+          },
           "provenance": {
             "sourceId": "S16",
             "citation": "Aircraft Materials, Ti-6Al-4V typical annealed sheet properties; titanium.com AMS 4911 summary",
@@ -133,9 +167,18 @@
           "unit": "ksi",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 126 },
+          "form": {
+            "kind": "constant",
+            "value": 126
+          },
           "basis": "typical",
-          "condition": { "thickness": { "min": 0.063, "max": 0.1875, "unit": "in" } },
+          "condition": {
+            "thickness": {
+              "min": 0.063,
+              "max": 0.1875,
+              "unit": "in"
+            }
+          },
           "provenance": {
             "sourceId": "S16",
             "citation": "Aircraft Materials, Ti-6Al-4V typical annealed sheet properties; titanium.com AMS 4911 summary",
@@ -150,9 +193,18 @@
           "unit": "%",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 10 },
+          "form": {
+            "kind": "constant",
+            "value": 10
+          },
           "basis": "typical",
-          "condition": { "thickness": { "min": 0.063, "max": 0.1875, "unit": "in" } },
+          "condition": {
+            "thickness": {
+              "min": 0.063,
+              "max": 0.1875,
+              "unit": "in"
+            }
+          },
           "provenance": {
             "sourceId": "S16",
             "citation": "Aircraft Materials, Ti-6Al-4V typical annealed sheet properties; titanium.com AMS 4911 summary",
@@ -170,7 +222,9 @@
       "productForm": "fastener",
       "specs": [],
       "licence": "vendor-catalogue",
-      "exportMarking": { "regime": "none" },
+      "exportMarking": {
+        "regime": "none"
+      },
       "propertyModels": [
         {
           "id": "Ftu_min",
@@ -178,7 +232,10 @@
           "unit": "ksi",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 160 },
+          "form": {
+            "kind": "constant",
+            "value": 160
+          },
           "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S21",
@@ -194,7 +251,10 @@
           "unit": "ksi",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 95 },
+          "form": {
+            "kind": "constant",
+            "value": 95
+          },
           "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S22",
@@ -213,7 +273,9 @@
       "productForm": "fastener",
       "specs": [],
       "licence": "vendor-catalogue",
-      "exportMarking": { "regime": "none" },
+      "exportMarking": {
+        "regime": "none"
+      },
       "propertyModels": [
         {
           "id": "Fsu_min",
@@ -221,7 +283,10 @@
           "unit": "ksi",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 95 },
+          "form": {
+            "kind": "constant",
+            "value": 95
+          },
           "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S26",
@@ -240,7 +305,9 @@
       "productForm": "fastener",
       "specs": [],
       "licence": "vendor-catalogue",
-      "exportMarking": { "regime": "none" },
+      "exportMarking": {
+        "regime": "none"
+      },
       "propertyModels": [
         {
           "id": "Fsu_min",
@@ -248,7 +315,10 @@
           "unit": "ksi",
           "variables": [],
           "validity": [],
-          "form": { "kind": "constant", "value": 95 },
+          "form": {
+            "kind": "constant",
+            "value": 95
+          },
           "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S26",
