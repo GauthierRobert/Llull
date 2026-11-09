@@ -6,6 +6,7 @@ import type { CommandResult } from '@core/commands/types';
 import { expressionSyntaxError, extractReferences, isBuiltinConstant } from '@lib/expression';
 import { nextId } from '@lib/id';
 import { distributionIssue, distributionSchema } from './distributions';
+import { deriveMaterialDistribution } from './materialBinding';
 import { refuseReliability } from './codes';
 import { cholesky } from '@lib/denseLinalg';
 import type { LimitState, RandomVariable } from '@cae/reliability/types';
@@ -28,7 +29,7 @@ const targetSchema = (what: string): z.ZodObject<{ value: z.ZodNumber; source: z
 /**
  * @affects doc.reliability.variables (adds or replaces the variable called `name`; affected: [variable id])
  * @invariant distribution parameters valid (sd > 0, lognormal mean > 0, min < max); a parameter binding names an existing document parameter
- * @failure bad name, name of a document parameter or built-in constant, invalid distribution, unknown parameter -> PRB_DISTRIBUTION_INVALID / PRB_PARAMS_INVALID / PRB_BINDING_UNRESOLVED (unchanged doc)
+ * @failure bad name, name of a document parameter, response or built-in constant, invalid distribution, unknown parameter -> PRB_DISTRIBUTION_INVALID / PRB_PARAMS_INVALID / PRB_BINDING_UNRESOLVED (unchanged doc)
  */
 export const defineRandomVariable = defineCommand({
   name: 'define_random_variable',
@@ -36,20 +37,48 @@ export const defineRandomVariable = defineCommand({
     'Define (or replace, by name) a random variable of the probabilistic model: a scattered input with a distribution. Use its `name` as a symbol in define_limit_state expressions. ' +
     'Distributions: normal {mean, sd}; lognormal {mean, sd} (the mean and sd of X itself, not of ln X); uniform {min, max}; weibull {shape, scale}; gumbel {location, scale}. ' +
     'Give the unit and cite the source of the scatter (`citation`), otherwise every result is marked unverified (PRB_SCATTER_UNSOURCED). `binding` is { kind: "free" } ' +
-    '(a symbol used only in expressions, default) or { kind: "parameter", parameter } (links the variable to an existing document parameter). ' +
+    '(a symbol used only in expressions, default), { kind: "parameter", parameter } (links the variable to an existing document parameter) or { kind: "materialProperty", material, property, at?, modelId?, measurementCoverage? } ' +
+    '(the scatter of a PHY-01 property model: with no `distribution` it is derived from the model uncertainty band, sd = half-width / Φ⁻¹((1 + coverage) / 2); a fit-error band is refused PRB_SCATTER_KIND_UNSUITABLE; ' +
+    'a density binding also drives geometry-backed responses by scaling the material density, other properties are usable as symbols in limit-state expressions). ' +
     'Returns the variable id (rv-<step>.<k>) in affected[0]. Next: define_limit_state, then propagate_uncertainty / run_reliability_study.',
   params: z.object({
     name: z
       .string()
       .describe('Symbol of the variable: letters, digits and underscores, not starting with a digit (e.g. "R", "yield_strength").'),
     unit: z.string().describe("Unit of the variable's values, e.g. 'MPa', 'mm', '1'. Recorded for reports; values are not converted."),
-    distribution: distributionSchema.describe('Marginal distribution of the variable.'),
+    distribution: distributionSchema
+      .optional()
+      .describe(
+        'Marginal distribution of the variable. Required unless binding is a materialProperty without one: then it is derived from the PHY-01 uncertainty band.',
+      ),
+    distributionShape: z
+      .enum(['normal', 'lognormal'])
+      .optional()
+      .describe(
+        'Shape of a distribution derived from a material property band (default normal; lognormal for strictly positive properties). Same mean and sd.',
+      ),
     binding: z
       .discriminatedUnion('kind', [
         z.object({ kind: z.literal('free').describe('A symbol for expressions only.') }),
         z.object({
           kind: z.literal('parameter').describe('Linked to a document parameter.'),
           parameter: z.string().describe('Name of an existing document parameter (set_parameter).'),
+        }),
+        z.object({
+          kind: z.literal('materialProperty').describe('Scatter of a PHY-01 material property.'),
+          material: z.string().describe('Material id (create_material name).'),
+          property: z.string().describe('Catalogue property name, e.g. density, E, k, cte.'),
+          at: z
+            .record(z.string(), z.object({ value: z.number().describe('Value.'), unit: z.string().describe('Unit, e.g. K.') }))
+            .optional()
+            .describe("Study condition for the model, each variable { value, unit }, e.g. { T: { value: 293, unit: 'K' } }."),
+          modelId: z.string().optional().describe('Use exactly this property model.'),
+          measurementCoverage: z
+            .number()
+            .gt(0)
+            .lt(1)
+            .optional()
+            .describe("Coverage of a 'measurement' uncertainty band (the model carries none)."),
         }),
       ])
       .optional()
@@ -58,20 +87,41 @@ export const defineRandomVariable = defineCommand({
       .optional()
       .describe('Source of the scatter. Strongly recommended: without it results carry PRB_SCATTER_UNSOURCED and unverified: true.'),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const fail = (code: string, message: string, paths: string[]): CommandResult =>
       refuseReliability(doc, 'define_random_variable', code, message, [params.name], paths);
     if (!IDENTIFIER.test(params.name))
       return fail('PRB_PARAMS_INVALID', `name '${params.name}' is not an identifier (letters, digits, underscore)`, ['name']);
+    if (Object.hasOwn(reliabilityOf(doc).responses ?? {}, params.name))
+      return fail(
+        'PRB_PARAMS_INVALID',
+        `name '${params.name}' is already a response: a limit-state expression could not tell them apart; choose another name`,
+        ['name'],
+      );
     if (Object.hasOwn(doc.parameters, params.name) || isBuiltinConstant(params.name))
       return fail(
         'PRB_PARAMS_INVALID',
         `name '${params.name}' is ${Object.hasOwn(doc.parameters, params.name) ? 'a document parameter' : 'a built-in constant'}: a limit-state expression could not tell the variable from it; choose another name`,
         ['name'],
       );
-    const issue = distributionIssue(params.distribution);
-    if (issue !== null) return fail('PRB_DISTRIBUTION_INVALID', issue, ['distribution']);
     const binding = params.binding ?? { kind: 'free' as const };
+    const derived =
+      params.distribution === undefined && binding.kind === 'materialProperty'
+        ? deriveMaterialDistribution(doc, binding, params.distributionShape ?? 'normal', ctx)
+        : null;
+    if (derived !== null && 'code' in derived) return fail(derived.code, derived.message, ['binding']);
+    const distribution = params.distribution ?? derived?.distribution;
+    if (distribution === undefined)
+      return fail('PRB_PARAMS_INVALID', 'distribution is required unless the binding is a materialProperty', ['distribution']);
+    const issue = distributionIssue(distribution);
+    if (issue !== null) return fail('PRB_DISTRIBUTION_INVALID', issue, ['distribution']);
+    const derivedCitation =
+      derived === null
+        ? undefined
+        : {
+            text: `PHY-01 property model ${derived.derivedFrom.modelId} uncertainty (${derived.derivedFrom.uncertaintyKind}, coverage ${derived.derivedFrom.coverage})`,
+          };
+    const citation = params.citation ?? derivedCitation;
     if (binding.kind === 'parameter' && !Object.hasOwn(doc.parameters, binding.parameter))
       return fail('PRB_BINDING_UNRESOLVED', `no document parameter '${binding.parameter}'`, ['binding', 'parameter']);
     const model = reliabilityOf(doc);
@@ -80,9 +130,10 @@ export const defineRandomVariable = defineCommand({
       id,
       name: params.name,
       unit: params.unit,
-      distribution: params.distribution,
+      distribution,
       binding,
-      ...(params.citation === undefined ? {} : { citation: params.citation }),
+      ...(derived === null ? {} : { derivedFrom: derived.derivedFrom }),
+      ...(citation === undefined ? {} : { citation }),
     };
     const replaced = variableOf(doc, params.name) !== undefined;
     const next = withReliability(doc, {
@@ -92,7 +143,7 @@ export const defineRandomVariable = defineCommand({
     });
     return changed(
       next,
-      `${replaced ? 'Replaced' : 'Defined'} random variable ${id} '${params.name}' [${params.unit}] (${params.distribution.kind}${params.citation === undefined ? ', unsourced scatter' : ''}).`,
+      `${replaced ? 'Replaced' : 'Defined'} random variable ${id} '${params.name}' [${params.unit}] (${distribution.kind}${derived === null ? '' : ' derived from the property model band'}${citation === undefined ? ', unsourced scatter' : ''}).`,
       [id],
     );
   },
@@ -194,7 +245,7 @@ export const setCorrelation = defineCommand({
 
 /**
  * @affects doc.reliability.limitStates (adds or replaces the limit state called `name`; affected: [limit state id])
- * @invariant expression parses; every symbol is a random variable, a document parameter or pi / tau; failure is g < 0
+ * @invariant expression parses; every symbol is a random variable, a response, a document parameter or pi / tau; failure is g < 0
  * @failure bad name / expression / unknown symbol / bad target -> PRB_PARAMS_INVALID / PRB_EXPRESSION_INVALID / PRB_TARGET_INVALID (unchanged doc)
  */
 export const defineLimitState = defineCommand({
@@ -219,10 +270,16 @@ export const defineLimitState = defineCommand({
     if (syntax !== null) return fail('PRB_EXPRESSION_INVALID', syntax, ['expression']);
     const model = reliabilityOf(doc);
     const unknown = [...extractReferences(params.expression)].filter(
-      (symbol) => !Object.hasOwn(model.variables, symbol) && !Object.hasOwn(doc.parameters, symbol) && !isBuiltinConstant(symbol),
+      (symbol) =>
+        !Object.hasOwn(model.variables, symbol) &&
+        !Object.hasOwn(model.responses ?? {}, symbol) &&
+        !Object.hasOwn(doc.parameters, symbol) &&
+        !isBuiltinConstant(symbol),
     );
     if (unknown.length > 0)
-      return fail('PRB_EXPRESSION_INVALID', `unknown symbol(s) ${unknown.join(', ')}: define the random variables first`, ['expression']);
+      return fail('PRB_EXPRESSION_INVALID', `unknown symbol(s) ${unknown.join(', ')}: define the random variables / responses first`, [
+        'expression',
+      ]);
     const { targetBeta, targetPf } = params;
     if (
       (targetBeta !== undefined && (!(targetBeta.value > 0) || targetBeta.source.trim() === '')) ||

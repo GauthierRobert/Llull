@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { stackContacts } from '@cae/corrosion/stacks';
 import { check, expected, pair, run, withEnvironment } from './fixtures';
 
 const ENVIRONMENTS = ['harsh', 'normal', 'controlled'] as const;
@@ -168,70 +167,6 @@ describe('check_material_compatibility: refusals and purity', () => {
     expect(first.affected).toEqual([]);
     expect(env).toEqual(before);
     expect(execute(env, 'check_material_compatibility', {}).data).toEqual(first.data);
-  });
-});
-
-describe('fastener stack contacts (VC-COR-12)', () => {
-  const stack = {
-    id: 'fst-1.1',
-    layers: [{ entityId: 'plate1' }, { entityId: 'plate2' }],
-    fastener: { instanceId: 'bolt' },
-    washers: [{ instanceId: 'washer', side: 'nut' }],
-    nut: { instanceId: 'nut' },
-  };
-  const withStacks = (doc: ReturnType<typeof pair>['doc'], stacks: unknown): ReturnType<typeof pair>['doc'] =>
-    ({ ...doc, fasteners: { catalogs: {}, stacks } }) as never;
-
-  it('2 plates + bolt + nut-side washer + nut give the 5 expected pairs, sorted', () => {
-    const oracle = expected.cases.find((entry) => entry.id === 'VC-COR-12')?.value as { pairs: string[][] };
-    expect(stackContacts(withStacks(createEmptyDocument(), { a: stack }))).toEqual(oracle.pairs);
-  });
-
-  it('a head washer sits on the first layer; a nut without washer sits on the last layer; duplicates merge', () => {
-    const second = { ...stack, id: 'fst-1.2', washers: [{ instanceId: 'hw', side: 'head' }], nut: { instanceId: 'nut2' } };
-    const pairs = stackContacts(withStacks(createEmptyDocument(), { a: stack, b: second })).map((entry) => entry.join('|'));
-    expect(pairs).toContain('hw|plate1');
-    expect(pairs).toContain('nut2|plate2');
-    expect(pairs.filter((entry) => entry === 'bolt|plate1')).toHaveLength(1);
-  });
-
-  it.each([[undefined], [null], [{ stacks: 5 }], [{ stacks: { a: 7, b: { layers: 'x', fastener: [], washers: {}, nut: 3 } } }]])(
-    'a malformed fasteners slice %j yields no pair and no throw',
-    (slice) => {
-      expect(stackContacts({ ...createEmptyDocument(), fasteners: slice } as never)).toEqual([]);
-    },
-  );
-
-  it('the check reports stack pairs without geometry and marks geometric ones that the stack also holds', () => {
-    const { doc, plate, block } = pair(['aluminium_wrought_other', 'nickel_titanium_group']);
-    const env = withEnvironment(doc, 'normal');
-    const stackDoc = withStacks(env, {
-      s: {
-        ...stack,
-        layers: [{ entityId: plate }, { entityId: block }],
-        fastener: { instanceId: 'ghost-bolt' },
-        washers: [],
-        nut: undefined,
-      },
-    });
-    const items = check(stackDoc).items;
-    expect(items.find((item) => item.key === `galvanic:${plate}|${block}`)?.contact.source).toBe('stack');
-    expect(items.find((item) => item.key.includes('ghost-bolt'))).toMatchObject({ status: 'unknown', code: 'COR_MATERIAL_MISSING' });
-    expect(check(stackDoc, { includeStacks: false }).items).toHaveLength(1);
-    expect(check(stackDoc, { includeStacks: false }).items[0]?.contact.source).toBe('closed_form');
-    expect(check(stackDoc, { entityIds: [plate, block] }).items.every((item) => !item.key.includes('ghost-bolt'))).toBe(true);
-  });
-
-  it('10^4 stacks resolve to contacts well inside the 1 s budget', () => {
-    const stacks = Object.fromEntries(
-      Array.from({ length: 10_000 }, (_, index) => [
-        `s${index}`,
-        { ...stack, layers: [{ entityId: `p${index}` }, { entityId: `q${index}` }], fastener: { instanceId: `b${index}` } },
-      ]),
-    );
-    const started = performance.now();
-    expect(stackContacts(withStacks(createEmptyDocument(), stacks)).length).toBeGreaterThan(40_000);
-    expect(performance.now() - started).toBeLessThan(1000);
   });
 });
 

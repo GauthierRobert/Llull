@@ -120,6 +120,7 @@ function scripted(behaviour: 'mesh' | 'silent' | 'refuse' = 'mesh'): Scripted {
       if (behaviour !== 'silent') onProgress?.({ type: 'progress', step: 10, total: 100, message: 'lattice' });
       return new Promise<JobRun>((resolve) => {
         const finish = (): void => {
+          if (signal?.aborted === true) return;
           if (behaviour === 'refuse') {
             const bytes = Buffer.from(
               JSON.stringify({ refusal: { code: 'FLL_IMPLICIT_MESH_TOO_LARGE', message: '9 lattice vertices exceed 1' } }),
@@ -277,8 +278,9 @@ describe('run_convergence_study on a field-meshed case', () => {
     await until(() => job.runs.length === 1);
     cancel.abort();
     // a level host without the caller's signal would keep waiting: release the job so that case ends (and fails the assertions below)
-    setTimeout(() => job.release(), 200);
+    const fallback = setTimeout(() => job.release(), 200);
     const result = await study;
+    clearTimeout(fallback);
     expect(result.summary).toContain('VNV_LEVEL_FAILED');
     expect(result.data).toMatchObject({ stage: 'meshing', cause: 'FEA_MESH_CANCELLED' });
     expect(job.runs[0]?.aborted).toBe(true);

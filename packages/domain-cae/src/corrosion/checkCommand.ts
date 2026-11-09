@@ -75,7 +75,8 @@ export const checkMaterialCompatibility = defineCommand({
     const contacts = found.data as ContactsData;
     const scope = entityIds === undefined ? null : new Set(entityIds.map(rootOf));
     const pairKey = (a: string, b: string): string => [rootOf(a), rootOf(b)].sort().join('|');
-    const stacks = includeStacks === false ? [] : stackContacts(doc).filter(([a, b]) => scope === null || (scope.has(a) && scope.has(b)));
+    const stackAnswer = includeStacks === false ? { pairs: [], skipped: [] } : stackContacts(doc);
+    const stacks = stackAnswer.pairs.filter(([a, b]) => scope === null || (scope.has(a) && scope.has(b)));
     const stackKeys = new Set(stacks.map(([a, b]) => pairKey(a, b)));
     const geometricKeys = new Set(contacts.pairs.map((pair) => pairKey(pair.a, pair.b)));
     const geometric = contacts.pairs.map((pair) => ({ ...pair, stack: stackKeys.has(pairKey(pair.a, pair.b)) }));
@@ -94,7 +95,7 @@ export const checkMaterialCompatibility = defineCommand({
     const confirm = (key: string, acceptance: Acceptance): AcceptanceState => acceptanceState(doc, port, key, acceptance);
     const items = [
       ...[...geometric, ...fromStacks].map((pair) => galvanicItem(doc, pair, scheme, environment, model.acceptances, confirm)),
-      ...contacts.skipped.map((skip) => skippedItem(skip.id, skip.reason)),
+      ...[...contacts.skipped, ...stackAnswer.skipped].map((skip) => skippedItem(skip.id, skip.reason)),
     ].sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : 0));
     const status = overall(items);
     const counts: Record<string, number> = { accepted: items.filter((item) => item.acceptance?.decision === 'accepted').length };

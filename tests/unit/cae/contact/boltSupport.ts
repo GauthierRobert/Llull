@@ -132,7 +132,7 @@ const ELEMENTS: number[][] = [
 ];
 
 /** (element, face) pairs whose three corners lie in `nodeIds`, among the elements `from`..`to`. */
-function facesIn(nodeIds: readonly number[], from: number, to: number): [number, number][] {
+export function facesIn(nodeIds: readonly number[], from: number, to: number): [number, number][] {
   const on = new Set(nodeIds);
   return ELEMENTS.filter(([id = 0]) => id >= from && id <= to).flatMap(([id = 0, ...nodes]) =>
     FACES.flatMap((face, index) => (face.every((corner) => on.has(nodes[corner] ?? -1)) ? [[id, index + 1] as [number, number]] : [])),

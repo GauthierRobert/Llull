@@ -45,7 +45,8 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
    ⇒ no-op). Ids are step-scoped and deterministic — no reset needed.
 5. Update + review the tool-schema snapshot (`npx vitest run tests/unit/contract -u`); keep
    the golden corpus green. Iterate with `npx vitest run <files>` and `npm run check:fast`; finish with ONE `npm run check:coverage`
-   (it waits for a machine-wide slot when another heavy run holds it). Fix until green. Confirm the coverage gate
+   (it waits for a machine-wide slot when another heavy run holds it). Fix until green. As a lane worker (workflow W5) finish with
+   the W5 lane gate instead: the orchestrator runs the full gate at merge. Confirm the coverage gate
    (90/85/90/90 on `packages/core/src/{commands,geometry}/**`, `packages/domain-aec/src/**`) still holds.
 6. Self-review against `.claude/context/review-checklist.md` before handing back: run the contract suites it names for what you
    touched (slice fuzz, hostile input, lifecycle) and walk sections 1–7. Report which items applied and how you met them —

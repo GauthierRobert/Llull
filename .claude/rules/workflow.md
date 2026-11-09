@@ -13,6 +13,7 @@
    Heavy runs (`check`, `check:coverage`, `npm test`, the server / desktop suites, `native:check`) take a machine-wide slot
    (`scripts/heavyLock.mjs`): parallel lanes queue instead of thrashing RAM; a run narrowed to test files never waits. Typecheck
    with the npm scripts (TypeScript 7, incremental, seconds), never a bare `tsc --noEmit` (a hook blocks it).
+   A lane worker (W5) never runs the full suite: it finishes with the W5 lane gate, the orchestrator runs the full gate at merge.
 4. Before review: self-review against `.claude/context/review-checklist.md` and run the contract suites it names.
 5. Viewport/UI work: verify in the desktop app (`verify-llull` skill).
 
@@ -28,16 +29,16 @@ answer it (add the test, or state why none is needed / why the snapshot diff is 
 
 ## W3 — Testing strategy
 
-| Dir | Covers |
-| --- | ------ |
-| `tests/unit/` | command layer + plugins (`building/**`); coverage gate 90/85/90/90 |
-| `tests/unit/contract/` | schema derivation, `toToolSchemas()` snapshot, ctx, plugins, guards, persistence, live sync |
-| `tests/golden/` | `build_project` plans → id-normalized snapshots + replay equality; one plan per regression |
-| `tests/integration/` | `store.dispatch` end-to-end (undo, live sync, local fallback) |
-| `tests/component/` | panels & param-gathering (Testing Library), never geometry math |
-| `server/tests/` | server + CLI (`npm --prefix server test`) |
-| `tests/e2e/` | LEGACY browser Playwright (`npm run test:e2e`), being retargeted to Electron (LC1): do not extend |
-| `desktop/tests/` | desktop app without Electron: real backend, File ops, CLI `--app` (`npm --prefix desktop test`) |
+| Dir                    | Covers                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| `tests/unit/`          | command layer + plugins (`building/**`); coverage gate 90/85/90/90                                |
+| `tests/unit/contract/` | schema derivation, `toToolSchemas()` snapshot, ctx, plugins, guards, persistence, live sync       |
+| `tests/golden/`        | `build_project` plans → id-normalized snapshots + replay equality; one plan per regression        |
+| `tests/integration/`   | `store.dispatch` end-to-end (undo, live sync, local fallback)                                     |
+| `tests/component/`     | panels & param-gathering (Testing Library), never geometry math                                   |
+| `server/tests/`        | server + CLI (`npm --prefix server test`)                                                         |
+| `tests/e2e/`           | LEGACY browser Playwright (`npm run test:e2e`), being retargeted to Electron (LC1): do not extend |
+| `desktop/tests/`       | desktop app without Electron: real backend, File ops, CLI `--app` (`npm --prefix desktop test`)   |
 
 `tests/unit` + `tests/golden` run in node with one shared module graph per worker (vitest project `node`); a suite that
 mocks modules, stubs globals, uses the DOM or registers test commands goes in `tests/isolatedSuites.ts` (contract-tested).
@@ -57,21 +58,32 @@ store + storage per test); one that mocks modules, stubs globals or registers te
 ## W5 — Delegation (speed first)
 
 Work in the main thread by default. Delegate only when it pays:
+
 - **≥ 2 independent lanes** of work that can run in parallel, or
 - a change spanning **> ~4 files** in one lane, or a broad search (use `Explore`).
 
 Lanes own disjoint write scopes (`.claude/work/BOARD.md` is the ledger):
 
-| Lane | Agent | Owns |
-| ---- | ----- | ---- |
-| 1 Core | `command-author` | `packages/core/src/**`, `packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,domain-implicit,design-lang,plm}/src/**`, `packages/kernel-*/src/**` |
-| 2 3D+Shell | `viewport-engineer` | `src/ui/viewport/3d/**`, `src/ui/{components,panels,store}/**`, `src/app/**` |
-| 3 2D | `viewport-engineer` | `src/ui/viewport/2d/**`, snapping/tracking helpers |
-| 4 CLI | `cli-engineer` | `packages/protocol/src/**`, `server/**` |
-| 5 Review | `test-verifier` + `cad-reviewer` | `tests/**`; reviews diffs |
+| Lane       | Agent                            | Owns                                                                                                                                                      |
+| ---------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 Core     | `command-author`                 | `packages/core/src/**`, `packages/{domain-aec,domain-cae,domain-aero,domain-dynamics,domain-implicit,design-lang,plm}/src/**`, `packages/kernel-*/src/**` |
+| 2 3D+Shell | `viewport-engineer`              | `src/ui/viewport/3d/**`, `src/ui/{components,panels,store}/**`, `src/app/**`                                                                              |
+| 3 2D       | `viewport-engineer`              | `src/ui/viewport/2d/**`, snapping/tracking helpers                                                                                                        |
+| 4 CLI      | `cli-engineer`                   | `packages/protocol/src/**`, `server/**`                                                                                                                   |
+| 5 Review   | `test-verifier` + `cad-reviewer` | `tests/**`; reviews diffs                                                                                                                                 |
 
 Core feature catalogs (`commands/<feature>/catalog.ts`) are Lane-1-only. Run `cad-reviewer` when the diff touches `packages/core`, the
 registry, a plugin's commands, or `packages/protocol`/`server` — not for docs, tests-only or small UI tweaks.
+
+- **At most 3 lanes in flight** (owner 2026-11-09). With 5 lanes one `check:fast` took ~23 min and unrelated timing tests failed
+  under load; a review / fix round counts as in flight.
+- **Lane gate** (what a worker runs before reporting, every round): `npm run check:static`, `npx vitest related --run <changed
+files>`, the contract suites `.claude/context/review-checklist.md` names for what it touched, targeted coverage on its own files,
+  and the native / server tests of what it touched. Never `check:fast` (it sweeps every test file once core or the registry
+  changes), `check` or `check:coverage`; report the vitest summary lines, not a tail.
+- **Merge gate** (orchestrator, one at a time on `main` after the merge): `npm run check:static` + the suites of the touched packages
+  - `tests/unit/contract` + `tests/golden` + the server suites of what changed; the full `check:coverage --maxWorkers=2` once per
+    batch of merges, before push when `packages/*/src` changed.
 
 ## W6 — When unsure
 

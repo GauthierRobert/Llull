@@ -2,6 +2,13 @@
 
 import { commandCatalog } from '@core/commands/schema';
 import { defineLimitState, defineRandomVariable, deleteRandomVariable, setCorrelation } from './setupCommands';
+import { acceptReliabilityResult } from './acceptance';
+import { basisToleranceFactor } from './basisCommands';
+import { checkProbabilistic, describeProbabilisticModel } from './inspectCommands';
+import { defineResponse } from './responseCommands';
+import { parameterSensitivity, sensitivityIndices } from './sensitivityCommands';
+import { morrisScreening } from './screeningCommands';
+import { responseSurfaceStudy } from './surfaceCommands';
 import { propagateUncertainty, runReliabilityStudy } from './studyCommands';
 
 export const reliabilityCommands = commandCatalog(
@@ -11,4 +18,13 @@ export const reliabilityCommands = commandCatalog(
   defineLimitState,
   propagateUncertainty,
   runReliabilityStudy,
+  defineResponse,
+  parameterSensitivity,
+  sensitivityIndices,
+  describeProbabilisticModel,
+  basisToleranceFactor,
+  checkProbabilistic,
+  acceptReliabilityResult,
+  morrisScreening,
+  responseSurfaceStudy,
 );

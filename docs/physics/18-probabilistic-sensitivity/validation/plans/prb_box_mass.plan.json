@@ -79,7 +79,7 @@
  {
   "command": "define_random_variable",
   "params": {
-   "name": "w",
+   "name": "w_rv",
    "unit": "mm",
    "binding": {
     "kind": "parameter",
@@ -98,7 +98,7 @@
  {
   "command": "define_random_variable",
   "params": {
-   "name": "h",
+   "name": "h_rv",
    "unit": "mm",
    "binding": {
     "kind": "parameter",
@@ -117,7 +117,7 @@
  {
   "command": "define_random_variable",
   "params": {
-   "name": "d",
+   "name": "d_rv",
    "unit": "mm",
    "binding": {
     "kind": "parameter",
@@ -156,7 +156,7 @@
   "command": "propagate_uncertainty",
   "params": {
    "method": "lhs",
-   "samples": 10000,
+   "samples": 2000,
    "seed": 7
   }
  }

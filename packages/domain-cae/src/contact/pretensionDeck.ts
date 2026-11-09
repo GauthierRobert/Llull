@@ -59,12 +59,12 @@ const GUARDED_SET = /^(C|S|N|L|B|T|V|K|R|P)_/;
 export function pretensionPlan(ctx: DeckContext): PretensionPlan | DeckRefusal {
   const cached = memo.get(ctx);
   if (cached !== undefined) return cached;
-  const planned = build(ctx);
+  const planned = build(ctx, true);
   memo.set(ctx, planned);
   return planned;
 }
 
-function build(ctx: DeckContext): PretensionPlan | DeckRefusal {
+function build(ctx: DeckContext, validate: boolean): PretensionPlan | DeckRefusal {
   const settings = ctx.analysis.pretension;
   if (settings === undefined) return EMPTY;
   const index = indexMesh(ctx.mesh);
@@ -72,7 +72,7 @@ function build(ctx: DeckContext): PretensionPlan | DeckRefusal {
   for (const [position, id] of settings.order.entries()) {
     const bolt = settings.bolts[id];
     if (bolt === undefined) continue;
-    const bad = pretensionProblem(ctx.doc, ctx.analysis, bolt);
+    const bad = validate ? pretensionProblem(ctx.doc, ctx.analysis, bolt) : null;
     if (bad !== null) return refuse(bad.code, `bolt pretension '${bolt.id}': ${bad.message}`, [bolt.id]);
     const point: Vec3 = [
       bolt.section.point[0] * ctx.lengthToAnalysis,
@@ -223,4 +223,28 @@ export function pretensionExtraNodes(
     duplicates: ascending(plan.bolts.flatMap((planned) => [...planned.duplicates.values()])),
     references: ascending(plan.bolts.map((planned) => planned.referenceNode)),
   };
+}
+
+/**
+ * The cut nodes and their copies of the pretensions of `analysisId`, for the readers of results (VTU export, fatigue): the plan the deck was written with,
+ * rebuilt from the stored bolts and the mesh without the deck's step / part validation (a result file only exists when the deck was accepted).
+ * @invariant same duplicate numbering as the deck; null when the case has no pretension or a stored cut does not hold on this mesh
+ */
+export function pretensionResultMap(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact): PretensionPlan | null {
+  const ctx = buildDeckContext(doc, analysisId, mesh);
+  if (ctx === null || ctx.analysis.pretension === undefined) return null;
+  const plan = build(ctx, false);
+  return 'code' in plan || plan.bolts.length === 0 ? null : plan;
+}
+
+/** Mesh node -> the nodes that copy it (ascending), over every bolt of `plan`. */
+export function copiesOf(plan: PretensionPlan): ReadonlyMap<number, readonly number[]> {
+  const copies = new Map<number, number[]>();
+  for (const planned of plan.bolts)
+    for (const [node, copy] of planned.duplicates)
+      copies.set(
+        node,
+        [...(copies.get(node) ?? []), copy].sort((a, b) => a - b),
+      );
+  return copies;
 }

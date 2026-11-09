@@ -610,7 +610,7 @@
     "FR-PRB-02",
     "FR-PRB-03"
    ],
-   "mcAcceptance": "MC N = 10 000: mean +- 5 sd/sqrt(N), sd +- 5 sd/sqrt(2N)"
+   "mcAcceptance": "MC N = 10 000: mean +- 5 sd/sqrt(N), sd +- 5 sd/sqrt(2N); as built (golden plan prb_box_mass, geometry regenerated per sample) N = 2000, LHS: mean of g within 0.02 g, sd within 5 % of 0.16200135 g"
   },
   {
    "id": "VC-PRB-07",

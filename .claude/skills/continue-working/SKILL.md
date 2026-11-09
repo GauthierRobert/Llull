@@ -1,6 +1,6 @@
 ---
 name: continue-working
-description: Drive the llull build forward autonomously from the task board. Use whenever the user says "continue working", "continue", "keep going", "what's next", "resume", "next task", or otherwise asks to make progress without naming a specific task. Reads .claude/work/BOARD.md, reconciles it against the real repo, then launches parallel agents (default 4 lanes) on the next eligible tasks and writes the board back. This is the project's stateful, self-pacing workflow.
+description: Drive the llull build forward autonomously from the task board. Use whenever the user says "continue working", "continue", "keep going", "what's next", "resume", "next task", or otherwise asks to make progress without naming a specific task. Reads .claude/work/BOARD.md, reconciles it against the real repo, then launches parallel agents (at most 3 lanes) on the next eligible tasks and writes the board back. This is the project's stateful, self-pacing workflow.
 ---
 
 # Skill: continue-working
@@ -13,26 +13,31 @@ or a decision in the Decision log is required.
 ## Procedure (run every time)
 
 ### 1. Read the board
+
 Open `.claude/work/BOARD.md`. Note each task's status, deps, and lane.
 
 ### 2. Reconcile against reality (ground truth = the repo, not the board)
+
 The board can be stale (a prior agent finished, a session ended mid-task). Verify:
+
 - For each `[WIP]`/`[REVIEW]` task, check whether its deliverable exists (the files/exports it
   promised) and `npm run check` is green. If so → it is done (after `cad-reviewer` for
   `[REVIEW]`): delete its line. If a `[WIP]` task has no progress in the repo, treat it as `[TODO]` again.
 - Use `Glob`/`Grep`/`Read` to confirm; don't trust the token blindly.
 
 ### 3. Select the next batch
+
 - A task is **eligible** if status is `[TODO]` and none of its deps is still on the board.
-- Pick **one eligible task per free lane**, up to **4 lanes in parallel** (Lane 5 review is
-  separate and runs after, not as one of the 4). Prefer the lowest-ID eligible task per lane.
+- Pick **one eligible task per free lane**, up to **3 lanes in flight** (workflow W5; a lane in
+  review or fixing review findings counts; the reviewer itself is not a lane). Prefer the lowest-ID eligible task per lane.
 - Lanes own disjoint files (see board table) so parallel writes never collide. Core command
   catalogs (`packages/core/src/commands/<feature>/catalog.ts`) are Lane-1 files; two core tasks
   in different feature folders no longer collide (lane write scopes: `.claude/rules/workflow.md` W5).
-- Skip `[BLOCKED]` tasks. If the *only* remaining work is blocked, surface the Decision-log
+- Skip `[BLOCKED]` tasks. If the _only_ remaining work is blocked, surface the Decision-log
   item to the user and stop.
 
 ### 4. Mark WIP + launch
+
 - Edit the board: flip the chosen tasks to `[WIP]`, update the **NOW** block (timestamp, WIP
   list, next-up), and write it.
 - Launch the lane agents **in one message, in parallel** (multiple `Agent` calls in a single
@@ -44,8 +49,9 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
   - the **already-DONE dependency outputs** it may read (resolved deps live in committed files —
     that is how you receive sibling work; there is no live channel between agents);
   - "you do NOT edit `.claude/work/BOARD.md` — the orchestrator owns it";
-  - "follow `.claude/rules/*`; iterate with `npm run check:fast`, finish with ONE `npm run check:coverage` green (workflow W1); happy + failure tests for any
-    new command; self-review against `.claude/context/review-checklist.md` before reporting."
+  - "follow `.claude/rules/*`; finish every round with the workflow W5 **lane gate** (`check:static`, `vitest related` on the
+    changed files, the checklist's contract suites, targeted coverage; never `check:fast` / `check` / `check:coverage`) and report
+    its summary lines; happy + failure tests for any new command; self-review against `.claude/context/review-checklist.md` before reporting."
   - its **lane worktree path** and "prefix every shell command with `cd \"<path>\" &&`; never `git stash`, never kill processes by name".
 - For long lanes, run agents with `run_in_background: true` so several proceed at once; you'll
   be notified on completion. Give each lane its own persistent worktree: `npm run lane -- <n> <branch>` prepares
@@ -54,18 +60,22 @@ The board can be stale (a prior agent finished, a session ended mid-task). Verif
   test file instead of ~5 s, a cargo rebuild). A lane with uncommitted or unpushed work is refused; merge it first.
 
 ### 5. Converge
+
 - When an agent returns, flip its task to `[REVIEW]`, then run `cad-reviewer` on the diff.
-- On a clean review + green `npm run check`, delete the task line (done). On findings, keep `[WIP]` and
-  hand the findings back to the same lane agent (via `SendMessage` to reuse its context).
-- Always re-run step 3 to top up any lane that just went free, keeping ~4 in flight.
+- On a clean review: merge into `main`, run the W5 **merge gate** (one at a time), push, delete the task line (done). On
+  findings, keep `[WIP]` and hand the findings back to the same lane agent (via `SendMessage` to reuse its context).
+- Always re-run step 3 to top up any lane that just went free, keeping at most 3 in flight.
 
 ### 6. Write the board back + report
+
 - Persist every status change and refresh the **NOW** block before yielding.
 - Tell the user, in 3–5 lines: what just completed, what is `[WIP]` now, and what unblocked.
 
 ## Coordination model (how parallel agents stay out of each other's way)
+
 Agents are isolated — they cannot see each other's in-progress work, and they never need to.
 Coordination is structural, enforced by you (the orchestrator), not by agent-to-agent messaging:
+
 1. **Single writer of state** — only you read/write the board. Flip a task to `[WIP]` BEFORE
    launching it; the board is the live "who's on what" ledger. Agents never write it.
 2. **Disjoint file ownership** — lanes own non-overlapping paths, so two agents physically
@@ -79,6 +89,7 @@ Coordination is structural, enforced by you (the orchestrator), not by agent-to-
    worktrees) catches anything that strayed across a boundary.
 
 ## Guardrails
+
 - Obey the PRIME DIRECTIVE and dependency law — agents must too. A `cad-reviewer` pass gates
   every task leaving the board.
 - Don't invent tasks not on the board; if the user asks for something new, add it to the

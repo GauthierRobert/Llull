@@ -35,6 +35,7 @@ import { refuseMargins } from './refusal';
 import { screenSingularities } from './singularity';
 import { adequacyOf } from '../results/adequacy';
 import { adequacyWarnings, gateRows, notAssessedText, overallOf } from './adequacyGate';
+import { jointMarginSchema, jointMarginTable } from '../contact/jointMargins';
 import { limitLoadMarginSchema, limitLoadMarginTable } from './limitLoadMargins';
 
 const CRITERIA = ['von_mises', 's_xx', 's_yy', 's_zz'] as const;
@@ -317,12 +318,11 @@ function buildRows(
 /** Parameters that choose which margin table is computed (shared by compute_margins and dispose_margin, so a row id means the same row in both). */
 export const marginQueryShape = {
   criterion: z
-    .enum([...CRITERIA, 'limit_load'])
+    .enum([...CRITERIA, 'limit_load', 'joint'])
     .optional()
-    .describe(
-      'von_mises (default) or the largest |s_xx| / |s_yy| / |s_zz|; limit_load: limit-load margin of a nonlinear_static case (limitLoad).',
-    ),
+    .describe('von_mises (default) / |s_xx| / |s_yy| / |s_zz|; limit_load (limitLoad) and joint (joint): nonlinear_static case.'),
   limitLoad: limitLoadMarginSchema.optional(),
+  joint: jointMarginSchema.optional(),
   allowable: allowableSchema
     .optional()
     .describe('"ftu" (ultimate check), "fty" (yield check), or { value, unit, against? }. Omit for both checks from the material models.'),
@@ -385,6 +385,8 @@ export function marginTable(
   if (marginalBand !== undefined && !(Number.isFinite(marginalBand) && marginalBand >= 0))
     return refuse('FEA_MARGIN_PARAM_INVALID', `marginalBand ${marginalBand} must be a finite number >= 0`);
   if (query.criterion === 'limit_load') return limitLoadMarginTable(doc, analysis, query, ctx);
+  if (query.criterion === 'joint') return jointMarginTable(doc, analysis, query, ctx);
+  if (query.joint !== undefined) return refuse('FEA_MARGIN_PARAM_INVALID', 'joint applies to criterion joint only');
   if (query.limitLoad !== undefined) return refuse('FEA_MARGIN_PARAM_INVALID', 'limitLoad applies to criterion limit_load only');
   const criterion = query.criterion ?? 'von_mises';
   if (analysis.type !== 'static' && analysis.type !== 'thermo_static')

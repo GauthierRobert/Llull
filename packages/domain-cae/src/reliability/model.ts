@@ -1,8 +1,9 @@
 /** Access to and validation of the probabilistic slice of the document (`CadDocument.probabilistic`, plugin `cae`). */
 
 import type { CadDocument } from '@core/model/types';
-import type { LimitState, RandomVariable, ReliabilityModel } from '@cae/reliability/types';
+import type { LimitState, RandomVariable, ReliabilityModel, Response } from '@cae/reliability/types';
 import { isRecord } from '@lib/isRecord';
+import { isReservedKey } from '@lib/reservedKey';
 import { distributionIssue } from './distributions';
 import { cholesky } from '@lib/denseLinalg';
 
@@ -36,8 +37,15 @@ function variableErrors(name: string, variable: unknown): string[] {
   const issue = distributionIssue(distribution as unknown as RandomVariable['distribution']);
   if (issue !== null) return bad(issue);
   const binding = variable['binding'];
-  if (!isRecord(binding) || (binding['kind'] !== 'free' && !(binding['kind'] === 'parameter' && isString(binding['parameter']))))
-    return bad('has a malformed binding');
+  const bound =
+    isRecord(binding) &&
+    (binding['kind'] === 'free' ||
+      (binding['kind'] === 'parameter' && isString(binding['parameter'])) ||
+      (binding['kind'] === 'materialProperty' && isString(binding['material']) && isString(binding['property'])));
+  if (!bound) return bad('has a malformed binding');
+  const derived = variable['derivedFrom'];
+  if (derived !== undefined && !(isRecord(derived) && isString(derived['modelId']) && typeof derived['value'] === 'number'))
+    return bad('has a malformed derivedFrom');
   const citation = variable['citation'];
   if (citation !== undefined && !(isRecord(citation) && isString(citation['text']))) return bad('has a malformed citation');
   return [];
@@ -57,6 +65,61 @@ function correlationErrors(correlation: unknown, variables: Record<string, unkno
   const rows = matrix as number[][];
   const symmetric = rows.every((row, i) => row[i] === 1 && row.every((v, j) => Math.abs(v - (rows[j]?.[i] ?? Number.NaN)) <= 1e-12));
   return symmetric && cholesky(rows) !== null ? [] : bad;
+}
+
+export const responseOf = (doc: CadDocument, name: string): Response | undefined => {
+  const responses = reliabilityOf(doc).responses ?? {};
+  return Object.hasOwn(responses, name) ? responses[name] : undefined;
+};
+
+function acceptanceErrors(slice: Record<string, unknown>): string[] {
+  const valid = (entry: unknown, limitState: boolean): boolean =>
+    isRecord(entry) &&
+    isString(entry['modelHash']) &&
+    isString(entry['resultHash']) &&
+    typeof entry['seed'] === 'number' &&
+    typeof entry['samples'] === 'number' &&
+    isString(entry['justification']) &&
+    isString(entry['signer']) &&
+    isString(entry['signatureId']) &&
+    isString(entry['documentUid']) &&
+    entry['signature'] !== undefined &&
+    (!limitState || isString(entry['limitState']));
+  const { acceptances, acceptanceLedger } = slice;
+  const errors: string[] = [];
+  if (acceptances !== undefined) {
+    if (!isRecord(acceptances)) errors.push('probabilistic.acceptances must be an object');
+    else
+      for (const [name, entry] of Object.entries(acceptances))
+        if (isReservedKey(name) || !Object.hasOwn(isRecord(slice['limitStates']) ? slice['limitStates'] : {}, name) || !valid(entry, false))
+          errors.push(`acceptance '${name}' is malformed or names no limit state`);
+  }
+  if (acceptanceLedger !== undefined && (!Array.isArray(acceptanceLedger) || !acceptanceLedger.every((entry) => valid(entry, true))))
+    errors.push('probabilistic.acceptanceLedger is malformed');
+  return errors;
+}
+
+function responseErrors(slice: Record<string, unknown>): string[] {
+  const { responses, responseOrder } = slice;
+  if (responses === undefined && responseOrder === undefined) return [];
+  if (!isRecord(responses) || !Array.isArray(responseOrder)) return ['probabilistic.responses / responseOrder are malformed'];
+  const errors = Object.entries(responses).flatMap(([name, response]) => {
+    const query = isRecord(response) ? response['query'] : undefined;
+    return !isReservedKey(name) &&
+      isRecord(response) &&
+      response['name'] === name &&
+      isString(response['id']) &&
+      isString(response['unit']) &&
+      isRecord(query) &&
+      isString(query['command']) &&
+      isRecord(query['params']) &&
+      isString(query['pointer'])
+      ? []
+      : [`response '${name}' is malformed`];
+  });
+  if (responseOrder.some((n) => !isString(n) || !Object.hasOwn(responses, n)))
+    errors.push('probabilistic.responseOrder names an unknown response');
+  return errors;
 }
 
 /** Value errors of the raw `probabilistic` slice (persistence rejects the file when non-empty). */
@@ -83,5 +146,5 @@ export function reliabilityErrors(raw: Record<string, unknown>): string[] {
     errors.push('probabilistic.variableOrder names an unknown variable');
   if (limitStateOrder.some((n) => !isString(n) || !Object.hasOwn(limitStates, n)))
     errors.push('probabilistic.limitStateOrder names an unknown limit state');
-  return [...errors, ...correlationErrors(slice['correlation'], variables)];
+  return [...errors, ...responseErrors(slice), ...acceptanceErrors(slice), ...correlationErrors(slice['correlation'], variables)];
 }
