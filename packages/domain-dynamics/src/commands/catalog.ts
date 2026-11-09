@@ -16,7 +16,9 @@ import { compareToReference } from './engine/compareReference';
 import { checkTimestepConvergence } from './engine/timestepConvergence';
 import { addMotor, addPropeller } from './drives';
 import { addRotor, setBodyDrag } from './flight';
+import { estimateEnduranceCommand } from './flightEndurance';
 import { addFlightController, defineFlightScenario } from './flightControl';
+import { addBattery, addFlightPowertrain } from './flightPower';
 import { flightReportCommand, runFlightCommand } from './flightRun';
 import { checkMotorDataCommand } from './motorData';
 import { setMotorDrive } from './motorDrive';
@@ -50,6 +52,9 @@ export const dynamicsCommands = commandCatalog(
   setBodyDrag,
   addFlightController,
   defineFlightScenario,
+  addBattery,
+  addFlightPowertrain,
+  estimateEnduranceCommand,
   runFlightCommand,
   flightReportCommand,
   addCylinderPressure,

@@ -10,6 +10,7 @@ import { add3, dot3, len3, scale3, sub3 } from '@lib/vec3';
 import type { FlightScenario, FlightSetpoint } from './controlModel';
 import { controllerUpdate, type ControllerMemory, type ControllerRuntime } from './controller';
 import { rotate } from './frames';
+import { initialPowerAux, packRpm, POWER_SLOTS, stepPower, type MotorLoad, type PowerRuntime } from './powerBlock';
 import { rotorOutput, validatedRange, type RotorRuntime } from './rotorLaw';
 import { airRelative, windAt } from './wind';
 
@@ -51,6 +52,9 @@ export const NOT_CONTROLLED = -1;
 
 export const rotorSlot = (rotor: number, field: number): number => ROTOR_BASE + ROTOR_SLOTS * rotor + field;
 
+/** First aux slot of powertrain `power` of a loop with `rotorCount` rotors (power slots follow the rotor slots, see POWER). */
+export const powerBase = (rotorCount: number, power: number): number => ROTOR_BASE + ROTOR_SLOTS * rotorCount + POWER_SLOTS * power;
+
 export interface FlightLoop {
   readonly scenario: FlightScenario;
   readonly vehicleId: string;
@@ -62,6 +66,8 @@ export interface FlightLoop {
     readonly rowOf: readonly number[];
     readonly initialRpm: readonly number[];
   } | null;
+  /** Powertrains (battery + motors + ESCs) feeding some of the rotors; none = the rotors run on their own rpm without a power budget. */
+  readonly power: readonly PowerRuntime[];
   /** Unit thrust axis, body axes (the tilt metric). */
   readonly thrustAxis: Vec3;
   /** World up (-g direction). */
@@ -120,8 +126,9 @@ export function tiltOf(loop: FlightLoop, body: BodyKinematics): number {
 }
 
 function initialAux(loop: FlightLoop): Float64Array {
-  const aux = new Float64Array(ROTOR_BASE + ROTOR_SLOTS * loop.rotors.length);
+  const aux = new Float64Array(powerBase(loop.rotors.length, loop.power.length));
   aux[SLOT.divergedTime] = -1;
+  loop.power.forEach((feed, p) => initialPowerAux(feed, aux, powerBase(loop.rotors.length, p)));
   loop.rotors.forEach((rotor, i) => {
     const row = mixerRow(loop, i);
     const rpm = row >= 0 ? (loop.control?.initialRpm[row] ?? 0) : rotor.rotor.rpm;
@@ -161,8 +168,9 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
   const midDecay = tau > 0 ? Math.exp(-dt / (2 * tau)) : 0;
   const endDecay = tau > 0 ? Math.exp(-dt / tau) : 0;
   const ranges = loop.rotors.map(validatedRange);
+  const fedBy = loop.rotors.map((_, i) => loop.power.findIndex((feed) => feed.rotorIndexes.includes(i)));
   return {
-    size: ROTOR_BASE + ROTOR_SLOTS * loop.rotors.length,
+    size: powerBase(loop.rotors.length, loop.power.length),
     aux0: initialAux(loop),
     joints: [],
     ledgerLayout: [],
@@ -189,6 +197,7 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
       const forces: Record<string, Vec3> = {};
       const moments: Record<string, Vec3> = {};
       let power = 0;
+      const loads: MotorLoad[][] = loop.power.map(() => []);
       loop.rotors.forEach((rotor, i) => {
         const command = aux[rotorSlot(i, ROTOR.command)] ?? 0;
         const now = aux[rotorSlot(i, ROTOR.rpm)] ?? 0;
@@ -196,7 +205,15 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
         aux[rotorSlot(i, ROTOR.rpm)] = command + (now - command) * endDecay;
         const target = state.bodies?.[rotor.rotor.bodyId];
         if (target === undefined) return;
-        const output = rotorOutput(rotor, rotor.rotor.bodyId === loop.vehicleId ? air : airRelative(target, wind), rpm);
+        const inflow = rotor.rotor.bodyId === loop.vehicleId ? air : airRelative(target, wind);
+        let output = rotorOutput(rotor, inflow, rpm);
+        const fed = fedBy[i];
+        const feed = fed === undefined ? undefined : loop.power[fed];
+        if (fed !== undefined && feed !== undefined) {
+          const sustained = packRpm(feed, aux, powerBase(loop.rotors.length, fed), rpm, output.torque);
+          if (sustained !== rpm) output = rotorOutput(rotor, inflow, sustained);
+          loads[fed]?.push({ torqueNm: output.torque, rpm: sustained });
+        }
         const id = rotor.rotor.bodyId;
         forces[id] = add3(forces[id] ?? [0, 0, 0], output.force);
         moments[id] = add3(moments[id] ?? [0, 0, 0], output.moment);
@@ -210,6 +227,7 @@ export function flightBlock(loop: FlightLoop): ActuatorBlock {
         if (output.advanceRatio < lo || output.advanceRatio > hi)
           aux[rotorSlot(i, ROTOR.outsideSteps)] = (aux[rotorSlot(i, ROTOR.outsideSteps)] ?? 0) + 1;
       });
+      loop.power.forEach((feed, p) => stepPower(feed, aux, powerBase(loop.rotors.length, p), loads[p] ?? [], state.time, dt));
       aux[SLOT.shaftEnergy] = (aux[SLOT.shaftEnergy] ?? 0) + power * dt;
       if (power > (aux[SLOT.peakPower] ?? 0)) {
         aux[SLOT.peakPower] = power;

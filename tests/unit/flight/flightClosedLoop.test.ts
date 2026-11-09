@@ -108,6 +108,7 @@ describe('13 FLT closed loop (FLT-M2)', () => {
       'max_attitude_deg',
       'final_position_error_m',
       'recovery_time_s',
+      'battery_final_soc',
     ]);
     expect(metrics.events).toEqual([expect.objectContaining({ kind: 'gust', timeS: 1 })]);
     // the gust disturbs the hover: calm air keeps it level
