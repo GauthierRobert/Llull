@@ -9,6 +9,9 @@ export { selectionPlugin } from './selection/plugin';
 // corrosion and compatibility (PHY-13): plugin
 export { corrosionPlugin } from './corrosion/plugin';
 
+// electrical bonding and optical balance (PHY-15): plugin
+export { electroOpticalPlugin } from './electroOptical/plugin';
+
 // vibro-acoustics hand-off (PHY-20): plugin
 export { vibroacousticsPlugin } from './vibroacoustics/plugin';
 

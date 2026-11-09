@@ -34,6 +34,7 @@ const SLICE_PROBES: Record<Exclude<OptionalKey, KeptKey>, unknown> = {
   vibroacoustics: {},
   spaceEnvironment: {},
   corrosion: {},
+  electroOptical: {},
   plm: {},
   plant: {},
   scan: {},

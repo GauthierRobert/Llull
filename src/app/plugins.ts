@@ -20,6 +20,7 @@ import {
   caePlugin,
   corrosionPlugin,
   environmentPlugin,
+  electroOpticalPlugin,
   explicitPlugin,
   selectionPlugin,
   topologyPlugin,
@@ -70,6 +71,7 @@ export function installDefaultPlugins(): void {
   installPlugin(implicitPlugin);
   installPlugin(vibroacousticsPlugin);
   installPlugin(corrosionPlugin);
+  installPlugin(electroOpticalPlugin);
   installPlugin(selectionPlugin);
   installPlugin(environmentPlugin);
 }

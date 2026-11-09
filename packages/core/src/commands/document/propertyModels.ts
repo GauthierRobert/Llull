@@ -21,6 +21,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   PROP_MODEL_NOT_FOUND: 'list the material models (describe_scene / evaluate_property candidates)',
   PROP_MODEL_IN_USE: 'remove or re-base the dependent ratioOf models first',
   PROP_PROPERTY_UNKNOWN: 'use a catalogue property (k, cp, E, G, nu, density, cte, thermalStrain, Ftu, Fty, …)',
+  EOP_PROPERTY_RANGE: 'emissivityIr and absorptivitySolar values are fractions in [0, 1]',
   MAT_UNIT_DIMENSION: 'use a unit of the property / variable dimension',
   MAT_UNIT_INVALID: "write units like 'W/(m*K)', 'J/(kg*K)', 'GPa', 'K', 'degC', '1e-5'",
   MAT_PROVENANCE_MISSING: 'give source.citation (and locator / url / accessed)',
@@ -51,6 +52,8 @@ const conditionSchema = z.strictObject({
   rrr: z.number().optional(),
   environment: z.string().optional(),
   note: z.string().optional(),
+  opticalKind: z.enum(['hemispherical_total', 'normal_total']).optional(),
+  lifeState: z.enum(['BOL', 'EOL']).optional(),
 });
 
 const firstIssuePath = (error: z.ZodError, prefix: string): string => {
@@ -101,7 +104,7 @@ export const definePropertyModel = defineCommand({
         doc,
         name,
         'PROP_FORM_INVALID',
-        'condition fields are temper, productForm, environment, note (text) and rrr (number)',
+        'condition fields are temper, productForm, environment, note (text), rrr (number), opticalKind (hemispherical_total | normal_total) and lifeState (BOL | EOL)',
         [input.id],
         firstIssuePath(condition.error, 'model.condition'),
       );

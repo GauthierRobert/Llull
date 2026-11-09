@@ -34,6 +34,7 @@ import { fixturePort, KEY_A } from '../unit/scan/fixturePort';
 import { flatDocument } from '../unit/vibroacoustics/fixtures';
 import { missionDocument } from '../unit/environment/fixtures';
 import { corrosionDocument } from '../unit/corrosion/seed';
+import { electroOpticalDocument } from '../unit/electroOptical/seed';
 import { quadDrone, rotorParams } from '../unit/flight/flightFixture';
 import { SOURCE_TEXT, imperfectBar } from '../unit/cae/nonlinear/imperfectionFixtures';
 import {
@@ -348,6 +349,12 @@ export const SLICE_SEEDS: Readonly<Record<string, PluginSliceSeed>> = {
     build: missionDocument,
     query: { name: 'check_space_environment', params: constant({ profile: 'nasa_gsfc_screening' }) },
     mutate: { name: 'set_mission_environment', params: constant({ aoFluence: { value: 2e21, unit: 'atoms/cm^2', source: 'fuzz' } }) },
+  },
+  'physics-electro-optical': {
+    roots: ['electroOptical'],
+    build: electroOpticalDocument,
+    query: { name: 'check_bonding', params: constant({}) },
+    mutate: { name: 'delete_bond_path', params: (doc) => ({ pathId: first(doc.electroOptical?.bondPaths) }) },
   },
   'physics-corrosion': {
     roots: ['corrosion'],
