@@ -63,9 +63,14 @@ const facts = (part: PartFacts): Record<string, unknown> => ({
 
 const RULE_ANODIC = 'anodic_index (non-889 rule of thumb)';
 
-function screening(a: PartFacts, b: PartFacts, environment: CorrosionEnvironment, inputs: Record<string, unknown>): Verdict {
-  const limit = limitOf(environment)?.maxDifferenceV ?? 0;
-  const [ia, ib] = [a.anodicIndexV ?? 0, b.anodicIndexV ?? 0];
+function screening(
+  a: PartFacts,
+  b: PartFacts,
+  indices: readonly [number, number],
+  limit: number,
+  inputs: Record<string, unknown>,
+): Verdict {
+  const [ia, ib] = indices;
   const difference = round12(Math.abs(ia - ib));
   const anode = difference === 0 ? null : ia > ib ? a : b;
   const cathode = anode === null ? null : anode === a ? b : a;
@@ -128,9 +133,12 @@ function verdictOf(a: PartFacts, b: PartFacts, scheme: CorrosionScheme, environm
       warnings: [],
     };
   const valueless = [a, b].filter((part) => part.anodicIndexV === null);
-  if (valueless.length > 0)
+  const [ia, ib] = [a.anodicIndexV, b.anodicIndexV];
+  if (valueless.length > 0 || ia === null || ib === null)
     return unknown('COR_GROUP_VALUE_MISSING', 'COR-R-02', RULE_ANODIC, { missing: valueless.map((part) => part.group) });
-  return screening(a, b, environment, inputs);
+  const limit = limitOf(environment);
+  if (limit === undefined) return unknown('COR_ENVIRONMENT_INVALID', 'COR-R-02', RULE_ANODIC, { missing: [environment] });
+  return screening(a, b, [ia, ib], limit.maxDifferenceV, inputs);
 }
 
 /**

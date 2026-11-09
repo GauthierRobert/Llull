@@ -41,7 +41,7 @@ const countsOf = (pairs: readonly ContactPair[]): Record<string, number> =>
  */
 export const findContacts = defineCommand({
   name: COMMAND,
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readOnly: true, idempotent: true, readsMeshTriangles: true },
   description:
     'List which solids touch or interfere (read-only). A pair is reported when its separation is within `tolerance`: kind interference (overlap volume), ' +
     'face (contact area and the normal from a toward b), edge, vertex, or possible (non-box or rotated solids: bounding-box proximity only, approximate: true, ' +

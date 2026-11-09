@@ -35,7 +35,7 @@ function overall(items: readonly CompatibilityItem[]): ItemStatus {
  */
 export const checkMaterialCompatibility = defineCommand({
   name: COMMAND,
-  annotations: { readOnly: true, idempotent: true },
+  annotations: { readOnly: true, idempotent: true, readsMeshTriangles: true },
   description:
     'Check the galvanic compatibility of every pair of parts in contact (find_contacts, plus the pairs that touch by construction in placed fastener stacks) against the document ' +
     'service environment (set_service_environment: REQUIRED) and the galvanic group of each part (set_galvanic_group per material; a plated part uses its plating group, assign_surface_system). ' +
