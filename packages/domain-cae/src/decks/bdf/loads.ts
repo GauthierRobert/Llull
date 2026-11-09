@@ -129,6 +129,12 @@ export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: 
     const key = `L_${id}`;
     const nodes = nodesOf(ctx, key);
     out.comments.push(`$ llull: load '${id}' ${load.kind} in load case ${loadCase}`);
+    if (load.kind === 'inertial')
+      return refusal(
+        'FLL_INERTIAL_UNSUPPORTED',
+        `inertial load '${id}' (${load.name}) is written to CalculiX decks only: the Nastran export has no body-force field`,
+        [id],
+      );
     if (load.kind === 'gravity' && load.vector !== undefined)
       load.vector.forEach((component, axis) => void (gravity[axis] = (gravity[axis] ?? 0) + component));
     else if (load.kind === 'force' && load.vector !== undefined) {

@@ -184,6 +184,25 @@ describe('SEL_MARGINS_NEED_RESOLVE (VC-SEL-09, AC-6)', () => {
     expect(conditions.find((entry) => entry.condition === 'results_current')?.detail).toContain('stale');
   });
 
+  it('a flight (inertial) load fails no_body_force like gravity: a material swap changes the body force', () => {
+    const base = alloy(0.3);
+    const flown = execute(base, 'export_flight_loads', {
+      analysisId: bar.analysisId,
+      state: { linearAccel: [1, 0, 0], angularVelocity: [0, 0, 0], angularAccel: [0, 0, 0] },
+    });
+    expect(flown.rejected).toBeUndefined();
+    const analysis = caseOf(flown.document, bar.analysisId);
+    const conditions = marginConditions(flown.document, analysis ?? ({} as never), {
+      from: 'steel',
+      to: 'alt',
+      nuTolerance: 0,
+      entityIds: [bar.boxId],
+    });
+    const body = conditions.find((entry) => entry.condition === 'no_body_force');
+    expect(body?.ok).toBe(false);
+    expect(body?.detail).toContain('inertial');
+  });
+
   it('single_material fails when a part of the analysis is made of another material (VC-SEL-09: load sharing follows the stiffness ratio)', () => {
     const base = alloy(0.3);
     const second = execute(base, 'add_box', { size: [1, 1, 1] });

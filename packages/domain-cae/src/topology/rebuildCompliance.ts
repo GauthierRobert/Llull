@@ -165,7 +165,8 @@ function externalWork(
       const material = materialId !== undefined && Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
       if (material === undefined || !(material.density > 0)) return `gravity '${id}': the solid '${entityId}' has no material density`;
       own = gravityWork(load, mesh, displacement, entityId, densityToAnalysis(material.density, doc.units, analysis.unitSystem));
-    } else return `load '${id}' is a ${load.kind}: F^T u is rebuilt for force, pressure and gravity loads`;
+    } else if (load.kind === 'inertial') return `load '${id}' is an inertial flight load: F^T u of a rigid-body state is not rebuilt`;
+    else return `load '${id}' is a ${load.kind}: F^T u is rebuilt for force, pressure and gravity loads`;
     if (typeof own === 'string') return own;
     work += own;
   }

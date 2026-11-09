@@ -40,5 +40,7 @@ not by llull. Material inputs in closed-form cases are **test inputs**, not mate
   (nodes within h of z = ∓10 and r ≤ 16 + h) with areas 802.4 and 795.6 mm² vs π 16² = 804.2 mm² (2026-11-08, review round 1). **The
   reference body itself stays open** until lite8.lld is added (expected 686 657 mm³).
 
+FLL-M2 (VC-FLL-02, relief): `tests/unit/cae/ccxFlightRelief.test.ts` (real CalculiX: a balanced load set gives the same stress for two 3-2-1 patterns, an unbalanced one does not), `flightLoadsRun.test.ts` (a real flight: force residual 9e-7, moment 1e-5 of the applied at the peak load), `flightLoads.test.ts` (deck text, checks). Details in TECHNICAL_SPEC §13.
+
 Run by `server/tests/feaFieldMesh.test.ts` (real llull-compute and CalculiX); analytic-field checks (sphere C3D10 −0.0012 %, box exact,
 determinism over thread counts) in `solver/crates/llull-field/src/tets_tests.rs`.

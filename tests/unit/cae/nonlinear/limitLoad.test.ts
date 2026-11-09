@@ -91,6 +91,11 @@ describe('limit_load', () => {
     expect((limit(solved, { method: 'peak', probe: 'pull_curve' }).data as Data)['probeId']).toBe(solved.probeId);
   });
 
+  it('labels the load axis of an inertial load (a rigid-body acceleration) in length/s^2, like gravity', () => {
+    const out = limit(solvedPressure('inertial'), { method: 'auto' });
+    expect(out.data).toMatchObject({ loadUnit: 'mm/s^2' });
+  });
+
   it('gives only a lower bound when the curve never peaks (VC-NLS-60 analogue) and finds a plateau with explicit parameters', () => {
     const pressure = limit(solvedPressure(), { method: 'auto' });
     expect(pressure.data).toMatchObject({ found: 'not_reached', lowerBound: 50, loadUnit: 'MPa' });

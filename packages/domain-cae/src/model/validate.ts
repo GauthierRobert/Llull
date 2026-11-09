@@ -29,7 +29,7 @@ const TYPES = [
 ];
 const UNIT_SYSTEMS = ['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'];
 const CONSTRAINT_KINDS = ['fixed', 'pinned', 'symmetry', 'displacement'];
-const LOAD_KINDS = ['force', 'pressure', 'gravity', 'moment'];
+const LOAD_KINDS = ['force', 'pressure', 'gravity', 'moment', 'inertial'];
 const CATEGORIES = ['limit', 'ultimate'];
 const SCALES = ['degC', 'K'];
 const QUANTITIES = [
@@ -71,6 +71,14 @@ function nonFinitePaths(value: unknown, path: string, out: string[]): void {
   } else if (isRecord(value)) {
     for (const [key, item] of Object.entries(value)) nonFinitePaths(item, `${path}.${key}`, out);
   }
+}
+
+/** A FlightLoadSource: scenario / designHash text or null, timeS a finite number or null. */
+function flightSourceOk(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const text = (field: unknown): boolean => field === null || typeof field === 'string';
+  const time = value['timeS'];
+  return text(value['scenario']) && text(value['designHash']) && (time === null || (typeof time === 'number' && Number.isFinite(time)));
 }
 
 interface Scope {
@@ -206,12 +214,18 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
   checkBag(scope, `${where}.constraints`, analysisCase['constraints'], analysisCase['constraintOrder'], (cid, constraint) => {
     if (!oneOf(CONSTRAINT_KINDS, constraint['kind'])) errors.push(`${where}: constraint '${cid}' has an unknown kind`);
     checkTarget(scope, constraint['target'], `${where}: constraint '${cid}'`);
+    if (constraint['freeBody'] !== undefined && constraint['freeBody'] !== true)
+      errors.push(`${where}: constraint '${cid}' freeBody must be true when present`);
   });
   checkBag(scope, `${where}.loads`, analysisCase['loads'], analysisCase['loadOrder'], (lid, load) => {
     if (!oneOf(LOAD_KINDS, load['kind'])) errors.push(`${where}: load '${lid}' has an unknown kind`);
     if (!oneOf(CATEGORIES, load['category'])) errors.push(`${where}: load '${lid}' has an unknown category`);
     if (load['target'] !== undefined) checkTarget(scope, load['target'], `${where}: load '${lid}'`);
     if (load['vector'] !== undefined && !isVec3(load['vector'])) errors.push(`${where}: load '${lid}' vector must be three finite numbers`);
+    if (load['flightSource'] !== undefined && !flightSourceOk(load['flightSource']))
+      errors.push(`${where}: load '${lid}' flightSource needs scenario (text | null), timeS (number | null) and designHash (text | null)`);
+    for (const field of ['angularVelocity', 'angularAccel'])
+      if (load[field] !== undefined && !isVec3(load[field])) errors.push(`${where}: load '${lid}' ${field} must be three finite numbers`);
   });
   checkMesh(scope, analysisCase['mesh'], where);
   const probes = analysisCase['probes'];

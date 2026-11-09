@@ -145,6 +145,7 @@ export function loadValueText(load: FeaLoad, unitSystem: UnitSystem): string {
     case 'pressure':
       return `${formatSignificant(magnitude)} ${stressUnitName(unitSystem)}`;
     case 'gravity':
+    case 'inertial':
       return unitSystem === 'N-mm-t-s' ? `${formatSignificant(magnitude / 1000)} m/s²` : `${formatSignificant(magnitude)} ${length}/s²`;
   }
 }
@@ -157,7 +158,7 @@ function loadItem(doc: CadDocument, load: FeaLoad, unitSystem: UnitSystem, fallb
     group: 'load',
     name: load.name,
     color: COLORS.load,
-    glyph: load.kind,
+    glyph: load.kind === 'inertial' ? 'gravity' : load.kind,
     points: targetPoints(doc, load.target, fallback),
     direction: load.vector === undefined ? (load.kind === 'gravity' ? [0, 0, -1] : null) : unit3(load.vector),
     label: value === '' ? load.name : value,

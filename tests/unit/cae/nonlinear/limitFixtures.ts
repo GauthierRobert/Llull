@@ -78,8 +78,26 @@ export function solvedPull(loads: readonly number[]): SolvedCurve {
 }
 
 /** The pressure bar (load probe on pressure p = 1 x LC1; LC1 ramps to 50 then back to 0) solved with the bore opening then closing. */
-export function solvedPressure(): SolvedCurve {
-  const bar = pressureBar();
+export function solvedPressure(loadKind?: 'inertial'): SolvedCurve {
+  const plain = pressureBar();
+  const analysis = plain.doc.analysis?.cases[plain.analysisId];
+  const retyped =
+    loadKind === undefined || analysis === undefined
+      ? plain.doc
+      : ({
+          ...plain.doc,
+          analysis: {
+            ...plain.doc.analysis,
+            cases: {
+              ...plain.doc.analysis?.cases,
+              [plain.analysisId]: {
+                ...analysis,
+                loads: Object.fromEntries(Object.entries(analysis.loads).map(([id, load]) => [id, { ...load, kind: loadKind }])),
+              },
+            },
+          },
+        } as CadDocument);
+  const bar = { ...plain, doc: retyped };
   const times = [0.5, 1, 1.5, 2];
   const ux = [0.001, 0.002, 0.0015, 0.0005];
   const text = times.flatMap((time, index) => displacementTable(setName(`N_${bar.probeId}`), time, ux[index] ?? 0)).join('\n');

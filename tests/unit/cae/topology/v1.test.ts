@@ -4,6 +4,7 @@
  * V1 summary fields (optimizer, objective, constraints) with TOP_CONSTRAINT_VIOLATED in check_topology.
  */
 import { describe, expect, it } from 'vitest';
+import { withInertialLoad } from '../inertialInject';
 import { execute } from '@core/commands/registry';
 import type { FeTopologyArtifact, TopologyStudy } from '@core/model/topology';
 import type { CadDocument } from '@core/model/types';
@@ -34,7 +35,11 @@ function analysisOn(
   doc = execute(doc, 'set_part_idealization', { analysisId, entityId: base.entityId, idealization: 'solid' }).document;
   for (const constraint of setup.constraints ?? [])
     doc = execute(doc, 'add_fea_constraint', { analysisId, name: 'c', ...constraint }).document;
-  for (const load of setup.loads ?? []) doc = execute(doc, 'add_fea_load', { analysisId, name: 'l', ...load }).document;
+  for (const load of setup.loads ?? [])
+    doc =
+      load['kind'] === 'inertial'
+        ? withInertialLoad(doc, analysisId)
+        : execute(doc, 'add_fea_load', { analysisId, name: 'l', ...load }).document;
   const made = execute(doc, 'create_topology_study', {
     analysisId,
     name: 's',
@@ -451,6 +456,12 @@ describe('the input hash and the material density', () => {
       loads: [point, { kind: 'gravity', loadCase: 'LC1', category: 'limit', vector: [0, -9810, 0] }],
     });
     expect(hashOf(denser(weighted.doc), weighted.studyId)).not.toBe(hashOf(weighted.doc, weighted.studyId));
+    // an inertial (flight) load is a body force too: the density enters the hash
+    const flown = analysisOn(model, {
+      constraints: [fixedLeft],
+      loads: [point, { kind: 'inertial', loadCase: 'LC1', category: 'limit', vector: [0, -9810, 0] }],
+    });
+    expect(hashOf(denser(flown.doc), flown.studyId)).not.toBe(hashOf(flown.doc, flown.studyId));
     // a recorded gravity result reads stale once the density changed
     const job = okJob(weighted.doc, weighted.studyId);
     const field = Float32Array.from({ length: 1200 }, (_, n) => (n % 60 < 30 ? 1 : 0));

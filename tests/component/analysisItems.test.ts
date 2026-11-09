@@ -44,6 +44,22 @@ describe('analysis set-up items', () => {
     ).toBe('9.81 m/s²');
   });
 
+  it('an inertial load reads as an acceleration and draws with the gravity glyph', () => {
+    const inertial = { id: 'i', name: 'i', loadCase: 'LC1', category: 'limit', kind: 'inertial', vector: [0, 0, 19620] } as const;
+    expect(loadValueText(inertial, 'N-mm-t-s')).toBe('19.62 m/s²');
+    expect(loadValueText(inertial, 'N-m-kg-s')).toBe('19620 m/s²');
+    useStore.getState().setDocument(createEmptyDocument());
+    const boxId = localDispatch('add_box', { size: [10, 20, 30] }).affected[0]!;
+    const analysisId = localDispatch('create_analysis', { name: 'Free', analysisType: 'static' }).affected[0]!;
+    localDispatch('set_part_idealization', { analysisId, entityId: boxId });
+    const doc = useStore.getState().document;
+    const base = doc.analysis!.cases[analysisId]!;
+    const withLoad: AnalysisCase = { ...base, loads: { i: inertial }, loadOrder: ['i'] };
+    const drawn = buildSetupItems(doc, withLoad).loads[0];
+    expect(drawn?.glyph).toBe('gravity');
+    expect(drawn?.label).toBe('19.62 m/s²');
+  });
+
   it('converts mesh coordinates to document units', () => {
     expect(analysisToDocument({ ...createEmptyDocument(), units: 'mm' }, 'N-m-kg-s')).toBe(1000);
     expect(analysisToDocument({ ...createEmptyDocument(), units: 'mm' }, 'N-mm-t-s')).toBe(1);
