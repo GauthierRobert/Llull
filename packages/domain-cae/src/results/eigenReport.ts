@@ -24,6 +24,8 @@ export interface ModalReport {
   readonly massUnit: string;
   /** Modes with a frequency at or below the rigid-body threshold: the model is not fully restrained. */
   readonly rigidBodyModes: number;
+  /** The rigid-body threshold of this report, Hz: every reader that skips rigid-body modes uses it, so the count and the skip agree. */
+  readonly rigidBodyHz: number;
   /** Reader notes of the `.dat` (a mass table that was printed but could not be read). */
   readonly warnings: readonly string[];
 }
@@ -115,6 +117,7 @@ export function eigenReport(analysis: AnalysisCase, results: FeResultsArtifact):
     totalEffectiveMass: total,
     massUnit: MASS_UNITS[analysis.unitSystem],
     rigidBodyModes: modes.filter((mode) => mode.frequencyHz <= threshold).length,
+    rigidBodyHz: threshold,
     warnings: results.dat?.warnings ?? [],
   };
 }

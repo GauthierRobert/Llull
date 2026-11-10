@@ -13,8 +13,6 @@ import { refuseFll } from './codes';
 import { rotorsOfFlightModel, trimmedRpm } from './rotorSource';
 
 const NAME = 'check_rotor_resonance';
-/** Modes at or below this frequency are rigid-body motions of an unrestrained model, not structural modes (eigenReport's absolute floor), Hz. */
-const RIGID_BODY_HZ = 1e-3;
 const HARMONIC_LIMIT = 100;
 
 type Status = 'pass' | 'fail' | 'unknown';
@@ -154,8 +152,12 @@ export const checkRotorResonance = defineCommand({
         'FLL_MODAL_UNAVAILABLE',
         `the modal results of '${params.analysisId}' are not available (state ${trust.state}${trust.problem === null ? '' : `, ${trust.problem.code}`}): solve the analysis first`,
       );
-    const modes = eigen.modes.filter((mode) => Number.isFinite(mode.frequencyHz) && mode.frequencyHz > RIGID_BODY_HZ);
-    if (modes.length === 0) return fail('FLL_NO_MODES', 'the modal results hold no elastic mode (frequency above 0.001 Hz)');
+    const modes = eigen.modes.filter((mode) => Number.isFinite(mode.frequencyHz) && mode.frequencyHz > eigen.rigidBodyHz);
+    if (modes.length === 0)
+      return fail(
+        'FLL_NO_MODES',
+        `the modal results hold no elastic mode (frequency above the rigid-body threshold ${eigen.rigidBodyHz} Hz)`,
+      );
     const records = rotorsOfFlightModel(doc, params.scenario, ctx);
     if (typeof records === 'string') return fail('FLL_NO_ROTORS', records);
     const unknown = (params.rotors ?? []).filter((id) => !records.some((rotor) => rotor.id === id));

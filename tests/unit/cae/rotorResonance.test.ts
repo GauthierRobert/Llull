@@ -225,6 +225,14 @@ describe('check_rotor_resonance', () => {
     expect(rowOf(data, 'r1', 1, 1).atOperating.map((point) => point.excitationHz)).toEqual([2000 / 60, 4000 / 60]);
   });
 
+  it('a free-free result skips every rigid-body mode by the eigen report threshold, also one just above 1e-3 Hz (0.00103 Hz next to 414 Hz)', () => {
+    const setup = flightModal([0, 0, 0, 0, 0.000446, 0.00103, 97.567, 414.378]);
+    const result = check(setup, { rotors: ['r1'], rpmBand: [3000, 7000], harmonics: [1] });
+    const data = dataOf(result);
+    expect([...new Set(data.rows.map((row) => row.mode))]).toEqual([7, 8]);
+    expect(result.summary).toContain('2 mode(s)');
+  });
+
   it('data.svg is a deterministic Campbell diagram (rpm vs Hz, modes, rays, band) and plot false omits it', () => {
     const setup = flightModal();
     const params = { rotors: ['r1'], rpmBand: [2000, 2400], bladeCount: 2 };
