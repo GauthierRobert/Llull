@@ -70,7 +70,11 @@ export async function runExplicitRun(
       );
       if (!run.ok) return { run, outputs: null };
       const [result, fields] = await Promise.all([readOutput(folder, run, 'result.json'), readOutput(folder, run, 'fields.f64')]);
-      return { run, outputs: { result, fields } };
+      // Reported only when the solver recorded the requested histories; its absence is flagged EXP_TIME_HISTORY_NOT_RECORDED, never read as empty.
+      const histories = run.outputs.some((output) => output.path === 'histories.json')
+        ? await readOutput(folder, run, 'histories.json')
+        : null;
+      return { run, outputs: { result, fields, histories } };
     },
     deps.env,
   ).catch((error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }));
@@ -84,7 +88,13 @@ export async function runExplicitRun(
       log: run.log.slice(-4000),
     });
   }
-  const artifact = buildExplicitArtifact(job, outputs.result.toString('utf8'), f64Values(outputs.fields), await deps.runner.version());
+  const artifact = buildExplicitArtifact(
+    job,
+    outputs.result.toString('utf8'),
+    f64Values(outputs.fields),
+    await deps.runner.version(),
+    outputs.histories?.toString('utf8') ?? null,
+  );
   if (typeof artifact === 'string') return failure('EXP_SOLVER_FAILED', artifact, [analysisId]);
   const artifactHash = deps.store.put(artifact);
   const analysisCase = doc.analysis?.cases[analysisId];

@@ -19,6 +19,7 @@
 
 use crate::contact::Contacts;
 use crate::hex8;
+use crate::history::{Recorder, Series, Snapshot};
 use crate::material::{split, update, von_mises, PointState, Sym};
 use crate::model::{Material, Model};
 use crate::shells::Shells;
@@ -73,6 +74,8 @@ pub struct Outcome {
     pub coordinates: Vec<f64>,
     /// Final nodal velocities (3 per node, at the last half step).
     pub velocities: Vec<f64>,
+    /// Requested time histories (history.rs), empty without a request.
+    pub histories: Vec<Series>,
 }
 
 /// One element's constant data.
@@ -336,6 +339,8 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     let mut walls: Vec<WallHistory> =
         model.walls.iter().map(|wall| WallHistory { name: wall.name.clone(), times: vec![], forces: vec![] }).collect();
     let mut wall_impulse = vec![0.0; model.walls.len()];
+    let mut wall_totals = vec![[0.0f64; 2]; model.walls.len()];
+    let mut recorder = Recorder::new(model, &elements);
     let mut last_sample = 0.0;
     let mut next_sample = controls.history_interval;
     let mut element_dt = f64::INFINITY;
@@ -391,9 +396,12 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
                         v_new[at + i] -= normal_speed * n[i];
                     }
                     wall_impulse[index] += -masses[node] * normal_speed;
+                    wall_totals[index][0] += -masses[node] * normal_speed;
                     // Work of the wall reaction R = m (v_pred·n)/Δt over the central-difference step, R·½(Δx^{n-½} + Δx^{n+½}),
                     // with the corrected normal velocity zero: a node resting on the wall dissipates nothing.
-                    wall_energy += 0.5 * masses[node] * normal_speed * previous_speed;
+                    let work = 0.5 * masses[node] * normal_speed * previous_speed;
+                    wall_energy += work;
+                    wall_totals[index][1] += work;
                 }
             }
         }
@@ -422,6 +430,11 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
             last_sample = time;
             next_sample = (((time / controls.history_interval) + 1e-9).floor() + 1.0) * controls.history_interval;
         }
+        if let Some(recorder) = recorder.as_mut() {
+            let v: Vec<f64> = if cycles == 0 { v_half.clone() } else { (0..3 * nodes).map(|k| 0.5 * (v_half[k] + v_new[k])).collect() };
+            let a: Vec<f64> = (0..3 * nodes).map(|k| (v_new[k] - v_half[k]) / (0.5 * (dt_prev + dt))).collect();
+            recorder.record(&Snapshot { time, x: &x, v: &v, a: &a, walls: &wall_totals });
+        }
         let x_new: Vec<f64> = (0..3 * nodes).map(|k| x[k] + dt * v_new[k]).collect();
         external_work += (0..3 * nodes).map(|k| external[k] * (x_new[k] - x[k])).sum::<f64>();
         let motion = Motion { x0: &x, x1: &x_new, v: &v_new, dt };
@@ -438,6 +451,9 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
                 for i in 0..3 {
                     f_int[3 * node + i] -= step.forces[k][i];
                 }
+            }
+            if let Some(recorder) = recorder.as_mut() {
+                recorder.add_internal(index, step.internal_work);
             }
             internal += step.internal_work;
             hourglass += step.hourglass_work;
@@ -473,6 +489,10 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
     if time > last_sample {
         sample_walls(&mut walls, &mut wall_impulse, time, last_sample);
     }
+    if let Some(recorder) = recorder.as_mut() {
+        let a: Vec<f64> = (0..3 * nodes).map(|k| if dt_prev > 0.0 { (v_end[k] - v_half[k]) / (0.5 * dt_prev) } else { 0.0 }).collect();
+        recorder.record(&Snapshot { time, x: &x, v: &v_end, a: &a, walls: &wall_totals });
+    }
     let mut fields = Vec::with_capacity(FIELD_STRIDE * elements.len());
     for (element, state) in elements.iter().zip(&states) {
         let c = centroid(&element.nodes, &x);
@@ -495,6 +515,7 @@ pub fn run(model: &Model, progress: &mut impl FnMut(Progress)) -> Result<Outcome
         fields,
         coordinates: x,
         velocities: v_half,
+        histories: recorder.map(Recorder::finish).unwrap_or_default(),
     })
 }
 

@@ -77,6 +77,19 @@ export function explicitJobFiles(job: ExplicitJob, device: ExplicitDevice): Reco
     ...(job.imposedMotions.length > 0
       ? { imposedMotions: job.imposedMotions.map(({ nodes, dof, kind, curve }) => ({ nodes, dof, kind, curve })) }
       : {}),
+    ...(job.timeHistories.length > 0
+      ? {
+          timeHistories: job.timeHistories.map(({ name, kind, nodes, part, wall, quantities, interval }) => ({
+            name,
+            kind,
+            ...(nodes !== undefined ? { nodes } : {}),
+            ...(part !== undefined ? { part } : {}),
+            ...(wall !== undefined ? { wall } : {}),
+            quantities,
+            ...(interval !== undefined ? { interval } : {}),
+          })),
+        }
+      : {}),
     gravity: job.gravity,
     walls: job.walls,
     ...(job.contacts.length > 0

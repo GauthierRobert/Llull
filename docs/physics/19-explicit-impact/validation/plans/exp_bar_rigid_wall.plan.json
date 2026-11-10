@@ -177,10 +177,10 @@
    "analysisId": "$an",
    "name": "wall_impulse",
    "kind": "rigid_wall",
-   "target": "anvil",
+   "wallId": "anvil",
    "quantities": [
-    "impulse_z",
-    "force_z"
+    "normal_impulse",
+    "normal_force"
    ]
   }
  },

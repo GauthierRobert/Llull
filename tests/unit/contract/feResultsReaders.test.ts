@@ -40,6 +40,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
     'check_rotor_resonance compares stored modal FREQUENCIES with rotor excitation orders (a frequency margin against a caller-given requirement, unknown without one, reviewRequired); no stress allowable, no through-thickness bending budget',
   'dynamics/check.ts': 'modal / buckling / dynamic checks judge frequencies, participation and factors, not a stress margin',
   'dynamics/reportCommands.ts': 'modal and dynamic report read-outs (frequencies, mode shapes); no stress allowable',
+  'explicit/historyQuery.ts':
+    'read-out of a requested time history from the explicit-dynamics artifact (fe_explicit, re-verified); values and a not-recorded flag, no verdict',
   'explicit/queries.ts': 'explicit-dynamics artifacts (fe_explicit), not fe_results; energy and contact read-outs',
   'explicit/record.ts': 'records an explicit-dynamics artifact summary after re-hashing it; no verdict',
   'explicit/trust.ts': 'verifier of explicit-dynamics artifacts (fe_explicit), not fe_results',

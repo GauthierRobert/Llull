@@ -75,6 +75,29 @@ export interface ExplicitContact {
   readonly penaltyScale: NamedValue;
 }
 
+/** Quantities a time history records, per kind (the Radioss /TH/NODE, /TH/PART and /TH/RWALL families). */
+export const TIME_HISTORY_QUANTITIES = {
+  node: ['displacement', 'velocity', 'acceleration'],
+  part: ['internal_energy', 'kinetic_energy', 'momentum', 'mass'],
+  rigid_wall: ['normal_force', 'normal_impulse', 'energy'],
+} as const;
+
+export type ExplicitTimeHistoryKind = keyof typeof TIME_HISTORY_QUANTITIES;
+
+/** Requested time history (TR-EXP-10 /TH/*): nodes, a part or a rigid wall, written at its own interval or the case history interval. */
+export interface ExplicitTimeHistory {
+  readonly name: string;
+  readonly kind: ExplicitTimeHistoryKind;
+  /** node: the part and near points / faces (document units); part: `entityId` only; rigid_wall: absent. */
+  readonly target?: ExplicitMotionTarget;
+  /** rigid_wall: id `rw-<step>.<k>` of a wall of the case. */
+  readonly wallId?: string;
+  /** Subset of `TIME_HISTORY_QUANTITIES[kind]`, in request order, no repeats. */
+  readonly quantities: readonly string[];
+  /** Seconds; absent = the case `historyIntervalS`. */
+  readonly intervalS?: number;
+}
+
 export interface ExplicitSpec {
   readonly endTimeS: number;
   readonly historyIntervalS: number;
@@ -102,6 +125,9 @@ export interface ExplicitSpec {
   /** Penalty contacts (RS-8c), by id `ct-<step>.<k>`. */
   readonly contacts?: Readonly<Record<string, ExplicitContact>>;
   readonly contactOrder?: readonly string[];
+  /** Requested time histories (at most 32), by id `th-<step>.<k>`. */
+  readonly timeHistories?: Readonly<Record<string, ExplicitTimeHistory>>;
+  readonly timeHistoryOrder?: readonly string[];
   /** Parts meshed as Belytschko–Tsay shells (thin boxes: mid-surface, thickness = the smallest dimension), by entity id (RS-8c). */
   readonly shells?: Readonly<Record<string, { readonly points: number }>>;
   readonly results?: ExplicitResultsSummary;
@@ -138,6 +164,19 @@ export interface ExplicitWallHistory {
   readonly force: readonly number[];
 }
 
+/** One recorded time-history series (an `ExplicitTimeHistory` quantity): `components` numbers per time, analysis units. */
+export interface ExplicitHistorySeries {
+  /** Id `th-<step>.<k>` of the request. */
+  readonly id: string;
+  readonly name: string;
+  readonly quantity: string;
+  readonly components: 1 | 3;
+  readonly unit: string;
+  /** Sample times, s: exact multiples of the request interval. */
+  readonly t: readonly number[];
+  readonly values: readonly number[];
+}
+
 /**
  * Artifact of one explicit run (JSON; stored by the host under `sha256Hex(canonicalJson(artifact))`).
  * @invariant per-element arrays have one value per element (hex8 first, then tet4); `centroids` holds 3 values per element in the FINAL
@@ -164,6 +203,8 @@ export interface FeExplicitArtifact {
   /** Element temperature, K (adiabatic heating; the initial temperature without it). */
   readonly temperature: readonly number[];
   readonly centroids: readonly number[];
+  /** Series of the requested time histories the solver recorded (absent without a request or from a binary that does not record them). */
+  readonly histories?: readonly ExplicitHistorySeries[];
 }
 
 export interface ExplicitExtreme {
@@ -172,6 +213,20 @@ export interface ExplicitExtreme {
   /** Final-configuration element centroid, analysis length units. */
   readonly at: Vec3;
   readonly element: number;
+}
+
+/** What the run gave of one requested time history (bounded: the series live in the artifact; `explicit_time_history` reads them). */
+export interface ExplicitHistorySummary {
+  readonly name: string;
+  readonly quantities: readonly {
+    readonly quantity: string;
+    readonly unit: string;
+    /** `recorded`, or `EXP_TIME_HISTORY_NOT_RECORDED` when the solver output has no series for it (never read as empty data). */
+    readonly status: 'recorded' | 'EXP_TIME_HISTORY_NOT_RECORDED';
+    readonly samples: number;
+    /** Largest absolute value over all samples and components. */
+    readonly peakAbs: number;
+  }[];
 }
 
 export interface ExplicitResultsSummary {
@@ -207,6 +262,8 @@ export interface ExplicitResultsSummary {
   /** Hottest element, K (RS-8 adiabatic heating). */
   readonly maxTemperature: ExplicitExtreme;
   readonly failedElements: number;
+  /** Per requested time history id; absent when none was requested. */
+  readonly histories?: Readonly<Record<string, ExplicitHistorySummary>>;
   readonly walls: Readonly<Record<string, { readonly peakForce: number; readonly impulse: number; readonly forceUnit: string }>>;
   readonly unverified: boolean;
   readonly unverifiedReasons: readonly string[];

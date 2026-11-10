@@ -2,6 +2,11 @@
   "note": "Hits of the INT-14 source scan (tests/unit/contract/fallbackInventory.test.ts) that are not engineering inputs, or are tracked in fallback_inventory.json. Each entry: file (under packages/), match (substring of the trimmed source line, unique per file), reason.",
   "entries": [
     {
+      "file": "domain-cae/src/explicit/historyQuery.ts",
+      "match": "offset = 0, limit = MAX_PAGE",
+      "reason": "explicit_time_history paging: first sample and page size of a read-out (the total is returned), not an engineering input"
+    },
+    {
       "file": "domain-aec/src/civil/drainage/drainageAnalysisCommands.ts",
       "match": "metres(pipePlanLength(civil, p) ?? 0),",
       "reason": "schedule column of a pipe whose end manholes are unresolved: 0 is displayed, never used in a check"

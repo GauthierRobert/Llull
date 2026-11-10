@@ -170,10 +170,10 @@
    "analysisId": "$an",
    "name": "floor_impulse",
    "kind": "rigid_wall",
-   "target": "floor",
+   "wallId": "floor",
    "quantities": [
-    "impulse_z",
-    "force_z"
+    "normal_impulse",
+    "normal_force"
    ]
   }
  },

@@ -1,11 +1,12 @@
 /** Access to and validation of the explicit set-up stored on analysis cases (`AnalysisCase.explicit`, plugin `explicit`). */
 
 import type { AnalysisCase } from '@core/model/analysis';
-import type { ExplicitSpec } from '@core/model/explicit';
+import { TIME_HISTORY_QUANTITIES, type ExplicitSpec, type ExplicitTimeHistoryKind } from '@core/model/explicit';
 import type { CadDocument } from '@core/model/types';
 import { isRecord } from '@lib/isRecord';
 import { unitSystemFactors } from '../decks/units';
 import { caseOf, withCase } from '../shared/access';
+import { withinHistoryCap } from './defaults';
 
 /** The case and its spec when `analysisId` is an explicit case, else a code + message. */
 export function explicitCase(
@@ -35,6 +36,43 @@ const finite = (value: unknown): boolean => typeof value === 'number' && Number.
 const isNamed = (value: unknown): boolean => isRecord(value) && finite(value['value']) && typeof value['source'] === 'string';
 const isVec = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(finite);
 
+/** Time-history records: shape, unique names, one of each quantity, intervals within (0, endTime] and the sample cap, walls of the case. */
+function historiesValid(spec: Record<string, unknown>): boolean {
+  const histories = spec['timeHistories'];
+  const order = spec['timeHistoryOrder'];
+  const endTime = spec['endTimeS'];
+  const walls = spec['rigidWallOrder'];
+  if (!isRecord(histories) || !Array.isArray(order) || order.length > 32) return false;
+  if (order.some((id) => typeof id !== 'string' || !Object.hasOwn(histories, id))) return false;
+  const entries = Object.values(histories);
+  if (new Set(entries.map((entry) => (isRecord(entry) ? entry['name'] : entry))).size !== entries.length) return false;
+  return entries.every((entry) => {
+    if (!isRecord(entry) || typeof entry['name'] !== 'string' || !Array.isArray(entry['quantities'])) return false;
+    const kind = String(entry['kind']);
+    if (!Object.hasOwn(TIME_HISTORY_QUANTITIES, kind)) return false;
+    const allowed: readonly unknown[] = TIME_HISTORY_QUANTITIES[kind as ExplicitTimeHistoryKind];
+    const quantities: readonly unknown[] = entry['quantities'];
+    const interval = entry['intervalS'];
+    const target = entry['target'];
+    const intervalOk =
+      interval === undefined ||
+      (finite(interval) &&
+        (interval as number) > 0 &&
+        finite(endTime) &&
+        (interval as number) <= (endTime as number) &&
+        withinHistoryCap(endTime as number, interval as number));
+    return (
+      quantities.length > 0 &&
+      new Set(quantities).size === quantities.length &&
+      quantities.every((quantity) => allowed.includes(quantity)) &&
+      intervalOk &&
+      (kind === 'rigid_wall'
+        ? typeof entry['wallId'] === 'string' && Array.isArray(walls) && walls.includes(entry['wallId'])
+        : isRecord(target) && typeof target['entityId'] === 'string')
+    );
+  });
+}
+
 function specErrors(caseId: string, spec: unknown): string[] {
   const where = `analysis.cases.${caseId}.explicit`;
   if (!isRecord(spec)) return [`${where} is malformed`];
@@ -46,7 +84,8 @@ function specErrors(caseId: string, spec: unknown): string[] {
     !finite(history) ||
     !((endTime as number) > 0) ||
     !((history as number) > 0) ||
-    (history as number) > (endTime as number)
+    (history as number) > (endTime as number) ||
+    !withinHistoryCap(endTime as number, history as number)
   )
     errors.push(`${where}: endTimeS / historyIntervalS must satisfy 0 < historyIntervalS <= endTimeS`);
   const bulk = spec['bulkViscosity'];
@@ -143,6 +182,7 @@ function specErrors(caseId: string, spec: unknown): string[] {
       ))
   )
     errors.push(`${where}.imposedMotions / imposedMotionOrder are malformed`);
+  if (spec['timeHistories'] !== undefined && !historiesValid(spec)) errors.push(`${where}.timeHistories / timeHistoryOrder are malformed`);
   const heating = spec['heating'];
   if (
     heating !== undefined &&

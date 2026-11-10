@@ -15,6 +15,7 @@ pub mod gpu;
 #[cfg(feature = "gpu")]
 mod gpu_tables;
 pub mod hex8;
+pub mod history;
 pub mod job;
 pub mod material;
 pub mod model;

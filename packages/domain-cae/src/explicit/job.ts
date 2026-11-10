@@ -11,6 +11,7 @@ import { toMetres } from '@core/model/units';
 import { analysisLengthMetres } from '../shared/defaults';
 import { fixedDofs, jobImposedMotions, type JobImposedMotion } from './constraints';
 import { explicitInputHash } from './hash';
+import { jobTimeHistories, type JobTimeHistory } from './historyJob';
 import { jobHeating, type JobHeating } from './heating';
 import { explicitMaterial, type ExplicitMaterial } from './laws';
 import { feaTetMesh, structuredHexMesh, type ExplicitMesh } from './mesh';
@@ -41,6 +42,8 @@ export interface ExplicitJob {
   readonly fixedRotation: readonly number[];
   /** Imposed motions on mesh nodes, in order. */
   readonly imposedMotions: readonly JobImposedMotion[];
+  /** Requested time histories resolved to nodes / part / wall indices, in request order. */
+  readonly timeHistories: readonly JobTimeHistory[];
   /** Index into `materials` per element (hex8 first, then tet4). */
   readonly elementMaterial: readonly number[];
   /** Part index per element (position in the sorted part ids). */
@@ -124,6 +127,8 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
   if ('code' in held) return refuse(held.code, held.message, held.ids);
   const imposedMotions = jobImposedMotions(spec, mesh, lengthToAnalysis, held.fixed);
   if ('code' in imposedMotions) return refuse(imposedMotions.code, imposedMotions.message, imposedMotions.ids);
+  const timeHistories = jobTimeHistories(spec, mesh, partIds, lengthToAnalysis);
+  if ('code' in timeHistories) return refuse(timeHistories.code, timeHistories.message, timeHistories.ids);
   const velocities = new Map(Object.values(spec.initialVelocities).map((entry) => [entry.entityId, entry.velocity] as const));
   const gravity: Vec3 = spec.gravity ?? [0, 0, 0];
   if (velocities.size === 0 && gravity.every((component) => component === 0) && imposedMotions.length === 0)
@@ -149,6 +154,7 @@ export function buildExplicitJob(doc: CadDocument, analysisId: string, meshArtif
       fixed: held.fixed,
       fixedRotation: held.fixedRotation,
       imposedMotions,
+      timeHistories,
       elementPart: mesh.elementPart.map((part) => partIds.indexOf(part)),
       contacts: (spec.contactOrder ?? []).flatMap((id) => {
         const contact = spec.contacts?.[id];

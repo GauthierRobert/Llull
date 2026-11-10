@@ -105,3 +105,103 @@ fn refuses_malformed_jobs() {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+fn history_job(histories: serde_json::Value) -> serde_json::Value {
+    let mut spec = job("cpu");
+    spec["timeHistories"] = histories;
+    spec
+}
+
+#[test]
+fn writes_requested_histories_with_a_manifest_and_a_hash() {
+    let dir = folder("histories");
+    write_job(
+        &dir,
+        history_job(serde_json::json!([
+            { "name": "top", "kind": "node", "nodes": [4, 5, 6, 7], "quantities": ["velocity", "displacement"], "interval": 5e-4 },
+            { "name": "cube", "kind": "part", "part": 0, "quantities": ["kinetic_energy"] },
+            { "name": "floor", "kind": "rigid_wall", "wall": 0, "quantities": ["normal_impulse", "normal_force"] }
+        ])),
+    );
+    let outputs = run_job(&dir, &mut Vec::new()).expect("the job runs");
+    assert_eq!(outputs.iter().map(|output| output.path.as_str()).collect::<Vec<_>>(), ["fields.f64", "histories.json", "result.json"]);
+    for output in &outputs {
+        assert_eq!(sha256_hex(&fs::read(dir.join(&output.path)).expect("read")), output.sha256);
+    }
+    let result: serde_json::Value = serde_json::from_slice(&fs::read(dir.join("result.json")).expect("read")).expect("json");
+    let manifest = result["histories"].as_array().expect("manifest");
+    assert_eq!(manifest.len(), 5);
+    assert_eq!(manifest[0]["quantity"], "velocity");
+    assert_eq!(manifest[0]["components"], 3);
+    assert_eq!(manifest[0]["samples"], 5);
+    assert_eq!(manifest[2]["samples"], 21);
+    let file: serde_json::Value = serde_json::from_slice(&fs::read(dir.join("histories.json")).expect("read")).expect("json");
+    assert_eq!(file["series"].as_array().expect("series").len(), 5);
+    assert_eq!(file["series"][0]["values"].as_array().expect("values").len(), 15);
+    assert_eq!(file["series"][0]["times"][4], 2e-3);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_job_without_histories_has_no_histories_file_or_manifest() {
+    let dir = folder("nohistory");
+    write_job(&dir, job("cpu"));
+    let outputs = run_job(&dir, &mut Vec::new()).expect("the job runs");
+    assert!(outputs.iter().all(|output| output.path != "histories.json"));
+    let result: serde_json::Value = serde_json::from_slice(&fs::read(dir.join("result.json")).expect("read")).expect("json");
+    assert!(result.get("histories").is_none());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_gpu_request_with_histories_runs_the_cpu_twin_and_still_records() {
+    let dir = folder("historygpu");
+    let mut spec = history_job(serde_json::json!([{ "name": "top", "kind": "node", "nodes": [0], "quantities": ["displacement"] }]));
+    spec["device"] = "gpu".into();
+    write_job(&dir, spec);
+    let mut events = Vec::new();
+    let outputs = run_job(&dir, &mut events).expect("the job runs");
+    assert!(String::from_utf8(events).expect("utf8").contains("EXP_GPU_FALLBACK"));
+    assert!(outputs.iter().any(|output| output.path == "histories.json"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn refuses_malformed_histories() {
+    let cases = [
+        ("kindless", serde_json::json!([{ "name": "a", "kind": "node", "quantities": ["velocity"] }])),
+        ("wrong_quantity", serde_json::json!([{ "name": "a", "kind": "node", "nodes": [0], "quantities": ["mass"] }])),
+        ("node_range", serde_json::json!([{ "name": "a", "kind": "node", "nodes": [99], "quantities": ["velocity"] }])),
+        ("no_part", serde_json::json!([{ "name": "a", "kind": "part", "part": 7, "quantities": ["mass"] }])),
+        ("no_wall", serde_json::json!([{ "name": "a", "kind": "rigid_wall", "wall": 3, "quantities": ["energy"] }])),
+        ("repeat", serde_json::json!([{ "name": "a", "kind": "part", "part": 0, "quantities": ["mass", "mass"] }])),
+        ("none", serde_json::json!([{ "name": "a", "kind": "part", "part": 0, "quantities": [] }])),
+        ("interval", serde_json::json!([{ "name": "a", "kind": "part", "part": 0, "quantities": ["mass"], "interval": 1.0 }])),
+        ("both", serde_json::json!([{ "name": "a", "kind": "part", "part": 0, "wall": 0, "quantities": ["mass"] }])),
+        ("unknown", serde_json::json!([{ "name": "a", "kind": "part", "part": 0, "quantities": ["mass"], "extra": 1 }])),
+    ];
+    for (name, histories) in cases {
+        let dir = folder(&format!("history-{name}"));
+        write_job(&dir, history_job(histories));
+        let error = run_job(&dir, &mut Vec::new()).expect_err(name);
+        assert_eq!(error.code, "NATIVE_JOB_INPUT", "{name}: {}", error.message);
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[test]
+fn caps_the_samples_of_a_history_and_of_the_controls() {
+    // endTime 2e-3 s: 1e-8 s is 200 000 intervals (refused), 2e-8 s is exactly 100 000 (accepted)
+    let dir = folder("cap-history");
+    write_job(&dir, history_job(serde_json::json!([{ "name": "a", "kind": "part", "part": 0, "quantities": ["mass"], "interval": 1e-8 }])));
+    let error = run_job(&dir, &mut Vec::new()).expect_err("history cap");
+    assert_eq!(error.code, "NATIVE_JOB_INPUT");
+    assert!(error.message.contains("100000"), "{}", error.message);
+    let _ = fs::remove_dir_all(&dir);
+    let dir = folder("cap-controls");
+    let mut spec = job("cpu");
+    spec["controls"]["historyInterval"] = 1e-8.into();
+    write_job(&dir, spec);
+    assert_eq!(run_job(&dir, &mut Vec::new()).expect_err("controls cap").code, "NATIVE_JOB_INPUT");
+    let _ = fs::remove_dir_all(&dir);
+}

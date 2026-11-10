@@ -34,6 +34,8 @@
 //!   `initialTemperature` (K; default: each Johnson–Cook material at its transition temperature), `shellWarping` (Belytschko–Wong–Chiang
 //!   shell: warping projection, fiber coupling and edge shear, default true), `imposedMotions`
 //!   `[{ "nodes": [..], "dof": 0..2, "kind": "velocity" | "displacement", "curve": [[t s, value], …] }]`.
+//! - Optional: `timeHistories` `[{ "name", "kind": "node" | "part" | "rigid_wall", "nodes": [..] (node), "part": u32 (part), "wall": index
+//!   into walls (rigid_wall), "quantities": [..], "interval": s }]` (history.rs: quantities per kind; `interval` default = historyInterval).
 //! - `device`: `cpu` (default, deterministic Rust path) | `gpu` | `auto`. Without the GPU kernels (feature) or an f64 adapter a GPU
 //!   request runs the CPU twin and reports the warning `EXP_GPU_FALLBACK`; contacts, fixed DOFs and shells run on the GPU path (contact
 //!   and shells as its deterministic host part, `gpu.rs`).
@@ -49,9 +51,14 @@
 //!   `addedMass`, `elements` {hex8, tet4}, `device` (`cpu` | `gpu`), `adapter` (GPU only), `deterministic` (true), `energy` (rows
 //!   `[t, kinetic, internal, hourglass, wall, contact, externalWork]`, one per history interval plus t = 0 and the end), `walls` ([{name, t[], force[]}], the normal force averaged
 //!   over each history interval = impulse / interval).
+//! - `histories.json` (only with `timeHistories`; a GPU request falls back to the CPU twin with `EXP_GPU_FALLBACK`):
+//!   `{version, series: [{name, quantity, components, times[], values[]}]}`, `values` = `components` numbers per time, sampled as
+//!   history.rs says (exact multiples of the request interval, linear interpolation between integer-step states); `result.json` lists
+//!   them in `histories` `[{name, quantity, components, samples}]` (absent without a request).
 //! - `fields.f64`: per element `[von Mises, equivalent plastic strain, failed (0/1), centroid x, y, z]` at the end, little-endian f64.
 //!   Every output is byte-identical across runs and thread counts.
 
+use crate::history::{check, within_cap, RequestSpec, MAX_INTERVALS};
 use crate::model::{
     Contact, ContactKind, Controls, Friction, Heating, ImposedKind, ImposedMotion, JohnsonCook, JohnsonCookFailure, MassScaling, Material,
     Model, Wall,
@@ -238,6 +245,8 @@ struct JobSpec {
     contacts: Vec<ContactSpec>,
     #[serde(default)]
     imposed_motions: Vec<ImposedSpec>,
+    #[serde(default)]
+    time_histories: Vec<RequestSpec>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -366,6 +375,9 @@ fn controls_of(spec: ControlsSpec) -> Result<Controls, JobError> {
     if !(end_time > 0.0 && history_interval > 0.0 && history_interval <= end_time) || !end_time.is_finite() {
         return Err(input("controls need 0 < historyInterval <= endTime"));
     }
+    if !within_cap(end_time, history_interval) {
+        return Err(input(format!("controls need endTime / historyInterval <= {MAX_INTERVALS}")));
+    }
     if !(time_step_scale > 0.0 && time_step_scale <= 1.0)
         || !(hourglass_coefficient >= 0.0)
         || !(bulk_linear >= 0.0 && bulk_quadratic >= 0.0)
@@ -459,6 +471,7 @@ pub fn load(folder: &Path) -> Result<(Model, bool), JobError> {
         shell_warping: spec.shell_warping.unwrap_or(true),
         initial_temperature: spec.initial_temperature,
         imposed,
+        histories: spec.time_histories.into_iter().map(|request| request.into_request().map_err(input)).collect::<Result<Vec<_>, _>>()?,
         fixed_rotation: match &spec.fixed_rotation {
             Some(name) => read_bytes(folder, name)?.into_iter().map(|byte| byte != 0).collect(),
             None => Vec::new(),
@@ -497,6 +510,9 @@ pub fn validate(model: &Model) -> Result<(), JobError> {
         || (!model.fixed.is_empty() && model.fixed.len() != 3 * nodes)
     {
         return Err(input("elementPart needs one value per element and fixed one byte per DOF"));
+    }
+    for request in &model.histories {
+        check(request, model).map_err(input)?;
     }
     if model.initial_velocity.len() != 3 * nodes || !finite(&model.initial_velocity) || !finite(&model.gravity) {
         return Err(input("initialVelocity needs 3 finite values per node and gravity 3 finite values"));
@@ -538,11 +554,46 @@ struct ResultFile<'a> {
     deterministic: bool,
     energy: Vec<[f64; 7]>,
     walls: Vec<WallOutput<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    histories: Vec<HistoryManifest<'a>>,
 }
 
-/// The bytes of `result.json` and `fields.f64` for an outcome.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryManifest<'a> {
+    name: &'a str,
+    quantity: &'static str,
+    components: usize,
+    samples: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HistorySeries<'a> {
+    name: &'a str,
+    quantity: &'static str,
+    components: usize,
+    times: &'a [f64],
+    /// `components` numbers per time.
+    values: &'a [f64],
+}
+
+#[derive(Serialize)]
+struct HistoriesFile<'a> {
+    version: u32,
+    series: Vec<HistorySeries<'a>>,
+}
+
+/// The files of a run: `result.json`, `fields.f64` and `histories.json` (only when requested).
+pub struct OutputBytes {
+    pub json: Vec<u8>,
+    pub fields: Vec<u8>,
+    pub histories: Option<Vec<u8>>,
+}
+
+/// The bytes of `result.json`, `fields.f64` and (only when histories were requested) `histories.json` for an outcome.
 /// `adapter` is the GPU that ran the kernels, `None` for the CPU path. Both paths are deterministic (no atomics, fixed-order sums).
-pub fn outputs(model: &Model, outcome: &Outcome, adapter: Option<&str>) -> Result<(Vec<u8>, Vec<u8>), JobError> {
+pub fn outputs(model: &Model, outcome: &Outcome, adapter: Option<&str>) -> Result<OutputBytes, JobError> {
     let result = ResultFile {
         version: 1,
         termination: if outcome.normal { "normal" } else { "abnormal" },
@@ -562,13 +613,42 @@ pub fn outputs(model: &Model, outcome: &Outcome, adapter: Option<&str>) -> Resul
             .map(|row| [row.time, row.kinetic, row.internal, row.hourglass, row.wall, row.contact, row.external_work])
             .collect(),
         walls: outcome.walls.iter().map(|wall| WallOutput { name: &wall.name, t: &wall.times, force: &wall.forces }).collect(),
+        histories: outcome
+            .histories
+            .iter()
+            .map(|series| HistoryManifest {
+                name: &series.name,
+                quantity: series.quantity.name(),
+                components: series.components,
+                samples: series.times.len(),
+            })
+            .collect(),
+    };
+    let histories = if outcome.histories.is_empty() {
+        None
+    } else {
+        let file = HistoriesFile {
+            version: 1,
+            series: outcome
+                .histories
+                .iter()
+                .map(|series| HistorySeries {
+                    name: &series.name,
+                    quantity: series.quantity.name(),
+                    components: series.components,
+                    times: &series.times,
+                    values: &series.values,
+                })
+                .collect(),
+        };
+        Some(serde_json::to_vec(&file).map_err(|error| io(format!("histories.json: {error}")))?)
     };
     let json = serde_json::to_vec(&result).map_err(|error| io(format!("result.json: {error}")))?;
     let mut fields = Vec::with_capacity(model.element_count() * crate::solver::FIELD_STRIDE * 8);
     for value in &outcome.fields {
         fields.extend_from_slice(&value.to_le_bytes());
     }
-    Ok((json, fields))
+    Ok(OutputBytes { json, fields, histories })
 }
 
 /// The run on the requested device: `(outcome, adapter, fallback reason)`.
@@ -577,6 +657,9 @@ fn solve(model: &Model, wants_gpu: bool, report: &mut impl FnMut(Progress)) -> R
     let failed = |message: String| JobError { code: "EXP_SOLVER_FAILED", message };
     if !wants_gpu {
         return Ok((run(model, report).map_err(failed)?, None, None));
+    }
+    if !model.histories.is_empty() {
+        return Ok((run(model, report).map_err(failed)?, None, Some("time histories are recorded by the CPU path".to_string())));
     }
     #[cfg(feature = "gpu")]
     {
@@ -613,9 +696,10 @@ pub fn run_job(folder: &Path, out: &mut impl Write) -> Result<Vec<Output>, JobEr
         let message = format!("GPU kernels not used ({reason}): the deterministic CPU twin ran");
         let _ = emit(out, &Event::Warning { code: "EXP_GPU_FALLBACK", message: &message });
     }
-    let (json, fields) = outputs(&model, &outcome, adapter.as_deref())?;
+    let OutputBytes { json, fields, histories } = outputs(&model, &outcome, adapter.as_deref())?;
     let mut written = Vec::new();
-    for (name, bytes) in [("fields.f64", fields), ("result.json", json)] {
+    let files = [("fields.f64", Some(fields)), ("histories.json", histories), ("result.json", Some(json))];
+    for (name, bytes) in files.into_iter().filter_map(|(name, bytes)| bytes.map(|bytes| (name, bytes))) {
         fs::write(folder.join(name), &bytes).map_err(|error| io(format!("cannot write {name}: {error}")))?;
         written.push(Output { path: name.to_string(), sha256: sha256_hex(&bytes) });
     }

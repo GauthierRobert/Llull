@@ -32,3 +32,10 @@ export const MAX_HISTORY_POINTS = 500;
 
 /** Most nodes a structured hex mesh may have (the job folder stays a few hundred MB at most). */
 export const MAX_STRUCTURED_NODES = 2_000_000;
+
+/** Most samples one history series (and the energy history) may hold, less one: endTime / interval <= this (bounds the artifact size). */
+export const MAX_HISTORY_INTERVALS = 100_000;
+
+/** Whether `endTimeS / intervalS` stays within `MAX_HISTORY_INTERVALS` (a 1e-9 relative slack absorbs the division round-off). */
+export const withinHistoryCap = (endTimeS: number, intervalS: number): boolean =>
+  endTimeS / intervalS <= MAX_HISTORY_INTERVALS * (1 + 1e-9);
