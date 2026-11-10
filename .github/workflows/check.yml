@@ -175,7 +175,7 @@ jobs:
       - run: npm --prefix server ci
       # A python with OCP + cadquery + build123d for the chamfer codegen oracle (tests/unit/chamferCodegenOracle.test.ts), which used to fail
       # when CI was set and no OCP was importable.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: python -m pip install cadquery build123d
