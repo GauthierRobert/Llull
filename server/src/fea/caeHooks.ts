@@ -11,6 +11,8 @@ import type {
 import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import type { CadDocument } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
+import { withFullResolution } from '@core/geometry/entityTriangles';
+import { defaultMeshAssetStore } from '../meshAssets/store';
 import {
   partMidsurfaceGeometry,
   type MidsurfaceGeometry,
@@ -137,7 +139,14 @@ export const caeHooks: CaeHooks = {
   partMidsurface: partMidsurfaceGeometry,
   mapShellResults,
   analysisInputHash,
-  writeInp,
+  // a printed part reads its triangles for the skin fraction: an asset-backed one must carry its full mesh (14 FLL-M3, as buildTopologyJob)
+  writeInp: (doc, analysisId, mesh, artifacts) =>
+    writeInp(
+      withFullResolution(doc, Object.keys(doc.analysis?.cases[analysisId]?.printed ?? {}), defaultMeshAssetStore()),
+      analysisId,
+      mesh,
+      artifacts,
+    ),
   writeBdf,
   writeVtu,
   pretensionResultMap,

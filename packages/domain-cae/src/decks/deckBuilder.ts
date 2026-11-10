@@ -12,6 +12,7 @@ import type { MaterialCardWriter } from './constitutive';
 import { appendAll, commentText, idLines, linesText, row, textLines } from './format';
 import { bucklingSteps, modalStep } from './eigen';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
+import { printedMaterialLines } from '../flightLoads/print/deck';
 import { nonlinearSteps } from '../nonlinear/deck';
 import { imperfectNodes } from '../nonlinear/imperfectionDeck';
 import { creepSteps } from '../creep/deck';
@@ -223,10 +224,16 @@ export function buildInp(
   for (const [name, entityId] of materialOwners) {
     const constitutive = heat ? null : (disciplines.materialCardWriter?.(ctx, entityId) ?? null);
     if (constitutive !== null && 'code' in constitutive) return constitutive;
+    if (constitutive !== null && Object.hasOwn(analysis.printed ?? {}, entityId))
+      return refuse(
+        'FLL_PRINT_CONSTITUTIVE',
+        `part '${entityId}' is printed (orthotropic elastic) and its material has a plastic / hyperelastic / creep set: the two cannot be combined`,
+        [entityId],
+      );
     const cards = heat
       ? [disciplines.heat.materialCards(ctx, entityId)]
       : [
-          ...(constitutive === null ? [mechanicalMaterialLines(ctx, entityId)] : []),
+          ...(constitutive === null ? [printedMaterialLines(ctx, entityId) ?? mechanicalMaterialLines(ctx, entityId)] : []),
           ...(analysis.type === 'thermo_static' ? [disciplines.thermomech.materialCards(ctx, entityId)] : []),
           ...(analysis.type === 'coupled_temperature_displacement' ? [disciplines.coupled.materialCards(ctx, entityId)] : []),
           ...(isDynamicType(analysis.type) ? [disciplines.dynamics.materialCards(ctx, entityId)] : []),

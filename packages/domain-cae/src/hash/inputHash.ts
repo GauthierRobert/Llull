@@ -167,6 +167,7 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
     ? { pretension: analysisCase.pretension.order.map((id) => withoutBoltName(analysisCase.pretension?.bolts[id])) }
     : {}),
   ...laminateInputs(doc, analysisCase),
+  ...(analysisCase.printed !== undefined ? { printed: analysisCase.printed } : {}),
   ...(analysisCase.dynamics !== undefined ? { dynamics: analysisCase.dynamics, spectrum: baseSpectrum(doc, analysisCase) } : {}),
 });
 
