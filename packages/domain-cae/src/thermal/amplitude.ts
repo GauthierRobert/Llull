@@ -1,6 +1,6 @@
 /** define_amplitude: time curves that scale thermal BC values (table, sine, ramp sampled to tables). */
 
-import type { Amplitude } from '@core/model/analysis';
+import type { Amplitude } from '@core/model/thermalBc';
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';

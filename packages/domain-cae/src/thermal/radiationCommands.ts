@@ -1,6 +1,6 @@
 /** add_cavity_radiation (PHY-03 V1): cavity radiation groups, recorded as data. */
 
-import type { CavityRadiation } from '@core/model/analysis';
+import type { CavityRadiation } from '@core/model/thermalBc';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';

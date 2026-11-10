@@ -1,6 +1,7 @@
 /** Derived state of a recorded convergence study: staleness, report, review reasons. Nothing here is stored in the document (L8). */
 
-import type { AnalysisCase, MeshControls, ThermalStep } from '@core/model/analysis';
+import type { AnalysisCase, MeshControls } from '@core/model/analysis';
+import type { ThermalStep } from '@core/model/thermalBc';
 import type { ConvergenceStudy, StudyExceptionRecord, StudyRefinement } from '@core/model/convergenceStudy';
 import type { CadDocument } from '@core/model/types';
 import type { ConvergenceSample } from '@lib/convergence';

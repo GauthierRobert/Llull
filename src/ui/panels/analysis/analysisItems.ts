@@ -2,15 +2,8 @@
 // it sits on the model (document units), its colour (row swatch == glyph on the model) and its value text. Pure: the panel rows and the
 // 3D overlay both read this, so the list and the picture never disagree.
 
-import type {
-  AnalysisCase,
-  FeaConstraint,
-  FeaLoad,
-  ResultsSummary,
-  ThermalBc,
-  ThermalResultsSummary,
-  UnitSystem,
-} from '@core/model/analysis';
+import type { AnalysisCase, FeaConstraint, FeaLoad, ResultsSummary, ThermalResultsSummary, UnitSystem } from '@core/model/analysis';
+import type { ThermalBc } from '@core/model/thermalBc';
 import type { FeaTarget } from '@core/model/feaTarget';
 import { boundsCenter, boundsExtent, entityBoundsInDoc, mergeBounds, type Bounds } from '@core/geometry/bounds';
 import { toMetres } from '@core/model/units';

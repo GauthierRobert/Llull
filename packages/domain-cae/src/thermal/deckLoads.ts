@@ -1,6 +1,7 @@
 /** `*BOUNDARY`, `*DFLUX`, `*CFLUX`, `*FILM`, `*RADIATE` blocks of the thermal step (PHY-03 §5.1, §5.2), values in the case unit system. */
 
-import type { CavityRadiation, ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
+import type { ThermalSetup } from '@core/model/analysis';
+import type { CavityRadiation, ThermalBcRecord } from '@core/model/thermalBc';
 import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
 import { appendAll, commentText, num, row } from '../decks/format';

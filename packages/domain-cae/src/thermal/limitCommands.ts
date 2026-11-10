@@ -1,6 +1,6 @@
 /** add_temperature_limit: sourced temperature limits that check_temperature_limits compares with the results. */
 
-import type { TemperatureLimit } from '@core/model/analysis';
+import type { TemperatureLimit } from '@core/model/thermalBc';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';

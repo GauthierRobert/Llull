@@ -11,6 +11,7 @@ import type { DurabilityModel } from './durability';
 import type { DispositionLedgerEntry } from './dispositionLedger';
 import type { FitDispositions, FitLedgerEntry } from './fitDisposition';
 import type { Quantity } from './quantity';
+import type { Amplitude, CavityRadiation, TemperatureLimit, ThermalBcRecord, ThermalContact, ThermalStep } from './thermalBc';
 import type { PrintCoupon, PrintIdealization } from './printIdealization';
 import type { FeMeshAdequacy } from './meshAdequacy';
 import type { FeTopologyArtifact, TopologyStudy } from './topology';
@@ -343,86 +344,6 @@ export interface FeConvergenceRow {
 }
 
 /** PHY-03 §3.1 thermal set-up (present iff the case type is `heat_*`). */
-export interface TableRef {
-  readonly csvSha256: string;
-  readonly rows: number;
-}
-
-/** Film coefficient h(T) of a face: rows [surface temperature on the case scale, h in W/(m^2*K)], strictly increasing temperature, h > 0. */
-interface FilmTable {
-  readonly points: ReadonlyArray<readonly [temperature: number, filmCoefficient: number]>;
-}
-
-export interface Amplitude {
-  readonly id: string;
-  readonly name: string;
-  readonly points: ReadonlyArray<readonly [timeS: number, factor: number]>;
-  readonly generatedFrom?: { kind: 'sine' | 'ramp' | 'table'; params: Readonly<Record<string, number>> };
-}
-
-export type ThermalBc =
-  | { readonly kind: 'temperature'; readonly value: Q; readonly target: FeaTarget }
-  | { readonly kind: 'surface_flux'; readonly value: Q; readonly target: FeaTarget }
-  | { readonly kind: 'heat_generation'; readonly value: Q; readonly mode: 'density' | 'total'; readonly entityId: EntityId }
-  | { readonly kind: 'concentrated_flux'; readonly value: Q; readonly target: FeaTarget }
-  | {
-      readonly kind: 'film';
-      readonly filmCoefficient: Q | { readonly table: TableRef | FilmTable };
-      readonly sinkTemperature: Q;
-      readonly target: FeaTarget;
-    }
-  | {
-      readonly kind: 'radiation';
-      readonly emissivity: number | { readonly fromProperty: 'emissivityIr' };
-      readonly sinkTemperature: Q;
-      readonly target: FeaTarget;
-    };
-
-export interface ThermalBcRecord {
-  readonly id: string;
-  readonly name: string;
-  readonly bc: ThermalBc;
-  readonly amplitude?: string;
-  readonly source?: { readonly citation: string; readonly locator?: string };
-}
-
-export interface CavityRadiation {
-  readonly id: string;
-  readonly name: string;
-  readonly environment: { readonly kind: 'open'; readonly temperature: Q } | { readonly kind: 'closed' };
-  readonly faces: ReadonlyArray<{ readonly target: FeaTarget; readonly emissivity: number | { readonly fromProperty: 'emissivityIr' } }>;
-}
-
-export interface ThermalContact {
-  readonly id: string;
-  readonly name: string;
-  readonly master: FeaTarget;
-  readonly slave: FeaTarget;
-  readonly conductance:
-    | Q
-    | { readonly points: ReadonlyArray<readonly [conductanceW_m2K: number, pressureMPa: number, temperature: number]> };
-}
-
-export interface ThermalStep {
-  readonly endTimeS?: number;
-  readonly initialIncrementS?: number;
-  readonly maxIncrementS?: number;
-  readonly minIncrementS?: number;
-  readonly fixedIncrements?: boolean;
-  readonly maxTemperatureChangePerIncrement?: Q;
-  readonly outputTimesS?: readonly number[];
-  readonly outputEveryS?: number;
-}
-
-export interface TemperatureLimit {
-  readonly id: string;
-  readonly name: string;
-  readonly scope: { readonly entityId: EntityId } | { readonly target: FeaTarget };
-  readonly min?: Q;
-  readonly max?: Q;
-  readonly source: { readonly citation: string; readonly locator?: string };
-}
-
 export interface Disposition {
   readonly decision: Decision;
   readonly justification: string;

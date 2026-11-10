@@ -1,6 +1,7 @@
 // One-line descriptions of the recorded FE set-up items (presentation only; the data is the command output).
 
-import type { AnalysisCase, FeaConstraint, FeaLoad, ThermalBc, ThermalBcRecord } from '@core/model/analysis';
+import type { AnalysisCase, FeaConstraint, FeaLoad } from '@core/model/analysis';
+import type { ThermalBc, ThermalBcRecord } from '@core/model/thermalBc';
 import type { FeaTarget } from '@core/model/feaTarget';
 import { DEFAULT_FACTORS } from '@cae/index';
 import { formatSignificant } from './quantityFormat';

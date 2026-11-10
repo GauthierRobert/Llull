@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type { AnalysisCase, ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
+import type { AnalysisCase, ThermalSetup } from '@core/model/analysis';
+import type { ThermalBcRecord } from '@core/model/thermalBc';
 import { useStore } from '@ui/store';
 import { buildSetupItems, analysisToDocument, loadValueText } from '@ui/panels/analysis/analysisItems';
 import { parseSurface } from '@ui/panels/analysis/surfaceData';

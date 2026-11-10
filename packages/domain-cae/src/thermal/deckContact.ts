@@ -1,6 +1,6 @@
 /** Tied face-to-face thermal contact conductance (PHY-03 TR-THM-15): `*SURFACE`, `*SURFACE INTERACTION`, `*GAP CONDUCTANCE`, `*CONTACT PAIR`. */
 
-import type { ThermalContact } from '@core/model/analysis';
+import type { ThermalContact } from '@core/model/thermalBc';
 import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
 import { appendAll, commentText, row } from '../decks/format';

@@ -8,7 +8,8 @@
  * slave and the unconnected wedge faces as master ccx 2.21 left 2-4 K error on a coarse mesh (non-uniform face temperatures).
  */
 
-import type { ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
+import type { ThermalSetup } from '@core/model/analysis';
+import type { ThermalBcRecord } from '@core/model/thermalBc';
 import type { Vec3 } from '@core/model/vectors';
 import { siToSystem } from './thermalUnits';
 import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';

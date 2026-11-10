@@ -1,6 +1,6 @@
 /** add_thermal_bc / update_thermal_bc: thermal boundary conditions and loads of a heat_* analysis. */
 
-import type { ThermalBc, ThermalBcRecord } from '@core/model/analysis';
+import type { ThermalBc, ThermalBcRecord } from '@core/model/thermalBc';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';

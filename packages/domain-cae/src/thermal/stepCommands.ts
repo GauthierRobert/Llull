@@ -1,6 +1,6 @@
 /** set_initial_temperature / set_thermal_step: the time-integration set-up of a heat_* analysis. */
 
-import type { ThermalStep } from '@core/model/analysis';
+import type { ThermalStep } from '@core/model/thermalBc';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';

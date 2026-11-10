@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type {
-  Amplitude,
-  CavityRadiation,
   Decision,
   Disposition,
   FeElementType,
@@ -13,15 +11,19 @@ import type {
   Named,
   QualitySummary,
   ResultsSummary,
-  TableRef,
   TemperatureFieldSource,
+  ThermalResultsSummary,
+} from '@core/model/analysis';
+import type {
+  Amplitude,
+  CavityRadiation,
+  TableRef,
   TemperatureLimit,
   ThermalBc,
   ThermalBcRecord,
   ThermalContact,
-  ThermalResultsSummary,
   ThermalStep,
-} from '@core/model/analysis';
+} from '@core/model/thermalBc';
 import type { FitDispositions } from '@core/model/fitDisposition';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';

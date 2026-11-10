@@ -1,7 +1,8 @@
 /** Review fixes 1 and 7: no free text reaches the INP as a keyword line; material / set names cannot collide. */
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
-import type { CavityRadiation, FeMeshArtifact } from '@core/model/analysis';
+import type { FeMeshArtifact } from '@core/model/analysis';
+import type { CavityRadiation } from '@core/model/thermalBc';
 import type { CadDocument } from '@core/model/types';
 import { buildDeckContext } from '@cae/decks/context';
 import { commentText } from '@cae/decks/format';

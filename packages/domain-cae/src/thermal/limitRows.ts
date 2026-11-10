@@ -1,6 +1,7 @@
 /** Rows of check_temperature_limits: one per limit and bound, computed from the temperature field of the results artifact (PHY-03 FR-THM-13). */
 
-import type { FeMeshArtifact, FeResultsArtifact, Q, TemperatureLimit } from '@core/model/analysis';
+import type { FeMeshArtifact, FeResultsArtifact, Q } from '@core/model/analysis';
+import type { TemperatureLimit } from '@core/model/thermalBc';
 import type { Vec3 } from '@core/model/vectors';
 import { toMetres } from '@core/model/units';
 import type { CadDocument } from '@core/model/types';

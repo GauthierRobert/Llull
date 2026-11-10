@@ -1,6 +1,7 @@
 /** Heat flow through each thermal BC from a solved temperature field (PHY-03 §5.5), in W, positive INTO the part. */
 
-import type { FeMeshArtifact, ThermalBcRecord, ThermalSetup, UnitSystem } from '@core/model/analysis';
+import type { FeMeshArtifact, ThermalSetup, UnitSystem } from '@core/model/analysis';
+import type { ThermalBcRecord } from '@core/model/thermalBc';
 import { stefanBoltzmannOf } from './constants';
 import { systemToSi } from './thermalUnits';
 import { analysisLengthMetres } from '../shared/defaults';

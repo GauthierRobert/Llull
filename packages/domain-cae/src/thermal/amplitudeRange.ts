@@ -1,6 +1,6 @@
 /** Extremes of an amplitude table. */
 
-import type { Amplitude } from '@core/model/analysis';
+import type { Amplitude } from '@core/model/thermalBc';
 
 /** [min, max] of the factors of `points` ([1, 1] for an empty table). */
 export function amplitudeRange(points: Amplitude['points']): readonly [number, number] {
