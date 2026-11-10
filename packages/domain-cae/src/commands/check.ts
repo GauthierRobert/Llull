@@ -14,6 +14,9 @@ import { trustedRecord, type Trust } from '../shared/trust';
 import { analysisInputHash } from '../hash/inputHash';
 import { checkNonlinearItems } from '../nonlinear/check';
 import { checkCreepItems } from '../creep/check';
+import { checkAmItems } from '../process/check';
+import { toMetres } from '@core/model/units';
+import { analysisLengthMetres } from '../shared/defaults';
 import { marginItems } from '../margins/checkItems';
 import { structureItems } from './checkStructure';
 import { flightLoadItems } from '../flightLoads/checkItems';
@@ -45,6 +48,7 @@ function partItems(doc: CadDocument, analysis: AnalysisCase): CheckItem[] {
     analysis.type === 'static' ||
     analysis.type === 'nonlinear_static' ||
     analysis.type === 'creep' ||
+    analysis.type === 'am_build_distortion' ||
     analysis.type === 'thermo_static' ||
     analysis.type === 'coupled_temperature_displacement';
   const items: CheckItem[] = [];
@@ -84,6 +88,7 @@ function setupItems(analysis: AnalysisCase): CheckItem[] {
     analysis.type === 'static' ||
     analysis.type === 'nonlinear_static' ||
     analysis.type === 'creep' ||
+    analysis.type === 'am_build_distortion' ||
     analysis.type === 'thermo_static' ||
     analysis.type === 'coupled_temperature_displacement';
   if (structural && analysis.constraintOrder.length === 0)
@@ -197,7 +202,14 @@ export const checkAnalysis = defineCommand({
           ? checkThermomechItems(doc, analysisId, port)
           : analysis.type === 'creep'
             ? checkCreepItems(doc, analysis)
-            : checkNonlinearItems(doc, analysis);
+            : analysis.type === 'am_build_distortion'
+              ? checkAmItems(
+                  analysis,
+                  trust.meshArtifact,
+                  trust.resultsArtifact,
+                  toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem),
+                )
+              : checkNonlinearItems(doc, analysis);
     const items: CheckItem[] = [
       ...partItems(doc, analysis),
       ...setupItems(analysis),

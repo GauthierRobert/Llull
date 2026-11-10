@@ -10,6 +10,7 @@ import { analysisLengthMetres } from '../shared/defaults';
 import { caseOf } from '../shared/access';
 import { nonlinearSummary } from '../nonlinear/summary';
 import { creepSummary } from '../creep/summary';
+import { amSummary } from '../process/diagnostics';
 import { thermalResultsSummary } from '../thermal/summary';
 import { transientResults } from '../thermomech/transientSummary';
 import { maxOverNodes, magnitude, nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from './fields';
@@ -82,6 +83,8 @@ export function resultsSummary(
   if (analysis.type === 'nonlinear_static') return { ...base, ...nonlinearSummary(analysis, mesh, results) };
   if (analysis.type === 'creep')
     return { ...base, ...creepSummary(analysis, mesh, results, toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem)) };
+  if (analysis.type === 'am_build_distortion')
+    return amSummary(base, analysis, mesh, results, toMetres(doc, 1) / analysisLengthMetres(analysis.unitSystem));
   if (analysis.type === 'modal') return { ...base, loadCases: [], frequenciesHz: eigenColumn(results, 'eigenvalues', 3) };
   if (isDynamicType(analysis.type))
     return {

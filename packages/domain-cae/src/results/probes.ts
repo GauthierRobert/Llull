@@ -10,6 +10,7 @@ import { axisFrame, CYLINDRICAL_FIELDS, CYLINDRICAL_QUANTITIES, type AxisFrame, 
 import { locatePoint, type PointWeights } from './probeInterpolation';
 import { isDynamicType, type DynamicProbeQuantity } from '../dynamics/quantities';
 import { holdSets } from '../creep/history';
+import { amResultSets } from '../process/results';
 
 interface ProbeValue {
   /** Load case name (static / thermo_static) or null for a time series (heat_*). */
@@ -134,10 +135,12 @@ export function evaluateProbes(
     ? results.steps.map((step) => ({ loadCase: null, step, time: analysis.type === 'heat_steady' ? 0 : step.time }))
     : analysis.type === 'creep'
       ? holdSets(analysis, results).map(({ step, holdTimeS }) => ({ loadCase: null, step, time: holdTimeS }))
-      : loadCasesOf(analysis).flatMap(({ name }, index) => {
-          const step = stepOfLoadCase(results, index, analysis);
-          return step === undefined ? [] : [{ loadCase: name, step, time: step.time }];
-        });
+      : analysis.type === 'am_build_distortion'
+        ? amResultSets(analysis, mesh, results, lengthToAnalysis).map(({ name, step }) => ({ loadCase: name, step, time: step.time }))
+        : loadCasesOf(analysis).flatMap(({ name }, index) => {
+            const step = stepOfLoadCase(results, index, analysis);
+            return step === undefined ? [] : [{ loadCase: name, step, time: step.time }];
+          });
   const coordinates = nodeCoordinates(mesh);
   return Object.entries(analysis.probes).map(([probeId, probe]) => {
     const [nodeId, nodeDistance] = nearestNode(mesh, probeId, probe.point, lengthToAnalysis);

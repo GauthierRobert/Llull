@@ -17,6 +17,7 @@ import type { CaseDynamics, DynamicSummary, DynamicsLibrary, NodalRmsField } fro
 import type { ExplicitSpec, FeExplicitArtifact } from './explicit';
 import type { CaseStudies } from './convergenceStudy';
 import type { ContactSettings, PretensionSettings } from './contact';
+import type { AmBuildSettings } from './am';
 import type { Imperfection, NonlinearResultsSummary, NonlinearThresholds } from './nonlinear';
 
 /** Same structural id as `types.ts` `EntityId` (not imported: types.ts imports this module). */
@@ -37,7 +38,8 @@ export type AnalysisType =
   | 'creep'
   | 'frequency_response'
   | 'random_response'
-  | 'explicit_dynamics';
+  | 'explicit_dynamics'
+  | 'am_build_distortion';
 /** `opencourant` (PHY-19 hand-off) is typed for forward compatibility and refused (not built); `llull_explicit` is RS1 RS-8. */
 export type FeSolver = 'calculix' | 'nastran' | 'opencourant' | 'llull_explicit';
 export type UnitSystem = 'N-mm-t-s' | 'N-m-kg-s' | 'lbf-in-slinch-s';
@@ -259,6 +261,10 @@ export interface ResultsSummary {
   readonly nonlinear?: NonlinearResultsSummary;
   /** PHY-11: present iff the case is `creep`. */
   readonly creep?: import('./creep').CreepResultsSummary;
+  /** PHY-16: present iff the case is `am_build_distortion`: findings of the mesh and results (empty layers, probes on built nodes, large deflection). */
+  readonly am?: {
+    readonly findings: readonly { readonly code: string; readonly severity: 'warning' | 'error'; readonly message: string }[];
+  };
   /** PHY-09: present iff the case is `frequency_response` or `random_response`. */
   readonly dynamics?: DynamicSummary;
 }
@@ -522,6 +528,8 @@ export interface AnalysisCase extends CaseStudies<MeshControls> {
   readonly contact?: ContactSettings;
   /** PHY-11 hold of a `creep` case; absent until `set_creep_step`. */
   readonly creep?: import('./creep').CreepStepSpec;
+  /** PHY-16 additive build set-up (am_build_distortion only); absent until `am_build_setup`. */
+  readonly am?: AmBuildSettings;
   /** PHY-06 bolt pretension sections (nonlinear_static only); absent until the first `add_bolt_pretension`. */
   readonly pretension?: PretensionSettings;
   /** PHY-17 topology studies of this case (plugin `topology`); absent until the first `create_topology_study`. */

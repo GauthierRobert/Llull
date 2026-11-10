@@ -1,17 +1,27 @@
 {
   "_comment": "Plans under docs/**/validation referencing commands that are not registered yet (plan path -> sorted names). Remove entries as commands get built; never add one without a board note. Regenerate: UPDATE_BLOCKED_PLANS=1 npx vitest run tests/unit/contract/validationPlanCommands.test.ts",
   "blocked": {
-    "docs/physics/16-process-physics/validation/plans/prc_am_layered_beam.plan.json": [
-      "add_release_step",
-      "am_build_setup",
-      "set_inherent_strain"
+    "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": [
+      "add_time_history"
     ],
-    "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": ["add_time_history"],
-    "docs/physics/19-explicit-impact/validation/plans/exp_bird_rigid_plate.plan.json": ["add_time_history"],
-    "docs/physics/19-explicit-impact/validation/plans/exp_drop_box.plan.json": ["add_time_history"],
-    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": ["export_caesar_neutral"],
-    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": ["fit_steel_member"],
-    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": ["export_pdf"],
-    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-print-1to50.json": ["load_plot_style", "print_sheet"]
+    "docs/physics/19-explicit-impact/validation/plans/exp_bird_rigid_plate.plan.json": [
+      "add_time_history"
+    ],
+    "docs/physics/19-explicit-impact/validation/plans/exp_drop_box.plan.json": [
+      "add_time_history"
+    ],
+    "docs/plant/07-pipe-stress-flexibility/validation/plans/sc-pst-05-springs-nozzles-export.json": [
+      "export_caesar_neutral"
+    ],
+    "docs/plant/10-pointcloud-brownfield/validation/plans/sc-scn-05-steel-section.json": [
+      "fit_steel_member"
+    ],
+    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-pdf-scale.json": [
+      "export_pdf"
+    ],
+    "docs/readiness/08-exchange-fidelity/validation/plans/sc-xch-print-1to50.json": [
+      "load_plot_style",
+      "print_sheet"
+    ]
   }
 }

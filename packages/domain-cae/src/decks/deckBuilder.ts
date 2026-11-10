@@ -15,6 +15,8 @@ import { mechanicalMaterialLines, staticStep } from './mechanical';
 import { nonlinearSteps } from '../nonlinear/deck';
 import { imperfectNodes } from '../nonlinear/imperfectionDeck';
 import { creepSteps } from '../creep/deck';
+import { amSections, amSteps } from '../process/deck';
+import { buildPartsOf } from '../process/layers';
 import { pretensionPlan } from '../contact/pretensionDeck';
 import { deckElementType, isCompositePart, planarSectionCards } from '../shell/shellDeck';
 import { PLANAR_TYPES } from '../shell/shellResults';
@@ -245,7 +247,10 @@ export function buildInp(
     appendAll(lines, textLines(block.text));
     orientations.set(entityId, block.name);
   }
+  // am_build_distortion: the build parts get one section per layer from `amSections`
+  const built = new Set(analysis.type === 'am_build_distortion' && analysis.am !== undefined ? buildPartsOf(analysis, analysis.am) : []);
   for (const entityId of Object.keys(analysis.parts)) {
+    if (built.has(entityId)) continue;
     const planar = planarSectionCards(ctx, entityId);
     if (planar !== null) {
       if (isDeckRefusal(planar)) return planar;
@@ -257,6 +262,11 @@ export function buildInp(
       `*SOLID SECTION, ELSET=${ctx.elset(entityId)}, MATERIAL=${ctx.materialName(entityId)}${orientation === undefined ? '' : `, ORIENTATION=${orientation}`}`,
     );
   }
+  if (analysis.type === 'am_build_distortion') {
+    const layers = amSections(ctx);
+    if (isDeckRefusal(layers)) return layers;
+    lines.push(...layers.text.split('\n').filter((line) => line !== ''));
+  }
   const steps = heat
     ? disciplines.heat.sections(ctx)
     : isDynamicType(analysis.type)
@@ -267,13 +277,15 @@ export function buildInp(
           ? nonlinearSteps(ctx)
           : analysis.type === 'creep'
             ? creepSteps(ctx)
-            : analysis.type === 'modal'
-              ? modalStep(ctx)
-              : analysis.type === 'buckling'
-                ? bucklingSteps(ctx)
-                : analysis.type === 'coupled_temperature_displacement'
-                  ? disciplines.coupled.sections(ctx)
-                  : disciplines.thermomech.sections(ctx);
+            : analysis.type === 'am_build_distortion'
+              ? amSteps(ctx)
+              : analysis.type === 'modal'
+                ? modalStep(ctx)
+                : analysis.type === 'buckling'
+                  ? bucklingSteps(ctx)
+                  : analysis.type === 'coupled_temperature_displacement'
+                    ? disciplines.coupled.sections(ctx)
+                    : disciplines.thermomech.sections(ctx);
   if (isDeckRefusal(steps)) return steps;
   return { text: `${linesText(lines)}${steps.text === '' || steps.text.endsWith('\n') ? steps.text : `${steps.text}\n`}` };
 }

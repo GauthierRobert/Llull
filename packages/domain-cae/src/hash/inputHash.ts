@@ -148,6 +148,7 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
   ...(analysisCase.nonlinear !== undefined ? { nonlinear: withoutNames(analysisCase.nonlinear) } : {}),
   ...(analysisCase.creep !== undefined ? { creep: analysisCase.creep } : {}),
+  ...(analysisCase.am !== undefined ? { am: analysisCase.am } : {}),
   ...(analysisCase.contact !== undefined
     ? {
         contact: {
