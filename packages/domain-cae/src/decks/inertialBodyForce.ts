@@ -71,6 +71,22 @@ function elementCentroids(ctx: DeckContext): readonly (readonly [elementId: numb
   return out;
 }
 
+/** A rotation term whose largest acceleration over the part is at most this fraction of the uniform field is numerical noise of the flown state. */
+const NEGLIGIBLE_ROTATION = 1e-9;
+/**
+ * Most elements with their own `GRAV` line: CalculiX 2.21 sizes its body-load index with the product of the body-load count and the element
+ * count in 32-bit integers (`u_calloc ipobody`, a negative size at 121 685 elements), so a per-element field beyond this is refused, not written.
+ */
+const MAX_PER_ELEMENT_BODY_LOADS = 30_000;
+
+/** Largest distance (analysis length) from `point` to an element centroid. */
+function reachFrom(centroids: readonly (readonly [number, Vec3])[], point: Vec3): number {
+  let reach = 0;
+  for (const [, centroid] of centroids)
+    reach = Math.max(reach, Math.hypot(centroid[0] - point[0], centroid[1] - point[1], centroid[2] - point[2]));
+  return reach;
+}
+
 /**
  * `*DLOAD` data lines of the inertial terms of a step. Without angular acceleration: the uniform field is the caller's `EALL, GRAV` line, only
  * the `CENTRIF` line is added here. With it the field is not uniform (CalculiX has no body-force field): one `GRAV` line per element with the
@@ -78,6 +94,8 @@ function elementCentroids(ctx: DeckContext): readonly (readonly [elementId: numb
  * @param keepZero nonlinear steps restate loads with OP=MOD: an element whose field is zero still gets `GRAV, 0` so an earlier value is replaced, not kept
  * @invariant at most one inertial load per step (the caller refuses more: CENTRIF takes one axis, and a second GRAV line of an element would replace the first)
  * @invariant deck size with angular acceleration: one line of about 60 bytes per element
+ * @invariant a rotation term below NEGLIGIBLE_ROTATION x |gravity| at the farthest centroid is omitted and named in a `**` comment (a flown hover carries ~1e-8 rad/s^2 of noise)
+ * @failure a real angular-acceleration field on more than MAX_PER_ELEMENT_BODY_LOADS elements -> FLL_INERTIAL_FIELD_TOO_LARGE
  */
 export function inertialDloadLines(
   ctx: DeckContext,
@@ -86,11 +104,32 @@ export function inertialDloadLines(
   keepZero = false,
 ): { readonly lines: string[]; readonly perElement: boolean } | DeckRefusal {
   const lines: string[] = [];
-  const centrifugal = terms.centrifugal[0];
-  if (terms.angular.length > 0) {
-    for (const [elementId, centroid] of elementCentroids(ctx)) {
+  const fieldScale = Math.hypot(component(gravity, 0), component(gravity, 1), component(gravity, 2));
+  const negligible = (acceleration: number): boolean => fieldScale > 0 && acceleration <= NEGLIGIBLE_ROTATION * fieldScale;
+  const centroids = terms.angular.length > 0 || terms.centrifugal.length > 0 ? elementCentroids(ctx) : [];
+  const significantAngular = terms.angular.filter(
+    ({ alpha, point }) => !negligible(Math.hypot(alpha[0], alpha[1], alpha[2]) * reachFrom(centroids, point)),
+  );
+  if (significantAngular.length < terms.angular.length)
+    lines.push(
+      `** angular acceleration negligible (< ${NEGLIGIBLE_ROTATION} of the ${num(fieldScale)} field at the farthest element): omitted, uniform field`,
+    );
+  const candidate = terms.centrifugal[0];
+  const centrifugal =
+    candidate !== undefined && negligible(candidate.omegaSquared * reachFrom(centroids, candidate.point)) ? undefined : candidate;
+  if (candidate !== undefined && centrifugal === undefined)
+    lines.push(
+      `** angular velocity negligible (< ${NEGLIGIBLE_ROTATION} of the ${num(fieldScale)} field at the farthest element): CENTRIF omitted`,
+    );
+  if (significantAngular.length > 0 && centroids.length > MAX_PER_ELEMENT_BODY_LOADS)
+    return {
+      code: 'FLL_INERTIAL_FIELD_TOO_LARGE',
+      message: `the angular acceleration needs one GRAV line per element and the mesh has ${centroids.length} elements: CalculiX 2.21 overflows its body-load index above about ${MAX_PER_ELEMENT_BODY_LOADS}; coarsen the mesh or export the instant without angular acceleration (state)`,
+    };
+  if (significantAngular.length > 0) {
+    for (const [elementId, centroid] of centroids) {
       const field: [number, number, number] = [component(gravity, 0), component(gravity, 1), component(gravity, 2)];
-      for (const { alpha, point } of terms.angular) {
+      for (const { alpha, point } of significantAngular) {
         const moment = cross(alpha, [centroid[0] - point[0], centroid[1] - point[1], centroid[2] - point[2]]);
         field[0] -= moment[0];
         field[1] -= moment[1];
@@ -104,5 +143,5 @@ export function inertialDloadLines(
   }
   if (centrifugal !== undefined)
     lines.push(`${ALL_ELEMENTS}, CENTRIF, ${row(centrifugal.omegaSquared, ...centrifugal.point, ...centrifugal.axis)}`);
-  return { lines, perElement: terms.angular.length > 0 };
+  return { lines, perElement: significantAngular.length > 0 };
 }

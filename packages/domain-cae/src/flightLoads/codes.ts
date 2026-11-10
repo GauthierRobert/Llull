@@ -20,6 +20,8 @@ const FLL_REMEDIATION: Readonly<Record<string, string>> = {
   FLL_RELIEF_UNASSESSED:
     'use total-distribution forces with target points and no pressure in a free-body case, and give the parts a material with a density',
   FLL_LOAD_CASE_EXISTS: 'choose another loadCase name',
+  FLL_INERTIAL_FIELD_TOO_LARGE:
+    'a real angular acceleration needs one CalculiX GRAV line per element: coarsen the mesh below about 30 000 elements, or export the instant as an explicit state without angular acceleration',
   FLL_INERTIAL_UNSUPPORTED: 'inertial flight loads are for static CalculiX analyses: use a static analysis or remove the load',
   FLL_SUPPORT_SINGULAR:
     'give three points that are not collinear and far apart (the supports must remove all six rigid-body motions and nothing more)',

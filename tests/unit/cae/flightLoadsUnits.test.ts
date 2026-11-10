@@ -377,6 +377,41 @@ describe('review fixes', () => {
     expect(errorsOf({ angularVelocity: [0, 'x', 0] })).toContain('angularVelocity');
   });
 
+  it('drops a numerically negligible angular acceleration / rotation (one uniform field, no per-element lines) and names it in the deck', () => {
+    const doc = exported();
+    const analysis = doc.analysis?.cases[bar.analysisId];
+    const sets = Object.fromEntries((analysis?.constraintOrder ?? []).map((id, index) => [`C_${id}`, [[1], [2], [3]][index] ?? [1]]));
+    const ctx = buildDeckContext(doc, bar.analysisId, barMesh(doc, bar.analysisId, bar.boxId, sets));
+    if (ctx === null) throw new Error('no context');
+    // a flown hover: |alpha| ~ 1e-8 rad/s^2 and |omega| ~ 4e-10 rad/s against a 17 541 mm/s^2 field over a 2 mm part
+    const noise = {
+      centrifugal: [{ omegaSquared: 1.6e-19, point: [0, 0, 0] as [number, number, number], axis: [0, 0, 1] as [number, number, number] }],
+      angular: [{ alpha: [1e-8, -8e-9, 0] as [number, number, number], point: [0, 0, 0] as [number, number, number] }],
+    };
+    const lines = inertialDloadLines(ctx, [0, 0, -17541.75], noise);
+    if ('code' in lines) throw new Error(lines.message);
+    expect(lines.perElement).toBe(false);
+    expect(lines.lines.filter((line) => !line.startsWith('**'))).toEqual([]);
+    expect(lines.lines.join('\n')).toContain('negligible');
+  });
+
+  it('refuses a real angular-acceleration field on a mesh too large for CalculiX per-element body loads', () => {
+    const doc = exported();
+    const analysis = doc.analysis?.cases[bar.analysisId];
+    const sets = Object.fromEntries((analysis?.constraintOrder ?? []).map((id, index) => [`C_${id}`, [[1], [2], [3]][index] ?? [1]]));
+    const small = barMesh(doc, bar.analysisId, bar.boxId, sets);
+    const block = small.blocks[0];
+    if (block === undefined) throw new Error('no block');
+    const many = Array.from({ length: 40_000 }, (_, index) => [
+      index + 1,
+      ...(block.elements[index % block.elements.length] ?? []).slice(1),
+    ]);
+    const ctx = buildDeckContext(doc, bar.analysisId, { ...small, blocks: [{ ...block, elements: many }] });
+    if (ctx === null) throw new Error('no context');
+    const refused = inertialDloadLines(ctx, [0, 0, -9806.65], { centrifugal: [], angular: [{ alpha: [0, 0, 50], point: [0, 0, 0] }] });
+    expect('code' in refused && refused.code).toBe('FLL_INERTIAL_FIELD_TOO_LARGE');
+  });
+
   it('with OP=MOD (nonlinear steps) an element whose angular field is zero still gets GRAV 0, and the centroids are cached', () => {
     const doc = exported();
     const analysis = doc.analysis?.cases[bar.analysisId];
