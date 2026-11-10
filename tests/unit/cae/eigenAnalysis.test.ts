@@ -218,6 +218,32 @@ describe('modal results recording, report and mode plot', () => {
     expect(second.document).toBe(solved.document);
   });
 
+  it('plots a mode of a mesh-sized result set (300 000 displacement rows, a 202k-node drone frame threw RangeError)', () => {
+    const extra = Array.from({ length: 300_000 }, (_, index) => [String(1_000_000 + index), [0, 0, 0]] as const);
+    const large = (scale: number): FeResultsArtifact['steps'][number]['fields'] => {
+      const base = displacement(scale)['DISP'];
+      return { DISP: { components: ['D1', 'D2', 'D3'], values: { ...base?.values, ...Object.fromEntries(extra) } } };
+    };
+    const big: FeResultsArtifact = {
+      ...results,
+      steps: [
+        { step: 1, time: 209.7283706, fields: large(1) },
+        { step: 1, time: 1299.409549, fields: large(2) },
+      ],
+    };
+    const bigHash = hashOf(big);
+    const bigContext: ExecutionContext = { ...defaultContext(), feaArtifacts: portOf(mesh, big) };
+    const recorded = execute(
+      meshed.document,
+      'record_fea_results',
+      { analysisId: bar.analysisId, summary: resultsSummary(bar.doc, bar.analysisId, mesh, big, bigHash) },
+      bigContext,
+    );
+    const plotted = execute(recorded.document, 'render_fea_results', { analysisId: bar.analysisId, mode: 2 }, bigContext);
+    expect(plotted.error).toBeUndefined();
+    expect(plotted.summary).toContain('max 1 normalised |u|');
+  });
+
   it('refuses a mode beyond the extracted ones, mode on a static case, and field mode on a static case', () => {
     const beyond = execute(solved.document, 'render_fea_results', { analysisId: bar.analysisId, mode: 3 }, context);
     expect(beyond.error?.code).toBe('FEA_RESULTS_MISSING');

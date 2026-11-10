@@ -195,7 +195,8 @@ export function fieldPlotRequest(doc: CadDocument, params: RenderParams, ctx: Ex
   const values = selected.step.fields[field]?.values;
   if (values === undefined)
     return refuseFe(doc, NAME, 'FEA_FIELD_MISSING', `the ${selected.label} result set has no ${field} field for ${quantity}`, [analysisId]);
-  const peak = quantity === 'mode' ? Math.max(...Object.values(values).map(magnitude), Number.MIN_VALUE) : 1;
+  let peak = quantity === 'mode' ? Number.MIN_VALUE : 1;
+  if (quantity === 'mode') for (const entry of Object.values(values)) peak = Math.max(peak, magnitude(entry));
   const scalar: typeof baseScalar = (entry, at, axisFrameValue) => baseScalar(entry, at, axisFrameValue) / peak;
   const coordinates = nodeCoordinates(mesh);
   const meshEntities = [...new Set(mesh.blocks.map((block) => block.entityId))];

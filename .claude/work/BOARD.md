@@ -172,6 +172,7 @@ list 3d` points to it, owner), FPR-MJ (MuJoCo 3.16.0, outputs bit-identical to 3
 - `[TODO]` **FLL-M3b** 14 left after FLL-M3 (merged 2026-11-10, 5e62b3ab7): the open items of FLL-D18..D23 in docs/aerospace/14-flight-loads-aeroelasticity. _Lane 1_
 - `[TODO]` **FLL-M4b** 14 left after FLL-M4 (TECHNICAL_SPEC §14): golden plan (quad → modal case → resonance, needs a CalculiX modal solve), speed-dependent frequencies (prestressed / spinning modal solve), blade count stored in `add_rotor`. _Lane 1_
 - `[TODO]` **FLL-M5** `create_drop_case`. _Lane 1_
+- `[TODO]` **FIX-MESH-SPREAD** audit `Math.max(...xs)` / `Math.min(...xs)` / `push(...xs)` over mesh-sized arrays (RangeError past ~1e5; found twice on the 202k-node drone showcase: deck writers 79c6e0413, mode plot): candidates explicit/constraints.ts:59-60 (part nodes), decks/loadDistribution.ts:133, contact/pinInHole.ts:39, contact/stackGeometry.ts; a lint rule or helper (minOf / maxOf) so it cannot come back. _Lane 1_
 - `[TODO]` **FLL-M2b** 14 M2 left: post-solve cross-check on solver reactions, rotor reaction torques as mount moments, a convex envelope over all instants (now: three peaks), nonlinear / modal refuse inertial loads at export (now only via check_analysis), `supportPattern.ts` branch coverage 69 %. _Lane 1_
 - `[TODO]` **FLL-M6** rotating loads, fatigue from flight, CFD pressure mapping, bonded joints. _deps: FLL-M2_
 - V2 (not scheduled): FLT-M7 BEMT / identification, FLL-M7 aeroelastic / flutter / preCICE.
