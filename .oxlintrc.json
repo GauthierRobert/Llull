@@ -127,6 +127,12 @@
             "skipBlankLines": true,
             "skipComments": true
           }
+        ],
+        "complexity": [
+          "error",
+          {
+            "max": 79
+          }
         ]
       }
     },
