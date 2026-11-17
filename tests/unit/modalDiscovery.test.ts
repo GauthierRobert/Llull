@@ -10,12 +10,17 @@ describe('modal analysis discoverability', () => {
     'natural frequencies of a bracket',
     'modal analysis',
     'eigenfrequency',
-    'resonance',
     'mode shapes',
     'vibration modes',
     'vibration mode',
   ])('"%s" ranks create_analysis (analysisType modal) in the top 3', (query) => {
     expect(top(query, 3)).toContain('create_analysis');
+  });
+
+  it('"resonance" leads with the resonance check and still lists create_analysis among the first analysis tools', () => {
+    // check_rotor_resonance (14 FLL-M4) matches by name and the two dynamic set-up tools by description: create_analysis follows them.
+    expect(top('resonance', 1)).toEqual(['check_rotor_resonance']);
+    expect(top('resonance', 4)).toContain('create_analysis');
   });
 
   it.each(['natural frequency', 'natural frequencies of a bracket', 'mode shapes', 'eigenfrequency'])(
