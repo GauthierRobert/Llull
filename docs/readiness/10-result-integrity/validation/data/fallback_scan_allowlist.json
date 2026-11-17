@@ -442,17 +442,17 @@
       "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input (the branch is reached only when pinRadiusMm > 0)"
     },
     {
-      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "file": "domain-dynamics/src/commands/transmissionBuild.ts",
       "match": "const ratio = params.ratio ?? fromTeeth ?? 0;",
       "reason": "validation sentinel: an absent value fails the check on the same line, the 0 is never used as an input (a missing ratio and tooth count is refused before this line)"
     },
     {
-      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "file": "domain-dynamics/src/commands/transmissionBuild.ts",
       "match": "if (!positive(params.meshStiffnessNmPerRad ?? 1) || !positive(params.meshDampingRatio ?? 1))",
       "reason": "validation of optional mesh numbers: absent passes (1 is any positive stand-in), the stored value is the given one or absent (the engine then states DRV_MESH_STIFFNESS_ASSUMED)"
     },
     {
-      "file": "domain-dynamics/src/commands/transmissions.ts",
+      "file": "domain-dynamics/src/commands/transmissionBuild.ts",
       "match": "if (!positive(params.meshStiffnessNPerM ?? 1) || !positive(params.meshDampingRatio ?? 1))",
       "reason": "validation of optional mesh numbers: absent passes (1 is any positive stand-in), the stored value is the given one or absent (the engine then states DRV_MESH_STIFFNESS_ASSUMED)"
     },

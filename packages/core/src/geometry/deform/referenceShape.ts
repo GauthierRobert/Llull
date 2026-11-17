@@ -43,6 +43,11 @@ export const REFERENCE_FIELDS: Readonly<Record<ReferenceKind, readonly string[]>
 
 const positive = (value: number | undefined): value is number => value !== undefined && Number.isFinite(value) && value > 0;
 
+type Missing = { readonly missing: string };
+type DistanceOrMissing = Distance | Missing;
+
+const need = (name: string, ok: boolean): Missing | null => (ok ? null : { missing: name });
+
 /**
  * Distance function of a reference shape to a point (unsigned), or the name of the first missing / invalid field.
  * torus: | sqrt((rho - R)^2 + h^2) - r |; cylinder: | distance to the axis - r |; cone: | rho cos(a) - h sin(a) | (distance to the generators, the nappe
@@ -51,119 +56,141 @@ const positive = (value: number | undefined): value is number => value !== undef
  * x cos(k z) + y sin(k z) = offset (x along reference, z along axis from point; the image of the plane x = offset under a twist of k per unit length),
  * first-order distance |g| / |grad g|, which is a helicoid when the offset is 0.
  */
-export function referenceDistance(reference: ReferenceShape): Distance | { readonly missing: string } {
-  const need = (name: string, ok: boolean): { missing: string } | null => (ok ? null : { missing: name });
+export function referenceDistance(reference: ReferenceShape): DistanceOrMissing {
   switch (reference.kind) {
-    case 'torus': {
-      const { majorRadius, minorRadius, center, axis } = reference;
-      const bad =
-        need('majorRadius', positive(majorRadius)) ??
-        need('minorRadius', positive(minorRadius) && (majorRadius === undefined || minorRadius < majorRadius)) ??
-        need('center', center !== undefined) ??
-        need('axis', axis !== undefined && len3(axis) > 0);
-      if (bad !== null || center === undefined || axis === undefined || majorRadius === undefined || minorRadius === undefined)
-        return bad ?? { missing: 'axis' };
-      const u = normalize3(axis);
-      return (p) => {
-        const d = sub3(p, center);
-        const h = dot3(d, u);
-        const rho = len3(sub3(d, scale3(u, h)));
-        return Math.abs(Math.hypot(rho - majorRadius, h) - minorRadius);
-      };
-    }
-    case 'cylinder': {
-      const { radius, point, axis } = reference;
-      const bad =
-        need('radius', positive(radius)) ?? need('point', point !== undefined) ?? need('axis', axis !== undefined && len3(axis) > 0);
-      if (bad !== null || radius === undefined || point === undefined || axis === undefined) return bad ?? { missing: 'axis' };
-      const u = normalize3(axis);
-      return (p) => {
-        const d = sub3(p, point);
-        return Math.abs(len3(sub3(d, scale3(u, dot3(d, u)))) - radius);
-      };
-    }
-    case 'cone': {
-      const { apex, axis, halfAngleDeg } = reference;
-      const bad =
-        need('apex', apex !== undefined) ??
-        need('axis', axis !== undefined && len3(axis) > 0) ??
-        need('halfAngleDeg', halfAngleDeg !== undefined && halfAngleDeg > 0 && halfAngleDeg < 90);
-      if (bad !== null || apex === undefined || axis === undefined || halfAngleDeg === undefined) return bad ?? { missing: 'halfAngleDeg' };
-      const u = normalize3(axis);
-      const alpha = (halfAngleDeg * Math.PI) / 180;
-      return (p) => {
-        const d = sub3(p, apex);
-        const h = dot3(d, u);
-        const rho = len3(sub3(d, scale3(u, h)));
-        return Math.abs(rho * Math.cos(alpha) - h * Math.sin(alpha));
-      };
-    }
-    case 'spheroid': {
-      const { center, semiAxes } = reference;
-      const bad = need('center', center !== undefined) ?? need('semiAxes', semiAxes !== undefined && semiAxes.every((a) => positive(a)));
-      if (bad !== null || center === undefined || semiAxes === undefined) return bad ?? { missing: 'semiAxes' };
-      return (p) => {
-        const d = sub3(p, center);
-        const f = d.reduce((sum, c, i) => sum + (c / (semiAxes[i] as number)) ** 2, 0) - 1;
-        const gradient = Math.hypot(...d.map((c, i) => (2 * c) / (semiAxes[i] as number) ** 2));
-        // the centre (zero gradient, f = -1): the nearest point of the surface is the end of the shortest semi-axis
-        return gradient === 0 ? Math.min(...semiAxes) : Math.abs(f) / gradient;
-      };
-    }
-    case 'sphere': {
-      const { center, radius } = reference;
-      const bad = need('center', center !== undefined) ?? need('radius', positive(radius));
-      if (bad !== null || center === undefined || radius === undefined) return bad ?? { missing: 'radius' };
-      return (p) => Math.abs(len3(sub3(p, center)) - radius);
-    }
-    case 'plane': {
-      const { point, normal } = reference;
-      const bad = need('point', point !== undefined) ?? need('normal', normal !== undefined && len3(normal) > 0);
-      if (bad !== null || point === undefined || normal === undefined) return bad ?? { missing: 'normal' };
-      const n = normalize3(normal);
-      return (p) => Math.abs(dot3(sub3(p, point), n));
-    }
-    case 'ellipticCylinder': {
-      const { point, axis, reference: direction, radii } = reference;
-      const bad =
-        need('point', point !== undefined) ??
-        need('axis', axis !== undefined && len3(axis) > 0) ??
-        need('reference', direction !== undefined && axis !== undefined && acrossAxis(direction, axis) !== null) ??
-        need('radii', radii !== undefined && radii.length === 2 && radii.every((r) => positive(r)));
-      if (bad !== null || point === undefined || axis === undefined || direction === undefined || radii === undefined)
-        return bad ?? { missing: 'radii' };
-      const frame = planeFrame(axis, direction);
-      const [a, b] = [radii[0] as number, radii[1] as number];
-      return (p) => {
-        const d = sub3(p, point);
-        const [x, y] = [dot3(d, frame.x), dot3(d, frame.y)];
-        const f = (x / a) ** 2 + (y / b) ** 2 - 1;
-        const gradient = Math.hypot((2 * x) / (a * a), (2 * y) / (b * b));
-        return gradient === 0 ? Math.min(a, b) : Math.abs(f) / gradient;
-      };
-    }
-    case 'helicoid': {
-      const { point, axis, reference: direction, rate, offset = 0 } = reference;
-      const bad =
-        need('point', point !== undefined) ??
-        need('axis', axis !== undefined && len3(axis) > 0) ??
-        need('reference', direction !== undefined && axis !== undefined && acrossAxis(direction, axis) !== null) ??
-        need('rate', rate !== undefined && Number.isFinite(rate)) ??
-        need('offset', Number.isFinite(offset));
-      if (bad !== null || point === undefined || axis === undefined || direction === undefined || rate === undefined)
-        return bad ?? { missing: 'rate' };
-      const frame = planeFrame(axis, direction);
-      return (p) => {
-        const d = sub3(p, point);
-        const [x, y, z] = [dot3(d, frame.x), dot3(d, frame.y), dot3(d, frame.z)];
-        const [cos, sin] = [Math.cos(rate * z), Math.sin(rate * z)];
-        const g = x * cos + y * sin - offset;
-        // dg/dz = k (y cos - x sin); the horizontal gradient (cos, sin) has length 1
-        const gradient = Math.hypot(1, rate * (y * cos - x * sin));
-        return Math.abs(g) / gradient;
-      };
-    }
+    case 'torus':
+      return torusDistance(reference);
+    case 'cylinder':
+      return cylinderDistance(reference);
+    case 'cone':
+      return coneDistance(reference);
+    case 'spheroid':
+      return spheroidDistance(reference);
+    case 'sphere':
+      return sphereDistance(reference);
+    case 'plane':
+      return planeDistance(reference);
+    case 'ellipticCylinder':
+      return ellipticCylinderDistance(reference);
+    case 'helicoid':
+      return helicoidDistance(reference);
   }
+}
+
+function torusDistance(reference: ReferenceShape): DistanceOrMissing {
+  const { majorRadius, minorRadius, center, axis } = reference;
+  const bad =
+    need('majorRadius', positive(majorRadius)) ??
+    need('minorRadius', positive(minorRadius) && (majorRadius === undefined || minorRadius < majorRadius)) ??
+    need('center', center !== undefined) ??
+    need('axis', axis !== undefined && len3(axis) > 0);
+  if (bad !== null || center === undefined || axis === undefined || majorRadius === undefined || minorRadius === undefined)
+    return bad ?? { missing: 'axis' };
+  const u = normalize3(axis);
+  return (p) => {
+    const d = sub3(p, center);
+    const h = dot3(d, u);
+    const rho = len3(sub3(d, scale3(u, h)));
+    return Math.abs(Math.hypot(rho - majorRadius, h) - minorRadius);
+  };
+}
+
+function cylinderDistance(reference: ReferenceShape): DistanceOrMissing {
+  const { radius, point, axis } = reference;
+  const bad = need('radius', positive(radius)) ?? need('point', point !== undefined) ?? need('axis', axis !== undefined && len3(axis) > 0);
+  if (bad !== null || radius === undefined || point === undefined || axis === undefined) return bad ?? { missing: 'axis' };
+  const u = normalize3(axis);
+  return (p) => {
+    const d = sub3(p, point);
+    return Math.abs(len3(sub3(d, scale3(u, dot3(d, u)))) - radius);
+  };
+}
+
+function coneDistance(reference: ReferenceShape): DistanceOrMissing {
+  const { apex, axis, halfAngleDeg } = reference;
+  const bad =
+    need('apex', apex !== undefined) ??
+    need('axis', axis !== undefined && len3(axis) > 0) ??
+    need('halfAngleDeg', halfAngleDeg !== undefined && halfAngleDeg > 0 && halfAngleDeg < 90);
+  if (bad !== null || apex === undefined || axis === undefined || halfAngleDeg === undefined) return bad ?? { missing: 'halfAngleDeg' };
+  const u = normalize3(axis);
+  const alpha = (halfAngleDeg * Math.PI) / 180;
+  return (p) => {
+    const d = sub3(p, apex);
+    const h = dot3(d, u);
+    const rho = len3(sub3(d, scale3(u, h)));
+    return Math.abs(rho * Math.cos(alpha) - h * Math.sin(alpha));
+  };
+}
+
+function spheroidDistance(reference: ReferenceShape): DistanceOrMissing {
+  const { center, semiAxes } = reference;
+  const bad = need('center', center !== undefined) ?? need('semiAxes', semiAxes !== undefined && semiAxes.every((a) => positive(a)));
+  if (bad !== null || center === undefined || semiAxes === undefined) return bad ?? { missing: 'semiAxes' };
+  return (p) => {
+    const d = sub3(p, center);
+    const f = d.reduce((sum, c, i) => sum + (c / (semiAxes[i] as number)) ** 2, 0) - 1;
+    const gradient = Math.hypot(...d.map((c, i) => (2 * c) / (semiAxes[i] as number) ** 2));
+    // the centre (zero gradient, f = -1): the nearest point of the surface is the end of the shortest semi-axis
+    return gradient === 0 ? Math.min(...semiAxes) : Math.abs(f) / gradient;
+  };
+}
+
+function sphereDistance(reference: ReferenceShape): DistanceOrMissing {
+  const { center, radius } = reference;
+  const bad = need('center', center !== undefined) ?? need('radius', positive(radius));
+  if (bad !== null || center === undefined || radius === undefined) return bad ?? { missing: 'radius' };
+  return (p) => Math.abs(len3(sub3(p, center)) - radius);
+}
+
+function planeDistance(reference: ReferenceShape): DistanceOrMissing {
+  const { point, normal } = reference;
+  const bad = need('point', point !== undefined) ?? need('normal', normal !== undefined && len3(normal) > 0);
+  if (bad !== null || point === undefined || normal === undefined) return bad ?? { missing: 'normal' };
+  const n = normalize3(normal);
+  return (p) => Math.abs(dot3(sub3(p, point), n));
+}
+
+function ellipticCylinderDistance(reference: ReferenceShape): DistanceOrMissing {
+  const { point, axis, reference: direction, radii } = reference;
+  const bad =
+    need('point', point !== undefined) ??
+    need('axis', axis !== undefined && len3(axis) > 0) ??
+    need('reference', direction !== undefined && axis !== undefined && acrossAxis(direction, axis) !== null) ??
+    need('radii', radii !== undefined && radii.length === 2 && radii.every((r) => positive(r)));
+  if (bad !== null || point === undefined || axis === undefined || direction === undefined || radii === undefined)
+    return bad ?? { missing: 'radii' };
+  const frame = planeFrame(axis, direction);
+  const [a, b] = [radii[0] as number, radii[1] as number];
+  return (p) => {
+    const d = sub3(p, point);
+    const [x, y] = [dot3(d, frame.x), dot3(d, frame.y)];
+    const f = (x / a) ** 2 + (y / b) ** 2 - 1;
+    const gradient = Math.hypot((2 * x) / (a * a), (2 * y) / (b * b));
+    return gradient === 0 ? Math.min(a, b) : Math.abs(f) / gradient;
+  };
+}
+
+function helicoidDistance(reference: ReferenceShape): DistanceOrMissing {
+  const { point, axis, reference: direction, rate, offset = 0 } = reference;
+  const bad =
+    need('point', point !== undefined) ??
+    need('axis', axis !== undefined && len3(axis) > 0) ??
+    need('reference', direction !== undefined && axis !== undefined && acrossAxis(direction, axis) !== null) ??
+    need('rate', rate !== undefined && Number.isFinite(rate)) ??
+    need('offset', Number.isFinite(offset));
+  if (bad !== null || point === undefined || axis === undefined || direction === undefined || rate === undefined)
+    return bad ?? { missing: 'rate' };
+  const frame = planeFrame(axis, direction);
+  return (p) => {
+    const d = sub3(p, point);
+    const [x, y, z] = [dot3(d, frame.x), dot3(d, frame.y), dot3(d, frame.z)];
+    const [cos, sin] = [Math.cos(rate * z), Math.sin(rate * z)];
+    const g = x * cos + y * sin - offset;
+    // dg/dz = k (y cos - x sin); the horizontal gradient (cos, sin) has length 1
+    const gradient = Math.hypot(1, rate * (y * cos - x * sin));
+    return Math.abs(g) / gradient;
+  };
 }
 
 /** `direction` projected perpendicular to `axis`, or null when it is parallel to it. */

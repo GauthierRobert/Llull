@@ -1,15 +1,17 @@
 /** add_transmission: gears, belts, lead / ball screws and racks between physics joints, with losses, self-locking and backlash. */
 
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand } from '@core/commands/schema';
 import { changed, codedRejection, failer } from '@core/commands/noop';
 import type { DynamicJoint, DynamicsModel } from '@core/model/dynamics';
 import { idTakenInDynamicsOrFlight } from '../flight/model';
 import { transmissionJoints, transmissionRatio, type Transmission } from '@core/model/transmissions';
 import { idOrNext } from '@lib/explicitId';
-import { leadScrewEfficiency, transmissionEfficiency } from '../sim/transmissions';
+import { transmissionEfficiency } from '../sim/transmissions';
 import { dynamicsOf, withDynamics } from './bodies';
-import { sourceSchema, toSource } from './motorSchemas';
+import { toSource } from './motorSchemas';
+import { buildTransmission, isRefusal, type TransmissionWiring } from './transmissionBuild';
+import { transmissionParams } from './transmissionSchema';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   DRV_TRANSMISSION_JOINTS:
@@ -27,7 +29,6 @@ const FIELDS: Readonly<Record<Transmission['kind'], readonly string[]>> = {
   rack_pinion: ['pinion', 'rack'],
 };
 
-const positive = (value: number | undefined): value is number => value !== undefined && Number.isFinite(value) && value > 0;
 const efficient = (value: number | undefined): boolean => value === undefined || (Number.isFinite(value) && value > 0 && value <= 1);
 
 /** True when `driver` is already driven, directly or through other transmissions, by `driven` (the new coupling would close a circle). */
@@ -65,61 +66,7 @@ export const addTransmission = defineCommand({
     'kind "rack_pinion": revolute `pinion`, prismatic `rack`, `pitchRadiusMm` (rack advance = pitch radius × pinion angle), `efficiency`, optional `backlashMm` ' +
     'with `meshStiffnessNPerM`. Losses are exact for both directions: forward the friction level on the driver is |T|·(1-η_f)/η_f, back-driven |T|·(1-η_b) (T the ideal ' +
     'coupling torque), so the screw with η_b <= 0 holds a load with the motor off. Add the motor, joint physics and loads after the transmission. Returns the transmission id in affected[0].',
-  params: z.object({
-    kind: z.enum(['gear', 'belt', 'lead_screw', 'ball_screw', 'rack_pinion']).describe('Transmission kind.'),
-    driver: z.string().optional().describe('gear, belt: revolute joint id that drives (the input).'),
-    driven: z.string().optional().describe('gear, belt: revolute joint id that follows.'),
-    ratio: z
-      .number()
-      .optional()
-      .describe('gear: speed(driven) / speed(driver), negative reverses. Give this OR `teeth`; with both they must agree.'),
-    teeth: z
-      .tuple([z.number().int().positive(), z.number().int().positive()])
-      .optional()
-      .describe('gear: tooth counts [driver, driven]: ratio = driverTeeth / drivenTeeth (negated by `reverseRotation`).'),
-    reverseRotation: z
-      .boolean()
-      .optional()
-      .describe('gear with `teeth`: true for an external spur mesh (driven turns the other way). Default false.'),
-    driverDiameterMm: z.number().optional().describe('belt: driver pulley pitch diameter, mm (> 0).'),
-    drivenDiameterMm: z.number().optional().describe('belt: driven pulley pitch diameter, mm (> 0).'),
-    screw: z.string().optional().describe('lead_screw, ball_screw: revolute joint id of the screw (the input).'),
-    nut: z.string().optional().describe('lead_screw, ball_screw: prismatic joint id of the nut.'),
-    pinion: z.string().optional().describe('rack_pinion: revolute joint id of the pinion (the input).'),
-    rack: z.string().optional().describe('rack_pinion: prismatic joint id of the rack.'),
-    leadMm: z
-      .number()
-      .optional()
-      .describe(
-        'screws: advance of the nut per screw revolution, mm (> 0); the positive screw sense advances the nut along its joint axis.',
-      ),
-    meanDiameterMm: z.number().optional().describe('lead_screw: mean thread diameter d_m, mm (> 0).'),
-    mu: z
-      .number()
-      .optional()
-      .describe(
-        'lead_screw: coefficient of friction of the thread flanks (>= 0): steel on bronze 0.08-0.15 lubricated, 0.35 dry steel on steel.',
-      ),
-    flankAngleDeg: z.number().optional().describe('lead_screw: flank half-angle α_n in degrees, [0, 90). Default 0 (square thread).'),
-    pitchRadiusMm: z.number().optional().describe('rack_pinion: pitch radius of the pinion, mm (> 0).'),
-    efficiency: z
-      .number()
-      .optional()
-      .describe(
-        'gear, belt, ball_screw, rack_pinion: forward efficiency in (0, 1]. gear / belt / rack default 1 (ideal); required for ball_screw.',
-      ),
-    efficiencyBack: z
-      .number()
-      .optional()
-      .describe('gear, rack_pinion, ball_screw: back-drive efficiency in (0, 1]. Default = efficiency (required for ball_screw).'),
-    backlashDeg: z.number().optional().describe('gear: total angular gap at the driven shaft, degrees (> 0).'),
-    backlashMm: z.number().optional().describe('rack_pinion: total linear gap of the rack, mm (> 0).'),
-    meshStiffnessNmPerRad: z.number().optional().describe('gear with backlash: contact stiffness at the driven shaft, N·m/rad (> 0).'),
-    meshStiffnessNPerM: z.number().optional().describe('rack_pinion with backlash: contact stiffness at the rack, N/m (> 0).'),
-    meshDampingRatio: z.number().optional().describe('gear / rack_pinion with backlash: damping ratio of the contact (> 0, default 0.5).'),
-    source: sourceSchema.optional().describe('Where the efficiencies / geometry come from (recommended: grades the result).'),
-    id: z.string().optional().describe('Optional explicit transmission id.'),
-  }),
+  params: transmissionParams,
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'add_transmission');
     const dynamics = dynamicsOf(doc);
@@ -161,97 +108,10 @@ export const addTransmission = defineCommand({
     const id = idOrNext(params.id, 'trans');
     if (idTakenInDynamicsOrFlight(doc, id)) return fail(`id '${id}' is already used`);
     const source = params.source === undefined ? {} : { source: toSource(params.source) };
-    let transmission: Transmission;
-    if (params.kind === 'gear') {
-      const fromTeeth =
-        params.teeth === undefined ? undefined : (params.reverseRotation === true ? -1 : 1) * (params.teeth[0] / params.teeth[1]);
-      if (params.ratio === undefined && fromTeeth === undefined) return fail('gear needs a ratio or tooth counts');
-      if (params.ratio !== undefined && fromTeeth !== undefined && Math.abs(params.ratio - fromTeeth) > 1e-9 * Math.abs(fromTeeth))
-        return fail(`ratio ${params.ratio} disagrees with the tooth counts (${params.teeth?.join('/')} give ${fromTeeth})`);
-      const ratio = params.ratio ?? fromTeeth ?? 0;
-      if (!(Math.abs(ratio) > 0) || !Number.isFinite(ratio)) return fail('ratio must be finite and non-zero');
-      if (params.backlashDeg !== undefined && !positive(params.backlashDeg)) return fail('backlashDeg must be > 0');
-      if (!positive(params.meshStiffnessNmPerRad ?? 1) || !positive(params.meshDampingRatio ?? 1))
-        return fail('mesh stiffness and damping ratio must be > 0');
-      transmission = {
-        kind: 'gear',
-        id,
-        driver: driverId,
-        driven: drivenId,
-        ratio,
-        ...(params.teeth === undefined ? {} : { teeth: params.teeth }),
-        ...(params.efficiency === undefined ? {} : { efficiency: params.efficiency }),
-        ...(params.efficiencyBack === undefined ? {} : { efficiencyBack: params.efficiencyBack }),
-        ...(params.backlashDeg === undefined ? {} : { backlashDeg: params.backlashDeg }),
-        ...(params.meshStiffnessNmPerRad === undefined ? {} : { meshStiffnessNmPerRad: params.meshStiffnessNmPerRad }),
-        ...(params.meshDampingRatio === undefined ? {} : { meshDampingRatio: params.meshDampingRatio }),
-        ...source,
-      };
-    } else if (params.kind === 'belt') {
-      if (!positive(params.driverDiameterMm) || !positive(params.drivenDiameterMm))
-        return fail('belt needs driverDiameterMm and drivenDiameterMm > 0');
-      transmission = {
-        kind: 'belt',
-        id,
-        driver: driverId,
-        driven: drivenId,
-        driverDiameterMm: params.driverDiameterMm,
-        drivenDiameterMm: params.drivenDiameterMm,
-        ...(params.efficiency === undefined ? {} : { efficiency: params.efficiency }),
-        ...(params.efficiencyBack === undefined ? {} : { efficiencyBack: params.efficiencyBack }),
-        ...source,
-      };
-    } else if (params.kind === 'lead_screw') {
-      if (!positive(params.leadMm) || !positive(params.meanDiameterMm)) return fail('lead_screw needs leadMm and meanDiameterMm > 0');
-      if (params.mu === undefined || !Number.isFinite(params.mu) || params.mu < 0) return fail('lead_screw needs mu >= 0');
-      if (params.flankAngleDeg !== undefined && !(params.flankAngleDeg >= 0 && params.flankAngleDeg < 90))
-        return fail('flankAngleDeg must be in [0, 90)');
-      transmission = {
-        kind: 'lead_screw',
-        id,
-        screw: driverId,
-        nut: drivenId,
-        leadMm: params.leadMm,
-        meanDiameterMm: params.meanDiameterMm,
-        mu: params.mu,
-        ...(params.flankAngleDeg === undefined ? {} : { flankAngleDeg: params.flankAngleDeg }),
-        ...source,
-      };
-      if (leadScrewEfficiency(transmission).forward <= 1e-3)
-        return refuse('DRV_EFFICIENCY_INVALID', `the thread (lead angle + friction angle >= 90 deg) cannot lift: forward efficiency is 0`);
-    } else if (params.kind === 'ball_screw') {
-      if (!positive(params.leadMm)) return fail('ball_screw needs leadMm > 0');
-      if (params.efficiency === undefined || params.efficiencyBack === undefined)
-        return refuse('DRV_EFFICIENCY_INVALID', 'ball_screw needs efficiency and efficiencyBack');
-      transmission = {
-        kind: 'ball_screw',
-        id,
-        screw: driverId,
-        nut: drivenId,
-        leadMm: params.leadMm,
-        efficiency: params.efficiency,
-        efficiencyBack: params.efficiencyBack,
-        ...source,
-      };
-    } else {
-      if (!positive(params.pitchRadiusMm)) return fail('rack_pinion needs pitchRadiusMm > 0');
-      if (params.backlashMm !== undefined && !positive(params.backlashMm)) return fail('backlashMm must be > 0');
-      if (!positive(params.meshStiffnessNPerM ?? 1) || !positive(params.meshDampingRatio ?? 1))
-        return fail('mesh stiffness and damping ratio must be > 0');
-      transmission = {
-        kind: 'rack_pinion',
-        id,
-        pinion: driverId,
-        rack: drivenId,
-        pitchRadiusMm: params.pitchRadiusMm,
-        ...(params.efficiency === undefined ? {} : { efficiency: params.efficiency }),
-        ...(params.efficiencyBack === undefined ? {} : { efficiencyBack: params.efficiencyBack }),
-        ...(params.backlashMm === undefined ? {} : { backlashMm: params.backlashMm }),
-        ...(params.meshStiffnessNPerM === undefined ? {} : { meshStiffnessNPerM: params.meshStiffnessNPerM }),
-        ...(params.meshDampingRatio === undefined ? {} : { meshDampingRatio: params.meshDampingRatio }),
-        ...source,
-      };
-    }
+    const wiring: TransmissionWiring = { id, driverId, drivenId, source, fail, refuse };
+    const built = buildTransmission(params, wiring);
+    if (isRefusal(built)) return built;
+    const transmission = built;
     const eta = transmissionEfficiency(transmission);
     const locking = eta.backward <= 0 ? ', SELF-LOCKING (η_b <= 0: holds a load with the motor off)' : '';
     const unit = linear ? 'm/rad' : '';

@@ -642,7 +642,7 @@
       "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
     },
     {
-      "file": "domain-aec/src/plant/fabrication/routeImport/plan.ts",
+      "file": "domain-aec/src/plant/fabrication/routeImport/planWalk.ts",
       "hits": 1,
       "reason": "recorded at the INT-14 scan extension: 1 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
     },
@@ -1927,7 +1927,7 @@
       "reason": "recorded at the INT-14 scan extension: 3 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
     },
     {
-      "file": "domain-dynamics/src/commands/simulate.ts",
+      "file": "domain-dynamics/src/commands/simulateRun.ts",
       "hits": 4,
       "reason": "recorded at the INT-14 scan extension: 4 numeric ?? / || default(s); not line-reviewed, tracked by INT-FB-013"
     },
