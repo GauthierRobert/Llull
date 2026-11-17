@@ -87,8 +87,8 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
      backoff, `syncState`, `hasUnsyncedLocalEdits`, `localOutbox`, `localRedoOutbox`, `localOnly`), the connect-grace timers
      (`graceRuns.ts`, `CONNECT_GRACE_MS`), the 4xx / 401-403-404 refusal classification that only the flush used, and the
      autosave "outbox acknowledged, drop the copy" rule; tests `outboxPermanentError`, `connectGrace` and the outbox / flush
-     cases of `store`, `dispatchOnResult`, `Autosave`. The desktop shell does not restart the backend (it quits when the backend
-     exits), so there is nothing to replay to.
+     cases of `store`, `dispatchOnResult`, `Autosave`. At the time the desktop shell did not restart the backend, so there was
+     nothing to replay to (since then `desktop/src/backendSupervisor.ts` restarts it; edits made meanwhile are kept as a recovery copy, FR-DSF-23).
      `VITE_LLULL_SERVER_URL` and `VITE_LLULL_API_TOKEN` (build vars): `serverConfig.ts` now uses the page origin in a production
      build (the backend serves the renderer) and `http://localhost:3001` under `npm run dev`; `desktop`'s `build:web` no longer sets
      the var (and drops `cross-env`). The IndexedDB material-library provider (`browserLibraries.ts` + test): nothing in the

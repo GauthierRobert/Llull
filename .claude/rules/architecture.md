@@ -39,8 +39,9 @@ commands (`packages/core/src/commands` or a plugin's commands). No component or 
 
 Registry = every core feature catalog (`commands/<feature>/catalog.ts`) + each installed plugin's
 `commands`. It exposes `listCommands()`,
-`getCommand()`, `execute()`, `toToolSchemas()`. UI menus iterate `listCommands()`; CLI tool schemas (`llull describe`, plan validation) come
-from `toToolSchemas()`; `paramsSchema` is derived from zod `params` — never hand-write either.
+`getCommand()`, `execute()`, `toToolSchemas()`. UI menus iterate `listCommands()`; the CLI (`llull list` / `describe`, plan validation) reads each
+command's `paramsSchema` from the registry (`server/src/cli/catalog.ts`), `llull search` reads `toToolSchemas()` (the same schemas as a list, pinned
+by the contract snapshot); `paramsSchema` is derived from zod `params` — never hand-write either.
 `execute()` is the single choke point (validation, `requiresKernel`, derivation guards,
 feature-step append). Toolsets are a VIEW (`@protocol/toolsets`: CLI listings, UI palette); every tool stays callable via
 `execute`.

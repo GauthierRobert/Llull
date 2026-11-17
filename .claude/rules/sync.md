@@ -21,7 +21,7 @@ paths:
   a server `epoch` so `(epoch, seq)` orders resyncs across restarts. `source` is `rest` | `cli`.
 - Agents use the `llull` CLI (no MCP server): `--doc` runs `execute` in-process on a file, `--app` / `--server` send
   `POST /command` / `POST /exchange` to the local backend. Toolsets (`@protocol/toolsets`) are a listing view
-  (`llull list <toolset>`, UI palette); every tool stays callable. Tool schemas come only from `toToolSchemas()`.
+  (`llull list <toolset>`, UI palette); every tool stays callable. Tool schemas come only from the registry (`paramsSchema` / `toToolSchemas()`).
 - The backend is local-only (LC1): loopback bind, the desktop app's per-launch bearer token, no users / licence / admin.
 - No business logic in `server/`; it forwards to the registry. Verify server changes with
   `npm --prefix server run typecheck && npm --prefix server test`.

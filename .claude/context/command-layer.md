@@ -199,6 +199,7 @@ No id-counter reset exists; tests rely on step-scoped determinism.
 
 - UI: `store.dispatch(name, params)` → with the backend connected (desktop app) `POST /command` (server `execute`, result arrives on
   `/live`) or, while the backend is unreachable, local `execute` → swap doc → undo snapshot (no outbox: LC1 step 6).
-- CLI (`server/src/cli` + `packages/protocol`): `llull list / search / describe` read `toToolSchemas()` (`buildCommandTools()`);
+- CLI (`server/src/cli` + `packages/protocol`): `llull list / describe` read the registry (`listCommands` / `getCommand` → `paramsSchema`, `cli/catalog.ts`), `llull search` reads
+  `toToolSchemas()` (`buildCommandTools()`);
   `llull exec` / `run` call `execute` in-process on a document file, or `POST /command` on the local backend, which runs
   `execute` on the shared live document and broadcasts a `command` event.
