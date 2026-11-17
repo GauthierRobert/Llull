@@ -134,167 +134,237 @@ export const checkWrap = defineCommand({
         return wrapRejection(doc, 'check_wrap', 'WRP_ENTITY_NOT_FOUND', `entity '${id}' not found`, [id], [`ids.${index}`]);
     }
     const limit = params.maxLengthStrain ?? DEFAULT_MAX_LENGTH_STRAIN;
-    const findings: Finding[] = [];
+    const tally: Tally = {
+      findings: [],
+      unverified: false,
+      checkedVolumes: 0,
+      skippedVolumes: 0,
+      reliefs: 0,
+      largestAllowance: VOLUME_TOLERANCE,
+      skippedStrokeChecks: 0,
+      curves: 0,
+    };
     const kernel = (ctx ?? currentContext()).kernel;
-    let unverified = false;
-    let checkedVolumes = 0;
-    let skippedVolumes = 0;
-    let reliefs = 0;
-    let largestAllowance = VOLUME_TOLERANCE;
-    let skippedStrokeChecks = 0;
-    let curves = 0;
     for (const id of targets) {
       const entity = doc.entities[id] as Entity;
-      if (entity.kind === 'nurbs_curve' && entity.onFace !== undefined) {
-        curves += 1;
-        const [first, last] = curveDomain(entity.curve);
-        const length3d = integrateCurve(entity.curve, first, last, (_point, derivative) =>
-          Math.hypot(derivative[0], derivative[1], derivative[2]),
-        );
-        const strain = entity.onFace.chartLength > 0 ? length3d / entity.onFace.chartLength - 1 : 0;
-        if (Math.abs(strain) > limit) findings.push(finding('WRP_CHECK_DISTORTION', 'fail', [id], strain, limit, '1'));
-      }
-      if (entity.kind === 'mesh' && entity.brep !== undefined) {
-        for (const node of embossNodes(recipeOf(entity))) {
-          const closed = embossClosedForm(node);
-          if (node.mode === 'deboss' && node.surface.type !== 'plane') {
-            const { type, data } = node.surface;
-            const radius = type === 'cylinder' || type === 'sphere' ? (data[9] as number) : type === 'torus' ? (data[10] as number) : null;
-            if (radius !== null && node.depth >= radius)
-              findings.push(finding('WRP_CHECK_DEPTH', 'fail', [id], node.depth, radius, doc.units));
-          }
-          if (params.minFeatureSize !== undefined && closed !== null && node.mode !== 'scribe') {
-            const lengthScale = node.surface.type === 'cylinder' ? (node.surface.data[9] as number) : 1;
-            const perimeter = node.regions.reduce(
-              (sum, region) => sum + [region.outer, ...region.holes].reduce((inner, loop) => inner + loopLengthUv(loop, lengthScale), 0),
-              0,
-            );
-            const flatFace = node.surface.type === 'plane' || node.surface.type === 'cylinder';
-            const width = perimeter > 0 && flatFace ? (2 * closed.area) / perimeter : null;
-            if (!flatFace) skippedStrokeChecks += 1;
-            if (width !== null && width < params.minFeatureSize)
-              findings.push(finding('WRP_CHECK_THIN_FEATURE', 'fail', [id], width, params.minFeatureSize, doc.units));
-          }
-          if (closed !== null && node.mode !== 'scribe' && kernel !== null) {
-            const solid = kernel.evaluate(node);
-            const base = kernel.evaluate(node.source);
-            const after = solid === null ? null : kernelVolume({ kernel }, solid);
-            const before = base === null ? null : kernelVolume({ kernel }, base);
-            if (after !== null && before !== null) {
-              checkedVolumes += 1;
-              const mismatch = Math.abs(after - before - closed.delta) / Math.max(Math.abs(closed.delta), 1e-300);
-              // cone, sphere and torus footprints are fitted curves: the kernel builds their edges to the recipe tolerance, which moves the boundary by that much
-              const fitted = node.surface.type === 'cone' || node.surface.type === 'sphere' || node.surface.type === 'torus';
-              const perimeter = fitted ? footprintPerimeter(node) : null;
-              const allowed = Math.min(
-                MAX_VOLUME_ALLOWANCE,
-                VOLUME_TOLERANCE + (perimeter === null || !(closed.area > 0) ? 0 : (2 * node.tolerance * perimeter) / closed.area),
-              );
-              largestAllowance = Math.max(largestAllowance, allowed);
-              if (mismatch > allowed) findings.push(finding('WRP_CHECK_VOLUME_MISMATCH', 'fail', [id], mismatch, allowed, '1'));
-            } else skippedVolumes += 1;
-          } else if (closed !== null && node.mode !== 'scribe') skippedVolumes += 1;
-        }
-      }
-      const relief = entity.kind === 'mesh' && entity.brep !== undefined ? reliefOf(doc, id) : undefined;
-      if (relief !== undefined && entity.kind === 'mesh') {
-        reliefs += 1;
-        skippedVolumes += 1;
-        const top = recipeOf(entity);
-        const base = kernel === null || top.op !== 'boolean' ? null : kernel.evaluate(top.a);
-        const solid = kernel === null ? null : kernel.evaluate(top);
-        const before = kernel === null || base === null ? null : kernelVolume({ kernel }, base);
-        const after = kernel === null || solid === null ? null : kernelVolume({ kernel }, solid);
-        const change = before === null || after === null ? null : after - before;
-        if (change !== null && relief.direction * change <= 0)
-          findings.push(
-            finding(
-              'WRP_CHECK_VOLUME_MISMATCH',
-              'fail',
-              [id],
-              change,
-              relief.direction > 0 ? 'volume added' : 'volume removed',
-              doc.units + '^3',
-            ),
-          );
-        findings.push(
-          finding(
-            'WRP_CHECK_VOLUME_SKIPPED',
-            'warn',
-            [id],
-            change === null ? 'direction not measured' : `volume change ${change}`,
-            'no closed form (pull walls, draft, helical grooves): only the direction is checked',
-            'doc units^3',
-          ),
-        );
-      }
-      const texts = textsOf(doc, stepOf(doc, id));
-      for (const text of texts) {
-        const loaded = loadFont(doc, text.font as string);
-        if (isFontFailure(loaded)) continue;
-        if (!loaded.record.provenance.verified) {
-          unverified = true;
-          findings.push(finding('WRP_CHECK_FONT_UNVERIFIED', 'warn', [id, text.id], loaded.record.blob, 'pinned sha256', 'sha256'));
-        }
-        const unmapped = [
-          ...new Set([...text.content].filter((c) => c.trim().length > 0 && loaded.font.glyphIndex(c.codePointAt(0) as number) === 0)),
-        ];
-        if (unmapped.length > 0)
-          findings.push(
-            finding('WRP_CHECK_GLYPH_MISSING', 'warn', [id, text.id], unmapped.join(''), 'all characters mapped', 'characters'),
-          );
-      }
+      auditCurve(entity, id, limit, tally);
+      if (entity.kind === 'mesh' && entity.brep !== undefined) auditEmbossNodes(doc, entity, id, params.minFeatureSize, kernel, tally);
+      auditRelief(doc, entity, id, kernel, tally);
+      auditFonts(doc, id, tally);
     }
-    if (params.maxLengthStrain === undefined && targets.length > 0)
-      findings.push(finding('WRP_CHECK_LIMIT_DEFAULTED', 'warn', [...targets], limit, limit, '1'));
-    if (skippedStrokeChecks > 0)
-      findings.push(finding('WRP_CHECK_STROKE_SKIPPED', 'warn', [...targets], skippedStrokeChecks, 'plane or cylinder', 'embossed solids'));
-    const status = findings.some((f) => f.severity === 'fail') ? 'fail' : findings.length > 0 ? 'warn' : 'pass';
-    const data = wrapData(
-      doc,
-      {
-        status,
-        findings,
-        checked: {
-          ids: targets.length,
-          curves,
-          volumes: checkedVolumes,
-          volumesSkipped: skippedVolumes,
-          reliefsWithoutClosedForm: reliefs,
-          ...(params.minFeatureSize === undefined ? {} : { strokeChecksSkipped: skippedStrokeChecks }),
-        },
-        limits: {
-          maxLengthStrain: {
-            value: limit,
-            unit: '1',
-            source: params.maxLengthStrain === undefined ? MAX_LENGTH_STRAIN_SOURCE : 'caller',
-            defaulted: params.maxLengthStrain === undefined,
-          },
-          volumeTolerance: { value: VOLUME_TOLERANCE, unit: '1', source: 'llull WRP internal-consistency guard', defaulted: true },
-          volumeAllowance: {
-            value: largestAllowance,
-            unit: '1',
-            source: `largest guard applied: ${VOLUME_TOLERANCE} plus, for cone / sphere / torus footprints (fitted edges), 2 x construction tolerance x perimeter / area, capped at ${MAX_VOLUME_ALLOWANCE}`,
-            defaulted: true,
-          },
-          ...(params.minFeatureSize === undefined
-            ? {}
-            : { minFeatureSize: { value: params.minFeatureSize, unit: doc.units, source: 'caller', defaulted: false } }),
-        },
-      },
-      {
-        unverified,
-        provenance: { method: 'length strain of wrapped curves, closed-form volume of embossed regions', inputs: { ids: targets } },
-      },
-    );
-    const failed = findings.filter((f) => f.severity === 'fail').map((f) => f.code);
-    return report(
-      doc,
-      `check_wrap: ${status} — ${targets.length} result(s) checked (${curves} curve(s), ${checkedVolumes} emboss volume(s))${failed.length > 0 ? `; failing: ${[...new Set(failed)].join(', ')}` : ''}${unverified ? '; unverified font' : ''}.`,
-      data,
-    );
+    return summarize(doc, targets, params.maxLengthStrain, params.minFeatureSize, tally);
   },
 });
+
+interface Tally {
+  readonly findings: Finding[];
+  unverified: boolean;
+  checkedVolumes: number;
+  skippedVolumes: number;
+  reliefs: number;
+  largestAllowance: number;
+  skippedStrokeChecks: number;
+  curves: number;
+}
+
+type Kernel = ReturnType<typeof currentContext>['kernel'];
+type MeshEntity = Extract<Entity, { kind: 'mesh' }>;
+type EmbossNode = ReturnType<typeof embossNodes>[number];
+
+function auditCurve(entity: Entity, id: string, limit: number, tally: Tally): void {
+  if (entity.kind !== 'nurbs_curve' || entity.onFace === undefined) return;
+  tally.curves += 1;
+  const [first, last] = curveDomain(entity.curve);
+  const length3d = integrateCurve(entity.curve, first, last, (_point, derivative) =>
+    Math.hypot(derivative[0], derivative[1], derivative[2]),
+  );
+  const strain = entity.onFace.chartLength > 0 ? length3d / entity.onFace.chartLength - 1 : 0;
+  if (Math.abs(strain) > limit) tally.findings.push(finding('WRP_CHECK_DISTORTION', 'fail', [id], strain, limit, '1'));
+}
+
+function auditEmbossNodes(
+  doc: CadDocument,
+  entity: MeshEntity,
+  id: string,
+  minFeatureSize: number | undefined,
+  kernel: Kernel,
+  tally: Tally,
+): void {
+  for (const node of embossNodes(recipeOf(entity))) {
+    const closed = embossClosedForm(node);
+    auditDepth(doc, node, id, tally);
+    if (minFeatureSize !== undefined && closed !== null && node.mode !== 'scribe')
+      auditStroke(doc, node, closed, id, minFeatureSize, tally);
+    if (closed !== null && node.mode !== 'scribe' && kernel !== null) auditVolume(node, closed, id, kernel, tally);
+    else if (closed !== null && node.mode !== 'scribe') tally.skippedVolumes += 1;
+  }
+}
+
+function auditDepth(doc: CadDocument, node: EmbossNode, id: string, tally: Tally): void {
+  if (node.mode !== 'deboss' || node.surface.type === 'plane') return;
+  const { type, data } = node.surface;
+  const radius = type === 'cylinder' || type === 'sphere' ? (data[9] as number) : type === 'torus' ? (data[10] as number) : null;
+  if (radius !== null && node.depth >= radius) tally.findings.push(finding('WRP_CHECK_DEPTH', 'fail', [id], node.depth, radius, doc.units));
+}
+
+function auditStroke(
+  doc: CadDocument,
+  node: EmbossNode,
+  closed: NonNullable<ReturnType<typeof embossClosedForm>>,
+  id: string,
+  minFeatureSize: number,
+  tally: Tally,
+): void {
+  const lengthScale = node.surface.type === 'cylinder' ? (node.surface.data[9] as number) : 1;
+  const perimeter = node.regions.reduce(
+    (sum, region) => sum + [region.outer, ...region.holes].reduce((inner, loop) => inner + loopLengthUv(loop, lengthScale), 0),
+    0,
+  );
+  const flatFace = node.surface.type === 'plane' || node.surface.type === 'cylinder';
+  const width = perimeter > 0 && flatFace ? (2 * closed.area) / perimeter : null;
+  if (!flatFace) tally.skippedStrokeChecks += 1;
+  if (width !== null && width < minFeatureSize)
+    tally.findings.push(finding('WRP_CHECK_THIN_FEATURE', 'fail', [id], width, minFeatureSize, doc.units));
+}
+
+function auditVolume(
+  node: EmbossNode,
+  closed: NonNullable<ReturnType<typeof embossClosedForm>>,
+  id: string,
+  kernel: NonNullable<Kernel>,
+  tally: Tally,
+): void {
+  const solid = kernel.evaluate(node);
+  const base = kernel.evaluate(node.source);
+  const after = solid === null ? null : kernelVolume({ kernel }, solid);
+  const before = base === null ? null : kernelVolume({ kernel }, base);
+  if (after === null || before === null) {
+    tally.skippedVolumes += 1;
+    return;
+  }
+  tally.checkedVolumes += 1;
+  const mismatch = Math.abs(after - before - closed.delta) / Math.max(Math.abs(closed.delta), 1e-300);
+  // cone, sphere and torus footprints are fitted curves: the kernel builds their edges to the recipe tolerance, which moves the boundary by that much
+  const fitted = node.surface.type === 'cone' || node.surface.type === 'sphere' || node.surface.type === 'torus';
+  const perimeter = fitted ? footprintPerimeter(node) : null;
+  const allowed = Math.min(
+    MAX_VOLUME_ALLOWANCE,
+    VOLUME_TOLERANCE + (perimeter === null || !(closed.area > 0) ? 0 : (2 * node.tolerance * perimeter) / closed.area),
+  );
+  tally.largestAllowance = Math.max(tally.largestAllowance, allowed);
+  if (mismatch > allowed) tally.findings.push(finding('WRP_CHECK_VOLUME_MISMATCH', 'fail', [id], mismatch, allowed, '1'));
+}
+
+function auditRelief(doc: CadDocument, entity: Entity, id: string, kernel: Kernel, tally: Tally): void {
+  const relief = entity.kind === 'mesh' && entity.brep !== undefined ? reliefOf(doc, id) : undefined;
+  if (relief === undefined || entity.kind !== 'mesh') return;
+  tally.reliefs += 1;
+  tally.skippedVolumes += 1;
+  const top = recipeOf(entity);
+  const base = kernel === null || top.op !== 'boolean' ? null : kernel.evaluate(top.a);
+  const solid = kernel === null ? null : kernel.evaluate(top);
+  const before = kernel === null || base === null ? null : kernelVolume({ kernel }, base);
+  const after = kernel === null || solid === null ? null : kernelVolume({ kernel }, solid);
+  const change = before === null || after === null ? null : after - before;
+  if (change !== null && relief.direction * change <= 0)
+    tally.findings.push(
+      finding(
+        'WRP_CHECK_VOLUME_MISMATCH',
+        'fail',
+        [id],
+        change,
+        relief.direction > 0 ? 'volume added' : 'volume removed',
+        doc.units + '^3',
+      ),
+    );
+  tally.findings.push(
+    finding(
+      'WRP_CHECK_VOLUME_SKIPPED',
+      'warn',
+      [id],
+      change === null ? 'direction not measured' : `volume change ${change}`,
+      'no closed form (pull walls, draft, helical grooves): only the direction is checked',
+      'doc units^3',
+    ),
+  );
+}
+
+function auditFonts(doc: CadDocument, id: string, tally: Tally): void {
+  for (const text of textsOf(doc, stepOf(doc, id))) {
+    const loaded = loadFont(doc, text.font as string);
+    if (isFontFailure(loaded)) continue;
+    if (!loaded.record.provenance.verified) {
+      tally.unverified = true;
+      tally.findings.push(finding('WRP_CHECK_FONT_UNVERIFIED', 'warn', [id, text.id], loaded.record.blob, 'pinned sha256', 'sha256'));
+    }
+    const unmapped = [
+      ...new Set([...text.content].filter((c) => c.trim().length > 0 && loaded.font.glyphIndex(c.codePointAt(0) as number) === 0)),
+    ];
+    if (unmapped.length > 0)
+      tally.findings.push(
+        finding('WRP_CHECK_GLYPH_MISSING', 'warn', [id, text.id], unmapped.join(''), 'all characters mapped', 'characters'),
+      );
+  }
+}
+
+function summarize(
+  doc: CadDocument,
+  targets: readonly string[],
+  maxLengthStrain: number | undefined,
+  minFeatureSize: number | undefined,
+  tally: Tally,
+): CommandResult {
+  const { findings, unverified, checkedVolumes, skippedVolumes, reliefs, largestAllowance, skippedStrokeChecks, curves } = tally;
+  const limit = maxLengthStrain ?? DEFAULT_MAX_LENGTH_STRAIN;
+  if (maxLengthStrain === undefined && targets.length > 0)
+    findings.push(finding('WRP_CHECK_LIMIT_DEFAULTED', 'warn', [...targets], limit, limit, '1'));
+  if (skippedStrokeChecks > 0)
+    findings.push(finding('WRP_CHECK_STROKE_SKIPPED', 'warn', [...targets], skippedStrokeChecks, 'plane or cylinder', 'embossed solids'));
+  const status = findings.some((f) => f.severity === 'fail') ? 'fail' : findings.length > 0 ? 'warn' : 'pass';
+  const data = wrapData(
+    doc,
+    {
+      status,
+      findings,
+      checked: {
+        ids: targets.length,
+        curves,
+        volumes: checkedVolumes,
+        volumesSkipped: skippedVolumes,
+        reliefsWithoutClosedForm: reliefs,
+        ...(minFeatureSize === undefined ? {} : { strokeChecksSkipped: skippedStrokeChecks }),
+      },
+      limits: {
+        maxLengthStrain: {
+          value: limit,
+          unit: '1',
+          source: maxLengthStrain === undefined ? MAX_LENGTH_STRAIN_SOURCE : 'caller',
+          defaulted: maxLengthStrain === undefined,
+        },
+        volumeTolerance: { value: VOLUME_TOLERANCE, unit: '1', source: 'llull WRP internal-consistency guard', defaulted: true },
+        volumeAllowance: {
+          value: largestAllowance,
+          unit: '1',
+          source: `largest guard applied: ${VOLUME_TOLERANCE} plus, for cone / sphere / torus footprints (fitted edges), 2 x construction tolerance x perimeter / area, capped at ${MAX_VOLUME_ALLOWANCE}`,
+          defaulted: true,
+        },
+        ...(minFeatureSize === undefined
+          ? {}
+          : { minFeatureSize: { value: minFeatureSize, unit: doc.units, source: 'caller', defaulted: false } }),
+      },
+    },
+    {
+      unverified,
+      provenance: { method: 'length strain of wrapped curves, closed-form volume of embossed regions', inputs: { ids: targets } },
+    },
+  );
+  const failed = findings.filter((f) => f.severity === 'fail').map((f) => f.code);
+  return report(
+    doc,
+    `check_wrap: ${status} — ${targets.length} result(s) checked (${curves} curve(s), ${checkedVolumes} emboss volume(s))${failed.length > 0 ? `; failing: ${[...new Set(failed)].join(', ')}` : ''}${unverified ? '; unverified font' : ''}.`,
+    data,
+  );
+}
 
 /** Length of a (u, v) loop with u scaled by `uScale` (cylinder: the radius, so both axes are lengths). */
 function loopLengthUv(loop: UvLoop, uScale: number): number {
