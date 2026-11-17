@@ -10,6 +10,12 @@ import { flangeStep } from './planFlange';
 import { addBranch, arrive, comp, free, midpoint, otherEnd, refuse, take, type PlanState, type Step, type Walk } from './planState';
 import type { RouteRefusal } from './planTypes';
 
+/** The axis-parallel corner of an elbow whose centre is not given (the L through the first axis the end points differ on). */
+const cornerOf = (a: Vec3, b: Vec3): Vec3 => {
+  const axis = [0, 1, 2].find((at) => Math.abs((b[at] as number) - (a[at] as number)) > 1e-6) ?? 0;
+  return [axis === 0 ? b[0] : a[0], axis === 1 ? b[1] : a[1], axis === 2 ? b[2] : a[2]];
+};
+
 /** A flange set at the free start (an optional gasket on the face, then the flange entered by its flanged face) is the start port. */
 export function startFlangeSet(s: PlanState, w: Walk, startEnd: NetworkPoint): RouteRefusal | undefined {
   arrive(s, w.key);
@@ -34,10 +40,10 @@ export function startFlangeSet(s: PlanState, w: Walk, startEnd: NetworkPoint): R
   return undefined;
 }
 
-function elbowStep(s: PlanState, w: Walk, component: NetworkComponent, exit: NetworkPoint): Step {
+function elbowStep(w: Walk, component: NetworkComponent, exit: NetworkPoint): Step {
   const [a, b] = [component.ends[0]?.xyz, component.ends[1]?.xyz];
   if (a === undefined || b === undefined) return refuse('ISO_ROUTE_UNSUPPORTED', `${component.id} has no end points`, [component.id]);
-  const centre = component.centre ?? s.cornerOf(a, b);
+  const centre = component.centre ?? cornerOf(a, b);
   const next = sub3(exit.xyz, centre);
   w.points.push(isShifted(w.shift) && distance3(exit.xyz, centre) > 1e-6 ? storedCorner(centre, w.shift, normalize3(next)) : centre);
   w.shift = ZERO;
@@ -119,7 +125,7 @@ function componentStep(
       return 'advance';
     case 'ELBOW':
     case 'BEND':
-      return elbowStep(s, w, component, exit);
+      return elbowStep(w, component, exit);
     case 'TEE':
       return teeStep(s, w, component);
     case 'REDUCER-CONCENTRIC':

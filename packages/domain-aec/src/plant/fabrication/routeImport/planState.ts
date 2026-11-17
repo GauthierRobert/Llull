@@ -11,7 +11,6 @@ export interface PlanState {
   readonly components: readonly NetworkComponent[];
   readonly options: PlanOptions;
   /** The corner of an elbow whose centre the file does not give. */
-  readonly cornerOf: (a: Vec3, b: Vec3) => Vec3;
   readonly index: ReadonlyMap<string, number[]>;
   readonly visited: Set<number>;
   readonly welds: PlannedWeld[];
@@ -50,25 +49,13 @@ export const midpoint = (a: Vec3, b: Vec3): Vec3 => [(a[0] + b[0]) / 2, (a[1] + 
 export const dedupe = (points: readonly Vec3[]): Vec3[] =>
   points.filter((point, k) => k === 0 || distance3(point, points[k - 1] as Vec3) > 1e-6);
 
-export function createState(components: readonly NetworkComponent[], options: PlanOptions, cornerOf: PlanState['cornerOf']): PlanState {
+export function createState(components: readonly NetworkComponent[], options: PlanOptions): PlanState {
   const index = new Map<string, number[]>();
   components.forEach((component, i) => {
     if (['OLET', 'BOLT', 'SUPPORT'].includes(component.type)) return;
     for (const end of component.ends) index.set(nodeKey(end.xyz), [...(index.get(nodeKey(end.xyz)) ?? []), i]);
   });
-  return {
-    components,
-    options,
-    cornerOf,
-    index,
-    visited: new Set(),
-    welds: [],
-    rebuilt: [],
-    gasketless: [],
-    seeds: [],
-    shopWelds: 0,
-    branches: 0,
-  };
+  return { components, options, index, visited: new Set(), welds: [], rebuilt: [], gasketless: [], seeds: [], shopWelds: 0, branches: 0 };
 }
 
 export const comp = (s: PlanState, i: number): NetworkComponent => s.components[i] as NetworkComponent;

@@ -25,12 +25,6 @@ interface OletCandidate {
   readonly i: number;
 }
 
-/** The axis-parallel corner of an elbow whose centre is not given (the L through the first axis the end points differ on). */
-const cornerOf = (a: Vec3, b: Vec3): Vec3 => {
-  const axis = [0, 1, 2].find((at) => Math.abs((b[at] as number) - (a[at] as number)) > 1e-6) ?? 0;
-  return [axis === 0 ? b[0] : a[0], axis === 1 ? b[1] : a[1], axis === 2 ? b[2] : a[2]];
-};
-
 /** True when `point` lies within 1 mm of the segment a-b. */
 function onSegment(point: Vec3, a: Vec3, b: Vec3): boolean {
   const length = distance3(a, b);
@@ -140,7 +134,7 @@ export function planRoute(components: readonly NetworkComponent[], options: Plan
       `${components.length} components: route mode rebuilds at most ${MAX_ROUTE_COMPONENTS} per line`,
       [],
     );
-  const s = createState(components, options, cornerOf);
+  const s = createState(components, options);
   const startEnd = pickStart(s);
   if ('ok' in startEnd) return startEnd;
   const runs: PlannedRun[] = [];
