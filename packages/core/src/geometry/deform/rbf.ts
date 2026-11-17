@@ -170,8 +170,11 @@ export function fitRbf(requested: ReadonlyArray<RbfConstraint>, smoothing: numbe
   const rhs: number[][] = Array.from({ length: size }, () => [0, 0, 0]);
   for (let i = 0; i < n; i++) {
     const [ci, di] = [(constraints[i] as RbfConstraint).at, (constraints[i] as RbfConstraint).delta];
-    for (let j = 0; j < n; j++)
-      (matrix[i] as number[])[j] = distance(ci, (constraints[j] as RbfConstraint).at) ** 3 + (i === j ? smoothing : 0);
+    for (let j = 0; j < n; j++) {
+      // r * r * r, as in rbfMap: `r ** 3` is not bit-identical across V8 versions (Node 22 vs 24, the Electron renderer), the products are
+      const r = distance(ci, (constraints[j] as RbfConstraint).at);
+      (matrix[i] as number[])[j] = r * r * r + (i === j ? smoothing : 0);
+    }
     const tail = [1, ci[0], ci[1], ci[2]];
     for (let k = 0; k < 4; k++) {
       (matrix[i] as number[])[n + k] = tail[k] as number;
