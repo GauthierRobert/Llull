@@ -1,15 +1,7 @@
 import { spawn } from 'node:child_process';
 import { describe, it, expect } from 'vitest';
 import { killAllChildren, trackChild } from '../src/childProcesses';
-
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
+import { alive } from './processTestSupport';
 
 async function until(condition: () => boolean, timeoutMs = 5000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;

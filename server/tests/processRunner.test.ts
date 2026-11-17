@@ -5,6 +5,7 @@ import { PassThrough } from 'node:stream';
 import type { ChildProcess } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { runProcess, runProcessSync, runTrackedProcess, type ProcessRunnerHooks } from '../src/processRunner';
+import { alive } from './processTestSupport';
 
 class FakeChild extends EventEmitter {
   readonly stdout = new PassThrough();
@@ -148,16 +149,6 @@ describe('runTrackedProcess', () => {
     }
   });
 });
-
-/** True when `pid` is still a live process. */
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 const GRANDCHILD_PARENT =
   "const c=require('child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});" +

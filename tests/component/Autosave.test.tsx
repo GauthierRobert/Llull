@@ -89,6 +89,22 @@ describe('useAutosave', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
+  it('unsaved work blocks a page unload, except in the desktop app (its main process asks, and a blocked unload would block quitting)', () => {
+    render(<Harness storage={fakeStorage()} />);
+    useSessionStore.setState({ dirty: true });
+    const blocked = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(blocked);
+    expect(blocked.defaultPrevented).toBe(true);
+    (window as unknown as { llull?: unknown }).llull = { exportThreeMf: () => Promise.resolve({}) };
+    try {
+      const allowed = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(allowed);
+      expect(allowed.defaultPrevented).toBe(false);
+    } finally {
+      delete (window as unknown as { llull?: unknown }).llull;
+    }
+  });
+
   it('saves the document after the debounce and marks it unsaved', () => {
     const storage = fakeStorage();
     render(<Harness storage={storage} />);
