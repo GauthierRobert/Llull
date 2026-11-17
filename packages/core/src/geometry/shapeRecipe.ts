@@ -348,6 +348,54 @@ function sidedChamferError(node: Record<string, unknown>, edgeCount: number): st
   return null;
 }
 
+type ChildCheck = (value: unknown) => string | null;
+
+/** Why an untrusted fillet / chamfer node is unusable (edges, per-edge laws, sizes, near points, source), or null. */
+function edgeBlendError(node: Record<string, unknown>, child: ChildCheck): string | null {
+  const edges = node['edges'];
+  if (!Array.isArray(edges) || !edges.every((e) => Number.isInteger(e) && (e as number) >= 0))
+    return `${String(node['op'])}: edges must be non-negative integers`;
+  const radiiProblem = radiiError(node, edges.length) ?? sidedChamferError(node, edges.length) ?? profileError(node) ?? cornersError(node);
+  if (radiiProblem !== null) return radiiProblem;
+  if (node['radii'] === undefined && (!isFiniteNumber(node['size']) || node['size'] <= 0)) return `${String(node['op'])}: size must be > 0`;
+  const sizeEnd = node['sizeEnd'];
+  if (sizeEnd !== undefined && (!isFiniteNumber(sizeEnd) || sizeEnd <= 0)) return `${String(node['op'])}: sizeEnd must be > 0`;
+  if (!isPointList(node['near'])) return `${String(node['op'])}: near must be a list of finite [x, y, z] points`;
+  return child(node['source']);
+}
+
+/** Why an untrusted blend node is unusable (sources, radius, joints), or null. */
+function blendError(node: Record<string, unknown>, child: ChildCheck): string | null {
+  const sources = node['sources'];
+  if (!Array.isArray(sources) || sources.length < 2) return 'blend: needs >= 2 sources';
+  if (!isFiniteNumber(node['radius']) || node['radius'] <= 0) return 'blend: radius must be > 0';
+  const joints = node['joints'];
+  if (joints !== undefined && (!Array.isArray(joints) || !joints.every(jointValid)))
+    return 'blend: joints must be a list of { near: [x, y, z] and / or name, radius > 0, optional radiusEnd > 0, sizes, interpolation }';
+  for (const source of sources) {
+    const problem = child(source);
+    if (problem !== null) return problem;
+  }
+  return null;
+}
+
+function faceBlendError(node: Record<string, unknown>, child: ChildCheck): string | null {
+  return (
+    faceSetError(node, ['facesA', 'facesB']) ??
+    radiusProblem(node) ??
+    taperProblem(node) ??
+    cliffProblem(node) ??
+    profileError({ ...node, op: 'fillet' }) ??
+    child(node['source'])
+  );
+}
+
+function brepError(node: Record<string, unknown>): string | null {
+  if (typeof node['blob'] !== 'string' || !/^[0-9a-f]{64}$/.test(node['blob'])) return 'brep: blob must be a lowercase sha256 hex string';
+  if (node['format'] !== 'occt-brep-v1') return `brep: unsupported format '${String(node['format'])}'`;
+  return node['label'] === undefined || typeof node['label'] === 'string' ? null : 'brep: label must be a string';
+}
+
 function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: LeafValidator): string | null {
   const child = (value: unknown): string | null => check(value, depth + 1, validateLeaf);
   switch (node['op']) {
@@ -357,33 +405,10 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       if (!['union', 'subtract', 'intersect'].includes(String(node['boolean']))) return `unknown boolean '${String(node['boolean'])}'`;
       return child(node['a']) ?? child(node['b']);
     case 'fillet':
-    case 'chamfer': {
-      const edges = node['edges'];
-      if (!Array.isArray(edges) || !edges.every((e) => Number.isInteger(e) && (e as number) >= 0))
-        return `${String(node['op'])}: edges must be non-negative integers`;
-      const radiiProblem =
-        radiiError(node, edges.length) ?? sidedChamferError(node, edges.length) ?? profileError(node) ?? cornersError(node);
-      if (radiiProblem !== null) return radiiProblem;
-      if (node['radii'] === undefined && (!isFiniteNumber(node['size']) || node['size'] <= 0))
-        return `${String(node['op'])}: size must be > 0`;
-      const sizeEnd = node['sizeEnd'];
-      if (sizeEnd !== undefined && (!isFiniteNumber(sizeEnd) || sizeEnd <= 0)) return `${String(node['op'])}: sizeEnd must be > 0`;
-      if (!isPointList(node['near'])) return `${String(node['op'])}: near must be a list of finite [x, y, z] points`;
-      return child(node['source']);
-    }
-    case 'blend': {
-      const sources = node['sources'];
-      if (!Array.isArray(sources) || sources.length < 2) return 'blend: needs >= 2 sources';
-      if (!isFiniteNumber(node['radius']) || node['radius'] <= 0) return 'blend: radius must be > 0';
-      const joints = node['joints'];
-      if (joints !== undefined && (!Array.isArray(joints) || !joints.every(jointValid)))
-        return 'blend: joints must be a list of { near: [x, y, z] and / or name, radius > 0, optional radiusEnd > 0, sizes, interpolation }';
-      for (const source of sources) {
-        const problem = child(source);
-        if (problem !== null) return problem;
-      }
-      return null;
-    }
+    case 'chamfer':
+      return edgeBlendError(node, child);
+    case 'blend':
+      return blendError(node, child);
     case 'shell':
       if (!isFiniteNumber(node['thickness']) || node['thickness'] <= 0) return 'shell: thickness must be > 0';
       if (!isPointList(node['openNear'])) return 'shell: openNear must be a list of finite [x, y, z] points';
@@ -394,14 +419,7 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
     case 'faceOp':
       return faceOpProblem(node) ?? child(node['source']);
     case 'faceBlend':
-      return (
-        faceSetError(node, ['facesA', 'facesB']) ??
-        radiusProblem(node) ??
-        taperProblem(node) ??
-        cliffProblem(node) ??
-        profileError({ ...node, op: 'fillet' }) ??
-        child(node['source'])
-      );
+      return faceBlendError(node, child);
     case 'fullRound':
       return faceSetError(node, ['side1', 'center', 'side2']) ?? child(node['source']);
     case 'emboss':
@@ -412,10 +430,7 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
       if (!isFiniteNumber(node['factor']) || node['factor'] <= 0) return 'scale: factor must be > 0';
       return child(node['source']);
     case 'brep':
-      if (typeof node['blob'] !== 'string' || !/^[0-9a-f]{64}$/.test(node['blob']))
-        return 'brep: blob must be a lowercase sha256 hex string';
-      if (node['format'] !== 'occt-brep-v1') return `brep: unsupported format '${String(node['format'])}'`;
-      return node['label'] === undefined || typeof node['label'] === 'string' ? null : 'brep: label must be a string';
+      return brepError(node);
     case 'feature':
       return featureError(node) ?? child(node['source']);
     case 'faceSlab':

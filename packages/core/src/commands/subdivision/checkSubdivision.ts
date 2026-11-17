@@ -1,34 +1,28 @@
 import type { CadDocument, SubdivisionEntity } from '../../model/types';
-import type { CommandResult } from '../types';
 import type { GeometryKernel } from '../../geometry/kernel';
+import { recipeOf } from '../../geometry/shapeRecipe';
+import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { report } from '../noop';
-import { recipeOf } from '../../geometry/shapeRecipe';
-import { findSelfIntersections } from '../../geometry/mesh/selfIntersection';
-import { subdivide } from '../../geometry/subdivision';
-import { fullSettleLevels, settleBudgetProblem, settleLevels } from '../../geometry/subd/settle';
 import { edgeSharpnessMap } from '../../geometry/subd/sharpness';
 import { symmetryDeviation } from '../../geometry/subd/symmetry';
-import { buildTopology, faceArea } from '../../geometry/subd/topology';
+import { type CageTopology, buildTopology } from '../../geometry/subd/topology';
 import { boundaryLoops } from '../../geometry/subd/boundary';
-import { levelMeshVolume, levelQuadCount, limitVolumeEstimate } from '../../geometry/subd/volume';
+import { levelMeshVolume, limitVolumeEstimate } from '../../geometry/subd/volume';
+import {
+  type Finding,
+  degenerateFaceFindings,
+  extraordinaryFindings,
+  patchSeamFindings,
+  selfIntersectionFindings,
+  sharpnessBudgetFindings,
+  symmetryFindings,
+  volumeFindings,
+} from './checkSubdivisionFindings';
 import { isEntity, subdivisionOf } from './shared';
 
 const COMMAND = 'check_subdivision';
-/** Triangle budget of the self-intersection test (the grid test is roughly linear in it). */
-const SELF_INTERSECTION_TRIANGLES = 20_000;
-
-interface Finding {
-  readonly code: string;
-  readonly severity: 'fail' | 'warn' | 'info';
-  readonly ids: readonly string[];
-  readonly value: number;
-  readonly limit: number;
-  readonly unit: string;
-  readonly message: string;
-  readonly remediation: string;
-}
 
 /** Exact-kernel view of the cage (OCC patches): volume and the worst seam gap / angle between neighbouring patches, or null without a kernel. */
 function limitPatches(kernel: GeometryKernel | null, entity: SubdivisionEntity): Record<string, number> | null {
@@ -45,6 +39,62 @@ function limitPatches(kernel: GeometryKernel | null, entity: SubdivisionEntity):
     for (const sample of samples) [gap, angle] = [Math.max(gap, sample.g0), Math.max(angle, sample.g1)];
   });
   return mass === null ? null : { volume: mass.volume, seams, maxG0Gap: gap, maxG1AngleRad: angle };
+}
+
+/** Number of connected components of the cage (union-find over its edges). */
+function componentCount(vertexCount: number, topology: CageTopology): number {
+  const parents = Array.from({ length: vertexCount }, (_, v) => v);
+  const find = (v: number): number => ((parents[v] as number) === v ? v : (parents[v] = find(parents[v] as number)));
+  for (const { a, b } of topology.edges) parents[find(a)] = find(b);
+  return new Set(parents.map((_, v) => find(v))).size;
+}
+
+interface Limits {
+  readonly symmetry: number;
+  readonly meshVsLimitRel: number;
+  readonly patchSeamGap: number;
+  readonly patchSeamAngleRad: number;
+}
+
+type Tolerances = {
+  readonly symmetry?: number | undefined;
+  readonly meshVsLimitRel?: number | undefined;
+  readonly patchSeamGap?: number | undefined;
+  readonly patchSeamAngleRad?: number | undefined;
+};
+
+/** The tolerances as reported in data: the value used, its unit, whether it is the named default and where the default comes from. */
+function toleranceRows(limits: Limits, given: Tolerances | undefined, unit: string): Array<Record<string, unknown>> {
+  return [
+    {
+      name: 'symmetry',
+      value: limits.symmetry,
+      unit,
+      defaulted: given?.symmetry === undefined,
+      source: 'llull choice: 1e-9 x cage diagonal',
+    },
+    {
+      name: 'meshVsLimitRel',
+      value: limits.meshVsLimitRel,
+      unit: 'relative',
+      defaulted: given?.meshVsLimitRel === undefined,
+      source: 'llull choice: 0.5 %',
+    },
+    {
+      name: 'patchSeamGap',
+      value: limits.patchSeamGap,
+      unit,
+      defaulted: given?.patchSeamGap === undefined,
+      source: 'llull choice: 1e-6 x cage diagonal',
+    },
+    {
+      name: 'patchSeamAngleRad',
+      value: limits.patchSeamAngleRad,
+      unit: 'rad',
+      defaulted: given?.patchSeamAngleRad === undefined,
+      source: 'llull choice: 0.05 rad',
+    },
+  ];
 }
 
 /**
@@ -110,170 +160,38 @@ export const checkSubdivision = defineCommand({
         (axis) => Math.max(...entity.vertices.map((p) => p[axis] as number)) - Math.min(...entity.vertices.map((p) => p[axis] as number)),
       ),
     );
-    const symmetryLimit = params.tolerances?.symmetry ?? 1e-9 * size;
-    const volumeLimit = params.tolerances?.meshVsLimitRel ?? 0.005;
-    const gapLimit = params.tolerances?.patchSeamGap ?? 1e-6 * size;
-    const angleLimit = params.tolerances?.patchSeamAngleRad ?? 0.05;
-    const flat = entity.faces.flatMap((face, f) => (faceArea(entity.vertices, face) < 1e-12 * size * size ? [f] : []));
-    if (flat.length > 0)
-      findings.push({
-        code: 'DIR_CHECK_DEGENERATE_FACE',
-        severity: 'fail',
-        ids: flat.map((f) => entity.elementIds.faces[f] as string),
-        value: flat.length,
-        limit: 0,
-        unit: 'faces',
-        message: `${flat.length} cage face(s) have zero area`,
-        remediation: 'move or merge the vertices of those faces',
-      });
-    const level =
-      [entity.levels, 2, 1, 0].find((l) => l <= entity.levels && 2 * levelQuadCount(entity, l) <= SELF_INTERSECTION_TRIANGLES) ?? 0;
-    const mesh = subdivide(entity, level);
-    const triangles = mesh.faces.flatMap((face) =>
-      face.slice(2).flatMap((_, k) => [face[0] as number, face[k + 1] as number, face[k + 2] as number]),
-    );
-    const crossings = findSelfIntersections(mesh.vertices.flat(), triangles, 8);
-    if (crossings.count > 0)
-      findings.push({
-        code: 'DIR_CHECK_SELF_INTERSECTION',
-        severity: 'fail',
-        ids: [entity.id],
-        value: crossings.count,
-        limit: 0,
-        unit: 'triangle pairs',
-        message: `the level-${level} mesh crosses itself in ${crossings.count} place(s)`,
-        remediation: 'pull the intersecting parts of the cage apart',
-      });
-    if (level < entity.levels)
-      findings.push({
-        code: 'DIR_CHECK_SELF_INTERSECTION_PARTIAL',
-        severity: 'warn',
-        ids: [entity.id],
-        value: level,
-        limit: entity.levels,
-        unit: 'levels',
-        message: `self-intersection was tested on the level-${level} mesh only (level ${entity.levels} is above the ${SELF_INTERSECTION_TRIANGLES}-triangle budget)`,
-        remediation: 'lower levels to run the full test, or check a coarser cage',
-      });
+    const limits: Limits = {
+      symmetry: params.tolerances?.symmetry ?? 1e-9 * size,
+      meshVsLimitRel: params.tolerances?.meshVsLimitRel ?? 0.005,
+      patchSeamGap: params.tolerances?.patchSeamGap ?? 1e-6 * size,
+      patchSeamAngleRad: params.tolerances?.patchSeamAngleRad ?? 0.05,
+    };
+    findings.push(...degenerateFaceFindings(entity, size));
+    const intersections = selfIntersectionFindings(entity);
+    const level = intersections.level;
+    findings.push(...intersections.findings);
     const deviation = entity.symmetry === undefined ? 0 : symmetryDeviation(entity.vertices, entity.symmetry);
-    if (entity.symmetry !== undefined && deviation > symmetryLimit)
-      findings.push({
-        code: 'DIR_CHECK_SYMMETRY_DEVIATION',
-        severity: 'warn',
-        ids: [entity.id],
-        value: deviation,
-        limit: symmetryLimit,
-        unit: doc.units,
-        message: `the cage deviates ${deviation.toExponential(3)} from its declared mirror symmetry`,
-        remediation: 'run set_cage_symmetry with snap true',
-      });
+    findings.push(...symmetryFindings(entity, deviation, limits.symmetry, doc.units));
     const loops = boundaryLoops(topology);
     const open = loops.length > 0;
     const meshVolume = open ? null : levelMeshVolume(entity, entity.levels);
     const estimate = open ? null : limitVolumeEstimate(entity);
     const volumeRatio =
       estimate === null || meshVolume === null ? null : Math.abs(meshVolume - estimate.volume) / Math.abs(estimate.volume);
-    if (open) {
-      // an open surface has no volume: the volume checks do not apply
-    } else if (estimate === null || meshVolume === null)
-      findings.push({
-        code: 'DIR_CHECK_LIMIT_VOLUME_UNAVAILABLE',
-        severity: 'warn',
-        ids: [entity.id],
-        value: 0,
-        limit: 0,
-        unit: 'volume',
-        message: 'the cage is too large for the limit-volume estimate: the level-mesh deviation was not checked',
-        remediation: 'check a coarser cage, or use the exact kernel with exactSeams true (data.limitPatches)',
-      });
-    else if (volumeRatio === null || !Number.isFinite(volumeRatio))
-      findings.push({
-        code: 'DIR_CHECK_VOLUME_NON_FINITE',
-        severity: 'warn',
-        ids: [entity.id],
-        value: Number.NaN,
-        limit: volumeLimit,
-        unit: 'relative',
-        message: `the volumes (level mesh ${meshVolume}, limit estimate ${estimate.volume}) cannot be compared`,
-        remediation: 'the cage is degenerate or inside out: check the winding and the face areas',
-      });
-    else if (volumeRatio > volumeLimit)
-      findings.push({
-        code: 'DIR_CHECK_LEVEL_MESH_DEVIATION',
-        severity: 'warn',
-        ids: [entity.id],
-        value: volumeRatio,
-        limit: volumeLimit,
-        unit: 'relative',
-        message: `the level-${entity.levels} mesh volume ${meshVolume.toPrecision(10)} differs from the limit-surface volume ${estimate.volume.toPrecision(8)}`,
-        remediation: 'raise levels, or use the exact kernel (mass_properties then measures the limit patches)',
-      });
-    const histogram: Record<string, number> = {};
-    const extraordinary: string[] = [];
-    (topology.vertexEdges as number[][]).forEach((edges, v) => {
-      if (edges.length === 4) return;
-      histogram[String(edges.length)] = (histogram[String(edges.length)] ?? 0) + 1;
-      extraordinary.push(entity.elementIds.vertices[v] as string);
-    });
-    const ngons = entity.faces.flatMap((face, f) => (face.length === 4 ? [] : [entity.elementIds.faces[f] as string]));
-    if (extraordinary.length > 0 || ngons.length > 0)
-      findings.push({
-        code: 'DIR_CHECK_EXTRAORDINARY',
-        severity: 'info',
-        ids: [...extraordinary, ...ngons],
-        value: extraordinary.length + ngons.length,
-        limit: 0,
-        unit: 'elements',
-        message: `${extraordinary.length} extraordinary vertex(es), ${ngons.length} n-gon face(s): the limit surface is only G1 there`,
-        remediation: 'none needed; a regular quad cage is C2 everywhere',
-      });
-    const budget = settleBudgetProblem(entity);
-    if (budget !== null)
-      findings.push({
-        code: 'DIR_SHARPNESS_BUDGET',
-        severity: 'warn',
-        ids: [entity.id],
-        value: fullSettleLevels(entity),
-        limit: settleLevels(entity),
-        unit: 'levels',
-        message: `${budget}: the exact paths (patches, B-spline export, evaluator, code export) read the sharpness left after the budgeted settling as infinite`,
-        remediation: 'set_cage_crease with a lower sharpness (or 10 for infinite) so every path describes the level mesh',
-      });
+    findings.push(...volumeFindings(entity, open, meshVolume, estimate, volumeRatio, limits.meshVsLimitRel));
+    const extraordinary = extraordinaryFindings(entity, topology);
+    findings.push(...extraordinary.findings, ...sharpnessBudgetFindings(entity));
     const euler = entity.vertices.length - topology.edges.length + entity.faces.length;
-    const parents = entity.vertices.map((_, v) => v);
-    const find = (v: number): number => ((parents[v] as number) === v ? v : (parents[v] = find(parents[v] as number)));
-    for (const { a, b } of topology.edges) parents[find(a)] = find(b);
-    const components = new Set(entity.vertices.map((_, v) => find(v))).size;
+    const components = componentCount(entity.vertices.length, topology);
     const kernel = (ctx ?? currentContext()).kernel;
     const patches = open || params.exactSeams !== true ? null : limitPatches(kernel, entity);
-    if (patches !== null && (patches['maxG0Gap'] as number) > gapLimit)
-      findings.push({
-        code: 'DIR_CHECK_PATCH_SEAM_GAP',
-        severity: 'warn',
-        ids: [entity.id],
-        value: patches['maxG0Gap'] as number,
-        limit: gapLimit,
-        unit: doc.units,
-        message: `neighbouring exact patches are up to ${(patches['maxG0Gap'] as number).toExponential(3)} apart`,
-        remediation: 'the exact solid may fail to sew: simplify creases near extraordinary vertices',
-      });
-    if (patches !== null && (patches['maxG1AngleRad'] as number) > angleLimit)
-      findings.push({
-        code: 'DIR_CHECK_PATCH_SEAM_ANGLE',
-        severity: 'warn',
-        ids: [entity.id],
-        value: patches['maxG1AngleRad'] as number,
-        limit: angleLimit,
-        unit: 'rad',
-        message: `neighbouring exact patches meet at up to ${(patches['maxG1AngleRad'] as number).toExponential(3)} rad (C0 at extraordinary vertices and creases)`,
-        remediation: 'expected next to extraordinary vertices; otherwise add loops to regularise the cage',
-      });
+    findings.push(...patchSeamFindings(entity, patches, limits.patchSeamGap, limits.patchSeamAngleRad, doc.units));
     const status = findings.some((f) => f.severity === 'fail') ? 'fail' : findings.some((f) => f.severity === 'warn') ? 'warn' : 'pass';
     const sharp = edgeSharpnessMap(entity);
     const data = {
       status,
       findings,
-      extraordinaryHistogram: histogram,
+      extraordinaryHistogram: extraordinary.histogram,
       creases: {
         infinite: entity.creases.length,
         semiSharp: entity.edgeSharpness?.length ?? 0,
@@ -291,36 +209,7 @@ export const checkSubdivision = defineCommand({
       meshVolume,
       limitVolumeEstimate: estimate === null ? null : estimate.volume,
       limitPatches: patches,
-      tolerances: [
-        {
-          name: 'symmetry',
-          value: symmetryLimit,
-          unit: doc.units,
-          defaulted: params.tolerances?.symmetry === undefined,
-          source: 'llull choice: 1e-9 x cage diagonal',
-        },
-        {
-          name: 'meshVsLimitRel',
-          value: volumeLimit,
-          unit: 'relative',
-          defaulted: params.tolerances?.meshVsLimitRel === undefined,
-          source: 'llull choice: 0.5 %',
-        },
-        {
-          name: 'patchSeamGap',
-          value: gapLimit,
-          unit: doc.units,
-          defaulted: params.tolerances?.patchSeamGap === undefined,
-          source: 'llull choice: 1e-6 x cage diagonal',
-        },
-        {
-          name: 'patchSeamAngleRad',
-          value: angleLimit,
-          unit: 'rad',
-          defaulted: params.tolerances?.patchSeamAngleRad === undefined,
-          source: 'llull choice: 0.05 rad',
-        },
-      ],
+      tolerances: toleranceRows(limits, params.tolerances, doc.units),
       provenance: {
         scheme: 'Catmull-Clark',
         creaseRule: entity.creaseMethod === 'chaikin' ? 'OpenSubdiv Chaikin' : 'OpenSubdiv uniform',
