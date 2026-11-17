@@ -1,5 +1,6 @@
 /** Host-filled `at` / `by` (pure, @protocol/hostParams): one command, plan steps, nested loops. */
 import { describe, expect, it } from 'vitest';
+import { listCommands } from '@core/commands/registry';
 import { fillHostParams, isoSeconds } from '@protocol/hostParams';
 
 const host = { now: new Date('2026-11-02T09:30:00.123Z'), user: (): string => 'alice' };
@@ -41,6 +42,19 @@ describe('fillHostParams', () => {
       revision: 'A',
       at: FILLED.at,
     });
+  });
+
+  it('the stamped gates outside plm are exactly the commands annotated hostStamped, and each declares the `at` the host fills', () => {
+    const stamped = listCommands().filter((command) => command.annotations?.hostStamped === true);
+    expect(stamped.map((command) => command.name).sort()).toEqual([
+      'accept_pid_finding',
+      'approve_pipe_spec',
+      'approve_pipe_stress',
+      'issue_isometric',
+      'issue_pid_sheet',
+      'set_deliverable_status',
+    ]);
+    for (const command of stamped) expect(Object.keys(command.paramsSchema.properties), command.name).toContain('at');
   });
 
   it('leaves other commands, unknown names and commands without at/by alone', () => {

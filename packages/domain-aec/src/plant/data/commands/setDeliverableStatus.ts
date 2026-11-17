@@ -32,7 +32,7 @@ export const setDeliverableStatus = defineCommand({
     'Every step stores `at` (host-filled) and a signed step also stores the signer, the signature id and the payload hash that was signed. The status is NOT a lock on the content: edit the plant afterwards and the stored hash no longer matches (export_handover document register reports contentCurrent). ' +
     'This is a document-state command, not a recipe step: a history replay keeps the deliverables and never re-runs a signature. Returns data = { deliverable, revision, status, from, contentSha256, hierarchy, signer?, signatureId?, payloadSha256?, at, superseded[], checkWarnings (null when no check ran), reviewRequired, reviewReason? }; ' +
     'reviewRequired is true until a signed status is reached. Refusals (document unchanged): DAT_PARAM_INVALID, DAT_HIERARCHY_UNKNOWN, DAT_STATUS_TRANSITION, DAT_CHECK_FAILED, DAT_HUMAN_GATE.',
-  annotations: { metaHistory: true },
+  annotations: { metaHistory: true, hostStamped: true },
   params: z.object({
     confirmExportControlled,
     deliverable: z

@@ -80,6 +80,7 @@ const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
  */
 export const approvePipeStress = defineCommand({
   name: 'approve_pipe_stress',
+  annotations: { hostStamped: true },
   description:
     'Approve the recorded pipe stress results of a model: a HUMAN act that an agent cannot perform (a qualified engineer reviews and signs). ' +
     'Needs record_pipe_stress_results first; refused with PST_RESULTS_STALE when the model, pipes, supports or material changed since the record, PST_RESULTS_FAILING when the status is fail, PST_RESULTS_INCOMPLETE when it is incomplete (all checked before any signature is spent). ' +

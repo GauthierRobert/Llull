@@ -26,7 +26,7 @@ export const issuePidSheet = defineCommand({
     '`at` is host-filled and part of what is signed. A document-state command, not a recipe step: a history replay keeps sheet statuses and stamps and never re-runs a signature. ' +
     'Returns data = { sheetId, number, revision, status, from, contentSha256, acceptedErrors[], signer?, signatureId?, payloadSha256?, at, reviewRequired }; reviewRequired is true until the sheet is signed for construction. ' +
     'Refusals (document unchanged): PID_SHEET_NOT_FOUND, PID_STATUS_TRANSITION, PID_CHECK_FAILED, PID_HUMAN_GATE.',
-  annotations: { metaHistory: true },
+  annotations: { metaHistory: true, hostStamped: true },
   params: z.object({
     sheet: z.string().trim().min(1).describe('The sheet: its number (e.g. "PID-001") or its id.'),
     status: z.enum(PID_SHEET_STATUSES).describe('The new status. issued_for_construction needs a human signature.'),

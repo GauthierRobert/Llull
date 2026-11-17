@@ -23,7 +23,7 @@ export const acceptPidFinding = defineCommand({
     '(with a nonce field) over the act, the findingKey, the reason, the rule code and `at`, verified and spent once by the signing port; the signer becomes `by`. The acceptance is stored in doc.plant.pid.acceptances, check_pid hides it ' +
     '(includeAccepted lists it) and a sheet with only accepted errors can be issued for construction. `at` is host-filled and part of what is signed. This is a document-state command, not a recipe step: a history replay keeps the acceptances and never re-runs a signature. ' +
     'Returns data = { findingKey, code, severity, reason, by, at, signed, signatureId?, payloadSha256?, reviewRequired }. Refusals (document unchanged): PID_FINDING_NOT_FOUND, PID_PARAM_INVALID, PID_HUMAN_GATE.',
-  annotations: { metaHistory: true },
+  annotations: { metaHistory: true, hostStamped: true },
   params: z.object({
     findingKey: z
       .string()

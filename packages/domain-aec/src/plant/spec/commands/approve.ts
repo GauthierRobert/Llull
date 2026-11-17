@@ -33,6 +33,7 @@ const approvalOf = (outcome: { signer: string; signatureId: string; at: string }
  */
 export const approvePipeSpec = defineCommand({
   name: 'approve_pipe_spec',
+  annotations: { hostStamped: true },
   description:
     'Approve a draft piping spec revision: a HUMAN act that an agent cannot perform (a qualified reviewer approves the spec). The spec must have no fail finding in check_pipe_spec (checked first, so a signature is not spent on a spec that cannot be approved); ' +
     'then `confirmation` must be a signature object produced by a human in the desktop app (with a nonce field) over the act, the spec id, the revision and the content hash of the spec, verified by the signing port. ' +
