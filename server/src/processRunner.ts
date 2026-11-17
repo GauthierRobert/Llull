@@ -9,7 +9,7 @@
 import { spawn, spawnSync, type ChildProcess, type ChildProcessByStdio } from 'node:child_process';
 import type { Readable, Writable } from 'node:stream';
 import { isRecord } from '@lib/isRecord';
-import { trackChild } from './childProcesses';
+import { killProcessTree, trackChild } from './childProcesses';
 
 const LOG_TAIL_BYTES = 64 * 1024;
 const PIPE_DRAIN_GRACE_MS = 1000;
@@ -95,29 +95,6 @@ export interface ProcessRunnerHooks {
   /** Kills `child` and every descendant. */
   readonly killTree: (child: ChildProcess) => void;
   readonly platform: NodeJS.Platform;
-}
-
-/**
- * Kill the process tree rooted at `pid` (never by image name): `taskkill /T /F /PID` on Windows (the parent links find detached descendants too), the
- * process group elsewhere. `fallback` runs when the tree kill cannot be done (no such group, taskkill missing).
- */
-export function killPidTree(pid: number, fallback: () => void, platform: NodeJS.Platform = process.platform): void {
-  if (platform === 'win32') {
-    const killer = spawn('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true });
-    killer.on('error', fallback);
-    return;
-  }
-  try {
-    process.kill(-pid, 'SIGKILL');
-  } catch {
-    fallback();
-  }
-}
-
-/** Kill the process tree rooted at `child`. */
-export function killProcessTree(child: ChildProcess, platform: NodeJS.Platform = process.platform): void {
-  if (child.pid === undefined) return;
-  killPidTree(child.pid, () => void child.kill('SIGKILL'), platform);
 }
 
 const REAL_HOOKS: ProcessRunnerHooks = {

@@ -110,9 +110,27 @@ export function getLiveDoc(): CadDocument {
   return _liveDoc;
 }
 
+interface HistoryFlags {
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+}
+
+let _historyFlags: (() => HistoryFlags) | null = null;
+
+/** The history owner (`commandBus`) registers its flags once, so snapshot / command events carry what the REST responses carry (no import cycle). */
+export function setHistoryFlagsSource(source: () => HistoryFlags): void {
+  _historyFlags = source;
+}
+
 /** `GET /live/snapshot` and the SSE `snapshot` event. Values of private material libraries never leave the process (TR-MAT-31). */
 export function getLiveSnapshot(): LiveSnapshotEvent {
-  return { epoch: _epoch, seq: _seq, stateHash: documentHash(_liveDoc), document: withoutPrivateValues(_liveDoc) };
+  return {
+    epoch: _epoch,
+    seq: _seq,
+    stateHash: documentHash(_liveDoc),
+    document: withoutPrivateValues(_liveDoc),
+    ...(_historyFlags?.() ?? {}),
+  };
 }
 
 const _subscribers = new Set<Response>();
@@ -188,6 +206,7 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     name: command.name,
     params: withoutConfirmations(command.params),
     stateHash: documentHash(next),
+    ...(_historyFlags?.() ?? {}),
     ...(command.source !== undefined ? { source: command.source } : {}),
     ...(command.commandId !== undefined ? { commandId: command.commandId } : {}),
   };

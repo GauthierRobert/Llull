@@ -7,7 +7,7 @@ import net from 'net';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
-import { killPidTree } from '@server/processRunner';
+import { killPidTree } from '@server/childProcesses';
 import { isHealthy } from '@server/restClient';
 import { readJsonFile } from '@server/readJsonFile';
 import { writeFileAtomic } from '@server/writeFileAtomic';

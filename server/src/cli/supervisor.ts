@@ -5,7 +5,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { killProcessTree } from '../processRunner';
+import { killProcessTree } from '../childProcesses';
 import { cliTarget, parseArgv, stringFlag } from './argv';
 import { DEADLINE_ENV } from './deadline';
 

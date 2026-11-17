@@ -9,7 +9,8 @@ paths:
 # RULE: sync (live document + local backend + CLI detail, L6 as built)
 
 - Live sync = the command log (`@protocol/liveSync`): `/live` SSE broadcasts `command`
-  `{ seq, name, params, stateHash, source?, commandId? }` and `snapshot` `{ seq, stateHash, document }` events. Clients
+  `{ seq, name, params, stateHash, source?, commandId? }` and `snapshot` `{ seq, stateHash, document }` events. Both also carry the
+  backend's `canUndo` / `canRedo` (optional on the wire; the store adopts them, so Undo / Redo follow CLI commands and File > Open). Clients
   re-run each command with `execute` and check `stateHash`; a seq gap or hash mismatch ⇒
   `GET /live/snapshot`. No document-diff channel, no UI bridge.
 - Host-only ports: the renderer's `applyLiveCommand` runs `execute` WITHOUT `meshAssets` (the content-addressed mesh store, native mesh engine and kernel

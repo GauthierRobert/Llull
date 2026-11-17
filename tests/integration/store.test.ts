@@ -375,6 +375,17 @@ describe('CadStore — live command log and epochs', () => {
     expect(selection()).toHaveLength(1);
   });
 
+  it('adopts the backend history flags from a snapshot and a command from another source; absent flags leave them alone', () => {
+    getState().hydrateLiveDocument({ ...liveSnapshot(createEmptyDocument(), 3), canUndo: true, canRedo: true });
+    expect([getState().canUndo, getState().canRedo]).toEqual([true, true]);
+    const after = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
+    const event = { epoch: TEST_EPOCH, seq: 4, name: 'add_box', params: { size: [1, 1, 1] }, stateHash: liveSnapshot(after).stateHash };
+    expect(getState().applyLiveCommand({ ...event, source: 'cli', canUndo: true, canRedo: false })).toBe(true);
+    expect([getState().canUndo, getState().canRedo]).toEqual([true, false]);
+    getState().hydrateLiveDocument(liveSnapshot(after, 5));
+    expect([getState().canUndo, getState().canRedo]).toEqual([true, false]);
+  });
+
   it('refuses a gap or a mismatching hash so the caller resyncs', () => {
     getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
     expect(getState().applyLiveCommand({ epoch: TEST_EPOCH, seq: 9, name: 'add_box', params: {}, stateHash: '' })).toBe(false);

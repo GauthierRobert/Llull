@@ -6,7 +6,7 @@ import type { CadDocument } from '@core/model/types';
 import { withMonotonicStepCounter } from '@core/model/stepCounter';
 import { getCommand } from '@core/commands/registry';
 import { reportServerCrash } from './serverCrash';
-import { getLiveDoc, setLiveDoc } from './liveDocument';
+import { getLiveDoc, setHistoryFlagsSource, setLiveDoc } from './liveDocument';
 import { sha256Hex } from './sha256';
 import { emptyHistory, historySummary, recordChange, stepHistory, type History, type HistoryDirection } from '@protocol/history';
 import type { LiveCommandSource } from '@protocol/liveSync';
@@ -232,6 +232,8 @@ export function canUndo(): boolean {
 export function canRedo(): boolean {
   return history.redo.length > 0;
 }
+
+setHistoryFlagsSource(() => ({ canUndo: canUndo(), canRedo: canRedo() }));
 
 /** @internal tests only */
 export function _resetHistory(): void {
