@@ -4,6 +4,7 @@ import type { FeaLoad } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { ALL_ELEMENTS, type DeckContext, type DeckRefusal } from './context';
 import { num, row } from './format';
+import { map3 } from '@lib/vec3';
 
 /** Rotation terms of the inertial loads of one step (the linear acceleration goes into the gravity field of the step). */
 export interface InertialTerms {
@@ -31,17 +32,15 @@ export function inertialContribution(
   readonly angular?: InertialTerms['angular'][number];
 } {
   const scale = ctx.lengthToAnalysis;
-  const point = (load.referencePoint ?? [0, 0, 0]).map((value) => value * scale) as unknown as Vec3;
+  const point = map3(load.referencePoint ?? [0, 0, 0], (value) => value * scale);
   const linear = load.vector ?? [0, 0, 0];
   const omega = load.angularVelocity ?? [0, 0, 0];
   const speed = Math.hypot(omega[0], omega[1], omega[2]);
   const alpha = load.angularAccel ?? [0, 0, 0];
   return {
     field: [-linear[0] * factor, -linear[1] * factor, -linear[2] * factor],
-    ...(speed > 0
-      ? { centrifugal: { omegaSquared: speed * speed * factor, point, axis: omega.map((value) => value / speed) as unknown as Vec3 } }
-      : {}),
-    ...(alpha.some((value) => value !== 0) ? { angular: { alpha: alpha.map((value) => value * factor) as unknown as Vec3, point } } : {}),
+    ...(speed > 0 ? { centrifugal: { omegaSquared: speed * speed * factor, point, axis: map3(omega, (value) => value / speed) } } : {}),
+    ...(alpha.some((value) => value !== 0) ? { angular: { alpha: map3(alpha, (value) => value * factor), point } } : {}),
   };
 }
 

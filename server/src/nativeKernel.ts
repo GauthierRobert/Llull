@@ -59,7 +59,7 @@ function startFailureCause(binary: string, env: NodeJS.ProcessEnv = process.env)
     windowsHide: true,
   });
   if (probe.error !== undefined) return probe.error.message;
-  if (probe.status === STATUS_DLL_NOT_FOUND || /shared libraries|TKw+.dll/.test(probe.stderr ?? '')) {
+  if (probe.status === STATUS_DLL_NOT_FOUND || /shared libraries|TK\w+\.dll/i.test(probe.stderr ?? '')) {
     return 'its OCCT libraries (TK*.dll) were not found; set LLULL_OCCT_DIR to the OCCT install prefix or put them next to the binary';
   }
   if (probe.status !== 0) return `it exited with code ${probe.status ?? probe.signal ?? 'unknown'}`;

@@ -56,9 +56,7 @@ export function backendOrigin(port: number): string {
 
 export function backendEnv(input: BackendEnvInput): Record<string, string> {
   const inherited = Object.fromEntries(
-    Object.entries(input.baseEnv).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined && !entry[0].startsWith('LLULL_') && entry[0] !== 'LLULL_AUTH_TOKEN',
-    ),
+    Object.entries(input.baseEnv).filter((entry): entry is [string, string] => entry[1] !== undefined && !entry[0].startsWith('LLULL_')),
   );
   return {
     ...inherited,

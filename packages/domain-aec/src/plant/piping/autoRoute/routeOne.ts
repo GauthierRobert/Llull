@@ -5,13 +5,13 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { PipeLine, PipeRun } from '@aec/plant/types';
-import type { Vec3 } from '@core/model/vectors';
 import { withRunEntities } from '../derive';
 import { getPiping, withPiping } from '../model';
 import { deriveRun } from '../routeParts';
 import { buildRouteProblem, type RouteRequest } from './problem';
 import { searchRoute } from './search';
 import { checkSolution, solutionFromSearch, type RouteSolution } from './solution';
+import { map3 } from '@lib/vec3';
 
 /** Expansion cap of the in-process TypeScript search, per first-move candidate (02 RTE §8, §13.3): above it, `llull auto_route`. */
 export const TS_MAX_EXPANSIONS = 200_000;
@@ -57,7 +57,7 @@ const refusal = (code: string, message: string, ids: readonly string[], paths: r
 /** The solution with its PIs snapped to whole µm (what a JSON round trip of a native answer gives). */
 const snapped = (solution: RouteSolution): RouteSolution => ({
   ...solution,
-  pis: solution.pis.map((p) => p.map((v) => Math.round(v * 1000) / 1000) as unknown as Vec3),
+  pis: solution.pis.map((p) => map3(p, (v) => Math.round(v * 1000) / 1000)),
 });
 
 /**

@@ -2,9 +2,9 @@ import { defineCommand, vec3, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import type { TieInPoint } from '@aec/plant/types';
-import type { Vec3 } from '@core/model/vectors';
 import { nextId } from '@lib/id';
 import { getPiping, refuse, withPiping } from '../model';
+import { map3 } from '@lib/vec3';
 
 export const END_TYPES = ['BW', 'FL', 'SW', 'SC', 'PL', 'WAF', 'LUG'] as const;
 
@@ -42,7 +42,7 @@ export const addTieInPoint = defineCommand({
     if (clash !== undefined)
       return refuse(doc, 'add_tie_in_point', 'RTE_DUPLICATE_TAG', `tag "${tag}" is used by ${clash}`, [clash], ['tag']);
     const id = nextId('tie');
-    const unit = direction.map((v) => v / length) as unknown as Vec3;
+    const unit = map3(direction, (v) => v / length);
     const tieIn: TieInPoint = {
       id,
       tag,

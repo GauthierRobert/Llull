@@ -14,7 +14,7 @@ import { worldSurface } from '../../geometry/deform/worldNurbs';
 import { closestOnSurface } from '../../lib/nurbs/closest';
 import { surfaceDerivatives, surfaceDomain } from '../../lib/nurbs/surface';
 import type { NurbsSurfaceData } from '../../lib/nurbs/surfaceTypes';
-import { cross3, dot3, len3, normalize3 } from '../../lib/vec3';
+import { cross3, dot3, len3, normalize3, map3 } from '../../lib/vec3';
 import type { DeformPlan } from './request';
 import { type DeformTarget, type Refusal, defaultTolerance, resolveTargetFrame } from './target';
 
@@ -70,7 +70,7 @@ function focalPoints(sheet: BaseSheetOptions): Vec3[] {
       const [suu, suv, svv] = [(d[2] as Vec3[])[0] as Vec3, (d[1] as Vec3[])[1] as Vec3, (d[0] as Vec3[])[2] as Vec3];
       const raw = cross3(su, sv);
       if (len3(raw) === 0) continue;
-      const n = normalize3(raw).map((c) => c * sheet.normalSign) as unknown as Vec3;
+      const n = map3(normalize3(raw), (c) => c * sheet.normalSign);
       const [e, f, g] = [dot3(su, su), dot3(su, sv), dot3(sv, sv)];
       const [l, m, k] = [dot3(n, suu), dot3(n, suv), dot3(n, svv)];
       // det(II - kappa I) = 0

@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo } from 'react';
 import '@ui/styles/panels/analysis.css';
 import { classNames } from '@ui/classNames';
-import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { execute } from '@core/commands/registry';
 import { ListRow, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { eigenOf, parseAnalysisList, parseCheck, parseDescribe } from './analysisData';
@@ -30,7 +30,7 @@ import { useHostQuery } from './useHostQuery';
 const ALL_CASES: Record<string, unknown> = {};
 
 export function AnalysisPanel({ className }: { className?: string }): React.ReactElement {
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const pickedId = useAnalysisViewStore((s) => s.analysisId);
   const setActive = useAnalysisViewStore((s) => s.setActive);
   const mode = useAnalysisViewStore((s) => s.mode);

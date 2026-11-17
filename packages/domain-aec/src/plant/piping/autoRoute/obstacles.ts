@@ -20,6 +20,7 @@ import { externalBodies, type ExternalBody } from '../../../industrial/clash/cla
 import { runPoints } from '../model';
 import { pipeOutsideDiameter } from '../specLookup';
 import type { ObstacleBox } from './lattice';
+import { map3 } from '@lib/vec3';
 
 /** Keep-out inputs of a route request. */
 export interface KeepOuts {
@@ -55,10 +56,7 @@ const inflate = (id: string, min: Vec3, max: Vec3, extra: number): ObstacleBox =
 /** World AABB of an oriented box. */
 function aabb(box: OrientedBox): Corners {
   const reach = [0, 1, 2].map((dim) => box.axes.reduce((sum, axis, k) => sum + Math.abs(axis[dim] as number) * (box.half[k] as number), 0));
-  return {
-    min: box.center.map((v, dim) => v - (reach[dim] as number)) as unknown as Vec3,
-    max: box.center.map((v, dim) => v + (reach[dim] as number)) as unknown as Vec3,
-  };
+  return { min: map3(box.center, (v, dim) => v - (reach[dim] as number)), max: map3(box.center, (v, dim) => v + (reach[dim] as number)) };
 }
 
 const axisAligned = (box: OrientedBox): boolean => box.axes.every((axis) => axis.some((v) => Math.abs(Math.abs(v) - 1) < AXIS_EPS));
@@ -74,8 +72,8 @@ export function aabbs(box: OrientedBox): Corners[] {
   const axis = box.axes[long] as Vec3;
   return Array.from({ length: cuts }, (_, cut) => {
     const offset = -length / 2 + ((cut + 0.5) * length) / cuts;
-    const center = box.center.map((v, dim) => v + (axis[dim] as number) * offset) as unknown as Vec3;
-    const half = box.half.map((v, k) => (k === long ? length / (2 * cuts) : v)) as unknown as Vec3;
+    const center = map3(box.center, (v, dim) => v + (axis[dim] as number) * offset);
+    const half = map3(box.half, (v, k) => (k === long ? length / (2 * cuts) : v));
     return aabb({ ...box, center, half });
   });
 }

@@ -211,7 +211,7 @@ interface CommandSpec<S extends ParamsObject> {
 
 /**
  * Define a command from one zod params schema.
- * @invariant unknown keys are preserved (loose object) so recorded/legacy params still run
+ * @invariant the validator is a loose object: undeclared top-level keys are refused earlier, by `guard.ts` (`CMD_UNKNOWN_PARAM`), except a command's `metadataKeys`
  * @failure params failing the schema -> `execute` no-ops with `<name> rejected: invalid params …`
  */
 export function defineCommand<S extends ParamsObject>(spec: CommandSpec<S>): CommandDefinition<z.output<S>> {

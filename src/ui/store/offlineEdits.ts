@@ -4,7 +4,7 @@
 
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import type { CadDocument } from '@core/model/types';
-import { browserStorage, writeAutosave } from './autosave';
+import { browserStorage, clearAutosave, writeAutosave } from './autosave';
 import { useRecoveryStore } from './recoveryStore';
 import { postRecovery } from './serverCommands';
 import { useSessionStore } from './sessionStore';
@@ -13,6 +13,9 @@ export function preserveOfflineEdits(offlineDocument: CadDocument, changeCount: 
   const json = serializeDocument(offlineDocument);
   void postRecovery('offline', { json, changeCount, path: useRecoveryStore.getState().documentPath }).then(
     () => {
+      // the backend slot is now the recoverable copy: drop the device copy so the same work is not offered twice at next launch
+      const storage = browserStorage();
+      if (storage !== null) clearAutosave(storage);
       useRecoveryStore.getState().setOfflineEditsKept(true);
       void useRecoveryStore.getState().refresh(false);
     },

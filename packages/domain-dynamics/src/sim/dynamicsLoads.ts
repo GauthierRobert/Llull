@@ -7,7 +7,7 @@ import { couplingsOf } from '@core/model/transmissions';
 import type { Vec3 } from '@core/model/vectors';
 import { GROUND, type DynamicJoint, type DynamicsModel, type Motor, type PropellerLoad } from '@core/model/dynamics';
 import { toMetres } from '@core/model/units';
-import { normalize3 } from '@lib/vec3';
+import { normalize3, map3 } from '@lib/vec3';
 import { formatSi } from '@lib/siText';
 import { bodyMassProperties } from '@core/geometry/bodyMassProperties';
 import { drivetrainOfMotor, isDatasheetMotor, peakJointTorque } from './actuators/machine';
@@ -312,7 +312,7 @@ export function bodyCentres(doc: CadDocument): Record<string, Vec3> {
   const centres: Record<string, Vec3> = {};
   for (const body of Object.values(doc.dynamics?.bodies ?? {})) {
     const props = bodyMassProperties(doc, body);
-    if (!('error' in props)) centres[body.id] = props.centerOfMass.map((c) => c / perUnit) as unknown as Vec3;
+    if (!('error' in props)) centres[body.id] = map3(props.centerOfMass, (c) => c / perUnit);
   }
   return centres;
 }

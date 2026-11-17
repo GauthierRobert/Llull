@@ -140,11 +140,6 @@ export function guardRead(): RequestHandler {
   };
 }
 
-/** Guard for `POST /live/ticket`: header auth ONLY (never a ticket). */
-export function guardTicketIssue(): RequestHandler {
-  return buildGuard(false);
-}
-
 function buildGuard(isRead: boolean): RequestHandler {
   return (req, res, next) => {
     const token = process.env['LLULL_AUTH_TOKEN'];

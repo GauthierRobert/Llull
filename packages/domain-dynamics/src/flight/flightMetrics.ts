@@ -5,7 +5,7 @@
  */
 
 import type { Quaternion, Vec3 } from '@core/model/vectors';
-import { dot3, len3, sub3 } from '@lib/vec3';
+import { dot3, len3, sub3, map3 } from '@lib/vec3';
 import { aeroMetrics, type AeroSurfaceMetrics } from './aeroMetrics';
 import { batteryMetrics, batteryWarnings, type BatteryMetrics } from './batteryMetrics';
 import { mixerRow, NOT_CONTROLLED, powerBase, ROTOR, rotorSlot, setpointAt, SLOT, tiltOf } from './flightBlock';
@@ -297,9 +297,7 @@ export function flightSeries(run: FlightRun): Record<string, unknown> {
         }) * DEG,
       ),
     ),
-    bodyRateDegS: ks.map((k) =>
-      vec(rotateInverse(samples.orientation(k), samples.angularVelocity(k)).map((w) => w * DEG) as unknown as Vec3),
-    ),
+    bodyRateDegS: ks.map((k) => vec(map3(rotateInverse(samples.orientation(k), samples.angularVelocity(k)), (w) => w * DEG))),
     windMps: ks.map((k) => vec(run.loop.wind(samples.time(k)))),
     battery: Object.fromEntries(
       run.loop.power.map((feed, p) => {

@@ -3,7 +3,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { roundTo } from '../../lib/compactNumber';
-import { sub3 } from '../../lib/vec3';
+import { sub3, map3 } from '../../lib/vec3';
 import { entityLocalToWorld } from '../../geometry/entityFrame';
 import { cageVertexLimits, sampleCurvature, surfaceEvaluator } from '../../geometry/subd/limit';
 import { isRefProblem, resolveFaces, resolveVertices } from '../../geometry/subd/elements';
@@ -71,8 +71,8 @@ export const evaluateSubdivision = defineCommand({
     if (named.items.length + samples.length > MAX_POINTS)
       return reject('DIR_EVAL_BUDGET', `${named.items.length + samples.length} points requested (max ${MAX_POINTS})`, ['params.samples']);
     const origin = entityLocalToWorld(entity, [0, 0, 0]);
-    const world = (p: Vec3): Vec3 => entityLocalToWorld(entity, p).map((value) => roundTo(value, 12)) as unknown as Vec3;
-    const direction = (n: Vec3): Vec3 => sub3(entityLocalToWorld(entity, n), origin).map((value) => roundTo(value, 12)) as unknown as Vec3;
+    const world = (p: Vec3): Vec3 => map3(entityLocalToWorld(entity, p), (value) => roundTo(value, 12));
+    const direction = (n: Vec3): Vec3 => map3(sub3(entityLocalToWorld(entity, n), origin), (value) => roundTo(value, 12));
     const evaluator = surfaceEvaluator(entity);
     const topology = buildTopology(entity.vertices.length, entity.faces);
     const limits = cageVertexLimits(entity, named.items);

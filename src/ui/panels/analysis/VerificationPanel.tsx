@@ -6,6 +6,7 @@ import React, { useId, useMemo, useState } from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
 import { PanelSection, StatusChip, StatusLine, type StatusTone } from '@ui/panels/PanelParts';
 import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { formatSignificant } from './quantityFormat';
 import {
   levelRows,
@@ -164,7 +165,7 @@ function StudyCard({ analysisCase, study }: { analysisCase: AnalysisCase; study:
 
 export function VerificationPanel({ analysisCase }: { analysisCase: AnalysisCase }): React.ReactElement {
   const ids = useId();
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const [targetText, setTargetText] = useState('');
   const target = parseTarget(targetText);
   const params = useMemo(

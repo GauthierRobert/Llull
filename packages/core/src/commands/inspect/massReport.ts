@@ -12,6 +12,7 @@ import { shiftInertia, type InertiaTensor } from '../../geometry/massProperties'
 import { recipeKey } from '../../geometry/shapeRecipe';
 import type { ResolvedMass } from '../../geometry/resolveMassProperties';
 import { toMetres } from '../../model/units';
+import { map3 } from '../../lib/vec3';
 
 export type MassFrame = 'document' | 'entity';
 export type MassPurpose = 'general' | 'weight-and-balance';
@@ -92,7 +93,7 @@ export function massDetail(
         ],
       },
       ...(principal !== null && mass > 0
-        ? { radiiOfGyration: principal.moments.map((moment) => Math.sqrt(Math.max(moment, 0) / mass)) as unknown as Vec3 }
+        ? { radiiOfGyration: map3(principal.moments, (moment) => Math.sqrt(Math.max(moment, 0) / mass)) }
         : {}),
       unit: weighted ? `g·${doc.units}²` : `${doc.units}⁵ (per unit density)`,
       frame,

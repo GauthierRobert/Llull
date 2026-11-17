@@ -128,7 +128,7 @@ export function ProjectIO(): React.ReactElement {
           title="Start a new project?"
           message={
             liveStatus === 'connected'
-              ? 'This clears the SHARED live model on the server, for every connected user and agent. You can undo it right after.'
+              ? 'This clears the live model, also for any agent connected through the llull CLI. You can undo it right after.'
               : 'This clears the current model. You can undo it right after.'
           }
           confirmLabel="Clear and start new"

@@ -6,7 +6,8 @@ import { CONVENTIONS_GUIDE, TOOLSET_SEE_ALSO, isToolsetName } from '@protocol/in
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
 import { booleanFlag, missingValueFlag, paramsSource, APP_SERVER, cliTarget, parseArgv, stringFlag, type ParsedArgv } from './argv';
-import { createLocalBackend, createRemoteBackend, saveDocumentWithBackup, type CliBackend } from './backend';
+import { writeDocumentFile } from '../documentFile';
+import { createLocalBackend, createRemoteBackend, type CliBackend } from './backend';
 import { describeCommand, listCatalog, searchCatalog, suggestNames, toolsetCounts, type CatalogEntry } from './catalog';
 import { planAliases } from './aliases';
 import { deadlineFromEnv, withDeadline } from './deadline';
@@ -324,7 +325,7 @@ function runNew(args: ParsedArgv, io: CliIo): number {
   const docPath = docPathOf(args, io);
   if (fs.existsSync(docPath) && !booleanFlag(args, 'force'))
     throw new UsageError(`${docPath} exists; pass --force to replace it with an empty document.`);
-  saveDocumentWithBackup(docPath, createEmptyDocument());
+  writeDocumentFile(docPath, createEmptyDocument());
   io.stdout(`Created empty document ${docPath}.`);
   return EXIT_OK;
 }

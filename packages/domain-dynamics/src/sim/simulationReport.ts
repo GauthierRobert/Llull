@@ -18,6 +18,7 @@ import { driveSeries } from './actuators/series';
 import { energyOf, type EnergyData, type EnergySeries } from './energyReport';
 import type { LedgerData } from './ledger';
 import { speedTrend, trendWarning } from './speedTrend';
+import { map3 } from '@lib/vec3';
 
 export type SimulationDetail = 'summary' | 'series' | 'poses';
 
@@ -261,7 +262,7 @@ export function simulationData(
         [
           body.id,
           {
-            finalPosition: end.map((c) => c / run.metresPerUnit) as unknown as Vec3,
+            finalPosition: map3(end, (c) => c / run.metresPerUnit),
             finalVelocity: velocity,
             speed: Math.hypot(velocity[0], velocity[1], velocity[2]),
           },
@@ -313,7 +314,7 @@ export function simulationData(
   const bodies = Object.fromEntries(
     Object.entries(mass).map(([id, props]) => {
       const name = dynamics.bodies[id]?.name;
-      const centerOfMass = props.centerOfMass.map((c) => c / run.metresPerUnit) as unknown as Vec3;
+      const centerOfMass = map3(props.centerOfMass, (c) => c / run.metresPerUnit);
       return [id, { ...(name !== undefined ? { name } : {}), massKg: props.mass, centerOfMass }];
     }),
   );
@@ -349,7 +350,7 @@ export function simulationData(
       Object.keys(trace.bodyPosition).map((id) => [
         id,
         {
-          position: seriesOf(trace.bodyPosition, id).map((p) => p.map((c) => c / run.metresPerUnit) as unknown as Vec3),
+          position: seriesOf(trace.bodyPosition, id).map((p) => map3(p, (c) => c / run.metresPerUnit)),
           orientation: seriesOf(trace.bodyOrientation, id),
         },
       ]),

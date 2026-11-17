@@ -1,6 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { frameEntityIds, makeFakeRes, parseSseFrame } from './sseTestHelpers';
-import { getLiveDoc, getLiveSnapshot, setLiveDoc, subscribeLive, _resetLiveDoc, liveSubscriberCount } from '../src/liveDocument';
+import {
+  getLiveDoc,
+  getLiveSnapshot,
+  publishLiveProgress,
+  setLiveDoc,
+  subscribeLive,
+  _resetLiveDoc,
+  liveSubscriberCount,
+} from '../src/liveDocument';
 import { applyToolCall } from '../../tests/helpers/applyToolCall';
 import { createEmptyDocument } from '@core/model/types';
 
@@ -58,6 +66,20 @@ describe('subscribeLive', () => {
     expect(parseSseFrame(resA.written[1] ?? '').event).toBe('snapshot');
     expect(frameEntityIds(resA.written[1] ?? '')).toHaveLength(1);
     unsubs.forEach((unsub) => unsub());
+  });
+
+  it('an event that cannot be serialized ends every stream (the clients reconnect and resync) instead of leaving them open and silent', () => {
+    const res = makeFakeRes();
+    const end = vi.spyOn(res, 'end');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    subscribeLive(res);
+    const cyclic: Record<string, unknown> = { command: 'quad_remesh', jobId: 'j1', state: 'running' };
+    cyclic['self'] = cyclic;
+    publishLiveProgress(cyclic as never);
+    expect(end).toHaveBeenCalledTimes(1);
+    expect(liveSubscriberCount()).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it('subscriber count tracks subscribe/unsubscribe', () => {

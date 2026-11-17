@@ -173,6 +173,20 @@ describe('createDocumentSession', () => {
     await expect(session.hasUnsavedChanges()).rejects.toThrow(/HTTP 502/);
     await expect(session.newDocument()).rejects.toThrow(/HTTP 502/);
   });
+
+  it('the unsaved-changes check is bounded: a backend that never answers gets an abort signal (quit must not hang)', async () => {
+    let signal: AbortSignal | null | undefined;
+    const session = createDocumentSession({
+      url: 'http://127.0.0.1:1',
+      token: 't',
+      fetchImpl: (_url, init) => {
+        signal = init?.signal;
+        return Promise.resolve(new Response('<html>502</html>', { status: 502 }));
+      },
+    });
+    await expect(session.hasUnsavedChanges()).rejects.toThrow(/HTTP 502/);
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
 });
 
 describe('chooseBackendPort', () => {

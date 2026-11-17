@@ -7,6 +7,7 @@
 import type { CfdQuality, CfdSolver } from '@aero/cfd/types';
 import type { Vec3 } from '@core/model/types';
 import type { Box } from './domainSizing';
+import { map3 } from '@lib/vec3';
 
 export const CELLS_PER_REFERENCE_LENGTH: Readonly<Record<CfdQuality, number>> = { draft: 64, standard: 128, fine: 256 };
 /**
@@ -83,8 +84,8 @@ function lbmCells(input: EstimateInput, n: number): { cells: number; updates: nu
         : volume(
             clampTo(
               {
-                min: input.body.min.map((v) => v - (level + 1) * LBM_BOX_MARGIN_LENGTHS * length) as unknown as Vec3,
-                max: input.body.max.map((v) => v + (level + 1) * LBM_BOX_MARGIN_LENGTHS * length) as unknown as Vec3,
+                min: map3(input.body.min, (v) => v - (level + 1) * LBM_BOX_MARGIN_LENGTHS * length),
+                max: map3(input.body.max, (v) => v + (level + 1) * LBM_BOX_MARGIN_LENGTHS * length),
               },
               input.domain,
             ),

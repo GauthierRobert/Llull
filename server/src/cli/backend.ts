@@ -26,11 +26,6 @@ export interface CliBackend {
   redo(): Promise<CommandOutcome>;
 }
 
-/** Save `doc`, keeping the previous file as `<docPath>.bak` (one level of undo): every document save does (`writeDocumentFile`). */
-export function saveDocumentWithBackup(docPath: string, doc: CadDocument): void {
-  writeDocumentFile(docPath, doc);
-}
-
 /** A refusal the host decided (lock, conflict): a failed outcome with a machine-readable code, nothing written. */
 function refusedOutcome(code: string, summary: string, documentPath: string, remediation: string): CommandOutcome {
   return { summary, affected: [], isError: true, changed: false, error: { code, ids: [], paths: [documentPath], remediation } };

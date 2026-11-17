@@ -15,7 +15,7 @@ import {
 import type { ServerCommandResponse } from '@ui/store/serverCommands';
 import { useRecoveryStore } from '@ui/store/recoveryStore';
 import { useSessionStore } from '@ui/store/sessionStore';
-import { browserStorage, readAutosave } from '@ui/store/autosave';
+import { browserStorage, readAutosave, writeAutosave } from '@ui/store/autosave';
 
 const dispatchId = (name: string, params: unknown): string => localDispatch(name, params).affected[0]!;
 const order = (): string[] => getState().document.order;
@@ -253,6 +253,23 @@ describe('CadStore — offline fallback', () => {
     expect(JSON.parse(kept?.[1].body ?? '{}')).toMatchObject({ json: offlineJson, changeCount: 1 });
     await flushPromises();
     expect(useRecoveryStore.getState().offlineEditsKept).toBe(true);
+  });
+
+  it('once the backend keeps the offline edits, the device autosave copy is dropped (the same work is not offered twice)', async () => {
+    offline();
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    const storage = browserStorage();
+    if (storage === null) throw new Error('no storage in this test environment');
+    writeAutosave(storage, { savedAt: 1, json: serializeDocument(getState().document) });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, slots: [] }) })),
+    );
+    online();
+    getState().hydrateLiveDocument(liveSnapshot(createEmptyDocument(), 3));
+    await flushPromises();
+    expect(useRecoveryStore.getState().offlineEditsKept).toBe(true);
+    expect(readAutosave(storage)).toBeNull();
   });
 
   it('offline edits that leave NO entity (deleted everything) are kept too, filed under the path the edits started from (review 7)', async () => {

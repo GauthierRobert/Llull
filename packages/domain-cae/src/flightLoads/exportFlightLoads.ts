@@ -16,6 +16,7 @@ import { refuseFll } from './codes';
 import { flightDesignHash } from './designHash';
 import { chooseInstants, flightInstants, type ChosenInstant, type FlightInstant } from './flightInstants';
 import { analysedCentre } from './rigidBalance';
+import { map3 } from '@lib/vec3';
 
 const NEWTON_PER_LBF = 4.4482216152605;
 /** Sampling of the run the instants are read from, Hz (accelerations are central differences of the recorded velocity). */
@@ -75,7 +76,7 @@ function mountLoads(
     const thrust = instant?.thrustN[mount.rotorId];
     if (thrust === undefined) return `mount '${mount.name}': the run has no thrust of rotor '${mount.rotorId}'`;
     const length = Math.hypot(...direction);
-    force = direction.map((component) => (thrust * component * forceUnit) / length) as unknown as Vec3;
+    force = map3(direction, (component) => (thrust * component * forceUnit) / length);
   } else if (mount.direction !== undefined) return `mount '${mount.name}': direction needs a rotorId`;
   if (force === undefined && mount.moment === undefined) return `mount '${mount.name}': give a force, a rotorId + direction, or a moment`;
   if (force !== undefined && force.some((component) => component !== 0))
@@ -267,7 +268,7 @@ export const exportFlightLoads = defineCommand({
           id: nextId('fl'),
           name: `inertial ${loadCase}`,
           kind: 'inertial',
-          vector: instant.accelMps2.map((c) => c * accelUnit) as unknown as Vec3,
+          vector: map3(instant.accelMps2, (c) => c * accelUnit),
           angularVelocity: instant.angularVelocity,
           angularAccel: instant.angularAccel,
           referencePoint: reference,
@@ -279,7 +280,7 @@ export const exportFlightLoads = defineCommand({
           id: nextId('fl'),
           name: `gravity ${loadCase}`,
           kind: 'gravity',
-          vector: instant.gravityMps2.map((c) => c * accelUnit) as unknown as Vec3,
+          vector: map3(instant.gravityMps2, (c) => c * accelUnit),
         });
       for (const mount of params.mounts ?? []) {
         const problem = targetProblem(doc, analysis, toTarget(mount.target));

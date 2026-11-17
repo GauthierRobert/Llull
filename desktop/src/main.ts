@@ -202,15 +202,16 @@ async function openDocument(filePath?: string): Promise<void> {
     pendingOpen = filePath ?? null;
     return;
   }
-  if (!(await confirmDiscard())) return;
-  let target = filePath;
-  if (target === undefined) {
-    const result = await dialog.showOpenDialog({ properties: ['openFile'], filters: FILE_FILTERS });
-    target = result.canceled ? undefined : result.filePaths[0];
-  }
-  if (target === undefined) return;
-  const chosen = target;
+  // the unsaved-changes check asks the backend: a failure there is an "Open failed" dialog, never an unhandled rejection
   await guarded('Open', async () => {
+    if (!(await confirmDiscard())) return;
+    let target = filePath;
+    if (target === undefined) {
+      const result = await dialog.showOpenDialog({ properties: ['openFile'], filters: FILE_FILTERS });
+      target = result.canceled ? undefined : result.filePaths[0];
+    }
+    if (target === undefined) return;
+    const chosen = target;
     const opened = await session?.open(chosen);
     app.addRecentDocument(chosen);
     if (opened?.warning === 'DSF_LOCK_UNAVAILABLE')
@@ -229,8 +230,8 @@ async function openDocument(filePath?: string): Promise<void> {
 async function restoreRecovery(slotId: unknown): Promise<{ ok: boolean; message: string; cancelled: boolean }> {
   if (session === null) return { ok: false, message: 'The backend is not running yet', cancelled: false };
   if (typeof slotId !== 'string') return { ok: false, message: 'Refused: not a recovery copy', cancelled: false };
-  if (!(await confirmDiscard())) return { ok: false, message: 'Restore cancelled', cancelled: true };
   try {
+    if (!(await confirmDiscard())) return { ok: false, message: 'Restore cancelled', cancelled: true };
     await session.restore(slotId);
     refreshTitleAndDiscovery();
     return { ok: true, message: 'Restored', cancelled: false };
@@ -240,8 +241,9 @@ async function restoreRecovery(slotId: unknown): Promise<{ ok: boolean; message:
 }
 
 async function newDocument(): Promise<void> {
-  if (!(await confirmDiscard())) return;
-  await guarded('New', async () => session?.newDocument());
+  await guarded('New', async () => {
+    if (await confirmDiscard()) await session?.newDocument();
+  });
 }
 
 /** File > Trust Signing Keys…: one native dialog per enrolled, untrusted key. The only place a key becomes trusted (keyTrust.ts). */
@@ -487,11 +489,11 @@ Your unsaved work is kept in the recovery folder (File > Open Data Folder).`,
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', (_event, argv) => {
+  app.on('second-instance', (_event, argv, workingDirectory) => {
     window?.show();
     window?.focus();
     const file = documentArgument(argv);
-    if (file !== null) void openDocument(file);
+    if (file !== null) void openDocument(path.resolve(workingDirectory, file));
   });
   app.on('open-file', (event, filePath) => {
     event.preventDefault();
