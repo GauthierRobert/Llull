@@ -4,8 +4,8 @@
 // large parts smooth where their silhouette spans the screen. A sphere at the floor is ~2.3k triangles.
 import { clamp } from '@lib/clamp';
 
-export const MIN_RADIAL_SEGMENTS = 48;
-export const MAX_RADIAL_SEGMENTS = 128;
+const MIN_RADIAL_SEGMENTS = 48;
+const MAX_RADIAL_SEGMENTS = 128;
 
 /** @returns integer in [MIN_RADIAL_SEGMENTS, MAX_RADIAL_SEGMENTS]; diag clamped to ≥ 1e-6 */
 export function radialSegmentsForDiag(diag: number): number {
