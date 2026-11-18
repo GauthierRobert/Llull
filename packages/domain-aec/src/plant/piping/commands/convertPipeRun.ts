@@ -1,35 +1,11 @@
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
-import { execute } from '@core/commands/registry';
-import type { Vec3 } from '@core/model/vectors';
-import type { PipeLine, PipeRun } from '@aec/plant/types';
-import type { PipeSupportElement } from '@aec/building/types';
-import type { CadDocument } from '@core/model/types';
-import { cross3, len3, sub3 } from '@lib/vec3';
-import { nextId } from '@lib/id';
-import { elementsOf, getBuilding } from '../../../building/model';
-import { pipeSizeByOutsideDiameter } from '../../../industrial/piping/pipeSizes';
 import { withRunEntities } from '../derive';
-import { chooseElbow, turnAngleDeg } from '../fittings';
-import { buildPath, unitVector } from '../legs';
-import { getPiping, refuse, withPiping } from '../model';
-import { deriveRun } from '../routeParts';
-import { createSpecLookup, isMiss } from '../specLookup';
 import { takeoffOf } from '../takeoff';
-import { followCarrier, supportOffsets, type SupportFollow } from '../supportReconcile';
-
-/** `supports` (hosted by a legacy pipe) renamed to carry on run `runId`: the document that has them there, and the renamed elements. */
-function retarget(
-  doc: CadDocument,
-  supports: ReadonlyArray<PipeSupportElement>,
-  runId: string,
-): { document: CadDocument; supports: PipeSupportElement[] } {
-  const renamed = supports.map((support): PipeSupportElement => ({ ...support, pipeId: runId }));
-  const building = getBuilding(doc);
-  const elements = { ...building.elements, ...Object.fromEntries(renamed.map((support) => [support.id, support])) };
-  return { document: { ...doc, building: { ...building, elements } }, supports: renamed };
-}
+import { type SupportFollow } from '../supportReconcile';
+import type { PipeSupportElement } from '@aec/building/types';
+import { buildRun, isRefused, replaceLegacy, resolveLegacy, straightenBends } from './convertPipeRunPhases';
 
 /** One sentence for the summary: the supports that moved onto the run, then how they re-attached (the attach note of followCarrier). */
 function supportSentence(follow: SupportFollow): string {
@@ -94,179 +70,21 @@ export const convertPipeRun = defineCommand({
       ),
   }),
   run: (doc, params, ctx): CommandResult => {
-    if (doc.units !== 'mm')
-      return refuse(
-        doc,
-        'convert_pipe_run',
-        'RTE_UNITS_UNSUPPORTED',
-        `plant lengths and catalogue dimensions are mm; this document is in ${doc.units}`,
-      );
-    const building = getBuilding(doc);
-    const pipe = building.elements[params.pipeId];
-    if (pipe === undefined || pipe.category !== 'pipe')
-      return refuse(doc, 'convert_pipe_run', 'RTE_UNKNOWN_PIPE', `no legacy pipe "${params.pipeId}" in the building model`, [], ['pipeId']);
-    const hosted = params.replace === true ? elementsOf(building, 'pipeSupport').filter((support) => support.pipeId === pipe.id) : [];
-    const piping = getPiping(doc);
-    const existing = params.lineId === undefined ? undefined : piping.lines[params.lineId];
-    if (params.lineId !== undefined && existing === undefined)
-      return refuse(doc, 'convert_pipe_run', 'RTE_UNKNOWN_LINE', `no pipe line "${params.lineId}"`, [], ['lineId']);
-    const specId = existing?.spec ?? params.spec;
-    if (specId === undefined)
-      return refuse(doc, 'convert_pipe_run', 'RTE_SPEC_UNKNOWN', 'give spec (or lineId of a line that has one)', [], ['spec']);
-    const lookup = createSpecLookup(doc, specId);
-    if (isMiss(lookup)) return refuse(doc, 'convert_pipe_run', lookup.miss, lookup.detail, [...lookup.ids], ['spec']);
-    const fromDiameter = pipe.dn === undefined ? pipeSizeByOutsideDiameter(pipe.diameter)?.[0] : undefined;
-    const dn = existing?.dn ?? pipe.dn ?? fromDiameter;
-    if (dn === undefined)
-      return refuse(
-        doc,
-        'convert_pipe_run',
-        'RTE_SIZE_MISMATCH',
-        `the legacy pipe has no dn and its diameter ${pipe.diameter} mm matches no DN in the pipe size table`,
-        [pipe.id],
-        ['pipeId'],
-      );
-    if (existing !== undefined && pipe.dn !== undefined && pipe.dn !== existing.dn)
-      return refuse(
-        doc,
-        'convert_pipe_run',
-        'RTE_SIZE_MISMATCH',
-        `the legacy pipe is DN${pipe.dn}, line ${existing.id} is DN${existing.dn}`,
-        [pipe.id, existing.id],
-        ['lineId'],
-      );
-    const elevation = building.levels[pipe.levelId]?.elevation ?? 0;
-    const world = pipe.points.map((point): Vec3 => [point[0], point[1], point[2] + elevation]);
-    const tolerance = lookup.elbowAngles().toleranceDeg;
-    const pipeRow = lookup.pipe(dn);
-    const bendOptions = isMiss(pipeRow) ? undefined : { pipeOd: pipeRow.dims['outsideDiameter'] ?? 0 };
-    // Every bend must have a spec elbow: list them all, not only the first.
-    const unfit: Array<{ vertex: number; angleDeg: number }> = [];
-    // A vertex that deflects by no more than the spec angle tolerance is straight pipe: it merges (counted in data.mergedPoints).
-    const kept: Vec3[] = [world[0] as Vec3];
-    const merged: Array<{ point: Vec3; after: number }> = [];
-    for (let i = 1; i + 1 < world.length; i++) {
-      const [before, after] = [
-        unitVector(sub3(world[i] as Vec3, kept.at(-1) as Vec3)),
-        unitVector(sub3(world[i + 1] as Vec3, world[i] as Vec3)),
-      ];
-      const turn = turnAngleDeg(before, after);
-      if (turn <= tolerance) {
-        merged.push({ point: world[i] as Vec3, after: kept.length - 1 });
-        continue;
-      }
-      kept.push(world[i] as Vec3);
-      if ('code' in chooseElbow(lookup, dn, turn, tolerance, bendOptions)) unfit.push({ vertex: i, angleDeg: turn });
-    }
-    kept.push(world.at(-1) as Vec3);
-    // How far the straightening moved the pipe: each merged vertex against the leg that now runs past it.
-    const straightenedMaxOffsetMm = merged.reduce((max, { point, after }) => {
-      const [from, to] = [kept[after] as Vec3, kept[after + 1] as Vec3];
-      const leg = sub3(to, from);
-      return Math.max(max, len3(cross3(leg, sub3(point, from))) / len3(leg));
-    }, 0);
-    if (unfit.length > 0)
-      return refuse(
-        doc,
-        'convert_pipe_run',
-        'RTE_NO_FITTING_FOR_ANGLE',
-        `bend(s) at vertex ${unfit.map((bend) => `${bend.vertex} (${+bend.angleDeg.toFixed(4)} deg)`).join(', ')} have no spec elbow (angles ${lookup.elbowAngles().anglesDeg.join(', ')} deg, tolerance ${tolerance} deg)`,
-        [pipe.id],
-        unfit.map((bend) => `points.${bend.vertex}`),
-        {
-          vertices: unfit.map((bend) => bend.vertex),
-          anglesDegAtVertices: unfit.map((bend) => bend.angleDeg),
-          anglesDeg: lookup.elbowAngles().anglesDeg,
-          toleranceDeg: tolerance,
-        },
-      );
-    const path = buildPath({ point: world[0] as Vec3 }, undefined, [], kept.slice(1), tolerance);
-    if (!path.ok)
-      return refuse(
-        doc,
-        'convert_pipe_run',
-        path.code,
-        path.message,
-        [pipe.id],
-        path.paths.map((p) => p.replace('via', 'points')),
-        path.detail,
-      );
-    const lineNumber = pipe.line ?? `${dn}-${pipe.service}-${pipe.mark}-${specId}`;
-    const clash = piping.lineOrder.find((id) => piping.lines[id]?.lineNumber === lineNumber);
-    if (existing === undefined && clash !== undefined)
-      return refuse(
-        doc,
-        'convert_pipe_run',
-        'RTE_DUPLICATE_LINE_NUMBER',
-        `line number ${lineNumber} is used by ${clash}; pass lineId: "${clash}" to put the run on that line`,
-        [clash, pipe.id],
-        ['lineId'],
-      );
-    const line: PipeLine =
-      existing ??
-      ({
-        id: nextId('line'),
-        lineNumber,
-        service: pipe.service,
-        sequence: pipe.line ?? pipe.mark,
-        spec: specId,
-        dn,
-        ...(pipe.from === undefined ? {} : { from: pipe.from }),
-        ...(pipe.to === undefined ? {} : { to: pipe.to }),
-      } satisfies PipeLine);
-    const runId = nextId('run');
-    const run: PipeRun = {
-      id: runId,
-      lineId: line.id,
-      start: { point: path.points[0] as Vec3 },
-      end: { point: path.points.at(-1) as Vec3 },
-      pis: path.points.slice(1, -1),
-    };
-    const lines = existing === undefined ? { ...piping.lines, [line.id]: line } : piping.lines;
-    const lineOrder = existing === undefined ? [...piping.lineOrder, line.id] : piping.lineOrder;
-    const stored = withPiping(doc, {
-      ...piping,
-      lines,
-      lineOrder,
-      runs: { ...piping.runs, [runId]: run },
-      runOrder: [...piping.runOrder, runId],
-    });
-    const derived = deriveRun(stored, run);
-    if (!derived.ok)
-      return refuse(doc, 'convert_pipe_run', derived.code, derived.message, [...derived.ids], [...derived.paths], derived.detail);
-    let result = withRunEntities(stored, runId);
+    const legacy = resolveLegacy(doc, params);
+    if (isRefused(legacy)) return legacy.refused;
+    const { pipe, existing, specId, dn, hosted } = legacy;
+    const straight = straightenBends(doc, legacy);
+    if (isRefused(straight)) return straight.refused;
+    const built = buildRun(doc, legacy, straight);
+    if (isRefused(built)) return built.refused;
+    const { path, line, run, runId, derived } = built;
+    let result = withRunEntities(built.stored, runId);
     let removed: string[] = [];
     let followed: SupportFollow | undefined;
     if (params.replace === true) {
-      const onRun = retarget(result, hosted, runId);
-      const limit = derived.pipe.outsideDiameterMm;
-      const off = supportOffsets(onRun.document, onRun.supports).filter(({ by }) => by > limit);
-      if (off.length > 0)
-        return refuse(
-          doc,
-          'convert_pipe_run',
-          'RTE_SUPPORT_OFF_RUN',
-          `pipe support(s) ${off.map(({ support, by }) => `${support.mark} (${+by.toFixed(1)} mm)`).join(', ')} of ${pipe.id} are farther than one outside diameter (${limit} mm) from the new centreline: they cannot sit on run ${runId}`,
-          [pipe.id, ...off.map(({ support }) => support.id)],
-          ['replace'],
-          { limitMm: limit, offsets: off.map(({ support, by }) => ({ id: support.id, mark: support.mark, offsetMm: by })) },
-        );
-      if (onRun.supports.length > 0) {
-        followed = followCarrier(onRun.document, onRun.supports);
-        result = followed.document;
-      }
-      const deleted = execute(result, 'delete_building_element', { elementIds: [pipe.id] }, ctx);
-      if (deleted.rejected === true || deleted.document === result)
-        return refuse(
-          doc,
-          'convert_pipe_run',
-          deleted.error?.code ?? 'RTE_UNKNOWN_PIPE',
-          `the legacy pipe ${pipe.id} could not be replaced: ${deleted.summary}`,
-          [pipe.id],
-          ['replace'],
-        );
-      result = deleted.document;
-      removed = deleted.affected;
+      const replaced = replaceLegacy(doc, legacy, built, result, ctx);
+      if (isRefused(replaced)) return replaced.refused;
+      ({ result, removed, followed } = replaced);
     }
     const takeoff = takeoffOf([{ runId, derivation: derived }]);
     return {
@@ -307,8 +125,8 @@ export const convertPipeRun = defineCommand({
         warnings: takeoff.warnings,
         unverified: takeoff.unverified,
         unverifiedReasons: takeoff.unverifiedReasons,
-        mergedPoints: merged.length + path.merged,
-        straightenedMaxOffsetMm,
+        mergedPoints: straight.mergedCount + path.merged,
+        straightenedMaxOffsetMm: straight.straightenedMaxOffsetMm,
         replaced: params.replace === true,
         supports: supportData(hosted, followed),
       },

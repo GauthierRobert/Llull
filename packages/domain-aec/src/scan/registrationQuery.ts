@@ -3,24 +3,13 @@
  * RegistrationRecord ready for apply_registration. Never changes the document (TR-SCN-04).
  */
 
-import type { CloudReference, RegistrationRecord } from '@aec/scan/types';
-import type { Mat4 } from '@core/model/pointCloud';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
-import { report } from '@core/commands/noop';
 import { refuseScan } from './codes';
 import { cloudAccess, isAccess } from './access';
-import { isSuccess, numberAt, runOp } from './compute';
-import { invertAffine, multiply, rotationAngleDeg, translationOf } from './mat4';
-import { fromM, toM, vecToM } from './model';
+import { type Registration, icpStage, isRefusal, registrationReport, targetStage } from './registrationPhases';
 import { cloudIdParam, mat4Param, regionParam } from './schemas';
 import { resolveRegion } from './region';
-
-/** Named quality gates (AF-31): target RMS ≤ 3 mm; ICP RMS ≤ 2 × the fixed cloud's median spacing. Above them: warn + unverified. */
-export const TARGET_RMS_GATE_M = 0.003;
-export const ICP_RMS_SPACING_FACTOR = 2;
-/** Below this overlap an ICP result is SCN_REG_NOT_CONVERGED (§5.8). */
-export const MIN_OVERLAP = 0.1;
 
 const point = (text: string): z.ZodArray<z.ZodNumber> => z.array(z.number()).length(3).describe(text);
 
@@ -33,17 +22,6 @@ const targetParam = z
     radius: z.number().optional().describe('Sphere radius in document units (required for kind sphere), e.g. 72.5.'),
   })
   .describe('One target pair.');
-
-interface Delta {
-  readonly transform: Mat4;
-  readonly result: Readonly<Record<string, unknown>>;
-}
-
-/** The registration record of a document-frame correction `delta` (moving document → fixed document). */
-function recordOf(fixed: CloudReference, moving: CloudReference, delta: Mat4): Mat4 {
-  const inverse = invertAffine(fixed.transform);
-  return inverse === null ? delta : multiply(inverse, multiply(delta, moving.transform));
-}
 
 /**
  * @failure SCN_CLOUD_NOT_FOUND / SCN_ASSET_*; same cloud -> SCN_REG_SAME_CLOUD; targets: SCN_REG_TARGETS_INSUFFICIENT, SCN_REG_DEGENERATE,
@@ -94,113 +72,23 @@ export const computeRegistration = defineCommand({
     if (!resolved.ok) return refuseScan(doc, command, resolved.code, resolved.message, [fixedId, movingId], ['region']);
     const { port } = fixedAccess;
     const [fixed, moving] = [fixedAccess.cloud, movingAccess.cloud];
-    const clouds = [fixed, moving];
-    const usesTargets = method === 'targets' || method === 'targets+icp';
-    let delta: Delta | null = null;
-    let targetResult: Readonly<Record<string, unknown>> | null = null;
-    let provenance = { device: 'cpu' as 'cpu' | 'gpu', deterministic: true, binary: '' };
-    if (usesTargets) {
-      if (targets.some((t) => t.kind === 'sphere' && !(t.radius !== undefined && t.radius > 0)))
-        return refuseScan(doc, command, 'SCN_PARAM_INVALID', 'a sphere target needs radius > 0', [], ['targets']);
-      const ran = runOp(doc, command, port, 'register_targets', clouds, {
-        targets: targets.map((t) => ({
-          name: t.name,
-          kind: t.kind,
-          fixed: vecToM(doc, t.fixedPoint),
-          moving: vecToM(doc, t.movingPoint),
-          ...(t.radius !== undefined ? { radius: toM(doc, t.radius) } : {}),
-        })),
-      });
-      if (!isSuccess(ran)) return ran;
-      targetResult = ran.result;
-      provenance = { ...ran.provenance };
-      delta = { transform: ran.result['transform'] as Mat4, result: ran.result };
+    let registered: Registration = {
+      delta: null,
+      targetResult: null,
+      icpResult: null,
+      provenance: { device: 'cpu', deterministic: true, binary: '' },
+    };
+    if (method === 'targets' || method === 'targets+icp') {
+      const staged = targetStage(doc, port, [fixed, moving], targets);
+      if (isRefusal(staged)) return staged;
+      registered = staged;
     }
-    let icpResult: Readonly<Record<string, unknown>> | null = null;
     if (method !== 'targets') {
-      const movingInverse = invertAffine(moving.transform);
-      const start: Mat4 | null =
-        delta?.transform ??
-        (initial !== undefined && movingInverse !== null ? multiply(fixed.transform, multiply(initial, movingInverse)) : null);
-      const ran = runOp(doc, command, port, 'icp', clouds, {
-        method: method === 'icp_point_to_plane' ? 'point_to_plane' : 'point_to_point',
-        maxIterations,
-        trimRatio,
-        region: resolved.region,
-        ...(start !== null ? { initial: start } : {}),
-      });
-      if (!isSuccess(ran)) return ran;
-      icpResult = ran.result;
-      provenance = { ...ran.provenance };
-      delta = { transform: ran.result['transform'] as Mat4, result: ran.result };
+      const staged = icpStage(doc, port, fixed, moving, { method, initial, maxIterations, trimRatio, region: resolved.region }, registered);
+      if (isRefusal(staged)) return staged;
+      registered = staged;
     }
-    if (delta === null) return refuseScan(doc, command, 'SCN_PARAM_INVALID', 'no registration ran', []);
-    const transform = recordOf(fixed, moving, delta.transform);
-    const targetRms = targetResult === null ? null : numberAt(targetResult, 'rms');
-    const icpRms = icpResult === null ? null : numberAt(icpResult, 'rms');
-    const spacing = icpResult === null ? null : numberAt(icpResult, 'fixedSpacing');
-    const overlap = icpResult === null ? undefined : numberAt(icpResult, 'overlap');
-    const converged = icpResult === null ? true : icpResult['converged'] === true && (overlap ?? 1) >= MIN_OVERLAP;
-    const gates = {
-      targetRmsM: { value: TARGET_RMS_GATE_M, source: 'TECHNICAL_SPEC §5.8 named default (AF-31)', defaulted: true },
-      icpRmsSpacingFactor: { value: ICP_RMS_SPACING_FACTOR, source: 'TECHNICAL_SPEC §5.8 named default (AF-31)', defaulted: true },
-    };
-    const exceeded = [
-      ...(targetRms !== null && targetRms > TARGET_RMS_GATE_M
-        ? [`target RMS ${fromM(doc, targetRms).toPrecision(4)} ${doc.units} above 3 mm`]
-        : []),
-      ...(icpRms !== null && spacing !== null && icpRms > ICP_RMS_SPACING_FACTOR * spacing ? ['ICP RMS above 2 x the point spacing'] : []),
-    ];
-    const residuals = ((targetResult?.['targets'] as { name: string; residual: number }[] | undefined) ?? []).map((t) => ({
-      name: t.name,
-      residual: t.residual,
-    }));
-    const record: Omit<RegistrationRecord, 'id'> = {
-      fixed: fixedId,
-      moving: movingId,
-      method,
-      transform,
-      quality: {
-        ...(residuals.length > 0 ? { targetResiduals: residuals } : {}),
-        rms: icpRms ?? targetRms ?? 0,
-        ...(overlap !== undefined ? { overlap } : {}),
-        ...(icpResult !== null ? { iterations: numberAt(icpResult, 'iterations') } : {}),
-        converged,
-      },
-      status: exceeded.length > 0 ? 'unverified' : 'computed',
-      provenance: {
-        method,
-        algorithmVersion: `${provenance.binary || 'llull-compute'}/register-1`,
-        device: provenance.device,
-        deterministic: provenance.deterministic,
-      },
-    };
-    const data = {
-      record,
-      quality: record.quality,
-      rotationDeg: rotationAngleDeg(transform),
-      translation: translationOf(transform).map((v) => fromM(doc, v)),
-      unit: doc.units,
-      gates,
-      warnings: exceeded.map((message) => ({ code: 'SCN_REGISTRATION_UNVERIFIED', message })),
-      ...(targetResult !== null ? { targets: targetResult['targets'] } : {}),
-    };
-    if (!converged)
-      return {
-        ...refuseScan(
-          doc,
-          command,
-          'SCN_REG_NOT_CONVERGED',
-          `ICP did not converge or the overlap is below ${MIN_OVERLAP * 100} % (overlap ${((overlap ?? 0) * 100).toFixed(1)} %)`,
-          [fixedId, movingId],
-        ),
-        data,
-      };
-    const rmsText = `${fromM(doc, record.quality?.rms ?? 0).toPrecision(4)} ${doc.units}`;
-    return report(
-      doc,
-      `Registration ${movingId} -> ${fixedId} (${method}): rotation ${data.rotationDeg.toFixed(4)} deg, RMS ${rmsText}, status ${record.status}${exceeded.length > 0 ? ` (${exceeded.join('; ')})` : ''}. Apply with apply_registration record=<data.record>.`,
-      data,
-    );
+    if (registered.delta === null) return refuseScan(doc, command, 'SCN_PARAM_INVALID', 'no registration ran', []);
+    return registrationReport(doc, { fixedId, movingId }, method, fixed, moving, registered.delta, registered);
   },
 });

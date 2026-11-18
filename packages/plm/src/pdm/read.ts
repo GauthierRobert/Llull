@@ -122,30 +122,13 @@ function chainOf(index: Index, top: number): number[] {
   return chain;
 }
 
-/** The PDM model a file holds, or why it holds none. */
-export function readPdm(text: string): PdmModel | string {
-  const index = new Index(text);
-  const owner = index.all('APPLIED_ORGANIZATION_ASSIGNMENT').find((assignment) => {
-    const role = index.args(asRef(argsOf(assignment, 'APPLIED_ORGANIZATION_ASSIGNMENT')[1]), 'ORGANIZATION_ROLE');
-    return asString(role?.[0]) === 'id owner';
-  });
-  if (owner === undefined) return 'no product with an id owner (APPLIED_ORGANIZATION_ASSIGNMENT)';
-  const ownerArgs = argsOf(owner, 'APPLIED_ORGANIZATION_ASSIGNMENT');
-  const top = asRefs(ownerArgs[2])[0];
-  const topProduct = index.args(top ?? null, 'PRODUCT');
-  const organization = index.args(asRef(ownerArgs[0]), 'ORGANIZATION');
-  if (top === undefined || topProduct === null || organization === null)
-    return 'the id owner assignment does not name a product and an organization';
-  const chain = chainOf(index, top);
-  const labels = chain.map((id) => asString(index.args(id, 'PRODUCT_DEFINITION_FORMATION')?.[0]) ?? '');
-  const current = chain.at(-1);
-  if (current === undefined) return 'the product has no version';
-  const currentArgs = index.args(current, 'PRODUCT_DEFINITION_FORMATION') ?? [];
-  const views = index.all('PRODUCT_DEFINITION').filter((view) => asRef(argsOf(view, 'PRODUCT_DEFINITION')[2]) === current);
-  const design = views.find((view) => asString(argsOf(view, 'PRODUCT_DEFINITION')[0]) === 'design');
-  if (design === undefined) return 'the current version has no design view (PRODUCT_DEFINITION)';
-  const manufacturing = views.find((view) => asString(argsOf(view, 'PRODUCT_DEFINITION')[0]) === 'manufacturing');
+interface Approvals {
+  readonly approvals: PdmModel['approvals'][number][];
+  readonly release: PdmModel['release'];
+  readonly approvalStatus: ApprovalStatus;
+}
 
+function approvalsOf(index: Index, current: number): Approvals {
   const approvals: PdmModel['approvals'][number][] = [];
   let release: PdmModel['release'] = null;
   let approvalStatus: ApprovalStatus = 'not yet approved';
@@ -171,7 +154,10 @@ export function readPdm(text: string): PdmModel | string {
       release = userId === null ? null : { by: userId, at };
     } else approvals.push({ role: level, userId: userId ?? '', at });
   }
+  return { approvals, release, approvalStatus };
+}
 
+function markingOf(index: Index, current: number): PdmModel['marking'] {
   const classification = index
     .all('APPLIED_SECURITY_CLASSIFICATION_ASSIGNMENT')
     .find((assignment) => asRefs(argsOf(assignment, 'APPLIED_SECURITY_CLASSIFICATION_ASSIGNMENT')[1]).includes(current));
@@ -182,7 +168,10 @@ export function readPdm(text: string): PdmModel | string {
   const regime = asString(classified?.[0]) ?? 'undetermined';
   const level = asString(index.args(asRef(classified?.[2]), 'SECURITY_CLASSIFICATION_LEVEL')?.[0]) ?? 'unclassified';
   const statement = asString(classified?.[1]) ?? '';
+  return { regime, classification: level === 'unclassified' ? null : level, statement: statement === '' ? null : statement };
+}
 
+function dateEffectivityOf(index: Index, current: number): PdmModel['dateEffectivity'][number][] {
   const dateEffectivity: PdmModel['dateEffectivity'][number][] = [];
   for (const assignment of index.all('APPLIED_EFFECTIVITY_ASSIGNMENT')) {
     const args = argsOf(assignment, 'APPLIED_EFFECTIVITY_ASSIGNMENT');
@@ -192,7 +181,11 @@ export function readPdm(text: string): PdmModel | string {
     const from = instantOf(index, asRef(effectivity?.[2]), true);
     if (from !== null) dateEffectivity.push({ from, to: instantOf(index, asRef(effectivity?.[1]), true) });
   }
-  const unitEffectivity = (propertiesOf(index, PROPERTY.effectivity, design.id)[0] ?? []).flatMap(([kind, range]): PdmUnitEffectivity[] => {
+  return dateEffectivity;
+}
+
+function unitEffectivityOf(index: Index, design: Instance): PdmUnitEffectivity[] {
+  return (propertiesOf(index, PROPERTY.effectivity, design.id)[0] ?? []).flatMap(([kind, range]): PdmUnitEffectivity[] => {
     try {
       const [from, to] = JSON.parse(range) as [string, string | null];
       return [{ kind, from, to }];
@@ -200,8 +193,10 @@ export function readPdm(text: string): PdmModel | string {
       return [];
     }
   });
+}
 
-  const signatures: PdmSignature[] = propertiesOf(index, PROPERTY.signature, design.id).map((items) => ({
+function signaturesOf(index: Index, design: Instance): PdmSignature[] {
+  return propertiesOf(index, PROPERTY.signature, design.id).map((items) => ({
     keyId: itemOf(items, 'keyId') ?? '',
     publicKey: itemOf(items, 'publicKey') ?? '',
     meaning: itemOf(items, 'meaning') ?? '',
@@ -211,21 +206,56 @@ export function readPdm(text: string): PdmModel | string {
     signedSha256: itemOf(items, 'signedSha256') ?? '',
     signature: itemOf(items, 'signature') ?? '',
   }));
+}
+
+function categoryOf(index: Index): PdmModel['category'] {
+  const subCategory = index
+    .all('PRODUCT_CATEGORY_RELATIONSHIP')
+    .map((link) => asString(index.args(asRef(argsOf(link, 'PRODUCT_CATEGORY_RELATIONSHIP')[3]), 'PRODUCT_RELATED_PRODUCT_CATEGORY')?.[0]))
+    .find((name) => name === 'assembly' || name === 'detail');
+  return subCategory === 'assembly' ? 'assembly' : 'detail';
+}
+
+/** The PDM model a file holds, or why it holds none. */
+export function readPdm(text: string): PdmModel | string {
+  const index = new Index(text);
+  const owner = index.all('APPLIED_ORGANIZATION_ASSIGNMENT').find((assignment) => {
+    const role = index.args(asRef(argsOf(assignment, 'APPLIED_ORGANIZATION_ASSIGNMENT')[1]), 'ORGANIZATION_ROLE');
+    return asString(role?.[0]) === 'id owner';
+  });
+  if (owner === undefined) return 'no product with an id owner (APPLIED_ORGANIZATION_ASSIGNMENT)';
+  const ownerArgs = argsOf(owner, 'APPLIED_ORGANIZATION_ASSIGNMENT');
+  const top = asRefs(ownerArgs[2])[0];
+  const topProduct = index.args(top ?? null, 'PRODUCT');
+  const organization = index.args(asRef(ownerArgs[0]), 'ORGANIZATION');
+  if (top === undefined || topProduct === null || organization === null)
+    return 'the id owner assignment does not name a product and an organization';
+  const chain = chainOf(index, top);
+  const labels = chain.map((id) => asString(index.args(id, 'PRODUCT_DEFINITION_FORMATION')?.[0]) ?? '');
+  const current = chain.at(-1);
+  if (current === undefined) return 'the product has no version';
+  const currentArgs = index.args(current, 'PRODUCT_DEFINITION_FORMATION') ?? [];
+  const views = index.all('PRODUCT_DEFINITION').filter((view) => asRef(argsOf(view, 'PRODUCT_DEFINITION')[2]) === current);
+  const design = views.find((view) => asString(argsOf(view, 'PRODUCT_DEFINITION')[0]) === 'design');
+  if (design === undefined) return 'the current version has no design view (PRODUCT_DEFINITION)';
+  const manufacturing = views.find((view) => asString(argsOf(view, 'PRODUCT_DEFINITION')[0]) === 'manufacturing');
+
+  const { approvals, release, approvalStatus } = approvalsOf(index, current);
+  const marking = markingOf(index, current);
+  const dateEffectivity = dateEffectivityOf(index, current);
+  const unitEffectivity = unitEffectivityOf(index, design);
+  const signatures = signaturesOf(index, design);
   const integrity = propertiesOf(index, PROPERTY.integrity, design.id)[0] ?? [];
   const state = itemOf(integrity, 'state') ?? '';
   if (!STATES.includes(state)) return `the version has no llull lifecycle state property (got '${state}')`;
   const mbomName = manufacturing === undefined ? null : asString(argsOf(manufacturing, 'PRODUCT_DEFINITION')[1]);
   const mbomId =
     manufacturing === undefined ? null : (propertiesOf(index, 'llull manufacturing bom', manufacturing.id)[0]?.[0]?.[1] ?? null);
-  const categories = index.all('PRODUCT_CATEGORY_RELATIONSHIP');
-  const subCategory = categories
-    .map((link) => asString(index.args(asRef(argsOf(link, 'PRODUCT_CATEGORY_RELATIONSHIP')[3]), 'PRODUCT_RELATED_PRODUCT_CATEGORY')?.[0]))
-    .find((name) => name === 'assembly' || name === 'detail');
   return {
     organization: { id: asString(organization[0]) ?? '', name: asString(organization[1]) ?? '' },
     partNumber: asString(topProduct[0]) ?? '',
     name: asString(topProduct[1]) ?? '',
-    category: subCategory === 'assembly' ? 'assembly' : 'detail',
+    category: categoryOf(index),
     revisions: labels,
     revision: labels.at(-1) ?? '',
     reason: (asString(currentArgs[1]) ?? '') === '' ? null : asString(currentArgs[1]),
@@ -233,7 +263,7 @@ export function readPdm(text: string): PdmModel | string {
     approvalStatus,
     approvals,
     release,
-    marking: { regime, classification: level === 'unclassified' ? null : level, statement: statement === '' ? null : statement },
+    marking,
     dateEffectivity,
     unitEffectivity,
     structure: usagesOf(index, design.id),
