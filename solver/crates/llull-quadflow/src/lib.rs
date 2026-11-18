@@ -76,8 +76,40 @@ static QUADFLOW: Mutex<()> = Mutex::new(());
 /// Stack of the worker thread that runs the pipeline (QuadriFlow recurses over the hierarchy and the flow graph; the main thread's 1 MiB on Windows is small).
 const WORKER_STACK_BYTES: usize = 256 * 1024 * 1024;
 
+/// What QuadriFlow cannot survive: an empty mesh divides by zero and a zero-area triangle never terminates, both of which would end the
+/// process instead of coming back as an [`Error`]. Refused here, before the C++ pipeline, with the first offender named.
+fn input_problem(positions: &[f64], triangles: &[u32]) -> Option<String> {
+    if positions.is_empty() || triangles.is_empty() {
+        return Some("the mesh is empty".to_string());
+    }
+    if !positions.len().is_multiple_of(3) || !triangles.len().is_multiple_of(3) {
+        return Some("positions and triangles must hold three values per vertex and per triangle".to_string());
+    }
+    if let Some(index) = positions.iter().position(|value| !value.is_finite()) {
+        return Some(format!("vertex {} has a coordinate that is not a finite number", index / 3));
+    }
+    let vertices = positions.len() / 3;
+    let point = |index: u32| -> [f64; 3] {
+        let at = index as usize * 3;
+        [positions[at], positions[at + 1], positions[at + 2]]
+    };
+    for (face, corner) in triangles.chunks_exact(3).enumerate() {
+        if let Some(bad) = corner.iter().find(|&&index| index as usize >= vertices) {
+            return Some(format!("triangle {face} names vertex {bad}, but the mesh has {vertices} vertices"));
+        }
+        let (a, b, c) = (point(corner[0]), point(corner[1]), point(corner[2]));
+        let (u, v) = ([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]);
+        let cross = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+        if cross == [0.0, 0.0, 0.0] {
+            return Some(format!("triangle {face} has no area (its three corners are on one line or coincide)"));
+        }
+    }
+    None
+}
+
 /// Quad-remeshes the indexed triangle mesh (`positions` xyz per vertex, `triangles` three indices each): a manifold mesh with consistent
-/// winding and no degenerate face (the caller checks). Every C++ throw comes back as an [`Error`].
+/// winding (the caller checks). An empty mesh, a non-finite coordinate, an out-of-range index and a zero-area triangle are refused here;
+/// every C++ throw comes back as an [`Error`].
 pub fn quad_remesh(positions: &[f64], triangles: &[u32], params: &QuadParams) -> Result<QuadMesh, Error> {
     quad_remesh_with_stages(positions, triangles, params, &mut |_, _| {})
 }
@@ -91,6 +123,9 @@ pub fn quad_remesh_with_stages(
     params: &QuadParams,
     on_stage: &mut dyn FnMut(&str, f64),
 ) -> Result<QuadMesh, Error> {
+    if let Some(problem) = input_problem(positions, triangles) {
+        return Err(Error(format!("quad_remesh refused: {problem}")));
+    }
     let _guard = QUADFLOW.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let (sender, receiver) = channel();
     std::thread::scope(|scope| {

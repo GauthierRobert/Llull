@@ -27,7 +27,7 @@ struct Pin {
 }
 
 fn wavy(x: f64, y: f64) -> f64 {
-    0.4 * (x / 1.5).sin() * (y / 2.0).cos()
+    0.4 * llull_jsmath::sin(x / 1.5) * llull_jsmath::cos(y / 2.0)
 }
 
 /// A ridge along x = 5: the two halves meet at about 77 degrees.
@@ -111,14 +111,14 @@ fn pinch() -> Mesh {
 
 /// Two wavy patches 0.001 apart: the vertices along the crack exist twice.
 fn cracked() -> Mesh {
-    let patch = grid(8, |_, y| 0.3 * y.cos(), &[]);
+    let patch = grid(8, |_, y| 0.3 * llull_jsmath::cos(y), &[]);
     side_by_side(&[patch.clone(), patch], 10.001)
 }
 
 /// A square grid of 100 cells a side with a 40 x 40 block of cells left out: a hole of 160 edges, above the limit of the dynamic program.
 fn greedy_hole() -> Mesh {
     let holes: Vec<(usize, usize)> = (30..70).flat_map(|i| (30..70).map(move |j| (i, j))).collect();
-    grid(100, |x, y| 0.1 * x.sin() * y.cos(), &holes)
+    grid(100, |x, y| 0.1 * llull_jsmath::sin(x) * llull_jsmath::cos(y), &holes)
 }
 
 /// `parts` meshes side by side (one shell each, shifted along x by `gap`).
@@ -265,7 +265,7 @@ fn pins() -> Vec<Pin> {
         Pin { name: "fill_curvature_alpha_2", mesh: holey_sphere(), job: fill(json!({ "alpha": 2.0 })) },
         Pin {
             name: "fill_tangent_near",
-            mesh: grid(30, |x, y| 0.2 * (x * y).sin(), &(8..22).flat_map(|i| (8..22).map(move |j| (i, j))).collect::<Vec<_>>()),
+            mesh: grid(30, |x, y| 0.2 * llull_jsmath::sin(x * y), &(8..22).flat_map(|i| (8..22).map(move |j| (i, j))).collect::<Vec<_>>()),
             job: fill(json!({ "fairing": "tangent", "alpha": 2.0, "select": { "near": [[5.0, 5.0, 0.0]] } })),
         },
         Pin { name: "fill_plain_loops", mesh: holey_sphere(), job: fill(json!({ "fairing": "none", "refine": false, "select": [1, 0] })) },
