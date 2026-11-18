@@ -69,6 +69,42 @@ const setFacesNear = (item: PmiItem, points: readonly (readonly [number, number,
   }
 };
 
+type DatumFeature = Extract<PmiItem, { kind: 'datum_feature' }>;
+
+/** The refusal of renaming a datum to an invalid or taken label, or null when `next` is not a rename. */
+function datumRenameRefusal(doc: CadDocument, original: PmiItem, next: PmiItem): CommandResult | null {
+  const renamed = next.kind === 'datum_feature' && original.kind === 'datum_feature' && next.label !== original.label ? next : undefined;
+  if (renamed === undefined) return null;
+  if (!/^[A-Z]{1,2}$/.test(renamed.label))
+    return refuse(doc, 'update_pmi', 'GDT_DATUM_LABEL_INVALID', `label '${renamed.label}' must be 1-2 capital letters`, [], ['label']);
+  const clash = pmiItems(doc).find(
+    (o) =>
+      o.kind === 'datum_feature' && o.id !== original.id && o.label === renamed.label && o.feature.entityId === renamed.feature.entityId,
+  );
+  if (clash !== undefined)
+    return refuse(doc, 'update_pmi', 'GDT_DATUM_DUPLICATE', `datum '${renamed.label}' already exists (${clash.id})`, [clash.id], ['label']);
+  return null;
+}
+
+/** The document with the frames and datum targets that reference the renamed datum rewritten, and their ids. */
+function renameDatumReferrers(doc: CadDocument, original: DatumFeature, next: DatumFeature): { document: CadDocument; touched: string[] } {
+  let document = doc;
+  const touched: string[] = [];
+  for (const other of pmiItems(doc)) {
+    const rename = (label: string): string => (label === original.label ? next.label : label);
+    if (other.kind === 'geometric_tolerance' && other.datums.some((d) => d.label === original.label) && other.target !== undefined) {
+      if (toleranceEntity(other, pmiOf(doc).items) !== original.feature.entityId) continue;
+      document = withItem(document, { ...other, datums: other.datums.map((d) => ({ ...d, label: rename(d.label) })) });
+      touched.push(other.id);
+    }
+    if (other.kind === 'datum_target' && other.label === original.label && other.feature.entityId === original.feature.entityId) {
+      document = withItem(document, { ...other, label: next.label });
+      touched.push(other.id);
+    }
+  }
+  return { document, touched };
+}
+
 /**
  * @affects replaces 1 PMI item (id and kind never change); a renamed datum label also rewrites the frames that reference it
  * @invariant the edited item is review-required again; derived data (faceIndices, measured size, count) is re-resolved when the kernel can
@@ -131,16 +167,8 @@ export const updatePmi = defineCommand({
     if (fields.placement !== undefined) next = { ...next, placement: placementFor(doc, undefined, 1, fields.placement) };
     if (JSON.stringify({ ...next, review: 0 }) === JSON.stringify({ ...original, review: 0 }) && fields.autoPlacement !== true)
       return noop(doc, `update_pmi: '${pmiId}' already has those values; no-op.`);
-    const renamed = next.kind === 'datum_feature' && original.kind === 'datum_feature' && next.label !== original.label ? next : undefined;
-    if (renamed !== undefined) {
-      if (!/^[A-Z]{1,2}$/.test(renamed.label))
-        return refuse(doc, command, 'GDT_DATUM_LABEL_INVALID', `label '${renamed.label}' must be 1-2 capital letters`, [], ['label']);
-      const clash = pmiItems(doc).find(
-        (o) => o.kind === 'datum_feature' && o.id !== pmiId && o.label === renamed.label && o.feature.entityId === renamed.feature.entityId,
-      );
-      if (clash !== undefined)
-        return refuse(doc, command, 'GDT_DATUM_DUPLICATE', `datum '${renamed.label}' already exists (${clash.id})`, [clash.id], ['label']);
-    }
+    const renameRefusal = datumRenameRefusal(doc, original, next);
+    if (renameRefusal !== null) return renameRefusal;
     if ((next.kind === 'size_dimension' || next.kind === 'location_dimension') && fields.tolerance !== undefined) {
       const problem = toleranceProblem(fields.tolerance);
       if (problem !== null) return refuse(doc, command, 'GDT_LIMITS_INVERTED', problem, [pmiId], ['tolerance']);
@@ -169,18 +197,9 @@ export const updatePmi = defineCommand({
     let document = doc;
     const touched = [pmiId];
     if (original.kind === 'datum_feature' && next.kind === 'datum_feature' && next.label !== original.label) {
-      for (const other of pmiItems(doc)) {
-        const rename = (label: string): string => (label === original.label ? next.label : label);
-        if (other.kind === 'geometric_tolerance' && other.datums.some((d) => d.label === original.label) && other.target !== undefined) {
-          if (toleranceEntity(other, pmiOf(doc).items) !== original.feature.entityId) continue;
-          document = withItem(document, { ...other, datums: other.datums.map((d) => ({ ...d, label: rename(d.label) })) });
-          touched.push(other.id);
-        }
-        if (other.kind === 'datum_target' && other.label === original.label && other.feature.entityId === original.feature.entityId) {
-          document = withItem(document, { ...other, label: next.label });
-          touched.push(other.id);
-        }
-      }
+      const renamedReferrers = renameDatumReferrers(doc, original, next);
+      document = renamedReferrers.document;
+      touched.push(...renamedReferrers.touched);
     }
     if (next.kind === 'geometric_tolerance') {
       const problem = toleranceFindings(next, { ...pmiOf(document).items, [next.id]: next }).find((f) => f.severity === 'error');

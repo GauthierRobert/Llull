@@ -6,7 +6,7 @@
  * pyramid, wedge, extrusion are all Z-up).
  */
 
-import type { CommandResult } from '../types';
+import type { CommandResult, ExecutionContext } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { escapeXml } from '../../lib/escapeXml';
 import type { ViewName } from './camera';
@@ -45,6 +45,41 @@ const overlayKind = z
   });
 
 const clampPixels = (value: number | undefined, fallback: number): number => clamp(Math.round(value ?? fallback), 64, 2000);
+
+interface CageNetRequest {
+  readonly svg: string;
+  readonly doc: CadDocument;
+  readonly base: RenderViewData;
+  readonly scene: CadDocument;
+  readonly kinds: string[];
+  readonly isolate: string | string[] | undefined;
+  readonly cut: Parameters<typeof cutKeep>[0];
+  readonly dim: boolean;
+  readonly options: Readonly<Record<string, unknown>>;
+  readonly ctx: ExecutionContext | undefined;
+}
+
+/** The cage / net / plugin overlay layers over the picture: the new svg, their stats and the summary sentences they add. */
+function drawCageNet(request: CageNetRequest): { svg: string; overlays: RenderViewData['overlays']; summary: string } {
+  const { kinds, ctx } = request;
+  const isolated = request.isolate === undefined ? undefined : typeof request.isolate === 'string' ? [request.isolate] : request.isolate;
+  const keep = cutKeep(request.cut);
+  const drawn = appendCageNetOverlays(request.svg, request.doc, request.base, orderedEntities(request.scene), kinds, isolated, {
+    ports: { pointClouds: ctx?.pointClouds ?? null },
+    options: request.options,
+    ...(keep === undefined ? {} : { cutKeep: keep }),
+    ...(request.dim ? { dim: true } : {}),
+  });
+  let summary = '';
+  for (const kind of kinds) {
+    const note = drawn.stats[kind]?.detail?.['note'];
+    if (typeof note === 'string') summary += ` Overlay ${kind}: ${note}`;
+    const failed = drawn.stats[kind]?.detail?.['failed'];
+    if (failed !== undefined) summary += ` Overlay ${kind} failed: ${String(failed)}.`;
+  }
+  summary += ` Overlay: ${kinds.map((kind) => `${kind} ${drawn.stats[kind]?.entities.length ?? 0} entit${drawn.stats[kind]?.entities.length === 1 ? 'y' : 'ies'}`).join(', ')}.`;
+  return { svg: drawn.svg, overlays: drawn.stats, summary };
+}
 
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
@@ -292,23 +327,21 @@ export const renderView = defineCommand({
     let overlays: RenderViewData['overlays'];
     if (kinds.length > 0 && perspective) summary += ` Overlay ${kinds.join(' + ')} not drawn: it needs an orthographic view.`;
     else if (kinds.length > 0) {
-      const isolated = params.isolate === undefined ? undefined : typeof params.isolate === 'string' ? [params.isolate] : params.isolate;
-      const keep = cutKeep(options.cut);
-      const drawn = appendCageNetOverlays(svg, doc, base, orderedEntities(scene), kinds, isolated, {
-        ports: { pointClouds: ctx?.pointClouds ?? null },
+      const drawn = drawCageNet({
+        svg,
+        doc,
+        base,
+        scene,
+        kinds,
+        isolate: params.isolate,
+        cut: options.cut,
+        dim: style.highlight !== null,
         options: overlayOptions.options,
-        ...(keep === undefined ? {} : { cutKeep: keep }),
-        ...(style.highlight === null ? {} : { dim: true }),
+        ctx,
       });
       svg = drawn.svg;
-      overlays = drawn.stats;
-      for (const kind of kinds) {
-        const note = drawn.stats[kind]?.detail?.['note'];
-        if (typeof note === 'string') summary += ` Overlay ${kind}: ${note}`;
-        const failed = drawn.stats[kind]?.detail?.['failed'];
-        if (failed !== undefined) summary += ` Overlay ${kind} failed: ${String(failed)}.`;
-      }
-      summary += ` Overlay: ${kinds.map((kind) => `${kind} ${drawn.stats[kind]?.entities.length ?? 0} entit${drawn.stats[kind]?.entities.length === 1 ? 'y' : 'ies'}`).join(', ')}.`;
+      overlays = drawn.overlays;
+      summary += drawn.summary;
     }
     return finish(doc, withNotes(summary), withReview({ ...base, svg: decorate(svg), ...(overlays === undefined ? {} : { overlays }) }));
   },

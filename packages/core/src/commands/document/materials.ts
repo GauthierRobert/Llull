@@ -34,6 +34,46 @@ function finishProblem(
   return null;
 }
 
+/** The finish of a created material (undefined without a pattern), or the first problem as the tail of the refusal summary. */
+function buildFinish(
+  pattern: MaterialFinish['pattern'] | undefined,
+  requestedScale: number | undefined,
+  color2: string | undefined,
+  normalStrength: number | undefined,
+  clearcoat: number | undefined,
+): { readonly finish: MaterialFinish | undefined } | { readonly problem: string } {
+  const finishOptions = [requestedScale, color2, normalStrength, clearcoat];
+  if (pattern === undefined && finishOptions.some((option) => option !== undefined))
+    return { problem: 'finishScale / color2 / normalStrength / clearcoat need a finish pattern.' };
+  const finishScale = requestedScale ?? 24;
+  const finishIssue = finishProblem(finishScale, color2, normalStrength, clearcoat);
+  if (finishIssue !== null) return { problem: `${finishIssue}.` };
+  return {
+    finish:
+      pattern === undefined
+        ? undefined
+        : {
+            pattern,
+            scale: finishScale,
+            ...(color2 !== undefined ? { color2 } : {}),
+            ...(normalStrength !== undefined ? { normalStrength } : {}),
+            ...(clearcoat !== undefined ? { clearcoat } : {}),
+          },
+  };
+}
+
+/** The property models, record and constitutive data a replaced material keeps. */
+function carriedFields(previous: Material | undefined): Partial<Material> {
+  const models = previous?.propertyModels;
+  return {
+    ...(models !== undefined ? { propertyModels: models } : {}),
+    ...(previous?.record !== undefined ? { record: previous.record } : {}),
+    ...(previous?.materialModels !== undefined ? { materialModels: previous.materialModels } : {}),
+    ...(previous?.constitutiveSets !== undefined ? { constitutiveSets: previous.constitutiveSets } : {}),
+    ...(previous?.defaultConstitutiveSet !== undefined ? { defaultConstitutiveSet: previous.defaultConstitutiveSet } : {}),
+  };
+}
+
 /**
  * @affects adds or replaces CadDocument.materials[name]
  * @invariant existing materials with different names are untouched
@@ -160,22 +200,9 @@ export const createMaterial = defineCommand({
     }
     if (!isHexColor(color))
       return noop(doc, `create_material '${name}' failed: color must be a 6-digit hex string like "#b0b0b0", got "${String(color)}".`);
-    const finishOptions = [requestedScale, color2, normalStrength, clearcoat];
-    if (pattern === undefined && finishOptions.some((option) => option !== undefined))
-      return noop(doc, `create_material '${name}' failed: finishScale / color2 / normalStrength / clearcoat need a finish pattern.`);
-    const finishScale = requestedScale ?? 24;
-    const finishIssue = finishProblem(finishScale, color2, normalStrength, clearcoat);
-    if (finishIssue !== null) return noop(doc, `create_material '${name}' failed: ${finishIssue}.`);
-    const finish: MaterialFinish | undefined =
-      pattern === undefined
-        ? undefined
-        : {
-            pattern,
-            scale: finishScale,
-            ...(color2 !== undefined ? { color2 } : {}),
-            ...(normalStrength !== undefined ? { normalStrength } : {}),
-            ...(clearcoat !== undefined ? { clearcoat } : {}),
-          };
+    const built = buildFinish(pattern, requestedScale, color2, normalStrength, clearcoat);
+    if ('problem' in built) return noop(doc, `create_material '${name}' failed: ${built.problem}`);
+    const finish = built.finish;
     if (previous?.record?.libraryRef !== undefined)
       return refuseMaterial(
         doc,
@@ -184,7 +211,6 @@ export const createMaterial = defineCommand({
         `'${name}' is a record of library '${previous.record.libraryRef.libraryId}'`,
         { ids: [name], path: 'name' },
       );
-    const models = previous?.propertyModels;
     const material: Material = {
       name,
       density,
@@ -193,11 +219,7 @@ export const createMaterial = defineCommand({
       metalness,
       roughness,
       ...(finish !== undefined ? { finish } : {}),
-      ...(models !== undefined ? { propertyModels: models } : {}),
-      ...(previous?.record !== undefined ? { record: previous.record } : {}),
-      ...(previous?.materialModels !== undefined ? { materialModels: previous.materialModels } : {}),
-      ...(previous?.constitutiveSets !== undefined ? { constitutiveSets: previous.constitutiveSets } : {}),
-      ...(previous?.defaultConstitutiveSet !== undefined ? { defaultConstitutiveSet: previous.defaultConstitutiveSet } : {}),
+      ...carriedFields(previous),
     };
     const newDoc: CadDocument = { ...doc, materials: { ...doc.materials, [name]: material } };
     const action = Object.hasOwn(doc.materials, name) ? 'replaced' : 'created';

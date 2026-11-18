@@ -14,6 +14,51 @@ export interface Dual {
 
 const STEP = 1e-6;
 
+type Quad = [number, number, number, number];
+
+function sminQuadDual(a: number, b: number, c: number, ga: Vec3, gb: Vec3, gc: Vec3): Quad {
+  const [ax, ay, az] = ga;
+  const [bx, by, bz] = gb;
+  const [cx, cy, cz] = gc;
+  const delta = Math.abs(a - b);
+  const value = smoothMinQuad(a, b, c);
+  if (!(c > 0) || delta >= c) {
+    const [ex, ey, ez] = a <= b ? [ax, ay, az] : [bx, by, bz];
+    return [value, ex, ey, ez];
+  }
+  const h = (c - delta) / c;
+  const [wa, wb] = a <= b ? [1 - h / 2, h / 2] : [h / 2, 1 - h / 2];
+  const dk = -(c * c - delta * delta) / (4 * c * c);
+  return [value, wa * ax + wb * bx + dk * cx, wa * ay + wb * by + dk * cy, wa * az + wb * bz + dk * cz];
+}
+
+function sminExpDual(a: number, b: number, c: number, ga: Vec3, gb: Vec3, gc: Vec3): Quad {
+  const [ax, ay, az] = ga;
+  const [bx, by, bz] = gb;
+  const [cx, cy, cz] = gc;
+  const value = smoothMinExp(a, b, c);
+  if (!(c > 0)) {
+    const [ex, ey, ez] = a <= b ? [ax, ay, az] : [bx, by, bz];
+    return [value, ex, ey, ez];
+  }
+  const m = Math.min(a, b);
+  const [ea, eb] = [Math.exp(-(a - m) / c), Math.exp(-(b - m) / c)];
+  const [wa, wb] = [ea / (ea + eb), eb / (ea + eb)];
+  const dk = (value - (wa * a + wb * b)) / c;
+  return [value, wa * ax + wb * bx + dk * cx, wa * ay + wb * by + dk * cy, wa * az + wb * bz + dk * cz];
+}
+
+function chamferMinDual(a: number, b: number, c: number, ga: Vec3, gb: Vec3, gc: Vec3): Quad {
+  const [ax, ay, az] = ga;
+  const [bx, by, bz] = gb;
+  const [cx, cy, cz] = gc;
+  const m = Math.min(a, b);
+  const chamfer = (a + b - c) * Math.SQRT1_2;
+  if (chamfer < m)
+    return [chamferMin(a, b, c), (ax + bx - cx) * Math.SQRT1_2, (ay + by - cy) * Math.SQRT1_2, (az + bz - cz) * Math.SQRT1_2];
+  return a <= b ? [m, ax, ay, az] : [m, bx, by, bz];
+}
+
 /** Gradient-carrying evaluation at (x, y, z). */
 export function evaluateWithGradient(prepared: PreparedProgram, x: number, y: number, z: number): Dual {
   const { opcodes, operands, program } = prepared;
@@ -113,43 +158,15 @@ export function evaluateWithGradient(prepared: PreparedProgram, x: number, y: nu
         if (a < 0) set(i, b, bx, by, bz);
         else set(i, c, cx, cy, cz);
         break;
-      case 'smin_quad': {
-        const delta = Math.abs(a - b);
-        const value = smoothMinQuad(a, b, c);
-        if (!(c > 0) || delta >= c) {
-          const [ex, ey, ez] = a <= b ? [ax, ay, az] : [bx, by, bz];
-          set(i, value, ex, ey, ez);
-          break;
-        }
-        const h = (c - delta) / c;
-        const [wa, wb] = a <= b ? [1 - h / 2, h / 2] : [h / 2, 1 - h / 2];
-        const dk = -(c * c - delta * delta) / (4 * c * c);
-        set(i, value, wa * ax + wb * bx + dk * cx, wa * ay + wb * by + dk * cy, wa * az + wb * bz + dk * cz);
+      case 'smin_quad':
+        set(i, ...sminQuadDual(a, b, c, [ax, ay, az], [bx, by, bz], [cx, cy, cz]));
         break;
-      }
-      case 'smin_exp': {
-        const value = smoothMinExp(a, b, c);
-        if (!(c > 0)) {
-          const [ex, ey, ez] = a <= b ? [ax, ay, az] : [bx, by, bz];
-          set(i, value, ex, ey, ez);
-          break;
-        }
-        const m = Math.min(a, b);
-        const [ea, eb] = [Math.exp(-(a - m) / c), Math.exp(-(b - m) / c)];
-        const [wa, wb] = [ea / (ea + eb), eb / (ea + eb)];
-        const dk = (value - (wa * a + wb * b)) / c;
-        set(i, value, wa * ax + wb * bx + dk * cx, wa * ay + wb * by + dk * cy, wa * az + wb * bz + dk * cz);
+      case 'smin_exp':
+        set(i, ...sminExpDual(a, b, c, [ax, ay, az], [bx, by, bz], [cx, cy, cz]));
         break;
-      }
-      case 'chamfer_min': {
-        const m = Math.min(a, b);
-        const chamfer = (a + b - c) * Math.SQRT1_2;
-        if (chamfer < m)
-          set(i, chamferMin(a, b, c), (ax + bx - cx) * Math.SQRT1_2, (ay + by - cy) * Math.SQRT1_2, (az + bz - cz) * Math.SQRT1_2);
-        else if (a <= b) set(i, m, ax, ay, az);
-        else set(i, m, bx, by, bz);
+      case 'chamfer_min':
+        set(i, ...chamferMinDual(a, b, c, [ax, ay, az], [bx, by, bz], [cx, cy, cz]));
         break;
-      }
       case 'mesh_sdf':
       case 'strut_set': {
         const radiusRegister = operands[base + 4] as number;

@@ -201,15 +201,9 @@ function savedViewProblem(key: string, view: unknown, items: Record<string, unkn
   return null;
 }
 
-/** Problems of the optional `pmi` field of a raw document (absent is valid). */
-export function pmiProblems(value: unknown): string[] {
-  if (value === undefined) return [];
-  if (!isRecord(value) || !isRecord(value['items']) || !isStringArray(value['order']))
-    return ['pmi must be { standard, items: object, order: string[], savedViews, savedViewOrder }'];
-  const { items, order } = value;
+/** Problems of each item and of datum labels used twice on one solid. */
+function itemErrors(items: Record<string, unknown>): string[] {
   const errors: string[] = [];
-  if (!isOneOf(PMI_STANDARDS, value['standard'])) errors.push(`pmi.standard must be one of ${PMI_STANDARDS.join(', ')}`);
-  if (!isOptional(value['generalToleranceNote'], (v) => typeof v === 'string')) errors.push('pmi.generalToleranceNote must be a string');
   const labels = new Map<string, string>();
   for (const [key, item] of Object.entries(items)) {
     if (isReservedKey(key)) errors.push(`pmi.items: id '${key}' is a reserved JavaScript property name`);
@@ -221,6 +215,12 @@ export function pmiProblems(value: unknown): string[] {
       labels.set(scope, key);
     }
   }
+  return errors;
+}
+
+/** Problems of items whose target frame or composite upper segment names no PMI item. */
+function referenceErrors(items: Record<string, unknown>): string[] {
+  const errors: string[] = [];
   for (const item of Object.values(items)) {
     if (!isRecord(item)) continue;
     const target = item['target'];
@@ -230,6 +230,19 @@ export function pmiProblems(value: unknown): string[] {
     if (typeof upper === 'string' && !Object.hasOwn(items, upper))
       errors.push(`pmi item '${String(item['id'])}': compositeOf '${upper}' is not a PMI item`);
   }
+  return errors;
+}
+
+/** Problems of the optional `pmi` field of a raw document (absent is valid). */
+export function pmiProblems(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!isRecord(value) || !isRecord(value['items']) || !isStringArray(value['order']))
+    return ['pmi must be { standard, items: object, order: string[], savedViews, savedViewOrder }'];
+  const { items, order } = value;
+  const errors: string[] = [];
+  if (!isOneOf(PMI_STANDARDS, value['standard'])) errors.push(`pmi.standard must be one of ${PMI_STANDARDS.join(', ')}`);
+  if (!isOptional(value['generalToleranceNote'], (v) => typeof v === 'string')) errors.push('pmi.generalToleranceNote must be a string');
+  errors.push(...itemErrors(items), ...referenceErrors(items));
   const listed = new Set(order);
   if (listed.size !== order.length) errors.push('pmi.order contains duplicate ids');
   for (const id of order) if (!Object.hasOwn(items, id)) errors.push(`pmi.order: '${id}' does not reference a known item`);

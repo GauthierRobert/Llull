@@ -4,7 +4,7 @@
  * STL / STEP solids.
  */
 
-import { type CadDocument, type Decal, type Entity, is3D } from '../../model/types';
+import { type CadDocument, type Decal, type Entity, type Vec3, is3D } from '../../model/types';
 import type { CommandResult } from '../types';
 import { colorField, defineCommand, vec3, z } from '../schema';
 import { changed, noop, failer } from '../noop';
@@ -30,6 +30,29 @@ function target(doc: CadDocument, id: string): Entity | string {
   if (entity === undefined) return `entity '${id}' not found`;
   if (!is3D(entity) || entity.kind === 'instance') return `entity '${id}' (kind '${entity.kind}') is not a solid; decals paint 3D solids`;
   return entity;
+}
+
+/** The first problem of the decal parameters (checked in this order), or null. */
+function decalProblem(
+  entity: Entity,
+  p: {
+    id: string;
+    text: string;
+    normal: Vec3;
+    height: number;
+    width: number | undefined;
+    depth: number | undefined;
+    background: string | undefined;
+  },
+): string | null {
+  if (p.text.trim().length === 0 || p.text.length > MAX_DECAL_TEXT) return `text must be 1..${MAX_DECAL_TEXT} characters`;
+  if (!(p.height > 0)) return `height must be > 0 (got ${p.height})`;
+  if (p.width !== undefined && !(p.width > 0)) return `width must be > 0 (got ${p.width})`;
+  if (p.depth !== undefined && !(p.depth > 0)) return `depth must be > 0 (got ${p.depth})`;
+  if (p.background !== undefined && !isHexColor(p.background)) return `background must be a #rrggbb colour (got "${p.background}")`;
+  if (Math.hypot(...p.normal) < 1e-12) return 'normal must be non-zero';
+  if ((entity.decals?.length ?? 0) >= MAX_DECALS_PER_ENTITY) return `entity '${p.id}' already has ${MAX_DECALS_PER_ENTITY} decals`;
+  return null;
 }
 
 /**
@@ -87,13 +110,8 @@ export const addDecal = defineCommand({
     const fail = failer(doc, 'add_decal');
     const entity = target(doc, id);
     if (typeof entity === 'string') return fail(entity);
-    if (text.trim().length === 0 || text.length > MAX_DECAL_TEXT) return fail(`text must be 1..${MAX_DECAL_TEXT} characters`);
-    if (!(height > 0)) return fail(`height must be > 0 (got ${height})`);
-    if (width !== undefined && !(width > 0)) return fail(`width must be > 0 (got ${width})`);
-    if (depth !== undefined && !(depth > 0)) return fail(`depth must be > 0 (got ${depth})`);
-    if (background !== undefined && !isHexColor(background)) return fail(`background must be a #rrggbb colour (got "${background}")`);
-    if (Math.hypot(...normal) < 1e-12) return fail('normal must be non-zero');
-    if ((entity.decals?.length ?? 0) >= MAX_DECALS_PER_ENTITY) return fail(`entity '${id}' already has ${MAX_DECALS_PER_ENTITY} decals`);
+    const problem = decalProblem(entity, { id, text, normal, height, width, depth, background });
+    if (problem !== null) return fail(problem);
     let working = doc;
     let ink: { width: number; height: number } | null = null;
     let mask: Decal['mask'];

@@ -45,6 +45,43 @@ const STOP_TEXT: Readonly<Record<FitStop, string>> = {
   pinned: 'limit points pinned',
 };
 
+/** The coded warnings of a finished fit (not converged, folded, solver residual, pin residual, shared pins). */
+function fitWarnings(
+  fit: SubdFitResult,
+  maxDeviation: number,
+  unit: string,
+  scale: number,
+  cageVertexCount: number,
+): Array<{ code: string; message: string }> {
+  const warnings: Array<{ code: string; message: string }> = [];
+  if (!fit.converged)
+    warnings.push({
+      code: 'MESH_FIT_NOT_CONVERGED',
+      message: `largest distance ${fit.final.max.toPrecision(4)} ${unit} > ${maxDeviation} after ${fit.rounds} round(s) (${STOP_TEXT[fit.stop]}); the best cage was kept${fit.stop === 'budget' ? ` (limit ${WORK_PER_QUERY} triangle tests per query)` : ''}`,
+    });
+  if (fit.folded.count > 0)
+    warnings.push({
+      code: 'MESH_FIT_FOLDED',
+      message: `${fit.folded.count} of ${fit.folded.checked} limit triangles face against the target (normals more than 100 degrees apart): the cage is inside out or folded there; check_subdivision lists self-intersections`,
+    });
+  if (!fit.cg.converged)
+    warnings.push({
+      code: 'MESH_FIT_SOLVER_RESIDUAL',
+      message: `the linear solve ended with relative residual ${fit.cg.relativeResidual.toExponential(2)} at its iteration cap; the cage is the best found, not an exact minimum`,
+    });
+  if (fit.pinResidual !== null && fit.pinResidual > PIN_TOLERANCE * scale)
+    warnings.push({
+      code: 'MESH_FIT_PIN_RESIDUAL',
+      message: `a pinned limit point misses its target vertex by ${fit.pinResidual.toExponential(2)} ${unit}`,
+    });
+  if (fit.sharedPins !== null && fit.sharedPins > 0)
+    warnings.push({
+      code: 'MESH_FIT_PIN_SHARED',
+      message: `${fit.sharedPins} of ${cageVertexCount} cage vertices are pinned to a target vertex that another cage vertex already has: the target is coarser than the cage and the surface collapses there (max deviation ${fit.final.max.toPrecision(3)} ${unit}); use the least-squares fit (interpolate off) or a coarser cage`,
+    });
+  return warnings;
+}
+
 /**
  * @affects rewrites the vertex positions of 1 subdivision entity (topology, creases, sharpness and element ids unchanged; `levels` set when given); the target is not touched
  * @invariant the returned cage is the best of the input and every round on the fit samples, so the fit never worsens the surface it was given; the limit surface is sampled at the vertices of the level-`fitLevel` refinement (at least the levels the semi-sharp creases need to decay) and verified on level fitLevel + 1, in both directions; the closest-point work of a round is capped; no kernel or native engine is used
@@ -194,32 +231,7 @@ export const fitSubdivisionToMesh = defineCommand({
       ? `converged (${STOP_TEXT[fit.stop]})`
       : `NOT converged (${STOP_TEXT[fit.stop]}; wanted <= ${maxDeviation} ${unit})`;
     const scale = entity.vertices.reduce((m, p) => Math.max(m, Math.abs(p[0]), Math.abs(p[1]), Math.abs(p[2])), 1e-300);
-    const warnings: Array<{ code: string; message: string }> = [];
-    if (!fit.converged)
-      warnings.push({
-        code: 'MESH_FIT_NOT_CONVERGED',
-        message: `largest distance ${fit.final.max.toPrecision(4)} ${unit} > ${maxDeviation} after ${fit.rounds} round(s) (${STOP_TEXT[fit.stop]}); the best cage was kept${fit.stop === 'budget' ? ` (limit ${WORK_PER_QUERY} triangle tests per query)` : ''}`,
-      });
-    if (fit.folded.count > 0)
-      warnings.push({
-        code: 'MESH_FIT_FOLDED',
-        message: `${fit.folded.count} of ${fit.folded.checked} limit triangles face against the target (normals more than 100 degrees apart): the cage is inside out or folded there; check_subdivision lists self-intersections`,
-      });
-    if (!fit.cg.converged)
-      warnings.push({
-        code: 'MESH_FIT_SOLVER_RESIDUAL',
-        message: `the linear solve ended with relative residual ${fit.cg.relativeResidual.toExponential(2)} at its iteration cap; the cage is the best found, not an exact minimum`,
-      });
-    if (fit.pinResidual !== null && fit.pinResidual > PIN_TOLERANCE * scale)
-      warnings.push({
-        code: 'MESH_FIT_PIN_RESIDUAL',
-        message: `a pinned limit point misses its target vertex by ${fit.pinResidual.toExponential(2)} ${unit}`,
-      });
-    if (fit.sharedPins !== null && fit.sharedPins > 0)
-      warnings.push({
-        code: 'MESH_FIT_PIN_SHARED',
-        message: `${fit.sharedPins} of ${entity.vertices.length} cage vertices are pinned to a target vertex that another cage vertex already has: the target is coarser than the cage and the surface collapses there (max deviation ${fit.final.max.toPrecision(3)} ${unit}); use the least-squares fit (interpolate off) or a coarser cage`,
-      });
+    const warnings = fitWarnings(fit, maxDeviation, unit, scale, entity.vertices.length);
     const defaults = [
       ...(params.iterations === undefined ? [namedDefault('iterations', DEFAULT_ITERATIONS, 'rounds', 'TECHNICAL_SPEC 5.9')] : []),
       ...(params.smoothing === undefined ? [namedDefault('smoothing', DEFAULT_SMOOTHING, '1', 'TECHNICAL_SPEC 5.9 (alpha)')] : []),

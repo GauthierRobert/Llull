@@ -10,7 +10,7 @@ import { bezier2 } from '../../lib/nurbs/curve2d';
 import { curveDomain } from '../../lib/nurbs/evaluate';
 import { integrateCurve } from '../../lib/nurbs/integrate';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
-import type { CurveProjectionRequest } from '../../geometry/kernelPorts';
+import type { CurveProjection, CurveProjectionRequest } from '../../geometry/kernelPorts';
 import { meshCorners, meshDiagonal } from '../../geometry/meshExtent';
 import { operandRecipe } from '../../geometry/operandRecipe';
 import type { PlaneSegment } from '../../geometry/planeSegments';
@@ -42,6 +42,67 @@ const worldCurve = (piece: PlaneSegment, toWorld: SketchOutline['toWorld']): Nur
     multiplicities: curve.multiplicities,
   };
 };
+
+type Source = { outline: SketchOutline; curve: NurbsCurveData; length: number };
+
+const missedParts = (sources: readonly Source[], coverage: readonly number[]): Array<{ entityId: string; fraction: number }> => {
+  const fraction = new Map<string, { sum: number; weight: number }>();
+  for (const [index, source] of sources.entries()) {
+    const entry = fraction.get(source.outline.id) ?? { sum: 0, weight: 0 };
+    entry.sum += (coverage[index] ?? 0) * source.length;
+    entry.weight += source.length;
+    fraction.set(source.outline.id, entry);
+  }
+  return [...fraction.entries()]
+    .filter(([, v]) => v.sum < v.weight * (1 - 1e-6))
+    .map(([entityId, v]) => ({ entityId, fraction: v.weight > 0 ? v.sum / v.weight : 0 }));
+};
+
+function projectedEntities(
+  doc: CadDocument,
+  solidId: string,
+  runs: CurveProjection['curves'],
+  sources: readonly Source[],
+  faceNameOf: (face: number) => string | undefined,
+  tolerance: number,
+): { next: CadDocument; created: string[]; records: Array<Record<string, unknown>> } {
+  let next: CadDocument = doc;
+  const created: string[] = [];
+  const records: Array<Record<string, unknown>> = [];
+  for (const run of runs) {
+    const source = sources[run.source] as Source;
+    const origin = doc.entities[source.outline.id] as Entity;
+    const id = nextId('curve');
+    const faceName = faceNameOf(run.face);
+    const length3d = lengthOf(run.curve);
+    const chartLength = lengthOf(source.curve, run.t0, run.t1);
+    const geometry = {
+      curve: run.curve,
+      onFace: {
+        entityId: solidId,
+        faceIndex: run.face,
+        ...(faceName !== undefined ? { faceName } : {}),
+        pcurve: run.pcurve,
+        frame: 'native' as const,
+        fitTolerance: tolerance,
+        chartLength,
+      },
+    } satisfies Omit<NurbsCurveEntity, keyof BaseEntity>;
+    next = withEntity(next, newEntity('nurbs_curve', id, geometry, [0, 0, 0], origin.color, { layerId: origin.layerId }));
+    created.push(id);
+    records.push({
+      id,
+      sourceId: source.outline.id,
+      faceIndex: run.face,
+      ...(faceName !== undefined ? { faceName } : {}),
+      length3d,
+      chartLength,
+      lengthStrain: chartLength > 0 ? length3d / chartLength - 1 : 0,
+      fitTolerance: tolerance,
+    });
+  }
+  return { next, created, records };
+}
 
 /**
  * @affects creates one nurbs_curve (with onFace and its native pcurve) per run of a sketch piece on a face
@@ -128,7 +189,7 @@ export const projectToFace = defineCommand({
       if (isSketchFailure(outline)) return fail(outline.code, outline.message, [entityId], [`entityIds.${index}`]);
       outlines.push(outline);
     }
-    const sources: Array<{ outline: SketchOutline; curve: NurbsCurveData; length: number }> = [];
+    const sources: Source[] = [];
     for (const outline of outlines) {
       const chains = [...outline.regions.flatMap((region) => [region.outer, ...region.holes]), ...outline.open];
       for (const piece of chains.flat()) {
@@ -169,16 +230,7 @@ export const projectToFace = defineCommand({
         params.entityIds,
         ['entityIds'],
       );
-    const fraction = new Map<string, { sum: number; weight: number }>();
-    for (const [index, source] of sources.entries()) {
-      const entry = fraction.get(source.outline.id) ?? { sum: 0, weight: 0 };
-      entry.sum += (projection.coverage[index] ?? 0) * source.length;
-      entry.weight += source.length;
-      fraction.set(source.outline.id, entry);
-    }
-    const missed = [...fraction.entries()]
-      .filter(([, v]) => v.sum < v.weight * (1 - 1e-6))
-      .map(([entityId, v]) => ({ entityId, fraction: v.weight > 0 ? v.sum / v.weight : 0 }));
+    const missed = missedParts(sources, projection.coverage);
     if (params.requireAll === true && missed.length > 0) {
       const refused = fail(
         'WRP_PROJECTION_MISSES_FACE',
@@ -188,41 +240,8 @@ export const projectToFace = defineCommand({
       );
       return { ...refused, data: { missed, unit: doc.units } };
     }
-    let next: CadDocument = doc;
-    const created: string[] = [];
-    const records: Array<Record<string, unknown>> = [];
-    for (const run of projection.curves) {
-      const source = sources[run.source] as (typeof sources)[number];
-      const origin = doc.entities[source.outline.id] as Entity;
-      const id = nextId('curve');
-      const faceName = topology?.faces[run.face]?.name;
-      const length3d = lengthOf(run.curve);
-      const chartLength = lengthOf(source.curve, run.t0, run.t1);
-      const geometry = {
-        curve: run.curve,
-        onFace: {
-          entityId: params.id,
-          faceIndex: run.face,
-          ...(faceName !== undefined ? { faceName } : {}),
-          pcurve: run.pcurve,
-          frame: 'native' as const,
-          fitTolerance: tolerance,
-          chartLength,
-        },
-      } satisfies Omit<NurbsCurveEntity, keyof BaseEntity>;
-      next = withEntity(next, newEntity('nurbs_curve', id, geometry, [0, 0, 0], origin.color, { layerId: origin.layerId }));
-      created.push(id);
-      records.push({
-        id,
-        sourceId: source.outline.id,
-        faceIndex: run.face,
-        ...(faceName !== undefined ? { faceName } : {}),
-        length3d,
-        chartLength,
-        lengthStrain: chartLength > 0 ? length3d / chartLength - 1 : 0,
-        fitTolerance: tolerance,
-      });
-    }
+    const faceNameOf = (face: number): string | undefined => topology?.faces[face]?.name;
+    const { next, created, records } = projectedEntities(doc, params.id, projection.curves, sources, faceNameOf, tolerance);
     const unverified = outlines.some((outline) => outline.unverified);
     const data = wrapData(
       doc,
