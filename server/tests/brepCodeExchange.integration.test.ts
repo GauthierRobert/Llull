@@ -34,7 +34,7 @@ function run(doc: CadDocument, name: string, params: unknown): ReturnType<typeof
 
 /** A 40 mm block drilled through, the top lip of the hole filleted (r 2). */
 function filletedBlock(): { doc: CadDocument; id: string } {
-  const block = run(createEmptyDocument(), 'add_box', { size: [40, 40, 20], name: 'Block' });
+  const block = run(createEmptyDocument(), 'add_box', { size: [40, 40, 20] });
   const drill = run(block.document, 'add_cylinder', { radius: 6, height: 40 });
   const drilled = run(drill.document, 'boolean', { op: 'subtract', a: block.affected[0], b: drill.affected[0] });
   const holed = drilled.affected[0]!;

@@ -116,7 +116,7 @@ Handle(Geom_Curve) section_curve(const gp_Pnt &start, const gp_Pnt &a, const gp_
     const double radius = leg_a * std::tan(wedge / 2);
     const gp_Pnt shoulder = start.Translated(bisector * (to_centre - radius));
     GC_MakeArcOfCircle arc(a, shoulder, b);
-    if (arc.IsDone()) return arc.Value();
+    if (arc.IsDone()) return Handle(Geom_Curve)(arc.Value());
   }
   Handle(Geom_BezierCurve) section;
   if (kind == 1) {

@@ -247,7 +247,7 @@ bool extension_edits(const Blend &blend, const Handle(Geom_BSplineSurface) &skin
               number(anchor.Distance(old)) + " long (the size continued past the end of the edge)";
         return false;
       }
-      const Handle(Geom_BSplineCurve) moved = segment(anchor, fresh);
+      const Handle(Geom_Curve) moved = segment(anchor, fresh);
       edit_of(end_face).replacements.push_back({shared, moved, {TopoDS_Vertex(), new_vertex[side][rail]}, 0.0});
       edit_of(support).replacements.push_back({shared, moved, {TopoDS_Vertex(), new_vertex[side][rail]}, 0.0});
     }
