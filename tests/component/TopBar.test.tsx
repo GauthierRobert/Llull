@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useLayoutStore, useStore, useThemeStore } from '@ui/store';
+import { useLayoutStore, useStore, useThemeStore, useToolStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { TopBar } from '@ui/components/TopBar';
 
@@ -96,5 +96,27 @@ describe('TopBar — dock toggles and actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More' }));
     expect(screen.getByRole('button', { name: /open project/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /save project/i })).toBeDefined();
+  });
+});
+
+describe('TopBar — view switch and help', () => {
+  beforeEach(() => {
+    resetStore();
+    useToolStore.setState({ viewMode: '3d', drawTool: 'none', modifyTool: 'none', shortcutsOpen: false });
+  });
+  it('the 3D / 2D switch is always visible and sets the view mode', () => {
+    render(<TopBar />);
+    expect(screen.getByRole('group', { name: 'View mode' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '2D' }));
+    expect(useToolStore.getState().viewMode).toBe('2d');
+    expect(screen.getByRole('button', { name: '2D' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '3D' }));
+    expect(useToolStore.getState().viewMode).toBe('3d');
+  });
+  it('Shortcuts opens the shortcut sheet', () => {
+    render(<TopBar />);
+    fireEvent.click(screen.getByRole('button', { name: 'Shortcuts' }));
+    expect(useToolStore.getState().shortcutsOpen).toBe(true);
   });
 });

@@ -22,6 +22,8 @@ interface CommandParamFormProps {
   onSubmit: (params: Record<string, unknown>) => void;
   /** Edit mode: pre-fill from these instead of the selection. */
   initialParams?: Readonly<Record<string, unknown>>;
+  /** Values laid over the selection pre-fill (a toolbar shortcut that already knows the operation or the operands). */
+  presetParams?: Readonly<Record<string, unknown>> | undefined;
   /** Default "Run". */
   submitLabel?: string;
   /** Default "Back to commands". */
@@ -125,11 +127,19 @@ function FieldControl({ field, id, value, describedBy, invalid, autoFocus, onCha
   );
 }
 
+/** The selection pre-fill with the preset's own values on top; fields the preset does not name keep their pre-fill. */
+function withPreset(fields: readonly FormField[], values: FormValues, preset: Readonly<Record<string, unknown>> | undefined): FormValues {
+  if (preset === undefined) return values;
+  const named = fields.filter((field) => preset[field.name] !== undefined);
+  return { ...values, ...valuesFromParams(named, preset) };
+}
+
 export function CommandParamForm({
   command,
   onBack,
   onSubmit,
   initialParams,
+  presetParams,
   submitLabel = 'Run',
   backLabel = 'Back to commands',
   statusMessage = null,
@@ -138,7 +148,7 @@ export function CommandParamForm({
   const allFields = useMemo(() => fieldsFromSchema(command.paramsSchema), [command]);
   const [values, setValues] = useState<FormValues>(() =>
     initialParams === undefined
-      ? initialValues(allFields, useStore.getState().document.selection)
+      ? withPreset(allFields, initialValues(allFields, useStore.getState().document.selection), presetParams)
       : valuesFromParams(allFields, initialParams),
   );
   // Only the fields that apply to the chosen operation are shown, parsed and submitted (fieldVisibility).

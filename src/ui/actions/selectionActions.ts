@@ -105,3 +105,10 @@ export function isolateSelection(): void {
   if (selection.length === 0) return;
   useViewportStore.getState().isolateEntities(selection, order);
 }
+
+/** Ctrl A: selects every entity that is not hidden in the viewport. */
+export function selectAllVisible(): void {
+  const { document, select } = useStore.getState();
+  const hidden = useViewportStore.getState().hiddenEntityIds;
+  select(document.order.filter((id) => !hidden.has(id)));
+}

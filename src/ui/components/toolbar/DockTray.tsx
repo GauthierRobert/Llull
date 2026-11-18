@@ -1,7 +1,6 @@
-// One section of the Tools panel: a titled row of labelled tools with their key, and a one-line hint for the hovered
-// (or armed) one.
+// One titled section of a tool flyout: labelled tools with their shortcut key. The flyout shows the hint of the hovered tool.
 
-import React, { useState } from 'react';
+import React from 'react';
 import { classNames } from '@ui/classNames';
 import { type IconName, Icon } from '@ui/components/Icon';
 
@@ -16,16 +15,15 @@ export interface DockTrayItem {
 }
 
 interface DockTrayProps {
-  id: string;
   label: string;
   items: readonly DockTrayItem[];
+  /** The tool under the pointer / keyboard focus. */
+  onDescribe: (item: DockTrayItem) => void;
 }
 
-export function DockTray({ id, label, items }: DockTrayProps): React.ReactElement {
-  const [focusedId, setFocusedId] = useState<string | null>(null);
-  const described = items.find((item) => item.id === focusedId) ?? items.find((item) => item.active === true);
+export function DockTray({ label, items, onDescribe }: DockTrayProps): React.ReactElement {
   return (
-    <div className="dock-tray" id={id} role="group" aria-label={label}>
+    <div className="dock-tray" role="group" aria-label={label}>
       <span className="dock-tray__title" aria-hidden="true">
         {label}
       </span>
@@ -35,29 +33,22 @@ export function DockTray({ id, label, items }: DockTrayProps): React.ReactElemen
             key={item.id}
             type="button"
             className={classNames('dock-tray__item', item.active === true && 'dock-tray__item--active')}
+            aria-label={item.label}
             aria-pressed={item.active}
-            title={item.shortcut === undefined ? item.hint : `${item.hint} (${item.shortcut})`}
             onClick={item.onPick}
-            onPointerEnter={() => setFocusedId(item.id)}
-            onFocus={() => setFocusedId(item.id)}
+            onPointerEnter={() => onDescribe(item)}
+            onFocus={() => onDescribe(item)}
           >
             <Icon name={item.icon} size={22} />
-            <span className="dock-tray__label">
-              {item.label}
-              {item.shortcut !== undefined && (
-                <kbd className="dock-tray__key" aria-hidden="true">
-                  {item.shortcut}
-                </kbd>
-              )}
-            </span>
+            <span className="dock-tray__label">{item.label}</span>
+            {item.shortcut !== undefined && (
+              <kbd className="dock-tray__key" aria-hidden="true">
+                {item.shortcut}
+              </kbd>
+            )}
           </button>
         ))}
       </div>
-      {described !== undefined && (
-        <p className="dock-tray__hint">
-          <b>{described.label}</b> — {described.hint}
-        </p>
-      )}
     </div>
   );
 }

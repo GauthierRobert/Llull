@@ -1,5 +1,5 @@
 // In-Canvas post-processing chain for the effects the plain renderer has no pass for (ambient occlusion, feature edges): EffectComposer =
-// RenderPass -> [HalfResGtaoPass] -> [EdgeOverlayPass] -> BackgroundOutputPass. Mounted only while an effect is on, so Draft / Standard keep
+// RenderPass -> [HalfResGtaoPass] -> [EdgeOverlayPass] -> BackgroundOutputPass -> [FXAAPass]. Mounted only while an effect is on, so Draft / Standard keep
 // the direct render. It renders at priority 1, replacing the drei Hud's main-scene render (the gizmo moves to priority 2 meanwhile, see
 // Viewport3D), and follows the adaptive pixel ratio of RenderRig. The composer is created in an effect and disposed with it (StrictMode-safe);
 // until it exists the frame is drawn directly.
@@ -9,8 +9,10 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { FXAAPass } from 'three/examples/jsm/postprocessing/FXAAPass.js';
 import { fromMm } from '@core/model/units';
-import { useStore } from '@ui/store';
+import { useStore, useViewportStore } from '@ui/store';
+import { currentViewportPalette } from '../../viewportPalette';
 import { mergedEntityBounds } from '../fitBounds';
 import { BackgroundOutputPass } from './BackgroundOutputPass';
 import { DepthRangeCamera } from './depthRangeCamera';
@@ -51,6 +53,13 @@ function depthRangeOf(box: SceneBox | null, camera: THREE.PerspectiveCamera): De
   return viewDepthRange(eye, [forward.x, forward.y, forward.z], box.min, box.max, camera.near, camera.far);
 }
 
+/** Read per frame by the edge pass (no re-render of the chain when the selection changes; the store invalidates the frame). */
+const hasSelection = (): boolean => useStore.getState().document.selection.length > 0;
+
+/** The theme's line colour while the hidden-line view is shown, else null (the pass default). Read per frame. */
+const wireLineColor = (): string | null =>
+  useViewportStore.getState().displayMode === 'wireframe' ? currentViewportPalette().wireLine : null;
+
 export function HighQualityEffects({ edges, ambientOcclusion }: EffectFlags): null {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
@@ -84,9 +93,11 @@ export function HighQualityEffects({ edges, ambientOcclusion }: EffectFlags): nu
     if (camera instanceof THREE.PerspectiveCamera) {
       const depthCamera = new DepthRangeCamera(camera, (view) => depthRangeOf(boxRef.current, view));
       if (ambientOcclusion) chain.addPass(new HalfResGtaoPass(scene, camera, width, height, gtaoParameters(radius.current), depthCamera));
-      if (edges) chain.addPass(new EdgeOverlayPass(scene, depthCamera, width, height));
+      if (edges) chain.addPass(new EdgeOverlayPass(scene, depthCamera, width, height, hasSelection, wireLineColor));
     }
     chain.addPass(new BackgroundOutputPass(() => background.current));
+    // Last, on the displayed (tone-mapped, sRGB) image: the edge lines are drawn after the MSAA resolve, so nothing else smooths them.
+    if (edges) chain.addPass(new FXAAPass());
     sized.current = { ratio, width: cssWidth, height: cssHeight };
     setComposer(chain);
     invalidate();

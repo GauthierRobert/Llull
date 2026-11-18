@@ -27,6 +27,11 @@ export const MODIFY_KEYS: Readonly<Record<string, ModifyToolKind>> = {
 
 const KEYS_3D: Readonly<Record<string, GizmoMode>> = { g: 'translate', m: 'translate', r: 'rotate', s: 'scale' };
 
+/** The key of each 2D modify tool, as shown next to it. */
+export const MODIFY_TOOL_KEYS: Readonly<Partial<Record<ModifyToolKind, string>>> = Object.fromEntries(
+  Object.entries(MODIFY_KEYS).map(([key, tool]) => [tool, key.toUpperCase()]),
+);
+
 /** Derived from the lookup tables. */
 export const DRAW_TOOL_KEYS: Readonly<Partial<Record<DrawToolKind, string>>> = Object.fromEntries(
   [...Object.entries(DRAW_KEYS), ...Object.entries(KEYS_2D)].map(([key, tool]) => [tool, key.toUpperCase()]),
@@ -61,6 +66,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { keys: PALETTE_SHORTCUT_LABEL, action: 'Search & run any command' },
       { keys: 'Ctrl Z', action: 'Undo' },
       { keys: 'Ctrl Y', action: 'Redo (also Ctrl Shift Z)' },
+      { keys: 'Ctrl A', action: 'Select everything' },
       { keys: 'Ctrl D', action: 'Duplicate selection' },
       { keys: 'Del', action: 'Delete selection' },
       { keys: 'Esc', action: 'Cancel tool, then clear selection' },
@@ -82,6 +88,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { keys: 'M / G', action: 'Move gizmo — drag an arrow' },
       { keys: 'R', action: 'Rotate gizmo — drag a ring' },
       { keys: 'S', action: 'Scale gizmo' },
+      { keys: 'F', action: 'Zoom to fit the whole model' },
       { keys: 'Drag', action: 'Orbit on empty space (right-drag pans, wheel zooms)' },
     ],
   },
@@ -93,7 +100,10 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { keys: 'L / P / W', action: 'Line / Polyline / Wall' },
       { keys: 'R / C / S / .', action: 'Rectangle / Circle / Spline / Point' },
       { keys: 'Enter', action: 'Finish polyline, wall or spline' },
-      { keys: Object.keys(MODIFY_KEYS).join(' ').toUpperCase(), action: 'Offset, Fillet, Chamfer, Trim, Extend, Explode (left palette)' },
+      {
+        keys: Object.keys(MODIFY_KEYS).join(' ').toUpperCase(),
+        action: 'Offset, Round corner, Cut corner, Trim, Extend, Explode (Modify)',
+      },
     ],
   },
 ];

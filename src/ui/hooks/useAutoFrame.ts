@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useStore, useToolStore } from '@ui/store';
 import { isLocalMode } from '@ui/store/localMode';
+import { AUTO_FRAME_PADDING } from '@ui/actions/viewActions';
 
 export function useAutoFrame(): void {
   useEffect(
@@ -12,7 +13,7 @@ export function useAutoFrame(): void {
         // Online the camera is shared: framing would move every client's view.
         if (!becameNonEmpty || !isLocalMode(state)) return;
         const direction = useToolStore.getState().viewMode === '2d' ? 'current' : 'iso';
-        state.dispatch('fit_view', { direction }, { quiet: true, coalesce: true });
+        state.dispatch('fit_view', { direction, padding: AUTO_FRAME_PADDING }, { quiet: true, coalesce: true });
       }),
     [],
   );

@@ -9,6 +9,7 @@ import { Icon } from '@ui/components/Icon';
 import { ModalDialog } from '@ui/components/ModalDialog';
 import { type PaletteItem, allPaletteItems, searchPaletteItems } from './paletteItems';
 import { CommandParamForm } from './CommandParamForm';
+import { suggestedPaletteIds } from './paletteSuggestions';
 
 function runCommand(command: CommandDefinition<unknown>, params: Record<string, unknown>): void {
   const readOnly = command.annotations?.readOnly === true;
@@ -104,11 +105,15 @@ function OpenPalette(): React.ReactElement {
     const pending = usePaletteStore.getState().pendingCommand;
     return pending === null ? null : (getCommand(pending) ?? null);
   });
+  // Read once: the preset belongs to the command the palette was opened on, not to one picked from the list afterwards.
+  const [presetParams] = useState(() => usePaletteStore.getState().pendingParams ?? undefined);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listId = useId();
 
   const catalog = useMemo(() => allPaletteItems(), []);
-  const results = useMemo(() => searchPaletteItems(catalog, query, recentIds), [catalog, query, recentIds]);
+  // The selection as it was when the palette opened (the palette is modal: it cannot change underneath).
+  const suggestedIds = useMemo(() => suggestedPaletteIds(useStore.getState().document), []);
+  const results = useMemo(() => searchPaletteItems(catalog, query, recentIds, suggestedIds), [catalog, query, recentIds, suggestedIds]);
 
   useEffect(() => {
     if (formCommand === null) inputRef.current?.focus();
@@ -170,7 +175,7 @@ function OpenPalette(): React.ReactElement {
               aria-autocomplete="list"
               aria-activedescendant={results.length > 0 ? `${listId}-${activeIndex}` : undefined}
               aria-label="Search commands"
-              placeholder="Search actions and commands…"
+              placeholder="What do you want to do? Try “extrude”, “fillet”, “measure”…"
               spellCheck={false}
               autoComplete="off"
               value={query}
@@ -206,6 +211,7 @@ function OpenPalette(): React.ReactElement {
       ) : (
         <CommandParamForm
           command={formCommand}
+          presetParams={formCommand.name === usePaletteStore.getState().pendingCommand ? presetParams : undefined}
           preview
           onBack={() => {
             setFormCommand(null);

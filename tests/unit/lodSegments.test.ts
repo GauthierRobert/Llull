@@ -2,50 +2,24 @@ import { describe, it, expect } from 'vitest';
 import { radialSegmentsForDiag, sphereDiag, cylinderDiag, torusDiag } from '../../src/ui/viewport/3d/lodSegments';
 
 describe('radialSegmentsForDiag', () => {
-  it('returns minimum 8 segments for a very small diagonal', () => {
-    expect(radialSegmentsForDiag(0.01)).toBe(8);
-    expect(radialSegmentsForDiag(1e-10)).toBe(8);
-    expect(radialSegmentsForDiag(0)).toBe(8);
+  it('never goes below the floor a round part needs to read as round', () => {
+    for (const diag of [0, 1e-10, 0.01, 1]) expect(radialSegmentsForDiag(diag)).toBe(48);
   });
-  it('returns 8 segments for diag = 1', () => {
-    // log2(1) = 0 → 8 + 0 = 8
-    expect(radialSegmentsForDiag(1)).toBe(8);
+  it('adds 8 segments per doubling of the size', () => {
+    expect(radialSegmentsForDiag(2)).toBe(56);
+    expect(radialSegmentsForDiag(4)).toBe(64);
+    expect(radialSegmentsForDiag(16)).toBe(80);
+    expect(radialSegmentsForDiag(64)).toBe(96);
   });
-  it('returns 16 segments for diag = 4', () => {
-    // log2(4) = 2 → 8 + floor(2*4) = 8 + 8 = 16
-    expect(radialSegmentsForDiag(4)).toBe(16);
+  it('caps at 128 segments for a very large diagonal', () => {
+    expect(radialSegmentsForDiag(1e9)).toBe(128);
   });
-  it('returns 24 segments for diag = 16', () => {
-    // log2(16) = 4 → 8 + floor(4*4) = 8 + 16 = 24
-    expect(radialSegmentsForDiag(16)).toBe(24);
-  });
-  it('returns 32 segments for diag = 64', () => {
-    // log2(64) = 6 → 8 + floor(6*4) = 8 + 24 = 32
-    expect(radialSegmentsForDiag(64)).toBe(32);
-  });
-  it('caps at 64 segments for a very large diagonal', () => {
-    expect(radialSegmentsForDiag(1e9)).toBe(64);
-  });
-  it('result is always an integer', () => {
-    for (const diag of [0.5, 2.7, 10, 50, 100]) {
+  it('is always an integer in [48, 128]', () => {
+    for (const diag of [0.001, 0.1, 0.5, 1, 2.7, 5, 10, 50, 100, 1000]) {
       const seg = radialSegmentsForDiag(diag);
       expect(Number.isInteger(seg)).toBe(true);
-    }
-  });
-  it('result is always in [8, 64]', () => {
-    for (const diag of [0.001, 0.1, 1, 5, 10, 100, 1000]) {
-      const seg = radialSegmentsForDiag(diag);
-      expect(seg).toBeGreaterThanOrEqual(8);
-      expect(seg).toBeLessThanOrEqual(64);
-    }
-  });
-  it('is monotonically non-decreasing with diag', () => {
-    const diags = [0.5, 1, 2, 4, 8, 16, 32, 64, 128];
-    let prev = radialSegmentsForDiag(diags[0]!);
-    for (let i = 1; i < diags.length; i++) {
-      const cur = radialSegmentsForDiag(diags[i]!);
-      expect(cur).toBeGreaterThanOrEqual(prev);
-      prev = cur;
+      expect(seg).toBeGreaterThanOrEqual(48);
+      expect(seg).toBeLessThanOrEqual(128);
     }
   });
 });

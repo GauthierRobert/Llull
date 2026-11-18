@@ -4,7 +4,8 @@ import type { CommandDefinition } from '@core/commands/types';
 import { listCommands } from '@core/commands/registry';
 import { type GizmoMode, useLayoutStore, useStore, useThemeStore, useToolStore } from '@ui/store';
 import type { IconName } from '@ui/components/Icon';
-import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
+import { deleteSelection, duplicateSelection, selectAllVisible } from '@ui/actions/selectionActions';
+import { zoomToFit } from '@ui/actions/viewActions';
 import { createSolid } from '@ui/actions/createSolid';
 import { DRAW_TOOL_KEYS, GIZMO_KEYS } from '@ui/hooks/shortcuts';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
@@ -55,6 +56,7 @@ const TOOLSET_GROUPS = {
 const OTHER_COMMANDS_GROUP = 'Other commands' as const;
 
 type PaletteGroup =
+  | 'Suggested for the selection'
   | 'Recent'
   | 'Create'
   | 'Draw'
@@ -120,6 +122,7 @@ const gizmoRow = (mode: GizmoMode, verb: string, hint: string, icon: IconName, k
 const STATIC_ACTIONS: ReadonlyArray<ActionRow> = [
   ['view-3d', 'View', 'Switch to 3D view', 'Perspective modeling view', 'cube', () => tools().setViewMode('3d'), '', '3'],
   ['view-2d', 'View', 'Switch to 2D view', 'Top-down drafting view', 'square', () => tools().setViewMode('2d'), '', '2'],
+  ['zoom-fit', 'View', 'Zoom to fit', 'Frame the whole model in the view', 'fit', zoomToFit, 'frame all home reset camera', 'F'],
   gizmoRow('translate', 'Move', 'Drag selected solids along axes (3D)', 'transformMove', 'translate transform'),
   gizmoRow('rotate', 'Rotate', 'Rotate selected solids (3D)', 'transformRotate', 'transform'),
   gizmoRow('scale', 'Scale', 'Scale selected solids (3D)', 'transformScale', 'transform resize'),
@@ -164,6 +167,7 @@ const STATIC_ACTIONS: ReadonlyArray<ActionRow> = [
   ['redo', 'Edit', 'Redo', 'Re-apply the last undone change', 'redo', () => store().redo(), '', 'Ctrl Y'],
   ['duplicate', 'Edit', 'Duplicate selection', 'Copy the selected entities', 'copy', duplicateSelection, '', 'Ctrl D'],
   ['delete', 'Edit', 'Delete selection', 'Remove the selected entities', 'trash', deleteSelection, 'remove erase', 'Del'],
+  ['select-all', 'Edit', 'Select all', 'Select everything that is not hidden', 'cursor', selectAllVisible, 'everything', 'Ctrl A'],
   ['clear-selection', 'Edit', 'Clear selection', 'Deselect everything', 'cursor', () => store().clearSelection(), 'deselect', 'Esc'],
   [
     'toggle-sidebar',
@@ -261,16 +265,26 @@ export function allPaletteItems(): PaletteItem[] {
   return [...appActions(), ...commands.map(commandItem)];
 }
 
-/** Empty query: recents (group 'Recent') then catalog order; else best score first, ties in catalog order. */
-export function searchPaletteItems(items: readonly PaletteItem[], query: string, recentIds: readonly string[]): PaletteItem[] {
+/** Empty query: suggestions for the selection, recents (group 'Recent'), then catalog order; else best score first, ties in catalog order. */
+export function searchPaletteItems(
+  items: readonly PaletteItem[],
+  query: string,
+  recentIds: readonly string[],
+  suggestedIds: readonly string[] = [],
+): PaletteItem[] {
   if (query.trim() === '') {
     const byId = new Map(items.map((item) => [item.id, item]));
-    const recent = recentIds
-      .map((id) => byId.get(id))
-      .filter((item): item is PaletteItem => item !== undefined)
-      .map((item): PaletteItem => ({ ...item, group: 'Recent' }));
-    const recentSet = new Set(recent.map((item) => item.id));
-    return [...recent, ...items.filter((item) => !recentSet.has(item.id))];
+    const pinned = (ids: readonly string[], group: PaletteGroup, skip: ReadonlySet<string>): PaletteItem[] =>
+      ids
+        .filter((id) => !skip.has(id))
+        .map((id) => byId.get(id))
+        .filter((item): item is PaletteItem => item !== undefined)
+        .map((item): PaletteItem => ({ ...item, group }));
+    const suggested = pinned(suggestedIds, 'Suggested for the selection', new Set());
+    const suggestedSet = new Set(suggested.map((item) => item.id));
+    const recent = pinned(recentIds, 'Recent', suggestedSet);
+    const pinnedSet = new Set([...suggestedSet, ...recent.map((item) => item.id)]);
+    return [...suggested, ...recent, ...items.filter((item) => !pinnedSet.has(item.id))];
   }
   return items
     .map((item, index) => ({ item, index, score: fuzzyScore(query, item.label, item.keywords) }))

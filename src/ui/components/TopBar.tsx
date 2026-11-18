@@ -1,9 +1,9 @@
-// Header: browser-panel toggle, brand, breadcrumbs (project › selection) and the More menu (file, export, theme,
-// properties); live-sync status sits in the status bar. The command palette trigger lives in the command bar.
+// Header: browser-panel toggle, brand, breadcrumbs (project › selection) on the left; on the right the 3D / 2D view switch, Help
+// (shortcuts) and the More menu (file, export, theme, properties). Live-sync status sits in the status bar.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
-import { useLayoutStore, useStore } from '@ui/store';
+import { type ViewMode, useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { projectNameOf } from '@ui/components/projectName';
 import { Icon } from '@ui/components/Icon';
@@ -34,6 +34,48 @@ function SidebarToggle(): React.ReactElement {
       title={`${label} — layers, parameters, history, materials…`}
     >
       <Icon name="panelLeft" size={16} />
+    </button>
+  );
+}
+
+const VIEW_MODES: ReadonlyArray<{ mode: ViewMode; label: string; title: string }> = [
+  { mode: '3d', label: '3D', title: '3D view (3) — model and orbit in perspective' },
+  { mode: '2d', label: '2D', title: '2D view (2) — sketch and draft from the top' },
+];
+
+/** The same model seen two ways (L7); always visible so the way back from a sketch is never hidden. */
+function ViewModeSwitch(): React.ReactElement {
+  const viewMode = useToolStore((s) => s.viewMode);
+  const setViewMode = useToolStore((s) => s.setViewMode);
+  return (
+    <div className="view-switch" role="group" aria-label="View mode">
+      {VIEW_MODES.map(({ mode, label, title }) => (
+        <button
+          key={mode}
+          type="button"
+          className="view-switch__btn"
+          aria-pressed={viewMode === mode}
+          title={title}
+          onClick={() => setViewMode(mode)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function HelpButton(): React.ReactElement {
+  const setShortcutsOpen = useToolStore((s) => s.setShortcutsOpen);
+  return (
+    <button
+      type="button"
+      className="icon-btn"
+      aria-label="Shortcuts"
+      title="Mouse and keyboard shortcuts (?)"
+      onClick={() => setShortcutsOpen(true)}
+    >
+      <Icon name="help" size={16} />
     </button>
   );
 }
@@ -78,6 +120,9 @@ export function TopBar(): React.ReactElement {
       </div>
 
       <div className="topbar__right">
+        <ViewModeSwitch />
+        <span className="topbar__sep" aria-hidden="true" />
+        <HelpButton />
         <MoreMenu />
       </div>
     </header>

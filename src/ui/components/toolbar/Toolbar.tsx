@@ -1,95 +1,40 @@
-// Command bar (bottom-center). Idle it is one line: a Tools button and "Search or run a command" (opens the palette).
-// Everything else is on demand: the Tools panel (sketch tools, solids, view mode, select, shortcuts), the armed
-// tool chip, an Undo/Redo pair (disabled when idle), and the selection's actions while something is selected.
+// Command bar (bottom-center). Every tool family is visible by name: Select, then Sketch / Solid / Modify / Inspect, each opening a
+// flyout of labelled tools; then "Search or run a command" (the palette, for everything else) and Undo / Redo. While something is
+// selected, the selection bar above it offers what can be done with that selection.
 
 import React, { useCallback, useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
-import { type GizmoMode, usePaletteStore, useStore, useToolStore } from '@ui/store';
+import { usePaletteStore, useStore, useToolStore } from '@ui/store';
 import { type IconName, Icon } from '@ui/components/Icon';
-import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
-import { DRAW_TOOL_KEYS, GIZMO_KEYS, PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
+import { HintBar } from '@ui/components/HintBar';
+import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
 import { useDismiss } from '@ui/hooks/useDismiss';
-import { createSolid } from '@ui/actions/createSolid';
-import { SOLID_PRESETS } from './solidPresets';
 import { DRAW_TOOLS } from './drawTools';
 import { type DockTrayItem, DockTray } from './DockTray';
+import { SelectionBar } from './SelectionBar';
+import { type ToolGroupId, TOOL_GROUPS, flyoutSections } from './toolFlyouts';
 
 interface DockButtonProps {
   label: string;
   icon: IconName;
   /** The shortcut key is appended when given. */
   tip: string;
-  shortcut?: string | undefined;
-  pressed?: boolean | undefined;
+  shortcut?: string;
   disabled?: boolean;
-  /** With a visible caption (default: icon only, the label is the accessible name and tooltip). */
-  caption?: boolean;
-  tone?: 'danger';
   onClick: () => void;
 }
 
-function DockButton({
-  label,
-  icon,
-  tip,
-  shortcut,
-  pressed,
-  disabled = false,
-  caption = false,
-  tone,
-  onClick,
-}: DockButtonProps): React.ReactElement {
+function DockButton({ label, icon, tip, shortcut, disabled = false, onClick }: DockButtonProps): React.ReactElement {
   const title = shortcut === undefined ? `${label} — ${tip}` : `${label} (${shortcut}) — ${tip}`;
   return (
-    <button
-      type="button"
-      className={classNames(
-        'dock-btn',
-        !caption && 'dock-btn--compact',
-        pressed === true && 'dock-btn--active',
-        tone === 'danger' && 'dock-btn--danger',
-      )}
-      aria-label={label}
-      aria-pressed={pressed}
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-    >
+    <button type="button" className="dock-btn dock-btn--compact" aria-label={label} title={title} disabled={disabled} onClick={onClick}>
       <Icon name={icon} size={16} />
-      {caption && <span className="dock-btn__label">{label}</span>}
     </button>
   );
 }
 
 function DockDivider(): React.ReactElement {
   return <span className="dock-divider" aria-hidden="true" />;
-}
-
-function ViewModeSwitch(): React.ReactElement {
-  const viewMode = useToolStore((s) => s.viewMode);
-  const setViewMode = useToolStore((s) => s.setViewMode);
-  return (
-    <div className="dock-view" role="group" aria-label="View mode">
-      <button
-        type="button"
-        className="dock-view__btn"
-        aria-pressed={viewMode === '3d'}
-        title="3D view (3)"
-        onClick={() => setViewMode('3d')}
-      >
-        3D
-      </button>
-      <button
-        type="button"
-        className="dock-view__btn"
-        aria-pressed={viewMode === '2d'}
-        title="2D drafting view (2)"
-        onClick={() => setViewMode('2d')}
-      >
-        2D
-      </button>
-    </div>
-  );
 }
 
 /** The 2D draw tool currently armed, if any. */
@@ -99,145 +44,86 @@ function useArmedSketchTool(): (typeof DRAW_TOOLS)[number] | undefined {
   return viewMode === '2d' ? DRAW_TOOLS.find((spec) => spec.tool === drawTool) : undefined;
 }
 
-function useSketchItems(close: () => void): DockTrayItem[] {
-  const setDrawTool = useToolStore((s) => s.setDrawTool);
-  const armed = useArmedSketchTool();
-  return DRAW_TOOLS.map((spec) => {
-    const active = spec === armed;
-    return {
-      id: spec.tool,
-      label: spec.label,
-      icon: spec.icon,
-      hint: spec.tip,
-      shortcut: DRAW_TOOL_KEYS[spec.tool],
-      active,
-      onPick: () => {
-        setDrawTool(active ? 'none' : spec.tool);
-        close();
-      },
-    };
-  });
-}
-
-function solidItems(close: () => void): DockTrayItem[] {
-  return SOLID_PRESETS.map((preset) => ({
-    id: preset.command,
-    label: preset.label,
-    icon: preset.icon,
-    hint: 'adds one at a free spot near the origin and selects it so you can drag it',
-    onPick: () => {
-      createSolid(preset);
-      close();
-    },
-  }));
-}
-
-function ToolsPanel({ close }: { close: () => void }): React.ReactElement {
-  const drawTool = useToolStore((s) => s.drawTool);
-  const viewMode = useToolStore((s) => s.viewMode);
-  const setDrawTool = useToolStore((s) => s.setDrawTool);
-  const setShortcutsOpen = useToolStore((s) => s.setShortcutsOpen);
-  const sketchItems = useSketchItems(close);
-  const is2d = viewMode === '2d';
-  return (
-    <div className="dock-panel" id="dock-tools" role="group" aria-label="Tools">
-      <DockTray id="dock-tray-sketch" label="Sketch tools" items={sketchItems} />
-      <DockTray id="dock-tray-solid" label="Solid tools" items={solidItems(close)} />
-      <div className="dock-panel__footer">
-        <ViewModeSwitch />
-        <DockButton
-          caption
-          label="Select"
-          icon="cursor"
-          tip="click an object to select it, Shift-click to add more"
-          shortcut={is2d ? DRAW_TOOL_KEYS.none : undefined}
-          pressed={is2d ? drawTool === 'none' : undefined}
-          onClick={() => {
-            setDrawTool('none');
-            close();
-          }}
-        />
-        <span className="dock-panel__spacer" />
-        <DockButton
-          label="Shortcuts"
-          icon="keyboard"
-          tip="list every keyboard shortcut"
-          shortcut="?"
-          onClick={() => setShortcutsOpen(true)}
-        />
-      </div>
-    </div>
-  );
-}
-
-const GIZMO_BUTTONS: ReadonlyArray<{ mode: GizmoMode; label: string; icon: IconName }> = [
-  { mode: 'translate', label: 'Move', icon: 'transformMove' },
-  { mode: 'rotate', label: 'Rotate', icon: 'transformRotate' },
-  { mode: 'scale', label: 'Scale', icon: 'transformScale' },
-];
-
-/** Move / Rotate / Scale, Duplicate, Delete — only while something is selected. */
-function SelectionActions(): React.ReactElement {
-  const viewMode = useToolStore((s) => s.viewMode);
-  const drawTool = useToolStore((s) => s.drawTool);
-  const gizmoMode = useToolStore((s) => s.gizmoMode);
-  const toggleDrawTool = useToolStore((s) => s.toggleDrawTool);
-  const setGizmoMode = useToolStore((s) => s.setGizmoMode);
-  const selectionCount = useStore((s) => s.document.selection.length);
-  return (
-    <>
-      <DockDivider />
-      {GIZMO_BUTTONS.map(({ mode, label, icon }) => {
-        if (viewMode === '2d') {
-          const isMove = mode === 'translate';
-          return (
-            <DockButton
-              key={mode}
-              label={label}
-              icon={icon}
-              tip={isMove ? 'click a base point, then where it should go' : 'switch to the 3D view to rotate or scale'}
-              shortcut={isMove ? DRAW_TOOL_KEYS.move : undefined}
-              pressed={isMove && drawTool === 'move'}
-              disabled={!isMove}
-              onClick={() => toggleDrawTool('move')}
-            />
-          );
-        }
-        return (
-          <DockButton
-            key={mode}
-            label={label}
-            icon={icon}
-            tip={selectionCount === 1 ? 'drag the gizmo handles on the selected object' : 'select one object, then drag the gizmo handles'}
-            shortcut={GIZMO_KEYS[mode]}
-            pressed={gizmoMode === mode}
-            onClick={() => setGizmoMode(mode)}
-          />
-        );
-      })}
-      <DockButton label="Duplicate" icon="copy" tip="copy the selection beside itself" shortcut="Ctrl D" onClick={duplicateSelection} />
-      <DockButton tone="danger" label="Delete" icon="trash" tip="delete the selection" shortcut="Del" onClick={deleteSelection} />
-    </>
-  );
-}
-
-/** The armed 2D tool as a chip; clicking it puts the tool down. */
-function ArmedToolChip(): React.ReactElement | null {
-  const armed = useArmedSketchTool();
-  const setDrawTool = useToolStore((s) => s.setDrawTool);
-  if (armed === undefined) return null;
+/** The default tool: pressed while nothing else is in hand; clicking it puts any armed tool down. */
+function SelectButton({ onPick }: { onPick: () => void }): React.ReactElement {
+  const idle = useToolStore((s) => s.drawTool === 'none' && s.modifyTool === 'none');
   return (
     <button
       type="button"
-      className="dock-chip"
-      aria-label={`Stop the ${armed.label} tool`}
-      title={`${armed.label} — ${armed.tip} (Esc to stop)`}
-      onClick={() => setDrawTool('none')}
+      className={classNames('dock-btn', idle && 'dock-btn--active')}
+      aria-label="Select"
+      aria-pressed={idle}
+      title="Select (V) — click an object to select it, Shift-click to add more"
+      onClick={() => {
+        const tools = useToolStore.getState();
+        tools.setDrawTool('none');
+        tools.setModifyTool('none');
+        onPick();
+      }}
     >
-      <Icon name={armed.icon} size={14} />
-      {armed.label}
-      <Icon name="close" size={12} className="dock-chip__close" />
+      <Icon name="cursor" size={16} />
+      <span className="dock-btn__label">Select</span>
     </button>
+  );
+}
+
+interface GroupButtonProps {
+  group: (typeof TOOL_GROUPS)[number];
+  open: boolean;
+  /** Another flyout is open: hovering this button switches to its flyout (menu-bar behaviour). */
+  switchOnHover: boolean;
+  onToggle: (id: ToolGroupId) => void;
+  onOpen: (id: ToolGroupId) => void;
+}
+
+function GroupButton({ group, open, switchOnHover, onToggle, onOpen }: GroupButtonProps): React.ReactElement {
+  const armed = useArmedSketchTool();
+  // The Sketch button carries the armed tool, so the tool in hand is always visible in the bar.
+  const carried = group.id === 'sketch' ? armed : undefined;
+  return (
+    <button
+      type="button"
+      className={classNames('dock-btn', 'dock-group-btn', (open || carried !== undefined) && 'dock-btn--active')}
+      aria-label={group.label}
+      aria-haspopup="true"
+      aria-expanded={open}
+      aria-controls={open ? 'dock-flyout' : undefined}
+      title={carried === undefined ? `${group.label} — ${group.tip}` : `${carried.label} tool in hand — ${carried.tip} (Esc to stop)`}
+      onClick={() => onToggle(group.id)}
+      onPointerEnter={() => {
+        if (switchOnHover) onOpen(group.id);
+      }}
+    >
+      <Icon name={carried?.icon ?? group.icon} size={16} />
+      <span className="dock-btn__label">{carried?.label ?? group.label}</span>
+      <Icon name="chevronDown" size={12} className="dock-group-btn__caret" />
+    </button>
+  );
+}
+
+const FLYOUT_PROMPT = 'Point at a tool to see what it does.';
+
+function Flyout({ group, close }: { group: ToolGroupId; close: () => void }): React.ReactElement {
+  // Subscribed so an armed tool or a view switch re-renders the sections (they read the store at call time).
+  useToolStore((s) => `${s.viewMode}:${s.drawTool}:${s.modifyTool}`);
+  const [described, setDescribed] = useState<DockTrayItem | null>(null);
+  const spec = TOOL_GROUPS.find((candidate) => candidate.id === group);
+  const sections = flyoutSections(group, close);
+  return (
+    <div className="dock-panel" id="dock-flyout" role="group" aria-label={`${spec?.label ?? group} tools`}>
+      {sections.map((section) => (
+        <DockTray key={section.id} label={section.label} items={section.items} onDescribe={setDescribed} />
+      ))}
+      <p className="dock-panel__hint" role="status">
+        {described === null ? (
+          FLYOUT_PROMPT
+        ) : (
+          <>
+            <b>{described.label}</b> — {described.hint}
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -253,7 +139,7 @@ function AskButton(): React.ReactElement {
       title={`Search every action and command (${PALETTE_SHORTCUT_LABEL})`}
     >
       <Icon name="search" size={15} />
-      <span className="dock-ask__text">Search or run a command…</span>
+      <span className="dock-ask__text">Search commands…</span>
       <kbd className="dock-ask__kbd">{PALETTE_SHORTCUT_LABEL}</kbd>
     </button>
   );
@@ -274,31 +160,35 @@ function UndoRedo(): React.ReactElement {
 }
 
 export function Toolbar(): React.ReactElement {
-  const [toolsOpen, setToolsOpen] = useState(false);
+  const [openGroup, setOpenGroup] = useState<ToolGroupId | null>(null);
   const dockRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setToolsOpen(false), []);
-  useDismiss(dockRef, toolsOpen, close);
+  const close = useCallback(() => setOpenGroup(null), []);
+  useDismiss(dockRef, openGroup !== null, close);
+  const toggle = useCallback((id: ToolGroupId) => setOpenGroup((current) => (current === id ? null : id)), []);
 
   const hasSelection = useStore((s) => s.document.selection.length > 0);
   return (
     <div className="dock" ref={dockRef}>
-      {toolsOpen && <ToolsPanel close={close} />}
+      {openGroup === null && <HintBar />}
+      {openGroup !== null && <Flyout key={openGroup} group={openGroup} close={close} />}
+      {openGroup === null && hasSelection && <SelectionBar />}
       <div className="dock__bar" role="toolbar" aria-label="Main toolbar">
-        <button
-          type="button"
-          className={classNames('dock-btn', 'dock-btn--compact', 'dock-tools-btn', toolsOpen && 'dock-btn--active')}
-          aria-label="Tools"
-          aria-expanded={toolsOpen}
-          aria-controls={toolsOpen ? 'dock-tools' : undefined}
-          title="Tools — sketch, solids, view mode"
-          onClick={() => setToolsOpen((open) => !open)}
-        >
-          <Icon name="plus" size={18} />
-        </button>
-        <ArmedToolChip />
+        <SelectButton onPick={close} />
+        <DockDivider />
+        {TOOL_GROUPS.map((group) => (
+          <GroupButton
+            key={group.id}
+            group={group}
+            open={openGroup === group.id}
+            switchOnHover={openGroup !== null && openGroup !== group.id}
+            onToggle={toggle}
+            onOpen={setOpenGroup}
+          />
+        ))}
+        <DockDivider />
         <AskButton />
+        <DockDivider />
         <UndoRedo />
-        {hasSelection && <SelectionActions />}
       </div>
     </div>
   );

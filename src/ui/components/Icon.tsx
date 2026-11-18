@@ -95,6 +95,27 @@ const ICON_PATHS = {
   aero: 'M3 8h4M3 12h3M3 16h4M10 12c2-3.5 6-4.5 11-3-2.5 1.5-4.5 3-6.5 5.5-2 0-3.5-.8-4.5-2.5Z',
   pointCloud:
     'M12 3.5h.01M7 6.5h.01M17 6.5h.01M4.5 11h.01M9.5 10h.01M14.5 10h.01M19.5 11h.01M7 14.5h.01M12 14h.01M17 14.5h.01M10 18h.01M14 18h.01M4.5 16.5h.01M19.5 16.5h.01M12 20.5h.01',
+  featureExtrude: 'M4 16l8-3.5 8 3.5-8 3.5-8-3.5ZM12 12.5V3M8.5 6.5 12 3l3.5 3.5',
+  featureRevolve: 'M12 2v20M16.5 7.5c2.7.9 4.5 2.6 4.5 4.5 0 3-4 5-9 5s-9-2-9-5c0-1.9 1.8-3.6 4.5-4.5M9 14.5l3 2.5-3 2.5',
+  featureSweep: 'M3 19c1-8 7-13 15-14.5M16 2.5l3.5 2-2.5 3M2 15h4v6H2z',
+  featureLoft: 'M5 20h14M9 4h6M5 20 9 4M19 20 15 4',
+  featureShell: 'M4 4h16v16H4zM8 8h8v8H8z',
+  featureHole: 'M4 4h16v16H4zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+  boolUnion: 'M4 4h10v6h6v10H10v-6H4V4Z',
+  boolSubtract: 'M4 4h10v6h-4v4H4V4ZM14 10h6v10H10v-6',
+  boolIntersect: 'M4 4h10v10H4zM10 10h10v10H10zM10 10h4v4h-4z',
+  arrangeMirror: 'M12 3v18M8 7 3 12l5 5V7ZM16 7l5 5-5 5V7Z',
+  arrangeLinear: 'M3 9h5v6H3zM10 9h5v6h-5zM17 9h4v6h-4z',
+  arrangePolar:
+    'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1',
+  arrangeAlign: 'M4 3v18M8 6h10v4H8zM8 14h6v4H8z',
+  measureAngle: 'M4 20h16M4 20 16 5M11 20a7 7 0 0 0-2.3-5.2',
+  measureMass: 'M6 8h12l2 12H4L6 8ZM12 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z',
+  dimension: 'M4 6v12M20 6v12M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3',
+  help: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5M12 17.5h.01',
+  mouse: 'M12 3a6 6 0 0 0-6 6v6a6 6 0 0 0 12 0V9a6 6 0 0 0-6-6ZM12 7v4',
+  sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 16v4M17 18h4',
+  pencil: 'M4 20l1-4L16 5l3 3L8 19l-4 1ZM14 7l3 3',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

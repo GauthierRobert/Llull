@@ -11,8 +11,8 @@ const base: HintContext = {
 };
 
 describe('hintText', () => {
-  it('points an empty model at the Tools menu of the command bar', () => {
-    expect(hintText({ ...base, entityCount: 0 })).toMatch(/Tools \(\+\) in the command bar/);
+  it('points an empty model at Solid and Sketch in the command bar', () => {
+    expect(hintText({ ...base, entityCount: 0 })).toMatch(/Solid .* or Sketch .* in the bar at the bottom/);
   });
   it('explains selection when nothing is selected', () => {
     expect(hintText(base)).toMatch(/click an object/i);

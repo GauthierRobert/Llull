@@ -24,7 +24,7 @@ export function buildConeGeometry(radius: number, height: number): THREE.BufferG
 /** Sphere centered at the origin, poles along +/-Z. */
 export function buildSphereGeometry(radius: number): THREE.BufferGeometry {
   const segments = radialSegmentsForDiag(sphereDiag(radius));
-  const heightSegments = clamp(Math.floor(segments / 2), 4, 32);
+  const heightSegments = clamp(Math.floor(segments / 2), 4, 64);
   const geo = new THREE.SphereGeometry(radius, segments, heightSegments);
   geo.rotateX(Math.PI / 2);
   return geo;
@@ -33,7 +33,7 @@ export function buildSphereGeometry(radius: number): THREE.BufferGeometry {
 /** Torus: ring in the XY plane (hole along +Z), centered at the origin. */
 export function buildTorusGeometry(ringRadius: number, tubeRadius: number): THREE.BufferGeometry {
   const tubularSegments = radialSegmentsForDiag(torusDiag(ringRadius, tubeRadius));
-  const radialSegments = Math.max(8, Math.floor(tubularSegments / 2));
+  const radialSegments = Math.max(16, Math.floor(tubularSegments / 2));
   return new THREE.TorusGeometry(ringRadius, tubeRadius, radialSegments, tubularSegments);
 }
 

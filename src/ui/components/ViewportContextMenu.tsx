@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
-import { deleteSelection, duplicateSelection, hideSelection, isolateSelection } from '@ui/actions/selectionActions';
+import { deleteSelection, duplicateSelection, hideSelection, isolateSelection, selectAllVisible } from '@ui/actions/selectionActions';
+import { zoomToFit } from '@ui/actions/viewActions';
 import { createSolid } from '@ui/actions/createSolid';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { useDismiss } from '@ui/hooks/useDismiss';
@@ -12,7 +13,7 @@ import type { GizmoMode } from '@ui/store';
 /** Max pointer travel (px) between right-button down and up that still counts as a click. */
 const CLICK_SLOP = 5;
 const EDGE_MARGIN = 8;
-const ESTIMATED_MENU_SIZE = { width: 232, height: 360 };
+const ESTIMATED_MENU_SIZE = { width: 232, height: 380 };
 
 interface MenuItem {
   label: string;
@@ -44,6 +45,8 @@ function useMenuEntries(): MenuEntry[] {
           }),
         ),
         'separator',
+        { label: 'Zoom to fit', shortcut: viewMode === '3d' ? 'F' : '', enabled: true, run: zoomToFit },
+        { label: 'Select all', shortcut: 'Ctrl A', enabled: true, run: selectAllVisible },
         showAll,
         { label: 'Search commands…', shortcut: PALETTE_SHORTCUT_LABEL, enabled: true, run: () => usePaletteStore.getState().setOpen(true) },
       ];
