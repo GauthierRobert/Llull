@@ -154,6 +154,19 @@ describe('REST rate limiting', () => {
     expect((await request(mini).post('/x')).status).toBe(200);
     expect((await request(mini).post('/x')).status).toBe(429);
   });
+
+  it('does not count requests with the valid bearer token (the UI and CLI agents share one loopback address); a wrong token is counted', async () => {
+    process.env['LLULL_REST_RATE_LIMIT_MAX'] = '2';
+    process.env['LLULL_AUTH_TOKEN'] = 'secret-token';
+    const mini = express()
+      .use(buildRestRateLimiter())
+      .post('/x', (_req, res) => res.json({ ok: true }));
+    for (let call = 0; call < 5; call++)
+      expect((await request(mini).post('/x').set('Authorization', 'Bearer secret-token')).status).toBe(200);
+    expect((await request(mini).post('/x').set('Authorization', 'Bearer wrong')).status).toBe(200);
+    expect((await request(mini).post('/x')).status).toBe(200);
+    expect((await request(mini).post('/x').set('Authorization', 'Bearer wrong')).status).toBe(429);
+  });
 });
 
 describe('thrown commands become error results', () => {

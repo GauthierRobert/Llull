@@ -223,13 +223,21 @@ export function securityHeaders(): RequestHandler {
   };
 }
 
-/** Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). */
+/**
+ * Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). A request with the valid bearer token is
+ * not counted: every client is loopback, so one bucket would let the desktop UI (drag previews) and a CLI agent throttle each other, and the
+ * token is the protection there. Token-less requests stay limited.
+ */
 function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
   return rateLimit({
     windowMs: positiveInteger(process.env[windowVariable], 60_000),
     max: positiveInteger(process.env[maxVariable], 600),
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => {
+      const token = process.env['LLULL_AUTH_TOKEN'];
+      return token !== undefined && token !== '' && hasValidBearer(req, token);
+    },
     message: { error: 'Too many requests — please slow down.' },
   });
 }
