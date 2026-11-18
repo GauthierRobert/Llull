@@ -38,6 +38,12 @@ export const BUDGETS = {
     'simulate_motion 2 s, 8 slider-cranks (24 bodies, 8 closed loops) at 600 rpm',
   ),
   'dynamics.clearance.cranks3': budget('job', 7000, 29000, 'check_motion_clearance, 63 pairs x 361 samples, native distance engine'),
+  'dynamics.clearance.cranks3_ts': budget(
+    'job',
+    20000,
+    39000,
+    'check_motion_clearance, 63 pairs x 361 samples, TypeScript meshBvh (no native engine)',
+  ),
   'explicit.run.hex10k': budget('job', 20000, 77000, 'explicit_run, 10 240 hex8, 1 206 cycles (native llull-compute, 4 threads)'),
   'document.command.draft20k': budget('instant', 100, null, 'draw_polyline + state hash on a 20 000-entity drawing'),
   'document.hash.mesh300k': budget('instant', 100, 780, 'state hash after a 300k-triangle mesh entity changed'),

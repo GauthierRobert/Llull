@@ -4,6 +4,7 @@
  */
 
 import type { Vec3 } from '../model/types';
+import { PAIR_FLOATS, RESULT_FLOATS, triangleDistanceInto } from './triangleDistanceKernel';
 import { add3, cross3, dot3, scale3, sub3 } from '../lib/vec3';
 
 export type Triangle = readonly [Vec3, Vec3, Vec3];
@@ -99,42 +100,18 @@ export function segmentPiercesTriangle(p: Vec3, q: Vec3, [a, b, c]: Triangle): V
   return inside ? point : null;
 }
 
-const edgesOf = ([a, b, c]: Triangle): ReadonlyArray<readonly [Vec3, Vec3]> => [
-  [a, b],
-  [b, c],
-  [c, a],
-];
-
 /**
  * Minimum distance between two triangles with witness points; 0 (witness = the crossing point) when they intersect. Evaluation order is
  * fixed: piercing edges of `first`, piercing edges of `second`, then edge-edge pairs, then vertex-triangle pairs; the first strictly
- * smaller candidate wins.
+ * smaller candidate wins. Tuple entry point over `triangleDistanceInto`: the hot path (`meshBvh`) calls the kernel directly; this one is the
+ * readable form the unit tests and the `llull-geomq` parity corpus use.
  */
 export function triangleDistance(first: Triangle, second: Triangle): ClosestPair {
-  for (const [p, q] of edgesOf(first)) {
-    const hit = segmentPiercesTriangle(p, q, second);
-    if (hit !== null) return { distance: 0, pointA: hit, pointB: hit };
-  }
-  for (const [p, q] of edgesOf(second)) {
-    const hit = segmentPiercesTriangle(p, q, first);
-    if (hit !== null) return { distance: 0, pointA: hit, pointB: hit };
-  }
-  let best: ClosestPair | null = null;
-  const consider = (candidate: ClosestPair): void => {
-    if (best === null || candidate.distance < best.distance) best = candidate;
-  };
-  for (const [p1, q1] of edgesOf(first)) {
-    for (const [p2, q2] of edgesOf(second)) consider(closestPointsOfSegments(p1, q1, p2, q2));
-  }
-  for (const vertex of first) {
-    const onSecond = closestPointOnTriangle(vertex, second);
-    consider({ distance: Math.sqrt(lengthSq(sub3(vertex, onSecond))), pointA: vertex, pointB: onSecond });
-  }
-  for (const vertex of second) {
-    const onFirst = closestPointOnTriangle(vertex, first);
-    consider({ distance: Math.sqrt(lengthSq(sub3(vertex, onFirst))), pointA: onFirst, pointB: vertex });
-  }
-  return best ?? { distance: Infinity, pointA: first[0], pointB: second[0] };
+  const tri = new Float64Array(PAIR_FLOATS);
+  [...first, ...second].forEach((vertex, k) => tri.set(vertex, k * 3));
+  const out = new Float64Array(RESULT_FLOATS);
+  triangleDistanceInto(tri, out);
+  return { distance: out[0] ?? Infinity, pointA: [out[1] ?? 0, out[2] ?? 0, out[3] ?? 0], pointB: [out[4] ?? 0, out[5] ?? 0, out[6] ?? 0] };
 }
 
 /** Distance along `direction` (unit or not, in its own units) to triangle `tri` from `origin`, in [tMin, tMax]; null on a miss (Möller-Trumbore, double-sided). */
