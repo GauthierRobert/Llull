@@ -135,16 +135,16 @@ function buildStroke(bytes: Uint8Array): ParsedFont {
   };
 }
 
-function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | undefined): ParsedFont {
-  if (bytes.length > MAX_FONT_BYTES)
-    throw new FontError('WRP_FONT_TOO_LARGE', `font: ${bytes.length} bytes exceed the ${MAX_FONT_BYTES}-byte limit`);
-  if (isStrokeFont(bytes)) return buildStroke(bytes);
-  const tables = readDirectory(bytes);
-  const header = readHeader(tables);
-  const permissions = readPermissions(tables);
-  const space = readVariationSpace(tables.table('fvar'), tables.table('avar'));
-  const strings = readNameStrings(tables);
-  // a name is matched in every language of the name table (a localised record never hides the English one), listed in the preferred language
+type Tables = ReturnType<typeof readDirectory>;
+type Header = ReturnType<typeof readHeader>;
+type Space = ReturnType<typeof readVariationSpace>;
+type Cff = ReturnType<typeof readCff>;
+
+/** A name is matched in every language of the name table (a localised record never hides the English one), listed in the preferred language. */
+function readNamedInstances(
+  space: Space,
+  strings: ReturnType<typeof readNameStrings>,
+): { namedInstances: NamedInstance[]; languages: Map<NamedInstance, readonly string[]> } {
   const namedInstances: NamedInstance[] = [];
   const languages = new Map<NamedInstance, readonly string[]>();
   for (const record of space?.instances ?? []) {
@@ -155,18 +155,111 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
     namedInstances.push(instance);
     languages.set(instance, [...names, ...(postScript ?? [])]);
   }
-  let variation = asked;
-  if (instanceName !== undefined) {
-    if (Object.keys(asked).length > 0)
-      throw new FontError('WRP_FONT_VARIATION', 'variation: give the axis values or a named instance, not both');
-    const found = namedInstances.find((candidate) => (languages.get(candidate) ?? []).some((text) => sameName(text, instanceName)));
-    if (found === undefined)
-      throw new FontError(
-        'WRP_FONT_VARIATION',
-        `variation: the font has no named instance '${instanceName}' (named instances: ${namedInstances.map((candidate) => candidate.name).join(', ') || 'none'})`,
-      );
-    variation = found.variation;
-  }
+  return { namedInstances, languages };
+}
+
+/** The axis values to instance at: `asked`, or those of the named instance `instanceName` (never both). */
+function resolveVariation(
+  asked: AxisValues,
+  instanceName: string | undefined,
+  namedInstances: readonly NamedInstance[],
+  languages: ReadonlyMap<NamedInstance, readonly string[]>,
+): AxisValues {
+  if (instanceName === undefined) return asked;
+  if (Object.keys(asked).length > 0)
+    throw new FontError('WRP_FONT_VARIATION', 'variation: give the axis values or a named instance, not both');
+  const found = namedInstances.find((candidate) => (languages.get(candidate) ?? []).some((text) => sameName(text, instanceName)));
+  if (found === undefined)
+    throw new FontError(
+      'WRP_FONT_VARIATION',
+      `variation: the font has no named instance '${instanceName}' (named instances: ${namedInstances.map((candidate) => candidate.name).join(', ') || 'none'})`,
+    );
+  return found.variation;
+}
+
+/** The `glyf` / `loca` tables (with the gvar variation of a moved instance) of a TrueType-flavoured font. */
+function readGlyphSource(
+  tables: Tables,
+  header: Header,
+  space: Space,
+  gvarTable: ReturnType<Tables['table']>,
+  moved: boolean,
+  coords: number[],
+): GlyphSource {
+  const source: GlyphSource = {
+    glyf: requireTable(tables, 'glyf'),
+    loca: requireTable(tables, 'loca'),
+    longLoca: header.longLoca,
+    numGlyphs: header.numGlyphs,
+    ...(moved && gvarTable !== null && space !== null
+      ? { variation: { gvar: readGvar(gvarTable, header.numGlyphs, space.axes.length), coords } }
+      : {}),
+  };
+  if (source.loca.length < (header.numGlyphs + 1) * (header.longLoca ? 4 : 2))
+    throw new FontError('WRP_FONT_PARSE', 'loca: shorter than its glyph count requires');
+  return source;
+}
+
+/** Highest control point of a glyph (the yMax of its header for TrueType, of its charstring for CFF) at the instance, or at the default instance with `atDefault`; null for a blank glyph. */
+function controlPointsTop(cff: Cff | null, source: GlyphSource | null, glyph: number, atDefault: boolean): number | null {
+  const ys =
+    cff !== null
+      ? cff
+          .outline(glyph)
+          .flatMap((loop) =>
+            loop.flatMap((segment) =>
+              segment.kind === 'line'
+                ? [segment.from[1], segment.to[1]]
+                : segment.kind === 'quad'
+                  ? [segment.from[1], segment.control[1], segment.to[1]]
+                  : [segment.from[1], segment.control1[1], segment.control2[1], segment.to[1]],
+            ),
+          )
+      : glyphContours(
+          atDefault && source?.variation !== undefined
+            ? { glyf: source.glyf, loca: source.loca, longLoca: source.longLoca, numGlyphs: source.numGlyphs }
+            : (source as GlyphSource),
+          glyph,
+        ).flatMap((contour) => contour.map((p) => p.y));
+  return ys.length === 0 ? null : Math.max(...ys);
+}
+
+function readVerticalLine(tables: Tables, header: Header, metric: (tag: string) => number): ParsedFont['verticalLine'] {
+  const lineOfVhea = verticalLineOf(tables);
+  return lineOfVhea === null
+    ? { height: header.ascender + metric('hasc') - (header.descender + metric('hdsc')) + header.lineGap + metric('hlgp'), source: 'hhea' }
+    : {
+        height: lineOfVhea.ascender + metric('vasc') - (lineOfVhea.descender + metric('vdsc')) + lineOfVhea.lineGap + metric('vlgp'),
+        source: 'vhea',
+      };
+}
+
+/** OS/2 sCapHeight (moved by MVAR), else the height of the outline of 'H'. */
+function readCapHeight(
+  declared: number | null,
+  metric: (tag: string) => number,
+  outline: (glyph: number) => readonly OutlineLoop[],
+  glyphIndex: (codePoint: number) => number,
+): { capHeight: number; capHeightSource: ParsedFont['capHeightSource'] } {
+  if (declared !== null) return { capHeight: declared + metric('cpht'), capHeightSource: 'os2' };
+  const top = outline(glyphIndex(0x48))
+    .map((loop) => loopBox(loop)?.max[1] ?? 0)
+    .reduce((a, b) => Math.max(a, b), 0);
+  if (!(top > 0)) throw new FontError('WRP_FONT_PARSE', "font: no OS/2 sCapHeight and no outline for 'H' to measure the cap height from");
+  return { capHeight: top, capHeightSource: 'glyph_H' };
+}
+
+function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | undefined): ParsedFont {
+  if (bytes.length > MAX_FONT_BYTES)
+    throw new FontError('WRP_FONT_TOO_LARGE', `font: ${bytes.length} bytes exceed the ${MAX_FONT_BYTES}-byte limit`);
+  if (isStrokeFont(bytes)) return buildStroke(bytes);
+  const tables = readDirectory(bytes);
+  const header = readHeader(tables);
+  const permissions = readPermissions(tables);
+  const space = readVariationSpace(tables.table('fvar'), tables.table('avar'));
+  const strings = readNameStrings(tables);
+  const { namedInstances, languages } = readNamedInstances(space, strings);
+  const variation = resolveVariation(asked, instanceName, namedInstances, languages);
   const cffTable = tables.flavor === 'cff' ? (tables.table('CFF ') ?? requireTable(tables, 'CFF2')) : null;
   const variable = cffTable !== null && cffTable.u8(0) === 2;
   const gvarTable = cffTable === null ? tables.table('gvar') : null;
@@ -195,20 +288,7 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
   const heights = new Map<number, number>();
   const advanceWork = { remaining: FONT_OPERATOR_BUDGET };
   const phantoms = new Map<number, ReturnType<typeof phantomAdvanceDeltas>>();
-  const source: GlyphSource | null =
-    cff === null
-      ? {
-          glyf: requireTable(tables, 'glyf'),
-          loca: requireTable(tables, 'loca'),
-          longLoca: header.longLoca,
-          numGlyphs: header.numGlyphs,
-          ...(moved && gvarTable !== null && space !== null
-            ? { variation: { gvar: readGvar(gvarTable, header.numGlyphs, space.axes.length), coords } }
-            : {}),
-        }
-      : null;
-  if (source !== null && source.loca.length < (header.numGlyphs + 1) * (header.longLoca ? 4 : 2))
-    throw new FontError('WRP_FONT_PARSE', 'loca: shorter than its glyph count requires');
+  const source: GlyphSource | null = cff === null ? readGlyphSource(tables, header, space, gvarTable, moved, coords) : null;
   const glyphIndex = buildCmap(requireTable(tables, 'cmap'), header.numGlyphs);
   /** The phantom-point advance variations of a glyph (one read per glyph, charged to one budget for the font). */
   const phantomsOf = (glyph: number): ReturnType<typeof phantomAdvanceDeltas> => {
@@ -230,47 +310,8 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
     }
     return loops;
   };
-  /** Highest control point of a glyph (the yMax of its header for TrueType, of its charstring for CFF) at the instance, or at the default instance with `atDefault`; null for a blank glyph. */
-  const pointsTop = (glyph: number, atDefault: boolean): number | null => {
-    const ys =
-      cff !== null
-        ? cff
-            .outline(glyph)
-            .flatMap((loop) =>
-              loop.flatMap((segment) =>
-                segment.kind === 'line'
-                  ? [segment.from[1], segment.to[1]]
-                  : segment.kind === 'quad'
-                    ? [segment.from[1], segment.control[1], segment.to[1]]
-                    : [segment.from[1], segment.control1[1], segment.control2[1], segment.to[1]],
-              ),
-            )
-        : glyphContours(
-            atDefault && source?.variation !== undefined
-              ? { glyf: source.glyf, loca: source.loca, longLoca: source.longLoca, numGlyphs: source.numGlyphs }
-              : (source as GlyphSource),
-            glyph,
-          ).flatMap((contour) => contour.map((p) => p.y));
-    return ys.length === 0 ? null : Math.max(...ys);
-  };
-  const lineOfVhea = verticalLineOf(tables);
-  const verticalLine: ParsedFont['verticalLine'] =
-    lineOfVhea === null
-      ? { height: header.ascender + metric('hasc') - (header.descender + metric('hdsc')) + header.lineGap + metric('hlgp'), source: 'hhea' }
-      : {
-          height: lineOfVhea.ascender + metric('vasc') - (lineOfVhea.descender + metric('vdsc')) + lineOfVhea.lineGap + metric('vlgp'),
-          source: 'vhea',
-        };
-  let capHeight = permissions.capHeight === null ? null : permissions.capHeight + metric('cpht');
-  let capHeightSource: ParsedFont['capHeightSource'] = 'os2';
-  if (capHeight === null) {
-    const top = outline(glyphIndex(0x48))
-      .map((loop) => loopBox(loop)?.max[1] ?? 0)
-      .reduce((a, b) => Math.max(a, b), 0);
-    if (!(top > 0)) throw new FontError('WRP_FONT_PARSE', "font: no OS/2 sCapHeight and no outline for 'H' to measure the cap height from");
-    capHeight = top;
-    capHeightSource = 'glyph_H';
-  }
+  const verticalLine = readVerticalLine(tables, header, metric);
+  const { capHeight, capHeightSource } = readCapHeight(permissions.capHeight, metric, outline, glyphIndex);
   return {
     format: tables.flavor,
     singleLine: false,
@@ -319,13 +360,13 @@ function build(bytes: Uint8Array, asked: AxisValues, instanceName: string | unde
       if (bearing !== null) {
         // a gvar font without VVAR moves the origin with the top phantom point (from the default outline); otherwise the origin is the top of the glyph at the instance plus its (VVAR moved) bearing
         const byPhantom = source?.variation !== undefined && vvar === null;
-        const top = pointsTop(glyph, byPhantom);
+        const top = controlPointsTop(cff, source, glyph, byPhantom);
         if (top !== null)
           return { y: top + bearing + Math.round(byPhantom ? phantomsOf(glyph).top : (bearingDelta?.(glyph) ?? 0)), source: 'vmtx' };
       }
       return { y: header.ascender + metric('hasc'), source: 'ascender' };
     },
-    verticalLine: verticalLine,
+    verticalLine,
     axes: space?.axes ?? [],
     namedInstances,
     namedInstanceProblems: space?.instanceProblems ?? [],

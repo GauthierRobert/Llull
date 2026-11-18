@@ -97,28 +97,9 @@ export function replayFailureError(failures: readonly ReplayFailure[]): CommandE
     : undefined;
 }
 
-/**
- * Replay all non-suppressed steps of `history` from a fresh document, preserving the document-level state of `base` (classification in
- * history_carry.ts). `=expr` params resolve against `base.parameters`; unresolved ones are reported in `resolveWarnings`.
- * @invariant steps with an unknown command name, or whose `run` throws, are skipped
- * @failure a live step needs the geometry kernel (`requiresKernel`) and none is available -> returns `base` unchanged (+ a warning) instead
- *   of regenerating without that step's geometry
- */
-export function replayHistory(
-  base: CadDocument,
-  history: FeatureStep[],
-  getCommandFn: (name: string) => CommandDefinition<unknown> | undefined,
-  resolveWarnings?: string[],
-  onStep?: (event: ReplayStepEvent) => void,
-): CadDocument {
-  const context = currentContext();
-  const refusal = kernelRefusal(base, history, { ...context, registry: getCommandFn });
-  if (refusal !== null) {
-    resolveWarnings?.push(`replay refused: ${refusal}`);
-    return base;
-  }
-  // Start from empty geometry but preserve document-level settings.
-  const seed: CadDocument = {
+/** Empty geometry that keeps the document-level settings and input state of `base` (what no recorded step regenerates). */
+function replaySeed(base: CadDocument, history: FeatureStep[]): CadDocument {
+  return {
     ...createEmptyDocument(),
     camera: base.camera,
     units: base.units,
@@ -148,6 +129,47 @@ export function replayHistory(
     // Seeds are deep-merged; a leaf two plugins seed differently is reported by mergeReplaySeeds (first wins) and failed by tests/unit/contract/replaySeeds.test.ts.
     ...mergeReplaySeeds(documentExtensions().map((extension) => extension.replaySeed?.(base) ?? {})).seed,
   };
+}
+
+/** Input state (L8: only metaHistory commands write the parameter table, configurations, recipes, review and display) survives every recorded step. */
+function restoreInputState(doc: CadDocument, before: CadDocument): CadDocument {
+  if (
+    doc.parameters === before.parameters &&
+    doc.configurations === before.configurations &&
+    doc.recipes === before.recipes &&
+    doc.review === before.review &&
+    doc.display === before.display
+  )
+    return doc;
+  let restored: CadDocument = { ...doc, parameters: before.parameters, configurations: before.configurations, recipes: before.recipes };
+  if (before.review !== undefined) restored = { ...restored, review: before.review };
+  else delete restored.review;
+  if (before.display !== undefined) restored = { ...restored, display: before.display };
+  else delete restored.display;
+  return restored;
+}
+
+/**
+ * Replay all non-suppressed steps of `history` from a fresh document, preserving the document-level state of `base` (classification in
+ * history_carry.ts). `=expr` params resolve against `base.parameters`; unresolved ones are reported in `resolveWarnings`.
+ * @invariant steps with an unknown command name, or whose `run` throws, are skipped
+ * @failure a live step needs the geometry kernel (`requiresKernel`) and none is available -> returns `base` unchanged (+ a warning) instead
+ *   of regenerating without that step's geometry
+ */
+export function replayHistory(
+  base: CadDocument,
+  history: FeatureStep[],
+  getCommandFn: (name: string) => CommandDefinition<unknown> | undefined,
+  resolveWarnings?: string[],
+  onStep?: (event: ReplayStepEvent) => void,
+): CadDocument {
+  const context = currentContext();
+  const refusal = kernelRefusal(base, history, { ...context, registry: getCommandFn });
+  if (refusal !== null) {
+    resolveWarnings?.push(`replay refused: ${refusal}`);
+    return base;
+  }
+  const seed = replaySeed(base, history);
   let doc: CadDocument = seed;
   // idMap tracks old entity id (from when the step was first recorded) → new id
   // (assigned during this replay). Subsequent steps' params are rewritten via
@@ -197,19 +219,7 @@ export function replayHistory(
       if (result) doc = { ...(tracking ? tracking.restore(result.document) : result.document), featureHistory: history };
       // Input state (L8: only metaHistory commands write the parameter table, configurations and recipes) survives every recorded step,
       // so a replayed clear_document cannot erase what was defined after it.
-      if (
-        doc.parameters !== before.parameters ||
-        doc.configurations !== before.configurations ||
-        doc.recipes !== before.recipes ||
-        doc.review !== before.review ||
-        doc.display !== before.display
-      ) {
-        doc = { ...doc, parameters: before.parameters, configurations: before.configurations, recipes: before.recipes };
-        if (before.review !== undefined) doc = { ...doc, review: before.review };
-        else delete doc.review;
-        if (before.display !== undefined) doc = { ...doc, display: before.display };
-        else delete doc.display;
-      }
+      doc = restoreInputState(doc, before);
       const deferred = deferralCount() !== deferralsAtStart;
       if (!deferred) {
         const state = {

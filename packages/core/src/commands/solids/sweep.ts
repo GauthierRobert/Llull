@@ -1,5 +1,5 @@
 import { idOrNext } from '../../lib/explicitId';
-import type { CadDocument, SweepEntity, Vec3 } from '../../model/types';
+import type { BaseEntity, CadDocument, SweepEntity, Vec3 } from '../../model/types';
 import type { SweepSection, SweepStation } from '../../model/sweepOrientation';
 import type { CommandResult } from '../types';
 import { defineCommand, untypedArray, z } from '../schema';
@@ -17,7 +17,7 @@ import type { NurbsCurveData } from '../../lib/nurbs/types';
 import { designedFields, lawField, refuseSweep, sweepDesign } from './sweepLaws';
 import { orientationField, sectionFrameField } from './sweepOrientation';
 import { localSurface, pathHelix, resolvePath } from './sweepPath';
-import { localRails, midlineSpine, railCurves, railDesign, railFields } from './sweepRails';
+import { localRails, midlineSpine, railCurves, railDesign, railFields, type RailParams } from './sweepRails';
 import { sectionOutline } from '../../geometry/sweepEval/rails';
 import { pathLength } from '../../geometry/sweepEval/evaluate';
 import { fitSweepFaces } from '../../geometry/sweepEval/fitted';
@@ -117,6 +117,246 @@ function resolveStations(
   const last = stations[stations.length - 1] as SweepStation;
   if (first.at !== 0 || last.at !== 1) return 'the first station must be at 0 and the last at 1';
   return { section: { shape: 'profile', profile: first.ring }, halfSize, stations };
+}
+
+type LawParams = Parameters<typeof designedFields>[0];
+
+/** The `sweep_profile` params the run phases read. */
+interface SweepRunParams {
+  readonly path?: unknown[] | undefined;
+  readonly pathId?: string | undefined;
+  readonly pathIds?: string[] | undefined;
+  readonly smooth?: boolean | undefined;
+  readonly closed?: boolean | undefined;
+  readonly bendRadius?: number | undefined;
+  readonly radius?: number | undefined;
+  readonly innerRadius?: number | undefined;
+  readonly section?: unknown[] | undefined;
+  readonly sectionId?: string | undefined;
+  readonly stations?: Array<SectionSpec & { at: number }> | undefined;
+  readonly stationBlend?: LawParams['stationBlend'];
+  readonly twist?: LawParams['twistInput'];
+  readonly twistTurns?: number | undefined;
+  readonly scale?: LawParams['scaleInput'];
+  readonly area?: LawParams['areaInput'];
+  readonly stretch?: LawParams['stretch'];
+  readonly orientation?: LawParams['orientationInput'];
+  readonly sectionFrame?: LawParams['orientationContext']['sectionFrame'];
+  readonly lawParameter?: 'fraction' | 'arc_length' | undefined;
+  readonly corners?: 'round' | 'miter' | undefined;
+  readonly fitTolerance?: number | undefined;
+  readonly guideIds?: string[] | undefined;
+  readonly guideMode?: RailParams['guideMode'];
+  readonly maintainHeight?: boolean | undefined;
+  readonly anchors?: number[][] | undefined;
+  readonly railTolerance?: number | undefined;
+  readonly layerId?: string | undefined;
+}
+
+interface SweepInputs {
+  readonly section: SweepSection;
+  readonly halfSize: number;
+  readonly stations: SweepStation[] | undefined;
+  readonly bendRadius: number;
+  readonly rails: NurbsCurveData[] | null;
+}
+
+/** Section, stations, bend radius and rails of a sweep, or the refusal (bad section / rails, rails combined with laws or a mitre). */
+function resolveInputs(doc: CadDocument, params: SweepRunParams): SweepInputs | CommandResult {
+  const fail = failer(doc, 'sweep_profile');
+  const { radius, innerRadius, section: rawSection, sectionId, stations: rawStations, guideIds, corners } = params;
+  const resolved =
+    rawStations === undefined
+      ? resolveSection(doc, radius, innerRadius, rawSection, sectionId)
+      : [radius, innerRadius, rawSection, sectionId].some((v) => v !== undefined)
+        ? 'with stations, give each section inside its station (not radius / section / sectionId)'
+        : resolveStations(doc, rawStations);
+  if (typeof resolved === 'string') return fail(resolved);
+  const { section, halfSize } = resolved;
+  const stations: SweepStation[] | undefined = 'stations' in resolved ? (resolved.stations as SweepStation[]) : undefined;
+  const bendRadius = params.bendRadius ?? DEFAULT_BEND_FACTOR * halfSize;
+  if (!(bendRadius > 0)) return fail(`bendRadius must be > 0 (got ${bendRadius})`);
+  const rails = guideIds === undefined ? null : railCurves(doc, 'sweep_profile', guideIds);
+  if (rails !== null && !Array.isArray(rails)) return rails;
+  if (
+    rails !== null &&
+    (stations !== undefined ||
+      [params.twist, params.twistTurns, params.scale, params.area, params.stretch].some((law) => law !== undefined))
+  )
+    return refuseSweep(
+      doc,
+      'sweep_profile',
+      'SWG_LAW_EXCLUSIVE',
+      'rails drive the section: give rails or twist / scale / area / stretch / stations, not both',
+      [],
+      ['guideIds'],
+    );
+  if (rails !== null && corners === 'miter')
+    return refuseSweep(
+      doc,
+      'sweep_profile',
+      'SWG_LAW_EXCLUSIVE',
+      'rails drive the section at every station, which a mitre ring cannot follow: give rails (guideIds) or corners: miter, not both',
+      [],
+      ['guideIds', 'corners'],
+    );
+  return { section, halfSize, stations, bendRadius, rails };
+}
+
+/** The validated path of a sweep (open or a G1 loop), or the refusal. */
+function resolveSweepPath(
+  doc: CadDocument,
+  params: SweepRunParams,
+  inputs: SweepInputs,
+): { path: CurveSegment<Vec3>[]; loop: boolean } | CommandResult {
+  const fail = failer(doc, 'sweep_profile');
+  const { path: rawPath, pathId, pathIds, corners } = params;
+  const { rails, stations, halfSize, bendRadius } = inputs;
+  const spine =
+    rails !== null && rails.length === 2 && rawPath === undefined && pathId === undefined && pathIds === undefined
+      ? midlineSpine(rails[0] as NurbsCurveData, rails[1] as NurbsCurveData)
+      : null;
+  const path =
+    spine ?? resolvePath(doc, rawPath, pathId, params.smooth ?? false, bendRadius, params.closed ?? false, pathIds, corners === 'miter');
+  if (typeof path === 'string') return refuseSweep(doc, 'sweep_profile', 'SWG_PATH_INVALID', path, [], ['path']);
+  const loop = isClosedChain(path);
+  if (loop && stations !== undefined) return fail('stations need an open path');
+  const issue = chainIssue(path, loop);
+  if (issue !== null) return refuseSweep(doc, 'sweep_profile', 'SWG_PATH_INVALID', `path invalid — ${issue}`, [], ['path']);
+  const miter = corners === 'miter' ? miterRefusal(path, halfSize) : null;
+  if (miter !== null) return refuseSweep(doc, 'sweep_profile', miter.code, miter.message, [], ['corners']);
+  const corner = miter === null && corners === 'miter' ? -1 : firstCorner(path);
+  if (corner >= 0)
+    return refuseSweep(
+      doc,
+      'sweep_profile',
+      'SWG_PATH_NOT_G1',
+      `the path has a sharp corner at joint ${corner}; use a bendRadius or smooth: true`,
+      [],
+      ['path'],
+    );
+  if (loop && !closesSmoothly(path))
+    return refuseSweep(
+      doc,
+      'sweep_profile',
+      'SWG_PATH_NOT_G1',
+      'the closed path has a sharp corner where it closes; use a bendRadius or smooth: true',
+      [],
+      ['path'],
+    );
+  return { path, loop };
+}
+
+/** Sweep geometry in the local frame of the path start: path, laws, orientation and rail fields, or the refusal. */
+function designSweepGeometry(
+  doc: CadDocument,
+  params: SweepRunParams,
+  inputs: SweepInputs,
+  path: CurveSegment<Vec3>[],
+): { start: Vec3; geometry: Omit<SweepEntity, keyof BaseEntity> } | CommandResult {
+  const { pathId, guideIds, fitTolerance, corners } = params;
+  const { section, stations, rails } = inputs;
+  const start = path[0]?.points[0] as Vec3;
+  const helix = pathHelix(doc, pathId, start);
+  const designed = designedFields({
+    twistInput: params.twist,
+    twistTurns: params.twistTurns,
+    scaleInput: params.scale,
+    areaInput: params.area,
+    stretch: params.stretch,
+    orientationInput: params.orientation,
+    orientationContext: { start, helix, sectionFrame: params.sectionFrame, surfaceOf: (surfaceId) => localSurface(doc, surfaceId, start) },
+    stationBlend: params.stationBlend,
+    stations,
+    arcLength: params.lawParameter === 'arc_length' ? pathLength(helix === undefined ? { path } : { path, helix }) : undefined,
+  });
+  if ('refusal' in designed)
+    return refuseSweep(doc, 'sweep_profile', designed.refusal.code, designed.refusal.message, [], [designed.refusal.path]);
+  const local = path.map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, start)));
+  let railFieldsOut: Partial<SweepEntity> = {};
+  if (rails !== null) {
+    const made = railDesign(
+      { path: local, orientation: designed.fields.orientation, outline: sectionOutline(section) },
+      localRails(rails, guideIds as string[], start),
+      { guideMode: params.guideMode, maintainHeight: params.maintainHeight, anchors: params.anchors, railTolerance: params.railTolerance },
+      rails,
+    );
+    if ('refusal' in made) return refuseSweep(doc, 'sweep_profile', made.refusal.code, made.refusal.message, [], [made.refusal.path]);
+    railFieldsOut = made.fields;
+  }
+  return {
+    start,
+    geometry: {
+      path: local,
+      section,
+      ...(stations === undefined ? {} : { stations }),
+      ...(helix === undefined ? {} : { helix }),
+      ...designed.fields,
+      ...railFieldsOut,
+      ...(fitTolerance === undefined ? {} : { fitTolerance }),
+      ...(corners === 'miter' ? { corners } : {}),
+    },
+  };
+}
+
+/** Refusal of an unreachable `fitTolerance` (<= 0, or tighter than the fitted faces can meet), else null. */
+function fitToleranceRefusal(doc: CadDocument, entity: SweepEntity, fitTolerance: number | undefined): CommandResult | null {
+  if (fitTolerance === undefined) return null;
+  if (!(fitTolerance > 0))
+    return refuseSweep(doc, 'sweep_profile', 'SWG_PARAM_INVALID', `fitTolerance must be > 0 (got ${fitTolerance})`, [], ['fitTolerance']);
+  const fit = needsFittedFaces(entity) ? fitSweepFaces(entity, fitTolerance) : null;
+  if (fit !== null && 'code' in fit && fit.code === 'SWG_FIT_TOLERANCE')
+    return refuseSweep(doc, 'sweep_profile', 'SWG_FIT_TOLERANCE', fit.message, [], ['fitTolerance']);
+  return null;
+}
+
+function sectionLabel(section: SweepSection, stations: SweepStation[] | undefined): string {
+  if (stations !== undefined) return `${stations.length}-station variable section`;
+  return section.shape === 'circle'
+    ? `round section r=${section.radius}${section.innerRadius !== undefined ? ` bore ${section.innerRadius}` : ''}`
+    : `${section.profile.length}-point section`;
+}
+
+function runSweepProfile(
+  doc: CadDocument,
+  params: SweepRunParams & { readonly color?: string | undefined; readonly id?: string | undefined },
+): CommandResult {
+  const fail = failer(doc, 'sweep_profile');
+  const explicitId = params.id;
+  if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
+  const inputs = resolveInputs(doc, params);
+  if ('document' in inputs) return inputs;
+  const swept = resolveSweepPath(doc, params, inputs);
+  if ('document' in swept) return swept;
+  const { path, loop } = swept;
+  const { section, halfSize, stations } = inputs;
+  const designed = designSweepGeometry(doc, params, inputs, path);
+  if ('document' in designed) return designed;
+  const id = idOrNext(explicitId, 'swp');
+  const entity = newEntity('sweep', id, designed.geometry, designed.start, params.color ?? DEFAULT_SOLID_COLOR, {
+    layerId: existingLayerOrDefault(doc, params.layerId),
+  });
+  const sweepEntity = entity as SweepEntity;
+  const design = sweepDesign(doc, sweepEntity, loop);
+  if ('document' in design) return design;
+  const fitRefusal = fitToleranceRefusal(doc, sweepEntity, params.fitTolerance);
+  if (fitRefusal !== null) return fitRefusal;
+  const bend = Math.min(...path.map(minCurvatureRadius));
+  if (sweepEntity.orientation?.mode !== 'axis_plane' && bend <= halfSize * design.maxScale)
+    return refuseSweep(
+      doc,
+      'sweep_profile',
+      'SWG_SELF_INTERSECTION_LOCAL',
+      `a bend of radius ${bend.toFixed(3)} (arc or spline curvature) is not wider than the section (${(halfSize * design.maxScale).toFixed(3)}); the solid would self-intersect`,
+      [],
+      ['radius'],
+    );
+  const length = polylineLength(sampleChain(path, false));
+  return commitSolid(
+    doc,
+    entity,
+    `sweep_profile: created sweep "${id}" — ${sectionLabel(section, stations)} along a ${path.length}-segment path (≈${length.toFixed(3)} long)`,
+  );
 }
 
 /**
@@ -250,186 +490,5 @@ export const sweepProfile = defineCommand({
       .optional(),
     ...solidStyleFields(),
   }),
-  run: (
-    doc,
-    {
-      path: rawPath,
-      pathId,
-      pathIds,
-      smooth = false,
-      closed = false,
-      bendRadius: rawBend,
-      radius,
-      innerRadius,
-      section: rawSection,
-      sectionId,
-      stations: rawStations,
-      stationBlend,
-      twist: twistInput,
-      twistTurns,
-      scale: scaleInput,
-      area: areaInput,
-      stretch,
-      orientation: orientationInput,
-      sectionFrame,
-      lawParameter,
-      corners,
-      fitTolerance,
-      guideIds,
-      guideMode,
-      maintainHeight,
-      anchors,
-      railTolerance,
-      layerId,
-      color = DEFAULT_SOLID_COLOR,
-      id: explicitId,
-    },
-  ): CommandResult => {
-    const fail = failer(doc, 'sweep_profile');
-    if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
-    const resolved =
-      rawStations === undefined
-        ? resolveSection(doc, radius, innerRadius, rawSection, sectionId)
-        : [radius, innerRadius, rawSection, sectionId].some((v) => v !== undefined)
-          ? 'with stations, give each section inside its station (not radius / section / sectionId)'
-          : resolveStations(doc, rawStations);
-    if (typeof resolved === 'string') return fail(resolved);
-    const { section, halfSize } = resolved;
-    const stations: SweepStation[] | undefined = 'stations' in resolved ? (resolved.stations as SweepStation[]) : undefined;
-    const bendRadius = rawBend ?? DEFAULT_BEND_FACTOR * halfSize;
-    if (!(bendRadius > 0)) return fail(`bendRadius must be > 0 (got ${bendRadius})`);
-    const rails = guideIds === undefined ? null : railCurves(doc, 'sweep_profile', guideIds);
-    if (rails !== null && !Array.isArray(rails)) return rails;
-    if (
-      rails !== null &&
-      (stations !== undefined || [twistInput, twistTurns, scaleInput, areaInput, stretch].some((law) => law !== undefined))
-    )
-      return refuseSweep(
-        doc,
-        'sweep_profile',
-        'SWG_LAW_EXCLUSIVE',
-        'rails drive the section: give rails or twist / scale / area / stretch / stations, not both',
-        [],
-        ['guideIds'],
-      );
-    if (rails !== null && corners === 'miter')
-      return refuseSweep(
-        doc,
-        'sweep_profile',
-        'SWG_LAW_EXCLUSIVE',
-        'rails drive the section at every station, which a mitre ring cannot follow: give rails (guideIds) or corners: miter, not both',
-        [],
-        ['guideIds', 'corners'],
-      );
-    const spine =
-      rails !== null && rails.length === 2 && rawPath === undefined && pathId === undefined && pathIds === undefined
-        ? midlineSpine(rails[0] as NurbsCurveData, rails[1] as NurbsCurveData)
-        : null;
-    const path = spine ?? resolvePath(doc, rawPath, pathId, smooth, bendRadius, closed, pathIds, corners === 'miter');
-    if (typeof path === 'string') return refuseSweep(doc, 'sweep_profile', 'SWG_PATH_INVALID', path, [], ['path']);
-    const loop = isClosedChain(path);
-    if (loop && stations !== undefined) return fail('stations need an open path');
-    const issue = chainIssue(path, loop);
-    if (issue !== null) return refuseSweep(doc, 'sweep_profile', 'SWG_PATH_INVALID', `path invalid — ${issue}`, [], ['path']);
-    const miter = corners === 'miter' ? miterRefusal(path, halfSize) : null;
-    if (miter !== null) return refuseSweep(doc, 'sweep_profile', miter.code, miter.message, [], ['corners']);
-    const corner = miter === null && corners === 'miter' ? -1 : firstCorner(path);
-    if (corner >= 0)
-      return refuseSweep(
-        doc,
-        'sweep_profile',
-        'SWG_PATH_NOT_G1',
-        `the path has a sharp corner at joint ${corner}; use a bendRadius or smooth: true`,
-        [],
-        ['path'],
-      );
-    if (loop && !closesSmoothly(path))
-      return refuseSweep(
-        doc,
-        'sweep_profile',
-        'SWG_PATH_NOT_G1',
-        'the closed path has a sharp corner where it closes; use a bendRadius or smooth: true',
-        [],
-        ['path'],
-      );
-    const start = path[0]?.points[0] as Vec3;
-    const helix = pathHelix(doc, pathId, start);
-    const designed = designedFields({
-      twistInput,
-      twistTurns,
-      scaleInput,
-      areaInput,
-      stretch,
-      orientationInput,
-      orientationContext: { start, helix, sectionFrame, surfaceOf: (surfaceId) => localSurface(doc, surfaceId, start) },
-      stationBlend,
-      stations,
-      arcLength: lawParameter === 'arc_length' ? pathLength(helix === undefined ? { path } : { path, helix }) : undefined,
-    });
-    if ('refusal' in designed)
-      return refuseSweep(doc, 'sweep_profile', designed.refusal.code, designed.refusal.message, [], [designed.refusal.path]);
-    const local = path.map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, start)));
-    let railFieldsOut: Partial<SweepEntity> = {};
-    if (rails !== null) {
-      const made = railDesign(
-        { path: local, orientation: designed.fields.orientation, outline: sectionOutline(section) },
-        localRails(rails, guideIds as string[], start),
-        { guideMode, maintainHeight, anchors, railTolerance },
-        rails,
-      );
-      if ('refusal' in made) return refuseSweep(doc, 'sweep_profile', made.refusal.code, made.refusal.message, [], [made.refusal.path]);
-      railFieldsOut = made.fields;
-    }
-    const id = idOrNext(explicitId, 'swp');
-    const geometry = {
-      path: local,
-      section,
-      ...(stations === undefined ? {} : { stations }),
-      ...(helix === undefined ? {} : { helix }),
-      ...designed.fields,
-      ...railFieldsOut,
-      ...(fitTolerance === undefined ? {} : { fitTolerance }),
-      ...(corners === 'miter' ? { corners } : {}),
-    };
-    const entity = newEntity('sweep', id, geometry, start, color, { layerId: existingLayerOrDefault(doc, layerId) });
-    const sweepEntity = entity as SweepEntity;
-    const design = sweepDesign(doc, sweepEntity, loop);
-    if ('document' in design) return design;
-    if (fitTolerance !== undefined) {
-      if (!(fitTolerance > 0))
-        return refuseSweep(
-          doc,
-          'sweep_profile',
-          'SWG_PARAM_INVALID',
-          `fitTolerance must be > 0 (got ${fitTolerance})`,
-          [],
-          ['fitTolerance'],
-        );
-      const fit = needsFittedFaces(sweepEntity) ? fitSweepFaces(sweepEntity, fitTolerance) : null;
-      if (fit !== null && 'code' in fit && fit.code === 'SWG_FIT_TOLERANCE')
-        return refuseSweep(doc, 'sweep_profile', 'SWG_FIT_TOLERANCE', fit.message, [], ['fitTolerance']);
-    }
-    const bend = Math.min(...path.map(minCurvatureRadius));
-    if (sweepEntity.orientation?.mode !== 'axis_plane' && bend <= halfSize * design.maxScale)
-      return refuseSweep(
-        doc,
-        'sweep_profile',
-        'SWG_SELF_INTERSECTION_LOCAL',
-        `a bend of radius ${bend.toFixed(3)} (arc or spline curvature) is not wider than the section (${(halfSize * design.maxScale).toFixed(3)}); the solid would self-intersect`,
-        [],
-        ['radius'],
-      );
-    const length = polylineLength(sampleChain(path, false));
-    const shape =
-      stations !== undefined
-        ? `${stations.length}-station variable section`
-        : section.shape === 'circle'
-          ? `round section r=${section.radius}${section.innerRadius !== undefined ? ` bore ${section.innerRadius}` : ''}`
-          : `${section.profile.length}-point section`;
-    return commitSolid(
-      doc,
-      entity,
-      `sweep_profile: created sweep "${id}" — ${shape} along a ${path.length}-segment path (≈${length.toFixed(3)} long)`,
-    );
-  },
+  run: (doc, params): CommandResult => runSweepProfile(doc, params),
 });

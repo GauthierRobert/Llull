@@ -3,28 +3,24 @@
  * from the kernel's exact face queries, plus validity. Numbers and coded findings instead of a zebra render.
  */
 
-import { hasFillet, blendSource, measureContact } from '../../geometry/blend/continuity';
+import { hasFillet, blendSource } from '../../geometry/blend/continuity';
 import type { GeometryKernel } from '../../geometry/kernel';
-import type { Entity, ShapeRecipe } from '../../model/types';
-import { roundSignificant } from '../../lib/significant';
+import type { CadDocument, Entity, ShapeRecipe } from '../../model/types';
 import { currentContext } from '../context';
 import { noop, report, tableRejection } from '../noop';
 import { defineCommand, z } from '../schema';
 import type { CommandResult } from '../types';
 import { diagonalOf } from './shapeDiagonal';
 import { recordsByFace } from './blendChains';
-import { judgeJunction, junctionsOf, supportCrease } from './blendJunctions';
-import { CORNER_G0_FACTOR, PROFILE_G0_FACTOR, namedTolerances, withBlendScaleFloor } from './checkBlendTolerances';
-import { checkCornerPatches, overshootFindings, roundContact, shapeFindings, spokeReachOf } from './checkBlendStars';
+import { CORNER_G0_FACTOR, namedTolerances } from './checkBlendTolerances';
+import { checkCornerPatches, overshootFindings, shapeFindings, spokeReachOf } from './checkBlendStars';
 import { blendFaceContacts } from '../../geometry/blend/blendInfo';
-import { REMEDIATION, cliffFinding, contactFindings, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
-import { RADIUS_LAW_TOLERANCE, checkRadius, lawIndex } from './checkBlendRadius';
-import { cliffEdgeOf } from '../../geometry/blend/cliffEdge';
+import { REMEDIATION, statusOf, type Finding, type Tolerances } from './checkBlendFindings';
+import { lawIndex } from './checkBlendRadius';
 import { readChamferLegs } from './checkChamferLegs';
 import { chamferNodes, legFilletNodes } from '../../geometry/blend/blendInfo';
-import type { BlendRow, Contact, EntityCheck } from './checkBlendRows';
-
-const sig = (value: number): number => roundSignificant(value, 10);
+import { checkBlendFace, type BlendFaceWorld } from './checkBlendFace';
+import type { BlendRow, EntityCheck } from './checkBlendRows';
 
 const refuse = tableRejection({
   SRF_ENTITY_NOT_FOUND:
@@ -109,131 +105,28 @@ function checkEntity(
       first.profile.type !== 'circular'
     );
   };
+  const faceWorld: BlendFaceWorld = {
+    kernel,
+    shape,
+    topology,
+    graph,
+    entityId,
+    unit,
+    laws,
+    contactsOf,
+    chained,
+    tolerances,
+    g0Param,
+    samples,
+    requireG2,
+  };
   for (const face of topology.faces) {
     const source = face.name === undefined ? null : blendSource(face.name);
     if (source === null || face.name === undefined) continue;
     if (only !== undefined && !only.has(face.name)) continue;
-    const contacts: Contact[] = [];
-    const before = unverified;
-    // width of the blend: its area over its longest edge (the contact lines)
-    const longest = Math.max(
-      ...graph.edgeFaces.flatMap((around, edge) => (around.includes(face.index) ? [topology.edges[edge]?.length ?? 0] : [])),
-      0,
-    );
-    const profiled = (laws.get(face.index)?.profile?.type ?? 'circular') !== 'circular';
-    const own: Tolerances = profiled ? { ...tolerances, g0: g0Param ?? tolerances.g0 * PROFILE_G0_FACTOR } : tolerances;
-    const faceTolerances = withBlendScaleFloor(own, face.area, longest);
-    graph.edgeFaces.forEach((around, edge) => {
-      if (around.length !== 2 || !around.includes(face.index)) return;
-      const otherName = topology.faces[around.find((other) => other !== face.index) ?? -1]?.name;
-      if (otherName === undefined || !source.supports.includes(otherName)) return;
-      const measured = kernel.faceQuery?.edgeContinuity(shape, edge, samples) ?? null;
-      const contact = measured === null ? null : measureContact(measured, faceTolerances);
-      if (contact === null) return void unverified++;
-      const name = topology.edges[edge]?.name;
-      contacts.push({ edge, ...(name === undefined ? {} : { name }), ...roundContact(contact) });
-      findings.push(...contactFindings(entityId, face.index, edge, contact, faceTolerances, requireG2, unit));
-    });
-    const junctions: Contact[] = [];
-    let missed = 0;
-    for (const junction of junctionsOf(topology, graph, face.index, chained)) {
-      const across = kernel.faceQuery?.edgeContinuity(shape, junction.edge, samples) ?? null;
-      // Across a crease of the part (a mitre) each blend is tangent to its own support at one end of the junction, so the normals differ there by the
-      // crease of the SUPPORT faces (read from them, not from the blends under test): the junction is held to g1AngleRad beyond it, and each end to the
-      // crease of the supports it touches. A smooth chain has no crease and keeps the plain rule.
-      const neighbourFace = topology.faces.findIndex((candidate) => candidate.name === junction.neighbour);
-      const crease = supportCrease(
-        topology,
-        graph,
-        face.index,
-        neighbourFace,
-        junction.edge,
-        (edge) => kernel.faceQuery?.edgeContinuity(shape, edge, samples) ?? null,
-      );
-      const verdict = judgeJunction(across ?? [], crease, faceTolerances.g1AngleRad);
-      const jointTolerances: Tolerances = { ...faceTolerances, g1AngleRad: verdict.limit };
-      const joint = across === null ? null : measureContact(across, jointTolerances);
-      if (joint === null) {
-        missed++;
-        continue;
-      }
-      const name = topology.edges[junction.edge]?.name;
-      junctions.push({
-        edge: junction.edge,
-        ...(name === undefined ? {} : { name }),
-        neighbour: junction.neighbour,
-        ...(crease > 0 ? { creaseRad: sig(crease) } : {}),
-        ...roundContact(joint),
-      });
-      findings.push(...contactFindings(entityId, face.index, junction.edge, joint, jointTolerances, false, unit));
-      if (verdict.endsOff > faceTolerances.g1AngleRad)
-        findings.push({
-          entityId,
-          face: face.index,
-          edge: junction.edge,
-          code: 'BLD_CHECK_G1_ANGLE',
-          severity: 'fail',
-          value: sig(verdict.endsOff),
-          limit: sig(faceTolerances.g1AngleRad),
-          unit: 'rad',
-          remediation: REMEDIATION.BLD_CHECK_G1_ANGLE,
-          message: `an end of junction edge ${junction.edge} differs by ${sig(verdict.endsOff)} rad from the ${sig(crease)} rad crease of the supports there (blend face ${face.index})`,
-        });
-    }
-    unverifiedJunctions += missed;
-    if (missed > 0)
-      findings.push({
-        code: 'BLD_CHECK_UNVERIFIED_CONTACT',
-        severity: 'warn',
-        entityId,
-        face: face.index,
-        unit,
-        remediation: REMEDIATION.BLD_CHECK_UNVERIFIED_CONTACT,
-        message: `${missed} junction(s) of blend face ${face.index} (${face.name}) with the next blend of its chain could not be measured by the kernel`,
-      });
-    const jointSource = laws.get(face.index)?.source;
-    const located = contactsOf.get(face.index);
-    const readback = located === undefined ? null : checkRadius(kernel, shape, located, laws.get(face.index), samples);
-    for (const deviation of readback?.deviations ?? [])
-      findings.push({
-        code: 'BLD_CHECK_RADIUS_LAW',
-        severity: 'fail',
-        entityId,
-        face: face.index,
-        value: deviation.deviation,
-        limit: sig(RADIUS_LAW_TOLERANCE * deviation.expected),
-        unit,
-        remediation: REMEDIATION.BLD_CHECK_RADIUS_LAW,
-        message: `blend face ${face.index} has radius ${deviation.actual} ${unit} at t = ${deviation.t} where the law gives ${deviation.expected}`,
-      });
-    const cliffEdge = cliffEdgeOf(kernel, shape, topology, graph, face.index, samples);
-    if (cliffEdge !== null) findings.push(cliffFinding(entityId, face.index, face.name, cliffEdge));
-    blends.push({
-      entityId,
-      face: face.index,
-      name: face.name,
-      kind: 'edge',
-      sourceEdges: [source.edge],
-      contacts,
-      ...(junctions.length === 0 ? {} : { junctions }),
-      profile: laws.get(face.index)?.profile?.type ?? 'circular',
-      ...(readback?.radius == null ? {} : { radius: readback.radius, lawChecked: readback.lawChecked }),
-      ...(readback?.lawNote === undefined ? {} : { lawNote: readback.lawNote }),
-      ...(jointSource === undefined ? {} : { source: jointSource }),
-    });
-    if (unverified > before || contacts.length === 0)
-      findings.push({
-        code: 'BLD_CHECK_UNVERIFIED_CONTACT',
-        severity: 'warn',
-        entityId,
-        face: face.index,
-        unit,
-        remediation: REMEDIATION.BLD_CHECK_UNVERIFIED_CONTACT,
-        message:
-          contacts.length === 0
-            ? `blend face ${face.index} (${face.name}) has no contact line against its support faces: nothing was measured`
-            : `${unverified - before} contact line(s) of blend face ${face.index} could not be measured by the kernel`,
-      });
+    const row = checkBlendFace(faceWorld, face, face.name, source, blends, findings);
+    unverified += row.unverified;
+    unverifiedJunctions += row.missed;
   }
   // The corner patches (a star sub-patch `blend(v:...)#k` is judged at the default g0, the plate patch of the fallback at 5x it): checkBlendStars.ts
   const plateTolerances: Tolerances = { ...tolerances, g0: g0Param ?? tolerances.g0 * CORNER_G0_FACTOR };
@@ -248,6 +141,77 @@ function checkEntity(
     ...shapeFindings(kernel, recipe as ShapeRecipe, entityId, unit),
   );
   return { blends, findings, unverified, unverifiedJunctions, g0: tolerances.g0 };
+}
+
+type LegRow = ReturnType<typeof readChamferLegs>['rows'][number];
+
+function paramsRefusal(
+  doc: CadDocument,
+  params: { readonly g0?: number | undefined; readonly g1AngleRad?: number | undefined; readonly g2Rel?: number | undefined },
+  samples: number,
+): CommandResult | null {
+  for (const name of ['g0', 'g1AngleRad', 'g2Rel'] as const) {
+    const value = params[name];
+    if (value !== undefined && !(value > 0)) return noop(doc, `check_blends: ${name} must be > 0 (got ${value}); no-op.`);
+  }
+  if (samples < 2 || samples > MAX_SAMPLES) return noop(doc, `check_blends: samples must be in 2..${MAX_SAMPLES} (got ${samples}); no-op.`);
+  return null;
+}
+
+/** The solids with a fillet and those with a chamfer / two-leg fillet among `ids` (default: every entity), or the refusal of an id without a blend. */
+function collectTargets(doc: CadDocument, ids: readonly string[] | undefined): { targets: Entity[]; chamfered: Entity[] } | CommandResult {
+  const targets: Entity[] = [];
+  const chamfered: Entity[] = [];
+  for (const id of ids ?? Object.keys(doc.entities)) {
+    const entity = doc.entities[id];
+    const recipe = entity?.kind === 'mesh' ? entity.brep : undefined;
+    const withChamfer = recipe !== undefined && (chamferNodes(recipe).length > 0 || legFilletNodes(recipe).length > 0);
+    if (entity !== undefined && recipe !== undefined && hasFillet(recipe)) targets.push(entity);
+    if (entity !== undefined && withChamfer) chamfered.push(entity);
+    if (recipe !== undefined && (hasFillet(recipe) || withChamfer)) continue;
+    if (ids !== undefined)
+      return refuse(doc, 'check_blends', 'SRF_ENTITY_NOT_FOUND', `no solid with a blend has id "${id}"`, [id], ['ids']);
+  }
+  return { targets, chamfered };
+}
+
+/** A chamfer whose legs could not be compared is not a pass: it is a warning that names why. */
+function unverifiedLegFindings(rows: readonly LegRow[], unit: string): Finding[] {
+  return rows.map(
+    (row): Finding => ({
+      code: row.op === 'fillet' ? 'BLD_CHECK_BLEND_UNVERIFIED' : 'BLD_CHECK_CHAMFER_UNVERIFIED',
+      severity: 'warn',
+      entityId: row.entityId,
+      ...(row.face === null ? {} : { face: row.face }),
+      edge: row.edge,
+      unit,
+      remediation: row.op === 'fillet' ? REMEDIATION.BLD_CHECK_BLEND_UNVERIFIED : REMEDIATION.BLD_CHECK_CHAMFER_UNVERIFIED,
+      message: `the legs of the ${row.op === 'fillet' ? 'blend' : 'chamfer'} of edge ${row.edge} were not verified: ${row.note}`,
+    }),
+  );
+}
+
+function releaseFindings(targets: readonly Entity[], defaulted: readonly string[], unit: string): Finding[] {
+  const found: Finding[] = [];
+  const subject = targets.map((entity) => entity.id);
+  if (defaulted.length > 0)
+    found.push({
+      code: 'BLD_CHECK_TOLERANCE_DEFAULTED',
+      severity: 'warn',
+      entityId: subject[0] ?? '',
+      unit,
+      remediation: REMEDIATION.BLD_CHECK_TOLERANCE_DEFAULTED,
+      message: `tolerances ${defaulted.join(', ')} are defaults`,
+    });
+  found.push({
+    code: 'BLD_CHECK_REVIEW',
+    severity: 'info',
+    entityId: subject[0] ?? '',
+    unit,
+    remediation: REMEDIATION.BLD_CHECK_REVIEW,
+    message: `release check of ${subject.length} solid(s): fillet radii need a human review`,
+  });
+  return found;
 }
 
 const invalid = (entityId: string, unit: string, message: string): Finding => ({
@@ -311,24 +275,11 @@ export const checkBlends = defineCommand({
   }),
   run: (doc, params, ctx): CommandResult => {
     const { ids, require = 'G1', samples = DEFAULT_SAMPLES, purpose = 'design' } = params;
-    for (const name of ['g0', 'g1AngleRad', 'g2Rel'] as const) {
-      const value = params[name];
-      if (value !== undefined && !(value > 0)) return noop(doc, `check_blends: ${name} must be > 0 (got ${value}); no-op.`);
-    }
-    if (samples < 2 || samples > MAX_SAMPLES)
-      return noop(doc, `check_blends: samples must be in 2..${MAX_SAMPLES} (got ${samples}); no-op.`);
-    const targets: Entity[] = [];
-    const chamfered: Entity[] = [];
-    for (const id of ids ?? Object.keys(doc.entities)) {
-      const entity = doc.entities[id];
-      const recipe = entity?.kind === 'mesh' ? entity.brep : undefined;
-      const withChamfer = recipe !== undefined && (chamferNodes(recipe).length > 0 || legFilletNodes(recipe).length > 0);
-      if (entity !== undefined && recipe !== undefined && hasFillet(recipe)) targets.push(entity);
-      if (entity !== undefined && withChamfer) chamfered.push(entity);
-      if (recipe !== undefined && (hasFillet(recipe) || withChamfer)) continue;
-      if (ids !== undefined)
-        return refuse(doc, 'check_blends', 'SRF_ENTITY_NOT_FOUND', `no solid with a blend has id "${id}"`, [id], ['ids']);
-    }
+    const invalidParams = paramsRefusal(doc, params, samples);
+    if (invalidParams !== null) return invalidParams;
+    const collected = collectTargets(doc, ids);
+    if ('document' in collected) return collected;
+    const { targets, chamfered } = collected;
     const kernel = (ctx ?? currentContext()).kernel;
     const unit = doc.units;
     const base = { g1AngleRad: params.g1AngleRad ?? DEFAULT_G1_ANGLE_RAD, g2Rel: params.g2Rel ?? DEFAULT_G2_REL };
@@ -354,43 +305,12 @@ export const checkBlends = defineCommand({
     const findings = [
       ...checks.flatMap((check) => check.findings),
       ...legs.flatMap((read) => read.findings),
-      // a chamfer whose legs could not be compared is not a pass: it is a warning that names why
-      ...unverifiedChamfers.map(
-        (row): Finding => ({
-          code: row.op === 'fillet' ? 'BLD_CHECK_BLEND_UNVERIFIED' : 'BLD_CHECK_CHAMFER_UNVERIFIED',
-          severity: 'warn',
-          entityId: row.entityId,
-          ...(row.face === null ? {} : { face: row.face }),
-          edge: row.edge,
-          unit,
-          remediation: row.op === 'fillet' ? REMEDIATION.BLD_CHECK_BLEND_UNVERIFIED : REMEDIATION.BLD_CHECK_CHAMFER_UNVERIFIED,
-          message: `the legs of the ${row.op === 'fillet' ? 'blend' : 'chamfer'} of edge ${row.edge} were not verified: ${row.note}`,
-        }),
-      ),
+      ...unverifiedLegFindings(unverifiedChamfers, unit),
     ];
     const defaulted = Object.entries(named)
       .filter(([, tolerance]) => tolerance.defaulted)
       .map(([name]) => name);
-    if (purpose === 'release') {
-      const subject = targets.map((entity) => entity.id);
-      if (defaulted.length > 0)
-        findings.push({
-          code: 'BLD_CHECK_TOLERANCE_DEFAULTED',
-          severity: 'warn',
-          entityId: subject[0] ?? '',
-          unit,
-          remediation: REMEDIATION.BLD_CHECK_TOLERANCE_DEFAULTED,
-          message: `tolerances ${defaulted.join(', ')} are defaults`,
-        });
-      findings.push({
-        code: 'BLD_CHECK_REVIEW',
-        severity: 'info',
-        entityId: subject[0] ?? '',
-        unit,
-        remediation: REMEDIATION.BLD_CHECK_REVIEW,
-        message: `release check of ${subject.length} solid(s): fillet radii need a human review`,
-      });
-    }
+    if (purpose === 'release') findings.push(...releaseFindings(targets, defaulted, unit));
     const notRun =
       kernel === null
         ? 'no geometry kernel is installed'

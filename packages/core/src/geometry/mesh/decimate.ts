@@ -186,69 +186,79 @@ class Heap {
   }
 }
 
-/** Decimate a manifold, consistently wound, welded mesh. */
-export function decimateMesh(input: MeshData, params: DecimateParams): { mesh: MeshData; report: DecimateReport } {
-  const mesh = new EditMesh(input.positions, input.indices);
-  const trianglesBefore = mesh.liveFaces;
-  const diagonal = meshDiagonal(input.positions);
-  const areaFloor = 1e-12 * diagonal * diagonal;
-  const target = params.targetTriangles ?? 0;
-  const quadrics: Quadric[] = Array.from({ length: mesh.vertexTotal }, () => new Float64Array(10));
-  const unitNormal = (f: number): Vec3 | null => {
-    const n = mesh.faceNormal(f);
-    const l = Math.hypot(...n);
-    return l > 0 ? [n[0] / l, n[1] / l, n[2] / l] : null;
-  };
-  for (let f = 0; f < mesh.fAlive.length; f++) {
-    const n = unitNormal(f);
-    if (n === null) continue;
-    const [a, b, c] = mesh.corners(f);
-    const k = planeQuadric(n, mesh.p(a), 1);
-    for (const v of [a, b, c]) addInto(quadrics[v] as Quadric, k);
-  }
-  const locked = new Uint8Array(mesh.vertexTotal);
+function unitNormalOf(mesh: EditMesh, f: number): Vec3 | null {
+  const n = mesh.faceNormal(f);
+  const l = Math.hypot(...n);
+  return l > 0 ? [n[0] / l, n[1] / l, n[2] / l] : null;
+}
+
+/** The boundary edges (with their face) and the feature edges (with both faces, sharper than `cosFeature`) of the mesh. */
+function classifyEdges(
+  mesh: EditMesh,
+  cosFeature: number | null,
+): { boundaryEdges: Array<[number, number, number]>; featureEdges: Array<[number, number, number, number]> } {
   const boundaryEdges: Array<[number, number, number]> = [];
   const featureEdges: Array<[number, number, number, number]> = [];
-  const cosFeature = params.featureAngleRad === undefined ? null : Math.cos(params.featureAngleRad);
   for (let a = 0; a < mesh.vertexTotal; a++) {
     for (const b of mesh.ring(a)) {
       if (b < a) continue;
       const shared = mesh.facesOnEdge(a, b);
       if (shared.length === 1) boundaryEdges.push([a, b, shared[0] as number]);
       else if (shared.length === 2 && cosFeature !== null) {
-        const [n1, n2] = [unitNormal(shared[0] as number), unitNormal(shared[1] as number)];
+        const [n1, n2] = [unitNormalOf(mesh, shared[0] as number), unitNormalOf(mesh, shared[1] as number)];
         if (n1 !== null && n2 !== null && n1[0] * n2[0] + n1[1] * n2[1] + n1[2] * n2[2] < cosFeature)
           featureEdges.push([a, b, shared[0] as number, shared[1] as number]);
       }
     }
   }
-  const penalise = (a: number, b: number, face: number): void => {
-    const n = unitNormal(face);
-    if (n === null) return;
-    const [pa, pb] = [mesh.p(a), mesh.p(b)];
-    const edge: Vec3 = [pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]];
-    const side = normalOf([0, 0, 0], edge, n);
-    const l = Math.hypot(...side);
-    if (l === 0) return;
-    const k = planeQuadric([side[0] / l, side[1] / l, side[2] / l], pa, PENALTY);
-    addInto(quadrics[a] as Quadric, k);
-    addInto(quadrics[b] as Quadric, k);
-  };
+  return { boundaryEdges, featureEdges };
+}
+
+/** Adds the penalty plane through the edge a-b, perpendicular to `face`, to both end quadrics. */
+function penaliseEdge(mesh: EditMesh, quadrics: Quadric[], a: number, b: number, face: number): void {
+  const n = unitNormalOf(mesh, face);
+  if (n === null) return;
+  const [pa, pb] = [mesh.p(a), mesh.p(b)];
+  const edge: Vec3 = [pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]];
+  const side = normalOf([0, 0, 0], edge, n);
+  const l = Math.hypot(...side);
+  if (l === 0) return;
+  const k = planeQuadric([side[0] / l, side[1] / l, side[2] / l], pa, PENALTY);
+  addInto(quadrics[a] as Quadric, k);
+  addInto(quadrics[b] as Quadric, k);
+}
+
+/** The vertex quadrics (face planes plus boundary / feature penalties) and the locked vertices (boundary when preserved, inside the locked region). */
+function initialQuadrics(mesh: EditMesh, params: DecimateParams): { quadrics: Quadric[]; locked: Uint8Array } {
+  const quadrics: Quadric[] = Array.from({ length: mesh.vertexTotal }, () => new Float64Array(10));
+  for (let f = 0; f < mesh.fAlive.length; f++) {
+    const n = unitNormalOf(mesh, f);
+    if (n === null) continue;
+    const [a, b, c] = mesh.corners(f);
+    const k = planeQuadric(n, mesh.p(a), 1);
+    for (const v of [a, b, c]) addInto(quadrics[v] as Quadric, k);
+  }
+  const locked = new Uint8Array(mesh.vertexTotal);
+  const cosFeature = params.featureAngleRad === undefined ? null : Math.cos(params.featureAngleRad);
+  const { boundaryEdges, featureEdges } = classifyEdges(mesh, cosFeature);
   for (const [a, b, face] of boundaryEdges) {
     if (params.preserveBoundary) {
       locked[a] = 1;
       locked[b] = 1;
-    } else penalise(a, b, face);
+    } else penaliseEdge(mesh, quadrics, a, b, face);
   }
   for (const [a, b, f1, f2] of featureEdges) {
-    penalise(a, b, f1);
-    penalise(a, b, f2);
+    penaliseEdge(mesh, quadrics, a, b, f1);
+    penaliseEdge(mesh, quadrics, a, b, f2);
   }
   if (params.lockedRegion !== undefined) {
     for (let v = 0; v < mesh.vertexTotal; v++) if (insideRegion(params.lockedRegion, mesh.p(v))) locked[v] = 1;
   }
-  // Probes for the deviation bound.
-  const maxDeviation = params.maxDeviation;
+  return { quadrics, locked };
+}
+
+/** Probes for the deviation bound: every live vertex and every face centroid, each owned by a vertex (empty without `maxDeviation`). */
+function deviationProbes(mesh: EditMesh, maxDeviation: number | undefined): { probes: Vec3[]; owned: number[][] } {
   const probes: Vec3[] = [];
   const owned: number[][] = Array.from({ length: mesh.vertexTotal }, () => []);
   if (maxDeviation !== undefined) {
@@ -263,6 +273,19 @@ export function decimateMesh(input: MeshData, params: DecimateParams): { mesh: M
       (owned[mesh.corners(f)[0]] as number[]).push(probes.length - 1);
     }
   }
+  return { probes, owned };
+}
+
+/** Decimate a manifold, consistently wound, welded mesh. */
+export function decimateMesh(input: MeshData, params: DecimateParams): { mesh: MeshData; report: DecimateReport } {
+  const mesh = new EditMesh(input.positions, input.indices);
+  const trianglesBefore = mesh.liveFaces;
+  const diagonal = meshDiagonal(input.positions);
+  const areaFloor = 1e-12 * diagonal * diagonal;
+  const target = params.targetTriangles ?? 0;
+  const { quadrics, locked } = initialQuadrics(mesh, params);
+  const maxDeviation = params.maxDeviation;
+  const { probes, owned } = deviationProbes(mesh, maxDeviation);
   const original = maxDeviation === undefined ? null : new SurfaceIndex(input.positions, input.indices);
   const version = new Int32Array(mesh.vertexTotal);
   const heap = new Heap();

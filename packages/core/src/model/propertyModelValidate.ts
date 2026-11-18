@@ -19,19 +19,80 @@ const finite = (values: readonly number[]): boolean => values.every(Number.isFin
 
 const increasing = (values: readonly number[]): number => values.findIndex((v, i) => i > 0 && !(v > (values[i - 1] ?? Number.NaN)));
 
+type FormOf<K extends PropertyForm['kind']> = Extract<PropertyForm, { kind: K }>;
+
+const formInvalid = (path: string, field: string, message: string): ModelProblem =>
+  problem('PROP_FORM_INVALID', `${path}.${field}`, message);
+
+function polynomialProblem(form: FormOf<'polynomial' | 'log10Polynomial'>, path: string): ModelProblem | null {
+  if (form.coefficients.length === 0 || !finite(form.coefficients))
+    return formInvalid(path, 'coefficients', 'need at least one finite coefficient');
+  if (form.kind === 'log10Polynomial' && form.coefficients.length > 9)
+    return formInvalid(path, 'coefficients', 'a log10Polynomial has at most 9 coefficients (a…i)');
+  return null;
+}
+
+function table1dProblem(form: FormOf<'table1d'>, path: string): ModelProblem | null {
+  if (form.points.length < 2) return formInvalid(path, 'points', 'a table needs at least 2 points');
+  const xs = form.points.map(([x]) => x);
+  const ys = form.points.map(([, y]) => y);
+  if (!finite(xs) || !finite(ys)) return formInvalid(path, 'points', 'points must be finite');
+  const bad = increasing(xs);
+  if (bad >= 0) return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.points[${bad}]`, 'x must be strictly increasing');
+  if (form.interpolation === 'loglog' || form.interpolation === 'loglinear') {
+    const nonPositive = ys.findIndex((y) => y <= 0);
+    if (nonPositive >= 0) return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.points[${nonPositive}]`, `${form.interpolation} needs y > 0`);
+  }
+  if (form.interpolation === 'loglog' && (xs[0] ?? 0) <= 0)
+    return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.points[0]`, 'loglog needs x > 0');
+  return null;
+}
+
+function table2dProblem(form: FormOf<'table2d'>, path: string): ModelProblem | null {
+  for (const [axis, values] of [
+    ['xs', form.xs],
+    ['ys', form.ys],
+  ] as const) {
+    if (values.length < 2 || !finite(values)) return formInvalid(path, axis, 'each axis needs at least 2 finite values');
+    const bad = increasing(values);
+    if (bad >= 0) return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.${axis}[${bad}]`, 'axis must be strictly increasing');
+    const spec = axis === 'xs' ? form.x : form.y;
+    if (spec.axis === 'log10' && (values[0] ?? 0) <= 0)
+      return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.${axis}[0]`, 'a log10 axis needs values > 0');
+  }
+  const shaped = form.values.length === form.xs.length && form.values.every((row) => row.length === form.ys.length && finite(row));
+  return shaped ? null : formInvalid(path, 'values', 'values[i][j] must be finite, one row per xs value, one column per ys value');
+}
+
+function piecewiseProblem(form: FormOf<'piecewise'>, path: string, knownModelIds: ReadonlySet<string>): ModelProblem | null {
+  if (form.segments.length === 0) return formInvalid(path, 'segments', 'need at least one segment');
+  const bad = increasing(form.segments.map((segment) => segment.upTo));
+  if (bad >= 0) return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.segments[${bad}].upTo`, 'upTo must be strictly increasing');
+  for (const [i, segment] of form.segments.entries()) {
+    const nested = formProblem(segment.form, `${path}.segments[${i}].form`, knownModelIds);
+    if (nested !== null) return nested;
+  }
+  return null;
+}
+
+function productProblem(form: FormOf<'product'>, path: string, knownModelIds: ReadonlySet<string>): ModelProblem | null {
+  if (form.factors.length === 0) return formInvalid(path, 'factors', 'need at least one factor');
+  for (const [i, factor] of form.factors.entries()) {
+    const nested = formProblem(factor, `${path}.factors[${i}]`, knownModelIds);
+    if (nested !== null) return nested;
+  }
+  return null;
+}
+
 /** First problem of a form (recursive), or null. `knownModelIds` resolves `ratioOf` bases. */
 function formProblem(form: PropertyForm, path: string, knownModelIds: ReadonlySet<string>): ModelProblem | null {
-  const invalid = (field: string, message: string): ModelProblem => problem('PROP_FORM_INVALID', `${path}.${field}`, message);
+  const invalid = (field: string, message: string): ModelProblem => formInvalid(path, field, message);
   switch (form.kind) {
     case 'constant':
       return Number.isFinite(form.value) ? null : invalid('value', 'must be finite');
     case 'polynomial':
     case 'log10Polynomial':
-      if (form.coefficients.length === 0 || !finite(form.coefficients))
-        return invalid('coefficients', 'need at least one finite coefficient');
-      if (form.kind === 'log10Polynomial' && form.coefficients.length > 9)
-        return invalid('coefficients', 'a log10Polynomial has at most 9 coefficients (a…i)');
-      return null;
+      return polynomialProblem(form, path);
     case 'nistRational':
       return form.coefficients.length === 9 && finite(form.coefficients)
         ? null
@@ -46,54 +107,14 @@ function formProblem(form: PropertyForm, path: string, knownModelIds: ReadonlySe
       if (form.law === 'johnsonCook')
         return form.referenceRate > 0 && Number.isFinite(form.C) ? null : invalid('referenceRate', 'must be > 0');
       return form.D > 0 && form.q > 0 ? null : invalid('D', 'D and q must be > 0');
-    case 'table1d': {
-      if (form.points.length < 2) return invalid('points', 'a table needs at least 2 points');
-      const xs = form.points.map(([x]) => x);
-      const ys = form.points.map(([, y]) => y);
-      if (!finite(xs) || !finite(ys)) return invalid('points', 'points must be finite');
-      const bad = increasing(xs);
-      if (bad >= 0) return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.points[${bad}]`, 'x must be strictly increasing');
-      if (form.interpolation === 'loglog' || form.interpolation === 'loglinear') {
-        const nonPositive = ys.findIndex((y) => y <= 0);
-        if (nonPositive >= 0)
-          return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.points[${nonPositive}]`, `${form.interpolation} needs y > 0`);
-      }
-      if (form.interpolation === 'loglog' && (xs[0] ?? 0) <= 0)
-        return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.points[0]`, 'loglog needs x > 0');
-      return null;
-    }
-    case 'table2d': {
-      for (const [axis, values] of [
-        ['xs', form.xs],
-        ['ys', form.ys],
-      ] as const) {
-        if (values.length < 2 || !finite(values)) return invalid(axis, 'each axis needs at least 2 finite values');
-        const bad = increasing(values);
-        if (bad >= 0) return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.${axis}[${bad}]`, 'axis must be strictly increasing');
-        const spec = axis === 'xs' ? form.x : form.y;
-        if (spec.axis === 'log10' && (values[0] ?? 0) <= 0)
-          return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.${axis}[0]`, 'a log10 axis needs values > 0');
-      }
-      const shaped = form.values.length === form.xs.length && form.values.every((row) => row.length === form.ys.length && finite(row));
-      return shaped ? null : invalid('values', 'values[i][j] must be finite, one row per xs value, one column per ys value');
-    }
-    case 'piecewise': {
-      if (form.segments.length === 0) return invalid('segments', 'need at least one segment');
-      const bad = increasing(form.segments.map((segment) => segment.upTo));
-      if (bad >= 0) return problem('PROP_TABLE_NOT_MONOTONIC', `${path}.segments[${bad}].upTo`, 'upTo must be strictly increasing');
-      for (const [i, segment] of form.segments.entries()) {
-        const nested = formProblem(segment.form, `${path}.segments[${i}].form`, knownModelIds);
-        if (nested !== null) return nested;
-      }
-      return null;
-    }
+    case 'table1d':
+      return table1dProblem(form, path);
+    case 'table2d':
+      return table2dProblem(form, path);
+    case 'piecewise':
+      return piecewiseProblem(form, path, knownModelIds);
     case 'product':
-      if (form.factors.length === 0) return invalid('factors', 'need at least one factor');
-      for (const [i, factor] of form.factors.entries()) {
-        const nested = formProblem(factor, `${path}.factors[${i}]`, knownModelIds);
-        if (nested !== null) return nested;
-      }
-      return null;
+      return productProblem(form, path, knownModelIds);
     case 'ratioOf':
       if (!knownModelIds.has(form.baseModelId))
         return invalid('baseModelId', `base model '${form.baseModelId}' is not defined on this material`);
