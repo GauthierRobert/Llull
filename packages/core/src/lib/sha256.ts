@@ -25,20 +25,40 @@ export function sha256Hex(text: string | Uint8Array): string {
   for (let offset = 0; offset < padded.length; offset += 64) {
     for (let t = 0; t < 16; t += 1) w[t] = view.getUint32(offset + t * 4);
     for (let t = 16; t < 64; t += 1) {
-      const w15 = w[t - 15] ?? 0;
-      const w2 = w[t - 2] ?? 0;
+      const w15 = w[t - 15] as number;
+      const w2 = w[t - 2] as number;
       const s0 = rotr(w15, 7) ^ rotr(w15, 18) ^ (w15 >>> 3);
       const s1 = rotr(w2, 17) ^ rotr(w2, 19) ^ (w2 >>> 10);
-      w[t] = ((w[t - 16] ?? 0) + s0 + (w[t - 7] ?? 0) + s1) >>> 0;
+      w[t] = (w[t - 16] as number) + s0 + (w[t - 7] as number) + s1;
     }
-    let [a, b, c, d, e, f, g, hh] = [h[0] ?? 0, h[1] ?? 0, h[2] ?? 0, h[3] ?? 0, h[4] ?? 0, h[5] ?? 0, h[6] ?? 0, h[7] ?? 0];
+    let a = h[0] as number;
+    let b = h[1] as number;
+    let c = h[2] as number;
+    let d = h[3] as number;
+    let e = h[4] as number;
+    let f = h[5] as number;
+    let g = h[6] as number;
+    let hh = h[7] as number;
     for (let t = 0; t < 64; t += 1) {
-      const t1 = (hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + (K[t] ?? 0) + (w[t] ?? 0)) >>> 0;
+      const t1 = (hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + (K[t] as number) + (w[t] as number)) >>> 0;
       const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
-      [hh, g, f, e, d, c, b, a] = [g, f, e, (d + t1) >>> 0, c, b, a, (t1 + t2) >>> 0];
+      hh = g;
+      g = f;
+      f = e;
+      e = (d + t1) >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (t1 + t2) >>> 0;
     }
-    const next = [a, b, c, d, e, f, g, hh];
-    for (let i = 0; i < 8; i += 1) h[i] = ((h[i] ?? 0) + (next[i] ?? 0)) >>> 0;
+    h[0] = (h[0] as number) + a;
+    h[1] = (h[1] as number) + b;
+    h[2] = (h[2] as number) + c;
+    h[3] = (h[3] as number) + d;
+    h[4] = (h[4] as number) + e;
+    h[5] = (h[5] as number) + f;
+    h[6] = (h[6] as number) + g;
+    h[7] = (h[7] as number) + hh;
   }
   return Array.from(h, (word) => word.toString(16).padStart(8, '0')).join('');
 }
