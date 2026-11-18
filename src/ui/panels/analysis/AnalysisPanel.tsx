@@ -6,25 +6,12 @@ import '@ui/styles/panels/analysis.css';
 import { classNames } from '@ui/classNames';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { execute } from '@core/commands/registry';
-import { ListRow, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
-import { eigenOf, parseAnalysisList, parseCheck, parseDescribe } from './analysisData';
-import { AnalysisActions } from './AnalysisActions';
-import { AnalysisChecks } from './AnalysisChecks';
-import { AnalysisMargins } from './AnalysisMargins';
-import { AnalysisResultSummary } from './AnalysisResultSummary';
-import { AnalysisStateBadge } from './AnalysisStateBadge';
-import { recordResultView } from './useResultView';
-import { AnalysisKpis } from './AnalysisKpis';
-import { AnalysisOnModel } from './AnalysisOnModel';
+import { PanelHeader, StatusLine } from '@ui/panels/PanelParts';
+import { parseAnalysisList, parseCheck, parseDescribe } from './analysisData';
+import { AnalysisCaseList } from './AnalysisCaseList';
+import { AnalysisDetail } from './AnalysisDetail';
 import { buildSetupItems } from './analysisItems';
 import { useAnalysisViewStore } from './analysisViewStore';
-import { AnalysisModes } from './AnalysisModes';
-import { AnalysisProbes } from './AnalysisProbes';
-import { AnalysisResults } from './AnalysisResults';
-import { AnalysisSetup } from './AnalysisSetup';
-import { NonlinearCurves } from './NonlinearCurves';
-import { VerificationPanel } from './VerificationPanel';
-import { TopologyPanel } from './TopologyPanel';
 import { useHostQuery } from './useHostQuery';
 
 const ALL_CASES: Record<string, unknown> = {};
@@ -63,92 +50,22 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
     () => (detail?.described == null ? null : buildSetupItems(document, detail.described.analysisCase)),
     [document, detail?.described],
   );
-  const openCase = detail?.described?.analysisCase;
-  const eigen = openCase === undefined ? null : eigenOf(openCase);
 
   return (
     <aside className={classNames('panel', className)} aria-label="Analysis" data-testid="analysis-panel">
       <PanelHeader title="Analysis" count={list.length} countLabel={`${list.length} analyses`} />
-      <PanelSection title="Cases" hint="Finite-element and thermal analyses set up in this document.">
-        {list.length === 0 ? (
-          <PanelEmpty
-            compact
-            icon="wireframe"
-            message="No analyses yet"
-            hint="Set up a finite-element or thermal case."
-            action={{ label: 'New analysis', command: 'create_analysis' }}
-          />
-        ) : (
-          <ul className="panel__list" aria-label="Analyses">
-            {list.map((item) => (
-              <ListRow
-                key={item.id}
-                testId={`analysis-row-${item.id}`}
-                buttonTestId={`analysis-open-${item.id}`}
-                selected={item.id === selectedId}
-                current={item.id === selectedId}
-                label={`Open analysis ${item.name}`}
-                onSelect={() => setActive(item.id)}
-              >
-                <span className="panel__row-main">{item.name}</span>
-                <span className="panel__row-meta">
-                  {item.type} · <AnalysisStateBadge state={item.state} testId={`analysis-state-${item.id}`} />
-                </span>
-              </ListRow>
-            ))}
-          </ul>
-        )}
-      </PanelSection>
+      <AnalysisCaseList list={list} selectedId={selectedId} onSelect={setActive} />
       {detail !== null && selectedId !== null && detail.described === null && <StatusLine text={detail.describeSummary} />}
       {detail?.described != null && analysis !== undefined && (
-        <>
-          {items !== null && (
-            <AnalysisKpis analysisCase={detail.described.analysisCase} state={detail.described.state} check={detail.check} items={items} />
-          )}
-          <AnalysisOnModel thermal={detail.described.analysisCase.thermal !== undefined} solved={detail.described.state === 'solved'} />
-          <PanelSection title="Case" hint="Case set-up as recorded in the document.">
-            <p className="analysis__line" data-testid="analysis-meta">
-              {detail.described.analysisCase.type} · {detail.described.analysisCase.solver} · {detail.described.analysisCase.unitSystem} ·{' '}
-              <AnalysisStateBadge state={detail.described.state} withMeaning testId="analysis-state-badge" />
-            </p>
-            {detail.described.problem !== null && <StatusLine text={detail.described.problem} />}
-          </PanelSection>
-          <AnalysisSetup analysisCase={detail.described.analysisCase} document={document} />
-          <AnalysisChecks check={detail.check} summary={detail.checkSummary} partIds={Object.keys(detail.described.analysisCase.parts)} />
-          {eigen !== null && openCase !== undefined && detail.described.state === 'solved' && (
-            <AnalysisModes
-              eigen={eigen}
-              selectedMode={mode}
-              onSelect={(next) => {
-                setMode(next);
-                recordResultView(openCase);
-              }}
-            />
-          )}
-          {detail.described.state === 'solved' && <AnalysisResultSummary analysisCase={detail.described.analysisCase} />}
-          {detail.described.state === 'solved' && detail.described.analysisCase.type === 'nonlinear_static' && (
-            <NonlinearCurves key={`nonlinear-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
-          )}
-          {detail.described.state === 'solved' &&
-            (detail.described.analysisCase.type === 'static' || detail.described.analysisCase.type === 'thermo_static') && (
-              <AnalysisMargins analysisCase={detail.described.analysisCase} />
-            )}
-          {detail.described.state === 'solved' && Object.keys(detail.described.analysisCase.probes ?? {}).length > 0 && (
-            <AnalysisProbes
-              analysisId={detail.described.analysisCase.id}
-              refreshKey={document}
-              items={Object.fromEntries((items?.probes ?? []).map((item) => [item.id, item]))}
-            />
-          )}
-          <AnalysisResults key={`results-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
-          {(detail.described.state === 'solved' || (detail.described.analysisCase.studyOrder ?? []).length > 0) && (
-            <VerificationPanel key={`verification-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
-          )}
-          {detail.described.analysisCase.type === 'static' && (
-            <TopologyPanel key={`topology-${detail.described.analysisCase.id}`} analysisId={detail.described.analysisCase.id} />
-          )}
-          <AnalysisActions key={`actions-${detail.described.analysisCase.id}`} analysisCase={detail.described.analysisCase} />
-        </>
+        <AnalysisDetail
+          described={detail.described}
+          check={detail.check}
+          checkSummary={detail.checkSummary}
+          items={items}
+          document={document}
+          mode={mode}
+          onSelectMode={setMode}
+        />
       )}
     </aside>
   );
