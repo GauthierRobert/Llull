@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - run: npm ci
       # Incremental state (reports/stryker-incremental-<folder>.json): unchanged mutants against unchanged tests are not re-run.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: reports/stryker-incremental-${{ matrix.folder }}.json
           key: stryker-${{ matrix.folder }}-${{ github.run_id }}
