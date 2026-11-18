@@ -8,6 +8,7 @@
  */
 
 import { bisect } from '@lib/bisect';
+import { powInt } from '@lib/powInt';
 
 /** Bicycle preset of Martin et al. 1998 (road tyres Crr, wheel drag area Fw m², chain drivetrain efficiency). */
 export const BICYCLE_DEFAULTS = { crr: 0.0032, wheelAreaM2: 0.0044, drivetrainEfficiency: 0.976 } as const;
@@ -88,7 +89,7 @@ export const bassettFrontalArea = (heightM: number, massKg: number): number => 0
 export function bassettPower(input: BassettInputs, speedKmh: number): number {
   const totalMass = input.riderMassKg + input.bikeMassKg;
   const area = bassettFrontalArea(input.riderHeightM, input.riderMassKg);
-  return input.k * (0.00953 * totalMass * speedKmh + 0.00775 * speedKmh ** 2 + input.k1 * area * 0.007551 * speedKmh ** 3);
+  return input.k * (0.00953 * totalMass * speedKmh + 0.00775 * speedKmh ** 2 + input.k1 * area * 0.007551 * powInt(speedKmh, 3));
 }
 
 /** Speed in km/h at `powerW` (eq. 8 is monotone in V). */

@@ -5,6 +5,7 @@
 
 import { clamp } from '@lib/clamp';
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
+import { powInt } from '@lib/powInt';
 
 export const E_STEEL = 210000; // N/mm²
 const GAMMA_M1 = 1.0;
@@ -89,7 +90,7 @@ const G_STEEL = 81000; // N/mm²
 export function criticalMoment(profile: SteelProfile, length: number, c1 = 1): number {
   if (profile.shape !== 'I') return Infinity;
   const minor = sectionProperties(profile).minorInertia;
-  const torsion = (2 * profile.b * profile.tf ** 3 + (profile.h - 2 * profile.tf) * profile.tw ** 3) / 3;
+  const torsion = (2 * profile.b * powInt(profile.tf, 3) + (profile.h - 2 * profile.tf) * powInt(profile.tw, 3)) / 3;
   const warping = (minor * (profile.h - profile.tf) ** 2) / 4;
   const euler = eulerForce(minor, length);
   return c1 * euler * Math.sqrt(warping / minor + (G_STEEL * torsion) / euler);

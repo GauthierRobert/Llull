@@ -8,6 +8,7 @@ import { STEEL_DENSITY_KG_PER_M3 } from '@aec/steel/profiles';
 import type { TankTemplate } from '../plantData';
 import { courseBottoms, eaveRadius, roofRise, tankLiquidVolume } from './tankFrame';
 import { TEST_WATER_KG_PER_M3, type MassPart } from './vesselMass';
+import { powInt } from '@lib/powInt';
 
 export interface TankMass {
   readonly parts: readonly MassPart[];
@@ -32,7 +33,7 @@ function roofArea(template: TankTemplate): number {
 
 /** @param scale metres per document unit */
 export function tankMass(scale: number, template: TankTemplate): TankMass {
-  const cubic = scale ** 3;
+  const cubic = powInt(scale, 3);
   const density = template.design.materialDensityKgM3 ?? STEEL_DENSITY_KG_PER_M3;
   const radius = template.diameter / 2;
   const bottoms = courseBottoms(template);

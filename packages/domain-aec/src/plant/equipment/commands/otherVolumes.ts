@@ -11,6 +11,7 @@ import { tankLiquidVolume } from '../geometry/tankFrame';
 import { refuse } from '../model';
 import type { ExchangerTemplate, TankTemplate } from '../plantData';
 import { findEquipment } from './equipmentRef';
+import { powInt } from '@lib/powInt';
 
 export interface VolumeRequest {
   readonly equipment?: string | undefined;
@@ -35,7 +36,7 @@ function exchangerVolume(doc: CadDocument, element: EquipmentElement, template: 
       ['levels'],
     );
   const geometry = resolveExchanger(template);
-  const cubic = toMetres(doc, 1) ** 3;
+  const cubic = powInt(toMetres(doc, 1), 3);
   const volumes = exchangerVolumes(template, geometry);
   const mm = MM_PER_UNIT[doc.units];
   const fluidSides = {
@@ -73,7 +74,7 @@ function exchangerVolume(doc: CadDocument, element: EquipmentElement, template: 
 function tankVolume(doc: CadDocument, element: EquipmentElement, template: TankTemplate, request: VolumeRequest): CommandResult {
   if (request.side !== undefined)
     return refuse(doc, 'vessel_volume', 'EQP_PARAM_INVALID', 'side applies to exchangers only', [element.id], ['side']);
-  const cubic = toMetres(doc, 1) ** 3;
+  const cubic = powInt(toMetres(doc, 1), 3);
   const total = tankLiquidVolume(template, template.shellHeight) * cubic;
   const rows: { level: number; liquidVolumeM3: number; percent: number }[] = [];
   for (const [index, level] of (request.levels ?? []).entries()) {

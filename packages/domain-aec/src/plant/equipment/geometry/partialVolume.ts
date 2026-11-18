@@ -4,6 +4,7 @@
  */
 
 import { headFilledVolume, headVolume, type HeadShape } from './heads';
+import { powInt } from '@lib/powInt';
 
 /** Circular segment area of a circle of radius r filled to depth h. */
 function segmentArea(radius: number, h: number): number {
@@ -30,8 +31,8 @@ export function verticalVolume(radius: number, length: number, bottom: HeadShape
 function conicalHeadHorizontal(radius: number, depth: number, h: number): number {
   const y = h - radius;
   const q = Math.sqrt(Math.max(0, radius * radius - y * y));
-  const logTerm = y === 0 || Math.abs(y) >= radius ? 0 : (y ** 3 / 3) * Math.log((radius + q) / Math.abs(y));
-  const antiderivative = (radius ** 3 / 3) * Math.acos(Math.max(-1, Math.min(1, -y / radius))) + ((2 * y) / 3) * radius * q - logTerm;
+  const logTerm = y === 0 || Math.abs(y) >= radius ? 0 : (powInt(y, 3) / 3) * Math.log((radius + q) / Math.abs(y));
+  const antiderivative = (powInt(radius, 3) / 3) * Math.acos(Math.max(-1, Math.min(1, -y / radius))) + ((2 * y) / 3) * radius * q - logTerm;
   return (depth / radius) * antiderivative;
 }
 

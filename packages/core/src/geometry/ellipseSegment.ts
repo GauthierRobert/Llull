@@ -6,6 +6,7 @@
 
 import type { Vec2, Vec3 } from '../model/types';
 import { add3, cross3, dot3, len3, scale3, sub3 } from '../lib/vec3';
+import { powInt } from '../lib/powInt';
 
 type Point = Vec2 | Vec3;
 type Triple = readonly [Point, Point, Point];
@@ -81,7 +82,7 @@ export function ellipseCurvature(points: Triple, t: number): number {
   const angle = (Math.PI / 2) * t;
   const d1 = add3(scale3(u, -Math.sin(angle)), scale3(v, Math.cos(angle)));
   const d2 = scale3(add3(scale3(u, Math.cos(angle)), scale3(v, Math.sin(angle))), -1);
-  return len3(cross3(d1, d2)) / len3(d1) ** 3;
+  return len3(cross3(d1, d2)) / powInt(len3(d1), 3);
 }
 
 /** Smallest radius of curvature on the quarter (sampled at 65 parameters, ends included). */

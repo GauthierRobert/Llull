@@ -12,6 +12,7 @@ import type { ReadOutcome } from './reader';
 import { withoutCompositeUsages } from './standardReader';
 import type { rebuildPart } from './rebuild';
 import { type ValidationFinding, compare, plyArea } from './validation';
+import { powInt } from '@lib/powInt';
 
 const MAX_STEP_CHARS = 64 * 1024 * 1024;
 
@@ -189,7 +190,7 @@ export function solidFindings(
   const reported =
     (solidsReport as { exchange?: { products?: { entityIds?: string[]; recomputed?: { volume: number } }[] } } | undefined)?.exchange
       ?.products ?? [];
-  const cubic = MM_PER_UNIT[units] ** 3;
+  const cubic = powInt(MM_PER_UNIT[units], 3);
   const volumesOf = (ids: readonly string[]): (number | undefined)[] => {
     const products = [...new Set(ids.map((id) => reported.find((product) => product.entityIds?.includes(id))))];
     return products.map((product) => (product?.recomputed === undefined ? undefined : product.recomputed.volume / cubic));

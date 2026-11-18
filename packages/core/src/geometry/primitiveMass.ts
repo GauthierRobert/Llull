@@ -8,6 +8,7 @@ import { applyEulerXYZ } from '../lib/eulerRotation';
 import { ORIGIN } from '../lib/vec3';
 import type { InertiaTensor, MassProperties } from './massProperties';
 import { polygonArea } from '../lib/polygon';
+import { powInt } from '../lib/powInt';
 
 /** Rotate a principal (diagonal) inertia [a, b, c] given in the entity's local axes into world axes: I_w = R · diag · Rᵀ. */
 function rotatedPrincipalInertia([a, b, c]: Vec3, rotation: Vec3): InertiaTensor {
@@ -40,7 +41,7 @@ export function primitiveMassProperties(e: Entity, density: number): MassPropert
     return { mass, volume, centerOfMass: e.position, inertia: rotatedPrincipalInertia(principal, e.rotation) };
   }
   if (e.kind === 'sphere') {
-    const volume = (4 / 3) * Math.PI * e.radius ** 3;
+    const volume = (4 / 3) * Math.PI * powInt(e.radius, 3);
     const mass = volume * density;
     const moment = (2 / 5) * mass * e.radius * e.radius;
     return { mass, volume, centerOfMass: e.position, inertia: [moment, moment, moment, 0, 0, 0] };

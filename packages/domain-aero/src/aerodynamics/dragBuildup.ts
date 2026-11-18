@@ -9,6 +9,7 @@
  */
 
 import { skinFrictionCoefficient } from './skinFriction';
+import { powInt } from '@lib/powInt';
 
 export type FormFactorModel = 'raymer' | 'torenbeek' | 'hoerner';
 
@@ -34,14 +35,14 @@ export interface LiftingShape {
 
 export function liftingFormFactor(model: FormFactorModel, shape: LiftingShape, mach: number): number {
   const t = shape.thicknessRatio;
-  if (model === 'torenbeek') return 1 + 2.7 * t + 100 * t ** 4;
-  if (model === 'hoerner') return 1 + 2 * t + 60 * t ** 4;
-  return (1 + (0.6 / shape.maxThicknessX) * t + 100 * t ** 4) * (1.34 * Math.pow(mach, 0.18) * Math.pow(Math.cos(shape.sweep), 0.28));
+  if (model === 'torenbeek') return 1 + 2.7 * t + 100 * powInt(t, 4);
+  if (model === 'hoerner') return 1 + 2 * t + 60 * powInt(t, 4);
+  return (1 + (0.6 / shape.maxThicknessX) * t + 100 * powInt(t, 4)) * (1.34 * Math.pow(mach, 0.18) * Math.pow(Math.cos(shape.sweep), 0.28));
 }
 
 export function bodyFormFactor(model: Exclude<FormFactorModel, 'raymer'>, finenessRatio: number): number {
   const f = finenessRatio;
-  return model === 'torenbeek' ? 1 + 2.2 / f ** 1.5 + 3.8 / f ** 3 : 1 + 1.5 / f ** 1.5 + 7 / f ** 3;
+  return model === 'torenbeek' ? 1 + 2.2 / f ** 1.5 + 3.8 / powInt(f, 3) : 1 + 1.5 / f ** 1.5 + 7 / powInt(f, 3);
 }
 
 export const FORMULAS: Readonly<Record<string, string>> = {

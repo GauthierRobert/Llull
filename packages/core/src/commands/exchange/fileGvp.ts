@@ -8,6 +8,7 @@ import type { EmbeddedGvp, GvpCheck, GvpComparison } from '../../model/exchange'
 import type { Vec3 } from '../../model/types';
 import type { FileGvp, Step21Summary } from '../../lib/step21/summary';
 import { type GvpSample, compareGvp, isPlaceholder, worstBand } from './gvpBands';
+import { powInt } from '../../lib/powInt';
 
 /** Tolerances of a same-kernel round trip (validation `tolerancePolicy.sameKernelRoundTrip`): only decimal serialisation intervenes. */
 export const SAME_KERNEL_POLICY = { greenRel: 1e-9, yellowRel: 1e-6, greenCentroidPerDiag: 1e-9, yellowCentroidMm: 1e-3 } as const;
@@ -68,7 +69,7 @@ export function groupFileGvp(summary: Step21Summary, mmPerUnit: number): FileGvp
     const area = values.find((value) => typeof value.value === 'number' && isArea(value.item));
     const centre = values.find((value) => Array.isArray(value.value) && isCentre(value.item));
     const sample: GvpSample = {
-      ...(volume === undefined ? {} : { volume: (volume.value as number) * length ** 3 }),
+      ...(volume === undefined ? {} : { volume: (volume.value as number) * powInt(length, 3) }),
       ...(area === undefined ? {} : { area: (area.value as number) * length ** 2 }),
       ...(centre === undefined ? {} : { centroid: (centre.value as Vec3).map((component) => component * length) as unknown as Vec3 }),
     };

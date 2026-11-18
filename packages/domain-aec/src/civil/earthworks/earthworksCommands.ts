@@ -18,6 +18,7 @@ import { buildSamples, compareSurfaceVolumes, daylightReach, padEarthworks, volu
 import { daylightPoints } from './platformDaylight';
 import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
+import { powInt } from '@lib/powInt';
 
 const DEFAULT_CUT_SLOPE = 1.5;
 const DEFAULT_FILL_SLOPE = 2;
@@ -56,9 +57,9 @@ function platformProblem(platform: PlatformObject, tin: Tin): string | null {
 function worksData(doc: CadDocument, works: Earthworks): Record<string, number> {
   const k = toMetres(doc, 1);
   return {
-    cutM3: round(works.cutVolume * k ** 3, 3),
-    fillM3: round(works.fillVolume * k ** 3, 3),
-    netM3: round((works.cutVolume - works.fillVolume) * k ** 3, 3),
+    cutM3: round(works.cutVolume * powInt(k, 3), 3),
+    fillM3: round(works.fillVolume * powInt(k, 3), 3),
+    netM3: round((works.cutVolume - works.fillVolume) * powInt(k, 3), 3),
     cutAreaM2: round(works.cutArea * k ** 2, 3),
     fillAreaM2: round(works.fillArea * k ** 2, 3),
     padAreaM2: round(works.padArea * k ** 2, 3),
@@ -293,7 +294,7 @@ export const balancePlatform = defineCommand({
     const updated: PlatformObject = { ...platform, elevation };
     const works = volumesFromSamples(samples, platform.boundary, elevation, platform.cutSlope, platform.fillSlope);
     const data = worksData(doc, works);
-    const residual = round((works.cutVolume * swellFactor - works.fillVolume) * toMetres(doc, 1) ** 3);
+    const residual = round((works.cutVolume * swellFactor - works.fillVolume) * powInt(toMetres(doc, 1), 3));
     return commitCivil(
       doc,
       withObject(civil, updated),
@@ -340,9 +341,9 @@ export const compareSurfaces = defineCommand({
     const data = {
       baseSurfaceId,
       comparisonSurfaceId,
-      cutM3: round(result.cutVolume * k ** 3, 3),
-      fillM3: round(result.fillVolume * k ** 3, 3),
-      netM3: round((result.cutVolume - result.fillVolume) * k ** 3, 3),
+      cutM3: round(result.cutVolume * powInt(k, 3), 3),
+      fillM3: round(result.fillVolume * powInt(k, 3), 3),
+      netM3: round((result.cutVolume - result.fillVolume) * powInt(k, 3), 3),
       cutAreaM2: round(result.cutArea * k ** 2, 3),
       fillAreaM2: round(result.fillArea * k ** 2, 3),
       areaM2: round(result.area * k ** 2, 3),

@@ -13,6 +13,7 @@ import type { Vec3 } from '../../model/vectors';
 import { add3, cross3, dot3, len3, normalize3, scale3, sub3 } from '../../lib/vec3';
 import { curveDerivatives, curveDomain } from '../../lib/nurbs/evaluate';
 import type { NurbsCurveData } from '../../lib/nurbs/types';
+import { powInt } from '../../lib/powInt';
 
 export type FlowLaw = Extract<DeformLaw, { kind: 'flowCurve' }>;
 
@@ -261,7 +262,7 @@ function refinedTable(
     if (typeof law === 'string') return law;
     const kappa = maxCurvature(law);
     const h = law.step;
-    const error = ((kappa * h) ** 2 * Math.max(options.lateral, 1e-12)) / 8 + (kappa * h) ** 4 * 1e-3;
+    const error = ((kappa * h) ** 2 * Math.max(options.lateral, 1e-12)) / 8 + powInt(kappa * h, 4) * 1e-3;
     if (error <= options.tolerance * 0.25 || count >= MAX_FLOW_STATIONS) return law;
     count = Math.min(MAX_FLOW_STATIONS, count * 2);
   }

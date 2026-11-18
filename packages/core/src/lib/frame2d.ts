@@ -4,6 +4,7 @@
  */
 
 import { solveDense } from './denseLinalg';
+import { powInt } from './powInt';
 
 export interface FrameNode {
   readonly x: number;
@@ -88,7 +89,7 @@ function localOf(nodes: ReadonlyArray<FrameNode>, member: FrameMember): Local | 
   if (!(length > 0)) return null;
   const [c, s] = [dx / length, dy / length];
   const { E, A, I } = member;
-  const [ea, ei] = [(E * A) / length, (E * I) / length ** 3];
+  const [ea, ei] = [(E * A) / length, (E * I) / powInt(length, 3)];
   const L = length;
   const k = [
     [ea, 0, 0, -ea, 0, 0],
@@ -234,10 +235,10 @@ export function solveFrame(nodes: ReadonlyArray<FrameNode>, members: ReadonlyArr
     const transverseAt = (x: number): number => {
       const t = x / L;
       return (
-        (1 - 3 * t * t + 2 * t ** 3) * (d[1] as number) +
-        (t - 2 * t * t + t ** 3) * L * (d[2] as number) +
-        (3 * t * t - 2 * t ** 3) * (d[4] as number) +
-        (-t * t + t ** 3) * L * (d[5] as number) +
+        (1 - 3 * t * t + 2 * powInt(t, 3)) * (d[1] as number) +
+        (t - 2 * t * t + powInt(t, 3)) * L * (d[2] as number) +
+        (3 * t * t - 2 * powInt(t, 3)) * (d[4] as number) +
+        (-t * t + powInt(t, 3)) * L * (d[5] as number) +
         (local.qTransverse * x * x * (L - x) ** 2) / (24 * ei)
       );
     };

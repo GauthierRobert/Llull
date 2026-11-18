@@ -1,3 +1,4 @@
+import { powInt } from '../../lib/powInt';
 /**
  * Incompressible hyperelasticity in homogeneous modes (PHY-02 §5.6): nominal and Cauchy stresses for W(I1, I2) laws (Neo-Hooke,
  * Mooney-Rivlin, polynomial, reduced polynomial, Yeoh, Arruda-Boyce) and Ogden, strain energy, initial shear modulus, and the
@@ -89,9 +90,9 @@ export function nominalStress(law: ResolvedHyper, mode: HyperMode, lambda: numbe
   }
   const { i1, i2 } = invariantsOf(modeStretches(mode, lambda));
   const { W1, W2 } = law.derivatives(i1, i2);
-  if (mode === 'UT') return 2 * (lambda - lambda ** -2) * (W1 + W2 / lambda);
-  if (mode === 'ET') return 2 * (lambda - lambda ** -5) * (W1 + lambda * lambda * W2);
-  return 2 * (lambda - lambda ** -3) * (W1 + W2);
+  if (mode === 'UT') return 2 * (lambda - powInt(lambda, -2)) * (W1 + W2 / lambda);
+  if (mode === 'ET') return 2 * (lambda - powInt(lambda, -5)) * (W1 + lambda * lambda * W2);
+  return 2 * (lambda - powInt(lambda, -3)) * (W1 + W2);
 }
 
 /** Cauchy stresses with σ3 = 0 (free thickness / lateral direction) at the principal stretches of the mode. */
@@ -104,7 +105,7 @@ export function cauchyStresses(law: ResolvedHyper, stretches: readonly [number, 
   }
   const { i1, i2 } = invariantsOf(stretches);
   const { W1, W2 } = law.derivatives(i1, i2);
-  const diff = (x: number): number => 2 * W1 * (x * x - c * c) - 2 * W2 * (x ** -2 - c ** -2);
+  const diff = (x: number): number => 2 * W1 * (x * x - c * c) - 2 * W2 * (powInt(x, -2) - powInt(c, -2));
   return [diff(a), diff(b), 0];
 }
 

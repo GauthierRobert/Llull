@@ -2,6 +2,7 @@
 
 import type { CrackGeometry } from '@core/model/durability';
 import { convertValue, isUnitFailure } from '@lib/quantity';
+import { powInt } from '@lib/powInt';
 
 /** A crack in SI lengths with its K solution. */
 export type SolvedGeometry =
@@ -59,12 +60,12 @@ const secantBeta = (a: number, W: number): number => Math.sqrt(1 / Math.cos((Mat
 
 function tadaBeta(a: number, b: number): number {
   const x = (Math.PI * a) / (2 * b);
-  return (Math.sqrt(((2 * b) / (Math.PI * a)) * Math.tan(x)) * (0.752 + 2.02 * (a / b) + 0.37 * (1 - Math.sin(x)) ** 3)) / Math.cos(x);
+  return (Math.sqrt(((2 * b) / (Math.PI * a)) * Math.tan(x)) * (0.752 + 2.02 * (a / b) + 0.37 * powInt(1 - Math.sin(x), 3))) / Math.cos(x);
 }
 
 function polynomialBeta(a: number, b: number): number {
   const r = a / b;
-  return 1.122 - 0.231 * r + 10.55 * r ** 2 - 21.71 * r ** 3 + 30.382 * r ** 4;
+  return 1.122 - 0.231 * r + 10.55 * r ** 2 - 21.71 * powInt(r, 3) + 30.382 * powInt(r, 4);
 }
 
 /** Newman-Raju shape factor Q (a/c <= 1). */
@@ -78,7 +79,7 @@ export function newmanRajuF(aOverC: number, aOverT: number, cOverB: number, phi:
   const g = 1 + (0.1 + 0.35 * aOverT ** 2) * (1 - Math.sin(phi)) ** 2;
   const fPhi = (aOverC ** 2 * Math.cos(phi) ** 2 + Math.sin(phi) ** 2) ** 0.25;
   const fW = Math.sqrt(1 / Math.cos(((Math.PI * cOverB) / 2) * Math.sqrt(aOverT)));
-  return (m1 + m2 * aOverT ** 2 + m3 * aOverT ** 4) * g * fPhi * fW;
+  return (m1 + m2 * aOverT ** 2 + m3 * powInt(aOverT, 4)) * g * fPhi * fW;
 }
 
 /** Validity of the solution for `geometry` at its current size. */

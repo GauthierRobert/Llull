@@ -4,6 +4,7 @@
  */
 
 import { GRAVITY } from '../../shared/numeric';
+import { powInt } from '@lib/powInt';
 
 /** Carbon steel, the named default of `pipe_section_properties`. */
 export const STEEL_DENSITY_KG_M3 = 7850;
@@ -38,7 +39,7 @@ export function sectionProperties(input: SectionInput): SectionProperties | null
   const inside = d - 2 * t;
   const metalArea = Math.PI * (d - t) * t;
   const flowArea = (Math.PI / 4) * inside ** 2;
-  const secondMoment = (Math.PI / 64) * (d ** 4 - inside ** 4);
+  const secondMoment = (Math.PI / 64) * (powInt(d, 4) - powInt(inside, 4));
   const mass = (input.steelDensityKgM3 * metalArea) / 1e6;
   const content = (input.contentDensityKgM3 * flowArea) / 1e6;
   const insulation =

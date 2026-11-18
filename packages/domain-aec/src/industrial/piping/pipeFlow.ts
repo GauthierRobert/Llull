@@ -1,10 +1,16 @@
+import { powInt } from '@lib/powInt';
 /** Single-phase incompressible pipe flow: water properties, Colebrook-White friction, bend loss coefficients, material roughness. */
 
 /** Water density (kg/m³) at `celsius` (Kell 1975, 0..100 °C, atmospheric pressure). */
 export function waterDensity(celsius: number): number {
   const t = celsius;
   const numerator =
-    999.83952 + 16.945176 * t - 7.9870401e-3 * t ** 2 - 46.170461e-6 * t ** 3 + 105.56302e-9 * t ** 4 - 280.54253e-12 * t ** 5;
+    999.83952 +
+    16.945176 * t -
+    7.9870401e-3 * t ** 2 -
+    46.170461e-6 * powInt(t, 3) +
+    105.56302e-9 * powInt(t, 4) -
+    280.54253e-12 * powInt(t, 5);
   return numerator / (1 + 16.87985e-3 * t);
 }
 

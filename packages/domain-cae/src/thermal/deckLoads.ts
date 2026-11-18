@@ -8,6 +8,7 @@ import { appendAll, commentText, num, row } from '../decks/format';
 import { analysisLengthMetres } from '../shared/defaults';
 import { amplitudeName } from './deckNames';
 import { absoluteZeroOf, inScale, siOf } from './quantities';
+import { powInt } from '@lib/powInt';
 
 export type Blocks = { readonly lines: readonly string[] } | DeckRefusal;
 
@@ -67,7 +68,7 @@ function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: ThermalBcRecor
       return { lines: [head, keyword('CFLUX', record), row(nset, 11, siToSystem('power', siOf('power', bc.value), system))] };
     }
     case 'heat_generation': {
-      const volumeSi = (volumes.get(bc.entityId) ?? 0) * analysisLengthMetres(system) ** 3;
+      const volumeSi = (volumes.get(bc.entityId) ?? 0) * powInt(analysisLengthMetres(system), 3);
       if (bc.mode === 'density') {
         const density = siToSystem('generation', siOf('generation', bc.value), system);
         return { lines: [head, keyword('DFLUX', record), row(ctx.elset(bc.entityId), 'BF', density)] };

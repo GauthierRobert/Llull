@@ -1,3 +1,4 @@
+import { powInt } from '@lib/powInt';
 /**
  * NACA 4-digit and 5-digit 230-series airfoil ordinates, NACA Report 824 (Abbott, von Doenhoff, Stivers 1945) §II:
  * thickness yt = 5t(0.2969√x - 0.1260x - 0.3516x² + 0.2843x³ - a4 x⁴), a4 = 0.1015 (open TE) or 0.1036 (closed TE); surfaces offset
@@ -45,15 +46,20 @@ export function parseNaca(raw: string): NacaSection | string {
     const [m, k1] = line;
     const camber = (x: number): { y: number; slope: number } =>
       x < m
-        ? { y: (k1 / 6) * (x ** 3 - 3 * m * x * x + m * m * (3 - m) * x), slope: (k1 / 6) * (3 * x * x - 6 * m * x + m * m * (3 - m)) }
-        : { y: ((k1 * m ** 3) / 6) * (1 - x), slope: -(k1 * m ** 3) / 6 };
+        ? {
+            y: (k1 / 6) * (powInt(x, 3) - 3 * m * x * x + m * m * (3 - m) * x),
+            slope: (k1 / 6) * (3 * x * x - 6 * m * x + m * m * (3 - m)),
+          }
+        : { y: ((k1 * powInt(m, 3)) / 6) * (1 - x), slope: -(k1 * powInt(m, 3)) / 6 };
     return { designation: `NACA ${digits}`, maxThickness: t, camber };
   }
   return `"${raw}" is not a NACA 4-digit (e.g. 2412) or 5-digit (e.g. 23012) designation`;
 }
 
 export const thicknessAt = (x: number, t: number, closedTrailingEdge: boolean): number =>
-  5 * t * (0.2969 * Math.sqrt(x) - 0.126 * x - 0.3516 * x * x + 0.2843 * x ** 3 - (closedTrailingEdge ? 0.1036 : 0.1015) * x ** 4);
+  5 *
+  t *
+  (0.2969 * Math.sqrt(x) - 0.126 * x - 0.3516 * x * x + 0.2843 * powInt(x, 3) - (closedTrailingEdge ? 0.1036 : 0.1015) * powInt(x, 4));
 
 /**
  * Ordinates from the upper trailing edge round the leading edge to the lower trailing edge (Selig order), cosine spacing,

@@ -3,6 +3,7 @@
 import type { UnitSystem } from '@core/model/analysis';
 import type { CadDocument, DocumentUnit } from '@core/model/types';
 import { toMetres, toMm } from '@core/model/units';
+import { powInt } from '@lib/powInt';
 
 const KG_PER_SLINCH = 175.12683525;
 
@@ -73,9 +74,9 @@ export function toAnalysisLength(doc: Pick<CadDocument, 'units'>, unitSystem: Un
  * (N-mm-t-s: t/mm^3, N-m-kg-s: kg/m^3, lbf-in-slinch-s: slinch/in^3).
  */
 export function densityToAnalysis(density: number, documentUnit: DocumentUnit, unitSystem: UnitSystem): number {
-  const kgPerCubicMetre = (density * 1e-3) / toMetres({ units: documentUnit }, 1) ** 3;
+  const kgPerCubicMetre = (density * 1e-3) / powInt(toMetres({ units: documentUnit }, 1), 3);
   if (unitSystem === 'N-m-kg-s') return kgPerCubicMetre;
   return unitSystem === 'N-mm-t-s'
     ? kgPerCubicMetre * 1e-12
-    : (kgPerCubicMetre * FACTORS['lbf-in-slinch-s'].metresPerLength ** 3) / KG_PER_SLINCH;
+    : (kgPerCubicMetre * powInt(FACTORS['lbf-in-slinch-s'].metresPerLength, 3)) / KG_PER_SLINCH;
 }

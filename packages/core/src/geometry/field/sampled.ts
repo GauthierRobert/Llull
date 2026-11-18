@@ -8,6 +8,7 @@
  */
 
 import type { Vec3 } from '../../model/types';
+import { powInt } from '../../lib/powInt';
 
 export interface GridSamples {
   readonly kind: 'grid';
@@ -105,7 +106,7 @@ function prepareTets(mesh: TetSamples): SampledEvaluator {
     const c = Math.floor((v - (low[axis] as number)) / (size[axis] as number));
     return c < 0 ? 0 : c > resolution - 1 ? resolution - 1 : c;
   };
-  const buckets: number[][] = Array.from({ length: resolution ** 3 }, () => []);
+  const buckets: number[][] = Array.from({ length: powInt(resolution, 3) }, () => []);
   for (let t = 0; t < tetCount; t += 1) {
     const [lo, hi] = [
       [Infinity, Infinity, Infinity],

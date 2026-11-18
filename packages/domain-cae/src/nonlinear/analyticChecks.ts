@@ -2,6 +2,7 @@
 
 import { inputValue, inputValues, isInputProblem, type InputProblem, type InputSpec } from '../creep/inputs';
 import { SUPPORTS, elastica, momentRatio, plasticHinge, pressureAtPlasticRadius, thickCylinder } from './analyticFormulas';
+import { powInt } from '@lib/powInt';
 
 export const CHECKS = [
   'plastic_hinge_beam',
@@ -170,7 +171,7 @@ function imperfectColumn(inputs: Inputs): Result {
         key: 'I_mm4',
         message: 'input I_mm4 (mm^4), or b_mm and h_mm of a rectangle (weak axis), is missing',
       };
-    inertia = (Math.max(section.b_mm, section.h_mm) * Math.min(section.b_mm, section.h_mm) ** 3) / 12;
+    inertia = (Math.max(section.b_mm, section.h_mm) * powInt(Math.min(section.b_mm, section.h_mm), 3)) / 12;
   }
   const critical = (Math.PI ** 2 * v.E_MPa * inertia) / v.L_mm ** 2;
   const hasLoad = Object.hasOwn(inputs, 'P_N');

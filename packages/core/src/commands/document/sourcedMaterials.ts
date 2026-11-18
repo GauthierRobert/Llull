@@ -5,6 +5,7 @@
 
 import type { CadDocument, Material } from '../../model/types';
 import { toMetres } from '../../model/units';
+import { powInt } from '../../lib/powInt';
 
 interface SourcedMaterial {
   /** kg/m³. */
@@ -42,7 +43,7 @@ export function sourcedMaterial(doc: Pick<CadDocument, 'units'>, name: string): 
   if (entry === undefined) return null;
   return {
     name,
-    density: entry.densityKgPerM3 * 1000 * toMetres(doc, 1) ** 3,
+    density: entry.densityKgPerM3 * 1000 * powInt(toMetres(doc, 1), 3),
     densityUnit: 'kg/m^3',
     source: entry.source,
     grade: entry.grade,

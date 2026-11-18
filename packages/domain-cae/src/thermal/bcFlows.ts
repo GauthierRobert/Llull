@@ -8,6 +8,7 @@ import { analysisLengthMetres } from '../shared/defaults';
 import { amplitudeAt } from './amplitude';
 import { elementVolume, faceNodes, integrateFace, nodalWeights, type MeshIndex } from './meshGeometry';
 import { absoluteZeroOf, inScale, siOf } from './quantities';
+import { powInt } from '@lib/powInt';
 
 export interface FlowInputs {
   readonly thermal: ThermalSetup;
@@ -114,7 +115,7 @@ export function bcFlowW(inputs: FlowInputs, record: ThermalBcRecord, step: StepF
       return siOf('power', bc.value) * factor * nodes().length;
     case 'heat_generation': {
       if (bc.mode === 'total') return siOf('power', bc.value) * factor;
-      return siOf('generation', bc.value) * factor * (inputs.volumes.get(bc.entityId) ?? 0) * length ** 3;
+      return siOf('generation', bc.value) * factor * (inputs.volumes.get(bc.entityId) ?? 0) * powInt(length, 3);
     }
   }
 }
@@ -175,11 +176,11 @@ export function nodalLoadsW(inputs: FlowInputs, record: ThermalBcRecord, step: S
     case 'heat_generation': {
       const volume = inputs.volumes.get(bc.entityId) ?? 0;
       const density =
-        bc.mode === 'total' ? (volume > 0 ? siOf('power', bc.value) / (volume * length ** 3) : 0) : siOf('generation', bc.value);
+        bc.mode === 'total' ? (volume > 0 ? siOf('power', bc.value) / (volume * powInt(length, 3)) : 0) : siOf('generation', bc.value);
       for (const element of index.elements.values()) {
         if (element.entityId !== bc.entityId) continue;
         const weights = nodalWeights(element, elementVolume(index, element));
-        element.nodes.forEach((node, i) => add(node, density * factor * (weights[i] ?? 0) * length ** 3));
+        element.nodes.forEach((node, i) => add(node, density * factor * (weights[i] ?? 0) * powInt(length, 3)));
       }
       break;
     }

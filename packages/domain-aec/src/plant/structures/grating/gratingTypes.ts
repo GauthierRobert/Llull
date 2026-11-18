@@ -4,6 +4,7 @@
  */
 
 import { MM_PER_INCH, PSF_TO_KG_M2, PSI_TO_MPA } from './imperial';
+import { powInt } from '@lib/powInt';
 
 /** Standards the catalogue can be filtered by; the metric (RAL-GZ / EN) tables need two manufacturer sources first (spec Q3). */
 export const GRATING_STANDARDS = ['naamm_mbg_531'] as const;
@@ -89,6 +90,6 @@ export function sectionPerMetre(type: GratingType): { readonly modulus: number; 
   const bars = 1000 / type.barPitchMm;
   return {
     modulus: (bars * type.barThicknessMm * type.barDepthMm ** 2) / 6,
-    inertia: (bars * type.barThicknessMm * type.barDepthMm ** 3) / 12,
+    inertia: (bars * type.barThicknessMm * powInt(type.barDepthMm, 3)) / 12,
   };
 }

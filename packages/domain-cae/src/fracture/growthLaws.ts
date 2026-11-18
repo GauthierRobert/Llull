@@ -2,6 +2,7 @@
 
 import type { CrackGrowthMaterialModel } from '@core/model/materialDurability';
 import { convertValue, isUnitFailure } from '@lib/quantity';
+import { powInt } from '@lib/powInt';
 
 type Table = ReadonlyArray<{ readonly stressRatio: number; readonly points: ReadonlyArray<readonly [number, number]> }>;
 type Closure =
@@ -96,7 +97,7 @@ export function newmanClosure(R: number, alpha: number, smaxOverSigma0: number):
   const a1 = (0.415 - 0.071 * alpha) * smaxOverSigma0;
   const a3 = 2 * a0 + a1 - 1;
   const a2 = 1 - a0 - a1 - a3;
-  return R >= 0 ? Math.max(R, a0 + a1 * R + a2 * R ** 2 + a3 * R ** 3) : a0 + a1 * R;
+  return R >= 0 ? Math.max(R, a0 + a1 * R + a2 * R ** 2 + a3 * powInt(R, 3)) : a0 + a1 * R;
 }
 
 function closureValue(closure: Closure, R: number): number {

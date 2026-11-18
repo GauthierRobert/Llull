@@ -9,6 +9,7 @@ import type { ExchangerGeometry } from './exchangerFrame';
 import { thicknessAt } from './tankFrame';
 import type { MassPart } from './vesselMass';
 import { headSurfaceHeight, type VesselGeometry } from './vesselFrame';
+import { powInt } from '@lib/powInt';
 
 const annulus = (outer: number, inner: number): number => Math.PI * (outer * outer - inner * inner);
 
@@ -41,7 +42,7 @@ export function neckMassParts(
     const flange = annulus(nozzle.flange.outsideDiameter / 2, bore) * nozzle.flange.thickness;
     return {
       part: `nozzle ${nozzle.mark}`,
-      kg: (neck + flange) * scale ** 3 * density,
+      kg: (neck + flange) * powInt(scale, 3) * density,
       method:
         'neck annulus beyond the outside wall + flange as a bored disc (OD x thickness from the catalogue; hub and bolt holes ignored)',
     };

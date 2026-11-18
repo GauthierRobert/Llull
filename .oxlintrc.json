@@ -133,7 +133,8 @@
           {
             "max": 40
           }
-        ]
+        ],
+        "llull/no-integer-pow": "error"
       }
     },
     {
@@ -143,6 +144,14 @@
       ],
       "rules": {
         "llull/no-import-meta": "error"
+      }
+    },
+    {
+      "files": [
+        "packages/domain-dynamics/src/**/*.ts"
+      ],
+      "rules": {
+        "llull/no-integer-pow": "off"
       }
     },
     {

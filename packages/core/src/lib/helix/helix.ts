@@ -6,6 +6,7 @@ import type { NurbsCurveData } from '../nurbs/types';
 import { add3, cross3, distance3, dot3, len3, normalize3, scale3, sub3 } from '../vec3';
 import type { ScalarLaw } from '../law/types';
 import type { HelixDefinition } from './types';
+import { powInt } from '../powInt';
 
 const NODES: ReadonlyArray<readonly [number, number]> = [
   [0, 0.5688888888888889],
@@ -191,7 +192,7 @@ export function helixDifferentials(def: HelixDefinition): { curvatureRadiusMin: 
     const d2 = scale3(sub3(helixAt(def, theta + h).derivative, helixAt(def, theta - h).derivative), 1 / (2 * h));
     const d3 = scale3(sub3(add3(helixAt(def, theta + h).derivative, helixAt(def, theta - h).derivative), scale3(d1, 2)), 1 / (h * h));
     const c = cross3(d1, d2);
-    radiusMin = Math.min(radiusMin, len3(d1) ** 3 / Math.max(len3(c), 1e-300));
+    radiusMin = Math.min(radiusMin, powInt(len3(d1), 3) / Math.max(len3(c), 1e-300));
     torsionSum += dot3(c, d3) / Math.max(dot3(c, c), 1e-300);
   }
   return { curvatureRadiusMin: radiusMin, torsionMean: torsionSum / (samples + 1) };

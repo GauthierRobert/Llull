@@ -17,6 +17,7 @@ import { buildingConnectionSolids } from './evaluateConnections';
 import { appendConnections, findMomentJoints } from './connectionSupport';
 import { polygonArea } from '@lib/polygon';
 import { existingLevelIdParam } from '../../building/levelParams';
+import { powInt } from '@lib/powInt';
 
 /** Steel mass of a connection in kg: its modelled end plate(s) + haunch (half the rafter section per metre). */
 export function connectionMass(doc: Pick<CadDocument, 'units'>, building: BuildingModel, connection: MomentConnectionElement): number {
@@ -24,7 +25,7 @@ export function connectionMass(doc: Pick<CadDocument, 'units'>, building: Buildi
   const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
   const solids = buildingConnectionSolids(doc, building, connection);
   if (!profile || !solids) return 0;
-  const cubicMetres = (value: number): number => value / fromMm(doc, 1000) ** 3;
+  const cubicMetres = (value: number): number => value / powInt(fromMm(doc, 1000), 3);
   const plates = solids
     .filter((solid) => solid.part.startsWith('plate'))
     .reduce((sum, solid) => sum + Math.abs(polygonArea(solid.outline)) * solid.depth, 0);

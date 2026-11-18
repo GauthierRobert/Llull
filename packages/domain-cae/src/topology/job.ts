@@ -19,6 +19,7 @@ import { dofComponents, isMappingFailure, mapTarget, nodeSets, type MappedTarget
 import { densityOf, elasticOf } from './material';
 import { regionMasks, voxelsAroundNodes } from './regions';
 import { artifactGrid, domainTriangles, gridOver, insideMask, isGridRefusal, type TopologyGrid } from './voxel';
+import { powInt } from '@lib/powInt';
 
 interface TopologyLoadCase {
   readonly name: string;
@@ -326,7 +327,7 @@ export function buildTopologyJob(doc: CadDocument, study: TopologyStudy): Topolo
   const thicknessDoc = idealization?.kind === 'plane_stress' ? idealization.thickness : grid.thickness;
   const thickness = study.dimension === 2 ? thicknessDoc * lengthFactor : 1;
   const voxelAnalysis = study.voxel * lengthFactor;
-  const voxelVolume = study.dimension === 3 ? voxelAnalysis ** 3 : voxelAnalysis ** 2 * thickness;
+  const voxelVolume = study.dimension === 3 ? powInt(voxelAnalysis, 3) : voxelAnalysis ** 2 * thickness;
 
   const sets = nodeSets(grid, active);
   const supports = supportsOf(doc, study, analysisCase, grid, sets);

@@ -24,6 +24,7 @@ import { measureThickness } from '../../geometry/assemblyCheck/thickness';
 import { realiseJoint } from '../../geometry/assemblyCheck/jointRealisation';
 import { type PartScope, candidateIds, collectParts, scopedIds } from '../../geometry/assemblyParts';
 import { assemblyLinks, intentOf } from '../../geometry/assemblyGraph';
+import { powInt } from '../../lib/powInt';
 
 export interface AssemblyCheckParams extends PartScope {
   readonly clearanceMm?: number | undefined;
@@ -331,7 +332,7 @@ export function runAssemblyCheck(
   const extras = {
     parts: parts
       .filter((part) => subjects.has(part.id))
-      .map((part) => ({ id: part.id, volumeMm3: (validity.analyses.get(part.id)?.volume ?? 0) * mmPerUnit ** 3 })),
+      .map((part) => ({ id: part.id, volumeMm3: (validity.analyses.get(part.id)?.volume ?? 0) * powInt(mmPerUnit, 3) })),
     skipped2D,
     pairsChecked: candidates.length,
     ...(thicknessOn ? { geometryQueries: engine.provenance } : {}),

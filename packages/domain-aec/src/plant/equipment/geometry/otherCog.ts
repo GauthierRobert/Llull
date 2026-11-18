@@ -14,6 +14,7 @@ import { courseBottoms, roofRise, tankBase, tankLiquidVolume } from './tankFrame
 import { tankMass } from './tankMass';
 import { TEST_WATER_KG_PER_M3 } from './vesselMass';
 import { centreOf, type CogPart, type VesselCog } from './vesselCog';
+import { powInt } from '@lib/powInt';
 
 const NOZZLE_APPROXIMATION = 'each nozzle (neck + flange) is one lump at the middle between the wall point and the flange face';
 
@@ -62,7 +63,7 @@ export function exchangerCog(scale: number, template: ExchangerTemplate, nozzleL
   };
   const metal = mass.parts.map((part): CogPart => ({ part: part.part, kg: part.kg, at: [xOf(part.part), 0, datum] }));
   const empty = [...metal, ...nozzleLumps];
-  const cubic = scale ** 3;
+  const cubic = powInt(scale, 3);
   const bore = tubes.outsideDiameter - 2 * tubes.wallThickness;
   const tubesOutside = (tubes.count * Math.PI * tubes.outsideDiameter ** 2) / 4;
   const closedByCover = geometry.rear.closure === 'shell_cover';
@@ -129,7 +130,7 @@ export function tankCog(scale: number, template: TankTemplate, nozzleLumps: read
   const empty = [...metal, ...nozzleLumps];
   const liquid = (part: string, level: number, kgPerM3: number): CogPart => ({
     part,
-    kg: tankLiquidVolume(template, level) * scale ** 3 * kgPerM3,
+    kg: tankLiquidVolume(template, level) * powInt(scale, 3) * kgPerM3,
     at: [0, 0, base + level / 2],
   });
   const operating = [liquid('liquid design level', template.design.designLiquidLevel, template.design.specificGravity * 1000)];

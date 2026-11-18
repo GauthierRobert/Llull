@@ -14,6 +14,7 @@ import { helixCurve } from '../../lib/helix/helix';
 import { newEntity } from '../entity/newEntity';
 import { axisFrame } from '../solids/shared';
 import { toothAzimuth } from './knurlGeometry';
+import { powInt } from '../../lib/powInt';
 
 /**
  * Estimated native kernel time of a cut of `grooves` helical grooves that each turn `turns` times along the face (face length / lead), seconds: grooves x 2.3 x (turns / 0.184)^1.8. Fitted to the
@@ -69,7 +70,7 @@ export function helicalGrooveArea(shape: HelicalKnurl): number {
   const base = r - h;
   const cosBeta = Math.cos((shape.helixDeg * Math.PI) / 180);
   const gamma = Math.tan((shape.toothAngleDeg * Math.PI) / 360);
-  return ((2 * gamma) / (r * cosBeta)) * ((r ** 3 - base ** 3) / 3 - (base * (r * r - base * base)) / 2);
+  return ((2 * gamma) / (r * cosBeta)) * ((powInt(r, 3) - powInt(base, 3)) / 3 - (base * (r * r - base * base)) / 2);
 }
 
 /** Land left between adjacent grooves at the surface (circumferential), document units; negative when they overlap. */

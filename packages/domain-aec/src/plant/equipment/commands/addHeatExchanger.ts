@@ -6,6 +6,7 @@ import { refuse } from '../model';
 import { bundlePullLength, buildExchangerTemplate, exchangerShape } from './exchangerParams';
 import { isVesselIssue } from './vesselParams';
 import { commitNewEquipment, levelContext, locationParam, newEquipmentElement, placementShape } from './newEquipment';
+import { powInt } from '@lib/powInt';
 
 /**
  * @affects creates 1 equipment element (plant template 'exchanger') plus derived revolutions / boxes on layer Q-EQPM tagged element:<id>
@@ -45,7 +46,7 @@ export const addHeatExchanger = defineCommand({
     const { template } = built;
     const geometry = resolveExchanger(template);
     const volumes = exchangerVolumes(template, geometry);
-    const scale = toMetres(doc, 1) ** 3;
+    const scale = powInt(toMetres(doc, 1), 3);
     const pull = bundlePullLength(template, doc.units);
     const { element } = created;
     return commitNewEquipment(

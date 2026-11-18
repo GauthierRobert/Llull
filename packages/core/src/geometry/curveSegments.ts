@@ -8,6 +8,7 @@ import type { Vec2, Vec3 } from '../model/types';
 import { add3, cross3, distance3, dot3, len3, lerp3, normalize3, scale3, sub3 } from '../lib/vec3';
 import { angleFromCosine, positiveSweep } from '../lib/angle';
 import { ellipseIssue, ellipseLength, ellipseMinRadius, ellipsePoint, ellipseVelocity } from './ellipseSegment';
+import { powInt } from '../lib/powInt';
 
 type Point = Vec2 | Vec3;
 
@@ -332,7 +333,7 @@ export function minCurvatureRadius(segment: CurveSegment<Point>): number {
     const d1 = add3(add3(scale3(sub3(p1, p0), 3 * u * u), scale3(sub3(p2, p1), 6 * u * t)), scale3(sub3(p3, p2), 3 * t * t));
     const d2 = add3(scale3(add3(sub3(p2, scale3(p1, 2)), p0), 6 * u), scale3(add3(sub3(p3, scale3(p2, 2)), p1), 6 * t));
     const bend = len3(cross3(d1, d2));
-    if (bend > 1e-12) least = Math.min(least, len3(d1) ** 3 / bend);
+    if (bend > 1e-12) least = Math.min(least, powInt(len3(d1), 3) / bend);
   }
   return least;
 }

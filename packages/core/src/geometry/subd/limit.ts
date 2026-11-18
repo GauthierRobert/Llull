@@ -12,6 +12,7 @@ import { settleLevels } from './settle';
 import { levelQuadCount } from './volume';
 import { SHARP_MAX, edgeSharpnessMap, vertexRule, vertexSharpnessArray, type VertexRule } from './sharpness';
 import { type CageTopology, buildTopology, neighbourVertices, newellVector } from './topology';
+import { powInt } from '../../lib/powInt';
 
 /** A cage level prepared for evaluation. */
 export interface Level {
@@ -132,10 +133,10 @@ export function cageVertexLimits(cage: Cage, vertices: readonly number[]): Verte
 
 type Weights = [number, number, number, number];
 const BASIS = (t: number): Weights => [
-  (1 - t) ** 3 / 6,
-  (3 * t ** 3 - 6 * t ** 2 + 4) / 6,
-  (-3 * t ** 3 + 3 * t ** 2 + 3 * t + 1) / 6,
-  t ** 3 / 6,
+  powInt(1 - t, 3) / 6,
+  (3 * powInt(t, 3) - 6 * t ** 2 + 4) / 6,
+  (-3 * powInt(t, 3) + 3 * t ** 2 + 3 * t + 1) / 6,
+  powInt(t, 3) / 6,
 ];
 const BASIS_D1 = (t: number): Weights => [-((1 - t) ** 2) / 2, (3 * t ** 2 - 4 * t) / 2, (-3 * t ** 2 + 2 * t + 1) / 2, t ** 2 / 2];
 const BASIS_D2 = (t: number): Weights => [1 - t, 3 * t - 2, -3 * t + 1, t];

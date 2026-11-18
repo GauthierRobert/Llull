@@ -13,6 +13,7 @@ import { validateProfile, verticalCurves } from '../alignment/profileGeometry';
 import { stationText } from '../model';
 import { toMetres } from '@core/model/units';
 import { isTableRefusal, lookupConservative, type TableRefusal } from '../../shared/designTable';
+import { powInt } from '@lib/powInt';
 
 /** Comfort criterion: rate of change of lateral acceleration (m/s^3). */
 export const LATERAL_JERK = 0.6;
@@ -104,7 +105,7 @@ export function designChecks(doc: CadDocument, alignment: AlignmentObject, desig
     if (element.kind !== 'spiral') return [];
     const radiusM = toMetres(doc, Number.isFinite(element.radiusEnd) ? element.radiusEnd : element.radiusStart);
     const lengthM = toMetres(doc, element.length);
-    const minLengthM = designSpeedKmh ** 3 / (46.656 * LATERAL_JERK * radiusM);
+    const minLengthM = powInt(designSpeedKmh, 3) / (46.656 * LATERAL_JERK * radiusM);
     const station = stationText(doc, element.startStation);
     const ok = lengthM >= minLengthM - 1e-9;
     if (!ok) {

@@ -32,6 +32,7 @@ import {
 } from './runwayCheckModel';
 import { round, weightKnPerMetre } from '../../shared/numeric';
 import { GAMMA_CRANE } from '../../shared/loadFactors';
+import { powInt } from '@lib/powInt';
 
 export function checkBeam(
   beam: SteelMemberElement,
@@ -105,7 +106,7 @@ export function checkBeam(
 
   // EN 1993-6 §5.7.1, rail not rigidly fixed (Tab. 5.1 case b): Irf = Ir,worn + If,eff, separate inertias.
   const effectiveWidth = Math.min(profile.b, rail.foot + rail.height + profile.tf);
-  const flangeInertia = (effectiveWidth * profile.tf ** 3) / 12;
+  const flangeInertia = (effectiveWidth * powInt(profile.tf, 3)) / 12;
   const railFlangeInertia = RAIL_WEAR_INERTIA_FACTOR * rail.inertia + flangeInertia;
   const loadedLength = 3.25 * (railFlangeInertia / profile.tw) ** (1 / 3);
   const localStress = (GAMMA_CRANE * wheel) / (loadedLength * profile.tw);

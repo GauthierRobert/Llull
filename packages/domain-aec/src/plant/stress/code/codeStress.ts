@@ -11,6 +11,7 @@ import type { BuiltModel } from '../model/build';
 import type { OperatingConditions } from '../model/schema';
 import type { CaseState } from '../solve/run';
 import { computeAllowables } from './allowables';
+import { powInt } from '@lib/powInt';
 
 export interface StressRow {
   readonly case: string;
@@ -148,7 +149,7 @@ export function codeStresses({ built, conditions, states }: CodeStressInput): Co
       const od = element.odMm;
       const inner = od - 2 * wall;
       const area = (Math.PI / 4) * (od ** 2 - inner ** 2);
-      const pipeZ = (Math.PI / 32) * ((od ** 4 - inner ** 4) / od);
+      const pipeZ = (Math.PI / 32) * ((powInt(od, 4) - powInt(inner, 4)) / od);
       const pressure = state.pressureBar * BAR_TO_MPA;
       for (const s of stations(state.elementForces, index * 12, axes.length, local as [number, number, number])) {
         const node = s.end === null ? null : nodeId(s.end === 'a' ? element.a : element.b);
