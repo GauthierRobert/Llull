@@ -184,155 +184,135 @@ const failOutcome = (code: string, message: string, ids: readonly string[], data
   resolved: null,
 });
 
-/**
- * Select the part number, washers, length and protrusion for a stack.
- * @failure unknown family/size, no stack, out-of-range grip, unshimmable gap, short protrusion -> ok:false with coded reasons
- */
-export function runSelection(doc: CadDocument, p: SelectionParams): SelectionOutcome {
-  const base = accessory(doc, p.family, p.diameterDash);
-  if (isOutcome(base)) return base;
-  const { family, size } = base;
-  const mode =
-    family.lengthRule?.kind === 'stack_plus_k_d' ? 'rivet' : family.gripMode === 'max_grip_range' ? 'pin' : family.gripMode ? 'bolt' : null;
-  if (mode === null)
-    return refused('FAST_FAMILY_NOT_SELECTABLE', `family '${family.id}' (${family.kind}) has no grip or length rule`, [family.id]);
-  const stack = stackFrom(doc, p);
-  if (!stack.ok) return refused(stack.code, stack.message, stack.ids);
-  const work =
-    family.gripIncrement?.unit ?? (family.lengthRule?.kind === 'stack_plus_k_d' ? family.lengthRule.step.unit : size.nominalDiameter.unit);
-  const stackTicks = toTicks(stack.stackIn, 'in', work) ?? 0;
-  const codes = p.codes ?? {};
-  const common = { family: family.id, kind: family.kind, diameterDash: size.dash, stackIn: round6(stack.stackIn) };
-  const measuredLayers = stack.measured?.layers ?? [];
-  const layout = stack.measured === null ? {} : { stackSource: 'measured', layers: measuredLayers };
-  const warnings: Reason[] = [...stack.warnings];
+type Stack = Extract<StackInput, { readonly ok: true }>;
 
-  if (mode === 'rivet') {
-    const rule = family.lengthRule;
-    if (rule?.kind !== 'stack_plus_k_d') return refused('FAST_FAMILY_NOT_SELECTABLE', 'rivet rule missing', [family.id]);
-    const diameterTicks = toTicks(size.nominalDiameter.value, size.nominalDiameter.unit, work) ?? 0;
-    const stepTicks = toTicks(rule.step.value, rule.step.unit, work) ?? 1;
-    const length = selectRivetLength(stackTicks, diameterTicks, rule.k, stepTicks, p.rivetRounding ?? rule.round);
-    const part = partNumberOf(family, size, { lengthDash: length.lengthDash }, codes);
-    const diameterIn = ticksToInches(diameterTicks, work);
-    const rivet = {
-      rawLengthIn: ticksToInches(length.rawTicks, work),
-      shopHeadMinDiameterIn: 1.5 * diameterIn,
-      shopHeadMinHeightIn: 0.5 * diameterIn,
-    };
-    const lengthIn = ticksToInches(length.lengthTicks, work);
-    const data = {
-      ok: true,
-      ...common,
-      ...layout,
-      partNumber: part.text,
-      partNumberDefaultedCodes: part.defaulted,
-      lengthIn,
-      ...rivet,
-      minEdgeDistanceIn: 2 * diameterIn,
-      minPitchIn: 3 * diameterIn,
-      rules: rulesForRivet(family, diameterIn, p.rivetRounding),
-      reasons: [],
-      warnings: warnings.map(withRemediation),
-    };
-    const resolved: Resolved = {
-      family,
-      size,
-      partNumber: part.text,
-      mode,
-      lengthIn,
-      representativeLength: false,
-      washers: [],
-      washerSide: 'nut',
-      nut: null,
-      stackIn: stack.stackIn,
-      measured: stack.measured,
-    };
-    return { ok: true, data, failure: null, resolved };
-  }
+/** What the three selection modes share once family, size and stack are resolved. */
+interface Plan {
+  readonly p: SelectionParams;
+  readonly doc: CadDocument;
+  readonly family: FastenerFamily;
+  readonly size: FastenerSize;
+  readonly mode: Resolved['mode'];
+  readonly stack: Stack;
+  readonly work: string;
+  readonly stackTicks: number;
+  readonly codes: FieldValues;
+  readonly common: Record<string, unknown>;
+  readonly layout: Record<string, unknown>;
+  readonly warnings: Reason[];
+}
 
-  const gripTicks = toTicks(family.gripIncrement?.value ?? 0, family.gripIncrement?.unit ?? work, work) ?? 0;
-  const gripMin = family.availableGripDash?.min ?? 1;
-  const gripMax = family.availableGripDash?.max ?? Number.MAX_SAFE_INTEGER;
+const resolvedOf = (
+  plan: Plan,
+  partNumber: string,
+  rest: Pick<Resolved, 'lengthIn' | 'representativeLength' | 'washers' | 'nut'>,
+): Resolved => ({
+  family: plan.family,
+  size: plan.size,
+  partNumber,
+  mode: plan.mode,
+  washerSide: plan.p.washerSide ?? 'nut',
+  stackIn: plan.stack.stackIn,
+  measured: plan.stack.measured,
+  ...rest,
+});
 
-  if (mode === 'pin') {
-    const pin = selectMaxGripPin(stackTicks, gripTicks, gripMin, gripMax);
-    const part = partNumberOf(family, size, { gripDash: pin.gripDash }, codes);
-    const range = [ticksToInches(pin.rangeTicks[0], work), ticksToInches(pin.rangeTicks[1], work)];
-    const given = [p.nut, p.washer].filter((value) => value !== undefined);
-    if (given.length > 0 && pin.ok)
-      warnings.push({ code: 'FAST_PROTRUSION_UNKNOWN', message: 'collar/nut and washers are not selected for a maximum-grip pin family' });
-    const data = {
-      ok: pin.ok,
-      ...common,
-      ...layout,
-      partNumber: part.text,
-      partNumberDefaultedCodes: part.defaulted,
-      gripDash: pin.gripDash,
-      gripIn: range[1],
-      gripRangeIn: range,
-      rules: {},
-      reasons: pin.reasons.map(withRemediation),
-      warnings: warnings.map(withRemediation),
-    };
-    const first = pin.reasons[0];
-    if (!pin.ok && first) return failOutcome(first.code, first.message, [family.id], data);
-    const resolved: Resolved = {
-      family,
-      size,
-      partNumber: part.text,
-      mode,
-      lengthIn: range[1] ?? 0,
-      representativeLength: true,
-      washers: [],
-      washerSide: 'nut',
-      nut: null,
-      stackIn: stack.stackIn,
-      measured: stack.measured,
-    };
-    return { ok: true, data, failure: null, resolved };
-  }
-
+function rivetSelection(plan: Plan): SelectionOutcome {
+  const { p, family, size, work, stackTicks, codes, common, layout, warnings } = plan;
   const rule = family.lengthRule;
-  const threadLengthTicks =
-    rule?.kind === 'grip_plus_thread' && size.threadLength ? (toTicks(size.threadLength.value, size.threadLength.unit, work) ?? 0) : 0;
-  const nutBase = p.nut === undefined ? null : accessory(doc, p.nut, size.dash);
-  if (nutBase !== null && isOutcome(nutBase)) return nutBase;
-  const washerBase = p.washer === undefined ? null : accessory(doc, p.washer, size.dash);
-  if (washerBase !== null && isOutcome(washerBase)) return washerBase;
+  if (rule?.kind !== 'stack_plus_k_d') return refused('FAST_FAMILY_NOT_SELECTABLE', 'rivet rule missing', [family.id]);
+  const diameterTicks = toTicks(size.nominalDiameter.value, size.nominalDiameter.unit, work) ?? 0;
+  const stepTicks = toTicks(rule.step.value, rule.step.unit, work) ?? 1;
+  const length = selectRivetLength(stackTicks, diameterTicks, rule.k, stepTicks, p.rivetRounding ?? rule.round);
+  const part = partNumberOf(family, size, { lengthDash: length.lengthDash }, codes);
+  const diameterIn = ticksToInches(diameterTicks, work);
+  const rivet = {
+    rawLengthIn: ticksToInches(length.rawTicks, work),
+    shopHeadMinDiameterIn: 1.5 * diameterIn,
+    shopHeadMinHeightIn: 0.5 * diameterIn,
+  };
+  const lengthIn = ticksToInches(length.lengthTicks, work);
+  const data = {
+    ok: true,
+    ...common,
+    ...layout,
+    partNumber: part.text,
+    partNumberDefaultedCodes: part.defaulted,
+    lengthIn,
+    ...rivet,
+    minEdgeDistanceIn: 2 * diameterIn,
+    minPitchIn: 3 * diameterIn,
+    rules: rulesForRivet(family, diameterIn, p.rivetRounding),
+    reasons: [],
+    warnings: warnings.map(withRemediation),
+  };
+  const resolved = resolvedOf(plan, part.text, { lengthIn, representativeLength: false, washers: [], nut: null });
+  return { ok: true, data, failure: null, resolved };
+}
+
+/** Grip increment and the available grip-dash window of the family, in work ticks. */
+function gripWindow(family: FastenerFamily, work: string): { gripTicks: number; gripMin: number; gripMax: number } {
+  return {
+    gripTicks: toTicks(family.gripIncrement?.value ?? 0, family.gripIncrement?.unit ?? work, work) ?? 0,
+    gripMin: family.availableGripDash?.min ?? 1,
+    gripMax: family.availableGripDash?.max ?? Number.MAX_SAFE_INTEGER,
+  };
+}
+
+function pinSelection(plan: Plan): SelectionOutcome {
+  const { p, family, size, work, stackTicks, codes, common, layout, warnings } = plan;
+  const { gripTicks, gripMin, gripMax } = gripWindow(family, work);
+  const pin = selectMaxGripPin(stackTicks, gripTicks, gripMin, gripMax);
+  const part = partNumberOf(family, size, { gripDash: pin.gripDash }, codes);
+  const range = [ticksToInches(pin.rangeTicks[0], work), ticksToInches(pin.rangeTicks[1], work)];
+  const given = [p.nut, p.washer].filter((value) => value !== undefined);
+  if (given.length > 0 && pin.ok)
+    warnings.push({ code: 'FAST_PROTRUSION_UNKNOWN', message: 'collar/nut and washers are not selected for a maximum-grip pin family' });
+  const data = {
+    ok: pin.ok,
+    ...common,
+    ...layout,
+    partNumber: part.text,
+    partNumberDefaultedCodes: part.defaulted,
+    gripDash: pin.gripDash,
+    gripIn: range[1],
+    gripRangeIn: range,
+    rules: {},
+    reasons: pin.reasons.map(withRemediation),
+    warnings: warnings.map(withRemediation),
+  };
+  const first = pin.reasons[0];
+  if (!pin.ok && first) return failOutcome(first.code, first.message, [family.id], data);
+  const resolved = resolvedOf(plan, part.text, { lengthIn: range[1] ?? 0, representativeLength: true, washers: [], nut: null });
+  return { ok: true, data, failure: null, resolved };
+}
+
+type BoltSelection = ReturnType<typeof selectBolt>;
+
+interface BoltParts {
+  readonly nutBase: Accessory | null;
+  readonly nutPart: string | null;
+  readonly washerBase: Accessory | null;
+  readonly washers: PlacedWasher[];
+}
+
+/** The bolt data record (key order is the contract) for a finished bolt selection. */
+function boltData(
+  plan: Plan,
+  selection: BoltSelection,
+  parts: BoltParts,
+  part: { text: string; defaulted: string[] },
+): Record<string, unknown> {
+  const { p, work, common, layout, warnings } = plan;
+  const { nutBase, nutPart, washers } = parts;
   const maxWasherGiven = p.maxWasherTotal !== undefined;
   const maxWasherIn = p.maxWasherTotal === undefined ? { value: 0.125, unit: 'in' } : p.maxWasherTotal;
-  const maxWasherTicks = toTicks(maxWasherIn.value, maxWasherIn.unit, work) ?? 0;
-  const pitchTicks = size.threadsPerInch === undefined ? null : toTicks(1 / size.threadsPerInch, 'in', work);
-  const options = washerBase === null ? null : washerOptions(washerBase.size, work);
-  const selection = selectBolt({
-    stackTicks,
-    gripTicks,
-    gripMin,
-    gripMax,
-    threadLengthTicks,
-    washerOptions: options,
-    maxWasherTicks,
-    nutHeightMaxTicks: nutBase === null ? null : dimensionTicks(nutBase.size, 'height', work),
-    pitchTicks,
-    nutGiven: nutBase !== null,
-  });
-  const part = partNumberOf(family, size, { gripDash: selection.gripDash }, codes);
-  const nutPart = nutBase === null ? null : (nutBase.size.partNumber ?? partNumberOf(nutBase.family, nutBase.size, {}, codes).text);
-  const washers: PlacedWasher[] =
-    washerBase === null
-      ? []
-      : selection.washers.map((ticks) => ({
-          partNumber: washerLabel(washerBase.family, washerBase.size, ticks, work),
-          thicknessIn: ticksToInches(ticks, work),
-        }));
   const washerTotalIn = ticksToInches(
     selection.washers.reduce((sum, value) => sum + value, 0),
     work,
   );
-  const allWarnings = [...warnings, ...selection.warnings];
   const protrusion = selection.protrusion;
-  const data = {
+  return {
     ok: selection.ok,
     ...common,
     ...layout,
@@ -371,22 +351,87 @@ export function runSelection(doc: CadDocument, p: SelectionParams): SelectionOut
       minProtrusion: { value: '1 thread pitch beyond nut max height', source: PROTRUSION_SOURCE, defaulted: true },
     },
     reasons: selection.reasons.map(withRemediation),
-    warnings: allWarnings.map(withRemediation),
+    warnings: [...warnings, ...selection.warnings].map(withRemediation),
   };
+}
+
+function boltSelection(plan: Plan): SelectionOutcome {
+  const { p, doc, family, size, work, stackTicks, codes } = plan;
+  const { gripTicks, gripMin, gripMax } = gripWindow(family, work);
+  const rule = family.lengthRule;
+  const threadLengthTicks =
+    rule?.kind === 'grip_plus_thread' && size.threadLength ? (toTicks(size.threadLength.value, size.threadLength.unit, work) ?? 0) : 0;
+  const nutBase = p.nut === undefined ? null : accessory(doc, p.nut, size.dash);
+  if (nutBase !== null && isOutcome(nutBase)) return nutBase;
+  const washerBase = p.washer === undefined ? null : accessory(doc, p.washer, size.dash);
+  if (washerBase !== null && isOutcome(washerBase)) return washerBase;
+  const maxWasherIn = p.maxWasherTotal === undefined ? { value: 0.125, unit: 'in' } : p.maxWasherTotal;
+  const maxWasherTicks = toTicks(maxWasherIn.value, maxWasherIn.unit, work) ?? 0;
+  const pitchTicks = size.threadsPerInch === undefined ? null : toTicks(1 / size.threadsPerInch, 'in', work);
+  const options = washerBase === null ? null : washerOptions(washerBase.size, work);
+  const selection = selectBolt({
+    stackTicks,
+    gripTicks,
+    gripMin,
+    gripMax,
+    threadLengthTicks,
+    washerOptions: options,
+    maxWasherTicks,
+    nutHeightMaxTicks: nutBase === null ? null : dimensionTicks(nutBase.size, 'height', work),
+    pitchTicks,
+    nutGiven: nutBase !== null,
+  });
+  const part = partNumberOf(family, size, { gripDash: selection.gripDash }, codes);
+  const nutPart = nutBase === null ? null : (nutBase.size.partNumber ?? partNumberOf(nutBase.family, nutBase.size, {}, codes).text);
+  const washers: PlacedWasher[] =
+    washerBase === null
+      ? []
+      : selection.washers.map((ticks) => ({
+          partNumber: washerLabel(washerBase.family, washerBase.size, ticks, work),
+          thicknessIn: ticksToInches(ticks, work),
+        }));
+  const data = boltData(plan, selection, { nutBase, nutPart, washerBase, washers }, part);
   const first = selection.reasons[0];
   if (!selection.ok && first) return failOutcome(first.code, first.message, [family.id], data);
-  const resolved: Resolved = {
-    family,
-    size,
-    partNumber: part.text,
-    mode,
+  const resolved = resolvedOf(plan, part.text, {
     lengthIn: ticksToInches(selection.lengthTicks, work),
     representativeLength: false,
     washers,
-    washerSide: p.washerSide ?? 'nut',
     nut: nutBase === null || nutPart === null ? null : { partNumber: nutPart, family: nutBase.family, size: nutBase.size },
-    stackIn: stack.stackIn,
-    measured: stack.measured,
-  };
+  });
   return { ok: true, data, failure: null, resolved };
+}
+
+/**
+ * Select the part number, washers, length and protrusion for a stack.
+ * @failure unknown family/size, no stack, out-of-range grip, unshimmable gap, short protrusion -> ok:false with coded reasons
+ */
+export function runSelection(doc: CadDocument, p: SelectionParams): SelectionOutcome {
+  const base = accessory(doc, p.family, p.diameterDash);
+  if (isOutcome(base)) return base;
+  const { family, size } = base;
+  const mode =
+    family.lengthRule?.kind === 'stack_plus_k_d' ? 'rivet' : family.gripMode === 'max_grip_range' ? 'pin' : family.gripMode ? 'bolt' : null;
+  if (mode === null)
+    return refused('FAST_FAMILY_NOT_SELECTABLE', `family '${family.id}' (${family.kind}) has no grip or length rule`, [family.id]);
+  const stack = stackFrom(doc, p);
+  if (!stack.ok) return refused(stack.code, stack.message, stack.ids);
+  const work =
+    family.gripIncrement?.unit ?? (family.lengthRule?.kind === 'stack_plus_k_d' ? family.lengthRule.step.unit : size.nominalDiameter.unit);
+  const measuredLayers = stack.measured?.layers ?? [];
+  const plan: Plan = {
+    p,
+    doc,
+    family,
+    size,
+    mode,
+    stack,
+    work,
+    stackTicks: toTicks(stack.stackIn, 'in', work) ?? 0,
+    codes: p.codes ?? {},
+    common: { family: family.id, kind: family.kind, diameterDash: size.dash, stackIn: round6(stack.stackIn) },
+    layout: stack.measured === null ? {} : { stackSource: 'measured', layers: measuredLayers },
+    warnings: [...stack.warnings],
+  };
+  return mode === 'rivet' ? rivetSelection(plan) : mode === 'pin' ? pinSelection(plan) : boltSelection(plan);
 }

@@ -131,7 +131,7 @@
         "complexity": [
           "error",
           {
-            "max": 79
+            "max": 59
           }
         ]
       }

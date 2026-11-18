@@ -1,22 +1,17 @@
 /** create_analysis / delete_analysis / describe_analysis: the lifecycle of an analysis case. */
 
-import { round6 } from '@lib/compactNumber';
-import type { AnalysisCase, AnalysisType, FactorSet, ThermoMechSetup } from '@core/model/analysis';
+import type { AnalysisCase } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
-import { nextId } from '@lib/id';
 import { analysisInputHash } from '../hash/inputHash';
 import { eigenSummaryText } from '../results/summary';
 import { trustedRecord, type Trust } from '../shared/trust';
-import { analysisOf, caseOf, withCase, withoutCase } from '../shared/access';
+import { analysisOf, caseOf, withoutCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
-import { loadCaseNameProblem } from '../shared/names';
-import { DEFAULT_FACTORS, defaultMeshControls, emptyThermalSetup, unitSystemOf } from '../shared/defaults';
 import { analysisIdSchema, quantitySchema } from '../shared/schemas';
-import { temperatureProblem } from '../shared/quantity';
-import { isDynamicType } from '../dynamics/quantities';
+import { createdAnalysis, createRefusal } from './analysisCreate';
 
 const ANALYSIS_TYPES = [
   'static',
@@ -33,27 +28,6 @@ const ANALYSIS_TYPES = [
   'explicit_dynamics',
   'am_build_distortion',
 ] as const;
-const BUILT: ReadonlySet<AnalysisType> = new Set([
-  'static',
-  'modal',
-  'buckling',
-  'heat_steady',
-  'heat_transient',
-  'thermo_static',
-  'coupled_temperature_displacement',
-  'nonlinear_static',
-  'creep',
-  'frequency_response',
-  'random_response',
-  'explicit_dynamics',
-  'am_build_distortion',
-]);
-/** Modes extracted for a dynamic case given only fMaxHz (the 05 cap); only the modes up to fMaxHz are used. */
-const DYNAMIC_MODES_FOR_FMAX = 100;
-const isThermal = (type: AnalysisType): boolean => type === 'heat_steady' || type === 'heat_transient';
-/** Types that carry a ThermoMechSetup (stress-free reference temperature). */
-const hasThermoMech = (type: AnalysisType): boolean => type === 'thermo_static' || type === 'coupled_temperature_displacement';
-
 const factorsSchema = z.object({
   ultimate: z.number().describe('Ultimate factor on limit loads (14 CFR 25.303 uses 1.5). Must be >= 1.'),
   yield: z.number().describe('Yield factor (1.0 = no detrimental permanent deformation at limit). Must be >= 1.'),
@@ -68,22 +42,6 @@ const factorsSchema = z.object({
     .optional()
     .describe('Additional multiplicative factors, each with a justification.'),
 });
-
-function factorProblem(input: z.output<typeof factorsSchema>): string | null {
-  const { ultimate, yield: yieldFactor, extra = [] } = input;
-  if (!(ultimate >= 1) || !(yieldFactor >= 1)) return 'ultimate and yield factors must be >= 1';
-  const bad = extra.find((factor) => !(factor.value >= 1) || factor.justification.trim() === '' || factor.name.trim() === '');
-  return bad === undefined ? null : `extra factor '${bad.name}' needs name, value >= 1 and a justification`;
-}
-
-function bandValid(band: { readonly min?: number | undefined; readonly max?: number | undefined }): boolean {
-  const { min, max } = band;
-  if (min === undefined && max === undefined) return false;
-  if (min !== undefined && !(Number.isFinite(min) && min >= 0)) return false;
-  return max === undefined || (Number.isFinite(max) && max > (min ?? 0));
-}
-
-const plain = (value: number): string => String(round6(value));
 
 /**
  * @affects doc.analysis.cases (adds 1 case; affected: [analysisId])
@@ -175,138 +133,9 @@ export const createAnalysis = defineCommand({
       ),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (code: string, message: string, ids: readonly string[] = [], paths: readonly string[] = []): CommandResult =>
-      refuseCode(doc, 'create_analysis', code, message, ids, paths);
-    const { name, analysisType: type, referenceTemperature, loadCaseName, temperatureScale } = params;
-    if (!BUILT.has(type)) return fail('FEA_ANALYSIS_TYPE_UNSUPPORTED', `analysisType '${type}' is not built`, [], ['analysisType']);
-    const solver = params.solver ?? (type === 'explicit_dynamics' ? 'llull_explicit' : 'calculix');
-    if ((type === 'explicit_dynamics') !== (solver === 'llull_explicit'))
-      return fail(
-        'EXP_SOLVER_UNSUPPORTED',
-        `solver '${solver}' cannot run a '${type}' analysis (explicit_dynamics: llull_explicit; others: calculix)`,
-        [],
-        ['solver'],
-      );
-    if (type === 'am_build_distortion' && solver !== 'calculix')
-      return fail(
-        'PRC_SOLVER_UNSUPPORTED',
-        `solver '${solver}' cannot run an am_build_distortion analysis (calculix only)`,
-        [],
-        ['solver'],
-      );
-    if (type === 'creep' && solver !== 'calculix')
-      return fail('CRP_SOLVER_UNSUPPORTED', `solver '${solver}' cannot run a creep analysis (calculix only)`, [], ['solver']);
-    const unitSystem = unitSystemOf(doc.units);
-    if (params.unitSystem !== undefined && params.unitSystem !== unitSystem)
-      return fail(
-        'FEA_UNITS_MISMATCH',
-        `unitSystem '${params.unitSystem}' disagrees with document unit '${doc.units}' (${unitSystem})`,
-        [],
-        ['unitSystem'],
-      );
-    const thermalUse = isThermal(type) || hasThermoMech(type);
-    if (temperatureScale !== undefined && !thermalUse)
-      return fail('FEA_PARAM_NOT_APPLICABLE', `temperatureScale does not apply to a '${type}' analysis`, [], ['temperatureScale']);
-    if ((referenceTemperature !== undefined || loadCaseName !== undefined) && !hasThermoMech(type))
-      return fail(
-        'FEA_PARAM_NOT_APPLICABLE',
-        `referenceTemperature / loadCaseName apply to thermo_static and coupled_temperature_displacement only`,
-        [],
-        ['referenceTemperature'],
-      );
-    if (hasThermoMech(type) && referenceTemperature === undefined)
-      return fail('TMC_REFERENCE_TEMPERATURE_MISSING', `a ${type} analysis needs referenceTemperature`, [], ['referenceTemperature']);
-    const temperature = referenceTemperature === undefined ? null : temperatureProblem(referenceTemperature);
-    if (temperature !== null) return fail('THM_UNITS_MISMATCH', temperature, [], ['referenceTemperature']);
-    const caseNameProblem = loadCaseName === undefined ? null : loadCaseNameProblem(loadCaseName);
-    if (caseNameProblem !== null) return fail('FEA_LOAD_INVALID', caseNameProblem, [], ['loadCaseName']);
-    const factorError = params.factors === undefined ? null : factorProblem(params.factors);
-    if (factorError !== null) return fail('FEA_FACTOR_INVALID', factorError, [], ['factors']);
-    if (params.factor !== undefined && params.factors !== undefined)
-      return fail('FEA_FACTOR_INVALID', 'give either factor (one number) or factors { ultimate, yield }, not both', [], ['factor']);
-    if (params.factor !== undefined && !(params.factor >= 1))
-      return fail('FEA_FACTOR_INVALID', `factor ${params.factor} must be a number >= 1`, [], ['factor']);
-    const dynamic = isDynamicType(type);
-    const eigen = type === 'modal' || type === 'buckling' || dynamic;
-    if (params.modes !== undefined && !eigen)
-      return fail('FEA_PARAM_NOT_APPLICABLE', `modes applies to modal, buckling and dynamic analyses only, not ${type}`, [], ['modes']);
-    if (params.fMaxHz !== undefined && !dynamic)
-      return fail('FEA_PARAM_NOT_APPLICABLE', `fMaxHz applies to frequency_response and random_response only, not ${type}`, [], ['fMaxHz']);
-    if (dynamic && params.modes === undefined && params.fMaxHz === undefined)
-      return fail('DYN_BASIS_MISSING', `a ${type} analysis needs modes or fMaxHz (the modal basis has no default)`, [], ['modes']);
-    if (params.fMaxHz !== undefined && !(params.fMaxHz > 0 && Number.isFinite(params.fMaxHz)))
-      return fail('FEA_PARAM_INVALID', `fMaxHz ${params.fMaxHz} must be > 0`, [], ['fMaxHz']);
-    if (params.modes !== undefined && !(params.modes >= 1 && params.modes <= 100))
-      return fail('FEA_PARAM_INVALID', `modes ${params.modes} must be an integer from 1 to 100`, [], ['modes']);
-    const band = params.frequencyRangeHz;
-    if (band !== undefined && type !== 'modal')
-      return fail('FEA_PARAM_NOT_APPLICABLE', `frequencyRangeHz applies to modal analyses only, not ${type}`, [], ['frequencyRangeHz']);
-    if (band !== undefined && !bandValid(band))
-      return fail(
-        'FEA_PARAM_INVALID',
-        'frequencyRangeHz needs min and / or max (finite), min >= 0 and max > min',
-        [],
-        ['frequencyRangeHz'],
-      );
-
-    const scale = temperatureScale ?? 'degC';
-    const factors: FactorSet =
-      params.factor !== undefined
-        ? { ultimate: params.factor, yield: params.factor, extra: [] }
-        : params.factors === undefined
-          ? DEFAULT_FACTORS
-          : { ultimate: params.factors.ultimate, yield: params.factors.yield, extra: params.factors.extra ?? [] };
-    const modes = params.modes ?? (type === 'modal' ? 6 : type === 'buckling' ? 3 : dynamic ? DYNAMIC_MODES_FOR_FMAX : undefined);
-    const thermomech: ThermoMechSetup | undefined =
-      hasThermoMech(type) && referenceTemperature !== undefined
-        ? {
-            referenceTemperature,
-            temperatureScale: scale,
-            loadCaseName: loadCaseName ?? 'thermal',
-            ...(type === 'coupled_temperature_displacement' ? { thermal: emptyThermalSetup(scale) } : {}),
-          }
-        : undefined;
-    const mesh = defaultMeshControls(doc.units);
-    const id = nextId('an');
-    const analysisCase: AnalysisCase = {
-      id,
-      name,
-      type,
-      solver,
-      unitSystem,
-      ...(modes !== undefined ? { modes } : {}),
-      ...(band !== undefined
-        ? {
-            frequencyRangeHz: {
-              ...(band.min !== undefined ? { min: band.min } : {}),
-              ...(band.max !== undefined ? { max: band.max } : {}),
-            },
-          }
-        : {}),
-      factors,
-      parts: {},
-      constraints: {},
-      constraintOrder: [],
-      loads: {},
-      loadOrder: [],
-      mesh,
-      probes: {},
-      dispositions: {},
-      ...(isThermal(type) ? { thermal: emptyThermalSetup(scale) } : {}),
-      ...(thermomech !== undefined ? { thermomech } : {}),
-      ...(dynamic ? { dynamics: { basis: params.fMaxHz !== undefined ? { fMaxHz: params.fMaxHz } : {} } } : {}),
-    };
-    const stated = params.factor !== undefined || params.factors !== undefined;
-    const extraNote = factors.extra.length > 0 ? ` + ${factors.extra.length} extra` : '';
-    const factorNote = `safety factors ultimate ${plain(factors.ultimate)}, yield ${plain(factors.yield)}${extraNote} (${stated ? 'set by the caller' : 'DEFAULT 14 CFR 25.303 - pass factor/factors if the user states another safety factor'})`;
-    const modesNote =
-      modes === undefined ? '' : `, ${modes} mode(s)${band === undefined ? '' : ` in ${band.min ?? 0}-${band.max ?? 'inf'} Hz`}`;
-    const scaleNote = thermalUse ? `, temperatureScale ${scale}${temperatureScale === undefined ? ' (default)' : ''}` : '';
-    return changed(
-      withCase(doc, analysisCase),
-      `create_analysis: '${id}' (${name}) — ${type}, ${solver}, ${unitSystem}${modesNote}${scaleNote}; ${isThermal(type) && !stated ? '' : `${factorNote}; `}mesh default tet order ${mesh.order} globalSize ${plain(mesh.globalSize)} ${doc.units}; no parts yet (next: set_part_idealization).`,
-      [id],
-    );
+    const refused = createRefusal(params, doc.units);
+    if (refused !== null) return refuseCode(doc, 'create_analysis', refused.code, refused.message, [], refused.paths);
+    return createdAnalysis(doc, params);
   },
 });
 

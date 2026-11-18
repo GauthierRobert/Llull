@@ -1,6 +1,8 @@
 /** set_motor_drive: how a datasheet motor is commanded (dc: voltage, torque, velocity, position, prescribed; pmsm: torque, velocity, position, prescribed; stepper: step position / rate; induction: supply voltage and frequency). */
 
-import type { CommandResult } from '@core/commands/types';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
+import type { DynamicsModel } from '@core/model/dynamics';
+import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed, codedRejection, failer } from '@core/commands/noop';
 import { compileProfile, isAngularUnit, isProfileRefusal } from '@core/geometry/motionProfile';
@@ -53,6 +55,131 @@ const QUANTITY: Readonly<Record<MotorDrive['mode'], readonly string[]>> = {
   prescribed: ['position', 'velocity'],
   frequency: ['frequency'],
 };
+
+interface DriveInput extends MotorDriveParams {
+  readonly motor: string;
+  readonly mode: MotorDrive['mode'];
+  readonly profile?: string | undefined;
+  readonly gains?: { readonly kp: number; readonly ki?: number | undefined; readonly kpPosition?: number | undefined } | undefined;
+  readonly tune?: { readonly bandwidthHz: number; readonly dampingRatio: number } | undefined;
+}
+
+interface Rejecters {
+  readonly fail: (why: string) => CommandResult;
+  readonly refuse: (code: string, message: string, ids?: readonly string[]) => CommandResult;
+}
+
+function modeProblem({ fail, refuse }: Rejecters, params: DriveInput, motor: DatasheetMotor): CommandResult | null {
+  const { mode } = params;
+  if (!DRIVE_MODES_BY_KIND[motor.kind].includes(mode))
+    return refuse('DRV_MODE_UNSUPPORTED', `a ${motor.kind} motor takes ${DRIVE_MODES_BY_KIND[motor.kind].join(', ')}, not '${mode}'`, [
+      motor.id,
+    ]);
+  const unused = NOT_APPLICABLE[motor.kind].find((field) => params[field] !== undefined);
+  return unused === undefined ? null : fail(`'${unused}' does not apply to a ${motor.kind} motor`);
+}
+
+function combinationProblem({ fail, refuse }: Rejecters, params: DriveInput, motor: DatasheetMotor): CommandResult | null {
+  const { mode } = params;
+  if (mode === 'voltage' && params.volts === undefined && params.profile === undefined)
+    return fail('voltage mode needs `volts` or a voltage `profile`');
+  if (mode === 'frequency' && (params.volts !== undefined || params.frequencyHz !== undefined))
+    return fail('frequency mode follows a frequency profile at constant V/f: volts and frequencyHz do not apply');
+  if (mode === 'voltage' && motor.kind === 'induction' && params.frequencyHz === undefined)
+    return fail('induction voltage mode needs `frequencyHz` (the supply frequency)');
+  if (mode === 'voltage' && params.volts !== undefined && params.profile !== undefined) return fail('give `volts` or `profile`, not both');
+  if (mode !== 'voltage' && params.profile === undefined) return refuse('DRV_PROFILE_INVALID', `${mode} mode needs a profile`);
+  return null;
+}
+
+function profileProblem({ refuse }: Rejecters, params: DriveInput, dynamics: DynamicsModel): CommandResult | null {
+  if (params.profile === undefined) return null;
+  const { mode } = params;
+  const profile = dynamics.profiles?.[params.profile];
+  if (profile === undefined) return refuse('DRV_PROFILE_INVALID', `profile '${params.profile}' not found (add_motion_profile first)`);
+  if (!QUANTITY[mode].includes(profile.quantity))
+    return refuse(
+      'DRV_PROFILE_INVALID',
+      `${mode} mode needs a ${QUANTITY[mode].join(' or ')} profile, '${profile.id}' is ${profile.quantity}`,
+    );
+  if ((profile.quantity === 'position' || profile.quantity === 'velocity') && !isAngularUnit(profile.unit))
+    return refuse(
+      'DRV_PROFILE_INVALID',
+      `profile '${profile.id}' is in '${profile.unit}'; a revolute joint needs an angular unit (rad, deg, rev, rad/s, rpm, deg/s)`,
+    );
+  const compiled = compileProfile(profile);
+  return isProfileRefusal(compiled) ? refuse(compiled.code, `profile '${profile.id}': ${compiled.error}`) : null;
+}
+
+function controlProblem({ fail, refuse }: Rejecters, params: DriveInput, motor: DatasheetMotor): CommandResult | null {
+  const { mode } = params;
+  const closedLoop = (motor.kind === 'dc' || motor.kind === 'pmsm') && (mode === 'velocity' || mode === 'position');
+  if (!closedLoop) return null;
+  if (params.sampleHz === undefined) return refuse('DRV_CONTROL_RATE', `${mode} mode needs sampleHz`);
+  if ((params.gains === undefined) === (params.tune === undefined)) return fail('give exactly one of `gains` and `tune`');
+  if (mode === 'position' && params.gains !== undefined && params.gains.kpPosition === undefined)
+    return fail('position mode with explicit gains needs gains.kpPosition > 0');
+  if (params.tune === undefined) return null;
+  const ratio = (2 * Math.PI * params.tune.bandwidthHz) / params.sampleHz;
+  return ratio > MAX_BANDWIDTH_PER_RATE
+    ? refuse(
+        'DRV_CONTROL_RATE',
+        `omega_c * T_s = ${ratio.toPrecision(3)} exceeds ${MAX_BANDWIDTH_PER_RATE} (bandwidth ${params.tune.bandwidthHz} Hz at ${params.sampleHz} Hz)`,
+      )
+    : null;
+}
+
+function inertiaProblem(
+  { refuse }: Rejecters,
+  doc: CadDocument,
+  params: DriveInput,
+  target: string,
+  ctx: ExecutionContext | undefined,
+): CommandResult | null {
+  if (params.tune === undefined && params.mode !== 'prescribed') return null;
+  const built = buildSimulationModel(doc, 1e-3, ctx?.kernel ?? null);
+  const inertia = 'error' in built ? undefined : jointInertiaOf(built, target);
+  if (inertia !== undefined && inertia > 0) return null;
+  return refuse(
+    'DRV_TUNE_NO_INERTIA',
+    `joint '${target}' has no inertia to ${params.mode === 'prescribed' ? 'servo' : 'tune'} against${'error' in built ? ` (${built.error})` : ''}`,
+    [target],
+  );
+}
+
+function driveOf(id: string, params: DriveInput): MotorDrive {
+  return {
+    id,
+    mode: params.mode,
+    ...(params.volts === undefined ? {} : { volts: params.volts }),
+    ...(params.frequencyHz === undefined ? {} : { frequencyHz: params.frequencyHz }),
+    ...(params.stepDivision === undefined ? {} : { stepDivision: params.stepDivision }),
+    ...(params.profile === undefined ? {} : { profile: params.profile }),
+    ...(params.currentLimitA === undefined ? {} : { currentLimitA: params.currentLimitA }),
+    ...(params.target === undefined ? {} : { target: params.target }),
+    ...(params.gains === undefined
+      ? {}
+      : {
+          gains: {
+            kp: params.gains.kp,
+            ki: params.gains.ki === undefined ? 0 : params.gains.ki,
+            kpPosition: params.gains.kpPosition === undefined ? 0 : params.gains.kpPosition,
+          },
+        }),
+    ...(params.tune === undefined ? {} : { tune: params.tune }),
+    ...(params.feedforward === undefined ? {} : { feedforward: params.feedforward }),
+    ...(params.busVoltageV === undefined ? {} : { busVoltageV: params.busVoltageV }),
+    ...(params.sampleHz === undefined ? {} : { sampleHz: params.sampleHz }),
+    ...(params.effortLimit === undefined ? {} : { effortLimit: params.effortLimit }),
+  };
+}
+
+const driveTarget = (params: DriveInput): string =>
+  params.mode === 'voltage'
+    ? params.volts === undefined
+      ? `profile '${params.profile}'`
+      : `${params.volts} V${params.frequencyHz === undefined ? '' : ` at ${params.frequencyHz} Hz`}`
+    : `profile '${params.profile}'`;
 
 /**
  * @affects sets doc.dynamics.drives[motor] (affected: [motorId])
@@ -150,107 +277,32 @@ export const setMotorDrive = defineCommand({
   }),
   run: (doc, params, ctx): CommandResult => {
     const name = 'set_motor_drive';
-    const fail = failer(doc, name);
-    const refuse = (code: string, message: string, ids: readonly string[] = []): CommandResult =>
-      codedRejection(doc, name, code, message, REMEDIATION[code] ?? '', ids);
+    const rejecters: Rejecters = {
+      fail: failer(doc, name),
+      refuse: (code, message, ids = []) => codedRejection(doc, name, code, message, REMEDIATION[code] ?? '', ids),
+    };
+    const { fail, refuse } = rejecters;
     const dynamics = dynamicsOf(doc);
     const motor = dynamics.motors[params.motor];
     if (motor === undefined) return fail(`motor '${params.motor}' not found (add_motor first)`);
     if (!isDatasheetMotor(motor)) return refuse('DRV_MOTOR_KIND_UNSUPPORTED', `motor '${motor.id}' is a ${motor.kind} motor`, [motor.id]);
     const { mode } = params;
-    if (!DRIVE_MODES_BY_KIND[motor.kind].includes(mode))
-      return refuse('DRV_MODE_UNSUPPORTED', `a ${motor.kind} motor takes ${DRIVE_MODES_BY_KIND[motor.kind].join(', ')}, not '${mode}'`, [
-        motor.id,
-      ]);
-    const unused = NOT_APPLICABLE[motor.kind].find((field) => params[field] !== undefined);
-    if (unused !== undefined) return fail(`'${unused}' does not apply to a ${motor.kind} motor`);
-    const closedLoop = (motor.kind === 'dc' || motor.kind === 'pmsm') && (mode === 'velocity' || mode === 'position');
+    const modeRefusal = modeProblem(rejecters, params, motor);
+    if (modeRefusal !== null) return modeRefusal;
     const target = params.target ?? motor.joint;
     const targetJoint = dynamics.joints[target];
     if (targetJoint === undefined || targetJoint.kind !== 'revolute')
       return refuse('DRV_JOINT_INVALID', `target joint '${target}' is missing or not revolute`, [target]);
-    if (mode === 'voltage' && params.volts === undefined && params.profile === undefined)
-      return fail('voltage mode needs `volts` or a voltage `profile`');
-    if (mode === 'frequency' && (params.volts !== undefined || params.frequencyHz !== undefined))
-      return fail('frequency mode follows a frequency profile at constant V/f: volts and frequencyHz do not apply');
-    if (mode === 'voltage' && motor.kind === 'induction' && params.frequencyHz === undefined)
-      return fail('induction voltage mode needs `frequencyHz` (the supply frequency)');
-    if (mode === 'voltage' && params.volts !== undefined && params.profile !== undefined)
-      return fail('give `volts` or `profile`, not both');
-    if (mode !== 'voltage' && params.profile === undefined) return refuse('DRV_PROFILE_INVALID', `${mode} mode needs a profile`);
-    if (params.profile !== undefined) {
-      const profile = dynamics.profiles?.[params.profile];
-      if (profile === undefined) return refuse('DRV_PROFILE_INVALID', `profile '${params.profile}' not found (add_motion_profile first)`);
-      if (!QUANTITY[mode].includes(profile.quantity))
-        return refuse(
-          'DRV_PROFILE_INVALID',
-          `${mode} mode needs a ${QUANTITY[mode].join(' or ')} profile, '${profile.id}' is ${profile.quantity}`,
-        );
-      if ((profile.quantity === 'position' || profile.quantity === 'velocity') && !isAngularUnit(profile.unit))
-        return refuse(
-          'DRV_PROFILE_INVALID',
-          `profile '${profile.id}' is in '${profile.unit}'; a revolute joint needs an angular unit (rad, deg, rev, rad/s, rpm, deg/s)`,
-        );
-      const compiled = compileProfile(profile);
-      if (isProfileRefusal(compiled)) return refuse(compiled.code, `profile '${profile.id}': ${compiled.error}`);
-    }
-    if (closedLoop) {
-      if (params.sampleHz === undefined) return refuse('DRV_CONTROL_RATE', `${mode} mode needs sampleHz`);
-      if ((params.gains === undefined) === (params.tune === undefined)) return fail('give exactly one of `gains` and `tune`');
-      if (mode === 'position' && params.gains !== undefined && params.gains.kpPosition === undefined)
-        return fail('position mode with explicit gains needs gains.kpPosition > 0');
-      if (params.tune !== undefined) {
-        const ratio = (2 * Math.PI * params.tune.bandwidthHz) / params.sampleHz;
-        if (ratio > MAX_BANDWIDTH_PER_RATE)
-          return refuse(
-            'DRV_CONTROL_RATE',
-            `omega_c * T_s = ${ratio.toPrecision(3)} exceeds ${MAX_BANDWIDTH_PER_RATE} (bandwidth ${params.tune.bandwidthHz} Hz at ${params.sampleHz} Hz)`,
-          );
-      }
-    }
-    if (params.tune !== undefined || mode === 'prescribed') {
-      const built = buildSimulationModel(doc, 1e-3, ctx?.kernel ?? null);
-      const inertia = 'error' in built ? undefined : jointInertiaOf(built, target);
-      if (inertia === undefined || !(inertia > 0))
-        return refuse(
-          'DRV_TUNE_NO_INERTIA',
-          `joint '${target}' has no inertia to ${mode === 'prescribed' ? 'servo' : 'tune'} against${'error' in built ? ` (${built.error})` : ''}`,
-          [target],
-        );
-    }
-    const drive: MotorDrive = {
-      id: motor.id,
-      mode,
-      ...(params.volts === undefined ? {} : { volts: params.volts }),
-      ...(params.frequencyHz === undefined ? {} : { frequencyHz: params.frequencyHz }),
-      ...(params.stepDivision === undefined ? {} : { stepDivision: params.stepDivision }),
-      ...(params.profile === undefined ? {} : { profile: params.profile }),
-      ...(params.currentLimitA === undefined ? {} : { currentLimitA: params.currentLimitA }),
-      ...(params.target === undefined ? {} : { target: params.target }),
-      ...(params.gains === undefined
-        ? {}
-        : {
-            gains: {
-              kp: params.gains.kp,
-              ki: params.gains.ki === undefined ? 0 : params.gains.ki,
-              kpPosition: params.gains.kpPosition === undefined ? 0 : params.gains.kpPosition,
-            },
-          }),
-      ...(params.tune === undefined ? {} : { tune: params.tune }),
-      ...(params.feedforward === undefined ? {} : { feedforward: params.feedforward }),
-      ...(params.busVoltageV === undefined ? {} : { busVoltageV: params.busVoltageV }),
-      ...(params.sampleHz === undefined ? {} : { sampleHz: params.sampleHz }),
-      ...(params.effortLimit === undefined ? {} : { effortLimit: params.effortLimit }),
-    };
-    const what =
-      mode === 'voltage'
-        ? params.volts === undefined
-          ? `profile '${params.profile}'`
-          : `${params.volts} V${params.frequencyHz === undefined ? '' : ` at ${params.frequencyHz} Hz`}`
-        : `profile '${params.profile}'`;
+    const refusal =
+      combinationProblem(rejecters, params, motor) ??
+      profileProblem(rejecters, params, dynamics) ??
+      controlProblem(rejecters, params, motor) ??
+      inertiaProblem(rejecters, doc, params, target, ctx);
+    if (refusal !== null) return refusal;
+    const drive = driveOf(motor.id, params);
     return changed(
       withDynamics(doc, { ...dynamics, drives: { ...dynamics.drives, [motor.id]: drive } }),
-      `set_motor_drive: '${motor.id}' ${mode} on joint '${motor.joint}' — ${what}` +
+      `set_motor_drive: '${motor.id}' ${mode} on joint '${motor.joint}' — ${driveTarget(params)}` +
         `${params.sampleHz === undefined ? '' : `, ${params.sampleHz} Hz`}${params.tune === undefined ? '' : `, tuned ${params.tune.bandwidthHz} Hz zeta ${params.tune.dampingRatio}`}.`,
       [motor.id],
     );

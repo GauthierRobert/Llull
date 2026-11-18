@@ -1,26 +1,22 @@
 import { confirmExportControlled, defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { exportRefusal, report } from '@core/commands/noop';
+import { exportRefusal } from '@core/commands/noop';
 import { PAPER_SIZES } from '@core/model/sheet';
-import { sha256Hex } from '@lib/sha256';
 import { analyseLine, isAnalysis } from '../analysis';
-import { isoIssue, refuseIso } from '../codes';
-import { deltaOf, snapshotOf, type IssueDelta } from '../compareIssue';
 import { basisOf, issueState } from '../issues';
 import { buildIsoGraph } from '../iso/isoGraph';
-import { axisAngles, TRUE_ISO_SCALE } from '../iso/isoProjection';
-import { dxfOf, svgOf } from '../iso/isoRender';
-import type { Vec3 } from '@core/model/vectors';
-import { buildIsoSheet, type IsoSheet, type SheetOptions } from '../iso/isoSheet';
-import { continuationOf, planSheets, type SheetInfo } from '../iso/isoSheets';
-import { isoTables, TABLE_NAMES } from '../iso/isoTables';
-import type { IsoIssue, IsoStyle } from '../model';
-import { lineSupports } from '../supports';
-
-const fileStem = (key: string): string => key.replace(/[^A-Za-z0-9._-]/g, '_');
-
-const tablesOf = (sheet: Pick<IsoSheet, 'tables'>): Record<string, unknown> =>
-  Object.fromEntries(sheet.tables.map((table) => [table.name, { rows: table.rows.length, columns: table.columns, data: table.rows }]));
+import { TABLE_NAMES } from '../iso/isoTables';
+import {
+  buildSheets,
+  chosenSheets,
+  graphRefusal,
+  isometricReport,
+  issueComparison,
+  mismatchesOf,
+  paramRefusal,
+  settingsOf,
+  warningsOf,
+} from './exportIsometricPhases';
 
 /**
  * @affects none (query: returns the same document; the files are in `data.files[]`)
@@ -90,241 +86,36 @@ export const exportIsometric = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const refused = exportRefusal(doc, 'export_isometric', 'sheet', params.confirmExportControlled, ctx);
     if (refused !== null) return refused;
-    if (params.spoolId !== undefined && params.style !== undefined && params.style !== 'spool')
-      return refuseIso(
-        doc,
-        'export_isometric',
-        'ISO_PARAM_INVALID',
-        'spoolId is for the spool style: omit style or pass style spool',
-        [params.spoolId],
-        ['spoolId', 'style'],
-      );
-    if (params.revision !== undefined && params.compareToIssue !== true)
-      return refuseIso(
-        doc,
-        'export_isometric',
-        'ISO_PARAM_INVALID',
-        'revision labels the compareToIssue clouds: pass compareToIssue true',
-        [],
-        ['revision'],
-      );
+    const paramProblem = paramRefusal(doc, params);
+    if (paramProblem !== null) return paramProblem;
     const analysis = analyseLine(doc, 'export_isometric', params.lineId);
     if (!isAnalysis(analysis)) return analysis;
     const graph = buildIsoGraph(analysis.read.network);
-    if (graph.steps.length === 0)
-      return refuseIso(
-        doc,
-        'export_isometric',
-        'ISO_NO_PIPING',
-        `line ${params.lineId} has no drawable component`,
-        [params.lineId],
-        ['lineId'],
-      );
-    if (graph.groups > 1)
-      return refuseIso(
-        doc,
-        'export_isometric',
-        'ISO_DISCONNECTED',
-        `${graph.unreachable.length} component(s) of line ${params.lineId} are not connected to the line start: ${graph.unreachable.join(', ')}`,
-        graph.unreachable,
-        ['lineId'],
-      );
-    const definition = analysis.fabrication.isometrics?.[analysis.lineId];
-    const style: IsoStyle = params.style ?? (params.spoolId === undefined ? (definition?.style ?? 'check') : 'spool');
-    const paper = params.paper ?? definition?.paper ?? 'A3';
-    const northArrow = params.northArrow ?? definition?.northArrow ?? 'up_right';
-    const plan = planSheets(
-      analysis,
-      style === 'spool'
-        ? { kind: 'spool' }
-        : {
-            kind: 'budget',
-            splitAt: definition?.splitAt ?? 'weld',
-            stored: definition?.sheetAssignment ?? {},
-            ...(definition?.maxPipePiecesPerSheet === undefined ? {} : { budget: definition.maxPipePiecesPerSheet }),
-          },
-    );
-    const chosen = params.spoolId === undefined ? plan.sheets : plan.sheets.filter((sheet) => sheet.spool === params.spoolId);
-    if (chosen.length === 0)
-      return refuseIso(
-        doc,
-        'export_isometric',
-        'ISO_SPOOL_NOT_FOUND',
-        `line ${params.lineId} has no spool "${params.spoolId}" (${plan.sheets.map((sheet) => sheet.spool).join(', ')})`,
-        [params.lineId],
-        ['spoolId'],
-      );
-    const wanted = params.tables ?? (style === 'check' ? [] : TABLE_NAMES);
-    const { latest, current } = issueState(analysis.fabrication, analysis.lineId, basisOf(analysis));
-    let comparison: { issueId: string; issuedRevision: string; purpose: string; unchanged: boolean; delta: IssueDelta } | undefined;
-    let revision: SheetOptions['revision'];
-    if (params.compareToIssue === true) {
-      const issued = latest === undefined ? undefined : analysis.fabrication.issueSnapshots?.[latest.id];
-      if (latest === undefined || issued === undefined)
-        return refuseIso(
-          doc,
-          'export_isometric',
-          latest === undefined ? 'ISO_ISSUE_NOT_FOUND' : 'ISO_ISSUE_SNAPSHOT_MISSING',
-          latest === undefined ? `line ${params.lineId} has no issue to compare with` : `issue ${latest.id} has no stored snapshot`,
-          latest === undefined ? [params.lineId] : [latest.id],
-          ['compareToIssue'],
-        );
-      const now = snapshotOf(analysis);
-      const delta = deltaOf(issued, now);
-      comparison = { issueId: latest.id, issuedRevision: latest.revision, purpose: latest.purpose, unchanged: delta.total === 0, delta };
-      if (delta.total > 0)
-        revision = {
-          label: params.revision ?? '*',
-          issuedRevision: latest.revision,
-          removed: delta.components.removed.length,
-          componentIds: new Set([...delta.components.added, ...delta.components.changed]),
-          welds: new Map([...delta.welds.added, ...delta.welds.changed].map((number) => [number, (now.welds[number] as { at: Vec3 }).at])),
-        };
-    }
-    const scoped = style === 'spool' || plan.sheets.length > 1;
-    const supports = lineSupports(doc, analysis.lineId, analysis.read.network);
-    const built: Array<{ info: SheetInfo; sheet: IsoSheet; continuation: ReturnType<typeof continuationOf> }> = [];
-    for (const info of chosen) {
-      const continuation = continuationOf(plan, info.index);
-      const sheet = buildIsoSheet(analysis, {
-        style,
-        paper,
-        northArrow,
-        tables: wanted,
-        supports,
-        ...(revision === undefined ? {} : { revision }),
-        project: doc.building?.project.name.trim() || 'llull',
-        ...(current === undefined
-          ? {}
-          : { issue: { revision: current.revision, purpose: current.purpose.replace('_', ' '), signer: current.signer } }),
-        ...(scoped
-          ? {
-              sheet: {
-                index: info.index,
-                total: plan.sheets.length,
-                include: new Set(info.componentIds),
-                indices: new Set(info.indices),
-                partial: style !== 'spool',
-                continuation: continuation.all,
-                ...(info.spool === undefined ? {} : { spool: info.spool }),
-              },
-            }
-          : {}),
-      });
-      if (sheet.graph.groups > 1)
-        return refuseIso(
-          doc,
-          'export_isometric',
-          'ISO_DISCONNECTED',
-          `sheet ${info.index} of line ${params.lineId} is not connected: ${sheet.graph.unreachable.join(', ')}`,
-          sheet.graph.unreachable,
-          ['lineId'],
-        );
-      built.push({ info, sheet, continuation });
-    }
-    const mismatches = built.reduce(
-      (total, { sheet }) => total + sheet.dimensions.reduce((sum, dimension) => sum + dimension.mismatches, 0),
-      0,
-    );
-    const unnumbered = analysis.numbering.entries.filter((entry) => entry.status === 'assigned');
-    const warnings: IsoIssue[] = [];
-    const warn = (issue: IsoIssue): void => {
-      if (!warnings.some((have) => have.code === issue.code && have.message === issue.message)) warnings.push(issue);
-    };
-    [...analysis.read.network.warnings, ...plan.warnings, ...built.flatMap(({ sheet }) => sheet.warnings)].forEach(warn);
-    if (mismatches > 0)
-      warn(isoIssue('ISO_DIMENSION_MISMATCH', 'error', `${mismatches} dimension label(s) differ from the 3D distance`, [params.lineId]));
-    if (unnumbered.length > 0)
-      warn(
-        isoIssue(
-          'ISO_WELDS_UNNUMBERED',
-          'warning',
-          `${unnumbered.length} weld number(s) on the sheet are provisional`,
-          unnumbered.map((entry) => entry.record.number),
-        ),
-      );
-    if (latest !== undefined && current === undefined)
-      warn(isoIssue('ISO_ISSUE_STALE', 'warning', `the line changed after issue ${latest.id} (revision ${latest.revision})`, [latest.id]));
-    const stem = fileStem(analysis.name);
-    const formats = (params.formats ?? ['svg']).filter((format, at, all) => all.indexOf(format) === at);
-    const files = built.flatMap(({ info, sheet }) =>
-      formats.map((format) => {
-        const content = format === 'svg' ? svgOf(sheet.primitives, sheet.width, sheet.height, sheet.title) : dxfOf(sheet.primitives);
-        return { name: `${stem}_iso_sheet${info.index}.${format}`, format, content, sha256: sha256Hex(content), sheetIndex: info.index };
-      }),
-    );
-    const angles = axisAngles(northArrow);
-    const whole = scoped ? isoTables(analysis, wanted).tables : (built[0]?.sheet.tables ?? []);
-    const first = (built[0] as (typeof built)[number]).sheet;
-    return report(
+    const graphProblem = graphRefusal(doc, params, graph);
+    if (graphProblem !== null) return graphProblem;
+    const settings = settingsOf(analysis, params);
+    const chosen = chosenSheets(doc, params, settings.plan);
+    if (!chosen.ok) return chosen.result;
+    const issues = issueState(analysis.fabrication, analysis.lineId, basisOf(analysis));
+    const compared = issueComparison(doc, params, analysis, issues.latest);
+    if (!compared.ok) return compared.result;
+    const { comparison, revision } = compared.value;
+    const sheets = buildSheets(doc, params, analysis, settings, chosen.value, revision, issues.current);
+    if (!sheets.ok) return sheets.result;
+    const built = sheets.value;
+    const mismatches = mismatchesOf(built);
+    return isometricReport({
       doc,
-      `export_isometric: line ${analysis.name}: ${built.length} sheet(s) ${paper} (${style}), ${graph.runs.length} run(s), ${built.reduce((sum, { sheet }) => sum + sheet.dimensions.length, 0)} dimension string(s) (${mismatches} mismatch), ` +
-        `${built.reduce((sum, { sheet }) => sum + sheet.annotations.length, 0)} label(s), ${whole.length} table(s), ${files.map((file) => file.name).join(', ')}; ` +
-        `${current === undefined ? 'NOT FOR CONSTRUCTION, review required' : `issued ${current.purpose.replace('_', ' ')} rev ${current.revision} by ${current.signer}`}` +
-        `${comparison === undefined ? '' : `; vs rev ${comparison.issuedRevision}: ${comparison.delta.total} difference(s)`}` +
-        `${warnings.length === 0 ? '' : `; warnings: ${[...new Set(warnings.map((warning) => warning.code))].join(', ')}`}`,
-      {
-        lineId: analysis.name,
-        style,
-        paper,
-        files: files.map(({ sheetIndex: _sheetIndex, ...file }) => file),
-        sheets: built.map(({ info, sheet, continuation }) => {
-          const own = files.filter((file) => file.sheetIndex === info.index);
-          return {
-            index: info.index,
-            files: own.map((file) => file.name),
-            sha256: own[0]?.sha256 ?? '',
-            componentIds: info.componentIds,
-            pipes: info.pipes,
-            ...(info.spool === undefined ? {} : { spool: info.spool }),
-            continuation,
-            tables: tablesOf(sheet),
-            layout: { k: sheet.layout.k, scale: sheet.layout.scale, overflow: sheet.layout.overflow },
-          };
-        }),
-        projection: {
-          axes: { east: { angleDeg: angles.east }, north: { angleDeg: angles.north }, up: { angleDeg: angles.up } },
-          interAxisAngleDeg: 120,
-          trueIsoScale: TRUE_ISO_SCALE,
-        },
-        northArrow: { mode: northArrow, angleDeg: angles.northArrow },
-        dimensions: built.flatMap(({ info, sheet }) => sheet.dimensions.map((dimension) => ({ ...dimension, sheetIndex: info.index }))),
-        dimensionMismatches: mismatches,
-        annotations: built.flatMap(({ info, sheet }) => sheet.annotations.map((annotation) => ({ ...annotation, sheetIndex: info.index }))),
-        supports: built.flatMap(({ info, sheet }) =>
-          sheet.annotations
-            .filter((annotation) => annotation.kind === 'support')
-            .map((annotation) => ({
-              id: annotation['supportId'],
-              mark: annotation.text,
-              type: annotation['supportType'],
-              at: annotation.at,
-              sheetIndex: info.index,
-            })),
-        ),
-        tables: tablesOf({ tables: whole }),
-        layout: {
-          k: first.layout.k,
-          scale: first.layout.scale,
-          overflow: first.layout.overflow,
-          passes: first.layout.passes,
-          crossings: first.layout.crossings.length,
-        },
-        ...(comparison === undefined
-          ? {}
-          : {
-              comparison: {
-                ...comparison,
-                clouds: built.reduce(
-                  (sum, { sheet }) => sum + sheet.annotations.filter((annotation) => annotation.kind === 'revision').length,
-                  0,
-                ),
-              },
-            }),
-        warnings,
-        reviewRequired: current === undefined,
-        ...(current === undefined ? {} : { issue: current }),
-      },
-    );
+      analysis,
+      graph,
+      settings,
+      scoped: settings.style === 'spool' || settings.plan.sheets.length > 1,
+      built,
+      mismatches,
+      warnings: warningsOf(params, analysis, settings.plan, built, mismatches, issues),
+      comparison,
+      current: issues.current,
+      params,
+    });
   },
 });

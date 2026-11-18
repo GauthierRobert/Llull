@@ -327,12 +327,12 @@
       "reason": "summary text when no comparison value exists; display only"
     },
     {
-      "file": "domain-cae/src/commands/analysis.ts",
+      "file": "domain-cae/src/commands/analysisCreate.ts",
       "match": "return max === undefined || (Number.isFinite(max) && max > (min ?? 0));",
       "reason": "frequency band without a lower bound starts at 0 Hz (band semantics); echoed in the summary"
     },
     {
-      "file": "domain-cae/src/commands/analysis.ts",
+      "file": "domain-cae/src/commands/analysisCreate.ts",
       "match": "modes === undefined ? '' : `, ${modes} mode(s)${band === undefined ? '' : ` in ${band.min ?? 0}-${band.max ?? 'inf'} Hz`}`;",
       "reason": "frequency band without a lower bound starts at 0 Hz (band semantics); echoed in the summary"
     },
