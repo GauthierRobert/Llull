@@ -48,6 +48,8 @@ interface ViewportPalette {
   grid2dMajor: number;
   /** Color stays constant: drei rebuilds targets on a color change. */
   contactShadowOpacity: number;
+  /** Opacity of the key light's shadow on the ground (the shadow catcher). */
+  groundShadowOpacity: number;
   axisColors: [string, string, string];
   axisLabel: string;
 }
@@ -60,6 +62,7 @@ const PALETTES: Record<Theme, ViewportPalette> = {
     grid2dMinor: 0x25282f,
     grid2dMajor: 0x343843,
     contactShadowOpacity: 0.55,
+    groundShadowOpacity: 0.42,
     axisColors: ['#e5534b', '#57ab5a', '#4c8dff'],
     axisLabel: '#f2f3f5',
   },
@@ -70,6 +73,7 @@ const PALETTES: Record<Theme, ViewportPalette> = {
     grid2dMinor: 0xdcdfe5,
     grid2dMajor: 0xc4c9d2,
     contactShadowOpacity: 0.3,
+    groundShadowOpacity: 0.22,
     axisColors: ['#d1453b', '#3f9142', '#2f6fe4'],
     axisLabel: '#ffffff',
   },

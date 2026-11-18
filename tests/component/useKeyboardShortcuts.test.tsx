@@ -203,7 +203,7 @@ describe('useKeyboardShortcuts', () => {
   it('F frames the model in the 3D view only (in 2D the key belongs to the fillet tool)', () => {
     render(<Harness />);
     fireEvent.keyDown(window, { key: 'f' });
-    expect(dispatch).toHaveBeenCalledWith('fit_view', { direction: 'current', padding: 1.7 }, { quiet: true, coalesce: true });
+    expect(dispatch).toHaveBeenCalledWith('fit_view', { direction: 'current', padding: 1.4 }, { quiet: true, coalesce: true });
     dispatch.mockClear();
     useToolStore.setState({ viewMode: '2d' });
     fireEvent.keyDown(window, { key: 'f' });

@@ -4,7 +4,7 @@ import { useStore } from '@ui/store';
 import { isLocalMode } from '@ui/store/localMode';
 
 /** Room left around the model when the app frames it by itself (fit_view's own default is tighter, for renders). */
-export const AUTO_FRAME_PADDING = 1.7;
+export const AUTO_FRAME_PADDING = 1.4;
 
 /** F: frames the whole model from the current viewing direction. */
 export function zoomToFit(): void {

@@ -1,12 +1,17 @@
 // Static segment count for curved geometries from the entity size (no three.js LOD objects / per-frame checks):
-// segments = clamp(8 + floor(log2(diag) * 4), 8, 64), e.g. diag 4 → 16, 16 → 24, 64 → 32.
+// segments = clamp(48 + floor(log2(diag) * 8), 48, 128), e.g. diag ≤ 1 → 48, 4 → 64, 16 → 80, 64 → 96.
+// The floor is what a round part needs to read as round up close (a 16-gon silhouette reads as a faceted prism); the size term keeps
+// large parts smooth where their silhouette spans the screen. A sphere at the floor is ~2.3k triangles.
 import { clamp } from '@lib/clamp';
 
-/** @returns integer in [8, 64]; diag clamped to ≥ 1e-6 */
+export const MIN_RADIAL_SEGMENTS = 48;
+export const MAX_RADIAL_SEGMENTS = 128;
+
+/** @returns integer in [MIN_RADIAL_SEGMENTS, MAX_RADIAL_SEGMENTS]; diag clamped to ≥ 1e-6 */
 export function radialSegmentsForDiag(diag: number): number {
   const safeDiag = Math.max(diag, 1e-6);
-  const raw = 8 + Math.floor(Math.log2(safeDiag) * 4);
-  return clamp(raw, 8, 64);
+  const raw = MIN_RADIAL_SEGMENTS + Math.floor(Math.log2(safeDiag) * 8);
+  return clamp(raw, MIN_RADIAL_SEGMENTS, MAX_RADIAL_SEGMENTS);
 }
 
 /** Diameter (not the true diagonal, diameter × √3). */

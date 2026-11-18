@@ -34,14 +34,14 @@ describe('realism tiers', () => {
       keyShadows: true,
       plantShadowMaxLod: 1,
     });
-    expect(settingsFor('low', 'standard').softShadowSamples).toBe(0);
+    expect(settingsFor('low', 'standard').shadowRadius).toBe(1);
   });
   it('Draft drops every shadow whatever the scene size', () => {
     for (const tier of ['high', 'medium', 'low'] as const) {
       expect(settingsFor(tier, 'draft')).toMatchObject({
         keyShadows: false,
         contactShadowsEnabled: false,
-        softShadowSamples: 0,
+        shadowRadius: 1,
         plantShadowMaxLod: -1,
       });
     }
@@ -52,7 +52,7 @@ describe('realism tiers', () => {
         keyShadows: true,
         contactShadowsEnabled: true,
         shadowMapSize: 4096,
-        softShadowSamples: 24,
+        shadowRadius: 10,
         plantShadowMaxLod: 2,
       });
     }
@@ -75,20 +75,20 @@ describe('realism tiers', () => {
 });
 
 describe('ambient occlusion', () => {
-  it('is on in High only, whatever the scene size', () => {
+  it('is on in High whatever the scene size, in Standard for small scenes only, never in Draft', () => {
     for (const tier of ['high', 'medium', 'low'] as const) {
       expect(settingsFor(tier, 'high').ambientOcclusion).toBe(true);
-      expect(settingsFor(tier, 'standard').ambientOcclusion).toBe(false);
+      expect(settingsFor(tier, 'standard').ambientOcclusion).toBe(tier === 'high');
       expect(settingsFor(tier, 'draft').ambientOcclusion).toBe(false);
     }
   });
 });
 
 describe('feature edges', () => {
-  it('are on by default in High only', () => {
+  it('are on by default in High, and in Standard up to a medium scene; never in Draft', () => {
     for (const tier of ['high', 'medium', 'low'] as const) {
       expect(settingsFor(tier, 'high').edgeLines).toBe(true);
-      expect(settingsFor(tier, 'standard').edgeLines).toBe(false);
+      expect(settingsFor(tier, 'standard').edgeLines).toBe(tier !== 'low');
       expect(settingsFor(tier, 'draft').edgeLines).toBe(false);
     }
   });
@@ -105,6 +105,8 @@ describe('feature edges', () => {
   it('the Edges toggle follows the tier, overrides it and persists the override', () => {
     render(<RealismControl />);
     const toggle = screen.getByLabelText('Edges');
+    expect(toggle).toBeChecked();
+    fireEvent.change(screen.getByLabelText('Realism'), { target: { value: 'draft' } });
     expect(toggle).not.toBeChecked();
     fireEvent.change(screen.getByLabelText('Realism'), { target: { value: 'high' } });
     expect(toggle).toBeChecked();

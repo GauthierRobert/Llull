@@ -6,7 +6,7 @@ import { useEdgeLines } from './useRenderQuality';
 
 const OPTIONS: { value: RealismTier; label: string; title: string }[] = [
   { value: 'draft', label: 'Draft', title: 'Draft — no shadows, fastest' },
-  { value: 'standard', label: 'Standard', title: 'Standard — shadows scaled to the scene size' },
+  { value: 'standard', label: 'Standard', title: 'Standard — shadows, edges and occlusion scaled to the scene size' },
   { value: 'high', label: 'High', title: 'High — soft 4096² shadows on every solid and plant batch, contact shadows, feature edges' },
 ];
 

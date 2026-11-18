@@ -40,6 +40,14 @@ The "Lens" shell was clean but **over-minimal**: it hid the product behind three
 6. **The start card teaches the two ways to begin** (sketch → extrude, or drop a solid) and how to move around the view.
 7. Ctrl A, F (zoom to fit), keep-in-view after a UI-created solid, and a roomier automatic framing (padding 1.7).
 
+## 3D rendering (same request, second pass)
+
+Found on a five-solid scene: round solids were 12 to 16-gons, no shadow was drawn at all (drei's PCSS patch reads the shadow map as a
+plain texture, which three r186 no longer provides), nothing sat on the ground, feature edges and occlusion existed but were off unless
+the user found the High tier, and a selection was a faint tint. Now: 48+ segments, three's own soft PCF on a shadow frustum fitted to
+the scene, a ground shadow catcher, the light from the front-left so shadows fall where they are seen, edges + selection outline on by
+default (occlusion on small scenes), all scaled down by the existing entity-count tiers. Verified with software GL only (no GPU here).
+
 ## Not done here (next candidates)
 
 - The 2D modify palette (left of the 2D view) duplicates Modify › Edit a sketch; it stays because it hosts the value input.

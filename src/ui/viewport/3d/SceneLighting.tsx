@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useThree } from '@react-three/fiber';
-import { Environment, Lightformer, ContactShadows, SoftShadows } from '@react-three/drei';
+import { Environment, Lightformer, ContactShadows } from '@react-three/drei';
 import type * as THREE from 'three';
 import { useStore } from '@ui/store';
 import { mergedEntityBounds } from './fitBounds';
@@ -57,13 +57,46 @@ function SceneContactShadows({ opacity, bounds }: { opacity: number; bounds: Sce
   );
 }
 
+/** No picking: the catcher is scenery, never a hit. */
+const NO_RAYCAST = (): void => undefined;
+
+/**
+ * Shadow catcher: an invisible ground patch that only shows the key light's shadow, so parts sit on the ground instead of floating
+ * over the grid. Sized to the key light's shadow frustum (outside it nothing is shadowed anyway).
+ */
+function GroundShadowCatcher({ opacity, bounds }: { opacity: number; bounds: SceneBounds }): React.ReactElement | null {
+  const renderOrigin = useStore((s) => s.renderOrigin);
+  const plane = useMemo(() => computeContactShadowPlane(bounds, renderOrigin), [bounds, renderOrigin]);
+  const rig = useMemo(() => computeKeyLightRig(bounds, renderOrigin), [bounds, renderOrigin]);
+  if (bounds === null) return null;
+  const side = rig.halfExtent * 2;
+  return (
+    <mesh
+      position={[rig.target[0], rig.target[1], plane.position[2]]}
+      scale={[side, side, 1]}
+      receiveShadow
+      raycast={NO_RAYCAST}
+      userData={{ noEdges: true }}
+      renderOrder={-1}
+    >
+      <planeGeometry args={[1, 1]} />
+      <shadowMaterial transparent opacity={opacity} depthWrite={false} color="#10131c" />
+    </mesh>
+  );
+}
+
+/** Shadow normal bias as a share of the shadow frustum's half extent (~1.5 texels of a 2048² map). */
+const NORMAL_BIAS_PER_HALF_EXTENT = 0.0015;
+
 /** Shadow-casting key light that follows the scene's extent (see keyLightRig.ts). */
 function SceneKeyLight({
   shadowMapSize,
+  shadowRadius,
   castShadow,
   bounds,
 }: {
   shadowMapSize: number;
+  shadowRadius: number;
   castShadow: boolean;
   bounds: SceneBounds;
 }): React.ReactElement {
@@ -88,11 +121,13 @@ function SceneKeyLight({
     // Z-up document: the default Y-up shadow camera left a dark patch on an off-origin scene.
     camera.up.set(0, 0, 1);
     camera.updateProjectionMatrix();
+    // World units: scaled with the frustum so a mm part and a 100 m site get the same acne-free offset in texels.
+    light.shadow.normalBias = rig.halfExtent * NORMAL_BIAS_PER_HALF_EXTENT;
     light.target = target;
     target.updateMatrixWorld();
     markShadowsDirty();
     invalidate();
-  }, [rig, shadowMapSize, castShadow, invalidate]);
+  }, [rig, shadowMapSize, shadowRadius, castShadow, invalidate]);
 
   return (
     <>
@@ -104,6 +139,8 @@ function SceneKeyLight({
         castShadow={castShadow}
         shadow-mapSize={[shadowMapSize, shadowMapSize]}
         shadow-bias={-0.0004}
+        // three's own PCF with a blur radius (in shadow-map texels): soft edges without patching the shadow shader chunk.
+        shadow-radius={shadowRadius}
       />
     </>
   );
@@ -112,19 +149,24 @@ function SceneKeyLight({
 /** Only this subscribes to the document, so edits never re-render the Environment (its cube map would re-bake). */
 function SceneShadowRig({
   shadowMapSize,
+  shadowRadius,
   keyShadows,
   contactShadows,
   contactShadowOpacity,
+  groundShadowOpacity,
 }: {
   shadowMapSize: number;
+  shadowRadius: number;
   keyShadows: boolean;
   contactShadows: boolean;
   contactShadowOpacity: number;
+  groundShadowOpacity: number;
 }): React.ReactElement {
   const bounds = useSceneBounds();
   return (
     <>
-      <SceneKeyLight shadowMapSize={shadowMapSize} castShadow={keyShadows} bounds={bounds} />
+      <SceneKeyLight shadowMapSize={shadowMapSize} shadowRadius={shadowRadius} castShadow={keyShadows} bounds={bounds} />
+      {keyShadows && <GroundShadowCatcher opacity={groundShadowOpacity} bounds={bounds} />}
       {contactShadows && <SceneContactShadows opacity={contactShadowOpacity} bounds={bounds} />}
     </>
   );
@@ -133,9 +175,11 @@ function SceneShadowRig({
 export function SceneLighting({
   quality,
   contactShadowOpacity,
+  groundShadowOpacity,
 }: {
   quality: RenderQualitySettings;
   contactShadowOpacity: number;
+  groundShadowOpacity: number;
 }): React.ReactElement {
   return (
     <>
@@ -154,17 +198,17 @@ export function SceneLighting({
         </Environment>
       )}
 
-      {quality.softShadowSamples > 0 && <SoftShadows size={25} samples={quality.softShadowSamples} focus={0.5} />}
-
       {/* Hemisphere fill avoids pure-black undersides; cool back-left rim. */}
       <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} position={[0, 0, 1]} />
       <directionalLight position={[-6, 8, 4]} intensity={0.4} color="#a8c8ff" />
 
       <SceneShadowRig
         shadowMapSize={quality.shadowMapSize}
+        shadowRadius={quality.shadowRadius}
         keyShadows={quality.keyShadows}
         contactShadows={quality.contactShadowsEnabled}
         contactShadowOpacity={contactShadowOpacity}
+        groundShadowOpacity={groundShadowOpacity}
       />
     </>
   );

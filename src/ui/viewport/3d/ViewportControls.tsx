@@ -201,9 +201,9 @@ function AnimationTransportControls(): React.ReactElement | null {
 
 const QUALITY_OPTIONS: { value: QualityOverride; label: string; title: string }[] = [
   { value: 'auto', label: 'Auto', title: 'Auto — tier scales with scene size (recommended)' },
-  { value: 'high', label: 'High', title: 'High — PCSS 16 samples, 2048² shadows (≤ 50 entities ideal)' },
-  { value: 'medium', label: 'Medium', title: 'Medium — PCSS 8 samples, 1024² shadows' },
-  { value: 'low', label: 'Low', title: 'Low — flat shadows, no contact shadows (best for 200+ entities)' },
+  { value: 'high', label: 'High', title: 'High — soft 2048² shadows, edges and ambient occlusion (≤ 50 entities ideal)' },
+  { value: 'medium', label: 'Medium', title: 'Medium — soft 1024² shadows and edges' },
+  { value: 'low', label: 'Low', title: 'Low — plain shadows, no contact shadows, edges or occlusion (best for 200+ entities)' },
 ];
 
 function QualityControl(): React.ReactElement {

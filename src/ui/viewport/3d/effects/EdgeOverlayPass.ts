@@ -2,11 +2,15 @@
 // the view-space normals and the linear depth marks creases, silhouettes and contact lines, drawn dark over the beauty image. Cost is one extra
 // scene render plus one full-screen quad whatever the instance count (plant batches stay instanced; no per-prototype edge geometry), and the
 // renderer's global clipping planes cut the normal render too, so a section clips the edges with the surface.
+// Selection outline: while something is selected, the selection layer alone is drawn flat into a mask; the mask's outer rim is drawn in the
+// selection colour over everything (no depth test: the outline of a part hidden behind another still shows where it is).
 
 import * as THREE from 'three';
 import { FullScreenQuad, Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 import type { DepthRangeCamera } from './depthRangeCamera';
 import { hideEdgeExcluded } from './edgeExclusion';
+import { SELECTION_LAYER } from './selectionLayer';
+import { SELECTION_COLOR } from '../../viewportPalette';
 
 const EDGE_SHADER = {
   uniforms: {
@@ -17,7 +21,11 @@ const EDGE_SHADER = {
     cameraNear: { value: 0.1 },
     cameraFar: { value: 1000 },
     lineColor: { value: new THREE.Color('#10131a') },
-    strength: { value: 0.85 },
+    strength: { value: 0.62 },
+    tMask: { value: null as THREE.Texture | null },
+    selectionColor: { value: new THREE.Color(SELECTION_COLOR) },
+    /** 0 = nothing selected (the mask is not sampled), 1 = draw the outline. */
+    selection: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -32,7 +40,22 @@ const EDGE_SHADER = {
     uniform float cameraFar;
     uniform vec3 lineColor;
     uniform float strength;
+    uniform sampler2D tMask;
+    uniform vec3 selectionColor;
+    uniform float selection;
     varying vec2 vUv;
+
+    // Coverage of the selection within ~2.5 texels: the mask dilated, so (dilated - mask) is a rim just outside the silhouette.
+    float dilatedMask(vec2 uv) {
+      float m = 0.0;
+      for (int i = 0; i < 8; i++) {
+        float angle = 0.7853981634 * float(i);
+        vec2 dir = vec2(cos(angle), sin(angle)) * texel;
+        m = max(m, texture2D(tMask, uv + dir * 2.5).r);
+        m = max(m, texture2D(tMask, uv + dir * 1.25).r);
+      }
+      return m;
+    }
 
     float viewDepth(vec2 uv) {
       float d = texture2D(tDepth, uv).x;
@@ -66,7 +89,14 @@ const EDGE_SHADER = {
       // The normal target is cleared to zero: no surface there, the depth edge already draws the silhouette.
       if (zc >= cameraFar && z0 >= cameraFar && z1 >= cameraFar && z2 >= cameraFar && z3 >= cameraFar) normalEdge = 0.0;
       float edge = max(depthEdge, normalEdge) * strength;
-      gl_FragColor = vec4(mix(base.rgb, lineColor, edge), max(base.a, edge));
+      vec4 color = vec4(mix(base.rgb, lineColor, edge), max(base.a, edge));
+      if (selection > 0.5) {
+        float inside = texture2D(tMask, vUv).r;
+        float rim = clamp(dilatedMask(vUv) - inside, 0.0, 1.0);
+        color.rgb = mix(color.rgb, selectionColor, max(rim, inside * 0.07));
+        color.a = max(color.a, rim);
+      }
+      gl_FragColor = color;
     }
   `,
 };
@@ -75,7 +105,9 @@ export class EdgeOverlayPass extends Pass {
   private readonly material: THREE.ShaderMaterial;
   private readonly quad: FullScreenQuad;
   private readonly normalMaterial = new THREE.MeshNormalMaterial();
+  private readonly maskMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
   private readonly target: THREE.WebGLRenderTarget;
+  private readonly mask: THREE.WebGLRenderTarget;
   private readonly clearColor = new THREE.Color();
 
   constructor(
@@ -83,8 +115,11 @@ export class EdgeOverlayPass extends Pass {
     private readonly depthCamera: DepthRangeCamera,
     width: number,
     height: number,
+    /** True while something is selected: the mask render is skipped otherwise. */
+    private readonly hasSelection: () => boolean = () => false,
   ) {
     super();
+    this.mask = new THREE.WebGLRenderTarget(width, height, { samples: 4, depthBuffer: false });
     this.target = new THREE.WebGLRenderTarget(width, height, { depthTexture: new THREE.DepthTexture(width, height) });
     this.material = new THREE.ShaderMaterial({
       uniforms: THREE.UniformsUtils.clone(EDGE_SHADER.uniforms),
@@ -99,6 +134,7 @@ export class EdgeOverlayPass extends Pass {
 
   override setSize(width: number, height: number): void {
     this.target.setSize(width, height);
+    this.mask.setSize(width, height);
     this.material.uniforms['texel']?.value.set(1 / width, 1 / height);
   }
 
@@ -117,6 +153,8 @@ export class EdgeOverlayPass extends Pass {
     renderer.setClearColor(0x808080, 0);
     renderer.autoClear = true;
     renderer.render(this.scene, camera);
+    const selection = this.hasSelection();
+    if (selection) this.renderSelectionMask(renderer, camera);
     this.scene.overrideMaterial = null;
     this.scene.background = previousBackground;
     restoreVisibility();
@@ -127,6 +165,8 @@ export class EdgeOverlayPass extends Pass {
     uniforms['tDiffuse']!.value = readBuffer.texture;
     uniforms['tNormal']!.value = this.target.texture;
     uniforms['tDepth']!.value = this.target.depthTexture;
+    uniforms['tMask']!.value = this.mask.texture;
+    uniforms['selection']!.value = selection ? 1 : 0;
     uniforms['cameraNear']!.value = camera.near;
     uniforms['cameraFar']!.value = camera.far;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
@@ -134,7 +174,20 @@ export class EdgeOverlayPass extends Pass {
     renderer.setRenderTarget(previousTarget);
   }
 
+  /** The selection layer alone, flat white on black. The camera's own layers are put back (it may be the view camera). */
+  private renderSelectionMask(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera): void {
+    const layers = camera.layers.mask;
+    camera.layers.set(SELECTION_LAYER);
+    this.scene.overrideMaterial = this.maskMaterial;
+    renderer.setRenderTarget(this.mask);
+    renderer.setClearColor(0x000000, 0);
+    renderer.render(this.scene, camera);
+    camera.layers.mask = layers;
+  }
+
   override dispose(): void {
+    this.mask.dispose();
+    this.maskMaterial.dispose();
     this.target.dispose();
     this.target.depthTexture?.dispose();
     this.material.dispose();

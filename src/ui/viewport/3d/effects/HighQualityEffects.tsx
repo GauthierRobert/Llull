@@ -51,6 +51,9 @@ function depthRangeOf(box: SceneBox | null, camera: THREE.PerspectiveCamera): De
   return viewDepthRange(eye, [forward.x, forward.y, forward.z], box.min, box.max, camera.near, camera.far);
 }
 
+/** Read per frame by the edge pass (no re-render of the chain when the selection changes; the store invalidates the frame). */
+const hasSelection = (): boolean => useStore.getState().document.selection.length > 0;
+
 export function HighQualityEffects({ edges, ambientOcclusion }: EffectFlags): null {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
@@ -84,7 +87,7 @@ export function HighQualityEffects({ edges, ambientOcclusion }: EffectFlags): nu
     if (camera instanceof THREE.PerspectiveCamera) {
       const depthCamera = new DepthRangeCamera(camera, (view) => depthRangeOf(boxRef.current, view));
       if (ambientOcclusion) chain.addPass(new HalfResGtaoPass(scene, camera, width, height, gtaoParameters(radius.current), depthCamera));
-      if (edges) chain.addPass(new EdgeOverlayPass(scene, depthCamera, width, height));
+      if (edges) chain.addPass(new EdgeOverlayPass(scene, depthCamera, width, height, hasSelection));
     }
     chain.addPass(new BackgroundOutputPass(() => background.current));
     sized.current = { ratio, width: cssWidth, height: cssHeight };

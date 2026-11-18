@@ -138,7 +138,11 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       <AnimationPlayer />
       <DynamicsPlayer />
 
-      <SceneLighting quality={quality} contactShadowOpacity={palette.contactShadowOpacity} />
+      <SceneLighting
+        quality={quality}
+        contactShadowOpacity={palette.contactShadowOpacity}
+        groundShadowOpacity={palette.groundShadowOpacity}
+      />
 
       <Grid
         args={[40, 40]}

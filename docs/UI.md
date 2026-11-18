@@ -25,6 +25,16 @@ sits behind an unlabelled icon. Rationale and references: `docs/decisions/UX1-di
 - Keys added with it: **Ctrl A** selects everything visible, **F** (3D) zooms to fit. A solid added from the UI keeps the model in
   view (local mode only: online the camera is shared).
 
+## 3D rendering defaults (UX-1)
+
+- **Curved solids** are tessellated with 48 to 128 radial segments (`viewport/3d/lodSegments.ts`): a cylinder reads as round.
+- **Feature edges and the selection outline** (`effects/EdgeOverlayPass.ts`) are on by default in Standard up to 200 entities;
+  **ambient occlusion** up to 50. Selected solids are also on `SELECTION_LAYER`; the pass draws their outer rim in the selection
+  colour over everything, so a part hidden behind another still shows where it is. Low / Draft keep the plain render (emissive tint).
+- **Shadows**: the key light's frustum hugs the scene (`keyLightRig.ts`), comes from the front-left of the default view, and a
+  shadow catcher on the ground shows its shadow. Softness is three's own PCF blur (`shadowRadius`): drei's PCSS patch produced no
+  shadow at all with three r186, where the shadow map is a comparison texture.
+
 ## Live previews and drag handles (SC-A2)
 
 - **Preview** = the command with the current params run on the current document through the same `execute`
