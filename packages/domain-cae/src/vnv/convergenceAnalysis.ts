@@ -64,14 +64,8 @@ export type AnalysisOutcome =
 
 const refused = (code: string, message: string, path: string): AnalysisOutcome => ({ ok: false, code, message, path });
 
-/**
- * Report of `samples` (sorted finest first, distinct positive h, finite values).
- * @invariant a ratio between 1.1 and 1.3 is a warning; the Fs default is named; non-monotone triplets carry no extrapolation
- * @failure ratio < 1.1 -> VNV_RATIO_TOO_SMALL; two samples without assumedOrder, or least_squares with fewer than 4 samples -> VNV_SAMPLES_INVALID;
- *   order iteration not converged -> VNV_ORDER_NOT_CONVERGED (the least-squares path never refuses on the fit: it reports a status)
- */
-export function analyseSamples(samples: readonly ConvergenceSample[], options: AnalysisOptions): AnalysisOutcome {
-  const findings: Finding[] = [];
+/** Refinement-ratio warnings pushed to `findings`; the refusal for the first ratio below 1.1, else null. */
+function ratioFindings(samples: readonly ConvergenceSample[], findings: Finding[]): AnalysisOutcome | null {
   for (let k = 1; k < samples.length; k += 1) {
     const fine = samples[k - 1];
     const coarse = samples[k];
@@ -92,6 +86,47 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
       });
     }
   }
+  return null;
+}
+
+/** The caller's formal order as a named value (undefined when not given); pushes the order-mismatch finding and the defaulted tolerance. */
+function formalOrderFinding(
+  options: AnalysisOptions,
+  summaryReport: TripletReport,
+  findings: Finding[],
+  defaults: NamedValue[],
+): NamedValue | undefined {
+  const { p, status } = summaryReport;
+  let formalOrder: NamedValue | undefined;
+  if (options.formalOrder !== undefined) {
+    formalOrder = { value: options.formalOrder, source: 'caller', defaulted: false };
+    const tolerance: NamedValue =
+      options.orderTolerance !== undefined
+        ? { value: options.orderTolerance, source: 'caller', defaulted: false }
+        : { value: ORDER_TOLERANCE, source: 'llull choice (no published source)', defaulted: true };
+    if (tolerance.defaulted) defaults.push(tolerance);
+    if (status === 'monotone' && p !== undefined && Math.abs(p - options.formalOrder) > tolerance.value) {
+      findings.push({
+        code: 'VNV_ORDER_MISMATCH',
+        severity: 'warning',
+        message: `observed order ${p.toPrecision(4)} differs from the formal order ${options.formalOrder} by more than ${tolerance.value}`,
+        remediation: 'levels are likely not in the asymptotic range: add a finer level',
+      });
+    }
+  }
+  return formalOrder;
+}
+
+/**
+ * Report of `samples` (sorted finest first, distinct positive h, finite values).
+ * @invariant a ratio between 1.1 and 1.3 is a warning; the Fs default is named; non-monotone triplets carry no extrapolation
+ * @failure ratio < 1.1 -> VNV_RATIO_TOO_SMALL; two samples without assumedOrder, or least_squares with fewer than 4 samples -> VNV_SAMPLES_INVALID;
+ *   order iteration not converged -> VNV_ORDER_NOT_CONVERGED (the least-squares path never refuses on the fit: it reports a status)
+ */
+export function analyseSamples(samples: readonly ConvergenceSample[], options: AnalysisOptions): AnalysisOutcome {
+  const findings: Finding[] = [];
+  const tooClose = ratioFindings(samples, findings);
+  if (tooClose !== null) return tooClose;
   const fitted = options.method === 'least_squares';
   if (fitted && samples.length < 4) return refused('VNV_SAMPLES_INVALID', 'a least-squares fit needs at least 4 samples', 'samples');
   const twoLevel = samples.length === 2;
@@ -150,25 +185,9 @@ export function analyseSamples(samples: readonly ConvergenceSample[], options: A
     }
   }
 
-  const { p, asymptoticRatio, status } = summaryReport;
+  const { p, asymptoticRatio } = summaryReport;
   const gci21Fine = lsq !== undefined ? lsq.uncertainty.relative : summaryReport.gci21Fine;
-  let formalOrder: NamedValue | undefined;
-  if (options.formalOrder !== undefined) {
-    formalOrder = { value: options.formalOrder, source: 'caller', defaulted: false };
-    const tolerance: NamedValue =
-      options.orderTolerance !== undefined
-        ? { value: options.orderTolerance, source: 'caller', defaulted: false }
-        : { value: ORDER_TOLERANCE, source: 'llull choice (no published source)', defaulted: true };
-    if (tolerance.defaulted) defaults.push(tolerance);
-    if (status === 'monotone' && p !== undefined && Math.abs(p - options.formalOrder) > tolerance.value) {
-      findings.push({
-        code: 'VNV_ORDER_MISMATCH',
-        severity: 'warning',
-        message: `observed order ${p.toPrecision(4)} differs from the formal order ${options.formalOrder} by more than ${tolerance.value}`,
-        remediation: 'levels are likely not in the asymptotic range: add a finer level',
-      });
-    }
-  }
+  const formalOrder = formalOrderFinding(options, summaryReport, findings, defaults);
   if (asymptoticRatio !== undefined && (asymptoticRatio < ASYMPTOTIC_BAND[0] || asymptoticRatio > ASYMPTOTIC_BAND[1])) {
     findings.push({
       code: 'VNV_NOT_ASYMPTOTIC',

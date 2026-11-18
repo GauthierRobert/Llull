@@ -91,6 +91,61 @@ function marginsSummary(margins: MarginsOutcome | undefined): string {
 
 const percent = (ratio: number): string => `${ratio >= 1 ? '+' : ''}${((ratio - 1) * 100).toFixed(1)} %`;
 
+/** The first unknown material, unknown entity or entity not made of `from`, or null. */
+function materialProblem(doc: CadDocument, entityIds: readonly string[], from: string, to: string): Failure | null {
+  const unknownMaterials = [from, to].filter((id) => !Object.hasOwn(doc.materials, id));
+  if (unknownMaterials.length > 0)
+    return {
+      code: 'SEL_MATERIAL_NOT_FOUND',
+      message: `no material ${unknownMaterials.map((id) => `'${id}'`).join(', ')}`,
+      ids: unknownMaterials,
+      path: 'from',
+    };
+  const missingEntities = entityIds.filter((id) => !Object.hasOwn(doc.entities, id));
+  if (missingEntities.length > 0)
+    return {
+      code: 'SEL_ENTITY_NOT_FOUND',
+      message: `no entity ${missingEntities.map((id) => `'${id}'`).join(', ')}`,
+      ids: missingEntities,
+      path: 'entityIds',
+    };
+  const wrong = entityIds.filter((id) => doc.entities[id]?.materialId !== from);
+  if (wrong.length > 0)
+    return {
+      code: 'SEL_MATERIAL_NOT_ASSIGNED',
+      message: `${wrong.map((id) => `'${id}'`).join(', ')} not made of '${from}'`,
+      ids: wrong,
+      path: 'from',
+    };
+  return null;
+}
+
+interface SummaryInput {
+  readonly entityIds: readonly string[];
+  readonly from: string;
+  readonly to: string;
+  readonly rule: DesignRule;
+  readonly include: readonly string[];
+  readonly beforeG: number;
+  readonly afterG: number;
+  readonly massRatio: number;
+  readonly stiffness: { readonly ratio: number } | undefined;
+  readonly resized: { readonly dimension: string; readonly factor: number } | undefined;
+  readonly margins: MarginsOutcome | undefined;
+  readonly unverified: boolean;
+}
+
+function substituteSummary(input: SummaryInput): string {
+  const { entityIds, from, to, rule, include, beforeG, afterG, massRatio, stiffness, resized, margins, unverified } = input;
+  return (
+    `${COMMAND}: ${entityIds.join(', ')} '${from}' -> '${to}' (${rule}): ` +
+    `${include.includes('mass') ? `mass ${Number(beforeG.toPrecision(7))} g -> ${Number(afterG.toPrecision(7))} g (x${Number(massRatio.toPrecision(7))}, ${percent(massRatio)}${rule === 'same_geometry' ? '' : ', idealised part'})` : ''}` +
+    `${stiffness === undefined ? '' : `; stiffness x${Number(stiffness.ratio.toPrecision(7))}`}` +
+    `${resized === undefined ? '' : `; ${resized.dimension} x${Number(resized.factor.toPrecision(7))}`}` +
+    `${marginsSummary(margins)}${unverified ? '; UNVERIFIED inputs (typical / supplier / legacy values)' : ''}; ${REVIEW_SENTENCE}.`
+  );
+}
+
 /**
  * @affects nothing - read-only (the swap is made on an in-memory copy that is never returned); data { entityIds, from, to, designRule, mass, stiffness?, resized?, inputs, unverified, unverifiedReasons, reviewRequired }
  * @invariant same_geometry: mass before / after by mass_properties on the real and the swapped copy (exact path, ratio = after / before), stiffness E2 / E1, deflection E1 / E2, modal frequency sqrt((E2/rho2) / (E1/rho1)), buckling E2 / E1;
@@ -166,30 +221,8 @@ export const substituteMaterial = defineCommand({
         [],
         [entityIds.length === 0 ? 'entityIds' : 'to'],
       );
-    const unknownMaterials = [from, to].filter((id) => !Object.hasOwn(doc.materials, id));
-    if (unknownMaterials.length > 0)
-      return refuse({
-        code: 'SEL_MATERIAL_NOT_FOUND',
-        message: `no material ${unknownMaterials.map((id) => `'${id}'`).join(', ')}`,
-        ids: unknownMaterials,
-        path: 'from',
-      });
-    const missingEntities = entityIds.filter((id) => !Object.hasOwn(doc.entities, id));
-    if (missingEntities.length > 0)
-      return refuse({
-        code: 'SEL_ENTITY_NOT_FOUND',
-        message: `no entity ${missingEntities.map((id) => `'${id}'`).join(', ')}`,
-        ids: missingEntities,
-        path: 'entityIds',
-      });
-    const wrong = entityIds.filter((id) => doc.entities[id]?.materialId !== from);
-    if (wrong.length > 0)
-      return refuse({
-        code: 'SEL_MATERIAL_NOT_ASSIGNED',
-        message: `${wrong.map((id) => `'${id}'`).join(', ')} not made of '${from}'`,
-        ids: wrong,
-        path: 'from',
-      });
+    const problem = materialProblem(doc, entityIds, from, to);
+    if (problem !== null) return refuse(problem);
     const include = params.include ?? ['mass', 'stiffness'];
     if (include.includes('margins') && rule !== 'same_geometry')
       return refuseSel(
@@ -264,14 +297,20 @@ export const substituteMaterial = defineCommand({
       reviewRequired: true,
       reviewReasons: beforeMass.reviewReasons,
     };
-    return report(
-      doc,
-      `${COMMAND}: ${entityIds.join(', ')} '${from}' -> '${to}' (${rule}): ` +
-        `${include.includes('mass') ? `mass ${Number(beforeMass.massG.toPrecision(7))} g -> ${Number(afterG.toPrecision(7))} g (x${Number(massRatio.toPrecision(7))}, ${percent(massRatio)}${rule === 'same_geometry' ? '' : ', idealised part'})` : ''}` +
-        `${stiffness === undefined ? '' : `; stiffness x${Number(stiffness.ratio.toPrecision(7))}`}` +
-        `${ratios.resized === undefined ? '' : `; ${ratios.resized.dimension} x${Number(ratios.resized.factor.toPrecision(7))}`}` +
-        `${marginsSummary(margins)}${weak.length > 0 || marginsUnverified ? '; UNVERIFIED inputs (typical / supplier / legacy values)' : ''}; ${REVIEW_SENTENCE}.`,
-      data,
-    );
+    const summary = substituteSummary({
+      entityIds,
+      from,
+      to,
+      rule,
+      include,
+      beforeG: beforeMass.massG,
+      afterG,
+      massRatio,
+      stiffness,
+      resized: ratios.resized,
+      margins,
+      unverified: weak.length > 0 || marginsUnverified,
+    });
+    return report(doc, summary, data);
   },
 });

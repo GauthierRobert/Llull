@@ -5,7 +5,7 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { codedRejection, report } from '@core/commands/noop';
 import { percent } from './analysisShared';
-import { analyseSamples } from './convergenceAnalysis';
+import { analyseSamples, type AnalysisOutcome } from './convergenceAnalysis';
 
 const FORMULAS = [
   'R = e32/e21, e21 = f2 - f1, e32 = f3 - f2 (finest first)',
@@ -32,6 +32,25 @@ const fail = (doc: Parameters<typeof report>[0], why: string, path: string, code
     [],
     [path],
   );
+
+type Analysis = Extract<AnalysisOutcome, { readonly ok: true }>['analysis'];
+
+function convergenceSummary(
+  params: { readonly quantity: string; readonly unit: string },
+  analysis: Analysis,
+  sampleCount: number,
+  extrapolates: boolean,
+): string {
+  const { findings, summaryReport, safetyFactor, lsq } = analysis;
+  const { p, gci21Fine, status } = summaryReport;
+  const head = `check_convergence ${params.quantity}: ${status} over ${sampleCount} levels`;
+  return lsq !== undefined
+    ? `${head}, least-squares fit (${lsq.method}): observed order ${lsq.p.toPrecision(4)} (standard error ${lsq.standardError?.p.toPrecision(2) ?? 'n/a'}), extrapolated ${lsq.f0.toPrecision(6)} ${params.unit}, fit standard deviation ${lsq.residual.standardDeviation.toPrecision(3)} ${params.unit}; estimated uncertainty ${lsq.uncertainty.relative === undefined ? `${lsq.uncertainty.absolute.toPrecision(3)} ${params.unit}` : `${percent(lsq.uncertainty.relative)} of the finest value`}.`
+    : extrapolates && p !== undefined && gci21Fine !== undefined && summaryReport.extrapolated !== undefined
+      ? `${head}, observed order ${p.toPrecision(4)}, extrapolated ${summaryReport.extrapolated.toPrecision(6)} ${params.unit}; ` +
+        `estimated discretisation error (GCI, Fs ${safetyFactor.value}) ${percent(gci21Fine)} of the finest value.`
+      : `${head}; no extrapolated value${findings.length > 0 ? ` (${findings.map((f) => f.code).join(', ')})` : ''}.`;
+}
 
 /**
  * @affects nothing — read-only; data { status, codes[], findings[], p?, extrapolated?, gci21, triplets[], safetyFactor, provenance, unit }
@@ -141,14 +160,7 @@ export const checkConvergence = defineCommand({
         safetyFactor: safetyFactor.value,
       },
     };
-    const head = `check_convergence ${params.quantity}: ${status} over ${samples.length} levels`;
-    const summary =
-      lsq !== undefined
-        ? `${head}, least-squares fit (${lsq.method}): observed order ${lsq.p.toPrecision(4)} (standard error ${lsq.standardError?.p.toPrecision(2) ?? 'n/a'}), extrapolated ${lsq.f0.toPrecision(6)} ${params.unit}, fit standard deviation ${lsq.residual.standardDeviation.toPrecision(3)} ${params.unit}; estimated uncertainty ${lsq.uncertainty.relative === undefined ? `${lsq.uncertainty.absolute.toPrecision(3)} ${params.unit}` : `${percent(lsq.uncertainty.relative)} of the finest value`}.`
-        : extrapolates && p !== undefined && gci21Fine !== undefined && summaryReport.extrapolated !== undefined
-          ? `${head}, observed order ${p.toPrecision(4)}, extrapolated ${summaryReport.extrapolated.toPrecision(6)} ${params.unit}; ` +
-            `estimated discretisation error (GCI, Fs ${safetyFactor.value}) ${percent(gci21Fine)} of the finest value.`
-          : `${head}; no extrapolated value${findings.length > 0 ? ` (${findings.map((f) => f.code).join(', ')})` : ''}.`;
+    const summary = convergenceSummary(params, outcome.analysis, samples.length, extrapolates);
     return report(doc, summary, data);
   },
 });

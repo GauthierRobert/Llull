@@ -82,35 +82,38 @@ function formOk(form: unknown): boolean {
   );
 }
 
+function flatNodeOk(node: Record<string, unknown>): boolean {
+  const frame = node['frame'];
+  const frameOk = isRecord(frame) && isVec3(frame['origin']) && isVec3(frame['xDir']) && isVec3(frame['normal']);
+  const cutoutsOk =
+    Array.isArray(node['cutouts']) &&
+    node['cutouts'].every(
+      (cutout) => isRecord(cutout) && isVec2List(cutout['points']) && (cutout['form'] === undefined || typeof cutout['form'] === 'string'),
+    );
+  return isVec2List(node['outline']) && (node['outline'] as unknown[]).length >= 3 && frameOk && cutoutsOk;
+}
+
+function bendNodeOk(node: Record<string, unknown>, flat: (id: unknown) => boolean): boolean {
+  const line = node['lineInFrom'];
+  return (
+    flat(node['from']) &&
+    flat(node['to']) &&
+    Array.isArray(line) &&
+    line.length === 2 &&
+    line.every(isVec2) &&
+    finite(node['angle']) &&
+    nonNegative(node['insideRadius'])
+  );
+}
+
 function nodeErrors(path: string, node: unknown, nodes: Record<string, unknown>): string[] {
   if (!isRecord(node) || typeof node['id'] !== 'string') return [`${path} must be a node with an id`];
   const flat = (id: unknown): boolean => typeof id === 'string' && isRecord(nodes[id]) && nodes[id]['type'] === 'flat';
   switch (node['type']) {
-    case 'flat': {
-      const frame = node['frame'];
-      const frameOk = isRecord(frame) && isVec3(frame['origin']) && isVec3(frame['xDir']) && isVec3(frame['normal']);
-      const cutoutsOk =
-        Array.isArray(node['cutouts']) &&
-        node['cutouts'].every(
-          (cutout) =>
-            isRecord(cutout) && isVec2List(cutout['points']) && (cutout['form'] === undefined || typeof cutout['form'] === 'string'),
-        );
-      return isVec2List(node['outline']) && (node['outline'] as unknown[]).length >= 3 && frameOk && cutoutsOk
-        ? []
-        : [`${path} is a malformed flat`];
-    }
-    case 'bend': {
-      const line = node['lineInFrom'];
-      const ok =
-        flat(node['from']) &&
-        flat(node['to']) &&
-        Array.isArray(line) &&
-        line.length === 2 &&
-        line.every(isVec2) &&
-        finite(node['angle']) &&
-        nonNegative(node['insideRadius']);
-      return ok ? [] : [`${path} is a malformed bend`];
-    }
+    case 'flat':
+      return flatNodeOk(node) ? [] : [`${path} is a malformed flat`];
+    case 'bend':
+      return bendNodeOk(node, flat) ? [] : [`${path} is a malformed bend`];
     case 'joggle':
       return flat(node['on']) && flat(node['incline']) && flat(node['after']) && positive(node['angle']) && positive(node['offset'])
         ? []

@@ -106,6 +106,68 @@ export interface FreeIds {
   nextElement: number;
 }
 
+interface MomentLoad {
+  readonly id: string;
+  readonly load: FeaLoad;
+  readonly vector: Vec3;
+  readonly nodes: readonly number[];
+}
+
+/** One moment: a reference GRID held to the target nodes by an RBE3 (into `out.rigid`) and its MOMENT card (into `out.loads`); the refusal or null. */
+function momentCards(
+  ctx: DeckContext,
+  moment: MomentLoad,
+  deck: { position: ReadonlyMap<number, Vec3>; ids: FreeIds; out: LoadCards; sidText: string; track: Rounding },
+): DeckRefusal | null {
+  const { id, load, vector, nodes } = moment;
+  const { position, ids, out, sidText, track } = deck;
+  if (nodes.length < 3)
+    return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}) needs at least 3 non-collinear target nodes for its RBE3`, [id]);
+  const carried = momentForces(ctx.mesh, nodes, vector);
+  if ('refusal' in carried)
+    return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}) cannot be held by an RBE3: ${carried.refusal}`, [id]);
+  const centre: Vec3 =
+    load.referencePoint !== undefined
+      ? [
+          load.referencePoint[0] * ctx.lengthToAnalysis,
+          load.referencePoint[1] * ctx.lengthToAnalysis,
+          load.referencePoint[2] * ctx.lengthToAnalysis,
+        ]
+      : nodes.reduce<Vec3>(
+          (sum, node) => {
+            const at = position.get(node) ?? [0, 0, 0];
+            return [sum[0] + at[0] / nodes.length, sum[1] + at[1] / nodes.length, sum[2] + at[2] / nodes.length];
+          },
+          [0, 0, 0],
+        );
+  const grid = ids.nextGrid++;
+  const element = ids.nextElement++;
+  const text = [
+    integer(grid, 'reference grid id'),
+    '',
+    real(centre[0], 'reference x', track),
+    real(centre[1], 'reference y', track),
+    real(centre[2], 'reference z', track),
+  ];
+  const rbe = [integer(element, 'RBE3 element id'), '', String(grid), '123456', '1.', '123', ...nodes.map(String)];
+  const bad = [...text, rbe[0] ?? ''].find((field) => typeof field !== 'string');
+  if (bad !== undefined) return bad as unknown as DeckRefusal;
+  out.rigid.push(...cardLines('GRID', text as string[]), ...cardLines('RBE3', rbe as string[]));
+  const { magnitude, direction } = unit(vector);
+  const fields = [
+    sidText,
+    String(grid),
+    '',
+    real(magnitude, 'moment', track),
+    ...direction.map((component) => real(component, 'moment direction', track)),
+  ];
+  const badField = fields.find(failed);
+  if (badField !== undefined) return badField as DeckRefusal;
+  out.loads.push(...cardLines('MOMENT', fields as string[]));
+  out.comments.push(`$ llull: moment '${id}' on reference grid ${grid} (RBE3 ${element} over ${nodes.length} nodes)`);
+  return null;
+}
+
 /**
  * Loads of one load case under `sid`: forces split like the INP writer (area-consistent over faces, else equal over the target nodes, or `per_node`),
  * pressure as PLOAD4 (+ into the material, the Nastran solid convention), gravity as one GRAV, and each moment as a MOMENT on a reference GRID held to
@@ -144,50 +206,8 @@ export function loadCards(ctx: DeckContext, loadCase: string, sid: number, ids: 
         weights !== null ? [...weights] : nodes.map((node) => [node, load.distribution === 'per_node' ? 1 : 1 / nodes.length]);
       for (const [node, share] of shares) add(forces, node, [load.vector[0] * share, load.vector[1] * share, load.vector[2] * share]);
     } else if (load.kind === 'moment' && load.vector !== undefined) {
-      if (nodes.length < 3)
-        return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}) needs at least 3 non-collinear target nodes for its RBE3`, [id]);
-      const carried = momentForces(ctx.mesh, nodes, load.vector);
-      if ('refusal' in carried)
-        return refusal('FEA_LOAD_INVALID', `moment '${id}' (${load.name}) cannot be held by an RBE3: ${carried.refusal}`, [id]);
-      const centre: Vec3 =
-        load.referencePoint !== undefined
-          ? [
-              load.referencePoint[0] * ctx.lengthToAnalysis,
-              load.referencePoint[1] * ctx.lengthToAnalysis,
-              load.referencePoint[2] * ctx.lengthToAnalysis,
-            ]
-          : nodes.reduce<Vec3>(
-              (sum, node) => {
-                const at = position.get(node) ?? [0, 0, 0];
-                return [sum[0] + at[0] / nodes.length, sum[1] + at[1] / nodes.length, sum[2] + at[2] / nodes.length];
-              },
-              [0, 0, 0],
-            );
-      const grid = ids.nextGrid++;
-      const element = ids.nextElement++;
-      const text = [
-        integer(grid, 'reference grid id'),
-        '',
-        real(centre[0], 'reference x', track),
-        real(centre[1], 'reference y', track),
-        real(centre[2], 'reference z', track),
-      ];
-      const rbe = [integer(element, 'RBE3 element id'), '', String(grid), '123456', '1.', '123', ...nodes.map(String)];
-      const bad = [...text, rbe[0] ?? ''].find((field) => typeof field !== 'string');
-      if (bad !== undefined) return bad as unknown as DeckRefusal;
-      out.rigid.push(...cardLines('GRID', text as string[]), ...cardLines('RBE3', rbe as string[]));
-      const { magnitude, direction } = unit(load.vector);
-      const fields = [
-        sidText,
-        String(grid),
-        '',
-        real(magnitude, 'moment', track),
-        ...direction.map((component) => real(component, 'moment direction', track)),
-      ];
-      const badField = fields.find(failed);
-      if (badField !== undefined) return badField as DeckRefusal;
-      out.loads.push(...cardLines('MOMENT', fields as string[]));
-      out.comments.push(`$ llull: moment '${id}' on reference grid ${grid} (RBE3 ${element} over ${nodes.length} nodes)`);
+      const refused = momentCards(ctx, { id, load, vector: load.vector, nodes }, { position, ids, out, sidText, track });
+      if (refused !== null) return refused;
     } else if (load.kind === 'pressure' && load.magnitude !== undefined) {
       const faces = ctx.faces(key);
       if (faces.length === 0) return refusal('FEA_TARGET_UNRESOLVED', `pressure '${id}' (${load.name}) has no faces in the mesh`, [id]);

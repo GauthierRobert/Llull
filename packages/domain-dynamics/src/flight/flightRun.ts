@@ -242,6 +242,27 @@ export function prepareVehicle(
   return { built, vehicle, compiled, rotors, massKg, inertia, gravity, start, runtime, power };
 }
 
+/** Names of every defaulted input of the run (stale aero tables first), for the report. */
+function defaultedNotes(input: {
+  readonly staleAero: readonly string[];
+  readonly controller: FlightController | null;
+  readonly scenario: FlightScenario;
+  readonly compiled: FlightRuntime | null;
+  readonly power: readonly PowerRuntime[];
+}): string[] {
+  const { staleAero, controller, scenario, compiled, power } = input;
+  return [
+    ...staleAero.map((id) => `aero.${id}.stale`),
+    ...(controller?.defaulted ?? []).map((name) => `controller.${name}`),
+    ...scenario.defaulted.map((name) => `scenario.${name}`),
+    ...(compiled?.aero ?? []).flatMap((entry) => entry.surface.defaulted.map((name) => `aero.${entry.surface.id}.${name}`)),
+    ...power.flatMap((feed) => [
+      ...feed.battery.defaulted.map((name) => `battery.${feed.battery.id}.${name}`),
+      ...feed.powertrain.defaulted.map((name) => `powertrain.${feed.powertrain.id}.${name}`),
+    ]),
+  ];
+}
+
 /** Run scenario `scenarioId` of `doc` at physics step `timestep` (s), recording a sample every `sampleInterval` (s, rounded to steps). */
 export function runFlight(
   doc: CadDocument,
@@ -338,16 +359,7 @@ export function runFlight(
       sampleInterval,
       engine: engine.name,
       staleAero,
-      defaulted: [
-        ...staleAero.map((id) => `aero.${id}.stale`),
-        ...(controller?.defaulted ?? []).map((name) => `controller.${name}`),
-        ...scenario.defaulted.map((name) => `scenario.${name}`),
-        ...(compiled?.aero ?? []).flatMap((entry) => entry.surface.defaulted.map((name) => `aero.${entry.surface.id}.${name}`)),
-        ...power.flatMap((feed) => [
-          ...feed.battery.defaulted.map((name) => `battery.${feed.battery.id}.${name}`),
-          ...feed.powertrain.defaulted.map((name) => `powertrain.${feed.powertrain.id}.${name}`),
-        ]),
-      ],
+      defaulted: defaultedNotes({ staleAero, controller, scenario, compiled, power }),
     };
   } catch (error) {
     return error instanceof SimulationDivergedError

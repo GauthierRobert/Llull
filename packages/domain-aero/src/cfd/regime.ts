@@ -34,11 +34,8 @@ const solverRange = (solver: CfdSolver): string =>
 
 const solverFor = (mach: number): CfdSolver | null => (mach < LBM_MAX_MACH ? 'lbm' : mach <= EULER_MAX_MACH ? 'euler' : null);
 
-/**
- * @failure no air state / bad free stream -> CFD_PARAM_INVALID; Mach above 5, or regime / forced solver outside its Mach range -> CFD_REGIME_MISMATCH
- */
-export function resolveFlow(cfdCase: Pick<CfdCase, 'regime' | 'freestream' | 'solver'>): FlowResolution {
-  const { freestream } = cfdCase;
+/** The refusal for a free stream with a missing / doubled speed, a non-positive value or a bad given air state, else null. */
+function freestreamRefusal(freestream: CfdCase['freestream']): FlowResolution | null {
   const hasMach = freestream.mach !== undefined;
   const hasSpeed = freestream.speedMS !== undefined;
   if (hasMach === hasSpeed) return refuse('CFD_PARAM_INVALID', 'freestream needs exactly one of mach / speedMS');
@@ -49,6 +46,17 @@ export function resolveFlow(cfdCase: Pick<CfdCase, 'regime' | 'freestream' | 'so
   const air = freestream.air;
   if (air !== undefined && !(air.densityKgM3 > 0 && air.temperatureK > 0 && air.viscosityPaS > 0))
     return refuse('CFD_PARAM_INVALID', 'freestream.air densityKgM3 / temperatureK / viscosityPaS must be > 0');
+  return null;
+}
+
+/**
+ * @failure no air state / bad free stream -> CFD_PARAM_INVALID; Mach above 5, or regime / forced solver outside its Mach range -> CFD_REGIME_MISMATCH
+ */
+export function resolveFlow(cfdCase: Pick<CfdCase, 'regime' | 'freestream' | 'solver'>): FlowResolution {
+  const { freestream } = cfdCase;
+  const invalid = freestreamRefusal(freestream);
+  if (invalid !== null) return invalid;
+  const air = freestream.air;
   const resolved = air === undefined ? resolveAirState({ altitudeM: freestream.altitudeM ?? 0 }) : null;
   if (resolved !== null && !isAirState(resolved)) return refuse('CFD_PARAM_INVALID', resolved.message);
   const speedOfSoundMS =

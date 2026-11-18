@@ -18,6 +18,49 @@ export const helmboldLiftSlope = (a0: number, aspectRatio: number): number => {
   return a0 / (Math.sqrt(1 + k * k) + k);
 };
 
+interface WingSection {
+  slopeDefaulted: boolean;
+  a0: number;
+  zeroLift: number;
+  zeroLiftSource: string;
+}
+
+interface SectionRefusal {
+  code: string;
+  message: string;
+  paths: string[];
+}
+
+const resolveSection = (params: {
+  sectionLiftSlopePerRad?: number | undefined;
+  zeroLiftAngleDeg?: number | undefined;
+  naca?: string | undefined;
+}): WingSection | SectionRefusal => {
+  const slopeDefaulted = params.sectionLiftSlopePerRad === undefined;
+  const a0 = params.sectionLiftSlopePerRad ?? 2 * Math.PI;
+  if (!(a0 > 0 && a0 < 10))
+    return { code: 'AER_PARAM_INVALID', message: 'sectionLiftSlopePerRad must be within (0, 10)', paths: ['sectionLiftSlopePerRad'] };
+  let zeroLift = (params.zeroLiftAngleDeg ?? 0) * RAD;
+  let zeroLiftSource = params.zeroLiftAngleDeg === undefined ? 'default 0 (symmetric section)' : 'given';
+  if (params.naca !== undefined) {
+    const section = parseNaca(params.naca);
+    if (typeof section === 'string') return { code: 'AER_AIRFOIL_INVALID', message: section, paths: ['naca'] };
+    if (params.zeroLiftAngleDeg === undefined) {
+      zeroLift = thinAirfoil((x) => section.camber(x).slope).zeroLiftAngle;
+      zeroLiftSource = `thin-airfoil theory of ${section.designation}`;
+    }
+  }
+  return { slopeDefaulted, a0, zeroLift, zeroLiftSource };
+};
+
+const wingWarnings = (aspectRatio: number, slopeDefaulted: boolean): string[] => [
+  ...(aspectRatio < 4
+    ? [`aspect ratio ${sig(aspectRatio)} < 4: lifting-line over-predicts lift slope; compare helmboldLiftSlopePerDeg.`]
+    : []),
+  ...(slopeDefaulted ? ['section lift slope defaulted to 2π per rad (thin airfoil); real sections are ~5-10 % lower.'] : []),
+  'Attached incompressible flow: no stall, no compressibility, no sweep, no fuselage interference.',
+];
+
 /**
  * @affects none; data = { geometry { span, area, aspectRatio, taperRatio, meanChord }, section, polar [{ alphaDeg, cl, cdi, spanEfficiency, forces? }], liftSlopePerDeg, helmboldLiftSlopePerDeg, stations, warnings, provenance }
  * @invariant odd Glauert terms, collocation on the half span; e = CL²/(π AR CDi); elliptical planform -> e = 1
@@ -64,19 +107,9 @@ export const analyzeWing = defineCommand({
     if (!(terms >= 2 && terms <= 80)) return fail('AER_PARAM_INVALID', 'terms must be within 2..80', ['terms']);
     if (alphas.length === 0 || alphas.length > 31 || alphas.some((alpha) => !(Math.abs(alpha) <= 15)))
       return fail('AER_PARAM_INVALID', 'alphasDeg needs 1..31 angles within -15..15 degrees', ['alphasDeg']);
-    const slopeDefaulted = params.sectionLiftSlopePerRad === undefined;
-    const a0 = params.sectionLiftSlopePerRad ?? 2 * Math.PI;
-    if (!(a0 > 0 && a0 < 10)) return fail('AER_PARAM_INVALID', 'sectionLiftSlopePerRad must be within (0, 10)', ['sectionLiftSlopePerRad']);
-    let zeroLift = (params.zeroLiftAngleDeg ?? 0) * RAD;
-    let zeroLiftSource = params.zeroLiftAngleDeg === undefined ? 'default 0 (symmetric section)' : 'given';
-    if (params.naca !== undefined) {
-      const section = parseNaca(params.naca);
-      if (typeof section === 'string') return fail('AER_AIRFOIL_INVALID', section, ['naca']);
-      if (params.zeroLiftAngleDeg === undefined) {
-        zeroLift = thinAirfoil((x) => section.camber(x).slope).zeroLiftAngle;
-        zeroLiftSource = `thin-airfoil theory of ${section.designation}`;
-      }
-    }
+    const sectionResult = resolveSection(params);
+    if ('code' in sectionResult) return fail(sectionResult.code, sectionResult.message, sectionResult.paths);
+    const { slopeDefaulted, a0, zeroLift, zeroLiftSource } = sectionResult;
     const twist = (params.twistDeg ?? 0) * RAD;
     const wing: WingGeometry = {
       span: params.span,
@@ -108,13 +141,7 @@ export const analyzeWing = defineCommand({
     const zero = solveLiftingLine(wing, 0, terms, area);
     const slope = unit !== null && zero !== null ? unit.cl - zero.cl : Number.NaN;
     const last = solved[solved.length - 1]?.solution as NonNullable<(typeof solved)[number]['solution']>;
-    const warnings = [
-      ...(aspectRatio < 4
-        ? [`aspect ratio ${sig(aspectRatio)} < 4: lifting-line over-predicts lift slope; compare helmboldLiftSlopePerDeg.`]
-        : []),
-      ...(slopeDefaulted ? ['section lift slope defaulted to 2π per rad (thin airfoil); real sections are ~5-10 % lower.'] : []),
-      'Attached incompressible flow: no stall, no compressibility, no sweep, no fuselage interference.',
-    ];
+    const warnings = wingWarnings(aspectRatio, slopeDefaulted);
     const data = {
       geometry: {
         planform,

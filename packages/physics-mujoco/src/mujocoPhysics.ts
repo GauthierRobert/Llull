@@ -15,7 +15,7 @@ import {
 import type { Quaternion, Vec3 } from '@core/model/vectors';
 import { OBJECT_BODY, OBJECT_JOINT, OBJECT_TENDON, type MjData, type MjModel, type MujocoModule } from './bindings';
 import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './constraintForces';
-import { createConstraintPhysics } from './constraintPhysics';
+import { createConstraintPhysics, type ConstraintPhysics } from './constraintPhysics';
 import { springTendonName, toMjcf } from './mjcf';
 import { createServoSchedule } from './servoSchedule';
 import { createBodyStateReader, type BodyStateReader } from './bodyKinematics';
@@ -280,31 +280,73 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
         if (sampled) record(read);
       } else if (sampled) record();
     }
-    const potentialStart = energy.potential[0] ?? 0;
-    return {
-      ...trace,
-      ...(bodyReader === null ? {} : { bodyVelocity }),
-      ...(options.energy === true
-        ? {
-            energy: {
-              kinetic: energy.kinetic,
-              potential: energy.potential.map((p) => p - potentialStart),
-              appliedWork: energy.appliedWork,
-            },
-            ...(springs.length > 0 ? { springs: springTrace } : {}),
-            ...(constraint === null ? {} : { heat: { layout: constraint.layout, joules: heatTrace }, stops: constraint.stops() }),
-          }
-        : {}),
-      ...(block === undefined
-        ? {}
-        : { aux: auxTrace, ledger: ledgerTrace, ...(options.energy === true ? { actuatorWork: actuatorWorkTrace } : {}) }),
-      ...(wantReactions ? { jointReaction: reaction, reactionPeaks: peaks, ...(slots.length > 0 ? { loopForce } : {}) } : {}),
-      ...(slots.length > 0 ? { loopResidual: residual } : {}),
-    };
+    return finishTrace(options, {
+      trace,
+      bodyReader,
+      bodyVelocity,
+      energy,
+      springs: springs.length > 0 ? springTrace : null,
+      constraint,
+      heatTrace,
+      block,
+      auxTrace,
+      ledgerTrace,
+      actuatorWorkTrace,
+      wantReactions,
+      reaction,
+      peaks,
+      loopForce: slots.length > 0 ? loopForce : null,
+      residual: slots.length > 0 ? residual : null,
+    });
   } finally {
     data.delete();
     mjModel.delete();
   }
+}
+
+interface TraceParts {
+  readonly trace: SimulationTrace;
+  readonly bodyReader: BodyStateReader | null;
+  readonly bodyVelocity: NonNullable<SimulationTrace['bodyVelocity']>;
+  readonly energy: { kinetic: number[]; potential: number[]; appliedWork: number[] };
+  readonly springs: NonNullable<SimulationTrace['springs']> | null;
+  readonly constraint: ConstraintPhysics | null;
+  readonly heatTrace: number[][];
+  readonly block: SimulationModel['actuators'];
+  readonly auxTrace: number[][];
+  readonly ledgerTrace: number[][];
+  readonly actuatorWorkTrace: number[];
+  readonly wantReactions: boolean;
+  readonly reaction: NonNullable<SimulationTrace['jointReaction']>;
+  readonly peaks: NonNullable<SimulationTrace['reactionPeaks']>;
+  /** Null when the model has no loops. */
+  readonly loopForce: NonNullable<SimulationTrace['loopForce']> | null;
+  /** Null when the model has no loops. */
+  readonly residual: number | null;
+}
+
+/** The finished trace: the recorded series plus the optional blocks the run was asked for. */
+function finishTrace(options: SimulationOptions, parts: TraceParts): SimulationTrace {
+  const { trace, bodyReader, bodyVelocity, energy, springs, constraint, heatTrace, block, auxTrace, ledgerTrace, actuatorWorkTrace } =
+    parts;
+  const { wantReactions, reaction, peaks, loopForce, residual } = parts;
+  const potentialStart = energy.potential[0] ?? 0;
+  return {
+    ...trace,
+    ...(bodyReader === null ? {} : { bodyVelocity }),
+    ...(options.energy === true
+      ? {
+          energy: { kinetic: energy.kinetic, potential: energy.potential.map((p) => p - potentialStart), appliedWork: energy.appliedWork },
+          ...(springs !== null ? { springs } : {}),
+          ...(constraint === null ? {} : { heat: { layout: constraint.layout, joules: heatTrace }, stops: constraint.stops() }),
+        }
+      : {}),
+    ...(block === undefined
+      ? {}
+      : { aux: auxTrace, ledger: ledgerTrace, ...(options.energy === true ? { actuatorWork: actuatorWorkTrace } : {}) }),
+    ...(wantReactions ? { jointReaction: reaction, reactionPeaks: peaks, ...(loopForce !== null ? { loopForce } : {}) } : {}),
+    ...(residual !== null ? { loopResidual: residual } : {}),
+  };
 }
 
 interface StepWorkBasis {

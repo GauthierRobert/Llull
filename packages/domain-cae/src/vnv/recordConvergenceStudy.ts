@@ -22,6 +22,24 @@ import { verifyStudy } from './studyVerify';
 const NOTE =
   'Exactly the study returned by run_convergence_study (never hand-written): every level is re-derived from the artifact store and compared.';
 
+type Analysis = Extract<ReturnType<typeof analyseStudy>, { readonly ok: true }>['analysis'];
+
+const studyHead = (recorded: CaseStudy, analysisId: string, levels: CaseStudy['levels']): string => {
+  const sizeName = recorded.refinement === 'dt' ? 'dt (s)' : recorded.refinement === 'p' ? '1/order' : 'h';
+  return `record_convergence_study: '${recorded.id}' on '${analysisId}' — ${recorded.refinement} study, ${levels.length} levels, ${sizeName} ${levels.map((level) => level.h.toPrecision(4)).join(' / ')}`;
+};
+
+const studyNumbers = (recorded: CaseStudy, analysis: Analysis, safetyFactor: NamedValue): string => {
+  const { summaryReport: report, lsq, orderPair } = analysis;
+  return orderPair !== undefined
+    ? `order 2 ${orderPair.quadratic.toPrecision(6)} vs order 1 ${orderPair.linear.toPrecision(6)} ${recorded.unit}, difference ${orderPair.difference.relative === undefined ? orderPair.difference.absolute.toPrecision(3) : percent(orderPair.difference.relative)} (an indicator: no observed order, no extrapolated value)`
+    : lsq !== undefined
+      ? `${report.status}, least-squares fit (${lsq.method}): observed order ${lsq.p.toPrecision(4)}, extrapolated ${lsq.f0.toPrecision(6)} ${recorded.unit}, fit standard deviation ${lsq.residual.standardDeviation.toPrecision(3)}, estimated uncertainty ${lsq.uncertainty.relative === undefined ? `${lsq.uncertainty.absolute.toPrecision(3)} ${recorded.unit}` : percent(lsq.uncertainty.relative)}`
+      : report.status === 'monotone' && report.p !== undefined && report.gci21Fine !== undefined && report.extrapolated !== undefined
+        ? `${report.status}, observed order ${report.p.toPrecision(4)}, extrapolated ${report.extrapolated.toPrecision(6)} ${recorded.unit}, estimated discretisation error (GCI, Fs ${safetyFactor.value}) ${percent(report.gci21Fine)}`
+        : `${report.status}, no extrapolated value (${analysis.findings.map((finding) => finding.code).join(', ') || 'none'})`;
+};
+
 /**
  * @affects doc.analysis.cases[analysisId].studies / studyOrder (adds `cs-<step>.<k>`; affected: [studyId])
  * @invariant with an artifact store: every level's mesh and results exist, hash to their names, bind to each other and to the level inputs; while the
@@ -145,17 +163,7 @@ export const recordConvergenceStudy = defineCommand({
     const evicted = problem !== null && problem.code === 'VNV_ARTIFACT_NOT_FOUND' && ctx?.replaying === true;
     if (problem !== null && !evicted) return fail(problem.code, problem.message, problem.ids, ['study']);
     const recorded: CaseStudy = { ...draft, id: nextId('cs'), ...(evicted ? { verified: false as const } : {}) };
-    const { summaryReport: report, lsq, orderPair } = outcome.analysis;
-    const sizeName = given.refinement === 'dt' ? 'dt (s)' : given.refinement === 'p' ? '1/order' : 'h';
-    const head = `record_convergence_study: '${recorded.id}' on '${analysisId}' — ${given.refinement} study, ${levels.length} levels, ${sizeName} ${levels.map((level) => level.h.toPrecision(4)).join(' / ')}`;
-    const numbers =
-      orderPair !== undefined
-        ? `order 2 ${orderPair.quadratic.toPrecision(6)} vs order 1 ${orderPair.linear.toPrecision(6)} ${recorded.unit}, difference ${orderPair.difference.relative === undefined ? orderPair.difference.absolute.toPrecision(3) : percent(orderPair.difference.relative)} (an indicator: no observed order, no extrapolated value)`
-        : lsq !== undefined
-          ? `${report.status}, least-squares fit (${lsq.method}): observed order ${lsq.p.toPrecision(4)}, extrapolated ${lsq.f0.toPrecision(6)} ${recorded.unit}, fit standard deviation ${lsq.residual.standardDeviation.toPrecision(3)}, estimated uncertainty ${lsq.uncertainty.relative === undefined ? `${lsq.uncertainty.absolute.toPrecision(3)} ${recorded.unit}` : percent(lsq.uncertainty.relative)}`
-          : report.status === 'monotone' && report.p !== undefined && report.gci21Fine !== undefined && report.extrapolated !== undefined
-            ? `${report.status}, observed order ${report.p.toPrecision(4)}, extrapolated ${report.extrapolated.toPrecision(6)} ${recorded.unit}, estimated discretisation error (GCI, Fs ${safetyFactor.value}) ${percent(report.gci21Fine)}`
-            : `${report.status}, no extrapolated value (${outcome.analysis.findings.map((finding) => finding.code).join(', ') || 'none'})`;
+    const numbers = studyNumbers(recorded, outcome.analysis, safetyFactor);
     const state = evicted
       ? ` Recorded UNVERIFIED (VNV_ARTIFACT_NOT_FOUND on replay: ${problem?.message}): no number is used until run_convergence_study is run on this machine.`
       : port === null
@@ -163,6 +171,8 @@ export const recordConvergenceStudy = defineCommand({
         : stale.length > 0
           ? ` Recorded STALE (${stale.join('; ')}): re-run run_convergence_study.`
           : '';
-    return changed(withStudy(doc, analysisCase, recorded), `${head}: ${numbers}.${state}`, [recorded.id]);
+    return changed(withStudy(doc, analysisCase, recorded), `${studyHead(recorded, analysisId, levels)}: ${numbers}.${state}`, [
+      recorded.id,
+    ]);
   },
 });

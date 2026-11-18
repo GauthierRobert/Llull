@@ -197,13 +197,8 @@ export interface EngineInput {
 const integrate = (values: readonly number[], step: number): number =>
   values.reduce((sum, v, i) => (i === 0 ? 0 : sum + 0.5 * (v + elementAt(values, i - 1)) * step), 0);
 
-/** The engine report of the first crank that has cylinder pressures; null when the model has none. */
-export function engineData(input: EngineInput): EngineData | null {
-  const first = input.runtimes[0];
-  if (first === undefined) return null;
-  const crank = first.layout.crankJoint;
-  const runtimes = input.runtimes;
-  const { trace } = input;
+/** Warnings of the cylinder set-up: a TDC angle that disagrees with the geometry, a pressure table without a source. */
+function runtimeWarnings(runtimes: readonly CylinderRuntime[]): string[] {
   const warnings: string[] = [];
   for (const runtime of runtimes)
     if (runtime.tdcMismatchDeg !== null)
@@ -212,6 +207,17 @@ export function engineData(input: EngineInput): EngineData | null {
       );
   if (runtimes.some((runtime) => runtime.cylinder.model.kind === 'table' && runtime.cylinder.model.source === undefined))
     warnings.push('unverified: a pressure table has no source');
+  return warnings;
+}
+
+/** The engine report of the first crank that has cylinder pressures; null when the model has none. */
+export function engineData(input: EngineInput): EngineData | null {
+  const first = input.runtimes[0];
+  if (first === undefined) return null;
+  const crank = first.layout.crankJoint;
+  const runtimes = input.runtimes;
+  const { trace } = input;
+  const warnings = runtimeWarnings(runtimes);
   const theta = trace.jointPosition[crank] ?? [];
   const omega = trace.jointVelocity[crank] ?? [];
   const cycleDeg = cycleLength(first.cylinder.cycle);

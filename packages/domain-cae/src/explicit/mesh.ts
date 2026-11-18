@@ -5,7 +5,7 @@
  */
 
 import type { AnalysisCase, FeMeshArtifact } from '@core/model/analysis';
-import type { CadDocument } from '@core/model/types';
+import type { BoxEntity, CadDocument } from '@core/model/types';
 import { MAX_STRUCTURED_NODES } from './defaults';
 
 export interface ExplicitMesh {
@@ -42,6 +42,43 @@ const CORNERS: readonly (readonly [number, number, number])[] = [
   [0, 1, 1],
 ];
 
+interface ShellGrid {
+  readonly nodes: number[];
+  readonly shell4: number[];
+  readonly shellThickness: number[];
+  readonly shellPart: string[];
+  readonly nodePart: string[];
+}
+
+/** Appends the mid-surface shell grid of one box (across its two largest dimensions) to `grid`. */
+function appendShellGrid(
+  grid: ShellGrid,
+  box: { entityId: string; entity: BoxEntity; min: readonly number[]; size: number; lengthToAnalysis: number },
+): void {
+  const { nodes, shell4, shellThickness, shellPart, nodePart } = grid;
+  const { entityId, entity, min, size, lengthToAnalysis } = box;
+  const thin = [0, 1, 2].reduce((best, axis) => ((entity.size[axis] ?? 0) < (entity.size[best] ?? 0) ? axis : best), 0);
+  const [u, v] = thin === 2 ? [0, 1] : thin === 0 ? [1, 2] : [2, 0];
+  const [nu, nv] = [u, v].map((axis) => Math.max(1, Math.round((entity.size[axis] ?? 0) / size)));
+  const base = nodes.length / 3;
+  for (let j = 0; j <= (nv ?? 1); j++)
+    for (let i = 0; i <= (nu ?? 1); i++) {
+      const point = [0, 0, 0];
+      point[u] = (min[u] ?? 0) + (i * (entity.size[u] ?? 0)) / (nu ?? 1);
+      point[v] = (min[v] ?? 0) + (j * (entity.size[v] ?? 0)) / (nv ?? 1);
+      point[thin] = (min[thin] ?? 0) + (entity.size[thin] ?? 0) / 2;
+      nodes.push(...point.map((value) => value * lengthToAnalysis));
+      nodePart.push(entityId);
+    }
+  const at = (i: number, j: number): number => base + i + ((nu ?? 1) + 1) * j;
+  for (let j = 0; j < (nv ?? 1); j++)
+    for (let i = 0; i < (nu ?? 1); i++) {
+      shell4.push(at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1));
+      shellThickness.push((entity.size[thin] ?? 0) * lengthToAnalysis);
+      shellPart.push(entityId);
+    }
+}
+
 /**
  * Structured hex8 grid over every part (each part meshed on its own: no shared nodes between parts); the parts in `shells` become a grid of
  * shells on their mid-surface across the two largest dimensions (thickness = the smallest one, normal along it).
@@ -71,26 +108,7 @@ export function structuredHexMesh(
       };
     const min = entity.position.map((centre, axis) => centre - (entity.size[axis] ?? 0) / 2);
     if (Object.hasOwn(shells, entityId)) {
-      const thin = [0, 1, 2].reduce((best, axis) => ((entity.size[axis] ?? 0) < (entity.size[best] ?? 0) ? axis : best), 0);
-      const [u, v] = thin === 2 ? [0, 1] : thin === 0 ? [1, 2] : [2, 0];
-      const [nu, nv] = [u, v].map((axis) => Math.max(1, Math.round((entity.size[axis] ?? 0) / size)));
-      const base = nodes.length / 3;
-      for (let j = 0; j <= (nv ?? 1); j++)
-        for (let i = 0; i <= (nu ?? 1); i++) {
-          const point = [0, 0, 0];
-          point[u] = (min[u] ?? 0) + (i * (entity.size[u] ?? 0)) / (nu ?? 1);
-          point[v] = (min[v] ?? 0) + (j * (entity.size[v] ?? 0)) / (nv ?? 1);
-          point[thin] = (min[thin] ?? 0) + (entity.size[thin] ?? 0) / 2;
-          nodes.push(...point.map((value) => value * lengthToAnalysis));
-          nodePart.push(entityId);
-        }
-      const at = (i: number, j: number): number => base + i + ((nu ?? 1) + 1) * j;
-      for (let j = 0; j < (nv ?? 1); j++)
-        for (let i = 0; i < (nu ?? 1); i++) {
-          shell4.push(at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1));
-          shellThickness.push((entity.size[thin] ?? 0) * lengthToAnalysis);
-          shellPart.push(entityId);
-        }
+      appendShellGrid({ nodes, shell4, shellThickness, shellPart, nodePart }, { entityId, entity, min, size, lengthToAnalysis });
       continue;
     }
     const counts = entity.size.map((extent) => Math.max(1, Math.round(extent / size)));

@@ -62,6 +62,68 @@ function loftEntity(
   return { id, kind: 'loft', rings: sections.map(sectionRing), ruled, sections, position: origin, rotation: [0, 0, 0], layerId, color };
 }
 
+interface ChordLayout {
+  readonly chords: number[];
+  readonly segmentDefaults: WingSegment;
+}
+
+interface ChordRefusal {
+  readonly code: string;
+  readonly message: string;
+  readonly path: string;
+}
+
+/** Chord of every section (from the planform, else each section's own) and the segment defaults the planform implies, or the refusal. */
+function resolveChords(
+  sections: readonly SectionInput[],
+  planform: z.infer<typeof planformSchema> | undefined,
+): ChordLayout | ChordRefusal {
+  if (planform === undefined) {
+    const noChord = sections.findIndex((section) => !((section.chord ?? 0) > 0));
+    if (noChord >= 0)
+      return {
+        code: 'AERO_PARAM_INVALID',
+        message: `section ${noChord} needs chord > 0 (or give a planform)`,
+        path: `sections.${noChord}.chord`,
+      };
+    return {
+      chords: sections.map((section) => section.chord as number),
+      segmentDefaults: { sweepDeg: 0, sweepLocation: 0, dihedralDeg: 0 },
+    };
+  }
+  const resolved = resolvePlanform(planform);
+  if ('code' in resolved) return { code: resolved.code, message: resolved.message, path: 'planform' };
+  const [first, last] = [sections[0] as SectionInput, sections[sections.length - 1] as SectionInput];
+  if (Math.abs(first.span) > 1e-9 || Math.abs(last.span - resolved.semiSpan) > 1e-9 * Math.max(1, resolved.semiSpan))
+    return {
+      code: 'AERO_PARAM_INVALID',
+      message: `with a planform the first section must be at span 0 and the last at the semi-span ${resolved.semiSpan} (got ${first.span} and ${last.span})`,
+      path: 'sections',
+    };
+  return {
+    chords: sections.map((section) => resolved.rootChord + ((resolved.tipChord - resolved.rootChord) * section.span) / resolved.semiSpan),
+    segmentDefaults: {
+      sweepDeg: planform.sweepDeg ?? 0,
+      sweepLocation: planform.sweepLocation ?? 0,
+      dihedralDeg: planform.dihedralDeg ?? 0,
+    },
+  };
+}
+
+type SegmentInput = z.infer<typeof segmentSchema>;
+
+/** One segment per span interval: the given one (or the single given one for all), else the planform defaults. */
+function resolveSegments(given: readonly SegmentInput[] | undefined, count: number, defaults: WingSegment): WingSegment[] {
+  return Array.from({ length: count }, (_, i) => {
+    const entry = given?.[given.length === 1 ? 0 : i];
+    return {
+      sweepDeg: entry === undefined ? defaults.sweepDeg : (entry.sweepDeg ?? 0),
+      sweepLocation: entry === undefined ? defaults.sweepLocation : (entry.sweepLocation ?? 0),
+      dihedralDeg: entry === undefined ? defaults.dihedralDeg : (entry.dihedralDeg ?? 0),
+    };
+  });
+}
+
 /**
  * @affects creates doc.aero.wings[id] and 1 loft entity (2 with mirror) whose sections are the exact placed airfoil curves
  * @invariant sections are not resampled (loft v3); trailing edge stays a B-rep edge; span strictly increasing; any 3 independent planform values resolve the rest
@@ -135,46 +197,16 @@ export const createWing = defineCommand({
       return refuse('AERO_AIRFOIL_NOT_FOUND', `no airfoil "${sections[missing]?.airfoilId}"`, `sections.${missing}.airfoilId`, [
         sections[missing]?.airfoilId ?? '',
       ]);
-    let chords: number[];
-    let segmentDefaults: WingSegment = { sweepDeg: 0, sweepLocation: 0, dihedralDeg: 0 };
-    if (planform !== undefined) {
-      const resolved = resolvePlanform(planform);
-      if ('code' in resolved) return refuse(resolved.code, resolved.message, 'planform');
-      const [first, last] = [sections[0] as SectionInput, sections[sections.length - 1] as SectionInput];
-      if (Math.abs(first.span) > 1e-9 || Math.abs(last.span - resolved.semiSpan) > 1e-9 * Math.max(1, resolved.semiSpan))
-        return refuse(
-          'AERO_PARAM_INVALID',
-          `with a planform the first section must be at span 0 and the last at the semi-span ${resolved.semiSpan} (got ${first.span} and ${last.span})`,
-          'sections',
-        );
-      chords = sections.map(
-        (section) => resolved.rootChord + ((resolved.tipChord - resolved.rootChord) * section.span) / resolved.semiSpan,
-      );
-      segmentDefaults = {
-        sweepDeg: planform.sweepDeg ?? 0,
-        sweepLocation: planform.sweepLocation ?? 0,
-        dihedralDeg: planform.dihedralDeg ?? 0,
-      };
-    } else {
-      const noChord = sections.findIndex((section) => !((section.chord ?? 0) > 0));
-      if (noChord >= 0)
-        return refuse('AERO_PARAM_INVALID', `section ${noChord} needs chord > 0 (or give a planform)`, `sections.${noChord}.chord`);
-      chords = sections.map((section) => section.chord as number);
-    }
+    const layout = resolveChords(sections, planform);
+    if ('code' in layout) return refuse(layout.code, layout.message, layout.path);
+    const { chords, segmentDefaults } = layout;
     if (params.segments !== undefined && params.segments.length !== 1 && params.segments.length !== sections.length - 1)
       return refuse(
         'AERO_PARAM_INVALID',
         `segments needs ${sections.length - 1} entries (or 1 for all), got ${params.segments.length}`,
         'segments',
       );
-    const segments: WingSegment[] = Array.from({ length: sections.length - 1 }, (_, i) => {
-      const given = params.segments?.[params.segments.length === 1 ? 0 : i];
-      return {
-        sweepDeg: given === undefined ? segmentDefaults.sweepDeg : (given.sweepDeg ?? 0),
-        sweepLocation: given === undefined ? segmentDefaults.sweepLocation : (given.sweepLocation ?? 0),
-        dihedralDeg: given === undefined ? segmentDefaults.dihedralDeg : (given.dihedralDeg ?? 0),
-      };
-    });
+    const segments = resolveSegments(params.segments, sections.length - 1, segmentDefaults);
     const bad = segments.findIndex(
       (segment) =>
         !(segment.sweepLocation >= 0 && segment.sweepLocation <= 1) ||
