@@ -100,7 +100,10 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { keys: 'L / P / W', action: 'Line / Polyline / Wall' },
       { keys: 'R / C / S / .', action: 'Rectangle / Circle / Spline / Point' },
       { keys: 'Enter', action: 'Finish polyline, wall or spline' },
-      { keys: Object.keys(MODIFY_KEYS).join(' ').toUpperCase(), action: 'Offset, Round corner, Cut corner, Trim, Extend, Explode (Modify)' },
+      {
+        keys: Object.keys(MODIFY_KEYS).join(' ').toUpperCase(),
+        action: 'Offset, Round corner, Cut corner, Trim, Extend, Explode (Modify)',
+      },
     ],
   },
 ];
