@@ -15,6 +15,7 @@ import { carrierOfSupport } from '../../industrial/piping/pipeCarrier';
 import { reconcilePipeSupports } from '../../industrial/piping/pipeSupportAttach';
 import { BUILDING_LAYER_COLOR } from './entities';
 import { regenerateOwned } from '../../shared/derived';
+import { memoizedEvaluation } from '../../shared/evaluationMemo';
 import { elementAffected, orderedElements } from '../model';
 import { openingsOf } from '../geometry/wallGeometry';
 import {
@@ -99,6 +100,55 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
 }
 
 /**
+ * Everything `evaluateElement` reads for `element` besides `doc.units` (the evaluation is a pure function of these), or null when the
+ * element is not memoized: walls and curved walls read their openings and joined walls (`openingsOf`, `wallExtent`), an unplaced element
+ * evaluates to nothing.
+ * @invariant the owner's `entityIds` are ignored by the comparison; every other element it names is listed here
+ */
+function evaluationInputs(context: EvaluationContext, element: BuildingElement): readonly unknown[] | null {
+  const { building } = context;
+  switch (element.category) {
+    case 'grid':
+      return [element];
+    case 'door':
+    case 'window': {
+      const host = building.elements[element.hostId];
+      const level = host && (host.category === 'wall' || host.category === 'curvedWall') ? building.levels[host.levelId] : undefined;
+      return level ? [element, host, level] : null;
+    }
+    case 'wall':
+    case 'curvedWall':
+    case 'assembly':
+      return null;
+    case 'connection': {
+      const [rafter, other] = [building.elements[element.rafterId], building.elements[element.otherId]];
+      return [
+        element,
+        rafter?.category === 'member' ? rafter : null,
+        other?.category === 'member' ? other : null,
+        building.levels[element.levelId],
+      ];
+    }
+    case 'plate': {
+      const member = building.elements[element.memberId];
+      return [element, member?.category === 'member' ? member : null, building.levels[element.levelId]];
+    }
+    case 'pipeSupport':
+      return [element, carrierOfSupport(context.doc, building, element) ?? null, building.levels[element.levelId]];
+    default:
+      return [element, building.levels[element.levelId]];
+  }
+}
+
+/** `evaluateElement`, reusing the entities of the previous regeneration when the element and what it reads are unchanged. */
+function evaluateMemoized(context: EvaluationContext, element: BuildingElement): Entity[] {
+  const inputs = evaluationInputs(context, element);
+  if (inputs === null || inputs.at(-1) === undefined) return evaluateElement(context, element);
+  const previous = context.doc.building?.elements[element.id]?.entityIds;
+  return memoizedEvaluation(context.doc, previous, inputs, () => evaluateElement(context, element));
+}
+
+/**
  * Replaces all previously evaluated building entities with a fresh evaluation of `edited` (after re-attaching the pipe supports whose pipe
  * or steel it changed).
  * @returns the new document; each element's `entityIds` lists the entities generated for it
@@ -111,7 +161,7 @@ export function regenerateBuilding(doc: CadDocument, edited: BuildingModel): Cad
     doc,
     Object.values(doc.building?.elements ?? {}),
     orderedElements(building),
-    (element) => evaluateElement(context, element),
+    (element) => evaluateMemoized(context, element),
     BUILDING_LAYER_COLOR,
   );
   return { ...doc, ...parts, building: { ...building, elements: owners } };
