@@ -113,7 +113,7 @@ export function meshFindings(
   features: { wall: number | null; strut: number | null },
 ): void {
   const { add } = sink;
-  if (full !== null && !isClosedManifold({ positions: [...full.positions], indices: [...full.indices] }))
+  if (full !== null && !isClosedManifold(full))
     add({
       code: 'IMP_CHECK_MESH_NOT_MANIFOLD',
       severity: 'fail',

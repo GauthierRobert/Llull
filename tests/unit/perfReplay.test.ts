@@ -3,7 +3,7 @@ import { type CadDocument, type FeatureStep, createEmptyDocument } from '@core/m
 import { execute } from '@core/commands/registry';
 import { defaultContext, runInContext } from '@core/commands/context';
 import { getCommand } from '@core/commands/commandTable';
-import { createReplayCache } from '@core/commands/history/replayCache';
+import { createReplayCache, replayCacheFor } from '@core/commands/history/replayCache';
 import { replayHistory } from '@core/commands/history/replay';
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandDefinition } from '@core/commands/types';
@@ -121,5 +121,37 @@ describe('replay cache and parameters', () => {
     const warm = replay(baseDoc(edited, 1), runs, cache);
     expect(runs).toHaveLength(11);
     expect(warm).toEqual(cold(baseDoc(edited, 1)));
+  });
+});
+
+describe('replay cache sized to the history (PERF1)', () => {
+  it('an edit of the last step of a 1500-step history re-runs that step only', () => {
+    const history = boxes(1500);
+    const cache = createReplayCache();
+    replay(baseDoc(history, 1), [], cache);
+    const edited = [...history.slice(0, -1), step(1500, 'add_box', { size: [7, 7, 7] })];
+    const runs: string[] = [];
+    const doc = replay(baseDoc(edited, 1), runs, cache);
+    expect(runs).toEqual(['add_box']);
+    expect(doc).toEqual(cold(baseDoc(edited, 1)));
+  });
+
+  it('grows the cache to hold every live step and its parameter variant, never shrinking it', () => {
+    const cache = createReplayCache(8);
+    expect(replayCacheFor(cache, 3, 10)).toBe(cache);
+    expect(cache.capacityNow).toBe(22);
+    expect(replayCacheFor(cache, 100, 50)).toBe(cache);
+    expect(cache.capacityNow).toBe(216);
+    expect(replayCacheFor(cache, 2, 50)).toBe(cache);
+    expect(cache.capacityNow).toBe(216);
+  });
+
+  it('does not memoize a history whose states would not fit the memory budget, and leaves a missing cache missing', () => {
+    const cache = createReplayCache(8);
+    expect(replayCacheFor(cache, 6000, 6000)).toBeNull();
+    expect(cache.capacityNow).toBe(8);
+    expect(replayCacheFor(null, 10, 10)).toBeNull();
+    const small = createReplayCache(20_000);
+    expect(replayCacheFor(small, 6000, 6000)).toBe(small);
   });
 });

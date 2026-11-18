@@ -13,6 +13,7 @@ import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { hashText } from '@lib/hash';
+import { jsonWithObjectMarks } from '@lib/jsonWithObjectMarks';
 
 /**
  * Who sent a broadcast command: the REST API (the UI, scripts) or the `llull` CLI.
@@ -123,17 +124,54 @@ const hashByPart = new WeakMap<object, PartHash>();
 /** Hash of one `ShapeRecipe` node, by identity: results share their operands' recipe objects, so a boolean chain costs O(1) per link. */
 const hashByRecipeNode = new WeakMap<object, string>();
 
+const NUMBERS_MARK = '\u0000numbers:';
+/** Shorter arrays are written as text (the mark would not be shorter). */
+const MIN_HASHED_NUMBERS = 64;
+const float = new Float64Array(1);
+const floatWords = new Uint32Array(float.buffer);
+/** Mark of a long array of finite numbers, by identity (null = not such an array): a pure command keeps the arrays of a mesh it did not reshape. */
+const markByNumbers = new WeakMap<object, string | null>();
+
+/**
+ * Stands for a long array of finite numbers (mesh positions / indices) in the hashed text: its length and a 64-bit fold of the IEEE-754
+ * bits, so a 100k-triangle mesh costs a pass over its numbers instead of printing each one. -0 counts as 0 (JSON prints both as `0`, and a
+ * snapshot-resynced replica must agree); an array with anything else than finite numbers is written as text.
+ */
+function numbersMark(values: readonly unknown[]): string | undefined {
+  if (values.length < MIN_HASHED_NUMBERS) return undefined;
+  const known = markByNumbers.get(values);
+  if (known !== undefined) return known ?? undefined;
+  let a = 0x811c9dc5;
+  let b = 0x01000193 ^ 0x5bd1e995;
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      markByNumbers.set(values, null);
+      return undefined;
+    }
+    float[0] = value + 0;
+    const low = floatWords[0] as number;
+    const high = floatWords[1] as number;
+    a = Math.imul(Math.imul(a ^ low, 0x01000193) ^ high, 0x01000193);
+    b = Math.imul(b ^ low, 0x5bd1e995) ^ (b >>> 15);
+    b = Math.imul(b ^ high, 0x5bd1e995) ^ (b >>> 15);
+  }
+  const mark = `${NUMBERS_MARK}${values.length}:${(a >>> 0).toString(16).padStart(8, '0')}${(b >>> 0).toString(16).padStart(8, '0')}`;
+  markByNumbers.set(values, mark);
+  return mark;
+}
+
 const RECIPE_CHILD_MARK = '\u0000recipe:';
 
 function isRecipeNode(value: unknown): value is object {
   return typeof value === 'object' && value !== null && typeof (value as { op?: unknown }).op === 'string';
 }
 
-/** JSON replacer: a nested recipe node stands for its own hash (always memoized by `hashRecipes` first), known or not. */
-function recipeChildReplacer(this: unknown, key: string, value: unknown): unknown {
-  if (key === '' || !isRecipeNode(value)) return value;
-  return RECIPE_CHILD_MARK + (hashByRecipeNode.get(value) ?? '');
-}
+/** A nested recipe node stands for its own hash (always memoized by `hashRecipes` first), known or not; a long numeric array for its fold. */
+const recipeChildMark = (value: object): string | undefined => {
+  if (Array.isArray(value)) return numbersMark(value);
+  return isRecipeNode(value) ? RECIPE_CHILD_MARK + (hashByRecipeNode.get(value) ?? '') : undefined;
+};
 
 /** Recipe nodes directly below `root` (not inside another node), found without recursion. */
 function childRecipeNodes(root: object, rootIsNode: boolean): object[] {
@@ -144,6 +182,15 @@ function childRecipeNodes(root: object, rootIsNode: boolean): object[] {
     if (typeof value !== 'object' || value === null) continue;
     if (isRecipeNode(value) && !(rootIsNode && value === root)) {
       found.push(value);
+      continue;
+    }
+    if (Array.isArray(value)) {
+      // A long numeric array already folded holds no node; any other array is scanned for objects only.
+      if (typeof markByNumbers.get(value) === 'string') continue;
+      for (let index = 0; index < value.length; index += 1) {
+        const child: unknown = value[index];
+        if (typeof child === 'object' && child !== null) pending.push(child);
+      }
       continue;
     }
     for (const child of Object.values(value)) pending.push(child);
@@ -165,7 +212,7 @@ function hashRecipes(root: object): void {
   }
   for (let i = order.length - 1; i >= 0; i--) {
     const node = order[i];
-    if (node !== undefined) hashByRecipeNode.set(node, hashText(JSON.stringify(node, recipeChildReplacer)));
+    if (node !== undefined) hashByRecipeNode.set(node, hashText(jsonWithObjectMarks(node, recipeChildMark)));
   }
 }
 
@@ -173,7 +220,7 @@ function partHash(part: object, key: string): PartHash {
   const known = hashByPart.get(part);
   if (known !== undefined) return known;
   hashRecipes(part);
-  const hex = hashText(JSON.stringify([key, part], recipeChildReplacer));
+  const hex = hashText(jsonWithObjectMarks([key, part], recipeChildMark));
   const hash = { high: Number.parseInt(hex.slice(0, 8), 16), low: Number.parseInt(hex.slice(8), 16) };
   hashByPart.set(part, hash);
   return hash;

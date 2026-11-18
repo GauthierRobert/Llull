@@ -232,7 +232,11 @@ export function renderDraftSvg(items: readonly DraftItem[], options: SvgOptions)
   const heightMm = Math.max((box.maxY - box.minY) * mm + 2 * options.marginMm, 1);
   const patterns = new Patterns(options);
   const byLayer = new Map<string, DraftItem[]>();
-  for (const item of items) byLayer.set(item.layerName, [...(byLayer.get(item.layerName) ?? []), item]);
+  for (const item of items) {
+    const layer = byLayer.get(item.layerName);
+    if (layer === undefined) byLayer.set(item.layerName, [item]);
+    else layer.push(item);
+  }
   const groups = [...byLayer].map(([name, layerItems], index) => {
     const first = layerItems[0] as DraftItem;
     const stroke = first.layerColor ?? '#000000';

@@ -2,7 +2,7 @@
 export class LruCache<V> {
   private readonly entries = new Map<string, V>();
 
-  constructor(private readonly capacity: number) {}
+  constructor(private capacity: number) {}
 
   get(key: string): V | undefined {
     const value = this.entries.get(key);
@@ -23,6 +23,15 @@ export class LruCache<V> {
       const oldest = this.entries.keys().next().value;
       if (oldest !== undefined) this.entries.delete(oldest);
     }
+  }
+
+  /** Raises the capacity to `minimum` when it is lower (never shrinks, so nothing is evicted). */
+  ensureCapacity(minimum: number): void {
+    if (minimum > this.capacity) this.capacity = minimum;
+  }
+
+  get capacityNow(): number {
+    return this.capacity;
   }
 
   get size(): number {
