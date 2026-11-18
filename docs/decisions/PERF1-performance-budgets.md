@@ -104,5 +104,9 @@ Also measured, no gate scenario yet: `explicit_run` at 20 000 hex8 did not finis
 | 11 | LBM throughput ~8 M cell-updates/s; topology ~100–330 ms per iteration; `mapNodalField` TypeScript fallback 5–11 s at 69k nodes | not profiled inside the binaries | |
 | 12 | 563 `Math.min(...array)` / `Math.max(...array)` spreads remain in `packages/` and `server/`: each is a RangeError above ~1.5·10⁵ items | by grep | a lint rule and linear helpers |
 
+**Scope (owner, 2026-11-18): PERF1 work does not touch the front-end** (`src/ui/**`, `desktop/`): a separate front-end review owns it.
+Row 9 (2D snapping, `src/ui/viewport/2d/snapping`) and every viewport frame-time question are handed to that review; nothing in
+`src/` or `desktop/` was changed under PERF1.
+
 Not measured here: the viewport (three.js frame times need a GPU: readiness pack 03 PRF owns those budgets), the native OCCT kernel
 and the Netgen mesher (not built in the measuring container), GPU solver paths.
