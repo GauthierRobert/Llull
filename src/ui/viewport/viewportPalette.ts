@@ -50,6 +50,8 @@ interface ViewportPalette {
   contactShadowOpacity: number;
   /** Opacity of the key light's shadow on the ground (the shadow catcher). */
   groundShadowOpacity: number;
+  /** Line colour of the hidden-line ("Wire") view: it must stand out from the background, unlike the shaded view's dark edges. */
+  wireLine: string;
   axisColors: [string, string, string];
   axisLabel: string;
 }
@@ -63,6 +65,7 @@ const PALETTES: Record<Theme, ViewportPalette> = {
     grid2dMajor: 0x343843,
     contactShadowOpacity: 0.55,
     groundShadowOpacity: 0.42,
+    wireLine: '#c5cddb',
     axisColors: ['#e5534b', '#57ab5a', '#4c8dff'],
     axisLabel: '#f2f3f5',
   },
@@ -74,10 +77,33 @@ const PALETTES: Record<Theme, ViewportPalette> = {
     grid2dMajor: 0xc4c9d2,
     contactShadowOpacity: 0.3,
     groundShadowOpacity: 0.22,
+    wireLine: '#1c2230',
     axisColors: ['#d1453b', '#3f9142', '#2f6fe4'],
     axisLabel: '#ffffff',
   },
 };
+
+/** The palette of the current theme, outside React (material factories). */
+export function currentViewportPalette(): ViewportPalette {
+  return PALETTES[useThemeStore.getState().theme];
+}
+
+/**
+ * The surface of the "Wire" display mode: unlit paper in the background colour, so the solid hides what is behind it and only the
+ * edge pass draws it (a hidden-line view). A triangle wireframe showed the tessellation, which on a round solid is a moiré of
+ * slivers, not the part.
+ */
+export function hiddenLineSurface(background: string): {
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+  roughness: number;
+  metalness: number;
+  envMapIntensity: number;
+  wireframe: false;
+} {
+  return { color: '#000000', emissive: background, emissiveIntensity: 1, roughness: 1, metalness: 0, envMapIntensity: 0, wireframe: false };
+}
 
 export function useViewportPalette(): ViewportPalette {
   const theme = useThemeStore((s) => s.theme);

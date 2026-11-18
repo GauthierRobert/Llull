@@ -40,3 +40,20 @@ describe('tinted solids (members coloured by utilisation on their real geometry)
     expect(useTintStore.getState().tints.size).toBe(0);
   });
 });
+
+describe('Wire display mode (hidden-line view)', () => {
+  it('blanks the surface to unlit paper in the background colour instead of a triangle wireframe; the edge pass is forced on', async () => {
+    const { useViewportStore, useThemeStore } = await import('@ui/store');
+    const { useEdgeLines } = await import('@ui/viewport/3d/useRenderQuality');
+    const { useRealismStore } = await import('@ui/store/realismStore');
+    const { makeMaterialArgs } = await import('@ui/viewport/3d/InstancedRenderer');
+    useThemeStore.setState({ theme: 'light' });
+    useViewportStore.setState({ displayMode: 'wireframe' });
+    useRealismStore.setState({ realism: 'draft', edges: 'off' });
+    const { result } = renderHook(() => ({ material: useMaterialProps({ color: '#888888', selected: true }), edges: useEdgeLines() }));
+    expect(result.current.material).toMatchObject({ wireframe: false, color: '#000000', emissive: '#eceef1', emissiveIntensity: 1 });
+    expect(result.current.edges).toBe(true);
+    expect(makeMaterialArgs('wireframe')).toMatchObject({ wireframe: false, emissive: '#eceef1' });
+    useViewportStore.setState({ displayMode: 'shaded' });
+  });
+});

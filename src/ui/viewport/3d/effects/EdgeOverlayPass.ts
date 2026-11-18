@@ -12,6 +12,9 @@ import { hideEdgeExcluded } from './edgeExclusion';
 import { SELECTION_LAYER } from './selectionLayer';
 import { SELECTION_COLOR } from '../../viewportPalette';
 
+/** Near-black: on a shaded solid an edge reads as a darker crease in either theme. */
+const DEFAULT_LINE_COLOR = '#10131a';
+
 const EDGE_SHADER = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
@@ -20,8 +23,8 @@ const EDGE_SHADER = {
     texel: { value: new THREE.Vector2(1, 1) },
     cameraNear: { value: 0.1 },
     cameraFar: { value: 1000 },
-    lineColor: { value: new THREE.Color('#10131a') },
-    strength: { value: 0.75 },
+    lineColor: { value: new THREE.Color(DEFAULT_LINE_COLOR) },
+    strength: { value: 0.9 },
     tMask: { value: null as THREE.Texture | null },
     selectionColor: { value: new THREE.Color(SELECTION_COLOR) },
     /** 0 = nothing selected (the mask is not sampled), 1 = draw the outline. */
@@ -66,14 +69,17 @@ const EDGE_SHADER = {
 
     // Edge strength (0..1) of the Roberts cross centred on uv.
     float edgeAt(vec2 uv) {
-      vec2 a = uv + vec2(-texel.x, -texel.y);
-      vec2 b = uv + vec2(texel.x, texel.y);
-      vec2 c = uv + vec2(-texel.x, texel.y);
-      vec2 d = uv + vec2(texel.x, -texel.y);
-      float z0 = viewDepth(a);
-      float z1 = viewDepth(b);
-      float z2 = viewDepth(c);
-      float z3 = viewDepth(d);
+      // Normals (linear-filtered, multisampled) on half-texel arms: a crease is a one-pixel line (full-texel arms drew it three wide).
+      // Depth is a point-sampled texture: half-texel arms would often read the same texel twice and break up the silhouettes.
+      vec2 arm = texel * 0.5;
+      vec2 a = uv + vec2(-arm.x, -arm.y);
+      vec2 b = uv + vec2(arm.x, arm.y);
+      vec2 c = uv + vec2(-arm.x, arm.y);
+      vec2 d = uv + vec2(arm.x, -arm.y);
+      float z0 = viewDepth(uv + vec2(-texel.x, -texel.y));
+      float z1 = viewDepth(uv + vec2(texel.x, texel.y));
+      float z2 = viewDepth(uv + vec2(-texel.x, texel.y));
+      float z3 = viewDepth(uv + vec2(texel.x, -texel.y));
       float zc = viewDepth(uv);
       // Depth jump relative to the depth itself, forgiven on surfaces seen at a grazing angle (their depth slopes steeply).
       float depthEdge = max(abs(z0 - z1), abs(z2 - z3)) / max(min(min(z0, z1), min(z2, z3)), 1e-4);
@@ -129,6 +135,8 @@ export class EdgeOverlayPass extends Pass {
     height: number,
     /** True while something is selected: the mask render is skipped otherwise. */
     private readonly hasSelection: () => boolean = () => false,
+    /** Line colour for this frame (the hidden-line view draws in the theme's line colour); the shader default otherwise. */
+    private readonly lineColor: () => string | null = () => null,
   ) {
     super();
     this.mask = new THREE.WebGLRenderTarget(width, height, { samples: 4, depthBuffer: false });
@@ -179,6 +187,7 @@ export class EdgeOverlayPass extends Pass {
     uniforms['tNormal']!.value = this.target.texture;
     uniforms['tDepth']!.value = this.target.depthTexture;
     uniforms['tMask']!.value = this.mask.texture;
+    (uniforms['lineColor']!.value as THREE.Color).set(this.lineColor() ?? DEFAULT_LINE_COLOR);
     uniforms['selection']!.value = selection ? 1 : 0;
     uniforms['cameraNear']!.value = camera.near;
     uniforms['cameraFar']!.value = camera.far;

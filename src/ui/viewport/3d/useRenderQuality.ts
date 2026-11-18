@@ -93,8 +93,10 @@ export function resolveEdgeLines(settings: RenderQualitySettings, preference: Ed
   return preference === 'auto' ? settings.edgeLines : preference === 'on';
 }
 
+/** The "Wire" display mode IS the edge pass (its surfaces are blank paper), whatever the tier or the preference. */
 export function useEdgeLines(): boolean {
   const settings = useRenderQuality();
   const preference = useRealismStore((s) => s.edges);
-  return resolveEdgeLines(settings, preference);
+  const wire = useViewportStore((s) => s.displayMode === 'wireframe');
+  return wire || resolveEdgeLines(settings, preference);
 }

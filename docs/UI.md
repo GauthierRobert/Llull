@@ -31,6 +31,11 @@ sits behind an unlabelled icon. Rationale and references: `docs/decisions/UX1-di
 - **Feature edges and the selection outline** (`effects/EdgeOverlayPass.ts`) are on by default in Standard up to 200 entities;
   **ambient occlusion** up to 50. Selected solids are also on `SELECTION_LAYER`; the pass draws their outer rim in the selection
   colour over everything, so a part hidden behind another still shows where it is. Low / Draft keep the plain render (emissive tint).
+- **Edge quality**: the edge pass averages four sub-pixel evaluations per pixel on a multisampled normal/depth target (normals on
+  half-texel arms = one-pixel creases, depth on full-texel arms = slightly heavier silhouettes) and an FXAA pass ends the chain.
+  One all-or-nothing evaluation per pixel drew stair-stepped lines of uneven weight.
+- **Wire** display mode is a hidden-line view: surfaces are unlit paper in the background colour (`hiddenLineSurface`) and the edge
+  pass, forced on, draws the part in the theme's `wireLine` colour. A triangle wireframe showed the tessellation, not the part.
 - **Shadows**: the key light's frustum hugs the scene (`keyLightRig.ts`), comes from the front-left of the default view, and a
   shadow catcher on the ground shows its shadow. Softness is three's own PCF blur (`shadowRadius`): drei's PCSS patch produced no
   shadow at all with three r186, where the shadow map is a comparison texture.

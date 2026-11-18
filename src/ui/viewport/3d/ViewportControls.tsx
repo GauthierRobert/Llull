@@ -53,7 +53,7 @@ function Snap3DToggle(): React.ReactElement {
 
 const DISPLAY_MODES: { value: DisplayMode; label: string; title: string; icon: IconName }[] = [
   { value: 'shaded', label: 'Shaded', title: 'Shaded — standard PBR rendering', icon: 'shaded' },
-  { value: 'wireframe', label: 'Wire', title: 'Wireframe — show mesh edges only', icon: 'wireframe' },
+  { value: 'wireframe', label: 'Wire', title: 'Edges only — a hidden-line view: outlines and creases, no shading', icon: 'wireframe' },
   { value: 'xray', label: 'X-Ray', title: 'X-Ray — transparent surfaces', icon: 'xray' },
 ];
 

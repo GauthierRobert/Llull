@@ -11,7 +11,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { FXAAPass } from 'three/examples/jsm/postprocessing/FXAAPass.js';
 import { fromMm } from '@core/model/units';
-import { useStore } from '@ui/store';
+import { useStore, useViewportStore } from '@ui/store';
+import { currentViewportPalette } from '../../viewportPalette';
 import { mergedEntityBounds } from '../fitBounds';
 import { BackgroundOutputPass } from './BackgroundOutputPass';
 import { DepthRangeCamera } from './depthRangeCamera';
@@ -55,6 +56,10 @@ function depthRangeOf(box: SceneBox | null, camera: THREE.PerspectiveCamera): De
 /** Read per frame by the edge pass (no re-render of the chain when the selection changes; the store invalidates the frame). */
 const hasSelection = (): boolean => useStore.getState().document.selection.length > 0;
 
+/** The theme's line colour while the hidden-line view is shown, else null (the pass default). Read per frame. */
+const wireLineColor = (): string | null =>
+  useViewportStore.getState().displayMode === 'wireframe' ? currentViewportPalette().wireLine : null;
+
 export function HighQualityEffects({ edges, ambientOcclusion }: EffectFlags): null {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
@@ -88,7 +93,7 @@ export function HighQualityEffects({ edges, ambientOcclusion }: EffectFlags): nu
     if (camera instanceof THREE.PerspectiveCamera) {
       const depthCamera = new DepthRangeCamera(camera, (view) => depthRangeOf(boxRef.current, view));
       if (ambientOcclusion) chain.addPass(new HalfResGtaoPass(scene, camera, width, height, gtaoParameters(radius.current), depthCamera));
-      if (edges) chain.addPass(new EdgeOverlayPass(scene, depthCamera, width, height, hasSelection));
+      if (edges) chain.addPass(new EdgeOverlayPass(scene, depthCamera, width, height, hasSelection, wireLineColor));
     }
     chain.addPass(new BackgroundOutputPass(() => background.current));
     // Last, on the displayed (tone-mapped, sRGB) image: the edge lines are drawn after the MSAA resolve, so nothing else smooths them.
