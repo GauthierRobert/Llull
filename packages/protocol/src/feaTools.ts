@@ -69,7 +69,12 @@ export interface FeaSolveOptions {
   readonly timeoutS?: number;
   /** Solver threads (1 = bit-reproducible results; more = faster, last digits vary between runs). Absent: the host default (LLULL_FEA_THREADS, else 1). */
   readonly threads?: number;
+  /** Equation solver of the static steps: 'direct' (default) or 'iterative' (faster on bulky solid models, results to about three digits). */
+  readonly solver?: FeaSolverMethod;
 }
+
+export const FEA_SOLVER_METHODS = ['direct', 'iterative'] as const;
+export type FeaSolverMethod = (typeof FEA_SOLVER_METHODS)[number];
 
 /** Port to the FE transports (implemented in `server/`). Failures are results (`isError`, summary starts `<tool> <CODE>`), not throws. */
 export interface FeaToolsPort {
@@ -134,6 +139,15 @@ export function buildFeaToolDefinitions(): ToolDefinition[] {
               'Solver threads (default 1, or LLULL_FEA_THREADS on the host). 1 gives bit-reproducible results. More threads shorten a large solve ' +
               '(about half the time at 4) but the last digits of the results then vary from run to run (relative difference around 1e-6); the ' +
               'summary, data.threads and the results artifact (solverThreads) record the count.',
+          },
+          solver: {
+            type: 'string',
+            enum: [...FEA_SOLVER_METHODS],
+            description:
+              'Equation solver of a linear static case. "direct" (default): sparse factorization, the reference. "iterative": preconditioned ' +
+              'conjugate gradients, about 2.5 times faster on one thread for bulky solid models (47k quadratic tetrahedra: 46 s instead of 117 s) ' +
+              'and reproducible run to run, but its results agree with the direct solve only to about three digits (stress within a few 1e-4 relative); ' +
+              'solid parts only, no contact or pretension (else FEA_SOLVER_OPTION_UNSUPPORTED). The results artifact records solverMethod.',
           },
         },
         required: ['analysisId'],
@@ -278,6 +292,12 @@ function exportOptions(args: Record<string, unknown>): { format?: FeaExportForma
   return { ...(format !== undefined ? { format: format as FeaExportFormat } : {}), ...(encoding !== undefined ? { encoding } : {}) };
 }
 
+/** The `solver` of a fea_solve call; nothing when absent or not a known method (the schema enum is the contract). */
+function solveMethod(args: Record<string, unknown>): { readonly solver?: FeaSolverMethod } {
+  const found = FEA_SOLVER_METHODS.find((method) => method === args['solver']);
+  return found === undefined ? {} : { solver: found };
+}
+
 /** The `threads` of a fea_solve call, clamped to FEA_SOLVE_THREADS; nothing when absent or not a positive number. */
 function solveThreads(args: Record<string, unknown>): { readonly threads?: number } {
   const requested = args['threads'];
@@ -377,7 +397,11 @@ export async function applyFeaToolCall(toolName: string, rawArgs: unknown, deps:
       toolName === 'fea_mesh'
         ? await deps.fea.mesh(analysisId, deps)
         : toolName === 'fea_solve'
-          ? await deps.fea.solve(analysisId, { ...(timeoutS === undefined ? {} : { timeoutS }), ...solveThreads(args) }, deps)
+          ? await deps.fea.solve(
+              analysisId,
+              { ...(timeoutS === undefined ? {} : { timeoutS }), ...solveThreads(args), ...solveMethod(args) },
+              deps,
+            )
           : await deps.fea.exportDeck(analysisId, deps, exportOptions(args));
     return shapeToolCallContent(result);
   } catch (error) {

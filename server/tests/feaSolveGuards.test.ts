@@ -2,7 +2,7 @@
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { FeMeshArtifact, FeResultsArtifact, ResultsSummary } from '@core/model/analysis';
@@ -146,6 +146,61 @@ describe('solver threads (PERF1)', () => {
     for (const threads of [4.7, 100000, 0, 'many']) await applyExchangeToolCall('fea_solve', { analysisId: 'an', threads }, deps);
     await applyExchangeToolCall('fea_solve', { analysisId: 'an' }, deps);
     expect(seen).toEqual([4, 256, undefined, undefined, undefined]);
+  });
+});
+
+describe('solver method (PERF1)', () => {
+  it('solves on the direct solver unless asked; the iterative deck, summary, data and artifact say so', async () => {
+    const decks: string[] = [];
+    const reading = (run: Harness): CcxRunner => ({
+      ...run.ccx,
+      run: async (jobDirectory, job, timeoutMs, threads) => {
+        decks.push(await readFile(path.join(jobDirectory, `${job}.inp`), 'utf8'));
+        return run.ccx.run(jobDirectory, job, timeoutMs, threads);
+      },
+    });
+    const hooks = { iterativeSolverDeck: (_doc: CadDocument, _id: string, text: string) => ({ text: `${text}** iterative\n` }) };
+    const direct = harness('x', hooks);
+    const plain = await runFeaSolve('an', {}, direct.host, { store, hooks: direct.hooks, ccx: reading(direct) });
+    expect(plain.data).toMatchObject({ solver: 'direct' });
+    expect(plain.summary).not.toContain('Iterative solver');
+    const asked = harness('x', hooks);
+    const iterative = await runFeaSolve('an', { solver: 'iterative' }, asked.host, { store, hooks: asked.hooks, ccx: reading(asked) });
+    expect(decks).toEqual(['*DECK\n', '*DECK\n** iterative\n']);
+    expect(iterative.summary).toContain('Iterative solver: results agree with a direct solve to about three digits (a few 1e-4 relative)');
+    expect(iterative.data).toMatchObject({ solver: 'iterative' });
+    expect(store.get(String((iterative.data as { resultsHash: string }).resultsHash))).toMatchObject({ solverMethod: 'iterative' });
+    const stored = store.get(String((plain.data as { resultsHash: string }).resultsHash));
+    expect(stored === null ? null : 'solverMethod' in stored).toBe(false);
+  });
+
+  it('refuses a case the iterative solver does not suit before starting the solver', async () => {
+    const run = harness('x');
+    const result = await runFeaSolve('an', { solver: 'iterative' }, run.host, { store, hooks: run.hooks, ccx: run.ccx });
+    expect(result.isError).toBe(true);
+    expect(result.summary).toContain('fea_solve FEA_SOLVER_OPTION_UNSUPPORTED');
+    expect(run.timeouts).toEqual([]);
+  });
+
+  it('the tool schema lists the methods and the dispatch forwards a known one only', async () => {
+    const tool = buildFeaToolDefinitions().find((entry) => entry.name === 'fea_solve');
+    expect(tool?.inputSchema.properties['solver']).toMatchObject({ type: 'string', enum: ['direct', 'iterative'] });
+    const seen: (string | undefined)[] = [];
+    const port: FeaToolsPort = {
+      mesh: () => Promise.resolve(ok('')),
+      solve: (_id, options) => {
+        seen.push(options.solver);
+        return Promise.resolve(ok(''));
+      },
+      exportDeck: () => Promise.resolve(ok('')),
+      importField: () => Promise.resolve(ok('')),
+      convergenceStudy: () => Promise.resolve(ok('')),
+      importResults: () => Promise.resolve(ok('')),
+    };
+    const deps = { port: null, allowCodeExecution: false, getDoc: createEmptyDocument, applyCommand: () => ok(''), fea: port };
+    for (const solver of ['iterative', 'direct', 'pardiso', 3])
+      await applyExchangeToolCall('fea_solve', { analysisId: 'an', solver }, deps);
+    expect(seen).toEqual(['iterative', 'direct', undefined, undefined]);
   });
 });
 

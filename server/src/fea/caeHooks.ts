@@ -23,6 +23,7 @@ import {
   writeBdf,
   type BdfResult,
   writeInp,
+  iterativeSolverDeck,
   firstNonFinite,
   parseFrd,
   classifyNonlinearStop,
@@ -78,6 +79,8 @@ export interface CaeHooks {
     frdText: string,
   ): { readonly steps: FeResultsArtifact['steps'] } | CaeCode;
   analysisInputHash(doc: CadDocument, analysisId: string, scope: 'mesh' | 'full'): string;
+  /** `deckText` with its static steps on the iterative solver, or the refusal for a case it does not suit. */
+  iterativeSolverDeck(doc: CadDocument, analysisId: string, deckText: string): { readonly text: string } | CaeCode;
   writeInp(
     doc: CadDocument,
     analysisId: string,
@@ -140,6 +143,7 @@ export const caeHooks: CaeHooks = {
   mapShellResults,
   analysisInputHash,
   // a printed part reads its triangles for the skin fraction: an asset-backed one must carry its full mesh (14 FLL-M3, as buildTopologyJob)
+  iterativeSolverDeck,
   writeInp: (doc, analysisId, mesh, artifacts) =>
     writeInp(
       withFullResolution(doc, Object.keys(doc.analysis?.cases[analysisId]?.printed ?? {}), defaultMeshAssetStore()),

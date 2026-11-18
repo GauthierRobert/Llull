@@ -524,6 +524,8 @@ export interface FeResultsArtifact {
   readonly inputHash: string;
   readonly solver: string;
   readonly solverVersion: string;
+  /** Equation solver of the static steps when it was not the direct factorization: such results agree with a direct solve to about three digits (a few 1e-4 relative). */
+  readonly solverMethod?: 'iterative';
   /** Threads the solver ran with, recorded only above 1: such results are reproducible to about six digits, not bit for bit. */
   readonly solverThreads?: number;
   /** Imported OP2 / FRD whose file carried no llull input-hash marker: stamped with the current hash without proof the file belongs to this set-up. */
