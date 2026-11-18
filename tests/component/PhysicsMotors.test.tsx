@@ -40,7 +40,8 @@ function addDcMotor(joint: string, extra: Record<string, unknown> = {}): string 
   return localDispatch('add_motor', { joint, kind: 'dc', datasheet: SHEET, source: SOURCE, ...extra }).affected[0]!;
 }
 
-const originalDispatch = useStore.getState().dispatch;
+// the store as created, not its state at file load: the shared DOM worker resets stores per test, so a previous file can leave a mocked dispatch behind
+const originalDispatch = useStore.getInitialState().dispatch;
 
 describe('Physics panel: motors, drives and profiles', () => {
   beforeEach(() => {
