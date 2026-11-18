@@ -103,7 +103,8 @@ export function segmentPiercesTriangle(p: Vec3, q: Vec3, [a, b, c]: Triangle): V
 /**
  * Minimum distance between two triangles with witness points; 0 (witness = the crossing point) when they intersect. Evaluation order is
  * fixed: piercing edges of `first`, piercing edges of `second`, then edge-edge pairs, then vertex-triangle pairs; the first strictly
- * smaller candidate wins.
+ * smaller candidate wins. Tuple entry point over `triangleDistanceInto`: the hot path (`meshBvh`) calls the kernel directly; this one is the
+ * readable form the unit tests and the `llull-geomq` parity corpus use.
  */
 export function triangleDistance(first: Triangle, second: Triangle): ClosestPair {
   const tri = new Float64Array(PAIR_FLOATS);

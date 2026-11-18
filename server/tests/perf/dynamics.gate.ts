@@ -125,7 +125,7 @@ describe.skipIf(requireTool('native:llull-compute', compute !== null))('motion c
 describe('motion clearance without the native engine (PERF1)', () => {
   it('dynamics.clearance.cranks3_ts: the same 63 part pairs over 361 samples on the TypeScript meshBvh', () => {
     const started = performance.now();
-    const result = execute(sliderCranks(3), 'check_motion_clearance', { duration: 1 }, context);
+    const result = execute(sliderCranks(3), 'check_motion_clearance', { duration: 1 }, { ...context, geometryQueries: null });
     const elapsed = performance.now() - started;
     expect(result.summary).toContain('63 pair(s) over 361 samples');
     expectWithinBudget('dynamics.clearance.cranks3_ts', elapsed);

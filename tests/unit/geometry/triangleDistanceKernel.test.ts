@@ -22,7 +22,7 @@ const bits = (values: readonly number[]): string => {
   return values
     .map((value) => {
       view.setFloat64(0, value);
-      return `${view.getUint32(0).toString(16)}${view.getUint32(4).toString(16)}`;
+      return `${view.getUint32(0).toString(16).padStart(8, '0')}${view.getUint32(4).toString(16).padStart(8, '0')}`;
     })
     .join(',');
 };
@@ -130,10 +130,28 @@ function soup(random: () => number, triangles: number, extent: number, size: num
   return { positions, indices: Array.from({ length: triangles * 3 }, (_, i) => i) };
 }
 
-const rotationZ = (angle: number): RigidTransform['rotation'] => {
+/** Rodrigues rotation about a random unit axis, so every matrix entry is exercised. */
+const randomRotation = (random: () => number): RigidTransform['rotation'] => {
+  const raw = [random() - 0.5, random() - 0.5, random() - 0.5 + 1e-3];
+  const length = Math.hypot(raw[0] ?? 0, raw[1] ?? 0, raw[2] ?? 0);
+  const x = (raw[0] ?? 0) / length;
+  const y = (raw[1] ?? 0) / length;
+  const z = (raw[2] ?? 0) / length;
+  const angle = random() * 6;
   const c = Math.cos(angle);
   const s = Math.sin(angle);
-  return [c, -s, 0, s, c, 0, 0, 0, 1];
+  const k = 1 - c;
+  return [
+    c + x * x * k,
+    x * y * k - z * s,
+    x * z * k + y * s,
+    y * x * k + z * s,
+    c + y * y * k,
+    y * z * k - x * s,
+    z * x * k - y * s,
+    z * y * k + x * s,
+    c + z * z * k,
+  ];
 };
 
 describe('mesh BVH distance query against the frozen dual query', () => {
@@ -143,7 +161,7 @@ describe('mesh BVH distance query against the frozen dual query', () => {
       const a = buildMeshBvh(soup(random, 10 + Math.floor(random() * 60), 10, 2, [0, 0, 0]));
       const b = buildMeshBvh(soup(random, 10 + Math.floor(random() * 60), 10, 2, [random() * 12, random() * 6, 0]));
       const transform: RigidTransform | null =
-        round % 3 === 0 ? null : { rotation: rotationZ(random() * 6), translation: [random() * 4 - 2, random() * 4, random() * 2] };
+        round % 3 === 0 ? null : { rotation: randomRotation(random), translation: [random() * 4 - 2, random() * 4, random() * 2] };
       for (const max of [0.05, 0.5, 3, 100]) {
         expect(flat(bvhMinDistance(a, b, max, transform))).toBe(flat(legacyDualQuery(a, b, transform, max, 0)));
       }
@@ -167,5 +185,7 @@ describe('mesh BVH distance query against the frozen dual query', () => {
       count: Int32Array.from([20]),
     };
     expect(flat(bvhMinDistance(some, loose, 100))).toBe(flat(legacyDualQuery(some, loose, null, 100, 0)));
+    const turned: RigidTransform = { rotation: randomRotation(seeded(5)), translation: [0.3, -0.2, 0.1] };
+    expect(flat(bvhMinDistance(some, loose, 100, turned))).toBe(flat(legacyDualQuery(some, loose, turned, 100, 0)));
   });
 });
