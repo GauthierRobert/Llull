@@ -24,12 +24,14 @@ interface PaletteStoreState {
   open: boolean;
   /** Command whose param form opens first; cleared on close. */
   pendingCommand: string | null;
+  /** Values the pending command's form starts with, on top of the selection pre-fill (e.g. the boolean operation). */
+  pendingParams: Readonly<Record<string, unknown>> | null;
   /** Most recent first, ≤ RECENT_LIMIT. */
   recentIds: readonly string[];
   result: PaletteResult | null;
   setOpen(open: boolean): void;
   /** Opens the palette straight on `name`'s param form. */
-  openCommand(name: string): void;
+  openCommand(name: string, presetParams?: Readonly<Record<string, unknown>>): void;
   showResult(result: Omit<PaletteResult, 'id'>): void;
   dismissResult(): void;
   recordRecent(id: string): void;
@@ -38,15 +40,16 @@ interface PaletteStoreState {
 export const usePaletteStore = create<PaletteStoreState>()((set, get) => ({
   open: false,
   pendingCommand: null,
+  pendingParams: null,
   recentIds: readRecent(),
   result: null,
 
   setOpen(open: boolean): void {
-    set(open ? { open } : { open, pendingCommand: null });
+    set(open ? { open } : { open, pendingCommand: null, pendingParams: null });
   },
 
-  openCommand(name: string): void {
-    set({ open: true, pendingCommand: name });
+  openCommand(name: string, presetParams?: Readonly<Record<string, unknown>>): void {
+    set({ open: true, pendingCommand: name, pendingParams: presetParams ?? null });
   },
 
   showResult(result: Omit<PaletteResult, 'id'>): void {

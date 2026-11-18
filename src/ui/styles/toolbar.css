@@ -62,19 +62,29 @@
   font-weight: var(--weight-semibold);
 }
 
-.dock-btn--danger:not(:disabled) {
-  color: oklch(0.75 0.14 25);
-}
-
 .dock-btn:disabled {
   opacity: 0.38;
   cursor: default;
 }
 
-.dock-btn:focus-visible,
-.dock-view__btn:focus-visible {
+.dock-btn:focus-visible {
   outline: 2px solid var(--accent-hover);
   outline-offset: 1px;
+}
+
+/* A tool family: icon, name and a caret that says "this opens". */
+.dock-group-btn {
+  gap: 7px;
+  padding: 0 8px 0 11px;
+}
+
+.dock-group-btn__caret {
+  opacity: 0.55;
+  transition: transform var(--dur) var(--ease);
+}
+
+.dock-group-btn[aria-expanded='true'] .dock-group-btn__caret {
+  transform: rotate(180deg);
 }
 
 .dock-divider {
@@ -85,42 +95,13 @@
   background: var(--dock-divider);
 }
 
-.dock-view {
-  display: inline-flex;
-  flex-shrink: 0;
-  gap: 2px;
-  padding: 3px;
-  margin-right: 4px;
-  border-radius: 11px;
-  background: var(--dock-hover);
-}
-
-.dock-view__btn {
-  height: 34px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--dock-fg-muted);
-  transition: var(--transition-colors);
-}
-
-.dock-view__btn:hover {
-  color: var(--dock-fg);
-}
-
-.dock-view__btn[aria-pressed='true'] {
-  background: var(--dock-active-bg);
-  color: var(--dock-active-fg);
-  font-weight: var(--weight-medium);
-}
-
-/* Tools panel (on demand, above the bar): sketch + solid sections and a footer. */
+/* Tool flyout (above the bar): titled sections of labelled tools and a one-line description of the pointed one. */
 .dock-panel {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-width: min(680px, 100%);
+  gap: 6px;
+  width: max-content;
+  max-width: min(610px, 100%);
   max-height: calc(100vh - var(--vp-inset-top, 76px) - 96px);
   overflow-y: auto;
   padding: 10px;
@@ -131,23 +112,18 @@
   animation: dock-tray-in var(--dur) var(--ease);
 }
 
-.dock-panel__footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 2px 0;
+.dock-panel__hint {
+  min-height: 34px;
+  margin: 2px 0 0;
+  padding: 8px 8px 0;
   border-top: 1px solid var(--divider);
-  /* The footer reuses dock controls on a light surface. */
-  --dock-fg: var(--fg);
-  --dock-fg-muted: var(--fg-muted);
-  --dock-hover: var(--surface-2);
-  --dock-active-bg: var(--accent-soft);
-  --dock-active-fg: var(--accent-text);
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
 }
 
-.dock-panel__spacer {
-  flex: 1;
+.dock-panel__hint b {
+  color: var(--fg);
+  font-weight: var(--weight-semibold);
 }
 
 .dock-tray {
@@ -172,13 +148,15 @@
 }
 
 .dock-tray__item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  width: 76px;
-  height: 68px;
+  gap: 7px;
+  width: 96px;
+  height: 66px;
+  padding: 0 4px;
   border-radius: 10px;
   color: var(--fg);
   transition: var(--transition-colors);
@@ -200,43 +178,51 @@
 }
 
 .dock-tray__label {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
   font-size: var(--text-sm);
+  line-height: 1.15;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* The shortcut key, as a small keycap in the corner of the tile. */
 .dock-tray__key {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  min-width: 15px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--surface-2);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
+  line-height: 15px;
+  text-align: center;
   color: var(--fg-subtle);
 }
 
+.dock-tray__item:hover .dock-tray__key {
+  background: var(--surface-3);
+}
+
 .dock-tray__item--active .dock-tray__key {
+  background: transparent;
   color: inherit;
   opacity: 0.75;
 }
 
-.dock-tray__hint {
-  padding: 0 6px 4px;
-  font-size: var(--text-sm);
-  color: var(--fg-subtle);
-}
-
-.dock-tray__hint b {
-  color: var(--fg);
-  font-weight: var(--weight-semibold);
-}
-
-/* "Search or run a command" — the bar's one permanent control (opens the command palette). */
+/* "Search commands" — everything the bar does not name (opens the command palette). */
 .dock-ask {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  width: clamp(220px, 30vw, 360px);
+  width: clamp(190px, 17vw, 260px);
   height: 40px;
   padding: 0 8px 0 12px;
   border-radius: 12px;
+  background: var(--dock-hover);
   color: var(--dock-fg-muted);
   font-size: var(--text-base);
   text-align: left;
@@ -244,12 +230,10 @@
 }
 
 .dock-ask:hover {
-  background: var(--dock-hover);
   color: var(--dock-fg);
 }
 
-.dock-ask:focus-visible,
-.dock-chip:focus-visible {
+.dock-ask:focus-visible {
   outline: 2px solid var(--accent-hover);
   outline-offset: 1px;
 }
@@ -271,44 +255,29 @@
   font-size: var(--text-xs);
 }
 
-/* Narrow windows: a shorter search box keeps the dock clear of the axis gizmo (bottom-right) and the status corner. */
-@media (max-width: 960px) {
+/* Narrower windows: the search box shrinks to its icon first, then the tool families drop their names (icon + caret remain,
+   the name stays in the tooltip). The dock always clears the axis gizmo (bottom-right) and the status corner. */
+@media (max-width: 1240px) {
   .dock-ask {
-    width: 168px;
+    width: 40px;
+    padding: 0;
+    justify-content: center;
   }
 
+  .dock-ask__text,
   .dock-ask__kbd {
     display: none;
   }
 }
 
-.dock-tools-btn .icon {
-  transition: transform var(--dur) var(--ease);
-}
+@media (max-width: 1020px) {
+  .dock-btn .dock-btn__label {
+    display: none;
+  }
 
-.dock-tools-btn[aria-expanded='true'] .icon {
-  transform: rotate(45deg);
-}
-
-/* The armed 2D tool, as a chip that puts it down. */
-.dock-chip {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  margin: 0 4px;
-  padding: 0 10px;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  white-space: nowrap;
-}
-
-.dock-chip__close {
-  opacity: 0.75;
+  .dock-divider {
+    margin: 0 2px;
+  }
 }
 
 @keyframes dock-tray-in {
@@ -318,18 +287,200 @@
   }
 }
 
+/* ---- Selection bar (above the dock, while something is selected) --------------- */
+
+.selbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-radius: 15px;
+  background: var(--surface-popover);
+  border: 1px solid var(--border-float);
+  box-shadow: var(--shadow-float);
+  animation: dock-tray-in var(--dur) var(--ease);
+}
+
+.selbar-group,
+.selbar-features,
+.selbar .feature-start {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The feature chips keep their own toolbars (role + name); in the bar they are plain buttons like their neighbours. */
+.selbar .feature-start {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  flex-wrap: nowrap;
+}
+
+/* A hairline before the first offered feature, only when there is one. */
+.selbar-features:not(:empty)::before {
+  content: '';
+  flex-shrink: 0;
+  width: 1px;
+  height: 20px;
+  margin: 0 6px;
+  background: var(--border-strong);
+}
+
+.selbar-btn,
+.selbar .feature-start__chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.selbar-btn--compact {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+}
+
+.selbar-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+/* What this selection offers is the point of the bar: the features read as the primary actions. */
+.selbar .feature-start__chip {
+  color: var(--accent-text);
+  font-weight: var(--weight-semibold);
+}
+
+.selbar .feature-start__chip:hover {
+  background: var(--accent-soft);
+}
+
+.selbar-btn--active,
+.selbar-btn--active:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: var(--weight-semibold);
+}
+
+.selbar-btn--danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.selbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.selbar-btn:focus-visible,
+.selbar-count:focus-visible,
+.selbar .feature-start__chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.selbar-divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 20px;
+  margin: 0 6px;
+  background: var(--border-strong);
+}
+
+/* What is selected; click to let go of it. */
+.selbar-count {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  max-width: 150px;
+  margin-left: 4px;
+  padding: 0 8px 0 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.selbar-count__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selbar-count > .icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ---- View switch (header): the same model in 3D or as a 2D drawing ------------- */
+
+.view-switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  margin: 0 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.view-switch__btn {
+  height: 28px;
+  min-width: 40px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--fg-subtle);
+  transition: var(--transition-colors);
+}
+
+.view-switch__btn:hover {
+  color: var(--fg);
+}
+
+.view-switch__btn[aria-pressed='true'] {
+  background: var(--surface-1);
+  color: var(--fg);
+  box-shadow: var(--shadow-sm);
+}
+
+.view-switch__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* ---- Viewport hint bar ----------------------------------------------------- */
 
 .hint-bar {
-  position: absolute;
-  left: 50%;
-  bottom: calc(var(--chrome-gap) + 52px + 12px); /* above the dock */
-  transform: translateX(-50%);
-  z-index: 9;
+  /* First row of the dock stack: always right above whatever the dock shows (flyout, selection bar or the bar itself). */
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  max-width: calc(100% - 200px);
+  max-width: 100%;
   padding: 6px var(--space-3);
   font-size: var(--text-sm);
   color: var(--fg-muted);

@@ -4,6 +4,10 @@ import { listCommands } from '@core/commands/registry';
 import { fuzzyScore } from '@ui/components/commandPalette/fuzzyMatch';
 import { fieldsFromSchema, humanizeName, initialValues, parseFormValues } from '@ui/components/commandPalette/paramForm';
 import { allPaletteItems, searchPaletteItems } from '@ui/components/commandPalette/paletteItems';
+import { suggestedPaletteIds } from '@ui/components/commandPalette/paletteSuggestions';
+import { booleanPreset } from '@ui/components/toolbar/commandTools';
+import { createEmptyDocument } from '@core/model/types';
+import { execute } from '@core/commands/registry';
 import { xy } from '../helpers/xy';
 
 describe('fuzzyScore', () => {
@@ -167,5 +171,54 @@ describe('palette catalog', () => {
     const results = searchPaletteItems(items, 'measure vol', []);
     expect(results[0]?.id).toBe('command:mass_properties');
     expect(searchPaletteItems(items, 'qqqzzz', [])).toEqual([]);
+  });
+  it('opens an empty query on the suggestions for the selection, then recents, each listed once', () => {
+    const results = searchPaletteItems(items, '', ['command:boolean', 'action:undo'], ['command:boolean', 'command:align', 'command:gone']);
+    expect(results.slice(0, 3).map((r) => [r.id, r.group])).toEqual([
+      ['command:boolean', 'Suggested for the selection'],
+      ['command:align', 'Suggested for the selection'],
+      ['action:undo', 'Recent'],
+    ]);
+    expect(results).toHaveLength(items.length);
+  });
+});
+
+describe('palette suggestions', () => {
+  const add = (doc: ReturnType<typeof createEmptyDocument>, name: string, params: unknown): ReturnType<typeof createEmptyDocument> =>
+    execute(doc, name, params).document;
+  const base = add(add(add(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }), 'add_sphere', { radius: 1 }), 'draw_rectangle', {
+    width: 2,
+    height: 1,
+  });
+  const [boxId, sphereId, rectId] = base.order as [string, string, string];
+  const suggest = (selection: string[]): string[] => suggestedPaletteIds({ ...base, selection });
+
+  it('suggests nothing without a selection (or for ids that are not entities)', () => {
+    expect(suggest([])).toEqual([]);
+    expect(suggest(['gone'])).toEqual([]);
+  });
+  it('suggests solid features for one solid and sketch features for one sketch', () => {
+    expect(suggest([boxId]).slice(0, 3)).toEqual(['command:fillet_edge', 'command:chamfer_edge', 'command:shell_solid']);
+    expect(suggest([rectId]).slice(0, 2)).toEqual(['command:extrude_profile', 'command:revolve_profile']);
+  });
+  it('suggests combining several solids, lofting several sketches, and arranging a mixed selection', () => {
+    expect(suggest([boxId, sphereId])[0]).toBe('command:boolean');
+    expect(suggest([rectId, rectId])[0]).toBe('command:loft_sections');
+    expect(suggest([boxId, rectId])).toEqual(['command:align', 'command:measure_distance', 'command:group_entities']);
+  });
+  it('every suggested command is in the palette catalog', () => {
+    const ids = new Set(allPaletteItems().map((item) => item.id));
+    for (const selection of [[boxId], [rectId], [boxId, sphereId], [rectId, rectId], [boxId, rectId]]) {
+      for (const id of suggest(selection)) expect(ids.has(id), id).toBe(true);
+    }
+  });
+  it('the boolean shortcut takes the first selected solid as the base and the others as tools', () => {
+    expect(booleanPreset('subtract', { ...base, selection: [rectId, boxId, sphereId] })).toEqual({ op: 'subtract', a: boxId, b: sphereId });
+    expect(booleanPreset('union', { ...base, selection: [boxId, sphereId, boxId] })).toEqual({
+      op: 'union',
+      a: boxId,
+      b: [sphereId, boxId],
+    });
+    expect(booleanPreset('intersect', { ...base, selection: [] })).toEqual({ op: 'intersect' });
   });
 });

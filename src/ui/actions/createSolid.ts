@@ -2,6 +2,7 @@
 
 import type { Vec3 } from '@core/model/types';
 import { useStore, useToolStore } from '@ui/store';
+import { keepModelInView } from './viewActions';
 import { type SolidPreset, nextPlacement, solidCommandParams } from '@ui/components/toolbar/solidPresets';
 
 /** How long a drop point stays reserved while its entity travels through the server round trip. */
@@ -19,7 +20,10 @@ export function createSolid(preset: SolidPreset): void {
     reservations.map((reservation) => reservation.position),
   );
   reservations.push({ position, expiresAt: now + RESERVATION_MS });
+  const hadGeometry = state.document.order.length > 0;
   state.dispatch(preset.command, solidCommandParams(preset, position), { selectAffected: true });
+  // The first solid is framed by useAutoFrame (iso); later ones may drop outside the current view.
+  if (hadGeometry) keepModelInView();
   const tools = useToolStore.getState();
   tools.setViewMode('3d');
   tools.setGizmoMode('translate');

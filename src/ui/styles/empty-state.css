@@ -13,61 +13,122 @@
 
 .empty-state__card {
   position: relative;
-  width: min(440px, 100%);
-  padding: var(--space-6) var(--space-5) var(--space-5);
+  width: min(600px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--space-6);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  background: var(--surface-float);
-  backdrop-filter: var(--backdrop);
+  gap: var(--space-4);
+  background: var(--surface-popover);
   border: 1px solid var(--border-float);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-float);
+  border-radius: 18px;
+  box-shadow: var(--shadow-popover);
   pointer-events: auto;
   animation: empty-state-in var(--dur) var(--ease) both;
 }
 
 .empty-state__dismiss {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+  top: var(--space-3);
+  right: var(--space-3);
 }
 
 .empty-state__heading {
-  margin: 0 0 6px;
-  font-size: var(--text-lg);
+  margin: 0;
+  font-size: 20px;
   font-weight: var(--weight-semibold);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--fg);
 }
 
 .empty-state__subheading {
-  max-width: 44ch;
-  margin: 0 0 var(--space-4);
+  margin: -10px 0 0;
   font-size: var(--text-base);
-  color: var(--fg-muted);
-  text-wrap: balance;
+  color: var(--fg-subtle);
 }
 
-.empty-state__subheading strong {
-  color: var(--fg);
+/* The main ways to begin: equal cards, icon on top. */
+.empty-state__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+
+.empty-state__card-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-1);
+  text-align: left;
+  transition:
+    var(--transition-colors),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.empty-state__card-btn:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-softer);
+  transform: translateY(-1px);
+}
+
+.empty-state__card-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.empty-state__card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.empty-state__card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.empty-state__card-title {
+  font-size: var(--text-md);
   font-weight: var(--weight-semibold);
+  color: var(--fg);
 }
 
-.empty-state__subheading code {
-  padding: 1px 5px;
-  border-radius: var(--radius-xs);
-  background: var(--surface-2);
-  font-family: var(--font-mono);
-  font-size: 0.92em;
-  color: var(--fg);
+.empty-state__card-sub {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--fg-subtle);
+}
+
+.empty-state__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.empty-state__row-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--fg-subtle);
 }
 
 .empty-state__starts {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 6px;
 }
 
@@ -75,14 +136,14 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: 30px;
   padding: 0 12px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-strong);
   background: var(--surface-1);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  color: var(--fg);
+  color: var(--fg-muted);
   transition: var(--transition-colors);
 }
 
@@ -97,10 +158,57 @@
   cursor: progress;
 }
 
-.empty-state__foot {
-  margin: var(--space-4) 0 0;
+/* The agent route: a quiet note, not a fourth button (nothing to click). */
+.empty-state__agent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 10px var(--space-3);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+
+.empty-state__agent > .icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--agent);
+}
+
+.empty-state__agent strong {
+  color: var(--fg);
+  font-weight: var(--weight-semibold);
+}
+
+.empty-state__agent code {
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--fg);
+}
+
+/* How to move around the view: the first thing a newcomer needs and never finds. */
+.empty-state__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-4);
+  margin: 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--divider);
+  list-style: none;
   font-size: var(--text-xs);
   color: var(--fg-subtle);
+}
+
+.empty-state__nav-icon {
+  display: inline-flex;
+  margin-right: -6px;
 }
 
 @keyframes empty-state-in {

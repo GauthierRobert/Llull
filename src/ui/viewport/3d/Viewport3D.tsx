@@ -56,7 +56,6 @@ import { BlendOverlay } from './overlays/BlendOverlay';
 import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
 import { zoomToFocus } from './zoomToFocus';
 import { FeatureSessionLayer } from './manipulators/FeatureSessionLayer';
-import { FeatureStartBar } from './manipulators/FeatureStartBar';
 import { CageEditLayer } from './cage/CageEditLayer';
 import { FaceEditLayer } from './faceEdit/FaceEditLayer';
 import { FaceEditBar } from './faceEdit/FaceEditBar';
@@ -239,7 +238,6 @@ export function Viewport3D(): React.ReactElement {
       <ScreenAnchorOverlay />
       <MarkupOverlay />
       <div className="feature-chips">
-        <FeatureStartBar />
         <CageEditBar />
         <FaceEditBar />
         <NurbsNetBar />

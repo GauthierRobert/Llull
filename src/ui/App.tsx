@@ -15,7 +15,6 @@ import { TopBar } from '@ui/components/TopBar';
 import { Sidebar } from '@ui/components/Sidebar';
 import { Toolbar } from '@ui/components/toolbar/Toolbar';
 import { ViewportContextMenu } from '@ui/components/ViewportContextMenu';
-import { HintBar } from '@ui/components/HintBar';
 import { ShortcutsDialog } from '@ui/components/ShortcutsDialog';
 import { ReportIssueDialog } from '@ui/components/ReportIssueDialog';
 import { ExportAnimationDialog } from '@ui/components/ExportAnimationDialog';
@@ -76,7 +75,6 @@ export function App(): React.ReactElement {
         {!sheetOpen && <ViewportErrorBoundary key={viewMode}>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>}
         <SheetViewer />
         <LiveActivityFeed />
-        <HintBar />
         <PaletteResultToast />
         <ViewportContextMenu />
       </main>
