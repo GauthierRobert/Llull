@@ -73,8 +73,8 @@ export interface FeaSolveOptions {
   readonly solver?: FeaSolverMethod;
 }
 
-export const FEA_SOLVER_METHODS = ['direct', 'iterative'] as const;
-export type FeaSolverMethod = (typeof FEA_SOLVER_METHODS)[number];
+const FEA_SOLVER_METHODS = ['direct', 'iterative'] as const;
+type FeaSolverMethod = (typeof FEA_SOLVER_METHODS)[number];
 
 /** Port to the FE transports (implemented in `server/`). Failures are results (`isError`, summary starts `<tool> <CODE>`), not throws. */
 export interface FeaToolsPort {
