@@ -55,6 +55,31 @@ export const ladderCageParam = z
   .optional()
   .describe('Cage dimensions; only with fallProtection "cage".');
 
+/** The cage settings (defaults noted), undefined without a cage, or the refusal message for cage options without a cage. */
+function cageOptions(
+  given: z.infer<typeof ladderCageParam>,
+  fallProtection: LadderFallProtection,
+  mm: (value: number) => number,
+  defaulted: string[],
+): LadderCage | string | undefined {
+  if (given !== undefined && fallProtection !== 'cage') return `cage options need fallProtection "cage" (it is "${fallProtection}")`;
+  if (fallProtection !== 'cage') return undefined;
+  const named = defaultCageMm();
+  const options = given ?? {};
+  const note = (name: string, value: number | undefined, fallback: number): void => {
+    if (value === undefined) defaulted.push(`cage.${name} ${fallback} mm (ISO 14122-4 row)`);
+  };
+  note('startHeight', options.startHeight, named.startHeight);
+  note('hoopSpacing', options.hoopSpacing, named.hoopSpacing);
+  note('diameter', options.diameter, named.diameter);
+  return {
+    startHeight: options.startHeight ?? mm(named.startHeight),
+    hoopSpacing: options.hoopSpacing ?? mm(named.hoopSpacing),
+    diameter: options.diameter ?? mm(named.diameter),
+    bars: options.bars ?? named.bars,
+  };
+}
+
 /**
  * @affects creates 1 ladder element (stiles, rungs, cage hoops / bars and landing plates as entities on layer S-LADR) and, for a through exit, a gap with a gate in the railing in front of it
  * @invariant rungs at k x pitch, k = 1..rungCount; resolved pitch: spaces = ceil(H / pitchMax), pitch = H / spaces, rungCount = spaces - 1; the arrival level is the last step
@@ -215,28 +240,8 @@ export const addLadder = defineCommand({
     if (params.installedOn === undefined && fallProtection !== 'none')
       defaulted.push('installedOn unset: checked as installed after 2018-11-19 (the strictest reading)');
 
-    let cage: LadderCage | undefined;
-    if (params.cage !== undefined && fallProtection !== 'cage')
-      return fail('STA_INVALID_GEOMETRY', `cage options need fallProtection "cage" (it is "${fallProtection}")`, [
-        'cage',
-        'fallProtection',
-      ]);
-    if (fallProtection === 'cage') {
-      const named = defaultCageMm();
-      const given = params.cage ?? {};
-      const note = (name: string, value: number | undefined, fallback: number): void => {
-        if (value === undefined) defaulted.push(`cage.${name} ${fallback} mm (ISO 14122-4 row)`);
-      };
-      note('startHeight', given.startHeight, named.startHeight);
-      note('hoopSpacing', given.hoopSpacing, named.hoopSpacing);
-      note('diameter', given.diameter, named.diameter);
-      cage = {
-        startHeight: given.startHeight ?? mm(named.startHeight),
-        hoopSpacing: given.hoopSpacing ?? mm(named.hoopSpacing),
-        diameter: given.diameter ?? mm(named.diameter),
-        bars: given.bars ?? named.bars,
-      };
-    }
+    const cage = cageOptions(params.cage, fallProtection, mm, defaulted);
+    if (typeof cage === 'string') return fail('STA_INVALID_GEOMETRY', cage, ['cage', 'fallProtection']);
 
     let landings: number[];
     if (params.landings === undefined) {

@@ -12,6 +12,34 @@ import { ENDS, dim, finish, need, refusal, type ShapeOutcome, type ShapeSource }
 /** Most bolt holes drawn in a flange (B16.47 NPS 60 has 60): a hostile row cannot make the recipe grow without bound. */
 const MAX_BOLT_HOLES = 128;
 
+function boltsFit(source: ShapeSource, outer: number, bore: number): boolean {
+  const circleRadius = (source.dims['boltCircle'] ?? 0) / 2;
+  const holeRadius = (source.dims['boltHole'] ?? 0) / 2;
+  return !(circleRadius + holeRadius > outer || (circleRadius > 0 && circleRadius - holeRadius <= bore));
+}
+
+function boltHoles(source: ShapeSource, raisedFace: number, thickness: number, notes: string[]): ShapeRecipe[] {
+  const count = source.dims['boltCount'];
+  const circle = source.dims['boltCircle'];
+  const hole = source.dims['boltHole'];
+  const canDrill =
+    count !== undefined &&
+    circle !== undefined &&
+    hole !== undefined &&
+    Number.isInteger(count) &&
+    count >= 1 &&
+    count <= MAX_BOLT_HOLES &&
+    hole > 0;
+  if (!canDrill) notes.push(`bolt holes not drawn: the row lacks boltCount (1 to ${MAX_BOLT_HOLES}) / boltCircle / bolt hole`);
+  return canDrill
+    ? Array.from({ length: count }, (_, k) => {
+        const angle = (2 * Math.PI * (k + 0.5)) / count;
+        const at: Vec3 = [(circle / 2) * Math.cos(angle), (circle / 2) * Math.sin(angle), -raisedFace - CUT_OVERSHOOT_MM];
+        return tube(`flange-hole-${k}`, at, [0, 0, 1], raisedFace + thickness + 2 * CUT_OVERSHOOT_MM, hole / 2);
+      })
+    : [];
+}
+
 export function flangeShape(source: ShapeSource): ShapeOutcome {
   const lacking = need(source, 'outsideDiameter', 'thickness');
   if (lacking !== null) return lacking;
@@ -68,32 +96,12 @@ export function flangeShape(source: ShapeSource): ShapeOutcome {
       : ([[bore, thickness]] as Section)),
   ];
   const body = revolved('flange', profile);
-  const count = source.dims['boltCount'];
-  const circle = source.dims['boltCircle'];
-  const hole = source.dims['boltHole'];
-  const circleRadius = (source.dims['boltCircle'] ?? 0) / 2;
-  const holeRadius = (source.dims['boltHole'] ?? 0) / 2;
-  if (circleRadius + holeRadius > outer || (circleRadius > 0 && circleRadius - holeRadius <= bore))
+  if (!boltsFit(source, outer, bore))
     return refusal(
       'PSC_CATALOG_DIM_MISMATCH',
       'the bolt holes do not fit between the bore and the flange outside diameter (check boltCircle and the bolt hole)',
     );
-  const canDrill =
-    count !== undefined &&
-    circle !== undefined &&
-    hole !== undefined &&
-    Number.isInteger(count) &&
-    count >= 1 &&
-    count <= MAX_BOLT_HOLES &&
-    hole > 0;
-  if (!canDrill) notes.push(`bolt holes not drawn: the row lacks boltCount (1 to ${MAX_BOLT_HOLES}) / boltCircle / bolt hole`);
-  const holes: ShapeRecipe[] = canDrill
-    ? Array.from({ length: count }, (_, k) => {
-        const angle = (2 * Math.PI * (k + 0.5)) / count;
-        const at: Vec3 = [(circle / 2) * Math.cos(angle), (circle / 2) * Math.sin(angle), -raisedFace - CUT_OVERSHOOT_MM];
-        return tube(`flange-hole-${k}`, at, [0, 0, 1], raisedFace + thickness + 2 * CUT_OVERSHOOT_MM, hole / 2);
-      })
-    : [];
+  const holes = boltHoles(source, raisedFace, thickness, notes);
   const recipe = holes.length === 0 ? body : subtract(body, unionAll(holes as [ShapeRecipe, ...ShapeRecipe[]]));
   const pipeSide = thickness + hubExtension;
   const portOd = pipeOd ?? 2 * outer;

@@ -3,6 +3,7 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import type { CadDocument } from '@core/model/types';
 import { BUNDLED_CATALOG_ID } from '../../catalog/bundled';
 import { refuse } from '../../catalog/codes';
 import { resolveCatalogRow, type ResolvedDim, type ResolvedRow } from '../../catalog/lookup';
@@ -21,7 +22,7 @@ import {
   type NominalSize,
   type PipingCatalog,
 } from '../../catalog/types';
-import { resolveChosen, resolveComponent, type ResolvedComponent } from '../resolve';
+import { resolveChosen, resolveComponent, type ComponentQuery, type ResolvedComponent } from '../resolve';
 import { inRange, querySize } from '../size';
 import { isLoaded, loadSpec } from './answer';
 
@@ -118,6 +119,50 @@ function flangeOd(catalogs: readonly PipingCatalog[], origin: Origin): number | 
   return undefined;
 }
 
+interface SpecOrigin {
+  readonly origin: Origin;
+  readonly catalogs: readonly PipingCatalog[];
+  readonly dimensionalStandard: DimensionalStandard;
+}
+
+function specOrigin(
+  doc: CadDocument,
+  specId: string,
+  revision: number | undefined,
+  componentId: string | undefined,
+  type: ComponentType | undefined,
+  wallMm: number | undefined,
+  query: Omit<ComponentQuery, 'type'>,
+): SpecOrigin | CommandResult {
+  const fail = (code: string, message: string, ids: readonly string[] = [], paths: readonly string[] = []): CommandResult =>
+    refuse(doc, 'component_shape', code, message, ids, paths);
+  const loaded = loadSpec(doc, 'component_shape', specId, revision);
+  if (!isLoaded(loaded)) return loaded;
+  const catalogs = loaded.catalogs;
+  const dimensionalStandard = loaded.spec.dimensionalStandard;
+  if (componentId === undefined && type === undefined)
+    return fail('PSC_NO_COMPONENT', 'give componentId or type with specId', [], ['componentId']);
+  const component = componentId === undefined ? undefined : loaded.spec.components.find((candidate) => candidate.id === componentId);
+  if (componentId !== undefined && component === undefined)
+    return fail('PSC_NO_COMPONENT', `spec ${specId} has no component "${componentId}"`, [specId], ['componentId']);
+  if (component !== undefined && type !== undefined && component.type !== type)
+    return fail('PSC_NO_COMPONENT', `component ${component.id} is a ${component.type}, not a ${type}`, [component.id], ['type']);
+  const size = querySize({ nps: query.nps, dn: query.dn });
+  const branch =
+    query.branchNps !== undefined || query.branchDn !== undefined ? querySize({ nps: query.branchNps, dn: query.branchDn }) : undefined;
+  if (size === null || branch === null)
+    return fail('PSC_SIZE_UNKNOWN', 'nps / dn (and branchNps / branchDn) must be nominal sizes', [], ['nps']);
+  if (component !== undefined && !inRange(size, component.from, component.to))
+    return fail('PSC_SIZE_OUT_OF_RANGE', `component ${component.id} does not cover this size`, [component.id], ['nps']);
+  const resolved =
+    component === undefined
+      ? resolveComponent(loaded.spec, loaded.catalogs, { ...query, type: type as ComponentType })
+      : resolveChosen(loaded.spec, loaded.catalogs, component, size, branch, { ...query, type: component.type });
+  if (!resolved.ok) return fail(resolved.code, resolved.message, resolved.ids, resolved.paths);
+  const origin = fromResolved(resolved.resolved);
+  return { origin: wallMm !== undefined ? { ...origin, wallMm } : origin, catalogs, dimensionalStandard };
+}
+
 /**
  * @affects none; data = { type, recipe, bounds: { min, max, size }, ports: [{ id, position, direction, outsideDiameterMm, endType }], hollow, notes, frame, stats, source, verified }
  * @invariant read-only; the recipe is analytic (revolution solids and booleans) in the component's local frame, bounds are exact for it, ports are outward unit directions; a missing dimension is a refusal, an omitted detail is named in notes
@@ -163,31 +208,9 @@ export const componentShape = defineCommand({
     let catalogs: readonly PipingCatalog[];
     let dimensionalStandard: DimensionalStandard;
     if (specId !== undefined) {
-      const loaded = loadSpec(doc, 'component_shape', specId, revision);
-      if (!isLoaded(loaded)) return loaded;
-      catalogs = loaded.catalogs;
-      dimensionalStandard = loaded.spec.dimensionalStandard;
-      if (componentId === undefined && type === undefined)
-        return fail('PSC_NO_COMPONENT', 'give componentId or type with specId', [], ['componentId']);
-      const component = componentId === undefined ? undefined : loaded.spec.components.find((candidate) => candidate.id === componentId);
-      if (componentId !== undefined && component === undefined)
-        return fail('PSC_NO_COMPONENT', `spec ${specId} has no component "${componentId}"`, [specId], ['componentId']);
-      if (component !== undefined && type !== undefined && component.type !== type)
-        return fail('PSC_NO_COMPONENT', `component ${component.id} is a ${component.type}, not a ${type}`, [component.id], ['type']);
-      const size = querySize({ nps: query.nps, dn: query.dn });
-      const branch =
-        query.branchNps !== undefined || query.branchDn !== undefined ? querySize({ nps: query.branchNps, dn: query.branchDn }) : undefined;
-      if (size === null || branch === null)
-        return fail('PSC_SIZE_UNKNOWN', 'nps / dn (and branchNps / branchDn) must be nominal sizes', [], ['nps']);
-      if (component !== undefined && !inRange(size, component.from, component.to))
-        return fail('PSC_SIZE_OUT_OF_RANGE', `component ${component.id} does not cover this size`, [component.id], ['nps']);
-      const resolved =
-        component === undefined
-          ? resolveComponent(loaded.spec, loaded.catalogs, { ...query, type: type as ComponentType })
-          : resolveChosen(loaded.spec, loaded.catalogs, component, size, branch, { ...query, type: component.type });
-      if (!resolved.ok) return fail(resolved.code, resolved.message, resolved.ids, resolved.paths);
-      origin = fromResolved(resolved.resolved);
-      if (wallMm !== undefined) origin = { ...origin, wallMm };
+      const chosen = specOrigin(doc, specId, revision, componentId, type, wallMm, query);
+      if (!('origin' in chosen)) return chosen;
+      ({ origin, catalogs, dimensionalStandard } = chosen);
     } else {
       if (type === undefined) return fail('PSC_NO_COMPONENT', 'give type (catalogue mode) or specId with componentId', [], ['type']);
       const reference = catalogId ?? BUNDLED_CATALOG_ID;

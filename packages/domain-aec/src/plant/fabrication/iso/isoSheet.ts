@@ -159,6 +159,36 @@ export function titleBlock(width: number, lines: ReadonlyArray<ReadonlyArray<rea
   return out;
 }
 
+function issueTexts(issue: SheetIssue | undefined): { stamp: string; note: string } {
+  const stamp = issue === undefined ? 'NOT FOR CONSTRUCTION' : `ISSUED ${issue.purpose.toUpperCase()} REV ${issue.revision}`;
+  const note =
+    issue === undefined
+      ? 'REVIEW REQUIRED - isometric not to scale; dimensions in mm from the 3D centreline'
+      : `APPROVED BY ${issue.signer} - isometric not to scale; dimensions in mm from the 3D centreline`;
+  return { stamp, note };
+}
+
+function titleRows(analysis: LineAnalysis, options: SheetOptions, scale: number): ReadonlyArray<ReadonlyArray<readonly [string, string]>> {
+  const network = analysis.read.network;
+  return [
+    [
+      ['PROJECT', options.project],
+      ['LINE', analysis.name],
+      ['SPEC', network.attributes['PIPING-SPEC'] ?? '-'],
+    ],
+    [
+      ['DRAWING', 'ISOMETRIC - NOT TO SCALE'],
+      ['STYLE', options.style.toUpperCase()],
+      ['REV', network.attributes['REVISION'] ?? '-'],
+    ],
+    [
+      ['STATUS', options.issue === undefined ? 'NOT FOR CONSTRUCTION' : `ISSUED REV ${options.issue.revision}`],
+      ['SHEET', `${options.sheet?.index ?? 1} OF ${options.sheet?.total ?? 1}`],
+      ['PAPER', `${options.paper} ${mmText(scale * 100)} % fit`],
+    ],
+  ];
+}
+
 export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): IsoSheet {
   const network = analysis.read.network;
   const graph = buildIsoGraph(network, options.sheet?.include);
@@ -324,12 +354,7 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
       anchor,
     );
   }
-  const stamp =
-    options.issue === undefined ? 'NOT FOR CONSTRUCTION' : `ISSUED ${options.issue.purpose.toUpperCase()} REV ${options.issue.revision}`;
-  const note =
-    options.issue === undefined
-      ? 'REVIEW REQUIRED - isometric not to scale; dimensions in mm from the 3D centreline'
-      : `APPROVED BY ${options.issue.signer} - isometric not to scale; dimensions in mm from the 3D centreline`;
+  const { stamp, note } = issueTexts(options.issue);
   const angles = axisAngles(options.northArrow);
   const centre: Vec2 = [area.x + area.width - tableWidth - 12, top - 14];
   const direction: Vec2 = [Math.cos((angles.northArrow * Math.PI) / 180), Math.sin((angles.northArrow * Math.PI) / 180)];
@@ -362,23 +387,7 @@ export function buildIsoSheet(analysis: LineAnalysis, options: SheetOptions): Is
           ),
         ]),
     ...tablePrimitives(tables, area.x + area.width - tableWidth + 3, top - 30),
-    ...titleBlock(width, [
-      [
-        ['PROJECT', options.project],
-        ['LINE', analysis.name],
-        ['SPEC', network.attributes['PIPING-SPEC'] ?? '-'],
-      ],
-      [
-        ['DRAWING', 'ISOMETRIC - NOT TO SCALE'],
-        ['STYLE', options.style.toUpperCase()],
-        ['REV', network.attributes['REVISION'] ?? '-'],
-      ],
-      [
-        ['STATUS', options.issue === undefined ? 'NOT FOR CONSTRUCTION' : `ISSUED REV ${options.issue.revision}`],
-        ['SHEET', `${options.sheet?.index ?? 1} OF ${options.sheet?.total ?? 1}`],
-        ['PAPER', `${options.paper} ${mmText(layout.scale * 100)} % fit`],
-      ],
-    ]),
+    ...titleBlock(width, titleRows(analysis, options, layout.scale)),
   );
   return {
     width,

@@ -6,14 +6,54 @@ import type { InlineComponent, PipeRun } from '@aec/plant/types';
 import { nextId } from '@lib/id';
 import { withRunEntities } from '../derive';
 import { envelopeDiameter } from '../insulation';
-import { buildPath, unitVector } from '../legs';
+import { buildPath, unitVector, type PathOk } from '../legs';
 import { getPiping, refuse, withPiping } from '../model';
 import { deriveRun } from '../routeParts';
 import { byRoute } from '../runSizes';
 import { createSpecLookup, isMiss } from '../specLookup';
 import { takeoffOf } from '../takeoff';
 import { branchFromRun, branchOnRun } from './routeBranchStart';
-import { buildInline, inlineAt, inlineFields, isResolved, legsInput, portOrPoint, resolveEndpoint, viaInput } from './routeInput';
+import {
+  buildInline,
+  inlineAt,
+  inlineFields,
+  isResolved,
+  legsInput,
+  portOrPoint,
+  resolveEndpoint,
+  viaInput,
+  type ResolvedEndpoint,
+} from './routeInput';
+
+function routedRun(
+  id: string,
+  lineId: string,
+  params: { readonly angleToleranceDeg?: number | undefined; readonly bendRadius?: number | undefined },
+  from: ResolvedEndpoint,
+  to: ResolvedEndpoint | undefined,
+  path: PathOk,
+  inline: readonly InlineComponent[],
+): PipeRun {
+  return {
+    id,
+    lineId,
+    start: {
+      point: path.points[0] as Vec3,
+      ...(from.end.direction === undefined ? {} : { direction: from.end.direction }),
+      ...(from.ref === undefined ? {} : { ref: from.ref }),
+    },
+    end: {
+      point: path.points.at(-1) as Vec3,
+      ...(to?.end.direction === undefined ? {} : { direction: to.end.direction }),
+      ...(to?.ref === undefined ? {} : { ref: to.ref }),
+    },
+    pis: path.points.slice(1, -1),
+    ...(path.legSlopes.some((slope) => slope !== null) ? { legSlopes: path.legSlopes } : {}),
+    ...(params.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: params.angleToleranceDeg }),
+    ...(params.bendRadius === undefined ? {} : { bendRadiusMm: params.bendRadius }),
+    ...(inline.length === 0 ? {} : { inline }),
+  };
+}
 
 /**
  * @affects creates 1 pipe run (plant.piping) and its derived, read-only part entities `<runId>/<kind>-<k>` (pipe pieces, elbows, flanges, gaskets,
@@ -135,25 +175,7 @@ export const routePipe = defineCommand({
       inline.push(built);
     }
     const id = nextId('run');
-    const run: PipeRun = {
-      id,
-      lineId: line.id,
-      start: {
-        point: path.points[0] as Vec3,
-        ...(from.end.direction === undefined ? {} : { direction: from.end.direction }),
-        ...(from.ref === undefined ? {} : { ref: from.ref }),
-      },
-      end: {
-        point: path.points.at(-1) as Vec3,
-        ...(to?.end.direction === undefined ? {} : { direction: to.end.direction }),
-        ...(to?.ref === undefined ? {} : { ref: to.ref }),
-      },
-      pis: path.points.slice(1, -1),
-      ...(path.legSlopes.some((slope) => slope !== null) ? { legSlopes: path.legSlopes } : {}),
-      ...(params.angleToleranceDeg === undefined ? {} : { angleToleranceDeg: params.angleToleranceDeg }),
-      ...(params.bendRadius === undefined ? {} : { bendRadiusMm: params.bendRadius }),
-      ...(inline.length === 0 ? {} : { inline }),
-    };
+    const run = routedRun(id, line.id, params, from, to, path, inline);
     const stored = withPiping(doc, { ...piping, runs: { ...piping.runs, [id]: run }, runOrder: [...piping.runOrder, id] });
     const derived = deriveRun(stored, run);
     if (!derived.ok) return refuse(doc, 'route_pipe', derived.code, derived.message, [...derived.ids], [...derived.paths], derived.detail);

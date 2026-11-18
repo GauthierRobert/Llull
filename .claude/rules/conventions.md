@@ -39,8 +39,8 @@ PostToolUse hook formats each edited file; never hand-format or fight it.
 - One concern per file (SRP). Group commands by domain; split by concern when it grows; import
   from defining files — no re-export barrels (package `index.ts` excepted).
 - Max **500 code lines** per file (oxlint `max-lines`, no allowlist; disabling it is hook-blocked).
-- Cyclomatic complexity ceiling per function: **59** (oxlint `complexity`, the worst function at 2026-11-18). It is a ratchet: lower it
-  when the worst offenders are split into named phases (target 40); never raise it. A new function above ~40 is a review finding.
+- Cyclomatic complexity ceiling per function: **40** (oxlint `complexity`, an error). Split a function that outgrows it into an orchestrator
+  plus named phase / case helpers; never raise the ceiling.
 - Open/closed: add a capability with a NEW command file + registration, a new domain with a new
   `CadPlugin`, a new entity kind with a union member + render branch (`add-entity-kind` skill) —
   not by growing a `switch` in every caller.

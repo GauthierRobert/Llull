@@ -6,10 +6,11 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import { refuseScan } from './codes';
 import { cloudAccess, isAccess, type CloudAccess } from './access';
-import type { CloudNearest } from '@core/model/pointCloud';
+import type { CloudNearest, CloudPoints } from '@core/model/pointCloud';
+import type { CadDocument } from '@core/model/types';
 import { applyPoint, invertAffine } from './mat4';
 import { fromM, scanOf, toM, vecFromM, vecToM } from './model';
-import { assetBox, inRegion, resolveRegion } from './region';
+import { assetBox, inRegion, resolveRegion, type MetricRegion } from './region';
 import { cloudIdParam, regionParam } from './schemas';
 
 /** Largest number of points one query_cloud_points call returns (AF-12). */
@@ -86,6 +87,34 @@ export const describePointCloud = defineCommand({
   },
 });
 
+function collectPoints(
+  doc: CadDocument,
+  transform: CloudAccess['cloud']['transform'],
+  region: MetricRegion,
+  read: CloudPoints,
+  cap: number,
+): { points: number[]; indices: number[]; columns: { intensity: number[]; rgb: number[]; classification: number[] }; truncated: boolean } {
+  const source = read.attributes;
+  const columns = { intensity: [] as number[], rgb: [] as number[], classification: [] as number[] };
+  const points: number[] = [];
+  const indices: number[] = [];
+  let truncated = false;
+  for (let i = 0; i < read.indices.length; i++) {
+    const p = applyPoint(transform, [read.positions[3 * i] ?? 0, read.positions[3 * i + 1] ?? 0, read.positions[3 * i + 2] ?? 0]);
+    if (!inRegion(region, p)) continue;
+    if (indices.length >= cap) {
+      truncated = true;
+      break;
+    }
+    points.push(...vecFromM(doc, p));
+    indices.push(read.indices[i] ?? 0);
+    if (source?.intensity !== undefined) columns.intensity.push(source.intensity[i] ?? 0);
+    if (source?.rgb !== undefined) columns.rgb.push(source.rgb[3 * i] ?? 0, source.rgb[3 * i + 1] ?? 0, source.rgb[3 * i + 2] ?? 0);
+    if (source?.classification !== undefined) columns.classification.push(source.classification[i] ?? 0);
+  }
+  return { points, indices, columns, truncated };
+}
+
 /**
  * @failure SCN_CLOUD_NOT_FOUND / SCN_ASSET_* ; bad region -> SCN_CROP_INVALID / SCN_CROP_NOT_FOUND / SCN_PARAM_INVALID
  */
@@ -136,8 +165,6 @@ export const queryCloudPoints = defineCommand({
     });
     if (read === null)
       return refuseScan(doc, 'query_cloud_points', 'SCN_ASSET_MISSING', `asset ${cloud.assetKey} could not be read`, [cloudId]);
-    const points: number[] = [];
-    const indices: number[] = [];
     const width = { intensity: 1, rgb: 3, classification: 1 } as const;
     const short = Object.entries(read.attributes ?? {}).some(
       ([name, column]) => column.length !== read.indices.length * width[name as keyof typeof width],
@@ -147,22 +174,8 @@ export const queryCloudPoints = defineCommand({
         cloudId,
       ]);
     const missingAttributes = wanted.filter((name) => read.attributes?.[name] === undefined);
-    const columns = { intensity: [] as number[], rgb: [] as number[], classification: [] as number[] };
     const source = read.attributes;
-    let truncated = false;
-    for (let i = 0; i < read.indices.length; i++) {
-      const p = applyPoint(cloud.transform, [read.positions[3 * i] ?? 0, read.positions[3 * i + 1] ?? 0, read.positions[3 * i + 2] ?? 0]);
-      if (!inRegion(resolved.region, p)) continue;
-      if (indices.length >= cap) {
-        truncated = true;
-        break;
-      }
-      points.push(...vecFromM(doc, p));
-      indices.push(read.indices[i] ?? 0);
-      if (source?.intensity !== undefined) columns.intensity.push(source.intensity[i] ?? 0);
-      if (source?.rgb !== undefined) columns.rgb.push(source.rgb[3 * i] ?? 0, source.rgb[3 * i + 1] ?? 0, source.rgb[3 * i + 2] ?? 0);
-      if (source?.classification !== undefined) columns.classification.push(source.classification[i] ?? 0);
-    }
+    const { points, indices, columns, truncated } = collectPoints(doc, cloud.transform, resolved.region, read, cap);
     const data = {
       cloudId,
       unit: doc.units,

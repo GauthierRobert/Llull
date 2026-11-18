@@ -7,6 +7,25 @@ import { isoIssue, refuseIso } from '../codes';
 import { definedPlan } from '../iso/isoSheets';
 import { allLineIds } from '../lineNetwork';
 
+function bomSummary(
+  params: {
+    readonly scope: string;
+    readonly lineId?: string | undefined;
+    readonly spoolId?: string | undefined;
+    readonly sheet?: number | undefined;
+  },
+  list: readonly BomRow[],
+  merged: Bolting | undefined,
+  warnings: ReadonlyArray<{ readonly code: string }>,
+): string {
+  return (
+    `piping_bom: ${params.scope}${params.scope === 'document' ? '' : ` ${params.lineId}${params.spoolId === undefined ? '' : `/${params.spoolId}`}${params.scope === 'sheet' ? `/sheet ${params.sheet}` : ''}`}: ${list.length} item(s)` +
+    `${list.some((row) => row.unit === 'm') ? `, pipe ${list.filter((row) => row.unit === 'm').reduce((sum, row) => sum + row.quantity, 0)} m` : ''}` +
+    `${merged === undefined ? '' : `; bolting: ${merged.joints} flanged joint(s), ${merged.gaskets} gasket(s), ${merged.studBolts} stud bolt(s)${merged.diameter === null ? '' : ` ${merged.diameter} in`}`}` +
+    `${warnings.length === 0 ? '' : `; warnings: ${warnings.map((warning) => warning.code).join(', ')}`}`
+  );
+}
+
 /**
  * @affects none (query: returns the same document)
  * @invariant PIPE quantities are metres of centreline (so BOM = takeoff = cut-list centreline sum), other items count; the spool rows add up to the line rows and the line rows to the document rows;
@@ -186,24 +205,17 @@ export const pipingBom = defineCommand({
           })()
         : undefined;
     const list = [...rows.values()];
-    return report(
-      doc,
-      `piping_bom: ${params.scope}${params.scope === 'document' ? '' : ` ${params.lineId}${params.spoolId === undefined ? '' : `/${params.spoolId}`}${params.scope === 'sheet' ? `/sheet ${params.sheet}` : ''}`}: ${list.length} item(s)` +
-        `${list.some((row) => row.unit === 'm') ? `, pipe ${list.filter((row) => row.unit === 'm').reduce((sum, row) => sum + row.quantity, 0)} m` : ''}` +
-        `${merged === undefined ? '' : `; bolting: ${merged.joints} flanged joint(s), ${merged.gaskets} gasket(s), ${merged.studBolts} stud bolt(s)${merged.diameter === null ? '' : ` ${merged.diameter} in`}`}` +
-        `${warnings.length === 0 ? '' : `; warnings: ${warnings.map((warning) => warning.code).join(', ')}`}`,
-      {
-        scope: params.scope,
-        rows: list,
-        ...(merged === undefined ? {} : { bolting: merged }),
-        withoutItemCode: missing,
-        warnings,
-        provenance: {
-          catalogue:
-            'ASME B16.5 class 150-600 weld-neck flange table (01 PSC bundled catalogue) for bolting; descriptions from the line (PCF MATERIALS / spec)',
-          sources: [...new Set(analyses.map((analysis) => analysis.read.network.source))],
-        },
+    return report(doc, bomSummary(params, list, merged, warnings), {
+      scope: params.scope,
+      rows: list,
+      ...(merged === undefined ? {} : { bolting: merged }),
+      withoutItemCode: missing,
+      warnings,
+      provenance: {
+        catalogue:
+          'ASME B16.5 class 150-600 weld-neck flange table (01 PSC bundled catalogue) for bolting; descriptions from the line (PCF MATERIALS / spec)',
+        sources: [...new Set(analyses.map((analysis) => analysis.read.network.source))],
       },
-    );
+    });
   },
 });
