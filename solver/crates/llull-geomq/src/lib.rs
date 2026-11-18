@@ -14,6 +14,8 @@
 //!
 //! Every op also writes `report.json` = `{ op, items, threads, ms }`.
 
+mod occlusion;
+mod panels;
 pub mod tree;
 pub mod triangle;
 pub mod viewfactor;
