@@ -10,7 +10,7 @@ import type { CommandDefinition, CommandError, CommandResult } from '../types';
 import { commandError } from '../noop';
 import { orphanState, withCarriedPmi } from './carry';
 import { kernelRefusal } from '../kernelRefusal';
-import { nextStateKey } from './replayCache';
+import { nextStateKey, replayCacheFor } from './replayCache';
 import { deferralCount } from '../../geometry/mesh/engine';
 import { hashText } from '../../lib/hash';
 import { remapIds } from './regenerate';
@@ -175,7 +175,11 @@ export function replayHistory(
   // (assigned during this replay). Subsequent steps' params are rewritten via
   // remapIds. Step-scoped ids replay identically, so this only maps legacy (pre-v2) ids.
   let idMap = new Map<string, string>();
-  const cache = context.replayCache;
+  const cache = replayCacheFor(
+    context.replayCache,
+    history.reduce((live, step) => live + (step.suppressed ? 0 : 1), 0),
+    base.order.length,
+  );
   // States are keyed by everything that determines them, so an unchanged prefix of an
   // edited history (or of a parameter change) is served from the cache instead of re-run.
   // Whether an artifact store is injected decides how artifact-recording steps replay (verified or flagged), so it is part of every key.

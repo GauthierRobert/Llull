@@ -46,7 +46,7 @@ function run(doc: CadDocument, analysisId: string): { result: Promise<FeaToolRes
   const ccx = vi.fn(() => Promise.resolve({ exitCode: 0, log: '', timedOut: false }));
   const runner: CcxRunner = { run: ccx, version: () => Promise.resolve('2.21') };
   const host: FeaHost = { getDoc: () => doc, applyCommand: () => ({ summary: '', affected: [], isError: false }) };
-  return { result: runFeaSolve(analysisId, undefined, host, { store, hooks: caeHooks, ccx: runner }), ccx };
+  return { result: runFeaSolve(analysisId, {}, host, { store, hooks: caeHooks, ccx: runner }), ccx };
 }
 
 describe('fea_solve gating on THM_BC_CONFLICT', () => {

@@ -2,6 +2,8 @@
 
 import type { FeMeshArtifact, QualitySummary } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
+import { memoByObject } from '@lib/memoByObject';
+import { nodeCoordinates } from './fields';
 import { quadMetrics, tetMetrics, triMetrics } from './verdict';
 
 type Metric = { min: number; max: number; p01: number; p99: number; outsideAcceptable: number };
@@ -43,8 +45,8 @@ const TETS: ReadonlySet<string> = new Set(['C3D4', 'C3D10']);
  * range [0.3, 1] flags every flat quad (open question 10). Only the metrics of the element families present are returned. Deterministic.
  * @invariant `inverted` counts elements with scaled Jacobian <= 0 (tet, quad) or a zero-area triangle
  */
-export function meshQuality(mesh: FeMeshArtifact): QualitySummary {
-  const coordinates = new Map<number, Vec3>(mesh.nodes.map((node) => [node[0], [node[1], node[2], node[3]]]));
+function measureQuality(mesh: FeMeshArtifact): QualitySummary {
+  const coordinates = nodeCoordinates(mesh);
   const series: Record<string, number[]> = {};
   const push = (name: string, value: number): void => void (series[name] ??= []).push(value);
   let inverted = 0;
@@ -89,3 +91,6 @@ export function meshQuality(mesh: FeMeshArtifact): QualitySummary {
     inverted,
   };
 }
+
+/** `meshQuality` of a mesh artifact, measured once per artifact object (shared: read-only). */
+export const meshQuality: (mesh: FeMeshArtifact) => QualitySummary = memoByObject(measureQuality);

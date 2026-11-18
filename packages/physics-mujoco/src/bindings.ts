@@ -62,6 +62,8 @@ export interface MujocoModule {
   mj_name2id(model: MjModel, type: number, name: string): number;
   mj_step(model: MjModel, data: MjData): void;
   mj_forward(model: MjModel, data: MjData): void;
+  /** `mj_forward` without the stages up to `skipStage` (0 none, 1 position, 2 velocity) and, with `skipSensor` 1, without the sensors. */
+  mj_forwardSkip(model: MjModel, data: MjData, skipStage: number, skipSensor: number): void;
   mj_rnePostConstraint(model: MjModel, data: MjData): void;
   mj_kinematics(model: MjModel, data: MjData): void;
   mj_comPos(model: MjModel, data: MjData): void;

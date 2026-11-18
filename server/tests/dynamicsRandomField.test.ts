@@ -109,7 +109,7 @@ describe('fea_solve on random_response cases', () => {
   it('refuses a case without damping with the deck code (VC-DYN-40)', async () => {
     const bare = strip();
     const { doc, mesh } = meshed(bare.doc, bare.analysisId, bare.boxId);
-    const result = await runFeaSolve(bare.analysisId, 60, hostOf(doc), solveDeps(mesh));
+    const result = await runFeaSolve(bare.analysisId, { timeoutS: 60 }, hostOf(doc), solveDeps(mesh));
     expect(result).toMatchObject({ isError: true, data: { code: 'DYN_DAMPING_UNSET' } });
   });
 
@@ -117,7 +117,7 @@ describe('fea_solve on random_response cases', () => {
     const ready = probed();
     const { doc, mesh } = meshed(ready.doc, ready.analysisId, ready.boxId);
     const host = hostOf(doc);
-    const result = await runFeaSolve(ready.analysisId, 60, host, solveDeps(mesh));
+    const result = await runFeaSolve(ready.analysisId, { timeoutS: 60 }, host, solveDeps(mesh));
     expect(result.isError, result.summary).toBe(false);
     expect(result.summary).toContain('in TypeScript (llull-compute not installed');
     expect(result.data).toMatchObject({ nodalField: { engine: 'ts', deterministic: true } });
@@ -147,7 +147,7 @@ describe('fea_solve on random_response cases', () => {
       const { doc, mesh } = meshed(ready.doc, ready.analysisId, ready.boxId);
       const host = hostOf(doc);
       const runner = createComputeRunner({}, BINARY);
-      const result = await runFeaSolve(ready.analysisId, 60, host, solveDeps(mesh, runner));
+      const result = await runFeaSolve(ready.analysisId, { timeoutS: 60 }, host, solveDeps(mesh, runner));
       expect(result.isError, result.summary).toBe(false);
       expect(result.data).toMatchObject({ nodalField: { engine: 'native-cpu' } });
       const stored = store.get((result.data as { resultsHash: string }).resultsHash) as FeResultsArtifact;

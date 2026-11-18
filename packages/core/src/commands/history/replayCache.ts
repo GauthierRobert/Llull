@@ -39,3 +39,24 @@ export function nextStateKey(previous: string, stepId: string, commandName: stri
 export function createReplayCache(capacity = 1024): ReplayCache {
   return new LruCache(capacity);
 }
+
+/** Heap a cached state costs per entity it references (its own entities record: measured ~200 bytes per entry at 2 000 x 2 000). */
+const BYTES_PER_STATE_ENTITY = 200;
+/** Ceiling of the heap one history's states may take. */
+const REPLAY_CACHE_BUDGET_BYTES = 512 * 1024 * 1024;
+
+/**
+ * The cache a replay of `liveSteps` steps over a document of `entityCount` entities should use: `cache` grown to hold the whole
+ * history (a smaller LRU evicts exactly the prefix the next replay needs, so every edit would miss), or null when those states
+ * would not fit the budget (a history too large to memoize replays faster uncached than under the collector's pressure).
+ */
+export function replayCacheFor(cache: ReplayCache | null, liveSteps: number, entityCount: number): ReplayCache | null {
+  if (cache === null) return null;
+  // A parameter-dependent step stores a second entry (its per-table variant): room for both.
+  const wanted = 2 * liveSteps + 16;
+  if (wanted <= cache.capacityNow) return cache;
+  // States grow from empty to the full document: half the entities on average.
+  if ((liveSteps * entityCount * BYTES_PER_STATE_ENTITY) / 2 > REPLAY_CACHE_BUDGET_BYTES) return null;
+  cache.ensureCapacity(wanted);
+  return cache;
+}

@@ -42,25 +42,21 @@ export function isClosedManifold({
 }): boolean {
   const vertices = positions.length / 3;
   if (vertices * vertices >= Number.MAX_SAFE_INTEGER || indices.length % 3 !== 0) return false;
+  // Closed manifold <=> no directed edge twice and the set of reversed edges equals the set of edges: two sorted arrays compared in step.
   const keys = new Float64Array(indices.length);
+  const reversed = new Float64Array(indices.length);
   for (let t = 0; t < indices.length; t += 3)
-    for (let e = 0; e < 3; e += 1) keys[t + e] = (indices[t + e] as number) * vertices + (indices[t + ((e + 1) % 3)] as number);
-  keys.sort();
-  const contains = (key: number): boolean => {
-    let [lo, hi] = [0, keys.length - 1];
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      const value = keys[mid] as number;
-      if (value === key) return true;
-      if (value < key) lo = mid + 1;
-      else hi = mid - 1;
+    for (let e = 0; e < 3; e += 1) {
+      const from = indices[t + e] as number;
+      const to = indices[t + ((e + 1) % 3)] as number;
+      keys[t + e] = from * vertices + to;
+      reversed[t + e] = to * vertices + from;
     }
-    return false;
-  };
+  keys.sort();
+  reversed.sort();
   for (let i = 0; i < keys.length; i += 1) {
-    const key = keys[i] as number;
-    if (i > 0 && keys[i - 1] === key) return false;
-    if (!contains((key % vertices) * vertices + Math.floor(key / vertices))) return false;
+    if (i > 0 && keys[i - 1] === keys[i]) return false;
+    if (keys[i] !== reversed[i]) return false;
   }
   return true;
 }

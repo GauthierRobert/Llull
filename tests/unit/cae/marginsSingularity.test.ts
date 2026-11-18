@@ -8,6 +8,8 @@ import { analysisInputHash } from '@cae/hash/inputHash';
 import { marginDispositionPayload } from '@cae/margins/disposition';
 import { screenSingularities } from '@cae/margins/singularity';
 import { caseIn } from './helpers';
+import { gridMesh, seeded } from './gridMesh';
+import { timeBudgetMs } from '../../helpers/timeBudget';
 import { barMesh, mustRun } from './deckFixtures';
 import { marginBar, STAND_IN_MESH, type MarginBar } from './marginsFixtures';
 
@@ -182,6 +184,72 @@ describe('singularity sources and units', () => {
     expect(inches.data['radius']).toMatchObject({ value: 0.1, unit: 'in', defaulted: false });
     const metres = screenSingularities(doc, { ...analysis, unitSystem: 'N-m-kg-s' }, withLoad, { radius: 1000, note: 'n' });
     expect(metres.excluded.size).toBe(3);
+  });
+});
+
+describe('singularity screen on a large node cloud (PERF1: grid of half-radius cells)', () => {
+  const bar = marginBar();
+  const doc = mustRun(bar.recorded, 'add_fea_load', {
+    analysisId: bar.analysisId,
+    name: 'point',
+    kind: 'force',
+    loadCase: 'LC1',
+    vector: [1, 0, 0],
+    target: { entityId: bar.boxId, pointsNear: [[2, 0, 0]] },
+  });
+  const analysis = caseIn(doc, bar.analysisId);
+  const pointId = analysis.loadOrder.find((id) => analysis.loads[id]?.kind === 'force') ?? '';
+  const next = seeded(7);
+  const nodes: [number, number, number, number][] = Array.from({ length: 6000 }, (_, index) => [
+    index + 1,
+    next() * 40 - 20,
+    next() * 10,
+    next() * 4,
+  ]);
+  // Exact distances on the boundary: a node exactly one radius away is inside (inclusive).
+  nodes.push([9001, 100, 100, 100], [9002, 100.5, 100, 100], [9003, 100, 100.25, 100], [9004, 100.5000001, 100, 100]);
+  const sources = [3, 77, 1500, 4242, 9001];
+  const mesh = { ...barMesh(doc, bar.analysisId, bar.boxId, { [`L_${pointId}`]: sources }), nodes };
+  const bruteForce = (radius: number): number[] => {
+    const at = new Map(nodes.map((node) => [node[0], node]));
+    return nodes
+      .filter(([, x, y, z]) =>
+        sources.some((id) => {
+          const source = at.get(id);
+          return source !== undefined && Math.hypot(x - source[1], y - source[2], z - source[3]) <= radius;
+        }),
+      )
+      .map((node) => node[0]);
+  };
+
+  it.each([0.5, 0.05, 3, 25, 1e-9, 500])('radius %d excludes exactly the nodes within it of a source', (radius) => {
+    const screen = screenSingularities(doc, analysis, mesh, { radius, note: 'n' });
+    expect([...screen.excluded].sort((a, b) => a - b)).toEqual(bruteForce(radius));
+    expect(screen.data['excludedNodes']).toBe(screen.excluded.size);
+  });
+
+  it('includes the node exactly one radius away and not the one just beyond', () => {
+    const screen = screenSingularities(doc, analysis, mesh, { radius: 0.5, note: 'n' });
+    expect(screen.excluded.has(9002)).toBe(true);
+    expect(screen.excluded.has(9003)).toBe(true);
+    expect(screen.excluded.has(9004)).toBe(false);
+  });
+
+  it('compares with every source when a coordinate is too far for cell numbers to step by one', () => {
+    const far = { ...mesh, nodes: [...nodes, [9100, 4e9, -4e9, 4e9] as [number, number, number, number]] };
+    const spread = { ...far, nodeSets: { [`L_${pointId}`]: [...sources, 9100] } };
+    const screen = screenSingularities(doc, analysis, spread, { radius: 1e-9, note: 'n' });
+    expect([...screen.excluded].sort((a, b) => a - b)).toEqual([...sources, 9100].sort((a, b) => a - b));
+  });
+
+  it('screens 68k nodes around a point source within the interactive budget', () => {
+    const grid = gridMesh({ cells: [40, 14, 14], size: [200, 40, 40], quadratic: true });
+    const big = { ...mesh, nodes: grid.nodes, nodeSets: { [`L_${pointId}`]: [1, 2, 3] } };
+    screenSingularities(doc, analysis, big, { radius: 10, note: 'n' });
+    const started = performance.now();
+    const screen = screenSingularities(doc, analysis, big, { radius: 10, note: 'n' });
+    expect(screen.excluded.size).toBeGreaterThan(3);
+    expect(performance.now() - started).toBeLessThan(timeBudgetMs(60));
   });
 });
 

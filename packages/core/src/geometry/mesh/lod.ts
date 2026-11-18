@@ -6,13 +6,14 @@
 
 import type { MeshData } from '../../model/types';
 import { tupleExtent } from '../../lib/extent';
+import { NumberIds, TripleSet } from './clusterTables';
 
 function cluster(mesh: MeshData, cell: number, origin: readonly number[], cells: readonly number[]): MeshData {
   const vertexCount = mesh.positions.length / 3;
   const target = new Int32Array(vertexCount).fill(-1);
-  const byCell = new Map<number, number>();
-  const sums: number[] = [];
-  const counts: number[] = [];
+  const byCell = new NumberIds();
+  let sums = new Float64Array(3 * 1024);
+  let counts = new Int32Array(1024);
   const referenced = new Uint8Array(vertexCount);
   for (const v of mesh.indices) referenced[v] = 1;
   for (let v = 0; v < vertexCount; v++) {
@@ -20,30 +21,27 @@ function cluster(mesh: MeshData, cell: number, origin: readonly number[], cells:
     const ix = Math.min(cells[0] as number, Math.floor(((mesh.positions[v * 3] as number) - (origin[0] as number)) / cell));
     const iy = Math.min(cells[1] as number, Math.floor(((mesh.positions[v * 3 + 1] as number) - (origin[1] as number)) / cell));
     const iz = Math.min(cells[2] as number, Math.floor(((mesh.positions[v * 3 + 2] as number) - (origin[2] as number)) / cell));
-    const key = ix + ((cells[0] as number) + 1) * (iy + ((cells[1] as number) + 1) * iz);
-    let id = byCell.get(key);
-    if (id === undefined) {
-      id = counts.length;
-      byCell.set(key, id);
-      counts.push(0);
-      sums.push(0, 0, 0);
+    const id = byCell.idOf(ix + ((cells[0] as number) + 1) * (iy + ((cells[1] as number) + 1) * iz));
+    if (id >= counts.length) {
+      const [grownCounts, grownSums] = [new Int32Array(counts.length * 2), new Float64Array(sums.length * 2)];
+      grownCounts.set(counts);
+      grownSums.set(sums);
+      [counts, sums] = [grownCounts, grownSums];
     }
     target[v] = id;
     counts[id] = (counts[id] as number) + 1;
     for (let a = 0; a < 3; a++) sums[id * 3 + a] = (sums[id * 3 + a] as number) + (mesh.positions[v * 3 + a] as number);
   }
-  const positions = sums.map((value, i) => value / (counts[Math.floor(i / 3)] as number));
+  const positions: number[] = [];
+  for (let i = 0; i < byCell.count * 3; i++) positions.push((sums[i] as number) / (counts[Math.floor(i / 3)] as number));
   const indices: number[] = [];
-  const seen = new Set<string>();
+  const seen = new TripleSet();
   for (let f = 0; f + 2 < mesh.indices.length; f += 3) {
     const a = target[mesh.indices[f] as number] as number;
     const b = target[mesh.indices[f + 1] as number] as number;
     const c = target[mesh.indices[f + 2] as number] as number;
     if (a === b || b === c || a === c) continue;
-    const key = [a, b, c].sort((x, y) => x - y).join(',');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    indices.push(a, b, c);
+    if (seen.add(a, b, c)) indices.push(a, b, c);
   }
   return { positions, indices };
 }

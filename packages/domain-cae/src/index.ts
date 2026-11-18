@@ -63,6 +63,7 @@ export { mapShellResults } from './shell/shellResults';
 // solver deck writers (BDF, INP) and unit names
 export { writeBdf, type BdfResult } from './decks/bdfWriter';
 export { writeInp } from './decks/inpWriter';
+export { iterativeSolverDeck } from './decks/solverOption';
 export { lengthUnitName, stressUnitName } from './decks/units';
 
 // result readers/writers, plot rendering and input binding

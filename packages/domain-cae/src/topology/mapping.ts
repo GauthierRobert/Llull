@@ -146,12 +146,15 @@ const direction = ({ a, b }: Edge): Vec3 => normalize3(sub3(b, a));
 const collinear = (edge: Edge, other: Edge, tolerance: number): boolean =>
   len3(cross3(direction(edge), direction(other))) < 1e-6 && len3(cross3(sub3(other.a, edge.a), direction(edge))) < tolerance;
 
+/** `Math.min` over a list of any length (a spread throws a RangeError above ~1.5e5 items: a 200k-node domain). */
+const smallest = (values: readonly number[]): number => values.reduce((least, value) => Math.min(least, value), Infinity);
+
 /** The nearest feature edge to `point` and every feature edge collinear with it and connected to it. */
 function edgeChain(grid: TopologyGrid, triangles: readonly Triangle[], point: Vec3): Edge[] {
   const edges = featureEdges(triangles);
   if (edges.length === 0) return [];
   const distances = edges.map((edge) => distanceToSegment(grid, point, edge.a, edge.b));
-  const seed = edges[distances.indexOf(Math.min(...distances))] as Edge;
+  const seed = edges[distances.indexOf(smallest(distances))] as Edge;
   const tolerance = 1e-7 * scaleOf(triangles);
   const line = edges.filter((edge) => collinear(seed, edge, tolerance));
   const chain = new Set<Edge>([seed]);
@@ -203,7 +206,7 @@ export function mapTarget(
   for (const point of target.pointsNear ?? []) {
     const flat = flatten(grid, point);
     const distances = sets.used.map((index) => distance3(flatten(grid, position(grid, index)), flat));
-    const best = Math.min(...distances);
+    const best = smallest(distances);
     if (!(best <= 1.5 * grid.voxel * Math.sqrt(grid.dimension)))
       return { error: `point [${point.join(', ')}] is ${best} from the nearest node of the domain` };
     found.add(sets.used[distances.indexOf(best)] as number);

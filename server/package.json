@@ -16,6 +16,7 @@
     "typecheck": "node ../node_modules/typescript-native/bin/tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc7/server.tsbuildinfo",
     "test": "node ../scripts/heavyLock.mjs server-test -- vitest run --config vitest.config.mts",
     "test:watch": "vitest --config vitest.config.mts",
+    "perf": "node ../scripts/heavyLock.mjs perf -- vitest run --config vitest.perf.config.mts",
     "quality:step": "vitest run --config vitest.quality.config.mts",
     "quality:drawings": "vitest run --config vitest.quality.config.mts tests/quality/drawingCorpus.gate.ts",
     "production:scripted": "vitest run --config vitest.production.config.mts tests/production/scripted.gate.ts",

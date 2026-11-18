@@ -16,12 +16,7 @@ import { validateDocumentShape, validateDocumentValues } from './validation';
 import { migrateRetiredCommands } from './retiredCommands';
 import { exceedsNestingDepth } from './nestingDepth';
 import { withoutPrivateValues } from '../materials/libraryRecords';
-
-interface DocumentEnvelope {
-  format: 'llull-document';
-  version: 3;
-  document: CadDocument;
-}
+import { documentJson } from './documentJson';
 
 /** Bump on a breaking field; `migrate()` upgrades older documents. */
 const CURRENT_SCHEMA_VERSION = 3;
@@ -44,12 +39,9 @@ interface SerializeOptions {
  *   (`import_step_exact`, `set_modeling_tolerance`) from their own ctx, never from the ambient kernel at save time
  */
 export function serializeDocument(doc: CadDocument, options: SerializeOptions = {}): string {
-  const envelope: DocumentEnvelope = {
-    format: 'llull-document',
-    version: CURRENT_SCHEMA_VERSION,
-    document: withoutPrivateValues(options.includeDerived === true ? doc : withoutDerivedEntities(doc)),
-  };
-  return JSON.stringify(envelope);
+  const document = withoutPrivateValues(options.includeDerived === true ? doc : withoutDerivedEntities(doc));
+  // The envelope `{ format, version, document }` in that key order, the document through the per-part text memo.
+  return `{"format":"llull-document","version":${CURRENT_SCHEMA_VERSION},"document":${documentJson(document)}}`;
 }
 
 export function withoutDerivedEntities(doc: CadDocument): CadDocument {

@@ -33,6 +33,7 @@
     "check:css": "node scripts/checkCss.mjs",
     "format:check": "prettier --check --cache \"**/*.{ts,tsx,mts,mjs,cjs,js}\"",
     "test:e2e": "playwright test",
+    "perf": "npm --prefix server run perf",
     "quality:fetch": "node quality/fetchCorpus.mjs",
     "quality:step": "npm --prefix server run quality:step",
     "quality:drawings": "npm --prefix server run quality:drawings",

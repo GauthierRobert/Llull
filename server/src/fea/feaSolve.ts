@@ -9,7 +9,7 @@ import path from 'node:path';
 import type { FeConvergenceRow, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { FeMeshAdequacy } from '@core/model/meshAdequacy';
 import type { CadDocument } from '@core/model/types';
-import { FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaToolResult } from '@protocol/index';
+import { FEA_SOLVE_THREADS, FEA_SOLVE_TIMEOUT_S, type FeaHost, type FeaSolveOptions, type FeaToolResult } from '@protocol/index';
 import type { FeArtifactStore } from './artifactStore';
 import type { CaeHooks } from './caeHooks';
 import type { CcxRunner } from './ccxProcess';
@@ -85,6 +85,10 @@ interface SolveInput {
   readonly current: { readonly mesh: FeMeshArtifact; readonly meshHash: string };
   readonly nonlinear: boolean;
   readonly random: boolean;
+  /** Solver threads of this run (1 = bit-reproducible). */
+  readonly threads: number;
+  /** The static steps run on the iterative solver. */
+  readonly iterative: boolean;
 }
 
 interface PreparedDeck {
@@ -120,7 +124,10 @@ async function prepareDeck(input: SolveInput): Promise<FeaToolResult | PreparedD
       data: { code: deck.code, ...(fallback === null ? {} : { mappingFallback: fallback }) },
     };
   }
-  return { deckText: deck.text, prepared, fallback };
+  if (!input.iterative) return { deckText: deck.text, prepared, fallback };
+  const iterative = deps.hooks.iterativeSolverDeck(doc, analysisId, deck.text);
+  if ('code' in iterative) return feaFailure('fea_solve', iterative.code, iterative.message, [analysisId]);
+  return { deckText: iterative.text, prepared, fallback };
 }
 
 function solverFailure(input: SolveInput, run: ProcessResult, seconds: number, convergence: readonly FeConvergenceRow[]): FeaToolResult {
@@ -151,7 +158,7 @@ async function runCcx(
 ): Promise<FeaToolResult | { readonly run: ProcessResult; readonly convergence: FeConvergenceRow[] }> {
   const { analysisId, deps, nonlinear } = input;
   const seconds = Math.min(FEA_SOLVE_TIMEOUT_S.max, Math.max(FEA_SOLVE_TIMEOUT_S.min, timeoutS ?? DEFAULT_SOLVE_TIMEOUT_S));
-  const run = await deps.ccx.run(directory, JOB, seconds * 1000);
+  const run = await deps.ccx.run(directory, JOB, seconds * 1000, input.threads);
   if (run.startError !== undefined) {
     return feaFailure('fea_solve', 'FEA_TOOL_MISSING', `cannot start CalculiX: ${run.startError}. ${INSTALL_HINT.ccx}`, [analysisId]);
   }
@@ -221,6 +228,8 @@ async function recordSolved(
     inputHash: deps.hooks.analysisInputHash(doc, analysisId, 'full'),
     solver: 'calculix',
     solverVersion: await deps.ccx.version(),
+    ...(input.iterative ? { solverMethod: 'iterative' as const } : {}),
+    ...(input.threads > 1 ? { solverThreads: input.threads } : {}),
     steps,
     ...(dat !== undefined ? { dat } : {}),
     ...(nonlinear && convergence.length > 0 ? { convergence } : {}),
@@ -244,13 +253,18 @@ async function recordSolved(
     summary: deps.hooks.resultsSummary(doc, analysisId, current.mesh, stored, resultsHash),
   });
   const increments = nonlinear ? ` ${convergenceNote(convergence)}.` : '';
+  const method = input.iterative ? ' Iterative solver: results agree with a direct solve to about three digits (a few 1e-4 relative).' : '';
+  const threaded =
+    input.threads > 1 ? ` ${input.threads} solver threads: the last digits vary between runs (threads 1 is bit-reproducible).` : '';
   return {
-    summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${prepared === null ? '' : ` ${prepared}.`} ${adequacyNote(adequacy, deps.hooks)}${post === null ? '' : ` ${post.note}.`} ${recorded.summary}`,
+    summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${method}${threaded}${prepared === null ? '' : ` ${prepared}.`} ${adequacyNote(adequacy, deps.hooks)}${post === null ? '' : ` ${post.note}.`} ${recorded.summary}`,
     affected: recorded.affected,
     isError: recorded.isError,
     data: {
       resultsHash,
       steps: steps.length,
+      threads: input.threads,
+      solver: input.iterative ? 'iterative' : 'direct',
       ...(fallback === null ? {} : { mappingFallback: fallback }),
       ...(nonlinear ? { convergence: convergenceTotals(convergence) } : {}),
       ...(post !== null ? { nodalField: { engine: post.engine, elapsedMs: post.elapsedMs, deterministic: true } } : {}),
@@ -264,18 +278,16 @@ async function recordSolved(
  *   `*ERROR`, non-zero exit, timeout or no result step -> FEA_SOLVER_FAILED (log tail in data.log); a nonlinear run that stops on the increment
  *   minimum / INC / divergence -> NLS_INCREMENT_TOO_SMALL / NLS_MAX_INCREMENTS / NLS_NOT_CONVERGED with data.convergence
  */
-export async function runFeaSolve(
-  analysisId: string,
-  timeoutS: number | undefined,
-  host: FeaHost,
-  deps: FeaSolveDeps,
-): Promise<FeaToolResult> {
+export async function runFeaSolve(analysisId: string, options: FeaSolveOptions, host: FeaHost, deps: FeaSolveDeps): Promise<FeaToolResult> {
+  const { timeoutS } = options;
+  const wanted = Math.floor(options.threads ?? deps.ccx.defaultThreads ?? 1);
+  const threads = Math.min(FEA_SOLVE_THREADS.max, Math.max(FEA_SOLVE_THREADS.min, wanted));
   const doc = host.getDoc();
   const current = currentMesh('fea_solve', doc, analysisId, deps.store, deps.hooks);
   if (isFailure(current)) return current;
   const nonlinear = doc.analysis?.cases[analysisId]?.type === 'nonlinear_static';
   const random = doc.analysis?.cases[analysisId]?.type === 'random_response';
-  const input: SolveInput = { analysisId, host, deps, doc, current, nonlinear, random };
+  const input: SolveInput = { analysisId, host, deps, doc, current, nonlinear, random, threads, iterative: options.solver === 'iterative' };
   const deck = await prepareDeck(input);
   if (isFailure(deck)) return deck;
 

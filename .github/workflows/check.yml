@@ -32,6 +32,38 @@ jobs:
         working-directory: solver
       - run: node scripts/nativeCheck.mjs
 
+  # Binding performance budgets (docs/decisions/PERF1-performance-budgets.md): server/tests/perf/*.gate.ts against
+  # server/tests/perf/budgets.ts, scaled by the harness's machine calibration. llull-compute is built for the native scenarios.
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            solver/target
+          key: perf-${{ runner.os }}-${{ hashFiles('solver/Cargo.lock', 'solver/**/Cargo.toml', 'solver/rust-toolchain.toml') }}
+          restore-keys: perf-${{ runner.os }}-
+      - run: rustup toolchain install
+        working-directory: solver
+      - run: cargo build --release -p llull-compute
+        working-directory: solver
+      - run: npm ci
+      - run: npm --prefix server ci
+      - run: npm run perf
+        env:
+          LLULL_REQUIRE_TOOLS: native:llull-compute
+
   # Native OCCT kernel (RS-1) and FE mesher (NG1): crates llull-kernel-occt + llull-netgen, bins llull-kernel + llull-mesh (clippy, cargo
   # test), every server suite that runs the real kernel or mesher (closed-form expectations; the WASM kernel is retired, LC1 step 5), then
   # the desktop native bundle. OCCT 7.9.2 is built SHARED by solver/scripts/build-occt.mjs (pinned source + sha256, ~60 min on 4 cores)

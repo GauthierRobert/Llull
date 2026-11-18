@@ -81,7 +81,7 @@ async function solve(type: string, outcome: { exitCode: number; log: string }): 
   };
   const doc = docOf(type);
   const host = { getDoc: () => doc, applyCommand: (): FeaToolResult => ok('recorded') };
-  return { result: await runFeaSolve('an', undefined, host, { store, hooks, ccx }), seen };
+  return { result: await runFeaSolve('an', {}, host, { store, hooks, ccx }), seen };
 }
 
 describe('fea_solve convergence of a nonlinear_static case', () => {

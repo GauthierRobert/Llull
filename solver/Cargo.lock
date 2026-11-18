@@ -1326,6 +1326,7 @@ version = "0.1.0"
 dependencies = [
  "llull-jsmath",
  "llull-protocol",
+ "pulp",
  "rayon",
  "serde",
  "serde_json",

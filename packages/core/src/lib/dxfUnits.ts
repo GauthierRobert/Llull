@@ -66,16 +66,29 @@ export function insUnitsMillimetres(code: number | null): number | null {
   }
 }
 
+const hexChannels = (value: string): [number, number, number] => [
+  Number.parseInt(value.slice(1, 3), 16),
+  Number.parseInt(value.slice(3, 5), 16),
+  Number.parseInt(value.slice(5, 7), 16),
+];
+
+let aciPalette: readonly (readonly [number, number, number])[] | null = null;
+const nearestAci = new Map<string, number>();
+/** Distinct colours remembered by `hexToAci` (a drawing uses a handful; the cap only bounds a hostile input). */
+const MAX_REMEMBERED_COLOURS = 4096;
+
 /** The AutoCAD Color Index (1-255) nearest to a `#rrggbb` colour (exact for the table's own colours). */
 export function hexToAci(hex: string): number {
-  const channels = (value: string): number[] => [1, 3, 5].map((at) => Number.parseInt(value.slice(at, at + 2), 16));
-  const target = channels(hex);
+  const known = nearestAci.get(hex);
+  if (known !== undefined) return known;
+  aciPalette ??= Array.from({ length: 255 }, (_, index) => hexChannels(aciToHex(index + 1)));
+  const target = hexChannels(hex);
   let best = 7;
   let bestDistance = Infinity;
-  for (let aci = 1; aci <= 255; aci++) {
-    const candidate = channels(aciToHex(aci));
+  aciPalette.forEach((candidate, index) => {
     const distance = candidate.reduce((sum, value, axis) => sum + (value - (target[axis] as number)) ** 2, 0);
-    if (distance < bestDistance) [best, bestDistance] = [aci, distance];
-  }
+    if (distance < bestDistance) [best, bestDistance] = [index + 1, distance];
+  });
+  if (nearestAci.size < MAX_REMEMBERED_COLOURS) nearestAci.set(hex, best);
   return best;
 }
