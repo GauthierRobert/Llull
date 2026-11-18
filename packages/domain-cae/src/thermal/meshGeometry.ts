@@ -3,6 +3,7 @@
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { cross3, dot3, sub3 } from '@lib/vec3';
+import { memoByObject } from '@lib/memoByObject';
 
 export interface MeshElement {
   readonly id: number;
@@ -18,8 +19,7 @@ export interface MeshIndex {
   readonly entityOfNode: ReadonlyMap<number, string>;
 }
 
-/** Index of the nodes and tet elements of `mesh` (other element types are ignored). */
-export function indexMesh(mesh: FeMeshArtifact): MeshIndex {
+function buildIndex(mesh: FeMeshArtifact): MeshIndex {
   const coordinates = new Map<number, Vec3>(mesh.nodes.map(([id, x, y, z]) => [id, [x, y, z]]));
   const elements = new Map<number, MeshElement>();
   const entityOfNode = new Map<number, string>();
@@ -32,6 +32,9 @@ export function indexMesh(mesh: FeMeshArtifact): MeshIndex {
   }
   return { coordinates, elements, entityOfNode };
 }
+
+/** Index of the nodes and tet elements of `mesh` (other element types are ignored), built once per mesh artifact (shared: read-only). */
+export const indexMesh: (mesh: FeMeshArtifact) => MeshIndex = memoByObject(buildIndex);
 
 const origin: Vec3 = [0, 0, 0];
 

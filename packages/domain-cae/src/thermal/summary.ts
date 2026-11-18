@@ -2,10 +2,9 @@
 
 import type { FeMeshArtifact, FeResultsArtifact, ThermalResultsSummary, ThermalSetup } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
+import { artifactHash } from '../shared/artifactHash';
 import { toMetres } from '@core/model/units';
 import type { Vec3 } from '@core/model/vectors';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
 import { systemToSi } from './thermalUnits';
 import { evaluateProbes } from '../results/probes';
 import { analysisLengthMetres } from '../shared/defaults';
@@ -108,7 +107,7 @@ export function thermalResultsSummary(
       series: reading.values.filter((v) => v.value !== null).map((v) => [steady ? 0 : v.time, v.value ?? 0] as const),
     });
   }
-  const resultsHash = sha256Hex(canonicalJson(results));
+  const resultsHash = artifactHash(results);
   return {
     temperatureScale: scale,
     times: steps.map(timeOf),

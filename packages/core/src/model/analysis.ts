@@ -524,6 +524,8 @@ export interface FeResultsArtifact {
   readonly inputHash: string;
   readonly solver: string;
   readonly solverVersion: string;
+  /** Threads the solver ran with, recorded only above 1: such results are reproducible to about six digits, not bit for bit. */
+  readonly solverThreads?: number;
   /** Imported OP2 / FRD whose file carried no llull input-hash marker: stamped with the current hash without proof the file belongs to this set-up. */
   readonly binding?: 'imported-unbound';
   readonly steps: readonly {
@@ -555,6 +557,11 @@ export interface FeTableArtifact {
 /** Read-only artifact store injected by the host (`ExecutionContext.feaArtifacts`). */
 export interface FeArtifactPort {
   get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | FeTopologyArtifact | FeExplicitArtifact | null;
+  /**
+   * The content hash (sha256 of the canonical JSON) this port verified for an artifact object it returned from `get`, null for any other
+   * object. Absent = the reader hashes the artifact itself. Lets a store that already hashed the bytes spare a second mesh-sized pass.
+   */
+  hashOf?(artifact: object): string | null;
 }
 
 /** THE signature port (`ExecutionContext.humanSignature`; 05 FEA, 08 MAT, 09 PLM, 09 VIS). Hosts with a key store install it; none: gates refuse. A command never signs. */

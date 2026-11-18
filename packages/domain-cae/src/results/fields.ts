@@ -2,6 +2,7 @@
 
 import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
+import { memoByObject } from '@lib/memoByObject';
 import { isTransientCase } from '../thermal/access';
 
 export type ResultStep = FeResultsArtifact['steps'][number];
@@ -24,16 +25,28 @@ export function stepOfLoadCase(results: FeResultsArtifact, index: number, analys
   return best?.step;
 }
 
-export const nodeCoordinates = (mesh: FeMeshArtifact): Map<number, Vec3> =>
-  new Map(mesh.nodes.map((node): [number, Vec3] => [node[0], [node[1], node[2], node[3]]]));
+/** Position of each node, built once per mesh artifact (shared: read-only). */
+export const nodeCoordinates: (mesh: FeMeshArtifact) => ReadonlyMap<number, Vec3> = memoByObject(
+  (mesh: FeMeshArtifact): ReadonlyMap<number, Vec3> => {
+    const positions = new Map<number, Vec3>();
+    for (const node of mesh.nodes) positions.set(node[0], [node[1], node[2], node[3]]);
+    return positions;
+  },
+);
 
-/** Entity owning each node (the first block that lists it). */
-export function nodeEntities(mesh: FeMeshArtifact): Map<number, string> {
-  const owner = new Map<number, string>();
-  for (const block of mesh.blocks)
-    for (const element of block.elements) for (const node of element.slice(1)) if (!owner.has(node)) owner.set(node, block.entityId);
-  return owner;
-}
+/** Entity owning each node (the first block that lists it), built once per mesh artifact (shared: read-only). */
+export const nodeEntities: (mesh: FeMeshArtifact) => ReadonlyMap<number, string> = memoByObject(
+  (mesh: FeMeshArtifact): ReadonlyMap<number, string> => {
+    const owner = new Map<number, string>();
+    for (const block of mesh.blocks)
+      for (const element of block.elements)
+        for (let at = 1; at < element.length; at += 1) {
+          const node = element[at] as number;
+          if (!owner.has(node)) owner.set(node, block.entityId);
+        }
+    return owner;
+  },
+);
 
 /** von Mises equivalent of [Sxx, Syy, Szz, Sxy, Syz, Szx]. */
 export function vonMises(stress: readonly number[]): number {
@@ -41,17 +54,36 @@ export function vonMises(stress: readonly number[]): number {
   return Math.sqrt(0.5 * ((xx - yy) ** 2 + (yy - zz) ** 2 + (zz - xx) ** 2) + 3 * (xy ** 2 + yz ** 2 + zx ** 2));
 }
 
-/** Largest scalar over the nodes of a field (first node wins ties); null for an empty / missing field. */
-export function maxOverNodes(
-  field: { readonly values: Readonly<Record<string, readonly number[]>> } | undefined,
-  scalar: (values: readonly number[]) => number,
-): { readonly node: number; readonly value: number } | null {
+type NodalValues = { readonly values: Readonly<Record<string, readonly number[]>> };
+type NodalScalar = (values: readonly number[]) => number;
+type NodalMaximum = { readonly node: number; readonly value: number } | null;
+
+const component = (values: readonly number[], index: number): number => values[index] ?? 0;
+
+export const magnitude = (values: readonly number[]): number =>
+  Math.hypot(component(values, 0), component(values, 1), component(values, 2));
+
+function scanMaximum(field: NodalValues, scalar: NodalScalar): NodalMaximum {
   let best: { node: number; value: number } | null = null;
-  for (const [id, values] of Object.entries(field?.values ?? {})) {
-    const value = scalar(values);
+  const values = field.values;
+  for (const id in values) {
+    const value = scalar(values[id] as readonly number[]);
     if (Number.isFinite(value) && (best === null || value > best.value)) best = { node: Number(id), value };
   }
   return best;
 }
 
-export const magnitude = (values: readonly number[]): number => Math.hypot(...values.slice(0, 3));
+/** The maxima every summary asks for, kept per field of a stored (immutable) results artifact. */
+const knownMaxima: ReadonlyMap<NodalScalar, (field: NodalValues) => NodalMaximum> = new Map<
+  NodalScalar,
+  (field: NodalValues) => NodalMaximum
+>([
+  [vonMises, memoByObject((field: NodalValues) => scanMaximum(field, vonMises))],
+  [magnitude, memoByObject((field: NodalValues) => scanMaximum(field, magnitude))],
+]);
+
+/** Largest scalar over the nodes of a field (first node wins ties); null for an empty / missing field. */
+export function maxOverNodes(field: NodalValues | undefined, scalar: NodalScalar): NodalMaximum {
+  if (field === undefined) return null;
+  return (knownMaxima.get(scalar) ?? ((values: NodalValues) => scanMaximum(values, scalar)))(field);
+}

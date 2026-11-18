@@ -10,6 +10,7 @@ import type {
   ThermoMechSetup,
 } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
+import { artifactHash } from '../shared/artifactHash';
 import { canonicalJson } from '@lib/canonicalJson';
 import { evaluateExpression, expressionSyntaxError, extractReferences, isBuiltinConstant } from '@lib/expression';
 import { sha256Hex } from '@lib/sha256';
@@ -269,7 +270,7 @@ function thermalSource(
     );
   const artifact = results as FeResultsArtifact;
   if (field.mapping !== 'interpolate') {
-    const meshHash = sha256Hex(canonicalJson(mesh));
+    const meshHash = artifactHash(mesh, artifacts);
     if (meshesDiffer(artifacts, artifact.meshHash, meshHash, mesh))
       return refusal(
         'TMC_MESH_MISMATCH',

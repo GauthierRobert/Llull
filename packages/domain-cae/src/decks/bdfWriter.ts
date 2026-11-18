@@ -5,8 +5,7 @@
 
 import type { FeArtifactPort, FeMeshArtifact } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
+import { artifactHash } from '../shared/artifactHash';
 import { analysisInputHash } from '../hash/inputHash';
 import { bindingMarker } from '../results/inputBinding';
 import { largest } from '../shared/largest';
@@ -136,7 +135,7 @@ export function writeBdf(doc: CadDocument, analysisId: string, mesh: FeMeshArtif
   if (analysis.type === 'modal') control.push('SUBCASE 1', '  LABEL = modes', `  METHOD = ${METHOD_SET}`);
   if (analysis.type === 'buckling') control.push('SUBCASE 2', '  LABEL = buckling', `  METHOD = ${METHOD_SET}`, '  STATSUB = 1');
   const solution = SOLUTIONS[analysis.type];
-  const meshHash = sha256Hex(canonicalJson(mesh));
+  const meshHash = artifactHash(mesh);
   const inputHash = analysisInputHash(doc, analysisId, 'full');
   const header = [
     `$ llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${inputHash} meshHash ${meshHash}`,

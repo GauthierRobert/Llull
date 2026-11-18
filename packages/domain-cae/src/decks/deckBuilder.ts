@@ -3,8 +3,7 @@
 import type { FeArtifactPort, FeMeshArtifact } from '@core/model/analysis';
 import { EXPORT_REMEDIATION, exportGate } from '@core/model/exportGate';
 import type { CadDocument } from '@core/model/types';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
+import { artifactHash } from '../shared/artifactHash';
 import { analysisInputHash } from '../hash/inputHash';
 import { bindingMarker } from '../results/inputBinding';
 import { ALL_ELEMENTS, ALL_NODES, buildDeckContext, isDeckRefusal, type DeckContext, type DeckRefusal, type DeckSections } from './context';
@@ -309,7 +308,7 @@ export function buildInp(
   const geometry = analysis.type === 'nonlinear_static' ? imperfectNodes(ctx) : { nodes: mesh.nodes, comments: [] };
   if ('code' in geometry) return geometry;
   const lines = [
-    `** llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${analysisInputHash(doc, analysisId, 'full')} meshHash ${sha256Hex(canonicalJson(mesh))}`,
+    `** llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${analysisInputHash(doc, analysisId, 'full')} meshHash ${artifactHash(mesh)}`,
     '*HEADING',
     bindingMarker(analysisInputHash(doc, analysisId, 'full')),
     ...geometry.comments,
