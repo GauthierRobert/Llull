@@ -21,6 +21,83 @@ const pointSchema = z.object({
     .describe('Reading / measurement uncertainty of `value`, same unit (digitised graphs: the reading error). Omit = unknown.'),
 });
 
+type Preset = (typeof REFERENCE_PRESETS)[keyof typeof REFERENCE_PRESETS];
+
+interface PointInput {
+  readonly rpm?: number | undefined;
+  readonly value: number;
+  readonly min?: number | undefined;
+  readonly max?: number | undefined;
+  readonly uncertainty?: number | undefined;
+}
+
+interface AddParams {
+  readonly quantity?: ReferenceData['quantity'] | undefined;
+  readonly points?: readonly PointInput[] | undefined;
+  readonly throttle?: 'full' | 'propeller_curve' | undefined;
+  readonly altitudeM?: number | undefined;
+  readonly note?: string | undefined;
+  readonly source?: string | undefined;
+  readonly grade?: 'A' | 'B' | 'C' | undefined;
+  readonly digitised?: boolean | undefined;
+  readonly calibrationRpm?: readonly number[] | undefined;
+  readonly bandRel?: number | undefined;
+}
+
+interface Draft {
+  readonly quantity: ReferenceData['quantity'];
+  readonly points: readonly PointInput[];
+  readonly source: string;
+  readonly bandRel: number;
+  readonly calibrationRpm: readonly number[];
+  readonly speeds: number[];
+}
+
+/** Quantity, points, source, band and calibration speeds (explicit fields over the preset), or the refusal message. */
+function draftOf(params: AddParams, preset: Preset | undefined): Draft | string {
+  const quantity = params.quantity ?? preset?.quantity;
+  const points = params.points ?? preset?.points;
+  const source = (params.source ?? preset?.source ?? '').trim();
+  if (quantity === undefined) return 'give a quantity (or a preset)';
+  if (points === undefined || points.length === 0) return 'give at least one point (or a preset)';
+  if (source === '') return 'a reference needs a source (document, figure or test it comes from)';
+  const bandRel = params.bandRel ?? preset?.bandRel ?? 0.05;
+  if (!(bandRel > 0)) return 'bandRel must be > 0';
+  const calibrationRpm = params.calibrationRpm ?? preset?.calibrationRpm ?? [];
+  const speeds = points.flatMap((point) => (point.rpm === undefined ? [] : [point.rpm]));
+  const stray = calibrationRpm.filter((rpm) => !speeds.some((speed) => Math.abs(speed - rpm) < 1e-9));
+  if (stray.length > 0) return `calibrationRpm ${stray.join(', ')} is not the speed of any point (${speeds.join(', ')})`;
+  if (points.some((point) => (point.min !== undefined) !== (point.max !== undefined) || (point.min ?? 0) > (point.max ?? 0)))
+    return 'a window point needs both min and max with min <= max';
+  return { quantity, points, source, bandRel, calibrationRpm, speeds };
+}
+
+/** The stored reference record of a valid draft. */
+function recordOf(params: AddParams, preset: Preset | undefined, draft: Draft, referenceId: string): ReferenceData {
+  const condition = {
+    throttle: params.throttle ?? preset?.condition.throttle ?? 'full',
+    altitudeM: params.altitudeM ?? preset?.condition.altitudeM ?? 0,
+    ...((params.note ?? preset?.condition.note) !== undefined ? { note: params.note ?? preset?.condition.note ?? '' } : {}),
+  } as const;
+  return {
+    id: referenceId,
+    quantity: draft.quantity,
+    condition,
+    points: draft.points.map((point) => ({
+      value: point.value,
+      ...(point.rpm !== undefined ? { rpm: point.rpm } : {}),
+      ...(point.min !== undefined ? { min: point.min } : {}),
+      ...(point.max !== undefined ? { max: point.max } : {}),
+      ...(point.uncertainty !== undefined ? { uncertainty: point.uncertainty } : {}),
+    })),
+    source: draft.source,
+    grade: params.grade ?? preset?.grade ?? 'C',
+    digitised: params.digitised ?? preset?.digitised ?? false,
+    calibrationRpm: [...draft.calibrationRpm],
+    bandRel: draft.bandRel,
+  };
+}
+
 /**
  * @affects adds 1 reference record to doc.prototype.references (affected: [referenceId]); created with the preset name as id when a preset is used;
  *   with `series`: adds 1 record to doc.dynamics.referenceSeries instead
@@ -95,47 +172,16 @@ export const addReferenceData = defineCommand({
       });
     }
     const preset = params.preset === undefined ? undefined : REFERENCE_PRESETS[params.preset];
-    const quantity = params.quantity ?? preset?.quantity;
-    const points = params.points ?? preset?.points;
-    const source = (params.source ?? preset?.source ?? '').trim();
-    if (quantity === undefined) return fail('give a quantity (or a preset)');
-    if (points === undefined || points.length === 0) return fail('give at least one point (or a preset)');
-    if (source === '') return fail('a reference needs a source (document, figure or test it comes from)');
-    const bandRel = params.bandRel ?? preset?.bandRel ?? 0.05;
-    if (!(bandRel > 0)) return fail('bandRel must be > 0');
-    const calibrationRpm = params.calibrationRpm ?? preset?.calibrationRpm ?? [];
-    const speeds = points.flatMap((point) => (point.rpm === undefined ? [] : [point.rpm]));
-    const stray = calibrationRpm.filter((rpm) => !speeds.some((speed) => Math.abs(speed - rpm) < 1e-9));
-    if (stray.length > 0) return fail(`calibrationRpm ${stray.join(', ')} is not the speed of any point (${speeds.join(', ')})`);
-    if (points.some((point) => (point.min !== undefined) !== (point.max !== undefined) || (point.min ?? 0) > (point.max ?? 0)))
-      return fail('a window point needs both min and max with min <= max');
+    const draft = draftOf(params, preset);
+    if (typeof draft === 'string') return fail(draft);
+    const { quantity, points, source, bandRel, calibrationRpm, speeds } = draft;
     const referenceId = params.id ?? params.preset ?? idOrNext(undefined, 'ref');
     const prototype = doc.prototype ?? createPrototypeModel();
     const references = prototype.references ?? {};
     if (idTaken(references, referenceId) || idTakenInDynamicsOrFlight(doc, referenceId))
       return fail(`reference '${referenceId}' already exists (the id is used by an engine reference or a dynamics record)`);
-    const condition = {
-      throttle: params.throttle ?? preset?.condition.throttle ?? 'full',
-      altitudeM: params.altitudeM ?? preset?.condition.altitudeM ?? 0,
-      ...((params.note ?? preset?.condition.note) !== undefined ? { note: params.note ?? preset?.condition.note ?? '' } : {}),
-    } as const;
-    const record: ReferenceData = {
-      id: referenceId,
-      quantity,
-      condition,
-      points: points.map((point) => ({
-        value: point.value,
-        ...(point.rpm !== undefined ? { rpm: point.rpm } : {}),
-        ...(point.min !== undefined ? { min: point.min } : {}),
-        ...(point.max !== undefined ? { max: point.max } : {}),
-        ...(point.uncertainty !== undefined ? { uncertainty: point.uncertainty } : {}),
-      })),
-      source,
-      grade: params.grade ?? preset?.grade ?? 'C',
-      digitised: params.digitised ?? preset?.digitised ?? false,
-      calibrationRpm: [...calibrationRpm],
-      bandRel,
-    };
+    const record = recordOf(params, preset, draft, referenceId);
+    const { condition } = record;
     const warning =
       condition.altitudeM !== 0 ? ` Note: altitude ${condition.altitudeM} m is not modelled (sea-level ambient pressure).` : '';
     return changed(

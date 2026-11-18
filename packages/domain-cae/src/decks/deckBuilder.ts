@@ -187,6 +187,104 @@ function modelBlock(ctx: DeckContext, nodes: FeMeshArtifact['nodes']): string[] 
   return lines;
 }
 
+/** One material block per distinct material name (first owner part), appended to `lines`; the first refusal, or null. */
+function materialBlocks(ctx: DeckContext, disciplines: DisciplineTable, heat: boolean, lines: string[]): DeckRefusal | null {
+  const { analysis } = ctx;
+  const materialOwners = new Map<string, string>();
+  for (const entityId of Object.keys(analysis.parts))
+    if (!isCompositePart(ctx, entityId) && !materialOwners.has(ctx.materialName(entityId)))
+      materialOwners.set(ctx.materialName(entityId), entityId);
+  for (const [name, entityId] of materialOwners) {
+    const constitutive = heat ? null : (disciplines.materialCardWriter?.(ctx, entityId) ?? null);
+    if (constitutive !== null && 'code' in constitutive) return constitutive;
+    if (constitutive !== null && Object.hasOwn(analysis.printed ?? {}, entityId))
+      return refuse(
+        'FLL_PRINT_CONSTITUTIVE',
+        `part '${entityId}' is printed (orthotropic elastic) and its material has a plastic / hyperelastic / creep set: the two cannot be combined`,
+        [entityId],
+      );
+    const cards = heat
+      ? [disciplines.heat.materialCards(ctx, entityId)]
+      : [
+          ...(constitutive === null ? [printedMaterialLines(ctx, entityId) ?? mechanicalMaterialLines(ctx, entityId)] : []),
+          ...(analysis.type === 'thermo_static' ? [disciplines.thermomech.materialCards(ctx, entityId)] : []),
+          ...(analysis.type === 'coupled_temperature_displacement' ? [disciplines.coupled.materialCards(ctx, entityId)] : []),
+          ...(isDynamicType(analysis.type) ? [disciplines.dynamics.materialCards(ctx, entityId)] : []),
+        ];
+    lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`);
+    if (constitutive === null) lines.push(`*MATERIAL, NAME=${name}`);
+    else lines.push(...constitutive.comments, ...constitutive.lines);
+    for (const card of cards) {
+      if (isDeckRefusal(card)) return card;
+      appendAll(lines, textLines(card.text));
+    }
+  }
+  return null;
+}
+
+/** `*ORIENTATION` blocks of the parts that need one, appended to `lines`; entity id -> orientation name, or the first refusal. */
+function orientationBlocks(ctx: DeckContext, disciplines: DisciplineTable, lines: string[]): Map<string, string> | DeckRefusal {
+  const orientations = new Map<string, string>();
+  for (const entityId of Object.keys(ctx.analysis.parts)) {
+    const block = disciplines.orientation?.(ctx, entityId) ?? null;
+    if (block === null) continue;
+    if ('code' in block) return block;
+    appendAll(lines, textLines(block.text));
+    orientations.set(entityId, block.name);
+  }
+  return orientations;
+}
+
+/** Section cards of every part (am_build_distortion: one per layer for the build parts), appended to `lines`; the first refusal, or null. */
+function sectionBlocks(ctx: DeckContext, orientations: ReadonlyMap<string, string>, lines: string[]): DeckRefusal | null {
+  const { analysis } = ctx;
+  // am_build_distortion: the build parts get one section per layer from `amSections`
+  const built = new Set(analysis.type === 'am_build_distortion' && analysis.am !== undefined ? buildPartsOf(analysis, analysis.am) : []);
+  for (const entityId of Object.keys(analysis.parts)) {
+    if (built.has(entityId)) continue;
+    const planar = planarSectionCards(ctx, entityId);
+    if (planar !== null) {
+      if (isDeckRefusal(planar)) return planar;
+      appendAll(lines, textLines(planar.text));
+      continue;
+    }
+    const orientation = orientations.get(entityId);
+    lines.push(
+      `*SOLID SECTION, ELSET=${ctx.elset(entityId)}, MATERIAL=${ctx.materialName(entityId)}${orientation === undefined ? '' : `, ORIENTATION=${orientation}`}`,
+    );
+  }
+  if (analysis.type === 'am_build_distortion') {
+    const layers = amSections(ctx);
+    if (isDeckRefusal(layers)) return layers;
+    lines.push(...layers.text.split('\n').filter((line) => line !== ''));
+  }
+  return null;
+}
+
+/** The step block of the analysis type. */
+function stepsOf(ctx: DeckContext, disciplines: DisciplineTable, heat: boolean): DeckSections {
+  const { analysis } = ctx;
+  return heat
+    ? disciplines.heat.sections(ctx)
+    : isDynamicType(analysis.type)
+      ? disciplines.dynamics.sections(ctx)
+      : analysis.type === 'static'
+        ? staticStep(ctx)
+        : analysis.type === 'nonlinear_static'
+          ? nonlinearSteps(ctx)
+          : analysis.type === 'creep'
+            ? creepSteps(ctx)
+            : analysis.type === 'am_build_distortion'
+              ? amSteps(ctx)
+              : analysis.type === 'modal'
+                ? modalStep(ctx)
+                : analysis.type === 'buckling'
+                  ? bucklingSteps(ctx)
+                  : analysis.type === 'coupled_temperature_displacement'
+                    ? disciplines.coupled.sections(ctx)
+                    : disciplines.thermomech.sections(ctx);
+}
+
 /**
  * Deterministic CalculiX deck of `analysisId` over `mesh`, with the discipline functions in `disciplines`.
  * @invariant byte-identical for identical inputs; header `** llull analysis <name> units <us> inputHash <h> meshHash <m>`
@@ -217,82 +315,13 @@ export function buildInp(
     ...geometry.comments,
     ...modelBlock(ctx, geometry.nodes),
   ];
-  const materialOwners = new Map<string, string>();
-  for (const entityId of Object.keys(analysis.parts))
-    if (!isCompositePart(ctx, entityId) && !materialOwners.has(ctx.materialName(entityId)))
-      materialOwners.set(ctx.materialName(entityId), entityId);
-  for (const [name, entityId] of materialOwners) {
-    const constitutive = heat ? null : (disciplines.materialCardWriter?.(ctx, entityId) ?? null);
-    if (constitutive !== null && 'code' in constitutive) return constitutive;
-    if (constitutive !== null && Object.hasOwn(analysis.printed ?? {}, entityId))
-      return refuse(
-        'FLL_PRINT_CONSTITUTIVE',
-        `part '${entityId}' is printed (orthotropic elastic) and its material has a plastic / hyperelastic / creep set: the two cannot be combined`,
-        [entityId],
-      );
-    const cards = heat
-      ? [disciplines.heat.materialCards(ctx, entityId)]
-      : [
-          ...(constitutive === null ? [printedMaterialLines(ctx, entityId) ?? mechanicalMaterialLines(ctx, entityId)] : []),
-          ...(analysis.type === 'thermo_static' ? [disciplines.thermomech.materialCards(ctx, entityId)] : []),
-          ...(analysis.type === 'coupled_temperature_displacement' ? [disciplines.coupled.materialCards(ctx, entityId)] : []),
-          ...(isDynamicType(analysis.type) ? [disciplines.dynamics.materialCards(ctx, entityId)] : []),
-        ];
-    lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`);
-    if (constitutive === null) lines.push(`*MATERIAL, NAME=${name}`);
-    else lines.push(...constitutive.comments, ...constitutive.lines);
-    for (const card of cards) {
-      if (isDeckRefusal(card)) return card;
-      appendAll(lines, textLines(card.text));
-    }
-  }
-  const orientations = new Map<string, string>();
-  for (const entityId of Object.keys(analysis.parts)) {
-    const block = disciplines.orientation?.(ctx, entityId) ?? null;
-    if (block === null) continue;
-    if ('code' in block) return block;
-    appendAll(lines, textLines(block.text));
-    orientations.set(entityId, block.name);
-  }
-  // am_build_distortion: the build parts get one section per layer from `amSections`
-  const built = new Set(analysis.type === 'am_build_distortion' && analysis.am !== undefined ? buildPartsOf(analysis, analysis.am) : []);
-  for (const entityId of Object.keys(analysis.parts)) {
-    if (built.has(entityId)) continue;
-    const planar = planarSectionCards(ctx, entityId);
-    if (planar !== null) {
-      if (isDeckRefusal(planar)) return planar;
-      appendAll(lines, textLines(planar.text));
-      continue;
-    }
-    const orientation = orientations.get(entityId);
-    lines.push(
-      `*SOLID SECTION, ELSET=${ctx.elset(entityId)}, MATERIAL=${ctx.materialName(entityId)}${orientation === undefined ? '' : `, ORIENTATION=${orientation}`}`,
-    );
-  }
-  if (analysis.type === 'am_build_distortion') {
-    const layers = amSections(ctx);
-    if (isDeckRefusal(layers)) return layers;
-    lines.push(...layers.text.split('\n').filter((line) => line !== ''));
-  }
-  const steps = heat
-    ? disciplines.heat.sections(ctx)
-    : isDynamicType(analysis.type)
-      ? disciplines.dynamics.sections(ctx)
-      : analysis.type === 'static'
-        ? staticStep(ctx)
-        : analysis.type === 'nonlinear_static'
-          ? nonlinearSteps(ctx)
-          : analysis.type === 'creep'
-            ? creepSteps(ctx)
-            : analysis.type === 'am_build_distortion'
-              ? amSteps(ctx)
-              : analysis.type === 'modal'
-                ? modalStep(ctx)
-                : analysis.type === 'buckling'
-                  ? bucklingSteps(ctx)
-                  : analysis.type === 'coupled_temperature_displacement'
-                    ? disciplines.coupled.sections(ctx)
-                    : disciplines.thermomech.sections(ctx);
+  const materials = materialBlocks(ctx, disciplines, heat, lines);
+  if (materials !== null) return materials;
+  const orientations = orientationBlocks(ctx, disciplines, lines);
+  if (!(orientations instanceof Map)) return orientations;
+  const sections = sectionBlocks(ctx, orientations, lines);
+  if (sections !== null) return sections;
+  const steps = stepsOf(ctx, disciplines, heat);
   if (isDeckRefusal(steps)) return steps;
   return { text: `${linesText(lines)}${steps.text === '' || steps.text.endsWith('\n') ? steps.text : `${steps.text}\n`}` };
 }
