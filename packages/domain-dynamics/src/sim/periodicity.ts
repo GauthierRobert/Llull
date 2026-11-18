@@ -27,13 +27,21 @@ function interpolate(values: readonly number[], index: number): number {
 function cycleMismatch(values: readonly number[], lag: number): number | null {
   const n = values.length;
   const width = Math.ceil(lag);
-  const recent = values.slice(n - width);
-  const both = values.slice(n - 2 * width);
-  const [low, high] = [Math.min(...both), Math.max(...both)];
+  // Extremes of the last two cycles and of the last one, in one pass (a spread over a long series throws a RangeError).
+  let [low, high, largest, recentLow, recentHigh] = [Infinity, -Infinity, -Infinity, Infinity, -Infinity];
+  for (let index = Math.max(0, n - 2 * width); index < n; index += 1) {
+    const value = values[index] as number;
+    low = Math.min(low, value);
+    high = Math.max(high, value);
+    largest = Math.max(largest, Math.abs(value));
+    if (index >= n - width) {
+      recentLow = Math.min(recentLow, value);
+      recentHigh = Math.max(recentHigh, value);
+    }
+  }
   const range = high - low;
-  const largest = Math.max(...both.map(Math.abs));
   if (range <= MIN_RELATIVE_RANGE * largest || range <= 1e-12) return null;
-  if (Math.max(...recent) - Math.min(...recent) < MIN_CYCLE_RANGE * range) return null;
+  if (recentHigh - recentLow < MIN_CYCLE_RANGE * range) return null;
   const squares = Array.from({ length: width }, (_, k) => (values[n - width + k] ?? 0) - interpolate(values, n - width + k - lag));
   return Math.sqrt(squares.reduce((total, d) => total + d * d, 0) / width) / range;
 }

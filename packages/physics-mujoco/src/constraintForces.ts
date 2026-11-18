@@ -39,26 +39,34 @@ function equalityOwners(slots: readonly LoopSlot[]): Map<number, number> {
 /** A Jacobian column is numerically dependent on the others below this fraction of the largest column norm. */
 const RANK_TOLERANCE = 1e-6;
 
-/** Orthonormal basis of the span of `columns` (pivoted Gram-Schmidt, rank decided at RANK_TOLERANCE of the largest norm). */
-function orthonormalBasis(columns: readonly number[][]): number[][] {
-  const residual = columns.map((column) => [...column]);
-  const norm = (v: readonly number[]): number => Math.sqrt(v.reduce((sum, x) => sum + x * x, 0));
-  const basis: number[][] = [];
+/**
+ * Orthonormal basis of the span of `count` columns of `length` values stored one after the other in `residual` (pivoted Gram-Schmidt, rank
+ * decided at RANK_TOLERANCE of the largest norm). `residual` is consumed; the basis vectors are written at the front of `basis` and their
+ * number returned. Flat typed arrays: a loop mechanism reads its reactions every step, and the sums run in the same order as on rows of
+ * plain arrays, so the result is the same to the last bit.
+ */
+function orthonormalBasis(residual: Float64Array, count: number, length: number, basis: Float64Array): number {
+  let rank = 0;
   let largest = 0;
   for (;;) {
     let best = -1;
     let bestNorm = 0;
-    residual.forEach((column, i) => {
-      const n = norm(column);
-      if (n > bestNorm) [best, bestNorm] = [i, n];
-    });
+    for (let column = 0; column < count; column++) {
+      let sum = 0;
+      for (let k = column * length; k < (column + 1) * length; k++) sum += (residual[k] as number) * (residual[k] as number);
+      const norm = Math.sqrt(sum);
+      if (norm > bestNorm) [best, bestNorm] = [column, norm];
+    }
     largest = Math.max(largest, bestNorm);
-    if (best < 0 || bestNorm <= RANK_TOLERANCE * largest) return basis;
-    const unit = (residual[best] ?? []).map((x) => x / bestNorm);
-    basis.push(unit);
-    for (const column of residual) {
-      const along = column.reduce((sum, x, k) => sum + x * (unit[k] ?? 0), 0);
-      column.forEach((x, k) => (column[k] = x - along * (unit[k] ?? 0)));
+    if (best < 0 || bestNorm <= RANK_TOLERANCE * largest) return rank;
+    const unit = rank * length;
+    for (let k = 0; k < length; k++) basis[unit + k] = (residual[best * length + k] as number) / bestNorm;
+    rank += 1;
+    for (let column = 0; column < count; column++) {
+      const at = column * length;
+      let along = 0;
+      for (let k = 0; k < length; k++) along += (residual[at + k] as number) * (basis[unit + k] as number);
+      for (let k = 0; k < length; k++) residual[at + k] = (residual[at + k] as number) - along * (basis[unit + k] as number);
     }
   }
 }
@@ -79,6 +87,9 @@ export interface LoopReader {
 
 export function loopReader(slots: readonly LoopSlot[]): LoopReader {
   const owner = equalityOwners(slots);
+  // Work arrays of `dropRedundantForces`, kept between calls (grown when the constraint rows outgrow them).
+  let columns = new Float64Array(0);
+  let basis = new Float64Array(0);
   return {
     dropRedundantForces(model, data) {
       const [types, ids, force, jacobian] = [data.efc_type, data.efc_id, data.efc_force, data.efc_J];
@@ -86,14 +97,21 @@ export function loopReader(slots: readonly LoopSlot[]): LoopReader {
       for (let row = 0; row < data.nefc; row++) if (types[row] === CONSTRAINT_EQUALITY && owner.has(ids[row] ?? -1)) rows.push(row);
       if (rows.length === 0) return;
       const nv = model.nv;
-      const columns = Array.from({ length: nv }, (_, v) => rows.map((row) => jacobian[row * nv + v] ?? 0));
-      const lambda = rows.map((row) => force[row] ?? 0);
-      const kept = rows.map(() => 0);
-      for (const unit of orthonormalBasis(columns)) {
-        const along = unit.reduce((sum, x, k) => sum + x * (lambda[k] ?? 0), 0);
-        unit.forEach((x, k) => (kept[k] = (kept[k] ?? 0) + along * x));
+      const length = rows.length;
+      if (columns.length < nv * length) {
+        columns = new Float64Array(nv * length);
+        basis = new Float64Array(nv * length);
       }
-      rows.forEach((row, k) => (force[row] = kept[k] ?? 0));
+      for (let v = 0; v < nv; v++) for (let k = 0; k < length; k++) columns[v * length + k] = jacobian[(rows[k] as number) * nv + v] ?? 0;
+      const lambda = rows.map((row) => force[row] ?? 0);
+      const kept = new Float64Array(length);
+      const rank = orthonormalBasis(columns, nv, length, basis);
+      for (let unit = 0; unit < rank; unit++) {
+        let along = 0;
+        for (let k = 0; k < length; k++) along += (basis[unit * length + k] as number) * (lambda[k] as number);
+        for (let k = 0; k < length; k++) kept[k] = (kept[k] as number) + along * (basis[unit * length + k] as number);
+      }
+      rows.forEach((row, k) => (force[row] = kept[k] as number));
     },
     forces(data) {
       const total = slots.map((): [number, number, number] => [0, 0, 0]);
