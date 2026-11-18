@@ -2,7 +2,7 @@
 // as set_review_disposition (with the check's inputsHash). Below: the mechanism graph, the motion timeline and the reference overlay.
 // The model review (issues, signed status moves, viewpoints, redlines, section box, colour profile) sits above the checks (09 VIS §12.11).
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { humanGatePayload } from '@core/model/humanGate';
 import { withDocumentUid } from '@core/model/documentUid';
 import { SignActDialog, type SignActRequest } from '@ui/components/SignActDialog';
@@ -10,6 +10,7 @@ import { getCommand } from '@core/commands/registry';
 import { classNames } from '@ui/classNames';
 import { KpiStrip, PanelEmpty, PanelHeader, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { availableParts, CHECK_COMMAND, reviewCheckCommand, runPrototypeCheck } from '@ui/services/prototypeCheck';
+import { warmPhysicsEngine } from '@ui/services/physicsRun';
 import { useStore } from '@ui/store';
 import { ReadinessChecklist } from './ReadinessChecklist';
 import { FindingsList, type DispositionChange } from './FindingsList';
@@ -37,7 +38,7 @@ function useRunChecks(): () => void {
     setBusy(true);
     setStatus('');
     const source = { entities: document.entities, dynamics: document.dynamics };
-    void runPrototypeCheck({}).then((run) => {
+    void runPrototypeCheck({}, setStatus).then((run) => {
       const review = parsePrototypeReview(run.data);
       if (review === null) setStatus(run.summary);
       else {
@@ -79,6 +80,8 @@ function VerdictLine({ verdict }: { verdict: string }): React.ReactElement {
 }
 
 export function ReviewPanel({ className }: { className?: string }): React.ReactElement {
+  // the backend serves the engine: load it into the physics worker while it is reachable, so a simulation still runs if it goes away
+  useEffect(() => warmPhysicsEngine(), []);
   const stored = useReviewStore((s) => s.result);
   const dispositions = useStore((s) => s.document.prototype?.dispositions);
   // dispositions are joined here over the stored result: an edit shows at once, the checks re-run only on request

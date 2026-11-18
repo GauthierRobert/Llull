@@ -39,6 +39,7 @@ import {
   jsonErrorHandler,
   securityHeaders,
   setHtmlSecurityHeaders,
+  setAssetHeaders,
 } from './security';
 
 const isChallengeProbe = (challenge: unknown): boolean => typeof challenge === 'string' && challenge !== '';
@@ -108,6 +109,7 @@ if (staticDir !== undefined && staticDir !== '') {
     express.static(staticDir, {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) setHtmlSecurityHeaders(res);
+        else setAssetHeaders(res, filePath);
       },
     }),
   );

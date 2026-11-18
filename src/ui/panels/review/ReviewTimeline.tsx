@@ -42,13 +42,10 @@ export function ReviewTimeline({ checks, durationS }: ReviewTimelineProps): Reac
   const simulate = async (): Promise<void> => {
     const duration = durationS ?? 1;
     setBusy(true);
-    const run = await runSimulation({
-      duration,
-      detail: 'poses',
-      reactions: 'series',
-      sampleRate: SAMPLES / duration,
-      ...(crank === null ? {} : { crankAxis: crank }),
-    });
+    const run = await runSimulation(
+      { duration, detail: 'poses', reactions: 'series', sampleRate: SAMPLES / duration, ...(crank === null ? {} : { crankAxis: crank }) },
+      setStatus,
+    );
     setBusy(false);
     setStatus(isSimulation(run.data) ? '' : run.summary);
     const current = useStore.getState().document;

@@ -85,10 +85,14 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
 6. **Simplify for one local backend** — done 2026-10-19.
    - Removed 2026-11-18: `GET /export/stl` and `GET /export/code` (browser download routes with no caller; the CLI and the UI export through
      `export_stl` / `export_code` and `POST /exchange`). `GET /export/step` stays (the UI's `serverFiles.ts` uses it).
-   - Removed 2026-11-18: the renderer's in-page MuJoCo (`src/app/physics.ts` `ensurePhysicsEngine`, the `@physics-mujoco` import and the
-     `@mujoco/mujoco` Vite `optimizeDeps` entry). The served CSP has no `'unsafe-eval'` and MuJoCo's WASM glue uses `new Function`, so it never
-     loaded in the packaged app; `simulationRun` / `prototypeCheck` run on the backend and, disconnected, answer "needs the llull backend".
-     `packages/physics-mujoco` stays (backend, CLI, tests).
+   - Reworked 2026-11-18: the renderer's in-page MuJoCo. `src/app/physics.ts` (`ensurePhysicsEngine`) loaded the engine in the page, which
+     the served CSP forbids (no `'unsafe-eval'`; MuJoCo's glue uses `new Function`): it never worked in the desktop app, only under
+     `npm run dev` (measured in Electron 38: page script `EvalError`, dedicated worker allowed). It is now a dedicated worker
+     (`src/physics.worker.ts`, jobs in `src/app/physicsJob.ts`, client `src/ui/services/physicsRun.ts`): the backend gives that one script
+     its own narrow CSP (`security.ts` `setAssetHeaders`), the page policy is unchanged. Connected, `simulationRun` / `prototypeCheck` still
+     run on the backend; disconnected, they run in the worker, off the UI thread. The backend also serves the engine, so the Physics and
+     Review panels warm the worker while it is reachable, and hashed `assets/` files are cached as immutable (a new worker reloads from
+     the cache). A renderer that never fetched the engine before the backend went away says so.
    - Removed: the offline outbox and its replay (`src/ui/store/outbox.ts`: queued commands, id remapping, poisoned ids, retry
      backoff, `syncState`, `hasUnsyncedLocalEdits`, `localOutbox`, `localRedoOutbox`, `localOnly`), the connect-grace timers
      (`graceRuns.ts`, `CONNECT_GRACE_MS`), the 4xx / 401-403-404 refusal classification that only the flush used, and the

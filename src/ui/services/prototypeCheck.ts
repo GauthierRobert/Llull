@@ -1,12 +1,13 @@
-// check_prototype for the Review tab (read-only query: kernel + physics). It runs on the backend (same reason as simulationRun: the
-// served app's CSP blocks the in-page MuJoCo load); disconnected, the checks that simulate answer that the backend is needed and the
-// others still run in the page. Where check_prototype is not registered, the tab
+// check_prototype for the Review tab (read-only query: kernel + physics). Connected, it runs on the backend; disconnected, the checks
+// that simulate run in the in-page physics worker (physicsRun.ts, same reason as simulationRun) and the
+// others in the page. Where check_prototype is not registered, the tab
 // runs the individual checks that are (check_assembly, check_mechanism, check_motion_clearance — each returns one check-result
 // envelope) and wraps them as one review; a check no command provides reads "not run".
 
 import { getCommand } from '@core/commands/registry';
 import { useStore } from '@ui/store';
 import { runQuery } from '@ui/services/localQuery';
+import { runPhysicsQuery } from '@ui/services/physicsRun';
 import { postCommand, ServerCommandError } from '@ui/store/serverCommands';
 
 export const CHECK_COMMAND = 'check_prototype';
@@ -50,18 +51,15 @@ async function runOnServer(command: string, params: Record<string, unknown>): Pr
   }
 }
 
-const needsBackend = (command: string): string =>
-  `${command} needs the llull backend (the physics engine runs there); it is not connected.`;
-
 const isEnvelope = (data: unknown): boolean => typeof data === 'object' && data !== null && 'check' in data && 'items' in data;
 
 /** Runs every available single check and wraps the envelopes as one review (a failed run is reported, the others still count). */
-async function runSingleChecks(params: Record<string, unknown>): Promise<PrototypeCheckRun> {
+async function runSingleChecks(params: Record<string, unknown>, onStatus?: (status: string) => void): Promise<PrototypeCheckRun> {
   const online = useStore.getState().liveStatus === 'connected';
-  // check_motion_clearance / check_dynamics simulate the mechanism: they run on the backend only.
+  // check_motion_clearance / check_dynamics simulate the mechanism: disconnected, they run in the physics worker.
   const runOne = (name: string): Promise<PrototypeCheckRun> => {
     if (online) return runOnServer(name, params);
-    if (SIMULATING.has(name)) return Promise.resolve({ summary: needsBackend(name), data: undefined });
+    if (SIMULATING.has(name)) return runPhysicsQuery(name, params, onStatus);
     const { summary, data } = runQuery(name, params);
     return Promise.resolve({ summary, data });
   };
@@ -78,8 +76,9 @@ async function runSingleChecks(params: Record<string, unknown>): Promise<Prototy
   return { summary, data: checks.length === 0 ? undefined : { checks, ownerSummary } };
 }
 
-export async function runPrototypeCheck(params: Record<string, unknown>): Promise<PrototypeCheckRun> {
-  if (reviewCheckCommand() === ASSEMBLY_COMMAND) return runSingleChecks(params);
+/** @param onStatus progress line while the in-page engine loads (disconnected only) */
+export async function runPrototypeCheck(params: Record<string, unknown>, onStatus?: (status: string) => void): Promise<PrototypeCheckRun> {
+  if (reviewCheckCommand() === ASSEMBLY_COMMAND) return runSingleChecks(params, onStatus);
   if (useStore.getState().liveStatus === 'connected') return runOnServer(CHECK_COMMAND, params);
-  return { summary: needsBackend(CHECK_COMMAND), data: undefined };
+  return runPhysicsQuery(CHECK_COMMAND, params, onStatus);
 }

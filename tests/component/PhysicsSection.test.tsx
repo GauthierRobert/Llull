@@ -8,7 +8,10 @@ import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { execute } from '@core/commands/registry';
 import { getPhysicsEngine, setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
+import type { PhysicsJobRequest } from '@app/physicsJob';
+import { setPhysicsWorkerFactory } from '@ui/services/physicsRun';
 import { connectFakeBackend } from '../helpers/fakeBackend';
+import { inProcessPhysicsWorker } from '../helpers/inProcessPhysicsWorker';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 beforeAll(async () => {
@@ -121,7 +124,39 @@ describe('PhysicsSection', () => {
     }
   });
 
-  it('disconnected, refuses to simulate (the renderer carries no engine) and loads none', async () => {
+  it('opening the panel warms the physics worker once (the engine is then in memory if the backend goes away)', () => {
+    buildRotor();
+    const warmUps = { count: 0 };
+    setPhysicsWorkerFactory(() => inProcessPhysicsWorker([], warmUps));
+    try {
+      const first = render(<PhysicsSection />);
+      first.unmount();
+      render(<PhysicsSection />);
+      expect(warmUps.count).toBe(1);
+    } finally {
+      setPhysicsWorkerFactory(null);
+    }
+  });
+
+  it('disconnected, simulates in the in-page physics worker and plays its result, without calling the backend', async () => {
+    const { jointId } = buildRotor();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const jobs: PhysicsJobRequest[] = [];
+    setPhysicsWorkerFactory(() => inProcessPhysicsWorker(jobs));
+    try {
+      render(<PhysicsSection />);
+      fireEvent.click(screen.getByTestId('physics-simulate'));
+      await waitFor(() => expect(screen.getByTestId('physics-results')).toHaveTextContent(new RegExp(`${jointId}.*rpm`)));
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(jobs.map((job) => [job.command, job.params['detail']])).toEqual([['simulate_motion', 'poses']]);
+      expect(useDynamicsPlaybackStore.getState().result?.poses?.times.length).toBeGreaterThan(10);
+    } finally {
+      fetchSpy.mockRestore();
+      setPhysicsWorkerFactory(null);
+    }
+  });
+
+  it('disconnected and without workers (this jsdom has none), says what is missing and loads no engine in the page', async () => {
     buildRotor();
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     setPhysicsEngine(null);

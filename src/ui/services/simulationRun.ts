@@ -1,7 +1,8 @@
-// simulate_motion for the Physics panel. It runs on the backend only (MuJoCo under Node): the served app's CSP has no 'unsafe-eval',
-// which MuJoCo's WASM bindings need at load, so the renderer carries no engine. Disconnected, it answers that the backend is needed.
+// simulate_motion for the Physics panel. Connected, it runs on the backend (MuJoCo under Node). Disconnected, it runs in the in-page
+// physics worker (physicsRun.ts): the page itself cannot load the engine under the app's CSP, a dedicated worker can.
 
 import { useStore } from '@ui/store';
+import { runPhysicsQuery } from '@ui/services/physicsRun';
 import { postCommand, ServerCommandError } from '@ui/store/serverCommands';
 
 export interface SimulationRun {
@@ -19,9 +20,8 @@ async function runOnServer(params: Record<string, unknown>): Promise<SimulationR
   }
 }
 
-const NEEDS_BACKEND = 'simulate_motion needs the llull backend (the physics engine runs there); it is not connected.';
-
-export async function runSimulation(params: Record<string, unknown>): Promise<SimulationRun> {
+/** @param onStatus progress line while the in-page engine loads (disconnected only) */
+export async function runSimulation(params: Record<string, unknown>, onStatus?: (status: string) => void): Promise<SimulationRun> {
   if (useStore.getState().liveStatus === 'connected') return runOnServer(params);
-  return { summary: NEEDS_BACKEND, data: undefined };
+  return runPhysicsQuery('simulate_motion', params, onStatus);
 }

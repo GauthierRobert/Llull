@@ -13,6 +13,9 @@ import { hardOverlap, reviewFixture, reviewWith, thinWall, withAccepted } from '
 import { resetStore } from '../helpers/componentEntities';
 import { localDispatch } from '../helpers/storeTestHelpers';
 import { connectFakeBackend } from '../helpers/fakeBackend';
+import type { PhysicsJobRequest } from '@app/physicsJob';
+import { setPhysicsWorkerFactory } from '@ui/services/physicsRun';
+import { inProcessPhysicsWorker } from '../helpers/inProcessPhysicsWorker';
 
 /** A full check_prototype run (the fake backend runs it in-process) can take long under a loaded full suite. */
 const RUN_TIMEOUT = 60_000;
@@ -55,7 +58,28 @@ describe('ReviewPanel running check_prototype', () => {
     2 * RUN_TIMEOUT,
   );
 
-  it('disconnected, says the review needs the backend instead of loading a physics engine', async () => {
+  it(
+    'disconnected, runs the review in the in-page physics worker',
+    async () => {
+      const jobs: PhysicsJobRequest[] = [];
+      setPhysicsWorkerFactory(() => inProcessPhysicsWorker(jobs));
+      // the real worker installs Manifold itself (src/physics.worker.ts); the in-process one uses this process's kernel
+      setGeometryKernel(await createManifoldKernel());
+      try {
+        render(<ReviewPanel />);
+        fireEvent.click(screen.getByTestId('review-run'));
+        await waitFor(() => expect(useReviewStore.getState().busy).toBe(false), { timeout: RUN_TIMEOUT });
+        expect(jobs.map((job) => job.command)).toEqual(['check_prototype']);
+        expect(useReviewStore.getState().result, useReviewStore.getState().status).not.toBeNull();
+      } finally {
+        setPhysicsWorkerFactory(null);
+        setGeometryKernel(null);
+      }
+    },
+    2 * RUN_TIMEOUT,
+  );
+
+  it('disconnected and without workers, says what is missing instead of loading a physics engine in the page', async () => {
     render(<ReviewPanel />);
     fireEvent.click(screen.getByTestId('review-run'));
     await waitFor(() => expect(useReviewStore.getState().busy).toBe(false));

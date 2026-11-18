@@ -16,6 +16,9 @@ beforeAll(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-static-'));
   fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>llull</title>');
   fs.writeFileSync(path.join(dir, 'app.js'), 'console.warn("ok");');
+  fs.mkdirSync(path.join(dir, 'assets'));
+  for (const name of ['physics.worker-AbC_12-x.js', 'other.worker-AbC_12-x.js'])
+    fs.writeFileSync(path.join(dir, 'assets', name), 'self.onmessage = null;');
   process.env['LLULL_STATIC_DIR'] = dir;
   vi.resetModules();
   app = (await import('../src/index')).app;
@@ -46,6 +49,22 @@ describe('LLULL_STATIC_DIR', () => {
       expect(response.headers['content-security-policy']).toContain("frame-ancestors 'none'");
     }
     expect((await request(app).get('/app.js')).headers['content-security-policy']).toBeUndefined();
+  });
+
+  it('gives the physics worker script its own narrow policy (it may evaluate strings, same-origin only) and no other asset one', async () => {
+    const worker = await request(app).get('/assets/physics.worker-AbC_12-x.js');
+    expect(worker.status).toBe(200);
+    expect(worker.headers['content-security-policy']).toBe(
+      "default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src 'self'",
+    );
+    expect((await request(app).get('/assets/other.worker-AbC_12-x.js')).headers['content-security-policy']).toBeUndefined();
+    // hashed assets never change: cacheable for good; the page and unhashed files are re-fetched
+    expect(worker.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    expect((await request(app).get('/app.js')).headers['cache-control']).not.toContain('immutable');
+    expect((await request(app).get('/').set('Accept', 'text/html')).headers['cache-control'] ?? '').not.toContain('immutable');
+    // the page policy itself never allows it
+    const page = await request(app).get('/').set('Accept', 'text/html');
+    expect(page.headers['content-security-policy']).not.toContain("'unsafe-eval'");
   });
 
   it('keeps JSON 404s for API clients', async () => {
