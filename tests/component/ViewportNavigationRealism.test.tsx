@@ -52,7 +52,7 @@ describe('realism tiers', () => {
         keyShadows: true,
         contactShadowsEnabled: true,
         shadowMapSize: 4096,
-        shadowRadius: 10,
+        shadowRadius: 4,
         plantShadowMaxLod: 2,
       });
     }
