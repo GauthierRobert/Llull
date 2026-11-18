@@ -21,7 +21,7 @@ const BASE64_KEYS = ['stlBase64', 'stepBase64', 'base64'] as const;
 const TEXT_KEYS = ['text', 'step', 'iges', 'stl', 'ifc', 'dxf', 'svg', 'content'] as const;
 
 /** The single file a data record carries (base64 or text payload), or null. */
-export function fileOfRecord(record: Record<string, unknown>): OutputFile | null {
+function fileOfRecord(record: Record<string, unknown>): OutputFile | null {
   const bareName = nonEmptyString(record['name']);
   const name =
     nonEmptyString(record['fileName']) ??

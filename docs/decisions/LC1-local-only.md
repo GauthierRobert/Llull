@@ -7,28 +7,28 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
 
 ## What changes
 
-| Before | After |
-| ------ | ----- |
-| Web app usable in a browser (Vite site, PWA + service worker, `?kernel=` URL choice) | The React UI runs only inside Electron (`desktop/`); no web build is published |
-| Cloud / on-prem server (Docker image, multi-user auth, licence, tickets, admin) and MCP `/mcp` for cloud agents | One local backend per machine, started by the desktop app or the CLI; agents use the `llull` CLI |
-| WASM kernels (OpenCascade.js 7.4, Manifold) as the default and the browser path | Native `llull-kernel` (OCCT 7.9.2) is the target default; WASM kernels are legacy, kept only until the native default is proven |
-| Offline outbox for a browser losing its server | The backend is local and always present: no outbox (step 6); the renderer runs commands locally only while `/live` is down |
+| Before                                                                                                          | After                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Web app usable in a browser (Vite site, PWA + service worker, `?kernel=` URL choice)                            | The React UI runs only inside Electron (`desktop/`); no web build is published                                                  |
+| Cloud / on-prem server (Docker image, multi-user auth, licence, tickets, admin) and MCP `/mcp` for cloud agents | One local backend per machine, started by the desktop app or the CLI; agents use the `llull` CLI                                |
+| WASM kernels (OpenCascade.js 7.4, Manifold) as the default and the browser path                                 | Native `llull-kernel` (OCCT 7.9.2) is the target default; WASM kernels are legacy, kept only until the native default is proven |
+| Offline outbox for a browser losing its server                                                                  | The backend is local and always present: no outbox (step 6); the renderer runs commands locally only while `/live` is down      |
 
 ## Order of work (each step keeps `npm run check` green)
 
 1. **Native kernel default on desktop + CLI** — VC-KRN-25 vs OCP 7.9.3 (passed), then flip.
    - [x] Done 2026-10-19. Desktop: KI7 (`backendEnv.ts`). Server + CLI: `LLULL_KERNEL` unset installs the native `llull-kernel` when
-     found (`LLULL_KERNEL_BIN`, `LLULL_NATIVE_DIR`, `solver/target/release`), else Manifold with a warning and
-     `kernel_info.fallbackReason`; `LLULL_KERNEL=manifold` is a diagnostic override. `llull run --validate` now warns from the installed
-     kernel (`supports('fillet')`), not from `$LLULL_KERNEL`.
+         found (`LLULL_KERNEL_BIN`, `LLULL_NATIVE_DIR`, `solver/target/release`), else Manifold with a warning and
+         `kernel_info.fallbackReason`; `LLULL_KERNEL=manifold` is a diagnostic override. `llull run --validate` now warns from the installed
+         kernel (`supports('fillet')`), not from `$LLULL_KERNEL`.
 2. **Stop shipping the browser build**: drop the PWA (`serviceWorker/`, `viteServiceWorker.ts`, `playwright.pwa.config.ts`, `test:pwa`,
    `tests/pwa/`), the public web deployment docs, and the `?kernel=` URL switch in `src/main.tsx`; Vite stays as the Electron renderer's
    dev server and bundler.
    - [x] Done 2026-10-19. Removed: `serviceWorker/`, `viteServiceWorker.ts` (+ its Vite plugin), `playwright.pwa.config.ts`,
-     `test:pwa`, `tests/pwa/`, `tests/unit/{viteServiceWorker,serviceWorkerRuntime}.test.ts`, the update banner
-     (`src/ui/services/appUpdates.ts`, `src/ui/components/UpdateBanner.tsx` + test + CSS), the `?kernel=` switch and
-     `src/ui/geometry/occtKernelBrowser.ts`. README / `docs/ARCHITECTURE.md` / `docs/DEPLOYMENT.md` / rules / skills describe
-     desktop + CLI. `parseKernelChoice` stayed until step 5.
+         `test:pwa`, `tests/pwa/`, `tests/unit/{viteServiceWorker,serviceWorkerRuntime}.test.ts`, the update banner
+         (`src/ui/services/appUpdates.ts`, `src/ui/components/UpdateBanner.tsx` + test + CSS), the `?kernel=` switch and
+         `src/ui/geometry/occtKernelBrowser.ts`. README / `docs/ARCHITECTURE.md` / `docs/DEPLOYMENT.md` / rules / skills describe
+         desktop + CLI. `parseKernelChoice` stayed until step 5.
    - Kept for step 5: the renderer still installs Manifold (WASM) in-process (`src/main.tsx`) — it runs the commands the
      renderer executes itself (local mode while the backend restarts, read-only queries, panel analyses) and re-runs live
      events to check the state hash. The desktop backend defaults to the native OCC kernel (KI7), so replay of kernel commands falls back to a
@@ -65,24 +65,30 @@ Binding text: `CLAUDE.md` § PRODUCT DIRECTIVE. Related: RS1 (native compute), K
    then decide on Manifold (still useful as an in-process mesh kernel for tests and for commands that need no exact B-rep).
    Decision: keep `packages/kernel-manifold` (in-process mesh kernel for tests, the renderer and the fallback when `llull-kernel` is missing).
    - [x] Done 2026-10-19. Unblocked by porting the pocket floor fillet to the sidecar: the host sends the floor-selection inputs of the
-     lowered pocket (`floorFillet` on the `featureCut` node: radius, floor depth, frame, outline / island curves in frame-local
-     coordinates), and `llull-kernel-occt` `recipe/floor.rs` picks the unique edges of the cut's topology in explorer order with the rules of
-     `floorEdgeIndices` (not seam / degenerate; start, mid and end on the floor plane within 1e-5 (1 + depth); within that tolerance of an outline
-     or island curve), then fillets them (no edge = refused). The gate in `server/src/native/kernelFeatures.ts` is gone.
-     Removed: `packages/kernel-occt` (opencascade.js, `@kernel-occt/*` alias, tsconfig / knip / package.json entries, the `opencascade.js`
-     dependency), `server/src/{occtNode,occtWorker}.ts`, the WASM fallback of `nativeKernelWorker.ts` / `native/kernelRouter.ts` (the router
-     now only translates and forwards; a refused or unsupported recipe is a null result, a dead sidecar is respawned on the next call),
-     `recycle` / `recycleCount` of `isolatedKernel.ts`, `kernelChoice.ts` / `parseKernelChoice` (nothing read it) and the `occt` value of
-     `LLULL_KERNEL` (only `manifold` is special; `occt` is now just "not manifold", i.e. the native kernel), the desktop's WASM fallback
-     (`desktopKernel(inherited)` returns `occt-native` unless `manifold`; a bundle without `llull-kernel` falls through to Manifold plus the
-     server's warning; `hasNativeKernel` is gone), the WASM-only tests (`tests/unit/occtKernel.test.ts`, `server/tests/occtRepeatedMeshing`,
-     `workerEntry`, the recycle cases of `isolatedKernel`). Moved to `packages/core/src/geometry`: `tangentGuard`, `meshClosure` (with their tests).
-     Parity suites that used WASM as the oracle assert closed forms and run against the real binary (see KI7 amendment); the other
-     `server/tests/occt*` suites run on the native kernel and skip with a logged reason when the binary is missing
-     (`LLULL_REQUIRE_NATIVE_KERNEL=1`, set in CI, fails instead).
+         lowered pocket (`floorFillet` on the `featureCut` node: radius, floor depth, frame, outline / island curves in frame-local
+         coordinates), and `llull-kernel-occt` `recipe/floor.rs` picks the unique edges of the cut's topology in explorer order with the rules of
+         `floorEdgeIndices` (not seam / degenerate; start, mid and end on the floor plane within 1e-5 (1 + depth); within that tolerance of an outline
+         or island curve), then fillets them (no edge = refused). The gate in `server/src/native/kernelFeatures.ts` is gone.
+         Removed: `packages/kernel-occt` (opencascade.js, `@kernel-occt/*` alias, tsconfig / knip / package.json entries, the `opencascade.js`
+         dependency), `server/src/{occtNode,occtWorker}.ts`, the WASM fallback of `nativeKernelWorker.ts` / `native/kernelRouter.ts` (the router
+         now only translates and forwards; a refused or unsupported recipe is a null result, a dead sidecar is respawned on the next call),
+         `recycle` / `recycleCount` of `isolatedKernel.ts`, `kernelChoice.ts` / `parseKernelChoice` (nothing read it) and the `occt` value of
+         `LLULL_KERNEL` (only `manifold` is special; `occt` is now just "not manifold", i.e. the native kernel), the desktop's WASM fallback
+         (`desktopKernel(inherited)` returns `occt-native` unless `manifold`; a bundle without `llull-kernel` falls through to Manifold plus the
+         server's warning; `hasNativeKernel` is gone), the WASM-only tests (`tests/unit/occtKernel.test.ts`, `server/tests/occtRepeatedMeshing`,
+         `workerEntry`, the recycle cases of `isolatedKernel`). Moved to `packages/core/src/geometry`: `tangentGuard`, `meshClosure` (with their tests).
+         Parity suites that used WASM as the oracle assert closed forms and run against the real binary (see KI7 amendment); the other
+         `server/tests/occt*` suites run on the native kernel and skip with a logged reason when the binary is missing
+         (`LLULL_REQUIRE_NATIVE_KERNEL=1`, set in CI, fails instead).
    - Kept: `packages/kernel-manifold` (mesh kernel for tests, the renderer, the fallback) and the hint texts `--kernel occt` / `LLULL_KERNEL=occt`
      in command descriptions, which still work (the value selects the native kernel like any value but `manifold`).
 6. **Simplify for one local backend** — done 2026-10-19.
+   - Removed 2026-11-18: `GET /export/stl` and `GET /export/code` (browser download routes with no caller; the CLI and the UI export through
+     `export_stl` / `export_code` and `POST /exchange`). `GET /export/step` stays (the UI's `serverFiles.ts` uses it).
+   - Removed 2026-11-18: the renderer's in-page MuJoCo (`src/app/physics.ts` `ensurePhysicsEngine`, the `@physics-mujoco` import and the
+     `@mujoco/mujoco` Vite `optimizeDeps` entry). The served CSP has no `'unsafe-eval'` and MuJoCo's WASM glue uses `new Function`, so it never
+     loaded in the packaged app; `simulationRun` / `prototypeCheck` run on the backend and, disconnected, answer "needs the llull backend".
+     `packages/physics-mujoco` stays (backend, CLI, tests).
    - Removed: the offline outbox and its replay (`src/ui/store/outbox.ts`: queued commands, id remapping, poisoned ids, retry
      backoff, `syncState`, `hasUnsyncedLocalEdits`, `localOutbox`, `localRedoOutbox`, `localOnly`), the connect-grace timers
      (`graceRuns.ts`, `CONNECT_GRACE_MS`), the 4xx / 401-403-404 refusal classification that only the flush used, and the

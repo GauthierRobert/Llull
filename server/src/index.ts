@@ -1,7 +1,7 @@
 /**
  * Express entry: middleware + route mounting only (L1, L6).
  *   GET /health            liveness + active kernel (`kernel`), { active, requested, fallbackReason } (`kernelStatus`), autosave; Host allowlist; `insecure: true` when token-less
- *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
+ *   /live /command /undo /redo   `liveRoutes.ts`      /export/step   `exportRoutes.ts`
  *   POST /import/dwg       `importRoutes.ts` (DWG -> DXF converter, then import_dxf)
  *   POST /exchange         `exchangeRoutes.ts` (STEP / DWG / CadQuery exchange tools for the CLI)
  *

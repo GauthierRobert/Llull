@@ -1,6 +1,6 @@
 /**
  * HTTP end-to-end tests for the CAD-exchange surface:
- *   GET /export/code, GET /export/step, POST /exchange export_step / import_step / import_code (the CLI's --app / --server path).
+ *   GET /export/step, POST /exchange export_step / import_step / import_code (the CLI's --app / --server path).
  *
  * index.ts reads LLULL_* env at import time, so each scenario loads a fresh module graph
  * (vi.resetModules) with the environment it needs.
@@ -22,7 +22,7 @@ const hasBuild123d = BUILD123D_PYTHON !== undefined && probePython(BUILD123D_PYT
 
 interface LoadedServer {
   app: Express;
-  applyCommand: (name: string, params: unknown) => { affected: string[]; isError: boolean };
+  applyCommand: (name: string, params: unknown) => { affected: string[]; isError: boolean; data?: { text?: string } };
   getLiveDoc: () => { entities: Record<string, { kind: string; name?: string }> };
   reset: () => void;
 }
@@ -68,53 +68,6 @@ function seedPlateWithHole(server: LoadedServer): void {
   expect(cut.affected).toHaveLength(1);
   server.applyCommand('set_entity_name', { id: cut.affected[0], name: 'Base plate' });
 }
-
-describe('GET /export/code', () => {
-  it('defaults to cadquery and sends an attachment', async () => {
-    const server = await loadServer({ LLULL_PYTHON: 'off' });
-    server.applyCommand('add_box', { size: [10, 20, 30] });
-    const res = await request(server.app).get('/export/code');
-    expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toMatch(/text\/plain/);
-    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="model\.py"$/);
-    expect(res.text).toContain('import cadquery as cq');
-    expect(res.text).toContain('LLULL_TRACE');
-    expect(res.text).toContain('box((10, 20, 30)');
-  });
-
-  it.each([
-    ['build123d', 'model.py', 'build123d'],
-    ['openscad', 'model.scad', 'cube('],
-    ['freecad', 'model.FCMacro', 'FreeCAD'],
-  ])('language=%s -> %s', async (language, fileName, marker) => {
-    const server = await loadServer({ LLULL_PYTHON: 'off' });
-    server.applyCommand('add_box', { size: [10, 20, 30] });
-    const res = await request(server.app).get('/export/code').query({ language });
-    expect(res.status).toBe(200);
-    expect(res.headers['content-disposition']).toBe(`attachment; filename="${fileName}"`);
-    expect(res.text).toContain(marker);
-  });
-
-  it('unknown language is a 400; name is sanitized into the filename', async () => {
-    const server = await loadServer({ LLULL_PYTHON: 'off' });
-    server.applyCommand('add_box', { size: [1, 2, 3] });
-    const res = await request(server.app).get('/export/code').query({ language: 'cobol', name: 'my part/../x' });
-    expect(res.status).toBe(400);
-    const ok = await request(server.app).get('/export/code').query({ name: 'my part/../x' });
-    expect(ok.status).toBe(200);
-    expect(ok.text).toContain('import cadquery as cq');
-    const disposition = String(ok.headers['content-disposition']);
-    expect(disposition).toMatch(/^attachment; filename="[A-Za-z0-9._-]+\.py"$/);
-    expect(disposition).not.toContain('/');
-  });
-
-  it('works on an empty document (header-only program)', async () => {
-    const server = await loadServer({ LLULL_PYTHON: 'off' });
-    const res = await request(server.app).get('/export/code');
-    expect(res.status).toBe(200);
-    expect(res.text.length).toBeGreaterThan(0);
-  });
-});
 
 describe('GET /export/step without Python', () => {
   it('returns 503 with an explanatory error when LLULL_PYTHON=off', async () => {
@@ -267,7 +220,7 @@ describe.skipIf(requireTool('python', hasCadQuery))('exchange tools with CadQuer
     server.reset();
     seedPlateWithHole(server);
     server.applyCommand('set_parameter', { name: 'width', expression: '40' });
-    const code = (await request(server.app).get('/export/code')).text;
+    const code = server.applyCommand('export_code', { language: 'cadquery' }).data?.text ?? '';
     expect(code).toContain('LLULL_TRACE');
 
     server.reset();
