@@ -17,11 +17,10 @@ import { collectParts } from '@core/geometry/assemblyParts';
 import { intentOf } from '@core/geometry/assemblyGraph';
 import { bisectEdge, goldenMinimum } from './motionRefine';
 import { type MotionPrefetch, prefetchMotion } from './motionPrefetch';
+import { type PairTravel, type SubstepPrefetch, prefetchSubsteps, substepCount, substepMoment } from './motionSubsteps';
 import type { GeometryQueryEngine } from '@core/geometry/geometryQueries';
 import { pow } from '@lib/pow';
 
-/** Most substeps between two recorded samples (pose interpolation against tunnelling). */
-const MAX_SUBSTEPS = 16;
 /** Most contact intervals per pair whose overlap volume is computed with the kernel. */
 const MAX_CLASSIFIED = 12;
 /** Most intervals classified with the kernel across all pairs. */
@@ -59,6 +58,8 @@ export interface MotionPlan {
   readonly mmPerUnit: number;
   /** Pair distances at recorded samples computed up front by the injected engine (RS-6), or null. */
   readonly prefetched: MotionPrefetch | null;
+  /** Pair distances at the substeps of the steps the sweep cannot certify clear, computed up front after the samples (PERF1), or null. */
+  readonly substeps: SubstepPrefetch | null;
 }
 
 export interface MotionPlanInput {
@@ -108,7 +109,7 @@ export function planMotion(input: MotionPlanInput): MotionPlan {
       pairs.push([a, b]);
     }
   });
-  return { ...input, parts, pairs, times: poses.times, tracks, prefetched: null };
+  return { ...input, parts, pairs, times: poses.times, tracks, prefetched: null, substeps: null };
 }
 
 /** `plan` with its sample distances prefetched by `engine` when the engine prefetches (`limits.motionPrefetchQueries` > 0, RS-6). */
@@ -124,7 +125,24 @@ export function withPrefetch(plan: MotionPlan, engine: GeometryQueryEngine | nul
     stride: plan.stride,
     placementAt: ([a, b], sample) => relativeTransform(poseOf(plan, a, sample), poseOf(plan, b, sample)),
   });
-  return prefetched === null ? plan : { ...plan, prefetched };
+  if (prefetched === null) return plan;
+  const sampled: MotionPlan = { ...plan, prefetched };
+  const meshes = plan.parts.map((p) => p.part.mesh ?? { positions: [], indices: [] });
+  const meshOf = (part: MotionPart): number => index.get(part) ?? 0;
+  const pairAt = (pair: number): readonly [MotionPart, MotionPart] => plan.pairs[pair] as readonly [MotionPart, MotionPart];
+  const substeps = prefetchSubsteps({
+    engine,
+    meshes,
+    pairCount: plan.pairs.length,
+    meshesOf: (pair) => [meshOf(pairAt(pair)[0]), meshOf(pairAt(pair)[1])],
+    sampleCount: plan.times.length,
+    stride: plan.stride,
+    lowBound: plan.clearance + plan.eps,
+    sampleDistance: prefetched,
+    travelOf: (pair) => pairTravel(plan, ...pairAt(pair)),
+    placementAt: (pair, u) => relativeTransform(poseOf(plan, pairAt(pair)[0], u), poseOf(plan, pairAt(pair)[1], u)),
+  });
+  return substeps === null ? sampled : { ...sampled, substeps };
 }
 
 /** A place on the strided run: `u` = sample index plus fraction. */
@@ -229,6 +247,39 @@ function classify(plan: MotionPlan, a: MotionPart, b: MotionPart, intervals: Int
   return used;
 }
 
+/**
+ * Cumulative travel of one pair over the recorded steps. `prefix` is the sum of both parts' absolute travel (sizes the substeps of one
+ * step); `certified` is the smaller of that and the RELATIVE motion of b in a's frame (the frame the distance is measured in), which
+ * proves a stretch clear for pairs that move together or turn about a common axis.
+ */
+function pairTravel(plan: MotionPlan, a: MotionPart, b: MotionPart): PairTravel {
+  const last = plan.times.length - 1;
+  const prefix = [0];
+  const certified = [0];
+  const half = (min: Vec3, max: Vec3): { centre: Vec3; radius: number } => ({
+    centre: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2],
+    radius: Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2,
+  });
+  const { centre: centreB, radius: radiusB } = half(b.part.min, b.part.max);
+  for (let i = 0; i < last; i++) {
+    const travel = [a, b].reduce((sum, part) => {
+      const track = part.body === null ? undefined : plan.tracks[part.body];
+      return track === undefined ? sum : sum + travelBound(track, i, part.radius);
+    }, 0);
+    prefix.push((prefix[i] ?? 0) + travel);
+    const relative = relativeTravelBound(
+      poseOf(plan, a, i),
+      poseOf(plan, a, i + 1),
+      poseOf(plan, b, i),
+      poseOf(plan, b, i + 1),
+      centreB,
+      radiusB,
+    );
+    certified.push((certified[i] ?? 0) + Math.min(travel, relative));
+  }
+  return { prefix, certified, limit: Math.max(Math.min(a.thin, b.thin) / 2, 1e-9) };
+}
+
 /** Work left for the whole run: pair-moment evaluations and kernel-classified intervals. */
 export interface Budget {
   evaluations: number;
@@ -253,14 +304,13 @@ interface Sweep {
  */
 function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget, pairIndex: number): Sweep {
   const lowBound = plan.clearance + plan.eps;
-  const limit = Math.max(Math.min(a.thin, b.thin) / 2, 1e-9);
   const state: { best: Closest | null; bound: number } = { best: null, bound: Infinity };
   let evaluations = 0;
   const closestAt = (u: number, bound: number): Closest | null => {
     evaluations++;
     budget.evaluations--;
     const poseA = poseOf(plan, a, u);
-    const cached = Number.isInteger(u) ? plan.prefetched?.(pairIndex, u) : undefined;
+    const cached = Number.isInteger(u) ? plan.prefetched?.(pairIndex, u) : plan.substeps?.(pairIndex, u);
     const hit =
       cached === undefined
         ? bvhMinDistance(a.bvh, b.bvh, bound, relativeTransform(poseA, poseOf(plan, b, u)))
@@ -273,32 +323,7 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget, p
   };
   const inContact = (u: number): boolean => (closestAt(u, plan.eps)?.distance ?? Infinity) <= plan.eps;
   const last = plan.times.length - 1;
-  // cumulative travel over the recorded steps: prefix[k] = from sample 0 to sample k. `prefix` is the sum of both parts' absolute travel (sizes
-  // the substeps of one step); `certified` is the smaller of that and the RELATIVE motion of b in a's frame (the frame the distance is
-  // measured in), which proves a stretch clear for pairs that move together or turn about a common axis
-  const prefix = [0];
-  const certified = [0];
-  const half = (min: Vec3, max: Vec3): { centre: Vec3; radius: number } => ({
-    centre: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2],
-    radius: Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2,
-  });
-  const { centre: centreB, radius: radiusB } = half(b.part.min, b.part.max);
-  for (let i = 0; i < last; i++) {
-    const travel = [a, b].reduce((sum, part) => {
-      const track = part.body === null ? undefined : plan.tracks[part.body];
-      return track === undefined ? sum : sum + travelBound(track, i, part.radius);
-    }, 0);
-    prefix.push((prefix[i] ?? 0) + travel);
-    const relative = relativeTravelBound(
-      poseOf(plan, a, i),
-      poseOf(plan, a, i + 1),
-      poseOf(plan, b, i),
-      poseOf(plan, b, i + 1),
-      centreB,
-      radiusB,
-    );
-    certified.push((certified[i] ?? 0) + Math.min(travel, relative));
-  }
+  const { prefix, certified, limit } = pairTravel(plan, a, b);
   const travelBetween = (from: number, to: number): number => (prefix[to] ?? 0) - (prefix[from] ?? 0);
   const certifiedBetween = (from: number, to: number): number => (certified[to] ?? 0) - (certified[from] ?? 0);
   const probes: { u: number; contact: boolean }[] = [];
@@ -319,11 +344,11 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget, p
   /** One recorded step: substeps sized by the travel against half the thinnest side of the pair. */
   const fine = (from: number, nearestEnd: number): void => {
     const travel = travelBetween(from, from + 1);
-    const substeps = Math.min(MAX_SUBSTEPS, Math.max(1, Math.ceil(travel / limit)));
+    const substeps = substepCount(travel, limit);
     const stepSize = travel / substeps;
     maxStep = Math.max(maxStep, stepSize);
     let nearest = nearestEnd;
-    for (let k = 1; k < substeps; k++) nearest = Math.min(nearest, probe(from + k / substeps, 0));
+    for (let k = 1; k < substeps; k++) nearest = Math.min(nearest, probe(substepMoment(from, k, substeps), 0));
     if (stepSize > Math.min(a.thin, b.thin) && nearest < stepSize) undersampled = true;
   };
   const refine = (from: number, distanceFrom: number, to: number, distanceTo: number): void => {

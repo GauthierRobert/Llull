@@ -82,18 +82,21 @@ const check = (doc: CadDocument, params: Record<string, unknown> = {}, context =
   execute(doc, 'check_motion_clearance', { crankAxis: 'arm_j', duration: 0.5, sampleRate: 360, ...params }, context);
 
 /** The TS engine, but prefetching up to `limit` pose x pair queries; counts the queries it was sent. */
-function prefetching(limit: number): { engine: GeometryQueryEngine; queries: () => number } {
+function prefetching(limit: number): { engine: GeometryQueryEngine; queries: () => number; batches: () => readonly number[] } {
   let sent = 0;
+  const batches: number[] = [];
   const engine: GeometryQueryEngine = {
     ...meshBvhEngine,
     provenance: { engine: 'prefetching-test', device: 'cpu', deterministic: true },
     limits: { ...meshBvhEngine.limits, motionPrefetchQueries: limit },
     placedDistanceBatch: (meshes, queries) => {
-      sent += queries.length;
+      // The first batch holds the recorded samples; a second one, when sent, the substeps inside recorded steps (PERF1).
+      if (batches.length === 0) sent += queries.length;
+      batches.push(queries.length);
       return meshBvhEngine.placedDistanceBatch(meshes, queries);
     },
   };
-  return { engine, queries: () => sent };
+  return { engine, queries: () => sent, batches: () => batches };
 }
 
 describe('check_motion_clearance on a rotating arm', () => {
@@ -280,6 +283,38 @@ describe('check_motion_clearance on a rotating arm', () => {
     const tight = prefetching(1);
     check(armScene().doc, {}, { ...ctxOf(), geometryQueries: tight.engine });
     expect(tight.queries()).toBe(0);
+  });
+
+  it('sends the substeps of the steps it cannot certify clear as a second batch, with the same answer (PERF1)', () => {
+    const { doc } = armScene();
+    const coarse = { sampleRate: 24 };
+    const reference = check(doc, coarse);
+    const spy = prefetching(1_000_000);
+    const batched = check(doc, coarse, { ...ctxOf(), geometryQueries: spy.engine });
+    expect(JSON.stringify(batched.data)).toBe(JSON.stringify(reference.data));
+    expect(spy.batches()).toHaveLength(2);
+    expect(spy.batches()[1]).toBeGreaterThan(0);
+    // a failing or short second batch is ignored: those moments are queried on meshBvh as before
+    for (const second of [
+      (): never => {
+        throw new Error('native run failed');
+      },
+      (): [] => [],
+    ]) {
+      let calls = 0;
+      const engine: GeometryQueryEngine = {
+        ...spy.engine,
+        placedDistanceBatch: (meshes, queries) => (calls++ === 0 ? meshBvhEngine.placedDistanceBatch(meshes, queries) : second()),
+      };
+      expect(JSON.stringify(check(doc, coarse, { ...ctxOf(), geometryQueries: engine }).data)).toBe(JSON.stringify(reference.data));
+      expect(calls).toBe(2);
+    }
+    // a limit that holds the samples but not the substeps sends the samples only
+    const samplesOnly = prefetching(spy.batches()[0] ?? 0);
+    expect(JSON.stringify(check(doc, coarse, { ...ctxOf(), geometryQueries: samplesOnly.engine }).data)).toBe(
+      JSON.stringify(reference.data),
+    );
+    expect(samplesOnly.batches()).toHaveLength(1);
   });
 
   it('is deterministic', () => {

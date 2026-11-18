@@ -6,6 +6,9 @@ import type { ExecutionContext } from '@core/commands/types';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
+import { createNativeGeometryQueryEngine } from '../../src/native/geometryQueryEngine';
+import { nativeBinaryPath } from '../../src/native/nativeBinary';
+import { requireTool } from '../../../tests/requireTool';
 import { expectWithinBudget, reportMeasurements } from './harness';
 
 let context: ExecutionContext;
@@ -65,6 +68,8 @@ function sliderCranks(count: number): CadDocument {
     const disc = must('add_cylinder', { radius: 40, height: 20, axis: [0, 0, 1], position: [0, 0, z - 30] });
     const link = must('add_box', { size: [rod, 10, 10], position: [(radius + wrist) / 2, 0, z] });
     const piston = must('add_box', { size: [30, 30, 30], position: [wrist + 25, 0, z] });
+    // A fixed liner beside each piston: a static part the moving ones pass close to.
+    must('add_box', { size: [120, 60, 10], position: [wrist, 0, z + 25] });
     must('add_rigid_body', { entityIds: [disc], massKg: 15, id: `crank${crank}` });
     must('add_rigid_body', { entityIds: [link], massKg: 0.5, id: `rod${crank}` });
     must('add_rigid_body', { entityIds: [piston], massKg: 0.4, id: `piston${crank}` });
@@ -103,6 +108,19 @@ function simulate(doc: CadDocument, duration: number): { readonly milliseconds: 
   const result = execute(doc, 'simulate_motion', { duration }, context);
   return { milliseconds: performance.now() - started, summary: result.summary };
 }
+
+const compute = nativeBinaryPath('llull-compute');
+
+describe.skipIf(requireTool('native:llull-compute', compute !== null))('motion clearance performance budget (PERF1)', () => {
+  it('dynamics.clearance.cranks3: 63 part pairs over 361 samples of 3 slider-cranks, distances on the native engine', () => {
+    const native = { ...context, geometryQueries: createNativeGeometryQueryEngine(compute ?? '') };
+    const started = performance.now();
+    const result = execute(sliderCranks(3), 'check_motion_clearance', { duration: 1 }, native);
+    const elapsed = performance.now() - started;
+    expect(result.summary).toContain('63 pair(s) over 361 samples');
+    expectWithinBudget('dynamics.clearance.cranks3', elapsed);
+  });
+});
 
 describe('rigid-body dynamics performance budgets (PERF1)', () => {
   it('dynamics.simulate.servo_arms: 10 s of 10 four-link arms on speed motors', () => {
