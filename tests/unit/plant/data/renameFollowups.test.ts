@@ -11,6 +11,7 @@ import type { BuildingElement } from '@aec/building/types';
 import { renamedReference } from '@aec/plant/equipment/tagReferences';
 import { getPlantData } from '@aec/plant/data/model';
 import { apply, data, expectRefusal } from '../../../helpers/commandAssertions';
+import { timeBudgetMs } from '../../../helpers/timeBudget';
 import { routedPumpToVessel } from '../piping/rteFixtures';
 import { addEquipment, addPipe, libraryDocument, markEquipmentByHand } from './dataFixtures';
 
@@ -404,6 +405,6 @@ describe('the direct-rename guard covers trays, supports and members', () => {
     const renamed = execute(big, 'rename_element_tag', { renames: [{ element: 'member-big-5', tag: 'B-FREE' }] });
     expect(renamed.rejected, renamed.summary).toBeUndefined();
     expect(same.document).toBe(big);
-    expect(performance.now() - started).toBeLessThan(1500);
+    expect(performance.now() - started).toBeLessThan(timeBudgetMs(1500));
   });
 });

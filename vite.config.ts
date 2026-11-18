@@ -67,6 +67,8 @@ export default defineConfig(({ command }) => ({
     // Domain suites run whole engineering solves (portal-frame design, golden plans) that take
     // several seconds, more under coverage instrumentation.
     testTimeout: 30_000,
+    // read by tests/helpers/timeBudget.ts: wall-clock budgets allow for the instrumentation of a coverage run
+    env: { LLULL_COVERAGE: process.argv.includes('--coverage') ? '1' : '0' },
     maxWorkers: testWorkers(),
     // Isolated agent worktrees (continue-working skill) live under the repo root
     // and contain full repo copies; never scan them for tests.
