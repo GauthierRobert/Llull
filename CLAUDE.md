@@ -92,6 +92,7 @@ npm run check:coverage # the final gate when packages/*/src changed: check with 
 npm run test:coverage  # gate 90/85/90/90 on core/{commands,geometry,dynamics} + domain-{aec,cae,aero,dynamics,implicit} + design-lang + plm
 npm run claude:lint  # after editing .claude/
 npm run lane -- <n> <branch>   # persistent lane worktree ../llull-lane<n> (warm caches; docs/decisions/DL1-dev-loop.md)
+npm run perf         # binding performance budgets (docs/decisions/PERF1-performance-budgets.md; server/tests/perf/budgets.ts): run when a measured path changes
 npm run quality | production   # real-file gates (docs/QUALITY_GATES.md, docs/PRODUCTION_GATE.md)
 node server/bin/llull.cjs help # CLI (llull-cli skill)
 npm --prefix server test ; npm --prefix desktop test
