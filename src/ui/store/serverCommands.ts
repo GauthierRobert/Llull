@@ -46,9 +46,16 @@ async function request<Body>(path: string, postBody?: unknown, signal?: AbortSig
   return response.json() as Promise<Body>;
 }
 
-/** `commandId` makes it idempotent server-side. @throws ServerCommandError (as do undo / redo / snapshot) */
-export function postCommand(name: string, params: unknown, commandId?: string, signal?: AbortSignal): Promise<ServerCommandResponse> {
-  return request('/command', commandId === undefined ? { name, params } : { name, params, commandId }, signal);
+/** `commandId` makes it idempotent server-side; `coalesce` folds the change into the previous undo step. @throws ServerCommandError (as do undo / redo / snapshot) */
+export function postCommand(
+  name: string,
+  params: unknown,
+  commandId?: string,
+  signal?: AbortSignal,
+  coalesce = false,
+): Promise<ServerCommandResponse> {
+  const body = { name, params, ...(commandId === undefined ? {} : { commandId }), ...(coalesce ? { coalesce: true } : {}) };
+  return request('/command', body, signal);
 }
 
 /** Host tool over POST /exchange (`topology_solve`, exchange tools): not a document command, so not in the command log. */

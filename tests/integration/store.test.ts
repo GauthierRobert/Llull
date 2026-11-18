@@ -65,6 +65,15 @@ const DEFAULT_RESPONSE: ServerCommandResponse = {
 describe('CadStore — networked dispatch', () => {
   useCleanStoreHooks();
 
+  it('a coalesced dispatch asks the backend to fold it into the previous undo step; a plain one does not', async () => {
+    const spy = mockFetch(DEFAULT_RESPONSE);
+    getState().dispatch('add_box', { size: [1, 1, 1] });
+    getState().dispatch('fit_view', { direction: 'iso' }, { coalesce: true });
+    await flushPromises();
+    const bodies = spy.mock.calls.map((call) => JSON.parse((call[1] as RequestInit).body as string) as { coalesce?: boolean });
+    expect(bodies.map((body) => body.coalesce)).toEqual([undefined, true]);
+  });
+
   it('dispatch POSTs name and params to /command and adopts the response summary / flags, not the document', async () => {
     const spy = mockFetch({ ...DEFAULT_RESPONSE, summary: 'Box created at origin.' });
     const before = getState().document;

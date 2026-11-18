@@ -69,7 +69,7 @@ export function postDispatch(set: StoreSet, get: StoreGet, name: string, params:
   const commandId = newCommandId();
   const request = new AbortController();
   const forget = registerCommandCancel(commandId, () => request.abort());
-  void postCommand(name, params, commandId, request.signal)
+  void postCommand(name, params, commandId, request.signal, options?.coalesce === true)
     .then((response) => {
       set((state) => ({
         document: selectAffectedIn(state.document, selectionAtDispatch, response.affected, options),

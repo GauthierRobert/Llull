@@ -35,4 +35,21 @@ describe('live history flags', () => {
     expect(events.at(-1)?.data).toMatchObject({ source: 'cli', canUndo: true, canRedo: false });
     expect(events[0]?.data).toMatchObject({ canUndo: true, canRedo: false });
   });
+
+  it('POST /command with coalesce folds the change into the previous undo step: one undo takes back both', async () => {
+    const first = await request(app).post('/command').send({ name: 'add_box', params: BOX });
+    expect(first.body.changed).toBe(true);
+    await request(app).post('/command').send({ name: 'add_box', params: BOX, coalesce: true });
+    expect(Object.keys(getLiveSnapshot().document.entities)).toHaveLength(2);
+    const undone = await request(app).post('/undo').send({});
+    expect(undone.body).toMatchObject({ canUndo: false, canRedo: true });
+    expect(Object.keys(getLiveSnapshot().document.entities)).toHaveLength(0);
+  });
+
+  it('without coalesce each command is its own undo step', async () => {
+    await request(app).post('/command').send({ name: 'add_box', params: BOX });
+    await request(app).post('/command').send({ name: 'add_box', params: BOX });
+    await request(app).post('/undo').send({});
+    expect(Object.keys(getLiveSnapshot().document.entities)).toHaveLength(1);
+  });
 });
