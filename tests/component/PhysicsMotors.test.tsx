@@ -7,6 +7,7 @@ import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { resetStore } from '../helpers/componentEntities';
+import { connectFakeBackend } from '../helpers/fakeBackend';
 import { answerDispatch, localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
 
 beforeAll(async () => {
@@ -49,7 +50,12 @@ describe('Physics panel: motors, drives and profiles', () => {
     useDynamicsPlaybackStore.setState({ result: null, time: 0, playing: false });
     useFocusStore.setState({ focus: null });
   });
-  afterEach(() => useStore.setState({ dispatch: originalDispatch }));
+  let disconnect: (() => void) | null = null;
+  afterEach(() => {
+    disconnect?.();
+    disconnect = null;
+    useStore.setState({ dispatch: originalDispatch });
+  });
 
   it('shows the stored datasheet of a dc motor, never as a torque curve', () => {
     const motor = addDcMotor(buildShaft(), { gearhead: { ratio: 10, efficiency: 0.9 } });
@@ -240,6 +246,7 @@ describe('Physics panel: motors, drives and profiles', () => {
     localDispatch('set_gravity', { gravity: [0, 0, 0] });
     const motor = addDcMotor(joint, { gearhead: { ratio: 4, efficiency: 0.9 } });
     localDispatch('set_motor_drive', { motor, mode: 'voltage', volts: 24 });
+    disconnect = connectFakeBackend();
     render(<PhysicsSection />);
     fireEvent.change(screen.getByTestId('physics-duration'), { target: { value: '0.5' } });
     fireEvent.click(screen.getByTestId('physics-simulate'));
@@ -250,6 +257,7 @@ describe('Physics panel: motors, drives and profiles', () => {
   it('a simulated run with a voltage-driven dc motor shows its torque row and the read-only energy ledger', async () => {
     const motor = addDcMotor(buildShaft());
     localDispatch('set_motor_drive', { motor, mode: 'voltage', volts: 48 });
+    disconnect = connectFakeBackend();
     render(<PhysicsSection />);
     fireEvent.change(screen.getByTestId('physics-duration'), { target: { value: '0.2' } });
     fireEvent.click(screen.getByTestId('physics-simulate'));
@@ -266,6 +274,7 @@ describe('Physics panel: motors, drives and profiles', () => {
   it('without datasheet motors a run shows no ledger', async () => {
     const joint = buildShaft();
     localDispatch('add_motor', { joint, kind: 'torque_curve', torque: 1 });
+    disconnect = connectFakeBackend();
     render(<PhysicsSection />);
     fireEvent.change(screen.getByTestId('physics-duration'), { target: { value: '0.5' } });
     fireEvent.click(screen.getByTestId('physics-simulate'));

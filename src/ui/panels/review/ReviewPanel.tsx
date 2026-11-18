@@ -37,7 +37,7 @@ function useRunChecks(): () => void {
     setBusy(true);
     setStatus('');
     const source = { entities: document.entities, dynamics: document.dynamics };
-    void runPrototypeCheck({}, setStatus).then((run) => {
+    void runPrototypeCheck({}).then((run) => {
       const review = parsePrototypeReview(run.data);
       if (review === null) setStatus(run.summary);
       else {

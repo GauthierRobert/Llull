@@ -127,10 +127,12 @@ export function PhysicsSection(): React.ReactElement {
     const seconds = parseNumber(duration) ?? 5;
     setBusy(true);
     setStatus(`Simulating ${format(seconds, 2)} s…`);
-    const run = await runSimulation(
-      { duration: seconds, detail: 'poses', energy: true, sampleRate: Math.min(1000, PLAYBACK_SAMPLES / seconds) },
-      setStatus,
-    );
+    const run = await runSimulation({
+      duration: seconds,
+      detail: 'poses',
+      energy: true,
+      sampleRate: Math.min(1000, PLAYBACK_SAMPLES / seconds),
+    });
     setBusy(false);
     setStatus(run.summary);
     const source = { dynamics: useStore.getState().document.dynamics, entities: useStore.getState().document.entities };

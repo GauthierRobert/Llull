@@ -1,9 +1,7 @@
-// simulate_motion for the Physics panel. Online it runs on the server (MuJoCo under Node): the served app's CSP has no
-// 'unsafe-eval', which MuJoCo's WASM bindings need at load, so the in-page engine cannot start there. Offline it runs in the page.
+// simulate_motion for the Physics panel. It runs on the backend only (MuJoCo under Node): the served app's CSP has no 'unsafe-eval',
+// which MuJoCo's WASM bindings need at load, so the renderer carries no engine. Disconnected, it answers that the backend is needed.
 
-import { ensurePhysicsEngine } from '@app/physics';
 import { useStore } from '@ui/store';
-import { runQuery } from '@ui/services/localQuery';
 import { postCommand, ServerCommandError } from '@ui/store/serverCommands';
 
 export interface SimulationRun {
@@ -21,13 +19,9 @@ async function runOnServer(params: Record<string, unknown>): Promise<SimulationR
   }
 }
 
-/** @param onStatus progress line while the engine loads / the run starts */
-export async function runSimulation(params: Record<string, unknown>, onStatus: (status: string) => void): Promise<SimulationRun> {
+const NEEDS_BACKEND = 'simulate_motion needs the llull backend (the physics engine runs there); it is not connected.';
+
+export async function runSimulation(params: Record<string, unknown>): Promise<SimulationRun> {
   if (useStore.getState().liveStatus === 'connected') return runOnServer(params);
-  onStatus('Loading the MuJoCo physics engine…');
-  if (!(await ensurePhysicsEngine())) return { summary: 'The physics engine could not be loaded (see the console).', data: undefined };
-  // let the status paint before the synchronous run
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  const run = runQuery('simulate_motion', params);
-  return { summary: run.summary, data: run.data };
+  return { summary: NEEDS_BACKEND, data: undefined };
 }

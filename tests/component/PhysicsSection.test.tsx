@@ -1,5 +1,5 @@
 import { resetStore } from '../helpers/componentEntities';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { PhysicsSection } from '@ui/panels/PhysicsSection';
 import { useStore } from '@ui/store';
@@ -8,10 +8,11 @@ import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { execute } from '@core/commands/registry';
 import { getPhysicsEngine, setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
+import { connectFakeBackend } from '../helpers/fakeBackend';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
 beforeAll(async () => {
-  // ensurePhysicsEngine() finds the engine already installed and skips the browser download.
+  // the engine the fake backend (connectFakeBackend) runs simulate_motion with; the renderer itself loads none.
   setPhysicsEngine(await createMujocoPhysics());
 });
 afterAll(() => setPhysicsEngine(null));
@@ -27,9 +28,14 @@ function buildRotor(): { bodyId: string; jointId: string } {
 }
 
 describe('PhysicsSection', () => {
+  let disconnect: (() => void) | null = null;
   beforeEach(() => {
     resetStore();
     useDynamicsPlaybackStore.setState({ result: null, time: 0, playing: false });
+  });
+  afterEach(() => {
+    disconnect?.();
+    disconnect = null;
   });
 
   it('explains how to start when the document has no rigid bodies', () => {
@@ -52,6 +58,7 @@ describe('PhysicsSection', () => {
 
   it('simulates, shows the operating point and a speed chart, and starts playback', async () => {
     const { jointId } = buildRotor();
+    disconnect = connectFakeBackend();
     render(<PhysicsSection />);
     fireEvent.change(screen.getByTestId('physics-duration'), { target: { value: '2' } });
     fireEvent.click(screen.getByTestId('physics-simulate'));
@@ -77,6 +84,7 @@ describe('PhysicsSection', () => {
     const arm = localDispatch('add_box', { size: [300, 20, 20] }).affected[0]!;
     const bodyId = localDispatch('add_rigid_body', { entityIds: [arm], name: 'pendulum' }).affected[0]!;
     localDispatch('add_body_joint', { kind: 'revolute', child: bodyId, anchor: [0, 10, 10], axis: [0, 1, 0] });
+    disconnect = connectFakeBackend();
     render(<PhysicsSection />);
     fireEvent.change(screen.getByTestId('physics-duration'), { target: { value: '1' } });
     fireEvent.click(screen.getByTestId('physics-simulate'));
@@ -85,7 +93,7 @@ describe('PhysicsSection', () => {
     expect(screen.getByTestId('physics-energy')).not.toHaveTextContent(/-0(?![.\d])/);
   });
 
-  it('online, runs simulate_motion on the server (the served CSP blocks in-page MuJoCo) and plays its result', async () => {
+  it('online, runs simulate_motion on the server and plays its result', async () => {
     const { jointId } = buildRotor();
     const serverRun = execute(useStore.getState().document, 'simulate_motion', { duration: 1, detail: 'poses' });
     const fetchSpy = vi
@@ -109,6 +117,23 @@ describe('PhysicsSection', () => {
     } finally {
       fetchSpy.mockRestore();
       useStore.setState({ liveStatus: 'disconnected' });
+      setPhysicsEngine(await createMujocoPhysics());
+    }
+  });
+
+  it('disconnected, refuses to simulate (the renderer carries no engine) and loads none', async () => {
+    buildRotor();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    setPhysicsEngine(null);
+    try {
+      render(<PhysicsSection />);
+      fireEvent.click(screen.getByTestId('physics-simulate'));
+      await waitFor(() => expect(screen.getByText(/simulate_motion needs the llull backend/)).toBeInTheDocument());
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(getPhysicsEngine()).toBeNull();
+      expect(useDynamicsPlaybackStore.getState().result).toBeNull();
+    } finally {
+      fetchSpy.mockRestore();
       setPhysicsEngine(await createMujocoPhysics());
     }
   });
