@@ -16,6 +16,7 @@ import type { CcxRunner } from './ccxProcess';
 import { errorMessage } from '@lib/errorMessage';
 import { currentMesh, feaFailure, INSTALL_HINT, isFailure } from './feaCommon';
 import type { RandomPostStep } from '../native/randomField';
+import type { ProcessResult } from '../processRunner';
 
 export interface FeaSolveDeps {
   readonly store: FeArtifactStore;
@@ -76,22 +77,26 @@ function adequacyNote(adequacy: FeMeshAdequacy, hooks: CaeHooks): string {
 
 const readOptional = (file: string): Promise<string> => readFile(file, 'utf8').catch(() => '');
 
-/**
- * @failure missing / stale mesh -> FEA_MESH_MISSING / FEA_MESH_STALE; deck refusal -> its code; ccx absent -> FEA_TOOL_MISSING;
- *   `*ERROR`, non-zero exit, timeout or no result step -> FEA_SOLVER_FAILED (log tail in data.log); a nonlinear run that stops on the increment
- *   minimum / INC / divergence -> NLS_INCREMENT_TOO_SMALL / NLS_MAX_INCREMENTS / NLS_NOT_CONVERGED with data.convergence
- */
-export async function runFeaSolve(
-  analysisId: string,
-  timeoutS: number | undefined,
-  host: FeaHost,
-  deps: FeaSolveDeps,
-): Promise<FeaToolResult> {
-  const doc = host.getDoc();
-  const current = currentMesh('fea_solve', doc, analysisId, deps.store, deps.hooks);
-  if (isFailure(current)) return current;
-  const nonlinear = doc.analysis?.cases[analysisId]?.type === 'nonlinear_static';
-  const random = doc.analysis?.cases[analysisId]?.type === 'random_response';
+interface SolveInput {
+  readonly analysisId: string;
+  readonly host: FeaHost;
+  readonly deps: FeaSolveDeps;
+  readonly doc: CadDocument;
+  readonly current: { readonly mesh: FeMeshArtifact; readonly meshHash: string };
+  readonly nonlinear: boolean;
+  readonly random: boolean;
+}
+
+interface PreparedDeck {
+  readonly deckText: string;
+  readonly prepared: string | null;
+  readonly fallback: MappingFallback | null;
+}
+
+type ResultSteps = FeResultsArtifact['steps'];
+
+async function prepareDeck(input: SolveInput): Promise<FeaToolResult | PreparedDeck> {
+  const { analysisId, deps, doc, current, random } = input;
   const tooLarge = random ? (deps.randomPost?.precheck(doc, analysisId, current.mesh) ?? null) : null;
   if (tooLarge !== null) return feaFailure('fea_solve', tooLarge.code, tooLarge.message, [analysisId]);
   const mapping =
@@ -115,115 +120,174 @@ export async function runFeaSolve(
       data: { code: deck.code, ...(fallback === null ? {} : { mappingFallback: fallback }) },
     };
   }
+  return { deckText: deck.text, prepared, fallback };
+}
+
+function solverFailure(input: SolveInput, run: ProcessResult, seconds: number, convergence: readonly FeConvergenceRow[]): FeaToolResult {
+  const { analysisId, deps, nonlinear } = input;
+  const why = run.timedOut
+    ? `timed out after ${seconds} s`
+    : run.exitCode !== 0
+      ? `exited with code ${String(run.exitCode)}`
+      : 'reported *ERROR';
+  const stop = nonlinear && !run.timedOut ? deps.hooks.classifyNonlinearStop(run.log) : null;
+  const progress = nonlinear ? ` after ${convergenceNote(convergence)}` : '';
+  return {
+    ...feaFailure('fea_solve', stop ?? 'FEA_SOLVER_FAILED', `CalculiX ${why}${progress}. Last output:\n${run.log.slice(-4000)}`, [
+      analysisId,
+    ]),
+    data: {
+      code: stop ?? 'FEA_SOLVER_FAILED',
+      log: run.log,
+      ...(nonlinear ? { stopCode: stop, convergence: convergenceTotals(convergence) } : {}),
+    },
+  };
+}
+
+async function runCcx(
+  input: SolveInput,
+  directory: string,
+  timeoutS: number | undefined,
+): Promise<FeaToolResult | { readonly run: ProcessResult; readonly convergence: FeConvergenceRow[] }> {
+  const { analysisId, deps, nonlinear } = input;
+  const seconds = Math.min(FEA_SOLVE_TIMEOUT_S.max, Math.max(FEA_SOLVE_TIMEOUT_S.min, timeoutS ?? DEFAULT_SOLVE_TIMEOUT_S));
+  const run = await deps.ccx.run(directory, JOB, seconds * 1000);
+  if (run.startError !== undefined) {
+    return feaFailure('fea_solve', 'FEA_TOOL_MISSING', `cannot start CalculiX: ${run.startError}. ${INSTALL_HINT.ccx}`, [analysisId]);
+  }
+  const failed = run.timedOut || run.exitCode !== 0 || /\*ERROR/.test(run.log);
+  const convergence = nonlinear ? deps.hooks.parseSta(await readOptional(path.join(directory, `${JOB}.sta`))) : [];
+  if (failed) return solverFailure(input, run, seconds, convergence);
+  return { run, convergence };
+}
+
+async function readResultSteps(
+  input: SolveInput,
+  directory: string,
+  run: ProcessResult,
+): Promise<FeaToolResult | { readonly steps: ResultSteps }> {
+  const { analysisId, deps, doc, current } = input;
+  const frdPath = path.join(directory, `${JOB}.frd`);
+  const frdBytes = await stat(frdPath).then(
+    (info) => info.size,
+    () => 0,
+  );
+  const cap = deps.maxResultsBytes ?? MAX_FRD_BYTES;
+  if (frdBytes > cap) {
+    return feaFailure(
+      'fea_solve',
+      'FEA_RESULTS_TOO_LARGE',
+      `the CalculiX result file is ${frdBytes} bytes (cap ${cap}): mesh more coarsely`,
+      [analysisId],
+    );
+  }
+  const frdText = await readOptional(frdPath);
+  const parsed = deps.hooks.parseFrd(frdText);
+  const shellMapped = parsed.length === 0 ? { steps: parsed } : deps.hooks.mapShellResults(doc, analysisId, current.mesh, parsed, frdText);
+  if ('code' in shellMapped) return feaFailure('fea_solve', shellMapped.code, shellMapped.message, [analysisId]);
+  const steps = shellMapped.steps;
+  if (steps.length === 0) {
+    return feaFailure(
+      'fea_solve',
+      'FEA_SOLVER_FAILED',
+      `CalculiX finished but wrote no result step. Last output:\n${run.log.slice(-4000)}`,
+      [analysisId],
+    );
+  }
+  const nonFinite = deps.hooks.firstNonFinite(steps);
+  if (nonFinite !== null) {
+    return feaFailure('fea_solve', 'FEA_SOLVER_FAILED', `CalculiX wrote non-finite results (${nonFinite}); the solution is not usable`, [
+      analysisId,
+    ]);
+  }
+  return { steps };
+}
+
+async function recordSolved(
+  input: SolveInput,
+  directory: string,
+  deck: PreparedDeck,
+  adequacy: FeMeshAdequacy,
+  convergence: FeConvergenceRow[],
+  steps: ResultSteps,
+): Promise<FeaToolResult> {
+  const { analysisId, host, deps, doc, current, nonlinear, random } = input;
+  const { prepared, fallback } = deck;
+  const datText = await readOptional(path.join(directory, `${JOB}.dat`));
+  const dat = datText === '' ? undefined : deps.hooks.parseDat(datText);
+  const solved: FeResultsArtifact = {
+    kind: 'fe_results',
+    meshHash: current.meshHash,
+    inputHash: deps.hooks.analysisInputHash(doc, analysisId, 'full'),
+    solver: 'calculix',
+    solverVersion: await deps.ccx.version(),
+    steps,
+    ...(dat !== undefined ? { dat } : {}),
+    ...(nonlinear && convergence.length > 0 ? { convergence } : {}),
+    adequacy,
+  };
+  const post = random && deps.randomPost !== undefined ? await deps.randomPost.run(doc, analysisId, current.mesh, solved) : null;
+  if (post !== null && !('results' in post)) return feaFailure('fea_solve', post.code, post.message, [analysisId]);
+  const results = post?.results ?? solved;
+  const resultsHash = deps.store.put(results);
+  const stored = deps.store.get(resultsHash);
+  if (stored === null || stored.kind !== 'fe_results') {
+    return feaFailure(
+      'fea_solve',
+      'FEA_ARTIFACT_NOT_FOUND',
+      `the results artifact ${resultsHash.slice(0, 12)} cannot be read back from the store`,
+      [analysisId],
+    );
+  }
+  const recorded = host.applyCommand('record_fea_results', {
+    analysisId,
+    summary: deps.hooks.resultsSummary(doc, analysisId, current.mesh, stored, resultsHash),
+  });
+  const increments = nonlinear ? ` ${convergenceNote(convergence)}.` : '';
+  return {
+    summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${prepared === null ? '' : ` ${prepared}.`} ${adequacyNote(adequacy, deps.hooks)}${post === null ? '' : ` ${post.note}.`} ${recorded.summary}`,
+    affected: recorded.affected,
+    isError: recorded.isError,
+    data: {
+      resultsHash,
+      steps: steps.length,
+      ...(fallback === null ? {} : { mappingFallback: fallback }),
+      ...(nonlinear ? { convergence: convergenceTotals(convergence) } : {}),
+      ...(post !== null ? { nodalField: { engine: post.engine, elapsedMs: post.elapsedMs, deterministic: true } } : {}),
+      ...(deps.keepJobs === true ? { jobDirectory: directory } : {}),
+    },
+  };
+}
+
+/**
+ * @failure missing / stale mesh -> FEA_MESH_MISSING / FEA_MESH_STALE; deck refusal -> its code; ccx absent -> FEA_TOOL_MISSING;
+ *   `*ERROR`, non-zero exit, timeout or no result step -> FEA_SOLVER_FAILED (log tail in data.log); a nonlinear run that stops on the increment
+ *   minimum / INC / divergence -> NLS_INCREMENT_TOO_SMALL / NLS_MAX_INCREMENTS / NLS_NOT_CONVERGED with data.convergence
+ */
+export async function runFeaSolve(
+  analysisId: string,
+  timeoutS: number | undefined,
+  host: FeaHost,
+  deps: FeaSolveDeps,
+): Promise<FeaToolResult> {
+  const doc = host.getDoc();
+  const current = currentMesh('fea_solve', doc, analysisId, deps.store, deps.hooks);
+  if (isFailure(current)) return current;
+  const nonlinear = doc.analysis?.cases[analysisId]?.type === 'nonlinear_static';
+  const random = doc.analysis?.cases[analysisId]?.type === 'random_response';
+  const input: SolveInput = { analysisId, host, deps, doc, current, nonlinear, random };
+  const deck = await prepareDeck(input);
+  if (isFailure(deck)) return deck;
 
   const adequacy = deps.hooks.meshAdequacy(current.mesh);
   const directory = await mkdtemp(path.join(tmpdir(), 'llull-ccx-'));
   try {
-    await writeFile(path.join(directory, `${JOB}.inp`), deck.text);
-    const seconds = Math.min(FEA_SOLVE_TIMEOUT_S.max, Math.max(FEA_SOLVE_TIMEOUT_S.min, timeoutS ?? DEFAULT_SOLVE_TIMEOUT_S));
-    const run = await deps.ccx.run(directory, JOB, seconds * 1000);
-    if (run.startError !== undefined) {
-      return feaFailure('fea_solve', 'FEA_TOOL_MISSING', `cannot start CalculiX: ${run.startError}. ${INSTALL_HINT.ccx}`, [analysisId]);
-    }
-    const failed = run.timedOut || run.exitCode !== 0 || /\*ERROR/.test(run.log);
-    const convergence = nonlinear ? deps.hooks.parseSta(await readOptional(path.join(directory, `${JOB}.sta`))) : [];
-    if (failed) {
-      const why = run.timedOut
-        ? `timed out after ${seconds} s`
-        : run.exitCode !== 0
-          ? `exited with code ${String(run.exitCode)}`
-          : 'reported *ERROR';
-      const stop = nonlinear && !run.timedOut ? deps.hooks.classifyNonlinearStop(run.log) : null;
-      const progress = nonlinear ? ` after ${convergenceNote(convergence)}` : '';
-      return {
-        ...feaFailure('fea_solve', stop ?? 'FEA_SOLVER_FAILED', `CalculiX ${why}${progress}. Last output:\n${run.log.slice(-4000)}`, [
-          analysisId,
-        ]),
-        data: {
-          code: stop ?? 'FEA_SOLVER_FAILED',
-          log: run.log,
-          ...(nonlinear ? { stopCode: stop, convergence: convergenceTotals(convergence) } : {}),
-        },
-      };
-    }
-    const frdPath = path.join(directory, `${JOB}.frd`);
-    const frdBytes = await stat(frdPath).then(
-      (info) => info.size,
-      () => 0,
-    );
-    const cap = deps.maxResultsBytes ?? MAX_FRD_BYTES;
-    if (frdBytes > cap) {
-      return feaFailure(
-        'fea_solve',
-        'FEA_RESULTS_TOO_LARGE',
-        `the CalculiX result file is ${frdBytes} bytes (cap ${cap}): mesh more coarsely`,
-        [analysisId],
-      );
-    }
-    const frdText = await readOptional(frdPath);
-    const parsed = deps.hooks.parseFrd(frdText);
-    const shellMapped =
-      parsed.length === 0 ? { steps: parsed } : deps.hooks.mapShellResults(doc, analysisId, current.mesh, parsed, frdText);
-    if ('code' in shellMapped) return feaFailure('fea_solve', shellMapped.code, shellMapped.message, [analysisId]);
-    const steps = shellMapped.steps;
-    if (steps.length === 0) {
-      return feaFailure(
-        'fea_solve',
-        'FEA_SOLVER_FAILED',
-        `CalculiX finished but wrote no result step. Last output:\n${run.log.slice(-4000)}`,
-        [analysisId],
-      );
-    }
-    const nonFinite = deps.hooks.firstNonFinite(steps);
-    if (nonFinite !== null) {
-      return feaFailure('fea_solve', 'FEA_SOLVER_FAILED', `CalculiX wrote non-finite results (${nonFinite}); the solution is not usable`, [
-        analysisId,
-      ]);
-    }
-    const datText = await readOptional(path.join(directory, `${JOB}.dat`));
-    const dat = datText === '' ? undefined : deps.hooks.parseDat(datText);
-    const solved: FeResultsArtifact = {
-      kind: 'fe_results',
-      meshHash: current.meshHash,
-      inputHash: deps.hooks.analysisInputHash(doc, analysisId, 'full'),
-      solver: 'calculix',
-      solverVersion: await deps.ccx.version(),
-      steps,
-      ...(dat !== undefined ? { dat } : {}),
-      ...(nonlinear && convergence.length > 0 ? { convergence } : {}),
-      adequacy,
-    };
-    const post = random && deps.randomPost !== undefined ? await deps.randomPost.run(doc, analysisId, current.mesh, solved) : null;
-    if (post !== null && !('results' in post)) return feaFailure('fea_solve', post.code, post.message, [analysisId]);
-    const results = post?.results ?? solved;
-    const resultsHash = deps.store.put(results);
-    const stored = deps.store.get(resultsHash);
-    if (stored === null || stored.kind !== 'fe_results') {
-      return feaFailure(
-        'fea_solve',
-        'FEA_ARTIFACT_NOT_FOUND',
-        `the results artifact ${resultsHash.slice(0, 12)} cannot be read back from the store`,
-        [analysisId],
-      );
-    }
-    const recorded = host.applyCommand('record_fea_results', {
-      analysisId,
-      summary: deps.hooks.resultsSummary(doc, analysisId, current.mesh, stored, resultsHash),
-    });
-    const increments = nonlinear ? ` ${convergenceNote(convergence)}.` : '';
-    return {
-      summary: `fea_solve: CalculiX ${results.solverVersion}, ${steps.length} result step(s).${increments}${prepared === null ? '' : ` ${prepared}.`} ${adequacyNote(adequacy, deps.hooks)}${post === null ? '' : ` ${post.note}.`} ${recorded.summary}`,
-      affected: recorded.affected,
-      isError: recorded.isError,
-      data: {
-        resultsHash,
-        steps: steps.length,
-        ...(fallback === null ? {} : { mappingFallback: fallback }),
-        ...(nonlinear ? { convergence: convergenceTotals(convergence) } : {}),
-        ...(post !== null ? { nodalField: { engine: post.engine, elapsedMs: post.elapsedMs, deterministic: true } } : {}),
-        ...(deps.keepJobs === true ? { jobDirectory: directory } : {}),
-      },
-    };
+    await writeFile(path.join(directory, `${JOB}.inp`), deck.deckText);
+    const solved = await runCcx(input, directory, timeoutS);
+    if (isFailure(solved)) return solved;
+    const read = await readResultSteps(input, directory, solved.run);
+    if (isFailure(read)) return read;
+    return await recordSolved(input, directory, deck, adequacy, solved.convergence, read.steps);
   } finally {
     if (deps.keepJobs !== true) await rm(directory, { recursive: true, force: true });
   }

@@ -49,36 +49,43 @@ async function builtLibrary(folder: string, library: string, platform: NodeJS.Pl
   return `src/${candidates.find((file) => present.includes(file)) ?? candidates[0] ?? ''}`;
 }
 
-/**
- * @failure tools absent -> MFRONT_TOOL_MISSING (reason in the message and data.reason); code execution not allowed ->
- *   MFRONT_CODE_EXECUTION_DISABLED; bad params -> MTEST_PARAMS_INVALID; mfront / mtest non-zero exit -> MFRONT_BUILD_FAILED / MTEST_FAILED
- *   (log tail in data.log); timeout -> MTEST_TIMEOUT; no parsable .res -> MTEST_RESULT_MISSING. Never throws for these.
- */
-export async function runMtestTool(params: unknown, deps: MtestDeps = {}): Promise<CommandOutcome> {
-  const env = deps.env ?? process.env;
-  const tools = deps.tools ?? mfrontTools(env);
-  const args = isRecord(params) ? params : {};
-  if (args['probe'] === true) {
-    return outcome(
-      false,
-      tools.mtest !== null
-        ? `${MTEST_TOOL}: mtest at ${tools.mtest}; mfront ${tools.mfront ?? 'not found'}${tools.reason !== null ? ` (${tools.reason})` : ''}`
-        : `${MTEST_TOOL}: not available — ${tools.reason ?? 'mtest not found'}`,
-      {
-        available: tools.mtest !== null,
-        mtest: tools.mtest,
-        mfront: tools.mfront,
-        reason: tools.reason,
-        codeExecutionAllowed: codeExecutionAllowed(env),
-      },
-    );
-  }
-  const script = nonEmptyString(args['mtest']);
-  if (script === undefined) return refusal('MTEST_PARAMS_INVALID', 'give mtest, the text of the MTest script');
-  const mfront = isRecord(args['mfront']) ? args['mfront'] : undefined;
-  const name = mfront === undefined ? undefined : nonEmptyString(mfront['name']);
-  const source = mfront === undefined ? undefined : nonEmptyString(mfront['source']);
-  const library = (mfront === undefined ? undefined : nonEmptyString(mfront['library'])) ?? 'Behaviour';
+interface MtestRun {
+  readonly runner: ProcessRunner;
+  readonly folder: string;
+  readonly timeoutMs: number;
+  readonly processEnv: NodeJS.ProcessEnv;
+  readonly log: string[];
+}
+
+function probeOutcome(tools: MfrontTools, env: NodeJS.ProcessEnv): CommandOutcome {
+  return outcome(
+    false,
+    tools.mtest !== null
+      ? `${MTEST_TOOL}: mtest at ${tools.mtest}; mfront ${tools.mfront ?? 'not found'}${tools.reason !== null ? ` (${tools.reason})` : ''}`
+      : `${MTEST_TOOL}: not available — ${tools.reason ?? 'mtest not found'}`,
+    {
+      available: tools.mtest !== null,
+      mtest: tools.mtest,
+      mfront: tools.mfront,
+      reason: tools.reason,
+      codeExecutionAllowed: codeExecutionAllowed(env),
+    },
+  );
+}
+
+const timeoutMsOf = (value: unknown): number =>
+  (typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.min(86_400, value)) : DEFAULT_TIMEOUT_S) * 1000;
+
+/** Refusals checked before anything runs, in order: bad mfront params, missing tools, code execution disabled. */
+function preflightRefusal(
+  args: Record<string, unknown>,
+  mfront: Record<string, unknown> | undefined,
+  name: string | undefined,
+  source: string | undefined,
+  library: string,
+  tools: MfrontTools,
+  env: NodeJS.ProcessEnv,
+): CommandOutcome | null {
   if (
     args['mfront'] !== undefined &&
     (name === undefined || source === undefined || !BEHAVIOUR_NAME.test(name) || !BEHAVIOUR_NAME.test(library))
@@ -96,66 +103,97 @@ export async function runMtestTool(params: unknown, deps: MtestDeps = {}): Promi
       'MFRONT_CODE_EXECUTION_DISABLED',
       'running MFront / MTest compiles and loads native code and is disabled: start with LLULL_ALLOW_CODE_EXECUTION=1 (only on a machine you trust)',
     );
+  return null;
+}
+
+async function buildBehaviour(run: MtestRun, mfrontTool: string, name: string, source: string): Promise<CommandOutcome | null> {
+  const { runner, folder, timeoutMs, processEnv, log } = run;
+  await writeFile(path.join(folder, `${name}.mfront`), source);
+  const built = await runner.run(mfrontTool, ['--obuild', '--interface=generic', `${name}.mfront`], folder, timeoutMs, processEnv);
+  log.push(built.log);
+  if (built.startError !== undefined)
+    return refusal('MFRONT_TOOL_MISSING', `cannot start mfront: ${built.startError}`, { reason: built.startError });
+  if (built.timedOut) return refusal('MTEST_TIMEOUT', `mfront timed out after ${timeoutMs} ms`, { log: built.log });
+  if (built.exitCode !== 0)
+    return refusal(
+      'MFRONT_BUILD_FAILED',
+      `mfront exited with code ${String(built.exitCode)}`,
+      { log: built.log },
+      'fix the .mfront source; the log tail is in data.log',
+    );
+  return null;
+}
+
+async function runMtestScript(run: MtestRun, mtestTool: string, script: string, library: string): Promise<CommandOutcome> {
+  const { runner, folder, timeoutMs, processEnv, log } = run;
+  const text = script.split(LIBRARY_TOKEN).join(await builtLibrary(folder, library, process.platform));
+  await writeFile(path.join(folder, 'job.mtest'), text);
+  const ran = await runner.run(mtestTool, ['job.mtest'], folder, timeoutMs, processEnv);
+  log.push(ran.log);
+  if (ran.startError !== undefined)
+    return refusal('MFRONT_TOOL_MISSING', `cannot start mtest: ${ran.startError}`, { reason: ran.startError });
+  if (ran.timedOut) return refusal('MTEST_TIMEOUT', `mtest timed out after ${timeoutMs} ms`, { log: ran.log });
+  if (ran.exitCode !== 0)
+    return refusal(
+      'MTEST_FAILED',
+      `mtest exited with code ${String(ran.exitCode)}`,
+      { log: ran.log },
+      'check the script; the log tail is in data.log',
+    );
+  const resultFile = (await readdir(folder)).find((file) => file.endsWith('.res'));
+  const parsed = resultFile === undefined ? null : parseMtestResult(await readFile(path.join(folder, resultFile), 'utf8'));
+  if (parsed === null)
+    return refusal(
+      'MTEST_RESULT_MISSING',
+      'mtest finished but wrote no parsable .res result file',
+      { log: ran.log },
+      'add output of the result file to the script',
+    );
+  return outcome(
+    false,
+    `${MTEST_TOOL}: ${parsed.rowCount} row(s), ${parsed.columns.length} column(s)${parsed.truncated ? ` (first ${parsed.rows.length} returned)` : ''}; ` +
+      'results come from an external MFront / MTest install and are not llull-validated',
+    {
+      columns: parsed.columns,
+      rows: parsed.rows,
+      rowCount: parsed.rowCount,
+      truncated: parsed.truncated,
+      mtest: mtestTool,
+      log: log.join('\n').slice(-4000),
+    },
+  );
+}
+
+/**
+ * @failure tools absent -> MFRONT_TOOL_MISSING (reason in the message and data.reason); code execution not allowed ->
+ *   MFRONT_CODE_EXECUTION_DISABLED; bad params -> MTEST_PARAMS_INVALID; mfront / mtest non-zero exit -> MFRONT_BUILD_FAILED / MTEST_FAILED
+ *   (log tail in data.log); timeout -> MTEST_TIMEOUT; no parsable .res -> MTEST_RESULT_MISSING. Never throws for these.
+ */
+export async function runMtestTool(params: unknown, deps: MtestDeps = {}): Promise<CommandOutcome> {
+  const env = deps.env ?? process.env;
+  const tools = deps.tools ?? mfrontTools(env);
+  const args = isRecord(params) ? params : {};
+  if (args['probe'] === true) return probeOutcome(tools, env);
+  const script = nonEmptyString(args['mtest']);
+  if (script === undefined) return refusal('MTEST_PARAMS_INVALID', 'give mtest, the text of the MTest script');
+  const mfront = isRecord(args['mfront']) ? args['mfront'] : undefined;
+  const name = mfront === undefined ? undefined : nonEmptyString(mfront['name']);
+  const source = mfront === undefined ? undefined : nonEmptyString(mfront['source']);
+  const library = (mfront === undefined ? undefined : nonEmptyString(mfront['library'])) ?? 'Behaviour';
+  const refused = preflightRefusal(args, mfront, name, source, library, tools, env);
+  if (refused !== null) return refused;
+  if (tools.mtest === null) return refusal('MFRONT_TOOL_MISSING', tools.reason ?? 'mtest not found');
   const runner = deps.runner ?? spawnRunner;
-  const timeoutMs =
-    (typeof args['timeoutS'] === 'number' && Number.isFinite(args['timeoutS'])
-      ? Math.max(1, Math.min(86_400, args['timeoutS']))
-      : DEFAULT_TIMEOUT_S) * 1000;
+  const timeoutMs = timeoutMsOf(args['timeoutS']);
   const processEnv = toolEnvironment(env);
   const folder = await mkdtemp(path.join(tmpdir(), 'llull-mtest-'));
   try {
-    const log: string[] = [];
+    const run: MtestRun = { runner, folder, timeoutMs, processEnv, log: [] };
     if (mfront !== undefined && name !== undefined && source !== undefined && tools.mfront !== null) {
-      await writeFile(path.join(folder, `${name}.mfront`), source);
-      const built = await runner.run(tools.mfront, ['--obuild', '--interface=generic', `${name}.mfront`], folder, timeoutMs, processEnv);
-      log.push(built.log);
-      if (built.startError !== undefined)
-        return refusal('MFRONT_TOOL_MISSING', `cannot start mfront: ${built.startError}`, { reason: built.startError });
-      if (built.timedOut) return refusal('MTEST_TIMEOUT', `mfront timed out after ${timeoutMs} ms`, { log: built.log });
-      if (built.exitCode !== 0)
-        return refusal(
-          'MFRONT_BUILD_FAILED',
-          `mfront exited with code ${String(built.exitCode)}`,
-          { log: built.log },
-          'fix the .mfront source; the log tail is in data.log',
-        );
+      const failed = await buildBehaviour(run, tools.mfront, name, source);
+      if (failed !== null) return failed;
     }
-    const text = script.split(LIBRARY_TOKEN).join(await builtLibrary(folder, library, process.platform));
-    await writeFile(path.join(folder, 'job.mtest'), text);
-    const ran = await runner.run(tools.mtest, ['job.mtest'], folder, timeoutMs, processEnv);
-    log.push(ran.log);
-    if (ran.startError !== undefined)
-      return refusal('MFRONT_TOOL_MISSING', `cannot start mtest: ${ran.startError}`, { reason: ran.startError });
-    if (ran.timedOut) return refusal('MTEST_TIMEOUT', `mtest timed out after ${timeoutMs} ms`, { log: ran.log });
-    if (ran.exitCode !== 0)
-      return refusal(
-        'MTEST_FAILED',
-        `mtest exited with code ${String(ran.exitCode)}`,
-        { log: ran.log },
-        'check the script; the log tail is in data.log',
-      );
-    const resultFile = (await readdir(folder)).find((file) => file.endsWith('.res'));
-    const parsed = resultFile === undefined ? null : parseMtestResult(await readFile(path.join(folder, resultFile), 'utf8'));
-    if (parsed === null)
-      return refusal(
-        'MTEST_RESULT_MISSING',
-        'mtest finished but wrote no parsable .res result file',
-        { log: ran.log },
-        'add output of the result file to the script',
-      );
-    return outcome(
-      false,
-      `${MTEST_TOOL}: ${parsed.rowCount} row(s), ${parsed.columns.length} column(s)${parsed.truncated ? ` (first ${parsed.rows.length} returned)` : ''}; ` +
-        'results come from an external MFront / MTest install and are not llull-validated',
-      {
-        columns: parsed.columns,
-        rows: parsed.rows,
-        rowCount: parsed.rowCount,
-        truncated: parsed.truncated,
-        mtest: tools.mtest,
-        log: log.join('\n').slice(-4000),
-      },
-    );
+    return await runMtestScript(run, tools.mtest, script, library);
   } finally {
     if (env['LLULL_NATIVE_KEEP'] !== '1') await rm(folder, { recursive: true, force: true });
   }
