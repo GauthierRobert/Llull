@@ -119,7 +119,7 @@ The dependency laws are executable. `npm run arch` (part of `npm run check`) run
 A contract test (`tests/unit/contract/catalogs.test.ts`) checks that every exported command
 definition is registered, so a command missing from its catalog fails the build. CI
 (`.github/workflows/check.yml`) runs the full gate, coverage and the server suite on every push
-and pull request; a Claude Code hook additionally gives agents immediate feedback while they edit.
+to `main` (and on manual dispatch); a Claude Code hook additionally gives agents immediate feedback while they edit.
 See `docs/decisions/AR1-modular-command-layer.md` for the reasoning.
 
 ## Plugins
